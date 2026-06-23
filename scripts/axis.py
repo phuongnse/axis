@@ -598,7 +598,12 @@ def parse_frontend_primitive_contracts(contract_text: str) -> list[dict[str, obj
         r"file:\s*'(?P<file>[^']+)'\s*,\s*"
         r"catalogTargets:\s*\[(?P<catalog>[^\]]*)\]\s*,\s*"
         r"visualTargets:\s*\[(?P<visual>[^\]]*)\]\s*,\s*"
-        r"testFiles:\s*\[(?P<tests>[^\]]*)\]\s*,?\s*"
+        r"testFiles:\s*\[(?P<tests>[^\]]*)\]\s*,\s*"
+        r"(?:(?:readiness:\s*'(?P<readiness>[^']+)'\s*,\s*"
+        r"variants:\s*\[(?P<variants>[^\]]*)\]\s*,\s*"
+        r"states:\s*\[(?P<states>[^\]]*)\]\s*,\s*"
+        r"accessibility:\s*\[(?P<accessibility>[^\]]*)\]\s*,\s*"
+        r"tokenFamilies:\s*\[(?P<token_families>[^\]]*)\]\s*,?\s*)?)"
         r"\}",
         re.DOTALL,
     )
@@ -613,6 +618,11 @@ def parse_frontend_primitive_contracts(contract_text: str) -> list[dict[str, obj
                 "catalogTargets": value_pattern.findall(match.group("catalog")),
                 "visualTargets": value_pattern.findall(match.group("visual")),
                 "testFiles": value_pattern.findall(match.group("tests")),
+                "readiness": match.group("readiness") or "",
+                "variants": value_pattern.findall(match.group("variants") or ""),
+                "states": value_pattern.findall(match.group("states") or ""),
+                "accessibility": value_pattern.findall(match.group("accessibility") or ""),
+                "tokenFamilies": value_pattern.findall(match.group("token_families") or ""),
             }
         )
 
@@ -636,6 +646,17 @@ def frontend_primitive_contract_issues(root: Path = ROOT) -> list[str]:
     if not contract_path.is_file():
         return [f"{path_label(contract_path)}: missing primitive contract registry"]
 
+    allowed_token_families = {
+        "border",
+        "breakpoint",
+        "color",
+        "motion",
+        "radius",
+        "shadow",
+        "sizing",
+        "spacing",
+        "typography",
+    }
     contracts = parse_frontend_primitive_contracts(contract_path.read_text(encoding="utf-8"))
     contracted_files = sorted(str(contract["file"]) for contract in contracts)
 
@@ -654,6 +675,11 @@ def frontend_primitive_contract_issues(root: Path = ROOT) -> list[str]:
     e2e_path = root / "frontend" / "e2e" / "design-system-catalog.pw.ts"
     catalog_text = catalog_path.read_text(encoding="utf-8") if catalog_path.is_file() else ""
     e2e_text = e2e_path.read_text(encoding="utf-8") if e2e_path.is_file() else ""
+    if contracts and ("primitive-readiness" not in catalog_text or "axisPrimitiveContracts" not in catalog_text):
+        issues.append(
+            "frontend/src/features/design-system/components/DesignSystemCatalog.tsx: "
+            "missing primitive readiness matrix rendered from axisPrimitiveContracts"
+        )
 
     for contract in contracts:
         component = str(contract["component"])
@@ -661,6 +687,8 @@ def frontend_primitive_contract_issues(root: Path = ROOT) -> list[str]:
         catalog_targets = list(contract["catalogTargets"])
         visual_targets = list(contract["visualTargets"])
         test_files = list(contract["testFiles"])
+        readiness = str(contract["readiness"])
+        token_families = list(contract["tokenFamilies"])
 
         if not catalog_targets:
             issues.append(f"{file_path}: {component} contract must name at least one catalog target")
@@ -668,6 +696,17 @@ def frontend_primitive_contract_issues(root: Path = ROOT) -> list[str]:
             issues.append(f"{file_path}: {component} contract must name at least one visual target")
         if not test_files:
             issues.append(f"{file_path}: {component} contract must name at least one test file")
+        if readiness not in {"ready", "candidate"}:
+            issues.append(f"{file_path}: {component} contract readiness must be `ready` or `candidate`")
+        for field_name in ("variants", "states", "accessibility", "tokenFamilies"):
+            if not list(contract[field_name]):
+                issues.append(f"{file_path}: {component} contract must list at least one {field_name} value")
+        unknown_token_families = sorted(set(token_families) - allowed_token_families)
+        if unknown_token_families:
+            joined_values = ", ".join(f"`{value}`" for value in unknown_token_families)
+            issues.append(
+                f"{file_path}: {component} contract has unknown tokenFamilies values: {joined_values}"
+            )
 
         for target in catalog_targets:
             if target not in catalog_text:
@@ -865,7 +904,30 @@ def frontend_design_token_usage_issues(root: Path = ROOT) -> list[str]:
     for path in iter_files(src_root, (".ts", ".tsx")):
         normalized = rel(path) if root == ROOT else str(path.relative_to(root)).replace("\\", "/")
         text = path.read_text(encoding="utf-8")
+        inside_contract_token_families = False
+        inside_type_alias = False
         for idx, line in enumerate(text.splitlines(), 1):
+            stripped = line.strip()
+            if inside_type_alias:
+                if ";" in stripped:
+                    inside_type_alias = False
+                continue
+
+            if re.match(r"(?:export\s+)?type\s+\w+\s*=", stripped):
+                if ";" not in stripped:
+                    inside_type_alias = True
+                continue
+
+            if inside_contract_token_families:
+                if "]" in line:
+                    inside_contract_token_families = False
+                continue
+
+            if "tokenFamilies:" in line:
+                if "]" not in line.split("tokenFamilies:", 1)[1]:
+                    inside_contract_token_families = True
+                continue
+
             if raw_neutral_color.search(line):
                 issues.append(
                     f"{normalized}:{idx}: use semantic color tokens instead of raw neutral Tailwind color utilities: {line.strip()}"
