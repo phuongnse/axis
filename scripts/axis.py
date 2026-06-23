@@ -767,8 +767,8 @@ def frontend_route_consumer_files(root: Path = ROOT) -> list[str]:
         return []
 
     import_pattern = re.compile(
-        r"import\s+(?:\{[^}]+\}|[A-Za-z_][A-Za-z0-9_]*)\s+from\s+['\"]@/"
-        r"(?P<source>(?:features/[^'\"]+/components/[^'\"]+|components/layout/[^'\"]+))['\"]"
+        r"import\s+(?!type\b)(?:[^'\";]+?)\s+from\s+['\"]@/"
+        r"(?P<source>(?:features/[^/'\"]+(?:/components/[^'\"]+)?|components/layout/[^'\"]+))['\"]"
     )
     consumer_files: set[str] = set()
     for path in iter_files(route_root, (".tsx",)):
@@ -779,11 +779,19 @@ def frontend_route_consumer_files(root: Path = ROOT) -> list[str]:
         text = path.read_text(encoding="utf-8")
         for match in import_pattern.finditer(text):
             source = match.group("source")
-            if source.startswith("features/design-system/"):
+            if source.startswith("features/design-system"):
                 continue
-            candidate = root / "frontend" / "src" / f"{source}.tsx"
-            if candidate.is_file():
-                consumer_files.add(str(candidate.relative_to(root)).replace("\\", "/"))
+            base = root / "frontend" / "src" / source
+            candidates = (
+                base.with_suffix(".tsx"),
+                base.with_suffix(".ts"),
+                base / "index.tsx",
+                base / "index.ts",
+            )
+            for candidate in candidates:
+                if candidate.is_file():
+                    consumer_files.add(str(candidate.relative_to(root)).replace("\\", "/"))
+                    break
 
     return sorted(consumer_files)
 
@@ -823,10 +831,15 @@ def frontend_consumer_contract_issues(root: Path = ROOT) -> list[str]:
             f"frontend/src/design-system/consumer-contracts.ts: stale consumer contract for missing route-bound file {file_path}"
         )
 
-    route_text = ""
+    declared_routes: set[str] = set()
     route_root = root / "frontend" / "src" / "routes"
+    route_declaration_pattern = re.compile(
+        r"create(?:Lazy)?FileRoute\(\s*['\"](?P<route>[^'\"]+)['\"]"
+    )
     if route_root.exists():
-        route_text = "\n".join(path.read_text(encoding="utf-8") for path in iter_files(route_root, (".tsx",)))
+        for path in iter_files(route_root, (".tsx",)):
+            route_text = path.read_text(encoding="utf-8")
+            declared_routes.update(match.group("route") for match in route_declaration_pattern.finditer(route_text))
 
     catalog_path = root / "frontend" / "src" / "features" / "design-system" / "components" / "DesignSystemCatalog.tsx"
     e2e_path = root / "frontend" / "e2e" / "design-system-catalog.pw.ts"
@@ -857,7 +870,7 @@ def frontend_consumer_contract_issues(root: Path = ROOT) -> list[str]:
             issues.append(f"{file_path}: {component} contract kind must be public, auth, or authenticated")
         if readiness not in {"ready", "candidate"}:
             issues.append(f"{file_path}: {component} contract readiness must be `ready` or `candidate`")
-        if route not in route_text:
+        if route not in declared_routes:
             issues.append(f"{file_path}: {component} contract route `{route}` is not declared in frontend routes")
         if not owner:
             issues.append(f"{file_path}: {component} contract must name an owner")

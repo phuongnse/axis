@@ -1597,7 +1597,7 @@ class TestFrontendComponentComposition(unittest.TestCase):
             {
                 "frontend/src/routes/index.lazy.tsx": (
                     "import { LandingPage } from '@/features/landing/components/LandingPage';\n"
-                    "export const route = '/';\n"
+                    "export const Route = createLazyFileRoute('/')({ component: LandingPage });\n"
                 ),
                 "frontend/src/features/landing/components/LandingPage.tsx": (
                     "export function LandingPage() { return null; }\n"
@@ -1612,7 +1612,7 @@ class TestFrontendComponentComposition(unittest.TestCase):
             {
                 "frontend/src/routes/index.lazy.tsx": (
                     "import { LandingPage } from '@/features/landing/components/LandingPage';\n"
-                    "export const route = '/';\n"
+                    "export const Route = createLazyFileRoute('/')({ component: LandingPage });\n"
                 ),
                 "frontend/src/features/landing/components/LandingPage.tsx": (
                     "export function LandingPage() { return null; }\n"
@@ -1652,7 +1652,7 @@ class TestFrontendComponentComposition(unittest.TestCase):
             {
                 "frontend/src/routes/index.lazy.tsx": (
                     "import { LandingPage } from '@/features/landing/components/LandingPage';\n"
-                    "export const route = '/';\n"
+                    "export const Route = createLazyFileRoute('/')({ component: LandingPage });\n"
                 ),
                 "frontend/src/features/landing/components/LandingPage.tsx": (
                     "export function LandingPage() { return null; }\n"
@@ -1665,12 +1665,73 @@ class TestFrontendComponentComposition(unittest.TestCase):
 
         self.assertIn("route-bound UI consumer must be listed", "\n".join(issues))
 
+    def test_rejects_barrel_route_consumer_missing_from_contract(self) -> None:
+        issues = self.issues_for_frontend(
+            {
+                "frontend/src/routes/index.lazy.tsx": (
+                    "import { LandingPage } from '@/features/landing';\n"
+                    "export const Route = createLazyFileRoute('/')({ component: LandingPage });\n"
+                ),
+                "frontend/src/features/landing/index.ts": (
+                    "export { LandingPage } from '@/features/landing/components/LandingPage';\n"
+                ),
+                "frontend/src/features/landing/components/LandingPage.tsx": (
+                    "export function LandingPage() { return null; }\n"
+                ),
+                "frontend/src/design-system/consumer-contracts.ts": (
+                    "export const axisConsumerContracts = [];\n"
+                ),
+            }
+        )
+
+        self.assertIn("route-bound UI consumer must be listed", "\n".join(issues))
+
+    def test_rejects_consumer_contract_partial_route_match(self) -> None:
+        issues = self.issues_for_frontend(
+            {
+                "frontend/src/routes/login-callback.lazy.tsx": (
+                    "import { LoginPage } from '@/features/auth/components/LoginPage';\n"
+                    "export const Route = createLazyFileRoute('/login-callback')({ component: LoginPage });\n"
+                ),
+                "frontend/src/features/auth/components/LoginPage.tsx": (
+                    "export function LoginPage() { return null; }\n"
+                ),
+                "frontend/src/design-system/consumer-contracts.ts": (
+                    "export const axisConsumerContracts = [{\n"
+                    "  surface: 'Sign in',\n"
+                    "  kind: 'auth',\n"
+                    "  route: '/login',\n"
+                    "  component: 'LoginPage',\n"
+                    "  file: 'frontend/src/features/auth/components/LoginPage.tsx',\n"
+                    "  owner: 'auth',\n"
+                    "  readiness: 'ready',\n"
+                    "  primitives: ['Button'],\n"
+                    "  states: ['default'],\n"
+                    "  evidence: ['unit-test'],\n"
+                    "  testFiles: ['frontend/tests/login-page.test.tsx'],\n"
+                    "}];\n"
+                ),
+                "frontend/src/features/design-system/components/DesignSystemCatalog.tsx": (
+                    "import { axisConsumerContracts } from '@/design-system/consumer-contracts';\n"
+                    "export const target = 'consumer-readiness';\n"
+                    "export const contracts = axisConsumerContracts;\n"
+                ),
+                "frontend/e2e/design-system-catalog.pw.ts": (
+                    "await expect(page.locator('[data-visual-target=\"consumer-readiness\"]'))"
+                    ".toHaveScreenshot('consumer-readiness-desktop.png');\n"
+                ),
+                "frontend/tests/login-page.test.tsx": "export {};\n",
+            }
+        )
+
+        self.assertIn("contract route `/login` is not declared", "\n".join(issues))
+
     def test_rejects_consumer_contract_without_readiness_matrix(self) -> None:
         issues = self.issues_for_frontend(
             {
                 "frontend/src/routes/index.lazy.tsx": (
                     "import { LandingPage } from '@/features/landing/components/LandingPage';\n"
-                    "export const route = '/';\n"
+                    "export const Route = createLazyFileRoute('/')({ component: LandingPage });\n"
                 ),
                 "frontend/src/features/landing/components/LandingPage.tsx": (
                     "export function LandingPage() { return null; }\n"
@@ -1708,7 +1769,7 @@ class TestFrontendComponentComposition(unittest.TestCase):
             {
                 "frontend/src/routes/index.lazy.tsx": (
                     "import { LandingPage } from '@/features/landing/components/LandingPage';\n"
-                    "export const route = '/';\n"
+                    "export const Route = createLazyFileRoute('/')({ component: LandingPage });\n"
                 ),
                 "frontend/src/features/landing/components/LandingPage.tsx": (
                     "export function LandingPage() { return null; }\n"
@@ -1745,7 +1806,7 @@ class TestFrontendComponentComposition(unittest.TestCase):
             {
                 "frontend/src/routes/index.lazy.tsx": (
                     "import { LandingPage } from '@/features/landing/components/LandingPage';\n"
-                    "export const route = '/';\n"
+                    "export const Route = createLazyFileRoute('/')({ component: LandingPage });\n"
                 ),
                 "frontend/src/features/landing/components/LandingPage.tsx": (
                     "export function LandingPage() { return null; }\n"
