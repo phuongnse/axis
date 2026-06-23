@@ -53,7 +53,7 @@ features/{feature-name}/
 
 - Component files: `PascalCase.tsx`. Hook files: `camelCase.ts` with mandatory `use` prefix (`useWorkflows.ts`).
 - Never import directly from another feature's `components/` or `hooks/` — only through its `index.ts`.
-- Shared UI primitives (shadcn/ui): `src/components/ui/`. Shared utilities: `src/lib/`.
+- Shared UI primitives: `src/components/ui/`. This is the Axis-owned primitive layer using shadcn/ui conventions, not a bypass around the design-system contract. Shared utilities: `src/lib/`.
 
 ---
 
@@ -125,7 +125,7 @@ export const workflowKeys = {
 - New visual rules start in the design system. Feature screens should consume existing tokens and shared components, or add the missing token/component before using the pattern.
 - Route files are routing boundaries only. They import and render page components; they must not contain styled layout markup, Tailwind-heavy JSX, or screen design details.
 - Shared patterns such as timelines, flow traces, panels, fields, buttons, badges, and status markers live in shared or feature components. If two screens need the same visual behaviour, extract the component before the second implementation lands.
-- Standard controls must come from the shadcn/ui primitive layer in `frontend/src/components/ui/`. Feature code must not render native `<button>`, `<input>`, `<label>`, `<select>`, or `<textarea>` directly. If a needed primitive does not exist, add or adapt it in `src/components/ui/` first, then compose it from feature components.
+- Standard controls must come from the Axis primitive layer in `frontend/src/components/ui/`. Feature code must not render native `<button>`, `<input>`, `<label>`, `<select>`, or `<textarea>` directly. If a needed primitive does not exist, add or adapt it in `src/components/ui/` first, add its design-system contract, then compose it from feature components.
 - Custom components are allowed when they represent a domain-specific or cross-screen pattern, but they should compose shared primitives instead of recreating standard controls. A custom component that only restyles a button, field, or label belongs in `src/components/ui/`, not in a feature folder.
 - Command buttons with visible text must include an icon child. Icon-only buttons and segmented/toggle controls are exempt because their symbol or selected state already carries the interaction affordance.
 - Never rebuild connector/timeline geometry inline. Use `FlowTrace` for vertical flow/timeline displays so marker, connector spacing, state colour, and accessibility remain consistent.

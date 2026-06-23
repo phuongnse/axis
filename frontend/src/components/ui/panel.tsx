@@ -6,12 +6,11 @@ import { cn } from '@/lib/utils';
 const panelVariants = cva('rounded-lg border p-5', {
   variants: {
     variant: {
-      default: 'border-border bg-card text-card-foreground shadow-sm',
+      default: 'border-border bg-card text-card-foreground shadow-surface',
       muted: 'border-border bg-muted/30 text-foreground',
       inset: 'border-border bg-background/80 text-foreground',
-      attention: 'border-destructive/30 bg-card text-card-foreground shadow-sm',
-      inverse:
-        'border-inverse-border bg-inverse text-inverse-foreground shadow-[var(--shadow-panel)]',
+      attention: 'border-destructive/30 bg-card text-card-foreground shadow-surface',
+      inverse: 'border-inverse-border bg-inverse text-inverse-foreground shadow-panel',
     },
   },
   defaultVariants: {

@@ -31,7 +31,7 @@ export function PreferenceControls({ className }: { className?: string }) {
   return (
     <div
       className={cn(
-        'inline-flex h-9 items-center gap-1 rounded-md border border-border bg-card/95 p-1 text-muted-foreground shadow-sm backdrop-blur',
+        'inline-flex h-9 items-center gap-1 rounded-md border border-border bg-card/95 p-1 text-muted-foreground shadow-surface backdrop-blur',
         className,
       )}
     >

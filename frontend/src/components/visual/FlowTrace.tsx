@@ -106,7 +106,7 @@ export function FlowTrace({
             <div className="flex flex-col items-center">
               <span
                 className={cn(
-                  'inline-flex items-center justify-center rounded-md border shadow-sm',
+                  'inline-flex items-center justify-center rounded-md border shadow-surface',
                   classes.marker,
                   markerClassName,
                   stateClass[state],

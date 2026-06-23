@@ -591,6 +591,97 @@ def check_frontend_api_contracts(_args: argparse.Namespace | None = None) -> int
     return 0
 
 
+def parse_frontend_primitive_contracts(contract_text: str) -> list[dict[str, object]]:
+    block_pattern = re.compile(
+        r"\{\s*"
+        r"component:\s*'(?P<component>[^']+)'\s*,\s*"
+        r"file:\s*'(?P<file>[^']+)'\s*,\s*"
+        r"catalogTargets:\s*\[(?P<catalog>[^\]]*)\]\s*,\s*"
+        r"visualTargets:\s*\[(?P<visual>[^\]]*)\]\s*,\s*"
+        r"testFiles:\s*\[(?P<tests>[^\]]*)\]\s*,?\s*"
+        r"\}",
+        re.DOTALL,
+    )
+    value_pattern = re.compile(r"'([^']+)'")
+    contracts: list[dict[str, object]] = []
+
+    for match in block_pattern.finditer(contract_text):
+        contracts.append(
+            {
+                "component": match.group("component"),
+                "file": match.group("file"),
+                "catalogTargets": value_pattern.findall(match.group("catalog")),
+                "visualTargets": value_pattern.findall(match.group("visual")),
+                "testFiles": value_pattern.findall(match.group("tests")),
+            }
+        )
+
+    return contracts
+
+
+def frontend_primitive_contract_issues(root: Path = ROOT) -> list[str]:
+    issues: list[str] = []
+    ui_root = root / "frontend" / "src" / "components" / "ui"
+    if not ui_root.exists():
+        return issues
+
+    ui_files = sorted(
+        str(path.relative_to(root)).replace("\\", "/")
+        for path in iter_files(ui_root, (".tsx",))
+    )
+    if not ui_files:
+        return issues
+
+    contract_path = root / "frontend" / "src" / "design-system" / "primitive-contracts.ts"
+    if not contract_path.is_file():
+        return [f"{path_label(contract_path)}: missing primitive contract registry"]
+
+    contracts = parse_frontend_primitive_contracts(contract_path.read_text(encoding="utf-8"))
+    contracted_files = sorted(str(contract["file"]) for contract in contracts)
+
+    missing_contracts = sorted(set(ui_files) - set(contracted_files))
+    stale_contracts = sorted(set(contracted_files) - set(ui_files))
+    for file_path in missing_contracts:
+        issues.append(
+            f"{file_path}: UI primitive must be listed in frontend/src/design-system/primitive-contracts.ts"
+        )
+    for file_path in stale_contracts:
+        issues.append(
+            f"frontend/src/design-system/primitive-contracts.ts: stale primitive contract for missing file {file_path}"
+        )
+
+    catalog_path = root / "frontend" / "src" / "features" / "design-system" / "components" / "DesignSystemCatalog.tsx"
+    e2e_path = root / "frontend" / "e2e" / "design-system-catalog.pw.ts"
+    catalog_text = catalog_path.read_text(encoding="utf-8") if catalog_path.is_file() else ""
+    e2e_text = e2e_path.read_text(encoding="utf-8") if e2e_path.is_file() else ""
+
+    for contract in contracts:
+        component = str(contract["component"])
+        file_path = str(contract["file"])
+        catalog_targets = list(contract["catalogTargets"])
+        visual_targets = list(contract["visualTargets"])
+        test_files = list(contract["testFiles"])
+
+        if not catalog_targets:
+            issues.append(f"{file_path}: {component} contract must name at least one catalog target")
+        if not visual_targets:
+            issues.append(f"{file_path}: {component} contract must name at least one visual target")
+        if not test_files:
+            issues.append(f"{file_path}: {component} contract must name at least one test file")
+
+        for target in catalog_targets:
+            if target not in catalog_text:
+                issues.append(f"{file_path}: catalog target `{target}` is missing from DesignSystemCatalog")
+        for target in visual_targets:
+            if target not in e2e_text or f"{target}-desktop.png" not in e2e_text:
+                issues.append(f"{file_path}: visual target `{target}` needs a desktop Playwright screenshot")
+        for test_file in test_files:
+            if not (root / test_file).is_file():
+                issues.append(f"{file_path}: test file `{test_file}` does not exist")
+
+    return issues
+
+
 def frontend_radius_token_issues(root: Path = ROOT) -> list[str]:
     issues: list[str] = []
     token_css = root / "frontend" / "src" / "design-system" / "tokens.css"
@@ -622,7 +713,7 @@ def frontend_radius_token_issues(root: Path = ROOT) -> list[str]:
 
 
 def frontend_component_composition_issues(root: Path = ROOT) -> list[str]:
-    issues: list[str] = []
+    issues: list[str] = [*frontend_primitive_contract_issues(root)]
     src_root = root / "frontend" / "src"
     route_root = src_root / "routes"
     ui_root = src_root / "components" / "ui"
@@ -753,10 +844,48 @@ def frontend_tailwind_opacity_issues(root: Path = ROOT) -> list[str]:
     return issues
 
 
+def frontend_design_token_usage_issues(root: Path = ROOT) -> list[str]:
+    issues: list[str] = []
+    src_root = root / "frontend" / "src"
+    if not src_root.exists():
+        return issues
+
+    raw_neutral_color = re.compile(
+        r"\b(?:bg|text|border|from|via|to|ring|divide|placeholder|decoration|outline)-"
+        r"(?:white|black|slate|gray|zinc|neutral|stone)(?:-\d{2,3})?(?:/[A-Za-z0-9.[\\]-]+)?\b"
+    )
+    raw_shadow = re.compile(
+        r"(?<![-\w])(?:shadow(?![-\w])|shadow-(?:sm|md|lg|xl|2xl|inner|none|\[[^\]]+\]))"
+    )
+    arbitrary_color = re.compile(
+        r"\b(?:bg|text|border|from|via|to|ring|divide|placeholder|decoration|outline)-"
+        r"\[(?:linear-gradient|radial-gradient|hsl|rgb|#)[^\]]+\]"
+    )
+
+    for path in iter_files(src_root, (".ts", ".tsx")):
+        normalized = rel(path) if root == ROOT else str(path.relative_to(root)).replace("\\", "/")
+        text = path.read_text(encoding="utf-8")
+        for idx, line in enumerate(text.splitlines(), 1):
+            if raw_neutral_color.search(line):
+                issues.append(
+                    f"{normalized}:{idx}: use semantic color tokens instead of raw neutral Tailwind color utilities: {line.strip()}"
+                )
+            if raw_shadow.search(line):
+                issues.append(
+                    f"{normalized}:{idx}: use named shadow tokens instead of raw Tailwind shadow utilities: {line.strip()}"
+                )
+            if arbitrary_color.search(line):
+                issues.append(
+                    f"{normalized}:{idx}: move arbitrary color or gradient values into design-system tokens: {line.strip()}"
+                )
+    return issues
+
+
 def frontend_style_issues(root: Path = ROOT) -> list[str]:
     return [
         *frontend_radius_token_issues(root),
         *frontend_tailwind_opacity_issues(root),
+        *frontend_design_token_usage_issues(root),
     ]
 
 

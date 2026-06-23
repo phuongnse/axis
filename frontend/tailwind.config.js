@@ -48,6 +48,12 @@ export default {
           3: 'hsl(var(--chart-3))',
           4: 'hsl(var(--chart-4))',
           5: 'hsl(var(--chart-5))',
+          foreground: 'hsl(var(--chart-foreground))',
+        },
+        action: {
+          accent: {
+            border: 'hsl(var(--action-accent-border))',
+          },
         },
         state: {
           info: {
@@ -88,6 +94,19 @@ export default {
         lg: 'var(--radius)',
         md: 'calc(var(--radius) - 2px)',
         sm: 'calc(var(--radius) - 4px)',
+      },
+      boxShadow: {
+        surface: 'var(--shadow-surface)',
+        control: 'var(--shadow-control)',
+        'accent-control': 'var(--shadow-accent-control)',
+        panel: 'var(--shadow-panel)',
+        'feature-panel': 'var(--shadow-feature-panel)',
+      },
+      backgroundImage: {
+        'gradient-inverse-panel': 'var(--gradient-inverse-panel)',
+        'gradient-topology-wash': 'var(--gradient-topology-wash)',
+        'gradient-topology-sheen': 'var(--gradient-topology-sheen)',
+        'gradient-topology-sheen-strong': 'var(--gradient-topology-sheen-strong)',
       },
     },
   },

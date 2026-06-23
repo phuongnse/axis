@@ -27,7 +27,7 @@ function LandingHeroPanel() {
   const { t } = useTranslation();
 
   return (
-    <section className="relative overflow-hidden rounded-lg border border-border/70 bg-card/95 text-foreground shadow-[var(--shadow-feature-panel)] backdrop-blur dark:border-inverse-border dark:bg-[linear-gradient(145deg,hsl(var(--inverse)),hsl(var(--background)))] dark:text-inverse-foreground">
+    <section className="relative overflow-hidden rounded-lg border border-border/70 bg-card/95 text-foreground shadow-feature-panel backdrop-blur dark:border-inverse-border dark:bg-gradient-inverse-panel dark:text-inverse-foreground">
       <div className="relative grid min-h-[460px] gap-8 p-7 sm:p-8 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-center lg:p-10">
         <div className="max-w-xl space-y-10">
           <BrandHeader label={t('landing.accessLabel')} tone="adaptive" />

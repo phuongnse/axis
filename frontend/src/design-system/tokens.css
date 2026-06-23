@@ -25,6 +25,7 @@
     --chart-3: 32 62% 48%;
     --chart-4: 5 56% 45%;
     --chart-5: 262 31% 45%;
+    --chart-foreground: 0 0% 100%;
     --state-info: 202 53% 43%;
     --state-info-foreground: 202 66% 20%;
     --state-info-background: 202 53% 43% / 0.08;
@@ -63,9 +64,32 @@
     --size-icon-md: 1rem;
     --size-icon-lg: 1.25rem;
     --size-sidebar: 16rem;
+    --shadow-surface: 0 1px 2px hsl(198 24% 5% / 0.08);
     --shadow-control: 0 1px 0 hsl(var(--action-primary-shadow));
+    --shadow-accent-control: 0 1px 0 hsl(var(--action-accent-shadow));
     --shadow-panel: 0 18px 55px hsl(198 24% 5% / 0.16);
     --shadow-feature-panel: 0 22px 70px hsl(198 24% 5% / 0.14);
+    --gradient-inverse-panel: linear-gradient(145deg, hsl(var(--inverse)), hsl(var(--background)));
+    --gradient-topology-wash: linear-gradient(
+      135deg,
+      hsl(var(--secondary) / 0.54) 0%,
+      hsl(var(--background) / 0) 48%,
+      hsl(var(--muted) / 0.42) 100%
+    );
+    --gradient-topology-sheen: linear-gradient(
+      115deg,
+      transparent 0%,
+      hsl(var(--background) / 0.34) 42%,
+      hsl(var(--background) / 0.54) 58%,
+      transparent 100%
+    );
+    --gradient-topology-sheen-strong: linear-gradient(
+      115deg,
+      transparent 0%,
+      hsl(var(--background) / 0.46) 42%,
+      hsl(var(--background) / 0.72) 58%,
+      transparent 100%
+    );
     --motion-duration-fast: 150ms;
     --motion-duration-standard: 200ms;
     --motion-easing-standard: cubic-bezier(0.2, 0, 0, 1);
@@ -99,6 +123,7 @@
     --chart-3: 32 62% 51%;
     --chart-4: 5 60% 58%;
     --chart-5: 262 36% 62%;
+    --chart-foreground: 0 0% 100%;
     --state-info: 202 53% 58%;
     --state-info-foreground: 202 78% 78%;
     --state-info-background: 202 53% 58% / 0.13;
@@ -125,6 +150,7 @@
     --sidebar-border: 0 0% 100% / 0.1;
     --sidebar-accent: 0 0% 100% / 0.1;
     --sidebar-accent-foreground: 0 0% 100%;
+    --shadow-surface: 0 1px 2px hsl(198 35% 4% / 0.22);
     --shadow-panel: 0 18px 55px hsl(198 35% 4% / 0.2);
     --shadow-feature-panel: 0 22px 70px hsl(198 35% 5% / 0.24);
   }

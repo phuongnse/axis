@@ -77,7 +77,7 @@ function UsageCard({ label, value, limit, percent, icon: Icon }: UsageCardProps)
   const { t } = useTranslation();
 
   return (
-    <Panel variant="inset" className="p-4 shadow-sm">
+    <Panel variant="inset" className="p-4 shadow-surface">
       <div className="flex items-center justify-between gap-3">
         <p className="text-sm font-medium text-foreground">{t(label)}</p>
         <span className="inline-flex size-8 items-center justify-center rounded-md border border-primary/20 bg-primary/10 text-primary">

@@ -96,7 +96,7 @@ export function WorkspaceProvisioningPage() {
 
   return (
     <div className="axis-grid flex min-h-screen items-center justify-center bg-background p-4 sm:p-6">
-      <section className="grid w-full max-w-5xl overflow-hidden rounded-lg border border-border bg-card shadow-sm lg:grid-cols-[0.9fr_1.1fr]">
+      <section className="grid w-full max-w-5xl overflow-hidden rounded-lg border border-border bg-card shadow-surface lg:grid-cols-[0.9fr_1.1fr]">
         <div className="flex flex-col justify-between gap-8 border-b border-border p-6 lg:border-b-0 lg:border-r">
           <div className="space-y-6">
             <div

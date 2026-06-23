@@ -23,6 +23,7 @@ export const axisSemanticColorTokens = [
   '--chart-3',
   '--chart-4',
   '--chart-5',
+  '--chart-foreground',
   '--state-info',
   '--state-info-foreground',
   '--state-info-background',
@@ -79,9 +80,18 @@ export const axisSizingTokens = [
 ] as const;
 
 export const axisShadowTokens = [
+  '--shadow-surface',
   '--shadow-control',
+  '--shadow-accent-control',
   '--shadow-panel',
   '--shadow-feature-panel',
+] as const;
+
+export const axisGradientTokens = [
+  '--gradient-inverse-panel',
+  '--gradient-topology-wash',
+  '--gradient-topology-sheen',
+  '--gradient-topology-sheen-strong',
 ] as const;
 
 export const axisMotionTokens = [
@@ -136,6 +146,12 @@ export const axisTailwindColorTokens = {
     '3': '--chart-3',
     '4': '--chart-4',
     '5': '--chart-5',
+    foreground: '--chart-foreground',
+  },
+  action: {
+    accent: {
+      border: '--action-accent-border',
+    },
   },
   state: {
     info: {
@@ -177,4 +193,19 @@ export const axisTailwindRadiusTokens = {
   lg: 'var(--radius)',
   md: 'calc(var(--radius) - 2px)',
   sm: 'calc(var(--radius) - 4px)',
+} as const;
+
+export const axisTailwindShadowTokens = {
+  surface: 'var(--shadow-surface)',
+  control: 'var(--shadow-control)',
+  'accent-control': 'var(--shadow-accent-control)',
+  panel: 'var(--shadow-panel)',
+  'feature-panel': 'var(--shadow-feature-panel)',
+} as const;
+
+export const axisTailwindBackgroundImageTokens = {
+  'gradient-inverse-panel': 'var(--gradient-inverse-panel)',
+  'gradient-topology-wash': 'var(--gradient-topology-wash)',
+  'gradient-topology-sheen': 'var(--gradient-topology-sheen)',
+  'gradient-topology-sheen-strong': 'var(--gradient-topology-sheen-strong)',
 } as const;
