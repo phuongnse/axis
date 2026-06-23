@@ -31,7 +31,7 @@ Complete in order when scaffolding a brand-new module:
 | 6 | Create `IEndpointRouteBuilder` extension class in `src/Axis.Api/Endpoints/{Module}Endpoints.cs`; wire it in `Axis.Api/Program.cs` |
 | 7 | Create test projects: `{Module}.Domain.Tests` (unit), `{Module}.Application.Tests` (unit), `{Module}.Infrastructure.Tests` (integration with Testcontainers) |
 | 8 | Add test projects to `Axis.sln` |
-| 9 | Run `dotnet build` — zero errors before writing any domain code |
+| 9 | Run `python scripts/axis.py dotnet build` — zero errors before writing any domain code |
 
 ### Per use case workflow
 
@@ -49,23 +49,23 @@ Repeat for every user story, in layer order: Domain → Application → Infrastr
 
 1. Write failing unit tests for aggregate behaviour, value object invariants, and domain events
 2. Implement: aggregate factory methods, domain methods, value objects, domain events, repository interface
-3. Run `dotnet test` (full `Axis.sln`) — must be **zero errors, zero warnings** before proceeding
+3. Run `python scripts/axis.py dotnet test` — must be **zero errors, zero warnings** before proceeding
 4. No EF Core, no MediatR, no external dependencies — pure C# only
 
 #### Step 3 — Application layer (TDD)
 
 1. Write failing unit tests for the command/query handler (NSubstitute for repository)
 2. Implement: `ICommand` / `IQuery`, handler, `AbstractValidator<T>`, `*Response` / `*Dto` record
-3. Run `dotnet test` (full `Axis.sln`) — must be **zero errors, zero warnings** before proceeding
+3. Run `python scripts/axis.py dotnet test` — must be **zero errors, zero warnings** before proceeding
 4. Handlers return `Result` / `Result<T>` for business rule violations — never throw
 
 #### Step 4 — Infrastructure layer (Testcontainers)
 
 1. Implement `IEntityTypeConfiguration<T>` — Fluent API only, no Data Annotations
 2. Implement repository — `AsNoTracking()` on reads, tracked queries on writes
-3. Run `dotnet ef migrations add {PascalCaseName}` — **never hand-write** migration files; use the module Infrastructure project as both `--project` and `--startup-project` when a `*DbContextFactory` exists ([local-dev.md § EF Core migrations](./local-dev.md#ef-core-migrations-dotnet-ef)). `dotnet ef` must resolve from `PATH`; if it is missing, fix the SDK/tool installation before generating migrations.
+3. Run `python scripts/axis.py dotnet ef migrations add {PascalCaseName}` — **never hand-write** migration files; use the module Infrastructure project as both `--project` and `--startup-project` when a `*DbContextFactory` exists ([local-dev.md § EF Core migrations](./local-dev.md#ef-core-migrations)). If the EF tool is missing, fix the SDK/tool installation before generating migrations.
 4. Verify the migration has a paired `.Designer.cs`; run integration tests against Testcontainers PostgreSQL
-5. Run `dotnet test` (full `Axis.sln`) — still green
+5. Run `python scripts/axis.py dotnet test` — still green
 
 #### Step 4.5 — Gap sweep (mandatory before API layer)
 
@@ -103,7 +103,7 @@ For every match: confirm the SQL only references tables owned by that match's ow
 2. Every endpoint calls `.RequireAuthorization()` unless explicitly public
 3. Mapping: `mediator.Send(...)` → `Result` → `result.ToProblemDetails()` — no logic in endpoint
 4. Add / update integration tests under `tests/Api/Axis.Api.Tests/`
-5. Run `dotnet test` (full `Axis.sln`) — must be **zero errors, zero warnings**
+5. Run `python scripts/axis.py dotnet test` — must be **zero errors, zero warnings**
 
 #### Step 6 — Update docs (same PR)
 
@@ -147,7 +147,7 @@ Repeat for every screen / feature area. **Never skip the wireframe step** — it
 | 6 | Write tests first (TDD) — Vitest + Testing Library | Failing tests that define expected behaviour |
 | 7 | Implement components + hooks | Feature folder anatomy (see `AGENTS.md`) |
 | 8 | Wire route — lazy-loaded, nested inside `_authenticated` | New file under `routes/` |
-| 9 | Run gates: `npm run ci` + `npm run test` | Both green |
+| 9 | Run gates: `python scripts/axis.py frontend ci` + `python scripts/axis.py frontend test` | Both green |
 | 10 | Update docs (same PR — see breakdown below) | No stale docs |
 
 **Step 10 — Update docs breakdown:**

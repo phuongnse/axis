@@ -17,7 +17,7 @@
 - Read: domain README → use-case file → same-module code
 - Skim [`docs/WORKAROUNDS.md`](../WORKAROUNDS.md) for entries touching the same files/modules — known shortcuts may explain surprising code
 - Before API layer: `grep -r "Application: ⚠️\|Infrastructure: ⚠️" docs/use-cases/` — fix, defer with reason, or stop
-- If the use case crosses the SPA/API boundary or depends on local-dev services (auth, email, provisioning, storage, Redis, Kafka, RabbitMQ, MailDev), start the Docker local-dev stack from [local-dev.md](./local-dev.md) during Ready review and include a smoke path in the plan. After the smoke path or E2E evidence is captured, run `docker compose down --remove-orphans` unless the user explicitly asks to keep the stack running for hands-on dev.
+- If the use case crosses the SPA/API boundary or depends on local-dev services (auth, email, provisioning, storage, Redis, Kafka, RabbitMQ, MailDev), start the Axis local-dev stack from [local-dev.md](./local-dev.md) during Ready review and include a smoke path in the plan. After the smoke path or E2E evidence is captured, run `python scripts/axis.py local-dev down` unless the user explicitly asks to keep the stack running for hands-on dev.
 - End of PR: [process.md § PR wrap-up](process.md) — deferred lines, host wiring, callouts (no user reminder)
 
 ### AC coverage — avoid happy-path-only
@@ -49,7 +49,7 @@ Use-case files group ACs under **Happy path**, **Validation & errors**, **Edge c
 
 - [process.md § Per use case workflow](./process.md#per-use-case-workflow): Domain → Application → Infrastructure → API; tests green per layer before the next.
 - [testing.md § Required test coverage](./testing.md#required-test-coverage-for-integration-tests): integration tests need happy path **and** not-found/isolation **and** constraint violations where applicable — not one happy test per handler.
-- **Docker local-dev smoke:** when triggered by the Ready-review rule above, run compose early enough to influence implementation. Minimum evidence: `/health`, `/health/ready`, the route/endpoint under test, and the observable dependency effect. Treat compose as a scoped resource: capture evidence, then `docker compose down --remove-orphans` unless the user wants the stack left up.
+- **Axis local-dev smoke:** when triggered by the Ready-review rule above, run the local-dev stack early enough to influence implementation. Minimum evidence: `/health`, `/health/ready`, the route/endpoint under test, and the observable dependency effect. Treat the stack as a scoped resource: capture evidence, then `python scripts/axis.py local-dev down` unless the user wants it left up.
 
 | Check | Action |
 |-------|--------|
@@ -87,9 +87,9 @@ Use the terms from [REVIEW_FINDINGS.md](../REVIEW_FINDINGS.md#enforcement-taxono
 - **Use-case docs** — `python scripts/axis.py check use-case-docs` validates the use-case document contract: required sections, table schemas, Acceptance Test Matrix AC coverage/runner values, high-level matrix cells, wireframe/status table shape, Mermaid-only diagrams, template placeholders, self-links, and truncated domain README rows. It also counts use cases still on the stock Main flow.
 - **Codex skill metadata** — `python scripts/axis.py check codex-skills` validates repo-scoped `.agents/skills/*/SKILL.md` frontmatter, concise bodies, doc references, required skill chaining, concrete wording, and UI metadata/default prompts.
 - **Secret scanning** — TruffleHog scans the full PR diff for committed secrets (API keys, passwords, tokens) and verifies each finding against the alleged service before reporting (`--only-verified` cuts false positives).
-- **Vulnerable packages** — `python scripts/axis.py check vulnerable-packages` wraps `dotnet list package --vulnerable --include-transitive` and fails on any known CVE in the dep tree (covers transitive packages too).
-- **Architecture fitness tests** run as part of `dotnet test` — failures there mean a AGENTS.md P0/P1 rule got violated structurally. See [tests README](../../tests/Architecture/Axis.Architecture.Tests/README.md).
-- **EF migrations** — drift verifies each migration `.cs` has its `.Designer.cs`. The command used to create the migration remains review-owned. See [local-dev.md § EF Core migrations](./local-dev.md#ef-core-migrations-dotnet-ef).
+- **Vulnerable packages** — `python scripts/axis.py check vulnerable-packages` wraps the NuGet vulnerable-package scan and fails on any known CVE in the dep tree (covers transitive packages too).
+- **Architecture fitness tests** run as part of `python scripts/axis.py dotnet test` — failures there mean a AGENTS.md P0/P1 rule got violated structurally. See [tests README](../../tests/Architecture/Axis.Architecture.Tests/README.md).
+- **EF migrations** — drift verifies each migration `.cs` has its `.Designer.cs`. The command used to create the migration remains review-owned. See [local-dev.md § EF Core migrations](./local-dev.md#ef-core-migrations).
 - **Local dev docs** — [`docker-compose.yml`](../../docker-compose.yml) changes require [`docs/playbooks/local-dev.md`](./local-dev.md) in the same PR; CI runs `python scripts/axis.py check local-dev-docs`.
 - **Async-safety analyzers** (`Microsoft.VisualStudio.Threading.Analyzers`) — type-aware checks at build time for sync-over-async (VSTHRD002), async-void (VSTHRD100), unobserved async results (VSTHRD110). Rule selection rationale in [runtime patterns § Async patterns](./runtime-patterns.md#async-patterns).
 - **Coverage report** uploaded as artifact (`dotnet-coverage`). No threshold yet — see [CONTRIBUTING.md § Coverage](../../CONTRIBUTING.md#coverage).
@@ -100,11 +100,11 @@ Use the terms from [REVIEW_FINDINGS.md](../REVIEW_FINDINGS.md#enforcement-taxono
 
 ### Verification Gate — verify before PR review
 
-**One command:** `python scripts/axis.py verify` runs the local ready-PR gate — documented toolchain version checks + build + vulnerable package scan + `dotnet format --verify` + **unit test projects only** + frontend `ci`/test + protobuf lint/breaking when proto config changed + markdown link check when markdown changed + drift. It only runs the layers whose files changed (so doc-only and frontend-only work stays quick).
+**One command:** `python scripts/axis.py verify` runs the local ready-PR gate — documented toolchain version checks + build + vulnerable package scan + Axis format check + **unit test projects only** + frontend `ci`/test + protobuf lint/breaking when proto config changed + markdown link check when markdown changed + drift. It only runs the layers whose files changed (so doc-only and frontend-only work stays quick).
 
 Run `python scripts/axis.py bootstrap` once to install the local **pre-push hook** under `.git/hooks/pre-push`; build commands must not mutate Git config. The hook runs `python scripts/axis.py pre-push`, a quick policy/doc sanity gate for ordinary network pushes. It intentionally does not run the full local Verification gate on every push. Set `AXIS_PRE_PUSH_FULL=1` when you explicitly want the hook to run `python scripts/axis.py verify` before pushing.
 
-CI/branch protection remains the authoritative full gate and runs full `dotnet test` including Testcontainers before merge.
+CI/branch protection remains the authoritative full gate and runs full `python scripts/axis.py dotnet test` including Testcontainers before merge.
 
 The .NET branch of `python scripts/axis.py verify` also runs the enforced
 `{Subject}_{Condition}_{ExpectedOutcome}` test-name check.
@@ -115,17 +115,17 @@ The .NET branch of `python scripts/axis.py verify` also runs the enforced
 |--------------------|--------|
 | Process/docs change | `python scripts/axis.py check doc-drift`; for Markdown links/anchors also run `python scripts/axis.py check markdown-links` |
 | Test change | `python scripts/axis.py check test-naming`; for project changes also run `python scripts/axis.py check test-project-classification` and `python scripts/axis.py test unit` |
-| Frontend change | `python scripts/axis.py check frontend-toolchain`, then `npm run ci` and/or `npm run test` |
-| Backend compile-sensitive change | `python scripts/axis.py check dotnet-sdk`, then `dotnet build` or the directly affected test project |
+| Frontend change | `python scripts/axis.py check frontend-toolchain`, then `python scripts/axis.py frontend ci` and/or `python scripts/axis.py frontend test` |
+| Backend compile-sensitive change | `python scripts/axis.py check dotnet-sdk`, then `python scripts/axis.py dotnet build` or the directly affected Axis test wrapper |
 | Review fix touching a rule/guard | The specific guard for that rule, then run `python scripts/axis.py verify` before requesting review |
 
 | Changed | Commands (all must pass when triggered) |
 |---------|----------------------------------------|
 | `tests/` | `python scripts/axis.py check test-naming` |
-| `src/` or `tests/` | `python scripts/axis.py check dotnet-sdk`, then `dotnet build` and `python scripts/axis.py test unit` (auto-discovers `*.Domain.Tests` and `*.Application.Tests`) |
+| `src/` or `tests/` | `python scripts/axis.py check dotnet-sdk`, then `python scripts/axis.py dotnet build` and `python scripts/axis.py test unit` (auto-discovers `*.Domain.Tests` and `*.Application.Tests`) |
 | `src/`, `tests/`, dependency props, or API contract | `python scripts/axis.py check vulnerable-packages` |
-| `src/` or `tests/` | `dotnet format --verify-no-changes` |
-| `frontend/` | `python scripts/axis.py check frontend-toolchain`, then `npm run ci` and `npm run test` |
+| `src/` or `tests/` | `python scripts/axis.py dotnet format --check` |
+| `frontend/` | `python scripts/axis.py check frontend-toolchain`, then `python scripts/axis.py frontend ci` and `python scripts/axis.py frontend test` |
 | `.proto` or `buf.yaml` | `python scripts/axis.py check buf-lint` then `python scripts/axis.py check buf-breaking-against-base` |
 | `src/Axis.Api/Endpoints/` or API contract | Update + run `tests/Api/Axis.Api.Tests/` |
 | Docs/scripts/layout/policy change | `python scripts/axis.py check policy-tests` then `python scripts/axis.py check doc-drift`; for Markdown/`lychee.toml` changes also run `python scripts/axis.py check markdown-links` |
@@ -133,7 +133,7 @@ The .NET branch of `python scripts/axis.py verify` also runs the enforced
 
 When reporting verification, state each triggered command as `ran`, `not triggered` with reason, or `failed` with the blocker. `$axis-ready-review` provides the repeatable reporting shape.
 
-**Full suite:** integration and API tests run in CI as part of full `dotnet test`; Docker/Testcontainers is required there. Run full local `dotnet test Axis.sln --nologo` when debugging CI, changing Infrastructure/API behavior, or preparing a high-risk backend PR. If Docker is not visible to the process running .NET, use the [local-dev Docker endpoint adapter](./local-dev.md#docker-endpoint-adapter) and report the execution context instead of rewriting verification commands.
+**Full suite:** integration and API tests run in CI as part of full `python scripts/axis.py dotnet test`; Docker/Testcontainers is required there. Run full local `python scripts/axis.py dotnet test` when debugging CI, changing Infrastructure/API behavior, or preparing a high-risk backend PR. If Docker is not visible to the process running .NET, use the [local-dev Docker endpoint adapter](./local-dev.md#docker-endpoint-adapter) and report the execution context instead of rewriting verification commands.
 
 ### Docs Review
 
@@ -214,7 +214,7 @@ These expectations still matter, but do not call them CI gates unless [REVIEW_FI
 - Frontend screen → source/preview row in the owning use-case `## Wireframes` table when the screen changes.
 - Use-case diagram → Mermaid in that use-case README; link other use cases in `**Related:**` prose, not in `## Diagrams` table.
 - No test `Skip = ...`, weakened tests, or completed layer status when ACs are open. New test skips are enforced; weakened assertions/status honesty remain review-only.
-- **Full suite honesty:** local `python scripts/axis.py verify` uses the ready-PR Verification gate command matrix; CI/branch protection runs full `dotnet test Axis.sln`. If you claim the full suite ran locally, it must be full `Axis.sln` with integration/API tests, not a solution filter or unit-only run.
+- **Full suite honesty:** local `python scripts/axis.py verify` uses the ready-PR Verification gate command matrix; CI/branch protection runs full `python scripts/axis.py dotnet test`. If you claim the full suite ran locally, it must be full `Axis.sln` with integration/API tests, not a solution filter or unit-only run.
 
 ---
 

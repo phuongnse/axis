@@ -19,46 +19,7 @@ local root private key stays on the host.
 Run from the repo root:
 
 ```bash
-mkdir -p .dev-certs
-
-openssl genrsa -out .dev-certs/rootCA-key.pem 4096
-openssl req -x509 -new -nodes \
-  -key .dev-certs/rootCA-key.pem \
-  -sha256 -days 825 \
-  -out .dev-certs/rootCA.pem \
-  -subj "/CN=Axis Local Dev Root CA"
-openssl x509 -outform der \
-  -in .dev-certs/rootCA.pem \
-  -out .dev-certs/rootCA.cer
-
-openssl genrsa -out .dev-certs/localhost-key.pem 2048
-cat > .dev-certs/localhost.ext <<'EOF'
-authorityKeyIdentifier=keyid,issuer
-basicConstraints=CA:FALSE
-keyUsage=digitalSignature,keyEncipherment
-extendedKeyUsage=serverAuth
-subjectAltName=@alt_names
-
-[alt_names]
-DNS.1=localhost
-DNS.2=api
-DNS.3=web
-IP.1=127.0.0.1
-IP.2=::1
-EOF
-
-openssl req -new \
-  -key .dev-certs/localhost-key.pem \
-  -out .dev-certs/localhost.csr \
-  -subj "/CN=localhost"
-openssl x509 -req \
-  -in .dev-certs/localhost.csr \
-  -CA .dev-certs/rootCA.pem \
-  -CAkey .dev-certs/rootCA-key.pem \
-  -CAcreateserial \
-  -out .dev-certs/localhost.pem \
-  -days 825 -sha256 \
-  -extfile .dev-certs/localhost.ext
+python scripts/axis.py local-dev certs
 ```
 
 ## Trust

@@ -22,7 +22,7 @@ Prerequisite: Docker + Compose v2 and the local HTTPS files from
 From repo root:
 
 ```bash
-docker compose up -d
+python scripts/axis.py local-dev up
 ```
 
 Then open:

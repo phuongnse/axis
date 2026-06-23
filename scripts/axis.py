@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Repository maintenance CLI.
 
-Python is the default entrypoint for repository maintenance. Ecosystem-native
-tools may live beside their owning package when the underlying renderer or
-generator is native to that ecosystem.
+Python is the default entrypoint for repository maintenance. Documented repo
+workflows go through this CLI; ecosystem-native tools are implementation
+details behind the wrapper.
 """
 
 from __future__ import annotations
@@ -36,6 +36,30 @@ TOOL_VERSIONS_DOC = "docs/playbooks/scripts.md#tool-versions"
 TECH_STACK_DOC = "docs/TECH_STACK.md"
 GLOBAL_JSON_PATH = ROOT / "global.json"
 NVMRC_PATH = ROOT / "frontend" / ".nvmrc"
+LOCAL_DEV_COMPOSE_FILE = ROOT / "docker-compose.yml"
+LOCAL_DEV_PROJECT_NAME = "axis"
+LOCAL_DEV_POSTGRES_VOLUME = f"{LOCAL_DEV_PROJECT_NAME}_postgres_data"
+DEFAULT_PENPOT_VERSION = "2.15.4"
+PENPOT_VERSION = os.environ.get("PENPOT_VERSION", DEFAULT_PENPOT_VERSION)
+PENPOT_MCP_PACKAGE = "@penpot/mcp@2.15.4"
+PENPOT_LOCAL_DIR = ROOT / ".local" / "penpot"
+PENPOT_COMPOSE_FILE = PENPOT_LOCAL_DIR / "docker-compose.yaml"
+PENPOT_COMPOSE_URL = (
+    f"https://raw.githubusercontent.com/penpot/penpot/{PENPOT_VERSION}/docker/images/docker-compose.yaml"
+)
+PENPOT_PROJECT_NAME = "penpot"
+PENPOT_URL = "http://localhost:9001"
+PENPOT_MAILCATCH_URL = "http://localhost:1080"
+API_PROJECT = ROOT / "src" / "Axis.Api" / "Axis.Api.csproj"
+FRONTEND_DIR = ROOT / "frontend"
+LOCAL_CERT_DIR = ROOT / ".dev-certs"
+LOCAL_ROOT_CA_KEY = LOCAL_CERT_DIR / "rootCA-key.pem"
+LOCAL_ROOT_CA_PEM = LOCAL_CERT_DIR / "rootCA.pem"
+LOCAL_ROOT_CA_CER = LOCAL_CERT_DIR / "rootCA.cer"
+LOCALHOST_KEY = LOCAL_CERT_DIR / "localhost-key.pem"
+LOCALHOST_CSR = LOCAL_CERT_DIR / "localhost.csr"
+LOCALHOST_EXT = LOCAL_CERT_DIR / "localhost.ext"
+LOCALHOST_CERT = LOCAL_CERT_DIR / "localhost.pem"
 
 if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
@@ -1690,6 +1714,11 @@ DOC_DRIFT_ADDED_LINE_RULES = [
         "Machine-specific local path introduced - use <repo-root> or state 'from the repo root'",
     ),
     (
+        r"(?:^|[`>\s])docker compose\s+(?:--profile\s+\S+\s+)?(?:up|down|start|stop|logs|ps|restart|exec|run|build|pull)\b",
+        lambda p: p.startswith("docs/") and p.endswith(".md"),
+        "Raw Docker Compose command introduced in docs - add/use a scripts/axis.py local-dev or design-source command",
+    ),
+    (
         r"GetAwaiter[(][)][.]GetResult[(][)]",
         lambda p: p.startswith("src/") and p.endswith(".cs"),
         "Sync-over-async introduced - make the caller async instead",
@@ -1727,6 +1756,82 @@ DOC_DRIFT_ADDED_LINE_RULES = [
         "New TODO/FIXME/stub marker introduced - resolve or open an issue",
     ),
 ]
+
+DOC_COMMAND_DOC_PATHS = {"AGENTS.md", "README.md", "CONTRIBUTING.md"}
+
+RAW_DOC_COMMAND_PATTERNS = [
+    (
+        re.compile(r"^(?:cd\s+\S+\s+&&\s+)?dotnet\s+(?:restore|build|test|format|run|ef)\b"),
+        "use `python scripts/axis.py dotnet ...`",
+    ),
+    (
+        re.compile(r"^(?:cd\s+\S+\s+&&\s+)?npm\s+(?:ci|run|test|install)\b"),
+        "use `python scripts/axis.py frontend ...`",
+    ),
+    (re.compile(r"^npx\b"), "use `python scripts/axis.py design-source penpot mcp` or an Axis wrapper"),
+    (
+        re.compile(r"^docker\s+(?:compose|info)\b"),
+        "use `python scripts/axis.py local-dev ...` or `python scripts/axis.py check docker`",
+    ),
+    (re.compile(r"^grpcurl\b"), "use `python scripts/axis.py grpc ...`"),
+    (re.compile(r"^openssl\b"), "use `python scripts/axis.py local-dev certs`"),
+    (re.compile(r"^python\s+docs/scripts/"), "use `python scripts/axis.py docs ...`"),
+    (re.compile(r"^buf\s+config\s+ls-breaking-rules\b"), "use `python scripts/axis.py buf list-breaking-rules`"),
+    (re.compile(r"^buf\s+--version\b"), "use `python scripts/axis.py check buf-cli`"),
+    (re.compile(r"^lychee\s+--version\b"), "use `python scripts/axis.py check markdown-links` or `python scripts/axis.py doctor`"),
+    (re.compile(r"^cargo\s+install\s+lychee\b"), "install tools externally, then verify through `python scripts/axis.py doctor`"),
+]
+
+
+def is_command_doc(path: str) -> bool:
+    return path in DOC_COMMAND_DOC_PATHS or (path.startswith("docs/") and path.endswith(".md"))
+
+
+def normalize_doc_command_fragment(fragment: str) -> str:
+    text = fragment.strip()
+    text = re.sub(r"^(?:[$>]|\#)\s*", "", text)
+    text = re.sub(r"^cd\s+frontend\s+&&\s+", "cd frontend && ", text)
+    return text
+
+
+def raw_doc_command_message(fragment: str) -> str | None:
+    normalized = normalize_doc_command_fragment(fragment)
+    if not normalized or normalized.startswith("python scripts/axis.py "):
+        return None
+    for pattern, replacement in RAW_DOC_COMMAND_PATTERNS:
+        if pattern.search(normalized):
+            return replacement
+    return None
+
+
+def documented_raw_command_issues(paths: Iterable[str] | None = None, *, root: Path = ROOT) -> list[str]:
+    candidates = paths or git_ls_files()
+    issues: list[str] = []
+    for path in sorted(candidates):
+        normalized = path.replace("\\", "/")
+        if not is_command_doc(normalized):
+            continue
+        full_path = root / normalized
+        if not full_path.is_file():
+            continue
+        text = full_path.read_text(encoding="utf-8", errors="replace")
+        fence_lang: str | None = None
+        for idx, line in enumerate(text.splitlines(), 1):
+            fence_match = re.match(r"^```([A-Za-z0-9_-]*)", line.strip())
+            if fence_match:
+                fence_lang = None if fence_lang is not None else fence_match.group(1).lower()
+                continue
+
+            if fence_lang in {"bash", "sh", "shell", "console"}:
+                message = raw_doc_command_message(line)
+                if message is not None:
+                    issues.append(f"{normalized}:{idx}: raw documented command `{line.strip()}` - {message}")
+
+            for fragment in re.findall(r"`([^`]+)`", line):
+                message = raw_doc_command_message(fragment)
+                if message is not None:
+                    issues.append(f"{normalized}:{idx}: raw documented command `{fragment}` - {message}")
+    return issues
 
 
 def doc_drift_added_line_issues(rows: Iterable[tuple[str, str]]) -> list[str]:
@@ -1852,17 +1957,18 @@ ENFORCEMENT_TRUTH_REQUIRED_SNIPPETS = [
         [
             ("pull_request:", "CI workflow runs for pull requests"),
             ("run: python scripts/axis.py check pr", "PR metadata guard runs in CI"),
+            ("run: python scripts/axis.py check docker", "Docker endpoint is available for Testcontainers in CI through the Axis wrapper"),
             ("run: python scripts/axis.py check vulnerable-packages", "vulnerable package gate runs in CI"),
             ("run: python scripts/axis.py check test-naming", ".NET test naming gate runs in CI"),
             ("dotnet-version: 8.0.x", ".NET CI setup uses the documented SDK major"),
-            ("run: dotnet build --no-restore", ".NET build runs in CI"),
-            ("run: dotnet format Axis.sln --verify-no-changes --no-restore", ".NET format gate runs in CI"),
-            ("dotnet test --no-build", "full .NET test suite runs in CI"),
+            ("run: python scripts/axis.py dotnet build -- --no-restore", ".NET build runs in CI through the Axis wrapper"),
+            ("run: python scripts/axis.py dotnet format --check", ".NET format gate runs in CI through the Axis wrapper"),
+            ("python scripts/axis.py dotnet test -- --no-build", "full .NET test suite runs in CI through the Axis wrapper"),
             ("node-version-file: frontend/.nvmrc", "frontend CI setup uses the documented Node source"),
-            ("npm run gen:api-types", "frontend API type generation runs in CI"),
-            ("git diff --exit-code -- src/lib/api-types.ts", "frontend API type diff fails stale generated types"),
-            ("run: npm run ci", "frontend typecheck/lint runs in CI"),
-            ("run: npm run test", "frontend tests run in CI"),
+            ("run: python scripts/axis.py frontend install", "frontend dependencies install through the Axis wrapper"),
+            ("run: python scripts/axis.py frontend gen-api-types --check", "frontend API type generation runs in CI through the Axis wrapper"),
+            ("run: python scripts/axis.py frontend ci", "frontend typecheck/lint runs in CI through the Axis wrapper"),
+            ("run: python scripts/axis.py frontend test", "frontend tests run in CI through the Axis wrapper"),
             ('version: "1.50.0"', "protobuf CI setup pins the documented Buf CLI version"),
             ("run: python scripts/axis.py check buf-lint", "protobuf CI lint uses the version-checking local wrapper"),
             ("run: python scripts/axis.py check buf-breaking-against-base", "protobuf CI breaking check uses the version-checking local wrapper"),
@@ -1889,6 +1995,7 @@ ENFORCEMENT_TRUTH_REQUIRED_SNIPPETS = [
             ("for issue in governance_owner_boundary_issues():", "doc drift checks governance owner boundaries"),
             ("for issue in review_findings_registry_issues():", "doc drift checks review findings registry rows"),
             ("for issue in enforcement_truth_audit_issues():", "doc drift checks enforcement truth wiring"),
+            ("for issue in documented_raw_command_issues():", "doc drift checks documented repo commands go through Axis"),
         ],
     ),
     (
@@ -2154,6 +2261,9 @@ def check_doc_drift(_args: argparse.Namespace | None = None) -> int:
 
     all_added_lines = added_lines(range_spec, lambda _path: True)
     for issue in doc_drift_added_line_issues(all_added_lines):
+        fail(issues, issue)
+
+    for issue in documented_raw_command_issues():
         fail(issues, issue)
 
     for hit in endpoint_mediator_hits():
@@ -2486,6 +2596,99 @@ def check_markdown_links(_args: argparse.Namespace | None = None) -> int:
     return result.returncode
 
 
+def dotnet_command(args: argparse.Namespace) -> int:
+    rc = check_dotnet_sdk()
+    if rc != 0:
+        return rc
+
+    command = args.dotnet_command
+    dotnet_args = list(args.dotnet_args)
+    if dotnet_args and dotnet_args[0] == "--":
+        dotnet_args = dotnet_args[1:]
+    if command == "restore":
+        return run([exe("dotnet"), "restore", "Axis.sln", *dotnet_args], check=False).returncode
+    if command == "build":
+        return run([exe("dotnet"), "build", "Axis.sln", "--nologo", *dotnet_args], check=False).returncode
+    if command == "test":
+        return run([exe("dotnet"), "test", "Axis.sln", "--nologo", *dotnet_args], check=False).returncode
+    if command == "format":
+        format_args = ["format", "Axis.sln"]
+        if args.check:
+            format_args.append("--verify-no-changes")
+        format_args.extend(dotnet_args)
+        return run([exe("dotnet"), *format_args], check=False).returncode
+    if command == "run-api":
+        return run([exe("dotnet"), "run", "--project", str(API_PROJECT), *dotnet_args], check=False).returncode
+    if command == "ef":
+        return run([exe("dotnet"), "ef", *dotnet_args], check=False).returncode
+    raise CheckError(f"Unknown dotnet command: {command}")
+
+
+def frontend_command(args: argparse.Namespace) -> int:
+    rc = check_frontend_toolchain()
+    if rc != 0:
+        return rc
+
+    command = args.frontend_command
+    if command == "install":
+        return run([exe("npm"), "ci"], cwd=FRONTEND_DIR, check=False).returncode
+    if command == "ci":
+        return run([exe("npm"), "run", "ci"], cwd=FRONTEND_DIR, check=False).returncode
+    if command == "test":
+        return run([exe("npm"), "run", "test"], cwd=FRONTEND_DIR, check=False).returncode
+    if command == "gen-api-types":
+        result = run([exe("npm"), "run", "gen:api-types"], cwd=FRONTEND_DIR, check=False)
+        if result.returncode != 0 or not args.check:
+            return result.returncode
+        diff = run([exe("git"), "diff", "--exit-code", "--", "frontend/src/lib/api-types.ts"], check=False)
+        if diff.returncode != 0:
+            print(
+                "frontend gen-api-types: frontend/src/lib/api-types.ts is stale - "
+                "run `python scripts/axis.py frontend gen-api-types` and commit the result",
+                file=sys.stderr,
+            )
+        return diff.returncode
+    if command == "script":
+        npm_args = ["run", args.script_name]
+        script_args = list(args.script_args)
+        if script_args and script_args[0] == "--":
+            script_args = script_args[1:]
+        if script_args:
+            npm_args.append("--")
+            npm_args.extend(script_args)
+        return run([exe("npm"), *npm_args], cwd=FRONTEND_DIR, check=False).returncode
+    raise CheckError(f"Unknown frontend command: {command}")
+
+
+def docs_command(args: argparse.Namespace) -> int:
+    command = args.docs_command
+    if command == "sync-mermaid-theme":
+        return run([sys.executable, str(ROOT / "docs" / "scripts" / "sync-mermaid-theme.py")], check=False).returncode
+    if command == "mermaid-init":
+        from docs.diagrams.mermaid_theme import MERMAID_INIT
+
+        print(MERMAID_INIT)
+        return 0
+    raise CheckError(f"Unknown docs command: {command}")
+
+
+def buf_command(args: argparse.Namespace) -> int:
+    rc = check_buf_cli()
+    if rc != 0:
+        return rc
+    if args.buf_command == "list-breaking-rules":
+        return run([find_buf() or exe("buf"), "config", "ls-breaking-rules", "--version=v2"], check=False).returncode
+    raise CheckError(f"Unknown buf command: {args.buf_command}")
+
+
+def check_docker(_args: argparse.Namespace | None = None) -> int:
+    if _docker_info_ok():
+        print("check-docker: OK (docker info works)")
+        return 0
+    print("check-docker: FAIL - docker info failed; no reachable Docker endpoint detected", file=sys.stderr)
+    return 1
+
+
 def verify(args: argparse.Namespace) -> int:
     range_spec = diff_range()
     paths = changed_paths(range_spec)
@@ -2540,15 +2743,15 @@ def verify(args: argparse.Namespace) -> int:
     if dotnet:
         if step(".NET SDK", lambda: check_dotnet_sdk()) == 0:
             step(".NET test naming", lambda: check_test_naming())
-            step(".NET build", lambda: run([exe("dotnet"), "build", "Axis.sln", "--nologo"], check=False).returncode)
+            step(".NET build", lambda: dotnet_command(argparse.Namespace(dotnet_command="build", dotnet_args=[])))
             step(".NET vulnerable packages", lambda: check_vulnerable_packages())
-            step(".NET format", lambda: run([exe("dotnet"), "format", "Axis.sln", "--verify-no-changes"], check=False).returncode)
+            step(".NET format", lambda: dotnet_command(argparse.Namespace(dotnet_command="format", check=True, dotnet_args=[])))
             step(".NET test (unit projects)", lambda: test_unit(argparse.Namespace(dotnet_args=[])))
 
     if frontend:
         if step("frontend toolchain", lambda: check_frontend_toolchain()) == 0:
-            step("frontend ci (tsc + biome)", lambda: run([exe("npm"), "run", "ci"], cwd=ROOT / "frontend", check=False).returncode)
-            step("frontend test", lambda: run([exe("npm"), "run", "test"], cwd=ROOT / "frontend", check=False).returncode)
+            step("frontend ci (tsc + biome)", lambda: frontend_command(argparse.Namespace(frontend_command="ci")))
+            step("frontend test", lambda: frontend_command(argparse.Namespace(frontend_command="test")))
 
     if protobuf:
         if step("buf lint", lambda: check_buf_lint()) == 0:
@@ -2809,6 +3012,324 @@ def _docker_compose_ok() -> bool:
     return result is not None and result.returncode == 0
 
 
+def compose_args(project_name: str, compose_file: Path, *args: str) -> list[str]:
+    return [
+        exe("docker"),
+        "compose",
+        "-p",
+        project_name,
+        "-f",
+        str(compose_file),
+        *args,
+    ]
+
+
+def local_dev_compose_args(*args: str) -> list[str]:
+    return compose_args(LOCAL_DEV_PROJECT_NAME, LOCAL_DEV_COMPOSE_FILE, *args)
+
+
+def require_docker_compose(label: str) -> int:
+    if _docker_compose_ok():
+        return 0
+    print(f"{label}: Docker Compose v2 is not available in this shell", file=sys.stderr)
+    return 1
+
+
+def run_required(command: list[str]) -> int:
+    result = run(command, check=False)
+    return result.returncode
+
+
+def restrict_local_cert_permissions() -> None:
+    LOCAL_CERT_DIR.chmod(0o700)
+    LOCAL_ROOT_CA_KEY.chmod(0o600)
+    LOCALHOST_KEY.chmod(0o600)
+
+
+def local_dev_certs(_args: argparse.Namespace | None = None) -> int:
+    if shutil.which(exe("openssl")) is None and shutil.which("openssl") is None:
+        print("local-dev certs: OpenSSL is not available in PATH", file=sys.stderr)
+        return 1
+
+    LOCAL_CERT_DIR.mkdir(parents=True, exist_ok=True)
+    LOCALHOST_EXT.write_text(
+        "\n".join(
+            [
+                "authorityKeyIdentifier=keyid,issuer",
+                "basicConstraints=CA:FALSE",
+                "keyUsage=digitalSignature,keyEncipherment",
+                "extendedKeyUsage=serverAuth",
+                "subjectAltName=@alt_names",
+                "",
+                "[alt_names]",
+                "DNS.1=localhost",
+                "DNS.2=api",
+                "DNS.3=web",
+                "IP.1=127.0.0.1",
+                "IP.2=::1",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+        newline="\n",
+    )
+
+    commands = [
+        [exe("openssl"), "genrsa", "-out", str(LOCAL_ROOT_CA_KEY), "4096"],
+        [
+            exe("openssl"),
+            "req",
+            "-x509",
+            "-new",
+            "-nodes",
+            "-key",
+            str(LOCAL_ROOT_CA_KEY),
+            "-sha256",
+            "-days",
+            "825",
+            "-out",
+            str(LOCAL_ROOT_CA_PEM),
+            "-subj",
+            "/CN=Axis Local Dev Root CA",
+        ],
+        [exe("openssl"), "x509", "-outform", "der", "-in", str(LOCAL_ROOT_CA_PEM), "-out", str(LOCAL_ROOT_CA_CER)],
+        [exe("openssl"), "genrsa", "-out", str(LOCALHOST_KEY), "2048"],
+        [
+            exe("openssl"),
+            "req",
+            "-new",
+            "-key",
+            str(LOCALHOST_KEY),
+            "-out",
+            str(LOCALHOST_CSR),
+            "-subj",
+            "/CN=localhost",
+        ],
+        [
+            exe("openssl"),
+            "x509",
+            "-req",
+            "-in",
+            str(LOCALHOST_CSR),
+            "-CA",
+            str(LOCAL_ROOT_CA_PEM),
+            "-CAkey",
+            str(LOCAL_ROOT_CA_KEY),
+            "-CAcreateserial",
+            "-out",
+            str(LOCALHOST_CERT),
+            "-days",
+            "825",
+            "-sha256",
+            "-extfile",
+            str(LOCALHOST_EXT),
+        ],
+    ]
+    for command in commands:
+        rc = run_required(command)
+        if rc != 0:
+            return rc
+
+    restrict_local_cert_permissions()
+    print(f"local-dev certs: generated files in {path_label(LOCAL_CERT_DIR)}")
+    return 0
+
+
+def local_dev(args: argparse.Namespace) -> int:
+    if args.local_dev_command == "certs":
+        return local_dev_certs(args)
+
+    rc = require_docker_compose("local-dev")
+    if rc != 0:
+        return rc
+
+    command = args.local_dev_command
+    if command == "up":
+        compose = ["up", "-d"]
+        if args.build:
+            compose.append("--build")
+        compose.extend(args.services)
+        return run(local_dev_compose_args(*compose), check=False).returncode
+
+    if command == "down":
+        compose = ["down", "--remove-orphans"]
+        if args.volumes:
+            compose.append("--volumes")
+        return run(local_dev_compose_args(*compose), check=False).returncode
+
+    if command in {"start", "stop", "restart"}:
+        return run(local_dev_compose_args(command, *args.services), check=False).returncode
+
+    if command == "recreate":
+        if not args.services:
+            print("local-dev recreate: name at least one service", file=sys.stderr)
+            return 1
+        return run(local_dev_compose_args("up", "-d", "--force-recreate", *args.services), check=False).returncode
+
+    if command == "status":
+        return run(local_dev_compose_args("ps"), check=False).returncode
+
+    if command == "logs":
+        compose = ["logs"]
+        if args.follow:
+            compose.append("-f")
+        compose.extend(args.services)
+        return run(local_dev_compose_args(*compose), check=False).returncode
+
+    if command == "shell":
+        shell_command = args.exec_command or ["bash"]
+        return run(local_dev_compose_args("exec", args.service, *shell_command), check=False).returncode
+
+    if command == "psql":
+        return run(
+            local_dev_compose_args("exec", "postgres", "psql", "-U", "axis", "-d", args.database),
+            check=False,
+        ).returncode
+
+    if command == "e2e":
+        build = run(local_dev_compose_args("--profile", "e2e", "build", "e2e"), check=False)
+        if build.returncode != 0:
+            return build.returncode
+        return run(local_dev_compose_args("--profile", "e2e", "run", "--rm", "--no-deps", "e2e"), check=False).returncode
+
+    if command == "observability":
+        obs_command = args.observability_command
+        if obs_command == "up":
+            return run(local_dev_compose_args("--profile", "observability", "up", "-d", "otel-lgtm"), check=False).returncode
+        if obs_command == "stop":
+            return run(local_dev_compose_args("--profile", "observability", "stop", "otel-lgtm"), check=False).returncode
+        if obs_command == "status":
+            return run(local_dev_compose_args("--profile", "observability", "ps", "otel-lgtm"), check=False).returncode
+        if obs_command == "logs":
+            compose = ["--profile", "observability", "logs"]
+            if args.follow:
+                compose.append("-f")
+            compose.append("otel-lgtm")
+            return run(local_dev_compose_args(*compose), check=False).returncode
+
+    if command == "reset-db":
+        down = run(local_dev_compose_args("down"), check=False)
+        if down.returncode != 0:
+            return down.returncode
+        remove = run([exe("docker"), "volume", "rm", LOCAL_DEV_POSTGRES_VOLUME], check=False, capture=True)
+        remove_output = "\n".join(part for part in [remove.stdout, remove.stderr] if part)
+        if remove.returncode != 0 and "No such volume" not in remove_output:
+            if remove_output:
+                print(remove_output, file=sys.stderr)
+            return remove.returncode
+        return run(local_dev_compose_args("up", "-d"), check=False).returncode
+
+    if command == "reset-all":
+        down = run(local_dev_compose_args("down", "--volumes"), check=False)
+        if down.returncode != 0:
+            return down.returncode
+        return run(local_dev_compose_args("up", "-d"), check=False).returncode
+
+    raise CheckError(f"Unknown local-dev command: {command}")
+
+
+def ensure_penpot_compose_file(*, refresh: bool = False) -> Path:
+    if PENPOT_COMPOSE_FILE.exists() and not refresh:
+        return PENPOT_COMPOSE_FILE
+
+    PENPOT_LOCAL_DIR.mkdir(parents=True, exist_ok=True)
+    try:
+        with urllib.request.urlopen(PENPOT_COMPOSE_URL, timeout=30) as response:
+            PENPOT_COMPOSE_FILE.write_bytes(response.read())
+    except (OSError, urllib.error.URLError) as exc:
+        raise CheckError(
+            "design-source penpot: failed to download the official Penpot compose file "
+            f"from {PENPOT_COMPOSE_URL}: {exc}"
+        ) from exc
+    return PENPOT_COMPOSE_FILE
+
+
+def penpot_compose_args(compose_file: Path, *args: str) -> list[str]:
+    return compose_args(PENPOT_PROJECT_NAME, compose_file, *args)
+
+
+def run_penpot_compose(compose_file: Path, *args: str) -> subprocess.CompletedProcess[str]:
+    return run(penpot_compose_args(compose_file, *args), check=False, env={"PENPOT_VERSION": PENPOT_VERSION})
+
+
+def design_source_penpot(args: argparse.Namespace) -> int:
+    command = args.penpot_command
+    if command == "mcp":
+        rc = check_frontend_toolchain()
+        if rc != 0:
+            return rc
+        if shutil.which(exe("npx")) is None and shutil.which("npx") is None:
+            print("design-source penpot mcp: npx is not available in PATH", file=sys.stderr)
+            return 1
+        return run([exe("npx"), "-y", PENPOT_MCP_PACKAGE], check=False).returncode
+
+    compose_file = PENPOT_COMPOSE_FILE
+
+    if command in {"up", "update"}:
+        compose_file = ensure_penpot_compose_file(refresh=command == "update")
+    elif not compose_file.exists():
+        print(
+            "design-source penpot: local compose file is not initialized yet; "
+            "run `python scripts/axis.py design-source penpot up` first."
+        )
+        return 0
+
+    rc = require_docker_compose("design-source penpot")
+    if rc != 0:
+        return rc
+
+    if command == "up":
+        result = run_penpot_compose(compose_file, "up", "-d")
+        if result.returncode == 0:
+            print(f"design-source penpot: running at {PENPOT_URL}")
+            print(f"design-source penpot: mail catcher at {PENPOT_MAILCATCH_URL}")
+        return result.returncode
+
+    if command == "update":
+        pull = run_penpot_compose(compose_file, "pull")
+        if pull.returncode != 0:
+            return pull.returncode
+        result = run_penpot_compose(compose_file, "up", "-d")
+        if result.returncode == 0:
+            print(f"design-source penpot: updated and running at {PENPOT_URL}")
+        return result.returncode
+
+    if command == "down":
+        down_args = ["down", "--remove-orphans"]
+        if args.volumes:
+            down_args.append("--volumes")
+        return run_penpot_compose(compose_file, *down_args).returncode
+
+    if command == "status":
+        return run_penpot_compose(compose_file, "ps").returncode
+
+    if command == "logs":
+        log_args = ["logs"]
+        if args.follow:
+            log_args.append("-f")
+        log_args.extend(args.services)
+        return run_penpot_compose(compose_file, *log_args).returncode
+
+    raise CheckError(f"Unknown Penpot design-source command: {command}")
+
+
+def grpc_command(args: argparse.Namespace) -> int:
+    if shutil.which(exe("grpcurl")) is None and shutil.which("grpcurl") is None:
+        print("grpc: grpcurl is not available in PATH", file=sys.stderr)
+        return 1
+
+    command = args.grpc_command
+    if command == "list":
+        return run([exe("grpcurl"), "-cacert", args.cacert, args.target, "list"], check=False).returncode
+    if command == "call":
+        grpc_args = [exe("grpcurl"), "-cacert", args.cacert]
+        if args.authorization:
+            grpc_args.extend(["-H", f"authorization: {args.authorization}"])
+        grpc_args.extend(["-d", args.data, args.target, args.method])
+        return run(grpc_args, check=False).returncode
+    raise CheckError(f"Unknown gRPC command: {command}")
+
+
 def _wsl_docker_ok() -> bool:
     if os.name != "nt" or shutil.which("wsl.exe") is None:
         return False
@@ -2979,6 +3500,116 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("pre-push").set_defaults(func=pre_push)
     sub.add_parser("verify").set_defaults(func=verify)
 
+    dotnet_parser = sub.add_parser("dotnet")
+    dotnet_sub = dotnet_parser.add_subparsers(dest="dotnet_command", required=True)
+    for dotnet_passthrough in ("restore", "build", "test"):
+        parser_for_dotnet = dotnet_sub.add_parser(dotnet_passthrough)
+        parser_for_dotnet.add_argument("dotnet_args", nargs=argparse.REMAINDER)
+        parser_for_dotnet.set_defaults(func=dotnet_command)
+    dotnet_format = dotnet_sub.add_parser("format")
+    dotnet_format.add_argument("--check", action="store_true", help="Fail when dotnet format would change files")
+    dotnet_format.add_argument("dotnet_args", nargs=argparse.REMAINDER)
+    dotnet_format.set_defaults(func=dotnet_command)
+    dotnet_run_api = dotnet_sub.add_parser("run-api")
+    dotnet_run_api.add_argument("dotnet_args", nargs=argparse.REMAINDER)
+    dotnet_run_api.set_defaults(func=dotnet_command)
+    dotnet_ef = dotnet_sub.add_parser("ef")
+    dotnet_ef.add_argument("dotnet_args", nargs=argparse.REMAINDER)
+    dotnet_ef.set_defaults(func=dotnet_command)
+
+    frontend_parser = sub.add_parser("frontend")
+    frontend_sub = frontend_parser.add_subparsers(dest="frontend_command", required=True)
+    frontend_sub.add_parser("install").set_defaults(func=frontend_command)
+    frontend_sub.add_parser("ci").set_defaults(func=frontend_command)
+    frontend_sub.add_parser("test").set_defaults(func=frontend_command)
+    frontend_gen_api = frontend_sub.add_parser("gen-api-types")
+    frontend_gen_api.add_argument("--check", action="store_true", help="Fail if generated frontend API types are stale")
+    frontend_gen_api.set_defaults(func=frontend_command)
+    frontend_script = frontend_sub.add_parser("script")
+    frontend_script.add_argument("script_name")
+    frontend_script.add_argument("script_args", nargs=argparse.REMAINDER)
+    frontend_script.set_defaults(func=frontend_command)
+
+    docs_parser = sub.add_parser("docs")
+    docs_sub = docs_parser.add_subparsers(dest="docs_command", required=True)
+    docs_sub.add_parser("sync-mermaid-theme").set_defaults(func=docs_command)
+    docs_sub.add_parser("mermaid-init").set_defaults(func=docs_command)
+
+    buf_parser = sub.add_parser("buf")
+    buf_sub = buf_parser.add_subparsers(dest="buf_command", required=True)
+    buf_sub.add_parser("list-breaking-rules").set_defaults(func=buf_command)
+
+    grpc_parser = sub.add_parser("grpc")
+    grpc_sub = grpc_parser.add_subparsers(dest="grpc_command", required=True)
+    grpc_list = grpc_sub.add_parser("list")
+    grpc_list.add_argument("--cacert", default=".dev-certs/rootCA.pem")
+    grpc_list.add_argument("--target", default="localhost:5281")
+    grpc_list.set_defaults(func=grpc_command)
+    grpc_call = grpc_sub.add_parser("call")
+    grpc_call.add_argument("method")
+    grpc_call.add_argument("--target", default="localhost:5281")
+    grpc_call.add_argument("--cacert", default=".dev-certs/rootCA.pem")
+    grpc_call.add_argument("--authorization", default="")
+    grpc_call.add_argument("--data", required=True)
+    grpc_call.set_defaults(func=grpc_command)
+
+    local_dev_parser = sub.add_parser("local-dev")
+    local_dev_sub = local_dev_parser.add_subparsers(dest="local_dev_command", required=True)
+    local_dev_sub.add_parser("certs").set_defaults(func=local_dev)
+    local_up = local_dev_sub.add_parser("up")
+    local_up.add_argument("--build", action="store_true")
+    local_up.add_argument("services", nargs="*")
+    local_up.set_defaults(func=local_dev)
+    local_down = local_dev_sub.add_parser("down")
+    local_down.add_argument("--volumes", action="store_true")
+    local_down.set_defaults(func=local_dev)
+    for local_command in ("start", "stop", "restart"):
+        parser_for_command = local_dev_sub.add_parser(local_command)
+        parser_for_command.add_argument("services", nargs="*")
+        parser_for_command.set_defaults(func=local_dev)
+    local_recreate = local_dev_sub.add_parser("recreate")
+    local_recreate.add_argument("services", nargs="+")
+    local_recreate.set_defaults(func=local_dev)
+    local_dev_sub.add_parser("status").set_defaults(func=local_dev)
+    local_logs = local_dev_sub.add_parser("logs")
+    local_logs.add_argument("-f", "--follow", action="store_true")
+    local_logs.add_argument("services", nargs="*")
+    local_logs.set_defaults(func=local_dev)
+    local_shell = local_dev_sub.add_parser("shell")
+    local_shell.add_argument("service", nargs="?", default="api")
+    local_shell.add_argument("exec_command", nargs=argparse.REMAINDER)
+    local_shell.set_defaults(func=local_dev)
+    local_psql = local_dev_sub.add_parser("psql")
+    local_psql.add_argument("--database", default="axis")
+    local_psql.set_defaults(func=local_dev)
+    local_dev_sub.add_parser("e2e").set_defaults(func=local_dev)
+    local_observability = local_dev_sub.add_parser("observability")
+    local_observability_sub = local_observability.add_subparsers(dest="observability_command", required=True)
+    local_observability_sub.add_parser("up").set_defaults(func=local_dev)
+    local_observability_sub.add_parser("stop").set_defaults(func=local_dev)
+    local_observability_sub.add_parser("status").set_defaults(func=local_dev)
+    local_observability_logs = local_observability_sub.add_parser("logs")
+    local_observability_logs.add_argument("-f", "--follow", action="store_true")
+    local_observability_logs.set_defaults(func=local_dev)
+    local_dev_sub.add_parser("reset-db").set_defaults(func=local_dev)
+    local_dev_sub.add_parser("reset-all").set_defaults(func=local_dev)
+
+    design_source = sub.add_parser("design-source")
+    design_source_sub = design_source.add_subparsers(dest="design_source_command", required=True)
+    penpot = design_source_sub.add_parser("penpot")
+    penpot_sub = penpot.add_subparsers(dest="penpot_command", required=True)
+    penpot_sub.add_parser("up").set_defaults(func=design_source_penpot)
+    penpot_sub.add_parser("update").set_defaults(func=design_source_penpot)
+    penpot_sub.add_parser("mcp").set_defaults(func=design_source_penpot)
+    penpot_down = penpot_sub.add_parser("down")
+    penpot_down.add_argument("--volumes", action="store_true", help="Also remove local Penpot Docker volumes")
+    penpot_down.set_defaults(func=design_source_penpot)
+    penpot_sub.add_parser("status").set_defaults(func=design_source_penpot)
+    penpot_logs = penpot_sub.add_parser("logs")
+    penpot_logs.add_argument("-f", "--follow", action="store_true")
+    penpot_logs.add_argument("services", nargs="*")
+    penpot_logs.set_defaults(func=design_source_penpot)
+
     check = sub.add_parser("check")
     check_sub = check.add_subparsers(dest="check_command", required=True)
     check_sub.add_parser("doc-drift").set_defaults(func=check_doc_drift)
@@ -2988,6 +3619,7 @@ def main(argv: list[str] | None = None) -> int:
     check_sub.add_parser("codex-skills").set_defaults(func=check_codex_skills)
     check_sub.add_parser("test-naming").set_defaults(func=check_test_naming)
     check_sub.add_parser("test-project-classification").set_defaults(func=check_test_project_classification)
+    check_sub.add_parser("docker").set_defaults(func=check_docker)
     check_sub.add_parser("dotnet-sdk").set_defaults(func=check_dotnet_sdk)
     check_sub.add_parser("frontend-toolchain").set_defaults(func=check_frontend_toolchain)
     check_sub.add_parser("vulnerable-packages").set_defaults(func=check_vulnerable_packages)

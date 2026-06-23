@@ -99,4 +99,4 @@ Execution lifecycle (start, cancel, retry, retry-with-context). `ExecutionEndpoi
 
 **Status: ✅ Tooling complete — feature implementation ⏳**
 
-React 19 + TypeScript + Vite. TanStack Router, TanStack Query, Zustand, i18next/react-i18next, shadcn/ui, Tailwind. Biome (lint + format). `npm run ci` gate enforced. All module feature UIs remain ⏳.
+React 19 + TypeScript + Vite. TanStack Router, TanStack Query, Zustand, i18next/react-i18next, shadcn/ui, Tailwind. Biome (lint + format). `python scripts/axis.py frontend ci` gate enforced. All module feature UIs remain ⏳.

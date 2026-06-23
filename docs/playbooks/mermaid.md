@@ -14,13 +14,13 @@ All Mermaid blocks under `docs/` use one theme so flowcharts, sequence diagrams,
 Print the init line:
 
 ```bash
-python -c "from docs.diagrams.mermaid_theme import MERMAID_INIT; print(MERMAID_INIT)"
+python scripts/axis.py docs mermaid-init
 ```
 
 Sync all Mermaid blocks:
 
 ```bash
-python docs/scripts/sync-mermaid-theme.py
+python scripts/axis.py docs sync-mermaid-theme
 ```
 
 ## Required Shape

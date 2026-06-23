@@ -58,9 +58,9 @@ Testing playbook responsibility here is implementation technique:
 
 ### Additional .NET test patterns
 
-- Never run `dotnet test --no-build` after editing test code — always let it recompile.
+- Never run the full .NET test wrapper with no-build arguments after editing test code — always let it recompile.
 - **Never hardcode environment configurations**: connection strings, API URLs, Docker endpoints, secret keys must use environment variables, `appsettings.json`, or `.testcontainers.properties`.
-- **Pre-push / CI**: local pre-push runs a quick policy/doc sanity gate (`python scripts/axis.py pre-push`) so ordinary pushes stay fast. Before requesting review, run the ready-PR gate (`python scripts/axis.py verify`), including unit test projects via `python scripts/axis.py test unit`. CI runs full `dotnet test Axis.sln`, including Testcontainers integration and API tests.
+- **Pre-push / CI**: local pre-push runs a quick policy/doc sanity gate (`python scripts/axis.py pre-push`) so ordinary pushes stay fast. Before requesting review, run the ready-PR gate (`python scripts/axis.py verify`), including unit test projects via `python scripts/axis.py test unit`. CI runs full `python scripts/axis.py dotnet test`, including Testcontainers integration and API tests.
 
 #### Pattern — keep API isolation tests deterministic, test async provisioning separately
 
@@ -124,17 +124,17 @@ public class CreateWorkflowTests : IAsyncLifetime
 See [agent-checklist.md § Verification Gate](./agent-checklist.md#verification-gate--verify-before-pr-review) and AGENTS.md. When `src/` or `tests/` change:
 
 ```bash
-dotnet build
+python scripts/axis.py dotnet build
 python scripts/axis.py check test-naming
 python scripts/axis.py test unit
-dotnet format --verify-no-changes
+python scripts/axis.py dotnet format --check
 ```
 
-`python scripts/axis.py test unit` discovers committed `*.Domain.Tests` and `*.Application.Tests` projects from `git ls-files`; it does not use a static solution filter. Run `python scripts/axis.py check test-project-classification` when adding a test project; CI fails if a committed `*.Tests.csproj` is not classified. Full `dotnet test Axis.sln --nologo` runs Domain, Application, Infrastructure with Testcontainers, and API tests; Docker must be available for that full local run and CI always runs it before merge.
+`python scripts/axis.py test unit` discovers committed `*.Domain.Tests` and `*.Application.Tests` projects from `git ls-files`; it does not use a static solution filter. Run `python scripts/axis.py check test-project-classification` when adding a test project; CI fails if a committed `*.Tests.csproj` is not classified. Full `python scripts/axis.py dotnet test` runs Domain, Application, Infrastructure with Testcontainers, and API tests; Docker must be available for that full local run and CI always runs it before merge.
 
-Full local `dotnet test` requires Docker to be visible to the process running
-.NET. Use `docker info` as the check. If Docker is not visible from that process,
-use the [local-dev Docker endpoint adapter](./local-dev.md#docker-endpoint-adapter);
+Full local `python scripts/axis.py dotnet test` requires Docker to be visible to the process running
+.NET. Use `python scripts/axis.py check docker` as the check. If Docker is not
+visible from that process, use the [local-dev Docker endpoint adapter](./local-dev.md#docker-endpoint-adapter);
 do not hardcode Docker endpoints in test code or fixtures.
 
 ### Integration test maintenance
@@ -180,7 +180,7 @@ When a suite in this class flakes, fix setup determinism first (is the precondit
 
 ### Runner and structure
 
-- Vitest + `@testing-library/react`. Run with `npm run test` (or `npx vitest`) inside `frontend/`.
+- Vitest + `@testing-library/react`. Run with `python scripts/axis.py frontend test` from the repo root.
 - `describe('ComponentOrHookName', () => { it('should ...', ...) })` — `describe` groups by subject, `it` sentences describe expected behaviour.
 
 ### File location
@@ -203,9 +203,9 @@ When a suite in this class flakes, fix setup determinism first (is the precondit
 
 ### Browser E2E
 
-- Playwright owns browser-level acceptance paths and local-dev smoke tests. Put these specs under `frontend/e2e/`, name them `*.pw.ts`, and run them with `npm run test:e2e`.
+- Playwright owns browser-level acceptance paths and local-dev smoke tests. Put these specs under `frontend/e2e/`, name them `*.pw.ts`, and run them with `python scripts/axis.py local-dev e2e`.
 - Keep Vitest for focused component, hook, and UI-state coverage. Do not duplicate a full browser journey in Vitest when a Playwright AT row already owns that path.
-- Run browser E2E through Docker: `docker compose --profile e2e build e2e && docker compose --profile e2e run --rm --no-deps e2e`. It runs inside the project E2E image based on the official Playwright image, bakes frontend dependencies at image build time, trusts `.dev-certs/rootCA.pem` through Node and Chromium NSS, and writes reports to the container-local E2E output directory.
+- Run browser E2E through the Axis local-dev wrapper: `python scripts/axis.py local-dev e2e`. It runs inside the project E2E image based on the official Playwright image, bakes frontend dependencies at image build time, trusts `.dev-certs/rootCA.pem` through Node and Chromium NSS, and writes reports to the container-local E2E output directory.
 - Browser E2E uses HTTPS (`https://localhost:3000` and `https://localhost:5281`) in the canonical compose path. Do not set Playwright `ignoreHTTPSErrors`; fix or trust the local CA instead.
 - Host-only Playwright runs are a developer convenience, not the canonical path. Use Docker evidence when closing an E2E AT row.
 
@@ -219,4 +219,4 @@ Never mock child components unless the child has external dependencies (network,
 
 ### Pre-push gate
 
-Run `npm run ci` (tsc + Biome) AND `npm run test`. Both must pass with zero errors and zero warnings.
+Run `python scripts/axis.py frontend ci` and `python scripts/axis.py frontend test`. Both must pass with zero errors and zero warnings.

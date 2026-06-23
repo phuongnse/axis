@@ -55,7 +55,7 @@
 | **react-hook-form** | 7.x | Form state management | Performant form handling; always paired with Zod via `@hookform/resolvers/zod`. |
 | **@hookform/resolvers** | 3.x | Form validation bridge | Connects Zod schemas to react-hook-form via `zodResolver`. |
 | **Biome** | 2.x | Linter + formatter | Replaces ESLint + Prettier. Single tool for linting, formatting, and import sorting. See ADR-008. |
-| **Vitest** | 3.x | Frontend test runner | Fast Vite-native test runner; v3 deduplicates cleanly with vite 6 (v4 installs a nested vite 8, breaking `npm ci`). |
+| **Vitest** | 3.x | Frontend test runner | Fast Vite-native test runner; v3 deduplicates cleanly with vite 6 (v4 installs a nested vite 8, breaking package-lock installs). |
 | **@testing-library/react** | 16.x | Component testing | Behaviour-driven component tests; always paired with Vitest |
 | **Playwright** | 1.x | Browser E2E test runner | Browser-level acceptance and local-dev smoke tests; the Docker e2e profile builds from the official browser image pinned to the package version and adds local-CA tooling. |
 
@@ -66,7 +66,7 @@
 | Technology | Version | Role | Rationale |
 |---|---|---|---|
 | **Penpot** | Self-hosted | Product design source | Open design tool for design-system files, app-shell references, and per-use-case screen sources. Setup and source-link rules live in [design-source.md](./playbooks/design-source.md). |
-| **Penpot MCP** | Remote MCP or `@penpot/mcp@stable` | AI design-agent bridge | Allows trusted MCP clients to inspect and edit Penpot files. It is design infrastructure, not an Axis frontend dependency. |
+| **Penpot MCP** | Remote MCP or `@penpot/mcp@2.15.4` | AI design-agent bridge | Allows trusted MCP clients to inspect and edit Penpot files. It is design infrastructure, not an Axis frontend dependency. |
 
 ---
 
