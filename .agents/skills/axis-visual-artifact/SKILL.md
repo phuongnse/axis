@@ -37,7 +37,7 @@ Keep Axis visual docs linked, source-first, regenerated where needed, and visual
 4. Refresh derived files.
    - Penpot: export/commit previews only when the use-case table has a preview row or review needs a stable snapshot.
    - Legacy Excalidraw: run `python scripts/axis.py generate wireframes` and include regenerated `.svg`.
-   - Mermaid theme changes: run `python docs/scripts/sync-mermaid-theme.py`.
+   - Mermaid theme changes: run `python scripts/axis.py docs sync-mermaid-theme`.
 
 5. Check links and visual quality.
    - Run the visual artifact checklist before commit.

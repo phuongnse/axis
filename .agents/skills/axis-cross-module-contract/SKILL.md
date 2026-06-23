@@ -47,7 +47,7 @@ Add or change cross-module communication without introducing in-process coupling
    - Proto: regenerate/check Buf config, then run `buf lint` when available.
    - Avro/Kafka: run `python scripts/axis.py check kafka-wiring` and `python scripts/axis.py register avro-schemas --dry-run` when triggered.
    - Layout: run `python scripts/axis.py check buf-modules` when proto layout changes.
-   - Architecture: run architecture tests or `dotnet test` scope that covers project references and module boundaries.
+   - Architecture: run architecture tests through `python scripts/axis.py dotnet test` with the scope that covers project references and module boundaries.
    - Ready review: `$axis-ready-review`.
 
 ## Output

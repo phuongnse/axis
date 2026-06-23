@@ -39,17 +39,6 @@ NVMRC_PATH = ROOT / "frontend" / ".nvmrc"
 LOCAL_DEV_COMPOSE_FILE = ROOT / "docker-compose.yml"
 LOCAL_DEV_PROJECT_NAME = "axis"
 LOCAL_DEV_POSTGRES_VOLUME = f"{LOCAL_DEV_PROJECT_NAME}_postgres_data"
-DEFAULT_PENPOT_VERSION = "2.15.4"
-PENPOT_VERSION = os.environ.get("PENPOT_VERSION", DEFAULT_PENPOT_VERSION)
-PENPOT_MCP_PACKAGE = "@penpot/mcp@2.15.4"
-PENPOT_LOCAL_DIR = ROOT / ".local" / "penpot"
-PENPOT_COMPOSE_FILE = PENPOT_LOCAL_DIR / "docker-compose.yaml"
-PENPOT_COMPOSE_URL = (
-    f"https://raw.githubusercontent.com/penpot/penpot/{PENPOT_VERSION}/docker/images/docker-compose.yaml"
-)
-PENPOT_PROJECT_NAME = "penpot"
-PENPOT_URL = "http://localhost:9001"
-PENPOT_MAILCATCH_URL = "http://localhost:1080"
 API_PROJECT = ROOT / "src" / "Axis.Api" / "Axis.Api.csproj"
 FRONTEND_DIR = ROOT / "frontend"
 LOCAL_CERT_DIR = ROOT / ".dev-certs"
@@ -1525,6 +1514,29 @@ def codex_skill_reference_issues(skill_md: Path, text: str, *, root: Path) -> li
     return issues
 
 
+def codex_skill_raw_command_issues(skill_md: Path, text: str, *, root: Path) -> list[str]:
+    issues: list[str] = []
+    fence_lang: str | None = None
+    for idx, line in enumerate(text.splitlines(), 1):
+        fence_match = re.match(r"^```([A-Za-z0-9_-]*)", line.strip())
+        if fence_match:
+            fence_lang = None if fence_lang is not None else fence_match.group(1).lower()
+            continue
+
+        if fence_lang in {"bash", "sh", "shell", "console"}:
+            message = raw_doc_command_message(line)
+            if message is not None:
+                issues.append(
+                    f"{rel_from(skill_md, root)}:{idx}: raw skill workflow command `{line.strip()}` - {message}"
+                )
+
+        for fragment in re.findall(r"`([^`]+)`", line):
+            message = raw_doc_command_message(fragment)
+            if message is not None:
+                issues.append(f"{rel_from(skill_md, root)}:{idx}: raw skill workflow command `{fragment}` - {message}")
+    return issues
+
+
 def codex_skill_issues(*, root: Path = ROOT) -> list[str]:
     skills_root = root / ".agents" / "skills"
     if not skills_root.exists():
@@ -1559,6 +1571,7 @@ def codex_skill_issues(*, root: Path = ROOT) -> list[str]:
                 issues.append(
                     f"{rel_from(skill_md, root)}:{idx}: replace ambiguous best-effort wording with a concrete action"
                 )
+        issues.extend(codex_skill_raw_command_issues(skill_md, text, root=root))
 
         frontmatter = FRONTMATTER_RE.match(text)
         if frontmatter is None:
@@ -1716,7 +1729,7 @@ DOC_DRIFT_ADDED_LINE_RULES = [
     (
         r"(?:^|[`>\s])docker compose\s+(?:--profile\s+\S+\s+)?(?:up|down|start|stop|logs|ps|restart|exec|run|build|pull)\b",
         lambda p: p.startswith("docs/") and p.endswith(".md"),
-        "Raw Docker Compose command introduced in docs - add/use a scripts/axis.py local-dev or design-source command",
+        "Raw Docker Compose command introduced in docs - add/use a scripts/axis.py local-dev command or a focused Axis wrapper",
     ),
     (
         r"GetAwaiter[(][)][.]GetResult[(][)]",
@@ -1768,7 +1781,10 @@ RAW_DOC_COMMAND_PATTERNS = [
         re.compile(r"^(?:cd\s+\S+\s+&&\s+)?npm\s+(?:ci|run|test|install)\b"),
         "use `python scripts/axis.py frontend ...`",
     ),
-    (re.compile(r"^npx\b"), "use `python scripts/axis.py design-source penpot mcp` or an Axis wrapper"),
+    (
+        re.compile(r"^npx\b"),
+        "use the Penpot Cloud MCP integration documented in `docs/playbooks/design-source.md`",
+    ),
     (
         re.compile(r"^docker\s+(?:compose|info)\b"),
         "use `python scripts/axis.py local-dev ...` or `python scripts/axis.py check docker`",
@@ -3228,91 +3244,6 @@ def local_dev(args: argparse.Namespace) -> int:
     raise CheckError(f"Unknown local-dev command: {command}")
 
 
-def ensure_penpot_compose_file(*, refresh: bool = False) -> Path:
-    if PENPOT_COMPOSE_FILE.exists() and not refresh:
-        return PENPOT_COMPOSE_FILE
-
-    PENPOT_LOCAL_DIR.mkdir(parents=True, exist_ok=True)
-    try:
-        with urllib.request.urlopen(PENPOT_COMPOSE_URL, timeout=30) as response:
-            PENPOT_COMPOSE_FILE.write_bytes(response.read())
-    except (OSError, urllib.error.URLError) as exc:
-        raise CheckError(
-            "design-source penpot: failed to download the official Penpot compose file "
-            f"from {PENPOT_COMPOSE_URL}: {exc}"
-        ) from exc
-    return PENPOT_COMPOSE_FILE
-
-
-def penpot_compose_args(compose_file: Path, *args: str) -> list[str]:
-    return compose_args(PENPOT_PROJECT_NAME, compose_file, *args)
-
-
-def run_penpot_compose(compose_file: Path, *args: str) -> subprocess.CompletedProcess[str]:
-    return run(penpot_compose_args(compose_file, *args), check=False, env={"PENPOT_VERSION": PENPOT_VERSION})
-
-
-def design_source_penpot(args: argparse.Namespace) -> int:
-    command = args.penpot_command
-    if command == "mcp":
-        rc = check_frontend_toolchain()
-        if rc != 0:
-            return rc
-        if shutil.which(exe("npx")) is None and shutil.which("npx") is None:
-            print("design-source penpot mcp: npx is not available in PATH", file=sys.stderr)
-            return 1
-        return run([exe("npx"), "-y", PENPOT_MCP_PACKAGE], check=False).returncode
-
-    compose_file = PENPOT_COMPOSE_FILE
-
-    if command in {"up", "update"}:
-        compose_file = ensure_penpot_compose_file(refresh=command == "update")
-    elif not compose_file.exists():
-        print(
-            "design-source penpot: local compose file is not initialized yet; "
-            "run `python scripts/axis.py design-source penpot up` first."
-        )
-        return 0
-
-    rc = require_docker_compose("design-source penpot")
-    if rc != 0:
-        return rc
-
-    if command == "up":
-        result = run_penpot_compose(compose_file, "up", "-d")
-        if result.returncode == 0:
-            print(f"design-source penpot: running at {PENPOT_URL}")
-            print(f"design-source penpot: mail catcher at {PENPOT_MAILCATCH_URL}")
-        return result.returncode
-
-    if command == "update":
-        pull = run_penpot_compose(compose_file, "pull")
-        if pull.returncode != 0:
-            return pull.returncode
-        result = run_penpot_compose(compose_file, "up", "-d")
-        if result.returncode == 0:
-            print(f"design-source penpot: updated and running at {PENPOT_URL}")
-        return result.returncode
-
-    if command == "down":
-        down_args = ["down", "--remove-orphans"]
-        if args.volumes:
-            down_args.append("--volumes")
-        return run_penpot_compose(compose_file, *down_args).returncode
-
-    if command == "status":
-        return run_penpot_compose(compose_file, "ps").returncode
-
-    if command == "logs":
-        log_args = ["logs"]
-        if args.follow:
-            log_args.append("-f")
-        log_args.extend(args.services)
-        return run_penpot_compose(compose_file, *log_args).returncode
-
-    raise CheckError(f"Unknown Penpot design-source command: {command}")
-
-
 def grpc_command(args: argparse.Namespace) -> int:
     if shutil.which(exe("grpcurl")) is None and shutil.which("grpcurl") is None:
         print("grpc: grpcurl is not available in PATH", file=sys.stderr)
@@ -3593,22 +3524,6 @@ def main(argv: list[str] | None = None) -> int:
     local_observability_logs.set_defaults(func=local_dev)
     local_dev_sub.add_parser("reset-db").set_defaults(func=local_dev)
     local_dev_sub.add_parser("reset-all").set_defaults(func=local_dev)
-
-    design_source = sub.add_parser("design-source")
-    design_source_sub = design_source.add_subparsers(dest="design_source_command", required=True)
-    penpot = design_source_sub.add_parser("penpot")
-    penpot_sub = penpot.add_subparsers(dest="penpot_command", required=True)
-    penpot_sub.add_parser("up").set_defaults(func=design_source_penpot)
-    penpot_sub.add_parser("update").set_defaults(func=design_source_penpot)
-    penpot_sub.add_parser("mcp").set_defaults(func=design_source_penpot)
-    penpot_down = penpot_sub.add_parser("down")
-    penpot_down.add_argument("--volumes", action="store_true", help="Also remove local Penpot Docker volumes")
-    penpot_down.set_defaults(func=design_source_penpot)
-    penpot_sub.add_parser("status").set_defaults(func=design_source_penpot)
-    penpot_logs = penpot_sub.add_parser("logs")
-    penpot_logs.add_argument("-f", "--follow", action="store_true")
-    penpot_logs.add_argument("services", nargs="*")
-    penpot_logs.set_defaults(func=design_source_penpot)
 
     check = sub.add_parser("check")
     check_sub = check.add_subparsers(dest="check_command", required=True)
