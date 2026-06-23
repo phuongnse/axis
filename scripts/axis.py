@@ -36,6 +36,12 @@ TOOL_VERSIONS_DOC = "docs/playbooks/scripts.md#tool-versions"
 TECH_STACK_DOC = "docs/TECH_STACK.md"
 GLOBAL_JSON_PATH = ROOT / "global.json"
 NVMRC_PATH = ROOT / "frontend" / ".nvmrc"
+PENPOT_LOCAL_DIR = ROOT / ".local" / "penpot"
+PENPOT_COMPOSE_FILE = PENPOT_LOCAL_DIR / "docker-compose.yaml"
+PENPOT_COMPOSE_URL = "https://raw.githubusercontent.com/penpot/penpot/main/docker/images/docker-compose.yaml"
+PENPOT_PROJECT_NAME = "penpot"
+PENPOT_URL = "http://localhost:9001"
+PENPOT_MAILCATCH_URL = "http://localhost:1080"
 
 if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
@@ -2809,6 +2815,86 @@ def _docker_compose_ok() -> bool:
     return result is not None and result.returncode == 0
 
 
+def ensure_penpot_compose_file() -> Path:
+    if PENPOT_COMPOSE_FILE.exists():
+        return PENPOT_COMPOSE_FILE
+
+    PENPOT_LOCAL_DIR.mkdir(parents=True, exist_ok=True)
+    try:
+        with urllib.request.urlopen(PENPOT_COMPOSE_URL, timeout=30) as response:
+            PENPOT_COMPOSE_FILE.write_bytes(response.read())
+    except (OSError, urllib.error.URLError) as exc:
+        raise CheckError(
+            "design-source penpot: failed to download the official Penpot compose file "
+            f"from {PENPOT_COMPOSE_URL}: {exc}"
+        ) from exc
+    return PENPOT_COMPOSE_FILE
+
+
+def penpot_compose_args(compose_file: Path, *args: str) -> list[str]:
+    return [
+        exe("docker"),
+        "compose",
+        "-p",
+        PENPOT_PROJECT_NAME,
+        "-f",
+        str(compose_file),
+        *args,
+    ]
+
+
+def design_source_penpot(args: argparse.Namespace) -> int:
+    command = args.penpot_command
+    compose_file = PENPOT_COMPOSE_FILE
+
+    if command in {"up", "update"}:
+        compose_file = ensure_penpot_compose_file()
+    elif not compose_file.exists():
+        print(
+            "design-source penpot: local compose file is not initialized yet; "
+            "run `python scripts/axis.py design-source penpot up` first."
+        )
+        return 0
+
+    if not _docker_compose_ok():
+        print("design-source penpot: Docker Compose v2 is not available in this shell", file=sys.stderr)
+        return 1
+
+    if command == "up":
+        result = run(penpot_compose_args(compose_file, "up", "-d"), check=False)
+        if result.returncode == 0:
+            print(f"design-source penpot: running at {PENPOT_URL}")
+            print(f"design-source penpot: mail catcher at {PENPOT_MAILCATCH_URL}")
+        return result.returncode
+
+    if command == "update":
+        pull = run(penpot_compose_args(compose_file, "pull"), check=False)
+        if pull.returncode != 0:
+            return pull.returncode
+        result = run(penpot_compose_args(compose_file, "up", "-d"), check=False)
+        if result.returncode == 0:
+            print(f"design-source penpot: updated and running at {PENPOT_URL}")
+        return result.returncode
+
+    if command == "down":
+        down_args = ["down", "--remove-orphans"]
+        if args.volumes:
+            down_args.append("--volumes")
+        return run(penpot_compose_args(compose_file, *down_args), check=False).returncode
+
+    if command == "status":
+        return run(penpot_compose_args(compose_file, "ps"), check=False).returncode
+
+    if command == "logs":
+        log_args = ["logs"]
+        if args.follow:
+            log_args.append("-f")
+        log_args.extend(args.services)
+        return run(penpot_compose_args(compose_file, *log_args), check=False).returncode
+
+    raise CheckError(f"Unknown Penpot design-source command: {command}")
+
+
 def _wsl_docker_ok() -> bool:
     if os.name != "nt" or shutil.which("wsl.exe") is None:
         return False
@@ -2978,6 +3064,21 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("install-hooks").set_defaults(func=install_hooks)
     sub.add_parser("pre-push").set_defaults(func=pre_push)
     sub.add_parser("verify").set_defaults(func=verify)
+
+    design_source = sub.add_parser("design-source")
+    design_source_sub = design_source.add_subparsers(dest="design_source_command", required=True)
+    penpot = design_source_sub.add_parser("penpot")
+    penpot_sub = penpot.add_subparsers(dest="penpot_command", required=True)
+    penpot_sub.add_parser("up").set_defaults(func=design_source_penpot)
+    penpot_sub.add_parser("update").set_defaults(func=design_source_penpot)
+    penpot_down = penpot_sub.add_parser("down")
+    penpot_down.add_argument("--volumes", action="store_true", help="Also remove local Penpot Docker volumes")
+    penpot_down.set_defaults(func=design_source_penpot)
+    penpot_sub.add_parser("status").set_defaults(func=design_source_penpot)
+    penpot_logs = penpot_sub.add_parser("logs")
+    penpot_logs.add_argument("-f", "--follow", action="store_true")
+    penpot_logs.add_argument("services", nargs="*")
+    penpot_logs.set_defaults(func=design_source_penpot)
 
     check = sub.add_parser("check")
     check_sub = check.add_subparsers(dest="check_command", required=True)

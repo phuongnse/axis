@@ -18,32 +18,45 @@ This playbook owns the Axis design-source workflow. Penpot is the approved sourc
 ## Self-Hosted Penpot
 
 Keep Penpot separate from the Axis app stack so local app development stays deterministic.
+Run the optional design-infra stack through the repo CLI:
 
 ```bash
-mkdir -p .local/penpot
-cd .local/penpot
-curl -o docker-compose.yaml https://raw.githubusercontent.com/penpot/penpot/main/docker/images/docker-compose.yaml
-docker compose -p penpot -f docker-compose.yaml up -d
+python scripts/axis.py design-source penpot up
 ```
 
-Default local URL:
+The first run downloads the official Penpot compose file into `.local/penpot/docker-compose.yaml`.
+The `.local/` directory is ignored because it contains runtime state, local environment files, and design data;
+the repeatable workflow lives in `scripts/axis.py` and this playbook.
 
-```text
-http://localhost:9001
+Default local URLs:
+
+| Service | URL |
+|---|---|
+| Penpot | `http://localhost:9001` |
+| Penpot mail catcher | `http://localhost:1080` |
+
+Check status:
+
+```bash
+python scripts/axis.py design-source penpot status
 ```
 
 Stop it with:
 
 ```bash
-docker compose -p penpot -f .local/penpot/docker-compose.yaml down
+python scripts/axis.py design-source penpot down
 ```
 
 Update it with:
 
 ```bash
-cd .local/penpot
-docker compose -p penpot -f docker-compose.yaml pull
-docker compose -p penpot -f docker-compose.yaml up -d
+python scripts/axis.py design-source penpot update
+```
+
+For troubleshooting:
+
+```bash
+python scripts/axis.py design-source penpot logs
 ```
 
 For a shared team instance, put Penpot behind HTTPS and a reverse proxy. Back up Penpot Docker volumes before upgrades because they hold design data and uploaded assets. Pin `PENPOT_VERSION` in the local Penpot `.env` before relying on a shared instance for review-critical work.

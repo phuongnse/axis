@@ -47,6 +47,8 @@ running protobuf checks.
 ```bash
 python scripts/axis.py doctor
 python scripts/axis.py verify
+python scripts/axis.py design-source penpot up
+python scripts/axis.py design-source penpot status
 python scripts/axis.py check policy-tests
 python scripts/axis.py check codex-skills
 python scripts/axis.py check text-encoding
