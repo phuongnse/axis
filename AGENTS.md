@@ -112,7 +112,7 @@ Design Gate is a required review artifact, not a machine-enforced CI gate. Revie
 
 **High-risk surfaces** — new/changed endpoint or contract/required field, migration/schema, cross-module interaction, auth, new library or public API surface — require **user sign-off via plan mode before writing code**.
 
-Use repo skills for repeatable workflows: `$axis-use-case-spec`, `$axis-use-case-implementation`, `$axis-api-contract`, `$axis-cross-module-contract`, `$axis-frontend-feature`, `$axis-visual-artifact`, `$axis-review-feedback`, and `$axis-ready-review`.
+Use repo skills for repeatable workflows: `$axis-use-case-spec`, `$axis-use-case-implementation`, `$axis-api-contract`, `$axis-cross-module-contract`, `$axis-frontend-feature`, `$axis-design-system`, `$axis-visual-artifact`, `$axis-review-feedback`, and `$axis-ready-review`.
 
 ### Reviews And Gates
 
@@ -156,6 +156,8 @@ Add navigation back-links per [docs/README.md](docs/README.md) (playbooks, use-c
 **Architecture/API contracts:** use `$axis-api-contract` for REST/OpenAPI/API-type work and `$axis-cross-module-contract` for events, protos, Wolverine, Kafka, RabbitMQ, or gRPC. Details live in [`api-patterns.md`](docs/playbooks/api-patterns.md), [`cross-module-patterns.md`](docs/playbooks/cross-module-patterns.md), [`wolverine-patterns.md`](docs/playbooks/wolverine-patterns.md), [`grpc-patterns.md`](docs/playbooks/grpc-patterns.md), and [`repo-layout-discovery.md`](docs/playbooks/repo-layout-discovery.md).
 
 **Frontend:** use `$axis-frontend-feature`; details live in [`frontend.md`](docs/playbooks/frontend.md).
+
+**Design system:** use `$axis-design-system` for tokens, UI primitives, catalog, visual QA, consumer contracts, and design-system enforcement. Details live in [`design-system.md`](docs/playbooks/design-system.md).
 
 **Visual artifacts:** use `$axis-visual-artifact` for Penpot design-source links, wireframes, committed previews, legacy Excalidraw assets, and diagrams. Source rules live in [`design-source.md`](docs/playbooks/design-source.md), [`wireframes.md`](docs/playbooks/wireframes.md), [`wireframes/README.md`](docs/wireframes/README.md), and [`visual-artifact-checklist.md`](docs/playbooks/visual-artifact-checklist.md).
 

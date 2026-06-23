@@ -4,6 +4,8 @@
 
 This playbook owns the Axis design-system workflow: tokens, reusable UI components, implementation rules, and visual QA. It is separate from use-case wireframes. Wireframes describe low-fidelity flow and screen intent; the design system defines final UI decisions.
 
+For repeatable execution, use `$axis-design-system`.
+
 ## Source Boundaries
 
 | Source | Owns | Does not own |
