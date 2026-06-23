@@ -112,7 +112,7 @@ Implementation lives in `Axis.Shared.Infrastructure/Observability/OpenTelemetryS
 ### Local Grafana stack
 
 ```bash
-docker compose --profile observability up -d otel-lgtm
+python scripts/axis.py local-dev observability up
 dotnet run --project src/Axis.Api/Axis.Api.csproj
 ```
 

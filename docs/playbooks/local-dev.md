@@ -1,10 +1,10 @@
-# Local dev — `docker compose up`
+# Local dev — Axis CLI
 
 > **Navigation**: [← docs/README.md](../README.md) · [← AGENTS.md](../../AGENTS.md)
 
-The full dev stack runs from one `docker compose up -d`: **Postgres**, **Redis**, **MailDev**, **LocalStack**, **Kafka** (KRaft), **Schema Registry**, **RabbitMQ**, **Vault** (dev mode), the **.NET API**, and the **Vite SPA**. Browser-facing local services run on HTTPS by default: Web at `https://localhost:3000` and API at `https://localhost:5281`. The API runs in Docker by restoring, building, then executing `dotnet Axis.Api.dll`; restart the `api` service after backend changes. Frontend hot-reloads via Vite. Source is bind-mounted — edit on the host, containers pick up changes.
+The full dev stack runs through `python scripts/axis.py local-dev up`: **Postgres**, **Redis**, **MailDev**, **LocalStack**, **Kafka** (KRaft), **Schema Registry**, **RabbitMQ**, **Vault** (dev mode), the **.NET API**, and the **Vite SPA**. Browser-facing local services run on HTTPS by default: Web at `https://localhost:3000` and API at `https://localhost:5281`. The API runs in Docker by restoring, building, then executing `dotnet Axis.Api.dll`; restart the `api` service after backend changes. Frontend hot-reloads via Vite. Source is bind-mounted — edit on the host, containers pick up changes.
 
-**Canonical port list:** [`docker-compose.yml`](../../docker-compose.yml) is the source of truth; this doc explains how to use it. Published ports bind to `127.0.0.1` only. CI runs `python scripts/axis.py check local-dev-docs` to catch drift.
+**Canonical service graph and port list:** [`docker-compose.yml`](../../docker-compose.yml) is the source of truth; `scripts/axis.py local-dev ...` is the repo-owned command surface for running it. Published ports bind to `127.0.0.1` only. CI runs `python scripts/axis.py check local-dev-docs` to catch drift.
 
 **Environment contract:** Project docs own repo-root commands, compose services,
 ports, and verification commands. Environment adapters below only make that
@@ -22,7 +22,7 @@ or pattern docs.
 - **.NET SDK 8.x** - local verification, EF migrations, and API contract generation; version must match [`global.json`](../../global.json).
 - **Node.js + npm** - frontend verification, OpenAPI TypeScript generation, and legacy wireframe export; major must match [`frontend/.nvmrc`](../../frontend/.nvmrc).
 - **Buf CLI + Lychee** - protobuf and markdown-link verification; use versions in [scripts.md § Tool Versions](./scripts.md#tool-versions).
-- **Docker** - Docker Engine + Compose v2. Run canonical commands from the repo root; if Docker is not visible, use [Environment adapters](#environment-adapters).
+- **Docker** - Docker Engine + Compose v2. Run Axis CLI commands from the repo root; if Docker is not visible, use [Environment adapters](#environment-adapters).
 - **OpenSSL** - local development CA and localhost certificate generation; see [Local HTTPS](./local-https.md).
 - Host ports free (default compose bindings):
 
@@ -67,7 +67,7 @@ the adapter only as execution context.
 
 ### Docker endpoint adapter
 
-Preferred path: run Docker, .NET, npm, and compose commands from the same
+Preferred path: run Docker, .NET, npm, and Axis CLI commands from the same
 execution environment where `docker info` succeeds.
 
 If Docker is reachable only through an exported endpoint, set `DOCKER_HOST` for
@@ -84,7 +84,7 @@ Use the endpoint's `/_ping` URL as the quick daemon probe when the Docker CLI is
 not visible in the current environment.
 
 If Docker is available only from another execution environment, run the same
-canonical repo-root command there.
+canonical Axis CLI repo-root command there.
 
 ### Package-manager adapter
 
@@ -99,7 +99,7 @@ scripts, e.g. `cd frontend && npm run ci && npm run test`.
 From the repo root:
 
 ```bash
-docker compose up -d
+python scripts/axis.py local-dev up
 ```
 
 If the cert files above are missing, `api`, `web`, and `e2e` fail fast instead
@@ -113,7 +113,7 @@ First boot:
 
 Add `--build` only after changing [`frontend/Dockerfile.dev`](../../frontend/Dockerfile.dev) or the root [`Dockerfile`](../../Dockerfile) (production image). Browser smoke builds only the E2E image because it bakes in the current frontend source and dependencies.
 
-Optional browser smoke uses `docker compose --profile e2e build e2e && docker compose --profile e2e run --rm --no-deps e2e`; see
+Optional browser smoke uses `python scripts/axis.py local-dev e2e`; see
 [testing.md § Browser E2E](./testing.md#browser-e2e).
 
 ---
@@ -146,7 +146,7 @@ Wolverine **AutoProvision** creates Kafka topics and RabbitMQ exchanges/queues i
 Grafana LGTM stack ([ADR-018](../TECH_STACK.md#adr-018-opentelemetry-sdk-with-grafana-stack-for-observability)):
 
 ```bash
-docker compose --profile observability up -d
+python scripts/axis.py local-dev observability up
 ```
 
 | Service | Host access | Notes |
@@ -166,17 +166,17 @@ when the current execution context cannot reach Docker.
 
 | Goal | Command |
 |---|---|
-| Pause everything (keep containers + data) | `docker compose stop` |
-| Stop and remove containers after smoke/E2E (keep data) | `docker compose down --remove-orphans` |
-| Start again | `docker compose start` or `docker compose up -d` |
-| Tail logs (all services) | `docker compose logs -f` |
-| Tail one service | `docker compose logs -f api` |
-| Service status | `docker compose ps` |
-| Restart one service | `docker compose restart api` |
-| Force recreate (env change) | `docker compose up -d --force-recreate api` |
-| Run browser smoke | `docker compose --profile e2e build e2e && docker compose --profile e2e run --rm --no-deps e2e` |
-| Shell in API container | `docker compose exec api bash` |
-| `psql` | `docker compose exec postgres psql -U axis -d axis` |
+| Pause everything (keep containers + data) | `python scripts/axis.py local-dev stop` |
+| Stop and remove containers after smoke/E2E (keep data) | `python scripts/axis.py local-dev down` |
+| Start again | `python scripts/axis.py local-dev start` or `python scripts/axis.py local-dev up` |
+| Tail logs (all services) | `python scripts/axis.py local-dev logs -f` |
+| Tail one service | `python scripts/axis.py local-dev logs -f api` |
+| Service status | `python scripts/axis.py local-dev status` |
+| Restart one service | `python scripts/axis.py local-dev restart api` |
+| Force recreate (env change) | `python scripts/axis.py local-dev recreate api` |
+| Run browser smoke | `python scripts/axis.py local-dev e2e` |
+| Shell in API container | `python scripts/axis.py local-dev shell api` |
+| `psql` | `python scripts/axis.py local-dev psql` |
 
 ---
 
@@ -184,8 +184,8 @@ when the current execution context cannot reach Docker.
 
 | Stack | Triggers reload | Needs container restart |
 |---|---|---|
-| Backend (`api`) | Restart `api` after saving `.cs` under `src/`. | Any backend code, `Directory.Packages.props`, or new `<PackageReference>` → `docker compose restart api`. |
-| Frontend (`web`) | Saving under `frontend/src/` — Vite HMR. | `vite.config.ts`, `package.json`, `package-lock.json`, or new npm dep → `docker compose restart web`; the container syncs `npm ci` automatically when the lockfile hash changes. |
+| Backend (`api`) | Restart `api` after saving `.cs` under `src/`. | Any backend code, `Directory.Packages.props`, or new `<PackageReference>` → `python scripts/axis.py local-dev restart api`. |
+| Frontend (`web`) | Saving under `frontend/src/` — Vite HMR. | `vite.config.ts`, `package.json`, `package-lock.json`, or new npm dep → `python scripts/axis.py local-dev restart web`; the container syncs `npm ci` automatically when the lockfile hash changes. |
 
 Vite polling is enabled (`VITE_USE_POLLING=1`) because file-watch events through
 bind mounts are not consistent across container runtimes. Expect ~200–500 ms
@@ -249,8 +249,7 @@ Each migration ships **both** `{timestamp}_{Name}.cs` and `{timestamp}_{Name}.De
 When migrations or seed data are broken:
 
 ```bash
-docker compose down -v   # drops postgres_data + nuget + node_modules volumes
-docker compose up -d
+python scripts/axis.py local-dev reset-all
 ```
 
 On the next boot, **Development only**, `IdentityDbContext.Database.MigrateAsync()` runs at startup ([`Program.cs`](../../src/Axis.Api/Program.cs)) before OpenIddict seeding.
@@ -260,9 +259,7 @@ Per-workspace module schemas (`workspace_{workspace-id}`) are provisioned on dem
 Wipe Postgres only (keep npm/NuGet caches):
 
 ```bash
-docker compose down
-docker volume rm axis_postgres_data
-docker compose up -d
+python scripts/axis.py local-dev reset-db
 ```
 
 ---
@@ -285,6 +282,7 @@ docker compose up -d
 | [`docker-compose.yml`](../../docker-compose.yml) | Service graph, env vars, volumes, healthchecks — **port source of truth** |
 | `.dev-certs/` | Ignored local CA and HTTPS leaf certificate used by compose |
 | `python scripts/axis.py doctor` | Local environment diagnostics for PATH, Docker, package-manager, and adapter visibility |
+| `python scripts/axis.py local-dev ...` | Repo-owned command surface for local stack operations |
 | `python scripts/axis.py check local-dev-docs` | CI/doc drift: verifies this file matches compose |
 | [`Dockerfile`](../../Dockerfile) | Production API image (not used by default compose dev) |
 | [`frontend/Dockerfile.dev`](../../frontend/Dockerfile.dev) | Node + Vite dev image |

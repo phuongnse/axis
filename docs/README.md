@@ -19,7 +19,7 @@
 
 | Playbook | Description |
 |---|---|
-| [Local dev](./playbooks/local-dev.md) | Run the full stack with `docker compose up` — baseline commands, URLs, ports, environment adapters |
+| [Local dev](./playbooks/local-dev.md) | Run the full stack with `python scripts/axis.py local-dev up` — baseline commands, URLs, ports, environment adapters |
 | [Process](./playbooks/process.md) | Step-by-step implementation workflow — backend and frontend; deferred follow-ups and PR wrap-up checklist |
 | [Design Gate](./playbooks/design-gate.md) | **Agents:** mandatory pre-code reasoning — re-derive the rules for the surface you touch, produce the dossier, sign-off on high-risk before coding |
 | [PR slicing](./playbooks/pr-slicing.md) | **Agents:** split large use cases into genuinely isolated, mergeable PRs — two-sided isolation test, shared-seam ownership, merge/rebase cadence |
@@ -209,7 +209,7 @@ When two docs disagree, the **owner** wins. Update the owner first; everything e
 | Per-use-case ACs and current gaps | `docs/use-cases/{domain}/{short-slug}/README.md` |
 | Module-wide layer status | [PROGRESS.md](./PROGRESS.md) |
 | Daily agent workflow + gates | [playbooks/agent-checklist.md](./playbooks/agent-checklist.md) |
-| Local dev (compose, ports, URLs, environment adapters) | [playbooks/local-dev.md](./playbooks/local-dev.md) + [`docker-compose.yml`](../docker-compose.yml) |
+| Local dev (Axis CLI, compose graph, ports, URLs, environment adapters) | [playbooks/local-dev.md](./playbooks/local-dev.md) + [`docker-compose.yml`](../docker-compose.yml) |
 | Implementation patterns and pitfalls | [playbooks/patterns-index.md](./playbooks/patterns-index.md) routes to the focused owner docs; [playbooks/patterns.md](./playbooks/patterns.md) is a compatibility router only |
 | Design-system tokens, component inventory, and pixel-perfect workflow | [playbooks/design-system.md](./playbooks/design-system.md) |
 | Product design source, Penpot, and MCP workflow | [playbooks/design-source.md](./playbooks/design-source.md) |

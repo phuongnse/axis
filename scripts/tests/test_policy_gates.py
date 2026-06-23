@@ -897,8 +897,12 @@ class TestDocDriftRatchets(unittest.TestCase):
         self.assertIn("Machine-specific local path introduced", issues)
 
     def test_accepts_placeholder_paths_in_docs(self) -> None:
-        issues = axis.doc_drift_added_line_issues([("docs/playbooks/local-dev.md", "cd <repo-root> && docker compose up -d")])
+        issues = axis.doc_drift_added_line_issues([("docs/playbooks/local-dev.md", "cd <repo-root> && python scripts/axis.py local-dev up")])
         self.assertEqual([], issues)
+
+    def test_rejects_raw_docker_compose_commands_in_docs(self) -> None:
+        issues = self.issue_text([("docs/playbooks/local-dev.md", "docker compose up -d")])
+        self.assertIn("Raw Docker Compose command introduced in docs", issues)
 
 
 class TestWorkingTreeDiffHelpers(unittest.TestCase):
@@ -2464,6 +2468,85 @@ class TestDesignSourcePenpotCli(unittest.TestCase):
             ["compose", "-p", "penpot", "-f", str(compose_file), "down", "--remove-orphans", "--volumes"],
             calls[0][1:],
         )
+
+
+class TestLocalDevCli(unittest.TestCase):
+    def run_local_dev(self, args: axis.argparse.Namespace) -> list[list[str]]:
+        calls: list[list[str]] = []
+
+        def fake_run(command: list[str], **_kwargs):
+            calls.append(command)
+            return axis.subprocess.CompletedProcess(command, 0, stdout="", stderr="")
+
+        with (
+            mock.patch.object(axis, "_docker_compose_ok", return_value=True),
+            mock.patch.object(axis, "run", side_effect=fake_run),
+        ):
+            self.assertEqual(0, axis.local_dev(args))
+
+        return calls
+
+    def test_up_uses_axis_project_and_committed_compose_file(self) -> None:
+        calls = self.run_local_dev(
+            axis.argparse.Namespace(local_dev_command="up", build=False, services=[])
+        )
+
+        self.assertEqual(
+            ["compose", "-p", "axis", "-f", str(axis.LOCAL_DEV_COMPOSE_FILE), "up", "-d"],
+            calls[0][1:],
+        )
+
+    def test_e2e_builds_and_runs_profile(self) -> None:
+        calls = self.run_local_dev(axis.argparse.Namespace(local_dev_command="e2e"))
+
+        self.assertEqual(
+            ["compose", "-p", "axis", "-f", str(axis.LOCAL_DEV_COMPOSE_FILE), "--profile", "e2e", "build", "e2e"],
+            calls[0][1:],
+        )
+        self.assertEqual(
+            [
+                "compose",
+                "-p",
+                "axis",
+                "-f",
+                str(axis.LOCAL_DEV_COMPOSE_FILE),
+                "--profile",
+                "e2e",
+                "run",
+                "--rm",
+                "--no-deps",
+                "e2e",
+            ],
+            calls[1][1:],
+        )
+
+    def test_observability_up_starts_lgtm_profile(self) -> None:
+        calls = self.run_local_dev(
+            axis.argparse.Namespace(local_dev_command="observability", observability_command="up")
+        )
+
+        self.assertEqual(
+            [
+                "compose",
+                "-p",
+                "axis",
+                "-f",
+                str(axis.LOCAL_DEV_COMPOSE_FILE),
+                "--profile",
+                "observability",
+                "up",
+                "-d",
+                "otel-lgtm",
+            ],
+            calls[0][1:],
+        )
+
+    def test_reset_db_removes_postgres_volume_between_down_and_up(self) -> None:
+        calls = self.run_local_dev(axis.argparse.Namespace(local_dev_command="reset-db"))
+
+        self.assertEqual(["compose", "-p", "axis", "-f", str(axis.LOCAL_DEV_COMPOSE_FILE), "down"], calls[0][1:])
+        self.assertEqual(["volume", "rm", "axis_postgres_data"], calls[1][1:])
+        self.assertEqual(["compose", "-p", "axis", "-f", str(axis.LOCAL_DEV_COMPOSE_FILE), "up", "-d"], calls[2][1:])
 
 
 class TestInstallHooks(unittest.TestCase):

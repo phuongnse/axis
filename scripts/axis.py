@@ -36,6 +36,9 @@ TOOL_VERSIONS_DOC = "docs/playbooks/scripts.md#tool-versions"
 TECH_STACK_DOC = "docs/TECH_STACK.md"
 GLOBAL_JSON_PATH = ROOT / "global.json"
 NVMRC_PATH = ROOT / "frontend" / ".nvmrc"
+LOCAL_DEV_COMPOSE_FILE = ROOT / "docker-compose.yml"
+LOCAL_DEV_PROJECT_NAME = "axis"
+LOCAL_DEV_POSTGRES_VOLUME = f"{LOCAL_DEV_PROJECT_NAME}_postgres_data"
 PENPOT_LOCAL_DIR = ROOT / ".local" / "penpot"
 PENPOT_COMPOSE_FILE = PENPOT_LOCAL_DIR / "docker-compose.yaml"
 PENPOT_COMPOSE_URL = "https://raw.githubusercontent.com/penpot/penpot/main/docker/images/docker-compose.yaml"
@@ -1696,6 +1699,11 @@ DOC_DRIFT_ADDED_LINE_RULES = [
         "Machine-specific local path introduced - use <repo-root> or state 'from the repo root'",
     ),
     (
+        r"(?:^|[`>\s])docker compose\s+(?:--profile\s+\S+\s+)?(?:up|down|start|stop|logs|ps|restart|exec|run|build|pull)\b",
+        lambda p: p.startswith("docs/") and p.endswith(".md"),
+        "Raw Docker Compose command introduced in docs - add/use a scripts/axis.py local-dev or design-source command",
+    ),
+    (
         r"GetAwaiter[(][)][.]GetResult[(][)]",
         lambda p: p.startswith("src/") and p.endswith(".cs"),
         "Sync-over-async introduced - make the caller async instead",
@@ -2815,6 +2823,114 @@ def _docker_compose_ok() -> bool:
     return result is not None and result.returncode == 0
 
 
+def compose_args(project_name: str, compose_file: Path, *args: str) -> list[str]:
+    return [
+        exe("docker"),
+        "compose",
+        "-p",
+        project_name,
+        "-f",
+        str(compose_file),
+        *args,
+    ]
+
+
+def local_dev_compose_args(*args: str) -> list[str]:
+    return compose_args(LOCAL_DEV_PROJECT_NAME, LOCAL_DEV_COMPOSE_FILE, *args)
+
+
+def require_docker_compose(label: str) -> int:
+    if _docker_compose_ok():
+        return 0
+    print(f"{label}: Docker Compose v2 is not available in this shell", file=sys.stderr)
+    return 1
+
+
+def local_dev(args: argparse.Namespace) -> int:
+    rc = require_docker_compose("local-dev")
+    if rc != 0:
+        return rc
+
+    command = args.local_dev_command
+    if command == "up":
+        compose = ["up", "-d"]
+        if args.build:
+            compose.append("--build")
+        compose.extend(args.services)
+        return run(local_dev_compose_args(*compose), check=False).returncode
+
+    if command == "down":
+        compose = ["down", "--remove-orphans"]
+        if args.volumes:
+            compose.append("--volumes")
+        return run(local_dev_compose_args(*compose), check=False).returncode
+
+    if command in {"start", "stop", "restart"}:
+        return run(local_dev_compose_args(command, *args.services), check=False).returncode
+
+    if command == "recreate":
+        if not args.services:
+            print("local-dev recreate: name at least one service", file=sys.stderr)
+            return 1
+        return run(local_dev_compose_args("up", "-d", "--force-recreate", *args.services), check=False).returncode
+
+    if command == "status":
+        return run(local_dev_compose_args("ps"), check=False).returncode
+
+    if command == "logs":
+        compose = ["logs"]
+        if args.follow:
+            compose.append("-f")
+        compose.extend(args.services)
+        return run(local_dev_compose_args(*compose), check=False).returncode
+
+    if command == "shell":
+        shell_command = args.exec_command or ["bash"]
+        return run(local_dev_compose_args("exec", args.service, *shell_command), check=False).returncode
+
+    if command == "psql":
+        return run(
+            local_dev_compose_args("exec", "postgres", "psql", "-U", "axis", "-d", args.database),
+            check=False,
+        ).returncode
+
+    if command == "e2e":
+        build = run(local_dev_compose_args("--profile", "e2e", "build", "e2e"), check=False)
+        if build.returncode != 0:
+            return build.returncode
+        return run(local_dev_compose_args("--profile", "e2e", "run", "--rm", "--no-deps", "e2e"), check=False).returncode
+
+    if command == "observability":
+        obs_command = args.observability_command
+        if obs_command == "up":
+            return run(local_dev_compose_args("--profile", "observability", "up", "-d", "otel-lgtm"), check=False).returncode
+        if obs_command == "stop":
+            return run(local_dev_compose_args("--profile", "observability", "stop", "otel-lgtm"), check=False).returncode
+        if obs_command == "status":
+            return run(local_dev_compose_args("--profile", "observability", "ps", "otel-lgtm"), check=False).returncode
+        if obs_command == "logs":
+            compose = ["--profile", "observability", "logs"]
+            if args.follow:
+                compose.append("-f")
+            compose.append("otel-lgtm")
+            return run(local_dev_compose_args(*compose), check=False).returncode
+
+    if command == "reset-db":
+        down = run(local_dev_compose_args("down"), check=False)
+        if down.returncode != 0:
+            return down.returncode
+        run([exe("docker"), "volume", "rm", LOCAL_DEV_POSTGRES_VOLUME], check=False)
+        return run(local_dev_compose_args("up", "-d"), check=False).returncode
+
+    if command == "reset-all":
+        down = run(local_dev_compose_args("down", "--volumes"), check=False)
+        if down.returncode != 0:
+            return down.returncode
+        return run(local_dev_compose_args("up", "-d"), check=False).returncode
+
+    raise CheckError(f"Unknown local-dev command: {command}")
+
+
 def ensure_penpot_compose_file() -> Path:
     if PENPOT_COMPOSE_FILE.exists():
         return PENPOT_COMPOSE_FILE
@@ -2832,15 +2948,7 @@ def ensure_penpot_compose_file() -> Path:
 
 
 def penpot_compose_args(compose_file: Path, *args: str) -> list[str]:
-    return [
-        exe("docker"),
-        "compose",
-        "-p",
-        PENPOT_PROJECT_NAME,
-        "-f",
-        str(compose_file),
-        *args,
-    ]
+    return compose_args(PENPOT_PROJECT_NAME, compose_file, *args)
 
 
 def design_source_penpot(args: argparse.Namespace) -> int:
@@ -2856,9 +2964,9 @@ def design_source_penpot(args: argparse.Namespace) -> int:
         )
         return 0
 
-    if not _docker_compose_ok():
-        print("design-source penpot: Docker Compose v2 is not available in this shell", file=sys.stderr)
-        return 1
+    rc = require_docker_compose("design-source penpot")
+    if rc != 0:
+        return rc
 
     if command == "up":
         result = run(penpot_compose_args(compose_file, "up", "-d"), check=False)
@@ -3064,6 +3172,46 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("install-hooks").set_defaults(func=install_hooks)
     sub.add_parser("pre-push").set_defaults(func=pre_push)
     sub.add_parser("verify").set_defaults(func=verify)
+
+    local_dev_parser = sub.add_parser("local-dev")
+    local_dev_sub = local_dev_parser.add_subparsers(dest="local_dev_command", required=True)
+    local_up = local_dev_sub.add_parser("up")
+    local_up.add_argument("--build", action="store_true")
+    local_up.add_argument("services", nargs="*")
+    local_up.set_defaults(func=local_dev)
+    local_down = local_dev_sub.add_parser("down")
+    local_down.add_argument("--volumes", action="store_true")
+    local_down.set_defaults(func=local_dev)
+    for local_command in ("start", "stop", "restart"):
+        parser_for_command = local_dev_sub.add_parser(local_command)
+        parser_for_command.add_argument("services", nargs="*")
+        parser_for_command.set_defaults(func=local_dev)
+    local_recreate = local_dev_sub.add_parser("recreate")
+    local_recreate.add_argument("services", nargs="+")
+    local_recreate.set_defaults(func=local_dev)
+    local_dev_sub.add_parser("status").set_defaults(func=local_dev)
+    local_logs = local_dev_sub.add_parser("logs")
+    local_logs.add_argument("-f", "--follow", action="store_true")
+    local_logs.add_argument("services", nargs="*")
+    local_logs.set_defaults(func=local_dev)
+    local_shell = local_dev_sub.add_parser("shell")
+    local_shell.add_argument("service", nargs="?", default="api")
+    local_shell.add_argument("exec_command", nargs=argparse.REMAINDER)
+    local_shell.set_defaults(func=local_dev)
+    local_psql = local_dev_sub.add_parser("psql")
+    local_psql.add_argument("--database", default="axis")
+    local_psql.set_defaults(func=local_dev)
+    local_dev_sub.add_parser("e2e").set_defaults(func=local_dev)
+    local_observability = local_dev_sub.add_parser("observability")
+    local_observability_sub = local_observability.add_subparsers(dest="observability_command", required=True)
+    local_observability_sub.add_parser("up").set_defaults(func=local_dev)
+    local_observability_sub.add_parser("stop").set_defaults(func=local_dev)
+    local_observability_sub.add_parser("status").set_defaults(func=local_dev)
+    local_observability_logs = local_observability_sub.add_parser("logs")
+    local_observability_logs.add_argument("-f", "--follow", action="store_true")
+    local_observability_logs.set_defaults(func=local_dev)
+    local_dev_sub.add_parser("reset-db").set_defaults(func=local_dev)
+    local_dev_sub.add_parser("reset-all").set_defaults(func=local_dev)
 
     design_source = sub.add_parser("design-source")
     design_source_sub = design_source.add_subparsers(dest="design_source_command", required=True)

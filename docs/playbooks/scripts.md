@@ -47,6 +47,9 @@ running protobuf checks.
 ```bash
 python scripts/axis.py doctor
 python scripts/axis.py verify
+python scripts/axis.py local-dev up
+python scripts/axis.py local-dev status
+python scripts/axis.py local-dev e2e
 python scripts/axis.py design-source penpot up
 python scripts/axis.py design-source penpot status
 python scripts/axis.py check policy-tests
@@ -73,6 +76,8 @@ python scripts/axis.py register avro-schemas --dry-run
 
 - Keep new repo-level maintenance and docs policy scripts in Python.
 - Add subcommands to `scripts/axis.py` for new repo workflows.
+- Document repo-owned orchestration through `scripts/axis.py`; raw underlying
+  commands belong inside the wrapper, not as the default docs path.
 - Put shared repository discovery in `scripts/axis_repo.py` or small Python helpers.
 - Do not add ad hoc utility scripts in any runtime under top-level `scripts/`,
   `docs/scripts/`, `docs/wireframes/`, or `docs/diagrams/`.
