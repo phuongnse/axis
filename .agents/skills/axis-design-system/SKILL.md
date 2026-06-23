@@ -15,7 +15,7 @@ Keep Axis design-system changes grounded in the source of truth: Penpot-approved
 - Use `$axis-frontend-feature` when changing SPA routes, feature components, forms, or product screens.
 - Use `$axis-visual-artifact` when touching Penpot links, design-source rows, committed previews, Mermaid, or visual artifact docs.
 - Use `$axis-api-contract` or `$axis-cross-module-contract` first when design-system work reveals API or cross-module contract changes.
-- Use `$axis-ready-review` before opening or marking a PR ready.
+- Use `$axis-ready-review` before asking whether the branch is ready; use `$axis-pull-request` before opening or marking a PR ready.
 
 ## Owner Docs
 

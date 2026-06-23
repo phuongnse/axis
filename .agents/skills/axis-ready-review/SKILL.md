@@ -1,6 +1,6 @@
 ---
 name: axis-ready-review
-description: Prepare an Axis branch for review by auditing changed paths, running the triggered verification commands, checking docs/status/workarounds, and producing an honest PR-readiness summary. Use before opening, updating, or marking a PR ready.
+description: Prepare an Axis branch for review by auditing changed paths, running the triggered verification commands, checking docs/status/workarounds, and producing an honest PR-readiness summary. Use when deciding whether branch work is ready for review.
 ---
 
 # Axis Ready Review
@@ -47,9 +47,9 @@ Decide whether the branch is ready for review using Axis enforced checks plus re
    - Docs review lines are `updated`, `not triggered`, or a named deferral.
    - Retrospective review answers each line, especially repeat findings and new enforceable rules.
 
-6. Prepare PR body content only if asked.
-   - Use Summary, Linked spec, and Requirements only.
-   - Do not paste CI status, commit lists, or long verification transcripts into the PR body.
+6. Hand off PR publication separately.
+   - If the branch is Ready and the user wants to open, update, or mark a PR ready, use `$axis-pull-request`.
+   - Do not draft PR title/body or perform GitHub PR actions in this skill.
 
 ## Output
 

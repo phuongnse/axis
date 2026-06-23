@@ -1,0 +1,4 @@
+interface:
+  display_name: "Axis Pull Request"
+  short_description: "Prepare and publish Axis PRs"
+  default_prompt: "Use $axis-pull-request to prepare exact PR metadata, validate it, and publish this Axis branch."
