@@ -28,6 +28,15 @@ describe('DesignSystemCatalog', () => {
     expect(screen.getByText('RegisterPage')).toBeInTheDocument();
     expect(screen.getByText('AppShell')).toBeInTheDocument();
     expect(screen.getAllByText('e2e smoke').length).toBeGreaterThan(0);
+    expect(
+      screen.getAllByText('References (source + 1 test + 1 visual target)').length,
+    ).toBeGreaterThan(0);
+    expect(screen.getAllByText('References (source + 1 test)').length).toBeGreaterThan(0);
+    expect(screen.getByText('frontend/src/components/ui/button.tsx')).toBeInTheDocument();
+    expect(
+      screen.getByText('frontend/src/features/auth/components/CallbackPage.tsx'),
+    ).toBeInTheDocument();
+    expect(screen.getByText('frontend/tests/callback-page.test.tsx')).toBeInTheDocument();
     expect(screen.getAllByText('aria busy loading').length).toBeGreaterThan(0);
     expect(screen.getByText('Chart 1')).toBeInTheDocument();
     expect(screen.getByText('Sidebar')).toBeInTheDocument();

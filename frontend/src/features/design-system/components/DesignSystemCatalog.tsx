@@ -144,6 +144,64 @@ function ReadinessBadge({
   );
 }
 
+function pluralize(count: number, singular: string) {
+  return `${count} ${singular}${count === 1 ? '' : 's'}`;
+}
+
+function ContractReferences({
+  sourceFile,
+  testFiles,
+  visualTargets = [],
+}: {
+  sourceFile: string;
+  testFiles: readonly string[];
+  visualTargets?: readonly string[];
+}) {
+  const summary = [
+    'source',
+    pluralize(testFiles.length, 'test'),
+    visualTargets.length > 0 ? pluralize(visualTargets.length, 'visual target') : null,
+  ]
+    .filter(Boolean)
+    .join(' + ');
+
+  return (
+    <details className="pt-1 text-xs text-muted-foreground">
+      <summary className="cursor-pointer font-medium text-muted-foreground hover:text-foreground">
+        References ({summary})
+      </summary>
+      <div className="mt-3 space-y-3 border-l border-border pl-3">
+        <div>
+          <p className="font-medium uppercase text-muted-foreground">Source</p>
+          <code className="mt-1 block break-all text-muted-foreground">{sourceFile}</code>
+        </div>
+        <div>
+          <p className="font-medium uppercase text-muted-foreground">Tests</p>
+          <div className="mt-1 space-y-1">
+            {testFiles.map((testFile) => (
+              <code key={testFile} className="block break-all text-muted-foreground">
+                {testFile}
+              </code>
+            ))}
+          </div>
+        </div>
+        {visualTargets.length > 0 ? (
+          <div>
+            <p className="font-medium uppercase text-muted-foreground">Visual targets</p>
+            <div className="mt-1 space-y-1">
+              {visualTargets.map((target) => (
+                <code key={target} className="block break-all text-muted-foreground">
+                  {target}
+                </code>
+              ))}
+            </div>
+          </div>
+        ) : null}
+      </div>
+    </details>
+  );
+}
+
 function PrimitiveReadinessMatrix() {
   return (
     <div className="grid gap-3">
@@ -158,7 +216,20 @@ function PrimitiveReadinessMatrix() {
               <h3 className="text-sm font-semibold text-foreground">{contract.component}</h3>
               <ReadinessBadge readiness={contract.readiness} />
             </div>
-            <p className="break-all text-xs leading-5 text-muted-foreground">{contract.file}</p>
+            <p className="text-xs font-medium text-muted-foreground">Primitive contract</p>
+            <div className="flex flex-wrap gap-1.5">
+              <span className="rounded-md border border-border bg-muted px-2 py-1 text-xs text-muted-foreground">
+                {pluralize(contract.testFiles.length, 'test')}
+              </span>
+              <span className="rounded-md border border-border bg-muted px-2 py-1 text-xs text-muted-foreground">
+                {pluralize(contract.visualTargets.length, 'visual target')}
+              </span>
+            </div>
+            <ContractReferences
+              sourceFile={contract.file}
+              testFiles={contract.testFiles}
+              visualTargets={contract.visualTargets}
+            />
           </div>
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <ReadinessGroup label="Variants" values={contract.variants} />
@@ -187,13 +258,27 @@ function ConsumerReadinessMatrix() {
               <ReadinessBadge readiness={contract.readiness} />
             </div>
             <p className="text-xs font-medium text-muted-foreground">{contract.surface}</p>
-            <p className="break-all text-xs leading-5 text-muted-foreground">{contract.file}</p>
+            <div className="flex flex-wrap gap-1.5">
+              <span className="rounded-md border border-border bg-muted px-2 py-1 text-xs text-muted-foreground">
+                {contract.route}
+              </span>
+              <span className="rounded-md border border-border bg-muted px-2 py-1 text-xs text-muted-foreground">
+                {formatContractLabel(contract.owner)}
+              </span>
+              <span className="rounded-md border border-border bg-muted px-2 py-1 text-xs text-muted-foreground">
+                {formatContractLabel(contract.kind)}
+              </span>
+            </div>
+            <ContractReferences sourceFile={contract.file} testFiles={contract.testFiles} />
           </div>
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <ReadinessGroup label="Primitives" values={contract.primitives} />
             <ReadinessGroup label="States" values={contract.states} />
             <ReadinessGroup label="Evidence" values={contract.evidence} />
-            <ReadinessGroup label="Tests" values={contract.testFiles} />
+            <ReadinessGroup
+              label="Coverage"
+              values={[pluralize(contract.testFiles.length, 'test file')]}
+            />
           </div>
         </div>
       ))}
