@@ -65,7 +65,7 @@ Users can create, view, edit, publish, archive, delete, and duplicate workflow d
 > **Decisions:**
 > - N/A
 
-## Wireframes
+## Design Sources
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|

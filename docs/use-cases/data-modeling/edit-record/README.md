@@ -64,7 +64,7 @@ Users can create, read, update, and delete records against any model. Records ar
 > **Decisions:**
 > - N/A
 
-## Wireframes
+## Design Sources
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|

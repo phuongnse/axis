@@ -62,7 +62,7 @@ Form fields define what data the form collects. Each field has a type, label, he
 > **Deferred follow-ups:**
 > - N/A
 
-## Wireframes
+## Design Sources
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|

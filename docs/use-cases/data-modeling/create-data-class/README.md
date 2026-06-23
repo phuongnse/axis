@@ -65,7 +65,7 @@ Data Classes are reusable, named object types composed of multiple fields. They 
 > **Deferred follow-ups:**
 > - N/A
 
-## Wireframes
+## Design Sources
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|

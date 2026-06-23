@@ -66,7 +66,7 @@ Users can create, read, update, and delete records against any model. Records ar
 > **Decisions:** N/A - no implementation-specific decision recorded for this slice.
 >
 
-## Wireframes
+## Design Sources
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|

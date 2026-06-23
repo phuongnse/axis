@@ -76,7 +76,7 @@ Allow Workspace admins to manage their Workspace's profile, settings, and basic 
 > **Decisions:** Hard delete uses in-process modulith cancellers until modules are extracted; cross-module RabbitMQ hard-delete commands are deferred to the extraction boundary.
 >
 
-## Wireframes
+## Design Sources
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|

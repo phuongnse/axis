@@ -191,7 +191,7 @@ Ship user value.
 """
             + matrix
             + """
-## Wireframes
+## Design Sources
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
@@ -277,7 +277,7 @@ Ship user value.
 
 - [ ] Works.
 
-## Wireframes
+## Design Sources
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
@@ -450,7 +450,7 @@ Ship user value.
 *Happy path*
 - [ ] AC-001 Works.
 
-## Wireframes
+## Design Sources
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|
@@ -626,7 +626,7 @@ Ship user value.
 
         self.assertIn("IDs must use one local prefix", "\n".join(issues))
 
-    def test_rejects_wireframes_table_schema_drift(self) -> None:
+    def test_rejects_design_sources_table_schema_drift(self) -> None:
         issues = self.issues_for_document(
             """# Sample use case
 
@@ -657,7 +657,7 @@ Ship user value.
 *Happy path*
 - [ ] AC-001 Works.
 
-## Wireframes
+## Design Sources
 
 | Screen | Preview |
 |--------|---------|
@@ -681,9 +681,9 @@ Ship user value.
 """
         )
 
-        self.assertIn("Wireframes table missing required columns: Source", "\n".join(issues))
+        self.assertIn("Design Sources table missing required columns: Source", "\n".join(issues))
 
-    def test_accepts_wireframes_table_with_source_column(self) -> None:
+    def test_rejects_legacy_wireframes_section_name(self) -> None:
         issues = self.issues_for_document(
             """# Sample use case
 
@@ -724,7 +724,259 @@ Ship user value.
 
 | Screen | Source | Preview |
 |--------|--------|---------|
+| register | [source](https://design.example/frame) | N/A |
+
+> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | Domain | N/A |
+> | Application | N/A |
+> | Infrastructure | N/A |
+> | API | N/A |
+> | Frontend | N/A |
+>
+> **Gaps vs spec:** none.
+>
+> **Deferred follow-ups:** N/A.
+>
+> **Decisions:** N/A.
+"""
+        )
+
+        self.assertIn("missing design sources section", "\n".join(issues))
+
+    def test_accepts_design_sources_table_with_source_column(self) -> None:
+        issues = self.issues_for_document(
+            """# Sample use case
+
+## Purpose
+
+Ship user value.
+
+## Primary actor
+
+- User
+
+## Trigger
+
+- User starts the flow.
+
+## Main flow
+
+1. User starts.
+2. System responds.
+3. User completes the flow.
+
+## Alternate / error flows
+
+- None.
+
+## Acceptance Criteria
+
+*Happy path*
+- [ ] AC-001 Works.
+
+## Acceptance Test Matrix
+
+| ID | Level | Scenario | Covers AC | Automated by | Required to close |
+|---|---|---|---|---|---|
+| AT-001 | E2E | User completes flow | AC-001 | Playwright | Yes |
+
+## Design Sources
+
+| Screen | Source | Preview |
+|--------|--------|---------|
 | N/A | N/A | N/A |
+
+> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | Domain | N/A |
+> | Application | N/A |
+> | Infrastructure | N/A |
+> | API | N/A |
+> | Frontend | N/A |
+>
+> **Gaps vs spec:** none.
+>
+> **Deferred follow-ups:** N/A.
+>
+> **Decisions:** N/A.
+"""
+        )
+
+        self.assertEqual([], issues)
+
+    def test_rejects_design_source_pointing_to_preview_asset(self) -> None:
+        issues = self.issues_for_document(
+            """# Sample use case
+
+## Purpose
+
+Ship user value.
+
+## Primary actor
+
+- User
+
+## Trigger
+
+- User starts the flow.
+
+## Main flow
+
+1. User starts.
+2. System responds.
+3. User completes the flow.
+
+## Alternate / error flows
+
+- None.
+
+## Acceptance Criteria
+
+*Happy path*
+- [ ] AC-001 Works.
+
+## Acceptance Test Matrix
+
+| ID | Level | Scenario | Covers AC | Automated by | Required to close |
+|---|---|---|---|---|---|
+| AT-001 | E2E | User completes flow | AC-001 | Playwright | Yes |
+
+## Design Sources
+
+| Screen | Source | Preview |
+|--------|--------|---------|
+| register | [source](./register.svg) | [preview](./register.svg) |
+
+> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | Domain | N/A |
+> | Application | N/A |
+> | Infrastructure | N/A |
+> | API | N/A |
+> | Frontend | N/A |
+>
+> **Gaps vs spec:** none.
+>
+> **Deferred follow-ups:** N/A.
+>
+> **Decisions:** N/A.
+"""
+        )
+
+        self.assertIn("must link to an editable design source", "\n".join(issues))
+
+    def test_rejects_design_source_preview_without_editable_source(self) -> None:
+        issues = self.issues_for_document(
+            """# Sample use case
+
+## Purpose
+
+Ship user value.
+
+## Primary actor
+
+- User
+
+## Trigger
+
+- User starts the flow.
+
+## Main flow
+
+1. User starts.
+2. System responds.
+3. User completes the flow.
+
+## Alternate / error flows
+
+- None.
+
+## Acceptance Criteria
+
+*Happy path*
+- [ ] AC-001 Works.
+
+## Acceptance Test Matrix
+
+| ID | Level | Scenario | Covers AC | Automated by | Required to close |
+|---|---|---|---|---|---|
+| AT-001 | E2E | User completes flow | AC-001 | Playwright | Yes |
+
+## Design Sources
+
+| Screen | Source | Preview |
+|--------|--------|---------|
+| register | N/A | [preview](./register.png) |
+
+> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | Domain | N/A |
+> | Application | N/A |
+> | Infrastructure | N/A |
+> | API | N/A |
+> | Frontend | N/A |
+>
+> **Gaps vs spec:** none.
+>
+> **Deferred follow-ups:** N/A.
+>
+> **Decisions:** N/A.
+"""
+        )
+
+        self.assertIn("has a preview but no editable Source/Excalidraw", "\n".join(issues))
+
+    def test_accepts_legacy_excalidraw_source_with_preview(self) -> None:
+        issues = self.issues_for_document(
+            """# Sample use case
+
+## Purpose
+
+Ship user value.
+
+## Primary actor
+
+- User
+
+## Trigger
+
+- User starts the flow.
+
+## Main flow
+
+1. User starts.
+2. System responds.
+3. User completes the flow.
+
+## Alternate / error flows
+
+- None.
+
+## Acceptance Criteria
+
+*Happy path*
+- [ ] AC-001 Works.
+
+## Acceptance Test Matrix
+
+| ID | Level | Scenario | Covers AC | Automated by | Required to close |
+|---|---|---|---|---|---|
+| AT-001 | E2E | User completes flow | AC-001 | Playwright | Yes |
+
+## Design Sources
+
+| Screen | Source | Preview |
+|--------|--------|---------|
+| register | [source](./register.excalidraw) | [preview](./register.svg) |
 
 > **Implementation status**
 >
@@ -777,13 +1029,36 @@ Ship user value.
 >
 > **Gaps vs spec:** old.
 
-## Wireframes
+## Design Sources
 """
         after = before.replace("> **Gaps vs spec:** old.", "> **Gaps vs spec:** new.\n>\n> **Deferred follow-ups:** N/A.")
 
         self.assertEqual(
             check_use_case_docs.strip_implementation_status_callouts(before),
             check_use_case_docs.strip_implementation_status_callouts(after),
+        )
+
+    def test_design_source_taxonomy_rename_is_not_material_use_case_refresh(self) -> None:
+        before = """# Sample
+
+## Screen flow
+
+Canonical order. The wireframes table below uses the same row order.
+
+## Wireframes
+
+| Screen | Source | Preview |
+|--------|--------|---------|
+| login | [source](https://design.example/frame) | N/A |
+"""
+        after = before.replace("wireframes table", "design sources table").replace(
+            "## Wireframes",
+            "## Design Sources",
+        )
+
+        self.assertEqual(
+            check_use_case_docs.material_change_snapshot(before),
+            check_use_case_docs.material_change_snapshot(after),
         )
 
     def test_changed_content_outside_status_uses_merge_base_for_three_dot_range(self) -> None:
@@ -957,6 +1232,38 @@ class TestDocDriftRatchets(unittest.TestCase):
                         "python scripts/axis.py docs sync-mermaid-theme",
                         "```",
                     ]
+                ),
+            }
+        )
+
+        self.assertEqual("", issues)
+
+    def visual_artifact_issue_text(self, files: dict[str, str]) -> str:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            for relative, content in files.items():
+                path = root / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(content, encoding="utf-8")
+            return "\n".join(axis.visual_artifact_hygiene_issues(files.keys(), root=root))
+
+    def test_rejects_penpot_mcp_transport_urls_in_visual_docs(self) -> None:
+        issues = self.visual_artifact_issue_text(
+            {
+                "docs/playbooks/design-source.md": (
+                    "Connect with https://design.example/mcp/stream?userToken=secret.\n"
+                ),
+            }
+        )
+
+        self.assertIn("Penpot MCP URLs with embedded userToken", issues)
+        self.assertIn("Penpot MCP transport URLs must not be documented", issues)
+
+    def test_accepts_penpot_design_frame_links_in_visual_docs(self) -> None:
+        issues = self.visual_artifact_issue_text(
+            {
+                "docs/playbooks/design-source.md": (
+                    "Use [source](https://design.example/#/view/file-id?page-id=page&section=interactions).\n"
                 ),
             }
         )

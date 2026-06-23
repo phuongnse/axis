@@ -100,7 +100,7 @@ flowchart TD
   fallback --> signup
 ```
 
-## Wireframes
+## Design Sources
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|

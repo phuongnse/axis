@@ -2,7 +2,7 @@
 
 > **Navigation**: [← docs/README.md](../README.md) · [← Design source](./design-source.md) · [← Frontend playbook](./frontend.md) · [← Wireframe playbook](./wireframes.md) · [← AGENTS.md](../../AGENTS.md)
 
-This playbook owns the Axis design-system workflow: tokens, reusable UI components, implementation rules, and visual QA. It is separate from use-case wireframes. Wireframes describe low-fidelity flow and screen intent; the design system defines final UI decisions.
+This playbook owns the Axis design-system workflow: tokens, reusable UI components, implementation rules, and visual QA. It is separate from use-case design sources. Low-fidelity wireframes describe flow and screen intent; the design system defines final UI decisions.
 
 For repeatable execution, use `$axis-design-system`.
 
@@ -11,7 +11,7 @@ For repeatable execution, use `$axis-design-system`.
 | Source | Owns | Does not own |
 |---|---|---|
 | Use-case docs | Product behavior, actors, acceptance criteria, visible states | Visual style, spacing, colors, component internals |
-| Wireframes | Layout intent, flow, content hierarchy, state inventory | Final theme, exact component styling, pixel-perfect approval |
+| Design sources | Layout intent, flow, content hierarchy, state inventory | New product behavior, acceptance criteria, endpoints, or data contracts |
 | Design system | Tokens, component anatomy, variants, state matrices, visual rules | New product behavior or acceptance criteria |
 | Frontend code | Executable components, accessibility behavior, responsive implementation | New visual rules not represented in the design system |
 | Visual QA | Evidence that implementation matches the approved design-system target | Product acceptance by itself |
@@ -174,7 +174,7 @@ Do not add per-file allowlists for design-system violations. If a component need
 - Add or update `consumer-contracts.ts` before exposing or changing a route-bound product UI surface.
 - Keep route files and feature pages thin; visual geometry belongs in shared components or feature-owned pattern components.
 - Do not write raw hex, HSL, arbitrary spacing, arbitrary radius, or page-local component clones when a token or shared component exists.
-- Do not add visual polish to wireframes to compensate for missing design-system decisions.
+- Do not add visual polish to low-fidelity wireframes to compensate for missing design-system decisions.
 - Treat existing UI as legacy until it is migrated through this workflow.
 - Keep behavior changes in use-case PRs; keep design-system foundation and token/component work in focused PRs.
 

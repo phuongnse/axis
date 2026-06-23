@@ -70,7 +70,7 @@ Workflow definitions can be exported as portable JSON files and imported into an
 > **Decisions:**
 > - N/A
 
-## Wireframes
+## Design Sources
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|

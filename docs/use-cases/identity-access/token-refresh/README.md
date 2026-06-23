@@ -69,7 +69,7 @@ Secure sign-in and sign-out flows using JWT access tokens and opaque refresh tok
 > **Deferred follow-ups:**
 > - N/A
 
-## Wireframes
+## Design Sources
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|

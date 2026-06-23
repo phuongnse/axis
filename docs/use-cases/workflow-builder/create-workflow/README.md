@@ -66,7 +66,7 @@ Users can create, view, edit, publish, archive, delete, and duplicate workflow d
 > - all data stored in single `workflow_definitions` table.
 >
 
-## Wireframes
+## Design Sources
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|

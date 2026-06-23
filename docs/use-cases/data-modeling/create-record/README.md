@@ -70,7 +70,7 @@ Users can create, read, update, and delete records against any model. Records ar
 > **Deferred follow-ups:**
 > - N/A
 
-## Wireframes
+## Design Sources
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|

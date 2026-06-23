@@ -79,19 +79,19 @@ Enforced by the incident/lesson-framing guard in `python scripts/axis.py check d
 
 ---
 
-## Use-case files — wireframes & implementation status
+## Use-case files — design sources & implementation status
 
 Every `docs/use-cases/<domain>/<short-slug>/README.md` file uses these layouts so agents can scan status without parsing inline pipes.
 
 **Canonical example (multi-screen + diagrams):** [platform-foundation/register-workspace/README.md](../use-cases/platform-foundation/register-workspace/README.md). Copy that structure when refreshing older use cases.
 
-**Wireframe practice (generic):** [wireframes.md § Multi-screen journey pattern](./wireframes.md#multi-screen-journey-pattern) — happy path vs `*-states`, diagrams, generator habits; register-workspace is the concrete reference.
+**Low-fidelity practice (generic):** [wireframes.md § Multi-screen journey pattern](./wireframes.md#multi-screen-journey-pattern) — happy path vs `*-states`, diagrams, generator habits; register-workspace is the concrete reference.
 
 ### Section order (after AC, before implementation status)
 
 ```text
 ## Screen flow      ← when rules below apply
-## Wireframes
+## Design Sources
 ## Diagrams
 > **Implementation status**
 ```
@@ -100,27 +100,27 @@ Every `docs/use-cases/<domain>/<short-slug>/README.md` file uses these layouts s
 
 Add **`## Screen flow`** when **any** of these is true:
 
-- More than **three** wireframe screens in the use-case folder (including `*-states` / error variants), or
+- More than **three** design-source screens in the use-case folder (including `*-states` / error variants), or
 - The happy path has **branches** (e.g. SSO vs email/password), or
 - Error screens are easy to confuse with sequential steps.
 
-Skip `## Screen flow` when there are **zero or one** local screen wireframes (a single `## Wireframes` table row is enough).
+Skip `## Screen flow` when there are **zero or one** local screen design sources (a single `## Design Sources` table row is enough).
 
 ### `## Screen flow` (content rules)
 
-1. One sentence: row order in `## Wireframes` matches this section.
-2. **Happy path** table: `| Step | Screen | When |` — use `1`, `2a`, `2b`, `3` for branches; screen slug in backticks. If a branch reuses the same UI (e.g. 2b submit on step 1’s screen), say so in **Screen** — it does not get a second wireframe row; merge step ids in the wireframes `#` column (e.g. `1 · 2b`) and label the edge in mermaid.
+1. One sentence: row order in `## Design Sources` matches this section.
+2. **Happy path** table: `| Step | Screen | When |` — use `1`, `2a`, `2b`, `3` for branches; screen slug in backticks. If a branch reuses the same UI (e.g. 2b submit on step 1’s screen), say so in **Screen** — it does not get a second design-source row; merge step ids in the `#` column (e.g. `1 · 2b`) and label the edge in mermaid.
 3. **Error / reference** table (separate): screens that are **not** sequential steps — when to open each (validation, 5xx, provider errors).
 4. Optional **mermaid** `flowchart` — solid edges = happy path, dotted = error/reference (keep labels = screen slugs).
 
-Do **not** duplicate design-source or preview links here; links live only in `## Wireframes`.
+Do **not** duplicate design-source or preview links here; links live only in `## Design Sources`.
 
-### Wireframes (content rules)
+### Design Sources (content rules)
 
-- Design sources live in Penpot and are linked from `## Wireframes`; setup and MCP rules live in [design-source.md](./design-source.md).
+- Design sources live in Penpot and are linked from `## Design Sources`; setup and MCP rules live in [design-source.md](./design-source.md).
 - Committed previews live **flat** in the use-case folder when they exist.
 - Reference **shared kit** screens from the shared Penpot file or `../../../wireframes/` legacy assets (e.g. `app-shell`) — do not copy files into the use-case folder.
-- One table per README — no blockquote wireframe stacks.
+- One table per README — no blockquote design-source stacks.
 - Opening line (when `## Screen flow` exists): state how many screens, that order matches Screen flow, and that **sequence/architecture** drawings are under `## Diagrams`.
 - **Inventory:** every documented **UI screen** for this use case must have a row. Include error/reference variants (`*-states`). Use `N/A` only when the use case truly has no design source or preview yet.
 - **Columns:** minimum `| Screen | Source | Preview |`. When `## Screen flow` exists, use `| # | Screen | Role | Source | Preview |` — `#` matches flow steps (`1`, `2a`, `—` for non-step error screens); `Role` = short happy-path / error label. Legacy tables with `Excalidraw` remain accepted until the owning use case is refreshed.
@@ -130,17 +130,17 @@ Do **not** duplicate design-source or preview links here; links live only in `##
 Minimal table (few screens, no Screen flow):
 
 ```markdown
-## Wireframes
+## Design Sources
 
 | Screen | Source | Preview |
 |--------|--------|---------|
 | login | [source](https://design.example/penpot-frame) | [preview](./login.svg) |
 ```
 
-Full table (see [register-workspace](../use-cases/platform-foundation/register-workspace/README.md#wireframes)):
+Full table (see [register-workspace](../use-cases/platform-foundation/register-workspace/README.md#design-sources)):
 
 ```markdown
-## Wireframes
+## Design Sources
 
 All UI assets in this folder (N screens). Row order matches [Screen flow](#screen-flow) above.
 Sequence/architecture drawings are under [Diagrams](#diagrams).
@@ -165,11 +165,11 @@ Sequence/architecture drawings are under [Diagrams](#diagrams).
 
 ### Adopting this layout on existing use cases
 
-When touching an older use case that only has a flat wireframes table:
+When touching an older use case that only has a flat design sources table:
 
 1. Count documented UI/state screens for the use case. Legacy `*.excalidraw` files count only when they are UI wireframes; sequence/entity content belongs in `## Diagrams` as Mermaid, not as image/source files.
 2. Add or refresh `## Screen flow` if the when-to-add rules apply.
-3. Expand `## Wireframes` so **every screen** has a row; add `#` / `Role` if helpful.
+3. Expand `## Design Sources` so **every screen** has a row; add `#` / `Role` if helpful.
 4. Move cross-use-case diagram references into `**Related:**` prose (link to the other README’s `###` anchor).
 5. Refresh committed previews when a design source changed; regenerate `.svg` if legacy **wireframe** `.excalidraw` changed; run [`visual-artifact-checklist.md`](./visual-artifact-checklist.md). Preview Mermaid after diagram edits.
 
@@ -219,7 +219,7 @@ Use case files should be self-contained and user-facing:
 3. Alternate/error flows
 4. Acceptance criteria
 5. Acceptance test matrix when implementing, closing, or materially refreshing the use case; keep it high-level and put spec citations / test file paths in implementation or verification reports, not in the use-case README
-6. Wireframes table (mapped to this use case)
+6. Design Sources table (mapped to this use case)
 7. Diagrams table (mapped to this use case; explicit N/A if not needed yet)
 8. Implementation status callout
 
@@ -230,7 +230,7 @@ Avoid writing engineering process constraints as end-user use cases. Keep those 
 ## When you add a new `.md` file
 
 1. Add the back-link header (per [`docs/README.md`](../README.md)): `> **Navigation**: [← parent.md](...)` so future readers can climb back up.
-2. If it belongs in the docs hub: add a playbook row, a [Key Diagrams](../README.md#key-diagrams) index link, or a [Wireframes](../README.md#wireframes) domain pointer — **not** a per-screen wireframe file row (those stay in the owning use-case `## Wireframes` only).
+2. If it belongs in the docs hub: add a playbook row, a [Key Diagrams](../README.md#key-diagrams) index link, or a [Design Sources](../README.md#design-sources) domain pointer — **not** a per-screen design-source row (those stay in the owning use-case `## Design Sources` only).
 3. If it owns a topic, add it to the **Single source of truth** table.
 4. If the topic could be enforced mechanically, add a tested rule to `scripts/axis.py` and document it in [REVIEW_FINDINGS.md](../REVIEW_FINDINGS.md). If it cannot be tested without noisy false positives, label it review-only guidance.
 

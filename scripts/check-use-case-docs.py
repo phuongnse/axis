@@ -27,7 +27,7 @@ REQUIRED_SECTIONS = (
     "Alternate / error flows",
     "Acceptance Criteria",
     "Acceptance Test Matrix",
-    "Wireframes",
+    "Design Sources",
 )
 IMPLEMENTATION_STATUS_HEADING = "> **Implementation status**"
 IMPLEMENTATION_STATUS_REQUIRED_MARKERS = (
@@ -81,8 +81,10 @@ AUTOMATED_BY_VALUES = {
     "xUnit Architecture",
 }
 IMPLEMENTATION_STATUS_COLUMNS = ["Layer", "Status"]
-WIREFRAME_REQUIRED_COLUMNS = {"Screen", "Preview"}
-WIREFRAME_SOURCE_COLUMNS = {"Source", "Excalidraw"}
+DESIGN_SOURCE_REQUIRED_COLUMNS = {"Screen", "Preview"}
+DESIGN_SOURCE_SOURCE_COLUMNS = {"Source", "Excalidraw"}
+NO_ARTIFACT_VALUES = {"", "-", "—", "n/a", "na", "none"}
+PREVIEW_ASSET_RE = re.compile(r"[.](?:svg|png|jpe?g|gif|webp|avif)(?:[)#?]|$)", re.IGNORECASE)
 
 # Placeholder markers from USE_CASE_TEMPLATE.md that must be replaced before a
 # use case can be considered written. Listed individually so the validator can
@@ -211,6 +213,18 @@ def validate_table_shape(
 
 def record_for_row(table: MarkdownTable, row: list[str]) -> dict[str, str]:
     return {header: row[idx] if idx < len(row) else "" for idx, header in enumerate(table.headers)}
+
+
+def is_no_artifact_cell(cell: str) -> bool:
+    return cell.strip().lower() in NO_ARTIFACT_VALUES
+
+
+def is_preview_asset_reference(cell: str) -> bool:
+    return PREVIEW_ASSET_RE.search(cell) is not None
+
+
+def is_editable_design_source(cell: str) -> bool:
+    return not is_no_artifact_cell(cell) and not is_preview_asset_reference(cell)
 
 
 def acceptance_criteria_ids(section: str) -> tuple[set[str], list[str], list[str]]:
@@ -419,19 +433,40 @@ def validate_acceptance_contract(doc: UseCaseDocument, *, require_matrix: bool) 
     return issues
 
 
-def validate_wireframes(doc: UseCaseDocument) -> list[str]:
-    table = first_markdown_table(doc.section("Wireframes"))
+def validate_design_sources(doc: UseCaseDocument) -> list[str]:
+    table = first_markdown_table(doc.section("Design Sources"))
     issues = validate_table_shape(
         table,
         rel=doc.rel,
-        label="Wireframes",
-        required_columns=WIREFRAME_REQUIRED_COLUMNS,
+        label="Design Sources",
+        required_columns=DESIGN_SOURCE_REQUIRED_COLUMNS,
     )
-    if table is not None and WIREFRAME_SOURCE_COLUMNS.isdisjoint(table.headers):
+    if table is not None and DESIGN_SOURCE_SOURCE_COLUMNS.isdisjoint(table.headers):
         issues.append(
-            f"{doc.rel}: Wireframes table missing required columns: Source "
+            f"{doc.rel}: Design Sources table missing required columns: Source "
             "(legacy Excalidraw accepted until the use case is refreshed)",
         )
+    if table is None:
+        return issues
+
+    source_headers = [header for header in ("Source", "Excalidraw") if header in table.headers]
+    for idx, row in enumerate(table.rows, start=1):
+        record = record_for_row(table, row)
+        screen = record.get("Screen", "").strip() or f"row {idx}"
+        source_cells = [record.get(header, "") for header in source_headers]
+        preview_cell = record.get("Preview", "")
+
+        for header, source_cell in zip(source_headers, source_cells, strict=False):
+            if is_preview_asset_reference(source_cell):
+                issues.append(
+                    f"{doc.rel}: Design Sources `{screen}` {header} must link to an editable design source, "
+                    "not a preview/export asset",
+                )
+
+        if not is_no_artifact_cell(preview_cell) and not any(is_editable_design_source(cell) for cell in source_cells):
+            issues.append(
+                f"{doc.rel}: Design Sources `{screen}` has a preview but no editable Source/Excalidraw",
+            )
     return issues
 
 
@@ -510,7 +545,7 @@ def check_file(
     issues: list[str] = []
     issues.extend(validate_sections(doc))
     issues.extend(validate_acceptance_contract(doc, require_matrix=require_acceptance_matrix))
-    issues.extend(validate_wireframes(doc))
+    issues.extend(validate_design_sources(doc))
     issues.extend(validate_diagrams(doc))
     issues.extend(validate_implementation_status(doc, strict_status=strict_status))
     return issues
@@ -608,6 +643,27 @@ def strip_implementation_status_callouts(text: str) -> str:
     return "\n".join(out).strip()
 
 
+def normalize_design_source_taxonomy(text: str) -> str:
+    """Ignore the Wireframes -> Design Sources rename for material-change ratchets."""
+    replacements = (
+        ("## Design Sources", "## Wireframes"),
+        ("`## Design Sources`", "`## Wireframes`"),
+        ("Design Sources table", "Wireframes table"),
+        ("design sources table", "wireframes table"),
+        ("#design-sources", "#wireframes"),
+        ("§ Design Sources", "§ Wireframes"),
+        ("Design Sources](#", "Wireframes](#"),
+    )
+    normalized = text
+    for current, legacy in replacements:
+        normalized = normalized.replace(current, legacy)
+    return normalized
+
+
+def material_change_snapshot(text: str) -> str:
+    return normalize_design_source_taxonomy(strip_implementation_status_callouts(text))
+
+
 def content_snapshot_ref(range_spec: str) -> str:
     if "..." not in range_spec:
         return range_spec
@@ -640,7 +696,7 @@ def changed_use_case_content_outside_status(path: Path, range_spec: str) -> bool
     )
     previous = result.stdout if result.returncode == 0 else ""
     current = path.read_text(encoding="utf-8")
-    return strip_implementation_status_callouts(previous) != strip_implementation_status_callouts(current)
+    return material_change_snapshot(previous) != material_change_snapshot(current)
 
 
 def check_changed_stock_main_flow(files: list[Path]) -> list[str]:

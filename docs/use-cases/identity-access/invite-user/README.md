@@ -70,7 +70,7 @@ Workspace admins can invite new members, manage their accounts, and deactivate u
 > **Decisions:** existing-member and pending-invitation checks throw `ValidationException` with specific messages matching AC wording.
 >
 
-## Wireframes
+## Design Sources
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|

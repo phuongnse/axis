@@ -70,7 +70,7 @@ Allow Workspace admins to manage their Workspace's profile, settings, and basic 
 > **Decisions:**
 > - N/A
 
-## Wireframes
+## Design Sources
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|

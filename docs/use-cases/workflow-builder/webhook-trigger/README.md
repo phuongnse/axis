@@ -67,7 +67,7 @@ A workflow must have at least one trigger before it can be published. Triggers d
 > **Decisions:**
 > - N/A
 
-## Wireframes
+## Design Sources
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|

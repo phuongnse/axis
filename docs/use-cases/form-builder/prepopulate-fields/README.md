@@ -64,7 +64,7 @@ Forms are attached to Form steps in a workflow. The engine creates a Form Task a
 > **Decisions:**
 > - N/A
 
-## Wireframes
+## Design Sources
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|

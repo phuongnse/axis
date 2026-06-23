@@ -72,7 +72,7 @@ Each field in a model has a type that determines what data it stores, how it's v
 > **Decisions:** all 9 field types serialized to JSONB via custom `FieldDefinitionConverter` — polymorphic FieldConfig deserialized using the `type` discriminator in the JSON object.
 >
 
-## Wireframes
+## Design Sources
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|

@@ -66,7 +66,7 @@ A node-based drag-and-drop canvas (powered by React Flow) where users design the
 > **Decisions:** Transitions remain static arrows for the current builder scope; animated direction is decorative and deferred until the core canvas UX is usable.
 >
 
-## Wireframes
+## Design Sources
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|

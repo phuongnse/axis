@@ -72,7 +72,7 @@ Allow users to reset forgotten passwords, change their current password, and man
 > **Deferred follow-ups:**
 > - N/A
 
-## Wireframes
+## Design Sources
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|

@@ -65,7 +65,7 @@ Each field in a model has a type that determines what data it stores, how it's v
 > **Decisions:**
 > - N/A
 
-## Wireframes
+## Design Sources
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|

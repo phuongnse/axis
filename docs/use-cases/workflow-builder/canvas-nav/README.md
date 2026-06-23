@@ -64,7 +64,7 @@ A node-based drag-and-drop canvas (powered by React Flow) where users design the
 > **Decisions:**
 > - N/A
 
-## Wireframes
+## Design Sources
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|

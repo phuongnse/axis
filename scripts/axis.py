@@ -1798,6 +1798,23 @@ RAW_DOC_COMMAND_PATTERNS = [
     (re.compile(r"^cargo\s+install\s+lychee\b"), "install tools externally, then verify through `python scripts/axis.py doctor`"),
 ]
 
+VISUAL_ARTIFACT_TEXT_ROOTS = (
+    "docs",
+    ".agents/skills",
+    ".github",
+)
+VISUAL_ARTIFACT_TEXT_FILES = ("AGENTS.md", "CONTRIBUTING.md", "README.md")
+PENPOT_TRANSPORT_PATTERNS = [
+    (
+        re.compile(r"userToken\s*(?:=|%3[dD])", re.IGNORECASE),
+        "Penpot MCP URLs with embedded userToken must not be committed; store the connection in the MCP client",
+    ),
+    (
+        re.compile(r"/mcp/stream\b", re.IGNORECASE),
+        "Penpot MCP transport URLs must not be documented or committed; link to the design file/frame instead",
+    ),
+]
+
 
 def is_command_doc(path: str) -> bool:
     return path in DOC_COMMAND_DOC_PATHS or (path.startswith("docs/") and path.endswith(".md"))
@@ -1847,6 +1864,32 @@ def documented_raw_command_issues(paths: Iterable[str] | None = None, *, root: P
                 message = raw_doc_command_message(fragment)
                 if message is not None:
                     issues.append(f"{normalized}:{idx}: raw documented command `{fragment}` - {message}")
+    return issues
+
+
+def is_visual_artifact_text_path(path: str) -> bool:
+    normalized = path.replace("\\", "/")
+    if normalized in VISUAL_ARTIFACT_TEXT_FILES:
+        return True
+    if not normalized.endswith((".md", ".yaml", ".yml")):
+        return False
+    return any(normalized.startswith(f"{root}/") for root in VISUAL_ARTIFACT_TEXT_ROOTS)
+
+
+def visual_artifact_hygiene_issues(paths: Iterable[str] | None = None, *, root: Path = ROOT) -> list[str]:
+    candidates = paths or git_ls_files()
+    issues: list[str] = []
+    for path in sorted(candidates):
+        normalized = path.replace("\\", "/")
+        if not is_visual_artifact_text_path(normalized):
+            continue
+        full_path = root / normalized
+        if not full_path.is_file():
+            continue
+        for idx, line in enumerate(full_path.read_text(encoding="utf-8", errors="replace").splitlines(), 1):
+            for pattern, message in PENPOT_TRANSPORT_PATTERNS:
+                if pattern.search(line):
+                    issues.append(f"{normalized}:{idx}: {message}")
     return issues
 
 
@@ -2280,6 +2323,9 @@ def check_doc_drift(_args: argparse.Namespace | None = None) -> int:
         fail(issues, issue)
 
     for issue in documented_raw_command_issues():
+        fail(issues, issue)
+
+    for issue in visual_artifact_hygiene_issues():
         fail(issues, issue)
 
     for hit in endpoint_mediator_hits():

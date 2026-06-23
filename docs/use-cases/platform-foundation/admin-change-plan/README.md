@@ -73,7 +73,7 @@ Define subscription plan tiers with feature limits and enforce those limits at t
 >
 > **Decisions:** `featureFlags` derived from plan slug (no JSON column); `PlatformAdmin:UserIds` config for platform admin plan change.
 >
-## Wireframes
+## Design Sources
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|

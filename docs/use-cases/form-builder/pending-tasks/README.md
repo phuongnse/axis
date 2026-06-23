@@ -72,7 +72,7 @@ When a workflow reaches a Form step, the engine creates a Form Task and notifies
 > **Decisions:** N/A - no implementation-specific decision recorded for this slice.
 >
 
-## Wireframes
+## Design Sources
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|

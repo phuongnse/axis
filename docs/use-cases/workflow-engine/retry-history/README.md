@@ -64,7 +64,7 @@ When a workflow execution fails at a step, users can manually retry from the fai
 > **Decisions:**
 > - N/A
 
-## Wireframes
+## Design Sources
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|

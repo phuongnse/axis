@@ -63,7 +63,7 @@ Workflows can take different execution paths based on data values using Conditio
 > **Deferred follow-ups:**
 > - N/A
 
-## Wireframes
+## Design Sources
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|

@@ -69,7 +69,7 @@ Form fields define what data the form collects. Each field has a type, label, he
 > **Decisions:**
 > - N/A
 
-## Wireframes
+## Design Sources
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|

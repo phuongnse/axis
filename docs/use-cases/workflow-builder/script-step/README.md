@@ -68,7 +68,7 @@ Each step has a type that determines what it does when executed. Users configure
 > **Decisions:**
 > - N/A
 
-## Wireframes
+## Design Sources
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|

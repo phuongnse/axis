@@ -66,7 +66,7 @@ Users can create custom data models within their Workspace. A model defines the 
 > **Decisions:**
 > - N/A
 
-## Wireframes
+## Design Sources
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|

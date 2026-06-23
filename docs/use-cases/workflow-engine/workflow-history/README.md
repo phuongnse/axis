@@ -64,7 +64,7 @@ Every workflow execution and each of its steps is recorded in full detail. Users
 > **Deferred follow-ups:**
 > - N/A
 
-## Wireframes
+## Design Sources
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|

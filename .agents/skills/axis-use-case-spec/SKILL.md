@@ -1,6 +1,6 @@
 ---
 name: axis-use-case-spec
-description: Draft or complete Axis docs-first use-case specifications before implementation. Use when a requested feature or use case lacks a docs/use-cases README, acceptance criteria, flow, implementation status, wireframe or diagram inventory, or has unclear product/design decisions that must be resolved before using axis-use-case-implementation.
+description: Draft or complete Axis docs-first use-case specifications before implementation. Use when a requested feature or use case lacks a docs/use-cases README, acceptance criteria, flow, implementation status, design-source or diagram inventory, or has unclear product/design decisions that must be resolved before using axis-use-case-implementation.
 ---
 
 # Axis Use Case Spec
@@ -39,10 +39,10 @@ Create or tighten the owning use-case spec so implementation can follow spec -> 
    - Split oversized work into isolated slices and record the slice boundary in `Decisions` or `Deferred follow-ups`.
 
 4. Define visuals and diagrams.
-   - For user-facing screens, use `$axis-visual-artifact` to create or update Penpot design-source links, optional previews, and the `## Wireframes` table.
+   - For user-facing screens, use `$axis-visual-artifact` to create or update Penpot design-source links, optional previews, and the `## Design Sources` table.
    - Add `## Screen flow` when the journey has more than three screens, branched happy paths, or non-obvious error screens.
    - Add Mermaid diagrams for non-trivial workflow, sequence, or cross-module behavior; keep local diagrams in the owning README.
-   - Use a single `N/A` row when no wireframe or local diagram applies.
+   - Use a single `N/A` row when no design source or local diagram applies.
 
 5. Mark implementation status honestly.
    - Add the `> **Implementation status**` callout after Out of scope using the template layer table.

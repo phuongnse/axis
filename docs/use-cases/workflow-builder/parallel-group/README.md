@@ -68,7 +68,7 @@ Multiple steps can run concurrently inside a Parallel Group. The workflow fans o
 > **Decisions:**
 > - N/A
 
-## Wireframes
+## Design Sources
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|

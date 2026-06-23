@@ -66,7 +66,7 @@ Allow Workspace admins to manage their workspace's profile, settings, and basic 
 > **Decisions:**
 > - N/A
 
-## Wireframes
+## Design Sources
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|

@@ -66,7 +66,7 @@ Workspace admins can invite new members, manage their accounts, and deactivate u
 > **Deferred follow-ups:**
 > - N/A
 
-## Wireframes
+## Design Sources
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|

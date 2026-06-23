@@ -69,7 +69,7 @@ A resource-based permission system where each permission grants the ability to p
 > **Deferred follow-ups:**
 > - N/A
 
-## Wireframes
+## Design Sources
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|

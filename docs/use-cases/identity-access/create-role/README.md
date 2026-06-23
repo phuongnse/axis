@@ -64,7 +64,7 @@ Workspace admins can create custom roles, assign permissions to each role, and a
 > **Deferred follow-ups:**
 > - N/A
 
-## Wireframes
+## Design Sources
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|

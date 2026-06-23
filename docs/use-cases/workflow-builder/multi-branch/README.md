@@ -66,7 +66,7 @@ Workflows can take different execution paths based on data values using Conditio
 > **Decisions:**
 > - N/A
 
-## Wireframes
+## Design Sources
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|

@@ -69,7 +69,7 @@ A workflow must have at least one trigger before it can be published. Triggers d
 > **Decisions:** Event trigger scope is limited to platform-owned event types until custom event contracts have an approved registry model.
 >
 
-## Wireframes
+## Design Sources
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|

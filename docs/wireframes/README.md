@@ -6,7 +6,7 @@ Wireframes are low-fidelity skeletons. They document layout, user flow, content 
 
 ## What Lives Here
 
-This folder is the shared wireframe contract and legacy shared-asset location. New design sources live in Penpot and are linked from the owning use-case `## Wireframes` table; setup lives in [design-source.md](../playbooks/design-source.md).
+This folder is the shared wireframe contract and legacy shared-asset location. New design sources live in Penpot and are linked from the owning use-case `## Design Sources` table; setup lives in [design-source.md](../playbooks/design-source.md).
 
 | File | Role |
 |------|------|
@@ -16,7 +16,7 @@ This folder is the shared wireframe contract and legacy shared-asset location. N
 Use-case screen sources live beside their owning use case as source/preview rows:
 
 ```text
-docs/use-cases/{domain}/{use-case}/README.md -> ## Wireframes
+docs/use-cases/{domain}/{use-case}/README.md -> ## Design Sources
 ```
 
 Legacy use cases may still contain:
@@ -44,7 +44,7 @@ When touching legacy `.excalidraw`, regenerate the matching `.svg`, then review 
 - Keep repeated screens in the same use-case journey visually aligned: same card widths, panel grids, section order, and spacing rhythm.
 - `*-states` frames/files are reference boards for validation, API feedback, alternate entry, or status outcomes. They are not a second happy path.
 - State labels belong above the relevant panel/card.
-- For multi-screen journeys, keep the order of `## Wireframes` and `## Screen flow` in the use-case README aligned.
+- For multi-screen journeys, keep the order of `## Design Sources` and `## Screen flow` in the use-case README aligned.
 - Use the shared app-shell design source for authenticated screens; legacy reference dimensions are in `docs/wireframes/app-shell.excalidraw` until migration.
 
 ### Brand Placeholders

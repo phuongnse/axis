@@ -67,7 +67,7 @@ A resource-based permission system where each permission grants the ability to p
 > **Decisions:**
 > - N/A
 
-## Wireframes
+## Design Sources
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|

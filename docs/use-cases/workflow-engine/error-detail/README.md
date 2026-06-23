@@ -67,7 +67,7 @@ When a step fails, the engine marks the execution as `FAILED`, records full erro
 > **Decisions:**
 > - N/A
 
-## Wireframes
+## Design Sources
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|

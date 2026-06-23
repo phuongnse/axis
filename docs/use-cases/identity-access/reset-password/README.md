@@ -83,7 +83,7 @@ Allow users to reset forgotten passwords, change their current password, and man
 > **Deferred follow-ups:**
 > - N/A
 
-## Wireframes
+## Design Sources
 
 The reset-password entry screen uses the shared public auth card/page-frame skeleton and field-level help text pattern from [wireframes/README](../../../wireframes/README.md#agent-contract).
 

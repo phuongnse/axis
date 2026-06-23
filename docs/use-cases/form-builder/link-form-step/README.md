@@ -63,7 +63,7 @@ Forms are attached to Form steps in a workflow. The engine creates a Form Task a
 > **Deferred follow-ups:**
 > - N/A
 
-## Wireframes
+## Design Sources
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|

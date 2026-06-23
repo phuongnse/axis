@@ -93,7 +93,7 @@ Define user-facing localization and visual theme behavior for the SPA so each us
 > **Deferred follow-ups:**
 > - N/A
 
-## Wireframes
+## Design Sources
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|

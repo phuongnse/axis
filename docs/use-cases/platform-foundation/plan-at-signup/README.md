@@ -68,7 +68,7 @@ Self-service registration flow where a new workspace signs up and is automatical
 > **Deferred follow-ups:**
 > - N/A
 
-## Wireframes
+## Design Sources
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|

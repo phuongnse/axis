@@ -66,7 +66,7 @@ A workflow must have at least one trigger before it can be published. Triggers d
 > **Deferred follow-ups:**
 > - N/A
 
-## Wireframes
+## Design Sources
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|

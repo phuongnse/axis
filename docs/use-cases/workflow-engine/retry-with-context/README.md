@@ -64,7 +64,7 @@ When a workflow execution fails at a step, users can manually retry from the fai
 > **Deferred follow-ups:**
 > - N/A
 
-## Wireframes
+## Design Sources
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|

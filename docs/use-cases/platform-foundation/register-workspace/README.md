@@ -139,7 +139,7 @@ flowchart TD
   confirm -.-> errVerify
 ```
 
-## Wireframes
+## Design Sources
 
 UI assets in this folder cover workspace-owned screens. Standalone user registration is owned by [register-user](../../identity-access/register-user/); external-provider/user-identity screens are not owned by this folder.
 

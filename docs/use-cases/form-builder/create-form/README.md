@@ -61,7 +61,7 @@ Users can create, edit, and delete form definitions. A form is a reusable collec
 > **Deferred follow-ups:**
 > - N/A
 
-## Wireframes
+## Design Sources
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|

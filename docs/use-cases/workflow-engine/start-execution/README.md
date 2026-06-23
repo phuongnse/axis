@@ -68,7 +68,7 @@ The engine manages the full lifecycle of a workflow execution — from creation 
 > **Deferred follow-ups:**
 > - N/A
 
-## Wireframes
+## Design Sources
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|

@@ -73,7 +73,7 @@ Infrastructure-level enforcement ensuring every database query is scoped to the 
 > **Decisions:**
 > - N/A
 
-## Wireframes
+## Design Sources
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|

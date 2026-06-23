@@ -66,7 +66,7 @@ Users can create custom data models within their Workspace. A model defines the 
 > **Deferred follow-ups:**
 > - N/A
 
-## Wireframes
+## Design Sources
 
 | Screen | Excalidraw | Preview |
 |--------|------------|---------|

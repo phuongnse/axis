@@ -84,7 +84,7 @@ Use the terms from [REVIEW_FINDINGS.md](../REVIEW_FINDINGS.md#enforcement-taxono
 - **Doc navigation** — `python scripts/axis.py check doc-navigation` requires every `docs/**/*.md` file to start with an H1 and a `> **Navigation**:` block so docs never become dead ends.
 - **Doc size budgets** — `python scripts/axis.py check doc-size-budgets` keeps reference docs/playbooks within the budgets in [docs-style.md](./docs-style.md#size-budgets), including the tighter pattern-router budget.
 - **Code-fence integrity** — `python scripts/axis.py check doc-code-fences` (inside the drift command) flags code-block lines with collapsed indentation (a lone leading space). Catches the bulk-find-replace corruption class that lychee, prettier, and the structural checks all let through.
-- **Use-case docs** — `python scripts/axis.py check use-case-docs` validates the use-case document contract: required sections, table schemas, Acceptance Test Matrix AC coverage/runner values, high-level matrix cells, wireframe/status table shape, Mermaid-only diagrams, template placeholders, self-links, and truncated domain README rows. It also counts use cases still on the stock Main flow.
+- **Use-case docs** — `python scripts/axis.py check use-case-docs` validates the use-case document contract: required sections, table schemas, Acceptance Test Matrix AC coverage/runner values, high-level matrix cells, design-source/status table shape, Mermaid-only diagrams, template placeholders, self-links, and truncated domain README rows. It also counts use cases still on the stock Main flow.
 - **Codex skill metadata** — `python scripts/axis.py check codex-skills` validates repo-scoped `.agents/skills/*/SKILL.md` frontmatter, concise bodies, doc references, required skill chaining, concrete wording, and UI metadata/default prompts.
 - **Secret scanning** — TruffleHog scans the full PR diff for committed secrets (API keys, passwords, tokens) and verifies each finding against the alleged service before reporting (`--only-verified` cuts false positives).
 - **Vulnerable packages** — `python scripts/axis.py check vulnerable-packages` wraps the NuGet vulnerable-package scan and fails on any known CVE in the dep tree (covers transitive packages too).
@@ -147,7 +147,7 @@ Common owner mapping:
 | New pattern or repeated finding | Focused owner from [patterns-index.md](./patterns-index.md) or [REVIEW_FINDINGS.md](../REVIEW_FINDINGS.md) |
 | Behavior/spec/status change | Owning use-case callout, domain README, and [PROGRESS.md](../PROGRESS.md) when their summaries change |
 | Repo layout, module, event, proto, API group | [repo-layout-discovery.md](./repo-layout-discovery.md) |
-| Frontend screen or use-case visual | Owning use-case wireframe/diagram section and [visual-artifact-checklist.md](./visual-artifact-checklist.md) |
+| Frontend screen or use-case visual | Owning use-case design-source/diagram section and [visual-artifact-checklist.md](./visual-artifact-checklist.md) |
 | Intentional P0/P1 shortcut | [WORKAROUNDS.md](../WORKAROUNDS.md) plus site reference |
 
 **Deferred follow-ups (mandatory when leaving work open):** do not wait for the user. Any skipped review item, thin-endpoint refactor, or partial layer needs a named `**Deferred follow-ups:**` line — full rules in [process.md § Deferred follow-up](process.md). Remove the line when fixed.
@@ -211,7 +211,7 @@ These expectations still matter, but do not call them CI gates unless [REVIEW_FI
 - No cross-module SQL / shared `DbContext` / `IMediator` for domain events. Structural subsets are enforced; semantic SQL and runtime DI remain review-only.
 - Changed `*Handler.cs` → matching `*HandlerTests.cs`. The diff ratchet enforces changed Application handlers; untouched legacy files are not swept.
 - Behavior/spec/status changes → update the owning docs in the same PR. Pure refactor, style, dependency, and test-only changes do not need a token docs edit.
-- Frontend screen → source/preview row in the owning use-case `## Wireframes` table when the screen changes.
+- Frontend screen → source/preview row in the owning use-case `## Design Sources` table when the screen changes.
 - Use-case diagram → Mermaid in that use-case README; link other use cases in `**Related:**` prose, not in `## Diagrams` table.
 - No test `Skip = ...`, weakened tests, or completed layer status when ACs are open. New test skips are enforced; weakened assertions/status honesty remain review-only.
 - **Full suite honesty:** local `python scripts/axis.py verify` uses the ready-PR Verification gate command matrix; CI/branch protection runs full `python scripts/axis.py dotnet test`. If you claim the full suite ran locally, it must be full `Axis.sln` with integration/API tests, not a solution filter or unit-only run.

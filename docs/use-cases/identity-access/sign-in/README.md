@@ -88,7 +88,7 @@ Secure sign-in and sign-out flows using JWT access tokens and opaque refresh tok
 > - `/connect/token` exchanges it for access + refresh tokens. Refresh token stored as an opaque reference in DB (OpenIddict `OpenIddictTokens` table) and delivered as an httpOnly `Secure SameSite=Strict` cookie at `/connect` path via `ApplyRefreshTokenCookieHandler`.
 >
 
-## Wireframes
+## Design Sources
 
 Current public sign-in wireframes show the implemented email/password path only. External identity providers remain documented in the use-case spec, but provider buttons should not appear here until ADR-027 is implemented for sign-in.
 
