@@ -8,6 +8,7 @@ import './index.css';
 import './features/preferences/i18n';
 
 import { PreferenceEffects } from './features/preferences';
+import { shouldRenderDevtools } from './lib/devtools';
 import { queryClient } from './lib/query-client';
 import { routeTree } from './routeTree.gen';
 
@@ -44,7 +45,7 @@ if (!rootElement.innerHTML) {
       <QueryClientProvider client={queryClient}>
         <PreferenceEffects />
         <RouterProvider router={router} />
-        <ReactQueryDevtools initialIsOpen={false} />
+        {shouldRenderDevtools() ? <ReactQueryDevtools initialIsOpen={false} /> : null}
       </QueryClientProvider>
     </React.StrictMode>,
   );

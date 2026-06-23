@@ -6,6 +6,12 @@ const screenshotOptions = {
 } as const;
 
 test.describe('design system catalog', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.addInitScript(() => {
+      window.__AXIS_DISABLE_DEVTOOLS__ = true;
+    });
+  });
+
   test('DSCAT-001 catalog route exposes stable visual QA targets', async ({ page }) => {
     await page.goto('/design-system');
 
