@@ -125,9 +125,10 @@ jobs:
       - name: Build
         run: python scripts/axis.py dotnet build -- --no-restore
 
-      # Format gate — see CLAUDE.md § Verification gate. Runs after build so analyzer
-      # diagnostics are populated. Fails the job on any whitespace / charset
-      # / style violation the local Axis format wrapper would also catch.
+      # Format gate — see docs/playbooks/agent-checklist.md § Verification Gate.
+      # Runs after build so analyzer diagnostics are populated. Fails the job on
+      # any whitespace / charset / style violation the local Axis format wrapper
+      # would also catch.
       - name: Verify formatting (dotnet format)
         run: python scripts/axis.py dotnet format --check
 

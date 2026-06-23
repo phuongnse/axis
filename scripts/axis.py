@@ -39,9 +39,14 @@ NVMRC_PATH = ROOT / "frontend" / ".nvmrc"
 LOCAL_DEV_COMPOSE_FILE = ROOT / "docker-compose.yml"
 LOCAL_DEV_PROJECT_NAME = "axis"
 LOCAL_DEV_POSTGRES_VOLUME = f"{LOCAL_DEV_PROJECT_NAME}_postgres_data"
+DEFAULT_PENPOT_VERSION = "2.15.4"
+PENPOT_VERSION = os.environ.get("PENPOT_VERSION", DEFAULT_PENPOT_VERSION)
+PENPOT_MCP_PACKAGE = "@penpot/mcp@2.15.4"
 PENPOT_LOCAL_DIR = ROOT / ".local" / "penpot"
 PENPOT_COMPOSE_FILE = PENPOT_LOCAL_DIR / "docker-compose.yaml"
-PENPOT_COMPOSE_URL = "https://raw.githubusercontent.com/penpot/penpot/main/docker/images/docker-compose.yaml"
+PENPOT_COMPOSE_URL = (
+    f"https://raw.githubusercontent.com/penpot/penpot/{PENPOT_VERSION}/docker/images/docker-compose.yaml"
+)
 PENPOT_PROJECT_NAME = "penpot"
 PENPOT_URL = "http://localhost:9001"
 PENPOT_MAILCATCH_URL = "http://localhost:1080"
@@ -3035,6 +3040,12 @@ def run_required(command: list[str]) -> int:
     return result.returncode
 
 
+def restrict_local_cert_permissions() -> None:
+    LOCAL_CERT_DIR.chmod(0o700)
+    LOCAL_ROOT_CA_KEY.chmod(0o600)
+    LOCALHOST_KEY.chmod(0o600)
+
+
 def local_dev_certs(_args: argparse.Namespace | None = None) -> int:
     if shutil.which(exe("openssl")) is None and shutil.which("openssl") is None:
         print("local-dev certs: OpenSSL is not available in PATH", file=sys.stderr)
@@ -3119,6 +3130,7 @@ def local_dev_certs(_args: argparse.Namespace | None = None) -> int:
         if rc != 0:
             return rc
 
+    restrict_local_cert_permissions()
     print(f"local-dev certs: generated files in {path_label(LOCAL_CERT_DIR)}")
     return 0
 
@@ -3199,7 +3211,12 @@ def local_dev(args: argparse.Namespace) -> int:
         down = run(local_dev_compose_args("down"), check=False)
         if down.returncode != 0:
             return down.returncode
-        run([exe("docker"), "volume", "rm", LOCAL_DEV_POSTGRES_VOLUME], check=False)
+        remove = run([exe("docker"), "volume", "rm", LOCAL_DEV_POSTGRES_VOLUME], check=False, capture=True)
+        remove_output = "\n".join(part for part in [remove.stdout, remove.stderr] if part)
+        if remove.returncode != 0 and "No such volume" not in remove_output:
+            if remove_output:
+                print(remove_output, file=sys.stderr)
+            return remove.returncode
         return run(local_dev_compose_args("up", "-d"), check=False).returncode
 
     if command == "reset-all":
@@ -3211,8 +3228,8 @@ def local_dev(args: argparse.Namespace) -> int:
     raise CheckError(f"Unknown local-dev command: {command}")
 
 
-def ensure_penpot_compose_file() -> Path:
-    if PENPOT_COMPOSE_FILE.exists():
+def ensure_penpot_compose_file(*, refresh: bool = False) -> Path:
+    if PENPOT_COMPOSE_FILE.exists() and not refresh:
         return PENPOT_COMPOSE_FILE
 
     PENPOT_LOCAL_DIR.mkdir(parents=True, exist_ok=True)
@@ -3231,6 +3248,10 @@ def penpot_compose_args(compose_file: Path, *args: str) -> list[str]:
     return compose_args(PENPOT_PROJECT_NAME, compose_file, *args)
 
 
+def run_penpot_compose(compose_file: Path, *args: str) -> subprocess.CompletedProcess[str]:
+    return run(penpot_compose_args(compose_file, *args), check=False, env={"PENPOT_VERSION": PENPOT_VERSION})
+
+
 def design_source_penpot(args: argparse.Namespace) -> int:
     command = args.penpot_command
     if command == "mcp":
@@ -3240,12 +3261,12 @@ def design_source_penpot(args: argparse.Namespace) -> int:
         if shutil.which(exe("npx")) is None and shutil.which("npx") is None:
             print("design-source penpot mcp: npx is not available in PATH", file=sys.stderr)
             return 1
-        return run([exe("npx"), "-y", "@penpot/mcp@stable"], check=False).returncode
+        return run([exe("npx"), "-y", PENPOT_MCP_PACKAGE], check=False).returncode
 
     compose_file = PENPOT_COMPOSE_FILE
 
     if command in {"up", "update"}:
-        compose_file = ensure_penpot_compose_file()
+        compose_file = ensure_penpot_compose_file(refresh=command == "update")
     elif not compose_file.exists():
         print(
             "design-source penpot: local compose file is not initialized yet; "
@@ -3258,17 +3279,17 @@ def design_source_penpot(args: argparse.Namespace) -> int:
         return rc
 
     if command == "up":
-        result = run(penpot_compose_args(compose_file, "up", "-d"), check=False)
+        result = run_penpot_compose(compose_file, "up", "-d")
         if result.returncode == 0:
             print(f"design-source penpot: running at {PENPOT_URL}")
             print(f"design-source penpot: mail catcher at {PENPOT_MAILCATCH_URL}")
         return result.returncode
 
     if command == "update":
-        pull = run(penpot_compose_args(compose_file, "pull"), check=False)
+        pull = run_penpot_compose(compose_file, "pull")
         if pull.returncode != 0:
             return pull.returncode
-        result = run(penpot_compose_args(compose_file, "up", "-d"), check=False)
+        result = run_penpot_compose(compose_file, "up", "-d")
         if result.returncode == 0:
             print(f"design-source penpot: updated and running at {PENPOT_URL}")
         return result.returncode
@@ -3277,17 +3298,17 @@ def design_source_penpot(args: argparse.Namespace) -> int:
         down_args = ["down", "--remove-orphans"]
         if args.volumes:
             down_args.append("--volumes")
-        return run(penpot_compose_args(compose_file, *down_args), check=False).returncode
+        return run_penpot_compose(compose_file, *down_args).returncode
 
     if command == "status":
-        return run(penpot_compose_args(compose_file, "ps"), check=False).returncode
+        return run_penpot_compose(compose_file, "ps").returncode
 
     if command == "logs":
         log_args = ["logs"]
         if args.follow:
             log_args.append("-f")
         log_args.extend(args.services)
-        return run(penpot_compose_args(compose_file, *log_args), check=False).returncode
+        return run_penpot_compose(compose_file, *log_args).returncode
 
     raise CheckError(f"Unknown Penpot design-source command: {command}")
 

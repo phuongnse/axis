@@ -24,7 +24,8 @@ Run the optional design-infra stack through the repo CLI:
 python scripts/axis.py design-source penpot up
 ```
 
-The first run downloads the official Penpot compose file into `.local/penpot/docker-compose.yaml`.
+The first run downloads the official Penpot compose file for the pinned
+`PENPOT_VERSION` used by `scripts/axis.py` into `.local/penpot/docker-compose.yaml`.
 The `.local/` directory is ignored because it contains runtime state, local environment files, and design data;
 the repeatable workflow lives in `scripts/axis.py` and this playbook.
 
@@ -59,7 +60,10 @@ For troubleshooting:
 python scripts/axis.py design-source penpot logs
 ```
 
-For a shared team instance, put Penpot behind HTTPS and a reverse proxy. Back up Penpot Docker volumes before upgrades because they hold design data and uploaded assets. Pin `PENPOT_VERSION` in the local Penpot `.env` before relying on a shared instance for review-critical work.
+For a shared team instance, put Penpot behind HTTPS and a reverse proxy. Back up
+Penpot Docker volumes before upgrades because they hold design data and uploaded
+assets. Override `PENPOT_VERSION` in the shell only when intentionally moving the
+local design-source stack to a reviewed Penpot release.
 
 Official references:
 

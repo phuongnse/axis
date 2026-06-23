@@ -52,7 +52,10 @@ python scripts/axis.py local-dev up
 python scripts/axis.py local-dev status
 python scripts/axis.py local-dev e2e
 python scripts/axis.py design-source penpot up
+python scripts/axis.py design-source penpot update
+python scripts/axis.py design-source penpot down [--volumes]
 python scripts/axis.py design-source penpot status
+python scripts/axis.py design-source penpot logs [-f] [service ...]
 python scripts/axis.py design-source penpot mcp
 python scripts/axis.py check policy-tests
 python scripts/axis.py check codex-skills
@@ -60,13 +63,28 @@ python scripts/axis.py check text-encoding
 python scripts/axis.py check docker
 python scripts/axis.py check dotnet-sdk
 python scripts/axis.py check frontend-toolchain
+python scripts/axis.py check vulnerable-packages
+python scripts/axis.py check ef-domain-mapping
+python scripts/axis.py check frontend-api-contracts
+python scripts/axis.py check frontend-style
+python scripts/axis.py check frontend-component-composition
+python scripts/axis.py check frontend-quality
 python scripts/axis.py check doc-drift
 python scripts/axis.py check markdown-links
 python scripts/axis.py check buf-cli
 python scripts/axis.py check buf-lint
+python scripts/axis.py check buf-modules
+python scripts/axis.py check buf-breaking-against-base
+python scripts/axis.py check local-dev-docs
+python scripts/axis.py check doc-link-targets
 python scripts/axis.py check scripts-standard
 python scripts/axis.py check doc-navigation
 python scripts/axis.py check doc-size-budgets
+python scripts/axis.py check doc-code-fences
+python scripts/axis.py check use-case-docs
+python scripts/axis.py check kafka-wiring
+python scripts/axis.py check domain-readme-index
+python scripts/axis.py check pr
 python scripts/axis.py test unit
 python scripts/axis.py generate api-contracts
 python scripts/axis.py generate wireframes
