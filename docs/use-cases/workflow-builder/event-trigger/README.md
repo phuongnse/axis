@@ -50,6 +50,12 @@ A workflow must have at least one trigger before it can be published. Triggers d
 - Custom platform events defined by users.
 - Listening to events from external systems (without going through a Webhook trigger).
 
+## Design Sources
+
+| Screen | Source | Preview |
+|--------|--------|---------|
+| N/A | N/A | N/A |
+
 > **Implementation status**
 >
 > | Layer | Status |
@@ -68,9 +74,3 @@ A workflow must have at least one trigger before it can be published. Triggers d
 >
 > **Decisions:** Event trigger scope is limited to platform-owned event types until custom event contracts have an approved registry model.
 >
-
-## Wireframes
-
-| Screen | Excalidraw | Preview |
-|--------|------------|---------|
-| N/A | N/A | N/A |

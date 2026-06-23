@@ -46,6 +46,12 @@ Users can create, read, update, and delete records against any model. Records ar
 *Out of scope*
 - Restoring a soft-deleted record.
 
+## Design Sources
+
+| Screen | Source | Preview |
+|--------|--------|---------|
+| N/A | N/A | N/A |
+
 > **Implementation status**
 >
 > | Layer | Status |
@@ -63,10 +69,3 @@ Users can create, read, update, and delete records against any model. Records ar
 >
 > **Decisions:**
 > - N/A
-
-## Wireframes
-
-| Screen | Excalidraw | Preview |
-|--------|------------|---------|
-| N/A | N/A | N/A |
-

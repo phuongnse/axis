@@ -22,7 +22,7 @@ Implement an Axis frontend slice with generated API types, user-visible states, 
    - `docs/playbooks/design-source.md`
    - `docs/playbooks/testing.md`
    - `docs/playbooks/agent-checklist.md`
-   - The owning use-case and wireframe docs when behavior or screen shape changes
+   - The owning use-case and design-source docs when behavior or screen shape changes
 
 3. Trace the existing feature.
    - Search routes, feature folder exports, generated API types, hooks, test files, and sibling components with `rg`.
@@ -33,7 +33,7 @@ Implement an Axis frontend slice with generated API types, user-visible states, 
    - Use TanStack Query for server state and Zustand only for client-only state.
    - Use React Hook Form plus Zod for forms.
    - Include loading, empty, error, validation, disabled, and success states when the workflow needs them.
-   - Match the owning Penpot source/preview when screen shape changes; update the use-case `## Wireframes` row through `$axis-visual-artifact`.
+   - Match the owning Penpot source/preview when screen shape changes; update the use-case `## Design Sources` row through `$axis-visual-artifact`.
    - Do not store auth tokens in `localStorage`.
    - Keep visible text focused on the product workflow, not developer instructions.
 

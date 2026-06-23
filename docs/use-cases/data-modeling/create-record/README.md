@@ -49,6 +49,12 @@ Users can create, read, update, and delete records against any model. Records ar
 *Out of scope*
 - Record templates (pre-filled forms).
 
+## Design Sources
+
+| Screen | Source | Preview |
+|--------|--------|---------|
+| N/A | N/A | N/A |
+
 > **Implementation status**
 >
 > | Layer | Status |
@@ -69,10 +75,3 @@ Users can create, read, update, and delete records against any model. Records ar
 >
 > **Deferred follow-ups:**
 > - N/A
-
-## Wireframes
-
-| Screen | Excalidraw | Preview |
-|--------|------------|---------|
-| N/A | N/A | N/A |
-

@@ -47,6 +47,12 @@ A node-based drag-and-drop canvas (powered by React Flow) where users design the
 *Out of scope*
 - Full-screen step config modal — the panel-based UI is the only config surface.
 
+## Design Sources
+
+| Screen | Source | Preview |
+|--------|--------|---------|
+| N/A | N/A | N/A |
+
 > **Implementation status**
 >
 > | Layer | Status |
@@ -66,10 +72,3 @@ A node-based drag-and-drop canvas (powered by React Flow) where users design the
 >
 > **Decisions:**
 > - N/A
-
-## Wireframes
-
-| Screen | Excalidraw | Preview |
-|--------|------------|---------|
-| N/A | N/A | N/A |
-

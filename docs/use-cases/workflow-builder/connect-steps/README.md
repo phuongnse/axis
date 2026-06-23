@@ -47,6 +47,12 @@ A node-based drag-and-drop canvas (powered by React Flow) where users design the
 *Out of scope*
 - Animated transitions showing flow direction — static arrows only.
 
+## Design Sources
+
+| Screen | Source | Preview |
+|--------|--------|---------|
+| N/A | N/A | N/A |
+
 > **Implementation status**
 >
 > | Layer | Status |
@@ -65,9 +71,3 @@ A node-based drag-and-drop canvas (powered by React Flow) where users design the
 >
 > **Decisions:** Transitions remain static arrows for the current builder scope; animated direction is decorative and deferred until the core canvas UX is usable.
 >
-
-## Wireframes
-
-| Screen | Excalidraw | Preview |
-|--------|------------|---------|
-| N/A | N/A | N/A |

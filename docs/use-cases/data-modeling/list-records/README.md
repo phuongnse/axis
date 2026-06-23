@@ -49,6 +49,12 @@ Users can create, read, update, and delete records against any model. Records ar
 - Saved views / custom column configurations.
 - Inline editing in the list.
 
+## Design Sources
+
+| Screen | Source | Preview |
+|--------|--------|---------|
+| N/A | N/A | N/A |
+
 > **Implementation status**
 >
 > | Layer | Status |
@@ -65,9 +71,3 @@ Users can create, read, update, and delete records against any model. Records ar
 >
 > **Decisions:** N/A - no implementation-specific decision recorded for this slice.
 >
-
-## Wireframes
-
-| Screen | Excalidraw | Preview |
-|--------|------------|---------|
-| N/A | N/A | N/A |

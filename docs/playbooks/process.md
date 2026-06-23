@@ -135,13 +135,13 @@ Complete in order before building any feature screen. Do not skip or reorder.
 
 ### Per-feature workflow
 
-Repeat for every screen / feature area. **Never skip the wireframe step** — it is part of the US, not a pre-task.
+Repeat for every screen / feature area. **Never skip the design-source step** — it is part of the US, not a pre-task.
 
 | Step | Action | Output |
 |---|---|---|
 | 1 | Read use-case file ACs in full and define the user goal, required decision, and minimum useful information | UX contract before visual design |
 | 2 | Create/update Penpot design source for the screen | Penpot frame linked from `docs/use-cases/{domain}/{slug}/README.md`; committed preview optional when review needs a stable snapshot |
-| 3 | Add row to the use-case `## Wireframes` table | Source/preview linked from spec |
+| 3 | Add row to the use-case `## Design Sources` table | Source/preview linked from spec |
 | 4 | Define types from backend contract | `features/{name}/types.ts` |
 | 5 | Define API functions + query key factory | `features/{name}/api.ts` |
 | 6 | Write tests first (TDD) — Vitest + Testing Library | Failing tests that define expected behaviour |

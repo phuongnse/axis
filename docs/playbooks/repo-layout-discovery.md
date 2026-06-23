@@ -30,7 +30,7 @@
 | `Program.cs` Wolverine `PublishAndListenWithAvro<T>` lines | Needs event **type** + serializer | Wire each new `*KafkaTopics` const (see check above) |
 | `WorkspaceModuleNames` string ids | Kafka contract between modules | Add module slug when adding `WorkspaceVerifiedHandler` |
 | Architecture test **project references** | MSBuild needs explicit refs | Reference new `Axis.{Module}.*` projects in `Axis.Architecture.Tests.csproj` when testing that module |
-| Use-case **spec** content (AC, wireframes) | Source of truth | Follow [USE_CASE_TEMPLATE.md](../use-cases/USE_CASE_TEMPLATE.md) |
+| Use-case **spec** content (AC, design sources) | Source of truth | Follow [USE_CASE_TEMPLATE.md](../use-cases/USE_CASE_TEMPLATE.md) |
 
 ---
 

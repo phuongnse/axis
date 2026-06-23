@@ -67,6 +67,12 @@ Define user-facing localization and visual theme behavior for the SPA so each us
 - Runtime machine translation.
 - Additional locales beyond `en` and `vi`.
 
+## Design Sources
+
+| Screen | Source | Preview |
+|--------|--------|---------|
+| N/A | N/A | N/A |
+
 > **Implementation status**
 >
 > | Layer | Status |
@@ -92,9 +98,3 @@ Define user-facing localization and visual theme behavior for the SPA so each us
 >
 > **Deferred follow-ups:**
 > - N/A
-
-## Wireframes
-
-| Screen | Excalidraw | Preview |
-|--------|------------|---------|
-| N/A | N/A | N/A |

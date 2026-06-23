@@ -50,6 +50,12 @@ Each step has a type that determines what it does when executed. Users configure
 - Importing external npm packages.
 - Python or other language scripts — JavaScript only.
 
+## Design Sources
+
+| Screen | Source | Preview |
+|--------|--------|---------|
+| N/A | N/A | N/A |
+
 > **Implementation status**
 >
 > | Layer | Status |
@@ -67,10 +73,3 @@ Each step has a type that determines what it does when executed. Users configure
 >
 > **Decisions:**
 > - N/A
-
-## Wireframes
-
-| Screen | Excalidraw | Preview |
-|--------|------------|---------|
-| N/A | N/A | N/A |
-

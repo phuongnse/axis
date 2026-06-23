@@ -48,6 +48,12 @@ Form fields define what data the form collects. Each field has a type, label, he
 *Out of scope*
 - Cross-field validation (e.g., "end date must be after start date").
 
+## Design Sources
+
+| Screen | Source | Preview |
+|--------|--------|---------|
+| N/A | N/A | N/A |
+
 > **Implementation status**
 >
 > | Layer | Status |
@@ -68,10 +74,3 @@ Form fields define what data the form collects. Each field has a type, label, he
 >
 > **Decisions:**
 > - N/A
-
-## Wireframes
-
-| Screen | Excalidraw | Preview |
-|--------|------------|---------|
-| N/A | N/A | N/A |
-

@@ -63,6 +63,14 @@ Allow users to reset forgotten passwords, change their current password, and man
 *Out of scope*
 - Security questions as a backup reset method.
 
+## Design Sources
+
+The reset-password entry screen uses the shared public auth card/page-frame skeleton and field-level help text pattern.
+
+| Screen | Source | Preview |
+|--------|--------|---------|
+| forgot-password | [source](./forgot-password.excalidraw) | [preview](./forgot-password.svg) |
+
 > **Implementation status**
 >
 > | Layer | Status |
@@ -82,11 +90,3 @@ Allow users to reset forgotten passwords, change their current password, and man
 >
 > **Deferred follow-ups:**
 > - N/A
-
-## Wireframes
-
-The reset-password entry screen uses the shared public auth card/page-frame skeleton and field-level help text pattern from [wireframes/README](../../../wireframes/README.md#agent-contract).
-
-| Screen | Excalidraw | Preview |
-|--------|------------|---------|
-| forgot-password | [source](./forgot-password.excalidraw) | [preview](./forgot-password.svg) |

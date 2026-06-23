@@ -53,10 +53,10 @@ Handler specifications (Form, HTTP, Condition, Script, Notification) remain docu
 *Out of scope*
 - Custom step types defined by users.
 
-## Wireframes
+## Design Sources
 
-| Screen | Excalidraw | Preview |
-|--------|------------|---------|
+| Screen | Source | Preview |
+|--------|--------|---------|
 | execution-detail | [source](./execution-detail.excalidraw) | [preview](./execution-detail.svg) |
 
 > **Implementation status**

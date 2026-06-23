@@ -44,6 +44,12 @@ Data Classes are reusable, named object types composed of multiple fields. They 
 *Out of scope*
 - Version history of data class changes.
 
+## Design Sources
+
+| Screen | Source | Preview |
+|--------|--------|---------|
+| N/A | N/A | N/A |
+
 > **Implementation status**
 >
 > | Layer | Status |
@@ -63,10 +69,3 @@ Data Classes are reusable, named object types composed of multiple fields. They 
 >
 > **Decisions:**
 > - N/A
-
-## Wireframes
-
-| Screen | Excalidraw | Preview |
-|--------|------------|---------|
-| N/A | N/A | N/A |
-

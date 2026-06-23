@@ -48,6 +48,12 @@ Infrastructure-level enforcement ensuring every database query is scoped to the 
 *Out of scope*
 - Cross-workspace data sharing features.
 
+## Design Sources
+
+| Screen | Source | Preview |
+|--------|--------|---------|
+| N/A | N/A | N/A |
+
 > **Implementation status**
 >
 > | Layer | Status |
@@ -72,9 +78,3 @@ Infrastructure-level enforcement ensuring every database query is scoped to the 
 >
 > **Decisions:**
 > - N/A
-
-## Wireframes
-
-| Screen | Excalidraw | Preview |
-|--------|------------|---------|
-| N/A | N/A | N/A |

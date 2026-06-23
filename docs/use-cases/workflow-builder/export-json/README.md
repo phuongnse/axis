@@ -51,6 +51,12 @@ Workflow definitions can be exported as portable JSON files and imported into an
 - Exporting execution history — definitions only.
 - Exporting to formats other than JSON (YAML, BPMN).
 
+## Design Sources
+
+| Screen | Source | Preview |
+|--------|--------|---------|
+| N/A | N/A | N/A |
+
 > **Implementation status**
 >
 > | Layer | Status |
@@ -70,9 +76,3 @@ Workflow definitions can be exported as portable JSON files and imported into an
 >
 > **Decisions:** credential scrubbing in `ExportWorkflowHandler` — keys matching token/api_key/apikey/secret/password/authorization/auth_token/hmac_secret/client_secret/private_key/bearer/access_token/refresh_token replaced with `[REDACTED]` (OrdinalIgnoreCase).
 >
-
-## Wireframes
-
-| Screen | Excalidraw | Preview |
-|--------|------------|---------|
-| N/A | N/A | N/A |

@@ -69,4 +69,4 @@ Use `SEQUENCE_PHASE_RGB` from `mermaid_theme.py` for `rect rgb(...)`.
 | Platform architecture | [docs/README.md - Key Diagrams](../README.md#key-diagrams) |
 | Use case | `docs/use-cases/{domain}/{slug}/README.md` -> `## Diagrams` or `## Screen flow` |
 
-Wireframe/design sources stay in Penpot. See [design-source.md](./design-source.md) and [wireframes.md](./wireframes.md). Legacy Excalidraw assets are only refreshed when touched.
+Design sources stay in Penpot. See [design-source.md](./design-source.md) and [wireframes.md](./wireframes.md). Legacy Excalidraw assets are only refreshed when touched.

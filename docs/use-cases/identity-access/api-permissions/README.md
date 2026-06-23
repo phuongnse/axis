@@ -50,6 +50,12 @@ A resource-based permission system where each permission grants the ability to p
 *Out of scope*
 - Row-level security (e.g., "user can only edit their own records") — all permission checks are type-level.
 
+## Design Sources
+
+| Screen | Source | Preview |
+|--------|--------|---------|
+| N/A | N/A | N/A |
+
 > **Implementation status**
 >
 > | Layer | Status |
@@ -68,9 +74,3 @@ A resource-based permission system where each permission grants the ability to p
 >
 > **Deferred follow-ups:**
 > - N/A
-
-## Wireframes
-
-| Screen | Excalidraw | Preview |
-|--------|------------|---------|
-| N/A | N/A | N/A |

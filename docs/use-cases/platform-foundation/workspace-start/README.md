@@ -50,12 +50,12 @@ Open the first authenticated workspace screen so that the user understands their
 - Editing Workspace settings.
 - Showing workflow/model/event metrics before those backend endpoints exist.
 
-## Wireframes
+## Design Sources
 
-The current screen reuses the authenticated app shell and dashboard composition. No new wireframe artifact is required for this small state-oriented slice.
+The current screen reuses the authenticated app shell and dashboard composition. No new design-source artifact is required for this small state-oriented slice.
 
-| Screen | Excalidraw | Preview |
-|--------|------------|---------|
+| Screen | Source | Preview |
+|--------|--------|---------|
 | N/A | N/A | N/A |
 
 > **Implementation status**

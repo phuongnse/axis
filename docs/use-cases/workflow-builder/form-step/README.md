@@ -49,6 +49,12 @@ Each step has a type that determines what it does when executed. Users configure
 *Out of scope*
 - Multiple assignees on a single Form step (assign to all and wait for the first response).
 
+## Design Sources
+
+| Screen | Source | Preview |
+|--------|--------|---------|
+| N/A | N/A | N/A |
+
 > **Implementation status**
 >
 > | Layer | Status |
@@ -65,9 +71,3 @@ Each step has a type that determines what it does when executed. Users configure
 >
 > **Decisions:** step config (formId, assignee, timeout) stored as JSONB dict in `steps` column. `StepType` enum includes `Start` and `End` values.
 >
-
-## Wireframes
-
-| Screen | Excalidraw | Preview |
-|--------|------------|---------|
-| N/A | N/A | N/A |

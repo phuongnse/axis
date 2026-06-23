@@ -45,6 +45,12 @@ Form fields define what data the form collects. Each field has a type, label, he
 *Out of scope*
 - Multi-column form layouts — single-column only.
 
+## Design Sources
+
+| Screen | Source | Preview |
+|--------|--------|---------|
+| N/A | N/A | N/A |
+
 > **Implementation status**
 >
 > | Layer | Status |
@@ -61,10 +67,3 @@ Form fields define what data the form collects. Each field has a type, label, he
 >
 > **Deferred follow-ups:**
 > - N/A
-
-## Wireframes
-
-| Screen | Excalidraw | Preview |
-|--------|------------|---------|
-| N/A | N/A | N/A |
-

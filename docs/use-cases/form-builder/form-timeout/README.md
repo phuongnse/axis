@@ -50,6 +50,12 @@ When a workflow reaches a Form step, the engine creates a Form Task and notifies
 *Out of scope*
 - Sending a reminder notification before timeout expires.
 
+## Design Sources
+
+| Screen | Source | Preview |
+|--------|--------|---------|
+| N/A | N/A | N/A |
+
 > **Implementation status**
 >
 > | Layer | Status |
@@ -72,9 +78,3 @@ When a workflow reaches a Form step, the engine creates a Form Task and notifies
 >
 > **Decisions:**
 > - N/A
-
-## Wireframes
-
-| Screen | Excalidraw | Preview |
-|--------|------------|---------|
-| N/A | N/A | N/A |

@@ -51,27 +51,10 @@ The engine manages the full lifecycle of a workflow execution — from creation 
 *Out of scope*
 - Triggering a specific version of a workflow (other than the current active version).
 
-> **Implementation status**
->
-> | Layer | Status |
-> |-------|--------|
-> | Domain | ✅ |
-> | Application | ✅ |
-> | Infrastructure | ✅ |
-> | API | ⏳ |
-> | Frontend | ⏳ |
->
-> **Gaps vs spec:** trigger HTTP endpoint, schedule/webhook/event trigger handlers, stale-PENDING recovery job pending API + workflow-engine engine.
->
-> **Decisions:** `WorkflowExecution.Create` sets status `Pending`; `Start()` transitions to `Running` — engine calls both in sequence.
->
-> **Deferred follow-ups:**
-> - N/A
+## Design Sources
 
-## Wireframes
-
-| Screen | Excalidraw | Preview |
-|--------|------------|---------|
+| Screen | Source | Preview |
+|--------|--------|---------|
 | N/A | N/A | N/A |
 
 ## Diagrams
@@ -119,3 +102,20 @@ sequenceDiagram
     Hub->>Browser: Push status update
   end
 ```
+
+> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | Domain | ✅ |
+> | Application | ✅ |
+> | Infrastructure | ✅ |
+> | API | ⏳ |
+> | Frontend | ⏳ |
+>
+> **Gaps vs spec:** trigger HTTP endpoint, schedule/webhook/event trigger handlers, stale-PENDING recovery job pending API + workflow-engine engine.
+>
+> **Decisions:** `WorkflowExecution.Create` sets status `Pending`; `Start()` transitions to `Running` — engine calls both in sequence.
+>
+> **Deferred follow-ups:**
+> - N/A

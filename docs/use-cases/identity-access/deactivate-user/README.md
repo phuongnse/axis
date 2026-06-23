@@ -49,6 +49,12 @@ Workspace admins can invite new members, manage their accounts, and deactivate u
 *Out of scope*
 - Transferring ownership of content from a deactivated user.
 
+## Design Sources
+
+| Screen | Source | Preview |
+|--------|--------|---------|
+| N/A | N/A | N/A |
+
 > **Implementation status**
 >
 > | Layer | Status |
@@ -65,10 +71,3 @@ Workspace admins can invite new members, manage their accounts, and deactivate u
 >
 > **Deferred follow-ups:**
 > - N/A
-
-## Wireframes
-
-| Screen | Excalidraw | Preview |
-|--------|------------|---------|
-| N/A | N/A | N/A |
-

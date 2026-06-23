@@ -49,6 +49,12 @@ A resource-based permission system where each permission grants the ability to p
 *Out of scope*
 - Per-record UI permissions (e.g., hiding individual table rows).
 
+## Design Sources
+
+| Screen | Source | Preview |
+|--------|--------|---------|
+| N/A | N/A | N/A |
+
 > **Implementation status**
 >
 > | Layer | Status |
@@ -66,9 +72,3 @@ A resource-based permission system where each permission grants the ability to p
 >
 > **Decisions:**
 > - N/A
-
-## Wireframes
-
-| Screen | Excalidraw | Preview |
-|--------|------------|---------|
-| N/A | N/A | N/A |

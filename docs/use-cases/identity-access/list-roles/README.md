@@ -44,6 +44,12 @@ Workspace admins can create custom roles, assign permissions to each role, and a
 *Out of scope*
 - Role hierarchy / role inheritance — flat role model only.
 
+## Design Sources
+
+| Screen | Source | Preview |
+|--------|--------|---------|
+| N/A | N/A | N/A |
+
 > **Implementation status**
 >
 > | Layer | Status |
@@ -61,10 +67,3 @@ Workspace admins can create custom roles, assign permissions to each role, and a
 >
 > **Decisions:**
 > - N/A
-
-## Wireframes
-
-| Screen | Excalidraw | Preview |
-|--------|------------|---------|
-| N/A | N/A | N/A |
-

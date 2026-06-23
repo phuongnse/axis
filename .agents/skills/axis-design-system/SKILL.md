@@ -13,7 +13,7 @@ Keep Axis design-system changes grounded in the source of truth: tokens, UI prim
 
 - Use `$axis-design-gate` before non-trivial design-system edits.
 - Use `$axis-frontend-feature` when changing SPA routes, feature components, forms, or product screens.
-- Use `$axis-visual-artifact` when touching Penpot links, wireframes, committed previews, Mermaid, or visual artifact docs.
+- Use `$axis-visual-artifact` when touching Penpot links, design-source rows, committed previews, Mermaid, or visual artifact docs.
 - Use `$axis-api-contract` or `$axis-cross-module-contract` first when design-system work reveals API or cross-module contract changes.
 - Use `$axis-ready-review` before opening or marking a PR ready.
 

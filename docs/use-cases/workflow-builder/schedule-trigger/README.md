@@ -49,6 +49,12 @@ A workflow must have at least one trigger before it can be published. Triggers d
 *Out of scope*
 - Date-specific one-time scheduling (e.g., "run once on 2026-12-25").
 
+## Design Sources
+
+| Screen | Source | Preview |
+|--------|--------|---------|
+| N/A | N/A | N/A |
+
 > **Implementation status**
 >
 > | Layer | Status |
@@ -68,10 +74,3 @@ A workflow must have at least one trigger before it can be published. Triggers d
 >
 > **Decisions:**
 > - N/A
-
-## Wireframes
-
-| Screen | Excalidraw | Preview |
-|--------|------------|---------|
-| N/A | N/A | N/A |
-

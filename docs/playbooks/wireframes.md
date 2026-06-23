@@ -6,7 +6,7 @@ This playbook covers low-fidelity UI wireframe intent and use-case visual invent
 
 ## Agent Checklist
 
-When you touch `docs/wireframes/**` or use-case wireframe source/preview links:
+When you touch `docs/wireframes/**` or use-case design-source/preview links:
 
 - [ ] Read [wireframes/README.md](../wireframes/README.md#agent-contract).
 - [ ] New output stays skeletal: grayscale structure only; state meaning comes from labels, copy, icons, and placement.
@@ -21,8 +21,8 @@ When you touch `docs/wireframes/**` or use-case wireframe source/preview links:
 
 | File or link | Purpose |
 |---|---|
-| Penpot source link | Source of truth for a screen design or wireframe frame |
-| `docs/use-cases/{domain}/{use-case}/README.md` | Use-case `## Wireframes` inventory |
+| Penpot source link | Source of truth for a screen design or low-fidelity frame |
+| `docs/use-cases/{domain}/{use-case}/README.md` | Use-case `## Design Sources` inventory |
 | Committed preview link | Optional exported preview for docs review |
 | `docs/wireframes/README.md` | Shared wireframe contract |
 | `docs/wireframes/*.excalidraw` / `.svg` | Legacy shared wireframe assets until migrated |
@@ -41,7 +41,7 @@ Reusable pattern for use cases with several UI steps and error variants. Product
 |----|-------|
 | One folder per actor journey | A separate folder per micro-step when the user sees one continuous flow |
 | `## Screen flow` when there are branches, many screens, or easy-to-confuse error screens | Listing error screens as if they were sequential steps |
-| `## Wireframes` with every UI source/preview row in order | Diagram-only assets in the wireframes table |
+| `## Design Sources` with every UI source/preview row in order | Diagram-only assets in the design sources table |
 | `## Diagrams` as Mermaid in the README | Sequence/entity image/source files beside use cases |
 | Note runtime behavior with no dedicated screen | A wireframe file the app never renders |
 
@@ -57,7 +57,7 @@ Split `*-states` by trigger: interactions on the same screen go on one board; a 
 
 ### Before Merge
 
-- [ ] README screen flow and wireframes table updated.
+- [ ] README screen flow and design sources table updated.
 - [ ] Committed previews refreshed for touched design sources when previews exist.
 - [ ] Legacy `.svg` regenerated for touched `.excalidraw`.
 - [ ] No visual polish that implies final frontend styling.
@@ -76,7 +76,7 @@ Split `*-states` by trigger: interactions on the same screen go on one board; a 
 
 1. Create or edit the design source in Penpot.
 2. Keep the screen traceable to a user goal, screen-flow step, or acceptance criterion.
-3. Add or update the row in the use-case `## Wireframes` table.
+3. Add or update the row in the use-case `## Design Sources` table.
 4. Add or update `## Screen flow` when the journey has more than three screens or branch states.
 5. Export and commit a preview when review needs a stable visual snapshot.
 6. Review the preview at 100% zoom when a preview exists.
@@ -89,7 +89,7 @@ Existing `.excalidraw` files remain valid historical sources until migrated. Whe
 python scripts/axis.py generate wireframes -f <use-case-or-screen-fragment>
 ```
 
-Use `python scripts/axis.py generate wireframes --changed` when several changed Markdown files reference legacy previews. Do not create new Excalidraw files for design-system or high-fidelity work; create Penpot frames and link them from the owning use-case table instead.
+Use `python scripts/axis.py generate wireframes --changed` when several changed Markdown files reference legacy previews. Do not create new Excalidraw files for design-system or high-fidelity work; create Penpot frames and link them from the owning use-case `## Design Sources` table instead.
 
 ## Script Policy
 

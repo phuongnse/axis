@@ -48,6 +48,12 @@ When a workflow reaches a Form step, the engine creates a Form Task and notifies
 - Delegating a task to another user.
 - Bulk task completion.
 
+## Design Sources
+
+| Screen | Source | Preview |
+|--------|--------|---------|
+| N/A | N/A | N/A |
+
 > **Implementation status**
 >
 > | Layer | Status |
@@ -71,9 +77,3 @@ When a workflow reaches a Form step, the engine creates a Form Task and notifies
 >
 > **Decisions:** N/A - no implementation-specific decision recorded for this slice.
 >
-
-## Wireframes
-
-| Screen | Excalidraw | Preview |
-|--------|------------|---------|
-| N/A | N/A | N/A |

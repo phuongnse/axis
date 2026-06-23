@@ -51,6 +51,12 @@ Allow users to reset forgotten passwords, change their current password, and man
 *Out of scope*
 - Per-session device naming by the user.
 
+## Design Sources
+
+| Screen | Source | Preview |
+|--------|--------|---------|
+| N/A | N/A | N/A |
+
 > **Implementation status**
 >
 > | Layer | Status |
@@ -71,9 +77,3 @@ Allow users to reset forgotten passwords, change their current password, and man
 >
 > **Deferred follow-ups:**
 > - N/A
-
-## Wireframes
-
-| Screen | Excalidraw | Preview |
-|--------|------------|---------|
-| N/A | N/A | N/A |

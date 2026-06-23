@@ -53,9 +53,9 @@ Use the lowest reliable level for each AC. Playwright covers browser-level journ
 
 ## Screen flow
 
-Add this section when the use case has **more than three** wireframe screens, **branched** happy paths, or non-obvious error screens. Otherwise delete it. Rules: [docs-style § Use-case visual artifacts](../playbooks/docs-style.md#use-case-files--wireframes--implementation-status). Example: [register-workspace](./platform-foundation/register-workspace/README.md#screen-flow).
+Add this section when the use case has **more than three** design-source screens, **branched** happy paths, or non-obvious error screens. Otherwise delete it. Rules: [docs-style § Use-case visual artifacts](../playbooks/docs-style.md#use-case-files--design-sources--implementation-status). Example: [register-workspace](./platform-foundation/register-workspace/README.md#screen-flow).
 
-Canonical order for this use case. **The wireframes table below uses the same row order.**
+Canonical order for this use case. **The design sources table below uses the same row order.**
 
 | Step | Screen | When |
 |------|--------|------|
@@ -77,9 +77,9 @@ flowchart TD
   step1 -.-> err["<screen>-states"]
 ```
 
-## Wireframes
+## Design Sources
 
-If `## Screen flow` exists, use the full table and inventory note from [register-workspace](./platform-foundation/register-workspace/README.md#wireframes). Otherwise use the minimal table below.
+If `## Screen flow` exists, use the full table and inventory note from [register-workspace](./platform-foundation/register-workspace/README.md#design-sources). Otherwise use the minimal table below.
 
 All UI assets in this folder (<N> screens). Row order matches [Screen flow](#screen-flow) above. Sequence/architecture drawings are under [Diagrams](#diagrams).
 
@@ -87,7 +87,7 @@ All UI assets in this folder (<N> screens). Row order matches [Screen flow](#scr
 |---|--------|------|--------|---------|
 | 1 | `<screen-slug>` | Happy path — … | `[source](https://design.example/penpot-frame)` | `[preview](./<screen-slug>.svg)` |
 
-Replace placeholders with real Penpot `[source](…)` links and optional `[preview](./…)` links when implementing (see [register-workspace](./platform-foundation/register-workspace/README.md#wireframes) for a filled-in table including error rows).
+Replace placeholders with real Penpot `[source](…)` links and optional `[preview](./…)` links when implementing (see [register-workspace](./platform-foundation/register-workspace/README.md#design-sources) for a filled-in table including error rows).
 
 Minimal (delete `#` / `Role` columns and the inventory note when Screen flow is omitted):
 
@@ -97,11 +97,11 @@ Minimal (delete `#` / `Role` columns and the inventory note when Screen flow is 
 
 Use real `[source](…)` / `[preview](./…)` links in implemented use cases — not angle-bracket placeholders.
 
-Committed previews live **flat** inside this use-case folder. Reference shared kit screens from Penpot or `../../../wireframes/` legacy assets when needed. Use a single `N/A` row when no wireframe applies.
+Committed previews live **flat** inside this use-case folder. Reference shared kit screens from Penpot or `../../../wireframes/` legacy assets when needed. Use a single `N/A` row when no design source applies.
 
 ## Diagrams
 
-Mermaid blocks in this README (sequence, flowchart, or `erDiagram`). One `### <diagram-slug>` heading per diagram. Multi-screen journeys: prefer **one** `<slug>-journey` sequence + **optional** `<slug>-cases` for error wireframes ([docs-style § Diagrams](../playbooks/docs-style.md#diagrams-content-rules)).
+Mermaid blocks in this README (sequence, flowchart, or `erDiagram`). One `### <diagram-slug>` heading per diagram. Multi-screen journeys: prefer **one** `<slug>-journey` sequence + **optional** `<slug>-cases` for error/state screens ([docs-style § Diagrams](../playbooks/docs-style.md#diagrams-content-rules)).
 
 ```markdown
 ### `<slug>-journey`

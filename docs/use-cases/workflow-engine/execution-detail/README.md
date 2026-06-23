@@ -47,6 +47,12 @@ Every workflow execution and each of its steps is recorded in full detail. Users
 *Out of scope*
 - Replaying or simulating an execution from any point with a different context.
 
+## Design Sources
+
+| Screen | Source | Preview |
+|--------|--------|---------|
+| N/A | N/A | N/A |
+
 > **Implementation status**
 >
 > | Layer | Status |
@@ -66,10 +72,3 @@ Every workflow execution and each of its steps is recorded in full detail. Users
 >
 > **Decisions:**
 > - N/A
-
-## Wireframes
-
-| Screen | Excalidraw | Preview |
-|--------|------------|---------|
-| N/A | N/A | N/A |
-

@@ -45,6 +45,12 @@ Users can create, view, edit, publish, archive, delete, and duplicate workflow d
 *Out of scope*
 - Approval workflow for publishing (e.g., requiring a second admin to approve).
 
+## Design Sources
+
+| Screen | Source | Preview |
+|--------|--------|---------|
+| N/A | N/A | N/A |
+
 > **Implementation status**
 >
 > | Layer | Status |
@@ -65,10 +71,3 @@ Users can create, view, edit, publish, archive, delete, and duplicate workflow d
 >
 > **Decisions:**
 > - N/A
-
-## Wireframes
-
-| Screen | Excalidraw | Preview |
-|--------|------------|---------|
-| N/A | N/A | N/A |
-

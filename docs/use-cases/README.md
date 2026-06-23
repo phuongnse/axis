@@ -2,7 +2,7 @@
 
 > **Navigation**: [← docs/README.md](../README.md) · [← AGENTS.md](../../AGENTS.md)
 
-Use cases are the user-facing source of truth for behavior. **One markdown file = one use case** (flow, AC, wireframes, diagrams, implementation status). Domain `README.md` indexes all use cases in that area.
+Use cases are the user-facing source of truth for behavior. **One markdown file = one use case** (flow, AC, design sources, diagrams, implementation status). Domain `README.md` indexes all use cases in that area.
 
 Create a full use-case README only when the work is shipped, being implemented, or being specified for the next concrete slice. Distant product ideas belong in a lightweight roadmap/open-work note until they are ready for doc-first implementation. The checker rejects new/touched placeholder sections and stock Main flow text, so a committed use-case file must describe real behavior rather than act as a blank reservation.
 
@@ -30,7 +30,7 @@ Create a full use-case README only when the work is shipped, being implemented, 
 
 When you ship code, update **use-case callout → domain README → PROGRESS** in the same PR. Never mark ✅ while `**Gaps vs spec**` still lists backend work for that layer.
 
-**Use-case file layout:** Purpose/Actor/Trigger, flow sections, AC, optional **Screen flow**, wireframes table, diagrams table, implementation status — see [docs-style § Use-case visual artifacts](../playbooks/docs-style.md#use-case-files--wireframes--implementation-status). Multi-screen reference: [register-workspace](./platform-foundation/register-workspace/README.md).
+**Use-case file layout:** Purpose/Actor/Trigger, flow sections, AC, optional **Screen flow**, design sources table, diagrams table, implementation status — see [docs-style § Use-case visual artifacts](../playbooks/docs-style.md#use-case-files--design-sources--implementation-status). Multi-screen reference: [register-workspace](./platform-foundation/register-workspace/README.md).
 
 ---
 
@@ -70,7 +70,7 @@ docs/use-cases/
         └── *.svg            # optional committed previews for this use case
 ```
 
-Penpot design sources are linked from each use-case `## Wireframes` table; setup lives in [design-source.md](../playbooks/design-source.md). Legacy shared wireframe references live in [`../wireframes/`](../wireframes/) — agent contract: [wireframes/README](../wireframes/README.md#agent-contract). Platform diagrams: [`../diagrams/`](../diagrams/).
+Penpot design sources are linked from each use-case `## Design Sources` table; setup lives in [design-source.md](../playbooks/design-source.md). Legacy shared wireframe references live in [`../wireframes/`](../wireframes/) — agent contract: [wireframes/README](../wireframes/README.md#agent-contract). Platform diagrams: [`../diagrams/`](../diagrams/).
 
 ---
 

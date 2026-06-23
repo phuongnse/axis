@@ -46,6 +46,12 @@ Users can create custom data models within their Workspace. A model defines the 
 *Out of scope*
 - Folders or categories for arranging models.
 
+## Design Sources
+
+| Screen | Source | Preview |
+|--------|--------|---------|
+| N/A | N/A | N/A |
+
 > **Implementation status**
 >
 > | Layer | Status |
@@ -65,10 +71,3 @@ Users can create custom data models within their Workspace. A model defines the 
 >
 > **Decisions:**
 > - N/A
-
-## Wireframes
-
-| Screen | Excalidraw | Preview |
-|--------|------------|---------|
-| N/A | N/A | N/A |
-

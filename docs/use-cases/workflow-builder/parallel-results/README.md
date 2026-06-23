@@ -44,6 +44,12 @@ Multiple steps can run concurrently inside a Parallel Group. The workflow fans o
 *Out of scope*
 - Merging/reducing outputs from parallel branches with built-in aggregation functions — use a Script step after the group for custom aggregation.
 
+## Design Sources
+
+| Screen | Source | Preview |
+|--------|--------|---------|
+| N/A | N/A | N/A |
+
 > **Implementation status**
 >
 > | Layer | Status |
@@ -63,10 +69,3 @@ Multiple steps can run concurrently inside a Parallel Group. The workflow fans o
 >
 > **Decisions:**
 > - N/A
-
-## Wireframes
-
-| Screen | Excalidraw | Preview |
-|--------|------------|---------|
-| N/A | N/A | N/A |
-

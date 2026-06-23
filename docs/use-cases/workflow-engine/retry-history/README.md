@@ -46,6 +46,12 @@ When a workflow execution fails at a step, users can manually retry from the fai
 *Out of scope*
 - Comparing two retry attempts side-by-side.
 
+## Design Sources
+
+| Screen | Source | Preview |
+|--------|--------|---------|
+| N/A | N/A | N/A |
+
 > **Implementation status**
 >
 > | Layer | Status |
@@ -63,10 +69,3 @@ When a workflow execution fails at a step, users can manually retry from the fai
 >
 > **Decisions:**
 > - N/A
-
-## Wireframes
-
-| Screen | Excalidraw | Preview |
-|--------|------------|---------|
-| N/A | N/A | N/A |
-

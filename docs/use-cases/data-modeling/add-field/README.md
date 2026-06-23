@@ -51,6 +51,12 @@ Each field in a model has a type that determines what data it stores, how it's v
 *Out of scope*
 - Computed / formula fields (e.g., "full_name = first_name + last_name").
 
+## Design Sources
+
+| Screen | Source | Preview |
+|--------|--------|---------|
+| N/A | N/A | N/A |
+
 > **Implementation status**
 >
 > | Layer | Status |
@@ -71,9 +77,3 @@ Each field in a model has a type that determines what data it stores, how it's v
 >
 > **Decisions:** all 9 field types serialized to JSONB via custom `FieldDefinitionConverter` — polymorphic FieldConfig deserialized using the `type` discriminator in the JSON object.
 >
-
-## Wireframes
-
-| Screen | Excalidraw | Preview |
-|--------|------------|---------|
-| N/A | N/A | N/A |

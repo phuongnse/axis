@@ -48,6 +48,12 @@ Workflows can take different execution paths based on data values using Conditio
 *Out of scope*
 - Regex-based branch matching.
 
+## Design Sources
+
+| Screen | Source | Preview |
+|--------|--------|---------|
+| N/A | N/A | N/A |
+
 > **Implementation status**
 >
 > | Layer | Status |
@@ -65,10 +71,3 @@ Workflows can take different execution paths based on data values using Conditio
 >
 > **Decisions:**
 > - N/A
-
-## Wireframes
-
-| Screen | Excalidraw | Preview |
-|--------|------------|---------|
-| N/A | N/A | N/A |
-

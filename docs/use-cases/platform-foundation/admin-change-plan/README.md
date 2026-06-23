@@ -45,6 +45,12 @@ Define subscription plan tiers with feature limits and enforce those limits at t
 *Out of scope*
 - workspace-initiated plan upgrade — part of the separate billing initiative (requires billing integration).
 
+## Design Sources
+
+| Screen | Source | Preview |
+|--------|--------|---------|
+| N/A | N/A | N/A |
+
 > **Implementation status**
 >
 > | Layer | Status |
@@ -73,8 +79,3 @@ Define subscription plan tiers with feature limits and enforce those limits at t
 >
 > **Decisions:** `featureFlags` derived from plan slug (no JSON column); `PlatformAdmin:UserIds` config for platform admin plan change.
 >
-## Wireframes
-
-| Screen | Excalidraw | Preview |
-|--------|------------|---------|
-| N/A | N/A | N/A |

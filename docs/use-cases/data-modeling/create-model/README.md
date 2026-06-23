@@ -47,29 +47,10 @@ Users can create custom data models within their Workspace. A model defines the 
 *Out of scope*
 - Importing a model from another workspace or from a JSON file directly — covered in [workflow-builder import-export Import/Export](../../workflow-builder/).
 
-> **Implementation status**
->
-> | Layer | Status |
-> |-------|--------|
-> | Domain | ✅ |
-> | Application | ✅ |
-> | Infrastructure | ✅ |
-> | API | ✅ |
-> | Frontend | ⏳ |
->
-> **Gaps vs spec:** model plan-limit check (HTTP 402) pending billing layer (platform-foundation subscription plans).
->
-> **Done:** name format validation enforced in Application handler.
->
-> **Decisions:** system fields (id, created_at, updated_at) injected by domain factory; atomicity guaranteed by UnitOfWork.
->
-> **Deferred follow-ups:**
-> - N/A
+## Design Sources
 
-## Wireframes
-
-| Screen | Excalidraw | Preview |
-|--------|------------|---------|
+| Screen | Source | Preview |
+|--------|--------|---------|
 | N/A | N/A | N/A |
 
 ## Diagrams
@@ -111,3 +92,22 @@ erDiagram
     string name
   }
 ```
+
+> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | Domain | ✅ |
+> | Application | ✅ |
+> | Infrastructure | ✅ |
+> | API | ✅ |
+> | Frontend | ⏳ |
+>
+> **Gaps vs spec:** model plan-limit check (HTTP 402) pending billing layer (platform-foundation subscription plans).
+>
+> **Done:** name format validation enforced in Application handler.
+>
+> **Decisions:** system fields (id, created_at, updated_at) injected by domain factory; atomicity guaranteed by UnitOfWork.
+>
+> **Deferred follow-ups:**
+> - N/A

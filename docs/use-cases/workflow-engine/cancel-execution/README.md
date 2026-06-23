@@ -49,6 +49,12 @@ The engine manages the full lifecycle of a workflow execution — from creation 
 *Out of scope*
 - Pausing an execution and resuming it — cancel only.
 
+## Design Sources
+
+| Screen | Source | Preview |
+|--------|--------|---------|
+| N/A | N/A | N/A |
+
 > **Implementation status**
 >
 > | Layer | Status |
@@ -65,10 +71,3 @@ The engine manages the full lifecycle of a workflow execution — from creation 
 >
 > **Deferred follow-ups:**
 > - N/A
-
-## Wireframes
-
-| Screen | Excalidraw | Preview |
-|--------|------------|---------|
-| N/A | N/A | N/A |
-

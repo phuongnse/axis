@@ -47,6 +47,12 @@ When a step fails, the engine marks the execution as `FAILED`, records full erro
 *Out of scope*
 - Sharing a link to a specific error detail view with another user.
 
+## Design Sources
+
+| Screen | Source | Preview |
+|--------|--------|---------|
+| N/A | N/A | N/A |
+
 > **Implementation status**
 >
 > | Layer | Status |
@@ -66,10 +72,3 @@ When a step fails, the engine marks the execution as `FAILED`, records full erro
 >
 > **Decisions:**
 > - N/A
-
-## Wireframes
-
-| Screen | Excalidraw | Preview |
-|--------|------------|---------|
-| N/A | N/A | N/A |
-
