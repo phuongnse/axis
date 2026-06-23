@@ -1956,9 +1956,9 @@ ENFORCEMENT_TRUTH_REQUIRED_SNIPPETS = [
             ("run: python scripts/axis.py check vulnerable-packages", "vulnerable package gate runs in CI"),
             ("run: python scripts/axis.py check test-naming", ".NET test naming gate runs in CI"),
             ("dotnet-version: 8.0.x", ".NET CI setup uses the documented SDK major"),
-            ("run: python scripts/axis.py dotnet build --no-restore", ".NET build runs in CI through the Axis wrapper"),
+            ("run: python scripts/axis.py dotnet build -- --no-restore", ".NET build runs in CI through the Axis wrapper"),
             ("run: python scripts/axis.py dotnet format --check", ".NET format gate runs in CI through the Axis wrapper"),
-            ("python scripts/axis.py dotnet test --no-build", "full .NET test suite runs in CI through the Axis wrapper"),
+            ("python scripts/axis.py dotnet test -- --no-build", "full .NET test suite runs in CI through the Axis wrapper"),
             ("node-version-file: frontend/.nvmrc", "frontend CI setup uses the documented Node source"),
             ("run: python scripts/axis.py frontend install", "frontend dependencies install through the Axis wrapper"),
             ("run: python scripts/axis.py frontend gen-api-types --check", "frontend API type generation runs in CI through the Axis wrapper"),
@@ -2597,22 +2597,25 @@ def dotnet_command(args: argparse.Namespace) -> int:
         return rc
 
     command = args.dotnet_command
+    dotnet_args = list(args.dotnet_args)
+    if dotnet_args and dotnet_args[0] == "--":
+        dotnet_args = dotnet_args[1:]
     if command == "restore":
-        return run([exe("dotnet"), "restore", "Axis.sln", *args.dotnet_args], check=False).returncode
+        return run([exe("dotnet"), "restore", "Axis.sln", *dotnet_args], check=False).returncode
     if command == "build":
-        return run([exe("dotnet"), "build", "Axis.sln", "--nologo", *args.dotnet_args], check=False).returncode
+        return run([exe("dotnet"), "build", "Axis.sln", "--nologo", *dotnet_args], check=False).returncode
     if command == "test":
-        return run([exe("dotnet"), "test", "Axis.sln", "--nologo", *args.dotnet_args], check=False).returncode
+        return run([exe("dotnet"), "test", "Axis.sln", "--nologo", *dotnet_args], check=False).returncode
     if command == "format":
         format_args = ["format", "Axis.sln"]
         if args.check:
             format_args.append("--verify-no-changes")
-        format_args.extend(args.dotnet_args)
+        format_args.extend(dotnet_args)
         return run([exe("dotnet"), *format_args], check=False).returncode
     if command == "run-api":
-        return run([exe("dotnet"), "run", "--project", str(API_PROJECT), *args.dotnet_args], check=False).returncode
+        return run([exe("dotnet"), "run", "--project", str(API_PROJECT), *dotnet_args], check=False).returncode
     if command == "ef":
-        return run([exe("dotnet"), "ef", *args.dotnet_args], check=False).returncode
+        return run([exe("dotnet"), "ef", *dotnet_args], check=False).returncode
     raise CheckError(f"Unknown dotnet command: {command}")
 
 

@@ -123,7 +123,7 @@ jobs:
         run: python scripts/axis.py check test-naming
 
       - name: Build
-        run: python scripts/axis.py dotnet build --no-restore
+        run: python scripts/axis.py dotnet build -- --no-restore
 
       # Format gate — see CLAUDE.md § Verification gate. Runs after build so analyzer
       # diagnostics are populated. Fails the job on any whitespace / charset
@@ -133,7 +133,7 @@ jobs:
 
       - name: Test
         run: >
-          python scripts/axis.py dotnet test --no-build --verbosity normal
+          python scripts/axis.py dotnet test -- --no-build --verbosity normal
           --logger "trx;LogFileName=test-results.trx"
           --results-directory ${{ github.workspace }}/TestResults
           --collect:"XPlat Code Coverage"

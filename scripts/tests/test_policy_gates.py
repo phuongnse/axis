@@ -2640,6 +2640,14 @@ class TestAxisCommandWrappers(unittest.TestCase):
 
         self.assertEqual(["dotnet", "build", "Axis.sln", "--nologo", "--no-restore"], calls[0])
 
+    def test_dotnet_build_strips_argparse_separator(self) -> None:
+        calls = self.run_with_fake_process(
+            axis.dotnet_command,
+            axis.argparse.Namespace(dotnet_command="build", dotnet_args=["--", "--no-restore"]),
+        )
+
+        self.assertEqual(["dotnet", "build", "Axis.sln", "--nologo", "--no-restore"], calls[0])
+
     def test_dotnet_format_check_uses_verify_no_changes(self) -> None:
         calls = self.run_with_fake_process(
             axis.dotnet_command,
