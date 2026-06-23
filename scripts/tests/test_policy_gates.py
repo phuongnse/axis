@@ -936,7 +936,7 @@ class TestDocDriftRatchets(unittest.TestCase):
 
         self.assertIn("use `python scripts/axis.py dotnet ...`", issues)
         self.assertIn("use `python scripts/axis.py frontend ...`", issues)
-        self.assertIn("use `python scripts/axis.py design-source penpot mcp`", issues)
+        self.assertIn("use the Penpot Cloud MCP integration", issues)
         self.assertIn("use `python scripts/axis.py local-dev certs`", issues)
         self.assertIn("use `python scripts/axis.py grpc ...`", issues)
         self.assertIn("use `python scripts/axis.py docs ...`", issues)
@@ -2453,114 +2453,6 @@ class TestScriptsStandardGate(unittest.TestCase):
             self.assertEqual(0, axis.check_scripts_standard())
 
 
-class TestDesignSourcePenpotCli(unittest.TestCase):
-    class FakeResponse:
-        def __init__(self, data: bytes) -> None:
-            self.data = data
-
-        def __enter__(self):
-            return self
-
-        def __exit__(self, *_args) -> bool:
-            return False
-
-        def read(self) -> bytes:
-            return self.data
-
-    def test_up_downloads_compose_file_and_runs_penpot_project(self) -> None:
-        with tempfile.TemporaryDirectory() as temp:
-            local_dir = Path(temp) / ".local" / "penpot"
-            compose_file = local_dir / "docker-compose.yaml"
-            calls: list[list[str]] = []
-
-            envs: list[dict[str, str] | None] = []
-
-            def fake_run(args: list[str], **kwargs):
-                calls.append(args)
-                envs.append(kwargs.get("env"))
-                return axis.subprocess.CompletedProcess(args, 0, stdout="", stderr="")
-
-            args = axis.argparse.Namespace(penpot_command="up")
-            with (
-                mock.patch.object(axis, "PENPOT_LOCAL_DIR", local_dir),
-                mock.patch.object(axis, "PENPOT_COMPOSE_FILE", compose_file),
-                mock.patch.object(axis.urllib.request, "urlopen", return_value=self.FakeResponse(b"services: {}\n")),
-                mock.patch.object(axis, "_docker_compose_ok", return_value=True),
-                mock.patch.object(axis, "run", side_effect=fake_run),
-                contextlib.redirect_stdout(io.StringIO()),
-            ):
-                self.assertEqual(0, axis.design_source_penpot(args))
-
-            self.assertEqual(b"services: {}\n", compose_file.read_bytes())
-            self.assertEqual(["compose", "-p", "penpot", "-f", str(compose_file), "up", "-d"], calls[0][1:])
-            self.assertEqual({"PENPOT_VERSION": axis.PENPOT_VERSION}, envs[0])
-
-    def test_update_refreshes_pinned_compose_file_before_pull(self) -> None:
-        with tempfile.TemporaryDirectory() as temp:
-            local_dir = Path(temp) / ".local" / "penpot"
-            local_dir.mkdir(parents=True)
-            compose_file = local_dir / "docker-compose.yaml"
-            compose_file.write_text("old: true\n", encoding="utf-8")
-            calls: list[list[str]] = []
-
-            def fake_run(args: list[str], **_kwargs):
-                calls.append(args)
-                return axis.subprocess.CompletedProcess(args, 0, stdout="", stderr="")
-
-            args = axis.argparse.Namespace(penpot_command="update")
-            with (
-                mock.patch.object(axis, "PENPOT_LOCAL_DIR", local_dir),
-                mock.patch.object(axis, "PENPOT_COMPOSE_FILE", compose_file),
-                mock.patch.object(axis.urllib.request, "urlopen", return_value=self.FakeResponse(b"new: true\n")),
-                mock.patch.object(axis, "_docker_compose_ok", return_value=True),
-                mock.patch.object(axis, "run", side_effect=fake_run),
-                contextlib.redirect_stdout(io.StringIO()),
-            ):
-                self.assertEqual(0, axis.design_source_penpot(args))
-
-            self.assertEqual("new: true\n", compose_file.read_text(encoding="utf-8"))
-            self.assertEqual(["compose", "-p", "penpot", "-f", str(compose_file), "pull"], calls[0][1:])
-
-    def test_status_without_compose_file_reports_not_initialized(self) -> None:
-        with tempfile.TemporaryDirectory() as temp:
-            compose_file = Path(temp) / ".local" / "penpot" / "docker-compose.yaml"
-            args = axis.argparse.Namespace(penpot_command="status")
-            with (
-                mock.patch.object(axis, "PENPOT_COMPOSE_FILE", compose_file),
-                mock.patch.object(axis.urllib.request, "urlopen") as urlopen,
-                mock.patch.object(axis, "run") as run,
-                contextlib.redirect_stdout(io.StringIO()) as stdout,
-            ):
-                self.assertEqual(0, axis.design_source_penpot(args))
-
-        urlopen.assert_not_called()
-        run.assert_not_called()
-        self.assertIn("not initialized", stdout.getvalue())
-
-    def test_down_with_volumes_uses_remove_orphans_and_volumes(self) -> None:
-        with tempfile.TemporaryDirectory() as temp:
-            compose_file = Path(temp) / "docker-compose.yaml"
-            compose_file.write_text("services: {}\n", encoding="utf-8")
-            calls: list[list[str]] = []
-
-            def fake_run(args: list[str], **_kwargs):
-                calls.append(args)
-                return axis.subprocess.CompletedProcess(args, 0, stdout="", stderr="")
-
-            args = axis.argparse.Namespace(penpot_command="down", volumes=True)
-            with (
-                mock.patch.object(axis, "PENPOT_COMPOSE_FILE", compose_file),
-                mock.patch.object(axis, "_docker_compose_ok", return_value=True),
-                mock.patch.object(axis, "run", side_effect=fake_run),
-            ):
-                self.assertEqual(0, axis.design_source_penpot(args))
-
-        self.assertEqual(
-            ["compose", "-p", "penpot", "-f", str(compose_file), "down", "--remove-orphans", "--volumes"],
-            calls[0][1:],
-        )
-
-
 class TestLocalDevCli(unittest.TestCase):
     def run_local_dev(self, args: axis.argparse.Namespace) -> list[list[str]]:
         calls: list[list[str]] = []
@@ -2773,14 +2665,6 @@ class TestAxisCommandWrappers(unittest.TestCase):
             ],
             calls[0],
         )
-
-    def test_penpot_mcp_runs_through_axis_wrapper(self) -> None:
-        calls = self.run_with_fake_process(
-            axis.design_source_penpot,
-            axis.argparse.Namespace(penpot_command="mcp"),
-        )
-
-        self.assertEqual(["npx", "-y", axis.PENPOT_MCP_PACKAGE], calls[0])
 
     def test_local_dev_certs_writes_extension_and_runs_openssl(self) -> None:
         with tempfile.TemporaryDirectory() as temp:

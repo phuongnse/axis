@@ -18,7 +18,7 @@ runtime.
 | Tool | Required version source | Used by | Local enforcement |
 |---|---:|---|---|
 | .NET SDK | `8.x` in [TECH_STACK.md](../TECH_STACK.md), selected by [`global.json`](../../global.json) | `python scripts/axis.py verify`, `python scripts/axis.py dotnet ...`, `test unit`, package scans, API contract generation | `global.json` must select major `8`; Axis checks the resolved SDK major before any wrapped .NET workflow runs. |
-| Node.js | [`frontend/.nvmrc`](../../frontend/.nvmrc) | `python scripts/axis.py verify`, `python scripts/axis.py frontend ...`, API type generation, legacy wireframe export, Penpot MCP | Axis checks the resolved Node major and package-manager availability before wrapped frontend workflows run. |
+| Node.js | [`frontend/.nvmrc`](../../frontend/.nvmrc) | `python scripts/axis.py verify`, `python scripts/axis.py frontend ...`, API type generation, legacy wireframe export | Axis checks the resolved Node major and package-manager availability before wrapped frontend workflows run. |
 | Lychee | `0.23.0` exactly in this table | `python scripts/axis.py check markdown-links`, CI Markdown link check | `lychee.toml` is written for the 0.23 config schema; Axis fails fast when another version resolves. |
 | Buf CLI | `1.50.0` exactly in this table | `python scripts/axis.py check buf-lint`, `python scripts/axis.py check buf-breaking-against-base`, CI protobuf checks | Axis checks the resolved Buf version before wrapped protobuf workflows run. |
 
@@ -51,13 +51,6 @@ python scripts/axis.py local-dev certs
 python scripts/axis.py local-dev up
 python scripts/axis.py local-dev status
 python scripts/axis.py local-dev e2e
-python scripts/axis.py design-source penpot up
-python scripts/axis.py design-source penpot update
-python scripts/axis.py design-source penpot down [--volumes]
-python scripts/axis.py design-source penpot status
-python scripts/axis.py design-source penpot smoke
-python scripts/axis.py design-source penpot logs [-f] [service ...]
-python scripts/axis.py design-source penpot mcp
 python scripts/axis.py check policy-tests
 python scripts/axis.py check codex-skills
 python scripts/axis.py check text-encoding
