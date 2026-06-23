@@ -55,6 +55,7 @@ python scripts/axis.py design-source penpot up
 python scripts/axis.py design-source penpot update
 python scripts/axis.py design-source penpot down [--volumes]
 python scripts/axis.py design-source penpot status
+python scripts/axis.py design-source penpot smoke
 python scripts/axis.py design-source penpot logs [-f] [service ...]
 python scripts/axis.py design-source penpot mcp
 python scripts/axis.py check policy-tests
@@ -98,7 +99,7 @@ python scripts/axis.py register avro-schemas --dry-run
 - Keep new repo-level maintenance and docs policy scripts in Python.
 - Add subcommands to `scripts/axis.py` for new repo workflows.
 - Document repo-owned workflows through `scripts/axis.py`; raw underlying
-  commands belong inside the wrapper, not in docs or CI `run:` steps.
+  commands belong inside the wrapper, not in docs, repo skills, or CI `run:` steps.
 - Put shared repository discovery in `scripts/axis_repo.py` or small Python helpers.
 - Do not add ad hoc utility scripts in any runtime under top-level `scripts/`,
   `docs/scripts/`, `docs/wireframes/`, or `docs/diagrams/`.

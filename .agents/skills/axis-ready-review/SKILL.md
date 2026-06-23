@@ -35,8 +35,8 @@ Decide whether the branch is ready for review using Axis enforced checks plus re
 4. Run enforced checks by changed path.
    - Skill changes: run skill-creator `quick_validate.py` for each changed skill, then run `python scripts/axis.py check codex-skills`.
    - Docs/scripts/layout/policy: run `python scripts/axis.py check policy-tests` and `python scripts/axis.py check doc-drift`.
-   - Frontend: run `npm run ci` and `npm run test` from `frontend/`.
-   - Source/tests: run `dotnet build`, `python scripts/axis.py check test-naming`, and `python scripts/axis.py test unit`.
+   - Frontend: run `python scripts/axis.py frontend ci` and `python scripts/axis.py frontend test`.
+   - Source/tests: run `python scripts/axis.py dotnet build`, `python scripts/axis.py check test-naming`, and `python scripts/axis.py test unit`.
    - API contract: regenerate API contracts and run the API tests named by `agent-checklist.md`.
    - Before PR review, run `python scripts/axis.py verify` unless the change is clearly outside its triggers.
 

@@ -42,6 +42,12 @@ Check status:
 python scripts/axis.py design-source penpot status
 ```
 
+Smoke-test the local HTTP surfaces:
+
+```bash
+python scripts/axis.py design-source penpot smoke
+```
+
 Stop it with:
 
 ```bash
@@ -85,6 +91,21 @@ Use stable names so source links survive design handoff and AI-agent edits.
 | Frame | Match the use-case screen slug, e.g. `register-workspace` or `register-workspace-states` |
 
 Keep design-system components and shared app-shell references in shared files. Keep use-case-specific screens in the owning use-case file.
+
+## Baseline Inventory
+
+Create these shared Penpot sources first. Do not add a source link to an owning
+use-case document until the referenced file/page/frame exists in Penpot.
+
+| Source | Penpot location | Purpose | Owning docs |
+|---|---|---|---|
+| Design system | `Axis` → `Axis Product` → `Axis Design System` | Tokens, primitive variants, component anatomy, and reusable UI states | [design-system.md](./design-system.md) |
+| App shell | `Axis` → `Axis Product` → `Axis App Shell` | Shared authenticated layout, navigation, and responsive shell decisions | [frontend.md](./frontend.md) |
+| Register workspace | `Axis` → `Axis Product` → `platform-foundation / register-workspace` → `Wireframes` → `register-workspace` | First product-flow source frame for the current public registration surface | [platform-foundation/register-workspace](../use-cases/platform-foundation/register-workspace/README.md) |
+
+For each source, keep the Penpot frame name stable and update the owning docs in
+the same PR when a real Penpot URL becomes available. Use `N/A` for committed
+previews until review needs a stable exported image.
 
 ## Design-First Workflow
 

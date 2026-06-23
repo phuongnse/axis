@@ -2977,6 +2977,29 @@ class TestCodexSkillsGate(unittest.TestCase):
 
         self.assertIn("replace ambiguous best-effort wording", "\n".join(issues))
 
+    def test_rejects_raw_repo_workflow_commands_in_skill_instructions(self) -> None:
+        files = self.valid_skill_files()
+        files[".agents/skills/axis-example/SKILL.md"] += (
+            "\n"
+            "```bash\n"
+            "npm run ci\n"
+            "dotnet test\n"
+            "python docs/scripts/sync-mermaid-theme.py\n"
+            "```\n"
+            "Inline command: `npm run test`.\n"
+        )
+
+        issues = self.issues_for_skill(files)
+
+        joined = "\n".join(issues)
+        self.assertIn("raw skill workflow command `npm run ci`", joined)
+        self.assertIn("use `python scripts/axis.py frontend ...`", joined)
+        self.assertIn("raw skill workflow command `dotnet test`", joined)
+        self.assertIn("use `python scripts/axis.py dotnet ...`", joined)
+        self.assertIn("raw skill workflow command `python docs/scripts/sync-mermaid-theme.py`", joined)
+        self.assertIn("use `python scripts/axis.py docs ...`", joined)
+        self.assertIn("raw skill workflow command `npm run test`", joined)
+
     def test_rejects_api_contract_skill_without_required_chaining(self) -> None:
         files = {
             ".agents/skills/axis-api-contract/SKILL.md": (

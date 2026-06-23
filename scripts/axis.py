@@ -1525,6 +1525,29 @@ def codex_skill_reference_issues(skill_md: Path, text: str, *, root: Path) -> li
     return issues
 
 
+def codex_skill_raw_command_issues(skill_md: Path, text: str, *, root: Path) -> list[str]:
+    issues: list[str] = []
+    fence_lang: str | None = None
+    for idx, line in enumerate(text.splitlines(), 1):
+        fence_match = re.match(r"^```([A-Za-z0-9_-]*)", line.strip())
+        if fence_match:
+            fence_lang = None if fence_lang is not None else fence_match.group(1).lower()
+            continue
+
+        if fence_lang in {"bash", "sh", "shell", "console"}:
+            message = raw_doc_command_message(line)
+            if message is not None:
+                issues.append(
+                    f"{rel_from(skill_md, root)}:{idx}: raw skill workflow command `{line.strip()}` - {message}"
+                )
+
+        for fragment in re.findall(r"`([^`]+)`", line):
+            message = raw_doc_command_message(fragment)
+            if message is not None:
+                issues.append(f"{rel_from(skill_md, root)}:{idx}: raw skill workflow command `{fragment}` - {message}")
+    return issues
+
+
 def codex_skill_issues(*, root: Path = ROOT) -> list[str]:
     skills_root = root / ".agents" / "skills"
     if not skills_root.exists():
@@ -1559,6 +1582,7 @@ def codex_skill_issues(*, root: Path = ROOT) -> list[str]:
                 issues.append(
                     f"{rel_from(skill_md, root)}:{idx}: replace ambiguous best-effort wording with a concrete action"
                 )
+        issues.extend(codex_skill_raw_command_issues(skill_md, text, root=root))
 
         frontmatter = FRONTMATTER_RE.match(text)
         if frontmatter is None:
@@ -3252,6 +3276,25 @@ def run_penpot_compose(compose_file: Path, *args: str) -> subprocess.CompletedPr
     return run(penpot_compose_args(compose_file, *args), check=False, env={"PENPOT_VERSION": PENPOT_VERSION})
 
 
+def penpot_http_smoke() -> int:
+    failed = False
+    for label, url in (("Penpot", PENPOT_URL), ("Penpot mail catcher", PENPOT_MAILCATCH_URL)):
+        try:
+            with urllib.request.urlopen(url, timeout=5) as response:
+                status = response.status
+        except (OSError, urllib.error.URLError) as exc:
+            print(f"design-source penpot smoke: {label} FAIL ({url}) - {exc}", file=sys.stderr)
+            failed = True
+            continue
+
+        if 200 <= status < 400:
+            print(f"design-source penpot smoke: {label} OK ({url}, HTTP {status})")
+        else:
+            print(f"design-source penpot smoke: {label} FAIL ({url}, HTTP {status})", file=sys.stderr)
+            failed = True
+    return 1 if failed else 0
+
+
 def design_source_penpot(args: argparse.Namespace) -> int:
     command = args.penpot_command
     if command == "mcp":
@@ -3262,6 +3305,9 @@ def design_source_penpot(args: argparse.Namespace) -> int:
             print("design-source penpot mcp: npx is not available in PATH", file=sys.stderr)
             return 1
         return run([exe("npx"), "-y", PENPOT_MCP_PACKAGE], check=False).returncode
+
+    if command == "smoke":
+        return penpot_http_smoke()
 
     compose_file = PENPOT_COMPOSE_FILE
 
@@ -3601,6 +3647,7 @@ def main(argv: list[str] | None = None) -> int:
     penpot_sub.add_parser("up").set_defaults(func=design_source_penpot)
     penpot_sub.add_parser("update").set_defaults(func=design_source_penpot)
     penpot_sub.add_parser("mcp").set_defaults(func=design_source_penpot)
+    penpot_sub.add_parser("smoke").set_defaults(func=design_source_penpot)
     penpot_down = penpot_sub.add_parser("down")
     penpot_down.add_argument("--volumes", action="store_true", help="Also remove local Penpot Docker volumes")
     penpot_down.set_defaults(func=design_source_penpot)

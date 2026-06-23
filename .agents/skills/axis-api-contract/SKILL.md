@@ -43,7 +43,7 @@ Change an Axis API surface without drifting from module boundaries, auth default
 6. Verify.
    - API contract: affected `tests/Api/Axis.Api.Tests/` tests.
    - Generated parity: `python scripts/axis.py check frontend-api-contracts` when available in the local command set.
-   - Frontend consumers: `npm run ci` and `npm run test` from `frontend/`.
+   - Frontend consumers: `python scripts/axis.py frontend ci` and `python scripts/axis.py frontend test`.
    - Ready review: `$axis-ready-review`.
 
 ## Output

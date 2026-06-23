@@ -67,7 +67,7 @@ Ship one reviewable Axis use-case slice without losing acceptance criteria, laye
    - Report acceptance evidence by AT ID (`AT-001 Playwright passed`, `AT-002 xUnit API passed`, etc.).
    - Before review, run `python scripts/axis.py verify` when triggered.
    - Use `$axis-ready-review` before asking for review.
-   - Do not claim the full suite unless full `dotnet test Axis.sln --nologo` ran.
+   - Do not claim the full suite unless full `python scripts/axis.py dotnet test` ran.
 
 ## Output
 
