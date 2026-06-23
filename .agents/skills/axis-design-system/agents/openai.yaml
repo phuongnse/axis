@@ -1,0 +1,4 @@
+interface:
+  display_name: "Axis Design System"
+  short_description: "Run Axis design-system workflow"
+  default_prompt: "Use $axis-design-system to change Axis design-system safely."
