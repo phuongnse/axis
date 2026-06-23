@@ -1415,10 +1415,17 @@ class TestFrontendComponentComposition(unittest.TestCase):
                     "  catalogTargets: ['primitive-custom-control'],\n"
                     "  visualTargets: ['primitive-custom-control'],\n"
                     "  testFiles: ['frontend/tests/custom-control.test.tsx'],\n"
+                    "  readiness: 'ready',\n"
+                    "  variants: ['default'],\n"
+                    "  states: ['default'],\n"
+                    "  accessibility: ['native-control'],\n"
+                    "  tokenFamilies: ['color'],\n"
                     "}];\n"
                 ),
                 "frontend/src/features/design-system/components/DesignSystemCatalog.tsx": (
-                    "export const target = 'primitive-custom-control';\n"
+                    "import { axisPrimitiveContracts } from '@/design-system/primitive-contracts';\n"
+                    "export const target = 'primitive-custom-control primitive-readiness';\n"
+                    "export const contracts = axisPrimitiveContracts;\n"
                 ),
                 "frontend/e2e/design-system-catalog.pw.ts": (
                     "await expect(page.locator('[data-visual-target=\"primitive-custom-control\"]'))"
@@ -1461,10 +1468,17 @@ class TestFrontendComponentComposition(unittest.TestCase):
                     "  catalogTargets: ['primitive-custom-control'],\n"
                     "  visualTargets: ['primitive-custom-control'],\n"
                     "  testFiles: ['frontend/tests/custom-control.test.tsx'],\n"
+                    "  readiness: 'ready',\n"
+                    "  variants: ['default'],\n"
+                    "  states: ['default'],\n"
+                    "  accessibility: ['native-control'],\n"
+                    "  tokenFamilies: ['color'],\n"
                     "}];\n"
                 ),
                 "frontend/src/features/design-system/components/DesignSystemCatalog.tsx": (
-                    "export const target = 'primitive-custom-control';\n"
+                    "import { axisPrimitiveContracts } from '@/design-system/primitive-contracts';\n"
+                    "export const target = 'primitive-custom-control primitive-readiness';\n"
+                    "export const contracts = axisPrimitiveContracts;\n"
                 ),
                 "frontend/e2e/design-system-catalog.pw.ts": "export {};\n",
                 "frontend/tests/custom-control.test.tsx": "export {};\n",
@@ -1472,6 +1486,111 @@ class TestFrontendComponentComposition(unittest.TestCase):
         )
 
         self.assertIn("needs a desktop Playwright screenshot", "\n".join(issues))
+
+    def test_rejects_primitive_contract_without_readiness_matrix(self) -> None:
+        issues = self.issues_for_frontend(
+            {
+                "frontend/src/components/ui/custom-control.tsx": (
+                    "export function CustomControl() {\n"
+                    "  return <button type=\"button\" />;\n"
+                    "}\n"
+                ),
+                "frontend/src/design-system/primitive-contracts.ts": (
+                    "export const axisPrimitiveContracts = [{\n"
+                    "  component: 'CustomControl',\n"
+                    "  file: 'frontend/src/components/ui/custom-control.tsx',\n"
+                    "  catalogTargets: ['primitive-custom-control'],\n"
+                    "  visualTargets: ['primitive-custom-control'],\n"
+                    "  testFiles: ['frontend/tests/custom-control.test.tsx'],\n"
+                    "}];\n"
+                ),
+                "frontend/src/features/design-system/components/DesignSystemCatalog.tsx": (
+                    "import { axisPrimitiveContracts } from '@/design-system/primitive-contracts';\n"
+                    "export const target = 'primitive-custom-control primitive-readiness';\n"
+                    "export const contracts = axisPrimitiveContracts;\n"
+                ),
+                "frontend/e2e/design-system-catalog.pw.ts": (
+                    "await expect(page.locator('[data-visual-target=\"primitive-custom-control\"]'))"
+                    ".toHaveScreenshot('primitive-custom-control-desktop.png');\n"
+                ),
+                "frontend/tests/custom-control.test.tsx": "export {};\n",
+            }
+        )
+
+        self.assertIn("contract readiness must be `ready` or `candidate`", "\n".join(issues))
+        self.assertIn("contract must list at least one variants value", "\n".join(issues))
+
+    def test_rejects_primitive_contract_without_catalog_readiness_target(self) -> None:
+        issues = self.issues_for_frontend(
+            {
+                "frontend/src/components/ui/custom-control.tsx": (
+                    "export function CustomControl() {\n"
+                    "  return <button type=\"button\" />;\n"
+                    "}\n"
+                ),
+                "frontend/src/design-system/primitive-contracts.ts": (
+                    "export const axisPrimitiveContracts = [{\n"
+                    "  component: 'CustomControl',\n"
+                    "  file: 'frontend/src/components/ui/custom-control.tsx',\n"
+                    "  catalogTargets: ['primitive-custom-control'],\n"
+                    "  visualTargets: ['primitive-custom-control'],\n"
+                    "  testFiles: ['frontend/tests/custom-control.test.tsx'],\n"
+                    "  readiness: 'ready',\n"
+                    "  variants: ['default'],\n"
+                    "  states: ['default'],\n"
+                    "  accessibility: ['native-control'],\n"
+                    "  tokenFamilies: ['color'],\n"
+                    "}];\n"
+                ),
+                "frontend/src/features/design-system/components/DesignSystemCatalog.tsx": (
+                    "export const target = 'primitive-custom-control';\n"
+                ),
+                "frontend/e2e/design-system-catalog.pw.ts": (
+                    "await expect(page.locator('[data-visual-target=\"primitive-custom-control\"]'))"
+                    ".toHaveScreenshot('primitive-custom-control-desktop.png');\n"
+                ),
+                "frontend/tests/custom-control.test.tsx": "export {};\n",
+            }
+        )
+
+        self.assertIn("missing primitive readiness matrix", "\n".join(issues))
+
+    def test_rejects_unknown_primitive_contract_token_family(self) -> None:
+        issues = self.issues_for_frontend(
+            {
+                "frontend/src/components/ui/custom-control.tsx": (
+                    "export function CustomControl() {\n"
+                    "  return <button type=\"button\" />;\n"
+                    "}\n"
+                ),
+                "frontend/src/design-system/primitive-contracts.ts": (
+                    "export const axisPrimitiveContracts = [{\n"
+                    "  component: 'CustomControl',\n"
+                    "  file: 'frontend/src/components/ui/custom-control.tsx',\n"
+                    "  catalogTargets: ['primitive-custom-control'],\n"
+                    "  visualTargets: ['primitive-custom-control'],\n"
+                    "  testFiles: ['frontend/tests/custom-control.test.tsx'],\n"
+                    "  readiness: 'ready',\n"
+                    "  variants: ['default'],\n"
+                    "  states: ['default'],\n"
+                    "  accessibility: ['native-control'],\n"
+                    "  tokenFamilies: ['raw-shadow'],\n"
+                    "}];\n"
+                ),
+                "frontend/src/features/design-system/components/DesignSystemCatalog.tsx": (
+                    "import { axisPrimitiveContracts } from '@/design-system/primitive-contracts';\n"
+                    "export const target = 'primitive-custom-control primitive-readiness';\n"
+                    "export const contracts = axisPrimitiveContracts;\n"
+                ),
+                "frontend/e2e/design-system-catalog.pw.ts": (
+                    "await expect(page.locator('[data-visual-target=\"primitive-custom-control\"]'))"
+                    ".toHaveScreenshot('primitive-custom-control-desktop.png');\n"
+                ),
+                "frontend/tests/custom-control.test.tsx": "export {};\n",
+            }
+        )
+
+        self.assertIn("unknown tokenFamilies values: `raw-shadow`", "\n".join(issues))
 
     def test_rejects_text_button_without_icon(self) -> None:
         issues = self.issues_for_frontend(
@@ -1589,6 +1708,23 @@ class TestFrontendDesignTokenUsage(unittest.TestCase):
     def test_accepts_shadow_token_variable_names(self) -> None:
         issues = self.issues_for_frontend(
             "export const tokens = ['--action-accent-shadow', '--shadow-surface'];\n"
+        )
+
+        self.assertEqual([], issues)
+
+    def test_accepts_primitive_contract_shadow_token_family_metadata(self) -> None:
+        issues = self.issues_for_frontend(
+            "export const axisPrimitiveContracts = [{ tokenFamilies: ['color', 'shadow'] }];\n"
+        )
+
+        self.assertEqual([], issues)
+
+    def test_accepts_token_family_type_literal(self) -> None:
+        issues = self.issues_for_frontend(
+            "export type AxisPrimitiveTokenFamily =\n"
+            "  | 'color'\n"
+            "  | 'shadow'\n"
+            "  | 'radius';\n"
         )
 
         self.assertEqual([], issues)

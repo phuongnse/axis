@@ -1,9 +1,27 @@
+export type AxisPrimitiveReadiness = 'ready' | 'candidate';
+
+export type AxisPrimitiveTokenFamily =
+  | 'border'
+  | 'breakpoint'
+  | 'color'
+  | 'motion'
+  | 'radius'
+  | 'shadow'
+  | 'sizing'
+  | 'spacing'
+  | 'typography';
+
 export interface AxisPrimitiveContract {
   component: string;
   file: string;
   catalogTargets: readonly string[];
   visualTargets: readonly string[];
   testFiles: readonly string[];
+  readiness: AxisPrimitiveReadiness;
+  variants: readonly string[];
+  states: readonly string[];
+  accessibility: readonly string[];
+  tokenFamilies: readonly AxisPrimitiveTokenFamily[];
 }
 
 export const axisPrimitiveContracts = [
@@ -13,6 +31,11 @@ export const axisPrimitiveContracts = [
     catalogTargets: ['primitive-action-link'],
     visualTargets: ['primitive-action-link'],
     testFiles: ['frontend/tests/design-system-catalog.test.tsx'],
+    readiness: 'ready',
+    variants: ['primary', 'secondary', 'surface-default', 'surface-inverted', 'surface-adaptive'],
+    states: ['default'],
+    accessibility: ['router-link', 'decorative-icon', 'text-accessible-name'],
+    tokenFamilies: ['color', 'border', 'shadow', 'radius', 'spacing'],
   },
   {
     component: 'Badge',
@@ -20,6 +43,20 @@ export const axisPrimitiveContracts = [
     catalogTargets: ['feedback'],
     visualTargets: ['feedback'],
     testFiles: ['frontend/tests/ui-primitives.test.tsx'],
+    readiness: 'ready',
+    variants: [
+      'neutral',
+      'primary',
+      'accent',
+      'info',
+      'success',
+      'warning',
+      'destructive',
+      'outline',
+    ],
+    states: ['default'],
+    accessibility: ['text-accessible-name', 'non-color-state-label'],
+    tokenFamilies: ['color', 'border', 'radius'],
   },
   {
     component: 'Button',
@@ -27,6 +64,23 @@ export const axisPrimitiveContracts = [
     catalogTargets: ['primitive-button'],
     visualTargets: ['primitive-button'],
     testFiles: ['frontend/tests/button.test.tsx'],
+    readiness: 'ready',
+    variants: [
+      'cta',
+      'default',
+      'outline',
+      'secondary',
+      'ghost',
+      'destructive',
+      'link',
+      'size-xs',
+      'size-sm',
+      'size-default',
+      'size-lg',
+    ],
+    states: ['default', 'disabled', 'loading', 'invalid'],
+    accessibility: ['native-button', 'aria-busy-loading', 'disabled-interaction', 'icon-required'],
+    tokenFamilies: ['color', 'border', 'shadow', 'radius', 'sizing', 'motion'],
   },
   {
     component: 'Card',
@@ -34,6 +88,11 @@ export const axisPrimitiveContracts = [
     catalogTargets: ['structure-data'],
     visualTargets: ['structure-data'],
     testFiles: ['frontend/tests/design-system-catalog.test.tsx'],
+    readiness: 'ready',
+    variants: ['surface-default', 'header', 'content', 'footer'],
+    states: ['default'],
+    accessibility: ['semantic-caller-owned', 'heading-content-order'],
+    tokenFamilies: ['color', 'border', 'shadow', 'radius', 'spacing'],
   },
   {
     component: 'Checkbox',
@@ -41,6 +100,11 @@ export const axisPrimitiveContracts = [
     catalogTargets: ['primitive-form'],
     visualTargets: ['primitive-form'],
     testFiles: ['frontend/tests/ui-primitives.test.tsx'],
+    readiness: 'ready',
+    variants: ['unchecked', 'checked'],
+    states: ['default', 'checked', 'disabled', 'invalid'],
+    accessibility: ['native-checkbox', 'focus-visible', 'aria-invalid'],
+    tokenFamilies: ['color', 'border', 'radius'],
   },
   {
     component: 'CheckboxField',
@@ -48,6 +112,11 @@ export const axisPrimitiveContracts = [
     catalogTargets: ['primitive-form'],
     visualTargets: ['primitive-form'],
     testFiles: ['frontend/tests/ui-primitives.test.tsx'],
+    readiness: 'ready',
+    variants: ['labelled', 'error'],
+    states: ['checked', 'error', 'disabled'],
+    accessibility: ['label-linked', 'aria-describedby-error', 'aria-invalid-error'],
+    tokenFamilies: ['color', 'spacing'],
   },
   {
     component: 'ContentGrid',
@@ -55,6 +124,11 @@ export const axisPrimitiveContracts = [
     catalogTargets: ['layout'],
     visualTargets: ['layout'],
     testFiles: ['frontend/tests/design-system-catalog.test.tsx'],
+    readiness: 'ready',
+    variants: ['one-column', 'two-column', 'three-column'],
+    states: ['responsive'],
+    accessibility: ['semantic-caller-owned', 'reading-order-preserved'],
+    tokenFamilies: ['spacing', 'breakpoint'],
   },
   {
     component: 'EmptyState',
@@ -62,6 +136,11 @@ export const axisPrimitiveContracts = [
     catalogTargets: ['structure-data'],
     visualTargets: ['structure-data'],
     testFiles: ['frontend/tests/ui-primitives.test.tsx'],
+    readiness: 'ready',
+    variants: ['with-action', 'without-action'],
+    states: ['empty'],
+    accessibility: ['decorative-icon', 'heading-first', 'action-accessible'],
+    tokenFamilies: ['color', 'border', 'shadow', 'radius', 'spacing'],
   },
   {
     component: 'FormField',
@@ -69,6 +148,11 @@ export const axisPrimitiveContracts = [
     catalogTargets: ['primitive-form'],
     visualTargets: ['primitive-form'],
     testFiles: ['frontend/tests/design-system-catalog.test.tsx'],
+    readiness: 'ready',
+    variants: ['label', 'help-text', 'error', 'description-ids'],
+    states: ['default', 'error'],
+    accessibility: ['label-linked', 'aria-describedby', 'error-id'],
+    tokenFamilies: ['color', 'spacing'],
   },
   {
     component: 'IconButton',
@@ -76,6 +160,11 @@ export const axisPrimitiveContracts = [
     catalogTargets: ['primitive-icon-button'],
     visualTargets: ['primitive-icon-button'],
     testFiles: ['frontend/tests/ui-primitives.test.tsx'],
+    readiness: 'ready',
+    variants: ['outline', 'secondary', 'destructive', 'size-icon', 'size-icon-sm', 'size-icon-lg'],
+    states: ['default', 'disabled', 'loading'],
+    accessibility: ['aria-label-required', 'loading-label', 'decorative-icon'],
+    tokenFamilies: ['color', 'border', 'shadow', 'radius', 'sizing'],
   },
   {
     component: 'Input',
@@ -83,6 +172,11 @@ export const axisPrimitiveContracts = [
     catalogTargets: ['primitive-form'],
     visualTargets: ['primitive-form'],
     testFiles: ['frontend/tests/design-system-catalog.test.tsx'],
+    readiness: 'ready',
+    variants: ['text', 'with-leading-icon'],
+    states: ['default', 'disabled', 'invalid', 'described'],
+    accessibility: ['label-or-aria-label', 'aria-invalid', 'aria-describedby'],
+    tokenFamilies: ['color', 'border', 'radius', 'sizing'],
   },
   {
     component: 'Label',
@@ -90,6 +184,11 @@ export const axisPrimitiveContracts = [
     catalogTargets: ['primitive-form'],
     visualTargets: ['primitive-form'],
     testFiles: ['frontend/tests/design-system-catalog.test.tsx'],
+    readiness: 'ready',
+    variants: ['default', 'normal-weight'],
+    states: ['default'],
+    accessibility: ['html-for-control', 'compact-label'],
+    tokenFamilies: ['color', 'typography'],
   },
   {
     component: 'Notice',
@@ -97,6 +196,11 @@ export const axisPrimitiveContracts = [
     catalogTargets: ['feedback'],
     visualTargets: ['feedback'],
     testFiles: ['frontend/tests/ui-primitives.test.tsx'],
+    readiness: 'ready',
+    variants: ['info', 'success', 'warning', 'error'],
+    states: ['status', 'alert'],
+    accessibility: ['role-status', 'role-alert', 'decorative-icon', 'non-color-state-copy'],
+    tokenFamilies: ['color', 'border', 'radius', 'spacing'],
   },
   {
     component: 'PageHeader',
@@ -104,6 +208,11 @@ export const axisPrimitiveContracts = [
     catalogTargets: ['layout'],
     visualTargets: ['layout'],
     testFiles: ['frontend/tests/design-system-catalog.test.tsx'],
+    readiness: 'ready',
+    variants: ['with-eyebrow', 'with-description', 'with-actions'],
+    states: ['responsive'],
+    accessibility: ['heading-order', 'actions-after-title'],
+    tokenFamilies: ['color', 'typography', 'spacing', 'breakpoint'],
   },
   {
     component: 'Panel',
@@ -111,6 +220,11 @@ export const axisPrimitiveContracts = [
     catalogTargets: ['structure-data'],
     visualTargets: ['structure-data'],
     testFiles: ['frontend/tests/design-system-catalog.test.tsx'],
+    readiness: 'ready',
+    variants: ['default', 'muted', 'inset', 'attention', 'inverse'],
+    states: ['default'],
+    accessibility: ['semantic-caller-owned', 'focusable-content-visible'],
+    tokenFamilies: ['color', 'border', 'shadow', 'radius', 'spacing'],
   },
   {
     component: 'Progress',
@@ -118,6 +232,11 @@ export const axisPrimitiveContracts = [
     catalogTargets: ['feedback'],
     visualTargets: ['feedback'],
     testFiles: ['frontend/tests/ui-primitives.test.tsx'],
+    readiness: 'ready',
+    variants: ['determinate', 'indeterminate'],
+    states: ['in-progress', 'complete'],
+    accessibility: ['accessible-label', 'native-progress'],
+    tokenFamilies: ['color', 'radius', 'sizing'],
   },
   {
     component: 'Select',
@@ -125,6 +244,11 @@ export const axisPrimitiveContracts = [
     catalogTargets: ['primitive-form'],
     visualTargets: ['primitive-form'],
     testFiles: ['frontend/tests/design-system-catalog.test.tsx'],
+    readiness: 'ready',
+    variants: ['native-select'],
+    states: ['default', 'disabled', 'invalid', 'described'],
+    accessibility: ['label-or-aria-label', 'aria-invalid', 'aria-describedby'],
+    tokenFamilies: ['color', 'border', 'radius', 'sizing'],
   },
   {
     component: 'Skeleton',
@@ -132,6 +256,11 @@ export const axisPrimitiveContracts = [
     catalogTargets: ['feedback'],
     visualTargets: ['feedback'],
     testFiles: ['frontend/tests/design-system-catalog.test.tsx'],
+    readiness: 'ready',
+    variants: ['line', 'block'],
+    states: ['loading'],
+    accessibility: ['aria-hidden', 'layout-stable'],
+    tokenFamilies: ['color', 'radius', 'motion'],
   },
   {
     component: 'Textarea',
@@ -139,6 +268,11 @@ export const axisPrimitiveContracts = [
     catalogTargets: ['primitive-form'],
     visualTargets: ['primitive-form'],
     testFiles: ['frontend/tests/ui-primitives.test.tsx'],
+    readiness: 'ready',
+    variants: ['long-text', 'resizable'],
+    states: ['default', 'disabled', 'invalid', 'described'],
+    accessibility: ['label-or-aria-label', 'aria-invalid', 'aria-describedby'],
+    tokenFamilies: ['color', 'border', 'radius', 'sizing'],
   },
   {
     component: 'Toolbar',
@@ -146,5 +280,10 @@ export const axisPrimitiveContracts = [
     catalogTargets: ['layout'],
     visualTargets: ['layout'],
     testFiles: ['frontend/tests/design-system-catalog.test.tsx'],
+    readiness: 'ready',
+    variants: ['text-actions', 'icon-actions', 'wrapping'],
+    states: ['responsive'],
+    accessibility: ['action-order-preserved', 'keyboard-reachable'],
+    tokenFamilies: ['color', 'border', 'shadow', 'radius', 'spacing'],
   },
 ] as const satisfies readonly AxisPrimitiveContract[];

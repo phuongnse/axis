@@ -10,14 +10,20 @@ describe('DesignSystemCatalog', () => {
 
     expect(screen.getByRole('heading', { name: 'Axis design system' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Semantic color tokens' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Button' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Icon button' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Action links' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Form controls' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Feedback' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Structure and data' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Layout' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Primitive readiness' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: 'Button' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: 'Icon button' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: 'Action links' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: 'Form controls' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: 'Feedback' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { level: 2, name: 'Structure and data' }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: 'Layout' })).toBeInTheDocument();
     expect(screen.getAllByText('Primary').length).toBeGreaterThan(0);
+    expect(screen.getByText('ActionLink')).toBeInTheDocument();
+    expect(screen.getByText('IconButton')).toBeInTheDocument();
+    expect(screen.getAllByText('aria busy loading').length).toBeGreaterThan(0);
     expect(screen.getByText('Chart 1')).toBeInTheDocument();
     expect(screen.getByText('Sidebar')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /save changes/i })).toBeInTheDocument();

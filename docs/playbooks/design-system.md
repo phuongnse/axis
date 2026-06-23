@@ -60,7 +60,7 @@ Penpot owns the approved design token decisions. Frontend code owns the executab
 |---|---|
 | `frontend/src/design-system/tokens.css` | Raw CSS variable values for light and dark themes |
 | `frontend/src/design-system/tokens.ts` | Typed token registry used by tests and future design-system tooling |
-| `frontend/src/design-system/primitive-contracts.ts` | UI primitive registry: file ownership, catalog target, visual target, and test coverage |
+| `frontend/src/design-system/primitive-contracts.ts` | UI primitive registry: file ownership, catalog target, visual target, readiness status, variant/state/accessibility matrix, token families, and test coverage |
 | `frontend/tailwind.config.js` | Tailwind names that map to semantic CSS variables |
 
 When importing token updates from Penpot:
@@ -108,7 +108,9 @@ If a variant is not documented, do not infer it from a one-off screen.
 
 ## Primitive Contracts
 
-The first shared primitive contract covers the controls already proven in the catalog. Keep this table updated before using a new primitive broadly in migrated screens.
+The executable primitive contract lives in `frontend/src/design-system/primitive-contracts.ts`. Keep it updated before using a new primitive broadly in migrated screens. The catalog renders its readiness matrix from that file so reviewers can inspect variants, states, accessibility expectations, token families, tests, and visual targets without a second source of truth.
+
+The table below is the human summary of the current executable contract:
 
 | Component | Purpose | Variants and states | Accessibility | Token map | Visual QA targets |
 |---|---|---|---|---|---|
@@ -146,7 +148,7 @@ Design-system rules should fail deterministically when they can be checked witho
 | Rule | Mechanism |
 |---|---|
 | UI primitive files must have a registry contract | `python scripts/axis.py check frontend-component-composition` compares `frontend/src/components/ui/*.tsx` to `primitive-contracts.ts` |
-| Primitive contracts must name catalog, visual, and test coverage | Same check verifies catalog target strings, desktop Playwright screenshot targets, and test file paths |
+| Primitive contracts must name catalog, visual, readiness, and test coverage | Same check verifies catalog target strings, readiness matrix fields, desktop Playwright screenshot targets, and test file paths |
 | Component code must use semantic color and shadow tokens | `python scripts/axis.py check frontend-style` rejects raw neutral color utilities, raw shadow utilities, and arbitrary color/gradient classes in TS/TSX |
 | Token registry must match executable Tailwind mapping | `frontend/tests/design-tokens.test.ts` checks CSS variables, color, radius, shadow, and background-image mappings |
 

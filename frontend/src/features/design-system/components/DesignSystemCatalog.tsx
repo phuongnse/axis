@@ -38,6 +38,10 @@ import { Select } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import { Toolbar } from '@/components/ui/toolbar';
+import {
+  type AxisPrimitiveContract,
+  axisPrimitiveContracts,
+} from '@/design-system/primitive-contracts';
 
 interface Swatch {
   label: string;
@@ -101,6 +105,64 @@ const surfaceSwatches: Swatch[] = [
   },
   { label: 'Inverse Muted', className: 'bg-inverse-muted', textClassName: 'text-foreground' },
 ];
+
+function formatContractLabel(value: string) {
+  return value.replaceAll('-', ' ');
+}
+
+function ReadinessGroup({ label, values }: { label: string; values: readonly string[] }) {
+  return (
+    <div>
+      <p className="text-xs font-medium uppercase text-muted-foreground">{label}</p>
+      <div className="mt-2 flex flex-wrap gap-1.5">
+        {values.map((value) => (
+          <span
+            key={value}
+            className="rounded-md border border-border bg-muted px-2 py-1 text-xs text-muted-foreground"
+          >
+            {formatContractLabel(value)}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ReadinessBadge({ readiness }: { readiness: AxisPrimitiveContract['readiness'] }) {
+  return (
+    <Badge variant={readiness === 'ready' ? 'success' : 'warning'}>
+      {formatContractLabel(readiness)}
+    </Badge>
+  );
+}
+
+function PrimitiveReadinessMatrix() {
+  return (
+    <div className="grid gap-3">
+      {axisPrimitiveContracts.map((contract) => (
+        <div
+          key={contract.component}
+          className="grid gap-4 rounded-lg border border-border bg-card p-4 shadow-surface lg:grid-cols-[11rem_minmax(0,1fr)]"
+          data-primitive-contract={contract.component}
+        >
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <h3 className="text-sm font-semibold text-foreground">{contract.component}</h3>
+              <ReadinessBadge readiness={contract.readiness} />
+            </div>
+            <p className="break-all text-xs leading-5 text-muted-foreground">{contract.file}</p>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <ReadinessGroup label="Variants" values={contract.variants} />
+            <ReadinessGroup label="States" values={contract.states} />
+            <ReadinessGroup label="Accessibility" values={contract.accessibility} />
+            <ReadinessGroup label="Tokens" values={contract.tokenFamilies} />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 function CatalogSection({
   title,
@@ -520,6 +582,10 @@ export function DesignSystemCatalog() {
             <SwatchGrid swatches={stateSwatches} />
             <SwatchGrid swatches={surfaceSwatches} />
           </div>
+        </CatalogSection>
+
+        <CatalogSection title="Primitive readiness" eyebrow="primitive-readiness">
+          <PrimitiveReadinessMatrix />
         </CatalogSection>
 
         <CatalogSection title="Button" eyebrow="primitive-button">
