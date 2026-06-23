@@ -18,7 +18,7 @@ runtime.
 | Tool | Required version source | Used by | Local enforcement |
 |---|---:|---|---|
 | .NET SDK | `8.x` in [TECH_STACK.md](../TECH_STACK.md), selected by [`global.json`](../../global.json) | `python scripts/axis.py verify`, `python scripts/axis.py dotnet ...`, `test unit`, package scans, API contract generation | `global.json` must select major `8`; Axis checks the resolved SDK major before any wrapped .NET workflow runs. |
-| Node.js | [`frontend/.nvmrc`](../../frontend/.nvmrc) | `python scripts/axis.py verify`, `python scripts/axis.py frontend ...`, API type generation, legacy wireframe export | Axis checks the resolved Node major and package-manager availability before wrapped frontend workflows run. |
+| Node.js | [`frontend/.nvmrc`](../../frontend/.nvmrc) | `python scripts/axis.py verify`, `python scripts/axis.py frontend ...`, API type generation, legacy wireframe export | Axis checks the resolved Node major and package-manager availability before wrapped frontend workflows run, and resolves matching nvm installs when non-interactive shells do not load nvm into `PATH`. |
 | Lychee | `0.23.0` exactly in this table | `python scripts/axis.py check markdown-links`, CI Markdown link check | `lychee.toml` is written for the 0.23 config schema; Axis fails fast when another version resolves. |
 | Buf CLI | `1.50.0` exactly in this table | `python scripts/axis.py check buf-lint`, `python scripts/axis.py check buf-breaking-against-base`, CI protobuf checks | Axis checks the resolved Buf version before wrapped protobuf workflows run. |
 
@@ -105,6 +105,12 @@ python scripts/axis.py register avro-schemas --dry-run
   writes the executable copy to `.git/hooks/pre-push`.
 - Use Python JSON/path/process APIs instead of shell string manipulation when parsing
   Markdown, OpenAPI, Avro, YAML-like config, or Git output.
+- New deterministic guards must encode a reusable invariant, not memorialize one
+  incident. Avoid exact route names, translation keys, CSS class fragments, or
+  screen-specific component names unless those strings are the source-of-truth
+  contract being checked. If the finding depends on visual judgment or a single
+  historical case, keep it in [REVIEW_FINDINGS.md](../REVIEW_FINDINGS.md) as
+  review-only guidance instead of adding a repo gate.
 - Diff-aware local checks must include the PR range plus staged, unstaged, and
   untracked files. They must not report "no diff" while the working tree is dirty.
 - Repo-scoped Codex skills under `.agents/skills/` must have valid `SKILL.md`

@@ -14,8 +14,6 @@ export type AxisPrimitiveTokenFamily =
 export interface AxisPrimitiveContract {
   component: string;
   file: string;
-  catalogTargets: readonly string[];
-  visualTargets: readonly string[];
   testFiles: readonly string[];
   readiness: AxisPrimitiveReadiness;
   variants: readonly string[];
@@ -28,9 +26,7 @@ export const axisPrimitiveContracts = [
   {
     component: 'ActionLink',
     file: 'frontend/src/components/ui/action-link.tsx',
-    catalogTargets: ['primitive-action-link'],
-    visualTargets: ['primitive-action-link'],
-    testFiles: ['frontend/tests/design-system-catalog.test.tsx'],
+    testFiles: ['frontend/tests/ui-primitives.test.tsx'],
     readiness: 'ready',
     variants: ['primary', 'secondary', 'surface-default', 'surface-inverted', 'surface-adaptive'],
     states: ['default'],
@@ -40,8 +36,6 @@ export const axisPrimitiveContracts = [
   {
     component: 'Badge',
     file: 'frontend/src/components/ui/badge.tsx',
-    catalogTargets: ['feedback'],
-    visualTargets: ['feedback'],
     testFiles: ['frontend/tests/ui-primitives.test.tsx'],
     readiness: 'ready',
     variants: [
@@ -61,8 +55,6 @@ export const axisPrimitiveContracts = [
   {
     component: 'Button',
     file: 'frontend/src/components/ui/button.tsx',
-    catalogTargets: ['primitive-button'],
-    visualTargets: ['primitive-button'],
     testFiles: ['frontend/tests/button.test.tsx'],
     readiness: 'ready',
     variants: [
@@ -85,9 +77,7 @@ export const axisPrimitiveContracts = [
   {
     component: 'Card',
     file: 'frontend/src/components/ui/card.tsx',
-    catalogTargets: ['structure-data'],
-    visualTargets: ['structure-data'],
-    testFiles: ['frontend/tests/design-system-catalog.test.tsx'],
+    testFiles: ['frontend/tests/ui-primitives.test.tsx'],
     readiness: 'ready',
     variants: ['surface-default', 'header', 'content', 'footer'],
     states: ['default'],
@@ -97,8 +87,6 @@ export const axisPrimitiveContracts = [
   {
     component: 'Checkbox',
     file: 'frontend/src/components/ui/checkbox.tsx',
-    catalogTargets: ['primitive-form'],
-    visualTargets: ['primitive-form'],
     testFiles: ['frontend/tests/ui-primitives.test.tsx'],
     readiness: 'ready',
     variants: ['unchecked', 'checked'],
@@ -109,8 +97,6 @@ export const axisPrimitiveContracts = [
   {
     component: 'CheckboxField',
     file: 'frontend/src/components/ui/checkbox-field.tsx',
-    catalogTargets: ['primitive-form'],
-    visualTargets: ['primitive-form'],
     testFiles: ['frontend/tests/ui-primitives.test.tsx'],
     readiness: 'ready',
     variants: ['labelled', 'error'],
@@ -121,9 +107,7 @@ export const axisPrimitiveContracts = [
   {
     component: 'ContentGrid',
     file: 'frontend/src/components/ui/content-grid.tsx',
-    catalogTargets: ['layout'],
-    visualTargets: ['layout'],
-    testFiles: ['frontend/tests/design-system-catalog.test.tsx'],
+    testFiles: ['frontend/tests/ui-primitives.test.tsx'],
     readiness: 'ready',
     variants: ['one-column', 'two-column', 'three-column'],
     states: ['responsive'],
@@ -133,8 +117,6 @@ export const axisPrimitiveContracts = [
   {
     component: 'EmptyState',
     file: 'frontend/src/components/ui/empty-state.tsx',
-    catalogTargets: ['structure-data'],
-    visualTargets: ['structure-data'],
     testFiles: ['frontend/tests/ui-primitives.test.tsx'],
     readiness: 'ready',
     variants: ['with-action', 'without-action'],
@@ -145,9 +127,7 @@ export const axisPrimitiveContracts = [
   {
     component: 'FormField',
     file: 'frontend/src/components/ui/form-field.tsx',
-    catalogTargets: ['primitive-form'],
-    visualTargets: ['primitive-form'],
-    testFiles: ['frontend/tests/design-system-catalog.test.tsx'],
+    testFiles: ['frontend/tests/ui-primitives.test.tsx'],
     readiness: 'ready',
     variants: ['label', 'help-text', 'error', 'description-ids'],
     states: ['default', 'error'],
@@ -157,8 +137,6 @@ export const axisPrimitiveContracts = [
   {
     component: 'IconButton',
     file: 'frontend/src/components/ui/icon-button.tsx',
-    catalogTargets: ['primitive-icon-button'],
-    visualTargets: ['primitive-icon-button'],
     testFiles: ['frontend/tests/ui-primitives.test.tsx'],
     readiness: 'ready',
     variants: ['outline', 'secondary', 'destructive', 'size-icon', 'size-icon-sm', 'size-icon-lg'],
@@ -169,9 +147,7 @@ export const axisPrimitiveContracts = [
   {
     component: 'Input',
     file: 'frontend/src/components/ui/input.tsx',
-    catalogTargets: ['primitive-form'],
-    visualTargets: ['primitive-form'],
-    testFiles: ['frontend/tests/design-system-catalog.test.tsx'],
+    testFiles: ['frontend/tests/ui-primitives.test.tsx'],
     readiness: 'ready',
     variants: ['text', 'with-leading-icon'],
     states: ['default', 'disabled', 'invalid', 'described'],
@@ -181,9 +157,7 @@ export const axisPrimitiveContracts = [
   {
     component: 'Label',
     file: 'frontend/src/components/ui/label.tsx',
-    catalogTargets: ['primitive-form'],
-    visualTargets: ['primitive-form'],
-    testFiles: ['frontend/tests/design-system-catalog.test.tsx'],
+    testFiles: ['frontend/tests/ui-primitives.test.tsx'],
     readiness: 'ready',
     variants: ['default', 'normal-weight'],
     states: ['default'],
@@ -193,8 +167,6 @@ export const axisPrimitiveContracts = [
   {
     component: 'Notice',
     file: 'frontend/src/components/ui/notice.tsx',
-    catalogTargets: ['feedback'],
-    visualTargets: ['feedback'],
     testFiles: ['frontend/tests/ui-primitives.test.tsx'],
     readiness: 'ready',
     variants: ['info', 'success', 'warning', 'error'],
@@ -205,9 +177,7 @@ export const axisPrimitiveContracts = [
   {
     component: 'PageHeader',
     file: 'frontend/src/components/ui/page-header.tsx',
-    catalogTargets: ['layout'],
-    visualTargets: ['layout'],
-    testFiles: ['frontend/tests/design-system-catalog.test.tsx'],
+    testFiles: ['frontend/tests/ui-primitives.test.tsx'],
     readiness: 'ready',
     variants: ['with-eyebrow', 'with-description', 'with-actions'],
     states: ['responsive'],
@@ -217,9 +187,7 @@ export const axisPrimitiveContracts = [
   {
     component: 'Panel',
     file: 'frontend/src/components/ui/panel.tsx',
-    catalogTargets: ['structure-data'],
-    visualTargets: ['structure-data'],
-    testFiles: ['frontend/tests/design-system-catalog.test.tsx'],
+    testFiles: ['frontend/tests/ui-primitives.test.tsx'],
     readiness: 'ready',
     variants: ['default', 'muted', 'inset', 'attention', 'inverse'],
     states: ['default'],
@@ -229,8 +197,6 @@ export const axisPrimitiveContracts = [
   {
     component: 'Progress',
     file: 'frontend/src/components/ui/progress.tsx',
-    catalogTargets: ['feedback'],
-    visualTargets: ['feedback'],
     testFiles: ['frontend/tests/ui-primitives.test.tsx'],
     readiness: 'ready',
     variants: ['determinate', 'indeterminate'],
@@ -241,9 +207,7 @@ export const axisPrimitiveContracts = [
   {
     component: 'Select',
     file: 'frontend/src/components/ui/select.tsx',
-    catalogTargets: ['primitive-form'],
-    visualTargets: ['primitive-form'],
-    testFiles: ['frontend/tests/design-system-catalog.test.tsx'],
+    testFiles: ['frontend/tests/ui-primitives.test.tsx'],
     readiness: 'ready',
     variants: ['native-select'],
     states: ['default', 'disabled', 'invalid', 'described'],
@@ -253,9 +217,7 @@ export const axisPrimitiveContracts = [
   {
     component: 'Skeleton',
     file: 'frontend/src/components/ui/skeleton.tsx',
-    catalogTargets: ['feedback'],
-    visualTargets: ['feedback'],
-    testFiles: ['frontend/tests/design-system-catalog.test.tsx'],
+    testFiles: ['frontend/tests/ui-primitives.test.tsx'],
     readiness: 'ready',
     variants: ['line', 'block'],
     states: ['loading'],
@@ -265,8 +227,6 @@ export const axisPrimitiveContracts = [
   {
     component: 'Textarea',
     file: 'frontend/src/components/ui/textarea.tsx',
-    catalogTargets: ['primitive-form'],
-    visualTargets: ['primitive-form'],
     testFiles: ['frontend/tests/ui-primitives.test.tsx'],
     readiness: 'ready',
     variants: ['long-text', 'resizable'],
@@ -277,9 +237,7 @@ export const axisPrimitiveContracts = [
   {
     component: 'Toolbar',
     file: 'frontend/src/components/ui/toolbar.tsx',
-    catalogTargets: ['layout'],
-    visualTargets: ['layout'],
-    testFiles: ['frontend/tests/design-system-catalog.test.tsx'],
+    testFiles: ['frontend/tests/ui-primitives.test.tsx'],
     readiness: 'ready',
     variants: ['text-actions', 'icon-actions', 'wrapping'],
     states: ['responsive'],

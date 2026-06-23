@@ -1628,6 +1628,35 @@ class TestToolVersionGates(unittest.TestCase):
         self.assertIn("expected Node 22.x", stderr.getvalue())
         self.assertIn("frontend/.nvmrc", stderr.getvalue())
 
+    def test_frontend_toolchain_env_resolves_nvm_when_path_lacks_node(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            nvm_root = root / ".nvm"
+            older_bin = nvm_root / "versions" / "node" / "v22.1.0" / "bin"
+            expected_bin = nvm_root / "versions" / "node" / "v22.23.0" / "bin"
+            path_dir = root / "plain-path"
+            for bin_dir in (older_bin, expected_bin):
+                bin_dir.mkdir(parents=True)
+                (bin_dir / "node").write_text("", encoding="utf-8")
+                (bin_dir / "npm").write_text("", encoding="utf-8")
+            path_dir.mkdir()
+
+            def fake_command_version_line(name: str, *_args: str, env: dict[str, str] | None = None):
+                path = env.get("PATH", "") if env else ""
+                if path.split(axis.os.pathsep)[0] == str(expected_bin):
+                    version = "v22.23.0" if name == "node" else "10.9.8"
+                    return True, version, str(expected_bin / name)
+                return False, f"{name} not found in PATH", name
+
+            with (
+                mock.patch.dict(axis.os.environ, {"NVM_DIR": str(nvm_root), "PATH": str(path_dir)}, clear=True),
+                mock.patch.object(axis, "required_node_major", return_value=(True, "22")),
+                mock.patch.object(axis, "command_version_line", side_effect=fake_command_version_line),
+            ):
+                env = axis.frontend_toolchain_env()
+
+        self.assertEqual(str(expected_bin), env["PATH"].split(axis.os.pathsep)[0])
+
     def test_buf_cli_rejects_wrong_version(self) -> None:
         with (
             mock.patch.object(axis, "find_buf", return_value="/usr/bin/buf"),
@@ -1803,6 +1832,7 @@ class TestVerifyGate(unittest.TestCase):
             mock.patch.object(axis, "diff_range", return_value="base...HEAD"),
             mock.patch.object(axis, "changed_paths", return_value=["frontend/src/App.tsx"]),
             mock.patch.object(axis, "check_frontend_toolchain", side_effect=lambda: calls.append("frontend-toolchain") or 0),
+            mock.patch.object(axis, "frontend_toolchain_env", return_value={}),
             mock.patch.object(axis, "run", side_effect=fake_run),
             mock.patch.object(axis, "check_policy_tests", side_effect=lambda: calls.append("policy-tests") or 0),
             mock.patch.object(axis, "check_doc_drift", side_effect=lambda: calls.append("doc-drift") or 0),
@@ -1892,59 +1922,6 @@ class TestFrontendComponentComposition(unittest.TestCase):
 
         self.assertEqual([], issues)
 
-    def test_rejects_duplicated_flow_trace_geometry(self) -> None:
-        issues = self.issues_for_frontend(
-            {
-                "frontend/src/features/auth/components/AuthCard.tsx": (
-                    "export function BadTrace() {\n"
-                    "  return <div className=\"grid grid-cols-[34px_1fr] gap-4\" />;\n"
-                    "}\n"
-                )
-            }
-        )
-
-        self.assertIn("duplicated flow/timeline geometry", "\n".join(issues))
-
-    def test_rejects_duplicated_access_path_trace(self) -> None:
-        issues = self.issues_for_frontend(
-            {
-                "frontend/src/features/auth/components/AuthSignalPanel.tsx": (
-                    "const steps = [{ labelKey: 'landing.signInStep' }];\n"
-                )
-            }
-        )
-
-        self.assertIn("duplicated access path trace", "\n".join(issues))
-
-    def test_rejects_hard_coded_public_auth_navigation_cta(self) -> None:
-        issues = self.issues_for_frontend(
-            {
-                "frontend/src/features/landing/components/LandingPage.tsx": (
-                    "import { Link } from '@tanstack/react-router';\n"
-                    "export function LandingActions() {\n"
-                    "  return <Link to=\"/login\" className=\"inline-flex h-9 items-center\">Sign in</Link>;\n"
-                    "}\n"
-                )
-            }
-        )
-
-        self.assertIn("navigation CTA styling must use ActionLink", "\n".join(issues))
-
-    def test_accepts_shared_public_auth_navigation_cta(self) -> None:
-        issues = self.issues_for_frontend(
-            {
-                "frontend/src/features/landing/components/LandingPage.tsx": (
-                    "import { ActionLink } from '@/components/ui/action-link';\n"
-                    "import { LogIn } from 'lucide-react';\n"
-                    "export function LandingActions() {\n"
-                    "  return <ActionLink to=\"/login\" icon={LogIn}>Sign in</ActionLink>;\n"
-                    "}\n"
-                )
-            }
-        )
-
-        self.assertEqual([], issues)
-
     def test_rejects_native_standard_controls_outside_ui_primitives(self) -> None:
         issues = self.issues_for_frontend(
             {
@@ -1957,8 +1934,20 @@ class TestFrontendComponentComposition(unittest.TestCase):
         )
 
         joined = "\n".join(issues)
-        self.assertIn("standard UI control <button> must use a shared shadcn/ui primitive", joined)
-        self.assertIn("standard UI control <input> must use a shared shadcn/ui primitive", joined)
+        self.assertIn("standard UI control <button> must use a shared Axis UI primitive", joined)
+        self.assertIn("standard UI control <input> must use a shared Axis UI primitive", joined)
+
+    def test_rejects_headless_ui_import_outside_ui_primitives(self) -> None:
+        issues = self.issues_for_frontend(
+            {
+                "frontend/src/features/auth/components/CustomMenu.tsx": (
+                    "import { Menu } from '@base-ui/react/menu';\n"
+                    "export function CustomMenu() { return null; }\n"
+                )
+            }
+        )
+
+        self.assertIn("headless UI primitives belong in frontend/src/components/ui", "\n".join(issues))
 
     def test_accepts_native_standard_controls_inside_ui_primitives(self) -> None:
         issues = self.issues_for_frontend(
@@ -1972,8 +1961,6 @@ class TestFrontendComponentComposition(unittest.TestCase):
                     "export const axisPrimitiveContracts = [{\n"
                     "  component: 'CustomControl',\n"
                     "  file: 'frontend/src/components/ui/custom-control.tsx',\n"
-                    "  catalogTargets: ['primitive-custom-control'],\n"
-                    "  visualTargets: ['primitive-custom-control'],\n"
                     "  testFiles: ['frontend/tests/custom-control.test.tsx'],\n"
                     "  readiness: 'ready',\n"
                     "  variants: ['default'],\n"
@@ -1981,15 +1968,6 @@ class TestFrontendComponentComposition(unittest.TestCase):
                     "  accessibility: ['native-control'],\n"
                     "  tokenFamilies: ['color'],\n"
                     "}];\n"
-                ),
-                "frontend/src/features/design-system/components/DesignSystemCatalog.tsx": (
-                    "import { axisPrimitiveContracts } from '@/design-system/primitive-contracts';\n"
-                    "export const target = 'primitive-custom-control primitive-readiness';\n"
-                    "export const contracts = axisPrimitiveContracts;\n"
-                ),
-                "frontend/e2e/design-system-catalog.pw.ts": (
-                    "await expect(page.locator('[data-visual-target=\"primitive-custom-control\"]'))"
-                    ".toHaveScreenshot('primitive-custom-control-desktop.png');\n"
                 ),
                 "frontend/tests/custom-control.test.tsx": "export {};\n",
             }
@@ -2013,7 +1991,7 @@ class TestFrontendComponentComposition(unittest.TestCase):
 
         self.assertIn("UI primitive must be listed", "\n".join(issues))
 
-    def test_rejects_primitive_contract_without_visual_screenshot(self) -> None:
+    def test_rejects_primitive_contract_without_required_readiness_metadata(self) -> None:
         issues = self.issues_for_frontend(
             {
                 "frontend/src/components/ui/custom-control.tsx": (
@@ -2025,53 +2003,8 @@ class TestFrontendComponentComposition(unittest.TestCase):
                     "export const axisPrimitiveContracts = [{\n"
                     "  component: 'CustomControl',\n"
                     "  file: 'frontend/src/components/ui/custom-control.tsx',\n"
-                    "  catalogTargets: ['primitive-custom-control'],\n"
-                    "  visualTargets: ['primitive-custom-control'],\n"
-                    "  testFiles: ['frontend/tests/custom-control.test.tsx'],\n"
-                    "  readiness: 'ready',\n"
-                    "  variants: ['default'],\n"
-                    "  states: ['default'],\n"
-                    "  accessibility: ['native-control'],\n"
-                    "  tokenFamilies: ['color'],\n"
-                    "}];\n"
-                ),
-                "frontend/src/features/design-system/components/DesignSystemCatalog.tsx": (
-                    "import { axisPrimitiveContracts } from '@/design-system/primitive-contracts';\n"
-                    "export const target = 'primitive-custom-control primitive-readiness';\n"
-                    "export const contracts = axisPrimitiveContracts;\n"
-                ),
-                "frontend/e2e/design-system-catalog.pw.ts": "export {};\n",
-                "frontend/tests/custom-control.test.tsx": "export {};\n",
-            }
-        )
-
-        self.assertIn("needs a desktop Playwright screenshot", "\n".join(issues))
-
-    def test_rejects_primitive_contract_without_readiness_matrix(self) -> None:
-        issues = self.issues_for_frontend(
-            {
-                "frontend/src/components/ui/custom-control.tsx": (
-                    "export function CustomControl() {\n"
-                    "  return <button type=\"button\" />;\n"
-                    "}\n"
-                ),
-                "frontend/src/design-system/primitive-contracts.ts": (
-                    "export const axisPrimitiveContracts = [{\n"
-                    "  component: 'CustomControl',\n"
-                    "  file: 'frontend/src/components/ui/custom-control.tsx',\n"
-                    "  catalogTargets: ['primitive-custom-control'],\n"
-                    "  visualTargets: ['primitive-custom-control'],\n"
                     "  testFiles: ['frontend/tests/custom-control.test.tsx'],\n"
                     "}];\n"
-                ),
-                "frontend/src/features/design-system/components/DesignSystemCatalog.tsx": (
-                    "import { axisPrimitiveContracts } from '@/design-system/primitive-contracts';\n"
-                    "export const target = 'primitive-custom-control primitive-readiness';\n"
-                    "export const contracts = axisPrimitiveContracts;\n"
-                ),
-                "frontend/e2e/design-system-catalog.pw.ts": (
-                    "await expect(page.locator('[data-visual-target=\"primitive-custom-control\"]'))"
-                    ".toHaveScreenshot('primitive-custom-control-desktop.png');\n"
                 ),
                 "frontend/tests/custom-control.test.tsx": "export {};\n",
             }
@@ -2079,41 +2012,6 @@ class TestFrontendComponentComposition(unittest.TestCase):
 
         self.assertIn("contract readiness must be `ready` or `candidate`", "\n".join(issues))
         self.assertIn("contract must list at least one variants value", "\n".join(issues))
-
-    def test_rejects_primitive_contract_without_catalog_readiness_target(self) -> None:
-        issues = self.issues_for_frontend(
-            {
-                "frontend/src/components/ui/custom-control.tsx": (
-                    "export function CustomControl() {\n"
-                    "  return <button type=\"button\" />;\n"
-                    "}\n"
-                ),
-                "frontend/src/design-system/primitive-contracts.ts": (
-                    "export const axisPrimitiveContracts = [{\n"
-                    "  component: 'CustomControl',\n"
-                    "  file: 'frontend/src/components/ui/custom-control.tsx',\n"
-                    "  catalogTargets: ['primitive-custom-control'],\n"
-                    "  visualTargets: ['primitive-custom-control'],\n"
-                    "  testFiles: ['frontend/tests/custom-control.test.tsx'],\n"
-                    "  readiness: 'ready',\n"
-                    "  variants: ['default'],\n"
-                    "  states: ['default'],\n"
-                    "  accessibility: ['native-control'],\n"
-                    "  tokenFamilies: ['color'],\n"
-                    "}];\n"
-                ),
-                "frontend/src/features/design-system/components/DesignSystemCatalog.tsx": (
-                    "export const target = 'primitive-custom-control';\n"
-                ),
-                "frontend/e2e/design-system-catalog.pw.ts": (
-                    "await expect(page.locator('[data-visual-target=\"primitive-custom-control\"]'))"
-                    ".toHaveScreenshot('primitive-custom-control-desktop.png');\n"
-                ),
-                "frontend/tests/custom-control.test.tsx": "export {};\n",
-            }
-        )
-
-        self.assertIn("missing primitive readiness matrix", "\n".join(issues))
 
     def test_rejects_unknown_primitive_contract_token_family(self) -> None:
         issues = self.issues_for_frontend(
@@ -2127,8 +2025,6 @@ class TestFrontendComponentComposition(unittest.TestCase):
                     "export const axisPrimitiveContracts = [{\n"
                     "  component: 'CustomControl',\n"
                     "  file: 'frontend/src/components/ui/custom-control.tsx',\n"
-                    "  catalogTargets: ['primitive-custom-control'],\n"
-                    "  visualTargets: ['primitive-custom-control'],\n"
                     "  testFiles: ['frontend/tests/custom-control.test.tsx'],\n"
                     "  readiness: 'ready',\n"
                     "  variants: ['default'],\n"
@@ -2136,15 +2032,6 @@ class TestFrontendComponentComposition(unittest.TestCase):
                     "  accessibility: ['native-control'],\n"
                     "  tokenFamilies: ['raw-shadow'],\n"
                     "}];\n"
-                ),
-                "frontend/src/features/design-system/components/DesignSystemCatalog.tsx": (
-                    "import { axisPrimitiveContracts } from '@/design-system/primitive-contracts';\n"
-                    "export const target = 'primitive-custom-control primitive-readiness';\n"
-                    "export const contracts = axisPrimitiveContracts;\n"
-                ),
-                "frontend/e2e/design-system-catalog.pw.ts": (
-                    "await expect(page.locator('[data-visual-target=\"primitive-custom-control\"]'))"
-                    ".toHaveScreenshot('primitive-custom-control-desktop.png');\n"
                 ),
                 "frontend/tests/custom-control.test.tsx": "export {};\n",
             }
@@ -2191,15 +2078,6 @@ class TestFrontendComponentComposition(unittest.TestCase):
                     "  evidence: ['e2e-smoke'],\n"
                     "  testFiles: ['frontend/e2e/local-dev-smoke.pw.ts'],\n"
                     "}];\n"
-                ),
-                "frontend/src/features/design-system/components/DesignSystemCatalog.tsx": (
-                    "import { axisConsumerContracts } from '@/design-system/consumer-contracts';\n"
-                    "export const target = 'consumer-readiness';\n"
-                    "export const contracts = axisConsumerContracts;\n"
-                ),
-                "frontend/e2e/design-system-catalog.pw.ts": (
-                    "await expect(page.locator('[data-visual-target=\"consumer-readiness\"]'))"
-                    ".toHaveScreenshot('consumer-readiness-desktop.png');\n"
                 ),
                 "frontend/e2e/local-dev-smoke.pw.ts": "export {};\n",
             }
@@ -2271,95 +2149,11 @@ class TestFrontendComponentComposition(unittest.TestCase):
                     "  testFiles: ['frontend/tests/login-page.test.tsx'],\n"
                     "}];\n"
                 ),
-                "frontend/src/features/design-system/components/DesignSystemCatalog.tsx": (
-                    "import { axisConsumerContracts } from '@/design-system/consumer-contracts';\n"
-                    "export const target = 'consumer-readiness';\n"
-                    "export const contracts = axisConsumerContracts;\n"
-                ),
-                "frontend/e2e/design-system-catalog.pw.ts": (
-                    "await expect(page.locator('[data-visual-target=\"consumer-readiness\"]'))"
-                    ".toHaveScreenshot('consumer-readiness-desktop.png');\n"
-                ),
                 "frontend/tests/login-page.test.tsx": "export {};\n",
             }
         )
 
         self.assertIn("contract route `/login` is not declared", "\n".join(issues))
-
-    def test_rejects_consumer_contract_without_readiness_matrix(self) -> None:
-        issues = self.issues_for_frontend(
-            {
-                "frontend/src/routes/index.lazy.tsx": (
-                    "import { LandingPage } from '@/features/landing/components/LandingPage';\n"
-                    "export const Route = createLazyFileRoute('/')({ component: LandingPage });\n"
-                ),
-                "frontend/src/features/landing/components/LandingPage.tsx": (
-                    "export function LandingPage() { return null; }\n"
-                ),
-                "frontend/src/design-system/consumer-contracts.ts": (
-                    "export const axisConsumerContracts = [{\n"
-                    "  surface: 'Public landing',\n"
-                    "  kind: 'public',\n"
-                    "  route: '/',\n"
-                    "  component: 'LandingPage',\n"
-                    "  file: 'frontend/src/features/landing/components/LandingPage.tsx',\n"
-                    "  owner: 'landing',\n"
-                    "  readiness: 'ready',\n"
-                    "  primitives: ['ActionLink'],\n"
-                    "  states: ['default'],\n"
-                    "  evidence: ['e2e-smoke'],\n"
-                    "  testFiles: ['frontend/e2e/local-dev-smoke.pw.ts'],\n"
-                    "}];\n"
-                ),
-                "frontend/src/features/design-system/components/DesignSystemCatalog.tsx": (
-                    "export const target = 'consumer';\n"
-                ),
-                "frontend/e2e/design-system-catalog.pw.ts": (
-                    "await expect(page.locator('[data-visual-target=\"consumer-readiness\"]'))"
-                    ".toHaveScreenshot('consumer-readiness-desktop.png');\n"
-                ),
-                "frontend/e2e/local-dev-smoke.pw.ts": "export {};\n",
-            }
-        )
-
-        self.assertIn("missing consumer readiness matrix", "\n".join(issues))
-
-    def test_rejects_consumer_contract_without_snapshot(self) -> None:
-        issues = self.issues_for_frontend(
-            {
-                "frontend/src/routes/index.lazy.tsx": (
-                    "import { LandingPage } from '@/features/landing/components/LandingPage';\n"
-                    "export const Route = createLazyFileRoute('/')({ component: LandingPage });\n"
-                ),
-                "frontend/src/features/landing/components/LandingPage.tsx": (
-                    "export function LandingPage() { return null; }\n"
-                ),
-                "frontend/src/design-system/consumer-contracts.ts": (
-                    "export const axisConsumerContracts = [{\n"
-                    "  surface: 'Public landing',\n"
-                    "  kind: 'public',\n"
-                    "  route: '/',\n"
-                    "  component: 'LandingPage',\n"
-                    "  file: 'frontend/src/features/landing/components/LandingPage.tsx',\n"
-                    "  owner: 'landing',\n"
-                    "  readiness: 'ready',\n"
-                    "  primitives: ['ActionLink'],\n"
-                    "  states: ['default'],\n"
-                    "  evidence: ['e2e-smoke'],\n"
-                    "  testFiles: ['frontend/e2e/local-dev-smoke.pw.ts'],\n"
-                    "}];\n"
-                ),
-                "frontend/src/features/design-system/components/DesignSystemCatalog.tsx": (
-                    "import { axisConsumerContracts } from '@/design-system/consumer-contracts';\n"
-                    "export const target = 'consumer-readiness';\n"
-                    "export const contracts = axisConsumerContracts;\n"
-                ),
-                "frontend/e2e/design-system-catalog.pw.ts": "export {};\n",
-                "frontend/e2e/local-dev-smoke.pw.ts": "export {};\n",
-            }
-        )
-
-        self.assertIn("consumer readiness matrix needs a desktop Playwright screenshot", "\n".join(issues))
 
     def test_rejects_consumer_contract_without_required_metadata(self) -> None:
         issues = self.issues_for_frontend(
@@ -2386,15 +2180,6 @@ class TestFrontendComponentComposition(unittest.TestCase):
                     "  testFiles: ['frontend/e2e/missing.pw.ts'],\n"
                     "}];\n"
                 ),
-                "frontend/src/features/design-system/components/DesignSystemCatalog.tsx": (
-                    "import { axisConsumerContracts } from '@/design-system/consumer-contracts';\n"
-                    "export const target = 'consumer-readiness';\n"
-                    "export const contracts = axisConsumerContracts;\n"
-                ),
-                "frontend/e2e/design-system-catalog.pw.ts": (
-                    "await expect(page.locator('[data-visual-target=\"consumer-readiness\"]'))"
-                    ".toHaveScreenshot('consumer-readiness-desktop.png');\n"
-                ),
             }
         )
 
@@ -2404,50 +2189,6 @@ class TestFrontendComponentComposition(unittest.TestCase):
         self.assertIn("contract must list at least one states value", joined)
         self.assertIn("unknown evidence values: `manual`", joined)
         self.assertIn("test file `frontend/e2e/missing.pw.ts` does not exist", joined)
-
-    def test_rejects_text_button_without_icon(self) -> None:
-        issues = self.issues_for_frontend(
-            {
-                "frontend/src/features/auth/components/ForgotPasswordPage.tsx": (
-                    "import { Button } from '@/components/ui/button';\n"
-                    "export function ForgotPasswordPage() {\n"
-                    "  return <Button variant=\"cta\">Send reset link</Button>;\n"
-                    "}\n"
-                )
-            }
-        )
-
-        self.assertIn("text Button must include an icon child", "\n".join(issues))
-
-    def test_accepts_text_button_with_icon(self) -> None:
-        issues = self.issues_for_frontend(
-            {
-                "frontend/src/features/auth/components/ForgotPasswordPage.tsx": (
-                    "import { Send } from 'lucide-react';\n"
-                    "import { Button } from '@/components/ui/button';\n"
-                    "export function ForgotPasswordPage() {\n"
-                    "  return <Button variant=\"cta\"><Send aria-hidden />Send reset link</Button>;\n"
-                    "}\n"
-                )
-            }
-        )
-
-        self.assertEqual([], issues)
-
-    def test_accepts_segmented_text_toggle_without_icon(self) -> None:
-        issues = self.issues_for_frontend(
-            {
-                "frontend/src/features/preferences/components/PreferenceControls.tsx": (
-                    "import { Button } from '@/components/ui/button';\n"
-                    "export function PreferenceControls() {\n"
-                    "  return <Button type=\"button\" aria-pressed={true} size=\"xs\">EN</Button>;\n"
-                    "}\n"
-                )
-            }
-        )
-
-        self.assertEqual([], issues)
-
 
 class TestFrontendTailwindOpacity(unittest.TestCase):
     def issues_for_frontend(self, component_source: str) -> list[str]:
@@ -3073,10 +2814,12 @@ class TestAxisCommandWrappers(unittest.TestCase):
         with (
             mock.patch.object(axis, "check_dotnet_sdk", return_value=0),
             mock.patch.object(axis, "check_frontend_toolchain", return_value=0),
+            mock.patch.object(axis, "frontend_toolchain_env", return_value={}),
             mock.patch.object(axis, "check_buf_cli", return_value=0),
             mock.patch.object(axis, "find_buf", return_value="buf"),
             mock.patch.object(axis, "run", side_effect=fake_run),
             mock.patch.object(axis, "exe", side_effect=lambda name: name),
+            mock.patch.object(axis, "resolve_exe", side_effect=lambda name, **_kwargs: name),
             mock.patch.object(axis.shutil, "which", return_value="/usr/bin/tool"),
             contextlib.redirect_stdout(io.StringIO()),
         ):
@@ -3116,6 +2859,24 @@ class TestAxisCommandWrappers(unittest.TestCase):
 
         self.assertEqual(["npm", "run", "gen:api-types"], calls[0])
         self.assertEqual(["git", "diff", "--exit-code", "--", "frontend/src/lib/api-types.ts"], calls[1])
+
+    def test_frontend_command_runs_npm_with_resolved_frontend_env(self) -> None:
+        calls: list[dict[str, dict[str, str] | None]] = []
+        frontend_env = {"PATH": "/tmp/nvm-node-bin:/usr/bin"}
+
+        def fake_run(command: list[str], **kwargs):
+            calls.append({"env": kwargs.get("env")})
+            return axis.subprocess.CompletedProcess(command, 0, stdout="", stderr="")
+
+        with (
+            mock.patch.object(axis, "check_frontend_toolchain", return_value=0),
+            mock.patch.object(axis, "frontend_toolchain_env", return_value=frontend_env),
+            mock.patch.object(axis, "resolve_exe", side_effect=lambda name, **_kwargs: name),
+            mock.patch.object(axis, "run", side_effect=fake_run),
+        ):
+            self.assertEqual(0, axis.frontend_command(axis.argparse.Namespace(frontend_command="ci")))
+
+        self.assertEqual(frontend_env, calls[0]["env"])
 
     def test_docs_sync_mermaid_theme_runs_from_axis(self) -> None:
         calls = self.run_with_fake_process(

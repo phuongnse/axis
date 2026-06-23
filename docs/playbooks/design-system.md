@@ -2,7 +2,7 @@
 
 > **Navigation**: [← docs/README.md](../README.md) · [← Design source](./design-source.md) · [← Frontend playbook](./frontend.md) · [← Wireframe playbook](./wireframes.md) · [← AGENTS.md](../../AGENTS.md)
 
-This playbook owns the Axis design-system workflow: tokens, reusable UI components, implementation rules, and visual QA. It is separate from use-case design sources. Low-fidelity wireframes describe flow and screen intent; the design system defines final UI decisions.
+This playbook owns the Axis design-system workflow: tokens, reusable UI components, implementation rules, and deterministic contract checks. It is separate from use-case design sources. Low-fidelity wireframes describe flow and screen intent; the design system defines final UI decisions.
 
 For repeatable execution, use `$axis-design-system`.
 
@@ -14,7 +14,6 @@ For repeatable execution, use `$axis-design-system`.
 | Design sources | Layout intent, flow, content hierarchy, state inventory | New product behavior, acceptance criteria, endpoints, or data contracts |
 | Design system | Tokens, component anatomy, variants, state matrices, visual rules | New product behavior or acceptance criteria |
 | Frontend code | Executable components, accessibility behavior, responsive implementation | New visual rules not represented in the design system |
-| Visual QA | Evidence that implementation matches the approved design-system target | Product acceptance by itself |
 
 Design-system work must not use Excalidraw files as the final visual source. Use Penpot design sources per [design-source.md](./design-source.md); legacy Excalidraw wireframes remain low-fidelity artifacts until migrated.
 
@@ -31,9 +30,9 @@ A screen or component is pixel-perfect only when all of these are true:
 | Responsive | Mobile, tablet, and desktop viewports are intentionally designed and verified |
 | Theme | Light, dark, and system behavior use the same semantic tokens |
 | Accessibility | Keyboard focus, labels, contrast, and non-color state cues are verified |
-| Visual QA | Screenshot evidence passes the configured threshold for the approved component or screen target |
+| Verification | Behavior, accessibility, responsive layout, and component contract checks pass for the covered states |
 
-Do not mark a UI surface pixel-perfect from a single happy-path screenshot.
+Do not mark a UI surface pixel-perfect from a single happy-path render.
 
 ## Token Taxonomy
 
@@ -62,7 +61,7 @@ Penpot owns the approved design token decisions. Frontend code owns the executab
 |---|---|
 | `frontend/src/design-system/tokens.css` | Raw CSS variable values for light and dark themes |
 | `frontend/src/design-system/tokens.ts` | Typed token registry used by tests and future design-system tooling |
-| `frontend/src/design-system/primitive-contracts.ts` | UI primitive registry: file ownership, catalog target, visual target, readiness status, variant/state/accessibility matrix, token families, and test coverage |
+| `frontend/src/design-system/primitive-contracts.ts` | UI primitive registry: file ownership, readiness status, variant/state/accessibility matrix, token families, and test coverage |
 | `frontend/src/design-system/consumer-contracts.ts` | Route-bound UI consumer registry: product surface, route, owner, readiness, primitive usage, state coverage, evidence, and tests |
 | `frontend/tailwind.config.js` | Tailwind names that map to semantic CSS variables |
 
@@ -105,52 +104,37 @@ Every component entry should document:
 | Responsive behavior | Wrapping, truncation, min/max dimensions, layout changes |
 | Accessibility | Role, labels, keyboard behavior, focus order, ARIA expectations |
 | Token map | Tokens used by each part and state |
-| Visual QA targets | Screenshot target names and viewport/theme coverage |
+| Test evidence | Vitest, Testing Library, Playwright, or equivalent checks that prove the component states |
 
 If a variant is not documented, do not infer it from a one-off screen.
 
 ## Primitive Contracts
 
-The executable primitive contract lives in `frontend/src/design-system/primitive-contracts.ts`. Keep it updated before using a new primitive broadly in migrated screens. The catalog renders its readiness matrix from that file so reviewers can inspect variants, states, accessibility expectations, token families, tests, and visual targets without a second source of truth.
+The executable primitive contract lives in `frontend/src/design-system/primitive-contracts.ts`. Keep it updated before using a new primitive broadly in migrated screens. Reviewers inspect that file together with the listed test files; do not maintain a second manual matrix for primitive readiness.
 
 The table below is the human summary of the current executable contract:
 
-| Component | Purpose | Variants and states | Accessibility | Token map | Visual QA targets |
-|---|---|---|---|---|---|
-| `Button` | Visible command with required icon support | `cta`, `default`, `outline`, `secondary`, `ghost`, `destructive`, `link`; `xs`, `sm`, `default`, `lg`, icon sizes; disabled, loading, invalid, focus-visible | Native button semantics through Base UI; loading sets `aria-busy` and disables interaction | `bg-primary`, `bg-accent`, `bg-secondary`, `bg-destructive`, `border-border`, `ring-ring`, `rounded-md` | `primitive-button` desktop screenshot |
-| `IconButton` | Icon-only command for dense tool surfaces | Shared button variants; icon sizes; disabled and loading | Requires `label`; label becomes the accessible name; loading label replaces the action label while busy | Same button tokens; icon size utilities only | `primitive-icon-button` smoke target |
-| `ActionLink` | Navigation CTA on public/auth surfaces | `primary`, `secondary`; `default`, `inverted`, `adaptive` surfaces | Renders TanStack Router `Link`; icon is decorative and text remains the accessible name | `bg-accent`, `text-accent-foreground`, `border-border`, inverse action tokens | `primitive-action-link` smoke target |
-| `Input`, `Textarea`, `Select` | Text, long text, and option input | Default, disabled, invalid, focus-visible, long-copy wrapping | Requires `Label` or `aria-label`; invalid state uses `aria-invalid`; descriptions flow through `FormField` | `bg-background`, `border-input`, `ring-ring`, `text-foreground`, `text-muted-foreground`, `rounded-md` | `primitive-form` desktop and mobile screenshots |
-| `Checkbox`, `CheckboxField` | Binary choice with optional validation | Checked, unchecked, disabled, invalid | `CheckboxField` links label and error copy through `aria-describedby` | `accent-primary`, `border-input`, `ring-ring`, `text-destructive`, `rounded-sm` | `primitive-form` desktop and mobile screenshots |
-| `FormField` | Label, help text, description IDs, and error copy wrapper | Help text, error, externally supplied description IDs | Provides deterministic `aria-describedby` IDs to child controls | `text-muted-foreground`, `text-primary`, `text-destructive` | `primitive-form` desktop and mobile screenshots |
-| `Notice` | Inline async/status feedback | `info`, `success`, `warning`, `error`; optional title/body/icon | Warning/error use `role="alert"`; info/success use `role="status"`; icon is decorative | `state.*`, `destructive`, `rounded-lg`, `border-*` | `feedback` desktop screenshot |
-| `Badge` | Compact status or metadata marker | `neutral`, `primary`, `accent`, `info`, `success`, `warning`, `destructive`, `outline` | Text remains the accessible name; icons remain optional/decorative | `bg-muted`, `primary`, `accent`, `state.*`, `destructive`, `rounded-md` | `feedback` desktop screenshot |
-| `Card`, `Panel` | Reusable framed work surfaces | Default, muted, inset, attention, inverse panels; card header/content/footer anatomy | Semantic HTML remains caller-owned; surface must not hide focusable content | `bg-card`, `bg-muted`, `bg-background`, `bg-inverse`, `border-border`, `shadow-*` | `structure-data` desktop screenshot |
-| `Skeleton`, `Progress`, `EmptyState` | Loading, quantitative progress, and empty-state feedback | Fixed skeleton blocks; determinate/indeterminate progress; empty state title/description/action | Progress requires an accessible label; empty-state icon is decorative | `bg-muted`, `accent-primary`, `rounded-md`, `rounded-full` for progress track | `feedback`, `structure-data` screenshots |
-| `PageHeader`, `Toolbar`, `ContentGrid` | Shared page-level layout rhythm | Header with eyebrow/title/description/actions; compact toolbar; responsive 1/2/3-column grid | Keeps heading/action order stable across viewports | `text-foreground`, `text-muted-foreground`, `border-border`, `bg-card`, shared spacing scale | `layout` desktop screenshot |
+| Component | Purpose | Variants and states | Accessibility | Token map |
+|---|---|---|---|---|
+| `Button` | Visible command with required icon support | `cta`, `default`, `outline`, `secondary`, `ghost`, `destructive`, `link`; `xs`, `sm`, `default`, `lg`, icon sizes; disabled, loading, invalid, focus-visible | Native button semantics through Base UI; loading sets `aria-busy` and disables interaction | `bg-primary`, `bg-accent`, `bg-secondary`, `bg-destructive`, `border-border`, `ring-ring`, `rounded-md` |
+| `IconButton` | Icon-only command for dense tool surfaces | Shared button variants; icon sizes; disabled and loading | Requires `label`; label becomes the accessible name; loading label replaces the action label while busy | Same button tokens; icon size utilities only |
+| `ActionLink` | Navigation CTA on public/auth surfaces | `primary`, `secondary`; `default`, `inverted`, `adaptive` surfaces | Renders TanStack Router `Link`; icon is decorative and text remains the accessible name | `bg-accent`, `text-accent-foreground`, `border-border`, inverse action tokens |
+| `Input`, `Textarea`, `Select` | Text, long text, and option input | Default, disabled, invalid, focus-visible, long-copy wrapping | Requires `Label` or `aria-label`; invalid state uses `aria-invalid`; descriptions flow through `FormField` | `bg-background`, `border-input`, `ring-ring`, `text-foreground`, `text-muted-foreground`, `rounded-md` |
+| `Checkbox`, `CheckboxField` | Binary choice with optional validation | Checked, unchecked, disabled, invalid | `CheckboxField` links label and error copy through `aria-describedby` | `accent-primary`, `border-input`, `ring-ring`, `text-destructive`, `rounded-sm` |
+| `FormField` | Label, help text, description IDs, and error copy wrapper | Help text, error, externally supplied description IDs | Provides deterministic `aria-describedby` IDs to child controls | `text-muted-foreground`, `text-primary`, `text-destructive` |
+| `Notice` | Inline async/status feedback | `info`, `success`, `warning`, `error`; optional title/body/icon | Warning/error use `role="alert"`; info/success use `role="status"`; icon is decorative | `state.*`, `destructive`, `rounded-lg`, `border-*` |
+| `Badge` | Compact status or metadata marker | `neutral`, `primary`, `accent`, `info`, `success`, `warning`, `destructive`, `outline` | Text remains the accessible name; icons remain optional/decorative | `bg-muted`, `primary`, `accent`, `state.*`, `destructive`, `rounded-md` |
+| `Card`, `Panel` | Reusable framed work surfaces | Default, muted, inset, attention, inverse panels; card header/content/footer anatomy | Semantic HTML remains caller-owned; surface must not hide focusable content | `bg-card`, `bg-muted`, `bg-background`, `bg-inverse`, `border-border`, `shadow-*` |
+| `Skeleton`, `Progress`, `EmptyState` | Loading, quantitative progress, and empty-state feedback | Fixed skeleton blocks; determinate/indeterminate progress; empty state title/description/action | Progress requires an accessible label; empty-state icon is decorative | `bg-muted`, `accent-primary`, `rounded-md`, `rounded-full` for progress track |
+| `PageHeader`, `Toolbar`, `ContentGrid` | Shared page-level layout rhythm | Header with eyebrow/title/description/actions; compact toolbar; responsive 1/2/3-column grid | Keeps heading/action order stable across viewports | `text-foreground`, `text-muted-foreground`, `border-border`, `bg-card`, shared spacing scale |
 
 ## Consumer Contracts
 
-The executable consumer contract lives in `frontend/src/design-system/consumer-contracts.ts`. It covers route-bound product UI surfaces: public pages, auth pages, authenticated shell layout, and routed workspace views. The design-system catalog renders its readiness matrix from that file so reviewers can inspect which screens consume which primitives, which states are covered, and which tests prove the contract.
+The executable consumer contract lives in `frontend/src/design-system/consumer-contracts.ts`. It covers route-bound product UI surfaces: public pages, auth pages, authenticated shell layout, and routed workspace views. Reviewers inspect that file together with the listed tests to see which screens consume which primitives and which states are covered.
 
 Every routed product surface must have exactly one consumer contract entry before the route is introduced or changed. Mark the surface `candidate` when the current implementation is intentionally transitional, but still list the primitives, states, evidence, and test files that exist today. Do not skip a surface because the UI is small; small surfaces are where drift starts cheapest.
 
 Consumer contracts are not a substitute for use-case acceptance criteria. They prove design-system consumption and screen-state evidence only; product behavior still belongs to the owning use-case docs and tests.
-
-## Component Catalog
-
-Use the frontend catalog route as the first visual QA harness:
-
-| Decision | Rule |
-|---|---|
-| Route | `frontend/src/routes/design-system.lazy.tsx` exposes `/design-system` |
-| Catalog owner | `frontend/src/features/design-system/` |
-| Storybook | Deferred until the route catalog cannot cover an expected component-review workflow |
-| Visual targets | Catalog sections include stable `data-visual-target` values for Playwright smoke checks and future screenshot baselines |
-| Navigation | Keep the catalog hidden from product navigation until there is an explicit internal-tools shell |
-
-The catalog route is an implementation and verification surface, not a product workflow. Use it to prove token, theme, state, and primitive-component coverage before migrating legacy screens.
-Run `python scripts/axis.py local-dev e2e` for canonical local smoke coverage. Host-only Playwright checks are developer convenience paths and should be exposed through an Axis frontend wrapper before becoming documented workflow commands.
 
 ## Enforceable Contract
 
@@ -159,12 +143,26 @@ Design-system rules should fail deterministically when they can be checked witho
 | Rule | Mechanism |
 |---|---|
 | UI primitive files must have a registry contract | `python scripts/axis.py check frontend-component-composition` compares `frontend/src/components/ui/*.tsx` to `primitive-contracts.ts` |
-| Primitive contracts must name catalog, visual, readiness, and test coverage | Same check verifies catalog target strings, readiness matrix fields, desktop Playwright screenshot targets, and test file paths |
-| Route-bound product UI surfaces must have a consumer contract | Same check compares frontend route imports to `consumer-contracts.ts` and verifies owner, readiness, primitive/state/evidence metadata, catalog matrix, desktop screenshot target, and test files |
+| Primitive contracts must name readiness and test coverage | Same check verifies readiness fields, variant/state/accessibility metadata, token families, and test file paths |
+| Route-bound product UI surfaces must have a consumer contract | Same check compares frontend route imports to `consumer-contracts.ts` and verifies owner, readiness, primitive/state/evidence metadata, and test files |
 | Component code must use semantic color and shadow tokens | `python scripts/axis.py check frontend-style` rejects raw neutral color utilities, raw shadow utilities, and arbitrary color/gradient classes in TS/TSX |
 | Token registry must match executable Tailwind mapping | `frontend/tests/design-tokens.test.ts` checks CSS variables, color, radius, shadow, and background-image mappings |
 
 Do not add per-file allowlists for design-system violations. If a component needs a new visual value, add the token and Tailwind mapping first, then consume the named class from component code.
+
+## Automation Boundary
+
+The default design-system workflow is Penpot source → executable tokens/contracts → component code/tests. Do not add a `/design-system` route, component catalog, committed visual snapshot baseline, or image-comparison harness as part of routine token/component work. Reintroduce one only after an explicit Design Gate decision names the owner, review job, retention rule, trigger, and cleanup path.
+
+New design-system guards must pass the same quality bar as repo policy guards:
+
+| Question | Required answer |
+|---|---|
+| Reusable invariant? | The rule applies to a class of future changes, not one screen, class string, route, or translation key |
+| Source of truth? | The checked value comes from Penpot-approved tokens, executable registries, generated contracts, or a documented owner file |
+| Cheap proof? | A negative policy test can prove the bad class fails without requiring visual or product-intent judgment |
+
+If any answer is no, keep the finding review-only in [REVIEW_FINDINGS.md](../REVIEW_FINDINGS.md) or turn the pattern into an explicit registry/contract first. Do not solve a subjective visual review problem with a brittle regex.
 
 ## Implementation Rules
 
@@ -178,19 +176,19 @@ Do not add per-file allowlists for design-system violations. If a component need
 - Treat existing UI as legacy until it is migrated through this workflow.
 - Keep behavior changes in use-case PRs; keep design-system foundation and token/component work in focused PRs.
 
-## Visual QA
+## Component Verification Coverage
 
-Visual QA proves that implementation matches the approved design-system target.
+Component verification proves that implementation surfaces consume the registered tokens, primitives, and states. It does not replace Penpot as the design source of truth.
 
 | Target | Minimum coverage |
 |---|---|
-| Component catalog | All documented variants and states |
+| Primitive tests | All documented variants and states that affect behavior, accessibility, or contract semantics |
 | Responsive sizes | 360px, 768px, and 1280px unless the component needs additional sizes |
 | Themes | Light and dark; system behavior verified where preference logic is involved |
 | Interaction states | Hover, focus-visible, active, disabled, loading, error where applicable |
 | Text stress | Long English, long Vietnamese, empty optional content, and validation copy |
 
-Use Playwright screenshot comparisons for deterministic visual checks. Component and screen tests still need behavior assertions; screenshots do not replace accessibility or user-flow tests.
+Use Playwright for route and responsive product verification, and use Vitest or Testing Library for primitive behavior and accessibility assertions. Image comparison baselines are intentionally out of scope until the project explicitly reintroduces them.
 
 ## PR Sequence
 
@@ -198,11 +196,10 @@ Keep design-system work isolated from feature work.
 
 | PR | Scope |
 |---|---|
-| 1 | Charter, source boundaries, token taxonomy, component inventory, visual QA rules |
+| 1 | Charter, source boundaries, token taxonomy, component inventory, and contract rules |
 | 2 | Design-source adoption and shared design-system file structure |
 | 3 | Token export/import convention and frontend token wiring |
-| 4 | Component catalog route or Storybook decision with visual QA harness |
-| 5+ | Primitive components and their screenshot baselines |
+| 4+ | Primitive components and their contract/test coverage |
 | Later | Pattern/layout components, then legacy UI migration by screen or use case |
 
 Do not migrate existing UI in the foundation PRs unless the migration is needed to prove the design-system workflow itself.

@@ -78,12 +78,26 @@ def rel_from(path: Path, root: Path) -> str:
 
 
 def exe(name: str) -> str:
+    return resolve_exe(name)
+
+
+def env_path(env: dict[str, str] | None = None) -> str | None:
+    return env.get("PATH") if env and "PATH" in env else None
+
+
+def resolve_exe(name: str, *, env: dict[str, str] | None = None) -> str:
+    path = env_path(env)
     if os.name == "nt" and not name.endswith(".exe"):
-        cmd = shutil.which(f"{name}.cmd")
+        cmd = shutil.which(f"{name}.cmd", path=path)
         if cmd:
             return cmd
-    found = shutil.which(name)
+    found = shutil.which(name, path=path)
     return found or name
+
+
+def command_exists(name: str, *, env: dict[str, str] | None = None) -> bool:
+    path = env_path(env)
+    return shutil.which(name, path=path) is not None or shutil.which(f"{name}.cmd", path=path) is not None
 
 
 def run(
@@ -609,8 +623,6 @@ def parse_frontend_primitive_contracts(contract_text: str) -> list[dict[str, obj
         r"\{\s*"
         r"component:\s*'(?P<component>[^']+)'\s*,\s*"
         r"file:\s*'(?P<file>[^']+)'\s*,\s*"
-        r"catalogTargets:\s*\[(?P<catalog>[^\]]*)\]\s*,\s*"
-        r"visualTargets:\s*\[(?P<visual>[^\]]*)\]\s*,\s*"
         r"testFiles:\s*\[(?P<tests>[^\]]*)\]\s*,\s*"
         r"(?:(?:readiness:\s*'(?P<readiness>[^']+)'\s*,\s*"
         r"variants:\s*\[(?P<variants>[^\]]*)\]\s*,\s*"
@@ -628,8 +640,6 @@ def parse_frontend_primitive_contracts(contract_text: str) -> list[dict[str, obj
             {
                 "component": match.group("component"),
                 "file": match.group("file"),
-                "catalogTargets": value_pattern.findall(match.group("catalog")),
-                "visualTargets": value_pattern.findall(match.group("visual")),
                 "testFiles": value_pattern.findall(match.group("tests")),
                 "readiness": match.group("readiness") or "",
                 "variants": value_pattern.findall(match.group("variants") or ""),
@@ -684,29 +694,13 @@ def frontend_primitive_contract_issues(root: Path = ROOT) -> list[str]:
             f"frontend/src/design-system/primitive-contracts.ts: stale primitive contract for missing file {file_path}"
         )
 
-    catalog_path = root / "frontend" / "src" / "features" / "design-system" / "components" / "DesignSystemCatalog.tsx"
-    e2e_path = root / "frontend" / "e2e" / "design-system-catalog.pw.ts"
-    catalog_text = catalog_path.read_text(encoding="utf-8") if catalog_path.is_file() else ""
-    e2e_text = e2e_path.read_text(encoding="utf-8") if e2e_path.is_file() else ""
-    if contracts and ("primitive-readiness" not in catalog_text or "axisPrimitiveContracts" not in catalog_text):
-        issues.append(
-            "frontend/src/features/design-system/components/DesignSystemCatalog.tsx: "
-            "missing primitive readiness matrix rendered from axisPrimitiveContracts"
-        )
-
     for contract in contracts:
         component = str(contract["component"])
         file_path = str(contract["file"])
-        catalog_targets = list(contract["catalogTargets"])
-        visual_targets = list(contract["visualTargets"])
         test_files = list(contract["testFiles"])
         readiness = str(contract["readiness"])
         token_families = list(contract["tokenFamilies"])
 
-        if not catalog_targets:
-            issues.append(f"{file_path}: {component} contract must name at least one catalog target")
-        if not visual_targets:
-            issues.append(f"{file_path}: {component} contract must name at least one visual target")
         if not test_files:
             issues.append(f"{file_path}: {component} contract must name at least one test file")
         if readiness not in {"ready", "candidate"}:
@@ -721,12 +715,6 @@ def frontend_primitive_contract_issues(root: Path = ROOT) -> list[str]:
                 f"{file_path}: {component} contract has unknown tokenFamilies values: {joined_values}"
             )
 
-        for target in catalog_targets:
-            if target not in catalog_text:
-                issues.append(f"{file_path}: catalog target `{target}` is missing from DesignSystemCatalog")
-        for target in visual_targets:
-            if target not in e2e_text or f"{target}-desktop.png" not in e2e_text:
-                issues.append(f"{file_path}: visual target `{target}` needs a desktop Playwright screenshot")
         for test_file in test_files:
             if not (root / test_file).is_file():
                 issues.append(f"{file_path}: test file `{test_file}` does not exist")
@@ -786,14 +774,12 @@ def frontend_route_consumer_files(root: Path = ROOT) -> list[str]:
     consumer_files: set[str] = set()
     for path in iter_files(route_root, (".tsx",)):
         normalized = rel(path) if root == ROOT else str(path.relative_to(root)).replace("\\", "/")
-        if normalized.endswith("routeTree.gen.ts") or normalized.endswith("design-system.lazy.tsx"):
+        if normalized.endswith("routeTree.gen.ts"):
             continue
 
         text = path.read_text(encoding="utf-8")
         for match in import_pattern.finditer(text):
             source = match.group("source")
-            if source.startswith("features/design-system"):
-                continue
             base = root / "frontend" / "src" / source
             candidates = (
                 base.with_suffix(".tsx"),
@@ -853,21 +839,6 @@ def frontend_consumer_contract_issues(root: Path = ROOT) -> list[str]:
         for path in iter_files(route_root, (".tsx",)):
             route_text = path.read_text(encoding="utf-8")
             declared_routes.update(match.group("route") for match in route_declaration_pattern.finditer(route_text))
-
-    catalog_path = root / "frontend" / "src" / "features" / "design-system" / "components" / "DesignSystemCatalog.tsx"
-    e2e_path = root / "frontend" / "e2e" / "design-system-catalog.pw.ts"
-    catalog_text = catalog_path.read_text(encoding="utf-8") if catalog_path.is_file() else ""
-    e2e_text = e2e_path.read_text(encoding="utf-8") if e2e_path.is_file() else ""
-    if contracts and ("consumer-readiness" not in catalog_text or "axisConsumerContracts" not in catalog_text):
-        issues.append(
-            "frontend/src/features/design-system/components/DesignSystemCatalog.tsx: "
-            "missing consumer readiness matrix rendered from axisConsumerContracts"
-        )
-    if contracts and ("consumer-readiness" not in catalog_text or "consumer-readiness-desktop.png" not in e2e_text):
-        issues.append(
-            "frontend/src/features/design-system/components/DesignSystemCatalog.tsx: "
-            "consumer readiness matrix needs a desktop Playwright screenshot"
-        )
 
     for contract in contracts:
         component = str(contract["component"])
@@ -956,23 +927,8 @@ def frontend_component_composition_issues(root: Path = ROOT) -> list[str]:
 
     if src_root.exists():
         standard_control = re.compile(r"<\s*(button|input|label|select|textarea)\b")
-        button_block = re.compile(r"<Button\b(?P<attrs>[^>]*)>(?P<body>.*?)</Button>", re.DOTALL)
-        duplicated_flow_trace = re.compile(
-            r"(grid-cols-\[(28|34|40)px_1fr\]|bottom-\[-\d+px\]|h-\[calc\(100%)"
-        )
-        access_path_keys = (
-            "landing.signInStep",
-            "landing.verifyAccess",
-            "landing.openWorkspace",
-        )
-        action_surface_roots = (
-            "frontend/src/features/landing/",
-            "frontend/src/features/auth/",
-        )
         for path in iter_files(src_root, (".tsx",)):
             normalized = rel(path) if root == ROOT else str(path.relative_to(root)).replace("\\", "/")
-            if normalized.endswith("frontend/src/components/visual/FlowTrace.tsx"):
-                continue
             text = path.read_text(encoding="utf-8")
             in_ui_primitives = path.is_relative_to(ui_root) if hasattr(path, "is_relative_to") else False
             if not in_ui_primitives:
@@ -983,47 +939,8 @@ def frontend_component_composition_issues(root: Path = ROOT) -> list[str]:
                         )
                     for match in standard_control.finditer(line):
                         issues.append(
-                            f"{normalized}:{idx}: standard UI control <{match.group(1)}> must use a shared shadcn/ui primitive from frontend/src/components/ui"
+                            f"{normalized}:{idx}: standard UI control <{match.group(1)}> must use a shared Axis UI primitive from frontend/src/components/ui"
                         )
-                for match in button_block.finditer(text):
-                    attrs = match.group("attrs")
-                    body = match.group("body")
-                    icon_only = re.search(r'\bsize=["\']icon', attrs) is not None
-                    segmented_toggle = "aria-pressed=" in attrs
-                    has_icon = re.search(r"<[A-Z][A-Za-z0-9.]*\b", body) is not None
-                    has_visible_label = bool(
-                        re.sub(r"<[^>]+>", "", body)
-                        .replace("{' '}", "")
-                        .replace('{" "}', "")
-                        .strip()
-                    )
-                    if has_visible_label and not has_icon and not icon_only and not segmented_toggle:
-                        idx = text.count("\n", 0, match.start()) + 1
-                        issues.append(
-                            f"{normalized}:{idx}: text Button must include an icon child so command actions stay consistent"
-                        )
-            if any(normalized.startswith(prefix) for prefix in action_surface_roots):
-                for match in re.finditer(
-                    r"<Link\b(?:(?!</Link>).)*?className=\"[^\"]*\binline-flex\b[^\"]*\"(?:(?!</Link>).)*?</Link>",
-                    text,
-                    flags=re.DOTALL,
-                ):
-                    idx = text.count("\n", 0, match.start()) + 1
-                    issues.append(
-                        f"{normalized}:{idx}: navigation CTA styling must use ActionLink so icon, spacing, and states stay consistent"
-                    )
-            for idx, line in enumerate(text.splitlines(), 1):
-                if duplicated_flow_trace.search(line):
-                    issues.append(
-                        f"{normalized}:{idx}: duplicated flow/timeline geometry; use FlowTrace instead"
-                    )
-                if (
-                    not normalized.endswith("frontend/src/components/visual/AccessPathTrace.tsx")
-                    and any(key in line for key in access_path_keys)
-                ):
-                    issues.append(
-                        f"{normalized}:{idx}: duplicated access path trace; use AccessPathTrace instead"
-                    )
     return issues
 
 
@@ -2419,13 +2336,13 @@ def check_doc_drift(_args: argparse.Namespace | None = None) -> int:
     return 0
 
 
-def command_version_line(name: str, *version_args: str) -> tuple[bool, str, str]:
-    command = exe(name)
-    resolved = shutil.which(command) or shutil.which(name)
+def command_version_line(name: str, *version_args: str, env: dict[str, str] | None = None) -> tuple[bool, str, str]:
+    command = resolve_exe(name, env=env)
+    resolved = shutil.which(command) or shutil.which(name, path=env_path(env))
     if resolved is None:
         return False, f"{name} not found in PATH", command
 
-    result = run_optional([command, *version_args])
+    result = run_optional([command, *version_args], env=env)
     if result is None:
         return False, f"{name} not executable from PATH", resolved
     if result.returncode != 0:
@@ -2449,6 +2366,63 @@ def required_node_major() -> tuple[bool, str]:
     if match is None:
         return False, f"{rel(NVMRC_PATH)} must contain a Node major or semver version"
     return True, match.group(1)
+
+
+def _path_with_prefix(bin_dir: Path) -> str:
+    entry = str(bin_dir)
+    current = os.environ.get("PATH", "")
+    parts = [part for part in current.split(os.pathsep) if part]
+    if entry in parts:
+        return current
+    return os.pathsep.join([entry, *parts]) if parts else entry
+
+
+def _version_sort_key(version_text: str) -> tuple[int, ...]:
+    return tuple(int(part) for part in re.findall(r"\d+", version_text))
+
+
+def _nvm_node_bin_dirs(expected_major: str) -> list[Path]:
+    roots: list[Path] = []
+    nvm_dir = os.environ.get("NVM_DIR")
+    if nvm_dir:
+        roots.append(Path(nvm_dir) / "versions" / "node")
+    roots.append(Path.home() / ".nvm" / "versions" / "node")
+
+    seen_roots: set[Path] = set()
+    candidates: list[Path] = []
+    for root in roots:
+        if root in seen_roots or not root.is_dir():
+            continue
+        seen_roots.add(root)
+        for version_dir in root.iterdir():
+            if not version_dir.is_dir() or version_major(version_dir.name) != expected_major:
+                continue
+            bin_dir = version_dir / "bin"
+            if (bin_dir / "node").is_file() and (bin_dir / "npm").is_file():
+                candidates.append(bin_dir)
+
+    return sorted(candidates, key=lambda path: _version_sort_key(path.parent.name), reverse=True)
+
+
+def frontend_toolchain_env() -> dict[str, str]:
+    expected_ok, expected_or_error = required_node_major()
+    if not expected_ok:
+        return {}
+
+    expected = expected_or_error
+    node_ok, node_version, _node_resolved = command_version_line("node", "--version")
+    npm_ok, _npm_version, _npm_resolved = command_version_line("npm", "--version")
+    if node_ok and npm_ok and version_major(node_version) == expected:
+        return {}
+
+    for bin_dir in _nvm_node_bin_dirs(expected):
+        env = {"PATH": _path_with_prefix(bin_dir)}
+        node_ok, node_version, _node_resolved = command_version_line("node", "--version", env=env)
+        npm_ok, _npm_version, _npm_resolved = command_version_line("npm", "--version", env=env)
+        if node_ok and npm_ok and version_major(node_version) == expected:
+            return env
+
+    return {}
 
 
 def global_json_sdk_major() -> tuple[bool, str]:
@@ -2511,13 +2485,14 @@ def check_dotnet_sdk(_args: argparse.Namespace | None = None) -> int:
     return 0
 
 
-def node_version_status() -> tuple[bool, str]:
+def node_version_status(env: dict[str, str] | None = None) -> tuple[bool, str]:
     expected_ok, expected_or_error = required_node_major()
     if not expected_ok:
         return False, f"{expected_or_error}; fix the documented Node source before running frontend commands"
     expected = expected_or_error
+    env = frontend_toolchain_env() if env is None else env
 
-    ok, version_line, resolved = command_version_line("node", "--version")
+    ok, version_line, resolved = command_version_line("node", "--version", env=env)
     if not ok:
         return False, f"{version_line}; Node {expected}.x is required per {rel(NVMRC_PATH)}"
 
@@ -2532,14 +2507,15 @@ def node_version_status() -> tuple[bool, str]:
 
 
 def check_frontend_toolchain(_args: argparse.Namespace | None = None) -> int:
-    node_ok, node_detail = node_version_status()
+    env = frontend_toolchain_env()
+    node_ok, node_detail = node_version_status(env)
     if not node_ok:
         print(f"frontend-toolchain: FAIL - {node_detail}", file=sys.stderr)
         return 1
 
-    npm_status, npm_detail = _command_version("npm", "--version")
+    npm_status, npm_detail = _command_version("npm", "--version", env=env)
     if npm_status != "OK":
-        print(f"frontend-toolchain: FAIL - {npm_detail}; npm must resolve beside Node from PATH", file=sys.stderr)
+        print(f"frontend-toolchain: FAIL - {npm_detail}; npm must resolve beside Node", file=sys.stderr)
         return 1
 
     print(f"frontend-toolchain: OK ({node_detail}; npm {npm_detail})")
@@ -2686,6 +2662,11 @@ def dotnet_command(args: argparse.Namespace) -> int:
     raise CheckError(f"Unknown dotnet command: {command}")
 
 
+def run_frontend_npm(npm_args: list[str], *, cwd: Path = FRONTEND_DIR) -> subprocess.CompletedProcess[str]:
+    env = frontend_toolchain_env()
+    return run([resolve_exe("npm", env=env), *npm_args], cwd=cwd, env=env, check=False)
+
+
 def frontend_command(args: argparse.Namespace) -> int:
     rc = check_frontend_toolchain()
     if rc != 0:
@@ -2693,13 +2674,13 @@ def frontend_command(args: argparse.Namespace) -> int:
 
     command = args.frontend_command
     if command == "install":
-        return run([exe("npm"), "ci"], cwd=FRONTEND_DIR, check=False).returncode
+        return run_frontend_npm(["ci"]).returncode
     if command == "ci":
-        return run([exe("npm"), "run", "ci"], cwd=FRONTEND_DIR, check=False).returncode
+        return run_frontend_npm(["run", "ci"]).returncode
     if command == "test":
-        return run([exe("npm"), "run", "test"], cwd=FRONTEND_DIR, check=False).returncode
+        return run_frontend_npm(["run", "test"]).returncode
     if command == "gen-api-types":
-        result = run([exe("npm"), "run", "gen:api-types"], cwd=FRONTEND_DIR, check=False)
+        result = run_frontend_npm(["run", "gen:api-types"])
         if result.returncode != 0 or not args.check:
             return result.returncode
         diff = run([exe("git"), "diff", "--exit-code", "--", "frontend/src/lib/api-types.ts"], check=False)
@@ -2718,7 +2699,7 @@ def frontend_command(args: argparse.Namespace) -> int:
         if script_args:
             npm_args.append("--")
             npm_args.extend(script_args)
-        return run([exe("npm"), *npm_args], cwd=FRONTEND_DIR, check=False).returncode
+        return run_frontend_npm(npm_args).returncode
     raise CheckError(f"Unknown frontend command: {command}")
 
 
@@ -2912,25 +2893,24 @@ def generate_api_contracts(_args: argparse.Namespace | None = None) -> int:
             ROOT / "src" / "Axis.Api",
             {"ASPNETCORE_ENVIRONMENT": "Testing", "DOTNET_ENVIRONMENT": "Testing"},
         ),
-        ([exe("npm"), "run", "gen:api-types"], ROOT / "frontend", None),
     ]
     for command, cwd, env in commands:
         result = run(command, cwd=cwd, env=env, check=False)
         if result.returncode != 0:
             return result.returncode
-    return 0
+    return run_frontend_npm(["run", "gen:api-types"]).returncode
 
 
 def generate_wireframes(args: argparse.Namespace) -> int:
     rc = check_frontend_toolchain()
     if rc != 0:
         return rc
-    command = [exe("npm"), "run", "export:wireframes", "--"]
+    npm_args = ["run", "export:wireframes", "--"]
     if args.filter:
-        command.extend(["--filter", args.filter])
+        npm_args.extend(["--filter", args.filter])
     if args.changed:
-        command.append("--changed")
-    result = run(command, cwd=ROOT / "frontend", check=False)
+        npm_args.append("--changed")
+    result = run_frontend_npm(npm_args)
     return result.returncode
 
 
@@ -3017,8 +2997,8 @@ def install_hooks(_args: argparse.Namespace | None = None) -> int:
     return 0
 
 
-def _command_version(name: str, *version_args: str) -> tuple[str, str]:
-    ok, version, resolved = command_version_line(name, *version_args)
+def _command_version(name: str, *version_args: str, env: dict[str, str] | None = None) -> tuple[str, str]:
+    ok, version, resolved = command_version_line(name, *version_args, env=env)
     if not ok:
         return "FAIL", version
     return "OK", f"{version} ({resolved})"
@@ -3360,14 +3340,16 @@ def doctor(args: argparse.Namespace) -> int:
     dotnet_ok, dotnet_detail = dotnet_sdk_status()
     record("OK" if dotnet_ok else "FAIL", ".NET SDK", dotnet_detail)
 
-    node_ok, node_detail = node_version_status()
+    frontend_env = frontend_toolchain_env()
+    node_ok, node_detail = node_version_status(frontend_env)
     record("OK" if node_ok else "FAIL", "node", node_detail)
 
     for name, version_args in (
         ("git", ("--version",)),
         ("npm", ("--version",)),
     ):
-        status, detail = _command_version(name, *version_args)
+        env = frontend_env if name == "npm" else None
+        status, detail = _command_version(name, *version_args, env=env)
         record(status, name, detail)
 
     docker_status, docker_detail = _command_version("docker", "--version")
@@ -3444,7 +3426,17 @@ def doctor(args: argparse.Namespace) -> int:
 
 
 def bootstrap(_args: argparse.Namespace | None = None) -> int:
-    missing = [name for name in ("git", "dotnet", "node", "npm") if shutil.which(name) is None and shutil.which(f"{name}.cmd") is None]
+    frontend_env = frontend_toolchain_env()
+    missing = [
+        name
+        for name, env in (
+            ("git", None),
+            ("dotnet", None),
+            ("node", frontend_env),
+            ("npm", frontend_env),
+        )
+        if not command_exists(name, env=env)
+    ]
     if missing:
         for name in missing:
             print(f"bootstrap: missing '{name}' in PATH", file=sys.stderr)
