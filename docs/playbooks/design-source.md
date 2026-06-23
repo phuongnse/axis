@@ -8,7 +8,7 @@ This playbook owns the Axis design-source workflow. Penpot is the approved sourc
 
 | Topic | Rule |
 |---|---|
-| Design tool | Use Penpot Cloud as the product design source. A personal Cloud workspace is acceptable while Axis has one maintainer; move sources into an `Axis` team before multi-person collaboration. |
+| Design tool | Use Penpot Cloud as the product design source under the `Axis` workspace/team and `Axis Product` project. Contributors use individual accounts; the same structure applies whether the team has one member or many. |
 | Runtime boundary | Do not add Penpot to the Axis app stack or repo CLI; Penpot is external design infrastructure, not an app dependency. |
 | Source links | Use-case `## Wireframes` rows link to Penpot file/page/frame URLs when the source exists. |
 | Previews | Committed previews are optional; use `N/A` until an export is needed for review or stable documentation. |
@@ -18,16 +18,16 @@ This playbook owns the Axis design-source workflow. Penpot is the approved sourc
 ## Penpot Cloud
 
 Create the baseline in Penpot Cloud before adding source links to use-case docs.
-While Axis has one maintainer, the baseline may live in the maintainer's
-personal Cloud workspace. Before a second contributor edits design sources,
-create an `Axis` team in Penpot Cloud and move or duplicate the baseline files
-there so everyone uses personal accounts against the same project.
+Use `Axis` as the stable workspace/team namespace and `Axis Product` as the
+project that owns product design sources. The current team may have one member,
+but the account model remains the same: each contributor uses their own Penpot
+account against the shared Axis project.
 
 Recommended Cloud structure:
 
 | Level | Naming |
 |---|---|
-| Workspace / Team | Current personal workspace; later `Axis` |
+| Workspace / Team | `Axis` |
 | Project | `Axis Product` |
 | Design system file | `Axis Design System` |
 | Shared shell file | `Axis App Shell` |
@@ -50,9 +50,9 @@ use-case document until the referenced file/page/frame exists in Penpot.
 
 | Source | Penpot location | Purpose | Owning docs |
 |---|---|---|---|
-| Design system | Current Cloud workspace, later `Axis` team → `Axis Product` → `Axis Design System` | Tokens, primitive variants, component anatomy, and reusable UI states | [design-system.md](./design-system.md) |
-| App shell | Current Cloud workspace, later `Axis` team → `Axis Product` → `Axis App Shell` | Shared authenticated layout, navigation, and responsive shell decisions | [frontend.md](./frontend.md) |
-| Register workspace | Current Cloud workspace, later `Axis` team → `Axis Product` → `platform-foundation / register-workspace` → `Wireframes` → `register-workspace` | First product-flow source frame for the current public registration surface | [platform-foundation/register-workspace](../use-cases/platform-foundation/register-workspace/README.md) |
+| Design system | `Axis` → `Axis Product` → `Axis Design System` | Tokens, primitive variants, component anatomy, and reusable UI states | [design-system.md](./design-system.md) |
+| App shell | `Axis` → `Axis Product` → `Axis App Shell` | Shared authenticated layout, navigation, and responsive shell decisions | [frontend.md](./frontend.md) |
+| Register workspace | `Axis` → `Axis Product` → `platform-foundation / register-workspace` → `Wireframes` → `register-workspace` | First product-flow source frame for the current public registration surface | [platform-foundation/register-workspace](../use-cases/platform-foundation/register-workspace/README.md) |
 
 For each source, keep the Penpot frame name stable and update the owning docs in
 the same PR when a real Penpot URL becomes available. Use `N/A` for committed
