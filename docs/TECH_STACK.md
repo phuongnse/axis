@@ -64,11 +64,10 @@
 
 ## Design Tooling
 
-Axis does not currently prescribe an external product-design platform. Editable
-design sources and optional previews are governed by
-[design-source.md](./playbooks/design-source.md). Adding a shared design
-platform, agent bridge, or repo command for design tooling requires explicit
-approval and a Design Gate-backed update to this section.
+| Technology | Role | Boundary |
+|---|---|---|
+| **Open Design** | External design-source workspace for Axis design-system direction, prototype artifacts, and the repo-owned `DESIGN.md` package | Approved as design-source tooling only; not a frontend/backend runtime dependency. The seed package starts at [`DESIGN.md`](../design-sources/open-design/axis/DESIGN.md). Adding a required shared service, MCP/agent bridge, repo command, or package dependency still requires explicit approval and a Design Gate-backed update. |
+| **Editable design sources** | Use-case screen sources and optional previews | Governed by [design-source.md](./playbooks/design-source.md). Use-case `## Design Sources` rows link to editable artifacts; generated previews are optional review aids. |
 
 ---
 

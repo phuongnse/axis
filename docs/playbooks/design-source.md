@@ -2,19 +2,20 @@
 
 > **Navigation**: [docs/README.md](../README.md) | [wireframes.md](./wireframes.md) | [AGENTS.md](../../AGENTS.md)
 
-This playbook owns the Axis design-source workflow. Axis does not currently
-mandate an external product-design platform. Design sources must still be
-editable, reviewable, and traceable to the owning use-case spec. Axis
-implementation follows the use-case specs first: design clarifies layout and
-handoff, but it does not invent behavior, acceptance criteria, endpoints, roles,
-or data contracts.
+This playbook owns the Axis design-source workflow. Axis uses a repo-owned Open
+Design package for shared design-system direction, while use-case screen sources
+remain traceable to their owning specs. Design sources must be editable,
+reviewable, and traceable to the owning use-case spec. Axis implementation
+follows the use-case specs first: design clarifies layout and handoff, but it
+does not invent behavior, acceptance criteria, endpoints, roles, or data
+contracts.
 
 ## Decisions
 
 | Topic | Rule |
 |---|---|
-| Design tool | No external design platform is prescribed. A design source may be an editable local artifact, a tool-native workspace link, or a legacy `.excalidraw` source while that legacy asset remains in use. |
-| Runtime boundary | Design tools are external design infrastructure, not Axis app dependencies. Adding a shared platform, agent bridge, or repo command requires explicit approval and a Design Gate-backed `TECH_STACK.md` update. |
+| Design tool | Open Design is the approved shared design-source workflow for Axis design-system direction. A use-case design source may still be an editable local artifact, a tool-native workspace link, or a legacy `.excalidraw` source while that legacy asset remains in use. |
+| Runtime boundary | Design tools are external design infrastructure, not Axis app dependencies. Adding a required shared service, agent bridge, repo command, package dependency, or secret-bearing integration requires explicit approval and a Design Gate-backed `TECH_STACK.md` update. |
 | Source links | Use-case `## Design Sources` rows link to editable source artifacts when they exist. Use `N/A` only when no source exists yet or the use case has no UI source. |
 | Previews | Committed previews are optional derived artifacts; use `N/A` until an export is needed for review or stable documentation. |
 | AI agent | Agent-assisted design is allowed only against editable sources. Keep tool-specific setup out of repo docs unless the tool is approved as shared project infrastructure. |
@@ -33,6 +34,33 @@ Recommended source names:
 | `Axis Design System` | Tokens, primitive variants, component anatomy, and reusable UI states | [design-system.md](./design-system.md) |
 | `Axis App Shell` | Shared authenticated layout, navigation, and responsive shell decisions | [frontend.md](./frontend.md) |
 | `{domain} / {use-case-slug}` | Use-case-specific screen sources and state boards | Owning use-case `README.md` |
+
+## Open Design Package
+
+The repo-owned Axis package lives outside production code so generated design
+artifacts cannot become implicit app dependencies:
+
+```text
+design-sources/open-design/axis/
+├── manifest.json
+├── DESIGN.md
+├── tokens.css
+└── USAGE.md
+```
+
+Ownership:
+
+| File | Owns |
+|---|---|
+| `DESIGN.md` | Axis visual direction for Open Design prompts: brand, density, layout rules, component anatomy, motion, copy, and anti-patterns |
+| `manifest.json` | Machine-readable package identity and declared source files |
+| `tokens.css` | Compiled semantic token seed for Open Design artifacts; executable SPA token contracts remain in `frontend/src/design-system/` |
+| `USAGE.md` | Agent-facing workflow for producing reviewable artifacts without changing product behavior |
+
+Do not copy generated Open Design HTML or CSS into the SPA. Treat generated
+artifacts as editable design sources or previews. Production UI changes still
+flow through [design-system.md](./design-system.md): tokens, primitive
+contracts, component tests, and consumer contracts.
 
 For use-case-specific screens, keep frame or artifact names stable and match the
 documented screen slug, for example `register-workspace` or
