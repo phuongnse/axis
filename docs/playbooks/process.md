@@ -121,7 +121,7 @@ For every match: confirm the SQL only references tables owned by that match's ow
 ### Phase 0 — Design system foundation
 
 Before broad UI polish or new visual patterns, follow [design-system.md](./design-system.md). Design-system PRs establish tokens, reusable components, component contract checks, and migration rules; they do not migrate unrelated legacy screens.
-When a foundation PR proposes new automation, use the design-system automation boundary first: prefer Penpot-backed tokens/contracts and keep case-specific visual checks review-only unless they have a reusable source-of-truth contract.
+When a foundation PR proposes new automation, use the design-system automation boundary first: prefer source-backed tokens/contracts and keep case-specific visual checks review-only unless they have a reusable source-of-truth contract.
 
 ### Phase 1 — Foundation (one-time)
 
@@ -141,7 +141,7 @@ Repeat for every screen / feature area. **Never skip the design-source step** �
 | Step | Action | Output |
 |---|---|---|
 | 1 | Read use-case file ACs in full and define the user goal, required decision, and minimum useful information | UX contract before visual design |
-| 2 | Create/update Penpot design source for the screen | Penpot frame linked from `docs/use-cases/{domain}/{slug}/README.md`; committed preview optional when review needs a stable snapshot |
+| 2 | Create/update an editable design source for the screen | Source linked from `docs/use-cases/{domain}/{slug}/README.md`; committed preview optional when review needs a stable snapshot |
 | 3 | Add row to the use-case `## Design Sources` table | Source/preview linked from spec |
 | 4 | Define types from backend contract | `features/{name}/types.ts` |
 | 5 | Define API functions + query key factory | `features/{name}/api.ts` |

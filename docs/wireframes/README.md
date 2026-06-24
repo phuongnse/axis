@@ -6,11 +6,11 @@ Wireframes are low-fidelity skeletons. They document layout, user flow, content 
 
 ## What Lives Here
 
-This folder is the shared wireframe contract and legacy shared-asset location. New design sources live in Penpot and are linked from the owning use-case `## Design Sources` table; setup lives in [design-source.md](../playbooks/design-source.md).
+This folder is the shared wireframe contract and legacy shared-asset location. New design sources are editable artifacts linked from the owning use-case `## Design Sources` table; workflow rules live in [design-source.md](../playbooks/design-source.md).
 
 | File | Role |
 |------|------|
-| `app-shell.excalidraw` | Legacy shared authenticated app chrome reference until migrated to Penpot |
+| `app-shell.excalidraw` | Legacy shared authenticated app chrome reference until migrated to an editable design source |
 | `app-shell.svg` | Legacy committed preview rendered from `app-shell.excalidraw` |
 
 Use-case screen sources live beside their owning use case as source/preview rows:

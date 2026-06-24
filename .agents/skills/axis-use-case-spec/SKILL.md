@@ -39,7 +39,7 @@ Create or tighten the owning use-case spec so implementation can follow spec -> 
    - Split oversized work into isolated slices and record the slice boundary in `Decisions` or `Deferred follow-ups`.
 
 4. Define visuals and diagrams.
-   - For user-facing screens, use `$axis-visual-artifact` to create or update Penpot design-source links, optional previews, and the `## Design Sources` table.
+   - For user-facing screens, use `$axis-visual-artifact` to create or update design-source links, optional previews, and the `## Design Sources` table.
    - Add `## Screen flow` when the journey has more than three screens, branched happy paths, or non-obvious error screens.
    - Add Mermaid diagrams for non-trivial workflow, sequence, or cross-module behavior; keep local diagrams in the owning README.
    - Use a single `N/A` row when no design source or local diagram applies.

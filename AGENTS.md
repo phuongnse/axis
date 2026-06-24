@@ -159,7 +159,7 @@ Add navigation back-links per [docs/README.md](docs/README.md) (playbooks, use-c
 
 **Design system:** use `$axis-design-system` for tokens, UI primitives, catalog, visual QA, consumer contracts, and design-system enforcement. Details live in [`design-system.md`](docs/playbooks/design-system.md).
 
-**Visual artifacts:** use `$axis-visual-artifact` for Penpot design-source links, wireframes, committed previews, legacy Excalidraw assets, and diagrams. Source rules live in [`design-source.md`](docs/playbooks/design-source.md), [`wireframes.md`](docs/playbooks/wireframes.md), [`wireframes/README.md`](docs/wireframes/README.md), and [`visual-artifact-checklist.md`](docs/playbooks/visual-artifact-checklist.md).
+**Visual artifacts:** use `$axis-visual-artifact` for design-source links, wireframes, committed previews, legacy Excalidraw assets, and diagrams. Source rules live in [`design-source.md`](docs/playbooks/design-source.md), [`wireframes.md`](docs/playbooks/wireframes.md), [`wireframes/README.md`](docs/wireframes/README.md), and [`visual-artifact-checklist.md`](docs/playbooks/visual-artifact-checklist.md).
 
 **Cross-cutting:** forward `CancellationToken`; audit fields in Application; soft-delete on workspace aggregates; Serilog without PII; rate limit auth endpoints; CORS before auth; `/health` + `/health/ready` anonymous.
 
@@ -189,7 +189,7 @@ Diagrams/wireframes: update design-source links and committed preview links toge
 | [patterns.md](docs/playbooks/patterns.md) | Compatibility router for legacy pattern anchors |
 | [testing.md](docs/playbooks/testing.md) | Test patterns |
 | [frontend.md](docs/playbooks/frontend.md) | SPA rules |
-| [design-source.md](docs/playbooks/design-source.md) | Penpot design source, MCP workflow, source/preview link rules |
+| [design-source.md](docs/playbooks/design-source.md) | Design-source workflow and source/preview link rules |
 | [docs-style.md](docs/playbooks/docs-style.md) | Doc anti-patterns + single-owner rule (read before adding a `.md`) |
 | [TECH_STACK.md](docs/TECH_STACK.md) | Libraries + ADRs |
 | [PROGRESS.md](docs/PROGRESS.md) | Module layer status |

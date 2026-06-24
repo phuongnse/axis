@@ -117,13 +117,13 @@ Do **not** duplicate design-source or preview links here; links live only in `##
 
 ### Design Sources (content rules)
 
-- Design sources live in Penpot and are linked from `## Design Sources`; setup and MCP rules live in [design-source.md](./design-source.md).
+- Design sources are editable artifacts linked from `## Design Sources`; workflow rules live in [design-source.md](./design-source.md).
 - Committed previews live **flat** in the use-case folder when they exist.
-- Reference **shared kit** screens from the shared Penpot file or `../../../wireframes/` legacy assets (e.g. `app-shell`) — do not copy files into the use-case folder.
+- Reference **shared kit** screens from the shared design source or `../../../wireframes/` legacy assets (e.g. `app-shell`) — do not copy files into the use-case folder.
 - One table per README — no blockquote design-source stacks.
 - Opening line (when `## Screen flow` exists): state how many screens, that order matches Screen flow, and that **sequence/architecture** drawings are under `## Diagrams`.
 - **Inventory:** every documented **UI screen** for this use case must have a row. Include error/reference variants (`*-states`). Use `N/A` only when the use case truly has no design source or preview yet.
-- **Columns:** minimum `| Screen | Source | Preview |`. When `## Screen flow` exists, use `| # | Screen | Role | Source | Preview |` — `#` matches flow steps (`1`, `2a`, `—` for non-step error screens); `Role` = short happy-path / error label. The `Source` cell may link to Penpot or a legacy `.excalidraw` file, but the column name stays generic.
+- **Columns:** minimum `| Screen | Source | Preview |`. When `## Screen flow` exists, use `| # | Screen | Role | Source | Preview |` — `#` matches flow steps (`1`, `2a`, `—` for non-step error screens); `Role` = short happy-path / error label. The `Source` cell may link to an editable design source or a legacy `.excalidraw` file, but the column name stays generic.
 - **Row order:** happy-path screens first (same order as Screen flow), then error/reference screens (same order as the error table in Screen flow).
 - **Do not** list diagrams here (e.g. `*-flow`, `workspace-provisioning`, entity models) — those are not UI screens; sequence/architecture diagrams belong under `## Diagrams` as Mermaid, not in this table.
 
@@ -134,7 +134,7 @@ Minimal table (few screens, no Screen flow):
 
 | Screen | Source | Preview |
 |--------|--------|---------|
-| login | [source](https://design.example/penpot-frame) | [preview](./login.svg) |
+| login | [source](https://design.example/source-frame) | [preview](./login.svg) |
 ```
 
 Full table (see [register-workspace](../use-cases/platform-foundation/register-workspace/README.md#design-sources)):
@@ -147,8 +147,8 @@ Sequence/architecture drawings are under [Diagrams](#diagrams).
 
 | # | Screen | Role | Source | Preview |
 |---|--------|------|--------|---------|
-| 1 | … | Happy path — … | [source](https://design.example/penpot-frame) | [preview](./….svg) |
-| — | …-states | Error — … | [source](https://design.example/penpot-states-frame) | [preview](./….svg) |
+| 1 | … | Happy path — … | [source](https://design.example/source-frame) | [preview](./….svg) |
+| — | …-states | Error — … | [source](https://design.example/source-states-frame) | [preview](./….svg) |
 ```
 
 ### Diagrams (content rules)

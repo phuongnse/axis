@@ -85,19 +85,19 @@ All UI assets in this folder (<N> screens). Row order matches [Screen flow](#scr
 
 | # | Screen | Role | Source | Preview |
 |---|--------|------|--------|---------|
-| 1 | `<screen-slug>` | Happy path — … | `[source](https://design.example/penpot-frame)` | `[preview](./<screen-slug>.svg)` |
+| 1 | `<screen-slug>` | Happy path — … | `[source](https://design.example/source-frame)` | `[preview](./<screen-slug>.svg)` |
 
-Replace placeholders with real Penpot `[source](…)` links and optional `[preview](./…)` links when implementing (see [register-workspace](./platform-foundation/register-workspace/README.md#design-sources) for a filled-in table including error rows).
+Replace placeholders with real editable `[source](…)` links and optional `[preview](./…)` links when implementing (see [register-workspace](./platform-foundation/register-workspace/README.md#design-sources) for a filled-in table including error rows).
 
 Minimal (delete `#` / `Role` columns and the inventory note when Screen flow is omitted):
 
 | Screen | Source | Preview |
 |--------|--------|---------|
-| `<screen-slug>` | `[source](https://design.example/penpot-frame)` | `[preview](./<screen-slug>.svg)` |
+| `<screen-slug>` | `[source](https://design.example/source-frame)` | `[preview](./<screen-slug>.svg)` |
 
 Use real `[source](…)` / `[preview](./…)` links in implemented use cases — not angle-bracket placeholders.
 
-Committed previews live **flat** inside this use-case folder. Reference shared kit screens from Penpot or `../../../wireframes/` legacy assets when needed. Use a single `N/A` row when no design source applies.
+Committed previews live **flat** inside this use-case folder. Reference shared kit screens from the shared design source or `../../../wireframes/` legacy assets when needed. Use a single `N/A` row when no design source applies.
 
 ## Diagrams
 

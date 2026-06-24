@@ -70,7 +70,7 @@ docs/use-cases/
         └── *.svg            # optional committed previews for this use case
 ```
 
-Penpot design sources are linked from each use-case `## Design Sources` table; setup lives in [design-source.md](../playbooks/design-source.md). Legacy shared wireframe references live in [`../wireframes/`](../wireframes/) — agent contract: [wireframes/README](../wireframes/README.md#agent-contract). Platform diagrams: [`../diagrams/`](../diagrams/).
+Editable design sources are linked from each use-case `## Design Sources` table; workflow rules live in [design-source.md](../playbooks/design-source.md). Legacy shared wireframe references live in [`../wireframes/`](../wireframes/) — agent contract: [wireframes/README](../wireframes/README.md#agent-contract). Platform diagrams: [`../diagrams/`](../diagrams/).
 
 ---
 

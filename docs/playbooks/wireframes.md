@@ -2,7 +2,7 @@
 
 > **Navigation**: [← docs/README.md](../README.md) · [← design-source.md](./design-source.md) · [← AGENTS.md](../../AGENTS.md)
 
-This playbook covers low-fidelity UI wireframe intent and use-case visual inventories. Penpot setup, source-link ownership, and MCP agent rules live in [design-source.md](./design-source.md). Wireframes prove layout, flow, hierarchy, content intent, and states; they do not reproduce final theme, decorative backdrop, dark/light styling, semantic color styling, shadows, or visual polish.
+This playbook covers low-fidelity UI wireframe intent and use-case visual inventories. Design-source workflow and source-link ownership live in [design-source.md](./design-source.md). Wireframes prove layout, flow, hierarchy, content intent, and states; they do not reproduce final theme, decorative backdrop, dark/light styling, semantic color styling, shadows, or visual polish.
 
 ## Agent Checklist
 
@@ -12,7 +12,7 @@ When you touch `docs/wireframes/**` or use-case design-source/preview links:
 - [ ] New output stays skeletal: grayscale structure only; state meaning comes from labels, copy, icons, and placement.
 - [ ] Brand areas use neutral placeholders, not real logo art.
 - [ ] Repeated screens in the same journey stay aligned in width, spacing rhythm, and panel order.
-- [ ] Refreshed committed previews from Penpot when previews exist.
+- [ ] Refreshed committed previews from the editable source when previews exist.
 - [ ] If touching legacy `.excalidraw`, regenerated its `.svg` preview with `python scripts/axis.py generate wireframes`.
 - [ ] Reviewed previews with [visual-artifact-checklist.md](./visual-artifact-checklist.md).
 - [ ] Updated the owning use-case `README.md` if screens were added, renamed, split, or removed.
@@ -21,7 +21,7 @@ When you touch `docs/wireframes/**` or use-case design-source/preview links:
 
 | File or link | Purpose |
 |---|---|
-| Penpot source link | Source of truth for a screen design or low-fidelity frame |
+| Editable source link | Source of truth for a screen design or low-fidelity frame |
 | `docs/use-cases/{domain}/{use-case}/README.md` | Use-case `## Design Sources` inventory |
 | Committed preview link | Optional exported preview for docs review |
 | `docs/wireframes/README.md` | Shared wireframe contract |
@@ -74,7 +74,7 @@ Split `*-states` by trigger: interactions on the same screen go on one board; a 
 
 ## Adding A New Screen
 
-1. Create or edit the design source in Penpot.
+1. Create or edit the editable design source.
 2. Keep the screen traceable to a user goal, screen-flow step, or acceptance criterion.
 3. Add or update the row in the use-case `## Design Sources` table.
 4. Add or update `## Screen flow` when the journey has more than three screens or branch states.
@@ -89,7 +89,7 @@ Existing `.excalidraw` files remain valid historical sources until migrated. Whe
 python scripts/axis.py generate wireframes -f <use-case-or-screen-fragment>
 ```
 
-Use `python scripts/axis.py generate wireframes --changed` when several changed Markdown files reference legacy previews. Do not create new Excalidraw files for design-system or high-fidelity work; create Penpot frames and link them from the owning use-case `## Design Sources` table instead.
+Use `python scripts/axis.py generate wireframes --changed` when several changed Markdown files reference legacy previews. Do not create new Excalidraw files for design-system or high-fidelity work; create editable design sources and link them from the owning use-case `## Design Sources` table instead.
 
 ## Script Policy
 

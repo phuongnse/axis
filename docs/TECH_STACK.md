@@ -63,10 +63,11 @@
 
 ## Design Tooling
 
-| Technology | Version | Role | Rationale |
-|---|---|---|---|
-| **Penpot** | Cloud | Product design source | Open design tool for design-system files, app-shell references, and per-use-case screen sources. Setup and source-link rules live in [design-source.md](./playbooks/design-source.md). |
-| **Penpot MCP** | Configured Cloud MCP | AI design-agent bridge | Allows trusted MCP clients to inspect and edit Penpot Cloud files. It is design infrastructure, not an Axis frontend dependency or repo command. |
+Axis does not currently prescribe an external product-design platform. Editable
+design sources and optional previews are governed by
+[design-source.md](./playbooks/design-source.md). Adding a shared design
+platform, agent bridge, or repo command for design tooling requires explicit
+approval and a Design Gate-backed update to this section.
 
 ---
 

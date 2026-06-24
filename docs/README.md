@@ -37,7 +37,7 @@
 | [Testing](./playbooks/testing.md) | Test isolation, naming, file layout, mocking rules — .NET and frontend |
 | [Frontend](./playbooks/frontend.md) | UX-first UI rules, TanStack Query patterns, TypeScript discipline, routing, component design |
 | [Design system](./playbooks/design-system.md) | Tokens, reusable components, pixel-perfect definition, and contract workflow |
-| [Design source](./playbooks/design-source.md) | Penpot source-of-truth workflow, MCP usage, source/preview link rules |
+| [Design source](./playbooks/design-source.md) | Design-source workflow and source/preview link rules |
 | [Wireframe kit](./playbooks/wireframes.md) | Low-fidelity screen intent and use-case visual inventory; **agents:** [wireframe contract](./wireframes/README.md#agent-contract) |
 | [Visual artifact checklist](./playbooks/visual-artifact-checklist.md) | Required review checklist for diagrams, design sources, and use-case visuals before commit |
 | [Mermaid theme](./playbooks/mermaid.md) | One `%%{init}%%` for every diagram in `docs/` |
@@ -62,7 +62,7 @@
 
 ## Key Diagrams
 
-Platform **architecture** diagrams live here as **Mermaid** (one shared [dark theme](./playbooks/mermaid.md) via `docs/diagrams/mermaid_theme.py`). **UI design sources** live in Penpot and are indexed from each use-case `## Design Sources` table — see [Design Sources](#design-sources) below.
+Platform **architecture** diagrams live here as **Mermaid** (one shared [dark theme](./playbooks/mermaid.md) via `docs/diagrams/mermaid_theme.py`). **UI design sources** are indexed from each use-case `## Design Sources` table — see [Design Sources](#design-sources) below.
 
 Use-case **sequence / entity** diagrams live in each use-case `README.md` under `## Diagrams` (also Mermaid). Index:
 
@@ -185,13 +185,13 @@ flowchart TB
 
 ## Design Sources
 
-Screen design-source links and previews live with their owning use case. This hub is navigation only; Penpot setup lives in [design-source.md](./playbooks/design-source.md), and low-fidelity/source-table rules live in [wireframes.md](./playbooks/wireframes.md), [docs-style.md](./playbooks/docs-style.md#use-case-files--design-sources--implementation-status), and [visual-artifact-checklist.md](./playbooks/visual-artifact-checklist.md).
+Screen design-source links and previews live with their owning use case. This hub is navigation only; design-source workflow lives in [design-source.md](./playbooks/design-source.md), and low-fidelity/source-table rules live in [wireframes.md](./playbooks/wireframes.md), [docs-style.md](./playbooks/docs-style.md#use-case-files--design-sources--implementation-status), and [visual-artifact-checklist.md](./playbooks/visual-artifact-checklist.md).
 
 | What | Where |
 |------|--------|
 | Browse by domain | [use-cases](./use-cases/README.md) → domain `README.md` → use-case `README.md` → `## Design Sources` |
-| Penpot workflow | [design-source.md](./playbooks/design-source.md) |
-| Shared app shell | Penpot `Axis App Shell` file; legacy preview: [wireframes/app-shell](./wireframes/app-shell.excalidraw) |
+| Design-source workflow | [design-source.md](./playbooks/design-source.md) |
+| Shared app shell | Shared design source; legacy preview: [wireframes/app-shell](./wireframes/app-shell.excalidraw) |
 | Canonical multi-screen example | [register-workspace § Design Sources](./use-cases/platform-foundation/register-workspace/README.md#design-sources) |
 
 ---
@@ -212,5 +212,5 @@ When two docs disagree, the **owner** wins. Update the owner first; everything e
 | Local dev (Axis CLI, compose graph, ports, URLs, environment adapters) | [playbooks/local-dev.md](./playbooks/local-dev.md) + [`docker-compose.yml`](../docker-compose.yml) |
 | Implementation patterns and pitfalls | [playbooks/patterns-index.md](./playbooks/patterns-index.md) routes to the focused owner docs; [playbooks/patterns.md](./playbooks/patterns.md) is a compatibility router only |
 | Design-system tokens, component inventory, and component contract workflow | [playbooks/design-system.md](./playbooks/design-system.md) |
-| Product design source, Penpot, and MCP workflow | [playbooks/design-source.md](./playbooks/design-source.md) |
+| Product design source and agent workflow | [playbooks/design-source.md](./playbooks/design-source.md) |
 | UI design sources and preview rows (per screen / use case) | `docs/use-cases/{domain}/{use-case}/README.md` → `## Design Sources` ([hub § Design Sources](./README.md#design-sources) for navigation only) |
