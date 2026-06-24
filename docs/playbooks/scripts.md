@@ -21,8 +21,9 @@ runtime.
 | Node.js | [`frontend/.nvmrc`](../../frontend/.nvmrc) | `python scripts/axis.py verify`, `python scripts/axis.py frontend ...`, API type generation, legacy wireframe export | Axis checks the resolved Node major and package-manager availability before wrapped frontend workflows run, and resolves matching nvm installs when non-interactive shells do not load nvm into `PATH`. |
 | Lychee | `0.23.0` exactly in this table | `python scripts/axis.py check markdown-links`, CI Markdown link check | `lychee.toml` is written for the 0.23 config schema; Axis fails fast when another version resolves. |
 | Buf CLI | `1.50.0` exactly in this table | `python scripts/axis.py check buf-lint`, `python scripts/axis.py check buf-breaking-against-base`, CI protobuf checks | Axis checks the resolved Buf version before wrapped protobuf workflows run. |
+| CodeRabbit CLI | `>= 0.6.0` in this table | `$axis-pull-request` local pre-PR review checkpoint | Axis checks the resolved CLI version with `python scripts/axis.py check coderabbit-cli`; auth is checked by the CodeRabbit review skill before review runs. |
 
-Install Lychee and Buf from their upstream releases at the documented versions,
+Install Lychee, Buf, and CodeRabbit CLI from their upstream releases at the documented versions,
 then verify the active toolchain with `python scripts/axis.py doctor` or the
 specific Axis checks below. Do not document raw installer/version commands as a
 repo workflow.
@@ -63,6 +64,7 @@ python scripts/axis.py check frontend-api-contracts
 python scripts/axis.py check frontend-style
 python scripts/axis.py check frontend-component-composition
 python scripts/axis.py check frontend-quality
+python scripts/axis.py check coderabbit-cli
 python scripts/axis.py check doc-drift
 python scripts/axis.py check markdown-links
 python scripts/axis.py check buf-cli

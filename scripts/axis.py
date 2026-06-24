@@ -32,6 +32,7 @@ SCRIPTS = ROOT / "scripts"
 REQUIRED_DOTNET_SDK_MAJOR = "8"
 REQUIRED_BUF_VERSION = "1.50.0"
 REQUIRED_LYCHEE_VERSION = "0.23.0"
+MINIMUM_CODERABBIT_CLI_VERSION = "0.6.0"
 TOOL_VERSIONS_DOC = "docs/playbooks/scripts.md#tool-versions"
 TECH_STACK_DOC = "docs/TECH_STACK.md"
 GLOBAL_JSON_PATH = ROOT / "global.json"
@@ -2634,6 +2635,33 @@ def check_markdown_links(_args: argparse.Namespace | None = None) -> int:
     return result.returncode
 
 
+def coderabbit_cli_status() -> tuple[bool, str]:
+    ok, version_line, resolved = command_version_line("coderabbit", "--version")
+    if not ok:
+        return False, f"{version_line}; CodeRabbit CLI is required for the local pre-PR review checkpoint. See {TOOL_VERSIONS_DOC}."
+
+    version_match = re.search(r"\b([0-9]+(?:[.][0-9]+)+)\b", version_line)
+    if version_match is None:
+        return False, f"found `{version_line or 'unknown'}` at {resolved}; expected version >= {MINIMUM_CODERABBIT_CLI_VERSION}"
+
+    if _version_sort_key(version_match.group(1)) < _version_sort_key(MINIMUM_CODERABBIT_CLI_VERSION):
+        return (
+            False,
+            f"found `{version_line or 'unknown'}` at {resolved}; expected version >= {MINIMUM_CODERABBIT_CLI_VERSION}",
+        )
+
+    return True, f"{version_line} ({resolved}); expected >= {MINIMUM_CODERABBIT_CLI_VERSION}"
+
+
+def check_coderabbit_cli(_args: argparse.Namespace | None = None) -> int:
+    ok, detail = coderabbit_cli_status()
+    if not ok:
+        print(f"coderabbit-cli: FAIL - {detail}", file=sys.stderr)
+        return 1
+    print(f"coderabbit-cli: OK ({detail})")
+    return 0
+
+
 def dotnet_command(args: argparse.Namespace) -> int:
     rc = check_dotnet_sdk()
     if rc != 0:
@@ -3337,6 +3365,9 @@ def doctor(args: argparse.Namespace) -> int:
         buf_ok, buf_detail = buf_version_status(buf)
         record("OK" if buf_ok else "FAIL", "buf", buf_detail)
 
+    coderabbit_ok, coderabbit_detail = coderabbit_cli_status()
+    record("OK" if coderabbit_ok else "FAIL", "coderabbit", coderabbit_detail)
+
     dotnet_ok, dotnet_detail = dotnet_sdk_status()
     record("OK" if dotnet_ok else "FAIL", ".NET SDK", dotnet_detail)
 
@@ -3581,6 +3612,7 @@ def main(argv: list[str] | None = None) -> int:
     check_sub.add_parser("frontend-style").set_defaults(func=check_frontend_style)
     check_sub.add_parser("frontend-component-composition").set_defaults(func=check_frontend_component_composition)
     check_sub.add_parser("frontend-quality").set_defaults(func=check_frontend_quality)
+    check_sub.add_parser("coderabbit-cli").set_defaults(func=check_coderabbit_cli)
     check_sub.add_parser("buf-cli").set_defaults(func=check_buf_cli)
     check_sub.add_parser("buf-lint").set_defaults(func=check_buf_lint)
     check_sub.add_parser("buf-modules").set_defaults(func=check_buf_modules)

@@ -1784,6 +1784,47 @@ class TestMarkdownLinkGate(unittest.TestCase):
 
         self.assertIn("Lychee 0.23.0 is required", stderr.getvalue())
 
+    def test_coderabbit_cli_rejects_missing_cli(self) -> None:
+        with (
+            mock.patch.object(
+                axis,
+                "command_version_line",
+                return_value=(False, "coderabbit not found in PATH", "coderabbit"),
+            ),
+            contextlib.redirect_stderr(io.StringIO()) as stderr,
+        ):
+            self.assertEqual(1, axis.check_coderabbit_cli())
+
+        output = stderr.getvalue()
+        self.assertIn("CodeRabbit CLI is required", output)
+        self.assertIn("docs/playbooks/scripts.md#tool-versions", output)
+
+    def test_coderabbit_cli_rejects_old_version(self) -> None:
+        with (
+            mock.patch.object(
+                axis,
+                "command_version_line",
+                return_value=(True, "0.5.9", "/usr/bin/coderabbit"),
+            ),
+            contextlib.redirect_stderr(io.StringIO()) as stderr,
+        ):
+            self.assertEqual(1, axis.check_coderabbit_cli())
+
+        self.assertIn("expected version >= 0.6.0", stderr.getvalue())
+
+    def test_coderabbit_cli_accepts_supported_version(self) -> None:
+        with (
+            mock.patch.object(
+                axis,
+                "command_version_line",
+                return_value=(True, "0.6.3", "/usr/bin/coderabbit"),
+            ),
+            contextlib.redirect_stdout(io.StringIO()) as stdout,
+        ):
+            self.assertEqual(0, axis.check_coderabbit_cli())
+
+        self.assertIn("coderabbit-cli: OK", stdout.getvalue())
+
 
 class TestVerifyGate(unittest.TestCase):
     def test_runs_markdown_links_for_markdown_changes(self) -> None:
