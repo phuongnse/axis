@@ -24,7 +24,7 @@ A screen or component is pixel-perfect only when all of these are true:
 | Area | Requirement |
 |---|---|
 | Design source | Approved target exists for the component or screen, including responsive size and state coverage |
-| Tokens | Colors, typography, spacing, radius, borders, shadows, and motion come from named design-system tokens |
+| Tokens | Axis-owned colors, typography, spacing, radius, borders, shadows, and motion come from named design-system tokens; shadcn-sourced primitives preserve upstream classes until Open Design token adoption is approved |
 | Component mapping | The implementation uses shared design-system components instead of page-local geometry |
 | States | Default, hover, focus, active, disabled, loading, empty, success, warning, error, and long-copy states are covered when applicable |
 | Responsive | Mobile, tablet, and desktop viewports are intentionally designed and verified |
@@ -45,7 +45,7 @@ Tokens are named by intent, not by current color or one screen. Raw values belon
 | Typography | `font.family.sans`, `type.body.sm`, `type.heading.md` | Include size, line height, weight, and letter spacing |
 | Spacing | `space.1`, `space.2`, `space.4`, `space.6` | Drives padding, gaps, and layout rhythm |
 | Sizing | `size.control.sm`, `size.icon.md`, `size.sidebar` | Stable dimensions for controls and fixed UI regions |
-| Radius | `radius.control`, `radius.panel`, `radius.full` | Avoid arbitrary radius in component code |
+| Radius | `radius.control`, `radius.panel`, `radius.full` | Avoid arbitrary radius in Axis-owned component code |
 | Border | `border.width.default`, `border.color.subtle` | Use semantic border colors |
 | Shadow | `shadow.panel`, `shadow.popover` | Use only where elevation improves hierarchy |
 | Motion | `motion.duration.fast`, `motion.easing.standard` | Keep motion purposeful and reduced-motion aware |
@@ -63,7 +63,7 @@ Editable design sources own approved design token decisions. Frontend code owns 
 | `frontend/src/design-system/tokens.css` | Generated CSS variable values for light and dark themes |
 | `frontend/src/design-system/tokens.ts` | Generated typed token registry used by tests and future design-system tooling |
 | `frontend/src/design-system/tailwind-tokens.js` | Generated Tailwind theme map consumed by `frontend/tailwind.config.js` |
-| `frontend/src/design-system/primitive-contracts.ts` | UI primitive registry: file ownership, readiness status, variant/state/accessibility matrix, token families, and test coverage |
+| `frontend/src/design-system/primitive-contracts.ts` | Shadcn UI primitive registry: source provenance, file ownership, readiness status, variant/state/accessibility matrix, token families, and test coverage |
 | `frontend/src/design-system/consumer-contracts.ts` | Route-bound UI consumer registry: product surface, route, owner, readiness, primitive usage, state coverage, evidence, and tests |
 | `frontend/tailwind.config.js` | Tailwind names that map to semantic CSS variables |
 
@@ -71,9 +71,9 @@ When importing token updates from a design source:
 
 1. Translate approved source token names into semantic entries in `tokens.json`.
 2. Run `python scripts/axis.py frontend gen-design-tokens --check` so generated CSS, TypeScript, and Tailwind maps stay current.
-3. Components should consume Tailwind token classes such as `bg-primary`, `text-muted-foreground`, `border-border`, and `rounded-md`.
+3. Axis-owned components should consume Tailwind token classes such as `bg-primary`, `text-muted-foreground`, `border-border`, and `rounded-md`.
 4. Map shadows and reusable gradients as named Tailwind tokens such as `shadow-surface`, `shadow-panel`, and `bg-gradient-inverse-panel`.
-5. Keep raw hex, raw HSL, raw neutral colors, raw shadows, and one-off visual values out of component files when a semantic token exists.
+5. Keep raw hex, raw HSL, raw neutral colors, raw shadows, and one-off visual values out of Axis-owned component files when a semantic token exists.
 
 Do not generate frontend tokens from unapproved design files. If a source export changes a visual decision, treat that as design-system work and include the registry/test update in the same PR.
 
@@ -83,12 +83,13 @@ Build the design system from primitives upward. A feature screen can use only co
 
 | Layer | Components |
 |---|---|
-| Primitives | Button, IconButton, Input, Textarea, Select, Checkbox, Radio, Switch, Label, Link |
-| Feedback | Notice, Alert, Toast, ErrorMessage, Spinner, Skeleton, Progress |
-| Structure | Card, Panel, Modal, Drawer, Popover, Tooltip, Tabs, Menu |
-| Data | Table, List, EmptyState, Pagination, FilterBar, Badge |
-| Forms | FormField, FieldGroup, ValidationSummary, HelpText |
+| Primitives | Button, Input, Textarea, NativeSelect, Checkbox, Label |
+| Feedback | Alert, Toast, ErrorMessage, Spinner, Skeleton, Progress |
+| Structure | Card, Separator, Modal, Drawer, Popover, Tooltip, Tabs, Menu |
+| Data | Table, List, Empty, Pagination, FilterBar, Badge |
+| Forms | Field, FieldSet, FieldGroup, ValidationSummary, HelpText |
 | Layout | PublicAuthShell, AppShell, PageHeader, Sidebar, Toolbar, ContentGrid |
+| Shared Axis components | ActionLink, AccessPathTrace, BrandHeader, FlowTrace, HeaderRule, TopologyBackdrop |
 | Domain patterns | WorkflowCanvasShell, FormBuilderShell, DataModelTable, ExecutionTimeline |
 
 Each component needs a variant matrix before broad screen use.
@@ -112,23 +113,24 @@ If a variant is not documented, do not infer it from a one-off screen.
 
 ## Primitive Contracts
 
-The executable primitive contract lives in `frontend/src/design-system/primitive-contracts.ts`. Keep it updated before using a new primitive broadly in migrated screens. Reviewers inspect that file together with the listed test files; do not maintain a second manual matrix for primitive readiness.
+The executable primitive contract lives in `frontend/src/design-system/primitive-contracts.ts`. It covers shadcn primitives in `frontend/src/components/ui/` only. Keep it updated before using a new shadcn primitive broadly in migrated screens. Reviewers inspect that file together with the listed test files; do not maintain a second manual matrix for primitive readiness.
+
+Until Open Design is applied to the executable token/component layer, shadcn is the source-first baseline for shared UI primitives. If shadcn provides the component, install or copy the shadcn implementation first, keep its standard API and upstream classes, and migrate consumers to that API. Do not Axis-ize variants, token classes, loading props, or wrapper names just to match a previous local abstraction.
+
+Axis-authored reusable components live outside `components/ui`, currently in `frontend/src/components/shared/`. They compose shadcn primitives and use `PascalCase.tsx`; non-component helper modules use `camelCase.ts`. Shadcn-sourced contracts use `source: 'shadcn'` and `sourceItem: '@shadcn/<component>'`.
 
 The table below is the human summary of the current executable contract:
 
 | Component | Purpose | Variants and states | Accessibility | Token map |
 |---|---|---|---|---|
-| `Button` | Visible command with required icon support | `cta`, `default`, `outline`, `secondary`, `ghost`, `destructive`, `link`; `xs`, `sm`, `default`, `lg`, icon sizes; disabled, loading, invalid, focus-visible | Native button semantics through Base UI; loading sets `aria-busy` and disables interaction | `bg-primary`, `bg-accent`, `bg-secondary`, `bg-destructive`, `border-border`, `ring-ring`, `rounded-md` |
-| `IconButton` | Icon-only command for dense tool surfaces | Shared button variants; icon sizes; disabled and loading | Requires `label`; label becomes the accessible name; loading label replaces the action label while busy | Same button tokens; icon size utilities only |
-| `ActionLink` | Navigation CTA on public/auth surfaces | `primary`, `secondary`; `default`, `inverted`, `adaptive` surfaces | Renders TanStack Router `Link`; icon is decorative and text remains the accessible name | `bg-accent`, `text-accent-foreground`, `border-border`, inverse action tokens |
-| `Input`, `Textarea`, `Select` | Text, long text, and option input | Default, disabled, invalid, focus-visible, long-copy wrapping | Requires `Label` or `aria-label`; invalid state uses `aria-invalid`; descriptions flow through `FormField` | `bg-background`, `border-input`, `ring-ring`, `text-foreground`, `text-muted-foreground`, `rounded-md` |
-| `Checkbox`, `CheckboxField` | Binary choice with optional validation | Checked, unchecked, disabled, invalid | `CheckboxField` links label and error copy through `aria-describedby` | `accent-primary`, `border-input`, `ring-ring`, `text-destructive`, `rounded-sm` |
-| `FormField` | Label, help text, description IDs, and error copy wrapper | Help text, error, externally supplied description IDs | Provides deterministic `aria-describedby` IDs to child controls | `text-muted-foreground`, `text-primary`, `text-destructive` |
-| `Notice` | Inline async/status feedback | `info`, `success`, `warning`, `error`; optional title/body/icon | Warning/error use `role="alert"`; info/success use `role="status"`; icon is decorative | `state.*`, `destructive`, `rounded-lg`, `border-*` |
-| `Badge` | Compact status or metadata marker | `neutral`, `primary`, `accent`, `info`, `success`, `warning`, `destructive`, `outline` | Text remains the accessible name; icons remain optional/decorative | `bg-muted`, `primary`, `accent`, `state.*`, `destructive`, `rounded-md` |
-| `Card`, `Panel` | Reusable framed work surfaces | Default, muted, inset, attention, inverse panels; card header/content/footer anatomy | Semantic HTML remains caller-owned; surface must not hide focusable content | `bg-card`, `bg-muted`, `bg-background`, `bg-inverse`, `border-border`, `shadow-*` |
-| `Skeleton`, `Progress`, `EmptyState` | Loading, quantitative progress, and empty-state feedback | Fixed skeleton blocks; determinate/indeterminate progress; empty state title/description/action | Progress requires an accessible label; empty-state icon is decorative | `bg-muted`, `accent-primary`, `rounded-md`, `rounded-full` for progress track |
-| `PageHeader`, `Toolbar`, `ContentGrid` | Shared page-level layout rhythm | Header with eyebrow/title/description/actions; compact toolbar; responsive 1/2/3-column grid | Keeps heading/action order stable across viewports | `text-foreground`, `text-muted-foreground`, `border-border`, `bg-card`, shared spacing scale |
+| `Button` | Visible command primitive from shadcn | `default`, `outline`, `secondary`, `ghost`, `destructive`, `link`; `xs`, `sm`, `default`, `lg`, icon sizes; disabled, invalid, focus-visible | Native button semantics through Base UI; caller owns loading copy/state composition | Upstream shadcn classes using semantic CSS variables such as `bg-primary`, `bg-secondary`, `border-border`, `ring-ring` |
+| `Input`, `Textarea`, `NativeSelect` | Text, long text, and option input from shadcn | Default, disabled, invalid, focus-visible, long-copy wrapping | Requires `Label` or `aria-label`; invalid state uses `aria-invalid`; descriptions compose through `Field` | Upstream shadcn classes using `bg-transparent`, `border-input`, `ring-ring`, `text-muted-foreground` |
+| `Checkbox` | Binary choice from shadcn | Checked, unchecked, disabled, invalid | Base UI checkbox semantics; compose with `Label` or `FieldLabel` | Upstream shadcn classes using `border-input`, `ring-ring`, `text-destructive`, `bg-primary` |
+| `Field` | Label, help text, layout, and error-copy composition from shadcn | Vertical, horizontal, responsive, fieldset, invalid | Label, description, and error slots remain explicit; caller wires `aria-describedby` to controls | Upstream shadcn classes using semantic text, border, radius, and spacing utilities |
+| `Alert` | Inline async/status feedback from shadcn | `default`, `destructive`; optional title/body/action/icon | Uses `role="alert"`; icon is decorative when supplied | Upstream shadcn classes using `bg-card`, `text-destructive`, `text-muted-foreground` |
+| `Badge` | Compact status or metadata marker from shadcn | `default`, `secondary`, `destructive`, `outline`, `ghost`, `link` | Text remains the accessible name; icons remain optional/decorative | Upstream shadcn classes using semantic color and border utilities |
+| `Card` | Reusable framed work surface from shadcn | Default and small card sizing; header/content/footer/action anatomy | Semantic HTML remains caller-owned; surface must not hide focusable content | Upstream shadcn classes using `bg-card`, `text-card-foreground`, `ring-foreground/10` |
+| `Empty`, `Skeleton`, `Progress`, `Spinner`, `Separator` | Empty, loading, progress, and structural feedback from shadcn | Empty media/content slots; fixed skeleton; determinate/indeterminate progress; loading spinner; horizontal/vertical separator | Progress and spinner require accessible labels; decorative slots remain caller-owned | Upstream shadcn classes using semantic background, border, sizing, radius, and motion utilities |
 
 ## Consumer Contracts
 
@@ -144,13 +146,14 @@ Design-system rules should fail deterministically when they can be checked witho
 
 | Rule | Mechanism |
 |---|---|
-| UI primitive files must have a registry contract | `python scripts/axis.py check frontend-component-composition` compares `frontend/src/components/ui/*.tsx` to `primitive-contracts.ts` |
-| Primitive contracts must name readiness and test coverage | Same check verifies readiness fields, variant/state/accessibility metadata, token families, and test file paths |
+| Shadcn UI primitive files must have a registry contract | `python scripts/axis.py check frontend-component-composition` compares `frontend/src/components/ui/*.tsx` to `primitive-contracts.ts` |
+| Primitive contracts must name shadcn source provenance, readiness, and test coverage | Same check verifies `source: 'shadcn'`, `sourceItem`, readiness fields, variant/state/accessibility metadata, token families, and test file paths |
+| Shared component filenames must match ownership | Same check requires shadcn primitives in `components/ui` to use registry kebab-case names, Axis-authored shared components to use `PascalCase.tsx`, and shared helper modules to use `camelCase.ts` |
 | Route-bound product UI surfaces must have a consumer contract | Same check compares frontend route imports to `consumer-contracts.ts` and verifies owner, readiness, primitive/state/evidence metadata, and test files |
-| Component code must use semantic color and shadow tokens | `python scripts/axis.py check frontend-style` rejects raw neutral color utilities, raw shadow utilities, and arbitrary color/gradient classes in TS/TSX |
+| Axis-owned component code must use semantic color and shadow tokens | `python scripts/axis.py check frontend-style` rejects raw neutral color utilities, raw shadow utilities, and arbitrary color/gradient classes outside shadcn-sourced primitive files |
 | Token registry must match executable Tailwind mapping | `frontend/tests/design-tokens.test.ts` checks CSS variables, color, radius, shadow, and background-image mappings |
 
-Do not add per-file allowlists for design-system violations. If a component needs a new visual value, add the token and Tailwind mapping first, then consume the named class from component code.
+Do not add ad hoc per-file allowlists for design-system violations. If an Axis-owned component needs a new visual value, add the token and Tailwind mapping first, then consume the named class from component code. If a shadcn-sourced primitive keeps upstream classes, record that source provenance in the primitive contract instead.
 
 ## Automation Boundary
 
@@ -170,10 +173,13 @@ If any answer is no, keep the finding review-only in [REVIEW_FINDINGS.md](../REV
 
 - Add or update tokens before component styles that need those values.
 - Add or update shared components before feature screens that need those components.
-- Add or update `primitive-contracts.ts` before broad use of a new UI primitive.
+- If shadcn has the primitive, install or copy shadcn first into `components/ui` and keep its standard API/classes until Open Design adoption changes the source contract.
+- Migrate consumers to shadcn APIs and variants instead of reintroducing local wrapper names or custom variants.
+- Put Axis-owned cross-screen abstractions in `components/shared`, not in `components/ui`.
+- Add or update `primitive-contracts.ts` before broad use of a new shadcn UI primitive.
 - Add or update `consumer-contracts.ts` before exposing or changing a route-bound product UI surface.
 - Keep route files and feature pages thin; visual geometry belongs in shared components or feature-owned pattern components.
-- Do not write raw hex, HSL, arbitrary spacing, arbitrary radius, or page-local component clones when a token or shared component exists.
+- Do not write raw hex, HSL, arbitrary spacing, arbitrary radius, or page-local component clones in Axis-owned code when a token or shared component exists.
 - Do not add visual polish to low-fidelity wireframes to compensate for missing design-system decisions.
 - Treat existing UI as legacy until it is migrated through this workflow.
 - Keep behavior changes in use-case PRs; keep design-system foundation and token/component work in focused PRs.

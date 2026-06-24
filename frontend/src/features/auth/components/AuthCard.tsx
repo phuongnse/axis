@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
-import { BrandHeader } from '@/components/visual/BrandHeader';
-import { TopologyBackdrop } from '@/components/visual/TopologyBackdrop';
+import { BrandHeader } from '@/components/shared/BrandHeader';
+import { TopologyBackdrop } from '@/components/shared/TopologyBackdrop';
 import { PreferenceControls } from '@/features/preferences';
 
 interface AuthCardProps {

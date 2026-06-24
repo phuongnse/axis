@@ -1,7 +1,7 @@
 import { screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
-import { AppShell } from '../src/components/layout/AppShell';
+import { AppShell } from '../src/components/shared/AppShell';
 import { renderWithRouter } from './render-with-router';
 
 vi.mock('@/features/auth/api', () => ({

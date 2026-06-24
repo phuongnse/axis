@@ -13,7 +13,7 @@ import { useTranslation } from 'react-i18next';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Panel } from '@/components/ui/panel';
+import { Card } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
 import { type UsageStats, useWorkspaceStart, type WorkspaceSettings } from '@/features/workspace';
@@ -77,7 +77,7 @@ function UsageCard({ label, value, limit, percent, icon: Icon }: UsageCardProps)
   const { t } = useTranslation();
 
   return (
-    <Panel variant="inset" className="p-4 shadow-surface">
+    <Card className="p-4">
       <div className="flex items-center justify-between gap-3">
         <p className="text-sm font-medium text-foreground">{t(label)}</p>
         <span className="inline-flex size-8 items-center justify-center rounded-md border border-primary/20 bg-primary/10 text-primary">
@@ -88,11 +88,10 @@ function UsageCard({ label, value, limit, percent, icon: Icon }: UsageCardProps)
       <p className="mt-1 text-xs text-muted-foreground">{t('dashboard.usage.limit', { limit })}</p>
       <Progress
         className="mt-4"
-        value={percent ?? 100}
-        isIndeterminate={percent === null}
+        value={percent}
         aria-label={t('dashboard.usage.progress', { label: t(label) })}
       />
-    </Panel>
+    </Card>
   );
 }
 
@@ -132,7 +131,7 @@ function WorkspaceSummary({
   ];
 
   return (
-    <Panel>
+    <Card className="p-4">
       <h2 className="text-sm font-semibold text-foreground">{t('dashboard.summary.title')}</h2>
       <div className="mt-4 space-y-3">
         {rows.map((row) => {
@@ -150,14 +149,14 @@ function WorkspaceSummary({
           );
         })}
       </div>
-    </Panel>
+    </Card>
   );
 }
 
 function LoadingDashboard() {
   return (
     <div className="max-w-6xl space-y-6">
-      <Panel className="p-6 sm:p-8">
+      <Card className="p-6 sm:p-8">
         <Skeleton className="h-4 w-32" />
         <Skeleton className="mt-8 h-9 w-80 max-w-full" />
         <Skeleton className="mt-4 h-4 w-[28rem] max-w-full" />
@@ -166,7 +165,7 @@ function LoadingDashboard() {
           <Skeleton className="h-36 rounded-lg" />
           <Skeleton className="h-36 rounded-lg" />
         </div>
-      </Panel>
+      </Card>
     </div>
   );
 }
@@ -175,7 +174,7 @@ function ErrorDashboard({ onRetry }: { onRetry: () => void }) {
   const { t } = useTranslation();
 
   return (
-    <Panel variant="attention" className="max-w-3xl p-6">
+    <Card className="max-w-3xl border-destructive/30 p-6">
       <div className="flex items-start gap-3">
         <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-md border border-destructive/25 bg-destructive/10 text-destructive">
           <AlertCircle className="size-4" aria-hidden />
@@ -189,7 +188,7 @@ function ErrorDashboard({ onRetry }: { onRetry: () => void }) {
           </Button>
         </div>
       </div>
-    </Panel>
+    </Card>
   );
 }
 
@@ -218,11 +217,11 @@ export function DashboardOverview() {
 
   return (
     <div className="max-w-6xl space-y-6">
-      <Panel className="overflow-hidden p-0">
+      <Card className="overflow-hidden p-0">
         <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_22rem]">
           <div className="p-6 sm:p-8">
             <div className="flex flex-wrap items-center gap-2">
-              <Badge variant="primary">
+              <Badge>
                 {hasWorkspace ? t('dashboard.workspaceLinked') : t('dashboard.accountReady')}
               </Badge>
               {settings?.planName ? <Badge>{settings.planName}</Badge> : null}
@@ -265,10 +264,10 @@ export function DashboardOverview() {
             </div>
           </div>
         </div>
-      </Panel>
+      </Card>
 
       {workspaceSettingsQuery.isError ? (
-        <Panel variant="attention">
+        <Card className="border-destructive/30 p-4">
           <div className="flex items-start gap-3">
             <AlertCircle className="mt-0.5 size-4 shrink-0 text-destructive" aria-hidden />
             <div>
@@ -290,7 +289,7 @@ export function DashboardOverview() {
               </Button>
             </div>
           </div>
-        </Panel>
+        </Card>
       ) : null}
 
       {showUsage ? (

@@ -2,7 +2,7 @@ import { Link } from '@tanstack/react-router';
 import { Mail, UserPlus } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
-import { ActionLink } from '@/components/ui/action-link';
+import { ActionLink } from '@/components/shared/ActionLink';
 import { Button } from '@/components/ui/button';
 import { AuthCard } from '@/features/auth/components/AuthCard';
 import { AuthNotice } from '@/features/auth/components/AuthNotice';
@@ -53,25 +53,25 @@ export function EmailConfirmationPage() {
         </div>
 
         {state === 'sending' ? (
-          <AuthNotice variant="info" title={t('emailConfirmation.sendingTitle')}>
+          <AuthNotice title={t('emailConfirmation.sendingTitle')}>
             {t('emailConfirmation.sendingBody')}
           </AuthNotice>
         ) : null}
 
         {state === 'success' ? (
-          <AuthNotice variant="success" title={t('emailConfirmation.successTitle')}>
+          <AuthNotice title={t('emailConfirmation.successTitle')}>
             {t('emailConfirmation.successBody')}
           </AuthNotice>
         ) : null}
 
         {state === 'rate_limited' ? (
-          <AuthNotice variant="warning" title={t('emailConfirmation.waitTitle')}>
+          <AuthNotice title={t('emailConfirmation.waitTitle')}>
             {rateLimitMessage ?? t('emailConfirmation.waitBodyDefault')}
           </AuthNotice>
         ) : null}
 
         {state === 'error' ? (
-          <AuthNotice variant="error" title={t('emailConfirmation.errorTitle')}>
+          <AuthNotice variant="destructive" title={t('emailConfirmation.errorTitle')}>
             {t('emailConfirmation.errorBody')}
           </AuthNotice>
         ) : null}

@@ -4,9 +4,9 @@ import { ChevronDown } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import axisLogo from '@/assets/axis-logo.svg';
-import { shellNavItems } from '@/components/layout/shell-nav';
+import { shellNavItems } from '@/components/shared/shellNav';
 import { Button } from '@/components/ui/button';
-import { Select } from '@/components/ui/select';
+import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
 import { switchWorkspace } from '@/features/auth/api';
 import { useAuthStore } from '@/features/auth/auth-store';
 import { useCurrentUserProfileQuery } from '@/features/workspace/hooks/useWorkspaceStart';
@@ -32,8 +32,8 @@ export function AppSidebar() {
           </p>
         </div>
         {workspaces.length > 0 ? (
-          <div className="relative">
-            <Select
+          <div>
+            <NativeSelect
               value={selectedWorkspaceId}
               disabled={switchWorkspaceMutation.isPending}
               aria-label={t('shell.workspaceLabel')}
@@ -43,23 +43,18 @@ export function AppSidebar() {
                   switchWorkspaceMutation.mutate(workspaceId);
                 }
               }}
-              className="h-10 w-full appearance-none rounded-md border border-sidebar-border bg-inverse-muted px-3 pr-9 text-left text-sm text-sidebar-foreground outline-none transition-colors hover:bg-sidebar-accent focus:border-inverse-border disabled:cursor-wait disabled:opacity-70"
+              className="w-full"
             >
               {workspaces.map((workspace) => (
-                <option
-                  key={workspace.id}
-                  value={workspace.id}
-                  className="bg-sidebar text-sidebar-foreground"
-                >
+                <NativeSelectOption key={workspace.id} value={workspace.id}>
                   {workspace.name} (
                   {workspace.type === 'Personal'
                     ? t('shell.personalWorkspace')
                     : t('shell.teamWorkspace')}
                   )
-                </option>
+                </NativeSelectOption>
               ))}
-            </Select>
-            <ChevronDown className="pointer-events-none absolute right-3 top-3 size-4 text-sidebar-muted" />
+            </NativeSelect>
           </div>
         ) : (
           <Button

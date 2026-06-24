@@ -43,16 +43,15 @@ describe('Button', () => {
     expect(button).toHaveAttribute('aria-label', 'test-label');
   });
 
-  it('should expose loading state as disabled busy feedback', () => {
+  it('should render icon children with standard button semantics', () => {
     render(
-      <Button data-testid="btn" isLoading loadingLabel="Saving">
+      <Button data-testid="btn">
+        <span aria-hidden>+</span>
         Save changes
       </Button>,
     );
 
     const button = screen.getByTestId('btn');
-    expect(button).toBeDisabled();
-    expect(button).toHaveAttribute('aria-busy', 'true');
-    expect(button).toHaveTextContent('Saving');
+    expect(button).toHaveTextContent('Save changes');
   });
 });

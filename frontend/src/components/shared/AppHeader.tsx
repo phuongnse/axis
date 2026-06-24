@@ -2,7 +2,7 @@ import { Link, useRouterState } from '@tanstack/react-router';
 import { Bell, LogOut, Search } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
-import { pageTitleKeyForPath, shellNavItems } from '@/components/layout/shell-nav';
+import { pageTitleKeyForPath, shellNavItems } from '@/components/shared/shellNav';
 import { Button } from '@/components/ui/button';
 import { PreferenceControls } from '@/features/preferences';
 import { cn } from '@/lib/utils';

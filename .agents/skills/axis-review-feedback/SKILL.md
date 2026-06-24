@@ -15,6 +15,9 @@ Resolve review feedback by improving the codebase, not merely silencing a thread
    - Read the review comment, affected diff, and surrounding code.
    - If comments come from a tool, treat them as signal to validate against Axis rules.
    - If feedback came from the local CodeRabbit plugin, preserve the issue text, severity, and file path in your working notes; there may be no GitHub thread to resolve.
+   - Before editing, record the reviewed checkpoint when follow-up review is expected:
+     - For committed work, record `git rev-parse HEAD`.
+     - For uncommitted work, either commit the reviewed state first or report that a true delta-only CodeRabbit rerun is unavailable.
 
 2. Classify each item.
    - Correctness bug or missing AC.
@@ -40,11 +43,13 @@ Resolve review feedback by improving the codebase, not merely silencing a thread
 5. Verify the touched surface.
    - Run the narrow test or policy check for the files changed.
    - Run `$axis-ready-review` before asking for another review pass.
-   - If this feedback was part of `$axis-pull-request`, return control to that skill so it can decide whether to rerun CodeRabbit before PR publication.
+   - If this feedback was part of `$axis-pull-request`, return control to that skill with the reviewed checkpoint, the files changed by the fix, and whether the fix is committed.
+   - When rerunning local CodeRabbit after fixes, review only the fix delta when possible: use the checkpoint SHA as the `--base-commit` and optionally add `--dir` only to narrow affected directories further. Do not rerun the full branch diff and describe it as a fix-only review.
 
 6. Report resolution.
    - Mark each comment as fixed, improved beyond suggestion, false positive with evidence, or deferred with owner.
    - Do not claim ready status while triggered verification is failing.
+   - Include the follow-up review scope: `fix delta`, `full diff with reason`, or `not rerun`.
 
 ## Output
 

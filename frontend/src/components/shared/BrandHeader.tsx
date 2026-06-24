@@ -1,5 +1,5 @@
 import axisLogo from '@/assets/axis-logo.svg';
-import { HeaderRule } from '@/components/visual/HeaderRule';
+import { HeaderRule } from '@/components/shared/HeaderRule';
 import { cn } from '@/lib/utils';
 
 type BrandHeaderTone = 'default' | 'inverted' | 'adaptive';

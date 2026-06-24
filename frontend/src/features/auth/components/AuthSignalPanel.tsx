@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
 
-import { AccessPathTrace } from '@/components/visual/AccessPathTrace';
-import { BrandHeader } from '@/components/visual/BrandHeader';
+import { AccessPathTrace } from '@/components/shared/AccessPathTrace';
+import { BrandHeader } from '@/components/shared/BrandHeader';
 
 export function AuthSignalPanel() {
   const { t } = useTranslation();

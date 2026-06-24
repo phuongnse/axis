@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 
-import { AppHeader } from '@/components/layout/AppHeader';
-import { AppSidebar } from '@/components/layout/AppSidebar';
+import { AppHeader } from '@/components/shared/AppHeader';
+import { AppSidebar } from '@/components/shared/AppSidebar';
 import { signOut } from '@/features/auth/api';
 import { useAuthStore } from '@/features/auth/auth-store';
 

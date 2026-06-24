@@ -1,7 +1,7 @@
 import { Building2, KeyRound, ShieldCheck } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
-import { FlowTrace, type FlowTraceStep } from '@/components/visual/FlowTrace';
+import { FlowTrace, type FlowTraceStep } from '@/components/shared/FlowTrace';
 
 type AccessPathTraceSurface = 'default' | 'dark' | 'adaptive';
 type AccessPathTraceSize = 'md' | 'lg';
