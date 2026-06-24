@@ -31,10 +31,62 @@ type TailwindConfig = {
     extend?: TailwindExtend;
   };
 };
+type TokenPair = readonly [sourceToken: string, frontendToken: string];
 
 const frontendRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const tokensCss = fs.readFileSync(path.join(frontendRoot, 'src/design-system/tokens.css'), 'utf8');
+const openDesignTokensCss = fs.readFileSync(
+  path.join(frontendRoot, '..', 'design-sources/open-design/axis/tokens.css'),
+  'utf8',
+);
 const tailwindExtend = (tailwindConfig as TailwindConfig).theme?.extend;
+
+const openDesignLightTokenPairs = [
+  ['--background', '--background'],
+  ['--foreground', '--foreground'],
+  ['--surface', '--card'],
+  ['--surface', '--popover'],
+  ['--surface-muted', '--muted'],
+  ['--text-muted', '--muted-foreground'],
+  ['--border', '--border'],
+  ['--primary', '--primary'],
+  ['--primary-foreground', '--primary-foreground'],
+  ['--accent', '--accent'],
+  ['--accent-foreground', '--accent-foreground'],
+  ['--danger', '--destructive'],
+  ['--success', '--state-success'],
+  ['--warning', '--state-warning'],
+  ['--info', '--state-info'],
+  ['--radius-panel', '--radius'],
+  ['--space-4', '--space-form-gap'],
+  ['--space-6', '--space-section-gap'],
+  ['--space-8', '--space-page-padding'],
+  ['--size-control-sm', '--size-control-sm'],
+  ['--size-control-md', '--size-control-md'],
+  ['--size-control-lg', '--size-control-lg'],
+  ['--shadow-surface', '--shadow-surface'],
+  ['--shadow-panel', '--shadow-panel'],
+  ['--motion-duration-fast', '--motion-duration-fast'],
+  ['--motion-duration-standard', '--motion-duration-standard'],
+] as const satisfies readonly TokenPair[];
+
+const openDesignDarkTokenPairs = [
+  ['--background', '--background'],
+  ['--foreground', '--foreground'],
+  ['--surface', '--card'],
+  ['--surface', '--popover'],
+  ['--surface-muted', '--muted'],
+  ['--text-muted', '--muted-foreground'],
+  ['--border', '--border'],
+  ['--primary', '--primary'],
+  ['--accent', '--accent'],
+  ['--danger', '--destructive'],
+  ['--success', '--state-success'],
+  ['--warning', '--state-warning'],
+  ['--info', '--state-info'],
+  ['--shadow-surface', '--shadow-surface'],
+  ['--shadow-panel', '--shadow-panel'],
+] as const satisfies readonly TokenPair[];
 
 if (!tailwindExtend) {
   throw new Error('Tailwind theme.extend is required for Axis design tokens.');
@@ -55,6 +107,34 @@ function cssBlock(selector: string) {
 
 function escapeRegExp(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function cssDeclarations(sourceCss: string, selector: string) {
+  const declarations = new Map<string, string>();
+  const declarationPattern = /(?<name>--[A-Za-z0-9-]+)\s*:\s*(?<value>[^;]+);/g;
+
+  for (const match of cssBlockFrom(sourceCss, selector).matchAll(declarationPattern)) {
+    if (!match.groups?.name || !match.groups.value) {
+      continue;
+    }
+
+    declarations.set(match.groups.name, match.groups.value.trim());
+  }
+
+  return declarations;
+}
+
+function cssBlockFrom(sourceCss: string, selector: string) {
+  const match = new RegExp(
+    `${escapeRegExp(selector)}\\s*\\{(?<body>[\\s\\S]*?)\\n\\s*\\}`,
+    'm',
+  ).exec(sourceCss);
+
+  if (!match?.groups?.body) {
+    throw new Error(`${selector} block is required in design tokens CSS.`);
+  }
+
+  return match.groups.body;
 }
 
 function flattenTokenTree(
@@ -86,6 +166,32 @@ function readPath(root: unknown, tokenPath: readonly string[]) {
   }
 
   return current;
+}
+
+function declarationValue(
+  declarations: ReadonlyMap<string, string>,
+  token: string,
+  selector: string,
+) {
+  const value = declarations.get(token);
+
+  if (!value) {
+    throw new Error(`${selector} is missing ${token}.`);
+  }
+
+  return normalizeTokenValue(value);
+}
+
+function normalizeTokenValue(value: string) {
+  const normalized = value.trim().replace(/\s+/g, ' ');
+  const hsl = /^hsl\((?<channels>.*)\)$/.exec(normalized);
+  const rem = /^(?<amount>\d+(?:\.\d+)?)rem$/.exec(hsl?.groups?.channels ?? normalized);
+
+  if (rem?.groups?.amount) {
+    return `${Number(rem.groups.amount) * 16}px`;
+  }
+
+  return hsl?.groups?.channels ?? normalized;
 }
 
 describe('Axis design tokens', () => {
@@ -141,6 +247,25 @@ describe('Axis design tokens', () => {
   it('maps Tailwind background image names to gradient tokens', () => {
     for (const [backgroundName, tokenValue] of Object.entries(axisTailwindBackgroundImageTokens)) {
       expect(readPath(tailwindExtend.backgroundImage, [backgroundName])).toBe(tokenValue);
+    }
+  });
+
+  it('keeps executable tokens aligned with the Open Design seed', () => {
+    const frontendLightTokens = cssDeclarations(tokensCss, ':root');
+    const frontendDarkTokens = cssDeclarations(tokensCss, '.dark');
+    const sourceLightTokens = cssDeclarations(openDesignTokensCss, ':root');
+    const sourceDarkTokens = cssDeclarations(openDesignTokensCss, '.dark');
+
+    for (const [sourceToken, frontendToken] of openDesignLightTokenPairs) {
+      expect(declarationValue(frontendLightTokens, frontendToken, ':root')).toBe(
+        declarationValue(sourceLightTokens, sourceToken, 'Open Design :root'),
+      );
+    }
+
+    for (const [sourceToken, frontendToken] of openDesignDarkTokenPairs) {
+      expect(declarationValue(frontendDarkTokens, frontendToken, '.dark')).toBe(
+        declarationValue(sourceDarkTokens, sourceToken, 'Open Design .dark'),
+      );
     }
   });
 });
