@@ -55,6 +55,7 @@
 | **react-hook-form** | 7.x | Form state management | Performant form handling; always paired with Zod via `@hookform/resolvers/zod`. |
 | **@hookform/resolvers** | 3.x | Form validation bridge | Connects Zod schemas to react-hook-form via `zodResolver`. |
 | **Biome** | 2.x | Linter + formatter | Replaces ESLint + Prettier. Single tool for linting, formatting, and import sorting. See ADR-008. |
+| **Style Dictionary** | 5.x | Design-token build pipeline | Generates CSS variables, TypeScript token registries, and Tailwind token maps from `frontend/src/design-system/tokens.json`. |
 | **Vitest** | 3.x | Frontend test runner | Fast Vite-native test runner; v3 deduplicates cleanly with vite 6 (v4 installs a nested vite 8, breaking package-lock installs). |
 | **@testing-library/react** | 16.x | Component testing | Behaviour-driven component tests; always paired with Vitest |
 | **Playwright** | 1.x | Browser E2E test runner | Browser-level acceptance and local-dev smoke tests; the Docker e2e profile builds from the official browser image pinned to the package version and adds local-CA tooling. |

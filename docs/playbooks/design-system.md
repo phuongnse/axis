@@ -59,17 +59,19 @@ Editable design sources own approved design token decisions. Frontend code owns 
 
 | File | Owns |
 |---|---|
-| `frontend/src/design-system/tokens.css` | Raw CSS variable values for light and dark themes |
-| `frontend/src/design-system/tokens.ts` | Typed token registry used by tests and future design-system tooling |
+| `frontend/src/design-system/tokens.json` | DTCG-style source for approved Axis token values, theme selectors, and Tailwind mapping metadata |
+| `frontend/src/design-system/tokens.css` | Generated CSS variable values for light and dark themes |
+| `frontend/src/design-system/tokens.ts` | Generated typed token registry used by tests and future design-system tooling |
+| `frontend/src/design-system/tailwind-tokens.js` | Generated Tailwind theme map consumed by `frontend/tailwind.config.js` |
 | `frontend/src/design-system/primitive-contracts.ts` | UI primitive registry: file ownership, readiness status, variant/state/accessibility matrix, token families, and test coverage |
 | `frontend/src/design-system/consumer-contracts.ts` | Route-bound UI consumer registry: product surface, route, owner, readiness, primitive usage, state coverage, evidence, and tests |
 | `frontend/tailwind.config.js` | Tailwind names that map to semantic CSS variables |
 
 When importing token updates from a design source:
 
-1. Translate approved source token names into the semantic CSS variable names in `tokens.css`.
-2. Update `tokens.ts` in the same change so tests know the complete token contract.
-3. Map semantic tokens in `tailwind.config.js`; components should consume Tailwind token classes such as `bg-primary`, `text-muted-foreground`, `border-border`, and `rounded-md`.
+1. Translate approved source token names into semantic entries in `tokens.json`.
+2. Run `python scripts/axis.py frontend gen-design-tokens --check` so generated CSS, TypeScript, and Tailwind maps stay current.
+3. Components should consume Tailwind token classes such as `bg-primary`, `text-muted-foreground`, `border-border`, and `rounded-md`.
 4. Map shadows and reusable gradients as named Tailwind tokens such as `shadow-surface`, `shadow-panel`, and `bg-gradient-inverse-panel`.
 5. Keep raw hex, raw HSL, raw neutral colors, raw shadows, and one-off visual values out of component files when a semantic token exists.
 

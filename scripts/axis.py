@@ -2672,6 +2672,33 @@ def frontend_command(args: argparse.Namespace) -> int:
                 file=sys.stderr,
             )
         return diff.returncode
+    if command == "gen-design-tokens":
+        generated_paths = [
+            "frontend/src/design-system/tokens.css",
+            "frontend/src/design-system/tokens.ts",
+            "frontend/src/design-system/tailwind-tokens.js",
+        ]
+        before = run(
+            [exe("git"), "diff", "--", *generated_paths],
+            capture=True,
+            check=False,
+        ).stdout
+        result = run_frontend_npm(["run", "gen:design-tokens"])
+        if result.returncode != 0 or not args.check:
+            return result.returncode
+        after = run(
+            [exe("git"), "diff", "--", *generated_paths],
+            capture=True,
+            check=False,
+        ).stdout
+        if before != after:
+            print(
+                "frontend gen-design-tokens: generated design-token files are stale - "
+                "run `python scripts/axis.py frontend gen-design-tokens` and commit the result",
+                file=sys.stderr,
+            )
+            return 1
+        return 0
     if command == "script":
         npm_args = ["run", args.script_name]
         script_args = list(args.script_args)
@@ -3478,6 +3505,13 @@ def main(argv: list[str] | None = None) -> int:
     frontend_gen_api = frontend_sub.add_parser("gen-api-types")
     frontend_gen_api.add_argument("--check", action="store_true", help="Fail if generated frontend API types are stale")
     frontend_gen_api.set_defaults(func=frontend_command)
+    frontend_gen_tokens = frontend_sub.add_parser("gen-design-tokens")
+    frontend_gen_tokens.add_argument(
+        "--check",
+        action="store_true",
+        help="Fail if generated design-token files are stale",
+    )
+    frontend_gen_tokens.set_defaults(func=frontend_command)
     frontend_script = frontend_sub.add_parser("script")
     frontend_script.add_argument("script_name")
     frontend_script.add_argument("script_args", nargs=argparse.REMAINDER)
