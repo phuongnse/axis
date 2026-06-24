@@ -10,6 +10,7 @@ description: Prepare, review, validate, create, update, or mark ready Axis pull 
 Own the PR publication boundary. This skill prepares the branch for publication, runs the local CodeRabbit plugin review checkpoint, validates the exact title/body that will be sent to GitHub, performs the requested PR action, and validates the resulting GitHub PR again.
 
 Do not perform branch readiness auditing here. Use `$axis-ready-review` first when readiness evidence is missing, stale, or not explicitly provided. Do not treat CodeRabbit as a machine gate; it is a required review checkpoint before PR publication unless the user explicitly asks to skip it.
+Do not rerun local guards just to create a longer transcript. Run each required guard once, then rerun only when a subsequent change invalidates that evidence.
 
 ## Workflow
 
@@ -20,6 +21,7 @@ Do not perform branch readiness auditing here. Use `$axis-ready-review` first wh
 
 2. Run the pre-PR CodeRabbit review checkpoint.
    - For create PR, update PR, or mark-ready requests, use the CodeRabbit plugin review skill (`$coderabbit:code-review`) after readiness passes and before GitHub PR actions.
+   - Confirm the CLI is available through `python scripts/axis.py check coderabbit-cli` when fresh toolchain evidence is missing.
    - Review the same branch diff that will be published. Prefer the committed branch diff when the branch is already committed; otherwise review the uncommitted diff before committing.
    - If CodeRabbit raises issues, use `$axis-review-feedback` to classify and fix them, then rerun the touched verification checks and `$axis-ready-review`.
    - Rerun CodeRabbit once after review fixes when the fixes materially change implementation behavior, contracts, docs policy, or tests.
@@ -53,7 +55,7 @@ Do not perform branch readiness auditing here. Use `$axis-ready-review` first wh
 
 7. Validate GitHub state after the action.
    - Read the PR title/body back from GitHub.
-   - Run `python scripts/axis.py check pr --title "<github title>" --body-file <github-body-file>`.
+   - If the PR metadata differs from the validated draft, run `python scripts/axis.py check pr --title "<github title>" --body-file <github-body-file>`.
    - If a tool or bot inserted extra PR-body content, remove it when possible and revalidate.
    - Report any remaining external mutation as a blocker instead of claiming the PR is clean.
 
@@ -76,7 +78,7 @@ PR metadata:
 - Title: ...
 - Body sections: Summary / Linked spec / Requirements
 - Draft validation: command -> pass/fail
-- GitHub post-action validation: command -> pass/fail
+- GitHub post-action validation: pass by exact metadata match / command -> pass/fail
 
 GitHub:
 - PR URL:
