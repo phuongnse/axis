@@ -32,9 +32,9 @@ Design-system rules live in [design-system.md](./design-system.md). Use that own
 - Critical navigation and account actions must remain reachable on mobile. Desktop sidebars can collapse or move into a top/horizontal navigation, but the user must not lose the path to the main sections.
 - Verify responsive surfaces at small phone, tablet, and desktop widths before claiming UI work is complete. Use `360px`, `768px`, and `1280px` as the default sanity check set unless the feature has a tighter target.
 - Text must wrap or truncate intentionally at mobile widths. Do not rely on viewport-scaled font sizes to make text fit.
-- Radius uses the shared Tailwind token scale: `rounded-sm` = 4px, `rounded-md` = 6px, `rounded-lg` = 8px. Use `rounded-md` for controls and small repeated items; use `rounded-lg` for panels, cards, dialogs, and major surfaces.
-- Avoid radius above 8px for core work surfaces. `rounded-full` is reserved for true circles such as avatars, status dots, and soft decorative glows.
-- Radius token drift and oversized-radius classes are checked by `python scripts/axis.py check frontend-style`. Mobile-first quality is review and visual-verification owned because regex gates cannot reliably prove responsive usability.
+- Axis-owned radius uses the shared Tailwind token scale: `rounded-sm` = 4px, `rounded-md` = 6px, `rounded-lg` = 8px. Use `rounded-md` for controls and small repeated items; use `rounded-lg` for panels, cards, dialogs, and major surfaces.
+- Avoid radius above 8px for Axis-owned core work surfaces. `rounded-full` is reserved for true circles such as avatars, status dots, and soft decorative glows.
+- Radius token drift and oversized-radius classes are checked by `python scripts/axis.py check frontend-style` for Axis-owned and feature code. Shadcn-sourced primitive files keep upstream radius classes through `primitive-contracts.ts` source provenance. Mobile-first quality is review and visual-verification owned because regex gates cannot reliably prove responsive usability.
 
 ---
 
@@ -53,7 +53,9 @@ features/{feature-name}/
 
 - Component files: `PascalCase.tsx`. Hook files: `camelCase.ts` with mandatory `use` prefix (`useWorkflows.ts`).
 - Never import directly from another feature's `components/` or `hooks/` — only through its `index.ts`.
-- Shared UI primitives: `src/components/ui/`. This is the Axis-owned primitive layer using shadcn/ui conventions, not a bypass around the design-system contract. Shared utilities: `src/lib/`.
+- Shared shadcn primitives: `src/components/ui/`. This folder is shadcn source-first/generated code only; files use shadcn registry kebab-case names such as `native-select.tsx`.
+- Shared Axis components: `src/components/shared/`. React component files use `PascalCase.tsx`; non-component helper modules use `camelCase.ts`.
+- Shared utilities: `src/lib/`.
 
 ---
 
@@ -106,7 +108,7 @@ export const workflowKeys = {
 - **Entity IDs are `string`**: backend uses Guid serialised as string. Never type an entity ID as `number`.
 - **No transformation in components**: if a different shape is needed, derive it in the hook or a selector — not inline in JSX.
 - **Type co-location**: small prop interfaces and local type aliases may be co-located with the component that owns them. Shared types belong in a `types.ts` file within the feature folder.
-- **Biome** is the single tool for linting and formatting (`frontend/biome.json`). Run `python scripts/axis.py frontend script lint:fix` to auto-fix, `python scripts/axis.py frontend script format` to format only.
+- **Biome** is the single tool for linting and formatting Axis-authored frontend code (`frontend/biome.json`). Shadcn-generated primitives under `src/components/ui/` are excluded from Biome lint/format and validated by TypeScript plus the shadcn provenance contract. Run `python scripts/axis.py frontend script lint:fix` to auto-fix, `python scripts/axis.py frontend script format` to format only.
 
 ---
 
@@ -125,13 +127,13 @@ export const workflowKeys = {
 - New visual rules start in the design system. Feature screens should consume existing tokens and shared components, or add the missing token/component before using the pattern.
 - Route files are routing boundaries only. They import and render page components; they must not contain styled layout markup, Tailwind-heavy JSX, or screen design details.
 - Shared patterns such as timelines, flow traces, panels, fields, buttons, badges, and status markers live in shared or feature components. If two screens need the same visual behaviour, extract the component before the second implementation lands.
-- Standard controls must come from the Axis primitive layer in `frontend/src/components/ui/`. Feature code must not render native `<button>`, `<input>`, `<label>`, `<select>`, or `<textarea>` directly. If a needed primitive does not exist, add or adapt it in `src/components/ui/` first, add its design-system contract, then compose it from feature components.
-- Custom components are allowed when they represent a domain-specific or cross-screen pattern, but they should compose shared primitives instead of recreating standard controls. A custom component that only restyles a button, field, or label belongs in `src/components/ui/`, not in a feature folder.
+- Standard controls must come from the shadcn primitive layer in `frontend/src/components/ui/`. Feature code must not render native `<button>`, `<input>`, `<label>`, `<select>`, or `<textarea>` directly. If shadcn provides the primitive, install or copy the shadcn implementation first, add its design-system contract, and migrate consumers to the standard shadcn API.
+- Axis-authored shared components live in `frontend/src/components/shared/`, compose shadcn primitives, and use `PascalCase.tsx`. Use them for domain-specific or cross-screen patterns instead of putting custom wrappers in `components/ui/`.
 - Command buttons with visible text must include an icon child. Icon-only buttons and segmented/toggle controls are exempt because their symbol or selected state already carries the interaction affordance.
 - Never rebuild connector/timeline geometry inline. Use `FlowTrace` for vertical flow/timeline displays so marker, connector spacing, state colour, and accessibility remain consistent.
 - The public/auth access path pattern uses `AccessPathTrace`; do not redefine its step list, icons, or labels in page-specific components.
 - Navigation CTAs on public/auth surfaces use `ActionLink`. Do not hand-code `Link` buttons with Tailwind classes; the shared component keeps icon presence, spacing, height, hover states, and accessible icon treatment consistent. Plain inline text links are still fine for secondary footer/help copy.
-- `python scripts/axis.py check frontend-component-composition` enforces route composition, primitive-layer ownership for native standard controls/headless UI imports, primitive registry coverage, and route-bound consumer contracts.
+- `python scripts/axis.py check frontend-component-composition` enforces route composition, shadcn primitive-layer ownership for native standard controls/headless UI imports, `ui`/`shared` filename conventions, primitive registry coverage, and route-bound consumer contracts.
 - High-level visual consistency is not a single regex rule. Enforce concrete, repeatable pieces through shared components and contract checks; handle broader judgement with mobile/desktop visual review.
 - **Single-purpose**: if a component both fetches server data AND contains complex conditional rendering, extract the data-fetching into a custom hook.
 - **Composition over prop drilling**: use compound components or context for UI that shares state across more than two levels. Avoid prop chains longer than 2 hops.
@@ -147,7 +149,7 @@ export const workflowKeys = {
 - Do not mix Tailwind utility classes and custom CSS on the same element.
 - Consume design tokens through Tailwind classes wired in `frontend/tailwind.config.js`; for token ownership and update workflow, follow [design-system.md](./design-system.md#token-exportimport-convention).
 - Use Tailwind opacity modifiers from the standard scale only: `/0`, `/5`, `/10`, ..., `/100` and `opacity-0`, `opacity-5`, ..., `opacity-100`. If a non-scale value is truly needed, use bracket syntax such as `/[0.28]`; bare values like `/28` or `opacity-58` can compile to no CSS and hide UI.
-- `python scripts/axis.py check frontend-style` is the shared style gate. It currently enforces radius tokens and Tailwind opacity modifier syntax; add future objective style checks there instead of creating narrowly named gates.
+- `python scripts/axis.py check frontend-style` is the shared style gate. It enforces radius tokens, semantic design-token usage, and Tailwind opacity modifier syntax for Axis-owned and feature code; shadcn-sourced primitive files are exempt from Axis tokenization checks through source provenance, while syntax/correctness checks still apply.
 
 ---
 

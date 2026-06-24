@@ -1351,6 +1351,32 @@ class TestDocDriftRatchets(unittest.TestCase):
         issues = axis.doc_drift_added_line_issues([("docs/example.md", "TODO in docs is not this gate")])
         self.assertEqual([], issues)
 
+    def test_rejects_placeholder_marker_in_frontend_source(self) -> None:
+        issues = self.issue_text([("frontend/src/features/example/Example.tsx", "const value = 'placeholder';")])
+        self.assertIn("New TODO/FIXME/stub marker introduced", issues)
+
+    def test_accepts_tailwind_placeholder_variant_in_frontend_source(self) -> None:
+        issues = axis.doc_drift_added_line_issues(
+            [
+                (
+                    "frontend/src/components/ui/input.tsx",
+                    '"placeholder:text-muted-foreground focus-visible:outline-none"',
+                )
+            ]
+        )
+        self.assertEqual([], issues)
+
+    def test_accepts_jsx_placeholder_attribute_in_frontend_source(self) -> None:
+        issues = axis.doc_drift_added_line_issues(
+            [
+                (
+                    "frontend/src/features/auth/components/Example.tsx",
+                    '<Input placeholder={t("common.emailAddress")} />',
+                )
+            ]
+        )
+        self.assertEqual([], issues)
+
     def test_rejects_machine_specific_paths_in_docs(self) -> None:
         issues = self.issue_text([("docs/playbooks/local-dev.md", "cd /mnt/d/projects/axis && docker compose up -d")])
         self.assertIn("Machine-specific local path introduced", issues)
@@ -1863,16 +1889,23 @@ class TestVerifyGate(unittest.TestCase):
 
 
 class TestFrontendRadiusTokens(unittest.TestCase):
-    def issues_for_frontend(self, component_source: str, css_radius: str = "0.5rem") -> list[str]:
+    def issues_for_files(self, files: dict[str, str], css_radius: str = "0.5rem") -> list[str]:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             css = root / "frontend" / "src" / "design-system" / "tokens.css"
-            component = root / "frontend" / "src" / "components" / "Example.tsx"
             css.parent.mkdir(parents=True, exist_ok=True)
-            component.parent.mkdir(parents=True, exist_ok=True)
             css.write_text(f":root {{\n  --radius: {css_radius};\n}}\n", encoding="utf-8")
-            component.write_text(component_source, encoding="utf-8")
+            for relative_path, content in files.items():
+                path = root / relative_path
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(content, encoding="utf-8")
             return axis.frontend_radius_token_issues(root=root)
+
+    def issues_for_frontend(self, component_source: str, css_radius: str = "0.5rem") -> list[str]:
+        return self.issues_for_files(
+            {"frontend/src/components/Example.tsx": component_source},
+            css_radius=css_radius,
+        )
 
     def test_rejects_radius_token_drift(self) -> None:
         issues = self.issues_for_frontend("export const ok = 'rounded-md';\n", css_radius="0.375rem")
@@ -1893,6 +1926,71 @@ class TestFrontendRadiusTokens(unittest.TestCase):
         issues = self.issues_for_frontend("export const ok = 'rounded-sm rounded-md rounded-lg';\n")
 
         self.assertEqual([], issues)
+
+    def test_accepts_upstream_radius_in_shadcn_sourced_primitive(self) -> None:
+        issues = self.issues_for_files(
+            {
+                "frontend/src/components/ui/button.tsx": (
+                    "export const upstream = 'rounded-xl rounded-[4px]';\n"
+                ),
+                "frontend/src/design-system/primitive-contracts.ts": (
+                    "export const axisPrimitiveContracts = [{\n"
+                    "  component: 'Button',\n"
+                    "  file: 'frontend/src/components/ui/button.tsx',\n"
+                    "  testFiles: ['frontend/tests/button.test.tsx'],\n"
+                    "  source: 'shadcn',\n"
+                    "  sourceItem: '@shadcn/button',\n"
+                    "  readiness: 'ready',\n"
+                    "  variants: ['default'],\n"
+                    "  states: ['default'],\n"
+                    "  accessibility: ['native-button'],\n"
+                    "  tokenFamilies: ['radius'],\n"
+                    "}];\n"
+                ),
+            }
+        )
+
+        self.assertEqual([], issues)
+
+    def test_rejects_radius_exemption_for_shadcn_contract_outside_ui(self) -> None:
+        issues = self.issues_for_files(
+            {
+                "frontend/src/features/auth/components/FakePrimitive.tsx": (
+                    "export const bad = 'rounded-xl rounded-[4px]';\n"
+                ),
+                "frontend/src/design-system/primitive-contracts.ts": (
+                    "export const axisPrimitiveContracts = [{\n"
+                    "  component: 'FakePrimitive',\n"
+                    "  file: 'frontend/src/features/auth/components/FakePrimitive.tsx',\n"
+                    "  testFiles: ['frontend/tests/fake-primitive.test.tsx'],\n"
+                    "  source: 'shadcn',\n"
+                    "  sourceItem: '@shadcn/fake-primitive',\n"
+                    "  readiness: 'ready',\n"
+                    "  variants: ['default'],\n"
+                    "  states: ['default'],\n"
+                    "  accessibility: ['native-control'],\n"
+                    "  tokenFamilies: ['radius'],\n"
+                    "}];\n"
+                ),
+            }
+        )
+
+        joined = "\n".join(issues)
+        self.assertIn("avoid radius above 8px", joined)
+        self.assertIn("use shared radius tokens", joined)
+
+    def test_rejects_upstream_radius_in_axis_owned_component(self) -> None:
+        issues = self.issues_for_files(
+            {
+                "frontend/src/components/shared/CustomControl.tsx": (
+                    "export const bad = 'rounded-xl rounded-[4px]';\n"
+                ),
+            }
+        )
+
+        joined = "\n".join(issues)
+        self.assertIn("avoid radius above 8px", joined)
+        self.assertIn("use shared radius tokens", joined)
 
 
 class TestFrontendComponentComposition(unittest.TestCase):
@@ -1930,6 +2028,52 @@ class TestFrontendComponentComposition(unittest.TestCase):
 
         self.assertEqual([], issues)
 
+    def test_rejects_non_registry_case_ui_primitive_filename(self) -> None:
+        issues = self.issues_for_frontend(
+            {
+                "frontend/src/components/ui/CustomControl.tsx": "export function CustomControl() { return null; }\n",
+                "frontend/src/design-system/primitive-contracts.ts": (
+                    "export const axisPrimitiveContracts = [{\n"
+                    "  component: 'CustomControl',\n"
+                    "  file: 'frontend/src/components/ui/CustomControl.tsx',\n"
+                    "  testFiles: ['frontend/tests/custom-control.test.tsx'],\n"
+                    "  source: 'shadcn',\n"
+                    "  sourceItem: '@shadcn/custom-control',\n"
+                    "  readiness: 'ready',\n"
+                    "  variants: ['default'],\n"
+                    "  states: ['default'],\n"
+                    "  accessibility: ['native-control'],\n"
+                    "  tokenFamilies: ['color'],\n"
+                    "}];\n"
+                ),
+                "frontend/tests/custom-control.test.tsx": "export {};\n",
+            }
+        )
+
+        self.assertIn("shadcn UI primitive files must use registry kebab-case names", "\n".join(issues))
+
+    def test_rejects_non_pascal_case_shared_component_filename(self) -> None:
+        issues = self.issues_for_frontend(
+            {
+                "frontend/src/components/shared/action-link.tsx": "export function ActionLink() { return null; }\n",
+                "frontend/src/components/shared/shell-nav.ts": "export const shellNavItems = [];\n",
+            }
+        )
+
+        joined = "\n".join(issues)
+        self.assertIn("shared React component files must use PascalCase names", joined)
+        self.assertIn("shared non-component modules must use camelCase names", joined)
+
+    def test_accepts_shared_component_filename_conventions(self) -> None:
+        issues = self.issues_for_frontend(
+            {
+                "frontend/src/components/shared/ActionLink.tsx": "export function ActionLink() { return null; }\n",
+                "frontend/src/components/shared/shellNav.ts": "export const shellNavItems = [];\n",
+            }
+        )
+
+        self.assertEqual([], issues)
+
     def test_rejects_native_standard_controls_outside_ui_primitives(self) -> None:
         issues = self.issues_for_frontend(
             {
@@ -1942,8 +2086,8 @@ class TestFrontendComponentComposition(unittest.TestCase):
         )
 
         joined = "\n".join(issues)
-        self.assertIn("standard UI control <button> must use a shared Axis UI primitive", joined)
-        self.assertIn("standard UI control <input> must use a shared Axis UI primitive", joined)
+        self.assertIn("standard UI control <button> must use a shared shadcn UI primitive", joined)
+        self.assertIn("standard UI control <input> must use a shared shadcn UI primitive", joined)
 
     def test_rejects_headless_ui_import_outside_ui_primitives(self) -> None:
         issues = self.issues_for_frontend(
@@ -1955,21 +2099,23 @@ class TestFrontendComponentComposition(unittest.TestCase):
             }
         )
 
-        self.assertIn("headless UI primitives belong in frontend/src/components/ui", "\n".join(issues))
+        self.assertIn("headless UI primitives belong in shadcn primitives", "\n".join(issues))
 
-    def test_accepts_native_standard_controls_inside_ui_primitives(self) -> None:
+    def test_accepts_native_standard_controls_inside_shadcn_ui_primitives(self) -> None:
         issues = self.issues_for_frontend(
             {
-                "frontend/src/components/ui/custom-control.tsx": (
-                    "export function CustomControl() {\n"
+                "frontend/src/components/ui/button.tsx": (
+                    "export function Button() {\n"
                     "  return <button type=\"button\"><input /></button>;\n"
                     "}\n"
                 ),
                 "frontend/src/design-system/primitive-contracts.ts": (
                     "export const axisPrimitiveContracts = [{\n"
-                    "  component: 'CustomControl',\n"
-                    "  file: 'frontend/src/components/ui/custom-control.tsx',\n"
-                    "  testFiles: ['frontend/tests/custom-control.test.tsx'],\n"
+                    "  component: 'Button',\n"
+                    "  file: 'frontend/src/components/ui/button.tsx',\n"
+                    "  testFiles: ['frontend/tests/button.test.tsx'],\n"
+                    "  source: 'shadcn',\n"
+                    "  sourceItem: '@shadcn/button',\n"
                     "  readiness: 'ready',\n"
                     "  variants: ['default'],\n"
                     "  states: ['default'],\n"
@@ -1977,7 +2123,7 @@ class TestFrontendComponentComposition(unittest.TestCase):
                     "  tokenFamilies: ['color'],\n"
                     "}];\n"
                 ),
-                "frontend/tests/custom-control.test.tsx": "export {};\n",
+                "frontend/tests/button.test.tsx": "export {};\n",
             }
         )
 
@@ -2019,7 +2165,91 @@ class TestFrontendComponentComposition(unittest.TestCase):
         )
 
         self.assertIn("contract readiness must be `ready` or `candidate`", "\n".join(issues))
+        self.assertIn("contract source must be `shadcn`", "\n".join(issues))
         self.assertIn("contract must list at least one variants value", "\n".join(issues))
+
+    def test_rejects_primitive_contract_with_incomplete_source_metadata(self) -> None:
+        issues = self.issues_for_frontend(
+            {
+                "frontend/src/components/ui/custom-control.tsx": (
+                    "export function CustomControl() {\n"
+                    "  return <button type=\"button\" />;\n"
+                    "}\n"
+                ),
+                "frontend/src/design-system/primitive-contracts.ts": (
+                    "export const axisPrimitiveContracts = [{\n"
+                    "  component: 'CustomControl',\n"
+                    "  file: 'frontend/src/components/ui/custom-control.tsx',\n"
+                    "  testFiles: ['frontend/tests/custom-control.test.tsx'],\n"
+                    "  source: 'shadcn',\n"
+                    "  readiness: 'ready',\n"
+                    "  variants: ['default'],\n"
+                    "  states: ['default'],\n"
+                    "  accessibility: ['native-control'],\n"
+                    "  tokenFamilies: ['color'],\n"
+                    "}];\n"
+                ),
+                "frontend/tests/custom-control.test.tsx": "export {};\n",
+            }
+        )
+
+        self.assertIn("shadcn contract must name sourceItem `@shadcn/...`", "\n".join(issues))
+
+    def test_rejects_primitive_contract_with_bare_shadcn_source_item(self) -> None:
+        issues = self.issues_for_frontend(
+            {
+                "frontend/src/components/ui/custom-control.tsx": (
+                    "export function CustomControl() {\n"
+                    "  return <button type=\"button\" />;\n"
+                    "}\n"
+                ),
+                "frontend/src/design-system/primitive-contracts.ts": (
+                    "export const axisPrimitiveContracts = [{\n"
+                    "  component: 'CustomControl',\n"
+                    "  file: 'frontend/src/components/ui/custom-control.tsx',\n"
+                    "  testFiles: ['frontend/tests/custom-control.test.tsx'],\n"
+                    "  source: 'shadcn',\n"
+                    "  sourceItem: '@shadcn/',\n"
+                    "  readiness: 'ready',\n"
+                    "  variants: ['default'],\n"
+                    "  states: ['default'],\n"
+                    "  accessibility: ['native-control'],\n"
+                    "  tokenFamilies: ['color'],\n"
+                    "}];\n"
+                ),
+                "frontend/tests/custom-control.test.tsx": "export {};\n",
+            }
+        )
+
+        self.assertIn("shadcn contract must name sourceItem `@shadcn/...`", "\n".join(issues))
+
+    def test_rejects_non_shadcn_source_in_ui_primitive_contract(self) -> None:
+        issues = self.issues_for_frontend(
+            {
+                "frontend/src/components/ui/custom-control.tsx": (
+                    "export function CustomControl() {\n"
+                    "  return <button type=\"button\" />;\n"
+                    "}\n"
+                ),
+                "frontend/src/design-system/primitive-contracts.ts": (
+                    "export const axisPrimitiveContracts = [{\n"
+                    "  component: 'CustomControl',\n"
+                    "  file: 'frontend/src/components/ui/custom-control.tsx',\n"
+                    "  testFiles: ['frontend/tests/custom-control.test.tsx'],\n"
+                    "  source: 'axis',\n"
+                    "  sourceReason: 'No shadcn equivalent for this test primitive.',\n"
+                    "  readiness: 'ready',\n"
+                    "  variants: ['default'],\n"
+                    "  states: ['default'],\n"
+                    "  accessibility: ['native-control'],\n"
+                    "  tokenFamilies: ['color'],\n"
+                    "}];\n"
+                ),
+                "frontend/tests/custom-control.test.tsx": "export {};\n",
+            }
+        )
+
+        self.assertIn("contract source must be `shadcn`", "\n".join(issues))
 
     def test_rejects_unknown_primitive_contract_token_family(self) -> None:
         issues = self.issues_for_frontend(
@@ -2034,6 +2264,8 @@ class TestFrontendComponentComposition(unittest.TestCase):
                     "  component: 'CustomControl',\n"
                     "  file: 'frontend/src/components/ui/custom-control.tsx',\n"
                     "  testFiles: ['frontend/tests/custom-control.test.tsx'],\n"
+                    "  source: 'shadcn',\n"
+                    "  sourceItem: '@shadcn/custom-control',\n"
                     "  readiness: 'ready',\n"
                     "  variants: ['default'],\n"
                     "  states: ['default'],\n"
@@ -2228,13 +2460,17 @@ class TestFrontendTailwindOpacity(unittest.TestCase):
 
 
 class TestFrontendDesignTokenUsage(unittest.TestCase):
-    def issues_for_frontend(self, component_source: str) -> list[str]:
+    def issues_for_files(self, files: dict[str, str]) -> list[str]:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
-            component = root / "frontend" / "src" / "components" / "Example.tsx"
-            component.parent.mkdir(parents=True, exist_ok=True)
-            component.write_text(component_source, encoding="utf-8")
+            for relative_path, content in files.items():
+                path = root / relative_path
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(content, encoding="utf-8")
             return axis.frontend_design_token_usage_issues(root=root)
+
+    def issues_for_frontend(self, component_source: str) -> list[str]:
+        return self.issues_for_files({"frontend/src/components/Example.tsx": component_source})
 
     def test_rejects_raw_neutral_color_utilities(self) -> None:
         issues = self.issues_for_frontend(
@@ -2259,6 +2495,71 @@ class TestFrontendDesignTokenUsage(unittest.TestCase):
         )
 
         self.assertIn("move arbitrary color or gradient values into design-system tokens", "\n".join(issues))
+
+    def test_accepts_upstream_design_classes_in_shadcn_sourced_primitive(self) -> None:
+        issues = self.issues_for_files(
+            {
+                "frontend/src/components/ui/card.tsx": (
+                    "export const upstream = 'bg-white text-slate-700 shadow-sm';\n"
+                ),
+                "frontend/src/design-system/primitive-contracts.ts": (
+                    "export const axisPrimitiveContracts = [{\n"
+                    "  component: 'Card',\n"
+                    "  file: 'frontend/src/components/ui/card.tsx',\n"
+                    "  testFiles: ['frontend/tests/ui-primitives.test.tsx'],\n"
+                    "  source: 'shadcn',\n"
+                    "  sourceItem: '@shadcn/card',\n"
+                    "  readiness: 'ready',\n"
+                    "  variants: ['default'],\n"
+                    "  states: ['default'],\n"
+                    "  accessibility: ['semantic-caller-owned'],\n"
+                    "  tokenFamilies: ['color', 'shadow'],\n"
+                    "}];\n"
+                ),
+            }
+        )
+
+        self.assertEqual([], issues)
+
+    def test_rejects_design_token_exemption_for_shadcn_contract_outside_ui(self) -> None:
+        issues = self.issues_for_files(
+            {
+                "frontend/src/features/auth/components/FakePrimitive.tsx": (
+                    "export const bad = 'bg-white text-slate-700 shadow-sm';\n"
+                ),
+                "frontend/src/design-system/primitive-contracts.ts": (
+                    "export const axisPrimitiveContracts = [{\n"
+                    "  component: 'FakePrimitive',\n"
+                    "  file: 'frontend/src/features/auth/components/FakePrimitive.tsx',\n"
+                    "  testFiles: ['frontend/tests/fake-primitive.test.tsx'],\n"
+                    "  source: 'shadcn',\n"
+                    "  sourceItem: '@shadcn/fake-primitive',\n"
+                    "  readiness: 'ready',\n"
+                    "  variants: ['default'],\n"
+                    "  states: ['default'],\n"
+                    "  accessibility: ['native-control'],\n"
+                    "  tokenFamilies: ['color', 'shadow'],\n"
+                    "}];\n"
+                ),
+            }
+        )
+
+        joined = "\n".join(issues)
+        self.assertIn("use semantic color tokens", joined)
+        self.assertIn("use named shadow tokens", joined)
+
+    def test_rejects_raw_design_classes_in_axis_owned_component(self) -> None:
+        issues = self.issues_for_files(
+            {
+                "frontend/src/components/shared/CustomCard.tsx": (
+                    "export const bad = 'bg-white text-slate-700 shadow-sm';\n"
+                ),
+            }
+        )
+
+        joined = "\n".join(issues)
+        self.assertIn("use semantic color tokens", joined)
+        self.assertIn("use named shadow tokens", joined)
 
     def test_accepts_semantic_token_utilities(self) -> None:
         issues = self.issues_for_frontend(

@@ -2,11 +2,10 @@ import { Link } from '@tanstack/react-router';
 import type { TFunction } from 'i18next';
 import { AlertCircle, Database, Loader2, RefreshCw, ShieldCheck, Workflow } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-
+import { FlowTrace, type FlowTraceState, type FlowTraceStep } from '@/components/shared/FlowTrace';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Panel } from '@/components/ui/panel';
-import { FlowTrace, type FlowTraceState, type FlowTraceStep } from '@/components/visual/FlowTrace';
 import { AuthCard } from '@/features/auth/components/AuthCard';
 import { useProvisioningStatus } from '@/features/auth/hooks/useProvisioningStatus';
 import { useRetryProvisioning } from '@/features/auth/hooks/useRetryProvisioning';
@@ -153,7 +152,7 @@ export function WorkspaceProvisioningPage() {
               </p>
               <p className="mt-1 text-sm font-medium text-foreground">{WorkspaceName}</p>
             </div>
-            <Badge variant={failed ? 'destructive' : 'primary'}>
+            <Badge variant={failed ? 'destructive' : 'default'}>
               {failed ? t('provisioning.blocked') : t('provisioning.running')}
             </Badge>
           </div>
@@ -167,11 +166,10 @@ export function WorkspaceProvisioningPage() {
           ) : null}
 
           {failed ? (
-            <Panel variant="attention" className="space-y-3 rounded-md p-4 text-sm">
-              <p className="text-muted-foreground">{t('provisioning.exhausted')}</p>
+            <Alert variant="destructive" className="space-y-3">
+              <AlertDescription>{t('provisioning.exhausted')}</AlertDescription>
               <Button
                 type="button"
-                variant="cta"
                 className="h-9"
                 disabled={retry.isPending}
                 onClick={() => void retry.mutateAsync().catch(() => {})}
@@ -192,7 +190,7 @@ export function WorkspaceProvisioningPage() {
                   {t('provisioning.contactSupport')}
                 </a>
               </p>
-            </Panel>
+            </Alert>
           ) : null}
         </div>
       </section>

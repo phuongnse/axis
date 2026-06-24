@@ -1,8 +1,8 @@
 import type { ReactNode } from 'react';
 
-import { Notice, type NoticeVariant } from '@/components/ui/notice';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
-type AuthNoticeVariant = NoticeVariant;
+type AuthNoticeVariant = 'default' | 'destructive';
 
 interface AuthNoticeProps {
   title?: ReactNode;
@@ -11,10 +11,11 @@ interface AuthNoticeProps {
   className?: string;
 }
 
-export function AuthNotice({ title, children, variant = 'info', className }: AuthNoticeProps) {
+export function AuthNotice({ title, children, variant = 'default', className }: AuthNoticeProps) {
   return (
-    <Notice title={title} variant={variant} className={className}>
-      {children}
-    </Notice>
+    <Alert variant={variant} className={className}>
+      {title ? <AlertTitle>{title}</AlertTitle> : null}
+      {children ? <AlertDescription>{children}</AlertDescription> : null}
+    </Alert>
   );
 }

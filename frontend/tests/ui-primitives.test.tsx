@@ -1,8 +1,8 @@
 import { render, screen } from '@testing-library/react';
-import { Inbox, Search } from 'lucide-react';
+import { Inbox } from 'lucide-react';
 import { describe, expect, it } from 'vitest';
 
-import { ActionLink } from '../src/components/ui/action-link';
+import { Alert, AlertDescription, AlertTitle } from '../src/components/ui/alert';
 import { Badge } from '../src/components/ui/badge';
 import {
   Card,
@@ -12,59 +12,23 @@ import {
   CardHeader,
   CardTitle,
 } from '../src/components/ui/card';
-import { CheckboxField } from '../src/components/ui/checkbox-field';
-import { ContentGrid } from '../src/components/ui/content-grid';
-import { EmptyState } from '../src/components/ui/empty-state';
-import { FormField } from '../src/components/ui/form-field';
-import { IconButton } from '../src/components/ui/icon-button';
+import { Checkbox } from '../src/components/ui/checkbox';
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from '../src/components/ui/empty';
+import { Field, FieldDescription, FieldError, FieldLabel } from '../src/components/ui/field';
 import { Input } from '../src/components/ui/input';
 import { Label } from '../src/components/ui/label';
-import { Notice } from '../src/components/ui/notice';
-import { PageHeader } from '../src/components/ui/page-header';
-import { Panel } from '../src/components/ui/panel';
+import { NativeSelect, NativeSelectOption } from '../src/components/ui/native-select';
 import { Progress } from '../src/components/ui/progress';
-import { Select } from '../src/components/ui/select';
+import { Separator } from '../src/components/ui/separator';
 import { Skeleton } from '../src/components/ui/skeleton';
+import { Spinner } from '../src/components/ui/spinner';
 import { Textarea } from '../src/components/ui/textarea';
-import { Toolbar } from '../src/components/ui/toolbar';
-
-import { renderWithRouter } from './render-with-router';
-
-describe('ActionLink', () => {
-  it('renders a routed call to action with an accessible name', async () => {
-    await renderWithRouter(
-      <ActionLink to="/login" icon={Search}>
-        Sign in
-      </ActionLink>,
-    );
-
-    expect(screen.getByRole('link', { name: 'Sign in' })).toHaveAttribute('href', '/login');
-  });
-});
-
-describe('IconButton', () => {
-  it('renders an accessible icon-only command', () => {
-    render(<IconButton type="button" icon={Search} label="Search records" />);
-
-    expect(screen.getByRole('button', { name: 'Search records' })).toBeInTheDocument();
-  });
-
-  it('uses loading state as the accessible name and disables interaction', () => {
-    render(
-      <IconButton
-        type="button"
-        icon={Search}
-        label="Search records"
-        isLoading
-        loadingLabel="Searching records"
-      />,
-    );
-
-    const button = screen.getByRole('button', { name: 'Searching records' });
-    expect(button).toBeDisabled();
-    expect(button).toHaveAttribute('aria-busy', 'true');
-  });
-});
 
 describe('Textarea', () => {
   it('passes standard textarea state attributes through', () => {
@@ -76,45 +40,37 @@ describe('Textarea', () => {
   });
 });
 
-describe('CheckboxField', () => {
-  it('links validation copy to the checkbox control', () => {
+describe('Checkbox', () => {
+  it('links a Base UI checkbox to a label', () => {
     render(
-      <CheckboxField id="terms" error="Accept terms before continuing.">
-        Terms
-      </CheckboxField>,
+      <>
+        <Checkbox id="terms" aria-invalid />
+        <Label htmlFor="terms">Terms</Label>
+      </>,
     );
 
-    const checkbox = screen.getByLabelText('Terms');
+    const checkbox = screen.getByRole('checkbox', { name: 'Terms' });
     expect(checkbox).toHaveAttribute('aria-invalid', 'true');
-    expect(checkbox).toHaveAccessibleDescription('Accept terms before continuing.');
   });
 });
 
-describe('Notice', () => {
-  it('uses alert semantics for warning and error feedback', () => {
+describe('Alert', () => {
+  it('renders alert title and description content', () => {
     render(
-      <Notice variant="warning" title="Needs review">
-        Check the required fields.
-      </Notice>,
+      <Alert>
+        <AlertTitle>Needs review</AlertTitle>
+        <AlertDescription>Check the required fields.</AlertDescription>
+      </Alert>,
     );
 
     expect(screen.getByRole('alert')).toHaveTextContent('Needs review');
-  });
-
-  it('uses status semantics for informational feedback', () => {
-    render(
-      <Notice variant="success" title="Ready">
-        Workspace is active.
-      </Notice>,
-    );
-
-    expect(screen.getByRole('status')).toHaveTextContent('Workspace is active.');
+    expect(screen.getByRole('alert')).toHaveTextContent('Check the required fields.');
   });
 });
 
 describe('Badge', () => {
   it('renders compact status text', () => {
-    render(<Badge variant="success">Stable</Badge>);
+    render(<Badge>Stable</Badge>);
 
     expect(screen.getByText('Stable')).toBeInTheDocument();
   });
@@ -133,44 +89,29 @@ describe('Card', () => {
       </Card>,
     );
 
-    expect(screen.getByRole('heading', { name: 'Workspace health' })).toBeInTheDocument();
+    expect(screen.getByText('Workspace health')).toBeInTheDocument();
     expect(screen.getByText('All checks are current.')).toBeInTheDocument();
   });
 });
 
-describe('ContentGrid', () => {
-  it('renders grouped content without changing child semantics', () => {
+describe('Field', () => {
+  it('links description and error copy to its control', () => {
     render(
-      <ContentGrid>
-        <section aria-label="Models">Models</section>
-        <section aria-label="Forms">Forms</section>
-      </ContentGrid>,
-    );
-
-    expect(screen.getByRole('region', { name: 'Models' })).toBeInTheDocument();
-    expect(screen.getByRole('region', { name: 'Forms' })).toBeInTheDocument();
-  });
-});
-
-describe('FormField', () => {
-  it('links help and error copy to its control', () => {
-    render(
-      <FormField
-        id="workspace-name"
-        label="Workspace name"
-        helpText="Shown in navigation"
-        error="Required"
-      >
-        {({ describedBy }) => (
-          <Input id="workspace-name" aria-describedby={describedBy} aria-invalid />
-        )}
-      </FormField>,
+      <Field data-invalid>
+        <FieldLabel htmlFor="workspace-name">Workspace name</FieldLabel>
+        <Input
+          id="workspace-name"
+          aria-describedby="workspace-name-help workspace-name-error"
+          aria-invalid
+        />
+        <FieldDescription id="workspace-name-help">Shown in navigation</FieldDescription>
+        <FieldError id="workspace-name-error">Required</FieldError>
+      </Field>,
     );
 
     const input = screen.getByLabelText('Workspace name');
-    expect(input).toHaveAttribute('aria-describedby', 'workspace-name-help workspace-name-error');
-    expect(screen.getByText('Shown in navigation')).toBeInTheDocument();
-    expect(screen.getByText('Required')).toBeInTheDocument();
+    expect(input).toHaveAccessibleDescription('Shown in navigation Required');
+    expect(input).toHaveAttribute('aria-invalid', 'true');
   });
 });
 
@@ -187,62 +128,30 @@ describe('Label', () => {
   });
 });
 
-describe('PageHeader', () => {
-  it('renders the page title, support copy, and actions', () => {
-    render(
-      <PageHeader
-        eyebrow="Workspace"
-        title="Dashboard"
-        description="Track active workflows."
-        actions={<span>Refresh</span>}
-      />,
-    );
-
-    expect(screen.getByRole('heading', { name: 'Dashboard' })).toBeInTheDocument();
-    expect(screen.getByText('Track active workflows.')).toBeInTheDocument();
-    expect(screen.getByText('Refresh')).toBeInTheDocument();
-  });
-});
-
-describe('Panel', () => {
-  it('renders caller-owned semantics and content', () => {
-    render(
-      <Panel role="region" aria-label="Usage">
-        Current usage is within limits.
-      </Panel>,
-    );
-
-    expect(screen.getByRole('region', { name: 'Usage' })).toHaveTextContent(
-      'Current usage is within limits.',
-    );
-  });
-});
-
 describe('Progress', () => {
   it('keeps a determinate value accessible', () => {
     render(<Progress value={42} aria-label="Storage used" />);
 
-    const progress = screen.getByLabelText('Storage used');
-    expect(progress).toHaveAttribute('value', '42');
-    expect(progress).toHaveAttribute('max', '100');
+    const progress = screen.getByRole('progressbar', { name: 'Storage used' });
+    expect(progress).toHaveAttribute('aria-valuenow', '42');
+    expect(progress).toHaveAttribute('aria-valuemax', '100');
   });
 
-  it('omits value for indeterminate progress semantics', () => {
-    render(<Progress isIndeterminate value={42} aria-label="Syncing workspace" />);
+  it('uses null value for indeterminate progress semantics', () => {
+    render(<Progress value={null} aria-label="Syncing workspace" />);
 
-    const progress = screen.getByLabelText('Syncing workspace');
-    expect(progress).not.toHaveAttribute('value');
-    expect(progress).toHaveAttribute('max', '100');
+    const progress = screen.getByRole('progressbar', { name: 'Syncing workspace' });
+    expect(progress).not.toHaveAttribute('aria-valuenow');
   });
 });
 
-describe('Select', () => {
+describe('NativeSelect', () => {
   it('passes native select state attributes through', () => {
     render(
-      <Select aria-label="Environment" aria-invalid defaultValue="production">
-        <option value="production">Production</option>
-        <option value="sandbox">Sandbox</option>
-      </Select>,
+      <NativeSelect aria-label="Environment" aria-invalid defaultValue="production">
+        <NativeSelectOption value="production">Production</NativeSelectOption>
+        <NativeSelectOption value="sandbox">Sandbox</NativeSelectOption>
+      </NativeSelect>,
     );
 
     const select = screen.getByLabelText('Environment');
@@ -252,37 +161,44 @@ describe('Select', () => {
 });
 
 describe('Skeleton', () => {
-  it('stays hidden from assistive technology', () => {
+  it('renders the shadcn skeleton slot', () => {
     render(<Skeleton data-testid="loading-line" />);
 
-    expect(screen.getByTestId('loading-line')).toHaveAttribute('aria-hidden', 'true');
+    expect(screen.getByTestId('loading-line')).toHaveAttribute('data-slot', 'skeleton');
   });
 });
 
-describe('Toolbar', () => {
-  it('supports caller-owned toolbar semantics', () => {
-    render(
-      <Toolbar role="toolbar" aria-label="View actions">
-        <span>Filter</span>
-        <span>Sort</span>
-      </Toolbar>,
-    );
+describe('Separator', () => {
+  it('renders the separator role', () => {
+    render(<Separator />);
 
-    expect(screen.getByRole('toolbar', { name: 'View actions' })).toHaveTextContent('Filter');
+    expect(screen.getByRole('separator')).toHaveAttribute('data-slot', 'separator');
   });
 });
 
-describe('EmptyState', () => {
+describe('Spinner', () => {
+  it('announces loading status', () => {
+    render(<Spinner />);
+
+    expect(screen.getByRole('status', { name: 'Loading' })).toHaveAttribute('data-slot', 'spinner');
+  });
+});
+
+describe('Empty', () => {
   it('renders a user-actionable empty state', () => {
     render(
-      <EmptyState
-        icon={Inbox}
-        title="No records yet"
-        description="Create the first record when the model is ready."
-      />,
+      <Empty>
+        <EmptyHeader>
+          <EmptyMedia variant="icon">
+            <Inbox aria-hidden />
+          </EmptyMedia>
+          <EmptyTitle>No records yet</EmptyTitle>
+          <EmptyDescription>Create the first record when the model is ready.</EmptyDescription>
+        </EmptyHeader>
+      </Empty>,
     );
 
-    expect(screen.getByRole('heading', { name: 'No records yet' })).toBeInTheDocument();
+    expect(screen.getByText('No records yet')).toBeInTheDocument();
     expect(
       screen.getByText('Create the first record when the model is ready.'),
     ).toBeInTheDocument();

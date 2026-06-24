@@ -1,11 +1,11 @@
 import { LockKeyhole, LogIn, UserPlus } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
-import { ActionLink } from '@/components/ui/action-link';
-import { AccessPathTrace } from '@/components/visual/AccessPathTrace';
-import { BrandHeader } from '@/components/visual/BrandHeader';
-import { HeaderRule } from '@/components/visual/HeaderRule';
-import { TopologyBackdrop } from '@/components/visual/TopologyBackdrop';
+import { AccessPathTrace } from '@/components/shared/AccessPathTrace';
+import { ActionLink } from '@/components/shared/ActionLink';
+import { BrandHeader } from '@/components/shared/BrandHeader';
+import { HeaderRule } from '@/components/shared/HeaderRule';
+import { TopologyBackdrop } from '@/components/shared/TopologyBackdrop';
 import { PreferenceControls } from '@/features/preferences';
 
 function LandingActions() {

@@ -1,5 +1,5 @@
 import { createFileRoute, Outlet, redirect } from '@tanstack/react-router';
-import { AppShell } from '@/components/layout/AppShell';
+import { AppShell } from '@/components/shared/AppShell';
 import { getAccessToken } from '@/features/auth/auth-store';
 
 export const Route = createFileRoute('/_authenticated')({

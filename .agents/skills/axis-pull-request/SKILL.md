@@ -24,7 +24,8 @@ Do not rerun local guards just to create a longer transcript. Run each required 
    - Confirm the CLI is available through `python scripts/axis.py check coderabbit-cli` when fresh toolchain evidence is missing.
    - Review the same branch diff that will be published. Prefer the committed branch diff when the branch is already committed; otherwise review the uncommitted diff before committing.
    - If CodeRabbit raises issues, use `$axis-review-feedback` to classify and fix them, then rerun the touched verification checks and `$axis-ready-review`.
-   - Rerun CodeRabbit once after review fixes when the fixes materially change implementation behavior, contracts, docs policy, or tests.
+   - Before handing off CodeRabbit issues, record the reviewed checkpoint. If the reviewed diff is uncommitted, commit that reviewed state before applying fixes when a delta-only rerun is expected.
+   - Rerun CodeRabbit once after review fixes when the fixes materially change implementation behavior, contracts, docs policy, or tests. Scope the rerun to the fix delta by using the reviewed checkpoint as `--base-commit`; add `--dir` only as an extra narrowing filter for affected directories. If a true delta-only rerun is impossible because there was no checkpoint, say so and do not present a full-diff rerun as fix-only.
    - If CodeRabbit is unavailable, unauthenticated, fails, or times out, stop and report the blocker. Skip only when the user explicitly requested no CodeRabbit review, and record the skip reason in the PR requirements.
 
 3. Determine the PR action.

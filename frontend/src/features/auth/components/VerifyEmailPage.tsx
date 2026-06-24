@@ -8,7 +8,7 @@ import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 
 import { Button } from '@/components/ui/button';
-import { FormField } from '@/components/ui/form-field';
+import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { AuthCard } from '@/features/auth/components/AuthCard';
 import { useResendVerification } from '@/features/auth/hooks/useResendVerification';
@@ -116,27 +116,28 @@ function VerifyEmailOutcome({
             onSubmit={handleSubmit((values) => void onResend(values.email.trim()))}
             noValidate
           >
-            <FormField
-              id="resend-email"
-              label={t('common.emailAddress')}
-              helpText={t('verifyEmail.resendEmailHelp')}
-              error={errors.email?.message}
-            >
-              {({ describedBy }) => (
-                <Input
-                  id="resend-email"
-                  type="email"
-                  autoComplete="email"
-                  aria-describedby={describedBy}
-                  aria-invalid={errors.email ? true : undefined}
-                  disabled={kind === 'rate_limited' || resendLoading}
-                  {...registerResend('email')}
-                />
-              )}
-            </FormField>
+            <Field data-invalid={errors.email ? true : undefined}>
+              <FieldLabel htmlFor="resend-email">{t('common.emailAddress')}</FieldLabel>
+              <Input
+                id="resend-email"
+                type="email"
+                autoComplete="email"
+                aria-describedby={
+                  errors.email ? 'resend-email-help resend-email-error' : 'resend-email-help'
+                }
+                aria-invalid={errors.email ? true : undefined}
+                disabled={kind === 'rate_limited' || resendLoading}
+                {...registerResend('email')}
+              />
+              <FieldDescription id="resend-email-help">
+                {t('verifyEmail.resendEmailHelp')}
+              </FieldDescription>
+              {errors.email ? (
+                <FieldError id="resend-email-error">{errors.email.message}</FieldError>
+              ) : null}
+            </Field>
             <Button
               type="submit"
-              variant="cta"
               className="w-full h-9"
               disabled={kind === 'rate_limited' || resendLoading}
             >

@@ -9,6 +9,7 @@
     "ignoreUnknown": false,
     "includes": [
       "**",
+      "!src/components/ui",
       "!**/routeTree.gen.ts",
       "!**/api-types.ts",
       "!eslint.config.js",

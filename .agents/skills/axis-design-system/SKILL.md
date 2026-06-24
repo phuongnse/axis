@@ -41,9 +41,11 @@ Read only the docs needed for the touched surface:
 
 3. Preserve source-of-truth order.
    - Add or update tokens before component styles that consume them.
-   - Add or update shared primitives before feature screens consume them.
+   - Add or update shared components before feature screens consume them.
    - Update `frontend/src/design-system/primitive-contracts.ts` before broad primitive use.
-   - Do not add per-file allowlists for design-system violations; add the missing token, primitive, contract, or documented workaround.
+   - If shadcn provides the primitive, install or copy the shadcn implementation into `frontend/src/components/ui`, keep its standard API/classes, and migrate consumers to that API.
+   - Keep `components/ui` shadcn-only with registry kebab-case filenames; put Axis-authored shared components in `components/shared` with `PascalCase.tsx`.
+   - Do not add ad hoc per-file allowlists for design-system violations; add the missing token, primitive, contract, source provenance, shared component, or documented workaround.
    - Prefer approved source tokens and executable registries over catalog pages, screenshots, or visual baselines.
 
 4. Check guard quality before adding enforcement.

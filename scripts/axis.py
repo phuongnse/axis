@@ -625,6 +625,9 @@ def parse_frontend_primitive_contracts(contract_text: str) -> list[dict[str, obj
         r"component:\s*'(?P<component>[^']+)'\s*,\s*"
         r"file:\s*'(?P<file>[^']+)'\s*,\s*"
         r"testFiles:\s*\[(?P<tests>[^\]]*)\]\s*,\s*"
+        r"(?:(?:source:\s*'(?P<source>[^']+)'\s*,\s*)?)"
+        r"(?:(?:sourceItem:\s*'(?P<source_item>[^']+)'\s*,\s*)?)"
+        r"(?:(?:sourceReason:\s*'(?P<source_reason>[^']+)'\s*,\s*)?)"
         r"(?:(?:readiness:\s*'(?P<readiness>[^']+)'\s*,\s*"
         r"variants:\s*\[(?P<variants>[^\]]*)\]\s*,\s*"
         r"states:\s*\[(?P<states>[^\]]*)\]\s*,\s*"
@@ -642,6 +645,9 @@ def parse_frontend_primitive_contracts(contract_text: str) -> list[dict[str, obj
                 "component": match.group("component"),
                 "file": match.group("file"),
                 "testFiles": value_pattern.findall(match.group("tests")),
+                "source": match.group("source") or "",
+                "sourceItem": match.group("source_item") or "",
+                "sourceReason": match.group("source_reason") or "",
                 "readiness": match.group("readiness") or "",
                 "variants": value_pattern.findall(match.group("variants") or ""),
                 "states": value_pattern.findall(match.group("states") or ""),
@@ -699,11 +705,20 @@ def frontend_primitive_contract_issues(root: Path = ROOT) -> list[str]:
         component = str(contract["component"])
         file_path = str(contract["file"])
         test_files = list(contract["testFiles"])
+        source = str(contract["source"])
+        source_item = str(contract["sourceItem"])
         readiness = str(contract["readiness"])
         token_families = list(contract["tokenFamilies"])
 
         if not test_files:
             issues.append(f"{file_path}: {component} contract must name at least one test file")
+        if source != "shadcn":
+            issues.append(
+                f"{file_path}: {component} contract source must be `shadcn`; "
+                "Axis-owned components belong outside frontend/src/components/ui"
+            )
+        if not re.fullmatch(r"@shadcn/[A-Za-z0-9][A-Za-z0-9._/-]*", source_item):
+            issues.append(f"{file_path}: {component} shadcn contract must name sourceItem `@shadcn/...`")
         if readiness not in {"ready", "candidate"}:
             issues.append(f"{file_path}: {component} contract readiness must be `ready` or `candidate`")
         for field_name in ("variants", "states", "accessibility", "tokenFamilies"):
@@ -770,7 +785,7 @@ def frontend_route_consumer_files(root: Path = ROOT) -> list[str]:
 
     import_pattern = re.compile(
         r"import\s+(?!type\b)(?:[^'\";]+?)\s+from\s+['\"]@/"
-        r"(?P<source>(?:features/[^/'\"]+(?:/components/[^'\"]+)?|components/layout/[^'\"]+))['\"]"
+        r"(?P<source>(?:features/[^/'\"]+(?:/components/[^'\"]+)?|components/shared/[^'\"]+))['\"]"
     )
     consumer_files: set[str] = set()
     for path in iter_files(route_root, (".tsx",)):
@@ -875,6 +890,27 @@ def frontend_consumer_contract_issues(root: Path = ROOT) -> list[str]:
     return issues
 
 
+def frontend_shadcn_primitive_files(root: Path = ROOT) -> set[str]:
+    contract_path = root / "frontend" / "src" / "design-system" / "primitive-contracts.ts"
+    if not contract_path.is_file():
+        return set()
+
+    contracts = parse_frontend_primitive_contracts(contract_path.read_text(encoding="utf-8"))
+    ui_root = root / "frontend" / "src" / "components" / "ui"
+    shadcn_files: set[str] = set()
+    for contract in contracts:
+        file_path = str(contract["file"])
+        candidate = root / file_path
+        if (
+            str(contract["source"]) == "shadcn"
+            and candidate.is_file()
+            and candidate.parent == ui_root
+            and candidate.suffix == ".tsx"
+        ):
+            shadcn_files.add(file_path)
+    return shadcn_files
+
+
 def frontend_radius_token_issues(root: Path = ROOT) -> list[str]:
     issues: list[str] = []
     token_css = root / "frontend" / "src" / "design-system" / "tokens.css"
@@ -893,8 +929,11 @@ def frontend_radius_token_issues(root: Path = ROOT) -> list[str]:
 
     oversized = re.compile(r"\brounded-(xl|2xl|3xl)\b")
     arbitrary = re.compile(r"\brounded-\[([^\]]+)\]")
+    shadcn_primitive_files = frontend_shadcn_primitive_files(root)
     for path in iter_files(src_root, (".ts", ".tsx")):
         normalized = rel(path) if root == ROOT else str(path.relative_to(root)).replace("\\", "/")
+        if normalized in shadcn_primitive_files:
+            continue
         text = path.read_text(encoding="utf-8")
         for idx, line in enumerate(text.splitlines(), 1):
             if oversized.search(line):
@@ -913,6 +952,30 @@ def frontend_component_composition_issues(root: Path = ROOT) -> list[str]:
     src_root = root / "frontend" / "src"
     route_root = src_root / "routes"
     ui_root = src_root / "components" / "ui"
+    shared_root = src_root / "components" / "shared"
+
+    if ui_root.exists():
+        shadcn_file_name = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*[.]tsx$")
+        for path in iter_files(ui_root, (".tsx",)):
+            normalized = rel(path) if root == ROOT else str(path.relative_to(root)).replace("\\", "/")
+            if not shadcn_file_name.fullmatch(path.name):
+                issues.append(
+                    f"{normalized}: shadcn UI primitive files must use registry kebab-case names"
+                )
+
+    if shared_root.exists():
+        pascal_component_name = re.compile(r"^[A-Z][A-Za-z0-9]*[.]tsx$")
+        camel_module_name = re.compile(r"^[a-z][A-Za-z0-9]*[.]ts$")
+        for path in iter_files(shared_root, (".ts", ".tsx")):
+            normalized = rel(path) if root == ROOT else str(path.relative_to(root)).replace("\\", "/")
+            if path.suffix == ".tsx" and not pascal_component_name.fullmatch(path.name):
+                issues.append(
+                    f"{normalized}: shared React component files must use PascalCase names"
+                )
+            if path.suffix == ".ts" and not camel_module_name.fullmatch(path.name):
+                issues.append(
+                    f"{normalized}: shared non-component modules must use camelCase names"
+                )
 
     if route_root.exists():
         for path in iter_files(route_root, (".tsx",)):
@@ -936,11 +999,11 @@ def frontend_component_composition_issues(root: Path = ROOT) -> list[str]:
                 for idx, line in enumerate(text.splitlines(), 1):
                     if "@base-ui/react" in line:
                         issues.append(
-                            f"{normalized}:{idx}: headless UI primitives belong in frontend/src/components/ui, not feature components"
+                            f"{normalized}:{idx}: headless UI primitives belong in shadcn primitives under frontend/src/components/ui, not feature components"
                         )
                     for match in standard_control.finditer(line):
                         issues.append(
-                            f"{normalized}:{idx}: standard UI control <{match.group(1)}> must use a shared Axis UI primitive from frontend/src/components/ui"
+                            f"{normalized}:{idx}: standard UI control <{match.group(1)}> must use a shared shadcn UI primitive from frontend/src/components/ui"
                         )
     return issues
 
@@ -1003,9 +1066,12 @@ def frontend_design_token_usage_issues(root: Path = ROOT) -> list[str]:
         r"\b(?:bg|text|border|from|via|to|ring|divide|placeholder|decoration|outline)-"
         r"\[(?:linear-gradient|radial-gradient|hsl|rgb|#)[^\]]+\]"
     )
+    shadcn_primitive_files = frontend_shadcn_primitive_files(root)
 
     for path in iter_files(src_root, (".ts", ".tsx")):
         normalized = rel(path) if root == ROOT else str(path.relative_to(root)).replace("\\", "/")
+        if normalized in shadcn_primitive_files:
+            continue
         text = path.read_text(encoding="utf-8")
         inside_contract_token_families = False
         inside_type_alias = False
@@ -1680,7 +1746,7 @@ DOC_DRIFT_ADDED_LINE_RULES = [
         "EnsureCreated introduced - use the owning DbContext migration chain",
     ),
     (
-        r"TODO|FIXME|NotImplementedException|placeholder|stub",
+        r"\b(?:TODO|FIXME|NotImplementedException|stub)\b|(?<![:\w-])placeholder(?!\s*=)(?![:\w-])",
         lambda p: (p.startswith("src/") or p.startswith("tests/") or p.startswith("frontend/src/"))
         and "/obj/" not in p
         and "/node_modules/" not in p,
