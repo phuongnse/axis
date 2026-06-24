@@ -25,6 +25,7 @@ import { Panel } from '../src/components/ui/panel';
 import { Progress } from '../src/components/ui/progress';
 import { Select } from '../src/components/ui/select';
 import { Skeleton } from '../src/components/ui/skeleton';
+import { Spinner } from '../src/components/ui/spinner';
 import { Textarea } from '../src/components/ui/textarea';
 import { Toolbar } from '../src/components/ui/toolbar';
 
@@ -256,6 +257,23 @@ describe('Skeleton', () => {
     render(<Skeleton data-testid="loading-line" />);
 
     expect(screen.getByTestId('loading-line')).toHaveAttribute('aria-hidden', 'true');
+  });
+});
+
+describe('Spinner', () => {
+  it('announces standalone loading state with a label', () => {
+    render(<Spinner label="Loading records" />);
+
+    const spinner = screen.getByRole('status', { name: 'Loading records' });
+    expect(spinner).toHaveAttribute('aria-live', 'polite');
+    expect(spinner.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
+  });
+
+  it('supports decorative inline loading indicators', () => {
+    render(<Spinner decorative data-testid="inline-spinner" />);
+
+    expect(screen.getByTestId('inline-spinner')).toHaveAttribute('aria-hidden', 'true');
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 });
 

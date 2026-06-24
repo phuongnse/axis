@@ -225,6 +225,16 @@ export const axisPrimitiveContracts = [
     tokenFamilies: ['color', 'radius', 'motion'],
   },
   {
+    component: 'Spinner',
+    file: 'frontend/src/components/ui/spinner.tsx',
+    testFiles: ['frontend/tests/ui-primitives.test.tsx'],
+    readiness: 'ready',
+    variants: ['standalone', 'decorative', 'size-sm', 'size-md', 'size-lg'],
+    states: ['loading'],
+    accessibility: ['role-status-label', 'aria-live-polite', 'decorative-aria-hidden'],
+    tokenFamilies: ['color', 'sizing', 'motion'],
+  },
+  {
     component: 'Textarea',
     file: 'frontend/src/components/ui/textarea.tsx',
     testFiles: ['frontend/tests/ui-primitives.test.tsx'],
