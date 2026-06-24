@@ -1,6 +1,6 @@
 ---
 name: axis-review-feedback
-description: Handle Axis PR review feedback safely. Use when addressing CodeRabbit or human review comments, follow-up review commits, requested changes, or suggestions that may affect design, tests, docs, or PR readiness.
+description: Handle Axis PR review feedback safely. Use when addressing local CodeRabbit plugin output, GitHub CodeRabbit or human review comments, follow-up review commits, requested changes, or suggestions that may affect design, tests, docs, or PR readiness.
 ---
 
 # Axis Review Feedback
@@ -14,6 +14,7 @@ Resolve review feedback by improving the codebase, not merely silencing a thread
 1. Gather the feedback.
    - Read the review comment, affected diff, and surrounding code.
    - If comments come from a tool, treat them as signal to validate against Axis rules.
+   - If feedback came from the local CodeRabbit plugin, preserve the issue text, severity, and file path in your working notes; there may be no GitHub thread to resolve.
 
 2. Classify each item.
    - Correctness bug or missing AC.
@@ -39,6 +40,7 @@ Resolve review feedback by improving the codebase, not merely silencing a thread
 5. Verify the touched surface.
    - Run the narrow test or policy check for the files changed.
    - Run `$axis-ready-review` before asking for another review pass.
+   - If this feedback was part of `$axis-pull-request`, return control to that skill so it can decide whether to rerun CodeRabbit before PR publication.
 
 6. Report resolution.
    - Mark each comment as fixed, improved beyond suggestion, false positive with evidence, or deferred with owner.

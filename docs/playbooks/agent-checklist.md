@@ -2,9 +2,9 @@
 
 > **Navigation**: [← docs/README.md](../README.md) · [← AGENTS.md](../../AGENTS.md)
 
-**Daily workflow.** Walk the Ready review, Docs review, and Retrospective review while implementing; run the Verification gate before marking a PR ready for review. Use `$axis-use-case-spec` when a use case lacks an owning spec, `$axis-use-case-implementation` for implementation slices, `$axis-ready-review` before review, and `$axis-pull-request` before opening, updating, or marking a PR ready. **PR title = Conventional Commit; PR description = Summary + Linked spec + Requirements only** — no review/check paste blocks, no commit list, no CI/Doc-drift status (GitHub Checks tab covers that).
+**Daily workflow.** Walk the Ready review, Docs review, and Retrospective review while implementing; run the Verification gate before marking a PR ready for review. Use `$axis-use-case-spec` when a use case lacks an owning spec, `$axis-use-case-implementation` for implementation slices, `$axis-ready-review` before review, and `$axis-pull-request` before opening, updating, or marking a PR ready. `$axis-pull-request` owns the pre-PR sequence: ready-review evidence → local CodeRabbit plugin review checkpoint → review fixes when needed → metadata validation → PR action. **PR title = Conventional Commit; PR description = Summary + Linked spec + Requirements only** — no review/check paste blocks, no commit list, no CI/Doc-drift status (GitHub Checks tab covers that).
 
-**Skill routing.** Use-case specs: `$axis-use-case-spec`; API contracts: `$axis-api-contract`; cross-module contracts: `$axis-cross-module-contract`; frontend: `$axis-frontend-feature`; design system: `$axis-design-system`; visuals: `$axis-visual-artifact`; review fixes: `$axis-review-feedback`; PR publish/update: `$axis-pull-request`.
+**Skill routing.** Use-case specs: `$axis-use-case-spec`; API contracts: `$axis-api-contract`; cross-module contracts: `$axis-cross-module-contract`; frontend: `$axis-frontend-feature`; design system: `$axis-design-system`; visuals: `$axis-visual-artifact`; review fixes from local CodeRabbit plugin, GitHub CodeRabbit, or humans: `$axis-review-feedback`; PR publish/update, including pre-PR CodeRabbit review: `$axis-pull-request`.
 
 **Large use cases:** split into **genuinely isolated PRs** (each branch from `main`, each passing the two-sided isolation test). See [pr-slicing.md](./pr-slicing.md) — never stack slice B on slice A's branch, never claim the Verification gate is green when you did not run it, and assign one owner per shared seam.
 
@@ -152,9 +152,9 @@ Common owner mapping:
 
 **Deferred follow-ups (mandatory when leaving work open):** do not wait for the user. Any skipped review item, thin-endpoint refactor, or partial layer needs a named `**Deferred follow-ups:**` line — full rules in [process.md § Deferred follow-up](process.md). Remove the line when fixed.
 
-### Review feedback (CodeRabbit / human)
+### Review feedback (local CodeRabbit plugin / GitHub / human)
 
-Use `$axis-review-feedback`. Apply fixes before resolving threads. Bots are **signal**, not authority — validate against the focused owner from [patterns-index.md](./patterns-index.md) and [AGENTS.md](../../AGENTS.md).
+Use `$axis-review-feedback`. Apply fixes before resolving threads. Local CodeRabbit plugin output may have no GitHub thread; classify and fix the issue, then return to `$axis-pull-request` when the feedback came from the pre-PR flow. Bots are **signal**, not authority — validate against the focused owner from [patterns-index.md](./patterns-index.md) and [AGENTS.md](../../AGENTS.md).
 
 Classify each comment as fixed, improved beyond suggestion, false positive with evidence, or deferred with owner. Prefer the design you would defend in review; when the user explicitly asks for the smallest change, say `Review fixes: minimal — <why>` in the PR Summary. For non-trivial improvements, say `Review fixes: improved — <what>`.
 
