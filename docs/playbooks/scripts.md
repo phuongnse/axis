@@ -42,6 +42,7 @@ python scripts/axis.py dotnet ef migrations add <Name> ...
 python scripts/axis.py frontend install
 python scripts/axis.py frontend ci
 python scripts/axis.py frontend test
+python scripts/axis.py frontend gen-design-tokens --check
 python scripts/axis.py frontend gen-api-types --check
 python scripts/axis.py docs sync-mermaid-theme
 python scripts/axis.py docs mermaid-init
