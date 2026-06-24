@@ -1,19 +1,19 @@
 ---
 name: axis-design-system
-description: Route and execute Axis design-system work safely. Use when changing tokens, primitive contracts, UI primitives, Penpot design-source handoff, screen/component consumer contracts, or deterministic enforcement/docs for design-system rules.
+description: Route and execute Axis design-system work safely. Use when changing tokens, primitive contracts, UI primitives, design-source handoff, screen/component consumer contracts, or deterministic enforcement/docs for design-system rules.
 ---
 
 # Axis Design System
 
 ## Goal
 
-Keep Axis design-system changes grounded in the source of truth: Penpot-approved decisions, executable tokens, UI primitives, component contracts, and deterministic enforcement. Treat this skill as a router plus checklist; do not duplicate the detailed rules from the owner docs.
+Keep Axis design-system changes grounded in the source of truth: approved design-source decisions, executable tokens, UI primitives, component contracts, and deterministic enforcement. Treat this skill as a router plus checklist; do not duplicate the detailed rules from the owner docs.
 
 ## Required Chaining
 
 - Use `$axis-design-gate` before non-trivial design-system edits.
 - Use `$axis-frontend-feature` when changing SPA routes, feature components, forms, or product screens.
-- Use `$axis-visual-artifact` when touching Penpot links, design-source rows, committed previews, Mermaid, or visual artifact docs.
+- Use `$axis-visual-artifact` when touching design-source rows, committed previews, Mermaid, or visual artifact docs.
 - Use `$axis-api-contract` or `$axis-cross-module-contract` first when design-system work reveals API or cross-module contract changes.
 - Use `$axis-ready-review` before asking whether the branch is ready; use `$axis-pull-request` before opening or marking a PR ready.
 
@@ -23,7 +23,7 @@ Read only the docs needed for the touched surface:
 
 - Always read `AGENTS.md`, `docs/playbooks/design-system.md`, and `docs/playbooks/agent-checklist.md`.
 - For frontend runtime changes, read `docs/playbooks/frontend.md`.
-- For Penpot/design-source or preview work, read `docs/playbooks/design-source.md` and `docs/playbooks/visual-artifact-checklist.md`.
+- For design-source or preview work, read `docs/playbooks/design-source.md` and `docs/playbooks/visual-artifact-checklist.md`.
 - For policy or script enforcement, read `docs/playbooks/scripts.md` and `docs/REVIEW_FINDINGS.md`.
 - For product screen behavior, read the owning `docs/use-cases/**` spec before touching UI.
 
@@ -44,7 +44,7 @@ Read only the docs needed for the touched surface:
    - Add or update shared primitives before feature screens consume them.
    - Update `frontend/src/design-system/primitive-contracts.ts` before broad primitive use.
    - Do not add per-file allowlists for design-system violations; add the missing token, primitive, contract, or documented workaround.
-   - Prefer Penpot-approved tokens and executable registries over catalog pages, screenshots, or visual baselines.
+   - Prefer approved source tokens and executable registries over catalog pages, screenshots, or visual baselines.
 
 4. Check guard quality before adding enforcement.
    - Add a deterministic guard only for a reusable invariant backed by a source-of-truth file or registry.

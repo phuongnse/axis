@@ -15,7 +15,7 @@ For repeatable execution, use `$axis-design-system`.
 | Design system | Tokens, component anatomy, variants, state matrices, visual rules | New product behavior or acceptance criteria |
 | Frontend code | Executable components, accessibility behavior, responsive implementation | New visual rules not represented in the design system |
 
-Design-system work must not use Excalidraw files as the final visual source. Use Penpot design sources per [design-source.md](./design-source.md); legacy Excalidraw wireframes remain low-fidelity artifacts until migrated.
+Design-system work must not use Excalidraw files as the final visual source. Use editable design sources per [design-source.md](./design-source.md); legacy Excalidraw wireframes remain low-fidelity artifacts until migrated.
 
 ## Pixel-Perfect Definition
 
@@ -55,7 +55,7 @@ Token changes are design-system changes. They should not be bundled with unrelat
 
 ## Token Export/Import Convention
 
-Penpot owns the approved design token decisions. Frontend code owns the executable token contract that components can consume.
+Editable design sources own approved design token decisions. Frontend code owns the executable token contract that components can consume.
 
 | File | Owns |
 |---|---|
@@ -65,15 +65,15 @@ Penpot owns the approved design token decisions. Frontend code owns the executab
 | `frontend/src/design-system/consumer-contracts.ts` | Route-bound UI consumer registry: product surface, route, owner, readiness, primitive usage, state coverage, evidence, and tests |
 | `frontend/tailwind.config.js` | Tailwind names that map to semantic CSS variables |
 
-When importing token updates from Penpot:
+When importing token updates from a design source:
 
-1. Translate approved Penpot token names into the semantic CSS variable names in `tokens.css`.
+1. Translate approved source token names into the semantic CSS variable names in `tokens.css`.
 2. Update `tokens.ts` in the same change so tests know the complete token contract.
 3. Map semantic tokens in `tailwind.config.js`; components should consume Tailwind token classes such as `bg-primary`, `text-muted-foreground`, `border-border`, and `rounded-md`.
 4. Map shadows and reusable gradients as named Tailwind tokens such as `shadow-surface`, `shadow-panel`, and `bg-gradient-inverse-panel`.
 5. Keep raw hex, raw HSL, raw neutral colors, raw shadows, and one-off visual values out of component files when a semantic token exists.
 
-Do not generate frontend tokens from unapproved design files. If a Penpot export changes a visual decision, treat that as design-system work and include the registry/test update in the same PR.
+Do not generate frontend tokens from unapproved design files. If a source export changes a visual decision, treat that as design-system work and include the registry/test update in the same PR.
 
 ## Component Inventory
 
@@ -152,14 +152,14 @@ Do not add per-file allowlists for design-system violations. If a component need
 
 ## Automation Boundary
 
-The default design-system workflow is Penpot source → executable tokens/contracts → component code/tests. Do not add a `/design-system` route, component catalog, committed visual snapshot baseline, or image-comparison harness as part of routine token/component work. Reintroduce one only after an explicit Design Gate decision names the owner, review job, retention rule, trigger, and cleanup path.
+The default design-system workflow is editable design source → executable tokens/contracts → component code/tests. Do not add a `/design-system` route, component catalog, committed visual snapshot baseline, or image-comparison harness as part of routine token/component work. Reintroduce one only after an explicit Design Gate decision names the owner, review job, retention rule, trigger, and cleanup path.
 
 New design-system guards must pass the same quality bar as repo policy guards:
 
 | Question | Required answer |
 |---|---|
 | Reusable invariant? | The rule applies to a class of future changes, not one screen, class string, route, or translation key |
-| Source of truth? | The checked value comes from Penpot-approved tokens, executable registries, generated contracts, or a documented owner file |
+| Source of truth? | The checked value comes from approved source tokens, executable registries, generated contracts, or a documented owner file |
 | Cheap proof? | A negative policy test can prove the bad class fails without requiring visual or product-intent judgment |
 
 If any answer is no, keep the finding review-only in [REVIEW_FINDINGS.md](../REVIEW_FINDINGS.md) or turn the pattern into an explicit registry/contract first. Do not solve a subjective visual review problem with a brittle regex.
@@ -178,7 +178,7 @@ If any answer is no, keep the finding review-only in [REVIEW_FINDINGS.md](../REV
 
 ## Component Verification Coverage
 
-Component verification proves that implementation surfaces consume the registered tokens, primitives, and states. It does not replace Penpot as the design source of truth.
+Component verification proves that implementation surfaces consume the registered tokens, primitives, and states. It does not replace the editable design source.
 
 | Target | Minimum coverage |
 |---|---|

@@ -1386,7 +1386,7 @@ class TestDocDriftRatchets(unittest.TestCase):
                         "```bash",
                         "dotnet build",
                         "npm run test",
-                        "npx -y @penpot/mcp@2.15.4",
+                        "npx -y external-design-agent",
                         "openssl genrsa -out key.pem 2048",
                         "grpcurl -cacert .dev-certs/rootCA.pem localhost:5281 list",
                         "python docs/scripts/sync-mermaid-theme.py",
@@ -1399,7 +1399,7 @@ class TestDocDriftRatchets(unittest.TestCase):
 
         self.assertIn("use `python scripts/axis.py dotnet ...`", issues)
         self.assertIn("use `python scripts/axis.py frontend ...`", issues)
-        self.assertIn("use the Penpot Cloud MCP integration", issues)
+        self.assertIn("use an approved project wrapper", issues)
         self.assertIn("use `python scripts/axis.py local-dev certs`", issues)
         self.assertIn("use `python scripts/axis.py grpc ...`", issues)
         self.assertIn("use `python scripts/axis.py docs ...`", issues)
@@ -1425,39 +1425,6 @@ class TestDocDriftRatchets(unittest.TestCase):
         )
 
         self.assertEqual("", issues)
-
-    def visual_artifact_issue_text(self, files: dict[str, str]) -> str:
-        with tempfile.TemporaryDirectory() as temp:
-            root = Path(temp)
-            for relative, content in files.items():
-                path = root / relative
-                path.parent.mkdir(parents=True, exist_ok=True)
-                path.write_text(content, encoding="utf-8")
-            return "\n".join(axis.visual_artifact_hygiene_issues(files.keys(), root=root))
-
-    def test_rejects_penpot_mcp_transport_urls_in_visual_docs(self) -> None:
-        issues = self.visual_artifact_issue_text(
-            {
-                "docs/playbooks/design-source.md": (
-                    "Connect with https://design.example/mcp/stream?userToken=secret.\n"
-                ),
-            }
-        )
-
-        self.assertIn("Penpot MCP URLs with embedded userToken", issues)
-        self.assertIn("Penpot MCP transport URLs must not be documented", issues)
-
-    def test_accepts_penpot_design_frame_links_in_visual_docs(self) -> None:
-        issues = self.visual_artifact_issue_text(
-            {
-                "docs/playbooks/design-source.md": (
-                    "Use [source](https://design.example/#/view/file-id?page-id=page&section=interactions).\n"
-                ),
-            }
-        )
-
-        self.assertEqual("", issues)
-
 
 class TestWorkingTreeDiffHelpers(unittest.TestCase):
     def test_module_main_supports_dataclass_scripts(self) -> None:

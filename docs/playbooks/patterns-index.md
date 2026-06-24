@@ -27,7 +27,7 @@ Open the owner doc for the surface you are changing. `patterns.md` is a compatib
 | Running pre-commit hygiene checks | [Code hygiene patterns](./code-hygiene-patterns.md) |
 | React / TanStack Query screen | [Frontend playbook](./frontend.md) |
 | Design-system tokens, components, or pixel-perfect workflow | [Design system](./design-system.md) |
-| Penpot design source or AI design agent | [Design source](./design-source.md) |
+| Design source or AI design agent | [Design source](./design-source.md) |
 | Design-source or visual docs | [Design source](./design-source.md) · [Wireframe kit](./wireframes.md) · [Visual artifact checklist](./visual-artifact-checklist.md) |
 | New module / Kafka / proto / domain README index | [Repo layout discovery](./repo-layout-discovery.md) |
 
@@ -49,7 +49,7 @@ Open the owner doc for the surface you are changing. `patterns.md` is a compatib
 | [code-hygiene-patterns.md](./code-hygiene-patterns.md) | Pre-commit code hygiene and policy regex constraints |
 | [frontend.md](./frontend.md) | SPA architecture, state, forms, components, accessibility |
 | [design-system.md](./design-system.md) | Tokens, reusable components, pixel-perfect workflow, component contract checks |
-| [design-source.md](./design-source.md) | Penpot source-of-truth workflow, MCP usage, source/preview link rules |
+| [design-source.md](./design-source.md) | Design-source workflow and source/preview link rules |
 | [wireframes.md](./wireframes.md) | Low-fidelity screen intent and legacy wireframe workflow |
 
 ---

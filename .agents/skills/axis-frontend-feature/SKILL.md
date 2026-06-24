@@ -33,7 +33,7 @@ Implement an Axis frontend slice with generated API types, user-visible states, 
    - Use TanStack Query for server state and Zustand only for client-only state.
    - Use React Hook Form plus Zod for forms.
    - Include loading, empty, error, validation, disabled, and success states when the workflow needs them.
-   - Match the owning Penpot source/preview when screen shape changes; update the use-case `## Design Sources` row through `$axis-visual-artifact`.
+   - Match the owning design source/preview when screen shape changes; update the use-case `## Design Sources` row through `$axis-visual-artifact`.
    - Do not store auth tokens in `localStorage`.
    - Keep visible text focused on the product workflow, not developer instructions.
 
