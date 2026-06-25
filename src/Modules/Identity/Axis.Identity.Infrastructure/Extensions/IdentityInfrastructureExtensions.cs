@@ -34,7 +34,6 @@ public static class IdentityInfrastructureExtensions
 
         services.AddScoped<IWorkspaceRepository, WorkspaceRepository>();
         services.AddScoped<IUserRepository, UserRepository>();
-        services.AddScoped<IWorkspaceMembershipRepository, WorkspaceMembershipRepository>();
         services.AddScoped<IRegistrationIdempotencyRepository, RegistrationIdempotencyRepository>();
 
         services.AddScoped<IUnitOfWork, IdentityUnitOfWork>();

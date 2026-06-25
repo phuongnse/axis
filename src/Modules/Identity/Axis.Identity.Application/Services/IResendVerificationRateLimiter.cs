@@ -2,7 +2,7 @@ using Axis.Shared.Domain.Primitives;
 
 namespace Axis.Identity.Application.Services;
 
-/// <summary>max 3 verification resends per normalized email per hour.</summary>
+/// <summary>Limits verification email resends per normalized email.</summary>
 public interface IResendVerificationRateLimiter
 {
     /// <summary>

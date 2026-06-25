@@ -1,15 +1,15 @@
 # Use Cases
 
-> **Navigation**: [docs](../README.md) · [AGENTS](../../AGENTS.md)
+> **Navigation**: [docs/README.md](../README.md) · [AGENTS.md](../../AGENTS.md)
 
-Use cases are the product source of truth. A use case stays in this tree only when it is implemented, actively being implemented, or deliberately being specified for the next concrete slice.
+Use cases are the product source of truth. One use case is a complete end-to-end flow: spec details, acceptance criteria, design-system contract, implementation status, acceptance tests, and review verification.
 
 ## Current Use Cases
 
 | Domain | Use case | Status |
 |---|---|---|
-| [identity-access](./identity-access/README.md) | [Register a standalone user account](./identity-access/register-user/README.md) | Done |
+| [docs/use-cases/identity-access/README.md](./identity-access/README.md) | [docs/use-cases/identity-access/register-user/README.md](./identity-access/register-user/README.md) | Done |
 
 ## Rule
 
-Do not add placeholder use-case folders. If a feature is not end-to-end usable, keep it out of this tree until it is ready to specify and implement.
+Do not add placeholder use-case folders.

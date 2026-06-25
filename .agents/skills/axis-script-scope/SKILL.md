@@ -9,6 +9,12 @@ description: Choose and run Axis scripts with the right scope and timing. Use wh
 
 Run enough evidence for the current context without turning development into local CI.
 
+## Inputs
+
+- Current moment: exploring, inner loop, ready-review boundary, or CI/debugging.
+- Changed paths or intended script/policy surface.
+- Checks already run and whether any subsequent diff invalidated them.
+
 ## Workflow
 
 1. Classify the moment.
@@ -19,7 +25,7 @@ Run enough evidence for the current context without turning development into loc
 
 2. Pick the narrow check.
    - Docs: focused docs check; use `$axis-doc-hygiene` when changing docs.
-   - Skills: skill-creator validation plus `python scripts/axis.py check codex-skills`.
+   - Skills: when available, run skill-creator `scripts/quick_validate.py <skill-folder>`, then `python scripts/axis.py check codex-skills`.
    - Scripts/policy: focused script/policy test, then `python scripts/axis.py check policy-tests` when rule wiring changed.
    - Backend: targeted test or `python scripts/axis.py dotnet build`; unit tests when behavior changed.
    - Frontend: focused Vitest/Playwright or `python scripts/axis.py frontend ci` for type/lint risk.
@@ -34,7 +40,9 @@ Run enough evidence for the current context without turning development into loc
 4. Use wrappers.
    - Document repo workflows through `python scripts/axis.py ...`.
    - Keep raw Docker, dotnet, npm, Lychee, and OpenSSL commands inside wrappers or package scripts.
-   - If a needed wrapper is missing, add it through `scripts/axis.py` instead of documenting a raw command.
+   - If a needed wrapper is missing, add it through [scripts/axis.py](../../../scripts/axis.py) instead of documenting a raw command.
+   - Encode current invariants in deterministic checks.
+   - When removing or renaming a command, marker, heading, or artifact, update the supported surface, run a one-time `rg` sweep for the old token, and remove old-token docs/tests. Do not keep permanent denylist or forbidden checks for the old name.
 
 5. Report honestly.
    - For each relevant check, say ran, not triggered with reason, failed with blocker, or skipped by explicit user request.
@@ -42,4 +50,4 @@ Run enough evidence for the current context without turning development into loc
 
 ## Output
 
-Report why each command was chosen, what was intentionally not run, and the next boundary check if review readiness is the goal.
+Report why each command was chosen, what was intentionally not run, any old-token sweep for renamed or removed surfaces, and the next boundary check if review readiness is the goal.

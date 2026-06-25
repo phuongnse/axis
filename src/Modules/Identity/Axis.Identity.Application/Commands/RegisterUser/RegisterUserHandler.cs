@@ -10,7 +10,6 @@ namespace Axis.Identity.Application.Commands.RegisterUser;
 public sealed class RegisterUserHandler(
     IUserRepository userRepo,
     IWorkspaceRepository workspaceRepo,
-    IWorkspaceMembershipRepository membershipRepo,
     IRegistrationIdempotencyRepository idempotencyRepo,
     IEmailVerificationTokenStore verificationTokenStore,
     IWorkspaceSlugGenerator slugGenerator,
@@ -121,8 +120,5 @@ public sealed class RegisterUserHandler(
             command.AcceptedPrivacyVersion);
 
         await workspaceRepo.AddAsync(personalWorkspace, cancellationToken);
-
-        WorkspaceMembership membership = WorkspaceMembership.Create(user.Id, personalWorkspace.Id);
-        await membershipRepo.AddAsync(membership, cancellationToken);
     }
 }

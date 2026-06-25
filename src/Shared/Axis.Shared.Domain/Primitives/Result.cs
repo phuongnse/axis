@@ -64,8 +64,6 @@ public class Result
     /// <summary>Per-field validation errors. Only populated when ErrorCode == ErrorCodes.FieldValidation.</summary>
     public IReadOnlyDictionary<string, string[]>? FieldErrors => _fieldErrors;
 
-    // ── Factory methods ─────────────────────────────────────────────────────
-
     public static Result Success() => new(true, null, null);
 
     /// <summary>Failure without a specific code — maps to HTTP 422 by default.</summary>

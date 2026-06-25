@@ -1,51 +1,36 @@
 # Architecture
 
-> **Navigation**: [docs](./README.md) · [AGENTS.md](../AGENTS.md)
+> **Navigation**: [docs/README.md](./README.md) · [AGENTS.md](../AGENTS.md)
 
-Axis currently ships one module behind one API gateway.
+This file owns durable source and runtime boundaries. Current behavior lives in [docs/use-cases/README.md](./use-cases/README.md); stack choices live in [docs/TECH_STACK.md](./TECH_STACK.md).
 
-## Runtime Shape
+## Boundary Rules
 
-| Layer | Runtime |
-|---|---|
-| Web | React SPA in `frontend/` |
-| Gateway | `src/Axis.Api` REST/OpenAPI gateway |
-| Module | `src/Modules/Identity` |
-| Data | PostgreSQL database `axis_identity` |
-| Cache / token support | Redis |
-| Email | SMTP, Maildev in local development |
-| Observability | Serilog + OpenTelemetry exporter configuration |
+- `frontend/` calls `Axis.Api` only.
+- `Axis.Api` is the REST/OpenAPI gateway and composes module infrastructure at startup.
+- Modules expose Application contracts to `Axis.Api`; module internals stay inside the module.
+- Domain projects have zero external dependencies.
+- `Axis.Shared.*` is for shared primitives and cross-cutting helpers only, not product behavior.
+- Module-owned data changes use EF Core migrations.
+- New product behavior starts in an owning use-case spec before source changes.
 
-## Source Boundaries
+## Dependency Direction
 
 ```text
-Axis.Identity.Domain
-  -> Axis.Identity.Application
-  -> Axis.Identity.Infrastructure
+frontend
   -> Axis.Api
-  -> frontend
+    -> Module.Application
+      -> Module.Domain
+    -> Module.Infrastructure
+      -> Module.Application
+      -> Module.Domain
+
+Axis.Shared.* supports layers without owning product behavior.
 ```
 
-`frontend/` calls only `Axis.Api`. `Axis.Api` calls Identity Application through MediatR and composes Identity Infrastructure at startup.
+## Ownership
 
-## Authentication
-
-Identity uses OpenIddict for Authorization Code + PKCE. The current usable flow is:
-
-1. User registers through `POST /api/users/register`.
-2. User verifies email through `POST /api/auth/verify-email`.
-3. API establishes the browser sign-in session.
-4. SPA completes PKCE through `/connect/authorize` and `/connect/token`.
-5. Authenticated SPA calls `GET /api/users/me`.
-
-Anything beyond the verified standalone-registration flow needs a new owning use case before source returns.
-
-## Data Ownership
-
-Identity owns users, personal workspaces, memberships, email-verification tokens, legal acceptance records, and OpenIddict storage. Schema changes use EF Core migrations only.
-
-There are no cross-module data flows in the current repo state.
-
-## Operations
-
-Local development uses Docker Compose for PostgreSQL, Redis, Maildev, optional OpenTelemetry collector, API, frontend, and E2E runner. Health endpoints remain anonymous. Logs must not contain PII.
+- Use-case docs own behavior, flows, acceptance criteria, and implementation status.
+- Module code owns business rules and persistence details.
+- [docs/TECH_STACK.md](./TECH_STACK.md) owns approved runtime and library categories.
+- [docs/ENFORCEMENT.md](./ENFORCEMENT.md) owns recurring architecture enforcement status.

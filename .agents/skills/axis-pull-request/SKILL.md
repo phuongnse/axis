@@ -12,15 +12,22 @@ Own the PR publication boundary. This skill prepares the branch for publication,
 Do not perform branch readiness auditing here. Use `$axis-ready-review` first when readiness evidence is missing, stale, or not explicitly provided. Do not treat CodeRabbit as a machine gate; it is a required review checkpoint before PR publication unless the user explicitly asks to skip it.
 Do not rerun local guards just to create a longer transcript. Run each required guard once, then rerun only when a subsequent change invalidates that evidence.
 
+## Inputs
+
+- Requested PR action: create, update, mark ready, or metadata-only update.
+- Fresh `$axis-ready-review` evidence unless the action is metadata-only.
+- Exact title/body draft or enough summary, linked spec, and requirement evidence to draft one.
+
 ## Workflow
 
 1. Confirm readiness evidence.
-   - If the user asks to open, update, or mark a PR ready and no fresh ready-review result exists, run `$axis-ready-review` first.
-   - If `$axis-ready-review` reports Not ready, stop before PR actions and report the blocker.
+   - If the user asks to open a PR, update the published branch/diff, or mark a PR ready and no fresh ready-review result exists, run `$axis-ready-review` first.
+   - If `$axis-ready-review` reports Not ready, stop before branch/diff PR actions or mark-ready and report the blocker.
    - If the user only asks to update PR metadata, readiness evidence is not required.
 
 2. Run the pre-PR CodeRabbit review checkpoint.
-   - For create PR, update PR, or mark-ready requests, use the CodeRabbit plugin review skill (`$coderabbit:code-review`) after readiness passes and before GitHub PR actions.
+   - For create PR, branch/diff update, or mark-ready requests, use the CodeRabbit plugin review skill (`$coderabbit:code-review`) after readiness passes and before GitHub PR actions.
+   - Metadata-only title/body updates do not require CodeRabbit.
    - Confirm the CLI is available through `python scripts/axis.py check coderabbit-cli` when fresh toolchain evidence is missing.
    - Review the same branch diff that will be published. Prefer the committed branch diff when the branch is already committed; otherwise review the uncommitted diff before committing.
    - If CodeRabbit raises issues, treat the output as review feedback: classify it before changing code, resolve the valid items, then rerun the touched verification checks and `$axis-ready-review`.

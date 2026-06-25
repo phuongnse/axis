@@ -1,58 +1,19 @@
 # Contributing to Axis
 
-Docs-first development: feature specs in `docs/use-cases/` are the contract; code implements them. The full agent and human workflow lives in [AGENTS.md](AGENTS.md) and [docs/playbooks/agent-checklist.md](docs/playbooks/agent-checklist.md) - this file is the short pointer for first-time contributors.
+Axis uses docs-first development. Use-case specs under [docs/use-cases/README.md](./docs/use-cases/README.md) are the product contract, and [AGENTS.md](./AGENTS.md) is the repo contract.
 
----
+## Branches and commits
 
-## Branch and commit
+- Branch from `main`; do not push directly to `main`.
+- Use `{type}/{short-description}` in kebab-case with `feat`, `fix`, `docs`, `refactor`, `test`, or `chore`.
+- Use Conventional Commits in imperative mood, max 72 characters, no trailing period.
 
-- **Base branch:** `main` - pull latest before branching. Never push directly to `main`.
-- **Branch names:** `{type}/{short-description}` in kebab-case. `type` is one of `feat`, `fix`, `docs`, `refactor`, `test`, `chore`.
-- **Commits:** [Conventional Commits](https://www.conventionalcommits.org/) - imperative, max 72 chars, no trailing period (e.g. `feat: add execution cancel endpoint`).
-- **Tool-named branches** (`cursor/...`, etc.): rename to the convention above before pushing unless you intentionally keep that name.
+## Before a PR
 
-## Before you push
+Install the local pre-push hook with `python scripts/axis.py install-hooks`.
 
-Install the local hook once with `python scripts/axis.py bootstrap`. The hook runs `python scripts/axis.py pre-push`, a quick policy/doc sanity gate that should not feel like local CI. Use `python scripts/axis.py verify` before marking a PR ready or claiming the local Verification gate is green. The authoritative Verification gate policy and command matrix live in [agent-checklist.md § Verification Gate](docs/playbooks/agent-checklist.md#verification-gate--verify-before-pr-review); unit-only feedback is available via `python scripts/axis.py test unit`. Script standards live in [scripts.md](docs/playbooks/scripts.md).
+Follow [docs/playbooks/agent-checklist.md](./docs/playbooks/agent-checklist.md) before opening or marking a PR ready. Run checks through `python scripts/axis.py ...`; command ownership lives in [docs/playbooks/scripts.md](./docs/playbooks/scripts.md).
 
-1. Walk Ready review, Verification gate, Docs review, and Retrospective review in [docs/playbooks/agent-checklist.md](docs/playbooks/agent-checklist.md) locally; tick the matching boxes in the PR body.
-2. When you touch C# under `src/` or `tests/`, run `python scripts/axis.py dotnet format --check` - style and naming rules live in [`.editorconfig`](.editorconfig).
-3. For docs, scripts, repo layout, handlers, endpoints, generated-contract surfaces, or bulk rewrites, use the policy/doc checks triggered by [agent-checklist.md § Verification Gate](docs/playbooks/agent-checklist.md#verification-gate--verify-before-pr-review). If `docker-compose.yml` changes, update [local-dev.md](docs/playbooks/local-dev.md).
-4. PR description: **Summary + Linked spec + Requirements only** - no commit list, no CI status (the Checks tab covers that). GitHub auto-fills [.github/PULL_REQUEST_TEMPLATE.md](.github/PULL_REQUEST_TEMPLATE.md); CI job **PR body guard** enforces the required sections and checklist state.
-## Dependency updates (Dependabot)
+Use [docs/playbooks/local-dev.md](./docs/playbooks/local-dev.md) for the local stack. When [docker-compose.yml](./docker-compose.yml) changes, update that playbook in the same PR.
 
-[`.github/dependabot.yml`](.github/dependabot.yml) runs **monthly** (first day of month, 06:00 Asia/Ho_Chi_Minh) and opens at most **one grouped PR per ecosystem**:
-
-| Ecosystem | Typical PR |
-|-----------|------------|
-| NuGet | All minor + patch bumps in `Directory.Packages.props` |
-| npm (`frontend/`) | All minor + patch bumps in `frontend/package.json` / lockfile |
-| GitHub Actions | All minor + patch action bumps |
-
-**Security advisories** still open a dedicated PR as soon as GitHub publishes them (not waiting for the monthly schedule).
-
-**Semver-major** bumps (NuGet, npm, GitHub Actions) are **ignored** by Dependabot - upgrade in an intentional `chore(deps)` PR when ready (major versions often need code changes; auto-PRs will fail CI until then).
-
-CI also runs `python scripts/axis.py check vulnerable-packages` on every build; merge security PRs promptly even if the monthly bundle is still open.
-
-## Coverage
-
-CI collects code coverage via coverlet on every PR and uploads `coverage.cobertura.xml` as an artifact (`dotnet-coverage`). **No threshold is enforced yet** - we want a measured baseline first before locking a floor. Open the artifact on a failing PR to see line/branch coverage per assembly; use it as a sanity check, not as a gate.
-
-When introducing a threshold, set it from the **current measured value** of Domain + Application test projects minus a small buffer (e.g. 5 percentage points). Never set it above the baseline - that breaks unrelated PRs.
-
-## Local dev stack
-
-`python scripts/axis.py local-dev up` starts the full stack. **Ports, URLs, startup order, hot reload, and reset commands** live in one place: [docs/playbooks/local-dev.md](docs/playbooks/local-dev.md).
-
-When you change [`docker-compose.yml`](docker-compose.yml), update that playbook in the same PR. The local-dev docs guard is part of Doc drift.
-
-## Where to read more
-
-| Doc | Purpose |
-|-----|---------|
-| [AGENTS.md](AGENTS.md) | Architecture severity rules and P0 stops |
-| [docs/playbooks/agent-checklist.md](docs/playbooks/agent-checklist.md) | Daily workflow, Verification gate, and review checks |
-| [docs/playbooks/process.md](docs/playbooks/process.md) | Layer-by-layer implementation + deferred follow-ups |
-| [docs/README.md](docs/README.md) | Documentation hub + single source of truth per topic |
-| [docs/README.md](docs/README.md) | Documentation hub + single source of truth per topic |
+GitHub fills the PR body from [.github/PULL_REQUEST_TEMPLATE.md](./.github/PULL_REQUEST_TEMPLATE.md). Keep the description to Summary, Linked spec, and Requirements; CI status belongs in Checks.

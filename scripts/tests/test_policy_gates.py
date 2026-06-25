@@ -36,29 +36,6 @@ def load_python_file(path: Path):
 
 check_pr = load_script("check-pr.py")
 check_use_case_docs = load_script("check-use-case-docs.py")
-sync_mermaid_theme = load_python_file(ROOT / "docs" / "scripts" / "sync-mermaid-theme.py")
-
-
-class TestSyncMermaidTheme(unittest.TestCase):
-    def test_moves_existing_init_after_banner_to_canonical_first_line(self) -> None:
-        old_init = '%%{init: {"theme": "neutral"}}%%'
-        content = (
-            "```mermaid\n"
-            "%% existing banner\n"
-            f"{old_init}\n"
-            "flowchart TD\n"
-            "    A --> B\n"
-            "```\n"
-        )
-
-        synced, changed = sync_mermaid_theme.sync_mermaid_blocks(content)
-
-        self.assertTrue(changed)
-        self.assertEqual(1, synced.count("%%{init:"))
-        self.assertIn(
-            f"```mermaid\n{sync_mermaid_theme.MERMAID_INIT}\n%% existing banner\nflowchart TD\n",
-            synced,
-        )
 
 
 class TestTestNamingGate(unittest.TestCase):
@@ -146,7 +123,7 @@ class TestUseCaseDocsGate(unittest.TestCase):
             finally:
                 check_use_case_docs.ROOT = original_root
 
-    def issues_for_use_case(self, callout: str) -> list[str]:
+    def issues_for_use_case(self, callout: str, ac_line: str = "- **AC-001** Works.") -> list[str]:
         matrix = (
             ""
             if "## Acceptance Test Matrix" in callout
@@ -159,7 +136,7 @@ class TestUseCaseDocsGate(unittest.TestCase):
 """
         )
         return self.issues_for_document(
-            """# Sample use case
+            f"""# Sample use case
 
 ## Purpose
 
@@ -186,11 +163,21 @@ Ship user value.
 ## Acceptance Criteria
 
 *Happy path*
-- [ ] AC-001 Works.
+{ac_line}
 
 """
             + matrix
             + """
+## Out Of Scope
+
+- N/A.
+
+## Design System
+
+| Surface | Contract |
+|---|---|
+| N/A | N/A |
+
 ## Design Sources
 
 | Screen | Source | Preview |
@@ -221,83 +208,6 @@ Ship user value.
 
         self.assertIn("missing implementation status deferred follow-ups section", "\n".join(issues))
 
-    def test_rejects_legacy_deferred_heading(self) -> None:
-        issues = self.issues_for_use_case(
-            """> **Implementation status**
->
-> | Layer | Status |
-> |-------|--------|
-> | Domain | N/A |
-> | Application | N/A |
-> | Infrastructure | N/A |
-> | API | N/A |
-> | Frontend | N/A |
->
-> **Gaps vs spec:** none.
->
-> **Deferred:** legacy wording.
->
-> **Decisions:** N/A.
-"""
-        )
-
-        joined = "\n".join(issues)
-        self.assertIn("missing implementation status deferred follow-ups section", joined)
-        self.assertIn("legacy Deferred status heading found", joined)
-
-    def test_rejects_legacy_deferred_heading_even_when_status_is_not_strict(self) -> None:
-        with tempfile.TemporaryDirectory() as temp:
-            root = Path(temp)
-            path = root / "docs" / "use-cases" / "example" / "sample" / "README.md"
-            path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(
-                """# Sample use case
-
-## Purpose
-
-Ship user value.
-
-## Primary actor
-
-- User
-
-## Trigger
-
-- User starts the flow.
-
-## Main flow
-
-1. User starts.
-
-## Alternate / error flows
-
-- None.
-
-## Acceptance Criteria
-
-- [ ] Works.
-
-## Design Sources
-
-| Screen | Source | Preview |
-|--------|--------|---------|
-| N/A | N/A | N/A |
-
-> **Implementation status**
->
-> **Deferred:** legacy wording.
-""",
-                encoding="utf-8",
-            )
-            original_root = check_use_case_docs.ROOT
-            check_use_case_docs.ROOT = root
-            try:
-                issues = check_use_case_docs.check_file(path, strict_status=False)
-            finally:
-                check_use_case_docs.ROOT = original_root
-
-        self.assertIn("legacy Deferred status heading found", "\n".join(issues))
-
     def test_rejects_pending_layer_with_empty_gap_and_deferred_status(self) -> None:
         issues = self.issues_for_use_case(
             """> **Implementation status**
@@ -308,11 +218,13 @@ Ship user value.
 > | Application | N/A |
 > | Infrastructure | N/A |
 > | API | N/A |
-> | Frontend | \u23f3 |
+> | Frontend | Not started |
 >
 > **Gaps vs spec:** none.
 >
 > **Deferred follow-ups:** N/A.
+>
+> **Verification:** N/A.
 >
 > **Decisions:** N/A.
 """
@@ -331,7 +243,7 @@ Ship user value.
 > | Application | N/A |
 > | Infrastructure | N/A |
 > | API | N/A |
-> | Frontend | \u23f3 |
+> | Frontend | Not started |
 >
 > **Gaps vs spec:** Open work remains in layers marked pending above.
 >
@@ -385,11 +297,38 @@ Ship user value.
 >
 > **Deferred follow-ups:** N/A.
 >
+> **Verification:** N/A.
+>
 > **Decisions:** N/A.
 """
         )
 
         self.assertEqual([], issues)
+
+    def test_rejects_acceptance_criteria_without_bold_id_prefix(self) -> None:
+        issues = self.issues_for_use_case(
+            """> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | Domain | N/A |
+> | Application | N/A |
+> | Infrastructure | N/A |
+> | API | N/A |
+> | Frontend | N/A |
+>
+> **Gaps vs spec:** none.
+>
+> **Deferred follow-ups:** N/A.
+>
+> **Verification:** N/A.
+>
+> **Decisions:** N/A.
+""",
+            ac_line="- AC-001 Works.",
+        )
+
+        self.assertIn("must use `- **AC-001** ...` format", "\n".join(issues))
 
     def test_rejects_evidence_source_column_in_acceptance_test_matrix(self) -> None:
         issues = self.issues_for_use_case(
@@ -412,6 +351,8 @@ Ship user value.
 > **Gaps vs spec:** none.
 >
 > **Deferred follow-ups:** N/A.
+>
+> **Verification:** N/A.
 >
 > **Decisions:** N/A.
 """
@@ -448,7 +389,7 @@ Ship user value.
 ## Acceptance Criteria
 
 *Happy path*
-- [ ] AC-001 Works.
+- **AC-001** Works.
 
 ## Design Sources
 
@@ -469,6 +410,8 @@ Ship user value.
 > **Gaps vs spec:** none.
 >
 > **Deferred follow-ups:** N/A.
+>
+> **Verification:** N/A.
 >
 > **Decisions:** N/A.
 """
@@ -500,6 +443,8 @@ Ship user value.
 >
 > **Deferred follow-ups:** N/A.
 >
+> **Verification:** N/A.
+>
 > **Decisions:** N/A.
 """
         )
@@ -530,6 +475,8 @@ Ship user value.
 >
 > **Deferred follow-ups:** N/A.
 >
+> **Verification:** N/A.
+>
 > **Decisions:** N/A.
 """
         )
@@ -557,6 +504,8 @@ Ship user value.
 > **Gaps vs spec:** none.
 >
 > **Deferred follow-ups:** N/A.
+>
+> **Verification:** N/A.
 >
 > **Decisions:** N/A.
 """
@@ -587,6 +536,8 @@ Ship user value.
 > **Gaps vs spec:** none.
 >
 > **Deferred follow-ups:** N/A.
+>
+> **Verification:** N/A.
 >
 > **Decisions:** N/A.
 """
@@ -620,11 +571,13 @@ Ship user value.
 >
 > **Deferred follow-ups:** N/A.
 >
+> **Verification:** N/A.
+>
 > **Decisions:** N/A.
 """
         )
 
-        self.assertIn("IDs must use one local prefix", "\n".join(issues))
+        self.assertIn("invalid ID `REG-002`", "\n".join(issues))
 
     def test_rejects_design_sources_table_schema_drift(self) -> None:
         issues = self.issues_for_document(
@@ -655,7 +608,7 @@ Ship user value.
 ## Acceptance Criteria
 
 *Happy path*
-- [ ] AC-001 Works.
+- **AC-001** Works.
 
 ## Design Sources
 
@@ -676,6 +629,8 @@ Ship user value.
 > **Gaps vs spec:** none.
 >
 > **Deferred follow-ups:** N/A.
+>
+> **Verification:** N/A.
 >
 > **Decisions:** N/A.
 """
@@ -712,13 +667,23 @@ Ship user value.
 ## Acceptance Criteria
 
 *Happy path*
-- [ ] AC-001 Works.
+- **AC-001** Works.
 
 ## Acceptance Test Matrix
 
 | ID | Level | Scenario | Covers AC | Automated by | Required to close |
 |---|---|---|---|---|---|
 | AT-001 | E2E | User completes flow | AC-001 | Playwright | Yes |
+
+## Out Of Scope
+
+- N/A.
+
+## Design System
+
+| Surface | Contract |
+|---|---|
+| N/A | N/A |
 
 ## Design Sources
 
@@ -739,6 +704,8 @@ Ship user value.
 > **Gaps vs spec:** none.
 >
 > **Deferred follow-ups:** N/A.
+>
+> **Verification:** N/A.
 >
 > **Decisions:** N/A.
 """
@@ -775,7 +742,7 @@ Ship user value.
 ## Acceptance Criteria
 
 *Happy path*
-- [ ] AC-001 Works.
+- **AC-001** Works.
 
 ## Acceptance Test Matrix
 
@@ -796,6 +763,8 @@ Ship user value.
 > **Gaps vs spec:** none.
 >
 > **Deferred follow-ups:** N/A.
+>
+> **Verification:** N/A.
 >
 > **Decisions:** N/A.
 
@@ -838,13 +807,23 @@ Ship user value.
 ## Acceptance Criteria
 
 *Happy path*
-- [ ] AC-001 Works.
+- **AC-001** Works.
 
 ## Acceptance Test Matrix
 
 | ID | Level | Scenario | Covers AC | Automated by | Required to close |
 |---|---|---|---|---|---|
 | AT-001 | E2E | User completes flow | AC-001 | Playwright | Yes |
+
+## Out Of Scope
+
+- N/A.
+
+## Design System
+
+| Surface | Contract |
+|---|---|
+| register | Uses shared UI primitives. |
 
 ## Design Sources
 
@@ -865,6 +844,8 @@ Ship user value.
 > **Gaps vs spec:** none.
 >
 > **Deferred follow-ups:** N/A.
+>
+> **Verification:** N/A.
 >
 > **Decisions:** N/A.
 """
@@ -901,13 +882,23 @@ Ship user value.
 ## Acceptance Criteria
 
 *Happy path*
-- [ ] AC-001 Works.
+- **AC-001** Works.
 
 ## Acceptance Test Matrix
 
 | ID | Level | Scenario | Covers AC | Automated by | Required to close |
 |---|---|---|---|---|---|
 | AT-001 | E2E | User completes flow | AC-001 | Playwright | Yes |
+
+## Out Of Scope
+
+- N/A.
+
+## Design System
+
+| Surface | Contract |
+|---|---|
+| register | Uses shared UI primitives. |
 
 ## Design Sources
 
@@ -928,6 +919,8 @@ Ship user value.
 > **Gaps vs spec:** none.
 >
 > **Deferred follow-ups:** N/A.
+>
+> **Verification:** N/A.
 >
 > **Decisions:** N/A.
 """
@@ -964,13 +957,23 @@ Ship user value.
 ## Acceptance Criteria
 
 *Happy path*
-- [ ] AC-001 Works.
+- **AC-001** Works.
 
 ## Acceptance Test Matrix
 
 | ID | Level | Scenario | Covers AC | Automated by | Required to close |
 |---|---|---|---|---|---|
 | AT-001 | E2E | User completes flow | AC-001 | Playwright | Yes |
+
+## Out Of Scope
+
+- N/A.
+
+## Design System
+
+| Surface | Contract |
+|---|---|
+| register | Uses shared UI primitives. |
 
 ## Design Sources
 
@@ -992,6 +995,8 @@ Ship user value.
 >
 > **Deferred follow-ups:** N/A.
 >
+> **Verification:** N/A.
+>
 > **Decisions:** N/A.
 """
         )
@@ -1010,13 +1015,15 @@ Ship user value.
 >
 > **Deferred follow-ups:** N/A.
 >
+> **Verification:** N/A.
+>
 > **Decisions:** N/A.
 """
         )
 
         self.assertIn("Implementation status table columns must be exactly", "\n".join(issues))
 
-    def test_strips_implementation_status_for_stock_flow_ratchet(self) -> None:
+    def test_strips_implementation_status_for_stock_flow_check(self) -> None:
         before = """# Sample
 
 ## Main flow
@@ -1130,7 +1137,7 @@ class TestDocDriftRatchets(unittest.TestCase):
 
     def test_rejects_ensure_created(self) -> None:
         issues = self.issue_text([("tests/Fixture.cs", "await db.Database.EnsureCreatedAsync();")])
-        self.assertIn("EnsureCreated introduced", issues)
+        self.assertIn("Database setup must use the owning DbContext migration chain", issues)
 
     def test_rejects_datetime_now_in_src_or_tests(self) -> None:
         issues = self.issue_text([("src/Example.cs", "var now = DateTime.Now;")])
@@ -1200,6 +1207,25 @@ class TestDocDriftRatchets(unittest.TestCase):
     def test_current_repository_stale_references_still_pass(self) -> None:
         self.assertEqual([], axis.stale_reference_issues())
 
+    def test_accepts_standard_doc_navigation(self) -> None:
+        issues = axis.doc_navigation_line_issues(
+            axis.ROOT / "docs/playbooks/example.md",
+            "> **Navigation**: [docs/README.md](../README.md) · [AGENTS.md](../../AGENTS.md)",
+        )
+
+        self.assertEqual([], issues)
+
+    def test_rejects_non_standard_doc_navigation(self) -> None:
+        issues = "\n".join(
+            axis.doc_navigation_line_issues(
+                axis.ROOT / "docs/playbooks/example.md",
+                "> **Navigation**: [<- docs](../README.md) | [AGENTS](../../AGENTS.md)",
+            )
+        )
+
+        self.assertIn("non-standard separators or arrows", issues)
+        self.assertIn("navigation link label must be a repo markdown path", issues)
+
     def test_rejects_raw_docker_compose_commands_in_docs(self) -> None:
         issues = self.issue_text([("docs/playbooks/local-dev.md", "docker compose up -d")])
         self.assertIn("Raw Docker Compose command introduced in docs", issues)
@@ -1225,7 +1251,7 @@ class TestDocDriftRatchets(unittest.TestCase):
                         "npm run test",
                         "npx -y external-design-agent",
                         "openssl genrsa -out key.pem 2048",
-                        "python docs/scripts/sync-mermaid-theme.py",
+                        "python docs/scripts/render-visuals.py",
                         "```",
                     ]
                 ),
@@ -1236,7 +1262,6 @@ class TestDocDriftRatchets(unittest.TestCase):
         self.assertIn("use `python scripts/axis.py frontend ...`", issues)
         self.assertIn("use an approved project wrapper", issues)
         self.assertIn("use `python scripts/axis.py local-dev certs`", issues)
-        self.assertIn("use `python scripts/axis.py docs ...`", issues)
 
     def test_accepts_axis_wrapped_documented_commands(self) -> None:
         issues = self.documented_issue_text(
@@ -1249,7 +1274,6 @@ class TestDocDriftRatchets(unittest.TestCase):
                         "python scripts/axis.py dotnet build",
                         "python scripts/axis.py frontend test",
                         "python scripts/axis.py local-dev certs",
-                        "python scripts/axis.py docs sync-mermaid-theme",
                         "```",
                     ]
                 ),
@@ -2564,14 +2588,14 @@ class TestGovernanceOwnerBoundary(unittest.TestCase):
         self.assertEqual([], axis.governance_owner_boundary_issues())
 
 
-class TestReviewFindingsRegistry(unittest.TestCase):
-    def issues_for_review_findings(self, ledger_rows: str) -> list[str]:
+class TestEnforcementLedger(unittest.TestCase):
+    def issues_for_enforcement_ledger(self, ledger_rows: str) -> list[str]:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
-            path = root / "docs" / "REVIEW_FINDINGS.md"
+            path = root / "docs" / "ENFORCEMENT.md"
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(
-                """# Review findings
+                """# Enforcement
 
 ## Ledger
 
@@ -2581,38 +2605,38 @@ class TestReviewFindingsRegistry(unittest.TestCase):
                 + ledger_rows,
                 encoding="utf-8",
             )
-            return axis.review_findings_registry_issues(root=root)
+            return axis.enforcement_ledger_issues(root=root)
 
     def test_rejects_missing_rule_owner(self) -> None:
-        issues = self.issues_for_review_findings(
+        issues = self.issues_for_enforcement_ledger(
             "| Example finding |  | PR scope | CI job | negative test | **Enforced** |\n"
         )
 
         self.assertIn("Rule owner", "\n".join(issues))
 
     def test_rejects_unknown_status(self) -> None:
-        issues = self.issues_for_review_findings(
+        issues = self.issues_for_enforcement_ledger(
             "| Example finding | This file | PR scope | Review | Human review | **Mandatory** |\n"
         )
 
         self.assertIn("unknown ledger status", "\n".join(issues))
 
     def test_rejects_partial_without_known_gap(self) -> None:
-        issues = self.issues_for_review_findings(
-            "| Example finding | This file | PR scope | Diff ratchet | Untouched files are not swept | **Partial** |\n"
+        issues = self.issues_for_enforcement_ledger(
+            "| Example finding | This file | PR scope | Diff-based check | Unchanged files are not swept | **Partial** |\n"
         )
 
         self.assertIn("Partial row must name a known gap", "\n".join(issues))
 
     def test_rejects_review_only_gate_language(self) -> None:
-        issues = self.issues_for_review_findings(
+        issues = self.issues_for_enforcement_ledger(
             "| Example finding | This file | PR scope | CI gate | Human review | **Review-only** |\n"
         )
 
         self.assertIn("must not use gate/enforced language", "\n".join(issues))
 
-    def test_current_repository_review_findings_registry_still_passes(self) -> None:
-        self.assertEqual([], axis.review_findings_registry_issues())
+    def test_current_repository_enforcement_ledger_still_passes(self) -> None:
+        self.assertEqual([], axis.enforcement_ledger_issues())
 
 
 class TestEnforcementTruthAudit(unittest.TestCase):
@@ -2832,8 +2856,7 @@ class TestScriptsStandardGate(unittest.TestCase):
     def test_accepts_python_docs_utility_native_frontend_tooling_and_visual_assets(self) -> None:
         issues = self.issues_for_files(
             {
-                "docs/scripts/sync-mermaid-theme.py": "print('ok')\n",
-                "docs/diagrams/mermaid_theme.py": "MERMAID_INIT = ''\n",
+                "docs/scripts/render-visuals.py": "print('ok')\n",
                 "frontend/package.json": '{"scripts":{"export:visuals":"node scripts/export-visuals.mjs"}}\n',
                 "frontend/scripts/export-visuals.mjs": "console.log('native package tooling');\n",
             }
@@ -3058,14 +3081,6 @@ class TestAxisCommandWrappers(unittest.TestCase):
 
         self.assertEqual(frontend_env, calls[0]["env"])
 
-    def test_docs_sync_mermaid_theme_runs_from_axis(self) -> None:
-        calls = self.run_with_fake_process(
-            axis.docs_command,
-            axis.argparse.Namespace(docs_command="sync-mermaid-theme"),
-        )
-
-        self.assertEqual([axis.sys.executable, str(axis.ROOT / "docs" / "scripts" / "sync-mermaid-theme.py")], calls[0])
-
     def test_local_dev_certs_writes_extension_and_runs_openssl(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             cert_dir = Path(temp) / ".dev-certs"
@@ -3103,6 +3118,16 @@ class TestAxisCommandWrappers(unittest.TestCase):
 
 
 class TestInstallHooks(unittest.TestCase):
+    def test_cli_exposes_install_hooks(self) -> None:
+        with (
+            mock.patch.object(axis, "install_hooks", return_value=0) as install_hooks,
+            contextlib.redirect_stdout(io.StringIO()),
+            contextlib.redirect_stderr(io.StringIO()),
+        ):
+            self.assertEqual(0, axis.main(["install-hooks"]))
+
+        install_hooks.assert_called_once()
+
     def test_refuses_to_overwrite_custom_core_hooks_path(self) -> None:
         calls: list[list[str]] = []
 
@@ -3122,7 +3147,7 @@ class TestInstallHooks(unittest.TestCase):
         self.assertIn("refusing to overwrite existing core.hooksPath", stderr.getvalue())
         self.assertEqual([["git", "config", "--get", "core.hooksPath"]], calls)
 
-    def test_replaces_legacy_core_hooks_path_with_git_hook_copy(self) -> None:
+    def test_replaces_repo_core_hooks_path_with_git_hook_copy(self) -> None:
         with tempfile.TemporaryDirectory(dir=ROOT) as temp:
             temp_root = Path(temp)
             source = temp_root / "scripts" / "hooks" / "pre-push"
@@ -3268,7 +3293,7 @@ class TestCodexSkillsGate(unittest.TestCase):
             "```bash\n"
             "npm run ci\n"
             "dotnet test\n"
-            "python docs/scripts/sync-mermaid-theme.py\n"
+            "python docs/scripts/render-visuals.py\n"
             "```\n"
             "Inline command: `npm run test`.\n"
         )
@@ -3280,8 +3305,8 @@ class TestCodexSkillsGate(unittest.TestCase):
         self.assertIn("use `python scripts/axis.py frontend ...`", joined)
         self.assertIn("raw skill workflow command `dotnet test`", joined)
         self.assertIn("use `python scripts/axis.py dotnet ...`", joined)
-        self.assertIn("raw skill workflow command `python docs/scripts/sync-mermaid-theme.py`", joined)
-        self.assertIn("use `python scripts/axis.py docs ...`", joined)
+        self.assertIn("raw skill workflow command `python docs/scripts/render-visuals.py`", joined)
+        self.assertIn("use an approved project wrapper", joined)
         self.assertIn("raw skill workflow command `npm run test`", joined)
 
     def test_rejects_api_contract_skill_without_required_chaining(self) -> None:

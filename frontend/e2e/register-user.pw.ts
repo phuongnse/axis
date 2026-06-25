@@ -109,7 +109,7 @@ test.describe('register user', () => {
     await clearMaildev(request);
   });
 
-  test('REG-001 user registers, opens verification email, and reaches dashboard', async ({
+  test('AT-001 user registers, opens verification email, and reaches dashboard', async ({
     page,
     request,
   }) => {
@@ -133,7 +133,7 @@ test.describe('register user', () => {
     await expect(page.getByText('Account ready')).toBeVisible();
   });
 
-  test('REG-002 duplicate email shows an inline error', async ({ page, request }) => {
+  test('AT-002 duplicate email shows an inline error', async ({ page, request }) => {
     const email = uniqueEmail('reg002');
     await registerUserViaApi(request, email);
 

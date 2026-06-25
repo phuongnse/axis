@@ -7,7 +7,6 @@ namespace Axis.Identity.Application.Queries.GetUserTokenClaims;
 
 public sealed class GetUserTokenClaimsHandler(
     IUserRepository userRepo,
-    IWorkspaceMembershipRepository membershipRepo,
     IWorkspaceRepository workspaceRepo)
     : IQueryHandler<GetUserTokenClaimsQuery, Result<UserTokenClaimsDto>>
 {
@@ -23,18 +22,18 @@ public sealed class GetUserTokenClaimsHandler(
                 "The account is no longer active.");
         }
 
-        WorkspaceMembership? membership = query.workspaceId is Guid workspaceId
-            ? await membershipRepo.GetByUserAndWorkspaceAsync(user.Id, workspaceId, cancellationToken)
-            : await membershipRepo.GetFirstActiveByUserIdAsync(user.Id, cancellationToken);
+        Workspace? workspace = query.workspaceId is Guid workspaceId
+            ? await workspaceRepo.GetByIdAsync(workspaceId, cancellationToken)
+            : await workspaceRepo.GetPersonalByOwnerUserIdAsync(user.Id, cancellationToken);
 
-        if (query.workspaceId.HasValue && membership is null)
+        if (query.workspaceId.HasValue && (workspace is null || workspace.OwnerUserId != user.Id))
         {
             return Result.Failure<UserTokenClaimsDto>(
                 ErrorCodes.BusinessRule,
-                "Invalid Workspace scope for this user.");
+                "Invalid workspace scope for this user.");
         }
 
-        if (membership is null)
+        if (workspace is null)
         {
             return Result.Success(new UserTokenClaimsDto(
                 user.Id,
@@ -43,8 +42,7 @@ public sealed class GetUserTokenClaimsHandler(
                 $"{user.FirstName} {user.LastName}"));
         }
 
-        Workspace? workspace = await workspaceRepo.GetByIdAsync(membership.workspaceId, cancellationToken);
-        if (workspace is null || !workspace.AllowsSignIn())
+        if (!workspace.AllowsSignIn())
         {
             return Result.Failure<UserTokenClaimsDto>(
                 ErrorCodes.BusinessRule,
@@ -53,7 +51,7 @@ public sealed class GetUserTokenClaimsHandler(
 
         return Result.Success(new UserTokenClaimsDto(
             user.Id,
-            membership.workspaceId,
+            workspace.Id,
             user.Email.Value,
             $"{user.FirstName} {user.LastName}"));
     }

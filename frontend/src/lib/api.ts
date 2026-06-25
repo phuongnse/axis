@@ -22,25 +22,21 @@ interface FetchApiOptions extends RequestInit {
 export async function fetchApi<T>(endpoint: string, options: FetchApiOptions = {}): Promise<T> {
   const url = `${BASE_URL}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
 
-  const headers: Record<string, string> = {
-    Accept: 'application/json',
-    ...((options.headers as Record<string, string>) || {}),
-  };
-
-  const accessToken = getAccessToken();
-  if (accessToken && !headers.Authorization) {
-    headers.Authorization = `Bearer ${accessToken}`;
+  const headers = new Headers(options.headers);
+  if (!headers.has('Accept')) {
+    headers.set('Accept', 'application/json');
   }
 
-  // Only set Content-Type to JSON if it's not FormData
-  if (!(options.body instanceof FormData)) {
-    if (!headers['Content-Type']) {
-      headers['Content-Type'] = 'application/json';
-    }
-  } else {
-    // If body is FormData, ensure Content-Type is NOT set so the browser
-    // automatically sets it with the correct multipart boundary.
-    delete headers['Content-Type'];
+  const accessToken = getAccessToken();
+  if (accessToken && !headers.has('Authorization')) {
+    headers.set('Authorization', `Bearer ${accessToken}`);
+  }
+
+  if (options.body instanceof FormData) {
+    // Let the browser set the multipart boundary.
+    headers.delete('Content-Type');
+  } else if (!headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json');
   }
 
   const timeoutMs = options.timeout || 30000;
@@ -80,7 +76,6 @@ export async function fetchApi<T>(endpoint: string, options: FetchApiOptions = {
       return null as T;
     }
 
-    // Handle 200/201 that might surprisingly have no body
     const text = await response.text();
     if (!text) {
       return null as T;

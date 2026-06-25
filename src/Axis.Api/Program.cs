@@ -30,5 +30,5 @@ finally
     Log.CloseAndFlush();
 }
 
-// Needed for WebApplicationFactory in integration tests
+// Needed for WebApplicationFactory in integration tests.
 public partial class Program;

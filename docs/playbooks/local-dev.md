@@ -1,78 +1,62 @@
-# Local dev — Axis CLI
+# Local Dev
 
-> **Navigation**: [<- docs/README.md](../README.md) . [<- scripts](./scripts.md) . [<- AGENTS.md](../../AGENTS.md)
+> **Navigation**: [docs/README.md](../README.md) · [docs/playbooks/scripts.md](./scripts.md) · [AGENTS.md](../../AGENTS.md)
 
 Use `python scripts/axis.py local-dev ...` for local stack work. Do not document raw Docker/npm/dotnet workflows as project commands.
 
 ## Prerequisites
 
-- .NET SDK from `global.json`.
-- Node from `frontend/.nvmrc`.
+- .NET SDK from [global.json](../../global.json).
+- Node from [frontend/.nvmrc](../../frontend/.nvmrc).
 - Docker reachable from the shell running tests.
-- Local certs generated through Axis CLI when HTTPS is needed.
+- Local certs from `python scripts/axis.py local-dev certs` when HTTPS is needed.
 
-## Environment doctor
+Run `python scripts/axis.py doctor` when toolchain resolution feels wrong.
 
-Run `python scripts/axis.py doctor` when the toolchain or wrappers feel wrong.
+## HTTPS
 
-## Local HTTPS
+Cert material stays local under `.dev-certs/`, which is ignored.
 
-Use `python scripts/axis.py local-dev certs`. Cert material stays local.
+- `.dev-certs/rootCA.pem` is for containers and E2E Node trust.
+- `.dev-certs/rootCA.cer` is for host OS trust.
+- `.dev-certs/localhost.pem` and `.dev-certs/localhost-key.pem` cover `localhost`, loopback, `api`, and `web`.
 
-## Environment adapters
+Trust the root CA in the OS that runs the browser. On WSL with a Windows browser, import `.dev-certs/rootCA.cer` into Windows Current User trusted roots.
 
-### Docker endpoint adapter
+## Environment Adapters
 
-If Docker is reachable only through Docker Desktop/WSL indirection, correct the shell environment instead of changing tests. Report the execution context when Docker/Testcontainers cannot be reached.
+If Docker is reachable only through Docker Desktop/WSL indirection, correct the shell environment instead of changing tests.
 
-### Package-manager adapter
+The package-manager adapter resolves the documented Node/npm binary/shim path. Do not bypass wrappers in docs or skills.
 
-Axis wrappers resolve the documented Node/npm binary/shim path. Do not bypass wrappers in docs or skills.
-
-## Start everything
+## Stack
 
 Use `python scripts/axis.py local-dev up`. Stop with `python scripts/axis.py local-dev down` unless the user asks to keep services running.
-
-## URLs and ports
 
 Mandatory services: `postgres`, `redis`, `maildev`, `api`, and `web`; optional services: `otel-lgtm` and `e2e`.
 
 Host ports published by compose: `1025`, `1080`, `3000`, `4318`, `5281`, `5432`, `6379`.
 
-The source of truth is `docker-compose.yml` plus this playbook. If compose changes, update this file in the same PR.
+[docker-compose.yml](../../docker-compose.yml) plus this playbook are the source of truth. If compose changes, update this file in the same PR.
 
-## Observability (optional)
+Use the observability stack only when debugging telemetry.
 
-Use the local Grafana stack only when debugging telemetry.
-
-## Daily operations
+## Daily Operations
 
 Prefer scoped CLI commands: `status`, `up`, `down`, `e2e`, and focused checks.
 
-## Hot reload
-
 Use runtime-specific dev servers only through the documented Axis wrapper or owning package script.
-
-## Run tests without the full stack
 
 Run unit or focused frontend tests while iterating. Integration/API tests need Docker/Testcontainers.
 
-## EF Core migrations
+## Database
 
-Create migrations through `python scripts/axis.py dotnet ef migrations add ...`. Use the owning module Infrastructure project as both project and startup project when a `*DbContextFactory` exists. Never hand-write migration files.
+Create migrations through `python scripts/axis.py dotnet ef migrations add ...`. Use the owning module Infrastructure project as both project and startup project when a `*DbContextFactory` exists.
 
-Identity dev bootstrap uses `MigrateAsync`.
+Identity dev database startup uses `MigrateAsync`.
 
-## Reset the database
+Use reset paths only for disposable local data. Do not use schema initialization shortcuts.
 
-Use local-dev reset paths only for disposable local data.
+## Guardrails
 
-## Gotchas
-
-- Do not use schema bootstrap shortcuts.
-- Do not commit local secrets, ports, certs, or personal URLs.
-- Keep compose/docs drift checked through `python scripts/axis.py check local-dev-docs`.
-
-## Files involved
-
-`docker-compose.yml`, `.env`-style local files, cert output, module connection settings, and this playbook.
+Do not commit local secrets, ports, certs, or personal URLs. Keep compose/docs drift checked through `python scripts/axis.py check local-dev-docs`.

@@ -9,7 +9,6 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
 {
     public DbSet<Workspace> Workspaces => Set<Workspace>();
     public DbSet<User> Users => Set<User>();
-    public DbSet<WorkspaceMembership> WorkspaceMemberships => Set<WorkspaceMembership>();
     internal DbSet<EmailVerificationToken> EmailVerificationTokens => Set<EmailVerificationToken>();
     internal DbSet<RegistrationIdempotencyRecord> RegistrationIdempotencyRecords =>
         Set<RegistrationIdempotencyRecord>();
@@ -19,7 +18,6 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
         modelBuilder.ApplyConfiguration(new WorkspaceConfiguration());
         modelBuilder.ApplyConfiguration(new RegistrationIdempotencyRecordConfiguration());
         modelBuilder.ApplyConfiguration(new UserConfiguration());
-        modelBuilder.ApplyConfiguration(new WorkspaceMembershipConfiguration());
         modelBuilder.ApplyConfiguration(new EmailVerificationTokenConfiguration());
 
         // Register OpenIddict entity model (Applications, Authorizations, Scopes, Tokens)

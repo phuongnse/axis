@@ -159,9 +159,7 @@ export function VerifyEmailPage() {
   useEffect(() => {
     if (!token || started) return;
     setStarted(true);
-    void submit(token).catch(() => {
-      // Error state is shown via errorKind.
-    });
+    void submit(token).catch(() => undefined);
   }, [token, started, submit]);
 
   if (!token) {

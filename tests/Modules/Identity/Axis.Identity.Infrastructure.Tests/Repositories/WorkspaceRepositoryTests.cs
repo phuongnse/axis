@@ -56,6 +56,24 @@ public class WorkspaceRepositoryTests(IdentityDatabaseFixture db) : IAsyncLifeti
     }
 
     [Fact]
+    public async Task GetPersonalByOwnerUserIdAsync_WhenPersonalWorkspaceExists_ReturnsOwnedWorkspace()
+    {
+        Guid ownerUserId = Guid.NewGuid();
+        Workspace workspace = Workspace.CreatePersonal(
+            "Jane Doe",
+            WorkspaceSlug.Create("jane-doe").Value,
+            Email.Create("jane@example.com").Value,
+            ownerUserId);
+        await _sut.AddAsync(workspace);
+        await _ctx.SaveChangesAsync();
+
+        Workspace? loaded = await _sut.GetPersonalByOwnerUserIdAsync(ownerUserId);
+
+        loaded.Should().NotBeNull();
+        loaded!.Id.Should().Be(workspace.Id);
+    }
+
+    [Fact]
     public async Task GetBySlugAsync_WhenSlugDoesNotExist_ReturnsNull()
     {
         WorkspaceSlug slug = WorkspaceSlug.Create("does-not-exist").Value;

@@ -158,40 +158,6 @@ namespace Axis.Identity.Infrastructure.Migrations
                     b.ToTable("Workspaces", (string)null);
                 });
 
-            modelBuilder.Entity("Axis.Identity.Domain.Aggregates.WorkspaceMembership", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("status");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("user_id");
-
-                    b.Property<Guid>("workspaceId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("workspace_id");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("workspaceId");
-
-                    b.HasIndex("UserId", "workspaceId")
-                        .IsUnique();
-
-                    b.ToTable("Workspace_memberships", (string)null);
-                });
-
             modelBuilder.Entity("Axis.Identity.Infrastructure.Persistence.Entities.EmailVerificationToken", b =>
                 {
                     b.Property<Guid>("Id")

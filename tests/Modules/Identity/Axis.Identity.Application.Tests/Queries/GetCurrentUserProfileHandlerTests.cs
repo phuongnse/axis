@@ -11,15 +11,12 @@ namespace Axis.Identity.Application.Tests.Queries;
 public sealed class GetCurrentUserProfileHandlerTests
 {
     private readonly IUserRepository _userRepo = Substitute.For<IUserRepository>();
-    private readonly IWorkspaceMembershipRepository _membershipRepo =
-        Substitute.For<IWorkspaceMembershipRepository>();
     private readonly IWorkspaceRepository _workspaceRepo = Substitute.For<IWorkspaceRepository>();
 
     private static readonly Guid WorkspaceId = Guid.NewGuid();
 
     private GetCurrentUserProfileHandler CreateHandler() => new(
         _userRepo,
-        _membershipRepo,
         _workspaceRepo);
 
     [Fact]
@@ -45,12 +42,9 @@ public sealed class GetCurrentUserProfileHandlerTests
             user.Email,
             user.Id);
         workspace.ActivateAfterOwnerVerification();
-        WorkspaceMembership membership = WorkspaceMembership.Create(user.Id, workspace.Id);
 
         _userRepo.GetByIdPlatformWideAsync(user.Id, Arg.Any<CancellationToken>()).Returns(user);
-        _membershipRepo.GetByUserIdAsync(user.Id, Arg.Any<CancellationToken>())
-            .Returns([membership]);
-        _workspaceRepo.GetByIdAsync(workspace.Id, Arg.Any<CancellationToken>())
+        _workspaceRepo.GetPersonalByOwnerUserIdAsync(user.Id, Arg.Any<CancellationToken>())
             .Returns(workspace);
         CurrentUserProfileDto? dto = await CreateHandler().Handle(
             new GetCurrentUserProfileQuery(user.Id, workspace.Id),

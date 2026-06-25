@@ -1,83 +1,67 @@
 # Docs Style
 
-> **Navigation**: [<- docs/README.md](../README.md) . [<- AGENTS.md](../../AGENTS.md)
+> **Navigation**: [docs/README.md](../README.md) · [AGENTS.md](../../AGENTS.md)
 
-Docs are scanned, not read. Use `$axis-doc-hygiene` for docs edits. Keep policy short, put workflow in skills, and let scripts enforce deterministic checks.
+Docs are scanned, not read. Use `$axis-doc-hygiene` for docs edits; keep workflow in skills and deterministic checks in scripts.
 
-## Single owner per topic
+## Ownership
 
-Every fact has one owner: version, path, command, process, table shape, or rule. Other docs link to the owner.
+Every fact has one owner: version, path, command, process, table shape, or rule. Other docs link to the owner inline, in the sentence that uses it.
 
-## Prose style
+Do not add reference-owner sections or bottom reference lists for repo docs.
+
+## Prose
 
 - Lead with the rule.
-- Keep the reason to one clause.
+- Use path-labeled repo links such as [docs/TECH_STACK.md](../TECH_STACK.md).
+- Keep reasons to one clause.
 - Prefer tables for matrices.
-- Classify by responsibility, not by listing current files.
-- Prefer high-level strict rules over low-level detail inventories.
+- Classify by responsibility, not current file inventory.
 - Delete sentences that do not carry a rule, fact, or decision.
 - Use examples only when they generalize.
 
-## Anti-patterns
+## Avoid
 
-| Avoid | Use instead |
+| Avoid | Use |
 |---|---|
 | Long workflow prose | A repo skill |
 | Duplicate commands or versions | Link to the owner |
-| Inventory of current files/tools | Responsibility taxonomy |
-| Placeholder sections | Delete until real |
-| Incident detail in rules | Use-case, `PROGRESS.md`, or PR retro |
-| Symptom-to-remedy guidance | Decision criteria and owner boundary |
-| Review-only guidance called a gate | [REVIEW_FINDINGS.md](../REVIEW_FINDINGS.md) terms |
+| Reference-style links for repo docs | Inline markdown links |
+| Owner dumps | Inline owner links |
+| Display labels like `[Tech Stack]` | Path labels like `[docs/TECH_STACK.md]` |
+| Old-name warning lists | One-time sweep plus current owner links |
+| Review-only guidance called a gate | [docs/ENFORCEMENT.md](../ENFORCEMENT.md) status terms |
 
-## Size budgets
+## Size
 
-`AGENTS.md`, `docs/ARCHITECTURE.md`, playbooks, and pattern routers stay under 100 lines. Move workflow into skills before adding prose.
+`AGENTS.md`, [docs/ARCHITECTURE.md](../ARCHITECTURE.md), playbooks, and pattern routers stay under 100 lines. Move workflow into skills before adding prose.
 
-## Use-case files — design sources & implementation status
+## Use-Case Files
 
-Use-case READMEs own product behavior and ACs. Keep this shape: purpose/actor/trigger, flows, ACs, Acceptance Test Matrix when touched, optional Screen flow/Design Sources/Diagrams, implementation status.
+Use-case READMEs own product behavior and ACs. Keep purpose/actor/trigger, flows, ACs, Acceptance Test Matrix, Out Of Scope, Design System, Design Sources, optional Diagrams, and implementation status.
 
 Use `$axis-use-case-spec` for spec shape, `$axis-use-case-implementation` for status, and `$axis-visual-artifact` for visual artifacts.
 
 ## Design Sources
 
-```markdown
-## Design Sources
+Use `Screen | Source | Preview`. Source links are editable artifacts; non-`N/A` previews need an editable source in the same row. Local workflow, sequence, and entity diagrams use Mermaid under `## Diagrams`.
 
-| Screen | Source | Preview |
-|---|---|---|
-| register | [source](https://design.example/source-frame) | [preview](./register.svg) |
+## Implementation Status
+
+Use one row per layer. Status values are `Done`, `Partial`, `Not started`, and `N/A`.
+
+Each status block must include `Gaps vs spec`, `Deferred follow-ups`, `Verification`, and `Decisions`. Use `N/A` only when there is no current item.
+
+Never combine `Done` with pending work, and do not keep historical "Done" logs unless they describe current status.
+
+## New Doc Files
+
+Create a new doc only for a separate topic large enough to justify another file.
+
+Every `docs/**/*.md` file starts with an H1 and a navigation line; targets are relative to the current file:
+
+```markdown
+> **Navigation**: [docs/README.md](../README.md) · [AGENTS.md](../../AGENTS.md)
 ```
 
-Rules: Source links are editable artifacts; non-`N/A` previews need an editable source in the same row; Mermaid owns local use-case diagrams.
-
-### Diagrams (content rules)
-
-Use Mermaid for local use-case diagrams. Put workflow, sequence, and entity diagrams under `## Diagrams` in the owning use-case README.
-
-## Implementation status (after each US AC block)
-
-```markdown
-> **Implementation status**
->
-> | Layer | Status |
-> |---|---|
-> | Domain | ✅ |
-> | Application | ✅ |
-> | Infrastructure | ✅ |
-> | API | ✅ |
-> | Frontend | ⏳ |
->
-> **Gaps vs spec:** N/A.
->
-> **Deferred follow-ups:** N/A.
->
-> **Decisions:** N/A.
-```
-
-Rules: one row per layer; `⚠️` names exact gaps; deferrals name exact ACs or `N/A`; avoid historical "Done" logs unless needed for current status.
-
-## New doc files
-
-Create a new doc only for a separate topic large enough to justify another file. Every `docs/**/*.md` file starts with an H1 and `> **Navigation**:`.
+Labels are repo paths ending in `.md`; separate multiple links with ` · `; do not use arrows, pipes, or prose labels in navigation.

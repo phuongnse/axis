@@ -17,16 +17,13 @@ public static class ConnectEndpoints
 {
     public static IEndpointRouteBuilder MapConnectEndpoints(this IEndpointRouteBuilder app)
     {
-        // Authorization Code + PKCE: browser redirects here to start the flow.
-        // OpenIddict intercepts this URI — passthrough is enabled so we handle it.
+        // OpenIddict passthrough lets Axis build the browser session and token principal.
         app.MapGet("/connect/authorize", (Delegate)Authorize)
             .WithName("Authorize")
             .WithSummary("Start Authorization Code + PKCE flow")
             .WithTags("OpenIddict")
             .ExcludeFromDescription();
 
-        // Token endpoint — OpenIddict intercepts; our handler builds the principal.
-        // Handles the authorization code issued after email verification.
         app.MapPost("/connect/token", Token)
             .WithName("Token")
             .WithSummary("Exchange authorization code for access token")
@@ -38,13 +35,11 @@ public static class ConnectEndpoints
         return app;
     }
 
-    // ── GET /connect/authorize ────────────────────────────────────────────────
     private static async Task<IResult> Authorize(HttpContext httpContext)
     {
         OpenIddictRequest? request = httpContext.GetOpenIddictServerRequest()
             ?? throw new InvalidOperationException("OpenIddict server request not found.");
 
-        // Check whether the user is already authenticated via the session cookie
         AuthenticateResult cookieResult = await httpContext.AuthenticateAsync(
             CookieAuthenticationDefaults.AuthenticationScheme);
 
@@ -53,7 +48,6 @@ public static class ConnectEndpoints
             return Results.Unauthorized();
         }
 
-        // Build the OpenIddict principal from the cookie session claims
         ClaimsPrincipal cookiePrincipal = cookieResult.Principal!;
         ClaimsPrincipal openIddictPrincipal = BuildOpenIddictPrincipal(
             cookiePrincipal, request.GetScopes());
@@ -64,7 +58,6 @@ public static class ConnectEndpoints
             OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
     }
 
-    // ── POST /connect/token ───────────────────────────────────────────────────
     private static async Task<IResult> Token(
         HttpContext httpContext,
         ISender mediator,
@@ -143,8 +136,6 @@ public static class ConnectEndpoints
             detail: "The specified grant type is not supported.",
             statusCode: StatusCodes.Status400BadRequest);
     }
-
-    // ── Helpers ───────────────────────────────────────────────────────────────
 
     private static ClaimsPrincipal BuildOpenIddictPrincipal(
         ClaimsPrincipal cookiePrincipal,

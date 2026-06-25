@@ -1,6 +1,6 @@
 # Frontend Playbook
 
-> **Navigation**: [<- docs/README.md](../README.md) . [<- AGENTS.md](../../AGENTS.md)
+> **Navigation**: [docs/README.md](../README.md) · [AGENTS.md](../../AGENTS.md)
 
 Use `$axis-frontend-feature` for SPA feature work and `$axis-design-system` for primitives/tokens.
 
@@ -44,9 +44,9 @@ Use design tokens and semantic utilities. Avoid arbitrary colors/gradients, raw 
 
 Do not store auth tokens in `localStorage`. Treat permission/visibility behavior as product behavior with tests.
 
-## Performance — canvas and builder UIs
+## Performance
 
-Keep heavy builder interactions scoped, virtualized, or memoized when needed. Test visible behavior first.
+Keep heavy canvas and builder interactions scoped, virtualized, or memoized when needed. Test visible behavior first.
 
 ## Accessibility baseline
 

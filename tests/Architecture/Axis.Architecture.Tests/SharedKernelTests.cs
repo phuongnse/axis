@@ -5,8 +5,8 @@ using NetArchTest.Rules;
 namespace Axis.Architecture.Tests;
 
 /// <summary>
-/// Enforces the AGENTS.md shared-code boundary:
-/// <c>Axis.Shared.*</c> projects contain interfaces, primitives, and Result types —
+/// Enforces the shared-code boundary:
+/// <c>Axis.Shared.*</c> projects contain interfaces, primitives, and Result types;
 /// never UnitOfWork base classes, EF helpers, or repository bases.
 ///
 /// <para>
@@ -37,7 +37,7 @@ public class SharedKernelTests
         Assembly sharedDomain = Conventions.TryLoad("Axis.Shared.Domain")
             ?? throw new InvalidOperationException("Axis.Shared.Domain not loadable.");
 
-        // Shared.Domain is stricter than Shared.Application — no MediatR either.
+        // Shared.Domain is stricter than Shared.Application; no MediatR either.
         string[] domainBans = [.. PersistenceAndMessagingNamespaces, "MediatR"];
 
         TestResult result = Types.InAssembly(sharedDomain)
@@ -63,7 +63,7 @@ public class SharedKernelTests
 
         result.IsSuccessful.Should().BeTrue(
             "Axis.Shared.Application must not depend on EF Core or Npgsql. " +
-            "MediatR adapters (ICommand/IQueryHandler/LoggingBehavior) are allowed — they are the " +
+            "MediatR adapters (ICommand/IQueryHandler/LoggingBehavior) are allowed; they are the " +
             "project-wide command/query abstraction. " +
             $"Offending types: {FormatFailingTypes(result)}");
     }
@@ -71,11 +71,6 @@ public class SharedKernelTests
     [Fact]
     public void ModuleAssembly_WhenInspected_DoesNotReferenceSharedInfrastructurePersistencePrimitives()
     {
-        // Future-proofing: if Axis.Shared.Infrastructure ever ships a UnitOfWork
-        // base class or DbContext base class, modules must not depend on it
-        // UnitOfWork and DbContext ownership belongs to the module Infrastructure layer.
-        // This test fails if a *.Persistence type from Shared.Infrastructure
-        // becomes a dependency of any module — flagging the regression.
         string[] forbiddenSharedInfraNamespaces =
         [
             "Axis.Shared.Infrastructure.Persistence.UnitOfWorkBase",

@@ -36,7 +36,7 @@ type TokenPair = readonly [sourceToken: string, frontendToken: string];
 const frontendRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const tokensCss = fs.readFileSync(path.join(frontendRoot, 'src/design-system/tokens.css'), 'utf8');
 const openDesignTokensCss = fs.readFileSync(
-  path.join(frontendRoot, '..', 'design-sources/open-design/axis/tokens.css'),
+  path.join(frontendRoot, '..', 'design-sources/open-design/tokens.css'),
   'utf8',
 );
 const tailwindExtend = (tailwindConfig as TailwindConfig).theme?.extend;

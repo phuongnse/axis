@@ -1,6 +1,6 @@
-# Design Gate — mandatory reasoning before code
+# Design Gate
 
-> **Navigation**: [← docs/README.md](../README.md) · [← agent-checklist.md](./agent-checklist.md) · [← AGENTS.md](../../AGENTS.md)
+> **Navigation**: [docs/README.md](../README.md) · [docs/playbooks/agent-checklist.md](./agent-checklist.md) · [AGENTS.md](../../AGENTS.md)
 
 The Design Gate is a required pre-code review artifact for non-trivial changes. It is not a machine-enforced CI gate; it is evidence that the agent re-derived the rules for the exact surface before editing it.
 
@@ -14,7 +14,7 @@ For repeatable execution, use `$axis-design-gate`.
 |------|----------|----------|
 | **Trivial** | typo, comment, single-line correction, doc-only | No dossier. Still run the triggered check. |
 | **Standard** | intra-module logic, new test, additive UI on an existing API, refactor with no contract change | Short dossier. No sign-off needed. |
-| **High-risk** | new/changed endpoint, contract/required field, migration/schema, auth, new library, public API surface | Full dossier + user sign-off before code. |
+| **High-risk** | new/changed endpoint, contract/required field, migration/schema, auth, new/replaced runtime, framework, service, major library, public API surface | Full dossier + user sign-off before code. |
 
 When unsure which tier, treat it as the higher one.
 
@@ -59,5 +59,5 @@ High-risk surfaces require user sign-off before code. For standard-tier work, th
 ## Close The Loop
 
 1. Self-review the diff against the dossier.
-2. Run the triggered checks from [agent-checklist § Verification Gate](./agent-checklist.md#verification-gate--verify-before-pr-review).
+2. Run the triggered checks from [docs/playbooks/agent-checklist.md § Review Verification](./agent-checklist.md#review-verification).
 3. If you claim the full suite ran locally, it must mean full `python scripts/axis.py dotnet test` ran, including integration tests.

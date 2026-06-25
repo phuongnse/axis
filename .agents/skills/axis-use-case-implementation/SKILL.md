@@ -9,13 +9,18 @@ description: Implement Axis use-case slices from specs through tests, code, docu
 
 Ship one reviewable Axis use-case slice without losing acceptance criteria, layer order, docs status, or verification honesty.
 
+## Inputs
+
+- Owning use-case README with Purpose, flows, ACs, Acceptance Test Matrix, Design System, Design Sources, and implementation status.
+- Design Gate dossier and sign-off when the slice is non-trivial or high-risk.
+- In-scope AC/AT rows and the lowest reliable runner for each required behavior.
+
 ## Workflow
 
 1. Locate the owning spec.
-   - Read `docs/use-cases/README.md`, the domain `README.md`, and the use-case file.
+   - Read [docs/use-cases/README.md](../../../docs/use-cases/README.md), the domain `README.md`, and the use-case file.
    - If the use case is unclear, search with `rg -n "<feature words>" docs/use-cases src tests frontend`.
    - If no owning use-case README or AC block exists, stop implementation and use `$axis-use-case-spec` first.
-   - Read `docs/WORKAROUNDS.md` for entries touching the same module or files.
 
 2. Prove spec readiness before code.
    - Record `Spec Readiness Verdict: Ready` only when each required-to-close AC and AT expected result can cite the owning spec section, AC ID, or flow step.
@@ -28,11 +33,12 @@ Ship one reviewable Axis use-case slice without losing acceptance criteria, laye
 
 4. Build the AC map.
    - If the use case you are implementing or closing lacks local AC IDs or an `## Acceptance Test Matrix`, update the spec first with `$axis-use-case-spec`.
-   - Copy each in-scope `- [ ]` acceptance criterion into a row.
+   - Map each in-scope `AC-...` bullet into one or more required AT rows.
    - Use the matrix as the acceptance contract: every in-scope AC must be covered by at least one required AT row before any layer or use case is marked done.
    - Keep implementation details out of the use-case matrix: do not add `Evidence source`, test file paths, class names, or commands.
    - For each required AT row, record in the implementation/verification report which spec section, AC ID, or flow step defines the expected behavior. If any expected behavior cannot be cited from the spec, stop and use `$axis-use-case-spec`.
-   - Include out-of-scope bullets as `N/A this PR`.
+   - Treat out-of-scope bullets as handoff boundaries, not deferred implementation rows.
+   - If an out-of-scope item is unrelated to the flow, tighten the spec with `$axis-use-case-spec`.
    - Give every in-scope row a proving automated test before coding. Use the AT ID in the test title, xUnit trait, or nearby metadata when practical.
    - Choose the lowest reliable runner: Playwright for browser-level journeys, Vitest for focused UI states/validation, and xUnit API/Application/Infrastructure for backend contracts, side effects, and business rules.
    - If a required runner is missing, treat installing the harness as a new-library Design Gate decision and get required sign-off before code.
@@ -54,11 +60,12 @@ Ship one reviewable Axis use-case slice without losing acceptance criteria, laye
    - Keep frontend server state in TanStack Query and forms in RHF + Zod.
 
 8. Update status docs when behavior/status changes.
-   - Update the use-case `Implementation status` callout.
+   - Update the use-case `Implementation status` callout; status values are `Done`, `Partial`, `Not started`, and `N/A`.
    - Use `$axis-visual-artifact` when frontend screen shape, design-source links, previews, or diagrams changed.
-   - Update the domain README and `docs/PROGRESS.md` only when their summarized status changes.
+   - Update the domain README or [docs/use-cases/README.md](../../../docs/use-cases/README.md) only when their summarized status changes.
    - Name exact deferred AC bullets under `Deferred follow-ups`; use `N/A` when none.
-   - Add or update `docs/WORKAROUNDS.md` only for intentional P0/P1 workarounds.
+   - Update `Verification` with the required AT runners; put pass/fail evidence in the implementation report, not the spec.
+   - Do not introduce intentional shortcuts.
 
 9. Verify honestly.
    - During development, run the smallest check that proves the touched surface.

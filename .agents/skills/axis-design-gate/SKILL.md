@@ -7,29 +7,37 @@ description: Prepare the Axis Design Gate dossier before non-trivial code change
 
 ## Goal
 
-Produce the pre-code dossier required by `docs/playbooks/design-gate.md`. Keep it concrete: quoted rules, blast-radius searches, contract decisions, and verification commands.
+Produce the pre-code dossier required by [docs/playbooks/design-gate.md](../../../docs/playbooks/design-gate.md). Keep it concrete: quoted rules, blast-radius searches, contract decisions, and verification commands.
 
 Do not edit implementation files before this dossier is complete. For high-risk surfaces, stop after the dossier and ask the user for sign-off before coding.
+
+## Inputs
+
+- User request, intended files, and touched surfaces.
+- Governing owner docs for the touched surface.
+- Blast-radius search terms for affected symbols, contracts, docs, tests, and generated artifacts.
 
 ## Workflow
 
 1. Classify the change.
    - Trivial: typo, comment, or tiny doc-only edit. State why no dossier is needed.
    - Standard: intra-module logic, tests, repo tooling, docs status, or existing-API frontend work. Produce a short dossier and continue.
-   - High-risk: new or changed endpoint, contract, required field, schema or migration, auth, new library, or public API surface. Produce a full dossier and wait for user sign-off.
+   - High-risk: new or changed endpoint, contract, required field, schema or migration, auth, new/replaced runtime, framework, service, major library, or public API surface. Produce a full dossier and wait for user sign-off.
 
 2. Read the governing docs for the exact surface.
-   - Always read `AGENTS.md`, `docs/playbooks/design-gate.md`, and `docs/playbooks/agent-checklist.md`.
-   - Read only the relevant surface docs: `process.md`, `api-patterns.md`, `frontend.md`, `testing.md`, `WORKAROUNDS.md`, or the owning use-case file.
+   - Always read [AGENTS.md](../../../AGENTS.md), [docs/playbooks/design-gate.md](../../../docs/playbooks/design-gate.md), and [docs/playbooks/agent-checklist.md](../../../docs/playbooks/agent-checklist.md).
+   - Read only the relevant surface docs: [docs/playbooks/api-patterns.md](../../../docs/playbooks/api-patterns.md), [docs/playbooks/frontend.md](../../../docs/playbooks/frontend.md), [docs/playbooks/testing.md](../../../docs/playbooks/testing.md), [docs/playbooks/design-system.md](../../../docs/playbooks/design-system.md), or the owning use-case file.
+   - For stack/library changes, read [docs/TECH_STACK.md](../../../docs/TECH_STACK.md) and the touched version owner manifest before deciding whether sign-off is required.
 
 3. Quote governing rules.
    - Use `file:section` references.
    - Quote only the rule text needed for the surface.
-   - Separate enforced checks from review-only expectations using `docs/REVIEW_FINDINGS.md` terms when status matters.
+   - Separate enforced checks from review-only expectations using [docs/ENFORCEMENT.md](../../../docs/ENFORCEMENT.md) terms when status matters.
 
 4. Run blast-radius searches before editing.
    - Prefer `rg`.
    - Search every affected symbol, endpoint route, DTO, handler, field name, test fixture, and frontend type.
+   - For stack/library changes, include [docs/TECH_STACK.md](../../../docs/TECH_STACK.md) and touched manifests ([global.json](../../../global.json), [Directory.Packages.props](../../../Directory.Packages.props), [frontend/package.json](../../../frontend/package.json), [docker-compose.yml](../../../docker-compose.yml)) in the blast-radius summary.
    - Paste the exact command and summarize the hits. If no search applies, write `N/A because ...`.
 
 5. Decide the contract shape.
@@ -38,7 +46,7 @@ Do not edit implementation files before this dossier is complete. For high-risk 
 
 6. Plan verification.
    - Name the narrow development checks.
-   - Name the ready-review gate commands from `docs/playbooks/agent-checklist.md`.
+   - Name the ready-review checks from [docs/playbooks/agent-checklist.md](../../../docs/playbooks/agent-checklist.md).
    - Do not call a review-only artifact a gate.
 
 ## Output

@@ -177,11 +177,7 @@ export function useRegister() {
       return;
     }
 
-    try {
-      await mutation.mutateAsync({ values, legalVersions });
-    } catch {
-      // Field and submit errors are applied in mutation.onError.
-    }
+    await mutation.mutateAsync({ values, legalVersions }).catch(() => undefined);
   }
 
   return {

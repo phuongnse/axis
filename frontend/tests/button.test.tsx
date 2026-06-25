@@ -12,13 +12,8 @@ describe('Button', () => {
     render(<Button data-testid="btn">Default</Button>);
     const button = screen.getByTestId('btn');
 
-    // Check base classes from cva
     expect(button).toHaveClass('inline-flex', 'items-center', 'justify-center');
-
-    // Check default variant classes
     expect(button).toHaveClass('bg-primary', 'text-primary-foreground');
-
-    // Check default size classes
     expect(button).toHaveClass('h-8', 'px-2.5');
   });
 

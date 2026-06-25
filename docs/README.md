@@ -2,44 +2,34 @@
 
 > **Navigation**: [AGENTS.md](../AGENTS.md)
 
-Axis is currently a focused registration product slice: standalone email/password registration, email verification, PKCE token exchange, and a verified-user dashboard.
+Axis is an open-source platform being built for adaptable, workflow-driven business applications.
 
 ## Primary Docs
 
 | Doc | Use |
 |---|---|
-| [Product Vision](./PRODUCT_VISION.md) | Current product scope and explicit non-scope. |
-| [Architecture](./ARCHITECTURE.md) | Current runtime shape and boundaries. |
-| [Tech Stack](./TECH_STACK.md) | Approved libraries and ADRs that still apply. |
-| [Use cases](./use-cases/README.md) | Implemented or actively specified use cases only. |
-| [Progress](./PROGRESS.md) | Current layer status. |
-| [Workarounds](./WORKAROUNDS.md) | Active intentional shortcuts. Empty means no known active shortcuts. |
-| [Review findings](./REVIEW_FINDINGS.md) | Enforcement status for recurring review findings. |
+| [docs/ARCHITECTURE.md](./ARCHITECTURE.md) | Current runtime shape and boundaries. |
+| [docs/TECH_STACK.md](./TECH_STACK.md) | Approved stack baseline and version owners. |
+| [docs/use-cases/README.md](./use-cases/README.md) | Implemented or actively specified use cases only. |
+| [docs/ENFORCEMENT.md](./ENFORCEMENT.md) | Enforcement status for recurring rule classes. |
 
 ## Playbooks
 
 | Playbook | Use |
 |---|---|
-| [Agent checklist](./playbooks/agent-checklist.md) | Daily workflow, verification, and review checkpoints. |
-| [Design Gate](./playbooks/design-gate.md) | Required reasoning artifact before non-trivial changes. |
-| [Process](./playbooks/process.md) | Layer workflow and deferred follow-up handling. |
-| [API patterns](./playbooks/api-patterns.md) | REST/OpenAPI and API-type change guidance. |
-| [Frontend](./playbooks/frontend.md) | SPA implementation guidance. |
-| [Design system](./playbooks/design-system.md) | Tokens, primitives, and frontend design contracts. |
-| [Design source](./playbooks/design-source.md) | Design-source ownership rules. |
-| [Visual artifact checklist](./playbooks/visual-artifact-checklist.md) | Checklist for diagrams and committed visual artifacts. |
-| [Testing](./playbooks/testing.md) | Backend and frontend test conventions. |
-| [Docs style](./playbooks/docs-style.md) | Documentation ownership and size rules. |
-| [Scripts](./playbooks/scripts.md) | Axis CLI and repo script standards. |
-| [Local dev](./playbooks/local-dev.md) | Local stack commands and ports. |
-| [Local HTTPS](./playbooks/local-https.md) | Local certificate setup. |
-| [Mermaid](./playbooks/mermaid.md) | Diagram theme rules. |
-| [Code hygiene](./playbooks/code-hygiene-patterns.md) | Focused hygiene checks. |
+| [docs/playbooks/agent-checklist.md](./playbooks/agent-checklist.md) | Review checkpoints and verification boundary. |
+| [docs/playbooks/design-gate.md](./playbooks/design-gate.md) | Required reasoning artifact before non-trivial changes. |
+| [docs/playbooks/api-patterns.md](./playbooks/api-patterns.md) | REST/OpenAPI and API-type change guidance. |
+| [docs/playbooks/frontend.md](./playbooks/frontend.md) | SPA implementation guidance. |
+| [docs/playbooks/design-system.md](./playbooks/design-system.md) | Tokens, primitives, and frontend design contracts. |
+| [docs/playbooks/testing.md](./playbooks/testing.md) | Backend and frontend test conventions. |
+| [docs/playbooks/docs-style.md](./playbooks/docs-style.md) | Documentation ownership and size rules. |
+| [docs/playbooks/scripts.md](./playbooks/scripts.md) | Axis CLI and repo script standards. |
+| [docs/playbooks/local-dev.md](./playbooks/local-dev.md) | Local stack commands and ports. |
 
 ## Current Diagram
 
 ```mermaid
-%%{init: {'theme':'dark','themeVariables':{'background':'#0d1117','mainBkg':'#0d1117','primaryColor':'#161b22','primaryBorderColor':'#388bfd','primaryTextColor':'#e6edf3','secondaryColor':'#21262d','secondaryBorderColor':'#388bfd','secondaryTextColor':'#e6edf3','tertiaryColor':'#161b22','tertiaryTextColor':'#e6edf3','lineColor':'#58a6ff','textColor':'#e6edf3','nodeBorder':'#388bfd','clusterBkg':'#161b22','clusterBorder':'#388bfd','titleColor':'#e6edf3','edgeLabelBackground':'#161b22','actorBkg':'#161b22','actorBorder':'#388bfd','actorTextColor':'#e6edf3','signalColor':'#58a6ff','labelBoxBkgColor':'#161b22','labelBoxBorderColor':'#388bfd','noteBkgColor':'#161b22','noteBorderColor':'#388bfd','noteTextColor':'#c9d1d9','activationBkgColor':'#30363d'}}}%%
 flowchart LR
   User["User"]
   SPA["React SPA"]
@@ -56,17 +46,3 @@ flowchart LR
   Identity --> Redis
   Identity --> Mail
 ```
-
-## Single Source Of Truth
-
-| Topic | Owner |
-|---|---|
-| Agent rules and current boundaries | [AGENTS.md](../AGENTS.md) |
-| Product scope | [PRODUCT_VISION.md](./PRODUCT_VISION.md) |
-| Runtime architecture | [ARCHITECTURE.md](./ARCHITECTURE.md) |
-| Library and ADR choices | [TECH_STACK.md](./TECH_STACK.md) |
-| Use-case acceptance criteria | [docs/use-cases](./use-cases/README.md) |
-| Layer status | [PROGRESS.md](./PROGRESS.md) |
-| Active shortcuts | [WORKAROUNDS.md](./WORKAROUNDS.md) |
-
-When two docs disagree, update the owner first and convert the other document back into a pointer.
