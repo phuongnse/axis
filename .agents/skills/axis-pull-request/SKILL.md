@@ -7,7 +7,7 @@ description: Prepare, review, validate, create, update, or mark ready Axis pull 
 
 ## Goal
 
-Own the PR publication boundary. This skill prepares the branch for publication, runs the local CodeRabbit plugin review checkpoint, validates the exact title/body that will be sent to GitHub, performs the requested PR action, and validates the resulting GitHub PR again.
+Own the PR publication boundary. This skill prepares the branch for publication, runs the local CodeRabbit plugin review checkpoint, validates the exact title/body before sending it to GitHub, and performs the requested PR action.
 
 Do not perform branch readiness auditing here. Use `$axis-ready-review` first when readiness evidence is missing, stale, or not explicitly provided. Do not treat CodeRabbit as a machine gate; it is a required review checkpoint before PR publication unless the user explicitly asks to skip it.
 Do not rerun local guards just to create a longer transcript. Run each required guard once, then rerun only when a subsequent change invalidates that evidence.
@@ -54,11 +54,10 @@ Do not rerun local guards just to create a longer transcript. Run each required 
    - When using a GitHub tool or CLI, pass the exact title/body explicitly; do not accept generated defaults.
    - Keep the PR draft unless the user asked to mark ready and readiness evidence is current.
 
-7. Validate GitHub state after the action.
-   - Read the PR title/body back from GitHub.
-   - If the PR metadata differs from the validated draft, run `python scripts/axis.py check pr --title "<github title>" --body-file <github-body-file>`.
-   - If a tool or bot inserted extra PR-body content, remove it when possible and revalidate.
-   - Report any remaining external mutation as a blocker instead of claiming the PR is clean.
+7. Hand off after the GitHub action.
+   - Do not rerun local verification or PR-body guards after pushing or creating/updating the PR; CI owns post-push checks.
+   - Report the PR URL, draft status, and which pre-action validations ran.
+   - If GitHub rejects the action or reports a metadata mutation/error, treat that as a new metadata-only fix instead of adding an after-push guard loop.
 
 ## Output
 
@@ -79,7 +78,7 @@ PR metadata:
 - Title: ...
 - Body sections: Summary / Linked spec / Requirements
 - Draft validation: command -> pass/fail
-- GitHub post-action validation: pass by exact metadata match / command -> pass/fail
+- Post-push local checks: not run; CI owns post-push validation
 
 GitHub:
 - PR URL:

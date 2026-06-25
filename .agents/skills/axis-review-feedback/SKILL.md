@@ -37,6 +37,7 @@ Resolve review feedback by improving the codebase, not merely silencing a thread
 4. Prefer the defensible fix.
    - Look for the existing module pattern before accepting a reviewer-proposed shortcut.
    - Improve ownership, transaction boundaries, error handling, or test coverage when that is the real issue.
+   - Keep tests semantically honest: strengthen assertions or rename tests when the stated behavior and proved behavior drift apart.
    - If the user explicitly asked for the smallest fix, keep the diff minimal and say so.
    - If a better fix is deliberately deferred, record an exact `Deferred follow-ups` line.
 
