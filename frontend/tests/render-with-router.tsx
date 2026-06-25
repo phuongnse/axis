@@ -5,11 +5,8 @@ import {
   createRouter,
   RouterProvider,
 } from '@tanstack/react-router';
-import { type RenderOptions, type RenderResult, render } from '@testing-library/react';
+import { act, type RenderOptions, type RenderResult, render } from '@testing-library/react';
 import type { ReactElement } from 'react';
-
-import { PreferenceEffects } from '../src/features/preferences';
-import '../src/features/preferences/i18n';
 
 interface RenderWithRouterOptions extends Omit<RenderOptions, 'wrapper'> {
   path?: string;
@@ -41,15 +38,18 @@ export async function renderWithRouter(
     history: createMemoryHistory({ initialEntries: [path] }),
   });
 
-  await router.load();
+  await act(async () => {
+    await router.load();
+  });
 
   const result = render(
     <QueryClientProvider client={queryClient}>
-      <PreferenceEffects />
       <RouterProvider router={router} />
     </QueryClientProvider>,
     renderOptions,
   );
+
+  await act(async () => {});
 
   return { router, ...result };
 }

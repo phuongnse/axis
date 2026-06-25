@@ -15,14 +15,12 @@ internal sealed class WorkspaceMembershipRepository(IdentityDbContext context) :
         Guid workspaceId,
         CancellationToken ct = default) =>
         context.WorkspaceMemberships
-            .Include(m => m.Roles)
             .FirstOrDefaultAsync(
                 m => m.UserId == userId && m.workspaceId == workspaceId,
                 ct);
 
     public Task<WorkspaceMembership?> GetFirstActiveByUserIdAsync(Guid userId, CancellationToken ct = default) =>
         context.WorkspaceMemberships
-            .Include(m => m.Roles)
             .Where(m => m.UserId == userId && m.Status == WorkspaceMembershipStatus.Active)
             .OrderBy(m => m.CreatedAt)
             .FirstOrDefaultAsync(ct);
@@ -31,7 +29,6 @@ internal sealed class WorkspaceMembershipRepository(IdentityDbContext context) :
         Guid userId,
         CancellationToken ct = default) =>
         await context.WorkspaceMemberships
-            .Include(m => m.Roles)
             .Where(m => m.UserId == userId)
             .ToListAsync(ct);
 
@@ -40,16 +37,4 @@ internal sealed class WorkspaceMembershipRepository(IdentityDbContext context) :
             m => m.workspaceId == workspaceId && m.Status == WorkspaceMembershipStatus.Active,
             ct);
 
-    public Task<int> CountAdminsAsync(Guid workspaceId, Guid adminRoleId, CancellationToken ct = default) =>
-        context.Set<WorkspaceMembershipRole>()
-            .Join(
-                context.WorkspaceMemberships,
-                role => role.MembershipId,
-                membership => membership.Id,
-                (role, membership) => new { role, membership })
-            .CountAsync(
-                row => row.role.RoleId == adminRoleId
-                       && row.membership.workspaceId == workspaceId
-                       && row.membership.Status == WorkspaceMembershipStatus.Active,
-                ct);
 }

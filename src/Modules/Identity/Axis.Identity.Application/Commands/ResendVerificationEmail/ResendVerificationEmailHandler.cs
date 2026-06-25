@@ -5,7 +5,7 @@ using Axis.Identity.Domain.ValueObjects;
 using Axis.Shared.Application.CQRS;
 using Axis.Shared.Domain.Primitives;
 
-namespace Axis.Identity.Application.Commands.VerifyEmail;
+namespace Axis.Identity.Application.Commands.ResendVerificationEmail;
 
 public sealed class ResendVerificationEmailHandler(
     IUserRepository userRepo,

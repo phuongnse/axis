@@ -1,4 +1,4 @@
-using Axis.Identity.Application.Commands.VerifyEmail;
+using Axis.Identity.Application.Commands.ResendVerificationEmail;
 using Axis.Identity.Application.Repositories;
 using Axis.Identity.Application.Services;
 using Axis.Identity.Domain.Aggregates;
@@ -16,8 +16,6 @@ public class ResendVerificationEmailHandlerTests
     private readonly IEmailVerificationTokenStore _tokenStore = Substitute.For<IEmailVerificationTokenStore>();
     private readonly IEmailSender _emailSender = Substitute.For<IEmailSender>();
     private readonly IResendVerificationRateLimiter _rateLimiter = Substitute.For<IResendVerificationRateLimiter>();
-
-    private static readonly Guid WorkspaceId = Guid.NewGuid();
 
     private ResendVerificationEmailHandler CreateHandler() =>
         new(_userRepo, _tokenStore, _emailSender, _rateLimiter);

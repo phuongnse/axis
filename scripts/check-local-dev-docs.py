@@ -110,9 +110,6 @@ def check_local_dev_doc() -> list[str]:
     if "MigrateAsync" not in doc:
         errors.append("local-dev.md should document Identity MigrateAsync dev bootstrap")
 
-    if "AutoProvision" not in doc:
-        errors.append("local-dev.md should mention Wolverine AutoProvision in Development")
-
     if TECH_STACK_FILE.is_file():
         tech_stack_text = TECH_STACK_FILE.read_text(encoding="utf-8")
         known_anchors = set(TECH_STACK_KNOWN_ANCHOR.findall(tech_stack_text))

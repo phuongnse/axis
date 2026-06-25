@@ -47,7 +47,6 @@ public static class ClaimDestinationsHelper
 
             // Custom claims for Axis — always access token only
             case "workspace_id":
-            case "permissions":
                 yield return Destinations.AccessToken;
                 yield break;
 

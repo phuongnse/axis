@@ -41,10 +41,8 @@ public sealed class GetCurrentUserProfileHandler(
             user.FirstName,
             user.LastName,
             $"{user.FirstName} {user.LastName}",
-            user.AvatarUrl,
             user.Status == UserStatus.Active,
             query.workspaceId,
-            query.Permissions,
             workspaces
                 .OrderBy(workspace => workspace.Type == WorkspaceType.Personal.ToString() ? 0 : 1)
                 .ThenBy(workspace => workspace.Name, StringComparer.OrdinalIgnoreCase)

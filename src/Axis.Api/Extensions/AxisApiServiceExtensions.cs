@@ -2,38 +2,22 @@ using System.Security.Cryptography.X509Certificates;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
-using Axis.Api.Authorization;
 using Axis.Api.HealthChecks;
 using Axis.Api.Infrastructure;
-using Axis.DataModeling.Application.Commands.CreateModel;
-using Axis.DataModeling.Infrastructure.Extensions;
-using Axis.FormBuilder.Application.Commands.CreateForm;
-using Axis.FormBuilder.Infrastructure.Extensions;
-using Axis.Identity.Application.Commands.RegisterWorkspace;
+using Axis.Identity.Application.Commands.RegisterUser;
 using Axis.Identity.Infrastructure.Extensions;
 using Axis.Shared.Application.Behaviors;
 using Axis.Shared.Application.Identity;
-using Axis.Shared.Application.Workspaces;
 using Axis.Shared.Infrastructure.Observability;
-using Axis.Shared.Infrastructure.Workspaces;
-using Axis.WorkflowBuilder.Application.Commands.CreateWorkflow;
-using Axis.WorkflowBuilder.Infrastructure.Extensions;
-using Axis.WorkflowEngine.Application.Commands.CancelExecution;
-using Axis.WorkflowEngine.Infrastructure.Extensions;
 using FluentValidation;
-using JasperFx.Resources;
-using MediatR;
 using Microsoft.AspNetCore.Authentication.Cookies;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.OpenApi.Models;
-using OpenIddict.Server.AspNetCore;
 using OpenIddict.Validation.AspNetCore;
 using Serilog;
 using StackExchange.Redis;
 using static OpenIddict.Abstractions.OpenIddictConstants;
-using static OpenIddict.Server.OpenIddictServerEvents;
 
 namespace Axis.Api.Extensions;
 
@@ -45,10 +29,6 @@ internal static class AxisApiServiceExtensions
     {
         builder.AddAxisOpenTelemetry();
         builder.AddAxisLogging();
-        builder.AddAxisMessaging();
-
-        if (builder.Environment.IsDevelopmentOrTesting())
-            builder.Services.AddResourceSetupOnStartup();
 
         builder.Services.AddAxisMediatR();
         builder.Services.AddAxisAuthentication(builder.Configuration, builder.Environment);
@@ -56,7 +36,6 @@ internal static class AxisApiServiceExtensions
         builder.Services.AddAxisForwardedHeaders();
         builder.Services.AddAxisRateLimiting(builder.Configuration, builder.Environment);
         builder.Services.AddAxisModules(builder.Configuration, builder.Environment);
-        builder.Services.AddAxisGrpcClients(builder.Configuration, builder.Environment);
         builder.Services.AddAxisRedis(builder.Configuration);
         builder.Services.AddAxisRequestContext();
         builder.Services.AddAxisCors(builder.Configuration);
@@ -83,21 +62,13 @@ internal static class AxisApiServiceExtensions
         services.AddMediatR(cfg =>
         {
             cfg.RegisterServicesFromAssemblies(
-                typeof(RegisterWorkspaceCommand).Assembly,
-                typeof(CreateModelCommand).Assembly,
-                typeof(CreateWorkflowCommand).Assembly,
-                typeof(CreateFormCommand).Assembly,
-                typeof(CancelExecutionCommand).Assembly);
+                typeof(RegisterUserCommand).Assembly);
             cfg.AddOpenBehavior(typeof(LoggingBehavior<,>));
             cfg.AddOpenBehavior(typeof(ValidationBehavior<,>));
         });
 
         services.AddValidatorsFromAssemblies([
-            typeof(RegisterWorkspaceCommand).Assembly,
-            typeof(CreateModelCommand).Assembly,
-            typeof(CreateWorkflowCommand).Assembly,
-            typeof(CreateFormCommand).Assembly,
-            typeof(CancelExecutionCommand).Assembly,
+            typeof(RegisterUserCommand).Assembly,
         ]);
     }
 
@@ -111,7 +82,7 @@ internal static class AxisApiServiceExtensions
             {
                 opts.ExpireTimeSpan = TimeSpan.FromMinutes(5);
                 opts.SlidingExpiration = false;
-                opts.LoginPath = "/connect/login";
+                opts.LoginPath = "/register";
             });
 
         services.AddOpenIddict()
@@ -120,44 +91,26 @@ internal static class AxisApiServiceExtensions
                 opts.SetAuthorizationEndpointUris("/connect/authorize")
                     .SetTokenEndpointUris("/connect/token");
 
-                opts.RegisterScopes(Scopes.OpenId, Scopes.Email, Scopes.Profile, Scopes.OfflineAccess, "permissions");
+                opts.RegisterScopes(Scopes.OpenId, Scopes.Email, Scopes.Profile);
 
                 opts.AllowAuthorizationCodeFlow()
                     .RequireProofKeyForCodeExchange();
-                opts.AllowClientCredentialsFlow();
-                opts.AllowRefreshTokenFlow();
-                opts.UseReferenceRefreshTokens();
 
                 opts.SetAccessTokenLifetime(ReadPositiveTimeSpan(
                     configuration,
                     "Jwt:AccessTokenTtlMinutes",
                     defaultValue: 15,
                     value => TimeSpan.FromMinutes(value)));
-                opts.SetRefreshTokenLifetime(ReadPositiveTimeSpan(
-                    configuration,
-                    "RefreshToken:TtlDays",
-                    defaultValue: 7,
-                    value => TimeSpan.FromDays(value)));
-
                 ConfigureOpenIddictCertificates(opts, configuration, environment);
 
                 opts.UseAspNetCore()
                     .EnableAuthorizationEndpointPassthrough()
                     .EnableTokenEndpointPassthrough();
-
-                opts.AddEventHandler<ApplyTokenResponseContext>(b =>
-                    b.UseSingletonHandler<ApplyRefreshTokenCookieHandler>());
-
-                opts.AddEventHandler<ExtractTokenRequestContext>(b =>
-                    b.UseSingletonHandler<ExtractRefreshTokenFromCookieHandler>());
             })
             .AddValidation(opts =>
             {
                 opts.UseLocalServer();
                 opts.UseAspNetCore();
-                opts.AddEventHandler<OpenIddict.Validation.OpenIddictValidationEvents.ProcessAuthenticationContext>(b =>
-                    b.UseScopedHandler<ValidateJtiBlacklistHandler>()
-                        .AddFilter<OpenIddict.Validation.OpenIddictValidationHandlerFilters.RequireAccessTokenValidated>());
             });
     }
 
@@ -189,8 +142,6 @@ internal static class AxisApiServiceExtensions
     private static void AddAxisAuthorization(this IServiceCollection services)
     {
         services.AddAuthorization();
-        services.AddSingleton<IAuthorizationPolicyProvider, PermissionPolicyProvider>();
-        services.AddScoped<IAuthorizationHandler, PermissionAuthorizationHandler>();
     }
 
     private static void AddAxisForwardedHeaders(this IServiceCollection services)
@@ -238,34 +189,6 @@ internal static class AxisApiServiceExtensions
         IHostEnvironment environment)
     {
         services.AddIdentityInfrastructure(configuration, environment);
-        services.AddDataModelingInfrastructure(configuration);
-        services.AddWorkflowBuilderInfrastructure(configuration);
-        services.AddFormBuilderInfrastructure(configuration);
-        services.AddWorkflowEngineInfrastructure(configuration);
-    }
-
-    private static void AddAxisGrpcClients(
-        this IServiceCollection services,
-        IConfiguration configuration,
-        IHostEnvironment environment)
-    {
-        string? configuredUrl = configuration["Modules:Identity:GrpcUrl"];
-        string identityGrpcUrl = !string.IsNullOrWhiteSpace(configuredUrl)
-            ? configuredUrl
-            : environment.IsDevelopmentOrTesting()
-                ? "https://localhost:7275"
-                : throw new InvalidOperationException("Modules:Identity:GrpcUrl is required");
-
-        if (!Uri.TryCreate(identityGrpcUrl, UriKind.Absolute, out Uri? identityUri))
-            throw new InvalidOperationException("Modules:Identity:GrpcUrl must be an absolute URI.");
-
-        if (!environment.IsDevelopmentOrTesting() && identityUri.IsLoopback)
-            throw new InvalidOperationException("Modules:Identity:GrpcUrl must not point to localhost outside Development/Testing.");
-
-        services.AddGrpcClient<Axis.Identity.Contracts.Grpc.IdentityService.IdentityServiceClient>(opts =>
-        {
-            opts.Address = identityUri;
-        });
     }
 
     private static void AddAxisRedis(
@@ -276,7 +199,6 @@ internal static class AxisApiServiceExtensions
             ConnectionMultiplexer.Connect(
                 configuration["Redis:ConnectionString"]
                     ?? throw new InvalidOperationException("Redis:ConnectionString is required")));
-        services.AddSingleton<IJtiBlacklist, RedisJtiBlacklist>();
     }
 
     private static void AddAxisRequestContext(this IServiceCollection services)
@@ -284,7 +206,6 @@ internal static class AxisApiServiceExtensions
         services.AddHttpContextAccessor();
         services.AddScoped<CurrentUser>();
         services.AddScoped<ICurrentUser, HttpContextCurrentUser>();
-        services.AddScoped<IWorkspaceContext, HttpWorkspaceContext>();
     }
 
     private static void AddAxisCors(
@@ -309,10 +230,6 @@ internal static class AxisApiServiceExtensions
             opts.SerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
             opts.SerializerOptions.PropertyNameCaseInsensitive = true;
             opts.SerializerOptions.Converters.Add(new JsonStringEnumConverter());
-            opts.SerializerOptions.Converters.Add(new AddFieldRequestConverter());
-            opts.SerializerOptions.Converters.Add(new UpdateFieldRequestConverter());
-            opts.SerializerOptions.Converters.Add(new AddDataClassFieldRequestConverter());
-            opts.SerializerOptions.Converters.Add(new AddFormFieldRequestConverter());
         });
 
         services.Configure<Microsoft.AspNetCore.Mvc.JsonOptions>(opts =>

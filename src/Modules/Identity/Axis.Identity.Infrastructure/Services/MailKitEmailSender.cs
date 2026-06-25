@@ -14,38 +14,6 @@ internal sealed class MailKitEmailSender(IConfiguration configuration) : IEmailS
         await SendAsync(toEmail, subject, body, ct);
     }
 
-    public async Task SendInvitationEmailAsync(string toEmail, string workspaceName, string invitationToken, CancellationToken ct = default)
-    {
-        string subject = $"You've been invited to join {workspaceName} on Axis";
-        string body = $"Click the link to accept your invitation: {GetBaseUrl()}/invitations/accept?token={invitationToken}";
-        await SendAsync(toEmail, subject, body, ct);
-    }
-
-    public async Task SendPasswordResetEmailAsync(string toEmail, string resetToken, CancellationToken ct = default)
-    {
-        string subject = "Reset your Axis password";
-        string body = $"Click the link to reset your password (valid for 1 hour): {GetBaseUrl()}/auth/reset-password?token={resetToken}";
-        await SendAsync(toEmail, subject, body, ct);
-    }
-
-    public async Task SendPasswordChangedNotificationAsync(string toEmail, CancellationToken ct = default)
-    {
-        string subject = "Your Axis password was changed";
-        string body = "Your password was recently changed. If this wasn't you, contact support immediately.";
-        await SendAsync(toEmail, subject, body, ct);
-    }
-
-    public async Task SendWorkspaceDeletionScheduledEmailAsync(
-        string toEmail,
-        string WorkspaceName,
-        CancellationToken ct = default)
-    {
-        string subject = $"Deletion scheduled for {WorkspaceName}";
-        string body =
-            "Your Workspace has been scheduled for deletion. All data will be permanently removed in 30 days.";
-        await SendAsync(toEmail, subject, body, ct);
-    }
-
     private async Task SendAsync(string toEmail, string subject, string body, CancellationToken ct)
     {
         IConfigurationSection email = configuration.GetSection("Email");

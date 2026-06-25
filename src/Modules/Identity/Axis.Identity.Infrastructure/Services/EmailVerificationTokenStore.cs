@@ -56,19 +56,6 @@ internal sealed class EmailVerificationTokenStore(IdentityDbContext context) : I
         return new EmailVerificationTokenResolveResult(EmailVerificationTokenState.AlreadyUsed, token.UserId);
     }
 
-    public async Task<Guid?> ResolveUserIdForProvisioningPollAsync(
-        string tokenHash,
-        CancellationToken ct = default)
-    {
-        EmailVerificationToken? token = await context.Set<EmailVerificationToken>()
-            .FirstOrDefaultAsync(t => t.TokenHash == tokenHash, ct);
-
-        if (token is null || DateTime.UtcNow >= token.ExpiresAt)
-            return null;
-
-        return token.UserId;
-    }
-
     public async Task InvalidateAsync(string tokenHash, CancellationToken ct = default)
     {
         EmailVerificationToken? token = await context.Set<EmailVerificationToken>()

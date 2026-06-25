@@ -1,7 +1,5 @@
 using System.Security.Claims;
 using Axis.Api.Authorization;
-using Axis.Api.Infrastructure;
-using Axis.Identity.Application.Commands.AuthenticateUser;
 using Axis.Identity.Application.Queries.GetUserTokenClaims;
 using Axis.Shared.Domain.Primitives;
 using MediatR;
@@ -27,21 +25,11 @@ public static class ConnectEndpoints
             .WithTags("OpenIddict")
             .ExcludeFromDescription();
 
-        // Login form (API-style) — validates credentials and signs the user in via cookie.
-        // Returns a redirect back to /connect/authorize to complete code issuance.
-        app.MapPost("/connect/login", Login)
-            .WithName("Login")
-            .WithSummary("Validate credentials and issue session cookie for PKCE flow")
-            .WithTags("OpenIddict")
-            .RequireRateLimiting("auth")
-            .DisableAntiforgery()
-            .ExcludeFromDescription();
-
         // Token endpoint — OpenIddict intercepts; our handler builds the principal.
-        // Handles: authorization_code, refresh_token, client_credentials.
+        // Handles the authorization code issued after email verification.
         app.MapPost("/connect/token", Token)
             .WithName("Token")
-            .WithSummary("Exchange code or refresh token for access token")
+            .WithSummary("Exchange authorization code for access token")
             .WithTags("OpenIddict")
             .RequireRateLimiting("auth")
             .DisableAntiforgery()
@@ -62,10 +50,7 @@ public static class ConnectEndpoints
 
         if (!cookieResult.Succeeded)
         {
-            // Not authenticated — redirect to the login endpoint, passing the current URL
-            // as a return_url so the user lands back here after a successful login
-            string returnUrl = httpContext.Request.Path + httpContext.Request.QueryString;
-            return Results.Redirect("/connect/login?return_url=" + Uri.EscapeDataString(returnUrl));
+            return Results.Unauthorized();
         }
 
         // Build the OpenIddict principal from the cookie session claims
@@ -79,67 +64,6 @@ public static class ConnectEndpoints
             OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
     }
 
-    // ── POST /connect/login ───────────────────────────────────────────────────
-    private static async Task<IResult> Login(
-        [FromForm] string email,
-        [FromForm] string password,
-        [FromForm(Name = "return_url")] string? returnUrl,
-        ISender mediator,
-        HttpContext httpContext,
-        CancellationToken ct)
-    {
-        Result<AuthenticationResult> result = await mediator.Send(
-            new AuthenticateUserCommand(email, password), ct);
-
-        if (result.IsFailure || !result.Value.Success)
-        {
-            AuthFailureReason? reason = result.IsSuccess ? result.Value.FailureReason : null;
-            string detail = reason switch
-            {
-                AuthFailureReason.AccountLocked =>
-                    $"Too many failed attempts. Try again after {result.Value.LockedUntil:HH:mm} UTC.",
-                AuthFailureReason.AccountDeactivated =>
-                    "Your account has been deactivated. Contact your Workspace admin.",
-                AuthFailureReason.EmailNotVerified =>
-                    "Please verify your email before signing in.",
-                AuthFailureReason.WorkspaceDeleted =>
-                    "This Workspace no longer exists.",
-                _ => "Incorrect email or password.",
-            };
-            return Results.Problem(detail: detail, statusCode: StatusCodes.Status401Unauthorized);
-        }
-
-        AuthenticationResult auth = result.Value;
-
-        // Issue a short-lived session cookie so the authorize endpoint can identify the user.
-        // The cookie is not a session token — it only lives long enough to complete the PKCE
-        // code exchange (5 minutes).
-        List<Claim> claims =
-        [
-            new(ClaimTypes.NameIdentifier, auth.UserId.ToString()),
-            new(ClaimTypes.Email, auth.Email),
-            new("name", auth.FullName),
-        ];
-        if (auth.workspaceId is Guid workspaceId)
-            claims.Add(new Claim("workspace_id", workspaceId.ToString()));
-        foreach (string permission in auth.Permissions)
-            claims.Add(new Claim("permissions", permission));
-
-        ClaimsIdentity identity = new(claims, CookieAuthenticationDefaults.AuthenticationScheme);
-        ClaimsPrincipal principal = new(identity);
-
-        AuthenticationProperties props = new()
-        {
-            IsPersistent = false,
-            ExpiresUtc = DateTimeOffset.UtcNow.AddMinutes(5),
-        };
-
-        await httpContext.SignInAsync(
-            CookieAuthenticationDefaults.AuthenticationScheme, principal, props);
-
-        return Results.Redirect(returnUrl ?? "/");
-    }
-
     // ── POST /connect/token ───────────────────────────────────────────────────
     private static async Task<IResult> Token(
         HttpContext httpContext,
@@ -149,8 +73,7 @@ public static class ConnectEndpoints
         OpenIddictRequest request = httpContext.GetOpenIddictServerRequest()
             ?? throw new InvalidOperationException("OpenIddict server request not found.");
 
-        // ── Authorization Code or Refresh Token ────────────────────────────
-        if (request.IsAuthorizationCodeGrantType() || request.IsRefreshTokenGrantType())
+        if (request.IsAuthorizationCodeGrantType())
         {
             AuthenticateResult result = await httpContext.AuthenticateAsync(
                 OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
@@ -208,25 +131,7 @@ public static class ConnectEndpoints
                 claims.workspaceId,
                 claims.Email,
                 claims.FullName,
-                claims.Permissions.ToList(),
                 result.Principal!.GetScopes());
-
-            return Results.SignIn(
-                principal,
-                properties: null,
-                OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
-        }
-
-        // ── Client Credentials (M2M) ───────────────────────────────────────
-        if (request.IsClientCredentialsGrantType())
-        {
-            ClaimsIdentity identity = new(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
-            identity.AddClaim(new Claim(Claims.Subject, request.ClientId!));
-            identity.AddClaim(new Claim(Claims.ClientId, request.ClientId!));
-
-            ClaimsPrincipal principal = new(identity);
-            principal.SetScopes(request.GetScopes());
-            ClaimDestinationsHelper.SetDestinations(principal);
 
             return Results.SignIn(
                 principal,
@@ -249,14 +154,12 @@ public static class ConnectEndpoints
         string? WorkspaceId = cookiePrincipal.FindFirstValue("workspace_id");
         string? email = cookiePrincipal.FindFirstValue(ClaimTypes.Email);
         string? name = cookiePrincipal.FindFirstValue("name");
-        IEnumerable<string> permissions = cookiePrincipal.FindAll("permissions").Select(c => c.Value);
 
         return BuildUserPrincipal(
             Guid.Parse(sub),
             Guid.TryParse(WorkspaceId, out Guid gWorkspaceId) ? gWorkspaceId : null,
             email ?? string.Empty,
             name ?? string.Empty,
-            permissions.ToList(),
             scopes);
     }
 
@@ -265,7 +168,6 @@ public static class ConnectEndpoints
         Guid? workspaceId,
         string email,
         string name,
-        IReadOnlyList<string> permissions,
         IEnumerable<string> scopes)
     {
         ClaimsIdentity identity = new(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
@@ -274,9 +176,6 @@ public static class ConnectEndpoints
         identity.AddClaim(new Claim("name", name));
         if (workspaceId is Guid resolvedWorkspaceId)
             identity.AddClaim(new Claim("workspace_id", resolvedWorkspaceId.ToString()));
-
-        foreach (string permission in permissions)
-            identity.AddClaim(new Claim("permissions", permission));
 
         ClaimsPrincipal principal = new(identity);
         principal.SetScopes(scopes);

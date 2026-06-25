@@ -1,95 +1,29 @@
 # Product Vision
 
-> **Navigation**: [← docs/README.md](./README.md) · [← AGENTS.md](../AGENTS.md)
+> **Navigation**: [docs](./README.md) · [AGENTS.md](../AGENTS.md)
 
----
+Axis is currently an account-registration foundation, not a low-code platform implementation.
 
-## Overview
+## Current Product Promise
 
-**Axis** is a multi-workspace SaaS low-code platform that enables Workspaces to build data-driven workflow applications without writing code. Users can model their own data, design automated workflows, create interactive forms, and build custom UI pages — all within a unified visual environment.
+A user can create a standalone Axis account with email/password, verify their email, complete the browser PKCE flow, and reach a simple account dashboard.
 
----
+## Current User
 
-## Problem Statement
-
-Workspaces of all sizes need to digitize and automate their business processes. Custom software development is expensive, slow, and requires dedicated engineering teams. Existing low-code tools are either too rigid (can't model custom data), too complex (require DevOps expertise), or too generic (lack workflow depth).
-
-**Core pain points:**
-
-- Business teams can't build the tools they need without engineering resources.
-- Custom data structures change frequently — rigid schemas don't keep up.
-- Workflow logic lives in spreadsheets, emails, and manual handoffs.
-- Form data is disconnected from business processes and approvals.
-
----
-
-## Solution
-
-Axis provides a unified platform where non-technical users can:
-
-1. **Define their data** — Create custom models and data classes that match their business domain.
-2. **Design workflows** — Visually build multi-step automated processes with branching, conditions, and integrations.
-3. **Collect data via forms** — Embed interactive forms directly into workflow steps.
-4. **Build UI** — Compose pages with pre-built widgets (lists, grids, charts) that are bound to live data and workflows.
-
----
-
-## Target Users
-
-| Role | Who They Are | Primary Goals |
-|---|---|---|
-| **Workspace Admin** | Business owner or ops lead of a workspace | Configure the platform, manage users, build workflows |
-| **Workspace Member** | Employees within the workspace | Execute workflows, manage records, fill forms |
-| **End User** | Customers or external stakeholders | Submit forms, view published pages |
-| **Platform Admin** | Axis internal team | Manage workspaces, monitor platform health |
-
----
-
-## Key Differentiators
-
-- **Custom data modeling** — Users define their own schemas; no pre-built rigid data structures.
-- **Deep workflow engine** — Branching, parallel steps, multiple trigger types (manual, schedule, webhook, event).
-- **Form-workflow integration** — Forms are first-class workflow steps, not afterthoughts.
-- **Multi-workspace isolation by design** — Each Workspace is fully isolated with its own database schema.
-- **Developer-friendly import/export** — Workflows and models can be imported/exported as JSON.
-
----
-
-## Production platform scope
-
-Use-case specs are the product contract. Work not shipped yet is listed in each file's `> **Implementation status**` callout or `*Out of scope*` acceptance criteria.
-
-**Core user journey:**
-
-```text
-Register & authenticate → Model data → Build workflows → Add forms
-  → Execute & monitor → Publish pages for end users
-```
-
-| Capability | In scope |
+| User | Goal |
 |---|---|
-| Multi-workspaceanization management (registration, slug, provisioning, plans) | Yes |
-| Authentication (email/password + Microsoft, Google, GitHub) & RBAC | Yes |
-| Legal acceptance (Terms of Service, Privacy Policy) at registration | Yes |
-| Custom data modeling | Yes |
-| Workflow builder (visual canvas) | Yes |
-| Step types: Form, HTTP, Condition, Script, Notification | Yes |
-| Trigger types: Manual, Schedule, Webhook, Event | Yes |
-| Branching & parallel execution | Yes |
-| Form builder | Yes |
-| Workflow execution engine | Yes |
-| Execution history & error notifications | Yes |
-| Page & UI builder | Yes |
+| Self-service user | Create and verify an Axis account without external setup context. |
 
-**Implementation order** follows domain **Open work** and use-case **Gaps vs spec** — not a reduced feature phase. Deferred items in a use case are backlog within the same product scope, not excluded from the platform.
+## In Scope Now
 
-**External user sign-in (required providers):** Microsoft (Entra ID / Microsoft account), Google, and GitHub — in addition to email/password. Details: [sign-in](./use-cases/identity-access/sign-in/README.md) and [TECH_STACK § ADR-027](./TECH_STACK.md#adr-027-external-identity-providers-for-user-sign-in-and-registration). Provider registration/linking is a separate user-identity follow-up; [register-user](./use-cases/identity-access/register-user/README.md) covers standalone email/password registration. Workspace onboarding uses an official Workspace contact email, not a generic third-party user identity.
+- Standalone email/password registration.
+- Current legal-version acceptance during registration.
+- Email verification and resend states.
+- Authorization Code + PKCE after verification.
+- Authenticated dashboard profile.
 
----
+## Out Of Scope Now
 
-## Non-goals (platform)
+Everything beyond the current registration path is out of scope until it has a new use-case spec, implementation plan, tests, and updated docs.
 
-These remain outside the product unless a future ADR explicitly adds them:
-
-- Built-in payment processing (billing integration is a separate initiative; plan assignment and limits are in scope today).
-- Axis-operated mobile native apps (responsive web SPA is the client).
+Future product scope must return through use-case specs first, then source and tests.

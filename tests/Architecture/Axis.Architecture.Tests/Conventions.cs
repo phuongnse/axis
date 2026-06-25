@@ -18,13 +18,11 @@ internal static class Conventions
 
     /// <summary>
     /// Per-module layer names. Each (module, layer) pair maps to assembly
-    /// <c>Axis.{Module}.{Layer}</c>. Not every module has every layer (e.g.
-    /// PageBuilder currently has no Contracts) — <see cref="TryLoad"/> handles
-    /// the absence gracefully.
+    /// <c>Axis.{Module}.{Layer}</c>. <see cref="TryLoad"/> handles absent
+    /// assemblies gracefully.
     /// </summary>
     public static readonly string[] LayerNames =
     [
-        "Contracts",
         "Domain",
         "Application",
         "Infrastructure",

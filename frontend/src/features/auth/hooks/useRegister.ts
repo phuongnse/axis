@@ -3,7 +3,6 @@ import { useMutation } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { useMemo, useRef } from 'react';
 import { type FieldPath, type UseFormReturn, useForm } from 'react-hook-form';
-import { useTranslation } from 'react-i18next';
 
 import { createRegisterIdempotencyKey, registerUser, toAdminNameParts } from '@/features/auth/api';
 import { useLegalVersions } from '@/features/auth/hooks/useLegalVersions';
@@ -14,7 +13,6 @@ import {
   type RegisterFormValues,
 } from '@/features/auth/schemas/register-schema';
 import type { LegalVersionsResponse, RegisterValidationErrorData } from '@/features/auth/types';
-import { useQueryParam } from '@/features/auth/use-query-param';
 import { ApiError } from '@/lib/api';
 
 type LoadedLegalVersions = LegalVersionsResponse & {
@@ -99,18 +97,16 @@ function applyRegisterValidationErrors(
 }
 
 export function useRegister() {
-  const { t } = useTranslation();
   const navigate = useNavigate();
-  const workspaceSetupToken = useQueryParam('setupToken');
   const {
     data: legalVersions,
     isError: legalVersionsError,
     isLoading: legalVersionsLoading,
   } = useLegalVersions();
   const idempotencyKeyRef = useRef(createRegisterIdempotencyKey());
-  const registerSchema = useMemo(() => createRegisterSchema(t), [t]);
-  const genericSubmitError = t('validation.genericSubmit');
-  const legalVersionsMissingError = t('validation.legalVersionsMissing');
+  const registerSchema = useMemo(() => createRegisterSchema(), []);
+  const genericSubmitError = 'Something went wrong, please try again';
+  const legalVersionsMissingError = 'Legal document versions are not loaded yet.';
   const form = useForm<RegisterFormValues>({
     resolver: zodResolver(registerSchema),
     defaultValues: {
@@ -135,7 +131,6 @@ export function useRegister() {
           passwordConfirmation: values.passwordConfirmation,
           acceptedTermsVersion: legalVersions.termsVersion,
           acceptedPrivacyVersion: legalVersions.privacyVersion,
-          workspaceSetupToken,
         },
         idempotencyKeyRef.current,
       );

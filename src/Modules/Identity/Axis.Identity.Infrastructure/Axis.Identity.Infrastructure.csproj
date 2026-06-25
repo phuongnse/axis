@@ -8,17 +8,13 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Axis.Identity.Application\Axis.Identity.Application.csproj" />
-    <ProjectReference Include="..\Axis.Identity.Contracts\Axis.Identity.Contracts.csproj" />
     <ProjectReference Include="..\Axis.Identity.Domain\Axis.Identity.Domain.csproj" />
     <ProjectReference Include="..\..\..\Shared\Axis.Shared.Infrastructure\Axis.Shared.Infrastructure.csproj" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Grpc.AspNetCore" />
     <PackageReference Include="BCrypt.Net-Next" />
     <PackageReference Include="MailKit" />
-    <PackageReference Include="AWSSDK.S3" />
-    <PackageReference Include="AWSSDK.Extensions.NETCore.Setup" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
       <PrivateAssets>all</PrivateAssets>

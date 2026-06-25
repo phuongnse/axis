@@ -1,178 +1,28 @@
-import type { LucideIcon } from 'lucide-react';
-import {
-  AlertCircle,
-  Building2,
-  CheckCircle2,
-  RefreshCw,
-  ShieldCheck,
-  Users,
-  Workflow,
-  Zap,
-} from 'lucide-react';
-import { useTranslation } from 'react-i18next';
+import { useQuery } from '@tanstack/react-query';
+import { AlertCircle, CheckCircle2, RefreshCw, UserRound } from 'lucide-react';
 
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
-import { type UsageStats, useWorkspaceStart, type WorkspaceSettings } from '@/features/workspace';
-
-interface UsageCardProps {
-  label: string;
-  value: string;
-  limit: string;
-  percent: number | null;
-  icon: LucideIcon;
-}
-
-function formatNumber(value: number | null | undefined, locale: string): string {
-  return typeof value === 'number' ? new Intl.NumberFormat(locale).format(value) : '-';
-}
-
-function formatLimit(
-  limit: number | null | undefined,
-  unlimitedLabel: string,
-  locale: string,
-): string {
-  return typeof limit === 'number' ? new Intl.NumberFormat(locale).format(limit) : unlimitedLabel;
-}
-
-function usagePercent(used: number | null | undefined, limit: number | null | undefined) {
-  if (typeof used !== 'number' || typeof limit !== 'number' || limit <= 0) return null;
-  return Math.min(100, Math.round((used / limit) * 100));
-}
-
-function usageCards(
-  usage: UsageStats | undefined,
-  unlimitedLabel: string,
-  locale: string,
-): UsageCardProps[] {
-  return [
-    {
-      label: 'dashboard.usage.users',
-      value: formatNumber(usage?.usersUsed, locale),
-      limit: formatLimit(usage?.usersLimit, unlimitedLabel, locale),
-      percent: usagePercent(usage?.usersUsed, usage?.usersLimit),
-      icon: Users,
-    },
-    {
-      label: 'dashboard.usage.workflows',
-      value: formatNumber(usage?.workflowsUsed, locale),
-      limit: formatLimit(usage?.workflowsLimit, unlimitedLabel, locale),
-      percent: usagePercent(usage?.workflowsUsed, usage?.workflowsLimit),
-      icon: Workflow,
-    },
-    {
-      label: 'dashboard.usage.executions',
-      value: formatNumber(usage?.executionsUsedThisMonth, locale),
-      limit: formatLimit(usage?.executionsPerMonthLimit, unlimitedLabel, locale),
-      percent: usagePercent(usage?.executionsUsedThisMonth, usage?.executionsPerMonthLimit),
-      icon: Zap,
-    },
-  ];
-}
-
-function UsageCard({ label, value, limit, percent, icon: Icon }: UsageCardProps) {
-  const { t } = useTranslation();
-
-  return (
-    <Card className="p-4">
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-sm font-medium text-foreground">{t(label)}</p>
-        <span className="inline-flex size-8 items-center justify-center rounded-md border border-primary/20 bg-primary/10 text-primary">
-          <Icon className="size-4" aria-hidden />
-        </span>
-      </div>
-      <p className="mt-4 text-2xl font-semibold text-foreground">{value}</p>
-      <p className="mt-1 text-xs text-muted-foreground">{t('dashboard.usage.limit', { limit })}</p>
-      <Progress
-        className="mt-4"
-        value={percent}
-        aria-label={t('dashboard.usage.progress', { label: t(label) })}
-      />
-    </Card>
-  );
-}
-
-function WorkspaceSummary({
-  settings,
-  canReadSettings,
-  hasWorkspace,
-}: {
-  settings: WorkspaceSettings | undefined;
-  canReadSettings: boolean;
-  hasWorkspace: boolean;
-}) {
-  const { t } = useTranslation();
-
-  const rows = [
-    {
-      label: t('dashboard.summary.workspace'),
-      value:
-        settings?.name ??
-        (hasWorkspace ? t('dashboard.summary.workspaceLinked') : t('dashboard.summary.none')),
-      icon: Building2,
-    },
-    {
-      label: t('dashboard.summary.status'),
-      value:
-        settings?.status ??
-        (hasWorkspace ? t('dashboard.summary.limited') : t('dashboard.summary.notLinked')),
-      icon: CheckCircle2,
-    },
-    {
-      label: t('dashboard.summary.plan'),
-      value:
-        settings?.planName ??
-        (canReadSettings ? t('dashboard.summary.loading') : t('dashboard.summary.unavailable')),
-      icon: ShieldCheck,
-    },
-  ];
-
-  return (
-    <Card className="p-4">
-      <h2 className="text-sm font-semibold text-foreground">{t('dashboard.summary.title')}</h2>
-      <div className="mt-4 space-y-3">
-        {rows.map((row) => {
-          const Icon = row.icon;
-          return (
-            <div key={row.label} className="flex items-start gap-3">
-              <span className="inline-flex size-8 shrink-0 items-center justify-center rounded-md border border-border bg-muted text-muted-foreground">
-                <Icon className="size-4" aria-hidden />
-              </span>
-              <div className="min-w-0">
-                <p className="text-xs text-muted-foreground">{row.label}</p>
-                <p className="truncate text-sm font-medium text-foreground">{row.value}</p>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </Card>
-  );
-}
+import {
+  type CurrentUserProfile,
+  dashboardQueryKeys,
+  getCurrentUserProfile,
+} from '@/features/dashboard/api';
 
 function LoadingDashboard() {
   return (
-    <div className="max-w-6xl space-y-6">
+    <div className="max-w-4xl space-y-6">
       <Card className="p-6 sm:p-8">
         <Skeleton className="h-4 w-32" />
         <Skeleton className="mt-8 h-9 w-80 max-w-full" />
         <Skeleton className="mt-4 h-4 w-[28rem] max-w-full" />
-        <div className="mt-8 grid gap-3 sm:grid-cols-3">
-          <Skeleton className="h-36 rounded-lg" />
-          <Skeleton className="h-36 rounded-lg" />
-          <Skeleton className="h-36 rounded-lg" />
-        </div>
       </Card>
     </div>
   );
 }
 
 function ErrorDashboard({ onRetry }: { onRetry: () => void }) {
-  const { t } = useTranslation();
-
   return (
     <Card className="max-w-3xl border-destructive/30 p-6">
       <div className="flex items-start gap-3">
@@ -180,11 +30,13 @@ function ErrorDashboard({ onRetry }: { onRetry: () => void }) {
           <AlertCircle className="size-4" aria-hidden />
         </span>
         <div className="min-w-0">
-          <h1 className="text-xl font-semibold text-foreground">{t('dashboard.errorTitle')}</h1>
-          <p className="mt-2 text-sm leading-6 text-muted-foreground">{t('dashboard.errorBody')}</p>
+          <h1 className="text-xl font-semibold text-foreground">Unable to load account</h1>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">
+            Refresh the session and try again.
+          </p>
           <Button type="button" variant="outline" className="mt-5" onClick={onRetry}>
             <RefreshCw className="size-4" aria-hidden />
-            {t('dashboard.retry')}
+            Retry
           </Button>
         </div>
       </div>
@@ -192,129 +44,96 @@ function ErrorDashboard({ onRetry }: { onRetry: () => void }) {
   );
 }
 
+function ProfileSummary({ profile }: { profile: CurrentUserProfile }) {
+  const currentWorkspace = profile.workspaces?.find((workspace) => workspace.isCurrent);
+
+  return (
+    <Card className="p-5">
+      <h2 className="text-sm font-semibold text-foreground">Account details</h2>
+      <dl className="mt-4 grid gap-4 text-sm sm:grid-cols-2">
+        <div>
+          <dt className="text-xs text-muted-foreground">Email</dt>
+          <dd className="mt-1 font-medium text-foreground">{profile.email}</dd>
+        </div>
+        <div>
+          <dt className="text-xs text-muted-foreground">Status</dt>
+          <dd className="mt-1 font-medium text-foreground">
+            {profile.isActive ? 'Active' : 'Inactive'}
+          </dd>
+        </div>
+        <div>
+          <dt className="text-xs text-muted-foreground">Workspace</dt>
+          <dd className="mt-1 font-medium text-foreground">
+            {currentWorkspace?.name ?? 'Personal workspace'}
+          </dd>
+        </div>
+        <div>
+          <dt className="text-xs text-muted-foreground">Workspace type</dt>
+          <dd className="mt-1 font-medium text-foreground">
+            {currentWorkspace?.type ?? 'Personal'}
+          </dd>
+        </div>
+      </dl>
+    </Card>
+  );
+}
+
 export function DashboardOverview() {
-  const { t, i18n } = useTranslation();
-  const { profileQuery, workspaceSettingsQuery, canReadSettings, hasWorkspace } =
-    useWorkspaceStart();
+  const profileQuery = useQuery({
+    queryKey: dashboardQueryKeys.currentUser(),
+    queryFn: getCurrentUserProfile,
+  });
 
   if (profileQuery.isLoading) {
     return <LoadingDashboard />;
   }
 
-  if (profileQuery.isError) {
+  if (profileQuery.isError || !profileQuery.data) {
     return <ErrorDashboard onRetry={() => void profileQuery.refetch()} />;
   }
 
   const profile = profileQuery.data;
-  const settings = workspaceSettingsQuery.data;
-  const showUsage = hasWorkspace && canReadSettings && settings;
-  const title = settings?.name ?? t('dashboard.title');
-  const body = !hasWorkspace
-    ? t('dashboard.noWorkspaceBody', { email: profile?.email ?? t('shell.userFallback') })
-    : canReadSettings
-      ? t('dashboard.bodyWithSettings')
-      : t('dashboard.bodyLimited');
 
   return (
-    <div className="max-w-6xl space-y-6">
+    <div className="max-w-4xl space-y-6">
       <Card className="overflow-hidden p-0">
-        <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_22rem]">
+        <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_18rem]">
           <div className="p-6 sm:p-8">
-            <div className="flex flex-wrap items-center gap-2">
-              <Badge>
-                {hasWorkspace ? t('dashboard.workspaceLinked') : t('dashboard.accountReady')}
-              </Badge>
-              {settings?.planName ? <Badge>{settings.planName}</Badge> : null}
+            <div className="inline-flex items-center gap-2 rounded-md border border-primary/20 bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
+              <CheckCircle2 className="size-3.5" aria-hidden />
+              Account ready
             </div>
 
             <div className="mt-8 max-w-3xl space-y-3">
               <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
-                {title}
+                {profile.fullName || profile.email}
               </h1>
-              <p className="max-w-2xl text-sm leading-6 text-muted-foreground">{body}</p>
+              <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
+                Your email is verified and your Axis account is ready to use.
+              </p>
             </div>
           </div>
 
           <div className="border-t border-border bg-muted/30 p-6 sm:p-8 lg:border-l lg:border-t-0">
             <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
-              {t('dashboard.session.title')}
+              Session
             </p>
-            <div className="mt-6 space-y-4">
-              <div>
-                <p className="text-sm font-medium text-foreground">
-                  {profile?.fullName || profile?.email || t('shell.userFallback')}
+            <div className="mt-6 flex items-center gap-3">
+              <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-md border border-border bg-background text-muted-foreground">
+                <UserRound className="size-4" aria-hidden />
+              </span>
+              <div className="min-w-0">
+                <p className="truncate text-sm font-medium text-foreground">
+                  {profile.fullName || profile.email}
                 </p>
-                {profile?.email ? (
-                  <p className="mt-1 text-xs text-muted-foreground">{profile.email}</p>
-                ) : null}
-              </div>
-              <div className="rounded-lg border border-border bg-background/75 p-4">
-                <div className="flex items-center gap-2 text-sm font-medium text-foreground">
-                  <CheckCircle2 className="size-4 text-primary" aria-hidden />
-                  {profile?.isActive
-                    ? t('dashboard.session.active')
-                    : t('dashboard.session.inactive')}
-                </div>
-                <p className="mt-2 text-xs leading-5 text-muted-foreground">
-                  {hasWorkspace
-                    ? t('dashboard.session.workspaceLinked')
-                    : t('dashboard.session.noWorkspace')}
-                </p>
+                <p className="mt-1 truncate text-xs text-muted-foreground">{profile.email}</p>
               </div>
             </div>
           </div>
         </div>
       </Card>
 
-      {workspaceSettingsQuery.isError ? (
-        <Card className="border-destructive/30 p-4">
-          <div className="flex items-start gap-3">
-            <AlertCircle className="mt-0.5 size-4 shrink-0 text-destructive" aria-hidden />
-            <div>
-              <h2 className="text-sm font-semibold text-foreground">
-                {t('dashboard.settingsErrorTitle')}
-              </h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                {t('dashboard.settingsErrorBody')}
-              </p>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="mt-4"
-                onClick={() => void workspaceSettingsQuery.refetch()}
-              >
-                <RefreshCw className="size-3.5" aria-hidden />
-                {t('dashboard.retry')}
-              </Button>
-            </div>
-          </div>
-        </Card>
-      ) : null}
-
-      {showUsage ? (
-        <section className="space-y-3">
-          <div>
-            <h2 className="text-base font-semibold text-foreground">
-              {t('dashboard.usage.title')}
-            </h2>
-            <p className="mt-1 text-sm text-muted-foreground">{t('dashboard.usage.body')}</p>
-          </div>
-          <div className="grid gap-3 sm:grid-cols-3">
-            {usageCards(settings.usage, t('dashboard.usage.unlimited'), i18n.language).map(
-              (card) => (
-                <UsageCard key={card.label} {...card} />
-              ),
-            )}
-          </div>
-        </section>
-      ) : (
-        <WorkspaceSummary
-          settings={settings}
-          canReadSettings={canReadSettings}
-          hasWorkspace={hasWorkspace}
-        />
-      )}
+      <ProfileSummary profile={profile} />
     </div>
   );
 }

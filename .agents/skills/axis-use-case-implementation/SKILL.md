@@ -41,7 +41,6 @@ Ship one reviewable Axis use-case slice without losing acceptance criteria, laye
 5. Work in layer order.
    - Domain, then Application, then Infrastructure, then API, then Frontend.
    - Before API work, search open lower-layer gaps in `docs/use-cases`.
-   - Cross-module work must use Kafka events, RabbitMQ commands/jobs/saga steps, or gRPC contracts. Do not add in-process calls across modules.
 
 6. Use TDD where behavior changes.
    - Add or update the proving test first when practical.
@@ -62,11 +61,11 @@ Ship one reviewable Axis use-case slice without losing acceptance criteria, laye
    - Add or update `docs/WORKAROUNDS.md` only for intentional P0/P1 workarounds.
 
 9. Verify honestly.
-   - During development, run the narrow checks for the touched surface.
+   - During development, run the smallest check that proves the touched surface.
    - Run every required AT row's runner or targeted test before claiming the use case/layer is complete.
    - Report acceptance evidence by AT ID (`AT-001 Playwright passed`, `AT-002 xUnit API passed`, etc.).
-   - Before review, run `python scripts/axis.py verify` when triggered.
-   - Use `$axis-ready-review` before asking for review.
+   - Use `$axis-ready-review` before asking for review; it owns `python scripts/axis.py verify` when triggered.
+   - Do not rerun ready-review verification after every small edit.
    - Do not claim the full suite unless full `python scripts/axis.py dotnet test` ran.
 
 ## Output

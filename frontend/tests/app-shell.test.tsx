@@ -1,16 +1,11 @@
 import { screen, within } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { AppShell } from '../src/components/shared/AppShell';
 import { renderWithRouter } from './render-with-router';
 
-vi.mock('@/features/auth/api', () => ({
-  signOut: vi.fn().mockResolvedValue(undefined),
-  switchWorkspace: vi.fn().mockResolvedValue(undefined),
-}));
-
 describe('AppShell', () => {
-  it('renders sidebar nav and search bar from wireframe', async () => {
+  it('renders the dashboard navigation shell', async () => {
     await renderWithRouter(
       <AppShell>
         <p>Child content</p>
@@ -21,8 +16,7 @@ describe('AppShell', () => {
     const sidebarNav = screen.getByRole('navigation', { name: /sidebar navigation/i });
     expect(sidebarNav).toBeInTheDocument();
     expect(within(sidebarNav).getByText('Dashboard')).toBeInTheDocument();
-    expect(within(sidebarNav).getByText('Data Models')).toBeInTheDocument();
-    expect(screen.getByLabelText(/search/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /sign out/i })).toBeInTheDocument();
     expect(screen.getByText('Child content')).toBeInTheDocument();
   });
 });

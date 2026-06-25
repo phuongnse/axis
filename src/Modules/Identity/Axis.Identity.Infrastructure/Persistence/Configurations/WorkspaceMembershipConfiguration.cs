@@ -31,31 +31,5 @@ internal sealed class WorkspaceMembershipConfiguration : IEntityTypeConfiguratio
 
         builder.HasIndex(m => new { m.UserId, m.workspaceId }).IsUnique();
         builder.HasIndex(m => m.workspaceId);
-
-        builder.HasMany(m => m.Roles)
-            .WithOne()
-            .HasForeignKey(r => r.MembershipId)
-            .OnDelete(DeleteBehavior.Cascade);
-
-        builder.Navigation(m => m.Roles)
-            .UsePropertyAccessMode(PropertyAccessMode.Field);
-
-        builder.Ignore(m => m.RoleIds);
-    }
-}
-
-internal sealed class WorkspaceMembershipRoleConfiguration : IEntityTypeConfiguration<WorkspaceMembershipRole>
-{
-    public void Configure(EntityTypeBuilder<WorkspaceMembershipRole> builder)
-    {
-        builder.ToTable("Workspace_membership_roles");
-        builder.HasKey(r => new { r.MembershipId, r.RoleId });
-        builder.Ignore(r => r.Id);
-        builder.Property(r => r.MembershipId).HasColumnName("membership_id");
-        builder.Property(r => r.RoleId).HasColumnName("role_id");
-        builder.Property(r => r.AssignedAt)
-            .HasColumnName("assigned_at")
-            .IsRequired();
-        builder.HasIndex(r => r.RoleId);
     }
 }

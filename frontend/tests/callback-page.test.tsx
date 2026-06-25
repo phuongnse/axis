@@ -3,7 +3,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { exchangeAuthorizationCode } from '@/features/auth/api';
 import { CallbackPage } from '@/features/auth/components/CallbackPage';
-import { storePostVerifyProvisioningToken } from '@/features/auth/post-verify-session';
 import { renderWithRouter } from './render-with-router';
 
 const navigateMock = vi.fn();
@@ -47,7 +46,7 @@ describe('CallbackPage', () => {
     await renderWithRouter(<CallbackPage />, { path: '/callback?code=auth-code&state=missing' });
 
     expect(
-      await screen.findByText('Invalid authorization response. Please try signing in again.'),
+      await screen.findByText('Invalid authorization response. Please try registering again.'),
     ).toBeInTheDocument();
     expect(exchangeAuthorizationCode).not.toHaveBeenCalled();
     expect(navigateMock).not.toHaveBeenCalled();
@@ -65,22 +64,5 @@ describe('CallbackPage', () => {
       expect(exchangeAuthorizationCode).toHaveBeenCalledWith('auth-code');
     });
     expect(navigateMock).toHaveBeenCalledWith({ to: '/dashboard', replace: true });
-  });
-
-  it('continues provisioning after a post-verification callback', async () => {
-    sessionStorage.setItem('pkce_verifier', 'verifier');
-    sessionStorage.setItem('pkce_state', 'state');
-    storePostVerifyProvisioningToken('provisioning-token');
-    setWindowPath('/callback?code=auth-code&state=state');
-
-    await renderWithRouter(<CallbackPage />, { path: '/callback?code=auth-code&state=state' });
-
-    await waitFor(() => {
-      expect(navigateMock).toHaveBeenCalledWith({
-        to: '/provisioning',
-        search: { token: 'provisioning-token' },
-        replace: true,
-      });
-    });
   });
 });

@@ -1,4 +1,3 @@
-import type { TFunction } from 'i18next';
 import { z } from 'zod';
 
 import {
@@ -9,26 +8,26 @@ import {
 
 export type RegisterFormValues = z.infer<ReturnType<typeof createRegisterSchema>>;
 
-export function createRegisterSchema(t: TFunction) {
+export function createRegisterSchema() {
   return z
     .object({
-      fullName: z.string().min(1, t('validation.fullNameRequired')),
-      email: z.string().min(1, t('validation.emailRequired')).email(t('validation.emailInvalid')),
+      fullName: z.string().min(1, 'Full name is required'),
+      email: z.string().min(1, 'Email address is required').email('Enter a valid email address'),
       password: z
         .string()
-        .min(1, t('validation.passwordRequired'))
-        .min(PASSWORD_MIN_LENGTH, t('validation.passwordMin'))
-        .max(PASSWORD_MAX_LENGTH, t('validation.passwordMax')),
-      passwordConfirmation: z.string().min(1, t('validation.passwordConfirmationRequired')),
+        .min(1, 'Password is required')
+        .min(PASSWORD_MIN_LENGTH, `Password must be at least ${PASSWORD_MIN_LENGTH} characters`)
+        .max(PASSWORD_MAX_LENGTH, `Password must be ${PASSWORD_MAX_LENGTH} characters or fewer`),
+      passwordConfirmation: z.string().min(1, 'Password confirmation is required'),
       acceptedTerms: z.boolean().refine((value) => value === true, {
-        message: t('validation.acceptTerms'),
+        message: 'You must accept the Terms of Service and Privacy Policy',
       }),
     })
     .superRefine((values, context) => {
       if (values.passwordConfirmation !== values.password) {
         context.addIssue({
           code: z.ZodIssueCode.custom,
-          message: t('validation.passwordConfirmationMatch'),
+          message: 'Passwords must match',
           path: ['passwordConfirmation'],
         });
       }
@@ -40,7 +39,7 @@ export function createRegisterSchema(t: TFunction) {
       if (nameParts.length < 2) {
         context.addIssue({
           code: z.ZodIssueCode.custom,
-          message: t('validation.firstLastName'),
+          message: 'Enter both first and last name',
           path: ['fullName'],
         });
       }
@@ -52,7 +51,7 @@ export function createRegisterSchema(t: TFunction) {
       ) {
         context.addIssue({
           code: z.ZodIssueCode.custom,
-          message: t('validation.passwordCommon'),
+          message: 'Choose a password that is harder to guess',
           path: ['password'],
         });
       }

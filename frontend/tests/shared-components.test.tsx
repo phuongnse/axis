@@ -12,12 +12,12 @@ import { renderWithRouter } from './render-with-router';
 describe('ActionLink', () => {
   it('renders a routed call to action with an accessible name', async () => {
     await renderWithRouter(
-      <ActionLink to="/login" icon={Search}>
-        Sign in
+      <ActionLink to="/register" icon={Search}>
+        Register
       </ActionLink>,
     );
 
-    expect(screen.getByRole('link', { name: 'Sign in' })).toHaveAttribute('href', '/login');
+    expect(screen.getByRole('link', { name: 'Register' })).toHaveAttribute('href', '/register');
   });
 });
 
@@ -25,13 +25,13 @@ describe('ContentGrid', () => {
   it('renders grouped content without changing child semantics', () => {
     render(
       <ContentGrid>
-        <section aria-label="Models">Models</section>
-        <section aria-label="Forms">Forms</section>
+        <section aria-label="Account">Account</section>
+        <section aria-label="Profile">Profile</section>
       </ContentGrid>,
     );
 
-    expect(screen.getByRole('region', { name: 'Models' })).toBeInTheDocument();
-    expect(screen.getByRole('region', { name: 'Forms' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Account' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Profile' })).toBeInTheDocument();
   });
 });
 

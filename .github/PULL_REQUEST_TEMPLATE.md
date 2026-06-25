@@ -4,7 +4,7 @@
 
 ## Linked spec
 
-<!-- Use-case file path(s) or domain README this PR delivers, e.g. docs/use-cases/workflow-engine/start-execution/README.md -->
+<!-- Use-case file path(s) or domain README this PR delivers, e.g. docs/use-cases/identity-access/register-user/README.md -->
 
 ## Requirements & rules followed
 

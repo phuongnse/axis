@@ -5,7 +5,7 @@ import { getAccessToken } from '@/features/auth/auth-store';
 export const Route = createFileRoute('/_authenticated')({
   beforeLoad: () => {
     if (!getAccessToken()) {
-      throw redirect({ to: '/login' });
+      throw redirect({ to: '/register' });
     }
   },
   component: AuthenticatedLayout,

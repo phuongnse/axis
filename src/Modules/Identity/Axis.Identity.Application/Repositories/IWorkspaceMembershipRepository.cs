@@ -9,5 +9,4 @@ public interface IWorkspaceMembershipRepository
     Task<WorkspaceMembership?> GetFirstActiveByUserIdAsync(Guid userId, CancellationToken ct = default);
     Task<IReadOnlyList<WorkspaceMembership>> GetByUserIdAsync(Guid userId, CancellationToken ct = default);
     Task<int> CountActiveUsersAsync(Guid workspaceId, CancellationToken ct = default);
-    Task<int> CountAdminsAsync(Guid workspaceId, Guid adminRoleId, CancellationToken ct = default);
 }

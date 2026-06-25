@@ -8,7 +8,7 @@ review checkpoint because a path-only rule cannot determine whether behavior
 changed.
 
 Run ``python3 scripts/doc_drift_domains.py --validate`` after adding a module,
-endpoint group, or domain folder. Agent checklists: docs/playbooks/repo-layout-discovery.md
+endpoint group, or domain folder.
 """
 
 from __future__ import annotations
@@ -54,8 +54,6 @@ def validate_discovery() -> list[str]:
 
     for domain_dir in sorted(USE_CASES_DIR.iterdir()):
         if not domain_dir.is_dir() or domain_dir.name.startswith((".", "_")):
-            continue
-        if domain_dir.name == "page-builder":
             continue
         if not (domain_dir / "README.md").is_file():
             issues.append(f"{domain_dir.relative_to(ROOT)}/README.md missing")

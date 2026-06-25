@@ -3,7 +3,7 @@ using System.Text;
 
 namespace Axis.Identity.Application.Services;
 
-/// <summary>Generates opaque one-time tokens stored as SHA-256 hashes (password reset, email verification).</summary>
+/// <summary>Generates opaque one-time tokens stored as SHA-256 hashes.</summary>
 public static class OpaqueTokenGenerator
 {
     public static (string RawToken, string TokenHash) Create()

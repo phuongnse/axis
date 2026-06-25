@@ -17,10 +17,8 @@ Install the local hook once with `python scripts/axis.py bootstrap`. The hook ru
 
 1. Walk Ready review, Verification gate, Docs review, and Retrospective review in [docs/playbooks/agent-checklist.md](docs/playbooks/agent-checklist.md) locally; tick the matching boxes in the PR body.
 2. When you touch C# under `src/` or `tests/`, run `python scripts/axis.py dotnet format --check` - style and naming rules live in [`.editorconfig`](.editorconfig).
-3. For docs, scripts, repo layout, handlers, endpoints, generated-contract surfaces, or bulk rewrites, use the policy/doc checks triggered by [agent-checklist.md § Verification Gate](docs/playbooks/agent-checklist.md#verification-gate--verify-before-pr-review). **New module, endpoint, Kafka event, or proto?** Follow [repo-layout-discovery.md](docs/playbooks/repo-layout-discovery.md). Use-case layout: [USE_CASE_TEMPLATE.md](docs/use-cases/USE_CASE_TEMPLATE.md). If `docker-compose.yml` changes, update [local-dev.md](docs/playbooks/local-dev.md).
+3. For docs, scripts, repo layout, handlers, endpoints, generated-contract surfaces, or bulk rewrites, use the policy/doc checks triggered by [agent-checklist.md § Verification Gate](docs/playbooks/agent-checklist.md#verification-gate--verify-before-pr-review). If `docker-compose.yml` changes, update [local-dev.md](docs/playbooks/local-dev.md).
 4. PR description: **Summary + Linked spec + Requirements only** - no commit list, no CI status (the Checks tab covers that). GitHub auto-fills [.github/PULL_REQUEST_TEMPLATE.md](.github/PULL_REQUEST_TEMPLATE.md); CI job **PR body guard** enforces the required sections and checklist state.
-5. When adding or changing `.proto` files: run `python scripts/axis.py generate buf-yaml` (updates [`buf.yaml`](buf.yaml) module paths), then `python scripts/axis.py check buf-lint` - see [repo-layout-discovery.md § Auto-discovered](docs/playbooks/repo-layout-discovery.md#auto-discovered-do-not-duplicate-lists-elsewhere). CI **Protobuf** job runs on proto/`buf.yaml` changes.
-
 ## Dependency updates (Dependabot)
 
 [`.github/dependabot.yml`](.github/dependabot.yml) runs **monthly** (first day of month, 06:00 Asia/Ho_Chi_Minh) and opens at most **one grouped PR per ecosystem**:
@@ -56,5 +54,5 @@ When you change [`docker-compose.yml`](docker-compose.yml), update that playbook
 | [AGENTS.md](AGENTS.md) | Architecture severity rules and P0 stops |
 | [docs/playbooks/agent-checklist.md](docs/playbooks/agent-checklist.md) | Daily workflow, Verification gate, and review checks |
 | [docs/playbooks/process.md](docs/playbooks/process.md) | Layer-by-layer implementation + deferred follow-ups |
-| [docs/playbooks/patterns-index.md](docs/playbooks/patterns-index.md) | Jump table into patterns |
+| [docs/README.md](docs/README.md) | Documentation hub + single source of truth per topic |
 | [docs/README.md](docs/README.md) | Documentation hub + single source of truth per topic |

@@ -30,7 +30,6 @@ sys.dont_write_bytecode = True
 ROOT = Path(__file__).resolve().parent.parent
 SCRIPTS = ROOT / "scripts"
 REQUIRED_DOTNET_SDK_MAJOR = "8"
-REQUIRED_BUF_VERSION = "1.50.0"
 REQUIRED_LYCHEE_VERSION = "0.23.0"
 MINIMUM_CODERABBIT_CLI_VERSION = "0.6.0"
 TOOL_VERSIONS_DOC = "docs/playbooks/scripts.md#tool-versions"
@@ -56,7 +55,6 @@ if str(SCRIPTS) not in sys.path:
 
 import axis_repo  # noqa: E402
 import doc_drift_domains  # noqa: E402
-import sync_buf_yaml  # noqa: E402
 
 
 class CheckError(RuntimeError):
@@ -280,8 +278,14 @@ def git_ls_files(pattern: str | None = None) -> list[str]:
     return [line for line in git(args).splitlines() if line.strip()]
 
 
+def repo_files(pattern: str | None = None) -> list[str]:
+    args = ["ls-files", "--cached", "--others", "--exclude-standard"]
+    if pattern is not None:
+        args.extend(["--", pattern])
+    return unique_paths(git_lines(args, label=f"repo_files {pattern or '*'}"))
+
+
 TEXT_ENCODING_SUFFIXES = {
-    ".avsc",
     ".cs",
     ".cshtml",
     ".csproj",
@@ -289,7 +293,6 @@ TEXT_ENCODING_SUFFIXES = {
     ".dockerignore",
     ".editorconfig",
     ".env",
-    ".excalidraw",
     ".gitattributes",
     ".gitignore",
     ".graphql",
@@ -302,7 +305,6 @@ TEXT_ENCODING_SUFFIXES = {
     ".md",
     ".mjs",
     ".props",
-    ".proto",
     ".ps1",
     ".py",
     ".runsettings",
@@ -320,7 +322,6 @@ TEXT_ENCODING_SUFFIXES = {
     ".yml",
 }
 TEXT_ENCODING_FILENAMES = {
-    ".coderabbit.yaml",
     ".editorconfig",
     ".gitattributes",
     ".gitignore",
@@ -391,17 +392,21 @@ def text_encoding_issues(paths: Iterable[Path], *, root: Path = ROOT) -> list[st
     return issues
 
 
-def check_text_encoding(_args: argparse.Namespace | None = None) -> int:
-    paths = [ROOT / path for path in git_ls_files() if should_check_text_encoding(path)]
-    issues = text_encoding_issues(paths)
+def run_text_encoding_check(paths: list[str], *, label: str = "check-text-encoding") -> int:
+    candidates = [ROOT / path for path in paths if should_check_text_encoding(path)]
+    issues = text_encoding_issues(candidates, root=ROOT)
     if issues:
-        print("check-text-encoding FAIL:", file=sys.stderr)
+        print(f"{label} FAIL:", file=sys.stderr)
         for issue in issues:
             print(f"  - {issue}", file=sys.stderr)
         print("\nUse UTF-8 without BOM and LF line endings for tracked text files.", file=sys.stderr)
         return 1
-    print(f"check-text-encoding: OK ({len(paths)} files scanned)")
+    print(f"{label}: OK ({len(candidates)} files scanned)")
     return 0
+
+
+def check_text_encoding(_args: argparse.Namespace | None = None) -> int:
+    return run_text_encoding_check(repo_files())
 
 
 TEST_ATTRIBUTE_RE = re.compile(r"^\s*\[(?:Xunit[.])?(?:Fact|Theory)(?:Attribute)?(?:\s*[(]|\s*\])")
@@ -467,7 +472,7 @@ def check_test_naming(_args: argparse.Namespace | None = None) -> int:
 
 def check_test_project_classification(_args: argparse.Namespace | None = None) -> int:
     failed = False
-    for project in git_ls_files("tests/**/*.csproj"):
+    for project in repo_files("tests/**/*.csproj"):
         name = Path(project).stem
         allowed = (
             re.fullmatch(r"Axis\..*\.(Domain|Application)\.Tests", name)
@@ -497,7 +502,7 @@ def test_unit(args: argparse.Namespace) -> int:
         return rc
     projects = [
         p
-        for p in git_ls_files("tests/**/*.csproj")
+        for p in repo_files("tests/**/*.csproj")
         if re.search(r"/Axis\..*\.(Domain|Application)\.Tests/Axis\..*\.(Domain|Application)\.Tests\.csproj$", p)
     ]
     if not projects:
@@ -583,7 +588,7 @@ def check_ef_domain_mapping(_args: argparse.Namespace | None = None) -> int:
     if issues:
         for issue in issues:
             print(f"check-ef-domain-mapping FAIL: {issue}", file=sys.stderr)
-        print("\nSee docs/playbooks/persistence-patterns.md#ef-core-aggregate-mapping-patterns", file=sys.stderr)
+        print("\nSee docs/playbooks/testing.md#database-rules", file=sys.stderr)
         return 1
     print("check-ef-domain-mapping: OK")
     return 0
@@ -1194,7 +1199,7 @@ def check_frontend_quality(_args: argparse.Namespace | None = None) -> int:
     if issues:
         for issue in issues:
             print(f"check-frontend-quality FAIL: {issue}", file=sys.stderr)
-        print("\nSee docs/playbooks/frontend.md#state-management and #localization-and-theme-preferences", file=sys.stderr)
+        print("\nSee docs/playbooks/frontend.md#state-management", file=sys.stderr)
         return 1
     print("check-frontend-quality: OK")
     return 0
@@ -1228,12 +1233,9 @@ def check_doc_navigation(_args: argparse.Namespace | None = None) -> int:
     return 0
 
 
-PLAYBOOK_DEFAULT_MAX_LINES = 300
-PATTERN_ROUTER_MAX_LINES = 150
-DOC_SIZE_BUDGETS = {
-    "docs/playbooks/patterns.md": PATTERN_ROUTER_MAX_LINES,
-    "docs/playbooks/patterns-index.md": PATTERN_ROUTER_MAX_LINES,
-}
+PLAYBOOK_DEFAULT_MAX_LINES = 100
+PATTERN_ROUTER_MAX_LINES = 100
+DOC_SIZE_BUDGETS: dict[str, int] = {}
 
 
 def doc_size_budget_issues(*, root: Path = ROOT) -> list[str]:
@@ -1251,7 +1253,7 @@ def doc_size_budget_issues(*, root: Path = ROOT) -> list[str]:
         if line_count > limit:
             issues.append(
                 f"{normalized}: {line_count} lines exceeds {limit}-line docs budget; "
-                "split by topic or route through patterns-index.md"
+                "split by topic or move repeatable workflow into a repo skill"
             )
     return issues
 
@@ -1267,75 +1269,9 @@ def check_doc_size_budgets(_args: argparse.Namespace | None = None) -> int:
     return 0
 
 
-def check_buf_modules(_args: argparse.Namespace | None = None) -> int:
-    return sync_buf_yaml.main_with_args(["--check"]) if hasattr(sync_buf_yaml, "main_with_args") else module_main("sync_buf_yaml.py", ["--check"])
-
-
-def buf_breaking_base_ref() -> str | None:
-    base_ref = os.environ.get("BASE_REF")
-    if base_ref:
-        return base_ref
-
-    base = os.environ.get("BASE_BRANCH", "main")
-    for candidate in (f"origin/{base}", base):
-        if ref_exists(candidate):
-            return candidate
-    return None
-
-
-def check_buf_breaking_against_base(_args: argparse.Namespace | None = None) -> int:
-    base_ref = buf_breaking_base_ref()
-    if not base_ref:
-        base = os.environ.get("BASE_BRANCH", "main")
-        print(
-            f"buf-breaking-against-base FAIL: cannot determine base ref; set BASE_REF "
-            f"or fetch origin/{base}",
-            file=sys.stderr,
-        )
-        return 1
-    if not ref_exists(base_ref):
-        print(f"buf-breaking-against-base FAIL: missing {base_ref}", file=sys.stderr)
-        return 1
-    buf = find_buf()
-    if buf is None:
-        print(
-            f"buf-breaking-against-base FAIL: Buf CLI {REQUIRED_BUF_VERSION} is required, "
-            f"but `buf` was not found in PATH. See {TOOL_VERSIONS_DOC}.",
-            file=sys.stderr,
-        )
-        return 1
-    buf_ok, buf_detail = buf_version_status(buf)
-    if not buf_ok:
-        print(
-            f"buf-breaking-against-base FAIL: Buf CLI {REQUIRED_BUF_VERSION} is required; {buf_detail}. "
-            f"Install the documented version or put it earlier in PATH. See {TOOL_VERSIONS_DOC}.",
-            file=sys.stderr,
-        )
-        return 1
-    if not (ROOT / "buf.yaml").is_file():
-        print("buf-breaking-against-base: no buf.yaml - skip")
-        return 0
-    text = (ROOT / "buf.yaml").read_text(encoding="utf-8")
-    paths = re.findall(r"^\s+- path: (.+)$", text, re.MULTILINE)
-    for path in paths:
-        if not path:
-            continue
-        existing = run([exe("git"), "ls-tree", "-r", "--name-only", base_ref, path], capture=True, check=False)
-        if existing.returncode == 0 and re.search(r"[.]proto$", existing.stdout, re.MULTILINE):
-            print(f"buf breaking {path} (vs {base_ref})")
-            result = run([buf, "breaking", path, "--against", f".git#ref={base_ref},subdir={path}"], check=False)
-            if result.returncode != 0:
-                return result.returncode
-        else:
-            print(f"buf breaking: skip {path} (new on this branch - no baseline on {base_ref})")
-    print("buf-breaking-against-base: OK")
-    return 0
-
-
 NON_PYTHON_UTILITY_SCRIPT_SUFFIXES = {".mjs", ".js", ".ps1", ".sh", ".cmd", ".bat"}
 DOCS_UTILITY_SCRIPT_ROOTS = (
     Path("docs/scripts"),
-    Path("docs/wireframes"),
     Path("docs/diagrams"),
 )
 
@@ -1402,7 +1338,7 @@ def check_scripts_standard(_args: argparse.Namespace | None = None) -> int:
 
 SKILL_NAME_RE = re.compile(r"^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$")
 FRONTMATTER_RE = re.compile(r"\A---\n(?P<header>.*?)\n---\n", re.DOTALL)
-SKILL_MAX_LINES = 120
+SKILL_MAX_LINES = 100
 SKILL_AMBIGUOUS_WORD_RE = re.compile(
     r"\b(best[- ]effort|if you have time|nice to have|maybe|probably|hopefully)\b",
     re.IGNORECASE,
@@ -1773,11 +1709,8 @@ RAW_DOC_COMMAND_PATTERNS = [
         re.compile(r"^docker\s+(?:compose|info)\b"),
         "use `python scripts/axis.py local-dev ...` or `python scripts/axis.py check docker`",
     ),
-    (re.compile(r"^grpcurl\b"), "use `python scripts/axis.py grpc ...`"),
     (re.compile(r"^openssl\b"), "use `python scripts/axis.py local-dev certs`"),
     (re.compile(r"^python\s+docs/scripts/"), "use `python scripts/axis.py docs ...`"),
-    (re.compile(r"^buf\s+config\s+ls-breaking-rules\b"), "use `python scripts/axis.py buf list-breaking-rules`"),
-    (re.compile(r"^buf\s+--version\b"), "use `python scripts/axis.py check buf-cli`"),
     (re.compile(r"^lychee\s+--version\b"), "use `python scripts/axis.py check markdown-links` or `python scripts/axis.py doctor`"),
     (re.compile(r"^cargo\s+install\s+lychee\b"), "install tools externally, then verify through `python scripts/axis.py doctor`"),
 ]
@@ -1804,7 +1737,7 @@ def raw_doc_command_message(fragment: str) -> str | None:
 
 
 def documented_raw_command_issues(paths: Iterable[str] | None = None, *, root: Path = ROOT) -> list[str]:
-    candidates = paths or git_ls_files()
+    candidates = paths or repo_files()
     issues: list[str] = []
     for path in sorted(candidates):
         normalized = path.replace("\\", "/")
@@ -1839,6 +1772,37 @@ def doc_drift_added_line_issues(rows: Iterable[tuple[str, str]]) -> list[str]:
         for pattern, include, message in DOC_DRIFT_ADDED_LINE_RULES:
             if include(path) and re.search(pattern, line):
                 issues.append(f"{message}: {path}: {line}")
+    return issues
+
+
+STALE_REFERENCE_RULES = (
+    (
+        re.compile(r"feature file|see gaps below|^> \*\*Wireframe\*\*:|docs/epics/|_template-feature-us|\| Diagram \| Source \| Preview \|"),
+        "Epic->Use-case migration - see docs/use-cases/README.md",
+    ),
+    (re.compile(r"\bCLAUDE[.]md\b"), "AGENTS.md is the agent contract; update repo review/agent guidance"),
+)
+
+
+def stale_reference_files(root: Path) -> list[Path]:
+    files = list((root / "docs").rglob("*.md")) + list((root / ".github").rglob("*.md"))
+    files.extend(root / name for name in ("AGENTS.md", "CONTRIBUTING.md", "README.md"))
+    skills_root = root / ".agents" / "skills"
+    if skills_root.is_dir():
+        files.extend(skills_root.glob("*/SKILL.md"))
+    return files
+
+
+def stale_reference_issues(*, root: Path | None = None) -> list[str]:
+    root = root or ROOT
+    issues: list[str] = []
+    for path in stale_reference_files(root):
+        if not path.is_file():
+            continue
+        for idx, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+            for pattern, message in STALE_REFERENCE_RULES:
+                if pattern.search(line):
+                    issues.append(f"Stale reference in {rel_from(path, root)}: {idx}:{line} ({message})")
     return issues
 
 
@@ -1968,9 +1932,6 @@ ENFORCEMENT_TRUTH_REQUIRED_SNIPPETS = [
             ("run: python scripts/axis.py frontend gen-api-types --check", "frontend API type generation runs in CI through the Axis wrapper"),
             ("run: python scripts/axis.py frontend ci", "frontend typecheck/lint runs in CI through the Axis wrapper"),
             ("run: python scripts/axis.py frontend test", "frontend tests run in CI through the Axis wrapper"),
-            ('version: "1.50.0"', "protobuf CI setup pins the documented Buf CLI version"),
-            ("run: python scripts/axis.py check buf-lint", "protobuf CI lint uses the version-checking local wrapper"),
-            ("run: python scripts/axis.py check buf-breaking-against-base", "protobuf CI breaking check uses the version-checking local wrapper"),
             ("run: python scripts/axis.py check policy-tests", "policy gate tests run in CI"),
             ("run: python scripts/axis.py check doc-drift", "doc drift runs in CI"),
             ("uses: lycheeverse/lychee-action", "markdown link check runs in CI"),
@@ -1984,11 +1945,10 @@ ENFORCEMENT_TRUTH_REQUIRED_SNIPPETS = [
         [
             ('step(".NET SDK", lambda: check_dotnet_sdk())', "local verify checks the documented .NET SDK before dotnet commands"),
             ('step("frontend toolchain", lambda: check_frontend_toolchain())', "local verify checks the documented Node source before npm commands"),
-            ('step("buf lint", lambda: check_buf_lint())', "local verify runs Buf lint through the version-checking wrapper"),
-            ('step("buf breaking", lambda: check_buf_breaking_against_base())', "local verify runs Buf breaking through the version-checking wrapper"),
-            ('step("policy gate tests", lambda: check_policy_tests())', "local verify runs policy gate tests"),
-            ('step("doc drift", lambda: check_doc_drift())', "local verify runs doc drift"),
-            ('step("markdown links", lambda: check_markdown_links())', "local verify runs markdown link check"),
+            ("dotnet_projects_for_changed_paths(paths)", "local verify routes .NET work by changed project paths"),
+            ('step("policy gate tests", lambda: check_policy_tests())', "local verify runs policy gate tests when scripts change"),
+            ('step("doc navigation", lambda: check_doc_navigation())', "local verify runs docs checks when docs change"),
+            ('step("markdown links (changed files)",', "local verify runs markdown link checks for changed markdown paths"),
             ('def pre_push(args: argparse.Namespace) -> int:', "pre-push quick gate is implemented in Python"),
             ('return verify(args)', "pre-push can opt into full verify with AXIS_PRE_PUSH_FULL"),
             ("for issue in governance_owner_boundary_issues():", "doc drift checks governance owner boundaries"),
@@ -2028,8 +1988,8 @@ ENFORCEMENT_TRUTH_REQUIRED_SNIPPETS = [
         [
             ("OpenApiDocument_WhenGeneratedFromRunningApi_MatchesCommittedSnapshot", "OpenAPI snapshot test exists"),
             ("openapi.json drifted from the API", "OpenAPI test fails on committed contract drift"),
-            ('fresh.Should().Contain("\\"workspaceName\\"");', "OpenAPI test asserts camelCase wire shape"),
-            ('fresh.Should().NotContain("\\"workspace_name\\"");', "OpenAPI test rejects snake_case wire drift"),
+            ('fresh.Should().Contain("\\"firstName\\"");', "OpenAPI test asserts camelCase wire shape"),
+            ('fresh.Should().NotContain("\\"first_name\\"");', "OpenAPI test rejects snake_case wire drift"),
         ],
     ),
     (
@@ -2293,15 +2253,8 @@ def check_doc_drift(_args: argparse.Namespace | None = None) -> int:
             if spec_rx.search(line):
                 fail(issues, f"Speculation in reference doc - move to docs/PROGRESS.md or a use-case file: {rel(spec_target)}:{idx}:{line}")
 
-    stale_rx = re.compile(r"feature file|see gaps below|^> \*\*Wireframe\*\*:|docs/epics/|_template-feature-us|\| Diagram \| Source \| Preview \|")
-    stale_files = list((ROOT / "docs").rglob("*.md")) + list((ROOT / ".github").rglob("*.md"))
-    stale_files.extend(ROOT / name for name in ("AGENTS.md", "CONTRIBUTING.md", "README.md"))
-    for path in stale_files:
-        if not path.is_file():
-            continue
-        for idx, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
-            if stale_rx.search(line):
-                fail(issues, f"Stale terminology in {rel(path)}: {idx}:{line} (Epic->Use-case migration - see docs/use-cases/README.md)")
+    for issue in stale_reference_issues(root=ROOT):
+        fail(issues, issue)
 
     lesson_rx = re.compile(r"\*\*Lesson|[Ll]esson [(]|[Ll]esson[)]")
     lesson_files = list((ROOT / "docs" / "playbooks").rglob("*.md"))
@@ -2338,9 +2291,6 @@ def check_doc_drift(_args: argparse.Namespace | None = None) -> int:
         ("check-doc-size-budgets", check_doc_size_budgets),
         ("check-doc-code-fences.py", lambda _=None: run_module_check("check-doc-code-fences.py", ["--check"])),
         ("check-local-dev-docs.py", lambda _=None: run_module_check("check-local-dev-docs.py", ["--check"])),
-        ("sync_buf_yaml.py", lambda _=None: module_main("sync_buf_yaml.py", ["--check"])),
-        ("check_kafka_wiring.py", lambda _=None: module_main("check_kafka_wiring.py", ["--check"])),
-        ("regenerate-domain-readme-index.py", lambda _=None: run_module_check("regenerate-domain-readme-index.py", ["--check"])),
     ]
     for name, checker in checkers:
         if checker() != 0:
@@ -2542,61 +2492,6 @@ def check_frontend_toolchain(_args: argparse.Namespace | None = None) -> int:
     return 0
 
 
-def find_buf() -> str | None:
-    return shutil.which(exe("buf")) or shutil.which("buf")
-
-
-def buf_version_status(buf: str) -> tuple[bool, str]:
-    result = run_optional([buf, "--version"])
-    if result is None:
-        return False, f"{buf} is not executable"
-    if result.returncode != 0:
-        detail = (result.stderr or result.stdout or "").strip()
-        return False, detail or f"{buf} --version exited with {result.returncode}"
-
-    first_line = (result.stdout or result.stderr or "").strip().splitlines()
-    version_line = first_line[0] if first_line else ""
-    if version_line != REQUIRED_BUF_VERSION:
-        return (
-            False,
-            f"found `{version_line or 'unknown'}` at {buf}; expected `{REQUIRED_BUF_VERSION}`",
-        )
-    return True, f"{version_line} ({buf})"
-
-
-def check_buf_cli(_args: argparse.Namespace | None = None) -> int:
-    buf = find_buf()
-    if buf is None:
-        print(
-            f"buf-cli: FAIL - Buf CLI {REQUIRED_BUF_VERSION} is required, "
-            f"but `buf` was not found in PATH. See {TOOL_VERSIONS_DOC}.",
-            file=sys.stderr,
-        )
-        return 1
-
-    ok, detail = buf_version_status(buf)
-    if not ok:
-        print(
-            f"buf-cli: FAIL - Buf CLI {REQUIRED_BUF_VERSION} is required; {detail}. "
-            f"Install the documented version or put it earlier in PATH. See {TOOL_VERSIONS_DOC}.",
-            file=sys.stderr,
-        )
-        return 1
-
-    print(f"buf-cli: OK ({detail})")
-    return 0
-
-
-def check_buf_lint(_args: argparse.Namespace | None = None) -> int:
-    rc = check_buf_cli()
-    if rc != 0:
-        return rc
-    buf = find_buf()
-    if buf is None:
-        return 1
-    return run([buf, "lint"], check=False).returncode
-
-
 def find_lychee() -> str | None:
     return shutil.which("lychee")
 
@@ -2620,8 +2515,9 @@ def lychee_version_status(lychee: str) -> tuple[bool, str]:
     return True, f"{version_line} ({lychee})"
 
 
-def run_lychee_markdown_check(lychee: str) -> subprocess.CompletedProcess[str]:
-    return run([lychee, "--config", "./lychee.toml", "./**/*.md"], capture=True, check=False)
+def run_lychee_markdown_check(lychee: str, paths: list[str] | None = None) -> subprocess.CompletedProcess[str]:
+    targets = paths if paths else ["./**/*.md"]
+    return run([lychee, "--config", "./lychee.toml", *targets], capture=True, check=False)
 
 
 def emit_captured_process(result: subprocess.CompletedProcess[str]) -> None:
@@ -2632,6 +2528,10 @@ def emit_captured_process(result: subprocess.CompletedProcess[str]) -> None:
 
 
 def check_markdown_links(_args: argparse.Namespace | None = None) -> int:
+    return check_markdown_links_for_paths(None)
+
+
+def check_markdown_links_for_paths(paths: list[str] | None) -> int:
     lychee = find_lychee()
     if lychee is None:
         print(
@@ -2649,7 +2549,7 @@ def check_markdown_links(_args: argparse.Namespace | None = None) -> int:
             file=sys.stderr,
         )
         return 1
-    result = run_lychee_markdown_check(lychee)
+    result = run_lychee_markdown_check(lychee, paths)
     emit_captured_process(result)
     return result.returncode
 
@@ -2789,15 +2689,6 @@ def docs_command(args: argparse.Namespace) -> int:
     raise CheckError(f"Unknown docs command: {command}")
 
 
-def buf_command(args: argparse.Namespace) -> int:
-    rc = check_buf_cli()
-    if rc != 0:
-        return rc
-    if args.buf_command == "list-breaking-rules":
-        return run([find_buf() or exe("buf"), "config", "ls-breaking-rules", "--version=v2"], check=False).returncode
-    raise CheckError(f"Unknown buf command: {args.buf_command}")
-
-
 def check_docker(_args: argparse.Namespace | None = None) -> int:
     if _docker_info_ok():
         print("check-docker: OK (docker info works)")
@@ -2806,38 +2697,140 @@ def check_docker(_args: argparse.Namespace | None = None) -> int:
     return 1
 
 
-def verify(args: argparse.Namespace) -> int:
-    range_spec = diff_range()
-    paths = changed_paths(range_spec)
+DOTNET_SOLUTION_LEVEL_RE = re.compile(
+    r"^(Directory[.].*|Axis[.]sln$|global[.]json$|[.]editorconfig$|[.]github/workflows/build-and-test[.]yml$)"
+)
 
-    dotnet = False
-    frontend = False
-    protobuf = False
-    markdown_links = False
-    if not paths:
-        dotnet = True
-        frontend = True
-        protobuf = True
-        markdown_links = True
+
+def is_dotnet_path(path: str) -> bool:
+    return path.startswith(("src/", "tests/")) or DOTNET_SOLUTION_LEVEL_RE.search(path) is not None
+
+
+def is_frontend_path(path: str) -> bool:
+    return path.startswith("frontend/") or path in {
+        ".editorconfig",
+        "openapi.json",
+        ".github/workflows/build-and-test.yml",
+    }
+
+
+def is_markdown_link_path(path: str) -> bool:
+    return path.endswith(".md") or path in {"lychee.toml", ".github/workflows/build-and-test.yml"}
+
+
+def is_docs_path(path: str) -> bool:
+    return path.startswith("docs/") or path in {
+        "AGENTS.md",
+        "README.md",
+        "CONTRIBUTING.md",
+        ".github/PULL_REQUEST_TEMPLATE.md",
+    }
+
+
+def nearest_csproj(path: str) -> str | None:
+    relative = Path(path)
+    if relative.suffix == ".csproj":
+        return path
+
+    current = ROOT / relative.parent
+    while current != ROOT.parent:
+        if current.exists():
+            projects = sorted(current.glob("*.csproj"))
+            if projects:
+                return rel(projects[0])
+        if current == ROOT:
+            break
+        current = current.parent
+    return None
+
+
+def related_test_project_for_source_project(project: str) -> str | None:
+    project_name = Path(project).stem
+    if project == "src/Axis.Api/Axis.Api.csproj":
+        candidate = ROOT / "tests/Api/Axis.Api.Tests/Axis.Api.Tests.csproj"
+    elif project.startswith("src/Modules/Identity/"):
+        candidate = ROOT / f"tests/Modules/Identity/{project_name}.Tests/{project_name}.Tests.csproj"
+    elif project.startswith("src/Shared/"):
+        candidate = ROOT / f"tests/Shared/{project_name}.Tests/{project_name}.Tests.csproj"
     else:
-        dotnet = any(
-            re.search(r"^(src/|tests/|Directory[.]|Axis[.]sln$|global[.]json$|[.]editorconfig$|openapi[.]json$|[.]github/workflows/build-and-test[.]yml$)", p)
-            for p in paths
-        )
-        frontend = any(
-            re.search(r"^(frontend/|[.]editorconfig$|openapi[.]json$|[.]github/workflows/build-and-test[.]yml$)", p)
-            for p in paths
-        )
-        protobuf = any(
-            re.search(r"(^|/)[^/]+[.]proto$|^buf[.]yaml$|^[.]github/workflows/build-and-test[.]yml$", p)
-            for p in paths
-        )
-        markdown_links = any(
-            re.search(r"(^|/)[^/]+[.]md$|^lychee[.]toml$|^[.]github/workflows/build-and-test[.]yml$", p)
-            for p in paths
-        )
+        return None
+    return rel(candidate) if candidate.is_file() else None
 
-    api_surface_drift = any_changed(paths, r"^src/Axis[.]Api/Endpoints/") and not any_changed(paths, r"^openapi[.]json$")
+
+def dotnet_projects_for_changed_paths(paths: list[str]) -> tuple[list[str], list[str]]:
+    build_projects: set[str] = set()
+    test_projects: set[str] = set()
+
+    for path in paths:
+        if not path.startswith(("src/", "tests/")):
+            continue
+        project = nearest_csproj(path)
+        if project is None:
+            continue
+        if project.startswith("tests/"):
+            if project != "tests/Shared/Axis.Testing/Axis.Testing.csproj":
+                test_projects.add(project)
+            continue
+
+        build_projects.add(project)
+        related_test = related_test_project_for_source_project(project)
+        if related_test is not None:
+            test_projects.add(related_test)
+
+    if any(path.startswith("src/") for path in paths):
+        architecture_tests = "tests/Architecture/Axis.Architecture.Tests/Axis.Architecture.Tests.csproj"
+        if (ROOT / architecture_tests).is_file():
+            test_projects.add(architecture_tests)
+
+    return sorted(build_projects), sorted(test_projects)
+
+
+def dotnet_format_changed_paths(paths: list[str]) -> int:
+    include = [
+        path
+        for path in paths
+        if path.startswith(("src/", "tests/"))
+        and Path(path).suffix.lower() in {".cs", ".csproj", ".props", ".targets"}
+        and (ROOT / path).is_file()
+    ]
+    if not include:
+        print("dotnet-format-changed: OK (no changed .NET files to format)")
+        return 0
+    return dotnet_command(
+        argparse.Namespace(
+            dotnet_command="format",
+            check=True,
+            dotnet_args=["--include", *include],
+        )
+    )
+
+
+def dotnet_build_projects(projects: list[str]) -> int:
+    for project in projects:
+        result = run([exe("dotnet"), "build", project, "--nologo"], check=False)
+        if result.returncode != 0:
+            return result.returncode
+    return 0
+
+
+def dotnet_test_projects(projects: list[str]) -> int:
+    for project in projects:
+        result = run([exe("dotnet"), "test", project, "--nologo"], check=False)
+        if result.returncode != 0:
+            return result.returncode
+    return 0
+
+
+def verify_scope_paths() -> tuple[str, list[str]]:
+    working_tree = working_tree_paths()
+    if working_tree:
+        return "working tree", working_tree
+    range_spec = diff_range()
+    return range_spec, changed_paths(range_spec)
+
+
+def verify(args: argparse.Namespace) -> int:
+    scope, paths = verify_scope_paths()
     failed: list[str] = []
 
     def step(name: str, fn: callable[[], int]) -> int:
@@ -2855,30 +2848,101 @@ def verify(args: argparse.Namespace) -> int:
             failed.append(name)
         return rc
 
-    print(f"verify - .NET={dotnet} frontend={frontend} protobuf={protobuf} markdown-links={markdown_links}")
+    dotnet = any(is_dotnet_path(path) for path in paths)
+    dotnet_solution_level = any(DOTNET_SOLUTION_LEVEL_RE.search(path) for path in paths)
+    dotnet_test_naming = any(path.startswith("tests/") and path.endswith(".cs") for path in paths)
+    dotnet_test_project_classification = any(path.startswith("tests/") and path.endswith(".csproj") for path in paths)
+    dotnet_package_scan = any(
+        path == "Directory.Packages.props" or (path.endswith(".csproj") and path.startswith(("src/", "tests/")))
+        for path in paths
+    )
+    build_projects, test_projects = dotnet_projects_for_changed_paths(paths)
+
+    frontend = any(is_frontend_path(path) for path in paths)
+    frontend_api_types = "openapi.json" in paths or "frontend/src/lib/api-types.ts" in paths
+    frontend_tests_only = frontend and all(
+        path.startswith("frontend/tests/") or path.startswith("frontend/e2e/")
+        for path in paths
+        if is_frontend_path(path)
+    )
+
+    markdown_paths = [path for path in paths if path.endswith(".md") and (ROOT / path).is_file()]
+    markdown_links_global = any(path in {"lychee.toml", ".github/workflows/build-and-test.yml"} for path in paths)
+    markdown_links = any(is_markdown_link_path(path) for path in paths)
+    docs = any(is_docs_path(path) for path in paths)
+    use_case_docs = any(path.startswith("docs/use-cases/") for path in paths)
+    skills = any(path.startswith(".agents/skills/") for path in paths)
+    scripts_changed = any(path.startswith("scripts/") for path in paths)
+    text_paths = [path for path in paths if (ROOT / path).is_file() and should_check_text_encoding(path)]
+    api_surface_drift = any_changed(paths, r"^src/Axis[.]Api/Endpoints/") and not any_changed(paths, r"^openapi[.]json$")
+
+    print(f"verify - changed-path scoped ({len(paths)} path(s), scope={scope})")
+    print(
+        "verify plan: "
+        f"dotnet={dotnet} frontend={frontend} docs={docs} scripts={scripts_changed} "
+        f"skills={skills} markdown-links={markdown_links}"
+    )
+
+    if not paths:
+        print("verify: no changed paths against the diff base; nothing to run")
+        return 0
+
+    if text_paths:
+        step("text encoding (changed files)", lambda: run_text_encoding_check(text_paths, label="check-text-encoding-changed"))
 
     if dotnet:
         if step(".NET SDK", lambda: check_dotnet_sdk()) == 0:
-            step(".NET test naming", lambda: check_test_naming())
-            step(".NET build", lambda: dotnet_command(argparse.Namespace(dotnet_command="build", dotnet_args=[])))
-            step(".NET vulnerable packages", lambda: check_vulnerable_packages())
-            step(".NET format", lambda: dotnet_command(argparse.Namespace(dotnet_command="format", check=True, dotnet_args=[])))
-            step(".NET test (unit projects)", lambda: test_unit(argparse.Namespace(dotnet_args=[])))
+            if dotnet_test_naming:
+                step(".NET test naming", lambda: check_test_naming())
+            if dotnet_test_project_classification:
+                step(".NET test project classification", lambda: check_test_project_classification())
+            if dotnet_solution_level:
+                step(".NET build (solution)", lambda: dotnet_command(argparse.Namespace(dotnet_command="build", dotnet_args=[])))
+                step(".NET format (solution)", lambda: dotnet_command(argparse.Namespace(dotnet_command="format", check=True, dotnet_args=[])))
+                step(".NET test (unit projects)", lambda: test_unit(argparse.Namespace(dotnet_args=[])))
+            else:
+                if build_projects:
+                    step(".NET build (changed projects)", lambda: dotnet_build_projects(build_projects))
+                step(".NET format (changed files)", lambda: dotnet_format_changed_paths(paths))
+                if test_projects:
+                    step(".NET test (related projects)", lambda: dotnet_test_projects(test_projects))
+            if dotnet_package_scan:
+                step(".NET vulnerable packages", lambda: check_vulnerable_packages())
 
     if frontend:
         if step("frontend toolchain", lambda: check_frontend_toolchain()) == 0:
+            if frontend_api_types:
+                step("frontend API types", lambda: frontend_command(argparse.Namespace(frontend_command="gen-api-types", check=True)))
             step("frontend ci (tsc + biome)", lambda: frontend_command(argparse.Namespace(frontend_command="ci")))
-            step("frontend test", lambda: frontend_command(argparse.Namespace(frontend_command="test")))
+            if frontend_tests_only:
+                changed_tests = [path for path in paths if path.startswith("frontend/tests/") and path.endswith((".ts", ".tsx"))]
+                if changed_tests:
+                    step(
+                        "frontend test (changed test files)",
+                        lambda: run_frontend_npm(["exec", "vitest", "run", *changed_tests]).returncode,
+                    )
+            else:
+                step("frontend test", lambda: frontend_command(argparse.Namespace(frontend_command="test")))
 
-    if protobuf:
-        if step("buf lint", lambda: check_buf_lint()) == 0:
-            step("buf breaking", lambda: check_buf_breaking_against_base())
+    if scripts_changed:
+        step("scripts standard", lambda: check_scripts_standard())
+        step("policy gate tests", lambda: check_policy_tests())
 
-    if markdown_links:
-        step("markdown links", lambda: check_markdown_links())
+    if skills:
+        step("Codex skills", lambda: check_codex_skills())
 
-    step("policy gate tests", lambda: check_policy_tests())
-    step("doc drift", lambda: check_doc_drift())
+    if docs:
+        step("doc navigation", lambda: check_doc_navigation())
+        step("doc size budgets", lambda: check_doc_size_budgets())
+        step("doc code fences", lambda: run_module_check("check-doc-code-fences.py", []))
+        if use_case_docs:
+            step("use-case docs", lambda: run_module_check("check-use-case-docs.py", []))
+
+    if markdown_links and (markdown_paths or markdown_links_global):
+        step(
+            "markdown links (changed files)",
+            lambda: check_markdown_links_for_paths(None if markdown_links_global else markdown_paths),
+        )
 
     if api_surface_drift:
         print()
@@ -2910,6 +2974,9 @@ def pre_push(args: argparse.Namespace) -> int:
         )
         for p in paths
     )
+    docs = not paths or any(re.search(r"^(AGENTS[.]md|README[.]md|docs/|[.]github/PULL_REQUEST_TEMPLATE[.]md)", p) for p in paths)
+    skills = not paths or any(p.startswith(".agents/skills/") for p in paths)
+    scripts_changed = not paths or any(p.startswith("scripts/") for p in paths)
     failed: list[str] = []
 
     def step(name: str, fn: callable[[], int]) -> None:
@@ -2927,15 +2994,22 @@ def pre_push(args: argparse.Namespace) -> int:
             failed.append(name)
 
     print("pre-push: quick gate")
-    print("  Runs cheap policy/doc checks before the network push.")
+    print("  Runs cheap sanity checks before the network push.")
     print("  Run `python scripts/axis.py verify` before marking a PR ready for review.")
 
     if dotnet:
         step(".NET test naming", lambda: check_test_naming())
         step(".NET test project classification", lambda: check_test_project_classification())
 
-    step("policy gate tests", lambda: check_policy_tests())
-    step("doc drift", lambda: check_doc_drift())
+    if docs:
+        step("doc navigation", lambda: check_doc_navigation())
+        step("doc size budgets", lambda: check_doc_size_budgets())
+
+    if skills:
+        step("Codex skills", lambda: check_codex_skills())
+
+    if scripts_changed:
+        step("scripts standard", lambda: check_scripts_standard())
 
     print()
     if not failed:
@@ -2973,58 +3047,6 @@ def generate_api_contracts(_args: argparse.Namespace | None = None) -> int:
         if result.returncode != 0:
             return result.returncode
     return run_frontend_npm(["run", "gen:api-types"]).returncode
-
-
-def generate_wireframes(args: argparse.Namespace) -> int:
-    rc = check_frontend_toolchain()
-    if rc != 0:
-        return rc
-    npm_args = ["run", "export:wireframes", "--"]
-    if args.filter:
-        npm_args.extend(["--filter", args.filter])
-    if args.changed:
-        npm_args.append("--changed")
-    result = run_frontend_npm(npm_args)
-    return result.returncode
-
-
-def register_avro_schemas(args: argparse.Namespace) -> int:
-    registry_url = args.schema_registry_url or os.environ.get("SCHEMA_REGISTRY_URL", "http://localhost:8081")
-    dry_run = args.dry_run or bool(os.environ.get("DRY_RUN"))
-    count = 0
-    for file in sorted((ROOT / "src" / "Modules").glob("**/Schemas/*Event.avsc")):
-        match = re.search(r"src/Modules/([^/\\]+)/", str(file).replace("\\", "/"))
-        if not match:
-            continue
-        module = match.group(1).lower()
-        event_name = file.stem.removesuffix("Event")
-        topic = f"axis.{module}.{axis_repo.pascal_to_kebab(event_name)}"
-        subject = f"{topic}-value"
-        if dry_run:
-            print(f"would register {subject}  <-  {rel(file)}")
-        else:
-            schema = file.read_text(encoding="utf-8")
-            payload = json.dumps({"schema": schema})
-            result = run(
-                [
-                    "curl",
-                    "-fsS",
-                    "-X",
-                    "POST",
-                    "-H",
-                    "Content-Type: application/vnd.schemaregistry.v1+json",
-                    "--data",
-                    payload,
-                    f"{registry_url}/subjects/{subject}/versions",
-                ],
-                check=False,
-            )
-            if result.returncode != 0:
-                return result.returncode
-            print(f"registered {subject}")
-        count += 1
-    print(f"register-avro-schemas: OK ({count} schemas)")
-    return 0
 
 
 def install_hooks(_args: argparse.Namespace | None = None) -> int:
@@ -3344,23 +3366,6 @@ def local_dev(args: argparse.Namespace) -> int:
     raise CheckError(f"Unknown local-dev command: {command}")
 
 
-def grpc_command(args: argparse.Namespace) -> int:
-    if shutil.which(exe("grpcurl")) is None and shutil.which("grpcurl") is None:
-        print("grpc: grpcurl is not available in PATH", file=sys.stderr)
-        return 1
-
-    command = args.grpc_command
-    if command == "list":
-        return run([exe("grpcurl"), "-cacert", args.cacert, args.target, "list"], check=False).returncode
-    if command == "call":
-        grpc_args = [exe("grpcurl"), "-cacert", args.cacert]
-        if args.authorization:
-            grpc_args.extend(["-H", f"authorization: {args.authorization}"])
-        grpc_args.extend(["-d", args.data, args.target, args.method])
-        return run(grpc_args, check=False).returncode
-    raise CheckError(f"Unknown gRPC command: {command}")
-
-
 def _wsl_docker_ok() -> bool:
     if os.name != "nt" or shutil.which("wsl.exe") is None:
         return False
@@ -3398,18 +3403,6 @@ def doctor(args: argparse.Namespace) -> int:
     else:
         lychee_ok, lychee_detail = lychee_version_status(lychee)
         record("OK" if lychee_ok else "FAIL", "lychee", lychee_detail)
-
-    buf = find_buf()
-    if buf is None:
-        record(
-            "FAIL",
-            "buf",
-            f"Buf CLI {REQUIRED_BUF_VERSION} is required for protobuf checks; "
-            f"install it on PATH per {TOOL_VERSIONS_DOC}",
-        )
-    else:
-        buf_ok, buf_detail = buf_version_status(buf)
-        record("OK" if buf_ok else "FAIL", "buf", buf_detail)
 
     coderabbit_ok, coderabbit_detail = coderabbit_cli_status()
     record("OK" if coderabbit_ok else "FAIL", "coderabbit", coderabbit_detail)
@@ -3588,24 +3581,6 @@ def main(argv: list[str] | None = None) -> int:
     docs_sub.add_parser("sync-mermaid-theme").set_defaults(func=docs_command)
     docs_sub.add_parser("mermaid-init").set_defaults(func=docs_command)
 
-    buf_parser = sub.add_parser("buf")
-    buf_sub = buf_parser.add_subparsers(dest="buf_command", required=True)
-    buf_sub.add_parser("list-breaking-rules").set_defaults(func=buf_command)
-
-    grpc_parser = sub.add_parser("grpc")
-    grpc_sub = grpc_parser.add_subparsers(dest="grpc_command", required=True)
-    grpc_list = grpc_sub.add_parser("list")
-    grpc_list.add_argument("--cacert", default=".dev-certs/rootCA.pem")
-    grpc_list.add_argument("--target", default="localhost:5281")
-    grpc_list.set_defaults(func=grpc_command)
-    grpc_call = grpc_sub.add_parser("call")
-    grpc_call.add_argument("method")
-    grpc_call.add_argument("--target", default="localhost:5281")
-    grpc_call.add_argument("--cacert", default=".dev-certs/rootCA.pem")
-    grpc_call.add_argument("--authorization", default="")
-    grpc_call.add_argument("--data", required=True)
-    grpc_call.set_defaults(func=grpc_command)
-
     local_dev_parser = sub.add_parser("local-dev")
     local_dev_sub = local_dev_parser.add_subparsers(dest="local_dev_command", required=True)
     local_dev_sub.add_parser("certs").set_defaults(func=local_dev)
@@ -3666,10 +3641,6 @@ def main(argv: list[str] | None = None) -> int:
     check_sub.add_parser("frontend-component-composition").set_defaults(func=check_frontend_component_composition)
     check_sub.add_parser("frontend-quality").set_defaults(func=check_frontend_quality)
     check_sub.add_parser("coderabbit-cli").set_defaults(func=check_coderabbit_cli)
-    check_sub.add_parser("buf-cli").set_defaults(func=check_buf_cli)
-    check_sub.add_parser("buf-lint").set_defaults(func=check_buf_lint)
-    check_sub.add_parser("buf-modules").set_defaults(func=check_buf_modules)
-    check_sub.add_parser("buf-breaking-against-base").set_defaults(func=check_buf_breaking_against_base)
     check_sub.add_parser("local-dev-docs").set_defaults(
         func=lambda _args: run_module_check("check-local-dev-docs.py", ["--check"])
     )
@@ -3685,12 +3656,6 @@ def main(argv: list[str] | None = None) -> int:
     check_sub.add_parser("use-case-docs").set_defaults(
         func=lambda _args: run_module_check("check-use-case-docs.py", ["--check"])
     )
-    check_sub.add_parser("kafka-wiring").set_defaults(
-        func=lambda _args: module_main("check_kafka_wiring.py", ["--check"])
-    )
-    check_sub.add_parser("domain-readme-index").set_defaults(
-        func=lambda _args: run_module_check("regenerate-domain-readme-index.py", ["--check"])
-    )
     pr_parser = check_sub.add_parser("pr")
     pr_parser.add_argument("--title")
     pr_parser.add_argument("--body-file", type=Path)
@@ -3705,21 +3670,6 @@ def main(argv: list[str] | None = None) -> int:
     generate = sub.add_parser("generate")
     generate_sub = generate.add_subparsers(dest="generate_command", required=True)
     generate_sub.add_parser("api-contracts").set_defaults(func=generate_api_contracts)
-    wireframes = generate_sub.add_parser("wireframes")
-    wireframes.add_argument("-f", "--filter", default="", help="Render only paths containing this text.")
-    wireframes.add_argument("--changed", action="store_true", help="Render changed wireframes and linked wireframes.")
-    wireframes.set_defaults(func=generate_wireframes)
-    write_buf = generate_sub.add_parser("buf-yaml")
-    write_buf.set_defaults(func=lambda _args: module_main("sync_buf_yaml.py", ["--write"]))
-    write_domain = generate_sub.add_parser("domain-readme-index")
-    write_domain.set_defaults(func=lambda _args: module_main("regenerate-domain-readme-index.py", []))
-
-    register = sub.add_parser("register")
-    register_sub = register.add_subparsers(dest="register_command", required=True)
-    avro = register_sub.add_parser("avro-schemas")
-    avro.add_argument("--schema-registry-url")
-    avro.add_argument("--dry-run", action="store_true")
-    avro.set_defaults(func=register_avro_schemas)
 
     args = parser.parse_args(argv)
     try:

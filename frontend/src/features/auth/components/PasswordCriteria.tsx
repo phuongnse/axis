@@ -1,5 +1,4 @@
 import { CheckCircle2, Circle, XCircle } from 'lucide-react';
-import { useTranslation } from 'react-i18next';
 
 import { isPasswordHardToGuess, PASSWORD_MIN_LENGTH } from '@/features/auth/password-policy';
 import { cn } from '@/lib/utils';
@@ -10,18 +9,17 @@ interface PasswordCriteriaProps {
 }
 
 function PasswordCriteria({ id, password }: PasswordCriteriaProps) {
-  const { t } = useTranslation();
   const hasValue = password.length > 0;
   const items = [
     {
       key: 'length',
       met: hasValue && password.length >= PASSWORD_MIN_LENGTH,
-      label: t('register.passwordCriteria.length'),
+      label: `At least ${PASSWORD_MIN_LENGTH} characters`,
     },
     {
       key: 'hard-to-guess',
       met: hasValue && isPasswordHardToGuess(password),
-      label: t('register.passwordCriteria.hardToGuess'),
+      label: 'Hard to guess',
     },
   ];
 
@@ -29,9 +27,7 @@ function PasswordCriteria({ id, password }: PasswordCriteriaProps) {
     <ul id={id} className="space-y-1 pt-1" aria-live="polite">
       {items.map((item) => {
         const Icon = item.met ? CheckCircle2 : hasValue ? XCircle : Circle;
-        const status = item.met
-          ? t('register.passwordCriteria.met')
-          : t('register.passwordCriteria.missing');
+        const status = item.met ? 'Met' : 'Missing';
         return (
           <li
             key={item.key}

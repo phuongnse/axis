@@ -129,8 +129,6 @@ public static class OpenTelemetryServiceExtensions
         OtlpOptions options)
     {
         export.Endpoint = new Uri(options.Endpoint!);
-        export.Protocol = string.Equals(options.Protocol, "HttpProtobuf", StringComparison.OrdinalIgnoreCase)
-            ? OtlpExportProtocol.HttpProtobuf
-            : OtlpExportProtocol.Grpc;
+        export.Protocol = OtlpExportProtocol.HttpProtobuf;
     }
 }

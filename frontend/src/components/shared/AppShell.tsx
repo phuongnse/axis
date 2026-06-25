@@ -2,7 +2,6 @@ import type { ReactNode } from 'react';
 
 import { AppHeader } from '@/components/shared/AppHeader';
 import { AppSidebar } from '@/components/shared/AppSidebar';
-import { signOut } from '@/features/auth/api';
 import { useAuthStore } from '@/features/auth/auth-store';
 
 interface AppShellProps {
@@ -12,13 +11,9 @@ interface AppShellProps {
 export function AppShell({ children }: AppShellProps) {
   const clearSession = useAuthStore((s) => s.clearSession);
 
-  async function handleSignOut() {
-    try {
-      await signOut();
-    } finally {
-      clearSession();
-      window.location.href = '/login';
-    }
+  function handleSignOut() {
+    clearSession();
+    window.location.href = '/register';
   }
 
   return (

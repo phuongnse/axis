@@ -170,44 +170,6 @@ describe('RegisterPage', () => {
     expect(registerAttempted).toBe(false);
   });
 
-  it('includes setup token when registering the first Workspace user', async () => {
-    const user = userEvent.setup();
-    let registerBody: Record<string, unknown> | undefined;
-    vi.mocked(fetch).mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
-      const url = typeof input === 'string' ? input : input.toString();
-      if (url.includes('/api/legal/versions')) {
-        return Promise.resolve({
-          ok: true,
-          status: 200,
-          text: () => Promise.resolve(JSON.stringify(LEGAL_VERSIONS)),
-        } as unknown as Response);
-      }
-      if (url.includes('/api/users/register') && init?.method === 'POST') {
-        registerBody = JSON.parse(String(init.body)) as Record<string, unknown>;
-        return Promise.resolve({
-          ok: true,
-          status: 200,
-          text: () =>
-            Promise.resolve(
-              JSON.stringify({
-                message: 'Registration successful. Please check your email to verify your account.',
-              }),
-            ),
-        } as unknown as Response);
-      }
-      return Promise.reject(new Error(`Unexpected fetch: ${url}`));
-    });
-
-    await renderWithRouter(<RegisterPage />, { path: '/register?setupToken=setup-token' });
-
-    await fillRegisterForm(user);
-    await user.click(screen.getByRole('button', { name: /create account/i }));
-
-    await waitFor(() => {
-      expect(registerBody?.workspaceSetupToken).toBe('setup-token');
-    });
-  });
-
   it('submits passwords with leading and trailing spaces as entered', async () => {
     const user = userEvent.setup();
     let registerBody: Record<string, unknown> | undefined;

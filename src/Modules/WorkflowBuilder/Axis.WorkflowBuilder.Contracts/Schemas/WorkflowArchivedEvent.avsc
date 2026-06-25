@@ -1,9 +1,0 @@
-{
-  "namespace": "axis.workflowbuilder.events",
-  "type": "record",
-  "name": "WorkflowArchivedEvent",
-  "fields": [
-    { "name": "workflowId", "type": "string" },
-    { "name": "workspaceId", "type": "string" }
-  ]
-}

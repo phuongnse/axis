@@ -9,24 +9,16 @@ import {
   loadPkceSession,
   REDIRECT_URI,
 } from './pkce';
-import { storePostVerifyProvisioningToken } from './post-verify-session';
 import type {
   LegalVersionsResponse,
-  LoginAttemptResult,
-  LoginCredentials,
   MessageResponse,
-  ProvisioningStatusResponse,
   RegisterUserRequest,
-  RegisterWorkspaceRequest,
   VerifyEmailResponse,
-  WorkspaceSlugPreviewResponse,
 } from './types';
 
 export const authKeys = {
   all: ['auth'] as const,
-  provisioningStatus: (token: string) => [...authKeys.all, 'provisioning-status', token] as const,
   legalVersions: ['auth', 'legal-versions'] as const,
-  slugPreview: (workspaceName: string) => [...authKeys.all, 'slug-preview', workspaceName] as const,
 };
 
 export function createRegisterIdempotencyKey(): string {
@@ -62,19 +54,6 @@ export function toAdminNameParts(fullName: string): { firstName: string; lastNam
   };
 }
 
-export async function registerWorkspace(
-  payload: RegisterWorkspaceRequest,
-  idempotencyKey: string,
-): Promise<MessageResponse> {
-  return fetchApi<MessageResponse>('/workspaces', {
-    method: 'POST',
-    headers: {
-      'Idempotency-Key': idempotencyKey,
-    },
-    body: JSON.stringify(payload),
-  });
-}
-
 export async function registerUser(
   payload: RegisterUserRequest,
   idempotencyKey: string,
@@ -90,62 +69,6 @@ export async function registerUser(
 
 export async function getLegalVersions(): Promise<LegalVersionsResponse> {
   return fetchApi<LegalVersionsResponse>('/legal/versions');
-}
-
-export async function getWorkspaceSlugPreview(
-  workspaceName: string,
-): Promise<WorkspaceSlugPreviewResponse> {
-  const params = new URLSearchParams({ workspaceName });
-  return fetchApi<WorkspaceSlugPreviewResponse>(`/workspaces/slug-preview?${params.toString()}`);
-}
-
-export class LoginRequestError extends Error {
-  status: number;
-  bodyText: string;
-
-  constructor(status: number, bodyText: string) {
-    super('Login request failed');
-    this.status = status;
-    this.bodyText = bodyText;
-    this.name = 'LoginRequestError';
-  }
-}
-
-export async function loginWithPassword(
-  credentials: LoginCredentials,
-): Promise<LoginAttemptResult> {
-  const pkce = createPkceSession();
-  const authorizeUrl = await buildAuthorizeUrl(pkce.state, pkce.verifier);
-  const body = new URLSearchParams({
-    email: credentials.email.trim(),
-    password: credentials.password,
-    return_url: authorizeUrl,
-  });
-
-  const response = await fetch(connectEndpoint('/connect/login'), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body,
-    credentials: 'include',
-    redirect: 'manual',
-  });
-
-  const isRedirect =
-    response.status === 302 ||
-    response.status === 303 ||
-    response.status === 307 ||
-    response.status === 308 ||
-    response.type === 'opaqueredirect';
-
-  if (!isRedirect && !response.ok) {
-    const bodyText = await response.text();
-    throw new LoginRequestError(response.status, bodyText);
-  }
-
-  return {
-    authorizeUrl,
-    location: response.headers.get('Location'),
-  };
 }
 
 export async function exchangeAuthorizationCode(code: string): Promise<string> {
@@ -213,26 +136,10 @@ export async function verifyEmail(token: string): Promise<VerifyEmailResponse> {
   return request;
 }
 
-/**
- * After verify-email establishes a session cookie, run PKCE so the SPA receives tokens.
- * Stores the verification token for the callback to redirect to provisioning.
- */
-export async function completePostVerifyPkceFlow(verificationToken?: string | null): Promise<void> {
-  if (verificationToken) {
-    storePostVerifyProvisioningToken(verificationToken);
-  }
+/** After verify-email establishes a short-lived cookie, run PKCE so the SPA receives tokens. */
+export async function completePostVerifyPkceFlow(): Promise<void> {
   const pkce = createPkceSession();
   const authorizeUrl = await buildAuthorizeUrl(pkce.state, pkce.verifier);
-  window.location.assign(authorizeUrl);
-}
-
-export async function switchWorkspace(workspaceId: string): Promise<void> {
-  const pkce = createPkceSession();
-  const authorizeUrl = await buildAuthorizeUrl(pkce.state, pkce.verifier);
-  await fetchApi<null>('/auth/switch-workspace', {
-    method: 'POST',
-    body: JSON.stringify({ workspaceId }),
-  });
   window.location.assign(authorizeUrl);
 }
 
@@ -254,25 +161,4 @@ export async function resendVerificationEmail(email: string): Promise<void> {
     method: 'POST',
     body: JSON.stringify({ email }),
   });
-}
-
-export async function getProvisioningStatus(token: string): Promise<ProvisioningStatusResponse> {
-  const params = new URLSearchParams({ token });
-  return fetchApi<ProvisioningStatusResponse>(`/auth/provisioning-status?${params.toString()}`);
-}
-
-export async function retryProvisioning(token: string): Promise<void> {
-  await fetchApi<null>('/auth/retry-provisioning', {
-    method: 'POST',
-    body: JSON.stringify({ token }),
-  });
-}
-
-/** Best-effort server sign-out; callers must clear local session regardless of outcome. */
-export async function signOut(): Promise<void> {
-  try {
-    await fetch('/api/auth/signout', { method: 'POST', credentials: 'include' });
-  } catch {
-    // Network failure - local cleanup is handled by the caller.
-  }
 }

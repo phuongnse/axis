@@ -12,7 +12,7 @@ Create or tighten the owning use-case spec so implementation can follow spec -> 
 ## Workflow
 
 1. Locate or create the owning spec.
-   - Read `docs/use-cases/README.md`, the domain `README.md`, and `docs/use-cases/USE_CASE_TEMPLATE.md`.
+   - Read `docs/use-cases/README.md` and the domain `README.md`.
    - Search existing docs and code with `rg -n "<feature words>" docs/use-cases src tests frontend`.
    - If no use-case folder exists, create `docs/use-cases/{domain}/{slug}/README.md` from the template and add the domain README link.
    - If the domain itself does not exist, stop and ask for scope unless the user explicitly approved a new domain.
@@ -20,8 +20,8 @@ Create or tighten the owning use-case spec so implementation can follow spec -> 
 2. Establish product boundaries before writing behavior.
    - Capture Purpose, Primary actor, Trigger, Main flow, Alternate/error flows, Acceptance Criteria, Out of scope, and Decisions.
    - Use the source priority from `AGENTS.md`: use-case ACs, then AGENTS, then playbooks, then same-module code.
-   - Ask the user for blocking decisions such as permission model, billing behavior, data ownership, API exposure, cross-module effects, or UI journey.
-   - Do not invent IDs, events, endpoints, table names, roles, plans, or copy that changes product meaning.
+   - Ask the user for blocking decisions such as authorization model, data ownership, API exposure, integration effects, or UI journey.
+   - Do not invent IDs, endpoints, table names, or copy that changes product meaning.
    - Treat the spec as ready only when each in-scope required-to-close AC has a cited actor, entry point, precondition, observable outcome, business side effect, failure/validation behavior, and testable expected result.
    - Cite readiness evidence by spec section, AC ID, or flow step. If an expected behavior cannot be cited from the spec, record it under Open decisions instead of turning it into a test expectation.
 
@@ -29,7 +29,7 @@ Create or tighten the owning use-case spec so implementation can follow spec -> 
    - Group ACs under `Happy path`, `Validation & errors`, `Edge cases`, and `Out of scope`.
    - When implementing, closing, or materially refreshing this use case, give in-scope AC bullets local IDs (`AC-001`, `AC-002`, ...). Do not bulk-retrofit unrelated use cases.
    - Keep checkboxes unchecked because use-case checkboxes are spec-only.
-   - Include enough validation, isolation, permission, dependency-failure, rollback, and empty-state ACs for the layer that will be implemented.
+   - Include enough validation, isolation, authorization, dependency-failure, rollback, and empty-state ACs for the layer that will be implemented.
    - Add an `## Acceptance Test Matrix` with local AT IDs (`AT-001`, `AT-002`, ...). Every in-scope AC must appear in at least one required AT row before the use case can be closed.
    - Keep the matrix high-level: do not add `Evidence source`, test file paths, class names, or commands to use-case specs.
    - Before making a row required, confirm its expected result can cite the spec section, AC ID, or flow step. That citation belongs in the readiness/verification report, not in the use-case matrix.
@@ -41,7 +41,7 @@ Create or tighten the owning use-case spec so implementation can follow spec -> 
 4. Define visuals and diagrams.
    - For user-facing screens, use `$axis-visual-artifact` to create or update design-source links, optional previews, and the `## Design Sources` table.
    - Add `## Screen flow` when the journey has more than three screens, branched happy paths, or non-obvious error screens.
-   - Add Mermaid diagrams for non-trivial workflow, sequence, or cross-module behavior; keep local diagrams in the owning README.
+   - Add Mermaid diagrams for non-trivial workflow or sequence behavior; keep local diagrams in the owning README.
    - Use a single `N/A` row when no design source or local diagram applies.
 
 5. Mark implementation status honestly.
@@ -53,16 +53,14 @@ Create or tighten the owning use-case spec so implementation can follow spec -> 
 
 6. Route follow-up implementation.
    - Use `$axis-api-contract` for new or changed REST/OpenAPI/API type surfaces.
-   - Use `$axis-cross-module-contract` for events, commands, jobs, saga steps, Kafka, RabbitMQ, Wolverine, gRPC, Avro, or proto work.
    - Use `$axis-frontend-feature` for SPA routes, feature folders, forms, data fetching, or UI behavior.
    - Use `$axis-use-case-implementation` only after the owning spec exists and blocking decisions are resolved.
 
-7. Verify the spec.
-   - Run `python scripts/axis.py check use-case-docs`.
-   - Run `python scripts/axis.py check doc-navigation`.
-   - Run `python scripts/axis.py check markdown-links` when Markdown links or anchors changed.
-   - Run the visual artifact checklist when design-source links, previews, Mermaid diagrams, or legacy visual assets changed.
-   - Run `python scripts/axis.py generate wireframes` only when legacy Excalidraw sources or SVG previews changed.
+7. Verify only what changed.
+   - Use `python scripts/axis.py check use-case-docs` for use-case README shape.
+   - Use `python scripts/axis.py check markdown-links` only when links or anchors changed.
+   - Use `$axis-visual-artifact` when design-source links, previews, Mermaid, or visual docs changed.
+   - Leave full ready-review verification to `$axis-ready-review`.
 
 ## Output
 
@@ -82,7 +80,7 @@ Visual artifacts:
 - created/updated/N/A
 
 Next skill:
-- $axis-use-case-implementation / $axis-api-contract / $axis-cross-module-contract / $axis-frontend-feature / none yet
+- $axis-use-case-implementation / $axis-api-contract / $axis-frontend-feature / none yet
 
 Checks:
 - command -> pass/fail/not run with reason

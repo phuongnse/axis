@@ -3,7 +3,7 @@ const CONNECT_BASE_URL = (
   import.meta.env.VITE_CONNECT_URL || (import.meta.env.DEV ? 'https://localhost:7275' : '')
 ).replace(/\/+$/, '');
 const REDIRECT_URI = `${window.location.origin}/callback`;
-const SCOPES = 'openid email profile offline_access permissions';
+const SCOPES = 'openid email profile';
 
 function randomString(length: number): string {
   const bytes = new Uint8Array(length);

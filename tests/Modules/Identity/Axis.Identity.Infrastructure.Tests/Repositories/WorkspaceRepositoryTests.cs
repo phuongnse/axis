@@ -1,5 +1,4 @@
 using Axis.Identity.Domain.Aggregates;
-using Axis.Identity.Domain.Subscriptions;
 using Axis.Identity.Domain.ValueObjects;
 using Axis.Identity.Infrastructure.Repositories;
 using Axis.Identity.Infrastructure.Tests.Fixtures;
@@ -26,8 +25,7 @@ public class WorkspaceRepositoryTests(IdentityDatabaseFixture db) : IAsyncLifeti
         Workspace.Create(
             "Test Workspace",
             WorkspaceSlug.Create(slug).Value,
-            Email.Create("owner@example.com").Value,
-            WellKnownSubscriptionPlans.FreeId);
+            Email.Create("owner@example.com").Value);
 
     [Fact]
     public async Task AddAsync_WhenEntityIsValid_PersistsAndCanBeRetrievedById()
@@ -41,8 +39,7 @@ public class WorkspaceRepositoryTests(IdentityDatabaseFixture db) : IAsyncLifeti
         loaded!.Name.Should().Be(workspace.Name);
         loaded.Slug.Value.Should().Be("workspace-add-get");
         loaded.OwnerEmail.Value.Should().Be("owner@example.com");
-        loaded.Status.Should().Be(WorkspaceStatus.Active);
-        loaded.SubscriptionPlanId.Should().Be(WellKnownSubscriptionPlans.FreeId);
+        loaded.Status.Should().Be(WorkspaceStatus.PendingVerification);
     }
 
     [Fact]

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Axis Script Scope"
+  short_description: "Run Axis scripts at the right scope"
+  default_prompt: "Use $axis-script-scope to choose the right Axis command scope."

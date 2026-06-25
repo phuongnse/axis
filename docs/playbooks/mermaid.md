@@ -59,14 +59,14 @@ Use `SEQUENCE_PHASE_RGB` from `mermaid_theme.py` for `rect rgb(...)`.
 | Type | Use for |
 |------|---------|
 | `flowchart` | Screen flow, architecture layers |
-| `sequenceDiagram` | API / auth / provisioning flows |
+| `sequenceDiagram` | API and auth flows |
 | `erDiagram` | Entity models |
 
 ## Where Diagrams Live
 
 | Scope | Location |
 |-------|----------|
-| Platform architecture | [docs/README.md - Key Diagrams](../README.md#key-diagrams) |
+| Platform architecture | [docs/README.md - Current Diagram](../README.md#current-diagram) |
 | Use case | `docs/use-cases/{domain}/{slug}/README.md` -> `## Diagrams` or `## Screen flow` |
 
-Design sources stay in editable source artifacts. See [design-source.md](./design-source.md) and [wireframes.md](./wireframes.md). Legacy Excalidraw assets are only refreshed when touched.
+Design sources stay in editable source artifacts. See [design-source.md](./design-source.md). Commit generated previews only when the owning use case still links them.

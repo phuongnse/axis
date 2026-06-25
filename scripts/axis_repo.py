@@ -1,7 +1,4 @@
-"""Shared repository layout discovery for maintenance scripts.
-
-Agent playbook (checklists, auto vs manual): docs/playbooks/repo-layout-discovery.md
-"""
+"""Shared repository layout discovery for maintenance scripts."""
 
 from __future__ import annotations
 
@@ -12,17 +9,11 @@ ROOT = Path(__file__).resolve().parent.parent
 MODULES_DIR = ROOT / "src" / "Modules"
 ENDPOINTS_DIR = ROOT / "src" / "Axis.Api" / "Endpoints"
 USE_CASES_DIR = ROOT / "docs" / "use-cases"
-BUF_CONFIG = ROOT / "buf.yaml"
 PROGRAM_CS = ROOT / "src" / "Axis.Api" / "Program.cs"
 
 MODULE_DOMAIN_SLUG_OVERRIDES: dict[str, str] = {
     "Identity": "identity-access",
 }
-
-KAFKA_TOPIC_CONST_RE = re.compile(
-    r'public\s+const\s+string\s+\w+\s*=\s*"(axis\.[^"]+)";',
-    re.MULTILINE,
-)
 
 APPLICATION_IMPORT_RE = re.compile(
     r"^using\s+Axis\.([A-Za-z0-9]+)\.Application\b",
@@ -44,11 +35,6 @@ def module_to_domain_slug(module_name: str) -> str:
     return slug
 
 
-def module_to_workspace_slug(module_name: str) -> str:
-    """Workspace provisioning id (``WorkspaceModuleNames`` values)."""
-    return module_name.lower()
-
-
 def iter_module_names() -> list[str]:
     if not MODULES_DIR.is_dir():
         return []
@@ -57,34 +43,6 @@ def iter_module_names() -> list[str]:
         for p in MODULES_DIR.iterdir()
         if p.is_dir() and not p.name.startswith(".")
     )
-
-
-def iter_proto_module_paths() -> list[str]:
-    """Paths listed under buf.yaml ``modules:`` — one per Contracts/Protos tree."""
-    paths: list[str] = []
-    for protos in sorted(MODULES_DIR.glob("*/Axis.*.Contracts/Protos")):
-        if any(protos.glob("**/*.proto")):
-            paths.append(str(protos.relative_to(ROOT)).replace("\\", "/"))
-    return paths
-
-
-def iter_kafka_topics() -> list[str]:
-    topics: list[str] = []
-    for topics_file in sorted(MODULES_DIR.glob("*/Axis.*.Contracts/*KafkaTopics.cs")):
-        text = topics_file.read_text(encoding="utf-8")
-        topics.extend(KAFKA_TOPIC_CONST_RE.findall(text))
-    return sorted(set(topics))
-
-
-def modules_with_workspace_verified_handler() -> list[str]:
-    """Modules that provision workspace schema on WorkspaceVerifiedEvent."""
-    found: list[str] = []
-    for module in iter_module_names():
-        if module == "Identity":
-            continue
-        if list(MODULES_DIR.glob(f"{module}/**/WorkspaceVerifiedHandler.cs")):
-            found.append(module)
-    return sorted(found)
 
 
 def primary_application_module(endpoint_file: Path) -> str:

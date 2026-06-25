@@ -2,9 +2,8 @@ namespace Axis.Shared.Application;
 
 /// <summary>
 /// Thrown by IUnitOfWork.SaveChangesAsync when the database rejects a write due to an
-/// optimistic concurrency conflict (xmin mismatch). Handlers catch this to exit gracefully
-/// on concurrent duplicate Wolverine message delivery — the winning instance already
-/// persisted the change.
+/// optimistic concurrency conflict (xmin mismatch). Handlers catch this to return a
+/// business-safe conflict instead of leaking database exceptions.
 /// </summary>
 public sealed class ConcurrencyException : Exception
 {

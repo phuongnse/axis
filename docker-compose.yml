@@ -38,114 +38,6 @@ services:
     healthcheck:
       disable: true
 
-  localstack:
-    image: localstack/localstack:3.8
-    container_name: axis_localstack
-    environment:
-      SERVICES: s3
-      DEBUG: 0
-    ports:
-      - "127.0.0.1:4566:4566"
-    volumes:
-      - localstack_data:/var/lib/localstack
-    healthcheck:
-      test: ["CMD", "curl", "-sf", "http://localhost:4566/_localstack/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-
-  # ── Distributed-ready foundation (ADR-013, ADR-019, ADR-022) ─────────
-  # Kafka + Schema Registry are the cross-module event transport
-  # (configured in Axis.Api as the Wolverine transport per ADR-013).
-  # Vault is the secrets store for production (dev uses .env).
-  # All three are mandatory like postgres/redis — the api service waits
-  # for kafka:healthy before starting.
-
-  kafka:
-    # Confluent CP image (Community License — free for single-broker dev
-    # and production). Pairs with cp-schema-registry below. KRaft mode is
-    # the current Confluent default (no ZooKeeper).
-    image: confluentinc/cp-kafka:7.7.0
-    container_name: axis_kafka
-    environment:
-      # Single-broker KRaft cluster — broker + controller in one process.
-      KAFKA_NODE_ID: 1
-      KAFKA_PROCESS_ROLES: "broker,controller"
-      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka:9093"
-      KAFKA_LISTENERS: "PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093,PLAINTEXT_HOST://0.0.0.0:29092"
-      # Two advertised listeners: internal (PLAINTEXT for other containers
-      # on the compose network) and host (PLAINTEXT_HOST for processes
-      # running on the developer's machine).
-      KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092"
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT,CONTROLLER:PLAINTEXT"
-      KAFKA_INTER_BROKER_LISTENER_NAME: "PLAINTEXT"
-      KAFKA_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
-      # Single broker → replication 1 for all internal topics.
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
-      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
-      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
-      # Fixed cluster ID so KRaft metadata survives container recreate
-      # (must be 22-char Base64-URL). Generated once with `kafka-storage random-uuid`.
-      CLUSTER_ID: "MkU3OEVBNTcwNTJENDM2Qk"
-      KAFKA_LOG_DIRS: "/var/lib/kafka/data"
-    ports:
-      # Only the host listener is published. The in-network listener
-      # (PLAINTEXT on :9092) stays reachable inside the Compose network as
-      # `kafka:9092` and is intentionally not exposed — its advertised
-      # address would mis-resolve from the host.
-      - "127.0.0.1:29092:29092" # host PLAINTEXT — connect from local processes here
-    volumes:
-      - kafka_data:/var/lib/kafka/data
-    healthcheck:
-      test: ["CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9092 >/dev/null 2>&1 || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 20
-      start_period: 30s
-
-  schema-registry:
-    image: confluentinc/cp-schema-registry:7.7.0
-    container_name: axis_schema_registry
-    depends_on:
-      kafka:
-        condition: service_healthy
-    environment:
-      SCHEMA_REGISTRY_HOST_NAME: "schema-registry"
-      SCHEMA_REGISTRY_LISTENERS: "http://0.0.0.0:8081"
-      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: "PLAINTEXT://kafka:9092"
-      # Backward-compatible-only is the safest default; producers cannot
-      # ship a breaking schema change without explicit override.
-      SCHEMA_REGISTRY_SCHEMA_COMPATIBILITY_LEVEL: "BACKWARD"
-    ports:
-      - "127.0.0.1:8081:8081"
-    healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://localhost:8081/subjects >/dev/null || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 20
-
-  rabbitmq:
-    # Management image bundles the web UI on :15672 — invaluable for
-    # debugging stuck queues, DLX contents, consumer lag. Single-node is
-    # fine for dev; production uses a clustered deployment per ADR-024.
-    image: rabbitmq:3.13-management-alpine
-    container_name: axis_rabbitmq
-    environment:
-      RABBITMQ_DEFAULT_USER: axis
-      RABBITMQ_DEFAULT_PASS: axis_dev_pass
-    ports:
-      - "127.0.0.1:5672:5672" # AMQP
-      - "127.0.0.1:15672:15672" # Management UI — http://localhost:15672 (axis / axis_dev_pass)
-    volumes:
-      - rabbitmq_data:/var/lib/rabbitmq
-    healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 20
-      start_period: 20s
-
   # Optional local observability stack (ADR-018). Start with:
   #   docker compose --profile observability up -d
   otel-lgtm:
@@ -154,7 +46,6 @@ services:
     container_name: axis_otel_lgtm
     ports:
       - "127.0.0.1:3001:3000" # Grafana UI — http://localhost:3001
-      - "127.0.0.1:4317:4317" # OTLP/gRPC (traces, metrics, logs)
       - "127.0.0.1:4318:4318" # OTLP/HTTP
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/health || exit 1"]
@@ -162,25 +53,6 @@ services:
       timeout: 5s
       retries: 10
       start_period: 20s
-
-  vault:
-    # Dev mode — secrets live in memory only (lost on restart). Acceptable
-    # for local development; production uses a separately-provisioned
-    # Vault cluster with persistent storage + unseal keys (ADR-022).
-    image: hashicorp/vault:1.18
-    container_name: axis_vault
-    cap_add: [IPC_LOCK]    # required by Vault to prevent secrets being swapped to disk
-    environment:
-      VAULT_DEV_ROOT_TOKEN_ID: "axis-dev-root-token"
-      VAULT_DEV_LISTEN_ADDRESS: "0.0.0.0:8200"
-      VAULT_ADDR: "http://0.0.0.0:8200"
-    ports:
-      - "127.0.0.1:8200:8200"
-    healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8200/v1/sys/health | grep -q '\"initialized\":true' || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
 
   api:
     image: mcr.microsoft.com/dotnet/sdk:8.0
@@ -197,39 +69,20 @@ services:
         condition: service_healthy
       maildev:
         condition: service_started
-      localstack:
-        condition: service_healthy
-      kafka:
-        condition: service_healthy
-      schema-registry:
-        condition: service_healthy
-      rabbitmq:
-        condition: service_healthy
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_URLS: https://+:8443
       Kestrel__Certificates__Default__Path: "/https/localhost.pem"
       Kestrel__Certificates__Default__KeyPath: "/https/localhost-key.pem"
       ConnectionStrings__Identity: "Host=postgres;Port=5432;Database=axis_identity;Username=axis;Password=axis_dev_pass"
-      ConnectionStrings__DataModeling: "Host=postgres;Port=5432;Database=axis_datamodeling;Username=axis;Password=axis_dev_pass"
-      ConnectionStrings__WorkflowBuilder: "Host=postgres;Port=5432;Database=axis_workflowbuilder;Username=axis;Password=axis_dev_pass"
-      ConnectionStrings__FormBuilder: "Host=postgres;Port=5432;Database=axis_formbuilder;Username=axis;Password=axis_dev_pass"
-      ConnectionStrings__WorkflowEngine: "Host=postgres;Port=5432;Database=axis_workflowengine;Username=axis;Password=axis_dev_pass"
       Redis__ConnectionString: "redis:6379"
-      Kafka__Brokers: "kafka:9092"
-      SchemaRegistry__Url: "http://schema-registry:8081"
-      ConnectionStrings__RabbitMq: "amqp://axis:axis_dev_pass@rabbitmq:5672/"
       Email__Host: maildev
       Email__Port: "1025"
-      Aws__ServiceURL: "http://localstack:4566"
-      Modules__Identity__GrpcUrl: "https://localhost:8443"
-      Modules__FormBuilder__GrpcUrl: "https://localhost:8443"
-      Modules__WorkflowBuilder__GrpcUrl: "https://localhost:8443"
       Cors__AllowedOrigins__0: "https://localhost:3000"
       # OTLP export is off in the default compose API container (no LGTM dependency).
       # For traces in Grafana: `docker compose --profile observability up -d otel-lgtm`
-      # then `dotnet run` on the host (appsettings.json → localhost:4317) or set
-      # OpenTelemetry__Otlp__Endpoint=http://otel-lgtm:4317 when running API in compose with the profile.
+      # then `dotnet run` on the host (appsettings.json → localhost:4318) or set
+      # OpenTelemetry__Otlp__Endpoint=http://otel-lgtm:4318 when running API in compose with the profile.
       OpenTelemetry__Otlp__Endpoint: ""
     ports:
       - "127.0.0.1:5281:8443"
@@ -312,8 +165,5 @@ services:
 volumes:
   postgres_data:
   redis_data:
-  localstack_data:
   web_node_modules:
   nuget_packages:
-  kafka_data:
-  rabbitmq_data:

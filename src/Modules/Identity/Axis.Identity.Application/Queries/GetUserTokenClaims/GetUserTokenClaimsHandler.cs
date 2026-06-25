@@ -8,8 +8,7 @@ namespace Axis.Identity.Application.Queries.GetUserTokenClaims;
 public sealed class GetUserTokenClaimsHandler(
     IUserRepository userRepo,
     IWorkspaceMembershipRepository membershipRepo,
-    IWorkspaceRepository workspaceRepo,
-    IRoleRepository roleRepo)
+    IWorkspaceRepository workspaceRepo)
     : IQueryHandler<GetUserTokenClaimsQuery, Result<UserTokenClaimsDto>>
 {
     public async Task<Result<UserTokenClaimsDto>> Handle(
@@ -41,8 +40,7 @@ public sealed class GetUserTokenClaimsHandler(
                 user.Id,
                 null,
                 user.Email.Value,
-                $"{user.FirstName} {user.LastName}",
-                []));
+                $"{user.FirstName} {user.LastName}"));
         }
 
         Workspace? workspace = await workspaceRepo.GetByIdAsync(membership.workspaceId, cancellationToken);
@@ -53,20 +51,10 @@ public sealed class GetUserTokenClaimsHandler(
                 "Workspace is not available for sign-in.");
         }
 
-        IReadOnlyList<Role> roles = await roleRepo.GetByIdsAsync(
-            membership.RoleIds,
-            membership.workspaceId,
-            cancellationToken);
-        List<string> permissions = roles
-            .SelectMany(r => r.Permissions)
-            .Distinct(StringComparer.Ordinal)
-            .ToList();
-
         return Result.Success(new UserTokenClaimsDto(
             user.Id,
             membership.workspaceId,
             user.Email.Value,
-            $"{user.FirstName} {user.LastName}",
-            permissions));
+            $"{user.FirstName} {user.LastName}"));
     }
 }
