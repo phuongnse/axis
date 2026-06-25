@@ -30,7 +30,6 @@ sys.dont_write_bytecode = True
 ROOT = Path(__file__).resolve().parent.parent
 SCRIPTS = ROOT / "scripts"
 REQUIRED_DOTNET_SDK_MAJOR = "8"
-REQUIRED_BUF_VERSION = "1.50.0"
 REQUIRED_LYCHEE_VERSION = "0.23.0"
 MINIMUM_CODERABBIT_CLI_VERSION = "0.6.0"
 TOOL_VERSIONS_DOC = "docs/playbooks/scripts.md#tool-versions"
@@ -56,7 +55,6 @@ if str(SCRIPTS) not in sys.path:
 
 import axis_repo  # noqa: E402
 import doc_drift_domains  # noqa: E402
-import sync_buf_yaml  # noqa: E402
 
 
 class CheckError(RuntimeError):
@@ -281,7 +279,6 @@ def git_ls_files(pattern: str | None = None) -> list[str]:
 
 
 TEXT_ENCODING_SUFFIXES = {
-    ".avsc",
     ".cs",
     ".cshtml",
     ".csproj",
@@ -289,7 +286,6 @@ TEXT_ENCODING_SUFFIXES = {
     ".dockerignore",
     ".editorconfig",
     ".env",
-    ".excalidraw",
     ".gitattributes",
     ".gitignore",
     ".graphql",
@@ -302,7 +298,6 @@ TEXT_ENCODING_SUFFIXES = {
     ".md",
     ".mjs",
     ".props",
-    ".proto",
     ".ps1",
     ".py",
     ".runsettings",
@@ -582,7 +577,7 @@ def check_ef_domain_mapping(_args: argparse.Namespace | None = None) -> int:
     if issues:
         for issue in issues:
             print(f"check-ef-domain-mapping FAIL: {issue}", file=sys.stderr)
-        print("\nSee docs/playbooks/persistence-patterns.md#ef-core-aggregate-mapping-patterns", file=sys.stderr)
+        print("\nSee docs/playbooks/testing.md#database-rules", file=sys.stderr)
         return 1
     print("check-ef-domain-mapping: OK")
     return 0
@@ -1193,7 +1188,7 @@ def check_frontend_quality(_args: argparse.Namespace | None = None) -> int:
     if issues:
         for issue in issues:
             print(f"check-frontend-quality FAIL: {issue}", file=sys.stderr)
-        print("\nSee docs/playbooks/frontend.md#state-management and #localization-and-theme-preferences", file=sys.stderr)
+        print("\nSee docs/playbooks/frontend.md#state-management", file=sys.stderr)
         return 1
     print("check-frontend-quality: OK")
     return 0
@@ -1229,10 +1224,7 @@ def check_doc_navigation(_args: argparse.Namespace | None = None) -> int:
 
 PLAYBOOK_DEFAULT_MAX_LINES = 100
 PATTERN_ROUTER_MAX_LINES = 100
-DOC_SIZE_BUDGETS = {
-    "docs/playbooks/patterns.md": PATTERN_ROUTER_MAX_LINES,
-    "docs/playbooks/patterns-index.md": PATTERN_ROUTER_MAX_LINES,
-}
+DOC_SIZE_BUDGETS: dict[str, int] = {}
 
 
 def doc_size_budget_issues(*, root: Path = ROOT) -> list[str]:
@@ -1250,7 +1242,7 @@ def doc_size_budget_issues(*, root: Path = ROOT) -> list[str]:
         if line_count > limit:
             issues.append(
                 f"{normalized}: {line_count} lines exceeds {limit}-line docs budget; "
-                "split by topic or route through patterns-index.md"
+                "split by topic or move repeatable workflow into a repo skill"
             )
     return issues
 
@@ -1266,75 +1258,9 @@ def check_doc_size_budgets(_args: argparse.Namespace | None = None) -> int:
     return 0
 
 
-def check_buf_modules(_args: argparse.Namespace | None = None) -> int:
-    return sync_buf_yaml.main_with_args(["--check"]) if hasattr(sync_buf_yaml, "main_with_args") else module_main("sync_buf_yaml.py", ["--check"])
-
-
-def buf_breaking_base_ref() -> str | None:
-    base_ref = os.environ.get("BASE_REF")
-    if base_ref:
-        return base_ref
-
-    base = os.environ.get("BASE_BRANCH", "main")
-    for candidate in (f"origin/{base}", base):
-        if ref_exists(candidate):
-            return candidate
-    return None
-
-
-def check_buf_breaking_against_base(_args: argparse.Namespace | None = None) -> int:
-    base_ref = buf_breaking_base_ref()
-    if not base_ref:
-        base = os.environ.get("BASE_BRANCH", "main")
-        print(
-            f"buf-breaking-against-base FAIL: cannot determine base ref; set BASE_REF "
-            f"or fetch origin/{base}",
-            file=sys.stderr,
-        )
-        return 1
-    if not ref_exists(base_ref):
-        print(f"buf-breaking-against-base FAIL: missing {base_ref}", file=sys.stderr)
-        return 1
-    buf = find_buf()
-    if buf is None:
-        print(
-            f"buf-breaking-against-base FAIL: Buf CLI {REQUIRED_BUF_VERSION} is required, "
-            f"but `buf` was not found in PATH. See {TOOL_VERSIONS_DOC}.",
-            file=sys.stderr,
-        )
-        return 1
-    buf_ok, buf_detail = buf_version_status(buf)
-    if not buf_ok:
-        print(
-            f"buf-breaking-against-base FAIL: Buf CLI {REQUIRED_BUF_VERSION} is required; {buf_detail}. "
-            f"Install the documented version or put it earlier in PATH. See {TOOL_VERSIONS_DOC}.",
-            file=sys.stderr,
-        )
-        return 1
-    if not (ROOT / "buf.yaml").is_file():
-        print("buf-breaking-against-base: no buf.yaml - skip")
-        return 0
-    text = (ROOT / "buf.yaml").read_text(encoding="utf-8")
-    paths = re.findall(r"^\s+- path: (.+)$", text, re.MULTILINE)
-    for path in paths:
-        if not path:
-            continue
-        existing = run([exe("git"), "ls-tree", "-r", "--name-only", base_ref, path], capture=True, check=False)
-        if existing.returncode == 0 and re.search(r"[.]proto$", existing.stdout, re.MULTILINE):
-            print(f"buf breaking {path} (vs {base_ref})")
-            result = run([buf, "breaking", path, "--against", f".git#ref={base_ref},subdir={path}"], check=False)
-            if result.returncode != 0:
-                return result.returncode
-        else:
-            print(f"buf breaking: skip {path} (new on this branch - no baseline on {base_ref})")
-    print("buf-breaking-against-base: OK")
-    return 0
-
-
 NON_PYTHON_UTILITY_SCRIPT_SUFFIXES = {".mjs", ".js", ".ps1", ".sh", ".cmd", ".bat"}
 DOCS_UTILITY_SCRIPT_ROOTS = (
     Path("docs/scripts"),
-    Path("docs/wireframes"),
     Path("docs/diagrams"),
 )
 
@@ -1772,11 +1698,8 @@ RAW_DOC_COMMAND_PATTERNS = [
         re.compile(r"^docker\s+(?:compose|info)\b"),
         "use `python scripts/axis.py local-dev ...` or `python scripts/axis.py check docker`",
     ),
-    (re.compile(r"^grpcurl\b"), "use `python scripts/axis.py grpc ...`"),
     (re.compile(r"^openssl\b"), "use `python scripts/axis.py local-dev certs`"),
     (re.compile(r"^python\s+docs/scripts/"), "use `python scripts/axis.py docs ...`"),
-    (re.compile(r"^buf\s+config\s+ls-breaking-rules\b"), "use `python scripts/axis.py buf list-breaking-rules`"),
-    (re.compile(r"^buf\s+--version\b"), "use `python scripts/axis.py check buf-cli`"),
     (re.compile(r"^lychee\s+--version\b"), "use `python scripts/axis.py check markdown-links` or `python scripts/axis.py doctor`"),
     (re.compile(r"^cargo\s+install\s+lychee\b"), "install tools externally, then verify through `python scripts/axis.py doctor`"),
 ]
@@ -1998,9 +1921,6 @@ ENFORCEMENT_TRUTH_REQUIRED_SNIPPETS = [
             ("run: python scripts/axis.py frontend gen-api-types --check", "frontend API type generation runs in CI through the Axis wrapper"),
             ("run: python scripts/axis.py frontend ci", "frontend typecheck/lint runs in CI through the Axis wrapper"),
             ("run: python scripts/axis.py frontend test", "frontend tests run in CI through the Axis wrapper"),
-            ('version: "1.50.0"', "protobuf CI setup pins the documented Buf CLI version"),
-            ("run: python scripts/axis.py check buf-lint", "protobuf CI lint uses the version-checking local wrapper"),
-            ("run: python scripts/axis.py check buf-breaking-against-base", "protobuf CI breaking check uses the version-checking local wrapper"),
             ("run: python scripts/axis.py check policy-tests", "policy gate tests run in CI"),
             ("run: python scripts/axis.py check doc-drift", "doc drift runs in CI"),
             ("uses: lycheeverse/lychee-action", "markdown link check runs in CI"),
@@ -2014,8 +1934,6 @@ ENFORCEMENT_TRUTH_REQUIRED_SNIPPETS = [
         [
             ('step(".NET SDK", lambda: check_dotnet_sdk())', "local verify checks the documented .NET SDK before dotnet commands"),
             ('step("frontend toolchain", lambda: check_frontend_toolchain())', "local verify checks the documented Node source before npm commands"),
-            ('step("buf lint", lambda: check_buf_lint())', "local verify runs Buf lint through the version-checking wrapper"),
-            ('step("buf breaking", lambda: check_buf_breaking_against_base())', "local verify runs Buf breaking through the version-checking wrapper"),
             ('step("policy gate tests", lambda: check_policy_tests())', "local verify runs policy gate tests"),
             ('step("doc drift", lambda: check_doc_drift())', "local verify runs doc drift"),
             ('step("markdown links", lambda: check_markdown_links())', "local verify runs markdown link check"),
@@ -2058,8 +1976,8 @@ ENFORCEMENT_TRUTH_REQUIRED_SNIPPETS = [
         [
             ("OpenApiDocument_WhenGeneratedFromRunningApi_MatchesCommittedSnapshot", "OpenAPI snapshot test exists"),
             ("openapi.json drifted from the API", "OpenAPI test fails on committed contract drift"),
-            ('fresh.Should().Contain("\\"workspaceName\\"");', "OpenAPI test asserts camelCase wire shape"),
-            ('fresh.Should().NotContain("\\"workspace_name\\"");', "OpenAPI test rejects snake_case wire drift"),
+            ('fresh.Should().Contain("\\"firstName\\"");', "OpenAPI test asserts camelCase wire shape"),
+            ('fresh.Should().NotContain("\\"first_name\\"");', "OpenAPI test rejects snake_case wire drift"),
         ],
     ),
     (
@@ -2361,9 +2279,6 @@ def check_doc_drift(_args: argparse.Namespace | None = None) -> int:
         ("check-doc-size-budgets", check_doc_size_budgets),
         ("check-doc-code-fences.py", lambda _=None: run_module_check("check-doc-code-fences.py", ["--check"])),
         ("check-local-dev-docs.py", lambda _=None: run_module_check("check-local-dev-docs.py", ["--check"])),
-        ("sync_buf_yaml.py", lambda _=None: module_main("sync_buf_yaml.py", ["--check"])),
-        ("check_kafka_wiring.py", lambda _=None: module_main("check_kafka_wiring.py", ["--check"])),
-        ("regenerate-domain-readme-index.py", lambda _=None: run_module_check("regenerate-domain-readme-index.py", ["--check"])),
     ]
     for name, checker in checkers:
         if checker() != 0:
@@ -2565,61 +2480,6 @@ def check_frontend_toolchain(_args: argparse.Namespace | None = None) -> int:
     return 0
 
 
-def find_buf() -> str | None:
-    return shutil.which(exe("buf")) or shutil.which("buf")
-
-
-def buf_version_status(buf: str) -> tuple[bool, str]:
-    result = run_optional([buf, "--version"])
-    if result is None:
-        return False, f"{buf} is not executable"
-    if result.returncode != 0:
-        detail = (result.stderr or result.stdout or "").strip()
-        return False, detail or f"{buf} --version exited with {result.returncode}"
-
-    first_line = (result.stdout or result.stderr or "").strip().splitlines()
-    version_line = first_line[0] if first_line else ""
-    if version_line != REQUIRED_BUF_VERSION:
-        return (
-            False,
-            f"found `{version_line or 'unknown'}` at {buf}; expected `{REQUIRED_BUF_VERSION}`",
-        )
-    return True, f"{version_line} ({buf})"
-
-
-def check_buf_cli(_args: argparse.Namespace | None = None) -> int:
-    buf = find_buf()
-    if buf is None:
-        print(
-            f"buf-cli: FAIL - Buf CLI {REQUIRED_BUF_VERSION} is required, "
-            f"but `buf` was not found in PATH. See {TOOL_VERSIONS_DOC}.",
-            file=sys.stderr,
-        )
-        return 1
-
-    ok, detail = buf_version_status(buf)
-    if not ok:
-        print(
-            f"buf-cli: FAIL - Buf CLI {REQUIRED_BUF_VERSION} is required; {detail}. "
-            f"Install the documented version or put it earlier in PATH. See {TOOL_VERSIONS_DOC}.",
-            file=sys.stderr,
-        )
-        return 1
-
-    print(f"buf-cli: OK ({detail})")
-    return 0
-
-
-def check_buf_lint(_args: argparse.Namespace | None = None) -> int:
-    rc = check_buf_cli()
-    if rc != 0:
-        return rc
-    buf = find_buf()
-    if buf is None:
-        return 1
-    return run([buf, "lint"], check=False).returncode
-
-
 def find_lychee() -> str | None:
     return shutil.which("lychee")
 
@@ -2812,15 +2672,6 @@ def docs_command(args: argparse.Namespace) -> int:
     raise CheckError(f"Unknown docs command: {command}")
 
 
-def buf_command(args: argparse.Namespace) -> int:
-    rc = check_buf_cli()
-    if rc != 0:
-        return rc
-    if args.buf_command == "list-breaking-rules":
-        return run([find_buf() or exe("buf"), "config", "ls-breaking-rules", "--version=v2"], check=False).returncode
-    raise CheckError(f"Unknown buf command: {args.buf_command}")
-
-
 def check_docker(_args: argparse.Namespace | None = None) -> int:
     if _docker_info_ok():
         print("check-docker: OK (docker info works)")
@@ -2835,12 +2686,10 @@ def verify(args: argparse.Namespace) -> int:
 
     dotnet = False
     frontend = False
-    protobuf = False
     markdown_links = False
     if not paths:
         dotnet = True
         frontend = True
-        protobuf = True
         markdown_links = True
     else:
         dotnet = any(
@@ -2849,10 +2698,6 @@ def verify(args: argparse.Namespace) -> int:
         )
         frontend = any(
             re.search(r"^(frontend/|[.]editorconfig$|openapi[.]json$|[.]github/workflows/build-and-test[.]yml$)", p)
-            for p in paths
-        )
-        protobuf = any(
-            re.search(r"(^|/)[^/]+[.]proto$|^buf[.]yaml$|^[.]github/workflows/build-and-test[.]yml$", p)
             for p in paths
         )
         markdown_links = any(
@@ -2878,7 +2723,7 @@ def verify(args: argparse.Namespace) -> int:
             failed.append(name)
         return rc
 
-    print(f"verify - .NET={dotnet} frontend={frontend} protobuf={protobuf} markdown-links={markdown_links}")
+    print(f"verify - .NET={dotnet} frontend={frontend} markdown-links={markdown_links}")
 
     if dotnet:
         if step(".NET SDK", lambda: check_dotnet_sdk()) == 0:
@@ -2892,10 +2737,6 @@ def verify(args: argparse.Namespace) -> int:
         if step("frontend toolchain", lambda: check_frontend_toolchain()) == 0:
             step("frontend ci (tsc + biome)", lambda: frontend_command(argparse.Namespace(frontend_command="ci")))
             step("frontend test", lambda: frontend_command(argparse.Namespace(frontend_command="test")))
-
-    if protobuf:
-        if step("buf lint", lambda: check_buf_lint()) == 0:
-            step("buf breaking", lambda: check_buf_breaking_against_base())
 
     if markdown_links:
         step("markdown links", lambda: check_markdown_links())
@@ -3006,58 +2847,6 @@ def generate_api_contracts(_args: argparse.Namespace | None = None) -> int:
         if result.returncode != 0:
             return result.returncode
     return run_frontend_npm(["run", "gen:api-types"]).returncode
-
-
-def generate_wireframes(args: argparse.Namespace) -> int:
-    rc = check_frontend_toolchain()
-    if rc != 0:
-        return rc
-    npm_args = ["run", "export:wireframes", "--"]
-    if args.filter:
-        npm_args.extend(["--filter", args.filter])
-    if args.changed:
-        npm_args.append("--changed")
-    result = run_frontend_npm(npm_args)
-    return result.returncode
-
-
-def register_avro_schemas(args: argparse.Namespace) -> int:
-    registry_url = args.schema_registry_url or os.environ.get("SCHEMA_REGISTRY_URL", "http://localhost:8081")
-    dry_run = args.dry_run or bool(os.environ.get("DRY_RUN"))
-    count = 0
-    for file in sorted((ROOT / "src" / "Modules").glob("**/Schemas/*Event.avsc")):
-        match = re.search(r"src/Modules/([^/\\]+)/", str(file).replace("\\", "/"))
-        if not match:
-            continue
-        module = match.group(1).lower()
-        event_name = file.stem.removesuffix("Event")
-        topic = f"axis.{module}.{axis_repo.pascal_to_kebab(event_name)}"
-        subject = f"{topic}-value"
-        if dry_run:
-            print(f"would register {subject}  <-  {rel(file)}")
-        else:
-            schema = file.read_text(encoding="utf-8")
-            payload = json.dumps({"schema": schema})
-            result = run(
-                [
-                    "curl",
-                    "-fsS",
-                    "-X",
-                    "POST",
-                    "-H",
-                    "Content-Type: application/vnd.schemaregistry.v1+json",
-                    "--data",
-                    payload,
-                    f"{registry_url}/subjects/{subject}/versions",
-                ],
-                check=False,
-            )
-            if result.returncode != 0:
-                return result.returncode
-            print(f"registered {subject}")
-        count += 1
-    print(f"register-avro-schemas: OK ({count} schemas)")
-    return 0
 
 
 def install_hooks(_args: argparse.Namespace | None = None) -> int:
@@ -3377,23 +3166,6 @@ def local_dev(args: argparse.Namespace) -> int:
     raise CheckError(f"Unknown local-dev command: {command}")
 
 
-def grpc_command(args: argparse.Namespace) -> int:
-    if shutil.which(exe("grpcurl")) is None and shutil.which("grpcurl") is None:
-        print("grpc: grpcurl is not available in PATH", file=sys.stderr)
-        return 1
-
-    command = args.grpc_command
-    if command == "list":
-        return run([exe("grpcurl"), "-cacert", args.cacert, args.target, "list"], check=False).returncode
-    if command == "call":
-        grpc_args = [exe("grpcurl"), "-cacert", args.cacert]
-        if args.authorization:
-            grpc_args.extend(["-H", f"authorization: {args.authorization}"])
-        grpc_args.extend(["-d", args.data, args.target, args.method])
-        return run(grpc_args, check=False).returncode
-    raise CheckError(f"Unknown gRPC command: {command}")
-
-
 def _wsl_docker_ok() -> bool:
     if os.name != "nt" or shutil.which("wsl.exe") is None:
         return False
@@ -3431,18 +3203,6 @@ def doctor(args: argparse.Namespace) -> int:
     else:
         lychee_ok, lychee_detail = lychee_version_status(lychee)
         record("OK" if lychee_ok else "FAIL", "lychee", lychee_detail)
-
-    buf = find_buf()
-    if buf is None:
-        record(
-            "FAIL",
-            "buf",
-            f"Buf CLI {REQUIRED_BUF_VERSION} is required for protobuf checks; "
-            f"install it on PATH per {TOOL_VERSIONS_DOC}",
-        )
-    else:
-        buf_ok, buf_detail = buf_version_status(buf)
-        record("OK" if buf_ok else "FAIL", "buf", buf_detail)
 
     coderabbit_ok, coderabbit_detail = coderabbit_cli_status()
     record("OK" if coderabbit_ok else "FAIL", "coderabbit", coderabbit_detail)
@@ -3621,24 +3381,6 @@ def main(argv: list[str] | None = None) -> int:
     docs_sub.add_parser("sync-mermaid-theme").set_defaults(func=docs_command)
     docs_sub.add_parser("mermaid-init").set_defaults(func=docs_command)
 
-    buf_parser = sub.add_parser("buf")
-    buf_sub = buf_parser.add_subparsers(dest="buf_command", required=True)
-    buf_sub.add_parser("list-breaking-rules").set_defaults(func=buf_command)
-
-    grpc_parser = sub.add_parser("grpc")
-    grpc_sub = grpc_parser.add_subparsers(dest="grpc_command", required=True)
-    grpc_list = grpc_sub.add_parser("list")
-    grpc_list.add_argument("--cacert", default=".dev-certs/rootCA.pem")
-    grpc_list.add_argument("--target", default="localhost:5281")
-    grpc_list.set_defaults(func=grpc_command)
-    grpc_call = grpc_sub.add_parser("call")
-    grpc_call.add_argument("method")
-    grpc_call.add_argument("--target", default="localhost:5281")
-    grpc_call.add_argument("--cacert", default=".dev-certs/rootCA.pem")
-    grpc_call.add_argument("--authorization", default="")
-    grpc_call.add_argument("--data", required=True)
-    grpc_call.set_defaults(func=grpc_command)
-
     local_dev_parser = sub.add_parser("local-dev")
     local_dev_sub = local_dev_parser.add_subparsers(dest="local_dev_command", required=True)
     local_dev_sub.add_parser("certs").set_defaults(func=local_dev)
@@ -3699,10 +3441,6 @@ def main(argv: list[str] | None = None) -> int:
     check_sub.add_parser("frontend-component-composition").set_defaults(func=check_frontend_component_composition)
     check_sub.add_parser("frontend-quality").set_defaults(func=check_frontend_quality)
     check_sub.add_parser("coderabbit-cli").set_defaults(func=check_coderabbit_cli)
-    check_sub.add_parser("buf-cli").set_defaults(func=check_buf_cli)
-    check_sub.add_parser("buf-lint").set_defaults(func=check_buf_lint)
-    check_sub.add_parser("buf-modules").set_defaults(func=check_buf_modules)
-    check_sub.add_parser("buf-breaking-against-base").set_defaults(func=check_buf_breaking_against_base)
     check_sub.add_parser("local-dev-docs").set_defaults(
         func=lambda _args: run_module_check("check-local-dev-docs.py", ["--check"])
     )
@@ -3718,12 +3456,6 @@ def main(argv: list[str] | None = None) -> int:
     check_sub.add_parser("use-case-docs").set_defaults(
         func=lambda _args: run_module_check("check-use-case-docs.py", ["--check"])
     )
-    check_sub.add_parser("kafka-wiring").set_defaults(
-        func=lambda _args: module_main("check_kafka_wiring.py", ["--check"])
-    )
-    check_sub.add_parser("domain-readme-index").set_defaults(
-        func=lambda _args: run_module_check("regenerate-domain-readme-index.py", ["--check"])
-    )
     pr_parser = check_sub.add_parser("pr")
     pr_parser.add_argument("--title")
     pr_parser.add_argument("--body-file", type=Path)
@@ -3738,21 +3470,6 @@ def main(argv: list[str] | None = None) -> int:
     generate = sub.add_parser("generate")
     generate_sub = generate.add_subparsers(dest="generate_command", required=True)
     generate_sub.add_parser("api-contracts").set_defaults(func=generate_api_contracts)
-    wireframes = generate_sub.add_parser("wireframes")
-    wireframes.add_argument("-f", "--filter", default="", help="Render only paths containing this text.")
-    wireframes.add_argument("--changed", action="store_true", help="Render changed wireframes and linked wireframes.")
-    wireframes.set_defaults(func=generate_wireframes)
-    write_buf = generate_sub.add_parser("buf-yaml")
-    write_buf.set_defaults(func=lambda _args: module_main("sync_buf_yaml.py", ["--write"]))
-    write_domain = generate_sub.add_parser("domain-readme-index")
-    write_domain.set_defaults(func=lambda _args: module_main("regenerate-domain-readme-index.py", []))
-
-    register = sub.add_parser("register")
-    register_sub = register.add_subparsers(dest="register_command", required=True)
-    avro = register_sub.add_parser("avro-schemas")
-    avro.add_argument("--schema-registry-url")
-    avro.add_argument("--dry-run", action="store_true")
-    avro.set_defaults(func=register_avro_schemas)
 
     args = parser.parse_args(argv)
     try:

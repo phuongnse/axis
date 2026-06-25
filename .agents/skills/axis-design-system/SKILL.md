@@ -14,7 +14,7 @@ Keep Axis design-system changes grounded in the source of truth: approved design
 - Use `$axis-design-gate` before non-trivial design-system edits.
 - Use `$axis-frontend-feature` when changing SPA routes, feature components, forms, or product screens.
 - Use `$axis-visual-artifact` when touching design-source rows, committed previews, Mermaid, or visual artifact docs.
-- Use `$axis-api-contract` or `$axis-cross-module-contract` first when design-system work reveals API or cross-module contract changes.
+- Use `$axis-api-contract` first when design-system work reveals API contract changes.
 - Use `$axis-ready-review` before asking whether the branch is ready; use `$axis-pull-request` before opening or marking a PR ready.
 
 ## Owner Docs
@@ -55,7 +55,7 @@ Read only the docs needed for the touched surface:
 
 5. Keep behavior separate from foundation.
    - Do not migrate unrelated screens in a foundation PR.
-   - Do not invent product copy, ACs, endpoints, roles, or states from design-system work.
+   - Do not invent product copy, ACs, endpoints, or states from design-system work.
    - If a screen needs new behavior, switch to the owning use-case workflow before coding it.
 
 6. Verify the exact surface.

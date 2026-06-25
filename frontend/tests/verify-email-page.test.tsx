@@ -37,7 +37,7 @@ describe('VerifyEmailPage', () => {
     vi.restoreAllMocks();
   });
 
-  it('starts PKCE and stores provisioning token after user verification', async () => {
+  it('starts PKCE after user verification', async () => {
     vi.mocked(fetch).mockResolvedValueOnce({
       ok: true,
       status: 200,
@@ -45,7 +45,7 @@ describe('VerifyEmailPage', () => {
         Promise.resolve(
           JSON.stringify({
             sessionEstablished: true,
-            nextStep: 'WorkspaceProvisioning',
+            nextStep: 'Dashboard',
           }),
         ),
     } as unknown as Response);
@@ -53,7 +53,7 @@ describe('VerifyEmailPage', () => {
     await renderWithRouter(<VerifyEmailPage />, { path: '/auth/verify?token=valid-token' });
 
     await waitFor(() => {
-      expect(completePostVerifyPkceFlow).toHaveBeenCalledWith('valid-token');
+      expect(completePostVerifyPkceFlow).toHaveBeenCalledWith();
     });
     expect(navigateMock).not.toHaveBeenCalled();
   });
@@ -79,34 +79,9 @@ describe('VerifyEmailPage', () => {
     );
 
     await waitFor(() => {
-      expect(completePostVerifyPkceFlow).toHaveBeenCalledWith(null);
+      expect(completePostVerifyPkceFlow).toHaveBeenCalledWith();
     });
     expect(fetch).toHaveBeenCalledTimes(1);
-  });
-
-  it('navigates to user registration when Workspace contact is verified', async () => {
-    vi.mocked(fetch).mockResolvedValueOnce({
-      ok: true,
-      status: 200,
-      text: () =>
-        Promise.resolve(
-          JSON.stringify({
-            sessionEstablished: false,
-            nextStep: 'RegisterUser',
-            workspaceSetupToken: 'setup-token',
-          }),
-        ),
-    } as unknown as Response);
-
-    await renderWithRouter(<VerifyEmailPage />, { path: '/auth/verify?token=workspace-token' });
-
-    await waitFor(() => {
-      expect(navigateMock).toHaveBeenCalledWith({
-        to: '/register',
-        search: { setupToken: 'setup-token' },
-      });
-    });
-    expect(completePostVerifyPkceFlow).not.toHaveBeenCalled();
   });
 
   it('shows expired message when verification token expired', async () => {
@@ -154,7 +129,7 @@ describe('VerifyEmailPage', () => {
     await renderWithRouter(<VerifyEmailPage />, { path: '/auth/verify?token=used-token' });
 
     expect(await screen.findByRole('heading', { name: /already verified/i })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /go to sign in/i })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /register another account/i })).toBeInTheDocument();
   });
 
   it('shows rate-limited message when verification retries are throttled', async () => {

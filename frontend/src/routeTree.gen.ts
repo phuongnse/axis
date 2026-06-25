@@ -14,9 +14,6 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 
 const RegisterLazyRouteImport = createFileRoute('/register')()
-const ProvisioningLazyRouteImport = createFileRoute('/provisioning')()
-const LoginLazyRouteImport = createFileRoute('/login')()
-const ForgotPasswordLazyRouteImport = createFileRoute('/forgot-password')()
 const CallbackLazyRouteImport = createFileRoute('/callback')()
 const IndexLazyRouteImport = createFileRoute('/')()
 const RegisterConfirmationLazyRouteImport = createFileRoute(
@@ -32,23 +29,6 @@ const RegisterLazyRoute = RegisterLazyRouteImport.update({
   path: '/register',
   getParentRoute: () => rootRouteImport,
 } as any).lazy(() => import('./routes/register.lazy').then((d) => d.Route))
-const ProvisioningLazyRoute = ProvisioningLazyRouteImport.update({
-  id: '/provisioning',
-  path: '/provisioning',
-  getParentRoute: () => rootRouteImport,
-} as any).lazy(() => import('./routes/provisioning.lazy').then((d) => d.Route))
-const LoginLazyRoute = LoginLazyRouteImport.update({
-  id: '/login',
-  path: '/login',
-  getParentRoute: () => rootRouteImport,
-} as any).lazy(() => import('./routes/login.lazy').then((d) => d.Route))
-const ForgotPasswordLazyRoute = ForgotPasswordLazyRouteImport.update({
-  id: '/forgot-password',
-  path: '/forgot-password',
-  getParentRoute: () => rootRouteImport,
-} as any).lazy(() =>
-  import('./routes/forgot-password.lazy').then((d) => d.Route),
-)
 const CallbackLazyRoute = CallbackLazyRouteImport.update({
   id: '/callback',
   path: '/callback',
@@ -88,9 +68,6 @@ const AuthenticatedDashboardLazyRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexLazyRoute
   '/callback': typeof CallbackLazyRoute
-  '/forgot-password': typeof ForgotPasswordLazyRoute
-  '/login': typeof LoginLazyRoute
-  '/provisioning': typeof ProvisioningLazyRoute
   '/register': typeof RegisterLazyRoute
   '/dashboard': typeof AuthenticatedDashboardLazyRoute
   '/auth/verify': typeof AuthVerifyLazyRoute
@@ -99,9 +76,6 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexLazyRoute
   '/callback': typeof CallbackLazyRoute
-  '/forgot-password': typeof ForgotPasswordLazyRoute
-  '/login': typeof LoginLazyRoute
-  '/provisioning': typeof ProvisioningLazyRoute
   '/register': typeof RegisterLazyRoute
   '/dashboard': typeof AuthenticatedDashboardLazyRoute
   '/auth/verify': typeof AuthVerifyLazyRoute
@@ -112,9 +86,6 @@ export interface FileRoutesById {
   '/': typeof IndexLazyRoute
   '/_authenticated': typeof AuthenticatedRouteWithChildren
   '/callback': typeof CallbackLazyRoute
-  '/forgot-password': typeof ForgotPasswordLazyRoute
-  '/login': typeof LoginLazyRoute
-  '/provisioning': typeof ProvisioningLazyRoute
   '/register': typeof RegisterLazyRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardLazyRoute
   '/auth/verify': typeof AuthVerifyLazyRoute
@@ -125,9 +96,6 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/callback'
-    | '/forgot-password'
-    | '/login'
-    | '/provisioning'
     | '/register'
     | '/dashboard'
     | '/auth/verify'
@@ -136,9 +104,6 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/callback'
-    | '/forgot-password'
-    | '/login'
-    | '/provisioning'
     | '/register'
     | '/dashboard'
     | '/auth/verify'
@@ -148,9 +113,6 @@ export interface FileRouteTypes {
     | '/'
     | '/_authenticated'
     | '/callback'
-    | '/forgot-password'
-    | '/login'
-    | '/provisioning'
     | '/register'
     | '/_authenticated/dashboard'
     | '/auth/verify'
@@ -161,9 +123,6 @@ export interface RootRouteChildren {
   IndexLazyRoute: typeof IndexLazyRoute
   AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
   CallbackLazyRoute: typeof CallbackLazyRoute
-  ForgotPasswordLazyRoute: typeof ForgotPasswordLazyRoute
-  LoginLazyRoute: typeof LoginLazyRoute
-  ProvisioningLazyRoute: typeof ProvisioningLazyRoute
   RegisterLazyRoute: typeof RegisterLazyRoute
   AuthVerifyLazyRoute: typeof AuthVerifyLazyRoute
   RegisterConfirmationLazyRoute: typeof RegisterConfirmationLazyRoute
@@ -176,27 +135,6 @@ declare module '@tanstack/react-router' {
       path: '/register'
       fullPath: '/register'
       preLoaderRoute: typeof RegisterLazyRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/provisioning': {
-      id: '/provisioning'
-      path: '/provisioning'
-      fullPath: '/provisioning'
-      preLoaderRoute: typeof ProvisioningLazyRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/login': {
-      id: '/login'
-      path: '/login'
-      fullPath: '/login'
-      preLoaderRoute: typeof LoginLazyRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/forgot-password': {
-      id: '/forgot-password'
-      path: '/forgot-password'
-      fullPath: '/forgot-password'
-      preLoaderRoute: typeof ForgotPasswordLazyRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/callback': {
@@ -260,9 +198,6 @@ const rootRouteChildren: RootRouteChildren = {
   IndexLazyRoute: IndexLazyRoute,
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
   CallbackLazyRoute: CallbackLazyRoute,
-  ForgotPasswordLazyRoute: ForgotPasswordLazyRoute,
-  LoginLazyRoute: LoginLazyRoute,
-  ProvisioningLazyRoute: ProvisioningLazyRoute,
   RegisterLazyRoute: RegisterLazyRoute,
   AuthVerifyLazyRoute: AuthVerifyLazyRoute,
   RegisterConfirmationLazyRoute: RegisterConfirmationLazyRoute,

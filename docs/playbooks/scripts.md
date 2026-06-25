@@ -9,9 +9,8 @@
 | Tool | Required source | Used by |
 |---|---|---|
 | .NET SDK | `global.json` / `docs/TECH_STACK.md` | build, tests, format, package scan, API contracts |
-| Node.js | `frontend/.nvmrc` | frontend commands, API types, wireframe export |
+| Node.js | `frontend/.nvmrc` | frontend commands and API types |
 | Lychee | `0.23.0` | Markdown link checks |
-| Buf CLI | `1.50.0` | protobuf lint/breaking checks |
 | CodeRabbit CLI | `>= 0.6.0` | `$axis-pull-request` pre-PR review checkpoint |
 
 Use `python scripts/axis.py doctor` or the exact `check` subcommand to verify local tool resolution.

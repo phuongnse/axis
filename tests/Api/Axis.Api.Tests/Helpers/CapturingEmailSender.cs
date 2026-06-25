@@ -16,19 +16,4 @@ public sealed class CapturingEmailSender : IEmailSender
         _verificationTokensByEmail[toEmail] = verificationToken;
         return Task.CompletedTask;
     }
-
-    public Task SendInvitationEmailAsync(string toEmail, string workspaceName, string invitationToken, CancellationToken ct = default) =>
-        Task.CompletedTask;
-
-    public Task SendPasswordResetEmailAsync(string toEmail, string resetToken, CancellationToken ct = default) =>
-        Task.CompletedTask;
-
-    public Task SendPasswordChangedNotificationAsync(string toEmail, CancellationToken ct = default) =>
-        Task.CompletedTask;
-
-    public Task SendWorkspaceDeletionScheduledEmailAsync(
-        string toEmail,
-        string WorkspaceName,
-        CancellationToken ct = default) =>
-        Task.CompletedTask;
 }

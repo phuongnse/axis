@@ -1,6 +1,6 @@
 # API Patterns
 
-> **Navigation**: [<- docs/README.md](../README.md) . [<- patterns index](./patterns-index.md) . [<- AGENTS.md](../../AGENTS.md)
+> **Navigation**: [<- docs/README.md](../README.md) . [<- AGENTS.md](../../AGENTS.md)
 
 Use `$axis-api-contract` for REST/OpenAPI/API type changes.
 

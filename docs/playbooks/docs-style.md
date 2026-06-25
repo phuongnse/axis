@@ -46,14 +46,14 @@ Use `$axis-use-case-spec` for spec shape, `$axis-use-case-implementation` for st
 
 | Screen | Source | Preview |
 |---|---|---|
-| login | [source](https://design.example/source-frame) | [preview](./login.svg) |
+| register | [source](https://design.example/source-frame) | [preview](./register.svg) |
 ```
 
 Rules: Source links are editable artifacts; non-`N/A` previews need an editable source in the same row; Mermaid owns local use-case diagrams.
 
 ### Diagrams (content rules)
 
-Use Mermaid for local use-case diagrams. Put workflow, sequence, entity, and cross-module diagrams under `## Diagrams` in the owning use-case README.
+Use Mermaid for local use-case diagrams. Put workflow, sequence, and entity diagrams under `## Diagrams` in the owning use-case README.
 
 ## Implementation status (after each US AC block)
 

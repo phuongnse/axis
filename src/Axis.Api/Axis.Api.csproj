@@ -8,11 +8,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Modules\Identity\Axis.Identity.Infrastructure\Axis.Identity.Infrastructure.csproj" />
-    <ProjectReference Include="..\Modules\DataModeling\Axis.DataModeling.Infrastructure\Axis.DataModeling.Infrastructure.csproj" />
-    <ProjectReference Include="..\Modules\WorkflowBuilder\Axis.WorkflowBuilder.Infrastructure\Axis.WorkflowBuilder.Infrastructure.csproj" />
-    <ProjectReference Include="..\Modules\FormBuilder\Axis.FormBuilder.Infrastructure\Axis.FormBuilder.Infrastructure.csproj" />
-    <ProjectReference Include="..\Modules\WorkflowEngine\Axis.WorkflowEngine.Infrastructure\Axis.WorkflowEngine.Infrastructure.csproj" />
-    <ProjectReference Include="..\Modules\PageBuilder\Axis.PageBuilder.Infrastructure\Axis.PageBuilder.Infrastructure.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -24,17 +19,10 @@
     <PackageReference Include="StackExchange.Redis" />
     <PackageReference Include="MediatR" />
     <PackageReference Include="FluentValidation.DependencyInjectionExtensions" />
-    <PackageReference Include="WolverineFx" />
-    <PackageReference Include="WolverineFx.EntityFrameworkCore" />
-    <PackageReference Include="WolverineFx.Postgresql" />
-    <PackageReference Include="WolverineFx.Kafka" />
-    <PackageReference Include="WolverineFx.RabbitMq" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" />
     <PackageReference Include="Npgsql" />
     <PackageReference Include="Swashbuckle.AspNetCore" />
     <PackageReference Include="Scalar.AspNetCore" />
-    <PackageReference Include="Grpc.AspNetCore" />
-    <PackageReference Include="Grpc.Net.ClientFactory" />
   </ItemGroup>
 
 </Project>

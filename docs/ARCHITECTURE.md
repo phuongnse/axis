@@ -1,52 +1,51 @@
 # Architecture
 
-> **Navigation**: [<- docs/README.md](./README.md) . [<- AGENTS.md](../AGENTS.md)
+> **Navigation**: [docs](./README.md) · [AGENTS.md](../AGENTS.md)
 
-Axis is a modulith with strict service boundaries. Extraction must be a redeploy, not a refactor.
+Axis currently ships one module behind one API gateway.
 
-## System Context
-
-Actors use the React SPA or platform APIs through `Axis.Api`. The gateway owns REST/OpenAPI, auth enforcement, and module composition in modulith mode.
-
-## Containers
+## Runtime Shape
 
 | Layer | Runtime |
 |---|---|
-| Web | React SPA |
-| Gateway | `Axis.Api` |
-| Modules | Identity, DataModeling, WorkflowBuilder, WorkflowEngine, FormBuilder, PageBuilder |
-| Data | One PostgreSQL DB per module; schema-per-workspace inside each module DB |
-| Messaging | Kafka for events/snapshots; RabbitMQ via Wolverine for commands/jobs/saga steps |
-| Observability | OpenTelemetry SDK to Grafana stack |
+| Web | React SPA in `frontend/` |
+| Gateway | `src/Axis.Api` REST/OpenAPI gateway |
+| Module | `src/Modules/Identity` |
+| Data | PostgreSQL database `axis_identity` |
+| Cache / token support | Redis |
+| Email | SMTP, Maildev in local development |
+| Observability | Serilog + OpenTelemetry exporter configuration |
 
-## Module = Service: layering and contract surface
+## Source Boundaries
 
-Each module keeps Domain pure, Application orchestration local, Infrastructure persistence/integration local, and Contracts schema-only.
+```text
+Axis.Identity.Domain
+  -> Axis.Identity.Application
+  -> Axis.Identity.Infrastructure
+  -> Axis.Api
+  -> frontend
+```
 
-### Per-module layer convention
-
-Contracts <- Domain <- Application <- Infrastructure <- `Axis.Api` composition. Other modules may reference only Contracts.
-
-### Cross-module communication contract
-
-Events/snapshots use Kafka + Avro + CloudEvents. Commands/jobs/saga steps use RabbitMQ/Wolverine. Sync escape hatches use gRPC proto contracts.
-
-Forbidden: shared `DbContext`, direct calls into another module Application/Infrastructure, cross-module SQL, in-process `IMediator` for cross-module dispatch.
-
-## Multi-Workspace Isolation Strategy
-
-Each module owns its own database. Workspace data lives in `workspace_{workspaceId:N}` schemas. Identity public schema is the registry; other modules do not query it.
-
-See [persistence patterns](./playbooks/persistence-patterns.md#multi-workspace-isolation-pitfalls).
+`frontend/` calls only `Axis.Api`. `Axis.Api` calls Identity Application through MediatR and composes Identity Infrastructure at startup.
 
 ## Authentication
 
-Identity issues JWTs. Other modules validate locally via JWKS and claims. Call Identity gRPC only when claims are insufficient for a synchronous decision.
+Identity uses OpenIddict for Authorization Code + PKCE. The current usable flow is:
 
-## Observability & Operations
+1. User registers through `POST /api/users/register`.
+2. User verifies email through `POST /api/auth/verify-email`.
+3. API establishes the browser sign-in session.
+4. SPA completes PKCE through `/connect/authorize` and `/connect/token`.
+5. Authenticated SPA calls `GET /api/users/me`.
 
-Use structured logs without PII, OpenTelemetry traces/metrics, `/health`, and `/health/ready`. Runtime patterns own host wiring details.
+Anything beyond the verified standalone-registration flow needs a new owning use case before source returns.
 
-## Workflow Execution
+## Data Ownership
 
-Workflow definitions belong to WorkflowBuilder; executions belong to WorkflowEngine. Cross-module state is local read models synced by events unless a gRPC escape hatch is explicitly justified.
+Identity owns users, personal workspaces, memberships, email-verification tokens, legal acceptance records, and OpenIddict storage. Schema changes use EF Core migrations only.
+
+There are no cross-module data flows in the current repo state.
+
+## Operations
+
+Local development uses Docker Compose for PostgreSQL, Redis, Maildev, optional OpenTelemetry collector, API, frontend, and E2E runner. Health endpoints remain anonymous. Logs must not contain PII.

@@ -1,17 +1,7 @@
 using Axis.Api.Endpoints;
-using Axis.Api.Infrastructure;
 using Axis.Api.Middleware;
-using Axis.DataModeling.Infrastructure.Extensions;
-using Axis.DataModeling.Infrastructure.Persistence;
-using Axis.FormBuilder.Infrastructure.Extensions;
-using Axis.FormBuilder.Infrastructure.Persistence;
-using Axis.Identity.Infrastructure.Extensions;
 using Axis.Identity.Infrastructure.Persistence;
 using Axis.Shared.Infrastructure.Observability;
-using Axis.Shared.Infrastructure.Persistence;
-using Axis.WorkflowBuilder.Infrastructure.Extensions;
-using Axis.WorkflowBuilder.Infrastructure.Persistence;
-using Axis.WorkflowEngine.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
 using Scalar.AspNetCore;
@@ -32,36 +22,6 @@ internal static class AxisApiApplicationExtensions
             .Options;
         await using IdentityDbContext identityDb = new(identityOptions);
         await identityDb.Database.MigrateAsync();
-
-        DesignTimePublicSchemaWorkspaceContext publicWorkspaceContext = new();
-        await MigrateWorkspaceModuleAsync<DataModelingDbContext>(
-            RequiredConnectionString(app.Configuration, "DataModeling"),
-            options => new DataModelingDbContext(options, publicWorkspaceContext));
-
-        await MigrateWorkspaceModuleAsync<WorkflowBuilderDbContext>(
-            RequiredConnectionString(app.Configuration, "WorkflowBuilder"),
-            options => new WorkflowBuilderDbContext(options, publicWorkspaceContext));
-
-        await MigrateWorkspaceModuleAsync<FormBuilderDbContext>(
-            RequiredConnectionString(app.Configuration, "FormBuilder"),
-            options => new FormBuilderDbContext(options, publicWorkspaceContext));
-
-        await MigrateWorkspaceModuleAsync<WorkflowEngineDbContext>(
-            RequiredConnectionString(app.Configuration, "WorkflowEngine"),
-            options => new WorkflowEngineDbContext(options, publicWorkspaceContext));
-    }
-
-    private static async Task MigrateWorkspaceModuleAsync<TContext>(
-        string connectionString,
-        Func<DbContextOptions<TContext>, TContext> contextFactory)
-        where TContext : DbContext
-    {
-        DbContextOptions<TContext> options = new DbContextOptionsBuilder<TContext>()
-            .UseNpgsql(connectionString)
-            .Options;
-
-        await using TContext context = contextFactory(options);
-        await context.Database.MigrateAsync();
     }
 
     private static string RequiredConnectionString(IConfiguration configuration, string name) =>
@@ -78,7 +38,6 @@ internal static class AxisApiApplicationExtensions
         app.UseAuthentication();
         app.UseMiddleware<CorrelationIdMiddleware>();
         app.UseSerilogRequestLogging();
-        app.UseMiddleware<WorkspaceAccessMiddleware>();
         app.UseAuthorization();
 
         if (app.Environment.IsDevelopment() || app.Environment.IsStaging())
@@ -107,25 +66,7 @@ internal static class AxisApiApplicationExtensions
 
         app.MapAuthEndpoints();
         app.MapLegalEndpoints();
-        app.MapPlanEndpoints();
-        app.MapWorkspaceEndpoints();
-        app.MapWorkspaceSettingsEndpoints();
-        app.MapPlatformWorkspaceEndpoints();
-        app.MapInvitationEndpoints();
         app.MapUserEndpoints();
-        app.MapRoleEndpoints();
-        app.MapModelEndpoints();
-        app.MapDataClassEndpoints();
-        app.MapRecordEndpoints();
-        app.MapWorkflowEndpoints();
-        app.MapExecutionEndpoints();
-        app.MapFormEndpoints();
-        app.MapFormTaskEndpoints();
-
-        app.MapIdentityGrpc();
-        app.MapDataModelingGrpc();
-        app.MapFormBuilderGrpc();
-        app.MapWorkflowBuilderGrpc();
 
         return app;
     }

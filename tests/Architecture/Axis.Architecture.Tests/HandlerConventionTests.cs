@@ -13,7 +13,7 @@ namespace Axis.Architecture.Tests;
 /// <list type="bullet">
 /// <item>Handlers must accept <c>CancellationToken</c> as the last parameter of
 /// <c>Handle</c> — required so cancellations propagate from the HTTP
-/// pipeline / Wolverine pipeline through to EF and HTTP/gRPC calls.</item>
+/// pipeline through to EF and outbound calls.</item>
 /// <item>Handler classes must be <c>sealed</c> — handlers are leaf types;
 /// inheritance is never the right tool for composing them.</item>
 /// </list>
@@ -60,7 +60,7 @@ public class HandlerConventionTests
         ParameterInfo last = parameters[^1];
         last.ParameterType.Should().Be<CancellationToken>(
             $"{handlerType.FullName}.Handle must accept CancellationToken as its LAST parameter " +
-            "so cancellations propagate from HTTP/Wolverine through to EF + outbound calls. " +
+            "so cancellations propagate from HTTP through to EF + outbound calls. " +
             $"Got: {string.Join(", ", parameters.Select(p => $"{p.ParameterType.Name} {p.Name}"))}.");
     }
 

@@ -11,9 +11,4 @@ public interface IEmailVerificationTokenStore
     Task<EmailVerificationTokenResolveResult> ResolveForVerificationAsync(
         string tokenHash,
         CancellationToken ct = default);
-
-    /// <summary>
-    /// Resolves user for provisioning poll using the same link token (including after one-time verify).
-    /// </summary>
-    Task<Guid?> ResolveUserIdForProvisioningPollAsync(string tokenHash, CancellationToken ct = default);
 }

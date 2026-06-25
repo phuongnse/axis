@@ -1,7 +1,5 @@
-import { createLazyFileRoute } from '@tanstack/react-router';
-
-import { LandingPage } from '@/features/landing/components/LandingPage';
+import { createLazyFileRoute, Navigate } from '@tanstack/react-router';
 
 export const Route = createLazyFileRoute('/')({
-  component: LandingPage,
+  component: () => <Navigate to="/register" replace />,
 });

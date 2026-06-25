@@ -10,5 +10,4 @@ public sealed record UserTokenClaimsDto(
     Guid UserId,
     Guid? workspaceId,
     string Email,
-    string FullName,
-    IReadOnlyList<string> Permissions);
+    string FullName);

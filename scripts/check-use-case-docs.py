@@ -87,9 +87,8 @@ NO_ARTIFACT_VALUES = {"", "-", "—", "n/a", "na", "none"}
 PREVIEW_ASSET_RE = re.compile(r"[.](?:svg|png|jpe?g|gif|webp|avif)(?:[)#?]|$)", re.IGNORECASE)
 USE_CASE_TAIL_SECTION_ORDER = ("Screen flow", "Design Sources", "Diagrams", "Implementation status")
 
-# Placeholder markers from USE_CASE_TEMPLATE.md that must be replaced before a
-# use case can be considered written. Listed individually so the validator can
-# point at the missing field.
+# Placeholder markers that must be replaced before a use case can be considered
+# written. Listed individually so the validator can point at the missing field.
 PURPOSE_PLACEHOLDERS = (
     "_(One sentence about user value.)_",
     "<One sentence about user value.>",
@@ -478,11 +477,6 @@ def validate_design_sources(doc: UseCaseDocument) -> list[str]:
         )
     if table is None:
         return issues
-    if "Excalidraw" in table.headers:
-        issues.append(
-            f"{doc.rel}: Design Sources table must use `Source`, not tool-specific `Excalidraw`",
-        )
-
     source_headers = [header for header in ("Source",) if header in table.headers]
     for idx, row in enumerate(table.rows, start=1):
         record = record_for_row(table, row)
@@ -509,7 +503,7 @@ def validate_diagrams(doc: UseCaseDocument) -> list[str]:
     rel = doc.rel
     if LEGACY_DIAGRAM_TABLE_HEADER in doc.text:
         issues.append(
-            f"{rel}: legacy Excalidraw diagrams table — use Mermaid under ## Diagrams "
+            f"{rel}: legacy local diagrams table — use Mermaid under ## Diagrams "
             "(docs-style) or omit ## Diagrams when there is no local diagram",
         )
     diagrams_section = doc.section("Diagrams")
@@ -678,32 +672,8 @@ def strip_implementation_status_callouts(text: str) -> str:
     return "\n".join(out).strip()
 
 
-def normalize_design_source_taxonomy(text: str) -> str:
-    """Ignore the Wireframes -> Design Sources rename for material-change ratchets."""
-    replacements = (
-        ("## Design Sources", "## Wireframes"),
-        ("`## Design Sources`", "`## Wireframes`"),
-        ("Design Sources table", "Wireframes table"),
-        ("design sources table", "wireframes table"),
-        ("| Screen | Source | Preview |", "| Screen | Excalidraw | Preview |"),
-        ("|--------|--------|---------|", "|--------|------------|---------|"),
-        ("| # | Screen | Role | Source | Preview |", "| # | Screen | Role | Excalidraw | Preview |"),
-        ("|---|--------|------|--------|---------|", "|---|--------|------|------------|---------|"),
-        ("design sources show", "wireframes show"),
-        ("design-source artifact", "wireframe artifact"),
-        ("#design-sources", "#wireframes"),
-        ("§ Design Sources", "§ Wireframes"),
-        ("Design Sources](#", "Wireframes](#"),
-    )
-    normalized = text
-    for current, legacy in replacements:
-        normalized = normalized.replace(current, legacy)
-    normalized = re.sub(r" from \[wireframes/README\]\([^)]*\)", "", normalized)
-    return normalized
-
-
 def material_change_snapshot(text: str) -> str:
-    normalized = normalize_design_source_taxonomy(strip_implementation_status_callouts(text))
+    normalized = strip_implementation_status_callouts(text)
     return re.sub(r"\n{3,}", "\n\n", normalized).strip()
 
 

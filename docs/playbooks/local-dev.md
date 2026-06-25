@@ -35,9 +35,9 @@ Use `python scripts/axis.py local-dev up`. Stop with `python scripts/axis.py loc
 
 ## URLs and ports
 
-Mandatory services: `postgres`, `redis`, `rabbitmq`, `kafka`, `schema-registry`, `maildev`, `localstack`, `vault`, `web`; optional observability service: `otel-lgtm`.
+Mandatory services: `postgres`, `redis`, `maildev`, `api`, and `web`; optional services: `otel-lgtm` and `e2e`.
 
-Host ports published by compose: `1025`, `1080`, `3000`, `4566`, `5281`, `5432`, `5672`, `6379`, `8081`, `8200`, `15672`, `29092`.
+Host ports published by compose: `1025`, `1080`, `3000`, `4318`, `5281`, `5432`, `6379`.
 
 The source of truth is `docker-compose.yml` plus this playbook. If compose changes, update this file in the same PR.
 
@@ -61,7 +61,7 @@ Run unit or focused frontend tests while iterating. Integration/API tests need D
 
 Create migrations through `python scripts/axis.py dotnet ef migrations add ...`. Use the owning module Infrastructure project as both project and startup project when a `*DbContextFactory` exists. Never hand-write migration files.
 
-Identity dev bootstrap uses `MigrateAsync`. Wolverine uses `AutoProvision` in Development.
+Identity dev bootstrap uses `MigrateAsync`.
 
 ## Reset the database
 

@@ -5,8 +5,7 @@ using NetArchTest.Rules;
 namespace Axis.Architecture.Tests;
 
 /// <summary>
-/// Enforces AGENTS.md P0 rule: <c>MediatR is intra-module only. Cross-module
-/// dispatch always goes through Wolverine</c>.
+/// Enforces AGENTS.md rule: <c>MediatR is intra-module only</c>.
 ///
 /// <para>
 /// Mechanical check: no <c>Axis.{ModuleA}.*</c> assembly may reference a

@@ -41,7 +41,6 @@ Ship one reviewable Axis use-case slice without losing acceptance criteria, laye
 5. Work in layer order.
    - Domain, then Application, then Infrastructure, then API, then Frontend.
    - Before API work, search open lower-layer gaps in `docs/use-cases`.
-   - Cross-module work must use Kafka events, RabbitMQ commands/jobs/saga steps, or gRPC contracts. Do not add in-process calls across modules.
 
 6. Use TDD where behavior changes.
    - Add or update the proving test first when practical.

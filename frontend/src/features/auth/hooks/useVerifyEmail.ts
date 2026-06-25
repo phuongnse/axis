@@ -20,32 +20,18 @@ export function useVerifyEmail() {
 
   const mutation = useMutation({
     mutationFn: verifyEmail,
-    onSuccess: async (data, token) => {
-      if (data?.nextStep === 'RegisterUser' && data.workspaceSetupToken) {
-        void navigate({
-          to: '/register',
-          search: { setupToken: data.workspaceSetupToken },
-        });
-        return;
-      }
-
+    onSuccess: async (data) => {
       if (data?.sessionEstablished) {
-        const shouldProvision = data.nextStep === 'WorkspaceProvisioning';
         try {
-          await completePostVerifyPkceFlow(shouldProvision ? token : null);
+          await completePostVerifyPkceFlow();
           return;
         } catch {
-          if (shouldProvision) {
-            void navigate({
-              to: '/provisioning',
-              search: { token },
-            });
-            return;
-          }
+          void navigate({ to: '/dashboard' });
+          return;
         }
       }
 
-      void navigate({ to: '/login' });
+      void navigate({ to: '/register' });
     },
   });
 

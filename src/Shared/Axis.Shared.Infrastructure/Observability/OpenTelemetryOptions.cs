@@ -40,11 +40,8 @@ public sealed class OpenTelemetryOptions
 
 public sealed class OtlpOptions
 {
-    /// <summary>OTLP/gRPC or HTTP endpoint, e.g. <c>http://localhost:4317</c>.</summary>
+    /// <summary>OTLP/HTTP endpoint, e.g. <c>http://localhost:4318</c>.</summary>
     public string? Endpoint { get; set; }
-
-    /// <summary><c>Grpc</c> (default) or <c>HttpProtobuf</c>.</summary>
-    public string Protocol { get; set; } = "Grpc";
 
     public bool IsConfigured => !string.IsNullOrWhiteSpace(Endpoint);
 }

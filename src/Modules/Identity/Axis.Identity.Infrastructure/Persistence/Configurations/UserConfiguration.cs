@@ -24,10 +24,6 @@ internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
             .HasMaxLength(100)
             .IsRequired();
 
-        builder.Property(u => u.AvatarUrl)
-            .HasColumnName("avatar_url")
-            .HasMaxLength(2048);
-
         builder.Property(u => u.Email)
             .HasColumnName("email")
             .HasMaxLength(320)
@@ -58,14 +54,6 @@ internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(u => u.LegalAcceptedAt)
             .HasColumnName("legal_accepted_at");
 
-        builder.Property(u => u.FailedLoginAttempts)
-            .HasColumnName("failed_login_attempts")
-            .HasDefaultValue(0)
-            .IsRequired();
-
-        builder.Property(u => u.LockedUntil)
-            .HasColumnName("locked_until");
-
         builder.Property(u => u.CreatedAt)
             .HasColumnName("created_at")
             .IsRequired();
@@ -74,6 +62,5 @@ internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
             .HasColumnName("password_hash");
 
         builder.Ignore(u => u.FullName);
-        builder.Ignore(u => u.IsLockedOut);
     }
 }

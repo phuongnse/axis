@@ -7,19 +7,12 @@ namespace Axis.Architecture.Tests;
 /// <summary>
 /// Enforces AGENTS.md P0 rules:
 /// <list type="bullet">
-/// <item>No project reference from <c>Axis.{ModuleA}.*</c> to <c>Axis.{ModuleB}.*</c>
-/// except to <c>Axis.{ModuleB}.Contracts</c>.</item>
+/// <item>No project reference from <c>Axis.{ModuleA}.*</c> to <c>Axis.{ModuleB}.*</c>.</item>
 /// <item>No in-process method call into another module's Application or Infrastructure.</item>
 /// </list>
-/// This is the architectural lock that makes "extraction is a redeploy" true ([ADR-010](../../docs/TECH_STACK.md)).
 /// </summary>
 public class ModuleBoundaryTests
 {
-    /// <summary>
-    /// Allowed cross-module layer — only Contracts may be referenced across module boundaries.
-    /// </summary>
-    private const string ContractsLayer = "Contracts";
-
     /// <summary>
     /// Known cross-module boundary violations that pre-date the architecture
     /// tests. Each entry MUST have a matching entry in <c>docs/WORKAROUNDS.md</c>
@@ -35,31 +28,37 @@ public class ModuleBoundaryTests
     private static readonly Dictionary<(string SourceModule, string SourceLayer, string TargetModule, string TargetLayer), HashSet<string>>
         KnownBoundaryWorkarounds = new();
 
-    public static IEnumerable<object[]> CrossModulePairs() =>
+    private static IEnumerable<(string ModuleA, string ModuleB)> CrossModulePairs() =>
         from a in Conventions.ModuleNames
         from b in Conventions.ModuleNames
         where a != b
-        select new object[] { a, b };
+        select (a, b);
 
-    [Theory]
-    [MemberData(nameof(CrossModulePairs))]
-    public void Module_WhenInspected_DoesNotReferenceOtherModuleDomain(string moduleA, string moduleB)
+    [Fact]
+    public void Modules_WhenInspected_DoNotReferenceOtherModuleDomain()
     {
-        AssertNoCrossModuleDependency(moduleA, moduleB, layer: "Domain");
+        foreach ((string moduleA, string moduleB) in CrossModulePairs())
+        {
+            AssertNoCrossModuleDependency(moduleA, moduleB, layer: "Domain");
+        }
     }
 
-    [Theory]
-    [MemberData(nameof(CrossModulePairs))]
-    public void Module_WhenInspected_DoesNotReferenceOtherModuleApplication(string moduleA, string moduleB)
+    [Fact]
+    public void Modules_WhenInspected_DoNotReferenceOtherModuleApplication()
     {
-        AssertNoCrossModuleDependency(moduleA, moduleB, layer: "Application");
+        foreach ((string moduleA, string moduleB) in CrossModulePairs())
+        {
+            AssertNoCrossModuleDependency(moduleA, moduleB, layer: "Application");
+        }
     }
 
-    [Theory]
-    [MemberData(nameof(CrossModulePairs))]
-    public void Module_WhenInspected_DoesNotReferenceOtherModuleInfrastructure(string moduleA, string moduleB)
+    [Fact]
+    public void Modules_WhenInspected_DoNotReferenceOtherModuleInfrastructure()
     {
-        AssertNoCrossModuleDependency(moduleA, moduleB, layer: "Infrastructure");
+        foreach ((string moduleA, string moduleB) in CrossModulePairs())
+        {
+            AssertNoCrossModuleDependency(moduleA, moduleB, layer: "Infrastructure");
+        }
     }
 
     private static void AssertNoCrossModuleDependency(string moduleA, string moduleB, string layer)
@@ -94,8 +93,7 @@ public class ModuleBoundaryTests
 
             unexpected.Should().BeEmpty(
                 $"Axis.{moduleA}.{aLayer} depends on {forbiddenNamespacePrefix} via NEW types " +
-                $"not in the WORKAROUNDS allow-list — cross-module references are only allowed " +
-                $"to Axis.{moduleB}.{ContractsLayer} (AGENTS.md P0). " +
+                "not in the WORKAROUNDS allow-list. " +
                 $"Unexpected types: {string.Join(", ", unexpected)}. " +
                 "If this is intentional, add the type name to KnownBoundaryWorkarounds in " +
                 "ModuleBoundaryTests.cs AND record the workaround in docs/WORKAROUNDS.md.");

@@ -20,10 +20,6 @@ Feature code lives under `frontend/src/features/{name}/` and exports through the
 
 Use TanStack Query for server state. Use local React state or Zustand only for client-only state.
 
-## Localization and theme preferences
-
-Use the app i18n/theme paths. Do not hard-code user-visible text when the surrounding feature is localized.
-
 ## TanStack Query patterns
 
 Use stable query keys, generated API types, and explicit invalidation after mutations.

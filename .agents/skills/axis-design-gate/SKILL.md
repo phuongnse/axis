@@ -1,6 +1,6 @@
 ---
 name: axis-design-gate
-description: Prepare the Axis Design Gate dossier before non-trivial code changes. Use when a task changes Axis source, tests, contracts, docs status, repo tooling, frontend behavior, API endpoints, migrations, cross-module interactions, auth, or any surface where AGENTS.md requires a Design Gate artifact before implementation.
+description: Prepare the Axis Design Gate dossier before non-trivial code changes. Use when a task changes Axis source, tests, contracts, docs status, repo tooling, frontend behavior, API endpoints, migrations, auth, or any surface where AGENTS.md requires a Design Gate artifact before implementation.
 ---
 
 # Axis Design Gate
@@ -16,11 +16,11 @@ Do not edit implementation files before this dossier is complete. For high-risk 
 1. Classify the change.
    - Trivial: typo, comment, or tiny doc-only edit. State why no dossier is needed.
    - Standard: intra-module logic, tests, repo tooling, docs status, or existing-API frontend work. Produce a short dossier and continue.
-   - High-risk: new or changed endpoint, contract, required field, schema or migration, cross-module interaction, auth, new library, or public API surface. Produce a full dossier and wait for user sign-off.
+   - High-risk: new or changed endpoint, contract, required field, schema or migration, auth, new library, or public API surface. Produce a full dossier and wait for user sign-off.
 
 2. Read the governing docs for the exact surface.
    - Always read `AGENTS.md`, `docs/playbooks/design-gate.md`, and `docs/playbooks/agent-checklist.md`.
-   - Read only the relevant surface docs: `process.md`, `patterns-index.md`, the focused pattern owner, `frontend.md`, `testing.md`, `repo-layout-discovery.md`, `WORKAROUNDS.md`, or the owning use-case file.
+   - Read only the relevant surface docs: `process.md`, `api-patterns.md`, `frontend.md`, `testing.md`, `WORKAROUNDS.md`, or the owning use-case file.
 
 3. Quote governing rules.
    - Use `file:section` references.
@@ -29,11 +29,11 @@ Do not edit implementation files before this dossier is complete. For high-risk 
 
 4. Run blast-radius searches before editing.
    - Prefer `rg`.
-   - Search every affected symbol, endpoint route, DTO, handler, event/topic, proto, field name, test fixture, and frontend type.
+   - Search every affected symbol, endpoint route, DTO, handler, field name, test fixture, and frontend type.
    - Paste the exact command and summarize the hits. If no search applies, write `N/A because ...`.
 
 5. Decide the contract shape.
-   - Name request/response DTOs, event/proto schemas, API casing, and FE/BE generated type parity when applicable.
+   - Name request/response DTOs, API casing, and FE/BE generated type parity when applicable.
    - If no wire contract is touched, write `N/A because no wire shape changes`.
 
 6. Plan verification.
@@ -60,7 +60,7 @@ Blast radius:
 - `rg -n "..." ...` -> summary of hits
 
 Contract decision:
-- Request/response/schema/casing: ...
+- Request/response/casing: ...
 - FE/BE type parity: ...
 - N/A reason: ...
 

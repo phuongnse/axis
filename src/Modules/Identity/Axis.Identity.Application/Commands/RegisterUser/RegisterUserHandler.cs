@@ -1,7 +1,6 @@
 using Axis.Identity.Application.Repositories;
 using Axis.Identity.Application.Services;
 using Axis.Identity.Domain.Aggregates;
-using Axis.Identity.Domain.Subscriptions;
 using Axis.Identity.Domain.ValueObjects;
 using Axis.Shared.Application.CQRS;
 using Axis.Shared.Domain.Primitives;
@@ -10,12 +9,10 @@ namespace Axis.Identity.Application.Commands.RegisterUser;
 
 public sealed class RegisterUserHandler(
     IUserRepository userRepo,
-    IWorkspaceRepository WorkspaceRepo,
+    IWorkspaceRepository workspaceRepo,
     IWorkspaceMembershipRepository membershipRepo,
-    IRoleRepository roleRepo,
     IRegistrationIdempotencyRepository idempotencyRepo,
     IEmailVerificationTokenStore verificationTokenStore,
-    IWorkspaceRegistrationTokenStore WorkspaceTokenStore,
     IWorkspaceSlugGenerator slugGenerator,
     IPasswordHasher hasher,
     IEmailSender emailSender,
@@ -59,25 +56,6 @@ public sealed class RegisterUserHandler(
             User user = User.Create(command.FirstName, command.LastName, email.Value);
             user.SetPasswordHash(hasher.Hash(command.Password));
             user.RecordLegalAcceptance(command.AcceptedTermsVersion, command.AcceptedPrivacyVersion);
-
-            string? setupToken = string.IsNullOrWhiteSpace(command.WorkspaceSetupToken)
-                ? null
-                : command.WorkspaceSetupToken.Trim();
-            if (setupToken is not null)
-            {
-                Result attachResult = await AttachFirstUserToWorkspaceAsync(
-                    user,
-                    setupToken,
-                    cancellationToken);
-                if (attachResult.IsFailure)
-                {
-                    await MarkIdempotencyFailedIfNeededAsync(
-                        idempotencyKey,
-                        acquireResult,
-                        cancellationToken);
-                    return attachResult;
-                }
-            }
 
             await CreatePersonalWorkspaceAsync(user, command, cancellationToken);
 
@@ -125,39 +103,6 @@ public sealed class RegisterUserHandler(
             ? idempotencyRepo.MarkFailedAsync(idempotencyKey, cancellationToken)
             : Task.CompletedTask;
 
-    private async Task<Result> AttachFirstUserToWorkspaceAsync(
-        User user,
-        string setupToken,
-        CancellationToken cancellationToken)
-    {
-        string tokenHash = OpaqueTokenGenerator.Hash(setupToken);
-        Result<Guid> setupResult =
-            await WorkspaceTokenStore.ConsumeFirstUserSetupAsync(
-                tokenHash,
-                user.Id,
-                cancellationToken);
-
-        if (setupResult.IsFailure)
-            return Result.Failure(
-                setupResult.ErrorCode ?? ErrorCodes.BusinessRule,
-                setupResult.Error);
-
-        Guid workspaceId = setupResult.Value;
-        Workspace? Workspace = await WorkspaceRepo.GetByIdAsync(workspaceId, cancellationToken);
-        if (Workspace is null || !Workspace.AllowsSignIn())
-            return Result.Failure(ErrorCodes.BusinessRule, "Workspace is not ready for user setup.");
-
-        Role? adminRole = await roleRepo.GetByNameAsync("Admin", Workspace.Id, cancellationToken);
-        if (adminRole is null)
-            return Result.Failure(ErrorCodes.BusinessRule, "Workspace is missing the Admin role.");
-
-        WorkspaceMembership membership = WorkspaceMembership.Create(user.Id, Workspace.Id);
-        membership.AssignRole(adminRole.Id);
-        await membershipRepo.AddAsync(membership, cancellationToken);
-
-        return Result.Success();
-    }
-
     private async Task CreatePersonalWorkspaceAsync(
         User user,
         RegisterUserCommand command,
@@ -170,23 +115,14 @@ public sealed class RegisterUserHandler(
             user.FullName,
             slug,
             user.Email,
-            user.Id,
-            WellKnownSubscriptionPlans.FreeId);
+            user.Id);
         personalWorkspace.RecordLegalAcceptance(
             command.AcceptedTermsVersion,
             command.AcceptedPrivacyVersion);
 
-        await WorkspaceRepo.AddAsync(personalWorkspace, cancellationToken);
+        await workspaceRepo.AddAsync(personalWorkspace, cancellationToken);
 
-        IReadOnlyList<Role> defaultRoles = WorkspaceRoleCatalog.CreateDefaultRoles(personalWorkspace.Id);
-        foreach (Role role in defaultRoles)
-        {
-            await roleRepo.AddAsync(role, cancellationToken);
-        }
-
-        Role adminRole = defaultRoles.Single(role => role.Name == "Admin");
         WorkspaceMembership membership = WorkspaceMembership.Create(user.Id, personalWorkspace.Id);
-        membership.AssignRole(adminRole.Id);
         await membershipRepo.AddAsync(membership, cancellationToken);
     }
 }

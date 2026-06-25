@@ -6,9 +6,8 @@ namespace Axis.Architecture.Tests;
 
 /// <summary>
 /// Enforces AGENTS.md P0 at the REST gateway: <c>Axis.Api</c> must not take
-/// in-process dependencies on another module's Application layer (repositories,
-/// services). Endpoints delegate via <c>ISender</c>; cross-module sync uses gRPC
-/// from consuming modules' Infrastructure (ADR-014).
+/// in-process dependencies on another module's Application layer repositories
+/// or services. Endpoints delegate through <c>ISender</c>.
 /// </summary>
 public class GatewayBoundaryTests
 {
@@ -72,8 +71,7 @@ public class GatewayBoundaryTests
                 .GetResult();
 
             result.IsSuccessful.Should().BeTrue(
-                $"{infraType.FullName} must not depend on another module's Application layer — " +
-                "use gRPC contracts (Axis.*.Contracts) from the consuming module's Infrastructure.");
+                $"{infraType.FullName} must not depend on another module's Application layer.");
         }
     }
 }

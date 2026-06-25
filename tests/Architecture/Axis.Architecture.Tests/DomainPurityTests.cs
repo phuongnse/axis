@@ -7,8 +7,8 @@ namespace Axis.Architecture.Tests;
 /// <summary>
 /// Enforces AGENTS.md P0 rule: <c>Domain: zero external dependencies</c>.
 /// Domain projects must contain only entities, value objects, domain events,
-/// and pure C# — no EF Core, MediatR, Wolverine, ASP.NET, MailKit, AWS SDK,
-/// gRPC, Confluent, or any infrastructure namespace.
+/// and pure C# — no EF Core, MediatR, ASP.NET, MailKit, OpenIddict,
+/// Redis, Serilog, or any infrastructure namespace.
 /// </summary>
 public class DomainPurityTests
 {
@@ -24,17 +24,12 @@ public class DomainPurityTests
         "Microsoft.Extensions.DependencyInjection",
         "Microsoft.Extensions.Hosting",
         "MediatR",
-        "Wolverine",
         "MailKit",
-        "Amazon",
-        "Grpc",
-        "Confluent",
         "Npgsql",
         "OpenIddict",
         "StackExchange.Redis",
         "Serilog",
         "FluentValidation",
-        "Apache.Avro",
     ];
 
     public static IEnumerable<object[]> DomainAssemblies() =>

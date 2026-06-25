@@ -6,11 +6,11 @@ Workflow lives in repo skills. This file keeps only durable process boundaries a
 
 ## Backend process
 
-Use `$axis-use-case-implementation` for feature slices and `$axis-cross-module-contract` for cross-module work.
+Use `$axis-use-case-implementation` for feature slices.
 
 ### New module setup
 
-Create module projects in the standard order: Contracts when needed, Domain, Application, Infrastructure, module entrypoint, Axis.Api endpoint wiring, then Frontend when the slice has UI. Update module discovery docs only when the module/domain surface is new.
+Create module projects in the standard order: Domain, Application, Infrastructure, Axis.Api endpoint wiring, then Frontend when the slice has UI. Update docs only when the module/domain surface is real product scope.
 
 Use `$axis-design-gate` first; new modules are high-blast-radius work even when no public API exists yet.
 

@@ -43,7 +43,6 @@ public sealed class EndpointAuthorizationTests(ApiTestFixture fixture)
         // OpenIddict — auth is enforced by OpenIddictServerHandlers in the
         // request pipeline, not by ASP.NET's [Authorize] metadata.
         "/connect/authorize",
-        "/connect/login",
         "/connect/token",
 
         // Health probes — explicitly anonymous by ADR-021 (load balancers /

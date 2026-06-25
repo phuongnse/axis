@@ -1,6 +1,6 @@
 # Code Hygiene Patterns
 
-> **Navigation**: [<- docs/README.md](../README.md) . [<- patterns index](./patterns-index.md) . [<- AGENTS.md](../../AGENTS.md)
+> **Navigation**: [<- docs/README.md](../README.md) . [<- AGENTS.md](../../AGENTS.md)
 
 Small hygiene rules keep reviews focused on behavior.
 

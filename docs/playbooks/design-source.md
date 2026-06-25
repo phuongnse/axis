@@ -2,7 +2,7 @@
 
 > **Navigation**: [<- docs/README.md](../README.md) . [<- visual checklist](./visual-artifact-checklist.md) . [<- AGENTS.md](../../AGENTS.md)
 
-Use `$axis-visual-artifact` for design-source links, previews, wireframes, Mermaid, and visual docs.
+Use `$axis-visual-artifact` for design-source links, previews, Mermaid, and visual docs.
 
 ## Decisions
 
@@ -10,7 +10,7 @@ Design sources are editable artifacts. Previews are derived evidence. Runtime Ax
 
 ## Source Organization
 
-Use-case-specific sources/previews live with the owning use case. Shared app shell or kit assets live under shared design/wireframe owners.
+Use-case-specific sources/previews live with the owning use case. Shared design assets live under their owning design-source package.
 
 ## Open Design Package
 

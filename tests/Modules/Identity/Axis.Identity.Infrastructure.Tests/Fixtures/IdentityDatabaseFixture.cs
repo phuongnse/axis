@@ -1,5 +1,4 @@
 using Axis.Identity.Infrastructure.Persistence;
-using Axis.Identity.Infrastructure.Services;
 using Axis.Testing;
 using Microsoft.EntityFrameworkCore;
 using Testcontainers.PostgreSql;
@@ -36,9 +35,6 @@ public sealed class IdentityDatabaseFixture : IAsyncLifetime
                     .UseNpgsql(_connectionString)
                     .UseOpenIddict()
                     .Options));
-
-        await using IdentityDbContext seedContext = CreateContext();
-        await SubscriptionPlanSeeder.EnsureWellKnownPlansAsync(seedContext);
     }
 
     public Task DisposeAsync() => _postgres.DisposeAsync().AsTask();

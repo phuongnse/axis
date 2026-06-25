@@ -33,7 +33,7 @@ Run enough evidence for the current context without turning development into loc
 
 4. Use wrappers.
    - Document repo workflows through `python scripts/axis.py ...`.
-   - Keep raw Docker, dotnet, npm, Buf, Lychee, OpenSSL, and grpcurl commands inside wrappers or package scripts.
+   - Keep raw Docker, dotnet, npm, Lychee, and OpenSSL commands inside wrappers or package scripts.
    - If a needed wrapper is missing, add it through `scripts/axis.py` instead of documenting a raw command.
 
 5. Report honestly.

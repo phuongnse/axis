@@ -4,37 +4,23 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DashboardOverview } from '../src/features/dashboard/components/DashboardOverview';
 import { renderWithRouter } from './render-with-router';
 
-const profileWithWorkspace = {
+const profile = {
   id: '9fc0f6c1-24f6-4e66-a50f-3f742ad10b1a',
   email: 'admin@example.com',
   firstName: 'Admin',
   lastName: 'User',
   fullName: 'Admin User',
-  avatarUrl: null,
   isActive: true,
   workspaceId: '3cde5c59-d18b-464f-a021-5fce16b01118',
-  permissions: ['workspace:settings:read'],
-};
-
-const WorkspaceSettings = {
-  workspaceId: '3cde5c59-d18b-464f-a021-5fce16b01118',
-  name: 'Northwind Labs',
-  slug: 'northwind-labs',
-  logoUrl: null,
-  planName: 'Business',
-  status: 'Active',
-  createdAt: '2026-06-01T00:00:00Z',
-  timeZoneId: 'Asia/Saigon',
-  defaultLanguage: 'en',
-  scheduledHardDeleteAt: null,
-  usage: {
-    workflowsUsed: 7,
-    workflowsLimit: 20,
-    executionsUsedThisMonth: 1250,
-    executionsPerMonthLimit: 5000,
-    usersUsed: 4,
-    usersLimit: 10,
-  },
+  workspaces: [
+    {
+      id: '3cde5c59-d18b-464f-a021-5fce16b01118',
+      name: 'Admin User',
+      slug: 'admin-user',
+      type: 'Personal',
+      isCurrent: true,
+    },
+  ],
 };
 
 function jsonResponse(data: unknown): Response {
@@ -55,16 +41,12 @@ describe('DashboardOverview', () => {
     vi.restoreAllMocks();
   });
 
-  it('renders current workspace data from the API instead of demo data', async () => {
+  it('renders the verified account dashboard from the current user API', async () => {
     vi.mocked(fetch).mockImplementation((input: RequestInfo | URL) => {
       const url = typeof input === 'string' ? input : input.toString();
 
       if (url.includes('/api/users/me')) {
-        return Promise.resolve(jsonResponse(profileWithWorkspace));
-      }
-
-      if (url.includes('/api/workspaces/current/settings')) {
-        return Promise.resolve(jsonResponse(WorkspaceSettings));
+        return Promise.resolve(jsonResponse(profile));
       }
 
       return Promise.reject(new Error(`Unexpected fetch: ${url}`));
@@ -72,38 +54,27 @@ describe('DashboardOverview', () => {
 
     await renderWithRouter(<DashboardOverview />, { path: '/dashboard' });
 
-    expect(await screen.findByRole('heading', { name: 'Northwind Labs' })).toBeInTheDocument();
-    expect(screen.getByText('Business')).toBeInTheDocument();
-    expect(screen.getByText('Users')).toBeInTheDocument();
-    expect(screen.getByText('Workflows')).toBeInTheDocument();
-    expect(screen.getByText('Executions this month')).toBeInTheDocument();
-    expect(screen.getByText('1,250')).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Admin User' })).toBeInTheDocument();
+    expect(screen.getByText('Account ready')).toBeInTheDocument();
+    expect(screen.getAllByText('admin@example.com')).toHaveLength(2);
+    expect(screen.getByText('Personal')).toBeInTheDocument();
 
-    expect(screen.queryByText('Acme Corp')).not.toBeInTheDocument();
-    expect(screen.queryByText('Order Processing')).not.toBeInTheDocument();
-    expect(screen.queryByText('42 models')).not.toBeInTheDocument();
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
   });
 
-  it('does not request Workspace settings when the account has no workspace', async () => {
-    vi.mocked(fetch).mockImplementation((input: RequestInfo | URL) => {
-      const url = typeof input === 'string' ? input : input.toString();
-
-      if (url.includes('/api/users/me')) {
-        return Promise.resolve(
-          jsonResponse({
-            ...profileWithWorkspace,
-            workspaceId: null,
-            permissions: [],
-          }),
-        );
-      }
-
-      return Promise.reject(new Error(`Unexpected fetch: ${url}`));
-    });
+  it('shows a retryable error state when the current user API fails', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce({
+      ok: false,
+      status: 500,
+      statusText: 'Internal Server Error',
+      json: () => Promise.resolve({ detail: 'boom' }),
+    } as unknown as Response);
 
     await renderWithRouter(<DashboardOverview />, { path: '/dashboard' });
 
-    expect(await screen.findByText(/not linked to a shared account yet/i)).toBeInTheDocument();
-    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    expect(
+      await screen.findByRole('heading', { name: /unable to load account/i }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /retry/i })).toBeInTheDocument();
   });
 });

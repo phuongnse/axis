@@ -1,13 +1,10 @@
 import { useMutation } from '@tanstack/react-query';
-import type { TFunction } from 'i18next';
-import { useTranslation } from 'react-i18next';
 
 import { resendVerificationEmail } from '@/features/auth/api';
 import type { ResendVerificationState } from '@/features/auth/types';
 import { ApiError } from '@/lib/api';
 
 export function useResendVerification() {
-  const { t } = useTranslation();
   const mutation = useMutation({
     mutationFn: resendVerificationEmail,
   });
@@ -29,7 +26,7 @@ export function useResendVerification() {
 
   const rateLimitMessage =
     mutation.error instanceof ApiError && mutation.error.status === 429
-      ? getRateLimitMessage(mutation.error, t)
+      ? getRateLimitMessage(mutation.error)
       : null;
 
   return {
@@ -40,7 +37,7 @@ export function useResendVerification() {
   };
 }
 
-function getRateLimitMessage(error: ApiError, t: TFunction): string {
+function getRateLimitMessage(error: ApiError): string {
   const data = error.data;
   if (
     typeof data === 'object' &&
@@ -49,5 +46,5 @@ function getRateLimitMessage(error: ApiError, t: TFunction): string {
   ) {
     return (data as { detail: string }).detail;
   }
-  return t('emailConfirmation.waitTitle');
+  return 'Please wait before requesting another verification email.';
 }

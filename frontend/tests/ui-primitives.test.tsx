@@ -119,12 +119,12 @@ describe('Label', () => {
   it('links a label to its form control', () => {
     render(
       <>
-        <Label htmlFor="model-name">Model name</Label>
-        <Input id="model-name" />
+        <Label htmlFor="profile-name">Profile name</Label>
+        <Input id="profile-name" />
       </>,
     );
 
-    expect(screen.getByLabelText('Model name')).toBeInTheDocument();
+    expect(screen.getByLabelText('Profile name')).toBeInTheDocument();
   });
 });
 
@@ -138,9 +138,9 @@ describe('Progress', () => {
   });
 
   it('uses null value for indeterminate progress semantics', () => {
-    render(<Progress value={null} aria-label="Syncing workspace" />);
+    render(<Progress value={null} aria-label="Syncing profile" />);
 
-    const progress = screen.getByRole('progressbar', { name: 'Syncing workspace' });
+    const progress = screen.getByRole('progressbar', { name: 'Syncing profile' });
     expect(progress).not.toHaveAttribute('aria-valuenow');
   });
 });

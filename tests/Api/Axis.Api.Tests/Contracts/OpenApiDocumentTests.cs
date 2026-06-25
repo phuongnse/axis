@@ -26,8 +26,8 @@ public class OpenApiDocumentTests(ApiTestFixture fixture)
         string fresh = doc.SerializeAsJson(OpenApiSpecVersion.OpenApi3_0).ReplaceLineEndings("\n");
 
         // The schema must match the camelCase wire the app actually emits.
-        fresh.Should().Contain("\"workspaceName\"");
-        fresh.Should().NotContain("\"workspace_name\"");
+        fresh.Should().Contain("\"firstName\"");
+        fresh.Should().NotContain("\"first_name\"");
 
         string path = Path.Combine(RepoRoot(), "openapi.json");
         string? committed = File.Exists(path) ? File.ReadAllText(path).ReplaceLineEndings("\n") : null;
@@ -36,7 +36,7 @@ public class OpenApiDocumentTests(ApiTestFixture fixture)
         {
             committed.Should().Be(
                 fresh,
-                "openapi.json drifted from the API. Run `scripts/generate-api-contracts.ps1` "
+                "openapi.json drifted from the API. Run `python scripts/axis.py frontend gen-api-types` "
                     + "to regenerate openapi.json and frontend/src/lib/api-types.ts, then commit both");
         }
     }

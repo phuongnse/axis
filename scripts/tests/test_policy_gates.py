@@ -683,69 +683,6 @@ Ship user value.
 
         self.assertIn("Design Sources table missing required columns: Source", "\n".join(issues))
 
-    def test_rejects_legacy_wireframes_section_name(self) -> None:
-        issues = self.issues_for_document(
-            """# Sample use case
-
-## Purpose
-
-Ship user value.
-
-## Primary actor
-
-- User
-
-## Trigger
-
-- User starts the flow.
-
-## Main flow
-
-1. User starts.
-2. System responds.
-3. User completes the flow.
-
-## Alternate / error flows
-
-- None.
-
-## Acceptance Criteria
-
-*Happy path*
-- [ ] AC-001 Works.
-
-## Acceptance Test Matrix
-
-| ID | Level | Scenario | Covers AC | Automated by | Required to close |
-|---|---|---|---|---|---|
-| AT-001 | E2E | User completes flow | AC-001 | Playwright | Yes |
-
-## Wireframes
-
-| Screen | Source | Preview |
-|--------|--------|---------|
-| register | [source](https://design.example/frame) | N/A |
-
-> **Implementation status**
->
-> | Layer | Status |
-> |-------|--------|
-> | Domain | N/A |
-> | Application | N/A |
-> | Infrastructure | N/A |
-> | API | N/A |
-> | Frontend | N/A |
->
-> **Gaps vs spec:** none.
->
-> **Deferred follow-ups:** N/A.
->
-> **Decisions:** N/A.
-"""
-        )
-
-        self.assertIn("missing design sources section", "\n".join(issues))
-
     def test_accepts_design_sources_table_with_source_column(self) -> None:
         issues = self.issues_for_document(
             """# Sample use case
@@ -871,69 +808,6 @@ Ship user value.
         )
 
         self.assertIn("section order must be", "\n".join(issues))
-
-    def test_rejects_tool_specific_design_source_header(self) -> None:
-        issues = self.issues_for_document(
-            """# Sample use case
-
-## Purpose
-
-Ship user value.
-
-## Primary actor
-
-- User
-
-## Trigger
-
-- User starts the flow.
-
-## Main flow
-
-1. User starts.
-2. System responds.
-3. User completes the flow.
-
-## Alternate / error flows
-
-- None.
-
-## Acceptance Criteria
-
-*Happy path*
-- [ ] AC-001 Works.
-
-## Acceptance Test Matrix
-
-| ID | Level | Scenario | Covers AC | Automated by | Required to close |
-|---|---|---|---|---|---|
-| AT-001 | E2E | User completes flow | AC-001 | Playwright | Yes |
-
-## Design Sources
-
-| Screen | Excalidraw | Preview |
-|--------|------------|---------|
-| register | [source](./register.excalidraw) | [preview](./register.svg) |
-
-> **Implementation status**
->
-> | Layer | Status |
-> |-------|--------|
-> | Domain | N/A |
-> | Application | N/A |
-> | Infrastructure | N/A |
-> | API | N/A |
-> | Frontend | N/A |
->
-> **Gaps vs spec:** none.
->
-> **Deferred follow-ups:** N/A.
->
-> **Decisions:** N/A.
-"""
-        )
-
-        self.assertIn("must use `Source`, not tool-specific `Excalidraw`", "\n".join(issues))
 
     def test_rejects_design_source_pointing_to_preview_asset(self) -> None:
         issues = self.issues_for_document(
@@ -1061,7 +935,7 @@ Ship user value.
 
         self.assertIn("has a preview but no editable Source", "\n".join(issues))
 
-    def test_accepts_legacy_excalidraw_asset_under_source_with_preview(self) -> None:
+    def test_accepts_external_design_source_with_preview(self) -> None:
         issues = self.issues_for_document(
             """# Sample use case
 
@@ -1102,7 +976,7 @@ Ship user value.
 
 | Screen | Source | Preview |
 |--------|--------|---------|
-| register | [source](./register.excalidraw) | [preview](./register.svg) |
+| register | [source](https://design.example/register) | [preview](./register.svg) |
 
 > **Implementation status**
 >
@@ -1162,91 +1036,6 @@ Ship user value.
         self.assertEqual(
             check_use_case_docs.strip_implementation_status_callouts(before),
             check_use_case_docs.strip_implementation_status_callouts(after),
-        )
-
-    def test_design_source_taxonomy_rename_is_not_material_use_case_refresh(self) -> None:
-        before = """# Sample
-
-## Screen flow
-
-Canonical order. The wireframes table below uses the same row order.
-
-## Wireframes
-
-| Screen | Excalidraw | Preview |
-|--------|------------|---------|
-| login | [source](https://design.example/frame) | N/A |
-"""
-        after = (
-            before.replace("wireframes table", "design sources table")
-            .replace("## Wireframes", "## Design Sources")
-            .replace("| Screen | Excalidraw | Preview |", "| Screen | Source | Preview |")
-            .replace("|--------|------------|---------|", "|--------|--------|---------|")
-        )
-
-        self.assertEqual(
-            check_use_case_docs.material_change_snapshot(before),
-            check_use_case_docs.material_change_snapshot(after),
-        )
-
-    def test_design_source_status_reorder_is_not_material_use_case_refresh(self) -> None:
-        before = """# Sample
-
-*Out of scope*
-- None.
-
-> **Implementation status**
->
-> **Gaps vs spec:** old.
-
-## Wireframes
-
-| Screen | Excalidraw | Preview |
-|--------|------------|---------|
-| login | [source](https://design.example/frame) | N/A |
-"""
-        after = """# Sample
-
-*Out of scope*
-- None.
-
-## Design Sources
-
-| Screen | Source | Preview |
-|--------|--------|---------|
-| login | [source](https://design.example/frame) | N/A |
-
-> **Implementation status**
->
-> **Gaps vs spec:** old.
-"""
-
-        self.assertEqual(
-            check_use_case_docs.material_change_snapshot(before),
-            check_use_case_docs.material_change_snapshot(after),
-        )
-
-    def test_design_source_prose_taxonomy_cleanup_is_not_material_use_case_refresh(self) -> None:
-        before = """# Sample
-
-## Wireframes
-
-Current public sign-in wireframes show the implemented email/password path only.
-No new wireframe artifact is required.
-The screen uses a shared pattern from [wireframes/README](../../../wireframes/README.md#agent-contract).
-"""
-        after = """# Sample
-
-## Design Sources
-
-Current public sign-in design sources show the implemented email/password path only.
-No new design-source artifact is required.
-The screen uses a shared pattern.
-"""
-
-        self.assertEqual(
-            check_use_case_docs.material_change_snapshot(before),
-            check_use_case_docs.material_change_snapshot(after),
         )
 
     def test_changed_content_outside_status_uses_merge_base_for_three_dot_range(self) -> None:
@@ -1436,9 +1225,7 @@ class TestDocDriftRatchets(unittest.TestCase):
                         "npm run test",
                         "npx -y external-design-agent",
                         "openssl genrsa -out key.pem 2048",
-                        "grpcurl -cacert .dev-certs/rootCA.pem localhost:5281 list",
                         "python docs/scripts/sync-mermaid-theme.py",
-                        "buf config ls-breaking-rules --version=v2",
                         "```",
                     ]
                 ),
@@ -1449,9 +1236,7 @@ class TestDocDriftRatchets(unittest.TestCase):
         self.assertIn("use `python scripts/axis.py frontend ...`", issues)
         self.assertIn("use an approved project wrapper", issues)
         self.assertIn("use `python scripts/axis.py local-dev certs`", issues)
-        self.assertIn("use `python scripts/axis.py grpc ...`", issues)
         self.assertIn("use `python scripts/axis.py docs ...`", issues)
-        self.assertIn("use `python scripts/axis.py buf list-breaking-rules`", issues)
 
     def test_accepts_axis_wrapped_documented_commands(self) -> None:
         issues = self.documented_issue_text(
@@ -1464,7 +1249,6 @@ class TestDocDriftRatchets(unittest.TestCase):
                         "python scripts/axis.py dotnet build",
                         "python scripts/axis.py frontend test",
                         "python scripts/axis.py local-dev certs",
-                        "python scripts/axis.py grpc list",
                         "python scripts/axis.py docs sync-mermaid-theme",
                         "```",
                     ]
@@ -1671,77 +1455,6 @@ class TestToolVersionGates(unittest.TestCase):
                 env = axis.frontend_toolchain_env()
 
         self.assertEqual(str(expected_bin), env["PATH"].split(axis.os.pathsep)[0])
-
-    def test_buf_cli_rejects_wrong_version(self) -> None:
-        with (
-            mock.patch.object(axis, "find_buf", return_value="/usr/bin/buf"),
-            mock.patch.object(
-                axis,
-                "run_optional",
-                return_value=axis.subprocess.CompletedProcess(
-                    ["/usr/bin/buf", "--version"],
-                    0,
-                    stdout="1.51.0\n",
-                    stderr="",
-                ),
-            ),
-            contextlib.redirect_stderr(io.StringIO()) as stderr,
-        ):
-            self.assertEqual(1, axis.check_buf_cli())
-
-        output = stderr.getvalue()
-        self.assertIn("Buf CLI 1.50.0 is required", output)
-        self.assertIn("found `1.51.0`", output)
-
-    def test_buf_lint_runs_through_version_checked_wrapper(self) -> None:
-        calls: list[list[str]] = []
-
-        def fake_run(args: list[str], **_kwargs):
-            calls.append(args)
-            return axis.subprocess.CompletedProcess(args, 0, stdout="", stderr="")
-
-        with (
-            mock.patch.object(axis, "find_buf", return_value="/usr/bin/buf"),
-            mock.patch.object(
-                axis,
-                "run_optional",
-                return_value=axis.subprocess.CompletedProcess(
-                    ["/usr/bin/buf", "--version"],
-                    0,
-                    stdout="1.50.0\n",
-                    stderr="",
-                ),
-            ),
-            mock.patch.object(axis, "run", side_effect=fake_run),
-            contextlib.redirect_stdout(io.StringIO()),
-        ):
-            self.assertEqual(0, axis.check_buf_lint())
-
-        self.assertEqual([["/usr/bin/buf", "lint"]], calls)
-
-    def test_buf_breaking_rejects_wrong_version_before_running_buf(self) -> None:
-        with (
-            mock.patch.dict(axis.os.environ, {"BASE_REF": "origin/main"}, clear=False),
-            mock.patch.object(axis, "ref_exists", return_value=True),
-            mock.patch.object(axis, "find_buf", return_value="/usr/bin/buf"),
-            mock.patch.object(
-                axis,
-                "run_optional",
-                return_value=axis.subprocess.CompletedProcess(
-                    ["/usr/bin/buf", "--version"],
-                    0,
-                    stdout="1.51.0\n",
-                    stderr="",
-                ),
-            ),
-            mock.patch.object(axis, "run") as run_mock,
-            contextlib.redirect_stderr(io.StringIO()) as stderr,
-        ):
-            self.assertEqual(1, axis.check_buf_breaking_against_base())
-
-        run_mock.assert_not_called()
-        self.assertIn("Buf CLI 1.50.0 is required", stderr.getvalue())
-
 
 class TestMarkdownLinkGate(unittest.TestCase):
     def test_runs_lychee_with_shared_config(self) -> None:
@@ -2389,33 +2102,33 @@ class TestFrontendComponentComposition(unittest.TestCase):
     def test_rejects_consumer_contract_partial_route_match(self) -> None:
         issues = self.issues_for_frontend(
             {
-                "frontend/src/routes/login-callback.lazy.tsx": (
-                    "import { LoginPage } from '@/features/auth/components/LoginPage';\n"
-                    "export const Route = createLazyFileRoute('/login-callback')({ component: LoginPage });\n"
+                "frontend/src/routes/register-callback.lazy.tsx": (
+                    "import { RegisterPage } from '@/features/auth/components/RegisterPage';\n"
+                    "export const Route = createLazyFileRoute('/register-callback')({ component: RegisterPage });\n"
                 ),
-                "frontend/src/features/auth/components/LoginPage.tsx": (
-                    "export function LoginPage() { return null; }\n"
+                "frontend/src/features/auth/components/RegisterPage.tsx": (
+                    "export function RegisterPage() { return null; }\n"
                 ),
                 "frontend/src/design-system/consumer-contracts.ts": (
                     "export const axisConsumerContracts = [{\n"
-                    "  surface: 'Sign in',\n"
+                    "  surface: 'Register',\n"
                     "  kind: 'auth',\n"
-                    "  route: '/login',\n"
-                    "  component: 'LoginPage',\n"
-                    "  file: 'frontend/src/features/auth/components/LoginPage.tsx',\n"
+                    "  route: '/register',\n"
+                    "  component: 'RegisterPage',\n"
+                    "  file: 'frontend/src/features/auth/components/RegisterPage.tsx',\n"
                     "  owner: 'auth',\n"
                     "  readiness: 'ready',\n"
                     "  primitives: ['Button'],\n"
                     "  states: ['default'],\n"
                     "  evidence: ['unit-test'],\n"
-                    "  testFiles: ['frontend/tests/login-page.test.tsx'],\n"
+                    "  testFiles: ['frontend/tests/register-page.test.tsx'],\n"
                     "}];\n"
                 ),
-                "frontend/tests/login-page.test.tsx": "export {};\n",
+                "frontend/tests/register-page.test.tsx": "export {};\n",
             }
         )
 
-        self.assertIn("contract route `/login` is not declared", "\n".join(issues))
+        self.assertIn("contract route `/register` is not declared", "\n".join(issues))
 
     def test_rejects_consumer_contract_without_required_metadata(self) -> None:
         issues = self.issues_for_frontend(
@@ -2628,11 +2341,11 @@ class TestFrontendQuality(unittest.TestCase):
     def test_rejects_hand_authored_form_values_interface_in_schema_file(self) -> None:
         issues = self.issues_for_frontend(
             {
-                "frontend/src/features/auth/schemas/login-schema.ts": (
-                    "export interface LoginFormValues {\n"
+                "frontend/src/features/auth/schemas/register-schema.ts": (
+                    "export interface RegisterFormValues {\n"
                     "  email: string;\n"
                     "}\n"
-                    "export function createLoginSchema() {}\n"
+                    "export function createRegisterSchema() {}\n"
                 )
             }
         )
@@ -2642,8 +2355,8 @@ class TestFrontendQuality(unittest.TestCase):
     def test_rejects_hand_authored_form_values_type_in_schema_file(self) -> None:
         issues = self.issues_for_frontend(
             {
-                "frontend/src/features/auth/schemas/login-schema.ts": (
-                    "export type LoginFormValues = { email: string };\n"
+                "frontend/src/features/auth/schemas/register-schema.ts": (
+                    "export type RegisterFormValues = { email: string };\n"
                 )
             }
         )
@@ -2653,10 +2366,10 @@ class TestFrontendQuality(unittest.TestCase):
     def test_accepts_zod_inferred_form_values_type_in_schema_file(self) -> None:
         issues = self.issues_for_frontend(
             {
-                "frontend/src/features/auth/schemas/login-schema.ts": (
+                "frontend/src/features/auth/schemas/register-schema.ts": (
                     "import { z } from 'zod';\n"
-                    "export type LoginFormValues = z.infer<ReturnType<typeof createLoginSchema>>;\n"
-                    "export function createLoginSchema() { return z.object({}); }\n"
+                    "export type RegisterFormValues = z.infer<ReturnType<typeof createRegisterSchema>>;\n"
+                    "export function createRegisterSchema() { return z.object({}); }\n"
                 )
             }
         )
@@ -2961,30 +2674,28 @@ class TestScriptsStandardGate(unittest.TestCase):
         )
 
     def test_rejects_non_python_docs_utility_script(self) -> None:
-        issues = self.issues_for_files({"docs/scripts/render-wireframes.mjs": "console.log('nope');\n"})
+        issues = self.issues_for_files({"docs/scripts/render-visuals.mjs": "console.log('nope');\n"})
         self.assertIn(
-            "docs/scripts/render-wireframes.mjs: docs-level utility scripts must be Python; "
+            "docs/scripts/render-visuals.mjs: docs-level utility scripts must be Python; "
             "native tooling belongs beside its owning package",
             issues,
         )
 
     def test_rejects_non_python_docs_utility_script_case_insensitive(self) -> None:
-        issues = self.issues_for_files({"docs/scripts/render-wireframes.MJS": "console.log('nope');\n"})
+        issues = self.issues_for_files({"docs/scripts/render-visuals.MJS": "console.log('nope');\n"})
         self.assertIn(
-            "docs/scripts/render-wireframes.MJS: docs-level utility scripts must be Python; "
+            "docs/scripts/render-visuals.MJS: docs-level utility scripts must be Python; "
             "native tooling belongs beside its owning package",
             issues,
         )
 
-    def test_accepts_python_docs_utility_native_frontend_tooling_and_wireframe_assets(self) -> None:
+    def test_accepts_python_docs_utility_native_frontend_tooling_and_visual_assets(self) -> None:
         issues = self.issues_for_files(
             {
                 "docs/scripts/sync-mermaid-theme.py": "print('ok')\n",
-                "docs/wireframes/app-shell.excalidraw": "{}\n",
-                "docs/wireframes/app-shell.svg": "<svg />\n",
                 "docs/diagrams/mermaid_theme.py": "MERMAID_INIT = ''\n",
-                "frontend/package.json": '{"scripts":{"export:wireframes":"node scripts/export-wireframes.mjs"}}\n',
-                "frontend/scripts/export-wireframes.mjs": "console.log('native package tooling');\n",
+                "frontend/package.json": '{"scripts":{"export:visuals":"node scripts/export-visuals.mjs"}}\n',
+                "frontend/scripts/export-visuals.mjs": "console.log('native package tooling');\n",
             }
         )
         self.assertEqual([], issues)
@@ -3146,8 +2857,6 @@ class TestAxisCommandWrappers(unittest.TestCase):
             mock.patch.object(axis, "check_dotnet_sdk", return_value=0),
             mock.patch.object(axis, "check_frontend_toolchain", return_value=0),
             mock.patch.object(axis, "frontend_toolchain_env", return_value={}),
-            mock.patch.object(axis, "check_buf_cli", return_value=0),
-            mock.patch.object(axis, "find_buf", return_value="buf"),
             mock.patch.object(axis, "run", side_effect=fake_run),
             mock.patch.object(axis, "exe", side_effect=lambda name: name),
             mock.patch.object(axis, "resolve_exe", side_effect=lambda name, **_kwargs: name),
@@ -3216,42 +2925,6 @@ class TestAxisCommandWrappers(unittest.TestCase):
         )
 
         self.assertEqual([axis.sys.executable, str(axis.ROOT / "docs" / "scripts" / "sync-mermaid-theme.py")], calls[0])
-
-    def test_buf_list_breaking_rules_uses_version_checked_wrapper(self) -> None:
-        calls = self.run_with_fake_process(
-            axis.buf_command,
-            axis.argparse.Namespace(buf_command="list-breaking-rules"),
-        )
-
-        self.assertEqual(["buf", "config", "ls-breaking-rules", "--version=v2"], calls[0])
-
-    def test_grpc_call_uses_grpcurl_with_default_local_target(self) -> None:
-        calls = self.run_with_fake_process(
-            axis.grpc_command,
-            axis.argparse.Namespace(
-                grpc_command="call",
-                cacert=".dev-certs/rootCA.pem",
-                authorization="Bearer token",
-                data='{"user_id":"user"}',
-                target="localhost:5281",
-                method="axis.identity.v1.IdentityService/GetUserPermissions",
-            ),
-        )
-
-        self.assertEqual(
-            [
-                "grpcurl",
-                "-cacert",
-                ".dev-certs/rootCA.pem",
-                "-H",
-                "authorization: Bearer token",
-                "-d",
-                '{"user_id":"user"}',
-                "localhost:5281",
-                "axis.identity.v1.IdentityService/GetUserPermissions",
-            ],
-            calls[0],
-        )
 
     def test_local_dev_certs_writes_extension_and_runs_openssl(self) -> None:
         with tempfile.TemporaryDirectory() as temp:

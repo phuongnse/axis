@@ -1,7 +1,5 @@
-import { Link } from '@tanstack/react-router';
 import { UserPlus } from 'lucide-react';
 import { Controller } from 'react-hook-form';
-import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -13,7 +11,6 @@ import { PasswordCriteria } from '@/features/auth/components/PasswordCriteria';
 import { useRegister } from '@/features/auth/hooks/useRegister';
 
 export function RegisterPage() {
-  const { t } = useTranslation();
   const { form, loading, submit } = useRegister();
   const {
     register,
@@ -26,20 +23,10 @@ export function RegisterPage() {
   const password = watch('password');
 
   return (
-    <AuthCard
-      title={t('register.title')}
-      footer={
-        <>
-          {t('register.footerPrompt')}{' '}
-          <Link to="/login" className="font-medium hover:underline">
-            {t('common.signIn')}
-          </Link>
-        </>
-      }
-    >
+    <AuthCard title="Create account">
       <form className="space-y-4" onSubmit={handleSubmit(submit)} noValidate>
         <Field data-invalid={errors.fullName ? true : undefined}>
-          <FieldLabel htmlFor="fullName">{t('register.fullName')}</FieldLabel>
+          <FieldLabel htmlFor="fullName">Full name</FieldLabel>
           <Input
             id="fullName"
             autoComplete="name"
@@ -47,14 +34,16 @@ export function RegisterPage() {
             aria-invalid={errors.fullName ? true : undefined}
             {...register('fullName')}
           />
-          <FieldDescription id="fullName-help">{t('register.fullNameHelp')}</FieldDescription>
+          <FieldDescription id="fullName-help">
+            This name will appear on your account.
+          </FieldDescription>
           {errors.fullName ? (
             <FieldError id="fullName-error">{errors.fullName.message}</FieldError>
           ) : null}
         </Field>
 
         <Field data-invalid={errors.email ? true : undefined}>
-          <FieldLabel htmlFor="email">{t('common.emailAddress')}</FieldLabel>
+          <FieldLabel htmlFor="email">Email address</FieldLabel>
           <Input
             id="email"
             type="email"
@@ -63,12 +52,14 @@ export function RegisterPage() {
             aria-invalid={errors.email ? true : undefined}
             {...register('email')}
           />
-          <FieldDescription id="email-help">{t('register.emailHelp')}</FieldDescription>
+          <FieldDescription id="email-help">
+            We will send a verification link to this address.
+          </FieldDescription>
           {errors.email ? <FieldError id="email-error">{errors.email.message}</FieldError> : null}
         </Field>
 
         <Field data-invalid={errors.password ? true : undefined}>
-          <FieldLabel htmlFor="password">{t('common.password')}</FieldLabel>
+          <FieldLabel htmlFor="password">Password</FieldLabel>
           <Input
             id="password"
             type="password"
@@ -81,7 +72,9 @@ export function RegisterPage() {
             aria-invalid={errors.password ? true : undefined}
             {...register('password')}
           />
-          <FieldDescription id="password-help">{t('register.passwordHelp')}</FieldDescription>
+          <FieldDescription id="password-help">
+            Use a memorable passphrase that is hard to guess.
+          </FieldDescription>
           <PasswordCriteria id="password-criteria" password={password} />
           {errors.password ? (
             <FieldError id="password-error">{errors.password.message}</FieldError>
@@ -89,7 +82,7 @@ export function RegisterPage() {
         </Field>
 
         <Field data-invalid={errors.passwordConfirmation ? true : undefined}>
-          <FieldLabel htmlFor="passwordConfirmation">{t('register.confirmPassword')}</FieldLabel>
+          <FieldLabel htmlFor="passwordConfirmation">Confirm password</FieldLabel>
           <Input
             id="passwordConfirmation"
             type="password"
@@ -103,7 +96,7 @@ export function RegisterPage() {
             {...register('passwordConfirmation')}
           />
           <FieldDescription id="passwordConfirmation-help">
-            {t('register.confirmPasswordHelp')}
+            Re-enter the password exactly as typed.
           </FieldDescription>
           {errors.passwordConfirmation ? (
             <FieldError id="passwordConfirmation-error">
@@ -129,23 +122,23 @@ export function RegisterPage() {
                   aria-invalid={errors.acceptedTerms ? true : undefined}
                 />
                 <FieldLabel htmlFor="acceptedTerms" className="font-normal leading-4">
-                  {t('register.agreePrefix')}{' '}
+                  I agree to the{' '}
                   <a
                     href="/legal/terms"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="font-medium text-primary hover:underline"
                   >
-                    {t('register.termsOfService')}
+                    Terms of Service
                   </a>{' '}
-                  {t('register.agreeMiddle')}{' '}
+                  and{' '}
                   <a
                     href="/legal/privacy"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="font-medium text-primary hover:underline"
                   >
-                    {t('register.privacyPolicy')}
+                    Privacy Policy
                   </a>
                 </FieldLabel>
               </div>
@@ -160,7 +153,7 @@ export function RegisterPage() {
 
         <Button type="submit" className="h-9 w-full" disabled={loading}>
           <UserPlus className="size-4" aria-hidden />
-          {loading ? t('register.creatingAccount') : t('common.createAccount')}
+          {loading ? 'Creating account...' : 'Create account'}
         </Button>
       </form>
     </AuthCard>

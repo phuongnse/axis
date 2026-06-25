@@ -3,18 +3,14 @@ import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { createRouter, RouterProvider } from '@tanstack/react-router';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import { useTranslation } from 'react-i18next';
 import './index.css';
-import './features/preferences/i18n';
 
-import { PreferenceEffects } from './features/preferences';
 import { shouldRenderDevtools } from './lib/devtools';
 import { queryClient } from './lib/query-client';
 import { routeTree } from './routeTree.gen';
 
 function NotFound() {
-  const { t } = useTranslation();
-  return <p className="p-8">{t('common.pageNotFound')}</p>;
+  return <p className="p-8">Page not found</p>;
 }
 
 const router = createRouter({
@@ -43,7 +39,6 @@ if (!rootElement.innerHTML) {
   root.render(
     <React.StrictMode>
       <QueryClientProvider client={queryClient}>
-        <PreferenceEffects />
         <RouterProvider router={router} />
         {shouldRenderDevtools() ? <ReactQueryDevtools initialIsOpen={false} /> : null}
       </QueryClientProvider>

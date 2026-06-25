@@ -24,7 +24,7 @@ Use Testcontainers for persistence/integration. Do not use EF in-memory provider
 
 ### Required test coverage for integration tests
 
-Cover happy path plus in-scope validation, not-found/isolation, permission, constraint, and dependency-failure paths.
+Cover happy path plus in-scope validation, not-found/isolation, authorization, constraint, and dependency-failure paths.
 
 ### Required path coverage (all implementation types)
 
@@ -32,7 +32,7 @@ Map each touched handler/repo/job/consumer/endpoint/component to the relevant pa
 
 ### Additional .NET test patterns
 
-Keep deterministic handler/repository tests separate from asynchronous pipeline tests. Use focused fixtures over broad shared setup.
+Keep deterministic handler/repository tests separate from integration pipeline tests. Use focused fixtures over broad shared setup.
 
 ### Ready-PR gate
 
@@ -48,7 +48,7 @@ API fixtures must create and isolate the module databases/schemas required by th
 
 ### Keep deterministic tests separate from async-pipeline tests
 
-Use unit/application tests for deterministic decisions and integration/pipeline tests for transport/retry/outbox behavior.
+Use unit/application tests for deterministic decisions and integration tests for persistence/API behavior.
 
 ## Frontend testing
 
@@ -66,7 +66,7 @@ Use clear `*.test.tsx` / `*.test.ts` names matching the surface.
 
 ### What to test
 
-Assert UI behavior, API interactions, validation, empty/error states, permissions, and loading/disabled states when in scope.
+Assert UI behavior, API interactions, validation, empty/error states, authorization, and loading/disabled states when in scope.
 
 ### Browser E2E
 

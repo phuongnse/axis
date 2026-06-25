@@ -4,11 +4,9 @@
 
 Use this checklist **before every commit** that changes visual artifacts:
 
-- `docs/wireframes/**`
 - `docs/use-cases/**` `## Design Sources` source/preview rows
 - committed design-source preview assets
-- legacy `docs/**/*.excalidraw` and `docs/**/*.svg` wireframe assets
-- `docs/README.md` and use-case `README.md` **Mermaid** blocks under `## Diagrams`, `## Screen flow`, or [Key Diagrams](../README.md#key-diagrams)
+- `docs/README.md` and use-case `README.md` **Mermaid** blocks under `## Diagrams`, `## Screen flow`, or [Current Diagram](../README.md#current-diagram)
 
 ## 1) Semantic checks
 
@@ -42,23 +40,17 @@ Use this checklist **before every commit** that changes visual artifacts:
 3. Export and commit preview assets only when a stable preview is needed or an existing preview row changes.
 4. Review committed previews at 100% zoom with this checklist.
 
-**Legacy Excalidraw wireframes:**
-
-1. Edit source `.excalidraw` files.
-2. Regenerate related `.svg` previews (`python scripts/axis.py generate wireframes`).
-3. Review at 100% zoom with this checklist.
-
 **Diagrams (Mermaid in Markdown):**
 
 1. Edit diagram content in `docs/README.md` or the owning use-case `README.md`.
 2. Theme colors: only in [`docs/diagrams/mermaid_theme.py`](../diagrams/mermaid_theme.py) — run `python scripts/axis.py docs sync-mermaid-theme` after changing `MERMAID_INIT`.
 3. Preview on GitHub or in the IDE; see [mermaid.md](./mermaid.md).
-4. Commit `.md` only — no `.excalidraw` / `.svg` for sequence or entity diagrams.
+4. Commit `.md` only for sequence or entity diagrams.
 
 ## 5) Use-case `README.md` sync (when `docs/use-cases/**` changes)
 
 - [ ] Every documented **screen** has a row in `## Design Sources` (error `*-states` included).
-- [ ] Rows use `Source` + `Preview`; the `Source` cell may link to an editable design source or a legacy `.excalidraw` file.
+- [ ] Rows use `Source` + `Preview`; the `Source` cell links to an editable design source.
 - [ ] No sequence/entity diagram files (`*-flow`, `*-model`, `*-cases`) in the folder — those belong in `## Diagrams` as **Mermaid** in the README.
 - [ ] `## Diagrams` uses `### <slug>` + fenced `mermaid` blocks; other use cases linked in `**Related:**` prose only.
-- [ ] When >3 screens or branched flow: `## Screen flow` present and **row order** matches design sources table ([docs-style § Use-case visual artifacts](./docs-style.md#use-case-files--design-sources--implementation-status), example [register-workspace](../use-cases/platform-foundation/register-workspace/README.md)); pattern checklist [wireframes.md § Multi-screen journey](./wireframes.md#multi-screen-journey-pattern).
+- [ ] When >3 screens or a branched flow exists: `## Screen flow` is present and row order matches the design sources table.

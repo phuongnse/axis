@@ -14,7 +14,7 @@ Decide whether the branch is ready for review. Run evidence once, avoid transcri
 1. Inspect the diff.
    - Run `git status --short`.
    - Run `git diff --name-only HEAD`.
-   - Classify paths as docs/skills/scripts/source/tests/API/frontend/proto/visuals.
+   - Classify paths as docs/skills/scripts/source/tests/API/frontend/visuals.
 
 2. Reconcile the Design Gate.
    - Confirm `$axis-design-gate` was used for non-trivial work.

@@ -7,5 +7,4 @@ public sealed record RegisterUserRequest(
     string Password,
     string PasswordConfirmation,
     string AcceptedTermsVersion,
-    string AcceptedPrivacyVersion,
-    string? WorkspaceSetupToken = null);
+    string AcceptedPrivacyVersion);

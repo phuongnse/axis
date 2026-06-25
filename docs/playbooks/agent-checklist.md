@@ -13,7 +13,6 @@ Daily index only. Workflow lives in repo skills; enforcement status lives in [RE
 | Spec | `$axis-use-case-spec` |
 | Use-case code | `$axis-use-case-implementation` |
 | REST/OpenAPI | `$axis-api-contract` |
-| Events/gRPC/Wolverine | `$axis-cross-module-contract` |
 | Frontend | `$axis-frontend-feature` |
 | Design system | `$axis-design-system` |
 | Visuals | `$axis-visual-artifact` |
@@ -31,7 +30,7 @@ Daily index only. Workflow lives in repo skills; enforcement status lives in [RE
 
 ## AC coverage — avoid happy-path-only
 
-Use-case ACs are the contract. Cover validation, edge, permission, isolation, and dependency-failure paths when in scope.
+Use-case ACs are the contract. Cover validation, edge, authorization, isolation, and dependency-failure paths when in scope.
 
 AC map: `AC | kind | surface | proving test or exact deferral`.
 
@@ -76,4 +75,4 @@ Never combine `✅` with pending work. Format lives in [docs-style](./docs-style
 
 ## Playbooks - open only when needed
 
-Design Gate: [design-gate.md](./design-gate.md). Layout discovery: [repo-layout-discovery.md](./repo-layout-discovery.md). Pattern owner: [patterns-index.md](./patterns-index.md). Scripts: [scripts.md](./scripts.md). Docs shape: [docs-style.md](./docs-style.md).
+Design Gate: [design-gate.md](./design-gate.md). Scripts: [scripts.md](./scripts.md). Docs shape: [docs-style.md](./docs-style.md). API: [api-patterns.md](./api-patterns.md). Frontend: [frontend.md](./frontend.md). Testing: [testing.md](./testing.md).

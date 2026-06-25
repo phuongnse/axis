@@ -5,9 +5,7 @@ public sealed record VerifyEmailSuccessDto(
     Guid? workspaceId,
     string Email,
     string FullName,
-    IReadOnlyList<string> Permissions,
-    VerifyEmailNextStep NextStep,
-    string? WorkspaceSetupToken = null)
+    VerifyEmailNextStep NextStep)
 {
     public bool SessionEstablished => UserId.HasValue;
 }
