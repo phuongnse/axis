@@ -1,239 +1,79 @@
-# Agent checklist (one page)
+# Agent Checklist
 
-> **Navigation**: [← docs/README.md](../README.md) · [← AGENTS.md](../../AGENTS.md)
+> **Navigation**: [<- docs/README.md](../README.md) . [<- AGENTS.md](../../AGENTS.md)
 
-**Daily workflow.** Walk the Ready review, Docs review, and Retrospective review while implementing; run the Verification gate before marking a PR ready for review. Use `$axis-use-case-spec` when a use case lacks an owning spec, `$axis-use-case-implementation` for implementation slices, `$axis-ready-review` before review, and `$axis-pull-request` before opening, updating, or marking a PR ready. `$axis-pull-request` owns the pre-PR sequence: ready-review evidence → local CodeRabbit plugin review checkpoint → review fixes when needed → metadata validation → PR action. Run each required local guard once unless the diff changes in a way that invalidates its evidence; CI owns the repeated post-push enforcement. **PR title = Conventional Commit; PR description = Summary + Linked spec + Requirements only** — no review/check paste blocks, no commit list, no CI/Doc-drift status (GitHub Checks tab covers that).
+Daily index only. Workflow lives in repo skills; enforcement status lives in [REVIEW_FINDINGS.md](../REVIEW_FINDINGS.md); command behavior lives in `scripts/axis.py`.
 
-**Skill routing.** Use-case specs: `$axis-use-case-spec`; API contracts: `$axis-api-contract`; cross-module contracts: `$axis-cross-module-contract`; frontend: `$axis-frontend-feature`; design system: `$axis-design-system`; visuals: `$axis-visual-artifact`; review fixes from local CodeRabbit plugin, GitHub CodeRabbit, or humans: `$axis-review-feedback`; PR publish/update, including pre-PR CodeRabbit review: `$axis-pull-request`.
+## Skill Routing
 
-**Large use cases:** split into **genuinely isolated PRs** (each branch from `main`, each passing the two-sided isolation test). See [pr-slicing.md](./pr-slicing.md) — never stack slice B on slice A's branch, never claim the Verification gate is green when you did not run it, and assign one owner per shared seam.
+| Work | Skill |
+|---|---|
+| Docs | `$axis-doc-hygiene` |
+| Script scope | `$axis-script-scope` |
+| Spec | `$axis-use-case-spec` |
+| Use-case code | `$axis-use-case-implementation` |
+| REST/OpenAPI | `$axis-api-contract` |
+| Events/gRPC/Wolverine | `$axis-cross-module-contract` |
+| Frontend | `$axis-frontend-feature` |
+| Design system | `$axis-design-system` |
+| Visuals | `$axis-visual-artifact` |
+| Feedback | `$axis-review-feedback` |
+| Review ready? | `$axis-ready-review` |
+| PR action | `$axis-pull-request` |
 
----
+## Ready Review - before code
 
-## Ready Review — before code
+- Run `$axis-design-gate` for non-trivial work; high-risk surfaces need sign-off.
+- Read owning use-case/domain docs and same-module code.
+- Check `docs/WORKAROUNDS.md` when touching known shortcut areas.
+- Build an AC map before behavior work.
+- Resolve or explicitly defer lower-layer gaps before API work.
 
-- **Design Gate** ([design-gate.md](./design-gate.md)): use `$axis-design-gate` before non-trivial code; **high-risk surfaces require user sign-off before code**
-- AC map: every row has layer + file/test — **no blank cells**
-- Read: domain README → use-case file → same-module code
-- Skim [`docs/WORKAROUNDS.md`](../WORKAROUNDS.md) for entries touching the same files/modules — known shortcuts may explain surprising code
-- Before API layer: `grep -r "Application: ⚠️\|Infrastructure: ⚠️" docs/use-cases/` — fix, defer with reason, or stop
-- If the use case crosses the SPA/API boundary or depends on local-dev services (auth, email, provisioning, storage, Redis, Kafka, RabbitMQ, MailDev), start the Axis local-dev stack from [local-dev.md](./local-dev.md) during Ready review and include a smoke path in the plan. After the smoke path or E2E evidence is captured, run `python scripts/axis.py local-dev down` unless the user explicitly asks to keep the stack running for hands-on dev.
-- End of PR: [process.md § PR wrap-up](process.md) — deferred lines, host wiring, callouts (no user reminder)
+## AC coverage — avoid happy-path-only
 
-### AC coverage — avoid happy-path-only
+Use-case ACs are the contract. Cover validation, edge, permission, isolation, and dependency-failure paths when in scope.
 
-Use-case files group ACs under **Happy path**, **Validation & errors**, **Edge cases**, and **Out of scope**. Cover every in-scope bullet for the layer you are shipping, not only the happy path.
+AC map: `AC | kind | surface | proving test or exact deferral`.
 
-**Ownership note (single source):** This file is the source of truth for AC/path coverage expectations. Other playbooks should link here instead of re-stating these rules.
+Rules: no blank in-scope rows; required AT rows name automated runners; implementation details stay out of spec matrices; spec checkboxes are not progress; incomplete in-scope ACs block `✅`.
 
-**AC map:** before code, copy each `- [ ]` AC bullet into a row, tag it `happy` / `validation` / `edge` / `out-of-scope`, and name the proving test or handler. Mark cross-layer bullets explicitly (`N/A this PR — Frontend` / `N/A this PR — API`). No blank in-scope file/test cells.
+## Verification Gate — verify before PR review
 
-**Use-case acceptance test matrix:** when implementing, closing, or materially refreshing a use case:
+During development, run the smallest check that proves the edit. Do not run the ready-review gate after every small change.
 
-- Add local AC IDs (`AC-001`, `AC-002`, ...) and an `## Acceptance Test Matrix` with AT IDs (`AT-001`, `AT-002`, ...).
-- Update only the touched use case; do not bulk-retrofit unrelated use cases.
-- Cover every in-scope AC in at least one required AT row before marking a layer or use case done.
-- Keep the matrix high-level: no `Evidence source` column, test file paths, class names, or commands.
-- Use `Automated by` for runner/tool names only: `Playwright`, `Vitest`, `xUnit API`, or another concrete runner.
-- Cite a spec section, AC ID, or flow step for each required AT expected behavior in the implementation/verification report; if no citation exists, stop and tighten the spec before coding.
-- Choose Playwright for browser-level happy paths, Vitest for focused UI states/validation, and xUnit API/Application/Infrastructure tests for backend contracts, side effects, and business rules.
-- Treat a missing runner as a new-library Design Gate decision and get required sign-off before code.
+Before review, use `$axis-ready-review`; it classifies changed paths, runs triggered verification once, checks docs/status/workarounds, and reports pass/fail/not-run honestly.
 
-**Path coverage matrix template** (fill once per touched implementation surface):
+Only claim a full local suite when full `python scripts/axis.py dotnet test` ran, including integration/API tests. CI remains authoritative before merge.
 
-| Surface (endpoint/handler/repo/job/consumer) | Happy | Validation/Constraint | Auth/Permission | Not-found/Isolation | Dependency-failure | Notes |
-|---|---|---|---|---|---|---|
-| `...` | `test: ...` | `test: ...` | `test: ...` / `N/A` | `test: ...` / `N/A` | `test: ...` / `N/A` | deferral if any |
-
-**During implementation:**
-
-- [process.md § Per use case workflow](./process.md#per-use-case-workflow): Domain → Application → Infrastructure → API; tests green per layer before the next.
-- [testing.md § Required test coverage](./testing.md#required-test-coverage-for-integration-tests): integration tests need happy path **and** not-found/isolation **and** constraint violations where applicable — not one happy test per handler.
-- **Axis local-dev smoke:** when triggered by the Ready-review rule above, run the local-dev stack early enough to influence implementation. Minimum evidence: `/health`, `/health/ready`, the route/endpoint under test, and the observable dependency effect. Treat the stack as a scoped resource: capture evidence, then `python scripts/axis.py local-dev down` unless the user wants it left up.
-
-| Check | Action |
-|-------|--------|
-| Map complete? | Every in-scope AC row has code + test or an exact deferral. |
-| Path matrix complete? | Each touched endpoint/handler/repo/job/consumer covers happy, validation, auth/permission, not-found/isolation, and dependency-failure paths, or marks `N/A`. |
-| Callout honest? | `> **Implementation status**` lists remaining bullets under `Gaps vs spec`; never mark a layer ✅ with open in-scope gaps. |
-| Deferred? | `**Deferred follow-ups:**` names the exact AC bullet deferred, not a vague “later”. |
-
-Self-audit before review: re-read the use case and tick each in-scope bullet against the AC map in spec order.
-
----
-
-## Automated gates and review checkpoints
-
-Use the terms from [REVIEW_FINDINGS.md](../REVIEW_FINDINGS.md#enforcement-taxonomy). "Gate" means a command, build, or CI job can fail the PR. Ready review, Docs review, Retrospective review, and Design Gate are required review artifacts/checkpoints unless a deterministic subset is listed below as CI-enforced.
-
-**Doc drift:** CI runs `python scripts/axis.py check policy-tests` and `python scripts/axis.py check doc-drift` on every PR. Run them locally when touching docs, scripts, repo layout, handlers, endpoints, generated-contract surfaces, or bulk file rewrites. This job enforces deterministic policy/doc checks; it does not require a docs edit for every code diff.
-
-| Item | Type | Action |
-|------|------|--------|
-| **Ready review** | Review-only | AC map + docs identified when shipping behavior |
-| **Verification gate** | Enforced | Local ready-PR verification; CI/branch protection owns the full suite |
-| **Docs review** | Review-only | Docs walkthrough when behavior/spec/status changes |
-| **Retrospective review** | Review-only | Retrospective and REVIEW_FINDINGS update when a rule/finding repeats |
-
-**CI-enforced checks** (run automatically on PR, no local action required unless debugging):
-
-- **PR guard** — [`scripts/check-pr.py`](../../scripts/check-pr.py) validates PR metadata shape and checkbox self-attestation. It cannot prove that review-only checkpoints happened.
-- **Policy gate tests** — `python scripts/axis.py check policy-tests` runs counterexample tests for custom Python gates so a regex/path change cannot silently disable enforcement.
-- **Doc drift** — runs deterministic docs/policy/layout checks: text encoding, module/API discovery, governance registry/owner-boundary/truth wiring, handler/test ratchets, endpoint DTO ratchets, workaround sync, doc hygiene, script standards, and layout checks (`buf`, Kafka wiring, domain README index). [REVIEW_FINDINGS.md](../REVIEW_FINDINGS.md) owns finding-class status; script output owns the exact failing guard.
-- **Markdown link check** — `lychee` verifies internal links and `#anchors`; the required version is owned by [scripts.md § Tool Versions](./scripts.md#tool-versions), and the local command is `python scripts/axis.py check markdown-links`. **Relative file/image targets** (`![alt](./asset.svg)`, `[text](./file.md)`) are double-checked by `python scripts/axis.py check doc-link-targets` inside the drift command — catches the broken-image class lychee misses.
-- **Doc navigation** — `python scripts/axis.py check doc-navigation` requires every `docs/**/*.md` file to start with an H1 and a `> **Navigation**:` block so docs never become dead ends.
-- **Doc size budgets** — `python scripts/axis.py check doc-size-budgets` keeps reference docs/playbooks within the budgets in [docs-style.md](./docs-style.md#size-budgets), including the tighter pattern-router budget.
-- **Code-fence integrity** — `python scripts/axis.py check doc-code-fences` (inside the drift command) flags code-block lines with collapsed indentation (a lone leading space). Catches the bulk-find-replace corruption class that lychee, prettier, and the structural checks all let through.
-- **Use-case docs** — `python scripts/axis.py check use-case-docs` validates the use-case document contract: required sections, table schemas, Acceptance Test Matrix AC coverage/runner values, high-level matrix cells, design-source/status table shape, Mermaid-only diagrams, template placeholders, self-links, and truncated domain README rows. It also counts use cases still on the stock Main flow.
-- **Codex skill metadata** — `python scripts/axis.py check codex-skills` validates repo-scoped `.agents/skills/*/SKILL.md` frontmatter, concise bodies, doc references, required skill chaining, concrete wording, and UI metadata/default prompts.
-- **Secret scanning** — TruffleHog scans the full PR diff for committed secrets (API keys, passwords, tokens) and verifies each finding against the alleged service before reporting (`--only-verified` cuts false positives).
-- **Vulnerable packages** — `python scripts/axis.py check vulnerable-packages` wraps the NuGet vulnerable-package scan and fails on any known CVE in the dep tree (covers transitive packages too).
-- **Architecture fitness tests** run as part of `python scripts/axis.py dotnet test` — failures there mean a AGENTS.md P0/P1 rule got violated structurally. See [tests README](../../tests/Architecture/Axis.Architecture.Tests/README.md).
-- **EF migrations** — drift verifies each migration `.cs` has its `.Designer.cs`. The command used to create the migration remains review-owned. See [local-dev.md § EF Core migrations](./local-dev.md#ef-core-migrations).
-- **Local dev docs** — [`docker-compose.yml`](../../docker-compose.yml) changes require [`docs/playbooks/local-dev.md`](./local-dev.md) in the same PR; CI runs `python scripts/axis.py check local-dev-docs`.
-- **Async-safety analyzers** (`Microsoft.VisualStudio.Threading.Analyzers`) — type-aware checks at build time for sync-over-async (VSTHRD002), async-void (VSTHRD100), unobserved async results (VSTHRD110). Rule selection rationale in [runtime patterns § Async patterns](./runtime-patterns.md#async-patterns).
-- **Coverage report** uploaded as artifact (`dotnet-coverage`). No threshold yet — see [CONTRIBUTING.md § Coverage](../../CONTRIBUTING.md#coverage).
-
-**Adding new CI checks — verify GitHub plan support first.** Some GitHub-native security workflows require **GitHub Advanced Security (GHAS)** on private repos (a paid add-on). On `phuong-labs/axis` this includes `actions/dependency-review-action` and CodeQL code-scanning *upload* (analysis runs, only the SARIF upload fails). Verify GHAS provisioning before adding such checks; otherwise the PR will fail and need a follow-up to disable. Dependabot security updates work on any plan and cover the same threat model with a publish-time delay — use it as the baseline. The disabled-job comment in [`.github/workflows/build-and-test.yml`](../../.github/workflows/build-and-test.yml) lists the specific jobs to restore when GHAS is provisioned.
-
-**Priority:** the Verification gate and CI-enforced checks block merge. Ready, Docs, and Retrospective reviews are review-only self-audits captured by the PR checklist.
-
-### Verification Gate — verify before PR review
-
-**One command:** `python scripts/axis.py verify` runs the local ready-PR gate — documented toolchain version checks + build + vulnerable package scan + Axis format check + **unit test projects only** + frontend `ci`/test + protobuf lint/breaking when proto config changed + markdown link check when markdown changed + drift. It only runs the layers whose files changed (so doc-only and frontend-only work stays quick).
-
-Run `python scripts/axis.py bootstrap` once to install the local **pre-push hook** under `.git/hooks/pre-push`; build commands must not mutate Git config. The hook runs `python scripts/axis.py pre-push`, a quick policy/doc sanity gate for ordinary network pushes. It intentionally does not run the full local Verification gate on every push. Set `AXIS_PRE_PUSH_FULL=1` when you explicitly want the hook to run `python scripts/axis.py verify` before pushing.
-
-CI/branch protection remains the authoritative full gate and runs full `python scripts/axis.py dotnet test` including Testcontainers before merge.
-
-The .NET branch of `python scripts/axis.py verify` also runs the enforced
-`{Subject}_{Condition}_{ExpectedOutcome}` test-name check.
-
-**Development loop vs enforcement:** while implementing, run the narrow check for the surface you are changing; do not repeatedly run `python scripts/axis.py verify` after every small edit. The pre-push hook gives fast feedback before a network push; `python scripts/axis.py verify` is the local enforcement point before requesting review; CI/branch protection runs the full suite before merge.
-
-| During development | Prefer |
-|--------------------|--------|
-| Process/docs change | `python scripts/axis.py check doc-drift`; for Markdown links/anchors also run `python scripts/axis.py check markdown-links` |
-| Test change | `python scripts/axis.py check test-naming`; for project changes also run `python scripts/axis.py check test-project-classification` and `python scripts/axis.py test unit` |
-| Frontend change | `python scripts/axis.py check frontend-toolchain`, then `python scripts/axis.py frontend ci` and/or `python scripts/axis.py frontend test` |
-| Backend compile-sensitive change | `python scripts/axis.py check dotnet-sdk`, then `python scripts/axis.py dotnet build` or the directly affected Axis test wrapper |
-| Review fix touching a rule/guard | The specific guard for that rule, then run `python scripts/axis.py verify` before requesting review |
-
-| Changed | Commands (all must pass when triggered) |
-|---------|----------------------------------------|
-| `tests/` | `python scripts/axis.py check test-naming` |
-| `src/` or `tests/` | `python scripts/axis.py check dotnet-sdk`, then `python scripts/axis.py dotnet build` and `python scripts/axis.py test unit` (auto-discovers `*.Domain.Tests` and `*.Application.Tests`) |
-| `src/`, `tests/`, dependency props, or API contract | `python scripts/axis.py check vulnerable-packages` |
-| `src/` or `tests/` | `python scripts/axis.py dotnet format --check` |
-| `frontend/` | `python scripts/axis.py check frontend-toolchain`, then `python scripts/axis.py frontend ci` and `python scripts/axis.py frontend test` |
-| `.proto` or `buf.yaml` | `python scripts/axis.py check buf-lint` then `python scripts/axis.py check buf-breaking-against-base` |
-| `src/Axis.Api/Endpoints/` or API contract | Update + run `tests/Api/Axis.Api.Tests/` |
-| Docs/scripts/layout/policy change | `python scripts/axis.py check policy-tests` then `python scripts/axis.py check doc-drift`; for Markdown/`lychee.toml` changes also run `python scripts/axis.py check markdown-links` |
-| `docker-compose.yml` | Update [local-dev.md](./local-dev.md) in same PR; `python scripts/axis.py check doc-drift` |
-
-When reporting verification, state each triggered command as `ran`, `not triggered` with reason, or `failed` with the blocker. `$axis-ready-review` provides the repeatable reporting shape.
-
-**Full suite:** integration and API tests run in CI as part of full `python scripts/axis.py dotnet test`; Docker/Testcontainers is required there. Run full local `python scripts/axis.py dotnet test` when debugging CI, changing Infrastructure/API behavior, or preparing a high-risk backend PR. If Docker is not visible to the process running .NET, use the [local-dev Docker endpoint adapter](./local-dev.md#docker-endpoint-adapter) and report the execution context instead of rewriting verification commands.
-
-### Docs Review
-
-Use `$axis-ready-review` for the walkthrough. Mark pure refactor/style/test-only changes as `not triggered` instead of inventing docs churn.
-
-Common owner mapping:
+## Docs Review
 
 | Trigger | Owner |
 |---|---|
-| Library or stack change | [TECH_STACK.md](../TECH_STACK.md) |
-| New pattern or repeated finding | Focused owner from [patterns-index.md](./patterns-index.md) or [REVIEW_FINDINGS.md](../REVIEW_FINDINGS.md) |
-| Behavior/spec/status change | Owning use-case callout, domain README, and [PROGRESS.md](../PROGRESS.md) when their summaries change |
-| Repo layout, module, event, proto, API group | [repo-layout-discovery.md](./repo-layout-discovery.md) |
-| Frontend screen or use-case visual | Owning use-case design-source/diagram section and [visual-artifact-checklist.md](./visual-artifact-checklist.md) |
-| Intentional P0/P1 shortcut | [WORKAROUNDS.md](../WORKAROUNDS.md) plus site reference |
+| Behavior/spec/status | Owning use case; domain README/`PROGRESS.md` only when summaries change |
+| Stack/library | `docs/TECH_STACK.md` |
+| Repeated finding | Focused playbook or `docs/REVIEW_FINDINGS.md` |
+| P0/P1 shortcut | `docs/WORKAROUNDS.md` plus site reference |
+| Visual/source/preview | `$axis-visual-artifact` |
 
-**Deferred follow-ups (mandatory when leaving work open):** do not wait for the user. Any skipped review item, thin-endpoint refactor, or partial layer needs a named `**Deferred follow-ups:**` line — full rules in [process.md § Deferred follow-up](process.md). Remove the line when fixed.
+Pure refactor/style/dependency/test-only changes can report docs as not triggered.
 
-### Review feedback (local CodeRabbit plugin / GitHub / human)
+## Retrospective Review
 
-Use `$axis-review-feedback`. Apply fixes before resolving threads. Local CodeRabbit plugin output may have no GitHub thread; classify and fix the issue, then return to `$axis-pull-request` when the feedback came from the pre-PR flow. Bots are **signal**, not authority — validate against the focused owner from [patterns-index.md](./patterns-index.md) and [AGENTS.md](../../AGENTS.md).
+Use `$axis-ready-review` and answer: new rule, invented invariant, infrastructure footgun, non-obvious test setup, direction change, review shortcut, spec gap, incident-level rule text, repeat finding.
 
-Classify each comment as fixed, improved beyond suggestion, false positive with evidence, or deferred with owner. Prefer the design you would defend in review; when the user explicitly asks for the smallest change, say `Review fixes: minimal — <why>` in the PR Summary. For non-trivial improvements, say `Review fixes: improved — <what>`.
+If any answer is `Yes`, update the owning doc, test, use-case, or finding row.
 
-### Retrospective Review
-
-Answer **Yes** or **No** on **each line** (same `-` bullet style as Docs review — do not collapse to a single `No`). If **Yes**, name the doc, test, or ledger row updated in this PR.
-
-```text
-Retrospective review:
-- New rule from test failure? → No
-- Invented invariant without AC? → No
-- Infrastructure footgun? → No
-- Non-obvious test setup? → No
-- Changed direction mid-task? → No
-- Review-driven change left as a shortcut when a better design was feasible? → No
-- Spec gap discovered? → No
-- Incident-level detail in rule text? → No
-- Repeat of a prior review finding class? → No
-```
-
-If the last line is **Yes**, record the class in [REVIEW_FINDINGS.md](../REVIEW_FINDINGS.md): mark it Enforced, Partial, Review-only, Guidance, or Not a rule. A finding class should be reviewed once, then prevented or explicitly kept human-owned.
-
----
-
-## Layer status (feature callouts)
+## Layer status
 
 | Symbol | Meaning |
-|--------|---------|
-| ✅ | All ACs for that layer in this US done |
-| ⚠️ | Started; list gaps in callout |
-| ⏳ | Not started |
+|---|---|
+| `✅` | In-scope layer ACs done |
+| `⚠️` | Started; exact gaps listed |
+| `⏳` | Not started |
+| `N/A` | Layer does not apply |
 
-Never ✅ and "pending …" in the same callout. Checkboxes in use-case files are spec-only — **do not** tick them.
+Never combine `✅` with pending work. Format lives in [docs-style](./docs-style.md#implementation-status-after-each-us-ac-block).
 
-### Status updates (three levels — same PR)
+## Playbooks - open only when needed
 
-| Level | When | What to write |
-|-------|------|----------------|
-| **1 — Use case** | Any layer progress on a use case | `> **Implementation status**`, `Gaps vs spec`, optional `**Deferred follow-ups:**` in `docs/use-cases/{domain}/*.md` |
-| **2 — Domain** | A layer is complete for the module | Domain `README.md` implementation table + **Open work (agents)** section (remove or reword items you closed) |
-| **3 — Platform** | Module-wide summary changed | `docs/PROGRESS.md` — layer status only |
-
-Updating only `PROGRESS.md` while changing `src/` without a use-case callout still fails because platform status needs an owning source. Domain README pending API status after endpoints ship also fails.
-
-**Agents starting a task:** read [use cases README § How agents find open work](../use-cases/README.md#how-agents-find-open-work) — checkboxes in use-case files are not progress.
-
----
-
-## Review-only project expectations
-
-These expectations still matter, but do not call them CI gates unless [REVIEW_FINDINGS.md](../REVIEW_FINDINGS.md) marks the class **Enforced**.
-
-- Spec → code, never the reverse.
-- No cross-module SQL / shared `DbContext` / `IMediator` for domain events. Structural subsets are enforced; semantic SQL and runtime DI remain review-only.
-- Changed `*Handler.cs` → matching `*HandlerTests.cs`. The diff ratchet enforces changed Application handlers; untouched legacy files are not swept.
-- Behavior/spec/status changes → update the owning docs in the same PR. Pure refactor, style, dependency, and test-only changes do not need a token docs edit.
-- Frontend screen → source/preview row in the owning use-case `## Design Sources` table when the screen changes.
-- Use-case diagram → Mermaid in that use-case README; link other use cases in `**Related:**` prose, not in `## Diagrams` table.
-- No test `Skip = ...`, weakened tests, or completed layer status when ACs are open. New test skips are enforced; weakened assertions/status honesty remain review-only.
-- **Full suite honesty:** local `python scripts/axis.py verify` uses the ready-PR Verification gate command matrix; CI/branch protection runs full `python scripts/axis.py dotnet test`. If you claim the full suite ran locally, it must be full `Axis.sln` with integration/API tests, not a solution filter or unit-only run.
-
----
-
-## Domain layout discovery
-
-**Full rules + agent checklists:** [repo-layout-discovery.md](./repo-layout-discovery.md) (auto vs manual tables, commands, checklists A–E).
-
-**Summary:** [`doc_drift_domains.py`](../../scripts/doc_drift_domains.py) validates that module folders and endpoint groups map to existing `docs/use-cases/{slug}/` domains. It does not require a token docs edit for every module-code change; behavior/spec/status doc accuracy is Docs review.
-
----
-
-## Playbooks (open when needed)
-
-| Need | File |
-|------|------|
-| Layer order, TDD, gap sweep, deferred docs, PR wrap-up | [process.md](./process.md) |
-| New module / event / proto / domain README — what to update & how CI checks | [repo-layout-discovery.md](./repo-layout-discovery.md) |
-| Find the right patterns section | [patterns-index.md](./patterns-index.md) |
-| EF, API, Wolverine, workspace isolation | [patterns-index.md](./patterns-index.md) routes to the focused owner doc |
-| React, Query, a11y | [frontend.md](./frontend.md) |
-| Tests, Testcontainers | [testing.md](./testing.md) |
-| Wireframe kit | [wireframes.md](./wireframes.md) · **Agent contract:** [wireframes/README § Agent contract](../wireframes/README.md#agent-contract) |
+Design Gate: [design-gate.md](./design-gate.md). Layout discovery: [repo-layout-discovery.md](./repo-layout-discovery.md). Pattern owner: [patterns-index.md](./patterns-index.md). Scripts: [scripts.md](./scripts.md). Docs shape: [docs-style.md](./docs-style.md).

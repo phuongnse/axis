@@ -41,9 +41,8 @@ Change an Axis API surface without drifting from module boundaries, auth default
    - If only a frontend caller changes and the server contract does not, state that generation was not triggered.
 
 6. Verify.
-   - API contract: affected `tests/Api/Axis.Api.Tests/` tests.
-   - Generated parity: `python scripts/axis.py check frontend-api-contracts` when available in the local command set.
-   - Frontend consumers: `python scripts/axis.py frontend ci` and `python scripts/axis.py frontend test`.
+   - Run affected API tests and generated-contract parity when the contract changes: wire shape, auth, validation, status code, or response body.
+   - For frontend consumers, run the smallest frontend check that proves the caller still matches the generated type.
    - Ready review: `$axis-ready-review`.
 
 ## Output

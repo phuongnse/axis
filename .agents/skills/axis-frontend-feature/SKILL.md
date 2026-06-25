@@ -44,8 +44,7 @@ Implement an Axis frontend slice with generated API types, user-visible states, 
    - Cover validation, empty/error states, and permission/visibility behavior when in scope.
 
 6. Verify.
-   - Run `python scripts/axis.py frontend ci`.
-   - Run `python scripts/axis.py frontend test`.
+   - During development, run the smallest targeted frontend test that proves changed behavior; use type/lint only for static edits.
    - For visual or layout-sensitive changes, use the browser skill to inspect the route at desktop and mobile sizes when the app is runnable.
    - Ready review: `$axis-ready-review`.
 

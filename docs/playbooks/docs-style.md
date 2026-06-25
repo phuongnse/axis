@@ -1,241 +1,82 @@
-# Docs style
+# Docs Style
 
-> **Navigation**: [← docs/README.md](../README.md) · [← AGENTS.md](../../AGENTS.md)
+> **Navigation**: [<- docs/README.md](../README.md) . [<- AGENTS.md](../../AGENTS.md)
 
-Short anti-pattern checklist for everything under `docs/`. Read once; come back when adding a new file. Some items are CI-enforced, some are review-only guidance; the enforcement status lives in [REVIEW_FINDINGS.md](../REVIEW_FINDINGS.md). Do not call a docs convention a gate unless CI actually blocks it.
-
----
+Docs are scanned, not read. Use `$axis-doc-hygiene` for docs edits. Keep policy short, put workflow in skills, and let scripts enforce deterministic checks.
 
 ## Single owner per topic
 
-Every fact — a version, a file path, a command, a step list — has **one** owner. Every other doc that needs it **links**, never repeats. The current ownership table lives in [`docs/README.md` § Single source of truth](../README.md#single-source-of-truth-per-topic).
+Every fact has one owner: version, path, command, process, table shape, or rule. Other docs link to the owner.
 
-When you find yourself editing the same fact in two files, the architecture is wrong: collapse to one owner + N pointers.
+## Prose style
 
----
+- Lead with the rule.
+- Keep the reason to one clause.
+- Prefer tables for matrices.
+- Classify by responsibility, not by listing current files.
+- Prefer high-level strict rules over low-level detail inventories.
+- Delete sentences that do not carry a rule, fact, or decision.
+- Use examples only when they generalize.
 
-## Prose style (write tight)
+## Anti-patterns
 
-Reference and practice docs are **scanned, not read**. Optimize for a reader who needs the rule in seconds. Concise, not thin: keep every load-bearing fact, cut everything else.
-
-- **Lead with the rule; one clause of why.** Imperative voice (`Run X`, not `You should run X`). Drop filler (`in order to`, `it should be noted`, `as mentioned`).
-- **Tables / lists** for rule sets and matrices, not paragraphs.
-- **No duplication** — link the owner (§ Single owner), don't re-explain.
-- **Test:** can a sentence be cut without losing a fact or a rule? Then cut it.
-
-**Code & examples in docs — keep generic:**
-
-- Show the **shape**, not a copy of one call site: placeholders (`{Module}`, `Foo`, `…`) over real names/fields from one feature.
-- Snippets illustrate a pattern; **code is the source of truth**. Trim to the lines that carry the point.
-- A concrete instance appears only as a labeled example (`e.g.`), never as the rule itself — see § Keep practice docs general.
-
----
-
-## Anti-patterns (don't ship these)
-
-| Anti-pattern | Why it rots | Do instead |
-|---|---|---|
-| **Speculation in reference docs** ("Not yet implemented", "planned design", "Will be wired") | Reads as reference, is actually guesswork; the real design will diverge | Put forward-looking content in `docs/PROGRESS.md` (current status) or a domain use-case file (spec). Enforced for `docs/ARCHITECTURE.md` by the drift script. |
-| **Dead-end docs without navigation** | Readers cannot climb back to the owning index; agents miss related guidance | Every `docs/**/*.md` file starts with an H1 followed by `> **Navigation**:` links to the relevant index |
-| **Duplicating versions / paths / commands** across docs | Both copies drift; readers don't know which is canonical | Link to the owner doc (see ownership table) |
-| **Duplicating compose ports / service URLs** | Playbooks drift from `docker-compose.yml` | Owner: [local-dev.md](./local-dev.md) + compose file; enforced by `python scripts/axis.py check local-dev-docs` |
-| **Environment-specific command fixes** | A local workaround reads like a project rule and misleads future readers | State the project-owned baseline first: repo root, committed scripts, compose services, CI command. Put execution adapters in [local-dev.md](./local-dev.md), never in feature specs or pattern rules. |
-| **Aspirational metrics** in engineering docs (e.g. "50 customers in 6 months") | Nobody measures or tests against them; they age into embarrassment | Keep in pitch deck / `PRODUCT_VISION.md` if anywhere; do not pollute technical reference |
-| **Empty "TODO: fill later" sections** | Look authoritative, contain nothing, lie to readers | Delete the section. Add it when there's content to add. |
-| **Accidental encoding rewrites** | Review diffs become unreadable; non-UTF-8 tool output can turn Unicode into mojibake | Tracked text files must be UTF-8 without BOM and LF line endings. `python scripts/axis.py check text-encoding` enforces this and still allows real Unicode such as Vietnamese, arrows, and status icons. |
-| **"Process about process"** docs > 100 lines | Nobody reads them; the rules don't get followed | If deterministic, embed the rule into a tested gate or template. If not, keep it short and label it review-only guidance. |
-| **New file for content that fits in an existing file** | Doc graph fragments; agents have to read more files to get less | Absorb into the closest existing file. New file only when topic is genuinely separate **and** ≥ ~50 lines worth. |
-| **Incident / lesson detail baked into a general rule** | Reads as universal guidance but only fits the one case it came from; ages into noise and is hard to apply elsewhere | State the **general principle** in the playbook; keep the instance specifics in the use-case file / `PROGRESS.md` / PR retro. See § Keep practice docs general. |
-
----
+| Avoid | Use instead |
+|---|---|
+| Long workflow prose | A repo skill |
+| Duplicate commands or versions | Link to the owner |
+| Inventory of current files/tools | Responsibility taxonomy |
+| Placeholder sections | Delete until real |
+| Incident detail in rules | Use-case, `PROGRESS.md`, or PR retro |
+| Review-only guidance called a gate | [REVIEW_FINDINGS.md](../REVIEW_FINDINGS.md) terms |
 
 ## Size budgets
 
-| File class | Budget | Action when exceeded |
-|---|---|---|
-| Reference docs (`AGENTS.md`, `ARCHITECTURE.md`, playbooks) | 300 lines | Split by topic, extract a sub-playbook, or move detail into an index + section pattern |
-| Pattern router docs (`patterns.md`, `patterns-index.md`) | 150 lines | Keep them as navigation only; implementation rules live in focused owner playbooks |
-| Domain README | 200 lines | Move detail into per-use-case files |
-| Use-case file | no hard cap | Already scoped by AC list |
-
-Do not add broad implementation guidance to `patterns.md`; pick the focused owner doc from [`patterns-index.md`](./patterns-index.md).
-
----
-
-## Keep practice docs general
-
-Practice / reference docs (playbooks, `AGENTS.md`, `ARCHITECTURE.md`) state the **general principle**. A concrete instance appears only as a clearly-labeled, linked **example** (`e.g.`, `Canonical example:`, `Reference screen:`) — never as the rule itself.
-
-When you learn something from a specific incident:
-
-| Goes in the playbook | Goes elsewhere |
-|---|---|
-| The general rule, phrased so it applies to any future case | The incident specifics — which feature, which fields, which error code |
-| (optional) one labeled example link | Detail lives in the use-case file, `PROGRESS.md`, or the PR retrospective |
-
-**Test:** read the rule as if you'd never seen the originating feature. If it only makes sense with that one use case in mind, generalize it and move the specifics out. (This is what [agent-checklist Retrospective review](./agent-checklist.md) means by "Incident-level detail in rule text? → No".)
-
-Enforced by the incident/lesson-framing guard in `python scripts/axis.py check doc-drift`, which flags lesson-style callouts (a bold *Lesson* heading, or a rule tagged with one specific feature in parentheses) in practice docs. The guard is deliberately narrow — it catches the recurring callout class, not every over-fit; the rest is on review and this section.
-
----
+`AGENTS.md`, `docs/ARCHITECTURE.md`, playbooks, and pattern routers stay under 100 lines. Move workflow into skills before adding prose.
 
 ## Use-case files — design sources & implementation status
 
-Every `docs/use-cases/<domain>/<short-slug>/README.md` file uses these layouts so agents can scan status without parsing inline pipes.
+Use-case READMEs own product behavior and ACs. Keep this shape: purpose/actor/trigger, flows, ACs, Acceptance Test Matrix when touched, optional Screen flow/Design Sources/Diagrams, implementation status.
 
-**Canonical example (multi-screen + diagrams):** [platform-foundation/register-workspace/README.md](../use-cases/platform-foundation/register-workspace/README.md). Copy that structure when refreshing older use cases.
+Use `$axis-use-case-spec` for spec shape, `$axis-use-case-implementation` for status, and `$axis-visual-artifact` for visual artifacts.
 
-**Low-fidelity practice (generic):** [wireframes.md § Multi-screen journey pattern](./wireframes.md#multi-screen-journey-pattern) — happy path vs `*-states`, diagrams, generator habits; register-workspace is the concrete reference.
-
-### Section order (after AC, before implementation status)
-
-```text
-## Screen flow      ← when rules below apply
 ## Design Sources
-## Diagrams
-> **Implementation status**
-```
-
-### When to add `## Screen flow`
-
-Add **`## Screen flow`** when **any** of these is true:
-
-- More than **three** design-source screens in the use-case folder (including `*-states` / error variants), or
-- The happy path has **branches** (e.g. SSO vs email/password), or
-- Error screens are easy to confuse with sequential steps.
-
-Skip `## Screen flow` when there are **zero or one** local screen design sources (a single `## Design Sources` table row is enough).
-
-### `## Screen flow` (content rules)
-
-1. One sentence: row order in `## Design Sources` matches this section.
-2. **Happy path** table: `| Step | Screen | When |` — use `1`, `2a`, `2b`, `3` for branches; screen slug in backticks. If a branch reuses the same UI (e.g. 2b submit on step 1’s screen), say so in **Screen** — it does not get a second design-source row; merge step ids in the `#` column (e.g. `1 · 2b`) and label the edge in mermaid.
-3. **Error / reference** table (separate): screens that are **not** sequential steps — when to open each (validation, 5xx, provider errors).
-4. Optional **mermaid** `flowchart` — solid edges = happy path, dotted = error/reference (keep labels = screen slugs).
-
-Do **not** duplicate design-source or preview links here; links live only in `## Design Sources`.
-
-### Design Sources (content rules)
-
-- Design sources are editable artifacts linked from `## Design Sources`; workflow rules live in [design-source.md](./design-source.md).
-- Committed previews live **flat** in the use-case folder when they exist.
-- Reference **shared kit** screens from the shared design source or `../../../wireframes/` legacy assets (e.g. `app-shell`) — do not copy files into the use-case folder.
-- One table per README — no blockquote design-source stacks.
-- Opening line (when `## Screen flow` exists): state how many screens, that order matches Screen flow, and that **sequence/architecture** drawings are under `## Diagrams`.
-- **Inventory:** every documented **UI screen** for this use case must have a row. Include error/reference variants (`*-states`). Use `N/A` only when the use case truly has no design source or preview yet.
-- **Columns:** minimum `| Screen | Source | Preview |`. When `## Screen flow` exists, use `| # | Screen | Role | Source | Preview |` — `#` matches flow steps (`1`, `2a`, `—` for non-step error screens); `Role` = short happy-path / error label. The `Source` cell may link to an editable design source or a legacy `.excalidraw` file, but the column name stays generic.
-- **Row order:** happy-path screens first (same order as Screen flow), then error/reference screens (same order as the error table in Screen flow).
-- **Do not** list diagrams here (e.g. `*-flow`, `workspace-provisioning`, entity models) — those are not UI screens; sequence/architecture diagrams belong under `## Diagrams` as Mermaid, not in this table.
-
-Minimal table (few screens, no Screen flow):
 
 ```markdown
 ## Design Sources
 
 | Screen | Source | Preview |
-|--------|--------|---------|
+|---|---|---|
 | login | [source](https://design.example/source-frame) | [preview](./login.svg) |
 ```
 
-Full table (see [register-workspace](../use-cases/platform-foundation/register-workspace/README.md#design-sources)):
-
-```markdown
-## Design Sources
-
-All UI assets in this folder (N screens). Row order matches [Screen flow](#screen-flow) above.
-Sequence/architecture drawings are under [Diagrams](#diagrams).
-
-| # | Screen | Role | Source | Preview |
-|---|--------|------|--------|---------|
-| 1 | … | Happy path — … | [source](https://design.example/source-frame) | [preview](./….svg) |
-| — | …-states | Error — … | [source](https://design.example/source-states-frame) | [preview](./….svg) |
-```
+Rules: Source links are editable artifacts; non-`N/A` previews need an editable source in the same row; Mermaid owns local use-case diagrams.
 
 ### Diagrams (content rules)
 
-- **Mermaid only** in this README (`sequenceDiagram`, `flowchart`, `erDiagram`, …) — one `### <diagram-slug>` section per diagram. First line inside each fence: `MERMAID_INIT` from [`mermaid_theme.py`](../diagrams/mermaid_theme.py) ([playbook](./mermaid.md)). **Do not** add image/source diagram link tables in this section (pre-Mermaid inventory tables are retired).
-- **Standard set (multi-screen user journeys):**
-  - **One** `### <slug>-journey` `sequenceDiagram` — actor happy path from first screen through the use-case outcome (use `rect rgb(22, 35, 58)` phase bands; keep SSO/error branches minimal — details belong in `*-cases`).
-  - **Zero or one** `### <slug>-cases` `sequenceDiagram` — dev/QA map of API responses to `*-states` wireframes. Skip when there are few error screens.
-  - **Do not** add a second happy-path sequence (e.g. avoid both `*-flow` and `*-journey` for the same story).
-- Platform-wide architecture diagrams live in [docs/README.md § Key Diagrams](../README.md#key-diagrams), not duplicated here.
-- **Related use cases:** prefer **one use-case folder** for a single actor journey (e.g. register → verify → provisioning wait). Add extra `###` diagram sections (`workspace-provisioning`, …) instead of a second README. Link out only when the story is truly a different actor/domain. Do not paste another use case’s Mermaid in a separate folder if it is the same journey.
-- After diagrams, optional **APIs** or **Related** line — anchors within the same README (`#workspace-provisioning`), not duplicate folders.
-- Omit `## Diagrams` when this use case has no local diagram.
+Use Mermaid for local use-case diagrams. Put workflow, sequence, entity, and cross-module diagrams under `## Diagrams` in the owning use-case README.
 
-### Adopting this layout on existing use cases
-
-When touching an older use case that only has a flat design sources table:
-
-1. Count documented UI/state screens for the use case. Legacy `*.excalidraw` files count only when they are UI wireframes; sequence/entity content belongs in `## Diagrams` as Mermaid, not as image/source files.
-2. Add or refresh `## Screen flow` if the when-to-add rules apply.
-3. Expand `## Design Sources` so **every screen** has a row; add `#` / `Role` if helpful.
-4. Move cross-use-case diagram references into `**Related:**` prose (link to the other README’s `###` anchor).
-5. Refresh committed previews when a design source changed; regenerate `.svg` if legacy **wireframe** `.excalidraw` changed; run [`visual-artifact-checklist.md`](./visual-artifact-checklist.md). Preview Mermaid after diagram edits.
-
-No need to bulk-edit all use cases in one PR — update the use case you are already changing, and align siblings in the same domain when obvious.
-
-### Implementation status (after each US AC block)
+## Implementation status (after each US AC block)
 
 ```markdown
 > **Implementation status**
 >
 > | Layer | Status |
-> |-------|--------|
+> |---|---|
 > | Domain | ✅ |
 > | Application | ✅ |
 > | Infrastructure | ✅ |
 > | API | ✅ |
 > | Frontend | ⏳ |
 >
-> **Gaps vs spec:** none for backend on this US.
+> **Gaps vs spec:** N/A.
 >
-> **Done:**
-> - Handler X; endpoint Y.
+> **Deferred follow-ups:** N/A.
 >
-> **Deferred follow-ups:** Frontend-only gap (one line).
->
-> **Decisions:** …
+> **Decisions:** N/A.
 ```
 
-Rules:
+Rules: one row per layer; `⚠️` names exact gaps; deferrals name exact ACs or `N/A`; avoid historical "Done" logs unless needed for current status.
 
-- **One row per layer** — split `Domain + Application` into two rows.
-- **Blank blockquote line** (`>`) between **Gaps vs spec**, **Done**, **Deferred follow-ups**, and **Decisions** — never glue `**Done:**` onto the same line as **Gaps vs spec**.
-- Use a **bullet list** under **Done** (or **Gaps vs spec**) when there are several semicolon-separated backend notes; keep a single sentence on one line when it is short.
-- **`Gaps vs spec`** lists remaining AC bullets; never write `pending API layer` when endpoints already exist — say what is missing (`403 test`, `date filter query param`, etc.).
-- **`API ✅`** on a US means in-scope REST/OpenAPI AC for that story are shipped; Frontend-only gaps do not downgrade API to ⚠️.
+## New doc files
 
-**Bulk validate:** `python scripts/axis.py check use-case-docs` (also run via `python scripts/axis.py check doc-drift`).
-
----
-
-## Use case files (flow-first)
-
-Use case files should be self-contained and user-facing:
-
-1. Purpose / actor / trigger
-2. Main flow
-3. Alternate/error flows
-4. Acceptance criteria
-5. Acceptance test matrix when implementing, closing, or materially refreshing the use case; keep it high-level and put spec citations / test file paths in implementation or verification reports, not in the use-case README
-6. Design Sources table (mapped to this use case)
-7. Diagrams table (mapped to this use case; explicit N/A if not needed yet)
-8. Implementation status callout
-
-Avoid writing engineering process constraints as end-user use cases. Keep those in shared playbooks and gates (for example `frontend.md`, `agent-checklist.md`, `AGENTS.md`).
-
----
-
-## When you add a new `.md` file
-
-1. Add the back-link header (per [`docs/README.md`](../README.md)): `> **Navigation**: [← parent.md](...)` so future readers can climb back up.
-2. If it belongs in the docs hub: add a playbook row, a [Key Diagrams](../README.md#key-diagrams) index link, or a [Design Sources](../README.md#design-sources) domain pointer — **not** a per-screen design-source row (those stay in the owning use-case `## Design Sources` only).
-3. If it owns a topic, add it to the **Single source of truth** table.
-4. If the topic could be enforced mechanically, add a tested rule to `scripts/axis.py` and document it in [REVIEW_FINDINGS.md](../REVIEW_FINDINGS.md). If it cannot be tested without noisy false positives, label it review-only guidance.
-
----
-
-## When you touch any `.md` file
-
-Boy-scout pass: while you're in the file, scan for the anti-patterns above and tighten prose to § Prose style. Stale links and `⏳` / `TODO` lines that have since shipped are the most common rot. The cost of removing one is seconds; the cost of leaving it accumulates.
+Create a new doc only for a separate topic large enough to justify another file. Every `docs/**/*.md` file starts with an H1 and `> **Navigation**:`.

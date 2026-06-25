@@ -59,11 +59,11 @@ Read only the docs needed for the touched surface:
    - If a screen needs new behavior, switch to the owning use-case workflow before coding it.
 
 6. Verify the exact surface.
-   - Primitive/contract/style change: run `python scripts/axis.py check frontend-style`, `python scripts/axis.py check frontend-component-composition`, `python scripts/axis.py frontend ci`, and `python scripts/axis.py frontend test`.
-   - Product screen verification change: run the affected Playwright screen spec after inspecting the rendered target.
-   - Enforcement/docs change: run `python scripts/axis.py check policy-tests` and `python scripts/axis.py check doc-drift`.
+   - Primitive/contract/style change: run the focused frontend style/composition check plus the smallest frontend test that proves the change.
+   - Product screen verification change: run the affected browser or component spec after inspecting the rendered target.
+   - Enforcement/docs change: run the focused policy/docs check for the touched rule.
    - Skill change: run `python scripts/axis.py check codex-skills` and the skill-creator `quick_validate.py` for the changed skill.
-   - Before review, run `python scripts/axis.py verify`.
+   - Before review, use `$axis-ready-review`.
 
 ## Output
 

@@ -1389,6 +1389,28 @@ class TestDocDriftRatchets(unittest.TestCase):
         issues = axis.doc_drift_added_line_issues([("docs/playbooks/local-dev.md", "cd <repo-root> && python scripts/axis.py local-dev up")])
         self.assertEqual([], issues)
 
+    def stale_reference_text(self, files: dict[str, str]) -> str:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            for relative, content in files.items():
+                path = root / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(content, encoding="utf-8")
+            return "\n".join(axis.stale_reference_issues(root=root))
+
+    def test_rejects_claude_reference_in_entry_guidance(self) -> None:
+        issues = self.stale_reference_text({"AGENTS.md": "canonical rules: CLAUDE.md\n"})
+
+        self.assertIn("AGENTS.md is the agent contract", issues)
+
+    def test_rejects_claude_reference_in_skill_guidance(self) -> None:
+        issues = self.stale_reference_text({".agents/skills/example/SKILL.md": "Read CLAUDE.md first.\n"})
+
+        self.assertIn("AGENTS.md is the agent contract", issues)
+
+    def test_current_repository_stale_references_still_pass(self) -> None:
+        self.assertEqual([], axis.stale_reference_issues())
+
     def test_rejects_raw_docker_compose_commands_in_docs(self) -> None:
         issues = self.issue_text([("docs/playbooks/local-dev.md", "docker compose up -d")])
         self.assertIn("Raw Docker Compose command introduced in docs", issues)
@@ -2896,17 +2918,17 @@ class TestDocSizeBudgetGate(unittest.TestCase):
 
     def test_rejects_overlong_pattern_router(self) -> None:
         issues = self.issues_for_files(
-            {"docs/playbooks/patterns.md": "\n".join("line" for _ in range(151))}
+            {"docs/playbooks/patterns.md": "\n".join("line" for _ in range(101))}
         )
 
-        self.assertIn("150-line docs budget", "\n".join(issues))
+        self.assertIn("100-line docs budget", "\n".join(issues))
 
     def test_rejects_overlong_playbook(self) -> None:
         issues = self.issues_for_files(
-            {"docs/playbooks/api-patterns.md": "\n".join("line" for _ in range(301))}
+            {"docs/playbooks/api-patterns.md": "\n".join("line" for _ in range(101))}
         )
 
-        self.assertIn("300-line docs budget", "\n".join(issues))
+        self.assertIn("100-line docs budget", "\n".join(issues))
 
     def test_current_repository_doc_size_budgets_still_pass(self) -> None:
         self.assertEqual([], axis.doc_size_budget_issues())

@@ -320,7 +320,6 @@ TEXT_ENCODING_SUFFIXES = {
     ".yml",
 }
 TEXT_ENCODING_FILENAMES = {
-    ".coderabbit.yaml",
     ".editorconfig",
     ".gitattributes",
     ".gitignore",
@@ -1228,8 +1227,8 @@ def check_doc_navigation(_args: argparse.Namespace | None = None) -> int:
     return 0
 
 
-PLAYBOOK_DEFAULT_MAX_LINES = 300
-PATTERN_ROUTER_MAX_LINES = 150
+PLAYBOOK_DEFAULT_MAX_LINES = 100
+PATTERN_ROUTER_MAX_LINES = 100
 DOC_SIZE_BUDGETS = {
     "docs/playbooks/patterns.md": PATTERN_ROUTER_MAX_LINES,
     "docs/playbooks/patterns-index.md": PATTERN_ROUTER_MAX_LINES,
@@ -1402,7 +1401,7 @@ def check_scripts_standard(_args: argparse.Namespace | None = None) -> int:
 
 SKILL_NAME_RE = re.compile(r"^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$")
 FRONTMATTER_RE = re.compile(r"\A---\n(?P<header>.*?)\n---\n", re.DOTALL)
-SKILL_MAX_LINES = 120
+SKILL_MAX_LINES = 100
 SKILL_AMBIGUOUS_WORD_RE = re.compile(
     r"\b(best[- ]effort|if you have time|nice to have|maybe|probably|hopefully)\b",
     re.IGNORECASE,
@@ -1839,6 +1838,37 @@ def doc_drift_added_line_issues(rows: Iterable[tuple[str, str]]) -> list[str]:
         for pattern, include, message in DOC_DRIFT_ADDED_LINE_RULES:
             if include(path) and re.search(pattern, line):
                 issues.append(f"{message}: {path}: {line}")
+    return issues
+
+
+STALE_REFERENCE_RULES = (
+    (
+        re.compile(r"feature file|see gaps below|^> \*\*Wireframe\*\*:|docs/epics/|_template-feature-us|\| Diagram \| Source \| Preview \|"),
+        "Epic->Use-case migration - see docs/use-cases/README.md",
+    ),
+    (re.compile(r"\bCLAUDE[.]md\b"), "AGENTS.md is the agent contract; update repo review/agent guidance"),
+)
+
+
+def stale_reference_files(root: Path) -> list[Path]:
+    files = list((root / "docs").rglob("*.md")) + list((root / ".github").rglob("*.md"))
+    files.extend(root / name for name in ("AGENTS.md", "CONTRIBUTING.md", "README.md"))
+    skills_root = root / ".agents" / "skills"
+    if skills_root.is_dir():
+        files.extend(skills_root.glob("*/SKILL.md"))
+    return files
+
+
+def stale_reference_issues(*, root: Path | None = None) -> list[str]:
+    root = root or ROOT
+    issues: list[str] = []
+    for path in stale_reference_files(root):
+        if not path.is_file():
+            continue
+        for idx, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+            for pattern, message in STALE_REFERENCE_RULES:
+                if pattern.search(line):
+                    issues.append(f"Stale reference in {rel_from(path, root)}: {idx}:{line} ({message})")
     return issues
 
 
@@ -2293,15 +2323,8 @@ def check_doc_drift(_args: argparse.Namespace | None = None) -> int:
             if spec_rx.search(line):
                 fail(issues, f"Speculation in reference doc - move to docs/PROGRESS.md or a use-case file: {rel(spec_target)}:{idx}:{line}")
 
-    stale_rx = re.compile(r"feature file|see gaps below|^> \*\*Wireframe\*\*:|docs/epics/|_template-feature-us|\| Diagram \| Source \| Preview \|")
-    stale_files = list((ROOT / "docs").rglob("*.md")) + list((ROOT / ".github").rglob("*.md"))
-    stale_files.extend(ROOT / name for name in ("AGENTS.md", "CONTRIBUTING.md", "README.md"))
-    for path in stale_files:
-        if not path.is_file():
-            continue
-        for idx, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
-            if stale_rx.search(line):
-                fail(issues, f"Stale terminology in {rel(path)}: {idx}:{line} (Epic->Use-case migration - see docs/use-cases/README.md)")
+    for issue in stale_reference_issues(root=ROOT):
+        fail(issues, issue)
 
     lesson_rx = re.compile(r"\*\*Lesson|[Ll]esson [(]|[Ll]esson[)]")
     lesson_files = list((ROOT / "docs" / "playbooks").rglob("*.md"))
@@ -2910,6 +2933,9 @@ def pre_push(args: argparse.Namespace) -> int:
         )
         for p in paths
     )
+    docs = not paths or any(re.search(r"^(AGENTS[.]md|README[.]md|docs/|[.]github/PULL_REQUEST_TEMPLATE[.]md)", p) for p in paths)
+    skills = not paths or any(p.startswith(".agents/skills/") for p in paths)
+    scripts_changed = not paths or any(p.startswith("scripts/") for p in paths)
     failed: list[str] = []
 
     def step(name: str, fn: callable[[], int]) -> None:
@@ -2927,15 +2953,22 @@ def pre_push(args: argparse.Namespace) -> int:
             failed.append(name)
 
     print("pre-push: quick gate")
-    print("  Runs cheap policy/doc checks before the network push.")
+    print("  Runs cheap sanity checks before the network push.")
     print("  Run `python scripts/axis.py verify` before marking a PR ready for review.")
 
     if dotnet:
         step(".NET test naming", lambda: check_test_naming())
         step(".NET test project classification", lambda: check_test_project_classification())
 
-    step("policy gate tests", lambda: check_policy_tests())
-    step("doc drift", lambda: check_doc_drift())
+    if docs:
+        step("doc navigation", lambda: check_doc_navigation())
+        step("doc size budgets", lambda: check_doc_size_budgets())
+
+    if skills:
+        step("Codex skills", lambda: check_codex_skills())
+
+    if scripts_changed:
+        step("scripts standard", lambda: check_scripts_standard())
 
     print()
     if not failed:

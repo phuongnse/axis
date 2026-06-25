@@ -57,12 +57,11 @@ Create or tighten the owning use-case spec so implementation can follow spec -> 
    - Use `$axis-frontend-feature` for SPA routes, feature folders, forms, data fetching, or UI behavior.
    - Use `$axis-use-case-implementation` only after the owning spec exists and blocking decisions are resolved.
 
-7. Verify the spec.
-   - Run `python scripts/axis.py check use-case-docs`.
-   - Run `python scripts/axis.py check doc-navigation`.
-   - Run `python scripts/axis.py check markdown-links` when Markdown links or anchors changed.
-   - Run the visual artifact checklist when design-source links, previews, Mermaid diagrams, or legacy visual assets changed.
-   - Run `python scripts/axis.py generate wireframes` only when legacy Excalidraw sources or SVG previews changed.
+7. Verify only what changed.
+   - Use `python scripts/axis.py check use-case-docs` for use-case README shape.
+   - Use `python scripts/axis.py check markdown-links` only when links or anchors changed.
+   - Use `$axis-visual-artifact` when design-source links, previews, Mermaid, or legacy visuals changed.
+   - Leave full ready-review verification to `$axis-ready-review`.
 
 ## Output
 

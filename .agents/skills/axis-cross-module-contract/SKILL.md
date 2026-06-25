@@ -44,10 +44,8 @@ Add or change cross-module communication without introducing in-process coupling
    - Keep MediatR intra-module only.
 
 6. Verify.
-   - Proto: regenerate/check Buf config, then run `buf lint` when available.
-   - Avro/Kafka: run `python scripts/axis.py check kafka-wiring` and `python scripts/axis.py register avro-schemas --dry-run` when triggered.
-   - Layout: run `python scripts/axis.py check buf-modules` when proto layout changes.
-   - Architecture: run architecture tests through `python scripts/axis.py dotnet test` with the scope that covers project references and module boundaries.
+   - Run the transport checks triggered by the changed contract, including schema/codegen compatibility for proto/Buf or Avro/Kafka.
+   - Use the smallest test scope that proves producer/consumer compatibility while developing.
    - Ready review: `$axis-ready-review`.
 
 ## Output

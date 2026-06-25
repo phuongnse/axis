@@ -59,10 +59,9 @@ Keep Axis visual docs linked, source-first, regenerated where needed, and visual
    - Run doc link/navigation checks when Markdown references change.
 
 8. Verify.
-   - Docs/scripts/policy changes: `python scripts/axis.py check policy-tests`.
-   - Docs drift: `python scripts/axis.py check doc-drift`.
+   - Use the narrow visual/docs check that matches the edit.
    - Markdown links: `python scripts/axis.py check markdown-links` when links or anchors changed.
-   - Ready review: `$axis-ready-review`.
+   - Use `$axis-ready-review` before review; it owns full ready-review verification.
 
 ## Output
 
