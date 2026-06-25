@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils';
 function Field({ className, ...props }: React.ComponentProps<'div'>) {
   return (
     <div
+      {...props}
       role="group"
       data-slot="field"
       data-orientation="vertical"
@@ -12,7 +13,6 @@ function Field({ className, ...props }: React.ComponentProps<'div'>) {
         'group/field flex w-full flex-col gap-2 data-[invalid=true]:text-destructive *:w-full [&>.sr-only]:w-auto',
         className,
       )}
-      {...props}
     />
   );
 }

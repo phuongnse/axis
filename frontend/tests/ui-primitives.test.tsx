@@ -38,7 +38,7 @@ describe('Alert', () => {
 });
 
 describe('Card', () => {
-  it('keeps structured card content in reading order', () => {
+  it('renders caller-owned card content', () => {
     render(<Card>All checks are current.</Card>);
 
     expect(screen.getByText('All checks are current.')).toBeInTheDocument();
