@@ -27,6 +27,7 @@ Every fact has one owner: version, path, command, process, table shape, or rule.
 | Inventory of current files/tools | Responsibility taxonomy |
 | Placeholder sections | Delete until real |
 | Incident detail in rules | Use-case, `PROGRESS.md`, or PR retro |
+| Symptom-to-remedy guidance | Decision criteria and owner boundary |
 | Review-only guidance called a gate | [REVIEW_FINDINGS.md](../REVIEW_FINDINGS.md) terms |
 
 ## Size budgets

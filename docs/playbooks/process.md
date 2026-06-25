@@ -28,7 +28,7 @@ Keep TDD practical: write the proving test before behavior changes when the targ
 
 ### Gap sweep before API
 
-Before API work, search use-case status for partial Domain, Application, or Infrastructure layers. Fix stale status, document exact deferrals, or stop and implement the lower layer first.
+Before API work, search use-case status for partial Domain, Application, or Infrastructure layers. Correct stale status, document exact deferrals, or stop and implement the lower layer first.
 
 ### Host wiring
 

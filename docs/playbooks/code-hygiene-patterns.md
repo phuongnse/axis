@@ -16,7 +16,7 @@ Do not change code shape just to dodge an import.
 
 ### 3. Verify `!` is actually needed before adding it
 
-Search existing call sites and fix the nullability cause when possible.
+Search existing call sites and correct the nullability cause when possible.
 
 ### 4. No scaffold placeholder files
 
@@ -28,7 +28,7 @@ Validate and normalize user-provided names before using them in schema/table/top
 
 ### 6. No direct commits to `main`
 
-Use feature branches. Review fixes stay on the PR branch.
+Use feature branches. Review follow-ups stay on the PR branch.
 
 ## Drift script regex constraints
 

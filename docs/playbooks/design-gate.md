@@ -12,7 +12,7 @@ For repeatable execution, use `$axis-design-gate`.
 
 | Tier | Examples | Required |
 |------|----------|----------|
-| **Trivial** | typo, comment, single-line fix, doc-only | No dossier. Still run the triggered check. |
+| **Trivial** | typo, comment, single-line correction, doc-only | No dossier. Still run the triggered check. |
 | **Standard** | intra-module logic, new test, additive UI on an existing API, refactor with no contract change | Short dossier. No sign-off needed. |
 | **High-risk** | new/changed endpoint, contract/required field, migration/schema, auth, new library, public API surface | Full dossier + user sign-off before code. |
 
