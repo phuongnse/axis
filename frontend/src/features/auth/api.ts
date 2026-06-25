@@ -136,7 +136,6 @@ export async function verifyEmail(token: string): Promise<VerifyEmailResponse> {
   return request;
 }
 
-/** After verify-email establishes a short-lived cookie, run PKCE so the SPA receives tokens. */
 export async function completePostVerifyPkceFlow(): Promise<void> {
   const pkce = createPkceSession();
   const authorizeUrl = await buildAuthorizeUrl(pkce.state, pkce.verifier);

@@ -14,8 +14,6 @@ public class RegisterUserHandlerTests
 {
     private readonly IUserRepository _userRepo = Substitute.For<IUserRepository>();
     private readonly IWorkspaceRepository _workspaceRepo = Substitute.For<IWorkspaceRepository>();
-    private readonly IWorkspaceMembershipRepository _membershipRepo =
-        Substitute.For<IWorkspaceMembershipRepository>();
     private readonly IRegistrationIdempotencyRepository _idempotencyRepo =
         Substitute.For<IRegistrationIdempotencyRepository>();
     private readonly IEmailVerificationTokenStore _verificationTokenStore =
@@ -35,7 +33,6 @@ public class RegisterUserHandlerTests
         new(
             _userRepo,
             _workspaceRepo,
-            _membershipRepo,
             _idempotencyRepo,
             _verificationTokenStore,
             _slugGenerator,
@@ -54,7 +51,7 @@ public class RegisterUserHandlerTests
         IdempotencyKey: "idem-1");
 
     [Fact]
-    public async Task RegisterUser_WhenCommandIsValid_CreatesUserWorkspaceMembershipAndVerificationEmail()
+    public async Task RegisterUser_WhenCommandIsValid_CreatesUserPersonalWorkspaceAndVerificationEmail()
     {
         _userRepo.EmailExistsPlatformWideAsync(Arg.Any<Email>(), Arg.Any<CancellationToken>())
             .Returns(false);
@@ -78,9 +75,6 @@ public class RegisterUserHandlerTests
                 && w.OwnerUserId.HasValue
                 && w.OwnerEmail.Value == "alice@example.com"
                 && w.Status == WorkspaceStatus.PendingVerification),
-            Arg.Any<CancellationToken>());
-        await _membershipRepo.Received(1).AddAsync(
-            Arg.Is<WorkspaceMembership>(m => m.UserId != Guid.Empty && m.workspaceId != Guid.Empty),
             Arg.Any<CancellationToken>());
         await _verificationTokenStore.Received(1).CreateAsync(
             Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>());

@@ -28,10 +28,6 @@ SERVICE_BLOCK = re.compile(
 PORT_MAPPING = re.compile(r'^\s+-\s+"(?:127[.]0[.]0[.]1:)?(\d+):\d+"', re.MULTILINE)
 PROFILE_LINE = re.compile(r'^\s+profiles:\s*\[(.+)\]', re.MULTILINE)
 
-STALE_MARKERS = [
-    ("EnsureCreated", "Identity bootstrap uses MigrateAsync — remove EnsureCreated references"),
-]
-
 def parse_compose() -> tuple[dict[str, list[int]], set[str], list[str]]:
     text = COMPOSE_FILE.read_text(encoding="utf-8")
     services: dict[str, list[int]] = {}
@@ -103,12 +99,8 @@ def check_local_dev_doc() -> list[str]:
     if "observability" not in doc_lower:
         errors.append("local-dev.md missing observability profile documentation")
 
-    for stale, message in STALE_MARKERS:
-        if stale in doc:
-            errors.append(f"local-dev.md stale content: {message}")
-
     if "MigrateAsync" not in doc:
-        errors.append("local-dev.md should document Identity MigrateAsync dev bootstrap")
+        errors.append("local-dev.md should document Identity MigrateAsync database startup")
 
     if TECH_STACK_FILE.is_file():
         tech_stack_text = TECH_STACK_FILE.read_text(encoding="utf-8")

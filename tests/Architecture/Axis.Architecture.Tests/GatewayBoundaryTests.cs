@@ -5,9 +5,7 @@ using NetArchTest.Rules;
 namespace Axis.Architecture.Tests;
 
 /// <summary>
-/// Enforces AGENTS.md P0 at the REST gateway: <c>Axis.Api</c> must not take
-/// in-process dependencies on another module's Application layer repositories
-/// or services. Endpoints delegate through <c>ISender</c>.
+/// Enforces the REST gateway boundary: endpoints delegate cross-module work through <c>ISender</c>.
 /// </summary>
 public class GatewayBoundaryTests
 {

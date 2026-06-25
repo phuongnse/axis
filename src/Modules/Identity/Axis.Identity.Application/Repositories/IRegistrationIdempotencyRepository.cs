@@ -1,6 +1,6 @@
 namespace Axis.Identity.Application.Repositories;
 
-/// <summary>caller-supplied idempotency key for registration deduplication.</summary>
+/// <summary>Persists caller-supplied registration idempotency keys.</summary>
 public interface IRegistrationIdempotencyRepository
 {
     Task<RegistrationIdempotencyAcquireResult> AcquireAsync(

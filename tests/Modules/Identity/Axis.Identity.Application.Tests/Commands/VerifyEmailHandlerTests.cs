@@ -13,7 +13,6 @@ public class VerifyEmailHandlerTests
 {
     private readonly IEmailVerificationTokenStore _tokenStore = Substitute.For<IEmailVerificationTokenStore>();
     private readonly IUserRepository _userRepo = Substitute.For<IUserRepository>();
-    private readonly IWorkspaceMembershipRepository _membershipRepo = Substitute.For<IWorkspaceMembershipRepository>();
     private readonly IWorkspaceRepository _workspaceRepo = Substitute.For<IWorkspaceRepository>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
 
@@ -21,11 +20,10 @@ public class VerifyEmailHandlerTests
         new(
             _tokenStore,
             _userRepo,
-            _membershipRepo,
             _workspaceRepo,
             _uow);
 
-    private static (User User, Workspace Workspace, WorkspaceMembership Membership) MakeUnverifiedUserWithWorkspace()
+    private static (User User, Workspace Workspace) MakeUnverifiedUserWithWorkspace()
     {
         Email email = Email.Create("alice@acme.com").Value;
         User user = User.Create("Alice", "Smith", email);
@@ -35,22 +33,20 @@ public class VerifyEmailHandlerTests
             WorkspaceSlug.Create("alice-smith").Value,
             email,
             user.Id);
-        WorkspaceMembership membership = WorkspaceMembership.Create(user.Id, workspace.Id);
-        return (user, workspace, membership);
+        return (user, workspace);
     }
 
     [Fact]
     public async Task VerifyEmail_WhenTokenIsValid_VerifiesUserActivatesWorkspaceAndRoutesToDashboard()
     {
-        (User user, Workspace workspace, WorkspaceMembership membership) = MakeUnverifiedUserWithWorkspace();
+        (User user, Workspace workspace) = MakeUnverifiedUserWithWorkspace();
         string rawToken = "valid-raw-token";
         string tokenHash = OpaqueTokenGenerator.Hash(rawToken);
 
         _tokenStore.ResolveForVerificationAsync(tokenHash, Arg.Any<CancellationToken>())
             .Returns(new EmailVerificationTokenResolveResult(EmailVerificationTokenState.Valid, user.Id));
         _userRepo.GetByIdPlatformWideAsync(user.Id, Arg.Any<CancellationToken>()).Returns(user);
-        _membershipRepo.GetByUserIdAsync(user.Id, Arg.Any<CancellationToken>()).Returns([membership]);
-        _workspaceRepo.GetByIdAsync(workspace.Id, Arg.Any<CancellationToken>()).Returns(workspace);
+        _workspaceRepo.GetPersonalByOwnerUserIdAsync(user.Id, Arg.Any<CancellationToken>()).Returns(workspace);
 
         Result<VerifyEmailSuccessDto> result = await CreateHandler().Handle(
             new VerifyEmailCommand(rawToken),

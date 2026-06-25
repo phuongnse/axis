@@ -9,6 +9,12 @@ description: Change Axis REST/OpenAPI contracts safely. Use when adding or modif
 
 Change an Axis API surface without drifting from module boundaries, auth defaults, generated contracts, or frontend type parity.
 
+## Inputs
+
+- API surface being added or changed: route, DTO, status code, generated type, or SPA caller.
+- Owning use-case/spec and Design Gate risk decision.
+- Existing endpoint, handler, DTO, OpenAPI, frontend type, and caller references from `rg`.
+
 ## Workflow
 
 1. Run `$axis-design-gate`.
@@ -16,11 +22,11 @@ Change an Axis API surface without drifting from module boundaries, auth default
    - Stop for user sign-off before code when the dossier marks the change high-risk.
 
 2. Read the owning rules.
-   - `AGENTS.md`
-   - `docs/playbooks/design-gate.md`
-   - `docs/playbooks/agent-checklist.md`
-   - `docs/playbooks/api-patterns.md`
-   - `docs/playbooks/frontend.md` when the SPA consumes the contract
+   - [AGENTS.md](../../../AGENTS.md)
+   - [docs/playbooks/design-gate.md](../../../docs/playbooks/design-gate.md)
+   - [docs/playbooks/agent-checklist.md](../../../docs/playbooks/agent-checklist.md)
+   - [docs/playbooks/api-patterns.md](../../../docs/playbooks/api-patterns.md)
+   - [docs/playbooks/frontend.md](../../../docs/playbooks/frontend.md) when the SPA consumes the contract
    - The owning use-case file when behavior or status changes
 
 3. Trace the contract.

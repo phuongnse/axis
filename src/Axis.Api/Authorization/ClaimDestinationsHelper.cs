@@ -22,14 +22,13 @@ public static class ClaimDestinationsHelper
     {
         switch (claim.Type)
         {
-            // sub and jti are always in the access token
+            // Required subject/token identifiers stay in the access token.
             case Claims.Subject:
             case Claims.Private.TokenId:
                 yield return Destinations.AccessToken;
                 yield break;
 
-            // Standard OIDC claims go in the id_token when openid scope is granted,
-            // and also in the access token so resource servers can read them
+            // OIDC claims enter the id_token only when the matching scope is granted.
             case Claims.Email:
             case "email_verified":
                 yield return Destinations.AccessToken;
@@ -45,12 +44,10 @@ public static class ClaimDestinationsHelper
                     yield return Destinations.IdentityToken;
                 yield break;
 
-            // Custom claims for Axis — always access token only
             case "workspace_id":
                 yield return Destinations.AccessToken;
                 yield break;
 
-            // Everything else: access token only
             default:
                 yield return Destinations.AccessToken;
                 yield break;

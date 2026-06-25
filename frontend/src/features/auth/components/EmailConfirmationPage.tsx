@@ -15,11 +15,7 @@ export function EmailConfirmationPage() {
   async function handleResend() {
     if (!context?.email || state === 'sending' || state === 'rate_limited') return;
     reset();
-    try {
-      await resend(context.email);
-    } catch {
-      // Resend state is derived from mutation error.
-    }
+    await resend(context.email).catch(() => undefined);
   }
 
   return (

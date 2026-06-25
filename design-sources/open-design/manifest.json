@@ -3,7 +3,7 @@
   "id": "axis",
   "name": "Axis",
   "category": "Product",
-  "description": "Design-source package for the Axis low-code SaaS platform.",
+  "description": "Design-source package for the Axis workflow-driven business application platform.",
   "source": {
     "type": "bundled",
     "origin": "axis repository"
@@ -11,6 +11,5 @@
   "files": {
     "design": "DESIGN.md",
     "tokens": "tokens.css"
-  },
-  "usage": "USAGE.md"
+  }
 }

@@ -9,6 +9,12 @@ description: Build Axis frontend feature slices safely. Use when changing SPA ro
 
 Implement an Axis frontend slice with generated API types, user-visible states, accessible interactions, and tests that prove behavior.
 
+## Inputs
+
+- Owning use-case, design source, and affected route or feature folder.
+- Generated API type or API contract dependency, if any.
+- Existing components, hooks, tests, and user-visible states found through `rg`.
+
 ## Workflow
 
 1. Classify the surface.
@@ -17,11 +23,10 @@ Implement an Axis frontend slice with generated API types, user-visible states, 
    - Use `$axis-design-gate` for non-trivial frontend behavior.
 
 2. Read the owning rules.
-   - `AGENTS.md`
-   - `docs/playbooks/frontend.md`
-   - `docs/playbooks/design-source.md`
-   - `docs/playbooks/testing.md`
-   - `docs/playbooks/agent-checklist.md`
+   - [AGENTS.md](../../../AGENTS.md)
+   - [docs/playbooks/frontend.md](../../../docs/playbooks/frontend.md)
+   - [docs/playbooks/testing.md](../../../docs/playbooks/testing.md)
+   - [docs/playbooks/agent-checklist.md](../../../docs/playbooks/agent-checklist.md)
    - The owning use-case and design-source docs when behavior or screen shape changes
 
 3. Trace the existing feature.
@@ -45,7 +50,8 @@ Implement an Axis frontend slice with generated API types, user-visible states, 
 
 6. Verify.
    - During development, run the smallest targeted frontend test that proves changed behavior; use type/lint only for static edits.
-   - For visual or layout-sensitive changes, use the browser skill to inspect the route at desktop and mobile sizes when the app is runnable.
+   - For visual or layout-sensitive changes, inspect the route at desktop and mobile sizes with Playwright or an available browser-capable tool when the app is runnable.
+   - For browser-level journey evidence that needs the local stack, use `python scripts/axis.py local-dev e2e`.
    - Ready review: `$axis-ready-review`.
 
 ## Output

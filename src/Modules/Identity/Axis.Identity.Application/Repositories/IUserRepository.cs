@@ -6,7 +6,6 @@ namespace Axis.Identity.Application.Repositories;
 public interface IUserRepository
 {
     Task AddAsync(User user, CancellationToken ct = default);
-    Task<User?> GetByIdAsync(Guid id, Guid workspaceId, CancellationToken ct = default);
 
     /// <summary>Platform-wide email lookup (for registration uniqueness check).</summary>
     Task<bool> EmailExistsPlatformWideAsync(Email email, CancellationToken ct = default);

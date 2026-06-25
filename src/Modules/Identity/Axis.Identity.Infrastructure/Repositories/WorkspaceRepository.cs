@@ -14,6 +14,12 @@ internal sealed class WorkspaceRepository(IdentityDbContext context) : IWorkspac
     public async Task<Workspace?> GetByIdAsync(Guid id, CancellationToken ct = default) =>
         await context.Workspaces.FindAsync([id], ct);
 
+    public async Task<Workspace?> GetPersonalByOwnerUserIdAsync(Guid ownerUserId, CancellationToken ct = default) =>
+        await context.Workspaces
+            .FirstOrDefaultAsync(
+                workspace => workspace.OwnerUserId == ownerUserId && workspace.Type == WorkspaceType.Personal,
+                ct);
+
     public async Task<Workspace?> GetBySlugAsync(WorkspaceSlug slug, CancellationToken ct = default) =>
         await context.Workspaces
             .FirstOrDefaultAsync(o => o.Slug == slug, ct);

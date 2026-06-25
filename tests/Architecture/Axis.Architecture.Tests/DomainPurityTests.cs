@@ -5,18 +5,14 @@ using NetArchTest.Rules;
 namespace Axis.Architecture.Tests;
 
 /// <summary>
-/// Enforces AGENTS.md P0 rule: <c>Domain: zero external dependencies</c>.
+/// Enforces the Domain zero external dependency rule.
 /// Domain projects must contain only entities, value objects, domain events,
-/// and pure C# — no EF Core, MediatR, ASP.NET, MailKit, OpenIddict,
+/// and pure C# - no EF Core, MediatR, ASP.NET, MailKit, OpenIddict,
 /// Redis, Serilog, or any infrastructure namespace.
 /// </summary>
 public class DomainPurityTests
 {
-    /// <summary>
-    /// Infrastructure namespaces that must NEVER appear in any Domain assembly.
-    /// Add new bans here when a new infra concern arrives; never narrow this list
-    /// without updating AGENTS.md.
-    /// </summary>
+    /// <summary>Infrastructure namespaces that must never appear in any Domain assembly.</summary>
     private static readonly string[] BannedNamespaces =
     [
         "Microsoft.EntityFrameworkCore",
@@ -48,7 +44,7 @@ public class DomainPurityTests
             .GetResult();
 
         result.IsSuccessful.Should().BeTrue(
-            $"Axis.{module}.Domain must not depend on infrastructure namespaces (AGENTS.md P0). " +
+            $"Axis.{module}.Domain must not depend on infrastructure namespaces. " +
             $"Offending types: {FormatFailingTypes(result)}");
     }
 
@@ -64,7 +60,7 @@ public class DomainPurityTests
             .GetResult();
 
         result.IsSuccessful.Should().BeTrue(
-            "Axis.Shared.Domain must not depend on infrastructure namespaces (ADR-017 + AGENTS.md P0). " +
+            "Axis.Shared.Domain must not depend on infrastructure namespaces. " +
             $"Offending types: {FormatFailingTypes(result)}");
     }
 

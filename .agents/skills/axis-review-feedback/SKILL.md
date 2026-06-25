@@ -9,6 +9,12 @@ description: Handle Axis PR review feedback safely. Use when addressing local Co
 
 Resolve review feedback by improving the codebase, not merely silencing a thread or making CI green.
 
+## Inputs
+
+- Review comments or tool output, including severity and affected file/line when available.
+- Reviewed checkpoint or branch diff that produced the feedback.
+- User constraints: minimal fix, broader cleanup, or follow-up review expectation.
+
 ## Workflow
 
 1. Gather the feedback.
@@ -23,19 +29,19 @@ Resolve review feedback by improving the codebase, not merely silencing a thread
    - Correctness bug or missing AC.
    - Boundary or architecture concern.
    - Test gap or weakened assertion.
-   - Docs/status/workaround drift.
+   - Docs/status drift.
    - Style, readability, or generated-file issue.
    - False positive, with evidence.
 
 3. Re-read the governing source.
-   - `AGENTS.md`
-   - `docs/playbooks/agent-checklist.md`
-   - The focused playbook for the touched surface, such as `docs/playbooks/api-patterns.md`, `docs/playbooks/frontend.md`, or `docs/playbooks/testing.md`
+   - [AGENTS.md](../../../AGENTS.md)
+   - [docs/playbooks/agent-checklist.md](../../../docs/playbooks/agent-checklist.md)
+   - The focused playbook for the touched surface, such as [docs/playbooks/api-patterns.md](../../../docs/playbooks/api-patterns.md), [docs/playbooks/frontend.md](../../../docs/playbooks/frontend.md), or [docs/playbooks/testing.md](../../../docs/playbooks/testing.md)
    - The owning use-case and tests when behavior is involved
-   - `docs/REVIEW_FINDINGS.md` when the issue looks repeatable
+   - [docs/ENFORCEMENT.md](../../../docs/ENFORCEMENT.md) when the issue looks repeatable
 
 4. Prefer the defensible change.
-   - Look for the existing module pattern before accepting a reviewer-proposed shortcut.
+   - Look for the existing module pattern before accepting a reviewer-proposed simplification.
    - Improve ownership, transaction boundaries, error handling, or test coverage when that is the real issue.
    - Keep tests semantically honest: strengthen assertions or rename tests when the stated behavior and proved behavior drift apart.
    - If the user explicitly asked for the smallest change, keep the diff minimal and say so.

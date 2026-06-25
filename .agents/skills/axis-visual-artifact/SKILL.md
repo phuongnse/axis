@@ -1,6 +1,6 @@
 ---
 name: axis-visual-artifact
-description: Update Axis visual artifacts safely. Use when changing design-source links, previews, Mermaid diagrams, diagram theme configuration, or visual artifacts referenced from use-case docs.
+description: Update Axis visual artifacts safely. Use when changing design-source links, previews, Mermaid diagrams, or visual artifacts referenced from use-case docs.
 ---
 
 # Axis Visual Artifact
@@ -9,25 +9,31 @@ description: Update Axis visual artifacts safely. Use when changing design-sourc
 
 Keep Axis visual docs linked, source-first, regenerated where needed, and visually checked instead of letting design evidence drift from the spec.
 
+## Inputs
+
+- Owning use-case/design row and artifact type: source, preview, Mermaid, or visual index.
+- Editable design source or Markdown diagram source to change.
+- Expected preview/link/check evidence for the touched artifact.
+
 ## Workflow
 
 1. Identify the artifact type.
    - Design source: editable artifact link in a use-case `## Design Sources` row.
    - Preview: committed image/export or `N/A` while no stable preview exists.
-   - Mermaid diagram: Markdown diagram using the shared theme.
+   - Mermaid diagram: Markdown diagram using default Mermaid rendering.
    - Visual index: tables in the owning use-case or domain README.
 
 2. Read the owning rules.
-   - `AGENTS.md`
-   - `docs/playbooks/design-source.md`
-   - `docs/playbooks/visual-artifact-checklist.md`
-   - `docs/playbooks/mermaid.md` when Mermaid changes
+   - [AGENTS.md](../../../AGENTS.md)
+   - [docs/playbooks/docs-style.md](../../../docs/playbooks/docs-style.md)
    - The owning use-case file when a screen or flow changes
 
 3. Edit the source of truth.
    - Edit the editable design source for new/updated screens, not only the committed preview.
    - Edit Mermaid source in Markdown, not rendered output.
+   - Use concise labels that match the flow vocabulary, not implementation names by default.
    - Keep use-case-specific previews under `docs/use-cases/{domain}/{use-case}/`.
+   - Keep shared editable design sources under `design-sources/`.
 
 4. Use design agents conservatively.
    - Start read-only: list sources, inspect layer or file structure, and export the current target before changing it.
@@ -42,14 +48,16 @@ Keep Axis visual docs linked, source-first, regenerated where needed, and visual
    - A `Source` cell links to an editable design source, never to a preview/export image.
    - A `Preview` cell can be `N/A`, but a non-`N/A` preview must have an editable source in the same row.
    - Source links point to editable design artifacts, not local transport URLs.
+   - Check meaning, connectors, labels, spacing, clipping, and source/preview pairing before reporting visual work done.
 
 6. Refresh derived files.
-   - Design sources: export/commit previews only when the use-case `## Design Sources` table has a preview row or review needs a stable snapshot.
-   - Mermaid theme changes: run `python scripts/axis.py docs sync-mermaid-theme`.
+   - Design sources: commit previews only when the same change keeps the owning `## Design Sources` source/preview pairing valid.
+   - Mermaid diagrams stay as plain Markdown source with default rendering.
 
 7. Check links and visual quality.
-   - Run the visual artifact checklist before commit.
    - Verify docs tables point to the right source and preview files.
+   - Preview Mermaid or committed visual assets in GitHub/IDE when practical.
+   - Check that diagram labels, connectors, and handoff boundaries match the owning spec.
    - Run doc link/navigation checks when Markdown references change.
 
 8. Verify.
@@ -59,4 +67,4 @@ Keep Axis visual docs linked, source-first, regenerated where needed, and visual
 
 ## Output
 
-Report design sources edited, previews refreshed or intentionally `N/A`, checklist result, and doc checks.
+Report design sources edited, previews refreshed or intentionally `N/A`, visual-quality result, and doc checks.

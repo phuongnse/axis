@@ -49,7 +49,8 @@ public class ResendVerificationEmailHandlerTests
     [Fact]
     public async Task ResendVerificationEmail_WhenEmailNotFound_DoesNothingWithoutErrorLeakage()
     {
-        // same behavior regardless of whether email exists
+        _rateLimiter.TryRecordResendAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(Result.Success());
         _userRepo.FindByEmailGloballyAsync(Arg.Any<Email>()).ReturnsNull();
 
         Func<Task> act = async () => await CreateHandler().Handle(
@@ -57,6 +58,8 @@ public class ResendVerificationEmailHandlerTests
             CancellationToken.None);
 
         await act.Should().NotThrowAsync();
+        await _rateLimiter.Received(1).TryRecordResendAsync(
+            "unknown@acme.com", Arg.Any<CancellationToken>());
         await _emailSender.DidNotReceive().SendVerificationEmailAsync(
             Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
     }
@@ -66,6 +69,8 @@ public class ResendVerificationEmailHandlerTests
     {
         User user = MakeUnverifiedUser();
         user.VerifyEmail();
+        _rateLimiter.TryRecordResendAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(Result.Success());
         _userRepo.FindByEmailGloballyAsync(Arg.Any<Email>()).Returns(user);
 
         await CreateHandler().Handle(
@@ -74,15 +79,13 @@ public class ResendVerificationEmailHandlerTests
 
         await _emailSender.DidNotReceive().SendVerificationEmailAsync(
             Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
-        await _rateLimiter.DidNotReceive().TryRecordResendAsync(
-            Arg.Any<string>(), Arg.Any<CancellationToken>());
+        await _rateLimiter.Received(1).TryRecordResendAsync(
+            "alice@acme.com", Arg.Any<CancellationToken>());
     }
 
     [Fact]
-    public async Task ResendVerificationEmail_WhenRateLimited_ReturnsRateLimitedWithoutSendingEmail()
+    public async Task ResendVerificationEmail_WhenRateLimited_ReturnsRateLimitedWithoutLookupOrEmail()
     {
-        User user = MakeUnverifiedUser();
-        _userRepo.FindByEmailGloballyAsync(Arg.Any<Email>()).Returns(user);
         _rateLimiter.TryRecordResendAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(Result.Failure(
                 ErrorCodes.RateLimited,
@@ -94,6 +97,8 @@ public class ResendVerificationEmailHandlerTests
 
         result.IsFailure.Should().BeTrue();
         result.ErrorCode.Should().Be(ErrorCodes.RateLimited);
+        await _userRepo.DidNotReceive().FindByEmailGloballyAsync(
+            Arg.Any<Email>(), Arg.Any<CancellationToken>());
         await _emailSender.DidNotReceive().SendVerificationEmailAsync(
             Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
     }

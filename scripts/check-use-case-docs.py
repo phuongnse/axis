@@ -27,25 +27,28 @@ REQUIRED_SECTIONS = (
     "Alternate / error flows",
     "Acceptance Criteria",
     "Acceptance Test Matrix",
+    "Out Of Scope",
+    "Design System",
     "Design Sources",
 )
 IMPLEMENTATION_STATUS_HEADING = "> **Implementation status**"
 IMPLEMENTATION_STATUS_REQUIRED_MARKERS = (
     ("> **Gaps vs spec:**", "gaps vs spec"),
     ("> **Deferred follow-ups:**", "deferred follow-ups"),
+    ("> **Verification:**", "verification"),
     ("> **Decisions:**", "decisions"),
 )
-LEGACY_DEFERRED_INLINE_RE = re.compile(r"\*\*Deferred(?: \([^)]*\))?:\*\*")
-PENDING_STATUS_CODEPOINTS = {0x23F3, 0x26A0}
+IMPLEMENTATION_STATUS_VALUES = {"Done", "Partial", "Not started", "N/A"}
+PENDING_STATUS_VALUES = {"Partial", "Not started"}
 GENERIC_STATUS_PROSE = (
     "Open work remains in layers marked pending above.",
     "Complete the open items listed in Gaps vs spec before marking this use case complete.",
 )
 
-LEGACY_DIAGRAM_TABLE_HEADER = "| Diagram | Source | Preview |"
 AC_ID_RE = re.compile(r"\bAC-\d{3}\b")
-AT_ID_RE = re.compile(r"^[A-Z][A-Z0-9]{1,11}-\d{3}$")
-CHECKBOX_AC_RE = re.compile(r"^\s*-\s+\[[ xX]\]\s+(?P<body>.+)$", re.MULTILINE)
+AT_ID_RE = re.compile(r"^AT-\d{3}$")
+AC_BULLET_RE = re.compile(r"^\s*-\s+(?P<body>.+)$", re.MULTILINE)
+AC_BOLD_ID_PREFIX_RE = re.compile(r"^\*\*(AC-\d{3})\*\*\s+\S")
 H2_RE = re.compile(r"^##\s+(.+?)\s*$", re.MULTILINE)
 IMPLEMENTATION_DETAIL_MATRIX_RE = re.compile(
     r"(?:`?(?:frontend|src|tests|scripts|[.]agents)/[^`|\s]+`?)|"
@@ -85,7 +88,14 @@ DESIGN_SOURCE_REQUIRED_COLUMNS = {"Screen", "Preview"}
 DESIGN_SOURCE_SOURCE_COLUMNS = {"Source"}
 NO_ARTIFACT_VALUES = {"", "-", "—", "n/a", "na", "none"}
 PREVIEW_ASSET_RE = re.compile(r"[.](?:svg|png|jpe?g|gif|webp|avif)(?:[)#?]|$)", re.IGNORECASE)
-USE_CASE_TAIL_SECTION_ORDER = ("Screen flow", "Design Sources", "Diagrams", "Implementation status")
+USE_CASE_TAIL_SECTION_ORDER = (
+    "Out Of Scope",
+    "Design System",
+    "Screen flow",
+    "Design Sources",
+    "Diagrams",
+    "Implementation status",
+)
 
 # Placeholder markers that must be replaced before a use case can be considered
 # written. Listed individually so the validator can point at the missing field.
@@ -227,18 +237,22 @@ def is_editable_design_source(cell: str) -> bool:
     return not is_no_artifact_cell(cell) and not is_preview_asset_reference(cell)
 
 
-def acceptance_criteria_ids(section: str) -> tuple[set[str], list[str], list[str]]:
+def acceptance_criteria_ids(section: str) -> tuple[set[str], list[str], list[str], list[str]]:
     ids: list[str] = []
     missing_id_bullets: list[str] = []
-    for match in CHECKBOX_AC_RE.finditer(section):
+    invalid_format_bullets: list[str] = []
+    for match in AC_BULLET_RE.finditer(section):
         body = match.group("body").strip()
+
         found = AC_ID_RE.search(body)
         if found:
             ids.append(found.group(0))
+            if not AC_BOLD_ID_PREFIX_RE.match(body):
+                invalid_format_bullets.append(body)
         else:
             missing_id_bullets.append(body)
     duplicate_ids = sorted({ac_id for ac_id in ids if ids.count(ac_id) > 1})
-    return set(ids), duplicate_ids, missing_id_bullets
+    return set(ids), duplicate_ids, missing_id_bullets, invalid_format_bullets
 
 
 def implementation_status_callout(text: str) -> str:
@@ -255,10 +269,12 @@ def implementation_status_callout(text: str) -> str:
     return ""
 
 
-def callout_has_pending_layer(callout: str) -> bool:
+def callout_has_pending_layer(table: MarkdownTable | None) -> bool:
+    if table is None:
+        return False
     return any(
-        line.startswith("> |") and any(ord(ch) in PENDING_STATUS_CODEPOINTS for ch in line)
-        for line in callout.splitlines()
+        record_for_row(table, row).get("Status", "") in PENDING_STATUS_VALUES
+        for row in table.rows
     )
 
 
@@ -298,9 +314,6 @@ def iter_use_case_files() -> list[Path]:
 def validate_sections(doc: UseCaseDocument) -> list[str]:
     issues: list[str] = []
     rel = doc.rel
-
-    if re.search(r"^#\s*F\d+\s*[—-]\s*", doc.text, re.MULTILINE):
-        issues.append(f"{rel}: legacy Fxx title found")
 
     duplicates = sorted({heading for heading in doc.h2_headings if doc.h2_headings.count(heading) > 1})
     for heading in duplicates:
@@ -348,8 +361,9 @@ def validate_section_order(doc: UseCaseDocument) -> list[str]:
         if previous_position <= current_position:
             continue
         return [
-            f"{doc.rel}: section order must be `## Screen flow` when present, then "
-            "`## Design Sources`, `## Diagrams` when present, then implementation status "
+            f"{doc.rel}: section order must be `## Out Of Scope`, `## Design System`, "
+            "`## Screen flow` when present, `## Design Sources`, `## Diagrams` when present, "
+            "then implementation status "
             f"(`{current_heading}` appears before `{previous_heading}`)",
         ]
     return []
@@ -359,9 +373,18 @@ def validate_acceptance_contract(doc: UseCaseDocument, *, require_matrix: bool) 
     issues: list[str] = []
     rel = doc.rel
     ac_section = doc.section("Acceptance Criteria")
-    ac_ids, duplicate_ac_ids, missing_id_bullets = acceptance_criteria_ids(ac_section)
+    (
+        ac_ids,
+        duplicate_ac_ids,
+        missing_id_bullets,
+        invalid_format_bullets,
+    ) = acceptance_criteria_ids(ac_section)
     for ac_id in duplicate_ac_ids:
         issues.append(f"{rel}: duplicate acceptance criterion ID `{ac_id}`")
+    for bullet in invalid_format_bullets:
+        issues.append(
+            f"{rel}: Acceptance Criteria bullet must use `- **AC-001** ...` format: {bullet}",
+        )
 
     if "Acceptance Test Matrix" not in doc.sections:
         if require_matrix:
@@ -498,14 +521,19 @@ def validate_design_sources(doc: UseCaseDocument) -> list[str]:
     return issues
 
 
+def validate_design_system(doc: UseCaseDocument) -> list[str]:
+    table = first_markdown_table(doc.section("Design System"))
+    return validate_table_shape(
+        table,
+        rel=doc.rel,
+        label="Design System",
+        exact_columns=["Surface", "Contract"],
+    )
+
+
 def validate_diagrams(doc: UseCaseDocument) -> list[str]:
     issues: list[str] = []
     rel = doc.rel
-    if LEGACY_DIAGRAM_TABLE_HEADER in doc.text:
-        issues.append(
-            f"{rel}: legacy local diagrams table — use Mermaid under ## Diagrams "
-            "(docs-style) or omit ## Diagrams when there is no local diagram",
-        )
     diagrams_section = doc.section("Diagrams")
     if diagrams_section and "```mermaid" not in diagrams_section:
         issues.append(
@@ -518,9 +546,6 @@ def validate_diagrams(doc: UseCaseDocument) -> list[str]:
 def validate_implementation_status(doc: UseCaseDocument, *, strict_status: bool) -> list[str]:
     issues: list[str] = []
     rel = doc.rel
-
-    if LEGACY_DEFERRED_INLINE_RE.search(doc.text):
-        issues.append(f"{rel}: legacy Deferred status heading found - use `Deferred follow-ups`")
 
     callout = implementation_status_callout(doc.text)
     if not callout:
@@ -538,6 +563,14 @@ def validate_implementation_status(doc: UseCaseDocument, *, strict_status: bool)
             exact_columns=IMPLEMENTATION_STATUS_COLUMNS,
         )
     )
+    if status_table is not None:
+        for idx, row in enumerate(status_table.rows, start=1):
+            status = record_for_row(status_table, row).get("Status", "")
+            if status not in IMPLEMENTATION_STATUS_VALUES:
+                issues.append(
+                    f"{rel}: Implementation status row {idx} has invalid Status `{status}`; "
+                    f"use {', '.join(sorted(IMPLEMENTATION_STATUS_VALUES))}",
+                )
 
     if strict_status:
         for marker, label in IMPLEMENTATION_STATUS_REQUIRED_MARKERS:
@@ -549,7 +582,7 @@ def validate_implementation_status(doc: UseCaseDocument, *, strict_status: bool)
                 issues.append(f"{rel}: implementation status {label} section is empty")
             if any(generic in line for generic in GENERIC_STATUS_PROSE for line in content):
                 issues.append(f"{rel}: implementation status {label} uses generic placeholder prose")
-        if callout_has_pending_layer(callout):
+        if callout_has_pending_layer(status_table):
             if any(
                 line in {
                     "> **Gaps vs spec:** none",
@@ -574,6 +607,7 @@ def check_file(
     issues.extend(validate_sections(doc))
     issues.extend(validate_section_order(doc))
     issues.extend(validate_acceptance_contract(doc, require_matrix=require_acceptance_matrix))
+    issues.extend(validate_design_system(doc))
     issues.extend(validate_design_sources(doc))
     issues.extend(validate_diagrams(doc))
     issues.extend(validate_implementation_status(doc, strict_status=strict_status))
@@ -623,7 +657,7 @@ def diff_range_against_base() -> str:
 
 
 def changed_paths_against_base() -> list[Path]:
-    """Return PR-range and working-tree paths for local and CI ratchets."""
+    """Return PR-range and working-tree paths for local and CI checks."""
     range_spec = diff_range_against_base()
 
     paths: list[Path] = []
@@ -657,7 +691,7 @@ def changed_paths_against_base() -> list[Path]:
 
 
 def strip_implementation_status_callouts(text: str) -> str:
-    """Remove status callout blocks so ratchets can distinguish status-only edits."""
+    """Remove status callout blocks so checks can distinguish status-only edits."""
     lines = text.splitlines()
     out: list[str] = []
     idx = 0

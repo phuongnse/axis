@@ -1206,6 +1206,31 @@ def check_frontend_quality(_args: argparse.Namespace | None = None) -> int:
 
 
 NAVIGATION_RE = re.compile(r"^> \*\*Navigation\*\*: .*\[[^\]]+\]\([^)]+\)")
+NAVIGATION_LINK_RE = re.compile(r"\[([^\]]+)\]\(([^)]+)\)")
+NAVIGATION_LABEL_RE = re.compile(r"^(?:[A-Za-z0-9._-]+/)*[A-Za-z0-9._-]+[.]md(?:#[A-Za-z0-9._-]+)?$")
+
+
+def doc_navigation_line_issues(path: Path, line: str) -> list[str]:
+    issues: list[str] = []
+    if any(token in line for token in ("<-", "←", "|")) or " . " in line:
+        issues.append(f"{rel(path)}: navigation uses non-standard separators or arrows")
+
+    links = NAVIGATION_LINK_RE.findall(line)
+    if not links:
+        issues.append(f"{rel(path)}: navigation block must include at least one markdown link")
+        return issues
+
+    expected_separator_count = max(len(links) - 1, 0)
+    if line.count(" · ") != expected_separator_count:
+        issues.append(f"{rel(path)}: navigation links must be separated with ` · `")
+
+    for label, target in links:
+        if not NAVIGATION_LABEL_RE.match(label):
+            issues.append(f"{rel(path)}: navigation link label must be a repo markdown path: `{label}`")
+        if not re.search(r"[.]md(?:#[-A-Za-z0-9_]+)?$", target):
+            issues.append(f"{rel(path)}: navigation target must point to a markdown file: `{target}`")
+
+    return issues
 
 
 def check_doc_navigation(_args: argparse.Namespace | None = None) -> int:
@@ -1222,8 +1247,11 @@ def check_doc_navigation(_args: argparse.Namespace | None = None) -> int:
         if not nav_lines:
             issues.append(f"{rel(path)}: missing `> **Navigation**:` block immediately after the H1")
             continue
-        if not any(NAVIGATION_RE.search(line) for line in nav_lines):
+        nav_line = nav_lines[0]
+        if not NAVIGATION_RE.search(nav_line):
             issues.append(f"{rel(path)}: navigation block must include at least one markdown link")
+            continue
+        issues.extend(doc_navigation_line_issues(path, nav_line))
     if issues:
         print("check-doc-navigation FAIL:", file=sys.stderr)
         for issue in issues:
@@ -1669,7 +1697,7 @@ DOC_DRIFT_ADDED_LINE_RULES = [
     (
         r"[.]Produces<object>|Results[.](Ok|Json|Created|Accepted)[(]new[ ]*[{]",
         lambda p: p.startswith("src/Axis.Api/Endpoints/") and p.endswith(".cs"),
-        "Endpoint returns object/anonymous JSON - use a named Application-layer DTO (REVIEW_FINDINGS.md)",
+        "Endpoint returns object/anonymous JSON - use a named Application-layer DTO (docs/ENFORCEMENT.md)",
     ),
     (
         r"\bSkip\s*=",
@@ -1679,7 +1707,7 @@ DOC_DRIFT_ADDED_LINE_RULES = [
     (
         r"[.]EnsureCreated(?:Async)?[(]",
         lambda p: (p.startswith("src/") or p.startswith("tests/")) and p.endswith(".cs"),
-        "EnsureCreated introduced - use the owning DbContext migration chain",
+        "Database setup must use the owning DbContext migration chain, not EnsureCreated",
     ),
     (
         r"\b(?:TODO|FIXME|NotImplementedException|stub)\b|(?<![:\w-])placeholder(?!\s*=)(?![:\w-])",
@@ -1710,7 +1738,7 @@ RAW_DOC_COMMAND_PATTERNS = [
         "use `python scripts/axis.py local-dev ...` or `python scripts/axis.py check docker`",
     ),
     (re.compile(r"^openssl\b"), "use `python scripts/axis.py local-dev certs`"),
-    (re.compile(r"^python\s+docs/scripts/"), "use `python scripts/axis.py docs ...`"),
+    (re.compile(r"^python\s+docs/scripts/"), "use an approved project wrapper"),
     (re.compile(r"^lychee\s+--version\b"), "use `python scripts/axis.py check markdown-links` or `python scripts/axis.py doctor`"),
     (re.compile(r"^cargo\s+install\s+lychee\b"), "install tools externally, then verify through `python scripts/axis.py doctor`"),
 ]
@@ -1848,43 +1876,6 @@ def endpoint_mediator_hits() -> list[str]:
     return hits
 
 
-def is_workaround_comment(path: Path, line: str) -> bool:
-    stripped = line.lstrip()
-    if path.suffix == ".py":
-        return stripped.startswith("#") and "WORKAROUND:" in stripped
-    if path.suffix in {".cs", ".ts", ".tsx"}:
-        return ("// WORKAROUND:" in line) or ("/* WORKAROUND:" in line)
-    return "WORKAROUND:" in line
-
-
-def check_workarounds(issues: list[str]) -> None:
-    workarounds = ROOT / "docs" / "WORKAROUNDS.md"
-    if not workarounds.is_file():
-        return
-    known = set()
-    for line in workarounds.read_text(encoding="utf-8").splitlines():
-        if line.startswith("### "):
-            slug = re.sub(r"[^A-Za-z0-9-]", "", line[4:]).lower()
-            known.add(slug)
-    roots = [ROOT / "src", ROOT / "tests", ROOT / "frontend" / "src", ROOT / "scripts"]
-    for root in roots:
-        for path in iter_files(root, (".cs", ".ts", ".tsx", ".md", ".py")):
-            text = path.read_text(encoding="utf-8", errors="ignore")
-            for idx, line in enumerate(text.splitlines(), 1):
-                if not is_workaround_comment(path, line):
-                    continue
-                match = re.search(r"docs/WORKAROUNDS[.]md#([A-Za-z0-9-]+)", line)
-                if not match:
-                    fail(issues, f"WORKAROUND comment without docs/WORKAROUNDS.md reference - add link or rephrase: {rel(path)}:{idx}:{line}")
-                    continue
-                referenced = match.group(1).lower()
-                if referenced not in known:
-                    fail(
-                        issues,
-                        f"WORKAROUND comment references unknown slug '{referenced}' - add a section to docs/WORKAROUNDS.md (or fix the slug): {rel(path)}",
-                    )
-
-
 GOVERNANCE_ENTRY_DOCS = [
     Path("AGENTS.md"),
     Path("CONTRIBUTING.md"),
@@ -1897,7 +1888,7 @@ GOVERNANCE_COMMANDS_OWNED_BY_AGENT_CHECKLIST = [
     "python scripts/axis.py check markdown-links",
 ]
 
-REVIEW_FINDINGS_LEDGER_HEADER = [
+ENFORCEMENT_LEDGER_HEADER = [
     "Finding class",
     "Rule owner",
     "Trigger / scope",
@@ -1906,12 +1897,10 @@ REVIEW_FINDINGS_LEDGER_HEADER = [
     "Status",
 ]
 
-REVIEW_FINDINGS_ALLOWED_STATUSES = {
+ENFORCEMENT_ALLOWED_STATUSES = {
     "Enforced",
     "Partial",
     "Review-only",
-    "Guidance",
-    "Not a rule",
 }
 
 ENFORCEMENT_TRUTH_REQUIRED_SNIPPETS = [
@@ -1952,7 +1941,7 @@ ENFORCEMENT_TRUTH_REQUIRED_SNIPPETS = [
             ('def pre_push(args: argparse.Namespace) -> int:', "pre-push quick gate is implemented in Python"),
             ('return verify(args)', "pre-push can opt into full verify with AXIS_PRE_PUSH_FULL"),
             ("for issue in governance_owner_boundary_issues():", "doc drift checks governance owner boundaries"),
-            ("for issue in review_findings_registry_issues():", "doc drift checks review findings registry rows"),
+            ("for issue in enforcement_ledger_issues():", "doc drift checks enforcement ledger rows"),
             ("for issue in enforcement_truth_audit_issues():", "doc drift checks enforcement truth wiring"),
             ("for issue in documented_raw_command_issues():", "doc drift checks documented repo commands go through Axis"),
         ],
@@ -2028,7 +2017,7 @@ def governance_owner_boundary_issues(*, root: Path | None = None) -> list[str]:
                 if command in line:
                     issues.append(
                         f"{normalized}:{idx}: governance doc restates `{command}`. "
-                        "Link to agent-checklist.md#verification-gate--verify-before-pr-review instead."
+                        "Link to agent-checklist.md#review-verification instead."
                     )
 
             if "Design Gate" not in line:
@@ -2044,7 +2033,7 @@ def governance_owner_boundary_issues(*, root: Path | None = None) -> list[str]:
             if mentions_machine_gate and "not " not in line_lower and "not-a-" not in line_lower:
                 issues.append(
                     f"{normalized}:{idx}: Design Gate is a review artifact, not a machine/CI gate. "
-                    "Move deterministic enforcement to scripts/tests and REVIEW_FINDINGS.md."
+                    "Move deterministic enforcement to scripts/tests and docs/ENFORCEMENT.md."
                 )
 
     return issues
@@ -2097,11 +2086,11 @@ def plain_markdown_cell(value: str) -> str:
     return re.sub(r"[*_`]", "", value).strip()
 
 
-def review_findings_registry_issues(*, root: Path | None = None) -> list[str]:
-    """Validate REVIEW_FINDINGS.md as the single rule registry."""
+def enforcement_ledger_issues(*, root: Path | None = None) -> list[str]:
+    """Validate docs/ENFORCEMENT.md as the single rule registry."""
     root = root or ROOT
-    path = root / "docs" / "REVIEW_FINDINGS.md"
-    normalized = "docs/REVIEW_FINDINGS.md"
+    path = root / "docs" / "ENFORCEMENT.md"
+    normalized = "docs/ENFORCEMENT.md"
 
     if not path.is_file():
         return [f"{normalized}: missing rule registry"]
@@ -2123,10 +2112,10 @@ def review_findings_registry_issues(*, root: Path | None = None) -> list[str]:
         return [f"{normalized}: ## Ledger must contain a markdown table"]
 
     header = markdown_table_cells(lines[header_idx])
-    if header != REVIEW_FINDINGS_LEDGER_HEADER:
+    if header != ENFORCEMENT_LEDGER_HEADER:
         return [
             f"{normalized}:{header_idx + 1}: ledger header must be "
-            f"`{' | '.join(REVIEW_FINDINGS_LEDGER_HEADER)}`"
+            f"`{' | '.join(ENFORCEMENT_LEDGER_HEADER)}`"
         ]
 
     issues: list[str] = []
@@ -2142,23 +2131,23 @@ def review_findings_registry_issues(*, root: Path | None = None) -> list[str]:
             continue
 
         row_count += 1
-        if len(cells) != len(REVIEW_FINDINGS_LEDGER_HEADER):
+        if len(cells) != len(ENFORCEMENT_LEDGER_HEADER):
             issues.append(
                 f"{normalized}:{idx + 1}: ledger row must have "
-                f"{len(REVIEW_FINDINGS_LEDGER_HEADER)} cells"
+                f"{len(ENFORCEMENT_LEDGER_HEADER)} cells"
             )
             continue
 
-        row = dict(zip(REVIEW_FINDINGS_LEDGER_HEADER, cells))
+        row = dict(zip(ENFORCEMENT_LEDGER_HEADER, cells))
         for field, value in row.items():
             if not value:
                 issues.append(f"{normalized}:{idx + 1}: ledger `{field}` cell is empty")
 
         status = plain_markdown_cell(row["Status"])
-        if status not in REVIEW_FINDINGS_ALLOWED_STATUSES:
+        if status not in ENFORCEMENT_ALLOWED_STATUSES:
             issues.append(
                 f"{normalized}:{idx + 1}: unknown ledger status `{row['Status']}`; "
-                f"use one of {sorted(REVIEW_FINDINGS_ALLOWED_STATUSES)}"
+                f"use one of {sorted(ENFORCEMENT_ALLOWED_STATUSES)}"
             )
             continue
 
@@ -2180,12 +2169,6 @@ def review_findings_registry_issues(*, root: Path | None = None) -> list[str]:
         elif status == "Review-only":
             if re.search(r"\b(gate|enforced)\b|fail(?:s|ed)? the pr|\bci\b", combined):
                 issues.append(f"{normalized}:{idx + 1}: Review-only row must not use gate/enforced language")
-        elif status == "Guidance":
-            if re.search(r"\b(must|gate|enforced)\b", combined):
-                issues.append(f"{normalized}:{idx + 1}: Guidance row must not use rule/gate language")
-        elif status == "Not a rule":
-            if owner not in {"none", "n/a"} or mechanism not in {"none", "n/a"}:
-                issues.append(f"{normalized}:{idx + 1}: Not-a-rule row must use `None` owner and mechanism")
 
     if row_count == 0:
         issues.append(f"{normalized}: ## Ledger must contain at least one rule row")
@@ -2214,10 +2197,6 @@ def check_doc_drift(_args: argparse.Namespace | None = None) -> int:
     for err in domain_errors:
         fail(issues, err)
 
-    if any(path.startswith("src/") for path in paths) and docs_changed_under(paths, "docs/PROGRESS.md"):
-        if not any(path.startswith("docs/use-cases/") for path in paths):
-            fail(issues, "docs/PROGRESS.md updated but no docs/use-cases/ change while src/ changed")
-
     all_added_lines = added_lines(range_spec, lambda _path: True)
     for issue in doc_drift_added_line_issues(all_added_lines):
         fail(issues, issue)
@@ -2229,18 +2208,16 @@ def check_doc_drift(_args: argparse.Namespace | None = None) -> int:
         fail(
             issues,
             "Endpoint handler calls the mediator more than once - move orchestration into a single "
-            f"command/handler or saga (REVIEW_FINDINGS.md): {hit}",
+            f"command/handler or saga (docs/ENFORCEMENT.md): {hit}",
         )
 
     for issue in missing_handler_test_issues(changed_name_status(range_spec)):
         fail(issues, issue)
 
-    check_workarounds(issues)
-
     for issue in governance_owner_boundary_issues():
         fail(issues, issue)
 
-    for issue in review_findings_registry_issues():
+    for issue in enforcement_ledger_issues():
         fail(issues, issue)
 
     for issue in enforcement_truth_audit_issues():
@@ -2251,7 +2228,7 @@ def check_doc_drift(_args: argparse.Namespace | None = None) -> int:
         spec_rx = re.compile(r"Not yet|\bplanned\b|Will be|To be implemented|Coming soon|in the future")
         for idx, line in enumerate(spec_target.read_text(encoding="utf-8").splitlines(), 1):
             if spec_rx.search(line):
-                fail(issues, f"Speculation in reference doc - move to docs/PROGRESS.md or a use-case file: {rel(spec_target)}:{idx}:{line}")
+                fail(issues, f"Speculation in reference doc - move to an owning use-case file: {rel(spec_target)}:{idx}:{line}")
 
     for issue in stale_reference_issues(root=ROOT):
         fail(issues, issue)
@@ -2267,7 +2244,7 @@ def check_doc_drift(_args: argparse.Namespace | None = None) -> int:
                 fail(
                     issues,
                     "Incident/lesson framing in practice doc - generalize the rule, move specifics to "
-                    f"the use-case/PROGRESS/retro (docs-style.md): {rel(path)}:{idx}:{line}",
+                    f"the owning use-case or PR retro (docs-style.md): {rel(path)}:{idx}:{line}",
                 )
 
     for migration in (ROOT / "src" / "Modules").glob("**/Migrations/*.cs"):
@@ -2677,18 +2654,6 @@ def frontend_command(args: argparse.Namespace) -> int:
     raise CheckError(f"Unknown frontend command: {command}")
 
 
-def docs_command(args: argparse.Namespace) -> int:
-    command = args.docs_command
-    if command == "sync-mermaid-theme":
-        return run([sys.executable, str(ROOT / "docs" / "scripts" / "sync-mermaid-theme.py")], check=False).returncode
-    if command == "mermaid-init":
-        from docs.diagrams.mermaid_theme import MERMAID_INIT
-
-        print(MERMAID_INIT)
-        return 0
-    raise CheckError(f"Unknown docs command: {command}")
-
-
 def check_docker(_args: argparse.Namespace | None = None) -> int:
     if _docker_info_ok():
         print("check-docker: OK (docker info works)")
@@ -3056,15 +3021,15 @@ def install_hooks(_args: argparse.Namespace | None = None) -> int:
 
     hooks_value = current_hooks.stdout.strip() if current_hooks.returncode == 0 else ""
     if hooks_value:
-        legacy_hooks_path = (ROOT / "scripts" / "hooks").resolve()
+        repo_hooks_path = (ROOT / "scripts" / "hooks").resolve()
         hooks_path = Path(hooks_value)
         resolved_hooks_path = hooks_path if hooks_path.is_absolute() else (ROOT / hooks_path)
         normalized_hooks_value = hooks_value.replace("\\", "/").rstrip("/")
-        is_legacy_hooks_path = (
+        is_repo_hooks_path = (
             normalized_hooks_value in {"scripts/hooks", "./scripts/hooks"}
-            or resolved_hooks_path.resolve() == legacy_hooks_path
+            or resolved_hooks_path.resolve() == repo_hooks_path
         )
-        if not is_legacy_hooks_path:
+        if not is_repo_hooks_path:
             print(
                 "install-hooks: refusing to overwrite existing core.hooksPath "
                 f"({hooks_value}). Clear it explicitly or move the hook manually.",
@@ -3495,29 +3460,6 @@ def doctor(args: argparse.Namespace) -> int:
     return 0
 
 
-def bootstrap(_args: argparse.Namespace | None = None) -> int:
-    frontend_env = frontend_toolchain_env()
-    missing = [
-        name
-        for name, env in (
-            ("git", None),
-            ("dotnet", None),
-            ("node", frontend_env),
-            ("npm", frontend_env),
-        )
-        if not command_exists(name, env=env)
-    ]
-    if missing:
-        for name in missing:
-            print(f"bootstrap: missing '{name}' in PATH", file=sys.stderr)
-        return 1
-    rc = install_hooks()
-    if rc != 0:
-        return rc
-    print("bootstrap: OK")
-    return 0
-
-
 def check_pr(args: argparse.Namespace) -> int:
     module_args: list[str] = []
     if args.title is not None:
@@ -3531,7 +3473,6 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
 
-    sub.add_parser("bootstrap").set_defaults(func=bootstrap)
     doctor_parser = sub.add_parser("doctor")
     doctor_parser.add_argument("--strict", action="store_true", help="Exit non-zero when required local-dev tools are unavailable")
     doctor_parser.set_defaults(func=doctor)
@@ -3575,11 +3516,6 @@ def main(argv: list[str] | None = None) -> int:
     frontend_script.add_argument("script_name")
     frontend_script.add_argument("script_args", nargs=argparse.REMAINDER)
     frontend_script.set_defaults(func=frontend_command)
-
-    docs_parser = sub.add_parser("docs")
-    docs_sub = docs_parser.add_subparsers(dest="docs_command", required=True)
-    docs_sub.add_parser("sync-mermaid-theme").set_defaults(func=docs_command)
-    docs_sub.add_parser("mermaid-init").set_defaults(func=docs_command)
 
     local_dev_parser = sub.add_parser("local-dev")
     local_dev_sub = local_dev_parser.add_subparsers(dest="local_dev_command", required=True)

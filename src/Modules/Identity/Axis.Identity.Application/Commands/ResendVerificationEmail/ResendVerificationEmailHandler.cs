@@ -19,14 +19,15 @@ public sealed class ResendVerificationEmailHandler(
     public async Task<Result> Handle(ResendVerificationEmailCommand command, CancellationToken cancellationToken)
     {
         Result<Email> email = Email.Create(command.Email);
-        if (email.IsFailure) return Result.Success(); // no error leakage
-
-        User? user = await userRepo.FindByEmailGloballyAsync(email.Value, cancellationToken);
-        if (user is null || user.IsEmailVerified) return Result.Success(); // silent — no info leakage
+        // Keep resend responses indistinguishable to avoid account enumeration.
+        if (email.IsFailure) return Result.Success();
 
         Result rateLimit = await rateLimiter.TryRecordResendAsync(email.Value.Value, cancellationToken);
         if (rateLimit.IsFailure)
             return rateLimit;
+
+        User? user = await userRepo.FindByEmailGloballyAsync(email.Value, cancellationToken);
+        if (user is null || user.IsEmailVerified) return Result.Success();
 
         await tokenStore.InvalidateAllForUserAsync(user.Id, cancellationToken);
 

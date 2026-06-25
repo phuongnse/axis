@@ -64,8 +64,29 @@ describe('fetchApi', () => {
 
     const fetchCallArgs = vi.mocked(fetch).mock.calls[0][1];
     expect(fetchCallArgs?.headers).toBeDefined();
-    const headers = fetchCallArgs?.headers as Record<string, string>;
-    expect(headers['Content-Type']).toBeUndefined();
+    const headers = fetchCallArgs?.headers as Headers;
+    expect(headers.has('Content-Type')).toBe(false);
+  });
+
+  it('should normalize Content-Type casing before deciding request headers', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      text: () => Promise.resolve('{"success": true}'),
+    } as unknown as Response);
+
+    const formData = new FormData();
+    formData.append('file', 'test');
+
+    await fetchApi('/upload', {
+      method: 'POST',
+      body: formData,
+      headers: { 'content-type': 'application/json' },
+    });
+
+    const fetchCallArgs = vi.mocked(fetch).mock.calls[0][1];
+    const headers = fetchCallArgs?.headers as Headers;
+    expect(headers.has('Content-Type')).toBe(false);
   });
 
   it('should throw ApiError on non-2xx responses', async () => {

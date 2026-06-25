@@ -12,8 +12,6 @@ public class UserRepositoryTests(IdentityDatabaseFixture db) : IAsyncLifetime
     private IdentityDbContext _ctx = null!;
     private UserRepository _sut = null!;
 
-    private static readonly Guid WorkspaceId = Guid.NewGuid();
-
     public Task InitializeAsync()
     {
         _ctx = db.CreateContext();
@@ -26,17 +24,13 @@ public class UserRepositoryTests(IdentityDatabaseFixture db) : IAsyncLifetime
     private static User MakeUser(string email) =>
         User.Create("Jane", "Doe", Email.Create(email).Value);
 
-    private static WorkspaceMembership MakeMembership(User user, Guid workspaceId) =>
-        WorkspaceMembership.Create(user.Id, workspaceId);
-
     [Fact]
     public async Task AddAsync_WhenEntityIsValid_PersistsAndCanBeRetrievedById()
     {
         User user = MakeUser("getbyid@example.com");
         await _sut.AddAsync(user);
-        await _ctx.WorkspaceMemberships.AddAsync(MakeMembership(user, WorkspaceId));
         await _ctx.SaveChangesAsync();
-        User? loaded = await _sut.GetByIdAsync(user.Id, WorkspaceId);
+        User? loaded = await _sut.GetByIdPlatformWideAsync(user.Id);
 
         loaded.Should().NotBeNull();
         loaded!.Email.Value.Should().Be("getbyid@example.com");
@@ -70,24 +64,10 @@ public class UserRepositoryTests(IdentityDatabaseFixture db) : IAsyncLifetime
         User user = MakeUser("withhash@example.com");
         user.SetPasswordHash("$2a$12$fakehashvalue");
         await _sut.AddAsync(user);
-        await _ctx.WorkspaceMemberships.AddAsync(MakeMembership(user, WorkspaceId));
         await _ctx.SaveChangesAsync();
-        User? loaded = await _sut.GetByIdAsync(user.Id, WorkspaceId);
+        User? loaded = await _sut.GetByIdPlatformWideAsync(user.Id);
 
         loaded!.PasswordHash.Should().Be("$2a$12$fakehashvalue");
-    }
-
-    [Fact]
-    public async Task GetByIdAsync_WhenUserBelongsToDifferentWorkspace_ReturnsNull()
-    {
-        User user = MakeUser($"crossWorkspace-{Guid.NewGuid():N}@example.com");
-        await _sut.AddAsync(user);
-        await _ctx.WorkspaceMemberships.AddAsync(MakeMembership(user, WorkspaceId));
-        await _ctx.SaveChangesAsync();
-
-        User? result = await _sut.GetByIdAsync(user.Id, Guid.NewGuid());
-
-        result.Should().BeNull();
     }
 
     [Fact]

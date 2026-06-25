@@ -92,21 +92,6 @@ namespace Axis.Identity.Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "Workspace_memberships",
-                columns: table => new
-                {
-                    id = table.Column<Guid>(type: "uuid", nullable: false),
-                    user_id = table.Column<Guid>(type: "uuid", nullable: false),
-                    workspace_id = table.Column<Guid>(type: "uuid", nullable: false),
-                    status = table.Column<string>(type: "text", nullable: false),
-                    created_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_Workspace_memberships", x => x.id);
-                });
-
-            migrationBuilder.CreateTable(
                 name: "Workspaces",
                 columns: table => new
                 {
@@ -257,17 +242,6 @@ namespace Axis.Identity.Infrastructure.Migrations
                 unique: true);
 
             migrationBuilder.CreateIndex(
-                name: "IX_Workspace_memberships_user_id_workspace_id",
-                table: "Workspace_memberships",
-                columns: new[] { "user_id", "workspace_id" },
-                unique: true);
-
-            migrationBuilder.CreateIndex(
-                name: "IX_Workspace_memberships_workspace_id",
-                table: "Workspace_memberships",
-                column: "workspace_id");
-
-            migrationBuilder.CreateIndex(
                 name: "IX_Workspaces_owner_user_id_type",
                 table: "Workspaces",
                 columns: new[] { "owner_user_id", "type" },
@@ -295,9 +269,6 @@ namespace Axis.Identity.Infrastructure.Migrations
 
             migrationBuilder.DropTable(
                 name: "registration_idempotency");
-
-            migrationBuilder.DropTable(
-                name: "Workspace_memberships");
 
             migrationBuilder.DropTable(
                 name: "Workspaces");

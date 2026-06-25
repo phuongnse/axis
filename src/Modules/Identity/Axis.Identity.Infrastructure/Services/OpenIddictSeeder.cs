@@ -31,7 +31,7 @@ public sealed class OpenIddictSeeder(IServiceProvider services) : IHostedService
         OpenIddictApplicationDescriptor descriptor = new()
         {
             ClientId = "axis_spa",
-            // Public client — no client secret (PKCE provides security instead)
+            // Public PKCE client; no client secret.
             ClientType = ClientTypes.Public,
             DisplayName = "Axis SPA",
             Permissions =
@@ -44,7 +44,7 @@ public sealed class OpenIddictSeeder(IServiceProvider services) : IHostedService
                 Permissions.Scopes.Email,
                 Permissions.Scopes.Profile,
             },
-            // Allowed redirect URIs — front-end dev server + placeholder for production
+            // Local SPA dev ports.
             RedirectUris =
             {
                 new Uri("https://localhost:3000/callback"),

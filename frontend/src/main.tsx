@@ -20,7 +20,7 @@ const router = createRouter({
   },
   defaultNotFoundComponent: NotFound,
   defaultPreload: 'intent',
-  // Ensure loader is always called when route is preloaded or visited
+  // Preloads should run loaders, not reuse stale route matches.
   defaultPreloadStaleTime: 0,
 });
 

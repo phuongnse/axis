@@ -1,56 +1,36 @@
 # Scripts
 
-> **Navigation**: [<- docs/README.md](../README.md) . [<- agent-checklist.md](./agent-checklist.md) . [<- AGENTS.md](../../AGENTS.md)
+> **Navigation**: [docs/README.md](../README.md) · [docs/playbooks/agent-checklist.md](./agent-checklist.md) · [AGENTS.md](../../AGENTS.md)
 
-`scripts/axis.py` is the source of truth for repo maintenance commands. Use `$axis-script-scope` when deciding what to run. Docs, skills, and CI describe repo workflows through Axis wrappers; underlying tools stay implementation details.
+[scripts/axis.py](../../scripts/axis.py) owns repo maintenance commands. Use `$axis-script-scope` when deciding what to run.
 
 ## Tool Versions
 
 | Tool | Required source | Used by |
 |---|---|---|
-| .NET SDK | `global.json` / `docs/TECH_STACK.md` | build, tests, format, package scan, API contracts |
-| Node.js | `frontend/.nvmrc` | frontend commands and API types |
-| Lychee | `0.23.0` | Markdown link checks |
-| CodeRabbit CLI | `>= 0.6.0` | `$axis-pull-request` pre-PR review checkpoint |
+| .NET SDK | [global.json](../../global.json) / [docs/TECH_STACK.md](../TECH_STACK.md) | build, tests, format, package scan, API contracts |
+| Node.js | [frontend/.nvmrc](../../frontend/.nvmrc) | frontend commands and API types |
+| Lychee | [scripts/axis.py](../../scripts/axis.py) check and [.github/workflows/build-and-test.yml](../../.github/workflows/build-and-test.yml) pin | Markdown link checks |
+| CodeRabbit CLI | [scripts/axis.py](../../scripts/axis.py) check | `$axis-pull-request` pre-PR review checkpoint |
 
 Use `python scripts/axis.py doctor` or the exact `check` subcommand to verify local tool resolution.
 
-## Inner Loop
+## Command Boundaries
 
-During development, run the smallest wrapper that proves the current edit:
+- Add repo workflows as `python scripts/axis.py ...` subcommands.
+- Keep raw Docker, dotnet, npm, Lychee, and OpenSSL calls inside wrappers or package scripts.
+- Use `python scripts/axis.py verify` only at the ready-review boundary; it is changed-path scoped.
+- Use `python scripts/axis.py pre-push` for ordinary Git push sanity.
+- Set `AXIS_PRE_PUSH_FULL=1` only when pre-push should run the full ready-review command.
+- CI remains the authoritative merge matrix.
 
-| Change | Prefer while iterating |
-|---|---|
-| One backend behavior | Targeted test or `python scripts/axis.py test unit` |
-| Compile-sensitive backend edit | `python scripts/axis.py dotnet build` |
-| One frontend behavior | `python scripts/axis.py frontend test` |
-| Frontend type/lint risk | `python scripts/axis.py frontend ci` |
-| Docs shape | The focused `python scripts/axis.py check ...` command |
-| Unsure / before review | `$axis-ready-review` |
-
-Do not run `python scripts/axis.py verify` after every small edit. It is the local ready-review boundary, and it routes checks from the changed path set. When the working tree has staged, unstaged, or untracked files, `verify` checks that working-tree set only; when the working tree is clean, it checks the branch diff against the base.
-
-## Boundaries
-
-| Boundary | Command |
-|---|---|
-| Local environment diagnosis | `python scripts/axis.py doctor` |
-| Ordinary Git push sanity | `python scripts/axis.py pre-push` |
-| Ready for review | `python scripts/axis.py verify` |
-| CI / merge | GitHub workflow full checks |
-
-Set `AXIS_PRE_PUSH_FULL=1` only when you intentionally want pre-push to run the full ready-review command.
-
-`verify` is intentionally changed-path scoped. It runs only checks tied to changed files: related .NET projects/tests for backend paths, frontend CI/tests for frontend paths, docs checks for docs paths, skill checks for repo skills, and policy tests for script/policy changes. CI remains the full authoritative merge matrix.
-
-## Rules
+## Script Rules
 
 - Keep repo maintenance scripts in Python.
-- Add repo workflows as `scripts/axis.py` subcommands.
-- Keep command examples in docs and repo skills behind Axis wrappers.
-- Put shared repository discovery in `scripts/axis_repo.py` or small Python helpers.
+- Put shared repository discovery in [scripts/axis_repo.py](../../scripts/axis_repo.py) or small Python helpers.
 - Keep top-level `scripts/*.py` files non-executable.
-- Keep `scripts/hooks/pre-push` non-executable in the worktree; installation writes the executable copy under `.git/hooks`.
-- New deterministic guards must encode reusable invariants, not one-off incidents.
-- Diff-aware checks must include PR range plus staged, unstaged, and untracked files.
-- Repo-scoped skills under `.agents/skills/` must stay concise, concrete, linked to existing docs, and valid under `python scripts/axis.py check codex-skills`.
+- Keep [scripts/hooks/pre-push](../../scripts/hooks/pre-push) non-executable in the worktree; installation writes the executable copy under `.git/hooks`.
+- New deterministic guards encode reusable current invariants, not one-off incidents or removed artifact names.
+- Command tests prove supported subcommands and current behavior.
+- Removed or renamed commands, markers, headings, and artifacts get a one-time `rg` sweep plus current owner links, not permanent denylist checks.
+- Diff-aware checks include PR range plus staged, unstaged, and untracked files.
