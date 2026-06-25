@@ -1306,6 +1306,28 @@ def main() -> int:
             paths,
         )
 
+    def test_verify_scope_prefers_working_tree_paths(self) -> None:
+        with (
+            mock.patch.object(axis, "working_tree_paths", return_value=["scripts/axis.py"]),
+            mock.patch.object(axis, "diff_range", return_value="base...HEAD"),
+            mock.patch.object(axis, "changed_paths", return_value=["src/Axis.Api/Program.cs"]),
+        ):
+            scope, paths = axis.verify_scope_paths()
+
+        self.assertEqual("working tree", scope)
+        self.assertEqual(["scripts/axis.py"], paths)
+
+    def test_verify_scope_uses_branch_diff_when_working_tree_is_clean(self) -> None:
+        with (
+            mock.patch.object(axis, "working_tree_paths", return_value=[]),
+            mock.patch.object(axis, "diff_range", return_value="base...HEAD"),
+            mock.patch.object(axis, "changed_paths", return_value=["docs/README.md"]),
+        ):
+            scope, paths = axis.verify_scope_paths()
+
+        self.assertEqual("base...HEAD", scope)
+        self.assertEqual(["docs/README.md"], paths)
+
     def test_repo_files_include_tracked_and_untracked_files(self) -> None:
         outputs = {
             ("ls-files", "--cached", "--others", "--exclude-standard"): (
@@ -1597,31 +1619,42 @@ class TestVerifyGate(unittest.TestCase):
         calls: list[str] = []
 
         with (
-            mock.patch.object(axis, "diff_range", return_value="base...HEAD"),
-            mock.patch.object(axis, "changed_paths", return_value=["docs/example.md"]),
-            mock.patch.object(axis, "check_markdown_links", side_effect=lambda: calls.append("markdown-links") or 0),
-            mock.patch.object(axis, "check_policy_tests", side_effect=lambda: calls.append("policy-tests") or 0),
-            mock.patch.object(axis, "check_doc_drift", side_effect=lambda: calls.append("doc-drift") or 0),
+            mock.patch.object(axis, "verify_scope_paths", return_value=("working tree", ["docs/README.md"])),
+            mock.patch.object(axis, "check_doc_navigation", side_effect=lambda: calls.append("doc-navigation") or 0),
+            mock.patch.object(axis, "check_doc_size_budgets", side_effect=lambda: calls.append("doc-size-budgets") or 0),
+            mock.patch.object(axis, "run_module_check", side_effect=lambda script, _args: calls.append(script) or 0),
+            mock.patch.object(
+                axis,
+                "check_markdown_links_for_paths",
+                side_effect=lambda paths: calls.append(f"markdown-links:{','.join(paths or [])}") or 0,
+            ),
             contextlib.redirect_stdout(io.StringIO()),
         ):
             self.assertEqual(0, axis.verify(object()))
 
-        self.assertEqual(["markdown-links", "policy-tests", "doc-drift"], calls)
+        self.assertEqual(
+            [
+                "doc-navigation",
+                "doc-size-budgets",
+                "check-doc-code-fences.py",
+                "markdown-links:docs/README.md",
+            ],
+            calls,
+        )
 
-    def test_skips_markdown_links_for_non_markdown_changes(self) -> None:
+    def test_runs_script_checks_for_script_changes(self) -> None:
         calls: list[str] = []
 
         with (
-            mock.patch.object(axis, "diff_range", return_value="base...HEAD"),
-            mock.patch.object(axis, "changed_paths", return_value=["scripts/tool.py"]),
-            mock.patch.object(axis, "check_markdown_links", side_effect=lambda: calls.append("markdown-links") or 0),
+            mock.patch.object(axis, "verify_scope_paths", return_value=("working tree", ["scripts/axis.py"])),
+            mock.patch.object(axis, "run_text_encoding_check", side_effect=lambda _paths, label: calls.append(label) or 0),
+            mock.patch.object(axis, "check_scripts_standard", side_effect=lambda: calls.append("scripts-standard") or 0),
             mock.patch.object(axis, "check_policy_tests", side_effect=lambda: calls.append("policy-tests") or 0),
-            mock.patch.object(axis, "check_doc_drift", side_effect=lambda: calls.append("doc-drift") or 0),
             contextlib.redirect_stdout(io.StringIO()),
         ):
             self.assertEqual(0, axis.verify(object()))
 
-        self.assertEqual(["policy-tests", "doc-drift"], calls)
+        self.assertEqual(["check-text-encoding-changed", "scripts-standard", "policy-tests"], calls)
 
     def test_runs_frontend_toolchain_before_frontend_commands(self) -> None:
         calls: list[str] = []
@@ -1636,13 +1669,10 @@ class TestVerifyGate(unittest.TestCase):
             return axis.subprocess.CompletedProcess(args, 0, stdout="", stderr="")
 
         with (
-            mock.patch.object(axis, "diff_range", return_value="base...HEAD"),
-            mock.patch.object(axis, "changed_paths", return_value=["frontend/src/App.tsx"]),
+            mock.patch.object(axis, "verify_scope_paths", return_value=("working tree", ["frontend/src/App.tsx"])),
             mock.patch.object(axis, "check_frontend_toolchain", side_effect=lambda: calls.append("frontend-toolchain") or 0),
             mock.patch.object(axis, "frontend_toolchain_env", return_value={}),
             mock.patch.object(axis, "run", side_effect=fake_run),
-            mock.patch.object(axis, "check_policy_tests", side_effect=lambda: calls.append("policy-tests") or 0),
-            mock.patch.object(axis, "check_doc_drift", side_effect=lambda: calls.append("doc-drift") or 0),
             contextlib.redirect_stdout(io.StringIO()),
         ):
             self.assertEqual(0, axis.verify(object()))
@@ -1654,8 +1684,62 @@ class TestVerifyGate(unittest.TestCase):
                 "npm run ci",
                 "frontend-toolchain",
                 "npm run test",
-                "policy-tests",
-                "doc-drift",
+            ],
+            calls,
+        )
+
+    def test_runs_only_changed_frontend_test_file_for_test_only_change(self) -> None:
+        calls: list[str] = []
+
+        with (
+            mock.patch.object(axis, "verify_scope_paths", return_value=("working tree", ["frontend/tests/button.test.tsx"])),
+            mock.patch.object(axis, "check_frontend_toolchain", side_effect=lambda: calls.append("frontend-toolchain") or 0),
+            mock.patch.object(axis, "frontend_toolchain_env", return_value={}),
+            mock.patch.object(
+                axis,
+                "run_frontend_npm",
+                side_effect=lambda args: calls.append(" ".join(args)) or axis.subprocess.CompletedProcess(args, 0),
+            ),
+            contextlib.redirect_stdout(io.StringIO()),
+        ):
+            self.assertEqual(0, axis.verify(object()))
+
+        self.assertEqual(
+            [
+                "frontend-toolchain",
+                "frontend-toolchain",
+                "run ci",
+                "exec vitest run frontend/tests/button.test.tsx",
+            ],
+            calls,
+        )
+
+    def test_runs_related_dotnet_projects_for_source_change(self) -> None:
+        calls: list[str] = []
+
+        with (
+            mock.patch.object(
+                axis,
+                "verify_scope_paths",
+                return_value=("working tree", ["src/Modules/Identity/Axis.Identity.Domain/Aggregates/User.cs"]),
+            ),
+            mock.patch.object(axis, "run_text_encoding_check", side_effect=lambda _paths, label: calls.append(label) or 0),
+            mock.patch.object(axis, "check_dotnet_sdk", side_effect=lambda: calls.append("dotnet-sdk") or 0),
+            mock.patch.object(axis, "dotnet_build_projects", side_effect=lambda projects: calls.append(f"build:{','.join(projects)}") or 0),
+            mock.patch.object(axis, "dotnet_format_changed_paths", side_effect=lambda _paths: calls.append("dotnet-format-changed") or 0),
+            mock.patch.object(axis, "dotnet_test_projects", side_effect=lambda projects: calls.append(f"test:{','.join(projects)}") or 0),
+            contextlib.redirect_stdout(io.StringIO()),
+        ):
+            self.assertEqual(0, axis.verify(object()))
+
+        self.assertEqual(
+            [
+                "check-text-encoding-changed",
+                "dotnet-sdk",
+                "build:src/Modules/Identity/Axis.Identity.Domain/Axis.Identity.Domain.csproj",
+                "dotnet-format-changed",
+                "test:tests/Architecture/Axis.Architecture.Tests/Axis.Architecture.Tests.csproj,"
+                "tests/Modules/Identity/Axis.Identity.Domain.Tests/Axis.Identity.Domain.Tests.csproj",
             ],
             calls,
         )
@@ -2563,7 +2647,7 @@ class TestEnforcementTruthAudit(unittest.TestCase):
     def test_rejects_local_verify_without_markdown_links(self) -> None:
         def mutate(files: dict[Path, str]) -> None:
             script = Path("scripts/axis.py")
-            files[script] = files[script].replace('step("markdown links", lambda: check_markdown_links())\n', "")
+            files[script] = files[script].replace('step("markdown links (changed files)",\n', "")
 
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)

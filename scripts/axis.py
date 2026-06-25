@@ -392,17 +392,21 @@ def text_encoding_issues(paths: Iterable[Path], *, root: Path = ROOT) -> list[st
     return issues
 
 
-def check_text_encoding(_args: argparse.Namespace | None = None) -> int:
-    paths = [ROOT / path for path in repo_files() if should_check_text_encoding(path)]
-    issues = text_encoding_issues(paths, root=ROOT)
+def run_text_encoding_check(paths: list[str], *, label: str = "check-text-encoding") -> int:
+    candidates = [ROOT / path for path in paths if should_check_text_encoding(path)]
+    issues = text_encoding_issues(candidates, root=ROOT)
     if issues:
-        print("check-text-encoding FAIL:", file=sys.stderr)
+        print(f"{label} FAIL:", file=sys.stderr)
         for issue in issues:
             print(f"  - {issue}", file=sys.stderr)
         print("\nUse UTF-8 without BOM and LF line endings for tracked text files.", file=sys.stderr)
         return 1
-    print(f"check-text-encoding: OK ({len(paths)} files scanned)")
+    print(f"{label}: OK ({len(candidates)} files scanned)")
     return 0
+
+
+def check_text_encoding(_args: argparse.Namespace | None = None) -> int:
+    return run_text_encoding_check(repo_files())
 
 
 TEST_ATTRIBUTE_RE = re.compile(r"^\s*\[(?:Xunit[.])?(?:Fact|Theory)(?:Attribute)?(?:\s*[(]|\s*\])")
@@ -1941,9 +1945,10 @@ ENFORCEMENT_TRUTH_REQUIRED_SNIPPETS = [
         [
             ('step(".NET SDK", lambda: check_dotnet_sdk())', "local verify checks the documented .NET SDK before dotnet commands"),
             ('step("frontend toolchain", lambda: check_frontend_toolchain())', "local verify checks the documented Node source before npm commands"),
-            ('step("policy gate tests", lambda: check_policy_tests())', "local verify runs policy gate tests"),
-            ('step("doc drift", lambda: check_doc_drift())', "local verify runs doc drift"),
-            ('step("markdown links", lambda: check_markdown_links())', "local verify runs markdown link check"),
+            ("dotnet_projects_for_changed_paths(paths)", "local verify routes .NET work by changed project paths"),
+            ('step("policy gate tests", lambda: check_policy_tests())', "local verify runs policy gate tests when scripts change"),
+            ('step("doc navigation", lambda: check_doc_navigation())', "local verify runs docs checks when docs change"),
+            ('step("markdown links (changed files)",', "local verify runs markdown link checks for changed markdown paths"),
             ('def pre_push(args: argparse.Namespace) -> int:', "pre-push quick gate is implemented in Python"),
             ('return verify(args)', "pre-push can opt into full verify with AXIS_PRE_PUSH_FULL"),
             ("for issue in governance_owner_boundary_issues():", "doc drift checks governance owner boundaries"),
@@ -2510,8 +2515,9 @@ def lychee_version_status(lychee: str) -> tuple[bool, str]:
     return True, f"{version_line} ({lychee})"
 
 
-def run_lychee_markdown_check(lychee: str) -> subprocess.CompletedProcess[str]:
-    return run([lychee, "--config", "./lychee.toml", "./**/*.md"], capture=True, check=False)
+def run_lychee_markdown_check(lychee: str, paths: list[str] | None = None) -> subprocess.CompletedProcess[str]:
+    targets = paths if paths else ["./**/*.md"]
+    return run([lychee, "--config", "./lychee.toml", *targets], capture=True, check=False)
 
 
 def emit_captured_process(result: subprocess.CompletedProcess[str]) -> None:
@@ -2522,6 +2528,10 @@ def emit_captured_process(result: subprocess.CompletedProcess[str]) -> None:
 
 
 def check_markdown_links(_args: argparse.Namespace | None = None) -> int:
+    return check_markdown_links_for_paths(None)
+
+
+def check_markdown_links_for_paths(paths: list[str] | None) -> int:
     lychee = find_lychee()
     if lychee is None:
         print(
@@ -2539,7 +2549,7 @@ def check_markdown_links(_args: argparse.Namespace | None = None) -> int:
             file=sys.stderr,
         )
         return 1
-    result = run_lychee_markdown_check(lychee)
+    result = run_lychee_markdown_check(lychee, paths)
     emit_captured_process(result)
     return result.returncode
 
@@ -2687,32 +2697,140 @@ def check_docker(_args: argparse.Namespace | None = None) -> int:
     return 1
 
 
-def verify(args: argparse.Namespace) -> int:
-    range_spec = diff_range()
-    paths = changed_paths(range_spec)
+DOTNET_SOLUTION_LEVEL_RE = re.compile(
+    r"^(Directory[.].*|Axis[.]sln$|global[.]json$|[.]editorconfig$|[.]github/workflows/build-and-test[.]yml$)"
+)
 
-    dotnet = False
-    frontend = False
-    markdown_links = False
-    if not paths:
-        dotnet = True
-        frontend = True
-        markdown_links = True
+
+def is_dotnet_path(path: str) -> bool:
+    return path.startswith(("src/", "tests/")) or DOTNET_SOLUTION_LEVEL_RE.search(path) is not None
+
+
+def is_frontend_path(path: str) -> bool:
+    return path.startswith("frontend/") or path in {
+        ".editorconfig",
+        "openapi.json",
+        ".github/workflows/build-and-test.yml",
+    }
+
+
+def is_markdown_link_path(path: str) -> bool:
+    return path.endswith(".md") or path in {"lychee.toml", ".github/workflows/build-and-test.yml"}
+
+
+def is_docs_path(path: str) -> bool:
+    return path.startswith("docs/") or path in {
+        "AGENTS.md",
+        "README.md",
+        "CONTRIBUTING.md",
+        ".github/PULL_REQUEST_TEMPLATE.md",
+    }
+
+
+def nearest_csproj(path: str) -> str | None:
+    relative = Path(path)
+    if relative.suffix == ".csproj":
+        return path
+
+    current = ROOT / relative.parent
+    while current != ROOT.parent:
+        if current.exists():
+            projects = sorted(current.glob("*.csproj"))
+            if projects:
+                return rel(projects[0])
+        if current == ROOT:
+            break
+        current = current.parent
+    return None
+
+
+def related_test_project_for_source_project(project: str) -> str | None:
+    project_name = Path(project).stem
+    if project == "src/Axis.Api/Axis.Api.csproj":
+        candidate = ROOT / "tests/Api/Axis.Api.Tests/Axis.Api.Tests.csproj"
+    elif project.startswith("src/Modules/Identity/"):
+        candidate = ROOT / f"tests/Modules/Identity/{project_name}.Tests/{project_name}.Tests.csproj"
+    elif project.startswith("src/Shared/"):
+        candidate = ROOT / f"tests/Shared/{project_name}.Tests/{project_name}.Tests.csproj"
     else:
-        dotnet = any(
-            re.search(r"^(src/|tests/|Directory[.]|Axis[.]sln$|global[.]json$|[.]editorconfig$|openapi[.]json$|[.]github/workflows/build-and-test[.]yml$)", p)
-            for p in paths
-        )
-        frontend = any(
-            re.search(r"^(frontend/|[.]editorconfig$|openapi[.]json$|[.]github/workflows/build-and-test[.]yml$)", p)
-            for p in paths
-        )
-        markdown_links = any(
-            re.search(r"(^|/)[^/]+[.]md$|^lychee[.]toml$|^[.]github/workflows/build-and-test[.]yml$", p)
-            for p in paths
-        )
+        return None
+    return rel(candidate) if candidate.is_file() else None
 
-    api_surface_drift = any_changed(paths, r"^src/Axis[.]Api/Endpoints/") and not any_changed(paths, r"^openapi[.]json$")
+
+def dotnet_projects_for_changed_paths(paths: list[str]) -> tuple[list[str], list[str]]:
+    build_projects: set[str] = set()
+    test_projects: set[str] = set()
+
+    for path in paths:
+        if not path.startswith(("src/", "tests/")):
+            continue
+        project = nearest_csproj(path)
+        if project is None:
+            continue
+        if project.startswith("tests/"):
+            if project != "tests/Shared/Axis.Testing/Axis.Testing.csproj":
+                test_projects.add(project)
+            continue
+
+        build_projects.add(project)
+        related_test = related_test_project_for_source_project(project)
+        if related_test is not None:
+            test_projects.add(related_test)
+
+    if any(path.startswith("src/") for path in paths):
+        architecture_tests = "tests/Architecture/Axis.Architecture.Tests/Axis.Architecture.Tests.csproj"
+        if (ROOT / architecture_tests).is_file():
+            test_projects.add(architecture_tests)
+
+    return sorted(build_projects), sorted(test_projects)
+
+
+def dotnet_format_changed_paths(paths: list[str]) -> int:
+    include = [
+        path
+        for path in paths
+        if path.startswith(("src/", "tests/"))
+        and Path(path).suffix.lower() in {".cs", ".csproj", ".props", ".targets"}
+        and (ROOT / path).is_file()
+    ]
+    if not include:
+        print("dotnet-format-changed: OK (no changed .NET files to format)")
+        return 0
+    return dotnet_command(
+        argparse.Namespace(
+            dotnet_command="format",
+            check=True,
+            dotnet_args=["--include", *include],
+        )
+    )
+
+
+def dotnet_build_projects(projects: list[str]) -> int:
+    for project in projects:
+        result = run([exe("dotnet"), "build", project, "--nologo"], check=False)
+        if result.returncode != 0:
+            return result.returncode
+    return 0
+
+
+def dotnet_test_projects(projects: list[str]) -> int:
+    for project in projects:
+        result = run([exe("dotnet"), "test", project, "--nologo"], check=False)
+        if result.returncode != 0:
+            return result.returncode
+    return 0
+
+
+def verify_scope_paths() -> tuple[str, list[str]]:
+    working_tree = working_tree_paths()
+    if working_tree:
+        return "working tree", working_tree
+    range_spec = diff_range()
+    return range_spec, changed_paths(range_spec)
+
+
+def verify(args: argparse.Namespace) -> int:
+    scope, paths = verify_scope_paths()
     failed: list[str] = []
 
     def step(name: str, fn: callable[[], int]) -> int:
@@ -2730,26 +2848,101 @@ def verify(args: argparse.Namespace) -> int:
             failed.append(name)
         return rc
 
-    print(f"verify - .NET={dotnet} frontend={frontend} markdown-links={markdown_links}")
+    dotnet = any(is_dotnet_path(path) for path in paths)
+    dotnet_solution_level = any(DOTNET_SOLUTION_LEVEL_RE.search(path) for path in paths)
+    dotnet_test_naming = any(path.startswith("tests/") and path.endswith(".cs") for path in paths)
+    dotnet_test_project_classification = any(path.startswith("tests/") and path.endswith(".csproj") for path in paths)
+    dotnet_package_scan = any(
+        path == "Directory.Packages.props" or (path.endswith(".csproj") and path.startswith(("src/", "tests/")))
+        for path in paths
+    )
+    build_projects, test_projects = dotnet_projects_for_changed_paths(paths)
+
+    frontend = any(is_frontend_path(path) for path in paths)
+    frontend_api_types = "openapi.json" in paths or "frontend/src/lib/api-types.ts" in paths
+    frontend_tests_only = frontend and all(
+        path.startswith("frontend/tests/") or path.startswith("frontend/e2e/")
+        for path in paths
+        if is_frontend_path(path)
+    )
+
+    markdown_paths = [path for path in paths if path.endswith(".md") and (ROOT / path).is_file()]
+    markdown_links_global = any(path in {"lychee.toml", ".github/workflows/build-and-test.yml"} for path in paths)
+    markdown_links = any(is_markdown_link_path(path) for path in paths)
+    docs = any(is_docs_path(path) for path in paths)
+    use_case_docs = any(path.startswith("docs/use-cases/") for path in paths)
+    skills = any(path.startswith(".agents/skills/") for path in paths)
+    scripts_changed = any(path.startswith("scripts/") for path in paths)
+    text_paths = [path for path in paths if (ROOT / path).is_file() and should_check_text_encoding(path)]
+    api_surface_drift = any_changed(paths, r"^src/Axis[.]Api/Endpoints/") and not any_changed(paths, r"^openapi[.]json$")
+
+    print(f"verify - changed-path scoped ({len(paths)} path(s), scope={scope})")
+    print(
+        "verify plan: "
+        f"dotnet={dotnet} frontend={frontend} docs={docs} scripts={scripts_changed} "
+        f"skills={skills} markdown-links={markdown_links}"
+    )
+
+    if not paths:
+        print("verify: no changed paths against the diff base; nothing to run")
+        return 0
+
+    if text_paths:
+        step("text encoding (changed files)", lambda: run_text_encoding_check(text_paths, label="check-text-encoding-changed"))
 
     if dotnet:
         if step(".NET SDK", lambda: check_dotnet_sdk()) == 0:
-            step(".NET test naming", lambda: check_test_naming())
-            step(".NET build", lambda: dotnet_command(argparse.Namespace(dotnet_command="build", dotnet_args=[])))
-            step(".NET vulnerable packages", lambda: check_vulnerable_packages())
-            step(".NET format", lambda: dotnet_command(argparse.Namespace(dotnet_command="format", check=True, dotnet_args=[])))
-            step(".NET test (unit projects)", lambda: test_unit(argparse.Namespace(dotnet_args=[])))
+            if dotnet_test_naming:
+                step(".NET test naming", lambda: check_test_naming())
+            if dotnet_test_project_classification:
+                step(".NET test project classification", lambda: check_test_project_classification())
+            if dotnet_solution_level:
+                step(".NET build (solution)", lambda: dotnet_command(argparse.Namespace(dotnet_command="build", dotnet_args=[])))
+                step(".NET format (solution)", lambda: dotnet_command(argparse.Namespace(dotnet_command="format", check=True, dotnet_args=[])))
+                step(".NET test (unit projects)", lambda: test_unit(argparse.Namespace(dotnet_args=[])))
+            else:
+                if build_projects:
+                    step(".NET build (changed projects)", lambda: dotnet_build_projects(build_projects))
+                step(".NET format (changed files)", lambda: dotnet_format_changed_paths(paths))
+                if test_projects:
+                    step(".NET test (related projects)", lambda: dotnet_test_projects(test_projects))
+            if dotnet_package_scan:
+                step(".NET vulnerable packages", lambda: check_vulnerable_packages())
 
     if frontend:
         if step("frontend toolchain", lambda: check_frontend_toolchain()) == 0:
+            if frontend_api_types:
+                step("frontend API types", lambda: frontend_command(argparse.Namespace(frontend_command="gen-api-types", check=True)))
             step("frontend ci (tsc + biome)", lambda: frontend_command(argparse.Namespace(frontend_command="ci")))
-            step("frontend test", lambda: frontend_command(argparse.Namespace(frontend_command="test")))
+            if frontend_tests_only:
+                changed_tests = [path for path in paths if path.startswith("frontend/tests/") and path.endswith((".ts", ".tsx"))]
+                if changed_tests:
+                    step(
+                        "frontend test (changed test files)",
+                        lambda: run_frontend_npm(["exec", "vitest", "run", *changed_tests]).returncode,
+                    )
+            else:
+                step("frontend test", lambda: frontend_command(argparse.Namespace(frontend_command="test")))
 
-    if markdown_links:
-        step("markdown links", lambda: check_markdown_links())
+    if scripts_changed:
+        step("scripts standard", lambda: check_scripts_standard())
+        step("policy gate tests", lambda: check_policy_tests())
 
-    step("policy gate tests", lambda: check_policy_tests())
-    step("doc drift", lambda: check_doc_drift())
+    if skills:
+        step("Codex skills", lambda: check_codex_skills())
+
+    if docs:
+        step("doc navigation", lambda: check_doc_navigation())
+        step("doc size budgets", lambda: check_doc_size_budgets())
+        step("doc code fences", lambda: run_module_check("check-doc-code-fences.py", []))
+        if use_case_docs:
+            step("use-case docs", lambda: run_module_check("check-use-case-docs.py", []))
+
+    if markdown_links and (markdown_paths or markdown_links_global):
+        step(
+            "markdown links (changed files)",
+            lambda: check_markdown_links_for_paths(None if markdown_links_global else markdown_paths),
+        )
 
     if api_surface_drift:
         print()

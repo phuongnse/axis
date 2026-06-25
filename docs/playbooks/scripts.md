@@ -28,7 +28,7 @@ During development, run the smallest wrapper that proves the current edit:
 | Docs shape | The focused `python scripts/axis.py check ...` command |
 | Unsure / before review | `$axis-ready-review` |
 
-Do not run `python scripts/axis.py verify` after every small edit. It is the local ready-review boundary.
+Do not run `python scripts/axis.py verify` after every small edit. It is the local ready-review boundary, and it routes checks from the changed path set. When the working tree has staged, unstaged, or untracked files, `verify` checks that working-tree set only; when the working tree is clean, it checks the branch diff against the base.
 
 ## Boundaries
 
@@ -40,6 +40,8 @@ Do not run `python scripts/axis.py verify` after every small edit. It is the loc
 | CI / merge | GitHub workflow full checks |
 
 Set `AXIS_PRE_PUSH_FULL=1` only when you intentionally want pre-push to run the full ready-review command.
+
+`verify` is intentionally changed-path scoped. It runs only checks tied to changed files: related .NET projects/tests for backend paths, frontend CI/tests for frontend paths, docs checks for docs paths, skill checks for repo skills, and policy tests for script/policy changes. CI remains the full authoritative merge matrix.
 
 ## Rules
 
