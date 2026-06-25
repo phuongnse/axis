@@ -278,6 +278,13 @@ def git_ls_files(pattern: str | None = None) -> list[str]:
     return [line for line in git(args).splitlines() if line.strip()]
 
 
+def repo_files(pattern: str | None = None) -> list[str]:
+    args = ["ls-files", "--cached", "--others", "--exclude-standard"]
+    if pattern is not None:
+        args.extend(["--", pattern])
+    return unique_paths(git_lines(args, label=f"repo_files {pattern or '*'}"))
+
+
 TEXT_ENCODING_SUFFIXES = {
     ".cs",
     ".cshtml",
@@ -386,8 +393,8 @@ def text_encoding_issues(paths: Iterable[Path], *, root: Path = ROOT) -> list[st
 
 
 def check_text_encoding(_args: argparse.Namespace | None = None) -> int:
-    paths = [ROOT / path for path in git_ls_files() if should_check_text_encoding(path)]
-    issues = text_encoding_issues(paths)
+    paths = [ROOT / path for path in repo_files() if should_check_text_encoding(path)]
+    issues = text_encoding_issues(paths, root=ROOT)
     if issues:
         print("check-text-encoding FAIL:", file=sys.stderr)
         for issue in issues:
@@ -461,7 +468,7 @@ def check_test_naming(_args: argparse.Namespace | None = None) -> int:
 
 def check_test_project_classification(_args: argparse.Namespace | None = None) -> int:
     failed = False
-    for project in git_ls_files("tests/**/*.csproj"):
+    for project in repo_files("tests/**/*.csproj"):
         name = Path(project).stem
         allowed = (
             re.fullmatch(r"Axis\..*\.(Domain|Application)\.Tests", name)
@@ -491,7 +498,7 @@ def test_unit(args: argparse.Namespace) -> int:
         return rc
     projects = [
         p
-        for p in git_ls_files("tests/**/*.csproj")
+        for p in repo_files("tests/**/*.csproj")
         if re.search(r"/Axis\..*\.(Domain|Application)\.Tests/Axis\..*\.(Domain|Application)\.Tests\.csproj$", p)
     ]
     if not projects:
@@ -1726,7 +1733,7 @@ def raw_doc_command_message(fragment: str) -> str | None:
 
 
 def documented_raw_command_issues(paths: Iterable[str] | None = None, *, root: Path = ROOT) -> list[str]:
-    candidates = paths or git_ls_files()
+    candidates = paths or repo_files()
     issues: list[str] = []
     for path in sorted(candidates):
         normalized = path.replace("\\", "/")

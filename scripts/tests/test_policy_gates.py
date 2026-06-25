@@ -1306,6 +1306,44 @@ def main() -> int:
             paths,
         )
 
+    def test_repo_files_include_tracked_and_untracked_files(self) -> None:
+        outputs = {
+            ("ls-files", "--cached", "--others", "--exclude-standard"): (
+                "docs/tracked.md\n"
+                "docs/untracked.md\n"
+            ),
+        }
+
+        with (
+            mock.patch.object(axis, "exe", side_effect=lambda name: name),
+            mock.patch.object(axis, "run", side_effect=self.fake_git_run(outputs)),
+        ):
+            paths = axis.repo_files()
+
+        self.assertEqual(["docs/tracked.md", "docs/untracked.md"], paths)
+
+    def test_repo_files_include_untracked_files_for_pathspec(self) -> None:
+        outputs = {
+            ("ls-files", "--cached", "--others", "--exclude-standard", "--", "tests/**/*.csproj"): (
+                "tests/Tracked/Axis.Tracked.Domain.Tests/Axis.Tracked.Domain.Tests.csproj\n"
+                "tests/New/Axis.New.Domain.Tests/Axis.New.Domain.Tests.csproj\n"
+            ),
+        }
+
+        with (
+            mock.patch.object(axis, "exe", side_effect=lambda name: name),
+            mock.patch.object(axis, "run", side_effect=self.fake_git_run(outputs)),
+        ):
+            paths = axis.repo_files("tests/**/*.csproj")
+
+        self.assertEqual(
+            [
+                "tests/Tracked/Axis.Tracked.Domain.Tests/Axis.Tracked.Domain.Tests.csproj",
+                "tests/New/Axis.New.Domain.Tests/Axis.New.Domain.Tests.csproj",
+            ],
+            paths,
+        )
+
     def test_changed_name_status_marks_untracked_files_added(self) -> None:
         outputs = {
             ("diff", "--name-status", "base...HEAD"): "M\tdocs/committed.md\n",
@@ -2617,6 +2655,24 @@ class TestTextEncodingGate(unittest.TestCase):
     def test_current_repository_text_encoding_still_passes(self) -> None:
         with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
             self.assertEqual(0, axis.check_text_encoding())
+
+    def test_check_text_encoding_rejects_untracked_utf8_bom(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            path = root / "docs" / "untracked.md"
+            path.parent.mkdir(parents=True)
+            path.write_bytes(b"\xef\xbb\xbf# Title\n")
+
+            with (
+                mock.patch.object(axis, "ROOT", root),
+                mock.patch.object(axis, "repo_files", return_value=["docs/untracked.md"]),
+                contextlib.redirect_stdout(io.StringIO()),
+                contextlib.redirect_stderr(io.StringIO()) as stderr,
+            ):
+                rc = axis.check_text_encoding()
+
+        self.assertEqual(1, rc)
+        self.assertIn("docs/untracked.md: UTF-8 BOM found", stderr.getvalue())
 
 
 class TestDocSizeBudgetGate(unittest.TestCase):
