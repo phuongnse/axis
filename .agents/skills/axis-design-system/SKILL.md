@@ -45,6 +45,7 @@ Read only the docs needed for the touched surface:
    - Update `frontend/src/design-system/primitive-contracts.ts` before broad primitive use.
    - If shadcn provides the primitive, install or copy the shadcn implementation into `frontend/src/components/ui`, keep its standard API/classes, and migrate consumers to that API.
    - Keep `components/ui` shadcn-only with registry kebab-case filenames; put Axis-authored shared components in `components/shared` with `PascalCase.tsx`.
+   - Keep component-owned invariants stronger than caller customization; do not let broad passthrough props create contradictory component states.
    - Do not add ad hoc per-file allowlists for design-system violations; add the missing token, primitive, contract, source provenance, shared component, or documented workaround.
    - Prefer approved source tokens and executable registries over catalog pages, screenshots, or visual baselines.
 
