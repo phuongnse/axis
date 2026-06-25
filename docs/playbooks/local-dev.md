@@ -23,7 +23,7 @@ Use `python scripts/axis.py local-dev certs`. Cert material stays local.
 
 ### Docker endpoint adapter
 
-If Docker is reachable only through Docker Desktop/WSL indirection, fix the shell environment instead of changing tests. Report the execution context when Docker/Testcontainers cannot be reached.
+If Docker is reachable only through Docker Desktop/WSL indirection, correct the shell environment instead of changing tests. Report the execution context when Docker/Testcontainers cannot be reached.
 
 ### Package-manager adapter
 

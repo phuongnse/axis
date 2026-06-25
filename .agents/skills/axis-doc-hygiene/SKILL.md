@@ -21,6 +21,7 @@ Change guidance without growing context load or drifting from the source of trut
 2. Preserve ownership.
    - One fact has one owner; link instead of restating.
    - Prefer durable categories over inventories of current files, commands, statuses, or tools.
+   - Generalize review or incident learning into decision criteria; do not publish symptom-to-remedy recipes.
    - Put repeatable workflow in skills, not prose docs.
    - Treat guidance configs and skill text as maintained docs, not throwaway config.
    - Keep enforcement status in the enforcement ledger, not scattered prose.
@@ -41,4 +42,4 @@ Change guidance without growing context load or drifting from the source of trut
 
 ## Output
 
-Report changed docs, ownership decisions, line/word reduction when relevant, checks run, and any deferred cleanup with an owner.
+Report changed docs, ownership decisions, generalization check, checks run, and any deferred cleanup with an owner.

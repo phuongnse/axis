@@ -1,6 +1,6 @@
 ---
 name: axis-use-case-implementation
-description: Implement Axis use-case slices from specs through tests, code, documentation status, and verification. Use when adding or fixing behavior for a documented use case in docs/use-cases, touching module Domain/Application/Infrastructure/API/Frontend layers, or closing implementation-status gaps. If the requested use case has no owning README or acceptance criteria, first use axis-use-case-spec.
+description: Implement Axis use-case slices from specs through tests, code, documentation status, and verification. Use when adding or changing behavior for a documented use case in docs/use-cases, touching module Domain/Application/Infrastructure/API/Frontend layers, or closing implementation-status gaps. If the requested use case has no owning README or acceptance criteria, first use axis-use-case-spec.
 ---
 
 # Axis Use Case Implementation

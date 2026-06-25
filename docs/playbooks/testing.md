@@ -40,7 +40,7 @@ Before review, `$axis-ready-review` owns triggered checks and `python scripts/ax
 
 ### Integration test maintenance
 
-Fix setup determinism before retrying flaky suites. Confirm preconditions exist before the request/action under test.
+Stabilize setup determinism before retrying flaky suites. Confirm preconditions exist before the request/action under test.
 
 ### ApiTestFixture — module database isolation (ADR-011 + ADR-023)
 
