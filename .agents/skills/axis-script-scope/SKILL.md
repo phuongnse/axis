@@ -30,12 +30,14 @@ Run enough evidence for the current context without turning development into loc
    - Backend: targeted test or `python scripts/axis.py dotnet build`; unit tests when behavior changed.
    - Frontend: focused Vitest/Playwright or `python scripts/axis.py frontend ci` for type/lint risk.
    - API contract: regenerate/check generated contracts only when route/request/response shape changed.
+   - Review follow-up: when a reviewed checkpoint exists, run `python scripts/axis.py verify --since <checkpoint>` so the wrapper selects checks from the follow-up delta plus working tree.
 
 3. Avoid waste.
    - Do not run `verify` after every small edit.
    - Do not run full `.NET` test suite unless debugging CI, high-risk backend behavior, or claiming full-suite evidence.
    - Do not run local-dev stack unless the workflow needs external services or smoke evidence.
    - Do not rerun passing checks unless the diff changed in a way that invalidates them.
+   - Do not rerun full branch review or full branch verification for a review follow-up when a checkpoint-specific delta is available.
 
 4. Use wrappers.
    - Document repo workflows through `python scripts/axis.py ...`.

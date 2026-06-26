@@ -1331,6 +1331,31 @@ def main() -> int:
             paths,
         )
 
+    def test_changed_paths_since_include_checkpoint_and_worktree_paths(self) -> None:
+        outputs = {
+            ("diff", "--name-only", "abc123..HEAD"): "docs/follow-up.md\n",
+            ("diff", "--name-only", "--cached"): "docs/staged.md\n",
+            ("diff", "--name-only"): "docs/unstaged.md\n",
+            ("ls-files", "--others", "--exclude-standard"): "docs/untracked.md\n",
+        }
+
+        with (
+            mock.patch.object(axis, "ref_exists", return_value=True),
+            mock.patch.object(axis, "exe", side_effect=lambda name: name),
+            mock.patch.object(axis, "run", side_effect=self.fake_git_run(outputs)),
+        ):
+            paths = axis.changed_paths_since("abc123")
+
+        self.assertEqual(
+            ["docs/follow-up.md", "docs/staged.md", "docs/unstaged.md", "docs/untracked.md"],
+            paths,
+        )
+
+    def test_changed_paths_since_rejects_missing_checkpoint(self) -> None:
+        with mock.patch.object(axis, "ref_exists", return_value=False):
+            with self.assertRaisesRegex(axis.CheckError, "git ref not found"):
+                axis.changed_paths_since("missing")
+
     def test_verify_scope_prefers_working_tree_paths(self) -> None:
         with (
             mock.patch.object(axis, "working_tree_paths", return_value=["scripts/axis.py"]),
@@ -1352,6 +1377,13 @@ def main() -> int:
 
         self.assertEqual("base...HEAD", scope)
         self.assertEqual(["docs/README.md"], paths)
+
+    def test_verify_scope_uses_since_checkpoint(self) -> None:
+        with mock.patch.object(axis, "changed_paths_since", return_value=["scripts/axis.py"]):
+            scope, paths = axis.verify_scope_paths("abc123")
+
+        self.assertEqual("abc123..HEAD + working tree", scope)
+        self.assertEqual(["scripts/axis.py"], paths)
 
     def test_repo_files_include_tracked_and_untracked_files(self) -> None:
         outputs = {

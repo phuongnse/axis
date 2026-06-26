@@ -215,6 +215,17 @@ def changed_paths(range_spec: str | None = None) -> list[str]:
     )
 
 
+def changed_paths_since(ref: str) -> list[str]:
+    if not ref_exists(f"{ref}^{{commit}}"):
+        raise CheckError(f"verify --since: git ref not found: {ref}")
+    return unique_paths(
+        [
+            *git_lines(["diff", "--name-only", f"{ref}..HEAD"], label=f"changed_paths_since {ref}..HEAD"),
+            *working_tree_paths(),
+        ]
+    )
+
+
 def changed_name_status(range_spec: str | None = None) -> list[list[str]]:
     range_spec = range_spec or diff_range()
     rows: list[list[str]] = []
@@ -2796,7 +2807,9 @@ def dotnet_test_projects(projects: list[str]) -> int:
     return 0
 
 
-def verify_scope_paths() -> tuple[str, list[str]]:
+def verify_scope_paths(since: str | None = None) -> tuple[str, list[str]]:
+    if since:
+        return f"{since}..HEAD + working tree", changed_paths_since(since)
     working_tree = working_tree_paths()
     if working_tree:
         return "working tree", working_tree
@@ -2805,7 +2818,7 @@ def verify_scope_paths() -> tuple[str, list[str]]:
 
 
 def verify(args: argparse.Namespace) -> int:
-    scope, paths = verify_scope_paths()
+    scope, paths = verify_scope_paths(getattr(args, "since", None))
     failed: list[str] = []
 
     def step(name: str, fn: callable[[], int]) -> int:
@@ -3804,7 +3817,9 @@ def main(argv: list[str] | None = None) -> int:
     doctor_parser.set_defaults(func=doctor)
     sub.add_parser("install-hooks").set_defaults(func=install_hooks)
     sub.add_parser("pre-push").set_defaults(func=pre_push)
-    sub.add_parser("verify").set_defaults(func=verify)
+    verify_parser = sub.add_parser("verify")
+    verify_parser.add_argument("--since", help="Scope verification to changes after this checkpoint plus the working tree")
+    verify_parser.set_defaults(func=verify)
 
     dotnet_parser = sub.add_parser("dotnet")
     dotnet_sub = dotnet_parser.add_subparsers(dest="dotnet_command", required=True)
