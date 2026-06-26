@@ -2414,6 +2414,31 @@ class TestLocalDevCli(unittest.TestCase):
         self.assertFalse(check_local_dev_docs.mentions_service("application apiary", "api"))
         self.assertFalse(check_local_dev_docs.mentions_service("otel-lgtms", "otel-lgtm"))
 
+    def test_parse_compose_reports_services_without_ports(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            compose = Path(temp) / "docker-compose.yml"
+            compose.write_text(
+                "services:\n"
+                "  api:\n"
+                "    image: axis-api\n"
+                "    ports:\n"
+                "      - \"127.0.0.1:5281:8443\"\n"
+                "  worker:\n"
+                "    image: axis-worker\n"
+                "  e2e:\n"
+                "    profiles: [\"e2e\"]\n"
+                "    image: axis-e2e\n"
+                "volumes:\n"
+                "  data:\n",
+                encoding="utf-8",
+            )
+
+            services, optional, service_names = check_local_dev_docs.parse_compose(compose)
+
+        self.assertEqual({"api": [5281]}, services)
+        self.assertEqual({"e2e"}, optional)
+        self.assertEqual(["api", "e2e", "worker"], service_names)
+
     def run_local_dev(
         self,
         args: axis.argparse.Namespace,
@@ -3012,6 +3037,30 @@ class TestDocDomainDiscovery(unittest.TestCase):
                 self.assertEqual(["Identity"], axis_repo.iter_module_names())
             finally:
                 axis_repo.ROOT = original_root
+                axis_repo.MODULES_DIR = original_modules_dir
+
+    def test_iter_module_names_fallback_skips_dependency_root(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            modules_dir = Path(temp) / "src" / "Modules"
+            dependency_dir = modules_dir / "node_modules" / "package"
+            dependency_dir.mkdir(parents=True)
+            (dependency_dir / "Generated.cs").write_text(
+                "public sealed class Generated {}",
+                encoding="utf-8",
+            )
+            real_module = modules_dir / "Identity" / "Axis.Identity.Domain"
+            real_module.mkdir(parents=True)
+            (real_module / "Axis.Identity.Domain.csproj").write_text(
+                "<Project />",
+                encoding="utf-8",
+            )
+
+            original_modules_dir = axis_repo.MODULES_DIR
+            axis_repo.MODULES_DIR = modules_dir
+            try:
+                with mock.patch.object(axis_repo, "git_visible_paths_under", return_value=None):
+                    self.assertEqual(["Identity"], axis_repo.iter_module_names())
+            finally:
                 axis_repo.MODULES_DIR = original_modules_dir
 
     def test_module_code_change_alone_does_not_force_doc_activity(self) -> None:

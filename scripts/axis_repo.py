@@ -98,6 +98,7 @@ def iter_module_names() -> list[str]:
         if (
             p.is_dir()
             and not p.name.startswith(".")
+            and p.name not in FALLBACK_GENERATED_OR_DEPENDENCY_DIRS
             and has_module_source(p)
         )
     )

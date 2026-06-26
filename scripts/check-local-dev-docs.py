@@ -37,16 +37,35 @@ def mentions_service(doc: str, service_name: str) -> bool:
     return service_pattern.search(doc.lower()) is not None
 
 
+def services_section(text: str) -> str:
+    lines = text.splitlines(keepends=True)
+    body: list[str] = []
+    in_services = False
+    for line in lines:
+        if not in_services:
+            if line.startswith("services:"):
+                in_services = True
+            continue
+        if line.strip() and not line.startswith((" ", "\t")):
+            break
+        body.append(line)
+    return "".join(body)
+
+
 def parse_compose(compose_file: Path) -> tuple[dict[str, list[int]], set[str], list[str]]:
     text = compose_file.read_text(encoding="utf-8")
+    service_text = services_section(text)
     services: dict[str, list[int]] = {}
     optional_services: set[str] = set()
+    service_names: list[str] = []
 
-    for match in SERVICE_BLOCK.finditer(text):
+    for match in SERVICE_BLOCK.finditer(service_text):
         name = match.group(1)
         block = match.group(2)
         if name == "volumes":
             continue
+
+        service_names.append(name)
 
         profile_match = PROFILE_LINE.search(block)
         if profile_match:
@@ -56,8 +75,7 @@ def parse_compose(compose_file: Path) -> tuple[dict[str, list[int]], set[str], l
         if ports:
             services[name] = ports
 
-    service_names = sorted(services.keys())
-    return services, optional_services, service_names
+    return services, optional_services, sorted(service_names)
 
 
 def mandatory_host_ports(services: dict[str, list[int]], optional: set[str]) -> set[int]:
@@ -80,8 +98,7 @@ def check_local_dev_doc() -> list[str]:
     if errors:
         return errors
 
-    main_services, main_optional, _main_service_names = parse_compose(MAIN_COMPOSE_FILE)
-    service_names = sorted(main_services.keys())
+    main_services, main_optional, service_names = parse_compose(MAIN_COMPOSE_FILE)
     doc = LOCAL_DEV_FILE.read_text(encoding="utf-8")
 
     doc_lower = doc.lower()
