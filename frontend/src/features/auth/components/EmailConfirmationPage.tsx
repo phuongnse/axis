@@ -32,7 +32,7 @@ export function EmailConfirmationPage() {
     >
       <div className="space-y-4">
         <div className="flex items-start gap-3">
-          <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-state-info-background text-state-info-foreground">
+          <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-100 text-blue-800 dark:bg-blue-500/15 dark:text-blue-300">
             <Mail className="h-4 w-4" aria-hidden />
           </div>
           <div className="space-y-2 text-sm text-muted-foreground">

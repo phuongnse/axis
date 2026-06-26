@@ -17,8 +17,6 @@ Recurring rule classes and their enforcement status.
 | Finding class | Rule owner | Trigger / scope | Mechanism | Proof / gap | Status |
 |---|---|---|---|---|---|
 | REST API/SPA wire drift | [docs/playbooks/api-patterns.md](./playbooks/api-patterns.md) | REST DTO, endpoint, `openapi.json`, or generated SPA types | OpenAPI snapshot tests; `python scripts/axis.py frontend gen-api-types` | Generated SPA types must match `openapi.json`; contract changes need focused API tests | Enforced |
-| Frontend route/component contract drift | [docs/playbooks/design-system.md](./playbooks/design-system.md) | Route-bound frontend surfaces | `python scripts/axis.py check frontend-component-composition` | Negative policy tests prove missing contracts and metadata fail | Enforced |
-| Raw frontend style bypasses tokens | [docs/playbooks/design-system.md](./playbooks/design-system.md) | Frontend styling changes | `python scripts/axis.py check frontend-style` | Negative policy tests prove token bypasses fail outside approved primitive sources | Enforced |
 | Skipped tests added | [AGENTS.md](../AGENTS.md) | Added or changed tests | Added-line policy check rejects `Skip =` under tests | Existing policy tests cover the check | Enforced |
 | Database setup bypasses migrations | [AGENTS.md](../AGENTS.md) | Source or test database setup changes | Added-line policy check rejects `EnsureCreated` / `EnsureCreatedAsync` | Existing policy tests cover the check | Enforced |
 | Domain external dependency | [AGENTS.md](../AGENTS.md) | Domain project changes | Architecture tests | Reflection catches common infrastructure dependencies in Domain assemblies | Enforced |

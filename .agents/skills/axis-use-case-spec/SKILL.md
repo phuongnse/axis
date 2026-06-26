@@ -7,7 +7,7 @@ description: Draft or complete Axis docs-first use-case specifications before im
 
 ## Goal
 
-Create or tighten the owning use-case spec so implementation can follow spec -> design-system contract -> tests -> code -> verification without invented behavior, blank AC rows, placeholder docs, or missing visual artifacts.
+Create or tighten the owning use-case spec so implementation can follow spec -> design requirements -> tests -> code -> verification without invented behavior, blank AC rows, placeholder docs, or missing visual artifacts.
 
 ## Inputs
 
@@ -47,8 +47,9 @@ Create or tighten the owning use-case spec so implementation can follow spec -> 
    - If the selected runner is not installed yet, record that adding the harness is a new-library Design Gate decision before implementation.
    - Split oversized work into isolated slices and record the slice boundary in `Decisions` or `Deferred follow-ups`.
 
-4. Define design-system and visual evidence.
-   - Add `## Design System` with `Surface | Contract` rows for UI primitives, tokens, states, accessibility, and consumer contracts; use one `N/A` row only when no UI surface exists.
+4. Define design requirements and visual evidence.
+   - Add `## Design System` with `Surface | Contract` rows for required UI primitives, states, accessibility, and visual contracts; use one `N/A` row only when no UI surface exists.
+   - If no approved design-system implementation exists, state the missing requirement in `## Design System` and keep the affected frontend status incomplete.
    - For user-facing screens, use `$axis-visual-artifact` to create or update design-source links, optional previews, and the `## Design Sources` table.
    - Add `## Screen flow` when the journey has more than three screens, branched happy paths, or non-obvious error screens.
    - Add Mermaid diagrams for non-trivial workflow or sequence behavior; use use-case vocabulary and keep local diagrams in the owning README.

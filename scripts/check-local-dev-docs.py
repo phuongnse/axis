@@ -15,8 +15,6 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 MAIN_COMPOSE_FILE = ROOT / "docker-compose.yml"
-OPEN_DESIGN_COMPOSE_FILE = ROOT / "docker-compose.open-design.yml"
-COMPOSE_FILES = (MAIN_COMPOSE_FILE, OPEN_DESIGN_COMPOSE_FILE)
 LOCAL_DEV_FILE = ROOT / "docs/playbooks/local-dev.md"
 TECH_STACK_FILE = ROOT / "docs/TECH_STACK.md"
 
@@ -75,17 +73,15 @@ def mandatory_host_ports(services: dict[str, list[int]], optional: set[str]) -> 
 def check_local_dev_doc() -> list[str]:
     errors: list[str] = []
 
-    for compose_file in COMPOSE_FILES:
-        if not compose_file.is_file():
-            errors.append(f"Missing {compose_file.relative_to(ROOT)}")
+    if not MAIN_COMPOSE_FILE.is_file():
+        errors.append(f"Missing {MAIN_COMPOSE_FILE.relative_to(ROOT)}")
     if not LOCAL_DEV_FILE.is_file():
         errors.append(f"Missing {LOCAL_DEV_FILE.relative_to(ROOT)}")
     if errors:
         return errors
 
     main_services, main_optional, _main_service_names = parse_compose(MAIN_COMPOSE_FILE)
-    open_design_services, open_design_optional, _open_design_service_names = parse_compose(OPEN_DESIGN_COMPOSE_FILE)
-    service_names = sorted({*main_services.keys(), *open_design_services.keys()})
+    service_names = sorted(main_services.keys())
     doc = LOCAL_DEV_FILE.read_text(encoding="utf-8")
 
     doc_lower = doc.lower()
@@ -106,22 +102,12 @@ def check_local_dev_doc() -> list[str]:
                 f"(published by docker-compose.yml)"
             )
 
-    for host_port in sorted(mandatory_host_ports(open_design_services, open_design_optional)):
-        if str(host_port) not in doc:
-            errors.append(
-                f"local-dev.md missing host port {host_port} "
-                f"(published by docker-compose.open-design.yml)"
-            )
-
     for service_name in service_names:
         if not mentions_service(doc, service_name):
             errors.append(
                 f"local-dev.md missing service name '{service_name}' "
-                f"(defined in local compose files)"
+                f"(defined in docker-compose.yml)"
             )
-
-    if "docker-compose.open-design.yml" not in doc or "open-design up" not in doc:
-        errors.append("local-dev.md missing Docker Open Design workflow")
 
     if "observability" not in doc_lower:
         errors.append("local-dev.md missing observability profile documentation")

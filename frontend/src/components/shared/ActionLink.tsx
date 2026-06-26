@@ -19,22 +19,19 @@ interface ActionLinkProps extends Omit<RouterLinkProps, 'children' | 'className'
 
 const actionLinkClass: Record<ActionLinkSurface, Record<ActionLinkVariant, string>> = {
   default: {
-    primary:
-      'border-action-accent-border bg-accent text-accent-foreground shadow-accent-control hover:bg-accent/90',
+    primary: 'border-primary bg-primary text-primary-foreground shadow-sm hover:bg-primary/90',
     secondary:
       'border-border bg-background text-foreground hover:bg-muted hover:text-foreground dark:border-input dark:bg-input/30 dark:hover:bg-input/50',
   },
   inverted: {
-    primary:
-      'border-inverse-foreground bg-inverse-foreground text-inverse hover:bg-inverse-foreground/90',
-    secondary:
-      'border-inverse-border bg-inverse-muted text-inverse-foreground hover:bg-inverse-muted',
+    primary: 'border-white bg-white text-slate-950 shadow-sm hover:bg-white/90',
+    secondary: 'border-white/20 bg-white/10 text-white hover:bg-white/15',
   },
   adaptive: {
     primary:
-      'border-action-accent-border bg-accent text-accent-foreground shadow-accent-control hover:bg-accent/90 dark:border-inverse-foreground dark:bg-inverse-foreground dark:text-inverse dark:hover:bg-inverse-foreground/90',
+      'border-primary bg-primary text-primary-foreground shadow-sm hover:bg-primary/90 dark:border-white dark:bg-white dark:text-slate-950 dark:hover:bg-white/90',
     secondary:
-      'border-border bg-background text-foreground hover:bg-muted hover:text-foreground dark:border-inverse-border dark:bg-inverse-muted dark:text-inverse-foreground dark:hover:bg-inverse-muted',
+      'border-border bg-background text-foreground hover:bg-muted hover:text-foreground dark:border-white/20 dark:bg-white/10 dark:text-white dark:hover:bg-white/15',
   },
 };
 
