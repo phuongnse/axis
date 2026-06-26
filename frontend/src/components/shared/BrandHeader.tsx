@@ -13,8 +13,8 @@ interface BrandHeaderProps {
 
 const labelToneClass: Record<BrandHeaderTone, string> = {
   default: 'text-muted-foreground',
-  inverted: 'text-inverse-muted',
-  adaptive: 'text-muted-foreground dark:text-inverse-muted',
+  inverted: 'text-white/60',
+  adaptive: 'text-muted-foreground dark:text-white/60',
 };
 
 function BrandHeader({ label, labelElement = 'p', tone = 'default' }: BrandHeaderProps) {

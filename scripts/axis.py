@@ -37,18 +37,9 @@ TECH_STACK_DOC = "docs/TECH_STACK.md"
 GLOBAL_JSON_PATH = ROOT / "global.json"
 NVMRC_PATH = ROOT / "frontend" / ".nvmrc"
 LOCAL_DEV_COMPOSE_FILE = ROOT / "docker-compose.yml"
-OPEN_DESIGN_COMPOSE_FILE = ROOT / "docker-compose.open-design.yml"
 LOCAL_DEV_ENV_FILE = ROOT / ".env.local"
 LOCAL_DEV_PROJECT_NAME = "axis"
-OPEN_DESIGN_PROJECT_NAME = f"{LOCAL_DEV_PROJECT_NAME}-open-design"
 LOCAL_DEV_POSTGRES_VOLUME = f"{LOCAL_DEV_PROJECT_NAME}_postgres_data"
-OPEN_DESIGN_SOURCE_DIR = Path.home() / "open-design"
-OPEN_DESIGN_GIT_URL = "https://github.com/nexu-io/open-design.git"
-OPEN_DESIGN_LOCAL_IMAGE = "axis-open-design:local"
-OPEN_DESIGN_SERVICE = "open-design"
-OPEN_DESIGN_VOLUME_NAME = "axis_open_design_data"
-OPEN_DESIGN_CODEX_BIN_FALLBACK_DIR = Path.home() / ".cache" / "axis" / "codex-bin"
-OPEN_DESIGN_CODEX_HOME_FALLBACK_DIR = Path.home() / ".cache" / "axis" / "codex-home"
 API_PROJECT = ROOT / "src" / "Axis.Api" / "Axis.Api.csproj"
 FRONTEND_DIR = ROOT / "frontend"
 LOCAL_CERT_DIR = ROOT / ".dev-certs"
@@ -150,7 +141,7 @@ def run_optional(
 
 
 def git(args: list[str], *, capture: bool = True, check: bool = True) -> str:
-    result = run([exe("git"), *args], capture=capture, check=check)
+    result = run([exe("git"), *args], cwd=ROOT, capture=capture, check=check)
     return result.stdout if result.stdout is not None else ""
 
 
@@ -176,7 +167,7 @@ def diff_range() -> str:
 
 
 def git_lines(args: list[str], *, label: str) -> list[str]:
-    result = run([exe("git"), *args], capture=True, check=False)
+    result = run([exe("git"), *args], cwd=ROOT, capture=True, check=False)
     if result.returncode != 0:
         detail = (result.stderr or result.stdout or "").strip()
         raise CheckError(f"{label}: git {' '.join(args)} failed: {detail}")
@@ -281,6 +272,23 @@ def run_module_check(script_name: str, args: list[str]) -> int:
 def iter_files(root: Path, suffixes: tuple[str, ...]) -> Iterable[Path]:
     if not root.exists():
         return []
+    try:
+        relative_root = root.relative_to(ROOT)
+    except ValueError:
+        relative_root = None
+
+    if relative_root is not None:
+        try:
+            paths = repo_files(str(relative_root))
+        except CheckError:
+            paths = []
+        else:
+            return (
+                ROOT / path
+                for path in paths
+                if (ROOT / path).is_file() and (ROOT / path).suffix in suffixes
+            )
+
     return (
         p
         for p in root.rglob("*")
@@ -645,336 +653,8 @@ def check_frontend_api_contracts(_args: argparse.Namespace | None = None) -> int
     return 0
 
 
-def parse_frontend_primitive_contracts(contract_text: str) -> list[dict[str, object]]:
-    block_pattern = re.compile(
-        r"\{\s*"
-        r"component:\s*'(?P<component>[^']+)'\s*,\s*"
-        r"file:\s*'(?P<file>[^']+)'\s*,\s*"
-        r"testFiles:\s*\[(?P<tests>[^\]]*)\]\s*,\s*"
-        r"(?:(?:source:\s*'(?P<source>[^']+)'\s*,\s*)?)"
-        r"(?:(?:sourceItem:\s*'(?P<source_item>[^']+)'\s*,\s*)?)"
-        r"(?:(?:sourceReason:\s*'(?P<source_reason>[^']+)'\s*,\s*)?)"
-        r"(?:(?:readiness:\s*'(?P<readiness>[^']+)'\s*,\s*"
-        r"variants:\s*\[(?P<variants>[^\]]*)\]\s*,\s*"
-        r"states:\s*\[(?P<states>[^\]]*)\]\s*,\s*"
-        r"accessibility:\s*\[(?P<accessibility>[^\]]*)\]\s*,\s*"
-        r"tokenFamilies:\s*\[(?P<token_families>[^\]]*)\]\s*,?\s*)?)"
-        r"\}",
-        re.DOTALL,
-    )
-    value_pattern = re.compile(r"'([^']+)'")
-    contracts: list[dict[str, object]] = []
-
-    for match in block_pattern.finditer(contract_text):
-        contracts.append(
-            {
-                "component": match.group("component"),
-                "file": match.group("file"),
-                "testFiles": value_pattern.findall(match.group("tests")),
-                "source": match.group("source") or "",
-                "sourceItem": match.group("source_item") or "",
-                "sourceReason": match.group("source_reason") or "",
-                "readiness": match.group("readiness") or "",
-                "variants": value_pattern.findall(match.group("variants") or ""),
-                "states": value_pattern.findall(match.group("states") or ""),
-                "accessibility": value_pattern.findall(match.group("accessibility") or ""),
-                "tokenFamilies": value_pattern.findall(match.group("token_families") or ""),
-            }
-        )
-
-    return contracts
-
-
-def frontend_primitive_contract_issues(root: Path = ROOT) -> list[str]:
+def frontend_component_file_name_issues(root: Path = ROOT) -> list[str]:
     issues: list[str] = []
-    ui_root = root / "frontend" / "src" / "components" / "ui"
-    if not ui_root.exists():
-        return issues
-
-    ui_files = sorted(
-        str(path.relative_to(root)).replace("\\", "/")
-        for path in iter_files(ui_root, (".tsx",))
-    )
-    if not ui_files:
-        return issues
-
-    contract_path = root / "frontend" / "src" / "design-system" / "primitive-contracts.ts"
-    if not contract_path.is_file():
-        return [f"{path_label(contract_path)}: missing primitive contract registry"]
-
-    allowed_token_families = {
-        "border",
-        "breakpoint",
-        "color",
-        "motion",
-        "radius",
-        "shadow",
-        "sizing",
-        "spacing",
-        "typography",
-    }
-    contracts = parse_frontend_primitive_contracts(contract_path.read_text(encoding="utf-8"))
-    contracted_files = sorted(str(contract["file"]) for contract in contracts)
-
-    missing_contracts = sorted(set(ui_files) - set(contracted_files))
-    stale_contracts = sorted(set(contracted_files) - set(ui_files))
-    for file_path in missing_contracts:
-        issues.append(
-            f"{file_path}: UI primitive must be listed in frontend/src/design-system/primitive-contracts.ts"
-        )
-    for file_path in stale_contracts:
-        issues.append(
-            f"frontend/src/design-system/primitive-contracts.ts: stale primitive contract for missing file {file_path}"
-        )
-
-    for contract in contracts:
-        component = str(contract["component"])
-        file_path = str(contract["file"])
-        test_files = list(contract["testFiles"])
-        source = str(contract["source"])
-        source_item = str(contract["sourceItem"])
-        readiness = str(contract["readiness"])
-        token_families = list(contract["tokenFamilies"])
-
-        if not test_files:
-            issues.append(f"{file_path}: {component} contract must name at least one test file")
-        if source != "shadcn":
-            issues.append(
-                f"{file_path}: {component} contract source must be `shadcn`; "
-                "Axis-owned components belong outside frontend/src/components/ui"
-            )
-        if not re.fullmatch(r"@shadcn/[A-Za-z0-9][A-Za-z0-9._/-]*", source_item):
-            issues.append(f"{file_path}: {component} shadcn contract must name sourceItem `@shadcn/...`")
-        if readiness not in {"ready", "candidate"}:
-            issues.append(f"{file_path}: {component} contract readiness must be `ready` or `candidate`")
-        for field_name in ("variants", "states", "accessibility", "tokenFamilies"):
-            if not list(contract[field_name]):
-                issues.append(f"{file_path}: {component} contract must list at least one {field_name} value")
-        unknown_token_families = sorted(set(token_families) - allowed_token_families)
-        if unknown_token_families:
-            joined_values = ", ".join(f"`{value}`" for value in unknown_token_families)
-            issues.append(
-                f"{file_path}: {component} contract has unknown tokenFamilies values: {joined_values}"
-            )
-
-        for test_file in test_files:
-            if not (root / test_file).is_file():
-                issues.append(f"{file_path}: test file `{test_file}` does not exist")
-
-    return issues
-
-
-def parse_frontend_consumer_contracts(contract_text: str) -> list[dict[str, object]]:
-    block_pattern = re.compile(
-        r"\{\s*"
-        r"surface:\s*'(?P<surface>[^']+)'\s*,\s*"
-        r"kind:\s*'(?P<kind>[^']+)'\s*,\s*"
-        r"route:\s*'(?P<route>[^']+)'\s*,\s*"
-        r"component:\s*'(?P<component>[^']+)'\s*,\s*"
-        r"file:\s*'(?P<file>[^']+)'\s*,\s*"
-        r"owner:\s*'(?P<owner>[^']+)'\s*,\s*"
-        r"readiness:\s*'(?P<readiness>[^']+)'\s*,\s*"
-        r"primitives:\s*\[(?P<primitives>[^\]]*)\]\s*,\s*"
-        r"states:\s*\[(?P<states>[^\]]*)\]\s*,\s*"
-        r"evidence:\s*\[(?P<evidence>[^\]]*)\]\s*,\s*"
-        r"testFiles:\s*\[(?P<tests>[^\]]*)\]\s*,?\s*"
-        r"\}",
-        re.DOTALL,
-    )
-    value_pattern = re.compile(r"'([^']+)'")
-    contracts: list[dict[str, object]] = []
-
-    for match in block_pattern.finditer(contract_text):
-        contracts.append(
-            {
-                "surface": match.group("surface"),
-                "kind": match.group("kind"),
-                "route": match.group("route"),
-                "component": match.group("component"),
-                "file": match.group("file"),
-                "owner": match.group("owner"),
-                "readiness": match.group("readiness"),
-                "primitives": value_pattern.findall(match.group("primitives")),
-                "states": value_pattern.findall(match.group("states")),
-                "evidence": value_pattern.findall(match.group("evidence")),
-                "testFiles": value_pattern.findall(match.group("tests")),
-            }
-        )
-
-    return contracts
-
-
-def frontend_route_consumer_files(root: Path = ROOT) -> list[str]:
-    route_root = root / "frontend" / "src" / "routes"
-    if not route_root.exists():
-        return []
-
-    import_pattern = re.compile(
-        r"import\s+(?!type\b)(?:[^'\";]+?)\s+from\s+['\"]@/"
-        r"(?P<source>(?:features/[^/'\"]+(?:/components/[^'\"]+)?|components/shared/[^'\"]+))['\"]"
-    )
-    consumer_files: set[str] = set()
-    for path in iter_files(route_root, (".tsx",)):
-        normalized = rel(path) if root == ROOT else str(path.relative_to(root)).replace("\\", "/")
-        if normalized.endswith("routeTree.gen.ts"):
-            continue
-
-        text = path.read_text(encoding="utf-8")
-        for match in import_pattern.finditer(text):
-            source = match.group("source")
-            base = root / "frontend" / "src" / source
-            candidates = (
-                base.with_suffix(".tsx"),
-                base.with_suffix(".ts"),
-                base / "index.tsx",
-                base / "index.ts",
-            )
-            for candidate in candidates:
-                if candidate.is_file():
-                    consumer_files.add(str(candidate.relative_to(root)).replace("\\", "/"))
-                    break
-
-    return sorted(consumer_files)
-
-
-def frontend_consumer_contract_issues(root: Path = ROOT) -> list[str]:
-    issues: list[str] = []
-    consumer_files = frontend_route_consumer_files(root)
-    if not consumer_files:
-        return issues
-
-    contract_path = root / "frontend" / "src" / "design-system" / "consumer-contracts.ts"
-    if not contract_path.is_file():
-        return [f"{path_label(contract_path)}: missing consumer contract registry"]
-
-    allowed_kinds = {"public", "auth", "authenticated"}
-    allowed_evidence = {
-        "api-state",
-        "auth-state",
-        "e2e-smoke",
-        "form-state",
-        "i18n",
-        "layout-state",
-        "route-state",
-        "unit-test",
-    }
-    contracts = parse_frontend_consumer_contracts(contract_path.read_text(encoding="utf-8"))
-    contracted_files = sorted(str(contract["file"]) for contract in contracts)
-
-    missing_contracts = sorted(set(consumer_files) - set(contracted_files))
-    stale_contracts = sorted(set(contracted_files) - set(consumer_files))
-    for file_path in missing_contracts:
-        issues.append(
-            f"{file_path}: route-bound UI consumer must be listed in frontend/src/design-system/consumer-contracts.ts"
-        )
-    for file_path in stale_contracts:
-        issues.append(
-            f"frontend/src/design-system/consumer-contracts.ts: stale consumer contract for missing route-bound file {file_path}"
-        )
-
-    declared_routes: set[str] = set()
-    route_root = root / "frontend" / "src" / "routes"
-    route_declaration_pattern = re.compile(
-        r"create(?:Lazy)?FileRoute\(\s*['\"](?P<route>[^'\"]+)['\"]"
-    )
-    if route_root.exists():
-        for path in iter_files(route_root, (".tsx",)):
-            route_text = path.read_text(encoding="utf-8")
-            declared_routes.update(match.group("route") for match in route_declaration_pattern.finditer(route_text))
-
-    for contract in contracts:
-        component = str(contract["component"])
-        file_path = str(contract["file"])
-        kind = str(contract["kind"])
-        route = str(contract["route"])
-        owner = str(contract["owner"])
-        readiness = str(contract["readiness"])
-        evidence = list(contract["evidence"])
-        test_files = list(contract["testFiles"])
-
-        if kind not in allowed_kinds:
-            issues.append(f"{file_path}: {component} contract kind must be public, auth, or authenticated")
-        if readiness not in {"ready", "candidate"}:
-            issues.append(f"{file_path}: {component} contract readiness must be `ready` or `candidate`")
-        if route not in declared_routes:
-            issues.append(f"{file_path}: {component} contract route `{route}` is not declared in frontend routes")
-        if not owner:
-            issues.append(f"{file_path}: {component} contract must name an owner")
-        for field_name in ("primitives", "states", "evidence", "testFiles"):
-            if not list(contract[field_name]):
-                issues.append(f"{file_path}: {component} contract must list at least one {field_name} value")
-
-        unknown_evidence = sorted(set(evidence) - allowed_evidence)
-        if unknown_evidence:
-            joined_values = ", ".join(f"`{value}`" for value in unknown_evidence)
-            issues.append(f"{file_path}: {component} contract has unknown evidence values: {joined_values}")
-
-        for test_file in test_files:
-            if not (root / test_file).is_file():
-                issues.append(f"{file_path}: test file `{test_file}` does not exist")
-
-    return issues
-
-
-def frontend_shadcn_primitive_files(root: Path = ROOT) -> set[str]:
-    contract_path = root / "frontend" / "src" / "design-system" / "primitive-contracts.ts"
-    if not contract_path.is_file():
-        return set()
-
-    contracts = parse_frontend_primitive_contracts(contract_path.read_text(encoding="utf-8"))
-    ui_root = root / "frontend" / "src" / "components" / "ui"
-    shadcn_files: set[str] = set()
-    for contract in contracts:
-        file_path = str(contract["file"])
-        candidate = root / file_path
-        if (
-            str(contract["source"]) == "shadcn"
-            and candidate.is_file()
-            and candidate.parent == ui_root
-            and candidate.suffix == ".tsx"
-        ):
-            shadcn_files.add(file_path)
-    return shadcn_files
-
-
-def frontend_radius_token_issues(root: Path = ROOT) -> list[str]:
-    issues: list[str] = []
-    token_css = root / "frontend" / "src" / "design-system" / "tokens.css"
-    if not token_css.is_file():
-        return [f"{rel(token_css) if root == ROOT else token_css}: missing radius token source"]
-
-    css = token_css.read_text(encoding="utf-8")
-    if "--radius: 0.5rem;" not in css:
-        issues.append(
-            "frontend/src/design-system/tokens.css: --radius must stay 0.5rem (8px panel token)"
-        )
-
-    src_root = root / "frontend" / "src"
-    if not src_root.exists():
-        return issues
-
-    oversized = re.compile(r"\brounded-(xl|2xl|3xl)\b")
-    arbitrary = re.compile(r"\brounded-\[([^\]]+)\]")
-    shadcn_primitive_files = frontend_shadcn_primitive_files(root)
-    for path in iter_files(src_root, (".ts", ".tsx")):
-        normalized = rel(path) if root == ROOT else str(path.relative_to(root)).replace("\\", "/")
-        if normalized in shadcn_primitive_files:
-            continue
-        text = path.read_text(encoding="utf-8")
-        for idx, line in enumerate(text.splitlines(), 1):
-            if oversized.search(line):
-                issues.append(f"{normalized}:{idx}: avoid radius above 8px on core UI surfaces: {line.strip()}")
-            match = arbitrary.search(line)
-            if match and "var(--radius" not in match.group(1):
-                issues.append(f"{normalized}:{idx}: use shared radius tokens instead of arbitrary radius: {line.strip()}")
-    return issues
-
-
-def frontend_component_composition_issues(root: Path = ROOT) -> list[str]:
-    issues: list[str] = [
-        *frontend_primitive_contract_issues(root),
-        *frontend_consumer_contract_issues(root),
-    ]
     src_root = root / "frontend" / "src"
     route_root = src_root / "routes"
     ui_root = src_root / "components" / "ui"
@@ -1034,17 +714,6 @@ def frontend_component_composition_issues(root: Path = ROOT) -> list[str]:
     return issues
 
 
-def check_frontend_component_composition(_args: argparse.Namespace | None = None) -> int:
-    issues = frontend_component_composition_issues()
-    if issues:
-        for issue in issues:
-            print(f"check-frontend-component-composition FAIL: {issue}", file=sys.stderr)
-        print("\nSee docs/playbooks/frontend.md#component-design", file=sys.stderr)
-        return 1
-    print("check-frontend-component-composition: OK")
-    return 0
-
-
 def frontend_tailwind_opacity_issues(root: Path = ROOT) -> list[str]:
     issues: list[str] = []
     src_root = root / "frontend" / "src"
@@ -1073,88 +742,6 @@ def frontend_tailwind_opacity_issues(root: Path = ROOT) -> list[str]:
                         f"{normalized}:{idx}: unsupported Tailwind opacity-{value}; use opacity-0, opacity-5, opacity-10...opacity-100"
                     )
     return issues
-
-
-def frontend_design_token_usage_issues(root: Path = ROOT) -> list[str]:
-    issues: list[str] = []
-    src_root = root / "frontend" / "src"
-    if not src_root.exists():
-        return issues
-
-    raw_neutral_color = re.compile(
-        r"\b(?:bg|text|border|from|via|to|ring|divide|placeholder|decoration|outline)-"
-        r"(?:white|black|slate|gray|zinc|neutral|stone)(?:-\d{2,3})?(?:/[A-Za-z0-9.[\\]-]+)?\b"
-    )
-    raw_shadow = re.compile(
-        r"(?<![-\w])(?:shadow(?![-\w])|shadow-(?:sm|md|lg|xl|2xl|inner|none|\[[^\]]+\]))"
-    )
-    arbitrary_color = re.compile(
-        r"\b(?:bg|text|border|from|via|to|ring|divide|placeholder|decoration|outline)-"
-        r"\[(?:linear-gradient|radial-gradient|hsl|rgb|#)[^\]]+\]"
-    )
-    shadcn_primitive_files = frontend_shadcn_primitive_files(root)
-
-    for path in iter_files(src_root, (".ts", ".tsx")):
-        normalized = rel(path) if root == ROOT else str(path.relative_to(root)).replace("\\", "/")
-        if normalized in shadcn_primitive_files:
-            continue
-        text = path.read_text(encoding="utf-8")
-        inside_contract_token_families = False
-        inside_type_alias = False
-        for idx, line in enumerate(text.splitlines(), 1):
-            stripped = line.strip()
-            if inside_type_alias:
-                if ";" in stripped:
-                    inside_type_alias = False
-                continue
-
-            if re.match(r"(?:export\s+)?type\s+\w+\s*=", stripped):
-                if ";" not in stripped:
-                    inside_type_alias = True
-                continue
-
-            if inside_contract_token_families:
-                if "]" in line:
-                    inside_contract_token_families = False
-                continue
-
-            if "tokenFamilies:" in line:
-                if "]" not in line.split("tokenFamilies:", 1)[1]:
-                    inside_contract_token_families = True
-                continue
-
-            if raw_neutral_color.search(line):
-                issues.append(
-                    f"{normalized}:{idx}: use semantic color tokens instead of raw neutral Tailwind color utilities: {line.strip()}"
-                )
-            if raw_shadow.search(line):
-                issues.append(
-                    f"{normalized}:{idx}: use named shadow tokens instead of raw Tailwind shadow utilities: {line.strip()}"
-                )
-            if arbitrary_color.search(line):
-                issues.append(
-                    f"{normalized}:{idx}: move arbitrary color or gradient values into design-system tokens: {line.strip()}"
-                )
-    return issues
-
-
-def frontend_style_issues(root: Path = ROOT) -> list[str]:
-    return [
-        *frontend_radius_token_issues(root),
-        *frontend_tailwind_opacity_issues(root),
-        *frontend_design_token_usage_issues(root),
-    ]
-
-
-def check_frontend_style(_args: argparse.Namespace | None = None) -> int:
-    issues = frontend_style_issues()
-    if issues:
-        for issue in issues:
-            print(f"check-frontend-style FAIL: {issue}", file=sys.stderr)
-        print("\nSee docs/playbooks/frontend.md#styling", file=sys.stderr)
-        return 1
-    print("check-frontend-style: OK")
-    return 0
 
 
 def frontend_form_schema_type_issues(root: Path = ROOT) -> list[str]:
@@ -1210,6 +797,8 @@ def frontend_test_async_boundary_issues(root: Path = ROOT) -> list[str]:
 
 def frontend_quality_issues(root: Path = ROOT) -> list[str]:
     return [
+        *frontend_component_file_name_issues(root),
+        *frontend_tailwind_opacity_issues(root),
         *frontend_form_schema_type_issues(root),
         *frontend_test_async_boundary_issues(root),
     ]
@@ -2280,8 +1869,6 @@ def check_doc_drift(_args: argparse.Namespace | None = None) -> int:
         ("check-codex-skills", check_codex_skills),
         ("check-ef-domain-mapping", check_ef_domain_mapping),
         ("check-frontend-api-contracts", check_frontend_api_contracts),
-        ("check-frontend-style", check_frontend_style),
-        ("check-frontend-component-composition", check_frontend_component_composition),
         ("check-frontend-quality", check_frontend_quality),
         ("check-use-case-docs.py", lambda _=None: run_module_check("check-use-case-docs.py", ["--check"])),
         ("check-doc-link-targets.py", lambda _=None: run_module_check("check-doc-link-targets.py", ["--check"])),
@@ -2294,7 +1881,7 @@ def check_doc_drift(_args: argparse.Namespace | None = None) -> int:
         if checker() != 0:
             issues.append(f"{name} failed")
 
-    if any_changed(paths, r"^docker-compose(?:[.]open-design)?[.]yml$") and not docs_changed_under(paths, "docs/playbooks/local-dev.md"):
+    if any_changed(paths, r"^docker-compose[.]yml$") and not docs_changed_under(paths, "docs/playbooks/local-dev.md"):
         fail(issues, "local compose file changed but docs/playbooks/local-dev.md not updated in this PR")
 
     if issues:
@@ -2636,33 +2223,6 @@ def frontend_command(args: argparse.Namespace) -> int:
                 file=sys.stderr,
             )
         return diff.returncode
-    if command == "gen-design-tokens":
-        generated_paths = [
-            "frontend/src/design-system/tokens.css",
-            "frontend/src/design-system/tokens.ts",
-            "frontend/src/design-system/tailwind-tokens.js",
-        ]
-        before = run(
-            [exe("git"), "diff", "--", *generated_paths],
-            capture=True,
-            check=False,
-        ).stdout
-        result = run_frontend_npm(["run", "gen:design-tokens"])
-        if result.returncode != 0 or not args.check:
-            return result.returncode
-        after = run(
-            [exe("git"), "diff", "--", *generated_paths],
-            capture=True,
-            check=False,
-        ).stdout
-        if before != after:
-            print(
-                "frontend gen-design-tokens: generated design-token files are stale - "
-                "run `python scripts/axis.py frontend gen-design-tokens` and commit the result",
-                file=sys.stderr,
-            )
-            return 1
-        return 0
     if command == "script":
         npm_args = ["run", args.script_name]
         script_args = list(args.script_args)
@@ -3179,15 +2739,6 @@ def local_dev_compose_args(*args: str) -> list[str]:
     )
 
 
-def open_design_compose_args(*args: str) -> list[str]:
-    return compose_args(
-        OPEN_DESIGN_PROJECT_NAME,
-        OPEN_DESIGN_COMPOSE_FILE,
-        *local_dev_env_args(),
-        *args,
-    )
-
-
 def require_docker_compose(label: str) -> int:
     if _docker_compose_ok():
         return 0
@@ -3295,285 +2846,6 @@ def local_dev_certs(_args: argparse.Namespace | None = None) -> int:
     return 0
 
 
-def read_env_value(path: Path, key: str) -> str | None:
-    if not path.is_file():
-        return None
-    for line in path.read_text(encoding="utf-8").splitlines():
-        stripped = line.strip()
-        if not stripped or stripped.startswith("#") or "=" not in stripped:
-            continue
-        name, value = stripped.split("=", 1)
-        if name.strip() == key:
-            return value.strip().strip("\"'")
-    return None
-
-
-def upsert_env_value(text: str, key: str, value: str) -> str:
-    lines = text.splitlines()
-    updated = False
-    for index, line in enumerate(lines):
-        if line.strip().startswith("#") or "=" not in line:
-            continue
-        name, _current_value = line.split("=", 1)
-        if name.strip() == key:
-            lines[index] = f"{key}={value}"
-            updated = True
-            break
-    if not updated:
-        lines.append(f"{key}={value}")
-    return "\n".join(lines).rstrip() + "\n"
-
-
-def write_open_design_env_value(key: str, value: str) -> None:
-    LOCAL_DEV_ENV_FILE.parent.mkdir(parents=True, exist_ok=True)
-    text = (
-        LOCAL_DEV_ENV_FILE.read_text(encoding="utf-8")
-        if LOCAL_DEV_ENV_FILE.is_file()
-        else ""
-    )
-    LOCAL_DEV_ENV_FILE.write_text(
-        upsert_env_value(text, key, value),
-        encoding="utf-8",
-        newline="\n",
-    )
-    LOCAL_DEV_ENV_FILE.chmod(0o600)
-
-
-def local_dev_open_design_source_dir() -> Path:
-    configured = read_env_value(LOCAL_DEV_ENV_FILE, "OPEN_DESIGN_SOURCE_DIR")
-    source = Path(configured).expanduser() if configured else OPEN_DESIGN_SOURCE_DIR
-    if not source.is_absolute():
-        source = ROOT / source
-    return source
-
-
-def local_dev_open_design_init() -> int:
-    LOCAL_DEV_ENV_FILE.parent.mkdir(parents=True, exist_ok=True)
-
-    if LOCAL_DEV_ENV_FILE.is_file():
-        text = LOCAL_DEV_ENV_FILE.read_text(encoding="utf-8")
-    else:
-        text = "\n".join(
-            [
-                "OPEN_DESIGN_PORT=7456",
-                f"OPEN_DESIGN_IMAGE={OPEN_DESIGN_LOCAL_IMAGE}",
-                f"OPEN_DESIGN_SOURCE_DIR={OPEN_DESIGN_SOURCE_DIR}",
-                "OPEN_DESIGN_MEM_LIMIT=6144m",
-                "NODE_OPTIONS=--max-old-space-size=4096",
-                "OPEN_DESIGN_ALLOWED_ORIGINS=",
-                "OPEN_DESIGN_DISABLE_API_AUTH=1",
-                "OD_CODEX_SANDBOX=danger-full-access",
-                "OD_CODEX_DISABLE_PLUGINS=1",
-                "",
-            ]
-        )
-
-    existing_port = read_env_value(LOCAL_DEV_ENV_FILE, "OPEN_DESIGN_PORT")
-    existing_memory = read_env_value(LOCAL_DEV_ENV_FILE, "OPEN_DESIGN_MEM_LIMIT")
-    existing_node_options = read_env_value(LOCAL_DEV_ENV_FILE, "NODE_OPTIONS")
-    existing_allowed_origins = read_env_value(LOCAL_DEV_ENV_FILE, "OPEN_DESIGN_ALLOWED_ORIGINS")
-    existing_disable_api_auth = read_env_value(LOCAL_DEV_ENV_FILE, "OPEN_DESIGN_DISABLE_API_AUTH")
-    existing_disable_plugins = read_env_value(LOCAL_DEV_ENV_FILE, "OD_CODEX_DISABLE_PLUGINS")
-    existing_sandbox = read_env_value(LOCAL_DEV_ENV_FILE, "OD_CODEX_SANDBOX")
-
-    text = upsert_env_value(text, "OPEN_DESIGN_PORT", existing_port or "7456")
-    text = upsert_env_value(text, "OPEN_DESIGN_IMAGE", OPEN_DESIGN_LOCAL_IMAGE)
-    text = upsert_env_value(text, "OPEN_DESIGN_SOURCE_DIR", str(local_dev_open_design_source_dir()))
-    text = upsert_env_value(text, "OPEN_DESIGN_MEM_LIMIT", existing_memory or "6144m")
-    text = upsert_env_value(text, "NODE_OPTIONS", existing_node_options or "--max-old-space-size=4096")
-    text = upsert_env_value(text, "OPEN_DESIGN_ALLOWED_ORIGINS", existing_allowed_origins or "")
-    text = upsert_env_value(text, "OPEN_DESIGN_DISABLE_API_AUTH", existing_disable_api_auth or "1")
-    text = upsert_env_value(text, "OD_CODEX_SANDBOX", existing_sandbox or "danger-full-access")
-    text = upsert_env_value(text, "OD_CODEX_DISABLE_PLUGINS", existing_disable_plugins or "1")
-    text = upsert_env_value(text, "OPEN_DESIGN_HOST_GID", str(os.getgid()))
-
-    LOCAL_DEV_ENV_FILE.write_text(text, encoding="utf-8", newline="\n")
-    LOCAL_DEV_ENV_FILE.chmod(0o600)
-    return 0
-
-
-def local_dev_open_design_clone(source_dir: Path) -> int:
-    if source_dir.exists():
-        return 0
-    source_dir.parent.mkdir(parents=True, exist_ok=True)
-    print(f"local-dev open-design: cloning source into {source_dir}", flush=True)
-    return run([exe("git"), "clone", OPEN_DESIGN_GIT_URL, str(source_dir)], check=False).returncode
-
-
-def local_dev_open_design_codex_bin() -> Path | None:
-    codex = shutil.which(exe("codex")) or shutil.which("codex")
-    if not codex:
-        return None
-    codex_bin = Path(codex).expanduser()
-    if not codex_bin.is_file():
-        return None
-    return codex_bin
-
-
-def local_dev_open_design_prepare_codex_bin(source_bin: Path | None) -> Path:
-    if source_bin is None:
-        raise CheckError("local-dev open-design: Codex CLI is not available in PATH")
-
-    target_bin_dir = OPEN_DESIGN_CODEX_BIN_FALLBACK_DIR
-    target_bin_dir.mkdir(parents=True, exist_ok=True)
-    target_bin_dir.chmod(0o755)
-    target_bin = target_bin_dir / "codex"
-    if source_bin and source_bin.resolve() == target_bin.resolve():
-        return target_bin_dir
-
-    for target in target_bin_dir.iterdir():
-        if target.is_dir() and not target.is_symlink():
-            shutil.rmtree(target)
-        else:
-            target.unlink()
-
-    if source_bin:
-        tmp_bin = target_bin_dir / ".codex.tmp"
-        shutil.copy2(source_bin, tmp_bin)
-        tmp_bin.chmod(0o755)
-        tmp_bin.replace(target_bin)
-    return target_bin_dir
-
-
-def local_dev_open_design_host_codex_home() -> Path:
-    candidates: list[Path] = []
-    configured = os.environ.get("CODEX_HOME")
-    if configured:
-        candidates.append(Path(configured).expanduser())
-    candidates.append(Path.home() / ".codex")
-
-    for candidate in candidates:
-        if (candidate / "auth.json").is_file():
-            return candidate
-    return candidates[0]
-
-
-def local_dev_open_design_sync_codex_auth(target_home: Path) -> None:
-    source_auth = local_dev_open_design_host_codex_home() / "auth.json"
-    target_auth = target_home / "auth.json"
-    if source_auth.is_file():
-        shutil.copy2(source_auth, target_auth)
-        target_auth.chmod(0o660)
-        return
-    if not target_auth.is_file():
-        raise CheckError(
-            "local-dev open-design: Codex CLI is not authenticated; run `codex login` in WSL first"
-        )
-
-
-def local_dev_open_design_verify_codex_auth(codex_bin: Path, codex_home: Path) -> None:
-    result = run(
-        [str(codex_bin), "login", "status"],
-        env={"CODEX_HOME": str(codex_home)},
-        check=False,
-        capture=True,
-    )
-    output = "\n".join(part for part in (result.stdout, result.stderr) if part)
-    if result.returncode != 0 or "Logged in" not in output:
-        raise CheckError(
-            "local-dev open-design: Codex CLI is installed but not authenticated for Open Design"
-        )
-
-
-def local_dev_open_design_prepare_codex_home() -> Path:
-    target_home = OPEN_DESIGN_CODEX_HOME_FALLBACK_DIR
-    target_home.mkdir(parents=True, exist_ok=True)
-    target_home.chmod(0o2770)
-    local_dev_open_design_sync_codex_auth(target_home)
-    return target_home
-
-
-def local_dev_open_design_configure_codex() -> None:
-    source_bin = local_dev_open_design_codex_bin()
-    codex_bin_dir = local_dev_open_design_prepare_codex_bin(source_bin)
-    codex_home = local_dev_open_design_prepare_codex_home()
-    local_dev_open_design_verify_codex_auth(source_bin, codex_home)
-    write_open_design_env_value("OPEN_DESIGN_CODEX_BIN_DIR", str(codex_bin_dir))
-    write_open_design_env_value("OPEN_DESIGN_CODEX_HOME", str(codex_home))
-
-
-def open_design_image_exists() -> bool:
-    result = run(
-        [exe("docker"), "image", "inspect", OPEN_DESIGN_LOCAL_IMAGE],
-        check=False,
-        capture=True,
-    )
-    return result.returncode == 0
-
-
-def local_dev_open_design_build(source_dir: Path) -> int:
-    dockerfile = source_dir / "deploy" / "Dockerfile"
-    if not dockerfile.is_file():
-        raise CheckError(f"local-dev open-design: missing {dockerfile}")
-    if open_design_image_exists():
-        return 0
-    return run(
-        [
-            exe("docker"),
-            "build",
-            "-t",
-            OPEN_DESIGN_LOCAL_IMAGE,
-            "-f",
-            str(dockerfile),
-            str(source_dir),
-        ],
-        check=False,
-    ).returncode
-
-
-def local_dev_open_design_ensure_volume() -> int:
-    result = run(
-        [exe("docker"), "volume", "inspect", OPEN_DESIGN_VOLUME_NAME],
-        check=False,
-        capture=True,
-    )
-    if result.returncode == 0:
-        return 0
-    return run([exe("docker"), "volume", "create", OPEN_DESIGN_VOLUME_NAME], check=False).returncode
-
-
-def local_dev_open_design_prepare() -> int:
-    rc = local_dev_open_design_init()
-    if rc != 0:
-        return rc
-
-    source_dir = local_dev_open_design_source_dir()
-    rc = local_dev_open_design_clone(source_dir)
-    if rc != 0:
-        return rc
-
-    write_open_design_env_value("OPEN_DESIGN_SOURCE_DIR", str(source_dir))
-    local_dev_open_design_configure_codex()
-    return local_dev_open_design_build(source_dir)
-
-
-def local_dev_open_design(args: argparse.Namespace) -> int:
-    od_command = args.open_design_command
-
-    if od_command == "up":
-        stop = run(open_design_compose_args("stop", OPEN_DESIGN_SERVICE), check=False)
-        if stop.returncode != 0:
-            return stop.returncode
-        rc = local_dev_open_design_prepare()
-        if rc != 0:
-            return rc
-        rc = local_dev_open_design_ensure_volume()
-        if rc != 0:
-            return rc
-        return run(open_design_compose_args("up", "-d", OPEN_DESIGN_SERVICE), check=False).returncode
-    if od_command in {"stop", "restart"}:
-        return run(open_design_compose_args(od_command, OPEN_DESIGN_SERVICE), check=False).returncode
-    if od_command == "status":
-        return run(open_design_compose_args("ps", OPEN_DESIGN_SERVICE), check=False).returncode
-    if od_command == "logs":
-        compose = ["logs"]
-        if args.follow:
-            compose.append("-f")
-        compose.append(OPEN_DESIGN_SERVICE)
-        return run(open_design_compose_args(*compose), check=False).returncode
-
-    raise CheckError(f"Unknown local-dev open-design command: {od_command}")
-
 def local_dev(args: argparse.Namespace) -> int:
     if args.local_dev_command == "certs":
         return local_dev_certs(args)
@@ -3583,9 +2855,6 @@ def local_dev(args: argparse.Namespace) -> int:
         return rc
 
     command = args.local_dev_command
-    if command == "open-design":
-        return local_dev_open_design(args)
-
     if command == "up":
         compose = ["up", "-d"]
         if args.build:
@@ -3846,13 +3115,6 @@ def main(argv: list[str] | None = None) -> int:
     frontend_gen_api = frontend_sub.add_parser("gen-api-types")
     frontend_gen_api.add_argument("--check", action="store_true", help="Fail if generated frontend API types are stale")
     frontend_gen_api.set_defaults(func=frontend_command)
-    frontend_gen_tokens = frontend_sub.add_parser("gen-design-tokens")
-    frontend_gen_tokens.add_argument(
-        "--check",
-        action="store_true",
-        help="Fail if generated design-token files are stale",
-    )
-    frontend_gen_tokens.set_defaults(func=frontend_command)
     frontend_script = frontend_sub.add_parser("script")
     frontend_script.add_argument("script_name")
     frontend_script.add_argument("script_args", nargs=argparse.REMAINDER)
@@ -3896,13 +3158,6 @@ def main(argv: list[str] | None = None) -> int:
     local_observability_logs = local_observability_sub.add_parser("logs")
     local_observability_logs.add_argument("-f", "--follow", action="store_true")
     local_observability_logs.set_defaults(func=local_dev)
-    local_open_design = local_dev_sub.add_parser("open-design")
-    local_open_design_sub = local_open_design.add_subparsers(dest="open_design_command", required=True)
-    for open_design_command in ("up", "stop", "restart", "status"):
-        local_open_design_sub.add_parser(open_design_command).set_defaults(func=local_dev)
-    local_open_design_logs = local_open_design_sub.add_parser("logs")
-    local_open_design_logs.add_argument("-f", "--follow", action="store_true")
-    local_open_design_logs.set_defaults(func=local_dev)
     local_dev_sub.add_parser("reset-db").set_defaults(func=local_dev)
     local_dev_sub.add_parser("reset-all").set_defaults(func=local_dev)
 
@@ -3921,8 +3176,6 @@ def main(argv: list[str] | None = None) -> int:
     check_sub.add_parser("vulnerable-packages").set_defaults(func=check_vulnerable_packages)
     check_sub.add_parser("ef-domain-mapping").set_defaults(func=check_ef_domain_mapping)
     check_sub.add_parser("frontend-api-contracts").set_defaults(func=check_frontend_api_contracts)
-    check_sub.add_parser("frontend-style").set_defaults(func=check_frontend_style)
-    check_sub.add_parser("frontend-component-composition").set_defaults(func=check_frontend_component_composition)
     check_sub.add_parser("frontend-quality").set_defaults(func=check_frontend_quality)
     check_sub.add_parser("coderabbit-cli").set_defaults(func=check_coderabbit_cli)
     check_sub.add_parser("local-dev-docs").set_defaults(

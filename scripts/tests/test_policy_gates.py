@@ -3,6 +3,7 @@ from __future__ import annotations
 import contextlib
 import importlib.util
 import io
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -15,6 +16,7 @@ if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
 
 import axis  # noqa: E402
+import axis_repo  # noqa: E402
 import doc_drift_domains  # noqa: E402
 
 
@@ -1423,6 +1425,25 @@ def main() -> int:
             paths,
         )
 
+    def test_iter_files_uses_repo_visible_paths_for_repo_roots(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            src_root = root / "src"
+            visible = src_root / "visible.ts"
+            ignored = src_root / "node_modules" / "ignored.ts"
+            visible.parent.mkdir(parents=True)
+            ignored.parent.mkdir(parents=True)
+            visible.write_text("export {};\n", encoding="utf-8")
+            ignored.write_text("export {};\n", encoding="utf-8")
+
+            with (
+                mock.patch.object(axis, "ROOT", root),
+                mock.patch.object(axis, "repo_files", return_value=["src/visible.ts"]) as repo_files,
+            ):
+                self.assertEqual([visible], list(axis.iter_files(src_root, (".ts",))))
+
+            repo_files.assert_called_once_with("src")
+
     def test_changed_name_status_marks_untracked_files_added(self) -> None:
         outputs = {
             ("diff", "--name-status", "base...HEAD"): "M\tdocs/committed.md\n",
@@ -1828,112 +1849,7 @@ class TestVerifyGate(unittest.TestCase):
         )
 
 
-class TestFrontendRadiusTokens(unittest.TestCase):
-    def issues_for_files(self, files: dict[str, str], css_radius: str = "0.5rem") -> list[str]:
-        with tempfile.TemporaryDirectory() as temp:
-            root = Path(temp)
-            css = root / "frontend" / "src" / "design-system" / "tokens.css"
-            css.parent.mkdir(parents=True, exist_ok=True)
-            css.write_text(f":root {{\n  --radius: {css_radius};\n}}\n", encoding="utf-8")
-            for relative_path, content in files.items():
-                path = root / relative_path
-                path.parent.mkdir(parents=True, exist_ok=True)
-                path.write_text(content, encoding="utf-8")
-            return axis.frontend_radius_token_issues(root=root)
-
-    def issues_for_frontend(self, component_source: str, css_radius: str = "0.5rem") -> list[str]:
-        return self.issues_for_files(
-            {"frontend/src/components/Example.tsx": component_source},
-            css_radius=css_radius,
-        )
-
-    def test_rejects_radius_token_drift(self) -> None:
-        issues = self.issues_for_frontend("export const ok = 'rounded-md';\n", css_radius="0.375rem")
-
-        self.assertIn("--radius must stay 0.5rem", "\n".join(issues))
-
-    def test_rejects_oversized_radius_utilities(self) -> None:
-        issues = self.issues_for_frontend("export const bad = 'rounded-2xl';\n")
-
-        self.assertIn("avoid radius above 8px", "\n".join(issues))
-
-    def test_rejects_arbitrary_non_token_radius(self) -> None:
-        issues = self.issues_for_frontend("export const bad = 'rounded-[18px]';\n")
-
-        self.assertIn("use shared radius tokens", "\n".join(issues))
-
-    def test_accepts_standard_radius_tokens(self) -> None:
-        issues = self.issues_for_frontend("export const ok = 'rounded-sm rounded-md rounded-lg';\n")
-
-        self.assertEqual([], issues)
-
-    def test_accepts_upstream_radius_in_shadcn_sourced_primitive(self) -> None:
-        issues = self.issues_for_files(
-            {
-                "frontend/src/components/ui/button.tsx": (
-                    "export const upstream = 'rounded-xl rounded-[4px]';\n"
-                ),
-                "frontend/src/design-system/primitive-contracts.ts": (
-                    "export const axisPrimitiveContracts = [{\n"
-                    "  component: 'Button',\n"
-                    "  file: 'frontend/src/components/ui/button.tsx',\n"
-                    "  testFiles: ['frontend/tests/button.test.tsx'],\n"
-                    "  source: 'shadcn',\n"
-                    "  sourceItem: '@shadcn/button',\n"
-                    "  readiness: 'ready',\n"
-                    "  variants: ['default'],\n"
-                    "  states: ['default'],\n"
-                    "  accessibility: ['native-button'],\n"
-                    "  tokenFamilies: ['radius'],\n"
-                    "}];\n"
-                ),
-            }
-        )
-
-        self.assertEqual([], issues)
-
-    def test_rejects_radius_exemption_for_shadcn_contract_outside_ui(self) -> None:
-        issues = self.issues_for_files(
-            {
-                "frontend/src/features/auth/components/FakePrimitive.tsx": (
-                    "export const bad = 'rounded-xl rounded-[4px]';\n"
-                ),
-                "frontend/src/design-system/primitive-contracts.ts": (
-                    "export const axisPrimitiveContracts = [{\n"
-                    "  component: 'FakePrimitive',\n"
-                    "  file: 'frontend/src/features/auth/components/FakePrimitive.tsx',\n"
-                    "  testFiles: ['frontend/tests/fake-primitive.test.tsx'],\n"
-                    "  source: 'shadcn',\n"
-                    "  sourceItem: '@shadcn/fake-primitive',\n"
-                    "  readiness: 'ready',\n"
-                    "  variants: ['default'],\n"
-                    "  states: ['default'],\n"
-                    "  accessibility: ['native-control'],\n"
-                    "  tokenFamilies: ['radius'],\n"
-                    "}];\n"
-                ),
-            }
-        )
-
-        joined = "\n".join(issues)
-        self.assertIn("avoid radius above 8px", joined)
-        self.assertIn("use shared radius tokens", joined)
-
-    def test_rejects_upstream_radius_in_axis_owned_component(self) -> None:
-        issues = self.issues_for_files(
-            {
-                "frontend/src/components/shared/CustomControl.tsx": (
-                    "export const bad = 'rounded-xl rounded-[4px]';\n"
-                ),
-            }
-        )
-
-        joined = "\n".join(issues)
-        self.assertIn("avoid radius above 8px", joined)
-        self.assertIn("use shared radius tokens", joined)
-
-
-class TestFrontendComponentComposition(unittest.TestCase):
+class TestFrontendComponentFileNames(unittest.TestCase):
     def issues_for_frontend(self, files: dict[str, str]) -> list[str]:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
@@ -1941,7 +1857,7 @@ class TestFrontendComponentComposition(unittest.TestCase):
                 path = root / relative_path
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_text(content, encoding="utf-8")
-            return axis.frontend_component_composition_issues(root=root)
+            return axis.frontend_component_file_name_issues(root=root)
 
     def test_rejects_styled_route_markup(self) -> None:
         issues = self.issues_for_frontend(
@@ -1972,21 +1888,6 @@ class TestFrontendComponentComposition(unittest.TestCase):
         issues = self.issues_for_frontend(
             {
                 "frontend/src/components/ui/CustomControl.tsx": "export function CustomControl() { return null; }\n",
-                "frontend/src/design-system/primitive-contracts.ts": (
-                    "export const axisPrimitiveContracts = [{\n"
-                    "  component: 'CustomControl',\n"
-                    "  file: 'frontend/src/components/ui/CustomControl.tsx',\n"
-                    "  testFiles: ['frontend/tests/custom-control.test.tsx'],\n"
-                    "  source: 'shadcn',\n"
-                    "  sourceItem: '@shadcn/custom-control',\n"
-                    "  readiness: 'ready',\n"
-                    "  variants: ['default'],\n"
-                    "  states: ['default'],\n"
-                    "  accessibility: ['native-control'],\n"
-                    "  tokenFamilies: ['color'],\n"
-                    "}];\n"
-                ),
-                "frontend/tests/custom-control.test.tsx": "export {};\n",
             }
         )
 
@@ -2049,326 +1950,11 @@ class TestFrontendComponentComposition(unittest.TestCase):
                     "  return <button type=\"button\"><input /></button>;\n"
                     "}\n"
                 ),
-                "frontend/src/design-system/primitive-contracts.ts": (
-                    "export const axisPrimitiveContracts = [{\n"
-                    "  component: 'Button',\n"
-                    "  file: 'frontend/src/components/ui/button.tsx',\n"
-                    "  testFiles: ['frontend/tests/button.test.tsx'],\n"
-                    "  source: 'shadcn',\n"
-                    "  sourceItem: '@shadcn/button',\n"
-                    "  readiness: 'ready',\n"
-                    "  variants: ['default'],\n"
-                    "  states: ['default'],\n"
-                    "  accessibility: ['native-control'],\n"
-                    "  tokenFamilies: ['color'],\n"
-                    "}];\n"
-                ),
-                "frontend/tests/button.test.tsx": "export {};\n",
             }
         )
 
         self.assertEqual([], issues)
 
-    def test_rejects_ui_primitive_without_contract(self) -> None:
-        issues = self.issues_for_frontend(
-            {
-                "frontend/src/components/ui/custom-control.tsx": (
-                    "export function CustomControl() {\n"
-                    "  return <button type=\"button\" />;\n"
-                    "}\n"
-                ),
-                "frontend/src/design-system/primitive-contracts.ts": (
-                    "export const axisPrimitiveContracts = [];\n"
-                ),
-            }
-        )
-
-        self.assertIn("UI primitive must be listed", "\n".join(issues))
-
-    def test_rejects_primitive_contract_without_required_readiness_metadata(self) -> None:
-        issues = self.issues_for_frontend(
-            {
-                "frontend/src/components/ui/custom-control.tsx": (
-                    "export function CustomControl() {\n"
-                    "  return <button type=\"button\" />;\n"
-                    "}\n"
-                ),
-                "frontend/src/design-system/primitive-contracts.ts": (
-                    "export const axisPrimitiveContracts = [{\n"
-                    "  component: 'CustomControl',\n"
-                    "  file: 'frontend/src/components/ui/custom-control.tsx',\n"
-                    "  testFiles: ['frontend/tests/custom-control.test.tsx'],\n"
-                    "}];\n"
-                ),
-                "frontend/tests/custom-control.test.tsx": "export {};\n",
-            }
-        )
-
-        self.assertIn("contract readiness must be `ready` or `candidate`", "\n".join(issues))
-        self.assertIn("contract source must be `shadcn`", "\n".join(issues))
-        self.assertIn("contract must list at least one variants value", "\n".join(issues))
-
-    def test_rejects_primitive_contract_with_incomplete_source_metadata(self) -> None:
-        issues = self.issues_for_frontend(
-            {
-                "frontend/src/components/ui/custom-control.tsx": (
-                    "export function CustomControl() {\n"
-                    "  return <button type=\"button\" />;\n"
-                    "}\n"
-                ),
-                "frontend/src/design-system/primitive-contracts.ts": (
-                    "export const axisPrimitiveContracts = [{\n"
-                    "  component: 'CustomControl',\n"
-                    "  file: 'frontend/src/components/ui/custom-control.tsx',\n"
-                    "  testFiles: ['frontend/tests/custom-control.test.tsx'],\n"
-                    "  source: 'shadcn',\n"
-                    "  readiness: 'ready',\n"
-                    "  variants: ['default'],\n"
-                    "  states: ['default'],\n"
-                    "  accessibility: ['native-control'],\n"
-                    "  tokenFamilies: ['color'],\n"
-                    "}];\n"
-                ),
-                "frontend/tests/custom-control.test.tsx": "export {};\n",
-            }
-        )
-
-        self.assertIn("shadcn contract must name sourceItem `@shadcn/...`", "\n".join(issues))
-
-    def test_rejects_primitive_contract_with_bare_shadcn_source_item(self) -> None:
-        issues = self.issues_for_frontend(
-            {
-                "frontend/src/components/ui/custom-control.tsx": (
-                    "export function CustomControl() {\n"
-                    "  return <button type=\"button\" />;\n"
-                    "}\n"
-                ),
-                "frontend/src/design-system/primitive-contracts.ts": (
-                    "export const axisPrimitiveContracts = [{\n"
-                    "  component: 'CustomControl',\n"
-                    "  file: 'frontend/src/components/ui/custom-control.tsx',\n"
-                    "  testFiles: ['frontend/tests/custom-control.test.tsx'],\n"
-                    "  source: 'shadcn',\n"
-                    "  sourceItem: '@shadcn/',\n"
-                    "  readiness: 'ready',\n"
-                    "  variants: ['default'],\n"
-                    "  states: ['default'],\n"
-                    "  accessibility: ['native-control'],\n"
-                    "  tokenFamilies: ['color'],\n"
-                    "}];\n"
-                ),
-                "frontend/tests/custom-control.test.tsx": "export {};\n",
-            }
-        )
-
-        self.assertIn("shadcn contract must name sourceItem `@shadcn/...`", "\n".join(issues))
-
-    def test_rejects_non_shadcn_source_in_ui_primitive_contract(self) -> None:
-        issues = self.issues_for_frontend(
-            {
-                "frontend/src/components/ui/custom-control.tsx": (
-                    "export function CustomControl() {\n"
-                    "  return <button type=\"button\" />;\n"
-                    "}\n"
-                ),
-                "frontend/src/design-system/primitive-contracts.ts": (
-                    "export const axisPrimitiveContracts = [{\n"
-                    "  component: 'CustomControl',\n"
-                    "  file: 'frontend/src/components/ui/custom-control.tsx',\n"
-                    "  testFiles: ['frontend/tests/custom-control.test.tsx'],\n"
-                    "  source: 'axis',\n"
-                    "  sourceReason: 'No shadcn equivalent for this test primitive.',\n"
-                    "  readiness: 'ready',\n"
-                    "  variants: ['default'],\n"
-                    "  states: ['default'],\n"
-                    "  accessibility: ['native-control'],\n"
-                    "  tokenFamilies: ['color'],\n"
-                    "}];\n"
-                ),
-                "frontend/tests/custom-control.test.tsx": "export {};\n",
-            }
-        )
-
-        self.assertIn("contract source must be `shadcn`", "\n".join(issues))
-
-    def test_rejects_unknown_primitive_contract_token_family(self) -> None:
-        issues = self.issues_for_frontend(
-            {
-                "frontend/src/components/ui/custom-control.tsx": (
-                    "export function CustomControl() {\n"
-                    "  return <button type=\"button\" />;\n"
-                    "}\n"
-                ),
-                "frontend/src/design-system/primitive-contracts.ts": (
-                    "export const axisPrimitiveContracts = [{\n"
-                    "  component: 'CustomControl',\n"
-                    "  file: 'frontend/src/components/ui/custom-control.tsx',\n"
-                    "  testFiles: ['frontend/tests/custom-control.test.tsx'],\n"
-                    "  source: 'shadcn',\n"
-                    "  sourceItem: '@shadcn/custom-control',\n"
-                    "  readiness: 'ready',\n"
-                    "  variants: ['default'],\n"
-                    "  states: ['default'],\n"
-                    "  accessibility: ['native-control'],\n"
-                    "  tokenFamilies: ['raw-shadow'],\n"
-                    "}];\n"
-                ),
-                "frontend/tests/custom-control.test.tsx": "export {};\n",
-            }
-        )
-
-        self.assertIn("unknown tokenFamilies values: `raw-shadow`", "\n".join(issues))
-
-    def test_rejects_route_bound_consumer_without_contract_registry(self) -> None:
-        issues = self.issues_for_frontend(
-            {
-                "frontend/src/routes/index.lazy.tsx": (
-                    "import { LandingPage } from '@/features/landing/components/LandingPage';\n"
-                    "export const Route = createLazyFileRoute('/')({ component: LandingPage });\n"
-                ),
-                "frontend/src/features/landing/components/LandingPage.tsx": (
-                    "export function LandingPage() { return null; }\n"
-                ),
-            }
-        )
-
-        self.assertIn("missing consumer contract registry", "\n".join(issues))
-
-    def test_accepts_route_bound_consumer_contract(self) -> None:
-        issues = self.issues_for_frontend(
-            {
-                "frontend/src/routes/index.lazy.tsx": (
-                    "import { LandingPage } from '@/features/landing/components/LandingPage';\n"
-                    "export const Route = createLazyFileRoute('/')({ component: LandingPage });\n"
-                ),
-                "frontend/src/features/landing/components/LandingPage.tsx": (
-                    "export function LandingPage() { return null; }\n"
-                ),
-                "frontend/src/design-system/consumer-contracts.ts": (
-                    "export const axisConsumerContracts = [{\n"
-                    "  surface: 'Public landing',\n"
-                    "  kind: 'public',\n"
-                    "  route: '/',\n"
-                    "  component: 'LandingPage',\n"
-                    "  file: 'frontend/src/features/landing/components/LandingPage.tsx',\n"
-                    "  owner: 'landing',\n"
-                    "  readiness: 'ready',\n"
-                    "  primitives: ['ActionLink'],\n"
-                    "  states: ['default'],\n"
-                    "  evidence: ['e2e-smoke'],\n"
-                    "  testFiles: ['frontend/e2e/local-dev-smoke.pw.ts'],\n"
-                    "}];\n"
-                ),
-                "frontend/e2e/local-dev-smoke.pw.ts": "export {};\n",
-            }
-        )
-
-        self.assertEqual([], issues)
-
-    def test_rejects_route_bound_consumer_missing_from_contract(self) -> None:
-        issues = self.issues_for_frontend(
-            {
-                "frontend/src/routes/index.lazy.tsx": (
-                    "import { LandingPage } from '@/features/landing/components/LandingPage';\n"
-                    "export const Route = createLazyFileRoute('/')({ component: LandingPage });\n"
-                ),
-                "frontend/src/features/landing/components/LandingPage.tsx": (
-                    "export function LandingPage() { return null; }\n"
-                ),
-                "frontend/src/design-system/consumer-contracts.ts": (
-                    "export const axisConsumerContracts = [];\n"
-                ),
-            }
-        )
-
-        self.assertIn("route-bound UI consumer must be listed", "\n".join(issues))
-
-    def test_rejects_barrel_route_consumer_missing_from_contract(self) -> None:
-        issues = self.issues_for_frontend(
-            {
-                "frontend/src/routes/index.lazy.tsx": (
-                    "import { LandingPage } from '@/features/landing';\n"
-                    "export const Route = createLazyFileRoute('/')({ component: LandingPage });\n"
-                ),
-                "frontend/src/features/landing/index.ts": (
-                    "export { LandingPage } from '@/features/landing/components/LandingPage';\n"
-                ),
-                "frontend/src/features/landing/components/LandingPage.tsx": (
-                    "export function LandingPage() { return null; }\n"
-                ),
-                "frontend/src/design-system/consumer-contracts.ts": (
-                    "export const axisConsumerContracts = [];\n"
-                ),
-            }
-        )
-
-        self.assertIn("route-bound UI consumer must be listed", "\n".join(issues))
-
-    def test_rejects_consumer_contract_partial_route_match(self) -> None:
-        issues = self.issues_for_frontend(
-            {
-                "frontend/src/routes/register-callback.lazy.tsx": (
-                    "import { RegisterPage } from '@/features/auth/components/RegisterPage';\n"
-                    "export const Route = createLazyFileRoute('/register-callback')({ component: RegisterPage });\n"
-                ),
-                "frontend/src/features/auth/components/RegisterPage.tsx": (
-                    "export function RegisterPage() { return null; }\n"
-                ),
-                "frontend/src/design-system/consumer-contracts.ts": (
-                    "export const axisConsumerContracts = [{\n"
-                    "  surface: 'Register',\n"
-                    "  kind: 'auth',\n"
-                    "  route: '/register',\n"
-                    "  component: 'RegisterPage',\n"
-                    "  file: 'frontend/src/features/auth/components/RegisterPage.tsx',\n"
-                    "  owner: 'auth',\n"
-                    "  readiness: 'ready',\n"
-                    "  primitives: ['Button'],\n"
-                    "  states: ['default'],\n"
-                    "  evidence: ['unit-test'],\n"
-                    "  testFiles: ['frontend/tests/register-page.test.tsx'],\n"
-                    "}];\n"
-                ),
-                "frontend/tests/register-page.test.tsx": "export {};\n",
-            }
-        )
-
-        self.assertIn("contract route `/register` is not declared", "\n".join(issues))
-
-    def test_rejects_consumer_contract_without_required_metadata(self) -> None:
-        issues = self.issues_for_frontend(
-            {
-                "frontend/src/routes/index.lazy.tsx": (
-                    "import { LandingPage } from '@/features/landing/components/LandingPage';\n"
-                    "export const Route = createLazyFileRoute('/')({ component: LandingPage });\n"
-                ),
-                "frontend/src/features/landing/components/LandingPage.tsx": (
-                    "export function LandingPage() { return null; }\n"
-                ),
-                "frontend/src/design-system/consumer-contracts.ts": (
-                    "export const axisConsumerContracts = [{\n"
-                    "  surface: 'Public landing',\n"
-                    "  kind: 'public',\n"
-                    "  route: '/',\n"
-                    "  component: 'LandingPage',\n"
-                    "  file: 'frontend/src/features/landing/components/LandingPage.tsx',\n"
-                    "  owner: 'landing',\n"
-                    "  readiness: 'unknown',\n"
-                    "  primitives: [],\n"
-                    "  states: [],\n"
-                    "  evidence: ['manual'],\n"
-                    "  testFiles: ['frontend/e2e/missing.pw.ts'],\n"
-                    "}];\n"
-                ),
-            }
-        )
-
-        joined = "\n".join(issues)
-        self.assertIn("contract readiness must be `ready` or `candidate`", joined)
-        self.assertIn("contract must list at least one primitives value", joined)
-        self.assertIn("contract must list at least one states value", joined)
-        self.assertIn("unknown evidence values: `manual`", joined)
-        self.assertIn("test file `frontend/e2e/missing.pw.ts` does not exist", joined)
 
 class TestFrontendTailwindOpacity(unittest.TestCase):
     def issues_for_frontend(self, component_source: str) -> list[str]:
@@ -2395,140 +1981,6 @@ class TestFrontendTailwindOpacity(unittest.TestCase):
 
     def test_accepts_bracket_opacity_syntax(self) -> None:
         issues = self.issues_for_frontend("export const ok = 'bg-white/[0.28] text-white/[0.52]';\n")
-
-        self.assertEqual([], issues)
-
-
-class TestFrontendDesignTokenUsage(unittest.TestCase):
-    def issues_for_files(self, files: dict[str, str]) -> list[str]:
-        with tempfile.TemporaryDirectory() as temp:
-            root = Path(temp)
-            for relative_path, content in files.items():
-                path = root / relative_path
-                path.parent.mkdir(parents=True, exist_ok=True)
-                path.write_text(content, encoding="utf-8")
-            return axis.frontend_design_token_usage_issues(root=root)
-
-    def issues_for_frontend(self, component_source: str) -> list[str]:
-        return self.issues_for_files({"frontend/src/components/Example.tsx": component_source})
-
-    def test_rejects_raw_neutral_color_utilities(self) -> None:
-        issues = self.issues_for_frontend(
-            "export const bad = 'bg-white text-slate-700 border-zinc-200';\n"
-        )
-
-        self.assertIn("use semantic color tokens", "\n".join(issues))
-
-    def test_rejects_raw_shadow_utilities(self) -> None:
-        issues = self.issues_for_frontend("export const bad = 'shadow-sm shadow-[0_1px_2px_red]';\n")
-
-        self.assertIn("use named shadow tokens", "\n".join(issues))
-
-    def test_rejects_bare_shadow_utility(self) -> None:
-        issues = self.issues_for_frontend("export const bad = 'shadow';\n")
-
-        self.assertIn("use named shadow tokens", "\n".join(issues))
-
-    def test_rejects_arbitrary_color_and_gradient_values(self) -> None:
-        issues = self.issues_for_frontend(
-            "export const bad = 'bg-[linear-gradient(red,blue)] border-[hsl(var(--border))]';\n"
-        )
-
-        self.assertIn("move arbitrary color or gradient values into design-system tokens", "\n".join(issues))
-
-    def test_accepts_upstream_design_classes_in_shadcn_sourced_primitive(self) -> None:
-        issues = self.issues_for_files(
-            {
-                "frontend/src/components/ui/card.tsx": (
-                    "export const upstream = 'bg-white text-slate-700 shadow-sm';\n"
-                ),
-                "frontend/src/design-system/primitive-contracts.ts": (
-                    "export const axisPrimitiveContracts = [{\n"
-                    "  component: 'Card',\n"
-                    "  file: 'frontend/src/components/ui/card.tsx',\n"
-                    "  testFiles: ['frontend/tests/ui-primitives.test.tsx'],\n"
-                    "  source: 'shadcn',\n"
-                    "  sourceItem: '@shadcn/card',\n"
-                    "  readiness: 'ready',\n"
-                    "  variants: ['default'],\n"
-                    "  states: ['default'],\n"
-                    "  accessibility: ['semantic-caller-owned'],\n"
-                    "  tokenFamilies: ['color', 'shadow'],\n"
-                    "}];\n"
-                ),
-            }
-        )
-
-        self.assertEqual([], issues)
-
-    def test_rejects_design_token_exemption_for_shadcn_contract_outside_ui(self) -> None:
-        issues = self.issues_for_files(
-            {
-                "frontend/src/features/auth/components/FakePrimitive.tsx": (
-                    "export const bad = 'bg-white text-slate-700 shadow-sm';\n"
-                ),
-                "frontend/src/design-system/primitive-contracts.ts": (
-                    "export const axisPrimitiveContracts = [{\n"
-                    "  component: 'FakePrimitive',\n"
-                    "  file: 'frontend/src/features/auth/components/FakePrimitive.tsx',\n"
-                    "  testFiles: ['frontend/tests/fake-primitive.test.tsx'],\n"
-                    "  source: 'shadcn',\n"
-                    "  sourceItem: '@shadcn/fake-primitive',\n"
-                    "  readiness: 'ready',\n"
-                    "  variants: ['default'],\n"
-                    "  states: ['default'],\n"
-                    "  accessibility: ['native-control'],\n"
-                    "  tokenFamilies: ['color', 'shadow'],\n"
-                    "}];\n"
-                ),
-            }
-        )
-
-        joined = "\n".join(issues)
-        self.assertIn("use semantic color tokens", joined)
-        self.assertIn("use named shadow tokens", joined)
-
-    def test_rejects_raw_design_classes_in_axis_owned_component(self) -> None:
-        issues = self.issues_for_files(
-            {
-                "frontend/src/components/shared/CustomCard.tsx": (
-                    "export const bad = 'bg-white text-slate-700 shadow-sm';\n"
-                ),
-            }
-        )
-
-        joined = "\n".join(issues)
-        self.assertIn("use semantic color tokens", joined)
-        self.assertIn("use named shadow tokens", joined)
-
-    def test_accepts_semantic_token_utilities(self) -> None:
-        issues = self.issues_for_frontend(
-            "export const ok = 'bg-card text-card-foreground border-border shadow-surface shadow-control shadow-accent-control shadow-panel shadow-feature-panel bg-gradient-inverse-panel';\n"
-        )
-
-        self.assertEqual([], issues)
-
-    def test_accepts_shadow_token_variable_names(self) -> None:
-        issues = self.issues_for_frontend(
-            "export const tokens = ['--action-accent-shadow', '--shadow-surface'];\n"
-        )
-
-        self.assertEqual([], issues)
-
-    def test_accepts_primitive_contract_shadow_token_family_metadata(self) -> None:
-        issues = self.issues_for_frontend(
-            "export const axisPrimitiveContracts = [{ tokenFamilies: ['color', 'shadow'] }];\n"
-        )
-
-        self.assertEqual([], issues)
-
-    def test_accepts_token_family_type_literal(self) -> None:
-        issues = self.issues_for_frontend(
-            "export type AxisPrimitiveTokenFamily =\n"
-            "  | 'color'\n"
-            "  | 'shadow'\n"
-            "  | 'radius';\n"
-        )
 
         self.assertEqual([], issues)
 
@@ -2955,12 +2407,37 @@ class TestScriptsStandardGate(unittest.TestCase):
 
 class TestLocalDevCli(unittest.TestCase):
     def test_local_dev_docs_service_match_requires_token_boundaries(self) -> None:
-        doc = "Mandatory services: `api`; command: python scripts/axis.py local-dev open-design up."
+        doc = "Mandatory services: `api`; optional service: `otel-lgtm`."
 
         self.assertTrue(check_local_dev_docs.mentions_service(doc, "api"))
-        self.assertTrue(check_local_dev_docs.mentions_service(doc, "open-design"))
+        self.assertTrue(check_local_dev_docs.mentions_service(doc, "otel-lgtm"))
         self.assertFalse(check_local_dev_docs.mentions_service("application apiary", "api"))
-        self.assertFalse(check_local_dev_docs.mentions_service("open-designs", "open-design"))
+        self.assertFalse(check_local_dev_docs.mentions_service("otel-lgtms", "otel-lgtm"))
+
+    def test_parse_compose_reports_services_without_ports(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            compose = Path(temp) / "docker-compose.yml"
+            compose.write_text(
+                "services:\n"
+                "  api:\n"
+                "    image: axis-api\n"
+                "    ports:\n"
+                "      - \"127.0.0.1:5281:8443\"\n"
+                "  worker:\n"
+                "    image: axis-worker\n"
+                "  e2e:\n"
+                "    profiles: [\"e2e\"]\n"
+                "    image: axis-e2e\n"
+                "volumes:\n"
+                "  data:\n",
+                encoding="utf-8",
+            )
+
+            services, optional, service_names = check_local_dev_docs.parse_compose(compose)
+
+        self.assertEqual({"api": [5281]}, services)
+        self.assertEqual({"e2e"}, optional)
+        self.assertEqual(["api", "e2e", "worker"], service_names)
 
     def run_local_dev(
         self,
@@ -3068,174 +2545,6 @@ class TestLocalDevCli(unittest.TestCase):
             ],
             calls[0][1:],
         )
-
-    def test_open_design_up_uses_separate_compose_with_local_env_file(self) -> None:
-        with tempfile.TemporaryDirectory() as temp:
-            env_file = Path(temp) / ".env.local"
-            env_file.write_text("OPEN_DESIGN_DISABLE_API_AUTH=1\n", encoding="utf-8")
-
-            with (
-                mock.patch.object(axis, "local_dev_open_design_prepare", return_value=0),
-                mock.patch.object(axis, "local_dev_open_design_ensure_volume", return_value=0),
-            ):
-                calls = self.run_local_dev(
-                    axis.argparse.Namespace(local_dev_command="open-design", open_design_command="up"),
-                    env_file=env_file,
-                )
-
-            self.assertEqual(
-                [
-                    "compose",
-                    "-p",
-                    "axis-open-design",
-                    "-f",
-                    str(axis.OPEN_DESIGN_COMPOSE_FILE),
-                    "--env-file",
-                    str(env_file),
-                    "stop",
-                    "open-design",
-                ],
-                calls[0][1:],
-            )
-            self.assertEqual(
-                [
-                    "compose",
-                    "-p",
-                    "axis-open-design",
-                    "-f",
-                    str(axis.OPEN_DESIGN_COMPOSE_FILE),
-                    "--env-file",
-                    str(env_file),
-                    "up",
-                    "-d",
-                    "open-design",
-                ],
-                calls[1][1:],
-            )
-
-    def test_open_design_prepare_clones_builds_and_writes_env(self) -> None:
-        with tempfile.TemporaryDirectory() as temp:
-            env_file = Path(temp) / ".env.local"
-            source_dir = Path(temp) / "open-design"
-            host_codex_bin_dir = Path(temp) / "host-codex" / "bin" / "wsl" / "test"
-            host_codex_bin = host_codex_bin_dir / "codex"
-            host_codex_home = Path(temp) / "host-codex-home"
-            cached_codex_bin_dir = Path(temp) / "cache" / "codex-bin"
-            runtime_codex_home = Path(temp) / "cache" / "codex-home"
-            env_file.parent.mkdir(parents=True, exist_ok=True)
-            env_file.write_text(
-                f"OPEN_DESIGN_SOURCE_DIR={source_dir}\n"
-                "OPEN_DESIGN_DISABLE_API_AUTH=0\n",
-                encoding="utf-8",
-            )
-            host_codex_bin_dir.mkdir(parents=True)
-            host_codex_home.mkdir(parents=True)
-            (host_codex_home / "auth.json").write_text('{"mode":"chatgpt"}\n', encoding="utf-8")
-            (runtime_codex_home / "sessions").mkdir(parents=True)
-            (runtime_codex_home / "stale.txt").write_text("stale\n", encoding="utf-8")
-            (runtime_codex_home / "sessions" / "stale.jsonl").write_text("stale\n", encoding="utf-8")
-            host_codex_bin.write_text("#!/bin/sh\necho codex\n", encoding="utf-8")
-            host_codex_bin.chmod(0o755)
-            calls: list[list[str]] = []
-
-            def fake_run(command: list[str], **kwargs):
-                calls.append(command)
-                if command[:2] == ["git", "clone"]:
-                    (source_dir / "deploy").mkdir(parents=True)
-                    (source_dir / "deploy" / "Dockerfile").write_text(
-                        "FROM scratch\n",
-                        encoding="utf-8",
-                    )
-                if command[:3] == ["docker", "image", "inspect"]:
-                    return axis.subprocess.CompletedProcess(
-                        command,
-                        1,
-                        stdout="",
-                        stderr="",
-                    )
-                if command[1:] == ["login", "status"]:
-                    return axis.subprocess.CompletedProcess(command, 0, stdout="Logged in using ChatGPT\n", stderr="")
-                return axis.subprocess.CompletedProcess(command, 0, stdout="", stderr="")
-
-            def fake_which(name: str):
-                if name == "codex":
-                    return str(host_codex_bin)
-                if name == "docker":
-                    return "/usr/bin/docker"
-                if name == "git":
-                    return "/usr/bin/git"
-                return None
-
-            with (
-                mock.patch.object(axis, "LOCAL_DEV_ENV_FILE", env_file),
-                mock.patch.object(axis, "OPEN_DESIGN_SOURCE_DIR", source_dir),
-                mock.patch.object(
-                    axis,
-                    "OPEN_DESIGN_CODEX_BIN_FALLBACK_DIR",
-                    cached_codex_bin_dir,
-                ),
-                mock.patch.object(
-                    axis,
-                    "OPEN_DESIGN_CODEX_HOME_FALLBACK_DIR",
-                    runtime_codex_home,
-                ),
-                mock.patch.object(axis, "exe", side_effect=lambda name: name),
-                mock.patch.object(axis.shutil, "which", side_effect=fake_which),
-                mock.patch.object(axis, "run", side_effect=fake_run),
-                mock.patch.dict(axis.os.environ, {"CODEX_HOME": str(host_codex_home)}),
-                contextlib.redirect_stdout(io.StringIO()),
-            ):
-                self.assertEqual(0, axis.local_dev_open_design_prepare())
-
-            self.assertIn(["git", "clone", axis.OPEN_DESIGN_GIT_URL, str(source_dir)], calls)
-            self.assertIn(
-                [
-                    "docker",
-                    "build",
-                    "-t",
-                    "axis-open-design:local",
-                    "-f",
-                    str(source_dir / "deploy" / "Dockerfile"),
-                    str(source_dir),
-                ],
-                calls,
-            )
-            env_text = env_file.read_text(encoding="utf-8")
-            self.assertIn("OPEN_DESIGN_IMAGE=axis-open-design:local", env_text)
-            self.assertIn(f"OPEN_DESIGN_SOURCE_DIR={source_dir}", env_text)
-            self.assertIn(f"OPEN_DESIGN_HOST_GID={axis.os.getgid()}", env_text)
-            self.assertIn(f"OPEN_DESIGN_CODEX_BIN_DIR={cached_codex_bin_dir}", env_text)
-            self.assertIn(f"OPEN_DESIGN_CODEX_HOME={runtime_codex_home}", env_text)
-            self.assertIn("OPEN_DESIGN_MEM_LIMIT=6144m", env_text)
-            self.assertIn("NODE_OPTIONS=--max-old-space-size=4096", env_text)
-            self.assertIn("OPEN_DESIGN_DISABLE_API_AUTH=0", env_text)
-            self.assertIn("OD_CODEX_DISABLE_PLUGINS=1", env_text)
-            self.assertEqual(
-                host_codex_bin.read_text(encoding="utf-8"),
-                (cached_codex_bin_dir / "codex").read_text(encoding="utf-8"),
-            )
-            self.assertEqual(
-                (host_codex_home / "auth.json").read_text(encoding="utf-8"),
-                (runtime_codex_home / "auth.json").read_text(encoding="utf-8"),
-            )
-            self.assertTrue(runtime_codex_home.stat().st_mode & 0o020)
-            self.assertTrue((runtime_codex_home / "auth.json").stat().st_mode & 0o020)
-            self.assertTrue((runtime_codex_home / "stale.txt").exists())
-            self.assertTrue((runtime_codex_home / "sessions").exists())
-
-    def test_open_design_prepare_fails_when_codex_cli_is_missing(self) -> None:
-        with self.assertRaisesRegex(axis.CheckError, "Codex CLI is not available"):
-            axis.local_dev_open_design_prepare_codex_bin(None)
-
-    def test_open_design_codex_home_requires_auth_when_no_source_or_target_auth_exists(self) -> None:
-        with tempfile.TemporaryDirectory() as temp:
-            codex_home = Path(temp) / "codex-home"
-            with (
-                mock.patch.object(axis, "OPEN_DESIGN_CODEX_HOME_FALLBACK_DIR", codex_home),
-                mock.patch.dict(axis.os.environ, {"CODEX_HOME": str(Path(temp) / "missing-codex-home")}),
-            ):
-                with self.assertRaisesRegex(axis.CheckError, "Codex CLI is not authenticated"):
-                    axis.local_dev_open_design_prepare_codex_home()
 
     def test_reset_db_removes_postgres_volume_between_down_and_up(self) -> None:
         calls = self.run_local_dev(axis.argparse.Namespace(local_dev_command="reset-db"))
@@ -3676,6 +2985,84 @@ class TestHandlerTestRatchet(unittest.TestCase):
 
 
 class TestDocDomainDiscovery(unittest.TestCase):
+    def test_iter_module_names_respects_gitignore(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            subprocess.run(
+                ["git", "init"],
+                cwd=root,
+                check=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+            (root / ".gitignore").write_text(
+                "bin/\n"
+                "obj/\n"
+                "node_modules/\n"
+                "src/Modules/IgnoredModule/\n",
+                encoding="utf-8",
+            )
+            modules_dir = root / "src" / "Modules"
+            generated_only = modules_dir / "GeneratedOnly"
+            (generated_only / "Axis.GeneratedOnly.Domain" / "obj").mkdir(parents=True)
+            (generated_only / "Axis.GeneratedOnly.Domain" / "obj" / "project.assets.json").write_text(
+                "{}",
+                encoding="utf-8",
+            )
+            dependency_dir = modules_dir / "node_modules"
+            (dependency_dir / "package").mkdir(parents=True)
+            (dependency_dir / "package" / "Generated.cs").write_text(
+                "public sealed class Generated {}",
+                encoding="utf-8",
+            )
+            ignored_module = modules_dir / "IgnoredModule"
+            (ignored_module / "Axis.IgnoredModule.Domain").mkdir(parents=True)
+            (ignored_module / "Axis.IgnoredModule.Domain" / "Ignored.cs").write_text(
+                "public sealed class Ignored {}",
+                encoding="utf-8",
+            )
+            real_module = modules_dir / "Identity"
+            (real_module / "Axis.Identity.Domain").mkdir(parents=True)
+            (real_module / "Axis.Identity.Domain" / "Axis.Identity.Domain.csproj").write_text(
+                "<Project />",
+                encoding="utf-8",
+            )
+
+            original_root = axis_repo.ROOT
+            original_modules_dir = axis_repo.MODULES_DIR
+            axis_repo.ROOT = root
+            axis_repo.MODULES_DIR = modules_dir
+            try:
+                self.assertEqual(["Identity"], axis_repo.iter_module_names())
+            finally:
+                axis_repo.ROOT = original_root
+                axis_repo.MODULES_DIR = original_modules_dir
+
+    def test_iter_module_names_fallback_skips_dependency_root(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            modules_dir = Path(temp) / "src" / "Modules"
+            dependency_dir = modules_dir / "node_modules" / "package"
+            dependency_dir.mkdir(parents=True)
+            (dependency_dir / "Generated.cs").write_text(
+                "public sealed class Generated {}",
+                encoding="utf-8",
+            )
+            real_module = modules_dir / "Identity" / "Axis.Identity.Domain"
+            real_module.mkdir(parents=True)
+            (real_module / "Axis.Identity.Domain.csproj").write_text(
+                "<Project />",
+                encoding="utf-8",
+            )
+
+            original_modules_dir = axis_repo.MODULES_DIR
+            axis_repo.MODULES_DIR = modules_dir
+            try:
+                with mock.patch.object(axis_repo, "git_visible_paths_under", return_value=None):
+                    self.assertEqual(["Identity"], axis_repo.iter_module_names())
+            finally:
+                axis_repo.MODULES_DIR = original_modules_dir
+
     def test_module_code_change_alone_does_not_force_doc_activity(self) -> None:
         self.assertEqual(
             [],

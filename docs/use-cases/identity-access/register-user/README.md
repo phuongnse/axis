@@ -73,7 +73,7 @@ Register a standalone Axis user with email/password so the user can verify their
 
 | Surface | Contract |
 |---|---|
-| Registration, confirmation, verification, and callback screens | Use auth consumer contracts from [frontend/src/design-system/consumer-contracts.ts](../../../../frontend/src/design-system/consumer-contracts.ts), shared primitives from [frontend/src/design-system/primitive-contracts.ts](../../../../frontend/src/design-system/primitive-contracts.ts), semantic tokens, and observable loading/error/disabled states. |
+| Registration, confirmation, verification, and callback screens | Required design-system contract is not implemented yet. Define approved primitives, states, accessibility expectations, and visual contract before Frontend can move from `Partial` to `Done`. |
 
 ## Design Sources
 
@@ -125,10 +125,10 @@ sequenceDiagram
 >
 > **Implemented:** The standalone registration backend, API, and currently implemented frontend subset are in place. `POST /api/users/register` owns submission, account creation, personal workspace creation, legal acceptance, idempotency, and verification email creation; the use case also covers email verification, resend states, post-verification PKCE, and dashboard routing.
 >
-> **Gaps vs spec:** Frontend implementation closure remains open. No reset-safe editable design source is committed, and the SPA has not been checked and adjusted against a newly approved Open Design source.
+> **Gaps vs spec:** Frontend implementation closure remains open. The required design-system contract is not implemented, no reset-safe editable design source is committed, and the SPA has not been checked and adjusted against a newly approved design source.
 >
-> **Deferred follow-ups:** Create a new editable Open Design source for registration, confirmation, verification, and callback decisions; then apply it to the SPA and either commit a stable preview export or keep the explicit `N/A` preview decision before marking Frontend `Done`.
+> **Deferred follow-ups:** Define and implement the required design-system contract for registration, confirmation, verification, and callback screens; create or approve a reset-safe editable design source; then apply both to the SPA before marking Frontend `Done`.
 >
-> **Verification:** Required AT rows are automated by Playwright, Vitest, xUnit API, and xUnit Application. Frontend closure also requires the design-system composition/style checks and affected frontend tests.
+> **Verification:** Required AT rows are automated by Playwright, Vitest, xUnit API, and xUnit Application. Frontend closure also requires future design-system verification once that contract exists, plus affected frontend tests.
 >
-> **Decisions:** Open Design remains the intended design-source workflow, but the previous committed design-source artifacts have been reset. Preview remains `N/A` until a new stable source/export pair is committed.
+> **Decisions:** The previous committed design-source artifacts have been reset. Preview remains `N/A` until a new stable source/export pair is committed.

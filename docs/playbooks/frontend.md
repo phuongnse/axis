@@ -2,7 +2,7 @@
 
 > **Navigation**: [docs/README.md](../README.md) · [AGENTS.md](../../AGENTS.md)
 
-Use `$axis-frontend-feature` for SPA feature work and `$axis-design-system` for primitives/tokens.
+Use `$axis-frontend-feature` for SPA feature work.
 
 ## UX-first product UI
 
@@ -10,7 +10,7 @@ Build the workflow, not a landing page or explanation page. Visible copy should 
 
 ## Mobile-first layout and radius
 
-Design from small screens up. Keep cards and controls at restrained radius unless the design system says otherwise.
+Design from small screens up. Keep cards and controls at restrained radius unless the owning use case says otherwise.
 
 ## Feature folder anatomy
 
@@ -34,11 +34,11 @@ Use TanStack Router patterns already in the app. Protected routes live under the
 
 ## Component design
 
-Use shadcn/Axis primitives, icons for iconable actions, labels/tooltips for clarity, and stable dimensions for fixed controls.
+Use shadcn primitives and shared components, icons for iconable actions, labels/tooltips for clarity, and stable dimensions for fixed controls.
 
 ## Styling
 
-Use design tokens and semantic utilities. Avoid arbitrary colors/gradients, raw shadows, and one-off local visual systems.
+Use Tailwind utilities consistently. Avoid one-off local visual systems.
 
 ## Security
 

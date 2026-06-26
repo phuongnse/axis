@@ -52,7 +52,7 @@ function VerifyEmailOutcome({
       icon: Clock,
       title: 'Verification link expired',
       body: 'Request a new verification email, then open the latest link.',
-      iconClass: 'bg-state-warning-background text-state-warning-foreground',
+      iconClass: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-500/15 dark:text-yellow-300',
     },
     already_used: {
       icon: CheckCircle2,
@@ -70,7 +70,7 @@ function VerifyEmailOutcome({
       icon: Clock,
       title: 'Please wait',
       body: 'Too many attempts. Try again shortly.',
-      iconClass: 'bg-state-warning-background text-state-warning-foreground',
+      iconClass: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-500/15 dark:text-yellow-300',
     },
   }[kind];
 

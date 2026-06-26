@@ -27,7 +27,7 @@ Do not edit implementation files before this dossier is complete. For high-risk 
 
 2. Read the governing docs for the exact surface.
    - Always read [AGENTS.md](../../../AGENTS.md), [docs/playbooks/design-gate.md](../../../docs/playbooks/design-gate.md), and [docs/playbooks/agent-checklist.md](../../../docs/playbooks/agent-checklist.md).
-   - Read only the relevant surface docs: [docs/playbooks/api-patterns.md](../../../docs/playbooks/api-patterns.md), [docs/playbooks/frontend.md](../../../docs/playbooks/frontend.md), [docs/playbooks/testing.md](../../../docs/playbooks/testing.md), [docs/playbooks/design-system.md](../../../docs/playbooks/design-system.md), or the owning use-case file.
+   - Read only the relevant surface docs: [docs/playbooks/api-patterns.md](../../../docs/playbooks/api-patterns.md), [docs/playbooks/frontend.md](../../../docs/playbooks/frontend.md), [docs/playbooks/testing.md](../../../docs/playbooks/testing.md), or the owning use-case file.
    - For stack/library changes, read [docs/TECH_STACK.md](../../../docs/TECH_STACK.md) and the touched version owner manifest before deciding whether sign-off is required.
 
 3. Quote governing rules.

@@ -15,8 +15,6 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 MAIN_COMPOSE_FILE = ROOT / "docker-compose.yml"
-OPEN_DESIGN_COMPOSE_FILE = ROOT / "docker-compose.open-design.yml"
-COMPOSE_FILES = (MAIN_COMPOSE_FILE, OPEN_DESIGN_COMPOSE_FILE)
 LOCAL_DEV_FILE = ROOT / "docs/playbooks/local-dev.md"
 TECH_STACK_FILE = ROOT / "docs/TECH_STACK.md"
 
@@ -39,16 +37,35 @@ def mentions_service(doc: str, service_name: str) -> bool:
     return service_pattern.search(doc.lower()) is not None
 
 
+def services_section(text: str) -> str:
+    lines = text.splitlines(keepends=True)
+    body: list[str] = []
+    in_services = False
+    for line in lines:
+        if not in_services:
+            if line.startswith("services:"):
+                in_services = True
+            continue
+        if line.strip() and not line.startswith((" ", "\t")):
+            break
+        body.append(line)
+    return "".join(body)
+
+
 def parse_compose(compose_file: Path) -> tuple[dict[str, list[int]], set[str], list[str]]:
     text = compose_file.read_text(encoding="utf-8")
+    service_text = services_section(text)
     services: dict[str, list[int]] = {}
     optional_services: set[str] = set()
+    service_names: list[str] = []
 
-    for match in SERVICE_BLOCK.finditer(text):
+    for match in SERVICE_BLOCK.finditer(service_text):
         name = match.group(1)
         block = match.group(2)
         if name == "volumes":
             continue
+
+        service_names.append(name)
 
         profile_match = PROFILE_LINE.search(block)
         if profile_match:
@@ -58,8 +75,7 @@ def parse_compose(compose_file: Path) -> tuple[dict[str, list[int]], set[str], l
         if ports:
             services[name] = ports
 
-    service_names = sorted(services.keys())
-    return services, optional_services, service_names
+    return services, optional_services, sorted(service_names)
 
 
 def mandatory_host_ports(services: dict[str, list[int]], optional: set[str]) -> set[int]:
@@ -75,17 +91,14 @@ def mandatory_host_ports(services: dict[str, list[int]], optional: set[str]) -> 
 def check_local_dev_doc() -> list[str]:
     errors: list[str] = []
 
-    for compose_file in COMPOSE_FILES:
-        if not compose_file.is_file():
-            errors.append(f"Missing {compose_file.relative_to(ROOT)}")
+    if not MAIN_COMPOSE_FILE.is_file():
+        errors.append(f"Missing {MAIN_COMPOSE_FILE.relative_to(ROOT)}")
     if not LOCAL_DEV_FILE.is_file():
         errors.append(f"Missing {LOCAL_DEV_FILE.relative_to(ROOT)}")
     if errors:
         return errors
 
-    main_services, main_optional, _main_service_names = parse_compose(MAIN_COMPOSE_FILE)
-    open_design_services, open_design_optional, _open_design_service_names = parse_compose(OPEN_DESIGN_COMPOSE_FILE)
-    service_names = sorted({*main_services.keys(), *open_design_services.keys()})
+    main_services, main_optional, service_names = parse_compose(MAIN_COMPOSE_FILE)
     doc = LOCAL_DEV_FILE.read_text(encoding="utf-8")
 
     doc_lower = doc.lower()
@@ -106,22 +119,12 @@ def check_local_dev_doc() -> list[str]:
                 f"(published by docker-compose.yml)"
             )
 
-    for host_port in sorted(mandatory_host_ports(open_design_services, open_design_optional)):
-        if str(host_port) not in doc:
-            errors.append(
-                f"local-dev.md missing host port {host_port} "
-                f"(published by docker-compose.open-design.yml)"
-            )
-
     for service_name in service_names:
         if not mentions_service(doc, service_name):
             errors.append(
                 f"local-dev.md missing service name '{service_name}' "
-                f"(defined in local compose files)"
+                f"(defined in docker-compose.yml)"
             )
-
-    if "docker-compose.open-design.yml" not in doc or "open-design up" not in doc:
-        errors.append("local-dev.md missing Docker Open Design workflow")
 
     if "observability" not in doc_lower:
         errors.append("local-dev.md missing observability profile documentation")

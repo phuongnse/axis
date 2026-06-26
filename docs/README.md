@@ -21,7 +21,6 @@ Axis is an open-source platform being built for adaptable, workflow-driven busin
 | [docs/playbooks/design-gate.md](./playbooks/design-gate.md) | Required reasoning artifact before non-trivial changes. |
 | [docs/playbooks/api-patterns.md](./playbooks/api-patterns.md) | REST/OpenAPI and API-type change guidance. |
 | [docs/playbooks/frontend.md](./playbooks/frontend.md) | SPA implementation guidance. |
-| [docs/playbooks/design-system.md](./playbooks/design-system.md) | Tokens, primitives, and frontend design contracts. |
 | [docs/playbooks/testing.md](./playbooks/testing.md) | Backend and frontend test conventions. |
 | [docs/playbooks/docs-style.md](./playbooks/docs-style.md) | Documentation ownership and size rules. |
 | [docs/playbooks/scripts.md](./playbooks/scripts.md) | Axis CLI and repo script standards. |
