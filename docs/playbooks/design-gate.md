@@ -26,8 +26,9 @@ For each surface you touch, before coding:
 
 1. **Governing rules** — quote the owner rules with `file:section`; do not rely on memory.
 2. **Blast radius** — paste the `rg` search that lists affected callers, consumers, tests, docs, and generated artifacts.
-3. **Contract decision** — name request/response shape, schema, casing, FE/BE type parity, or write `N/A because no wire shape changes`.
-4. **Verification plan** — list exact development checks and ready-review checks. Do not call review-only artifacts gates.
+3. **Retirement contract** — for removals, renames, replacements, drops, disables, deprecations, or other retirements, list retired identifiers, compatibility exceptions, and the post-edit `rg` sweep; otherwise write `N/A because no supported surface is retired`.
+4. **Contract decision** — name request/response shape, schema, casing, FE/BE type parity, or write `N/A because no wire shape changes`.
+5. **Verification plan** — list exact development checks and ready-review checks. Do not call review-only artifacts gates.
 
 Skip a row only with an explicit `N/A because ...`.
 

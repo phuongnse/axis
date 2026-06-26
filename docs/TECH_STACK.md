@@ -20,12 +20,12 @@ Tech-stack changes need explicit user approval before implementation. Update thi
 | Frontend | React, TypeScript, Vite, TanStack Router, TanStack Query, Zustand, react-hook-form, Zod. |
 | UI | Tailwind CSS, shadcn/Base UI primitives, Style Dictionary tokens, lucide-react icons. |
 | Testing | xUnit, Testcontainers, architecture tests, Vitest, Testing Library, Playwright. |
-| Local runtime | Docker Compose with PostgreSQL, Redis, Maildev, API, SPA, and optional observability/e2e profiles. |
+| Local runtime | Docker Compose with PostgreSQL, Redis, Maildev, API, SPA, optional observability/e2e profiles, and a separate Open Design compose file. |
 
 ## Version Owners
 
 - .NET SDK: `global.json`
 - Backend packages: `Directory.Packages.props`
 - Frontend packages: `frontend/package.json`
-- Local container images: `docker-compose.yml`
+- Local container images: `docker-compose.yml`, `docker-compose.open-design.yml`
 - OpenAPI contract: `openapi.json`

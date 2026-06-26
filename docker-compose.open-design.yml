@@ -1,0 +1,45 @@
+services:
+  open-design:
+    image: ${OPEN_DESIGN_IMAGE:-axis-open-design:local}
+    container_name: axis_open_design
+    group_add:
+      - "${OPEN_DESIGN_HOST_GID:-1000}"
+    environment:
+      NODE_ENV: production
+      NODE_OPTIONS: ${NODE_OPTIONS:---max-old-space-size=4096}
+      PATH: /opt/host-codex/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+      HOME: /home/open-design
+      CODEX_HOME: /home/open-design/.codex
+      CODEX_BIN: /opt/host-codex/bin/codex
+      OD_BIND_HOST: 0.0.0.0
+      OD_ALLOWED_ORIGINS: ${OPEN_DESIGN_ALLOWED_ORIGINS:-}
+      OD_PORT: "7456"
+      OD_WEB_PORT: ${OPEN_DESIGN_PORT:-7456}
+      OD_DISABLE_API_AUTH: ${OPEN_DESIGN_DISABLE_API_AUTH:-}
+      OD_CODEX_SANDBOX: ${OD_CODEX_SANDBOX:-danger-full-access}
+      OD_CODEX_DISABLE_PLUGINS: ${OD_CODEX_DISABLE_PLUGINS:-1}
+    ports:
+      - "127.0.0.1:${OPEN_DESIGN_PORT:-7456}:7456"
+    volumes:
+      - open_design_data:/app/.od
+      - ./:/workspace/axis
+      - ${OPEN_DESIGN_CODEX_BIN_DIR:?OPEN_DESIGN_CODEX_BIN_DIR is set by scripts/axis.py}:/opt/host-codex/bin:ro
+      - ${OPEN_DESIGN_CODEX_HOME:?OPEN_DESIGN_CODEX_HOME is set by scripts/axis.py}:/home/open-design/.codex
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: ${OPEN_DESIGN_MEM_LIMIT:-6144m}
+    pids_limit: 256
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:7456/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+volumes:
+  open_design_data:
+    external: true
+    name: axis_open_design_data

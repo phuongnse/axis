@@ -8,7 +8,7 @@ Use cases are the product source of truth. One use case is a complete end-to-end
 
 | Domain | Use case | Status |
 |---|---|---|
-| [docs/use-cases/identity-access/README.md](./identity-access/README.md) | [docs/use-cases/identity-access/register-user/README.md](./identity-access/register-user/README.md) | Done |
+| [docs/use-cases/identity-access/README.md](./identity-access/README.md) | [docs/use-cases/identity-access/register-user/README.md](./identity-access/register-user/README.md) | Partial |
 
 ## Rule
 
