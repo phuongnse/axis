@@ -23,7 +23,7 @@ Resolve review feedback by improving the codebase, not merely silencing a thread
    - If feedback came from the local CodeRabbit plugin, preserve the issue text, severity, and file path in your working notes; there may be no GitHub thread to resolve.
    - Before editing, record the reviewed checkpoint when follow-up review is expected:
      - For committed work, record `git rev-parse HEAD`.
-     - For uncommitted work, either commit the reviewed state first or report that a true delta-only CodeRabbit rerun is unavailable.
+     - For uncommitted work, commit the reviewed state first or stop and report that a true delta-only CodeRabbit rerun is unavailable.
 
 2. Classify each item.
    - Correctness bug or missing AC.
@@ -47,17 +47,25 @@ Resolve review feedback by improving the codebase, not merely silencing a thread
    - If the user explicitly asked for the smallest change, keep the diff minimal and say so.
    - If a better resolution is deliberately deferred, record an exact `Deferred follow-ups` line.
 
-5. Verify the touched surface.
+5. Generalize the lesson.
+   - For each valid finding, decide whether it is a one-off defect, missing deterministic check, missing workflow rule, stale doc/status rule, or retired-surface cleanup miss.
+   - When the issue class can recur, improve the owning skill, wrapper, checker, or test in a general form before asking for another review.
+   - Do not add example-specific denylist checks, compatibility notes, or "do not use old name" prose for retired surfaces; apply `$axis-design-gate`'s retirement contract and sweep old identifiers instead.
+   - Keep lessons broad enough to prevent the class of mistake, but do not create new product behavior, stack policy, or use-case scope from a review comment alone.
+
+6. Verify the touched surface.
    - Run the narrow test or policy check for the files changed.
+   - When a reviewed checkpoint exists, prefer `python scripts/axis.py verify --since <reviewed-checkpoint>` so follow-up verification is scoped to the changed delta plus working tree.
    - Run `$axis-ready-review` before asking for another review pass.
    - If this feedback was part of `$axis-pull-request`, return control to that skill with the reviewed checkpoint, the files changed by the follow-up, and whether the follow-up is committed.
    - When rerunning local CodeRabbit after follow-up changes, review only the follow-up delta when possible: use the checkpoint SHA as the `--base-commit` and optionally add `--dir` only to narrow affected directories further. Do not rerun the full branch diff and describe it as follow-up-only review.
 
-6. Report resolution.
+7. Report resolution.
    - Mark each comment as resolved, improved beyond suggestion, false positive with evidence, or deferred with owner.
    - Do not claim ready status while triggered verification is failing.
+   - Include the generalized lesson or say `N/A: one-off defect`.
    - Include the follow-up review scope: `follow-up delta`, `full diff with reason`, or `not rerun`.
 
 ## Output
 
-Report review follow-ups as `improved` or `minimal`, list verification, and name any unresolved or deferred comments.
+Report review follow-ups as `improved` or `minimal`, list generalized lessons, verification, retired-identifier sweep results when applicable, and any unresolved or deferred comments.

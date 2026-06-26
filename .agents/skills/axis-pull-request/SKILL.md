@@ -29,10 +29,11 @@ Do not rerun local guards just to create a longer transcript. Run each required 
    - For create PR, branch/diff update, or mark-ready requests, use the CodeRabbit plugin review skill (`$coderabbit:code-review`) after readiness passes and before GitHub PR actions.
    - Metadata-only title/body updates do not require CodeRabbit.
    - Confirm the CLI is available through `python scripts/axis.py check coderabbit-cli` when fresh toolchain evidence is missing.
-   - Review the same branch diff that will be published. Prefer the committed branch diff when the branch is already committed; otherwise review the uncommitted diff before committing.
-   - If CodeRabbit raises issues, treat the output as review feedback: classify it before changing code, resolve the valid items, then rerun the touched verification checks and `$axis-ready-review`.
-   - Before handing off CodeRabbit issues, record the reviewed checkpoint. If the reviewed diff is uncommitted, commit that reviewed state before applying follow-up changes when a delta-only rerun is expected.
-   - Rerun CodeRabbit once after review follow-up changes when they materially change implementation behavior, contracts, docs policy, or tests. Scope the rerun to the follow-up delta by using the reviewed checkpoint as `--base-commit`; add `--dir` only as an extra narrowing filter for affected directories. If a true delta-only rerun is impossible because there was no checkpoint, say so and do not present a full-diff rerun as follow-up-only.
+   - Review only committed work during PR publication. After readiness passes, create an intentional checkpoint commit before CodeRabbit so the reviewed state cannot be lost.
+   - Review the same committed branch diff that will be published. If the user explicitly blocks committing, stop and report that PR publication cannot get a delta-safe review checkpoint yet.
+   - If CodeRabbit raises issues, record `git rev-parse HEAD` as the reviewed checkpoint, then use `$axis-review-feedback`: classify items, resolve valid items, generalize any workflow/check gaps, and commit the follow-up before rerunning review.
+   - Rerun CodeRabbit after review follow-up changes only when the follow-up materially changes implementation behavior, contracts, docs policy, or tests. Scope the rerun to the follow-up delta by using the reviewed checkpoint as `--base-commit`; add `--dir` only as an extra narrowing filter for affected directories. If a true delta-only rerun is impossible because there was no checkpoint, say so and do not present a full-diff rerun as follow-up-only.
+   - Use `python scripts/axis.py verify --since <reviewed-checkpoint>` for follow-up verification when the checkpoint exists; use full `verify` only at the review boundary or when the follow-up scope cannot be represented by a checkpoint.
    - If CodeRabbit is unavailable, unauthenticated, fails, or times out, stop and report the blocker. Skip only when the user explicitly requested no CodeRabbit review, and record the skip reason in the PR requirements.
 
 3. Determine the PR action.
@@ -80,6 +81,8 @@ Ready-review source:
 CodeRabbit review:
 - ran / issues resolved / skipped with reason / blocked
 - scope:
+- reviewed checkpoint:
+- follow-up review scope:
 
 PR metadata:
 - Title: ...

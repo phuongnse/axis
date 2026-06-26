@@ -35,6 +35,7 @@ def load_python_file(path: Path):
 
 
 check_pr = load_script("check-pr.py")
+check_local_dev_docs = load_script("check-local-dev-docs.py")
 check_use_case_docs = load_script("check-use-case-docs.py")
 
 
@@ -1330,6 +1331,31 @@ def main() -> int:
             paths,
         )
 
+    def test_changed_paths_since_include_checkpoint_and_worktree_paths(self) -> None:
+        outputs = {
+            ("diff", "--name-only", "abc123..HEAD"): "docs/follow-up.md\n",
+            ("diff", "--name-only", "--cached"): "docs/staged.md\n",
+            ("diff", "--name-only"): "docs/unstaged.md\n",
+            ("ls-files", "--others", "--exclude-standard"): "docs/untracked.md\n",
+        }
+
+        with (
+            mock.patch.object(axis, "ref_exists", return_value=True),
+            mock.patch.object(axis, "exe", side_effect=lambda name: name),
+            mock.patch.object(axis, "run", side_effect=self.fake_git_run(outputs)),
+        ):
+            paths = axis.changed_paths_since("abc123")
+
+        self.assertEqual(
+            ["docs/follow-up.md", "docs/staged.md", "docs/unstaged.md", "docs/untracked.md"],
+            paths,
+        )
+
+    def test_changed_paths_since_rejects_missing_checkpoint(self) -> None:
+        with mock.patch.object(axis, "ref_exists", return_value=False):
+            with self.assertRaisesRegex(axis.CheckError, "git ref not found"):
+                axis.changed_paths_since("missing")
+
     def test_verify_scope_prefers_working_tree_paths(self) -> None:
         with (
             mock.patch.object(axis, "working_tree_paths", return_value=["scripts/axis.py"]),
@@ -1351,6 +1377,13 @@ def main() -> int:
 
         self.assertEqual("base...HEAD", scope)
         self.assertEqual(["docs/README.md"], paths)
+
+    def test_verify_scope_uses_since_checkpoint(self) -> None:
+        with mock.patch.object(axis, "changed_paths_since", return_value=["scripts/axis.py"]):
+            scope, paths = axis.verify_scope_paths("abc123")
+
+        self.assertEqual("abc123..HEAD + working tree", scope)
+        self.assertEqual(["scripts/axis.py"], paths)
 
     def test_repo_files_include_tracked_and_untracked_files(self) -> None:
         outputs = {
@@ -1733,7 +1766,33 @@ class TestVerifyGate(unittest.TestCase):
                 "frontend-toolchain",
                 "frontend-toolchain",
                 "run ci",
-                "exec vitest run frontend/tests/button.test.tsx",
+                "exec vitest run tests/button.test.tsx",
+            ],
+            calls,
+        )
+
+    def test_runs_changed_frontend_e2e_file_for_e2e_only_change(self) -> None:
+        calls: list[str] = []
+
+        with (
+            mock.patch.object(axis, "verify_scope_paths", return_value=("working tree", ["frontend/e2e/register.pw.ts"])),
+            mock.patch.object(axis, "check_frontend_toolchain", side_effect=lambda: calls.append("frontend-toolchain") or 0),
+            mock.patch.object(axis, "frontend_toolchain_env", return_value={}),
+            mock.patch.object(
+                axis,
+                "run_frontend_npm",
+                side_effect=lambda args: calls.append(" ".join(args)) or axis.subprocess.CompletedProcess(args, 0),
+            ),
+            contextlib.redirect_stdout(io.StringIO()),
+        ):
+            self.assertEqual(0, axis.verify(object()))
+
+        self.assertEqual(
+            [
+                "frontend-toolchain",
+                "frontend-toolchain",
+                "run ci",
+                "run test:e2e -- e2e/register.pw.ts",
             ],
             calls,
         )
@@ -2895,14 +2954,34 @@ class TestScriptsStandardGate(unittest.TestCase):
 
 
 class TestLocalDevCli(unittest.TestCase):
-    def run_local_dev(self, args: axis.argparse.Namespace) -> list[list[str]]:
+    def test_local_dev_docs_service_match_requires_token_boundaries(self) -> None:
+        doc = "Mandatory services: `api`; command: python scripts/axis.py local-dev open-design up."
+
+        self.assertTrue(check_local_dev_docs.mentions_service(doc, "api"))
+        self.assertTrue(check_local_dev_docs.mentions_service(doc, "open-design"))
+        self.assertFalse(check_local_dev_docs.mentions_service("application apiary", "api"))
+        self.assertFalse(check_local_dev_docs.mentions_service("open-designs", "open-design"))
+
+    def run_local_dev(
+        self,
+        args: axis.argparse.Namespace,
+        *,
+        env_file: Path | None = None,
+    ) -> list[list[str]]:
         calls: list[list[str]] = []
 
         def fake_run(command: list[str], **_kwargs):
             calls.append(command)
             return axis.subprocess.CompletedProcess(command, 0, stdout="", stderr="")
 
+        temp_dir: tempfile.TemporaryDirectory[str] | None = None
+        if env_file is None:
+            temp_dir = tempfile.TemporaryDirectory()
+            env_file = Path(temp_dir.name) / ".env.local"
+
         with (
+            temp_dir if temp_dir is not None else contextlib.nullcontext(),
+            mock.patch.object(axis, "LOCAL_DEV_ENV_FILE", env_file),
             mock.patch.object(axis, "_docker_compose_ok", return_value=True),
             mock.patch.object(axis, "run", side_effect=fake_run),
         ):
@@ -2917,6 +2996,31 @@ class TestLocalDevCli(unittest.TestCase):
 
         self.assertEqual(
             ["compose", "-p", "axis", "-f", str(axis.LOCAL_DEV_COMPOSE_FILE), "up", "-d"],
+            calls[0][1:],
+        )
+
+    def test_up_uses_local_env_file_when_present(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            env_file = Path(temp) / ".env.local"
+            env_file.write_text("AXIS_LOCAL_TEST=1\n", encoding="utf-8")
+
+            calls = self.run_local_dev(
+                axis.argparse.Namespace(local_dev_command="up", build=False, services=[]),
+                env_file=env_file,
+            )
+
+        self.assertEqual(
+            [
+                "compose",
+                "-p",
+                "axis",
+                "-f",
+                str(axis.LOCAL_DEV_COMPOSE_FILE),
+                "--env-file",
+                str(env_file),
+                "up",
+                "-d",
+            ],
             calls[0][1:],
         )
 
@@ -2965,6 +3069,174 @@ class TestLocalDevCli(unittest.TestCase):
             calls[0][1:],
         )
 
+    def test_open_design_up_uses_separate_compose_with_local_env_file(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            env_file = Path(temp) / ".env.local"
+            env_file.write_text("OPEN_DESIGN_DISABLE_API_AUTH=1\n", encoding="utf-8")
+
+            with (
+                mock.patch.object(axis, "local_dev_open_design_prepare", return_value=0),
+                mock.patch.object(axis, "local_dev_open_design_ensure_volume", return_value=0),
+            ):
+                calls = self.run_local_dev(
+                    axis.argparse.Namespace(local_dev_command="open-design", open_design_command="up"),
+                    env_file=env_file,
+                )
+
+            self.assertEqual(
+                [
+                    "compose",
+                    "-p",
+                    "axis-open-design",
+                    "-f",
+                    str(axis.OPEN_DESIGN_COMPOSE_FILE),
+                    "--env-file",
+                    str(env_file),
+                    "stop",
+                    "open-design",
+                ],
+                calls[0][1:],
+            )
+            self.assertEqual(
+                [
+                    "compose",
+                    "-p",
+                    "axis-open-design",
+                    "-f",
+                    str(axis.OPEN_DESIGN_COMPOSE_FILE),
+                    "--env-file",
+                    str(env_file),
+                    "up",
+                    "-d",
+                    "open-design",
+                ],
+                calls[1][1:],
+            )
+
+    def test_open_design_prepare_clones_builds_and_writes_env(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            env_file = Path(temp) / ".env.local"
+            source_dir = Path(temp) / "open-design"
+            host_codex_bin_dir = Path(temp) / "host-codex" / "bin" / "wsl" / "test"
+            host_codex_bin = host_codex_bin_dir / "codex"
+            host_codex_home = Path(temp) / "host-codex-home"
+            cached_codex_bin_dir = Path(temp) / "cache" / "codex-bin"
+            runtime_codex_home = Path(temp) / "cache" / "codex-home"
+            env_file.parent.mkdir(parents=True, exist_ok=True)
+            env_file.write_text(
+                f"OPEN_DESIGN_SOURCE_DIR={source_dir}\n"
+                "OPEN_DESIGN_DISABLE_API_AUTH=0\n",
+                encoding="utf-8",
+            )
+            host_codex_bin_dir.mkdir(parents=True)
+            host_codex_home.mkdir(parents=True)
+            (host_codex_home / "auth.json").write_text('{"mode":"chatgpt"}\n', encoding="utf-8")
+            (runtime_codex_home / "sessions").mkdir(parents=True)
+            (runtime_codex_home / "stale.txt").write_text("stale\n", encoding="utf-8")
+            (runtime_codex_home / "sessions" / "stale.jsonl").write_text("stale\n", encoding="utf-8")
+            host_codex_bin.write_text("#!/bin/sh\necho codex\n", encoding="utf-8")
+            host_codex_bin.chmod(0o755)
+            calls: list[list[str]] = []
+
+            def fake_run(command: list[str], **kwargs):
+                calls.append(command)
+                if command[:2] == ["git", "clone"]:
+                    (source_dir / "deploy").mkdir(parents=True)
+                    (source_dir / "deploy" / "Dockerfile").write_text(
+                        "FROM scratch\n",
+                        encoding="utf-8",
+                    )
+                if command[:3] == ["docker", "image", "inspect"]:
+                    return axis.subprocess.CompletedProcess(
+                        command,
+                        1,
+                        stdout="",
+                        stderr="",
+                    )
+                if command[1:] == ["login", "status"]:
+                    return axis.subprocess.CompletedProcess(command, 0, stdout="Logged in using ChatGPT\n", stderr="")
+                return axis.subprocess.CompletedProcess(command, 0, stdout="", stderr="")
+
+            def fake_which(name: str):
+                if name == "codex":
+                    return str(host_codex_bin)
+                if name == "docker":
+                    return "/usr/bin/docker"
+                if name == "git":
+                    return "/usr/bin/git"
+                return None
+
+            with (
+                mock.patch.object(axis, "LOCAL_DEV_ENV_FILE", env_file),
+                mock.patch.object(axis, "OPEN_DESIGN_SOURCE_DIR", source_dir),
+                mock.patch.object(
+                    axis,
+                    "OPEN_DESIGN_CODEX_BIN_FALLBACK_DIR",
+                    cached_codex_bin_dir,
+                ),
+                mock.patch.object(
+                    axis,
+                    "OPEN_DESIGN_CODEX_HOME_FALLBACK_DIR",
+                    runtime_codex_home,
+                ),
+                mock.patch.object(axis, "exe", side_effect=lambda name: name),
+                mock.patch.object(axis.shutil, "which", side_effect=fake_which),
+                mock.patch.object(axis, "run", side_effect=fake_run),
+                mock.patch.dict(axis.os.environ, {"CODEX_HOME": str(host_codex_home)}),
+                contextlib.redirect_stdout(io.StringIO()),
+            ):
+                self.assertEqual(0, axis.local_dev_open_design_prepare())
+
+            self.assertIn(["git", "clone", axis.OPEN_DESIGN_GIT_URL, str(source_dir)], calls)
+            self.assertIn(
+                [
+                    "docker",
+                    "build",
+                    "-t",
+                    "axis-open-design:local",
+                    "-f",
+                    str(source_dir / "deploy" / "Dockerfile"),
+                    str(source_dir),
+                ],
+                calls,
+            )
+            env_text = env_file.read_text(encoding="utf-8")
+            self.assertIn("OPEN_DESIGN_IMAGE=axis-open-design:local", env_text)
+            self.assertIn(f"OPEN_DESIGN_SOURCE_DIR={source_dir}", env_text)
+            self.assertIn(f"OPEN_DESIGN_HOST_GID={axis.os.getgid()}", env_text)
+            self.assertIn(f"OPEN_DESIGN_CODEX_BIN_DIR={cached_codex_bin_dir}", env_text)
+            self.assertIn(f"OPEN_DESIGN_CODEX_HOME={runtime_codex_home}", env_text)
+            self.assertIn("OPEN_DESIGN_MEM_LIMIT=6144m", env_text)
+            self.assertIn("NODE_OPTIONS=--max-old-space-size=4096", env_text)
+            self.assertIn("OPEN_DESIGN_DISABLE_API_AUTH=0", env_text)
+            self.assertIn("OD_CODEX_DISABLE_PLUGINS=1", env_text)
+            self.assertEqual(
+                host_codex_bin.read_text(encoding="utf-8"),
+                (cached_codex_bin_dir / "codex").read_text(encoding="utf-8"),
+            )
+            self.assertEqual(
+                (host_codex_home / "auth.json").read_text(encoding="utf-8"),
+                (runtime_codex_home / "auth.json").read_text(encoding="utf-8"),
+            )
+            self.assertTrue(runtime_codex_home.stat().st_mode & 0o020)
+            self.assertTrue((runtime_codex_home / "auth.json").stat().st_mode & 0o020)
+            self.assertTrue((runtime_codex_home / "stale.txt").exists())
+            self.assertTrue((runtime_codex_home / "sessions").exists())
+
+    def test_open_design_prepare_fails_when_codex_cli_is_missing(self) -> None:
+        with self.assertRaisesRegex(axis.CheckError, "Codex CLI is not available"):
+            axis.local_dev_open_design_prepare_codex_bin(None)
+
+    def test_open_design_codex_home_requires_auth_when_no_source_or_target_auth_exists(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            codex_home = Path(temp) / "codex-home"
+            with (
+                mock.patch.object(axis, "OPEN_DESIGN_CODEX_HOME_FALLBACK_DIR", codex_home),
+                mock.patch.dict(axis.os.environ, {"CODEX_HOME": str(Path(temp) / "missing-codex-home")}),
+            ):
+                with self.assertRaisesRegex(axis.CheckError, "Codex CLI is not authenticated"):
+                    axis.local_dev_open_design_prepare_codex_home()
+
     def test_reset_db_removes_postgres_volume_between_down_and_up(self) -> None:
         calls = self.run_local_dev(axis.argparse.Namespace(local_dev_command="reset-db"))
 
@@ -2982,6 +3254,8 @@ class TestLocalDevCli(unittest.TestCase):
             return axis.subprocess.CompletedProcess(command, 0, stdout="", stderr="")
 
         with (
+            tempfile.TemporaryDirectory() as temp,
+            mock.patch.object(axis, "LOCAL_DEV_ENV_FILE", Path(temp) / ".env.local"),
             mock.patch.object(axis, "_docker_compose_ok", return_value=True),
             mock.patch.object(axis, "run", side_effect=fake_run),
             contextlib.redirect_stderr(io.StringIO()),
@@ -3000,6 +3274,8 @@ class TestLocalDevCli(unittest.TestCase):
             return axis.subprocess.CompletedProcess(command, 0, stdout="", stderr="")
 
         with (
+            tempfile.TemporaryDirectory() as temp,
+            mock.patch.object(axis, "LOCAL_DEV_ENV_FILE", Path(temp) / ".env.local"),
             mock.patch.object(axis, "_docker_compose_ok", return_value=True),
             mock.patch.object(axis, "run", side_effect=fake_run),
         ):

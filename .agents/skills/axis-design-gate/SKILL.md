@@ -1,6 +1,6 @@
 ---
 name: axis-design-gate
-description: Prepare the Axis Design Gate dossier before non-trivial code changes. Use when a task changes Axis source, tests, contracts, docs status, repo tooling, frontend behavior, API endpoints, migrations, auth, or any surface where AGENTS.md requires a Design Gate artifact before implementation.
+description: Prepare the Axis Design Gate dossier before non-trivial code changes. Use when a task changes Axis source, tests, contracts, docs status, repo tooling, frontend behavior, API endpoints, migrations, auth, removes or renames supported surfaces, or any surface where AGENTS.md requires a Design Gate artifact before implementation.
 ---
 
 # Axis Design Gate
@@ -16,6 +16,7 @@ Do not edit implementation files before this dossier is complete. For high-risk 
 - User request, intended files, and touched surfaces.
 - Governing owner docs for the touched surface.
 - Blast-radius search terms for affected symbols, contracts, docs, tests, and generated artifacts.
+- Retired or renamed identifiers when the request removes, drops, replaces, disables, or stops supporting anything.
 
 ## Workflow
 
@@ -40,11 +41,18 @@ Do not edit implementation files before this dossier is complete. For high-risk 
    - For stack/library changes, include [docs/TECH_STACK.md](../../../docs/TECH_STACK.md) and touched manifests ([global.json](../../../global.json), [Directory.Packages.props](../../../Directory.Packages.props), [frontend/package.json](../../../frontend/package.json), [docker-compose.yml](../../../docker-compose.yml)) in the blast-radius summary.
    - Paste the exact command and summarize the hits. If no search applies, write `N/A because ...`.
 
-5. Decide the contract shape.
+5. Apply the retirement contract when removing or renaming.
+   - Trigger on user intent such as remove, delete, drop, no fallback, no legacy, stop using, replace, rename, retire, deprecate, or no longer needed.
+   - List every retired identifier: symbols, env vars, config keys, commands, flags, paths, files, service names, IDs, endpoints, DTO fields, feature branches, docs anchors, tests, fixtures, generated artifacts, and user-facing names.
+   - Default to zero current-source references after the edit. Do not keep compatibility shims, migrations, fallbacks, denylist checks, legacy tests, stale docs, or "do not use old name" guidance unless an owner doc or explicit user decision requires compatibility.
+   - If compatibility is required, document the owner, expiry/removal condition, and proving test. Otherwise delete tests and docs that exist only to preserve the retired name.
+   - Plan a post-edit repo-wide `rg` sweep for retired identifiers. Final reporting must say zero matches or name each accepted compatibility exception.
+
+6. Decide the contract shape.
    - Name request/response DTOs, API casing, and FE/BE generated type parity when applicable.
    - If no wire contract is touched, write `N/A because no wire shape changes`.
 
-6. Plan verification.
+7. Plan verification.
    - Name the narrow development checks.
    - Name the ready-review checks from [docs/playbooks/agent-checklist.md](../../../docs/playbooks/agent-checklist.md).
    - Do not call a review-only artifact a gate.
@@ -66,6 +74,11 @@ Governing rules:
 
 Blast radius:
 - `rg -n "..." ...` -> summary of hits
+
+Retirement contract:
+- Retired identifiers: ...
+- Compatibility exceptions: ... / N/A because ...
+- Post-edit sweep: ...
 
 Contract decision:
 - Request/response/casing: ...

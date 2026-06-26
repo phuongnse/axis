@@ -14,6 +14,7 @@ Change guidance without growing context load or drifting from the source of trut
 - Guidance artifact being changed and the rule, workflow, or owner fact it carries.
 - Current owner doc or skill for that fact.
 - Old token or renamed surface when the change removes or renames guidance.
+- Retired identifiers from `$axis-design-gate` when the request removes, renames, replaces, drops, disables, deprecates, or otherwise retires a supported surface.
 
 ## Workflow
 
@@ -32,7 +33,8 @@ Change guidance without growing context load or drifting from the source of trut
    - Skill text follows the same link rule: owner docs use markdown links, not plain path text.
    - Keep exact runtime, package, container, and tool versions in the owning manifests or script checks; keep only the baseline/category in [docs/TECH_STACK.md](../../../docs/TECH_STACK.md).
    - Prefer durable categories over inventories of current files, commands, statuses, or tools.
-   - For renamed or removed names, run a one-time `rg` sweep, update current owner links, and remove old-name guidance instead of keeping "do not use old name" prose.
+   - For renamed, removed, replaced, dropped, disabled, deprecated, or otherwise retired names, apply `$axis-design-gate`'s retirement contract: run pre- and post-edit `rg` sweeps, update current owner links, and remove old-name guidance instead of keeping "do not use old name" prose.
+   - Do not keep docs, migration notes, compatibility prose, denylist checks, or tests that mention a retired name unless an owner doc or explicit user decision requires a compatibility exception.
    - Generalize review or incident learning into decision criteria; do not publish symptom-to-remedy recipes.
    - Put repeatable workflow in skills, not prose docs.
    - Treat guidance configs and skill text as maintained docs, not throwaway config.
@@ -56,4 +58,4 @@ Change guidance without growing context load or drifting from the source of trut
 
 ## Output
 
-Report changed docs, ownership decisions, generalization check, old-name sweep when applicable, checks run, and any deferred cleanup with an owner.
+Report changed docs, ownership decisions, generalization check, retired-name sweep results, accepted compatibility exceptions, checks run, and any deferred cleanup with an owner.

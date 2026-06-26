@@ -8,4 +8,4 @@ Identity Access owns account access flows for Axis users.
 
 | Use case | Status |
 |---|---|
-| [docs/use-cases/identity-access/register-user/README.md](./register-user/README.md) | Done |
+| [docs/use-cases/identity-access/register-user/README.md](./register-user/README.md) | Partial |

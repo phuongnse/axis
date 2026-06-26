@@ -73,13 +73,13 @@ Register a standalone Axis user with email/password so the user can verify their
 
 | Surface | Contract |
 |---|---|
-| Registration, confirmation, verification, and callback screens | Use existing auth feature consumer contracts, shared UI primitives, semantic tokens, and observable loading/error/disabled states. |
+| Registration, confirmation, verification, and callback screens | Use auth consumer contracts from [frontend/src/design-system/consumer-contracts.ts](../../../../frontend/src/design-system/consumer-contracts.ts), shared primitives from [frontend/src/design-system/primitive-contracts.ts](../../../../frontend/src/design-system/primitive-contracts.ts), semantic tokens, and observable loading/error/disabled states. |
 
 ## Design Sources
 
 | Screen | Source | Preview |
 |---|---|---|
-| registration flow | N/A | N/A |
+| N/A | N/A | N/A |
 
 ## Diagrams
 
@@ -121,14 +121,14 @@ sequenceDiagram
 > | Application | Done |
 > | Infrastructure | Done |
 > | API | Done |
-> | Frontend | Done |
+> | Frontend | Partial |
 >
-> **Implemented:** The standalone registration use case is implemented end to end. `POST /api/users/register` owns submission, account creation, personal workspace creation, legal acceptance, idempotency, and verification email creation; the use case also covers email verification, resend states, post-verification PKCE, and dashboard routing.
+> **Implemented:** The standalone registration backend, API, and currently implemented frontend subset are in place. `POST /api/users/register` owns submission, account creation, personal workspace creation, legal acceptance, idempotency, and verification email creation; the use case also covers email verification, resend states, post-verification PKCE, and dashboard routing.
 >
-> **Gaps vs spec:** none for standalone email/password registration.
+> **Gaps vs spec:** Frontend implementation closure remains open. No reset-safe editable design source is committed, and the SPA has not been checked and adjusted against a newly approved Open Design source.
 >
-> **Deferred follow-ups:** N/A.
+> **Deferred follow-ups:** Create a new editable Open Design source for registration, confirmation, verification, and callback decisions; then apply it to the SPA and either commit a stable preview export or keep the explicit `N/A` preview decision before marking Frontend `Done`.
 >
-> **Verification:** Required AT rows are automated by Playwright, Vitest, xUnit API, and xUnit Application.
+> **Verification:** Required AT rows are automated by Playwright, Vitest, xUnit API, and xUnit Application. Frontend closure also requires the design-system composition/style checks and affected frontend tests.
 >
-> **Decisions:** No editable design-source artifact is committed for this use case; implemented screens are covered by component and E2E tests.
+> **Decisions:** Open Design remains the intended design-source workflow, but the previous committed design-source artifacts have been reset. Preview remains `N/A` until a new stable source/export pair is committed.

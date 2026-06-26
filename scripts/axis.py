@@ -37,8 +37,18 @@ TECH_STACK_DOC = "docs/TECH_STACK.md"
 GLOBAL_JSON_PATH = ROOT / "global.json"
 NVMRC_PATH = ROOT / "frontend" / ".nvmrc"
 LOCAL_DEV_COMPOSE_FILE = ROOT / "docker-compose.yml"
+OPEN_DESIGN_COMPOSE_FILE = ROOT / "docker-compose.open-design.yml"
+LOCAL_DEV_ENV_FILE = ROOT / ".env.local"
 LOCAL_DEV_PROJECT_NAME = "axis"
+OPEN_DESIGN_PROJECT_NAME = f"{LOCAL_DEV_PROJECT_NAME}-open-design"
 LOCAL_DEV_POSTGRES_VOLUME = f"{LOCAL_DEV_PROJECT_NAME}_postgres_data"
+OPEN_DESIGN_SOURCE_DIR = Path.home() / "open-design"
+OPEN_DESIGN_GIT_URL = "https://github.com/nexu-io/open-design.git"
+OPEN_DESIGN_LOCAL_IMAGE = "axis-open-design:local"
+OPEN_DESIGN_SERVICE = "open-design"
+OPEN_DESIGN_VOLUME_NAME = "axis_open_design_data"
+OPEN_DESIGN_CODEX_BIN_FALLBACK_DIR = Path.home() / ".cache" / "axis" / "codex-bin"
+OPEN_DESIGN_CODEX_HOME_FALLBACK_DIR = Path.home() / ".cache" / "axis" / "codex-home"
 API_PROJECT = ROOT / "src" / "Axis.Api" / "Axis.Api.csproj"
 FRONTEND_DIR = ROOT / "frontend"
 LOCAL_CERT_DIR = ROOT / ".dev-certs"
@@ -200,6 +210,17 @@ def changed_paths(range_spec: str | None = None) -> list[str]:
     return unique_paths(
         [
             *git_lines(["diff", "--name-only", range_spec], label=f"changed_paths {range_spec}"),
+            *working_tree_paths(),
+        ]
+    )
+
+
+def changed_paths_since(ref: str) -> list[str]:
+    if not ref_exists(f"{ref}^{{commit}}"):
+        raise CheckError(f"verify --since: git ref not found: {ref}")
+    return unique_paths(
+        [
+            *git_lines(["diff", "--name-only", f"{ref}..HEAD"], label=f"changed_paths_since {ref}..HEAD"),
             *working_tree_paths(),
         ]
     )
@@ -2273,8 +2294,8 @@ def check_doc_drift(_args: argparse.Namespace | None = None) -> int:
         if checker() != 0:
             issues.append(f"{name} failed")
 
-    if any_changed(paths, r"^docker-compose[.]yml$") and not docs_changed_under(paths, "docs/playbooks/local-dev.md"):
-        fail(issues, "docker-compose.yml changed but docs/playbooks/local-dev.md not updated in this PR")
+    if any_changed(paths, r"^docker-compose(?:[.]open-design)?[.]yml$") and not docs_changed_under(paths, "docs/playbooks/local-dev.md"):
+        fail(issues, "local compose file changed but docs/playbooks/local-dev.md not updated in this PR")
 
     if issues:
         print("\nSee docs/playbooks/agent-checklist.md", file=sys.stderr)
@@ -2786,7 +2807,9 @@ def dotnet_test_projects(projects: list[str]) -> int:
     return 0
 
 
-def verify_scope_paths() -> tuple[str, list[str]]:
+def verify_scope_paths(since: str | None = None) -> tuple[str, list[str]]:
+    if since:
+        return f"{since}..HEAD + working tree", changed_paths_since(since)
     working_tree = working_tree_paths()
     if working_tree:
         return "working tree", working_tree
@@ -2795,7 +2818,7 @@ def verify_scope_paths() -> tuple[str, list[str]]:
 
 
 def verify(args: argparse.Namespace) -> int:
-    scope, paths = verify_scope_paths()
+    scope, paths = verify_scope_paths(getattr(args, "since", None))
     failed: list[str] = []
 
     def step(name: str, fn: callable[[], int]) -> int:
@@ -2880,11 +2903,25 @@ def verify(args: argparse.Namespace) -> int:
                 step("frontend API types", lambda: frontend_command(argparse.Namespace(frontend_command="gen-api-types", check=True)))
             step("frontend ci (tsc + biome)", lambda: frontend_command(argparse.Namespace(frontend_command="ci")))
             if frontend_tests_only:
-                changed_tests = [path for path in paths if path.startswith("frontend/tests/") and path.endswith((".ts", ".tsx"))]
-                if changed_tests:
+                changed_unit_tests = [
+                    path.removeprefix("frontend/")
+                    for path in paths
+                    if path.startswith("frontend/tests/") and path.endswith((".ts", ".tsx"))
+                ]
+                changed_e2e_tests = [
+                    path.removeprefix("frontend/")
+                    for path in paths
+                    if path.startswith("frontend/e2e/") and path.endswith((".ts", ".tsx"))
+                ]
+                if changed_unit_tests:
                     step(
                         "frontend test (changed test files)",
-                        lambda: run_frontend_npm(["exec", "vitest", "run", *changed_tests]).returncode,
+                        lambda: run_frontend_npm(["exec", "vitest", "run", *changed_unit_tests]).returncode,
+                    )
+                if changed_e2e_tests:
+                    step(
+                        "frontend e2e (changed test files)",
+                        lambda: run_frontend_npm(["run", "test:e2e", "--", *changed_e2e_tests]).returncode,
                     )
             else:
                 step("frontend test", lambda: frontend_command(argparse.Namespace(frontend_command="test")))
@@ -3127,8 +3164,28 @@ def compose_args(project_name: str, compose_file: Path, *args: str) -> list[str]
     ]
 
 
+def local_dev_env_args() -> list[str]:
+    if LOCAL_DEV_ENV_FILE.is_file():
+        return ["--env-file", str(LOCAL_DEV_ENV_FILE)]
+    return []
+
+
 def local_dev_compose_args(*args: str) -> list[str]:
-    return compose_args(LOCAL_DEV_PROJECT_NAME, LOCAL_DEV_COMPOSE_FILE, *args)
+    return compose_args(
+        LOCAL_DEV_PROJECT_NAME,
+        LOCAL_DEV_COMPOSE_FILE,
+        *local_dev_env_args(),
+        *args,
+    )
+
+
+def open_design_compose_args(*args: str) -> list[str]:
+    return compose_args(
+        OPEN_DESIGN_PROJECT_NAME,
+        OPEN_DESIGN_COMPOSE_FILE,
+        *local_dev_env_args(),
+        *args,
+    )
 
 
 def require_docker_compose(label: str) -> int:
@@ -3238,6 +3295,285 @@ def local_dev_certs(_args: argparse.Namespace | None = None) -> int:
     return 0
 
 
+def read_env_value(path: Path, key: str) -> str | None:
+    if not path.is_file():
+        return None
+    for line in path.read_text(encoding="utf-8").splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#") or "=" not in stripped:
+            continue
+        name, value = stripped.split("=", 1)
+        if name.strip() == key:
+            return value.strip().strip("\"'")
+    return None
+
+
+def upsert_env_value(text: str, key: str, value: str) -> str:
+    lines = text.splitlines()
+    updated = False
+    for index, line in enumerate(lines):
+        if line.strip().startswith("#") or "=" not in line:
+            continue
+        name, _current_value = line.split("=", 1)
+        if name.strip() == key:
+            lines[index] = f"{key}={value}"
+            updated = True
+            break
+    if not updated:
+        lines.append(f"{key}={value}")
+    return "\n".join(lines).rstrip() + "\n"
+
+
+def write_open_design_env_value(key: str, value: str) -> None:
+    LOCAL_DEV_ENV_FILE.parent.mkdir(parents=True, exist_ok=True)
+    text = (
+        LOCAL_DEV_ENV_FILE.read_text(encoding="utf-8")
+        if LOCAL_DEV_ENV_FILE.is_file()
+        else ""
+    )
+    LOCAL_DEV_ENV_FILE.write_text(
+        upsert_env_value(text, key, value),
+        encoding="utf-8",
+        newline="\n",
+    )
+    LOCAL_DEV_ENV_FILE.chmod(0o600)
+
+
+def local_dev_open_design_source_dir() -> Path:
+    configured = read_env_value(LOCAL_DEV_ENV_FILE, "OPEN_DESIGN_SOURCE_DIR")
+    source = Path(configured).expanduser() if configured else OPEN_DESIGN_SOURCE_DIR
+    if not source.is_absolute():
+        source = ROOT / source
+    return source
+
+
+def local_dev_open_design_init() -> int:
+    LOCAL_DEV_ENV_FILE.parent.mkdir(parents=True, exist_ok=True)
+
+    if LOCAL_DEV_ENV_FILE.is_file():
+        text = LOCAL_DEV_ENV_FILE.read_text(encoding="utf-8")
+    else:
+        text = "\n".join(
+            [
+                "OPEN_DESIGN_PORT=7456",
+                f"OPEN_DESIGN_IMAGE={OPEN_DESIGN_LOCAL_IMAGE}",
+                f"OPEN_DESIGN_SOURCE_DIR={OPEN_DESIGN_SOURCE_DIR}",
+                "OPEN_DESIGN_MEM_LIMIT=6144m",
+                "NODE_OPTIONS=--max-old-space-size=4096",
+                "OPEN_DESIGN_ALLOWED_ORIGINS=",
+                "OPEN_DESIGN_DISABLE_API_AUTH=1",
+                "OD_CODEX_SANDBOX=danger-full-access",
+                "OD_CODEX_DISABLE_PLUGINS=1",
+                "",
+            ]
+        )
+
+    existing_port = read_env_value(LOCAL_DEV_ENV_FILE, "OPEN_DESIGN_PORT")
+    existing_memory = read_env_value(LOCAL_DEV_ENV_FILE, "OPEN_DESIGN_MEM_LIMIT")
+    existing_node_options = read_env_value(LOCAL_DEV_ENV_FILE, "NODE_OPTIONS")
+    existing_allowed_origins = read_env_value(LOCAL_DEV_ENV_FILE, "OPEN_DESIGN_ALLOWED_ORIGINS")
+    existing_disable_api_auth = read_env_value(LOCAL_DEV_ENV_FILE, "OPEN_DESIGN_DISABLE_API_AUTH")
+    existing_disable_plugins = read_env_value(LOCAL_DEV_ENV_FILE, "OD_CODEX_DISABLE_PLUGINS")
+    existing_sandbox = read_env_value(LOCAL_DEV_ENV_FILE, "OD_CODEX_SANDBOX")
+
+    text = upsert_env_value(text, "OPEN_DESIGN_PORT", existing_port or "7456")
+    text = upsert_env_value(text, "OPEN_DESIGN_IMAGE", OPEN_DESIGN_LOCAL_IMAGE)
+    text = upsert_env_value(text, "OPEN_DESIGN_SOURCE_DIR", str(local_dev_open_design_source_dir()))
+    text = upsert_env_value(text, "OPEN_DESIGN_MEM_LIMIT", existing_memory or "6144m")
+    text = upsert_env_value(text, "NODE_OPTIONS", existing_node_options or "--max-old-space-size=4096")
+    text = upsert_env_value(text, "OPEN_DESIGN_ALLOWED_ORIGINS", existing_allowed_origins or "")
+    text = upsert_env_value(text, "OPEN_DESIGN_DISABLE_API_AUTH", existing_disable_api_auth or "1")
+    text = upsert_env_value(text, "OD_CODEX_SANDBOX", existing_sandbox or "danger-full-access")
+    text = upsert_env_value(text, "OD_CODEX_DISABLE_PLUGINS", existing_disable_plugins or "1")
+    text = upsert_env_value(text, "OPEN_DESIGN_HOST_GID", str(os.getgid()))
+
+    LOCAL_DEV_ENV_FILE.write_text(text, encoding="utf-8", newline="\n")
+    LOCAL_DEV_ENV_FILE.chmod(0o600)
+    return 0
+
+
+def local_dev_open_design_clone(source_dir: Path) -> int:
+    if source_dir.exists():
+        return 0
+    source_dir.parent.mkdir(parents=True, exist_ok=True)
+    print(f"local-dev open-design: cloning source into {source_dir}", flush=True)
+    return run([exe("git"), "clone", OPEN_DESIGN_GIT_URL, str(source_dir)], check=False).returncode
+
+
+def local_dev_open_design_codex_bin() -> Path | None:
+    codex = shutil.which(exe("codex")) or shutil.which("codex")
+    if not codex:
+        return None
+    codex_bin = Path(codex).expanduser()
+    if not codex_bin.is_file():
+        return None
+    return codex_bin
+
+
+def local_dev_open_design_prepare_codex_bin(source_bin: Path | None) -> Path:
+    if source_bin is None:
+        raise CheckError("local-dev open-design: Codex CLI is not available in PATH")
+
+    target_bin_dir = OPEN_DESIGN_CODEX_BIN_FALLBACK_DIR
+    target_bin_dir.mkdir(parents=True, exist_ok=True)
+    target_bin_dir.chmod(0o755)
+    target_bin = target_bin_dir / "codex"
+    if source_bin and source_bin.resolve() == target_bin.resolve():
+        return target_bin_dir
+
+    for target in target_bin_dir.iterdir():
+        if target.is_dir() and not target.is_symlink():
+            shutil.rmtree(target)
+        else:
+            target.unlink()
+
+    if source_bin:
+        tmp_bin = target_bin_dir / ".codex.tmp"
+        shutil.copy2(source_bin, tmp_bin)
+        tmp_bin.chmod(0o755)
+        tmp_bin.replace(target_bin)
+    return target_bin_dir
+
+
+def local_dev_open_design_host_codex_home() -> Path:
+    candidates: list[Path] = []
+    configured = os.environ.get("CODEX_HOME")
+    if configured:
+        candidates.append(Path(configured).expanduser())
+    candidates.append(Path.home() / ".codex")
+
+    for candidate in candidates:
+        if (candidate / "auth.json").is_file():
+            return candidate
+    return candidates[0]
+
+
+def local_dev_open_design_sync_codex_auth(target_home: Path) -> None:
+    source_auth = local_dev_open_design_host_codex_home() / "auth.json"
+    target_auth = target_home / "auth.json"
+    if source_auth.is_file():
+        shutil.copy2(source_auth, target_auth)
+        target_auth.chmod(0o660)
+        return
+    if not target_auth.is_file():
+        raise CheckError(
+            "local-dev open-design: Codex CLI is not authenticated; run `codex login` in WSL first"
+        )
+
+
+def local_dev_open_design_verify_codex_auth(codex_bin: Path, codex_home: Path) -> None:
+    result = run(
+        [str(codex_bin), "login", "status"],
+        env={"CODEX_HOME": str(codex_home)},
+        check=False,
+        capture=True,
+    )
+    output = "\n".join(part for part in (result.stdout, result.stderr) if part)
+    if result.returncode != 0 or "Logged in" not in output:
+        raise CheckError(
+            "local-dev open-design: Codex CLI is installed but not authenticated for Open Design"
+        )
+
+
+def local_dev_open_design_prepare_codex_home() -> Path:
+    target_home = OPEN_DESIGN_CODEX_HOME_FALLBACK_DIR
+    target_home.mkdir(parents=True, exist_ok=True)
+    target_home.chmod(0o2770)
+    local_dev_open_design_sync_codex_auth(target_home)
+    return target_home
+
+
+def local_dev_open_design_configure_codex() -> None:
+    source_bin = local_dev_open_design_codex_bin()
+    codex_bin_dir = local_dev_open_design_prepare_codex_bin(source_bin)
+    codex_home = local_dev_open_design_prepare_codex_home()
+    local_dev_open_design_verify_codex_auth(source_bin, codex_home)
+    write_open_design_env_value("OPEN_DESIGN_CODEX_BIN_DIR", str(codex_bin_dir))
+    write_open_design_env_value("OPEN_DESIGN_CODEX_HOME", str(codex_home))
+
+
+def open_design_image_exists() -> bool:
+    result = run(
+        [exe("docker"), "image", "inspect", OPEN_DESIGN_LOCAL_IMAGE],
+        check=False,
+        capture=True,
+    )
+    return result.returncode == 0
+
+
+def local_dev_open_design_build(source_dir: Path) -> int:
+    dockerfile = source_dir / "deploy" / "Dockerfile"
+    if not dockerfile.is_file():
+        raise CheckError(f"local-dev open-design: missing {dockerfile}")
+    if open_design_image_exists():
+        return 0
+    return run(
+        [
+            exe("docker"),
+            "build",
+            "-t",
+            OPEN_DESIGN_LOCAL_IMAGE,
+            "-f",
+            str(dockerfile),
+            str(source_dir),
+        ],
+        check=False,
+    ).returncode
+
+
+def local_dev_open_design_ensure_volume() -> int:
+    result = run(
+        [exe("docker"), "volume", "inspect", OPEN_DESIGN_VOLUME_NAME],
+        check=False,
+        capture=True,
+    )
+    if result.returncode == 0:
+        return 0
+    return run([exe("docker"), "volume", "create", OPEN_DESIGN_VOLUME_NAME], check=False).returncode
+
+
+def local_dev_open_design_prepare() -> int:
+    rc = local_dev_open_design_init()
+    if rc != 0:
+        return rc
+
+    source_dir = local_dev_open_design_source_dir()
+    rc = local_dev_open_design_clone(source_dir)
+    if rc != 0:
+        return rc
+
+    write_open_design_env_value("OPEN_DESIGN_SOURCE_DIR", str(source_dir))
+    local_dev_open_design_configure_codex()
+    return local_dev_open_design_build(source_dir)
+
+
+def local_dev_open_design(args: argparse.Namespace) -> int:
+    od_command = args.open_design_command
+
+    if od_command == "up":
+        stop = run(open_design_compose_args("stop", OPEN_DESIGN_SERVICE), check=False)
+        if stop.returncode != 0:
+            return stop.returncode
+        rc = local_dev_open_design_prepare()
+        if rc != 0:
+            return rc
+        rc = local_dev_open_design_ensure_volume()
+        if rc != 0:
+            return rc
+        return run(open_design_compose_args("up", "-d", OPEN_DESIGN_SERVICE), check=False).returncode
+    if od_command in {"stop", "restart"}:
+        return run(open_design_compose_args(od_command, OPEN_DESIGN_SERVICE), check=False).returncode
+    if od_command == "status":
+        return run(open_design_compose_args("ps", OPEN_DESIGN_SERVICE), check=False).returncode
+    if od_command == "logs":
+        compose = ["logs"]
+        if args.follow:
+            compose.append("-f")
+        compose.append(OPEN_DESIGN_SERVICE)
+        return run(open_design_compose_args(*compose), check=False).returncode
+
+    raise CheckError(f"Unknown local-dev open-design command: {od_command}")
+
 def local_dev(args: argparse.Namespace) -> int:
     if args.local_dev_command == "certs":
         return local_dev_certs(args)
@@ -3247,6 +3583,9 @@ def local_dev(args: argparse.Namespace) -> int:
         return rc
 
     command = args.local_dev_command
+    if command == "open-design":
+        return local_dev_open_design(args)
+
     if command == "up":
         compose = ["up", "-d"]
         if args.build:
@@ -3478,7 +3817,9 @@ def main(argv: list[str] | None = None) -> int:
     doctor_parser.set_defaults(func=doctor)
     sub.add_parser("install-hooks").set_defaults(func=install_hooks)
     sub.add_parser("pre-push").set_defaults(func=pre_push)
-    sub.add_parser("verify").set_defaults(func=verify)
+    verify_parser = sub.add_parser("verify")
+    verify_parser.add_argument("--since", help="Scope verification to changes after this checkpoint plus the working tree")
+    verify_parser.set_defaults(func=verify)
 
     dotnet_parser = sub.add_parser("dotnet")
     dotnet_sub = dotnet_parser.add_subparsers(dest="dotnet_command", required=True)
@@ -3555,6 +3896,13 @@ def main(argv: list[str] | None = None) -> int:
     local_observability_logs = local_observability_sub.add_parser("logs")
     local_observability_logs.add_argument("-f", "--follow", action="store_true")
     local_observability_logs.set_defaults(func=local_dev)
+    local_open_design = local_dev_sub.add_parser("open-design")
+    local_open_design_sub = local_open_design.add_subparsers(dest="open_design_command", required=True)
+    for open_design_command in ("up", "stop", "restart", "status"):
+        local_open_design_sub.add_parser(open_design_command).set_defaults(func=local_dev)
+    local_open_design_logs = local_open_design_sub.add_parser("logs")
+    local_open_design_logs.add_argument("-f", "--follow", action="store_true")
+    local_open_design_logs.set_defaults(func=local_dev)
     local_dev_sub.add_parser("reset-db").set_defaults(func=local_dev)
     local_dev_sub.add_parser("reset-all").set_defaults(func=local_dev)
 

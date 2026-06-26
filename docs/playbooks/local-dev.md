@@ -33,17 +33,19 @@ The package-manager adapter resolves the documented Node/npm binary/shim path. D
 
 Use `python scripts/axis.py local-dev up`. Stop with `python scripts/axis.py local-dev down` unless the user asks to keep services running.
 
-Mandatory services: `postgres`, `redis`, `maildev`, `api`, and `web`; optional services: `otel-lgtm` and `e2e`.
+Mandatory services in [docker-compose.yml](../../docker-compose.yml): `postgres`, `redis`, `maildev`, `api`, and `web`; optional services: `otel-lgtm` and `e2e`.
 
-Host ports published by compose: `1025`, `1080`, `3000`, `4318`, `5281`, `5432`, `6379`.
+Host ports published by compose: `1025`, `1080`, `3000`, `4318`, `5281`, `5432`, `6379`, `7456`.
 
-[docker-compose.yml](../../docker-compose.yml) plus this playbook are the source of truth. If compose changes, update this file in the same PR.
+[docker-compose.yml](../../docker-compose.yml), [docker-compose.open-design.yml](../../docker-compose.open-design.yml), and this playbook are the source of truth for Axis local Docker services. If compose changes, update this file in the same PR.
 
 Use the observability stack only when debugging telemetry.
 
+Local overrides live in ignored root `.env.local`. Open Design runs from [docker-compose.open-design.yml](../../docker-compose.open-design.yml); use `python scripts/axis.py local-dev open-design up` to clone, build, configure, and start it at `127.0.0.1:7456`; stop it with `python scripts/axis.py local-dev open-design stop`. Local-dev builds a local image from `~/open-design`, mounts the local Codex CLI binary, and syncs local Codex ChatGPT auth into a Linux-native Docker mount without writing or passing API keys. Run `codex login` in WSL first when Codex is not authenticated. Open Design API auth is disabled for the loopback-only local browser flow.
+
 ## Daily Operations
 
-Prefer scoped CLI commands: `status`, `up`, `down`, `e2e`, and focused checks.
+Prefer scoped CLI commands: `status`, `up`, `down`, `e2e`, `open-design`, and focused checks.
 
 Use runtime-specific dev servers only through the documented Axis wrapper or owning package script.
 
@@ -59,4 +61,4 @@ Use reset paths only for disposable local data. Do not use schema initialization
 
 ## Guardrails
 
-Do not commit local secrets, ports, certs, or personal URLs. Keep compose/docs drift checked through `python scripts/axis.py check local-dev-docs`.
+Do not commit local secrets, ports, certs, Open Design env files, or personal URLs. Keep compose/docs drift checked through `python scripts/axis.py check local-dev-docs`.

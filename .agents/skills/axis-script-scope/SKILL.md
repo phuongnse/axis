@@ -30,19 +30,22 @@ Run enough evidence for the current context without turning development into loc
    - Backend: targeted test or `python scripts/axis.py dotnet build`; unit tests when behavior changed.
    - Frontend: focused Vitest/Playwright or `python scripts/axis.py frontend ci` for type/lint risk.
    - API contract: regenerate/check generated contracts only when route/request/response shape changed.
+   - Review follow-up: when a reviewed checkpoint exists, run `python scripts/axis.py verify --since <checkpoint>` so the wrapper selects checks from the follow-up delta plus working tree.
 
 3. Avoid waste.
    - Do not run `verify` after every small edit.
    - Do not run full `.NET` test suite unless debugging CI, high-risk backend behavior, or claiming full-suite evidence.
    - Do not run local-dev stack unless the workflow needs external services or smoke evidence.
    - Do not rerun passing checks unless the diff changed in a way that invalidates them.
+   - Do not rerun full branch review or full branch verification for a review follow-up when a checkpoint-specific delta is available.
 
 4. Use wrappers.
    - Document repo workflows through `python scripts/axis.py ...`.
    - Keep raw Docker, dotnet, npm, Lychee, and OpenSSL commands inside wrappers or package scripts.
    - If a needed wrapper is missing, add it through [scripts/axis.py](../../../scripts/axis.py) instead of documenting a raw command.
    - Encode current invariants in deterministic checks.
-   - When removing or renaming a command, marker, heading, or artifact, update the supported surface, run a one-time `rg` sweep for the old token, and remove old-token docs/tests. Do not keep permanent denylist or forbidden checks for the old name.
+   - When removing, renaming, replacing, dropping, disabling, deprecating, or otherwise retiring any supported surface, use `$axis-design-gate`'s retirement contract. Sweep old symbols, env vars, config keys, commands, flags, paths, service names, IDs, routes, markers, headings, fixtures, and artifacts before editing and again before final reporting.
+   - Do not keep migration helpers, fallback branches, denylist checks, compatibility notes, docs, or tests that exist only to mention retired identifiers unless an owner doc or explicit user decision requires a compatibility exception.
 
 5. Report honestly.
    - For each relevant check, say ran, not triggered with reason, failed with blocker, or skipped by explicit user request.
@@ -50,4 +53,4 @@ Run enough evidence for the current context without turning development into loc
 
 ## Output
 
-Report why each command was chosen, what was intentionally not run, any old-token sweep for renamed or removed surfaces, and the next boundary check if review readiness is the goal.
+Report why each command was chosen, what was intentionally not run, retired-identifier sweep results or accepted compatibility exceptions, and the next boundary check if review readiness is the goal.
