@@ -1,0 +1,25 @@
+---
+description: Read Axis repo skills before non-trivial edits
+alwaysApply: true
+---
+
+# Axis repo skills
+
+Workflow lives in `.cursor/skills/*/SKILL.md`, not ad hoc. See `.cursor/skills/README.md` for the index.
+
+Before editing source, tests, scripts, migrations, API contracts, frontend behavior, or docs status:
+
+1. Match the task surface to a skill in the index (or frontmatter `description`).
+2. **Read the full matching `SKILL.md` file** and follow it before making changes.
+3. When a skill chains to another, read that skill's `SKILL.md` too.
+4. Run commands through `python scripts/axis.py ...` as written in the skill.
+
+`$axis-*` names in docs alias `.cursor/skills/<name>/SKILL.md`.
+
+Common matches:
+
+- Non-trivial / pre-code → `axis-design-gate`
+- Use-case spec → `axis-use-case-spec`; implementation → `axis-use-case-implementation`
+- API contract → `axis-api-contract`; frontend → `axis-frontend-feature`
+- Docs/guidance → `axis-doc-hygiene`; command scope → `axis-script-scope`
+- Before review → `axis-ready-review`; PR → `axis-pull-request`; review feedback → `axis-review-feedback`

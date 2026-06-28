@@ -4,7 +4,7 @@
 
 The Design Gate is a required pre-code review artifact for non-trivial changes. It is not a machine-enforced CI gate; it is evidence that the agent re-derived the rules for the exact surface before editing it.
 
-For repeatable execution, use `$axis-design-gate`.
+For repeatable execution, read [`.cursor/skills/axis-design-gate/SKILL.md`](../../.cursor/skills/axis-design-gate/SKILL.md) (`$axis-design-gate`).
 
 ---
 

@@ -1,4 +1,0 @@
-interface:
-  display_name: "Axis Ready Review"
-  short_description: "Check Axis pre-PR review readiness"
-  default_prompt: "Use $axis-ready-review to prepare this Axis branch for review."

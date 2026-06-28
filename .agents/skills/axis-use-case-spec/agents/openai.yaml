@@ -1,4 +1,0 @@
-interface:
-  display_name: "Axis Use Case Spec"
-  short_description: "Draft Axis use-case specs"
-  default_prompt: "Use $axis-use-case-spec to draft or complete this Axis use-case spec before implementation."

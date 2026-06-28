@@ -45,7 +45,6 @@ export default defineConfig({
         changeOrigin: true,
       },
     },
-    // chokidar polling for bind-mounted source on WSL2 — inotify events do not propagate.
     watch: process.env.VITE_USE_POLLING ? { usePolling: true, interval: 300 } : undefined,
   },
   test: {

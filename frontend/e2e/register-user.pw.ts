@@ -129,7 +129,7 @@ test.describe('register user', () => {
 
     await expect(page).toHaveURL(/\/dashboard$/, { timeout: 30_000 });
     await expect(page.getByRole('heading', { name: 'Alex Rivers', level: 1 })).toBeVisible();
-    await expect(page.getByText(email)).toBeVisible();
+    await expect(page.getByRole('definition').filter({ hasText: email })).toBeVisible();
     await expect(page.getByText('Account ready')).toBeVisible();
   });
 

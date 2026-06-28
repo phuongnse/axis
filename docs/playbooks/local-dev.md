@@ -27,7 +27,7 @@ Trust the root CA in the OS that runs the browser. On WSL with a Windows browser
 
 If Docker is reachable only through Docker Desktop/WSL indirection, correct the shell environment instead of changing tests.
 
-The package-manager adapter resolves the documented Node/npm binary/shim path. Do not bypass wrappers in docs or skills.
+The package-manager adapter resolves the documented Node/npm binary/shim path from PATH, nvm, nvm-windows, or Volta. OpenSSL for certs resolves PATH or Git for Windows.
 
 ## Stack
 
@@ -41,11 +41,42 @@ Host ports published by compose: `1025`, `1080`, `3000`, `4318`, `5281`, `5432`,
 
 Use the observability stack only when debugging telemetry.
 
-Local overrides live in ignored root `.env.local`.
+Local overrides live in ignored root `.env.local`. See [.env.example](../../.env.example) for optional Compose variables; stack defaults stay in [docker-compose.yml](../../docker-compose.yml).
+
+## Environment
+
+| Layer | Owner | When you set it |
+|---|---|---|
+| Docker Compose stack | [docker-compose.yml](../../docker-compose.yml) | Default `local-dev up` — no `.env` file required. |
+| Compose overrides | `.env.local` (copy from [.env.example](../../.env.example)) | Optional; only when a compose default needs changing (e.g. `VITE_USE_POLLING`). |
+| API on host (`dotnet run`) | [src/Axis.Api/appsettings.json](../../src/Axis.Api/appsettings.json) | Host-native dev without the API container. Override with ASP.NET env vars (`Section__Key`) or ignored `appsettings.Development.json`. |
+| EF migrations | `ConnectionStrings__Identity` or `IDENTITY_CONNECTION_STRING` | `python scripts/axis.py dotnet ef ...` only. |
+| Shell adapters | `python scripts/axis.py doctor` | `DOCKER_HOST`, `NVM_DIR`, `PATH` when tools resolve from another context (WSL, Docker Desktop). |
+| E2E on host | [frontend/playwright.config.ts](../../frontend/playwright.config.ts) | `npm run test:e2e` against a running stack: `E2E_BASE_URL`, `E2E_API_URL`, `E2E_MAILDEV_URL`. Compose E2E profile sets these internally. |
+
+Common API settings (compose uses service hostnames; host run uses `localhost`):
+
+| Setting | Compose default | Host `appsettings.json` | Purpose |
+|---|---|---|---|
+| Identity DB | `ConnectionStrings__Identity` → `postgres` | `ConnectionStrings:Identity` → `localhost:5432` | PostgreSQL for Identity/OpenIddict. |
+| Redis | `Redis__ConnectionString` → `redis:6379` | `Redis:ConnectionString` → `localhost:6379` | Sessions, idempotency, caches. |
+| SMTP | `Email__Host` / `Email__Port` → `maildev:1025` | `Email:Host` / `Email:Port` → `localhost:1025` | Outbound mail (Maildev locally). |
+| CORS | `Cors__AllowedOrigins__0` → SPA origin | `Cors:AllowedOrigins` | Browser origins allowed to call the API. |
+| HTTPS certs | `/https/*.pem` mounts | Kestrel / Vite dev cert env in compose `web` | Local TLS for SPA and API. |
+
+Frontend dev (compose `web` service sets these; host Vite uses [frontend/vite.config.ts](../../frontend/vite.config.ts) defaults):
+
+| Variable | Default behavior | Purpose |
+|---|---|---|
+| `VITE_API_PROXY_TARGET` | `https://api:8443` in compose; `https://localhost:7275` on host | Vite proxy target for `/api` and `/connect`. |
+| `VITE_API_URL` | unset → `/api` (same-origin proxy) | Direct API base URL; only set when bypassing the proxy. |
+| `VITE_CONNECT_URL` | unset → current page origin in dev | OAuth `/connect` base URL. |
+| `VITE_DEV_HTTPS_CERT` / `VITE_DEV_HTTPS_KEY` | compose cert mounts | HTTPS for Vite dev server. |
+| `VITE_USE_POLLING` | auto on WSL; see `.env.example` | Chokidar polling for bind-mount hot reload. |
 
 ## Daily Operations
 
-Prefer scoped CLI commands: `status`, `up`, `down`, `e2e`, and focused checks.
+Prefer scoped CLI commands: `status`, `up`, `down`, `e2e`, and focused checks. `local-dev shell [service]` runs inside the container; host shell (PowerShell, bash, WSL) does not matter.
 
 Use runtime-specific dev servers only through the documented Axis wrapper or owning package script.
 

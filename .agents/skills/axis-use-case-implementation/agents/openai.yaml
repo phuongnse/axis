@@ -1,4 +1,0 @@
-interface:
-  display_name: "Axis Use Case Implementation"
-  short_description: "Implement Axis use-case slices"
-  default_prompt: "Use $axis-use-case-implementation to implement this Axis use-case slice."

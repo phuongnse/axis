@@ -1,4 +1,0 @@
-interface:
-  display_name: "Axis Review Feedback"
-  short_description: "Handle Axis PR review feedback"
-  default_prompt: "Use $axis-review-feedback to address this Axis review feedback safely."

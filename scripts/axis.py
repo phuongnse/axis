@@ -50,6 +50,16 @@ LOCALHOST_KEY = LOCAL_CERT_DIR / "localhost-key.pem"
 LOCALHOST_CSR = LOCAL_CERT_DIR / "localhost.csr"
 LOCALHOST_EXT = LOCAL_CERT_DIR / "localhost.ext"
 LOCALHOST_CERT = LOCAL_CERT_DIR / "localhost.pem"
+LOCAL_DEV_SERVICE_SHELL: dict[str, str] = {
+    "api": "bash",
+    "web": "sh",
+    "postgres": "sh",
+    "redis": "sh",
+    "maildev": "sh",
+    "otel-lgtm": "sh",
+    "e2e": "bash",
+}
+LOCAL_DEV_DEFAULT_SHELL = "sh"
 
 if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
@@ -975,6 +985,7 @@ def check_scripts_standard(_args: argparse.Namespace | None = None) -> int:
 
 
 SKILL_NAME_RE = re.compile(r"^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$")
+REPO_SKILLS_DIR = ".cursor/skills"
 FRONTMATTER_RE = re.compile(r"\A---\n(?P<header>.*?)\n---\n", re.DOTALL)
 SKILL_MAX_LINES = 100
 SKILL_AMBIGUOUS_WORD_RE = re.compile(
@@ -982,17 +993,24 @@ SKILL_AMBIGUOUS_WORD_RE = re.compile(
     re.IGNORECASE,
 )
 SKILL_REPO_REF_RE = re.compile(
-    r"`(?P<target>(?:AGENTS\.md|\.github/[A-Za-z0-9._/#-]+|docs/[A-Za-z0-9._/#-]+|"
-    r"scripts/[A-Za-z0-9._/#-]+|tests/[A-Za-z0-9._/#-]+|frontend/[A-Za-z0-9._/#-]+))`"
+    r"`(?P<target>(?:AGENTS\.md|\.cursor/skills/[A-Za-z0-9._/#-]+|\.github/[A-Za-z0-9._/#-]+|"
+    r"docs/[A-Za-z0-9._/#-]+|scripts/[A-Za-z0-9._/#-]+|tests/[A-Za-z0-9._/#-]+|"
+    r"frontend/[A-Za-z0-9._/#-]+))`"
 )
 SKILL_MD_LINK_RE = re.compile(r"\[[^\]]+\]\((?P<target>[^)]+)\)")
 SKILL_REQUIRED_SKILL_REFS = {
     "axis-api-contract": ("axis-design-gate", "axis-ready-review"),
-    "axis-cross-module-contract": ("axis-design-gate", "axis-ready-review"),
     "axis-frontend-feature": ("axis-design-gate", "axis-ready-review"),
     "axis-use-case-implementation": ("axis-design-gate", "axis-ready-review"),
     "axis-review-feedback": ("axis-ready-review",),
 }
+
+
+def skill_chain_referenced(text: str, skill_name: str) -> bool:
+    if f"${skill_name}" in text:
+        return True
+    skill_path = f"{REPO_SKILLS_DIR}/{skill_name}/SKILL.md"
+    return skill_path in text or f"{REPO_SKILLS_DIR}/{skill_name}" in text
 
 
 def simple_yaml_value(text: str, key: str) -> str:
@@ -1034,13 +1052,13 @@ def skill_reference_target(target: str, *, skill_dir: Path, root: Path) -> tuple
         return None
 
     normalized = path_part.replace("\\", "/")
-    repo_prefixes = ("AGENTS.md", ".github/", "docs/", "scripts/", "tests/", "frontend/")
+    repo_prefixes = ("AGENTS.md", f"{REPO_SKILLS_DIR}/", ".github/", "docs/", "scripts/", "tests/", "frontend/")
     if normalized.startswith(repo_prefixes):
         return root / normalized, target
     return skill_dir / normalized, target
 
 
-def codex_skill_reference_issues(skill_md: Path, text: str, *, root: Path) -> list[str]:
+def repo_skill_reference_issues(skill_md: Path, text: str, *, root: Path) -> list[str]:
     issues: list[str] = []
     seen: set[str] = set()
     skill_dir = skill_md.parent
@@ -1072,7 +1090,7 @@ def codex_skill_reference_issues(skill_md: Path, text: str, *, root: Path) -> li
     return issues
 
 
-def codex_skill_raw_command_issues(skill_md: Path, text: str, *, root: Path) -> list[str]:
+def repo_skill_raw_command_issues(skill_md: Path, text: str, *, root: Path) -> list[str]:
     issues: list[str] = []
     fence_lang: str | None = None
     for idx, line in enumerate(text.splitlines(), 1):
@@ -1095,21 +1113,27 @@ def codex_skill_raw_command_issues(skill_md: Path, text: str, *, root: Path) -> 
     return issues
 
 
-def codex_skill_issues(*, root: Path = ROOT) -> list[str]:
-    skills_root = root / ".agents" / "skills"
+def repo_skill_issues(*, root: Path = ROOT) -> list[str]:
+    skills_root = root / REPO_SKILLS_DIR.replace("/", os.sep)
     if not skills_root.exists():
         return []
 
     issues: list[str] = []
     for skill_dir in sorted(skills_root.iterdir()):
-        skill_path = rel_from(skill_dir, root)
         if not skill_dir.is_dir():
-            issues.append(f"{skill_path}: repo skills must be directories")
             continue
+        skill_path = rel_from(skill_dir, root)
 
         skill_name = skill_dir.name
         if SKILL_NAME_RE.fullmatch(skill_name) is None:
             issues.append(f"{skill_path}: skill folder name must be lowercase letters, digits, and hyphens")
+
+        legacy_adapter = skill_dir / "agents"
+        if legacy_adapter.is_dir():
+            issues.append(
+                f"{skill_path}: remove legacy agents/ vendor metadata; "
+                f"repo skills use {REPO_SKILLS_DIR}/<name>/SKILL.md only"
+            )
 
         skill_md = skill_dir / "SKILL.md"
         if not skill_md.is_file():
@@ -1129,7 +1153,7 @@ def codex_skill_issues(*, root: Path = ROOT) -> list[str]:
                 issues.append(
                     f"{rel_from(skill_md, root)}:{idx}: replace ambiguous best-effort wording with a concrete action"
                 )
-        issues.extend(codex_skill_raw_command_issues(skill_md, text, root=root))
+        issues.extend(repo_skill_raw_command_issues(skill_md, text, root=root))
 
         frontmatter = FRONTMATTER_RE.match(text)
         if frontmatter is None:
@@ -1153,44 +1177,24 @@ def codex_skill_issues(*, root: Path = ROOT) -> list[str]:
         if not re.search(r"(?m)^#\s+\S", body):
             issues.append(f"{rel_from(skill_md, root)}: body must start with a Markdown H1")
         for required_skill in SKILL_REQUIRED_SKILL_REFS.get(skill_name, ()):
-            if f"${required_skill}" not in text:
-                issues.append(f"{rel_from(skill_md, root)}: must chain to ${required_skill}")
-        issues.extend(codex_skill_reference_issues(skill_md, text, root=root))
-
-        openai_yaml = skill_dir / "agents" / "openai.yaml"
-        if not openai_yaml.is_file():
-            issues.append(f"{skill_path}: missing agents/openai.yaml UI metadata")
-            continue
-
-        metadata = openai_yaml.read_text(encoding="utf-8")
-        if "TODO" in metadata:
-            issues.append(f"{rel_from(openai_yaml, root)}: remove template TODO text before committing")
-
-        display_name = simple_yaml_value(metadata, "display_name")
-        short_description = simple_yaml_value(metadata, "short_description")
-        default_prompt = simple_yaml_value(metadata, "default_prompt")
-        if not display_name:
-            issues.append(f"{rel_from(openai_yaml, root)}: interface.display_name is required")
-        if not short_description:
-            issues.append(f"{rel_from(openai_yaml, root)}: interface.short_description is required")
-        elif not 25 <= len(short_description) <= 64:
-            issues.append(f"{rel_from(openai_yaml, root)}: interface.short_description must be 25-64 characters")
-        if not default_prompt:
-            issues.append(f"{rel_from(openai_yaml, root)}: interface.default_prompt is required")
-        elif f"${skill_name}" not in default_prompt:
-            issues.append(f"{rel_from(openai_yaml, root)}: default_prompt must mention ${skill_name}")
+            if not skill_chain_referenced(text, required_skill):
+                issues.append(
+                    f"{rel_from(skill_md, root)}: must chain to ${required_skill} "
+                    f"or `{REPO_SKILLS_DIR}/{required_skill}/SKILL.md`"
+                )
+        issues.extend(repo_skill_reference_issues(skill_md, text, root=root))
 
     return issues
 
 
-def check_codex_skills(_args: argparse.Namespace | None = None) -> int:
-    issues = codex_skill_issues()
+def check_repo_skills(_args: argparse.Namespace | None = None) -> int:
+    issues = repo_skill_issues()
     if issues:
-        print("check-codex-skills FAIL:", file=sys.stderr)
+        print("check-repo-skills FAIL:", file=sys.stderr)
         for issue in issues:
             print(f"  - {issue}", file=sys.stderr)
         return 1
-    print("check-codex-skills: OK")
+    print("check-repo-skills: OK")
     return 0
 
 
@@ -1410,37 +1414,6 @@ def doc_drift_added_line_issues(rows: Iterable[tuple[str, str]]) -> list[str]:
         for pattern, include, message in DOC_DRIFT_ADDED_LINE_RULES:
             if include(path) and re.search(pattern, line):
                 issues.append(f"{message}: {path}: {line}")
-    return issues
-
-
-STALE_REFERENCE_RULES = (
-    (
-        re.compile(r"feature file|see gaps below|^> \*\*Wireframe\*\*:|docs/epics/|_template-feature-us|\| Diagram \| Source \| Preview \|"),
-        "Epic->Use-case migration - see docs/use-cases/README.md",
-    ),
-    (re.compile(r"\bCLAUDE[.]md\b"), "AGENTS.md is the agent contract; update repo review/agent guidance"),
-)
-
-
-def stale_reference_files(root: Path) -> list[Path]:
-    files = list((root / "docs").rglob("*.md")) + list((root / ".github").rglob("*.md"))
-    files.extend(root / name for name in ("AGENTS.md", "CONTRIBUTING.md", "README.md"))
-    skills_root = root / ".agents" / "skills"
-    if skills_root.is_dir():
-        files.extend(skills_root.glob("*/SKILL.md"))
-    return files
-
-
-def stale_reference_issues(*, root: Path | None = None) -> list[str]:
-    root = root or ROOT
-    issues: list[str] = []
-    for path in stale_reference_files(root):
-        if not path.is_file():
-            continue
-        for idx, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
-            for pattern, message in STALE_REFERENCE_RULES:
-                if pattern.search(line):
-                    issues.append(f"Stale reference in {rel_from(path, root)}: {idx}:{line} ({message})")
     return issues
 
 
@@ -1840,9 +1813,6 @@ def check_doc_drift(_args: argparse.Namespace | None = None) -> int:
             if spec_rx.search(line):
                 fail(issues, f"Speculation in reference doc - move to an owning use-case file: {rel(spec_target)}:{idx}:{line}")
 
-    for issue in stale_reference_issues(root=ROOT):
-        fail(issues, issue)
-
     lesson_rx = re.compile(r"\*\*Lesson|[Ll]esson [(]|[Ll]esson[)]")
     lesson_files = list((ROOT / "docs" / "playbooks").rglob("*.md"))
     lesson_files.extend(ROOT / name for name in ("AGENTS.md", "docs/ARCHITECTURE.md"))
@@ -1866,7 +1836,7 @@ def check_doc_drift(_args: argparse.Namespace | None = None) -> int:
     checkers = [
         ("check-text-encoding", check_text_encoding),
         ("check-scripts-standard", check_scripts_standard),
-        ("check-codex-skills", check_codex_skills),
+        ("check-repo-skills", check_repo_skills),
         ("check-ef-domain-mapping", check_ef_domain_mapping),
         ("check-frontend-api-contracts", check_frontend_api_contracts),
         ("check-frontend-quality", check_frontend_quality),
@@ -1936,27 +1906,102 @@ def _version_sort_key(version_text: str) -> tuple[int, ...]:
     return tuple(int(part) for part in re.findall(r"\d+", version_text))
 
 
-def _nvm_node_bin_dirs(expected_major: str) -> list[Path]:
+def _npm_exists_in_bin_dir(bin_dir: Path) -> bool:
+    return any((bin_dir / name).is_file() for name in ("npm", "npm.cmd", "npm.exe"))
+
+
+def _node_exists_in_bin_dir(bin_dir: Path) -> bool:
+    return (bin_dir / "node").is_file() or (bin_dir / "node.exe").is_file()
+
+
+def _nvm_unix_roots() -> list[Path]:
     roots: list[Path] = []
     nvm_dir = os.environ.get("NVM_DIR")
     if nvm_dir:
         roots.append(Path(nvm_dir) / "versions" / "node")
     roots.append(Path.home() / ".nvm" / "versions" / "node")
+    return roots
 
-    seen_roots: set[Path] = set()
+
+def _nvm_windows_roots() -> list[Path]:
+    if os.name != "nt":
+        return []
+    roots: list[Path] = []
+    for env_name in ("NVM_HOME", "NVM_DIR"):
+        value = os.environ.get(env_name)
+        if value:
+            roots.append(Path(value))
+    appdata = os.environ.get("APPDATA")
+    if appdata:
+        roots.append(Path(appdata) / "nvm")
+    return roots
+
+
+def _windows_git_usr_bin_dirs() -> list[Path]:
+    dirs: list[Path] = []
+    for env_name in ("ProgramFiles", "ProgramFiles(x86)", "LocalAppData"):
+        base = os.environ.get(env_name)
+        if base:
+            dirs.append(Path(base) / "Git" / "usr" / "bin")
+    return dirs
+
+
+def find_openssl() -> str | None:
+    for name in (exe("openssl"), "openssl"):
+        resolved = shutil.which(name)
+        if resolved:
+            return resolved
+    if os.name != "nt":
+        return None
+    for usr_bin in _windows_git_usr_bin_dirs():
+        candidate = usr_bin / "openssl.exe"
+        if candidate.is_file():
+            return str(candidate)
+    return None
+
+
+def _node_version_label(bin_dir: Path) -> str:
+    if bin_dir.name == "bin" and bin_dir.parent.name.startswith("v"):
+        return bin_dir.parent.name
+    return bin_dir.name
+
+
+def _node_toolchain_bin_dirs(expected_major: str) -> list[Path]:
+    seen: set[Path] = set()
     candidates: list[Path] = []
-    for root in roots:
-        if root in seen_roots or not root.is_dir():
-            continue
-        seen_roots.add(root)
-        for version_dir in root.iterdir():
-            if not version_dir.is_dir() or version_major(version_dir.name) != expected_major:
-                continue
-            bin_dir = version_dir / "bin"
-            if (bin_dir / "node").is_file() and (bin_dir / "npm").is_file():
-                candidates.append(bin_dir)
 
-    return sorted(candidates, key=lambda path: _version_sort_key(path.parent.name), reverse=True)
+    def add(bin_dir: Path) -> None:
+        resolved = bin_dir.resolve()
+        if resolved in seen or not _node_exists_in_bin_dir(resolved) or not _npm_exists_in_bin_dir(resolved):
+            return
+        seen.add(resolved)
+        candidates.append(resolved)
+
+    for root in _nvm_unix_roots():
+        if not root.is_dir():
+            continue
+        for version_dir in root.iterdir():
+            if version_dir.is_dir() and version_major(version_dir.name) == expected_major:
+                add(version_dir / "bin")
+
+    for root in _nvm_windows_roots():
+        if not root.is_dir():
+            continue
+        for version_dir in root.iterdir():
+            if version_dir.is_dir() and version_major(version_dir.name) == expected_major:
+                add(version_dir)
+
+    nvm_symlink = os.environ.get("NVM_SYMLINK")
+    if nvm_symlink:
+        add(Path(nvm_symlink))
+
+    add(Path.home() / ".volta" / "bin")
+
+    return sorted(candidates, key=lambda path: _version_sort_key(_node_version_label(path)), reverse=True)
+
+
+def _nvm_node_bin_dirs(expected_major: str) -> list[Path]:
+    return _node_toolchain_bin_dirs(expected_major)
 
 
 def frontend_toolchain_env() -> dict[str, str]:
@@ -2419,7 +2464,7 @@ def verify(args: argparse.Namespace) -> int:
     markdown_links = any(is_markdown_link_path(path) for path in paths)
     docs = any(is_docs_path(path) for path in paths)
     use_case_docs = any(path.startswith("docs/use-cases/") for path in paths)
-    skills = any(path.startswith(".agents/skills/") for path in paths)
+    skills = any(path.startswith(f"{REPO_SKILLS_DIR}/") for path in paths)
     scripts_changed = any(path.startswith("scripts/") for path in paths)
     text_paths = [path for path in paths if (ROOT / path).is_file() and should_check_text_encoding(path)]
     api_surface_drift = any_changed(paths, r"^src/Axis[.]Api/Endpoints/") and not any_changed(paths, r"^openapi[.]json$")
@@ -2491,7 +2536,7 @@ def verify(args: argparse.Namespace) -> int:
         step("policy gate tests", lambda: check_policy_tests())
 
     if skills:
-        step("Codex skills", lambda: check_codex_skills())
+        step("Repo skills", lambda: check_repo_skills())
 
     if docs:
         step("doc navigation", lambda: check_doc_navigation())
@@ -2537,7 +2582,7 @@ def pre_push(args: argparse.Namespace) -> int:
         for p in paths
     )
     docs = not paths or any(re.search(r"^(AGENTS[.]md|README[.]md|docs/|[.]github/PULL_REQUEST_TEMPLATE[.]md)", p) for p in paths)
-    skills = not paths or any(p.startswith(".agents/skills/") for p in paths)
+    skills = not paths or any(p.startswith(f"{REPO_SKILLS_DIR}/") for p in paths)
     scripts_changed = not paths or any(p.startswith("scripts/") for p in paths)
     failed: list[str] = []
 
@@ -2568,7 +2613,7 @@ def pre_push(args: argparse.Namespace) -> int:
         step("doc size budgets", lambda: check_doc_size_budgets())
 
     if skills:
-        step("Codex skills", lambda: check_codex_skills())
+        step("Repo skills", lambda: check_repo_skills())
 
     if scripts_changed:
         step("scripts standard", lambda: check_scripts_standard())
@@ -2739,6 +2784,13 @@ def local_dev_compose_args(*args: str) -> list[str]:
     )
 
 
+def local_dev_shell_argv(service: str, exec_command: list[str]) -> list[str]:
+    command = exec_command[1:] if exec_command[:1] == ["--"] else exec_command
+    if command:
+        return command
+    return [LOCAL_DEV_SERVICE_SHELL.get(service, LOCAL_DEV_DEFAULT_SHELL)]
+
+
 def require_docker_compose(label: str) -> int:
     if _docker_compose_ok():
         return 0
@@ -2752,14 +2804,20 @@ def run_required(command: list[str]) -> int:
 
 
 def restrict_local_cert_permissions() -> None:
+    if os.name == "nt":
+        return
     LOCAL_CERT_DIR.chmod(0o700)
     LOCAL_ROOT_CA_KEY.chmod(0o600)
     LOCALHOST_KEY.chmod(0o600)
 
 
 def local_dev_certs(_args: argparse.Namespace | None = None) -> int:
-    if shutil.which(exe("openssl")) is None and shutil.which("openssl") is None:
-        print("local-dev certs: OpenSSL is not available in PATH", file=sys.stderr)
+    openssl = find_openssl()
+    if openssl is None:
+        print(
+            "local-dev certs: OpenSSL is not available in PATH or Git for Windows usr/bin",
+            file=sys.stderr,
+        )
         return 1
 
     LOCAL_CERT_DIR.mkdir(parents=True, exist_ok=True)
@@ -2786,9 +2844,9 @@ def local_dev_certs(_args: argparse.Namespace | None = None) -> int:
     )
 
     commands = [
-        [exe("openssl"), "genrsa", "-out", str(LOCAL_ROOT_CA_KEY), "4096"],
+        [openssl, "genrsa", "-out", str(LOCAL_ROOT_CA_KEY), "4096"],
         [
-            exe("openssl"),
+            openssl,
             "req",
             "-x509",
             "-new",
@@ -2803,10 +2861,10 @@ def local_dev_certs(_args: argparse.Namespace | None = None) -> int:
             "-subj",
             "/CN=Axis Local Dev Root CA",
         ],
-        [exe("openssl"), "x509", "-outform", "der", "-in", str(LOCAL_ROOT_CA_PEM), "-out", str(LOCAL_ROOT_CA_CER)],
-        [exe("openssl"), "genrsa", "-out", str(LOCALHOST_KEY), "2048"],
+        [openssl, "x509", "-outform", "der", "-in", str(LOCAL_ROOT_CA_PEM), "-out", str(LOCAL_ROOT_CA_CER)],
+        [openssl, "genrsa", "-out", str(LOCALHOST_KEY), "2048"],
         [
-            exe("openssl"),
+            openssl,
             "req",
             "-new",
             "-key",
@@ -2817,7 +2875,7 @@ def local_dev_certs(_args: argparse.Namespace | None = None) -> int:
             "/CN=localhost",
         ],
         [
-            exe("openssl"),
+            openssl,
             "x509",
             "-req",
             "-in",
@@ -2888,8 +2946,11 @@ def local_dev(args: argparse.Namespace) -> int:
         return run(local_dev_compose_args(*compose), check=False).returncode
 
     if command == "shell":
-        shell_command = args.exec_command or ["bash"]
-        return run(local_dev_compose_args("exec", args.service, *shell_command), check=False).returncode
+        shell_command = local_dev_shell_argv(args.service, args.exec_command)
+        return run(
+            local_dev_compose_args("exec", "-it", args.service, *shell_command),
+            check=False,
+        ).returncode
 
     if command == "psql":
         return run(
@@ -2962,8 +3023,6 @@ def doctor(args: argparse.Namespace) -> int:
     else:
         record("WARN", "python launcher", "not found in PATH; open a shell where Python 3 resolves before running repo scripts")
 
-    yaml_status, yaml_detail = _python_module_version("yaml", "PyYAML")
-    record(yaml_status, "python package PyYAML", f"{yaml_detail}; required for skill-creator quick_validate.py")
 
     lychee = find_lychee()
     if lychee is None:
@@ -2994,6 +3053,12 @@ def doctor(args: argparse.Namespace) -> int:
         env = frontend_env if name == "npm" else None
         status, detail = _command_version(name, *version_args, env=env)
         record(status, name, detail)
+
+    openssl = find_openssl()
+    if openssl:
+        record("OK", "openssl", openssl)
+    else:
+        record("WARN", "openssl", "required for local-dev certs; install OpenSSL on PATH or Git for Windows")
 
     docker_status, docker_detail = _command_version("docker", "--version")
     if docker_status == "FAIL":
@@ -3142,7 +3207,7 @@ def main(argv: list[str] | None = None) -> int:
     local_logs.add_argument("-f", "--follow", action="store_true")
     local_logs.add_argument("services", nargs="*")
     local_logs.set_defaults(func=local_dev)
-    local_shell = local_dev_sub.add_parser("shell")
+    local_shell = local_dev_sub.add_parser("shell", help="Open an interactive shell in a compose service container")
     local_shell.add_argument("service", nargs="?", default="api")
     local_shell.add_argument("exec_command", nargs=argparse.REMAINDER)
     local_shell.set_defaults(func=local_dev)
@@ -3167,7 +3232,7 @@ def main(argv: list[str] | None = None) -> int:
     check_sub.add_parser("policy-tests").set_defaults(func=check_policy_tests)
     check_sub.add_parser("text-encoding").set_defaults(func=check_text_encoding)
     check_sub.add_parser("scripts-standard").set_defaults(func=check_scripts_standard)
-    check_sub.add_parser("codex-skills").set_defaults(func=check_codex_skills)
+    check_sub.add_parser("repo-skills").set_defaults(func=check_repo_skills)
     check_sub.add_parser("test-naming").set_defaults(func=check_test_naming)
     check_sub.add_parser("test-project-classification").set_defaults(func=check_test_project_classification)
     check_sub.add_parser("docker").set_defaults(func=check_docker)

@@ -113,13 +113,10 @@ services:
     environment:
       NODE_EXTRA_CA_CERTS: "/https/rootCA.pem"
       VITE_API_PROXY_TARGET: "https://api:8443"
-      VITE_API_URL: "https://localhost:5281/api"
-      VITE_CONNECT_URL: "https://localhost:5281"
       VITE_ALLOWED_HOSTS: "localhost,127.0.0.1,web"
       VITE_DEV_HTTPS_CERT: "/https/localhost.pem"
       VITE_DEV_HTTPS_KEY: "/https/localhost-key.pem"
-      # Vite chokidar polling — needed for file change events through WSL bind mounts.
-      VITE_USE_POLLING: "1"
+      VITE_USE_POLLING: "${VITE_USE_POLLING:-}"
     command: ["sh", "./scripts/docker-dev-entrypoint.sh"]
     ports:
       - "127.0.0.1:3000:3000"
@@ -137,18 +134,19 @@ services:
       dockerfile: Dockerfile.e2e
     container_name: axis_e2e
     working_dir: /work/frontend
-    network_mode: host
     depends_on:
       api:
         condition: service_healthy
       web:
         condition: service_started
+      maildev:
+        condition: service_started
     environment:
       CI: "1"
       NODE_EXTRA_CA_CERTS: "/https/rootCA.pem"
-      E2E_BASE_URL: "https://localhost:3000"
-      E2E_API_URL: "https://localhost:5281"
-      E2E_MAILDEV_URL: "http://localhost:1080"
+      E2E_BASE_URL: "https://web:3000"
+      E2E_API_URL: "https://api:8443"
+      E2E_MAILDEV_URL: "http://maildev:1080"
       E2E_SKIP_WEB_SERVER: "1"
       E2E_OUTPUT_DIR: "/tmp/axis-e2e/test-results"
       E2E_REPORT_DIR: "/tmp/axis-e2e/playwright-report"

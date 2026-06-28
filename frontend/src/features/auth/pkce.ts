@@ -1,8 +1,19 @@
 const CLIENT_ID = 'axis_spa';
-const CONNECT_BASE_URL = (
-  import.meta.env.VITE_CONNECT_URL || (import.meta.env.DEV ? 'https://localhost:7275' : '')
-).replace(/\/+$/, '');
 const REDIRECT_URI = `${window.location.origin}/callback`;
+
+function connectBaseUrl(): string {
+  const configured = import.meta.env.VITE_CONNECT_URL;
+  if (configured) {
+    return configured.replace(/\/+$/, '');
+  }
+  if (import.meta.env.DEV) {
+    if (typeof window !== 'undefined') {
+      return window.location.origin;
+    }
+    return 'https://localhost:7275';
+  }
+  return '';
+}
 const SCOPES = 'openid email profile';
 
 function randomString(length: number): string {
@@ -60,11 +71,11 @@ export async function buildAuthorizeUrl(state: string, verifier: string): Promis
     scope: SCOPES,
     state,
   });
-  return `${CONNECT_BASE_URL}/connect/authorize?${params.toString()}`;
+  return `${connectBaseUrl()}/connect/authorize?${params.toString()}`;
 }
 
 export function connectEndpoint(path: string): string {
-  return `${CONNECT_BASE_URL}${path}`;
+  return `${connectBaseUrl()}${path}`;
 }
 
 export { CLIENT_ID, REDIRECT_URI };
