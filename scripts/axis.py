@@ -987,7 +987,7 @@ def check_scripts_standard(_args: argparse.Namespace | None = None) -> int:
 SKILL_NAME_RE = re.compile(r"^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$")
 REPO_SKILLS_DIR = ".cursor/skills"
 FRONTMATTER_RE = re.compile(r"\A---\n(?P<header>.*?)\n---\n", re.DOTALL)
-SKILL_MAX_LINES = 100
+SKILL_MAX_LINES = 115
 SKILL_AMBIGUOUS_WORD_RE = re.compile(
     r"\b(best[- ]effort|if you have time|nice to have|maybe|probably|hopefully)\b",
     re.IGNORECASE,
@@ -1002,8 +1002,45 @@ SKILL_REQUIRED_SKILL_REFS = {
     "axis-api-contract": ("axis-design-gate", "axis-ready-review"),
     "axis-frontend-feature": ("axis-design-gate", "axis-ready-review"),
     "axis-use-case-implementation": ("axis-design-gate", "axis-ready-review"),
+    "axis-pull-request": ("axis-ready-review", "axis-review-feedback"),
     "axis-review-feedback": ("axis-ready-review",),
 }
+SKILL_HARD_GATE_REQUIREMENTS: dict[str, tuple[str, ...]] = {
+    "axis-api-contract": ("## Hard gates", r"reference\.md", r"axis-design-gate", r"axis-ready-review"),
+    "axis-design-gate": ("## Hard gates", r"reference\.md", r"Do not edit implementation"),
+    "axis-doc-hygiene": ("## Hard gates", r"reference\.md", r"axis-ready-review"),
+    "axis-frontend-feature": ("## Hard gates", r"reference\.md", r"axis-design-gate", r"axis-ready-review"),
+    "axis-pull-request": (
+        "## Hard gates",
+        r"reference\.md",
+        r"Do not push",
+        r"axis-review-feedback",
+        r"axis-ready-review",
+    ),
+    "axis-ready-review": ("## Hard gates", r"reference\.md", r"Not ready", r"axis-pull-request"),
+    "axis-review-feedback": ("## Hard gates", r"reference\.md", r"axis-ready-review", r"axis-pull-request"),
+    "axis-script-scope": ("## Hard gates", r"reference\.md", r"axis-ready-review"),
+    "axis-use-case-implementation": (
+        "## Hard gates",
+        r"reference\.md",
+        r"axis-design-gate",
+        r"axis-use-case-spec",
+    ),
+    "axis-use-case-spec": ("## Hard gates", r"reference\.md", r"axis-use-case-implementation"),
+    "axis-visual-artifact": ("## Hard gates", r"reference\.md", r"axis-ready-review"),
+}
+
+
+def repo_skill_hard_gate_issues(skill_name: str, text: str, *, skill_md: Path, root: Path) -> list[str]:
+    issues: list[str] = []
+    requirements = SKILL_HARD_GATE_REQUIREMENTS.get(skill_name)
+    if requirements is None:
+        return issues
+    rel = rel_from(skill_md, root)
+    for pattern in requirements:
+        if re.search(pattern, text, re.IGNORECASE) is None:
+            issues.append(f"{rel}: hard-gate contract missing required pattern `{pattern}`")
+    return issues
 
 
 def skill_chain_referenced(text: str, skill_name: str) -> bool:
@@ -1061,7 +1098,7 @@ def skill_reference_target(target: str, *, skill_dir: Path, root: Path) -> tuple
     repo_prefixes = ("AGENTS.md", f"{REPO_SKILLS_DIR}/", ".github/", "docs/", "scripts/", "tests/", "frontend/")
     if normalized.startswith(repo_prefixes):
         return root / normalized, target
-    return skill_dir / normalized, target
+    return (skill_dir / normalized).resolve(), target
 
 
 def repo_skill_reference_issues(skill_md: Path, text: str, *, root: Path) -> list[str]:
@@ -1188,6 +1225,7 @@ def repo_skill_issues(*, root: Path = ROOT) -> list[str]:
                     f"{rel_from(skill_md, root)}: must chain to ${required_skill} "
                     f"or `{REPO_SKILLS_DIR}/{required_skill}/SKILL.md`"
                 )
+        issues.extend(repo_skill_hard_gate_issues(skill_name, text, skill_md=skill_md, root=root))
         issues.extend(repo_skill_reference_issues(skill_md, text, root=root))
 
     return issues

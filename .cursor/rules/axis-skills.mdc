@@ -5,14 +5,16 @@ alwaysApply: true
 
 # Axis repo skills
 
-Workflow lives in `.cursor/skills/*/SKILL.md`, not ad hoc. See `.cursor/skills/README.md` for the index.
+Workflow lives in `.cursor/skills/*/SKILL.md` under the shared contract in [`.cursor/skills/reference.md`](../skills/reference.md). See [`.cursor/skills/README.md`](../skills/README.md) for the index.
 
 Before editing source, tests, scripts, migrations, API contracts, frontend behavior, or docs status:
 
 1. Match the task surface to a skill in the index (or frontmatter `description`).
-2. **Read the full matching `SKILL.md` file** and follow it before making changes.
-3. When a skill chains to another, read that skill's `SKILL.md` too.
-4. Run commands through `python scripts/axis.py ...` as written in the skill.
+2. **Read the full matching `SKILL.md` file** and [reference.md](../skills/reference.md) hard-gate rules before making changes.
+3. When a skill chains to another, **read and follow** that skill's `SKILL.md` too — chains are mandatory, not suggestions.
+4. Execute numbered workflow steps **in order**. Do not skip, reorder, or "follow up later" unless the user explicitly approved skipping or deferring **that step**.
+5. When a step says **stop**, stop — no push, PR, mark-ready, or implementation edits until the blocker is resolved.
+6. Run commands through `python scripts/axis.py ...` as written in the skill.
 
 `$axis-*` names in docs alias `.cursor/skills/<name>/SKILL.md`.
 

@@ -2888,6 +2888,7 @@ class TestRepoSkillsGate(unittest.TestCase):
 
     def test_accepts_required_chain_via_skill_path(self) -> None:
         files = {
+            ".cursor/skills/reference.md": "# Reference\n",
             ".cursor/skills/axis-design-gate/SKILL.md": (
                 "---\n"
                 "name: axis-design-gate\n"
@@ -2895,6 +2896,11 @@ class TestRepoSkillsGate(unittest.TestCase):
                 "---\n"
                 "\n"
                 "# Axis Design Gate\n"
+                "\n"
+                "## Hard gates\n"
+                "\n"
+                "Follow [reference.md](../reference.md).\n"
+                "- Do not edit implementation files until the dossier is complete.\n"
             ),
             ".cursor/skills/axis-ready-review/SKILL.md": (
                 "---\n"
@@ -2903,6 +2909,11 @@ class TestRepoSkillsGate(unittest.TestCase):
                 "---\n"
                 "\n"
                 "# Axis Ready Review\n"
+                "\n"
+                "## Hard gates\n"
+                "\n"
+                "Follow [reference.md](../reference.md).\n"
+                "- Not ready stops publication;**Ready** hands off to `$axis-pull-request`.\n"
             ),
             ".cursor/skills/axis-api-contract/SKILL.md": (
                 "---\n"
@@ -2911,6 +2922,11 @@ class TestRepoSkillsGate(unittest.TestCase):
                 "---\n"
                 "\n"
                 "# Axis API Contract\n"
+                "\n"
+                "## Hard gates\n"
+                "\n"
+                "Follow [reference.md](../reference.md).\n"
+                "- `$axis-design-gate` before code; `$axis-ready-review` before review.\n"
                 "\n"
                 "1. Read `.cursor/skills/axis-design-gate/SKILL.md`.\n"
                 "2. Before review, read `.cursor/skills/axis-ready-review/SKILL.md`.\n"
@@ -2930,6 +2946,40 @@ class TestRepoSkillsGate(unittest.TestCase):
     def test_skill_chain_referenced_matches_dollar_and_path(self) -> None:
         text = "Read $axis-ready-review and `.cursor/skills/axis-ready-review/SKILL.md`."
         self.assertTrue(axis.skill_chain_referenced(text, "axis-ready-review"))
+
+    def test_rejects_skill_missing_hard_gate_contract(self) -> None:
+        files = {
+            ".cursor/skills/axis-pull-request/SKILL.md": (
+                "---\n"
+                "name: axis-pull-request\n"
+                "description: Prepare, review, validate, create, update, or mark ready Axis pull requests.\n"
+                "---\n"
+                "\n"
+                "# Axis Pull Request\n"
+                "\n"
+                "Create PR immediately.\n"
+            ),
+        }
+
+        issues = self.issues_for_skill(files)
+
+        joined = "\n".join(issues)
+        self.assertIn("hard-gate contract missing required pattern", joined)
+        self.assertIn("must chain to $axis-ready-review", joined)
+
+    def test_skill_reference_target_resolves_parent_reference(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            skills_root = root / ".cursor" / "skills"
+            skill_dir = skills_root / "axis-example"
+            skill_dir.mkdir(parents=True)
+            (skills_root / "reference.md").write_text("# Reference\n", encoding="utf-8")
+            skill_md = skill_dir / "SKILL.md"
+            skill_md.write_text("# Example\n\nSee [reference.md](../reference.md).\n", encoding="utf-8")
+
+            issues = axis.repo_skill_reference_issues(skill_md, skill_md.read_text(encoding="utf-8"), root=root)
+
+        self.assertEqual([], issues)
 
     def test_rejects_template_todo_text(self) -> None:
         files = self.valid_skill_files()

@@ -11,6 +11,13 @@ Produce the pre-code dossier required by [docs/playbooks/design-gate.md](../../.
 
 Do not edit implementation files before this dossier is complete. For high-risk surfaces, stop after the dossier and ask the user for sign-off before coding.
 
+## Hard gates
+
+Follow [reference.md](../reference.md).
+- Do not edit implementation files until the dossier output is complete.
+- High-risk: stop after the dossier until user sign-off — no code.
+- Trivial-only bypass must state why no dossier is needed in the output.
+
 ## Inputs
 
 - User request, intended files, and touched surfaces.

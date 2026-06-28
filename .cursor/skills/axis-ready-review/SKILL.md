@@ -9,6 +9,13 @@ description: Prepare an Axis branch for review by auditing changed paths, runnin
 
 Decide whether the branch is ready for review. Run evidence once, avoid transcript inflation, and never turn missing evidence into a green claim.
 
+## Hard gates
+
+Follow [reference.md](../reference.md).
+- Do not perform GitHub PR actions or draft PR metadata here; hand off to `$axis-pull-request` only when status is **Ready**.
+- If verification fails or evidence is missing, output **Not ready** and stop — do not claim Ready.
+- Do not skip Design Gate reconciliation for non-trivial diffs.
+
 ## Inputs
 
 - Current branch diff and changed path classes.

@@ -9,6 +9,13 @@ description: Build Axis frontend feature slices safely. Use when changing SPA ro
 
 Implement an Axis frontend slice with generated API types, user-visible states, accessible interactions, and tests that prove behavior.
 
+## Hard gates
+
+Follow [reference.md](../reference.md).
+- Use `$axis-design-gate` for non-trivial behavior; stop for high-risk sign-off before code.
+- Use generated API types — do not hand-write duplicate wire shapes.
+- Do not claim review-ready without `$axis-ready-review`.
+
 ## Inputs
 
 - Owning use-case, design source, and affected route or feature folder.

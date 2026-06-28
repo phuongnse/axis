@@ -9,6 +9,13 @@ description: Handle Axis PR review feedback safely. Use when addressing automate
 
 Resolve review feedback by improving the codebase, not merely silencing a thread or making CI green.
 
+## Hard gates
+
+Follow [reference.md](../reference.md).
+- Resolve or classify every finding before returning to `$axis-pull-request` or asking for another review pass.
+- Do not claim ready while triggered verification is failing.
+- When pre-PR review raised findings, return to pull-request only after commit and scoped rerun per [scripts.md § Pre-PR review checkpoint](../../../docs/playbooks/scripts.md#pre-pr-review-checkpoint).
+
 ## Inputs
 
 - Review comments or tool output, including severity and affected file/line when available.

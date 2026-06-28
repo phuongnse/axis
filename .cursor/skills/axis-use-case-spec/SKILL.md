@@ -9,6 +9,13 @@ description: Draft or complete Axis docs-first use-case specifications before im
 
 Create or tighten the owning use-case spec so implementation can follow spec -> design requirements -> tests -> code -> verification without invented behavior, blank AC rows, placeholder docs, or missing visual artifacts.
 
+## Hard gates
+
+Follow [reference.md](../reference.md).
+- Do not route to `$axis-use-case-implementation` while blocking decisions remain open.
+- Do not invent product behavior, IDs, endpoints, or tables.
+- New domain without user scope approval: stop and ask.
+
 ## Inputs
 
 - User feature request, domain candidate, and use-case slug when known.

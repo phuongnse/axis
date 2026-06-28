@@ -12,6 +12,14 @@ Own the PR publication boundary. This skill prepares the branch for publication,
 Do not perform branch readiness auditing here. Read `.cursor/skills/axis-ready-review/SKILL.md` (`$axis-ready-review`) first when readiness evidence is missing, stale, or not explicitly provided. The checkpoint is a required review step before PR publication, not a machine-enforced CI gate, unless the user explicitly asks to skip it.
 Do not rerun local guards just to create a longer transcript. Run each required guard once, then rerun only when a subsequent change invalidates that evidence.
 
+## Hard gates
+
+Follow [reference.md § Publication gate](../reference.md#publication-gate-pr-boundary).
+- Step 1 requires `$axis-ready-review` **Ready** before any PR publication step except metadata-only updates.
+- Step 2 must close the pre-PR review checkpoint — including `$axis-review-feedback` when findings exist — before push or `gh pr create`.
+- Do not push, open a PR, or mark ready while valid review findings remain open unless the user explicitly deferred each item.
+- Do not describe open findings as follow-up, non-blocking, or later in PR metadata.
+
 ## Inputs
 
 - Requested PR action: create, update, mark ready, or metadata-only update.

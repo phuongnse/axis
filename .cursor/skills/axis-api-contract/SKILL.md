@@ -9,6 +9,13 @@ description: Change Axis REST/OpenAPI contracts safely. Use when adding or modif
 
 Change an Axis API surface without drifting from module boundaries, auth defaults, generated contracts, or frontend type parity.
 
+## Hard gates
+
+Follow [reference.md](../reference.md).
+- Run `$axis-design-gate` before code; high-risk contract changes stop for user sign-off.
+- Regenerate contracts when wire shape changes — do not skip generation silently.
+- Do not claim review-ready without `$axis-ready-review`.
+
 ## Inputs
 
 - API surface being added or changed: route, DTO, status code, generated type, or SPA caller.

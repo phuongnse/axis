@@ -9,6 +9,13 @@ description: Choose and run Axis scripts with the right scope and timing. Use wh
 
 Run enough evidence for the current context without turning development into local CI.
 
+## Hard gates
+
+Follow [reference.md](../reference.md).
+- Run the narrowest check that proves the edit — do not substitute full `verify` during inner loop.
+- At the review boundary, read `$axis-ready-review`; it owns triggered `verify`.
+- Report not run with reason; never present partial checks as full ready-review evidence.
+
 ## Inputs
 
 - Current moment: exploring, inner loop, ready-review boundary, or CI/debugging.

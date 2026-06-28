@@ -9,6 +9,13 @@ description: Update Axis visual artifacts safely. Use when changing design-sourc
 
 Keep Axis visual docs linked, source-first, regenerated where needed, and visually checked instead of letting design evidence drift from the spec.
 
+## Hard gates
+
+Follow [reference.md](../reference.md).
+- Edit design source of truth, not only previews or rendered output.
+- Non-`N/A` preview requires an editable source in the same `## Design Sources` row.
+- Do not paste local transport URLs, keys, or tokens into repo docs.
+
 ## Inputs
 
 - Owning use-case/design row and artifact type: source, preview, Mermaid, or visual index.

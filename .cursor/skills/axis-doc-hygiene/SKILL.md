@@ -9,6 +9,13 @@ description: Keep Axis guidance concise, correct, linked, and stable over time. 
 
 Change guidance without growing context load or drifting from the source of truth.
 
+## Hard gates
+
+Follow [reference.md](../reference.md).
+- One fact, one owner — link instead of duplicating workflow steps from skills.
+- Retired surfaces: apply `$axis-design-gate` retirement contract; no stale-name compatibility prose.
+- Do not claim review-ready without `$axis-ready-review` when the diff needs review.
+
 ## Inputs
 
 - Guidance artifact being changed and the rule, workflow, or owner fact it carries.

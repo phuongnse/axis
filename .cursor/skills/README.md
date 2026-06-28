@@ -4,12 +4,15 @@ Portable agent workflows for this repository. Standard layout: one directory per
 
 Project skills live under [`.cursor/skills/`](.) per the Agent Skills format used by Cursor and other agents that read repo files.
 
+Shared workflow contract: [reference.md](./reference.md) — sequential steps, stop/defer/skip rules, and the PR publication gate.
+
 ## How agents use skills
 
 1. Match the task to a skill in the table below (or use the skill `description` in frontmatter).
-2. **Read the full `SKILL.md` file before editing** implementation files.
-3. Follow chained skills the same way: read their `SKILL.md` paths, not just the alias name.
-4. Run repo commands through `python scripts/axis.py ...` as written in the skill.
+2. **Read [reference.md](./reference.md) and the full `SKILL.md` file before editing** implementation files.
+3. Execute numbered workflow steps **in order**; each skill's `## Hard gates` section adds skill-specific stop rules.
+4. Follow chained skills the same way: read their `SKILL.md` paths, not just the alias name.
+5. Run repo commands through `python scripts/axis.py ...` as written in the skill.
 
 `$axis-*` names in docs are **aliases** for `.cursor/skills/<name>/SKILL.md`.
 
@@ -38,5 +41,7 @@ Validate skill changes: `python scripts/axis.py check repo-skills`
 spec gap     → axis-use-case-spec
 non-trivial  → axis-design-gate → implement skill → axis-script-scope (checks)
 before review→ axis-ready-review
-PR action    → axis-pull-request → axis-review-feedback (if needed)
+PR action    → axis-pull-request → axis-review-feedback (if needed) → then push/PR
 ```
+
+Numbered steps in each skill are sequential gates. See [reference.md](./reference.md).

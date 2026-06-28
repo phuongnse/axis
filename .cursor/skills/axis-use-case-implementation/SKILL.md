@@ -9,6 +9,13 @@ description: Implement Axis use-case slices from specs through tests, code, docu
 
 Ship one reviewable Axis use-case slice without losing acceptance criteria, layer order, docs status, or verification honesty.
 
+## Hard gates
+
+Follow [reference.md](../reference.md).
+- No code when spec readiness is **Blocked** — read `$axis-use-case-spec` first.
+- High-risk: stop for `$axis-design-gate` sign-off before code.
+- Do not mark **Done** while in-scope AC/AT rows lack proving tests or pass evidence.
+
 ## Inputs
 
 - Owning use-case README with Purpose, flows, ACs, Acceptance Test Matrix, Design System, Design Sources, and implementation status.
