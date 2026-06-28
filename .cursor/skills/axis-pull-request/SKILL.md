@@ -28,11 +28,12 @@ Do not rerun local guards just to create a longer transcript. Run each required 
 2. Run the pre-PR review checkpoint.
    - For create PR, branch/diff update, or mark-ready requests, follow [docs/playbooks/scripts.md § Pre-PR review checkpoint](../../../docs/playbooks/scripts.md#pre-pr-review-checkpoint) after readiness passes and before GitHub PR actions.
    - Metadata-only title/body updates do not require the checkpoint.
-   - If the review raises issues or follow-up verification is needed, read `.cursor/skills/axis-review-feedback/SKILL.md` (`$axis-review-feedback`) and rerun per scripts.md.
+   - If the review raises issues or follow-up verification is needed, read `.cursor/skills/axis-review-feedback/SKILL.md` (`$axis-review-feedback`), resolve valid items, commit the follow-up, and rerun scoped to the checkpoint per scripts.md.
+   - Do not push the branch or open the PR until checkpoint findings are resolved, explicitly deferred with user approval, or classified false positive with evidence.
    - Skip only when the user explicitly requested no pre-PR review, and record the skip reason in the PR requirements.
 
 3. Determine the PR action.
-   - Create PR: branch must be committed and pushed first.
+   - Create PR: branch must be committed first; push only after step 2 is complete.
    - Update PR: identify the existing PR from the current branch or the user-provided PR number/URL.
    - Mark ready: update and validate metadata before changing draft status.
    - Metadata-only update: update title/body and validate the result.

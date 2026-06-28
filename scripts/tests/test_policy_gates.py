@@ -1619,6 +1619,13 @@ class TestToolVersionGates(unittest.TestCase):
             ):
                 self.assertEqual(str(openssl), axis.find_openssl())
 
+    def test_windows_git_usr_bin_dirs_includes_local_programs(self) -> None:
+        localappdata = r"C:\Users\alice\AppData\Local"
+        with mock.patch.dict(axis.os.environ, {"LOCALAPPDATA": localappdata}, clear=True):
+            dirs = axis._windows_git_usr_bin_dirs()
+        expected = Path(localappdata) / "Programs" / "Git" / "usr" / "bin"
+        self.assertIn(expected, dirs)
+
 
 class TestMarkdownLinkGate(unittest.TestCase):
     def test_runs_lychee_with_shared_config(self) -> None:
@@ -2911,6 +2918,18 @@ class TestRepoSkillsGate(unittest.TestCase):
         }
 
         self.assertEqual([], self.issues_for_skill(files))
+
+    def test_skill_chain_referenced_ignores_prefix_skill_names(self) -> None:
+        text = (
+            "See $axis-design-gate-extended and "
+            "`.cursor/skills/axis-design-gate-extended/SKILL.md`."
+        )
+        self.assertFalse(axis.skill_chain_referenced(text, "axis-design-gate"))
+        self.assertTrue(axis.skill_chain_referenced(text, "axis-design-gate-extended"))
+
+    def test_skill_chain_referenced_matches_dollar_and_path(self) -> None:
+        text = "Read $axis-ready-review and `.cursor/skills/axis-ready-review/SKILL.md`."
+        self.assertTrue(axis.skill_chain_referenced(text, "axis-ready-review"))
 
     def test_rejects_template_todo_text(self) -> None:
         files = self.valid_skill_files()

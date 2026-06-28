@@ -1007,10 +1007,16 @@ SKILL_REQUIRED_SKILL_REFS = {
 
 
 def skill_chain_referenced(text: str, skill_name: str) -> bool:
-    if f"${skill_name}" in text:
+    if re.search(rf"(?<![A-Za-z0-9_-])\${re.escape(skill_name)}(?![A-Za-z0-9_-])", text):
         return True
     skill_path = f"{REPO_SKILLS_DIR}/{skill_name}/SKILL.md"
-    return skill_path in text or f"{REPO_SKILLS_DIR}/{skill_name}" in text
+    skill_dir = f"{REPO_SKILLS_DIR}/{skill_name}"
+    return (
+        re.search(rf"(?<![A-Za-z0-9._/#-]){re.escape(skill_path)}(?![A-Za-z0-9._/#-])", text)
+        is not None
+        or re.search(rf"(?<![A-Za-z0-9._/#-]){re.escape(skill_dir)}/?(?![A-Za-z0-9._/#-])", text)
+        is not None
+    )
 
 
 def simple_yaml_value(text: str, key: str) -> str:
@@ -1939,10 +1945,13 @@ def _nvm_windows_roots() -> list[Path]:
 
 def _windows_git_usr_bin_dirs() -> list[Path]:
     dirs: list[Path] = []
-    for env_name in ("ProgramFiles", "ProgramFiles(x86)", "LocalAppData"):
+    for env_name in ("ProgramFiles", "ProgramFiles(x86)"):
         base = os.environ.get(env_name)
         if base:
             dirs.append(Path(base) / "Git" / "usr" / "bin")
+    localappdata = os.environ.get("LOCALAPPDATA") or os.environ.get("LocalAppData")
+    if localappdata:
+        dirs.append(Path(localappdata) / "Programs" / "Git" / "usr" / "bin")
     return dirs
 
 
