@@ -26,6 +26,7 @@ Do not invent IDs, endpoints, tables, or product behavior. If code and docs conf
 - Keep product behavior tied to owning use-case acceptance criteria.
 - Keep architecture and stack changes aligned with [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) and [docs/TECH_STACK.md](./docs/TECH_STACK.md).
 - Keep tests behavior-focused and proportional to risk.
+- Repeatable workflows live in [`.cursor/skills/`](./.cursor/skills/README.md). Before non-trivial work, read the matching `SKILL.md`, [`.cursor/skills/reference.md`](./.cursor/skills/reference.md) hard-gate rules, and follow numbered steps in order. Do not skip workflow gates or defer them into PR follow-ups unless the user explicitly approved that deferral. `$axis-*` in docs is an alias for that path.
 
 ## Verification
 

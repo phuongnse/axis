@@ -1,4 +1,0 @@
-interface:
-  display_name: "Axis Doc Hygiene"
-  short_description: "Keep Axis guidance concise and correct"
-  default_prompt: "Use $axis-doc-hygiene to update Axis guidance without adding drift or bloat."

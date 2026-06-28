@@ -1,4 +1,0 @@
-interface:
-  display_name: "Axis Pull Request"
-  short_description: "Review and publish Axis PRs"
-  default_prompt: "Use $axis-pull-request to run ready-review, CodeRabbit review, validate PR metadata, and publish this Axis branch."

@@ -1188,28 +1188,6 @@ class TestDocDriftRatchets(unittest.TestCase):
         issues = axis.doc_drift_added_line_issues([("docs/playbooks/local-dev.md", "cd <repo-root> && python scripts/axis.py local-dev up")])
         self.assertEqual([], issues)
 
-    def stale_reference_text(self, files: dict[str, str]) -> str:
-        with tempfile.TemporaryDirectory() as temp:
-            root = Path(temp)
-            for relative, content in files.items():
-                path = root / relative
-                path.parent.mkdir(parents=True, exist_ok=True)
-                path.write_text(content, encoding="utf-8")
-            return "\n".join(axis.stale_reference_issues(root=root))
-
-    def test_rejects_claude_reference_in_entry_guidance(self) -> None:
-        issues = self.stale_reference_text({"AGENTS.md": "canonical rules: CLAUDE.md\n"})
-
-        self.assertIn("AGENTS.md is the agent contract", issues)
-
-    def test_rejects_claude_reference_in_skill_guidance(self) -> None:
-        issues = self.stale_reference_text({".agents/skills/example/SKILL.md": "Read CLAUDE.md first.\n"})
-
-        self.assertIn("AGENTS.md is the agent contract", issues)
-
-    def test_current_repository_stale_references_still_pass(self) -> None:
-        self.assertEqual([], axis.stale_reference_issues())
-
     def test_accepts_standard_doc_navigation(self) -> None:
         issues = axis.doc_navigation_line_issues(
             axis.ROOT / "docs/playbooks/example.md",
@@ -1593,6 +1571,61 @@ class TestToolVersionGates(unittest.TestCase):
                 env = axis.frontend_toolchain_env()
 
         self.assertEqual(str(expected_bin), env["PATH"].split(axis.os.pathsep)[0])
+
+    def test_frontend_toolchain_env_resolves_nvm_windows_when_path_lacks_node(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            nvm_home = root / "nvm"
+            expected_dir = nvm_home / "v22.23.0"
+            path_dir = root / "plain-path"
+            expected_dir.mkdir(parents=True)
+            path_dir.mkdir()
+            (expected_dir / "node.exe").write_text("", encoding="utf-8")
+            (expected_dir / "npm.cmd").write_text("", encoding="utf-8")
+
+            def fake_command_version_line(name: str, *_args: str, env: dict[str, str] | None = None):
+                if env is None:
+                    return False, f"{name} not found in PATH", name
+                path = env.get("PATH", "")
+                if path.split(axis.os.pathsep)[0] != str(expected_dir):
+                    return False, f"{name} not found in PATH", name
+                version = "v22.23.0" if name == "node" else "10.9.8"
+                suffix = "node.exe" if name == "node" else "npm.cmd"
+                return True, version, str(expected_dir / suffix)
+
+            with (
+                mock.patch.object(axis, "_nvm_unix_roots", return_value=[]),
+                mock.patch.object(axis, "_nvm_windows_roots", return_value=[nvm_home]),
+                mock.patch.object(axis.Path, "home", return_value=root),
+                mock.patch.dict(axis.os.environ, {"PATH": str(path_dir)}, clear=True),
+                mock.patch.object(axis, "required_node_major", return_value=(True, "22")),
+                mock.patch.object(axis, "command_version_line", side_effect=fake_command_version_line),
+            ):
+                env = axis.frontend_toolchain_env()
+
+        self.assertEqual(str(expected_dir), env["PATH"].split(axis.os.pathsep)[0])
+
+    def test_find_openssl_uses_git_for_windows_usr_bin(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            git_bin = Path(temp) / "Git" / "usr" / "bin"
+            git_bin.mkdir(parents=True)
+            openssl = git_bin / "openssl.exe"
+            openssl.write_text("", encoding="utf-8")
+
+            with (
+                mock.patch.object(axis.os, "name", "nt"),
+                mock.patch.object(axis.shutil, "which", return_value=None),
+                mock.patch.object(axis, "_windows_git_usr_bin_dirs", return_value=[git_bin]),
+            ):
+                self.assertEqual(str(openssl), axis.find_openssl())
+
+    def test_windows_git_usr_bin_dirs_includes_local_programs(self) -> None:
+        localappdata = r"C:\Users\alice\AppData\Local"
+        with mock.patch.dict(axis.os.environ, {"LOCALAPPDATA": localappdata}, clear=True):
+            dirs = axis._windows_git_usr_bin_dirs()
+        expected = Path(localappdata) / "Programs" / "Git" / "usr" / "bin"
+        self.assertIn(expected, dirs)
+
 
 class TestMarkdownLinkGate(unittest.TestCase):
     def test_runs_lychee_with_shared_config(self) -> None:
@@ -2525,6 +2558,42 @@ class TestLocalDevCli(unittest.TestCase):
             calls[1][1:],
         )
 
+    def test_shell_uses_service_default_inside_container(self) -> None:
+        calls = self.run_local_dev(
+            axis.argparse.Namespace(local_dev_command="shell", service="web", exec_command=[])
+        )
+
+        self.assertEqual(
+            ["compose", "-p", "axis", "-f", str(axis.LOCAL_DEV_COMPOSE_FILE), "exec", "-it", "web", "sh"],
+            calls[0][1:],
+        )
+
+    def test_shell_honors_explicit_command(self) -> None:
+        calls = self.run_local_dev(
+            axis.argparse.Namespace(
+                local_dev_command="shell",
+                service="api",
+                exec_command=["bash", "-lc", "dotnet --version"],
+            )
+        )
+
+        self.assertEqual(
+            [
+                "compose",
+                "-p",
+                "axis",
+                "-f",
+                str(axis.LOCAL_DEV_COMPOSE_FILE),
+                "exec",
+                "-it",
+                "api",
+                "bash",
+                "-lc",
+                "dotnet --version",
+            ],
+            calls[0][1:],
+        )
+
     def test_observability_up_starts_lgtm_profile(self) -> None:
         calls = self.run_local_dev(
             axis.argparse.Namespace(local_dev_command="observability", observability_command="up")
@@ -2591,6 +2660,16 @@ class TestLocalDevCli(unittest.TestCase):
             self.assertEqual(0, axis.local_dev(axis.argparse.Namespace(local_dev_command="reset-db")))
 
         self.assertEqual(["compose", "-p", "axis", "-f", str(axis.LOCAL_DEV_COMPOSE_FILE), "up", "-d"], calls[2][1:])
+
+
+class TestLocalDevShellArgv(unittest.TestCase):
+    def test_defaults_by_service(self) -> None:
+        self.assertEqual(["bash"], axis.local_dev_shell_argv("api", []))
+        self.assertEqual(["sh"], axis.local_dev_shell_argv("web", []))
+        self.assertEqual(["sh"], axis.local_dev_shell_argv("unknown", []))
+
+    def test_strips_double_dash_prefix(self) -> None:
+        self.assertEqual(["bash"], axis.local_dev_shell_argv("web", ["--", "bash"]))
 
 
 class TestAxisCommandWrappers(unittest.TestCase):
@@ -2687,8 +2766,7 @@ class TestAxisCommandWrappers(unittest.TestCase):
                 mock.patch.object(axis, "LOCALHOST_EXT", cert_dir / "localhost.ext"),
                 mock.patch.object(axis, "LOCALHOST_CERT", cert_dir / "localhost.pem"),
                 mock.patch.object(axis, "run", side_effect=fake_run),
-                mock.patch.object(axis, "exe", side_effect=lambda name: name),
-                mock.patch.object(axis.shutil, "which", return_value="/usr/bin/openssl"),
+                mock.patch.object(axis, "find_openssl", return_value="/usr/bin/openssl"),
                 mock.patch.object(axis.Path, "chmod", autospec=True) as chmod,
                 contextlib.redirect_stdout(io.StringIO()),
             ):
@@ -2699,7 +2777,7 @@ class TestAxisCommandWrappers(unittest.TestCase):
             chmod.assert_any_call(cert_dir, 0o700)
             chmod.assert_any_call(cert_dir / "rootCA-key.pem", 0o600)
             chmod.assert_any_call(cert_dir / "localhost-key.pem", 0o600)
-            self.assertEqual("openssl", calls[0][0])
+            self.assertEqual("/usr/bin/openssl", calls[0][0])
 
 
 class TestInstallHooks(unittest.TestCase):
@@ -2770,7 +2848,7 @@ class TestInstallHooks(unittest.TestCase):
             self.assertIn(["git", "config", "--unset-all", "core.hooksPath"], calls)
 
 
-class TestCodexSkillsGate(unittest.TestCase):
+class TestRepoSkillsGate(unittest.TestCase):
     def issues_for_skill(self, files: dict[str, str]) -> list[str]:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
@@ -2778,34 +2856,134 @@ class TestCodexSkillsGate(unittest.TestCase):
                 path = root / relative
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_text(content, encoding="utf-8")
-            return axis.codex_skill_issues(root=root)
+            return axis.repo_skill_issues(root=root)
 
     def valid_skill_files(self) -> dict[str, str]:
         return {
-            ".agents/skills/axis-example/SKILL.md": (
+            ".cursor/skills/axis-example/SKILL.md": (
                 "---\n"
                 "name: axis-example\n"
-                "description: Use when Codex needs to perform a concrete Axis example workflow with repo-specific checks.\n"
+                "description: Use when an agent needs to perform a concrete Axis example workflow with repo-specific checks.\n"
                 "---\n"
                 "\n"
                 "# Axis Example\n"
                 "\n"
                 "Run the example workflow.\n"
             ),
-            ".agents/skills/axis-example/agents/openai.yaml": (
-                "interface:\n"
-                "  display_name: \"Axis Example\"\n"
-                "  short_description: \"Check example skill metadata\"\n"
-                "  default_prompt: \"Use $axis-example to run the example workflow.\"\n"
-            ),
         }
 
     def test_accepts_valid_repo_skill(self) -> None:
         self.assertEqual([], self.issues_for_skill(self.valid_skill_files()))
 
+    def test_rejects_legacy_vendor_adapter_directory(self) -> None:
+        files = self.valid_skill_files()
+        files[".cursor/skills/axis-example/agents/openai.yaml"] = (
+            "interface:\n"
+            "  display_name: \"Axis Example\"\n"
+        )
+
+        issues = self.issues_for_skill(files)
+
+        self.assertIn("remove legacy agents/ vendor metadata", "\n".join(issues))
+
+    def test_accepts_required_chain_via_skill_path(self) -> None:
+        files = {
+            ".cursor/skills/reference.md": "# Reference\n",
+            ".cursor/skills/axis-design-gate/SKILL.md": (
+                "---\n"
+                "name: axis-design-gate\n"
+                "description: Prepare the Axis Design Gate dossier before non-trivial code changes.\n"
+                "---\n"
+                "\n"
+                "# Axis Design Gate\n"
+                "\n"
+                "## Hard gates\n"
+                "\n"
+                "Follow [reference.md](../reference.md).\n"
+                "- Do not edit implementation files until the dossier is complete.\n"
+            ),
+            ".cursor/skills/axis-ready-review/SKILL.md": (
+                "---\n"
+                "name: axis-ready-review\n"
+                "description: Prepare an Axis branch for review with honest verification evidence.\n"
+                "---\n"
+                "\n"
+                "# Axis Ready Review\n"
+                "\n"
+                "## Hard gates\n"
+                "\n"
+                "Follow [reference.md](../reference.md).\n"
+                "- Not ready stops publication;**Ready** hands off to `$axis-pull-request`.\n"
+            ),
+            ".cursor/skills/axis-api-contract/SKILL.md": (
+                "---\n"
+                "name: axis-api-contract\n"
+                "description: Use when an agent changes Axis REST API contracts with generated frontend types.\n"
+                "---\n"
+                "\n"
+                "# Axis API Contract\n"
+                "\n"
+                "## Hard gates\n"
+                "\n"
+                "Follow [reference.md](../reference.md).\n"
+                "- `$axis-design-gate` before code; `$axis-ready-review` before review.\n"
+                "\n"
+                "1. Read `.cursor/skills/axis-design-gate/SKILL.md`.\n"
+                "2. Before review, read `.cursor/skills/axis-ready-review/SKILL.md`.\n"
+            ),
+        }
+
+        self.assertEqual([], self.issues_for_skill(files))
+
+    def test_skill_chain_referenced_ignores_prefix_skill_names(self) -> None:
+        text = (
+            "See $axis-design-gate-extended and "
+            "`.cursor/skills/axis-design-gate-extended/SKILL.md`."
+        )
+        self.assertFalse(axis.skill_chain_referenced(text, "axis-design-gate"))
+        self.assertTrue(axis.skill_chain_referenced(text, "axis-design-gate-extended"))
+
+    def test_skill_chain_referenced_matches_dollar_and_path(self) -> None:
+        text = "Read $axis-ready-review and `.cursor/skills/axis-ready-review/SKILL.md`."
+        self.assertTrue(axis.skill_chain_referenced(text, "axis-ready-review"))
+
+    def test_rejects_skill_missing_hard_gate_contract(self) -> None:
+        files = {
+            ".cursor/skills/axis-pull-request/SKILL.md": (
+                "---\n"
+                "name: axis-pull-request\n"
+                "description: Prepare, review, validate, create, update, or mark ready Axis pull requests.\n"
+                "---\n"
+                "\n"
+                "# Axis Pull Request\n"
+                "\n"
+                "Create PR immediately.\n"
+            ),
+        }
+
+        issues = self.issues_for_skill(files)
+
+        joined = "\n".join(issues)
+        self.assertIn("hard-gate contract missing required pattern", joined)
+        self.assertIn("must chain to $axis-ready-review", joined)
+
+    def test_skill_reference_target_resolves_parent_reference(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            skills_root = root / ".cursor" / "skills"
+            skill_dir = skills_root / "axis-example"
+            skill_dir.mkdir(parents=True)
+            (skills_root / "reference.md").write_text("# Reference\n", encoding="utf-8")
+            skill_md = skill_dir / "SKILL.md"
+            skill_md.write_text("# Example\n\nSee [reference.md](../reference.md).\n", encoding="utf-8")
+
+            issues = axis.repo_skill_reference_issues(skill_md, skill_md.read_text(encoding="utf-8"), root=root)
+
+        self.assertEqual([], issues)
+
     def test_rejects_template_todo_text(self) -> None:
         files = self.valid_skill_files()
-        files[".agents/skills/axis-example/SKILL.md"] += "\nTODO: finish this later.\n"
+        files[".cursor/skills/axis-example/SKILL.md"] += "\nTODO: finish this later.\n"
 
         issues = self.issues_for_skill(files)
 
@@ -2813,27 +2991,17 @@ class TestCodexSkillsGate(unittest.TestCase):
 
     def test_rejects_frontmatter_name_mismatch(self) -> None:
         files = self.valid_skill_files()
-        files[".agents/skills/axis-example/SKILL.md"] = files[
-            ".agents/skills/axis-example/SKILL.md"
+        files[".cursor/skills/axis-example/SKILL.md"] = files[
+            ".cursor/skills/axis-example/SKILL.md"
         ].replace("name: axis-example", "name: axis-other")
 
         issues = self.issues_for_skill(files)
 
         self.assertIn("frontmatter name must match folder name", "\n".join(issues))
 
-    def test_rejects_default_prompt_without_skill_invocation(self) -> None:
-        files = self.valid_skill_files()
-        files[".agents/skills/axis-example/agents/openai.yaml"] = files[
-            ".agents/skills/axis-example/agents/openai.yaml"
-        ].replace("$axis-example", "$other-skill")
-
-        issues = self.issues_for_skill(files)
-
-        self.assertIn("default_prompt must mention $axis-example", "\n".join(issues))
-
     def test_rejects_missing_skill_doc_reference(self) -> None:
         files = self.valid_skill_files()
-        files[".agents/skills/axis-example/SKILL.md"] += "\nRead `docs/playbooks/missing.md`.\n"
+        files[".cursor/skills/axis-example/SKILL.md"] += "\nRead `docs/playbooks/missing.md`.\n"
 
         issues = self.issues_for_skill(files)
 
@@ -2841,14 +3009,14 @@ class TestCodexSkillsGate(unittest.TestCase):
 
     def test_accepts_existing_skill_doc_reference(self) -> None:
         files = self.valid_skill_files()
-        files[".agents/skills/axis-example/SKILL.md"] += "\nRead `docs/playbooks/frontend.md`.\n"
+        files[".cursor/skills/axis-example/SKILL.md"] += "\nRead `docs/playbooks/frontend.md`.\n"
         files["docs/playbooks/frontend.md"] = "# Frontend\n"
 
         self.assertEqual([], self.issues_for_skill(files))
 
     def test_rejects_missing_markdown_anchor_reference(self) -> None:
         files = self.valid_skill_files()
-        files[".agents/skills/axis-example/SKILL.md"] += "\nRead [Frontend](docs/playbooks/frontend.md#missing).\n"
+        files[".cursor/skills/axis-example/SKILL.md"] += "\nRead [Frontend](docs/playbooks/frontend.md#missing).\n"
         files["docs/playbooks/frontend.md"] = "# Frontend\n"
 
         issues = self.issues_for_skill(files)
@@ -2857,7 +3025,7 @@ class TestCodexSkillsGate(unittest.TestCase):
 
     def test_rejects_overlong_skill_body(self) -> None:
         files = self.valid_skill_files()
-        files[".agents/skills/axis-example/SKILL.md"] += "\n" + "\n".join("Extra line." for _ in range(130))
+        files[".cursor/skills/axis-example/SKILL.md"] += "\n" + "\n".join("Extra line." for _ in range(130))
 
         issues = self.issues_for_skill(files)
 
@@ -2865,7 +3033,7 @@ class TestCodexSkillsGate(unittest.TestCase):
 
     def test_rejects_ambiguous_best_effort_wording(self) -> None:
         files = self.valid_skill_files()
-        files[".agents/skills/axis-example/SKILL.md"] += "\nMaybe run the check if you have time.\n"
+        files[".cursor/skills/axis-example/SKILL.md"] += "\nMaybe run the check if you have time.\n"
 
         issues = self.issues_for_skill(files)
 
@@ -2873,7 +3041,7 @@ class TestCodexSkillsGate(unittest.TestCase):
 
     def test_rejects_raw_repo_workflow_commands_in_skill_instructions(self) -> None:
         files = self.valid_skill_files()
-        files[".agents/skills/axis-example/SKILL.md"] += (
+        files[".cursor/skills/axis-example/SKILL.md"] += (
             "\n"
             "```bash\n"
             "npm run ci\n"
@@ -2896,33 +3064,27 @@ class TestCodexSkillsGate(unittest.TestCase):
 
     def test_rejects_api_contract_skill_without_required_chaining(self) -> None:
         files = {
-            ".agents/skills/axis-api-contract/SKILL.md": (
+            ".cursor/skills/axis-api-contract/SKILL.md": (
                 "---\n"
                 "name: axis-api-contract\n"
-                "description: Use when Codex changes Axis REST API contracts with generated frontend types.\n"
+                "description: Use when an agent changes Axis REST API contracts with generated frontend types.\n"
                 "---\n"
                 "\n"
                 "# Axis API Contract\n"
                 "\n"
                 "Change the API contract.\n"
             ),
-            ".agents/skills/axis-api-contract/agents/openai.yaml": (
-                "interface:\n"
-                "  display_name: \"Axis API Contract\"\n"
-                "  short_description: \"Change Axis API contracts safely\"\n"
-                "  default_prompt: \"Use $axis-api-contract to change this API contract.\"\n"
-            ),
         }
 
         issues = self.issues_for_skill(files)
 
         joined = "\n".join(issues)
-        self.assertIn("must chain to $axis-design-gate", joined)
-        self.assertIn("must chain to $axis-ready-review", joined)
+        self.assertIn("must chain to $axis-design-gate or `.cursor/skills/axis-design-gate/SKILL.md`", joined)
+        self.assertIn("must chain to $axis-ready-review or `.cursor/skills/axis-ready-review/SKILL.md`", joined)
 
-    def test_current_repository_codex_skills_still_pass(self) -> None:
+    def test_current_repository_skills_still_pass(self) -> None:
         with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
-            self.assertEqual(0, axis.check_codex_skills())
+            self.assertEqual(0, axis.check_repo_skills())
 
 
 class TestDoctorPythonPackageChecks(unittest.TestCase):

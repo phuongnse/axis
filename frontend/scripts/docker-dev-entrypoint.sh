@@ -18,4 +18,8 @@ if [ "$current_hash" != "$installed_hash" ]; then
   echo "$current_hash" > "$hashfile"
 fi
 
+if [ -z "${VITE_USE_POLLING:-}" ] && grep -qi microsoft /proc/version 2>/dev/null; then
+  export VITE_USE_POLLING=1
+fi
+
 exec npm run dev -- --host 0.0.0.0 --port 3000

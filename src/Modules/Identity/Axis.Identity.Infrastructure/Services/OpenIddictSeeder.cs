@@ -49,6 +49,7 @@ public sealed class OpenIddictSeeder(IServiceProvider services) : IHostedService
             {
                 new Uri("https://localhost:3000/callback"),
                 new Uri("https://localhost:5173/callback"),
+                new Uri("https://web:3000/callback"),
             },
             Requirements =
             {
