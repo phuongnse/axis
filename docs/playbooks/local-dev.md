@@ -49,10 +49,10 @@ Local overrides live in ignored root `.env.local`. See [.env.example](../../.env
 |---|---|---|
 | Docker Compose stack | [docker-compose.yml](../../docker-compose.yml) | Default `local-dev up` — no `.env` file required. |
 | Compose overrides | `.env.local` (copy from [.env.example](../../.env.example)) | Optional; only when a compose default needs changing (e.g. `VITE_USE_POLLING`). |
-| API on host (`dotnet run`) | [src/Axis.Api/appsettings.json](../../src/Axis.Api/appsettings.json) | Host-native dev without the API container. Override with ASP.NET env vars (`Section__Key`) or ignored `appsettings.Development.json`. |
+| API on host | [src/Axis.Api/appsettings.json](../../src/Axis.Api/appsettings.json) | Host-native dev without the API container (`python scripts/axis.py dotnet run-api`). Override with ASP.NET env vars (`Section__Key`) or ignored `appsettings.Development.json`. |
 | EF migrations | `ConnectionStrings__Identity` or `IDENTITY_CONNECTION_STRING` | `python scripts/axis.py dotnet ef ...` only. |
 | Shell adapters | `python scripts/axis.py doctor` | `DOCKER_HOST`, `NVM_DIR`, `PATH` when tools resolve from another context (WSL, Docker Desktop). |
-| E2E on host | [frontend/playwright.config.ts](../../frontend/playwright.config.ts) | `npm run test:e2e` against a running stack: `E2E_BASE_URL`, `E2E_API_URL`, `E2E_MAILDEV_URL`. Compose E2E profile sets these internally. |
+| E2E on host | [frontend/playwright.config.ts](../../frontend/playwright.config.ts) | `python scripts/axis.py frontend script test:e2e` against a running stack with `E2E_BASE_URL`, `E2E_API_URL`, `E2E_MAILDEV_URL`. Compose E2E profile: `python scripts/axis.py local-dev e2e`. |
 
 Common API settings (compose uses service hostnames; host run uses `localhost`):
 
