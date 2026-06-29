@@ -69,18 +69,6 @@ Register a standalone Axis user with email/password so the user can verify their
 
 - Dashboard experience.
 
-## Design System
-
-| Surface | Contract |
-|---|---|
-| Registration, confirmation, verification, and callback screens | Required design-system contract is not implemented yet. Define approved primitives, states, accessibility expectations, and visual contract before Frontend can move from `Partial` to `Done`. |
-
-## Design Sources
-
-| Screen | Source | Preview |
-|---|---|---|
-| N/A | N/A | N/A |
-
 ## Diagrams
 
 ### register-user-journey
@@ -125,10 +113,10 @@ sequenceDiagram
 >
 > **Implemented:** The standalone registration backend, API, and currently implemented frontend subset are in place. `POST /api/users/register` owns submission, account creation, personal workspace creation, legal acceptance, idempotency, and verification email creation; the use case also covers email verification, resend states, post-verification PKCE, and dashboard routing.
 >
-> **Gaps vs spec:** Frontend implementation closure remains open. The required design-system contract is not implemented, no reset-safe editable design source is committed, and the SPA has not been checked and adjusted against a newly approved design source.
+> **Gaps vs spec:** Frontend implementation closure remains open. Registration, confirmation, verification, and callback screens still need an approved UI contract for primitives, states, accessibility expectations, and visual treatment before Frontend can move from `Partial` to `Done`.
 >
-> **Deferred follow-ups:** Define and implement the required design-system contract for registration, confirmation, verification, and callback screens; create or approve a reset-safe editable design source; then apply both to the SPA before marking Frontend `Done`.
+> **Deferred follow-ups:** Define and implement the required UI contract for registration, confirmation, verification, and callback screens; then verify the SPA against that contract before marking Frontend `Done`.
 >
-> **Verification:** Required AT rows are automated by Playwright, Vitest, xUnit API, and xUnit Application. Frontend closure also requires future design-system verification once that contract exists, plus affected frontend tests.
+> **Verification:** Required AT rows are automated by Playwright, Vitest, xUnit API, and xUnit Application. Frontend closure also requires future UI-contract verification once that contract exists, plus affected frontend tests.
 >
-> **Decisions:** The previous committed design-source artifacts have been reset. Preview remains `N/A` until a new stable source/export pair is committed.
+> **Decisions:** Dedicated use-case design sections have been retired; UI requirements now live in flows, ACs, and implementation-status gaps.

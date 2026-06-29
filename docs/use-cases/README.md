@@ -2,7 +2,7 @@
 
 > **Navigation**: [docs/README.md](../README.md) · [AGENTS.md](../../AGENTS.md)
 
-Use cases are the product source of truth. One use case is a complete end-to-end flow: spec details, acceptance criteria, Design System requirement, implementation status, acceptance tests, and review verification.
+Use cases are the product source of truth. One use case is a complete end-to-end flow: spec details, acceptance criteria, implementation status, acceptance tests, and review verification.
 
 ## Current Use Cases
 

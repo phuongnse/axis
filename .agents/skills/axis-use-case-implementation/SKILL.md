@@ -18,7 +18,7 @@ Follow [reference.md](../reference.md).
 
 ## Inputs
 
-- Owning use-case README with Purpose, flows, ACs, Acceptance Test Matrix, Design System, Design Sources, and implementation status.
+- Owning use-case README with Purpose, flows, ACs, Acceptance Test Matrix, Out Of Scope, optional diagrams, and implementation status.
 - Design Gate dossier and sign-off when the slice is non-trivial or high-risk.
 - In-scope AC/AT rows and the lowest reliable runner for each required behavior.
 
@@ -68,7 +68,7 @@ Follow [reference.md](../reference.md).
 
 8. Update status docs when behavior/status changes.
    - Update the use-case `Implementation status` callout; status values are `Done`, `Partial`, `Not started`, and `N/A`.
-   - Use `$axis-visual-artifact` when frontend screen shape, design-source links, previews, or diagrams changed.
+   - Use `$axis-visual-artifact` when Mermaid diagrams or committed visual artifacts changed.
    - Update the domain README or [docs/use-cases/README.md](../../../docs/use-cases/README.md) only when their summarized status changes.
    - Name exact deferred AC bullets under `Deferred follow-ups`; use `N/A` when none.
    - Update `Verification` with the required AT runners; put pass/fail evidence in the implementation report, not the spec.

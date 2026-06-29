@@ -44,7 +44,7 @@ Use the matching repo skill for surface-specific checklist detail:
 | Use-case slice | `$axis-use-case-implementation` |
 | REST/OpenAPI/API type change | `$axis-api-contract` |
 | Frontend feature or SPA caller | `$axis-frontend-feature` |
-| Design source, Mermaid, generated visual artifact | `$axis-visual-artifact` |
+| Mermaid or generated visual artifact | `$axis-visual-artifact` |
 | Review feedback | `$axis-review-feedback` |
 
 If no skill fits, quote the owner doc directly and keep the same dossier shape.

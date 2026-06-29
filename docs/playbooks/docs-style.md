@@ -38,13 +38,9 @@ Do not add reference-owner sections or bottom reference lists for repo docs.
 
 ## Use-Case Files
 
-Use-case READMEs own product behavior and ACs. Keep purpose/actor/trigger, flows, ACs, Acceptance Test Matrix, Out Of Scope, Design System, Design Sources, optional Diagrams, and implementation status.
+Use-case READMEs own product behavior and ACs. Keep purpose/actor/trigger, flows, ACs, Acceptance Test Matrix, Out Of Scope, optional Screen flow, optional Diagrams, and implementation status.
 
-Use `$axis-use-case-spec` for spec shape, `$axis-use-case-implementation` for status, and `$axis-visual-artifact` for visual artifacts.
-
-## Design Sources
-
-Use `Screen | Source | Preview`. Source links are editable artifacts; non-`N/A` previews need an editable source in the same row. Local workflow, sequence, and entity diagrams use Mermaid under `## Diagrams`.
+Use `$axis-use-case-spec` for spec shape, `$axis-use-case-implementation` for status, and `$axis-visual-artifact` for diagrams or committed visual artifacts.
 
 ## Implementation Status
 

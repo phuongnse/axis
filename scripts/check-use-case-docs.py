@@ -28,8 +28,6 @@ REQUIRED_SECTIONS = (
     "Acceptance Criteria",
     "Acceptance Test Matrix",
     "Out Of Scope",
-    "Design System",
-    "Design Sources",
 )
 IMPLEMENTATION_STATUS_HEADING = "> **Implementation status**"
 IMPLEMENTATION_STATUS_REQUIRED_MARKERS = (
@@ -84,15 +82,9 @@ AUTOMATED_BY_VALUES = {
     "xUnit Architecture",
 }
 IMPLEMENTATION_STATUS_COLUMNS = ["Layer", "Status"]
-DESIGN_SOURCE_REQUIRED_COLUMNS = {"Screen", "Preview"}
-DESIGN_SOURCE_SOURCE_COLUMNS = {"Source"}
-NO_ARTIFACT_VALUES = {"", "-", "—", "n/a", "na", "none"}
-PREVIEW_ASSET_RE = re.compile(r"[.](?:svg|png|jpe?g|gif|webp|avif)(?:[)#?]|$)", re.IGNORECASE)
 USE_CASE_TAIL_SECTION_ORDER = (
     "Out Of Scope",
-    "Design System",
     "Screen flow",
-    "Design Sources",
     "Diagrams",
     "Implementation status",
 )
@@ -225,18 +217,6 @@ def record_for_row(table: MarkdownTable, row: list[str]) -> dict[str, str]:
     return {header: row[idx] if idx < len(row) else "" for idx, header in enumerate(table.headers)}
 
 
-def is_no_artifact_cell(cell: str) -> bool:
-    return cell.strip().lower() in NO_ARTIFACT_VALUES
-
-
-def is_preview_asset_reference(cell: str) -> bool:
-    return PREVIEW_ASSET_RE.search(cell) is not None
-
-
-def is_editable_design_source(cell: str) -> bool:
-    return not is_no_artifact_cell(cell) and not is_preview_asset_reference(cell)
-
-
 def acceptance_criteria_ids(section: str) -> tuple[set[str], list[str], list[str], list[str]]:
     ids: list[str] = []
     missing_id_bullets: list[str] = []
@@ -361,9 +341,8 @@ def validate_section_order(doc: UseCaseDocument) -> list[str]:
         if previous_position <= current_position:
             continue
         return [
-            f"{doc.rel}: section order must be `## Out Of Scope`, `## Design System`, "
-            "`## Screen flow` when present, `## Design Sources`, `## Diagrams` when present, "
-            "then implementation status "
+            f"{doc.rel}: section order must be `## Out Of Scope`, `## Screen flow` when present, "
+            "`## Diagrams` when present, then implementation status "
             f"(`{current_heading}` appears before `{previous_heading}`)",
         ]
     return []
@@ -486,51 +465,6 @@ def validate_acceptance_contract(doc: UseCaseDocument, *, require_matrix: bool) 
     return issues
 
 
-def validate_design_sources(doc: UseCaseDocument) -> list[str]:
-    table = first_markdown_table(doc.section("Design Sources"))
-    issues = validate_table_shape(
-        table,
-        rel=doc.rel,
-        label="Design Sources",
-        required_columns=DESIGN_SOURCE_REQUIRED_COLUMNS,
-    )
-    if table is not None and DESIGN_SOURCE_SOURCE_COLUMNS.isdisjoint(table.headers):
-        issues.append(
-            f"{doc.rel}: Design Sources table missing required columns: Source",
-        )
-    if table is None:
-        return issues
-    source_headers = [header for header in ("Source",) if header in table.headers]
-    for idx, row in enumerate(table.rows, start=1):
-        record = record_for_row(table, row)
-        screen = record.get("Screen", "").strip() or f"row {idx}"
-        source_cells = [record.get(header, "") for header in source_headers]
-        preview_cell = record.get("Preview", "")
-
-        for header, source_cell in zip(source_headers, source_cells, strict=False):
-            if is_preview_asset_reference(source_cell):
-                issues.append(
-                    f"{doc.rel}: Design Sources `{screen}` {header} must link to an editable design source, "
-                    "not a preview/export asset",
-                )
-
-        if not is_no_artifact_cell(preview_cell) and not any(is_editable_design_source(cell) for cell in source_cells):
-            issues.append(
-                f"{doc.rel}: Design Sources `{screen}` has a preview but no editable Source",
-            )
-    return issues
-
-
-def validate_design_system(doc: UseCaseDocument) -> list[str]:
-    table = first_markdown_table(doc.section("Design System"))
-    return validate_table_shape(
-        table,
-        rel=doc.rel,
-        label="Design System",
-        exact_columns=["Surface", "Contract"],
-    )
-
-
 def validate_diagrams(doc: UseCaseDocument) -> list[str]:
     issues: list[str] = []
     rel = doc.rel
@@ -607,8 +541,6 @@ def check_file(
     issues.extend(validate_sections(doc))
     issues.extend(validate_section_order(doc))
     issues.extend(validate_acceptance_contract(doc, require_matrix=require_acceptance_matrix))
-    issues.extend(validate_design_system(doc))
-    issues.extend(validate_design_sources(doc))
     issues.extend(validate_diagrams(doc))
     issues.extend(validate_implementation_status(doc, strict_status=strict_status))
     return issues

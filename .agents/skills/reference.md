@@ -21,6 +21,13 @@ Shared rules for every `.agents/skills/*/SKILL.md` workflow. Skill-specific gate
 | **Defer** | One specific item cannot close now | User approves deferral; record exact owner and AC/item |
 | **Skip** | User explicitly waived a step | Record reason; later steps that depend on it still stop unless user waived those too |
 
+## Intent routing
+
+- Route by the user's intended next workflow action, not exact words.
+- Treat examples and trigger phrases as cues, not exhaustive command strings.
+- Name concrete signal classes and explicit overrides when a skill has multiple directions, phases, or publication boundaries.
+- Ask one question only when two workflow directions remain plausible or conflicting after local inspection.
+
 ## Publication gate (PR boundary)
 
 Applies to `$axis-pull-request` and [docs/playbooks/scripts.md § Pre-PR review checkpoint](../../docs/playbooks/scripts.md#pre-pr-review-checkpoint).

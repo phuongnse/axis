@@ -1,13 +1,13 @@
 ---
 name: axis-use-case-spec
-description: Draft or complete Axis docs-first use-case specifications before implementation. Use when a requested feature or use case lacks a docs/use-cases README, acceptance criteria, flow, implementation status, design-source or diagram inventory, or has unclear product/design decisions that must be resolved before using axis-use-case-implementation.
+description: Draft or complete Axis docs-first use-case specifications before implementation. Use when a requested feature or use case lacks a docs/use-cases README, acceptance criteria, flow, implementation status, diagram inventory, or has unclear product/design decisions that must be resolved before using axis-use-case-implementation.
 ---
 
 # Axis Use Case Spec
 
 ## Goal
 
-Create or tighten the owning use-case spec so implementation can follow spec -> design requirements -> tests -> code -> verification without invented behavior, blank AC rows, placeholder docs, or missing visual artifacts.
+Create or tighten the owning use-case spec so implementation can follow spec -> tests -> code -> verification without invented behavior, blank AC rows, placeholder docs, or missing diagrams.
 
 ## Hard gates
 
@@ -31,7 +31,7 @@ Follow [reference.md](../reference.md).
    - If the domain itself does not exist, stop and ask for scope unless the user explicitly approved a new domain.
 
 2. Establish product boundaries before writing behavior.
-   - Capture Purpose, Primary actor, Trigger, Main flow, Alternate/error flows, Acceptance Criteria, Acceptance Test Matrix, Out Of Scope, Design System, Design Sources, implementation status, and Decisions.
+   - Capture Purpose, Primary actor, Trigger, Main flow, Alternate/error flows, Acceptance Criteria, Acceptance Test Matrix, Out Of Scope, optional Screen flow, optional Diagrams, implementation status, and Decisions.
    - Use the source priority from [AGENTS.md](../../../AGENTS.md): use-case ACs, then AGENTS, then focused owner docs, then same-module code, then agent judgment.
    - Ask the user for blocking decisions such as authorization model, data ownership, API exposure, integration effects, or UI journey.
    - Do not invent IDs, endpoints, table names, or copy that changes product meaning.
@@ -43,13 +43,12 @@ Follow [reference.md](../reference.md).
 3. Write acceptance criteria and acceptance tests for implementation.
    - Follow [reference.md](./reference.md) for AC IDs, Acceptance Test Matrix shape, runner choice, and slice boundaries.
 
-4. Define design requirements and visual evidence.
-   - Add `## Design System` with `Surface | Contract` rows for required UI primitives, states, accessibility, and visual contracts; use one `N/A` row only when no UI surface exists.
-   - If no approved design-system implementation exists, state the missing requirement in `## Design System` and keep the affected frontend status incomplete.
-   - For user-facing screens, use `$axis-visual-artifact` to create or update design-source links, optional previews, and the `## Design Sources` table.
+4. Define UI requirements and diagrams.
+   - Put required UI primitives, states, accessibility, and visual constraints in flows, ACs, or implementation-status gaps instead of separate design sections.
+   - If no approved UI contract exists, keep the affected frontend status incomplete and state the missing contract in `Gaps vs spec` / `Deferred follow-ups`.
    - Add `## Screen flow` when the journey has more than three screens, branched happy paths, or non-obvious error screens.
    - Add Mermaid diagrams for non-trivial workflow or sequence behavior; use use-case vocabulary and keep local diagrams in the owning README.
-   - Use a single `N/A` row when no design source or local diagram applies.
+   - Omit diagram sections when no local diagram applies.
 
 5. Mark implementation status honestly.
    - Add the `> **Implementation status**` callout after visual sections using the template layer table.
@@ -67,7 +66,7 @@ Follow [reference.md](../reference.md).
 7. Verify only what changed.
    - Use `python scripts/axis.py check use-case-docs` for use-case README shape.
    - Use `python scripts/axis.py check markdown-links` only when links or anchors changed.
-   - Use `$axis-visual-artifact` when design-source links, previews, Mermaid, or visual docs changed.
+   - Use `$axis-visual-artifact` when Mermaid or committed visual docs changed.
    - Leave full ready-review verification to `$axis-ready-review`.
 
 ## Output
@@ -85,7 +84,7 @@ Open decisions:
 - ...
 
 Visual artifacts:
-- created/updated/N/A
+- diagrams/committed visuals updated or N/A
 
 Next skill:
 - $axis-use-case-implementation / $axis-api-contract / $axis-frontend-feature / none yet

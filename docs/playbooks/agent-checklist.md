@@ -32,7 +32,7 @@ Only claim a full local suite when full `python scripts/axis.py dotnet test` ran
 | Behavior/spec/status | Owning use case |
 | Stack/library/manifests | [docs/TECH_STACK.md](../TECH_STACK.md) and owning manifests |
 | Repeated rule class | Focused playbook or [docs/ENFORCEMENT.md](../ENFORCEMENT.md) |
-| Visual/source/preview | `$axis-visual-artifact` |
+| Mermaid or committed visual artifact | `$axis-visual-artifact` |
 
 Pure refactor/style/test-only changes can report docs as not triggered.
 
