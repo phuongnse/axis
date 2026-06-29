@@ -27,15 +27,15 @@ Follow [reference.md](../reference.md).
 1. Classify the moment.
    - Exploring: prefer read-only commands such as `rg`, `git status`, `git diff`, and targeted file reads.
    - Inner loop: run the smallest command that proves the edit.
-   - Boundary: read `.cursor/skills/axis-ready-review/SKILL.md` (`$axis-ready-review`) before review; it owns `python scripts/axis.py verify` when triggered.
+   - Boundary: read `.agents/skills/axis-ready-review/SKILL.md` (`$axis-ready-review`) before review; it owns `python scripts/axis.py verify` when triggered.
    - CI/debugging: run broader checks only to reproduce or diagnose a failing gate.
 
 2. Pick the narrow check.
-   - Docs: focused docs check; read `.cursor/skills/axis-doc-hygiene/SKILL.md` (`$axis-doc-hygiene`) when changing docs.
+   - Docs: focused docs check; read `.agents/skills/axis-doc-hygiene/SKILL.md` (`$axis-doc-hygiene`) when changing docs.
    - Skills: `python scripts/axis.py check repo-skills`.
    - Scripts/policy: focused script/policy test, then `python scripts/axis.py check policy-tests` when rule wiring changed.
    - Local-dev / compose / cross-platform: read [docs/playbooks/local-dev.md](../../../docs/playbooks/local-dev.md); use `python scripts/axis.py doctor`, `python scripts/axis.py check local-dev-docs`, and `python scripts/axis.py local-dev e2e` only when stack behavior or E2E evidence is in scope.
-   - EF migrations / schema: targeted dotnet tests; read `.cursor/skills/axis-design-gate/SKILL.md` (`$axis-design-gate`) for high-risk sign-off before code.
+   - EF migrations / schema: targeted dotnet tests; read `.agents/skills/axis-design-gate/SKILL.md` (`$axis-design-gate`) for high-risk sign-off before code.
    - Backend: targeted test or `python scripts/axis.py dotnet build`; unit tests when behavior changed.
    - Frontend: focused Vitest/Playwright or `python scripts/axis.py frontend ci` for type/lint risk.
    - API contract: regenerate/check generated contracts only when route/request/response shape changed.

@@ -985,7 +985,7 @@ def check_scripts_standard(_args: argparse.Namespace | None = None) -> int:
 
 
 SKILL_NAME_RE = re.compile(r"^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$")
-REPO_SKILLS_DIR = ".cursor/skills"
+REPO_SKILLS_DIR = ".agents/skills"
 FRONTMATTER_RE = re.compile(r"\A---\n(?P<header>.*?)\n---\n", re.DOTALL)
 SKILL_MAX_LINES = 115
 SKILL_AMBIGUOUS_WORD_RE = re.compile(
@@ -993,7 +993,7 @@ SKILL_AMBIGUOUS_WORD_RE = re.compile(
     re.IGNORECASE,
 )
 SKILL_REPO_REF_RE = re.compile(
-    r"`(?P<target>(?:AGENTS\.md|\.cursor/skills/[A-Za-z0-9._/#-]+|\.github/[A-Za-z0-9._/#-]+|"
+    r"`(?P<target>(?:AGENTS\.md|\.agents/skills/[A-Za-z0-9._/#-]+|\.github/[A-Za-z0-9._/#-]+|"
     r"docs/[A-Za-z0-9._/#-]+|scripts/[A-Za-z0-9._/#-]+|tests/[A-Za-z0-9._/#-]+|"
     r"frontend/[A-Za-z0-9._/#-]+))`"
 )
@@ -1157,11 +1157,11 @@ def repo_skill_raw_command_issues(skill_md: Path, text: str, *, root: Path) -> l
 
 
 def repo_skill_issues(*, root: Path = ROOT) -> list[str]:
+    issues: list[str] = []
     skills_root = root / REPO_SKILLS_DIR.replace("/", os.sep)
     if not skills_root.exists():
-        return []
+        return issues
 
-    issues: list[str] = []
     for skill_dir in sorted(skills_root.iterdir()):
         if not skill_dir.is_dir():
             continue

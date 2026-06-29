@@ -27,14 +27,14 @@ Follow [reference.md](../reference.md).
 1. Locate the owning spec.
    - Read [docs/use-cases/README.md](../../../docs/use-cases/README.md), the domain `README.md`, and the use-case file.
    - If the use case is unclear, search with `rg -n "<feature words>" docs/use-cases src tests frontend`.
-   - If no owning use-case README or AC block exists, stop and read `.cursor/skills/axis-use-case-spec/SKILL.md` (`$axis-use-case-spec`) first.
+   - If no owning use-case README or AC block exists, stop and read `.agents/skills/axis-use-case-spec/SKILL.md` (`$axis-use-case-spec`) first.
 
 2. Prove spec readiness before code.
    - Record `Spec Readiness Verdict: Ready` only when each required-to-close AC and AT expected result can cite the owning spec section, AC ID, or flow step.
    - Mark the verdict `Blocked` and use `$axis-use-case-spec` when any required AC lacks a cited actor, entry point, precondition, observable outcome, business side effect, failure/validation behavior, or testable expected result.
    - Do not infer product behavior from existing code, screenshots, or agent judgment and then make it a required test expectation.
 
-3. Run `.cursor/skills/axis-design-gate/SKILL.md` (`$axis-design-gate`) for non-trivial work.
+3. Run `.agents/skills/axis-design-gate/SKILL.md` (`$axis-design-gate`) for non-trivial work.
    - Stop for high-risk sign-off before code.
    - Carry the dossier decisions into the implementation.
 
@@ -78,7 +78,7 @@ Follow [reference.md](../reference.md).
    - During development, run the smallest check that proves the touched surface.
    - Run every required AT row's runner or targeted test before claiming the use case/layer is complete.
    - Report acceptance evidence by AT ID (`AT-001 Playwright passed`, `AT-002 xUnit API passed`, etc.).
-   - Use `.cursor/skills/axis-ready-review/SKILL.md` (`$axis-ready-review`) before asking for review; it owns `python scripts/axis.py verify` when triggered.
+   - Use `.agents/skills/axis-ready-review/SKILL.md` (`$axis-ready-review`) before asking for review; it owns `python scripts/axis.py verify` when triggered.
    - Do not rerun ready-review verification after every small edit.
    - Do not claim the full suite unless full `python scripts/axis.py dotnet test` ran.
 

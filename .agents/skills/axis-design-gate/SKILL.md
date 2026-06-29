@@ -60,7 +60,7 @@ Follow [reference.md](../reference.md).
    - If no wire contract is touched, write `N/A because no wire shape changes`.
 
 7. Plan verification.
-   - Name narrow checks via `$axis-script-scope` and before-review work via `.cursor/skills/axis-ready-review/SKILL.md` (`$axis-ready-review`).
+   - Name narrow checks via `$axis-script-scope` and before-review work via `.agents/skills/axis-ready-review/SKILL.md` (`$axis-ready-review`).
    - Do not call a review-only artifact a gate.
 
 ## Output

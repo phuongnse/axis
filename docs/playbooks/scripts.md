@@ -17,17 +17,19 @@ Use `python scripts/axis.py doctor` or the exact `check` subcommand to verify lo
 
 ## Pre-PR review checkpoint
 
-Before create, branch/diff update, or mark-ready PR actions:
+Run the checkpoint before create, branch/diff update, or mark-ready PR actions when the diff contains non-trivial implementation, behavior, contract, or high-risk changes. For docs-only, metadata-only, or small guidance/tooling-text changes, record `not triggered` with the reason; when unsure, run the checkpoint.
+
+When triggered:
 
 1. Confirm toolchain: `python scripts/axis.py check coderabbit-cli`
 2. After readiness passes, create an intentional checkpoint commit on the branch that will be published.
 3. Review only committed work that will be published. If the user blocks committing, stop PR publication until a delta-safe reviewed commit exists.
 4. Review the committed diff with the CodeRabbit CLI: full branch diff on the first pass; for follow-up reruns, scope with `--base-commit <reviewed-checkpoint>` and optional `--dir` for affected directories.
-5. If the review raises issues, record `git rev-parse HEAD`, read `.cursor/skills/axis-review-feedback/SKILL.md` (`$axis-review-feedback`), commit the follow-up, then rerun scoped to the checkpoint.
+5. If the review raises issues, record `git rev-parse HEAD`, read `.agents/skills/axis-review-feedback/SKILL.md` (`$axis-review-feedback`), commit the follow-up, then rerun scoped to the checkpoint.
 6. For follow-up verification when a checkpoint exists, run `python scripts/axis.py verify --since <reviewed-checkpoint>`; use full `verify` only at the review boundary or when the follow-up scope cannot be represented by a checkpoint.
 7. Push and open the PR only after steps 4–6 are complete or explicitly skipped with user approval.
 
-Skip only when the user explicitly requested no pre-PR review. If the checkpoint tool is unavailable, unauthenticated, fails, or times out, stop and report the blocker.
+Skip only when the user explicitly requested no pre-PR review. If the checkpoint is triggered and the tool is unavailable, unauthenticated, fails, or times out, stop and report the blocker.
 
 Metadata-only PR title/body updates do not require the checkpoint.
 

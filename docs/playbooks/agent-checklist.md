@@ -2,7 +2,7 @@
 
 > **Navigation**: [docs/README.md](../README.md) · [AGENTS.md](../../AGENTS.md)
 
-Review checklist only. Workflow lives in repo skills ([`.cursor/skills/README.md`](../../.cursor/skills/README.md) and [`.cursor/skills/reference.md`](../../.cursor/skills/reference.md)); enforcement status lives in [docs/ENFORCEMENT.md](../ENFORCEMENT.md); command behavior lives in [docs/playbooks/scripts.md](./scripts.md).
+Review checklist only. Workflow lives in repo skills ([`.agents/skills/README.md`](../../.agents/skills/README.md) and [`.agents/skills/reference.md`](../../.agents/skills/reference.md)); enforcement status lives in [docs/ENFORCEMENT.md](../ENFORCEMENT.md); command behavior lives in [docs/playbooks/scripts.md](./scripts.md).
 
 ## Before Code
 

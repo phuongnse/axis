@@ -2860,7 +2860,7 @@ class TestRepoSkillsGate(unittest.TestCase):
 
     def valid_skill_files(self) -> dict[str, str]:
         return {
-            ".cursor/skills/axis-example/SKILL.md": (
+            ".agents/skills/axis-example/SKILL.md": (
                 "---\n"
                 "name: axis-example\n"
                 "description: Use when an agent needs to perform a concrete Axis example workflow with repo-specific checks.\n"
@@ -2877,7 +2877,7 @@ class TestRepoSkillsGate(unittest.TestCase):
 
     def test_rejects_legacy_vendor_adapter_directory(self) -> None:
         files = self.valid_skill_files()
-        files[".cursor/skills/axis-example/agents/openai.yaml"] = (
+        files[".agents/skills/axis-example/agents/openai.yaml"] = (
             "interface:\n"
             "  display_name: \"Axis Example\"\n"
         )
@@ -2888,8 +2888,8 @@ class TestRepoSkillsGate(unittest.TestCase):
 
     def test_accepts_required_chain_via_skill_path(self) -> None:
         files = {
-            ".cursor/skills/reference.md": "# Reference\n",
-            ".cursor/skills/axis-design-gate/SKILL.md": (
+            ".agents/skills/reference.md": "# Reference\n",
+            ".agents/skills/axis-design-gate/SKILL.md": (
                 "---\n"
                 "name: axis-design-gate\n"
                 "description: Prepare the Axis Design Gate dossier before non-trivial code changes.\n"
@@ -2902,7 +2902,7 @@ class TestRepoSkillsGate(unittest.TestCase):
                 "Follow [reference.md](../reference.md).\n"
                 "- Do not edit implementation files until the dossier is complete.\n"
             ),
-            ".cursor/skills/axis-ready-review/SKILL.md": (
+            ".agents/skills/axis-ready-review/SKILL.md": (
                 "---\n"
                 "name: axis-ready-review\n"
                 "description: Prepare an Axis branch for review with honest verification evidence.\n"
@@ -2915,7 +2915,7 @@ class TestRepoSkillsGate(unittest.TestCase):
                 "Follow [reference.md](../reference.md).\n"
                 "- Not ready stops publication;**Ready** hands off to `$axis-pull-request`.\n"
             ),
-            ".cursor/skills/axis-api-contract/SKILL.md": (
+            ".agents/skills/axis-api-contract/SKILL.md": (
                 "---\n"
                 "name: axis-api-contract\n"
                 "description: Use when an agent changes Axis REST API contracts with generated frontend types.\n"
@@ -2928,8 +2928,8 @@ class TestRepoSkillsGate(unittest.TestCase):
                 "Follow [reference.md](../reference.md).\n"
                 "- `$axis-design-gate` before code; `$axis-ready-review` before review.\n"
                 "\n"
-                "1. Read `.cursor/skills/axis-design-gate/SKILL.md`.\n"
-                "2. Before review, read `.cursor/skills/axis-ready-review/SKILL.md`.\n"
+                "1. Read `.agents/skills/axis-design-gate/SKILL.md`.\n"
+                "2. Before review, read `.agents/skills/axis-ready-review/SKILL.md`.\n"
             ),
         }
 
@@ -2938,18 +2938,18 @@ class TestRepoSkillsGate(unittest.TestCase):
     def test_skill_chain_referenced_ignores_prefix_skill_names(self) -> None:
         text = (
             "See $axis-design-gate-extended and "
-            "`.cursor/skills/axis-design-gate-extended/SKILL.md`."
+            "`.agents/skills/axis-design-gate-extended/SKILL.md`."
         )
         self.assertFalse(axis.skill_chain_referenced(text, "axis-design-gate"))
         self.assertTrue(axis.skill_chain_referenced(text, "axis-design-gate-extended"))
 
     def test_skill_chain_referenced_matches_dollar_and_path(self) -> None:
-        text = "Read $axis-ready-review and `.cursor/skills/axis-ready-review/SKILL.md`."
+        text = "Read $axis-ready-review and `.agents/skills/axis-ready-review/SKILL.md`."
         self.assertTrue(axis.skill_chain_referenced(text, "axis-ready-review"))
 
     def test_rejects_skill_missing_hard_gate_contract(self) -> None:
         files = {
-            ".cursor/skills/axis-pull-request/SKILL.md": (
+            ".agents/skills/axis-pull-request/SKILL.md": (
                 "---\n"
                 "name: axis-pull-request\n"
                 "description: Prepare, review, validate, create, update, or mark ready Axis pull requests.\n"
@@ -2970,7 +2970,7 @@ class TestRepoSkillsGate(unittest.TestCase):
     def test_skill_reference_target_resolves_parent_reference(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
-            skills_root = root / ".cursor" / "skills"
+            skills_root = root / ".agents" / "skills"
             skill_dir = skills_root / "axis-example"
             skill_dir.mkdir(parents=True)
             (skills_root / "reference.md").write_text("# Reference\n", encoding="utf-8")
@@ -2983,7 +2983,7 @@ class TestRepoSkillsGate(unittest.TestCase):
 
     def test_rejects_template_todo_text(self) -> None:
         files = self.valid_skill_files()
-        files[".cursor/skills/axis-example/SKILL.md"] += "\nTODO: finish this later.\n"
+        files[".agents/skills/axis-example/SKILL.md"] += "\nTODO: finish this later.\n"
 
         issues = self.issues_for_skill(files)
 
@@ -2991,8 +2991,8 @@ class TestRepoSkillsGate(unittest.TestCase):
 
     def test_rejects_frontmatter_name_mismatch(self) -> None:
         files = self.valid_skill_files()
-        files[".cursor/skills/axis-example/SKILL.md"] = files[
-            ".cursor/skills/axis-example/SKILL.md"
+        files[".agents/skills/axis-example/SKILL.md"] = files[
+            ".agents/skills/axis-example/SKILL.md"
         ].replace("name: axis-example", "name: axis-other")
 
         issues = self.issues_for_skill(files)
@@ -3001,7 +3001,7 @@ class TestRepoSkillsGate(unittest.TestCase):
 
     def test_rejects_missing_skill_doc_reference(self) -> None:
         files = self.valid_skill_files()
-        files[".cursor/skills/axis-example/SKILL.md"] += "\nRead `docs/playbooks/missing.md`.\n"
+        files[".agents/skills/axis-example/SKILL.md"] += "\nRead `docs/playbooks/missing.md`.\n"
 
         issues = self.issues_for_skill(files)
 
@@ -3009,14 +3009,14 @@ class TestRepoSkillsGate(unittest.TestCase):
 
     def test_accepts_existing_skill_doc_reference(self) -> None:
         files = self.valid_skill_files()
-        files[".cursor/skills/axis-example/SKILL.md"] += "\nRead `docs/playbooks/frontend.md`.\n"
+        files[".agents/skills/axis-example/SKILL.md"] += "\nRead `docs/playbooks/frontend.md`.\n"
         files["docs/playbooks/frontend.md"] = "# Frontend\n"
 
         self.assertEqual([], self.issues_for_skill(files))
 
     def test_rejects_missing_markdown_anchor_reference(self) -> None:
         files = self.valid_skill_files()
-        files[".cursor/skills/axis-example/SKILL.md"] += "\nRead [Frontend](docs/playbooks/frontend.md#missing).\n"
+        files[".agents/skills/axis-example/SKILL.md"] += "\nRead [Frontend](docs/playbooks/frontend.md#missing).\n"
         files["docs/playbooks/frontend.md"] = "# Frontend\n"
 
         issues = self.issues_for_skill(files)
@@ -3025,7 +3025,7 @@ class TestRepoSkillsGate(unittest.TestCase):
 
     def test_rejects_overlong_skill_body(self) -> None:
         files = self.valid_skill_files()
-        files[".cursor/skills/axis-example/SKILL.md"] += "\n" + "\n".join("Extra line." for _ in range(130))
+        files[".agents/skills/axis-example/SKILL.md"] += "\n" + "\n".join("Extra line." for _ in range(130))
 
         issues = self.issues_for_skill(files)
 
@@ -3033,7 +3033,7 @@ class TestRepoSkillsGate(unittest.TestCase):
 
     def test_rejects_ambiguous_best_effort_wording(self) -> None:
         files = self.valid_skill_files()
-        files[".cursor/skills/axis-example/SKILL.md"] += "\nMaybe run the check if you have time.\n"
+        files[".agents/skills/axis-example/SKILL.md"] += "\nMaybe run the check if you have time.\n"
 
         issues = self.issues_for_skill(files)
 
@@ -3041,7 +3041,7 @@ class TestRepoSkillsGate(unittest.TestCase):
 
     def test_rejects_raw_repo_workflow_commands_in_skill_instructions(self) -> None:
         files = self.valid_skill_files()
-        files[".cursor/skills/axis-example/SKILL.md"] += (
+        files[".agents/skills/axis-example/SKILL.md"] += (
             "\n"
             "```bash\n"
             "npm run ci\n"
@@ -3064,7 +3064,7 @@ class TestRepoSkillsGate(unittest.TestCase):
 
     def test_rejects_api_contract_skill_without_required_chaining(self) -> None:
         files = {
-            ".cursor/skills/axis-api-contract/SKILL.md": (
+            ".agents/skills/axis-api-contract/SKILL.md": (
                 "---\n"
                 "name: axis-api-contract\n"
                 "description: Use when an agent changes Axis REST API contracts with generated frontend types.\n"
@@ -3079,8 +3079,8 @@ class TestRepoSkillsGate(unittest.TestCase):
         issues = self.issues_for_skill(files)
 
         joined = "\n".join(issues)
-        self.assertIn("must chain to $axis-design-gate or `.cursor/skills/axis-design-gate/SKILL.md`", joined)
-        self.assertIn("must chain to $axis-ready-review or `.cursor/skills/axis-ready-review/SKILL.md`", joined)
+        self.assertIn("must chain to $axis-design-gate or `.agents/skills/axis-design-gate/SKILL.md`", joined)
+        self.assertIn("must chain to $axis-ready-review or `.agents/skills/axis-ready-review/SKILL.md`", joined)
 
     def test_current_repository_skills_still_pass(self) -> None:
         with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):

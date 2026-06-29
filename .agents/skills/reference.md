@@ -1,6 +1,6 @@
 # Axis skill workflow contract
 
-Shared rules for every `.cursor/skills/*/SKILL.md` workflow. Skill-specific gates sit in each skill's `## Hard gates` section.
+Shared rules for every `.agents/skills/*/SKILL.md` workflow. Skill-specific gates sit in each skill's `## Hard gates` section.
 
 ## Hard gates (universal)
 
@@ -9,7 +9,7 @@ Shared rules for every `.cursor/skills/*/SKILL.md` workflow. Skill-specific gate
 3. **STOP means stop.** When a step says stop, do not push, open or update a PR, mark ready, edit implementation files, or claim ready/done. Report the blocker instead.
 4. **No silent deferral.** Do not substitute "follow-up", "later", "non-blocking", or PR-body notes for completing a gate. Defer only a **specific item** with **explicit user approval** for that item.
 5. **Skip is explicit.** Skip a step only when the user explicitly requested skipping **that step**. Record the skip reason in the skill output.
-6. **Chains are mandatory.** `$axis-*` aliases and `.cursor/skills/<name>/SKILL.md` paths name required skills, not optional reading.
+6. **Chains are mandatory.** `$axis-*` aliases and `.agents/skills/<name>/SKILL.md` paths name required skills, not optional reading.
 7. **Honest output.** Fill the skill output template. A missing section means the step did not run — do not invent pass status.
 8. **Invalidate and rerun.** After a follow-up edit invalidates evidence, rerun only the checks the skill names for that boundary; do not skip because an earlier run passed.
 
@@ -25,15 +25,20 @@ Shared rules for every `.cursor/skills/*/SKILL.md` workflow. Skill-specific gate
 
 Applies to `$axis-pull-request` and [docs/playbooks/scripts.md § Pre-PR review checkpoint](../../docs/playbooks/scripts.md#pre-pr-review-checkpoint).
 
+The pre-PR review checkpoint is triggered by non-trivial implementation, behavior, contract, or high-risk changes. Docs-only, metadata-only, and small guidance/tooling-text changes record `not triggered` with the reason; when unsure, run the checkpoint.
+
 ```text
 $axis-ready-review -> Ready
-  -> checkpoint commit on publish branch
-  -> pre-PR review (CodeRabbit CLI)
-  -> IF findings:
-       -> $axis-review-feedback (fix valid items, commit)
-       -> verify --since <checkpoint> when triggered
-       -> rerun review scoped to checkpoint
-       -> repeat until clean OR user-approved defer/false-positive per item
+  -> IF pre-PR review checkpoint not triggered:
+       -> record not triggered with reason
+  -> IF pre-PR review checkpoint triggered:
+       -> checkpoint commit on publish branch
+       -> pre-PR review (CodeRabbit CLI)
+       -> IF findings:
+            -> $axis-review-feedback (fix valid items, commit)
+            -> verify --since <checkpoint> when triggered
+            -> rerun review scoped to checkpoint
+            -> repeat until clean OR user-approved defer/false-positive per item
   -> ONLY THEN: push + gh pr create / mark ready
 ```
 
