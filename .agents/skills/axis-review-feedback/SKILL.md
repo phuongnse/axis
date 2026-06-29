@@ -54,9 +54,10 @@ Follow [reference.md](../reference.md).
    - If the user explicitly asked for the smallest change, keep the diff minimal and say so.
    - If a better resolution is deliberately deferred, record an exact `Deferred follow-ups` line.
 
-5. Generalize the lesson.
+5. Generalize repeatable lessons.
    - For each valid finding, decide whether it is a one-off defect, missing deterministic check, missing workflow rule, stale doc/status rule, or retired-surface cleanup miss.
    - When the issue class can recur, improve the owning skill, wrapper, checker, or test in a general form before asking for another review.
+   - When the issue is a one-off defect, record `N/A: one-off defect`; do not broaden scope just to create a generalized lesson.
    - Do not add example-specific denylist checks, compatibility notes, or "do not use old name" prose for retired surfaces; apply `$axis-design-gate`'s retirement contract and sweep old identifiers instead.
    - Keep lessons broad enough to prevent the class of mistake, but do not create new product behavior, stack policy, or use-case scope from a review comment alone.
 
@@ -70,9 +71,9 @@ Follow [reference.md](../reference.md).
 7. Report resolution.
    - Mark each comment as resolved, improved beyond suggestion, false positive with evidence, or deferred with owner.
    - Do not claim ready status while triggered verification is failing.
-   - Include the generalized lesson or say `N/A: one-off defect`.
+   - Include the generalized lesson only for repeatable issue classes, or say `N/A: one-off defect`.
    - Include the follow-up review scope: `follow-up delta`, `full diff with reason`, or `not rerun`.
 
 ## Output
 
-Report review follow-ups as `improved` or `minimal`, list generalized lessons, verification, retired-identifier sweep results when applicable, and any unresolved or deferred comments.
+Report review follow-ups as `improved` or `minimal`, list generalized lessons only for repeatable issue classes, verification, retired-identifier sweep results when applicable, and any unresolved or deferred comments.

@@ -31,7 +31,7 @@ Follow [reference.md](../reference.md).
    - Treat [global.json](../../../global.json), [Directory.Packages.props](../../../Directory.Packages.props), [frontend/package.json](../../../frontend/package.json), [frontend/package-lock.json](../../../frontend/package-lock.json), [docker-compose.yml](../../../docker-compose.yml), `Dockerfile*`, and project-level package references as stack-manifest changes.
 
 2. Reconcile the Design Gate.
-   - Confirm `.cursor/skills/axis-design-gate/SKILL.md` (`$axis-design-gate`) was used for non-trivial work.
+   - Confirm `.agents/skills/axis-design-gate/SKILL.md` (`$axis-design-gate`) was used for non-trivial work.
    - Confirm user sign-off happened before code for high-risk surfaces.
    - For stack-manifest changes, confirm user approval and [docs/TECH_STACK.md](../../../docs/TECH_STACK.md) updates when the baseline changes; otherwise record why the stack doc was not triggered.
    - Self-review the diff against the dossier: governing rules, blast radius, contract decision, and verification plan.
@@ -58,7 +58,7 @@ Follow [reference.md](../reference.md).
    - Enforcement status: use [docs/ENFORCEMENT.md](../../../docs/ENFORCEMENT.md) terms; do not call review-only work a gate.
 
 6. Hand off PR publication separately.
-   - If Ready and the user wants a PR action, read `.cursor/skills/axis-pull-request/SKILL.md` (`$axis-pull-request`).
+   - If Ready and the user wants a PR action, read `.agents/skills/axis-pull-request/SKILL.md` (`$axis-pull-request`).
    - Do not draft PR metadata or perform GitHub actions in this skill.
 
 ## Output

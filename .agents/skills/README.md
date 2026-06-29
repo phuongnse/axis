@@ -2,7 +2,7 @@
 
 Portable agent workflows for this repository. Standard layout: one directory per skill with a required `SKILL.md` (YAML frontmatter + markdown body). Optional extras: `reference.md`, `examples.md`, `scripts/`.
 
-Project skills live under [`.cursor/skills/`](.) per the Agent Skills format used by Cursor and other agents that read repo files.
+Project skills live under [`.agents/skills/`](.) as the canonical, tool-neutral repo workflow path.
 
 Shared workflow contract: [reference.md](./reference.md) — sequential steps, stop/defer/skip rules, and the PR publication gate.
 
@@ -14,7 +14,7 @@ Shared workflow contract: [reference.md](./reference.md) — sequential steps, s
 4. Follow chained skills the same way: read their `SKILL.md` paths, not just the alias name.
 5. Run repo commands through `python scripts/axis.py ...` as written in the skill.
 
-`$axis-*` names in docs are **aliases** for `.cursor/skills/<name>/SKILL.md`.
+`$axis-*` names in docs are **aliases** for `.agents/skills/<name>/SKILL.md`.
 
 Validate skill changes: `python scripts/axis.py check repo-skills`
 

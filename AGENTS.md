@@ -12,7 +12,7 @@ This file is the high-signal contract for agents. Keep workflow details in focus
 
 Do not invent IDs, endpoints, tables, or product behavior. If code and docs conflict, surface the conflict.
 
-## P0 Rules
+## Critical Rules
 
 - Spec -> code only; no intentional shortcuts.
 - Keep tests and acceptance evidence honest; do not skip, weaken, bypass, or mark incomplete work done.
@@ -26,7 +26,9 @@ Do not invent IDs, endpoints, tables, or product behavior. If code and docs conf
 - Keep product behavior tied to owning use-case acceptance criteria.
 - Keep architecture and stack changes aligned with [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) and [docs/TECH_STACK.md](./docs/TECH_STACK.md).
 - Keep tests behavior-focused and proportional to risk.
-- Repeatable workflows live in [`.cursor/skills/`](./.cursor/skills/README.md). Before non-trivial work, read the matching `SKILL.md`, [`.cursor/skills/reference.md`](./.cursor/skills/reference.md) hard-gate rules, and follow numbered steps in order. Do not skip workflow gates or defer them into PR follow-ups unless the user explicitly approved that deferral. `$axis-*` in docs is an alias for that path.
+- Repeatable workflows live in [`.agents/skills/`](./.agents/skills/README.md).
+- Before non-trivial work, read the matching `SKILL.md` and [`.agents/skills/reference.md`](./.agents/skills/reference.md), then follow numbered steps in order.
+- `$axis-*` aliases in docs map to `.agents/skills/<name>/SKILL.md`. Do not skip workflow gates or defer them into PR follow-ups unless the user explicitly approved that deferral.
 
 ## Verification
 

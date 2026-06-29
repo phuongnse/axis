@@ -24,7 +24,7 @@ Follow [reference.md](../reference.md).
 
 ## Workflow
 
-1. Run `.cursor/skills/axis-design-gate/SKILL.md` (`$axis-design-gate`).
+1. Run `.agents/skills/axis-design-gate/SKILL.md` (`$axis-design-gate`).
    - API endpoint, required-field, response-shape, status-code, or public contract changes are high-risk.
    - Stop for user sign-off before code when the dossier marks the change high-risk.
 
@@ -55,7 +55,7 @@ Follow [reference.md](../reference.md).
 6. Verify.
    - Run affected API tests and generated-contract parity when the contract changes: wire shape, auth, validation, status code, or response body.
    - For frontend consumers, run the smallest frontend check that proves the caller still matches the generated type.
-   - Ready review: `.cursor/skills/axis-ready-review/SKILL.md` (`$axis-ready-review`).
+   - Ready review: `.agents/skills/axis-ready-review/SKILL.md` (`$axis-ready-review`).
 
 ## Output
 

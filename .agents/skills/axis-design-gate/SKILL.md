@@ -38,7 +38,7 @@ Follow [reference.md](../reference.md).
    - For stack/library changes, read [docs/TECH_STACK.md](../../../docs/TECH_STACK.md) and the touched version owner manifest before deciding whether sign-off is required.
 
 3. Quote governing rules.
-   - Use `file:section` references.
+   - Use `path:section` references.
    - Quote only the rule text needed for the surface.
    - Separate enforced checks from review-only expectations using [docs/ENFORCEMENT.md](../../../docs/ENFORCEMENT.md) terms when status matters.
 
@@ -60,7 +60,7 @@ Follow [reference.md](../reference.md).
    - If no wire contract is touched, write `N/A because no wire shape changes`.
 
 7. Plan verification.
-   - Name narrow checks via `$axis-script-scope` and before-review work via `.cursor/skills/axis-ready-review/SKILL.md` (`$axis-ready-review`).
+   - Name narrow checks via `$axis-script-scope` and before-review work via `.agents/skills/axis-ready-review/SKILL.md` (`$axis-ready-review`).
    - Do not call a review-only artifact a gate.
 
 ## Output
