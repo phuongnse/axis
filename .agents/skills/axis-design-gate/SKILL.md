@@ -38,7 +38,7 @@ Follow [reference.md](../reference.md).
    - For stack/library changes, read [docs/TECH_STACK.md](../../../docs/TECH_STACK.md) and the touched version owner manifest before deciding whether sign-off is required.
 
 3. Quote governing rules.
-   - Use `file:section` references.
+   - Use `path:section` references.
    - Quote only the rule text needed for the surface.
    - Separate enforced checks from review-only expectations using [docs/ENFORCEMENT.md](../../../docs/ENFORCEMENT.md) terms when status matters.
 

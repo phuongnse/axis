@@ -32,7 +32,7 @@ Follow [reference.md](../reference.md).
 
 2. Establish product boundaries before writing behavior.
    - Capture Purpose, Primary actor, Trigger, Main flow, Alternate/error flows, Acceptance Criteria, Acceptance Test Matrix, Out Of Scope, Design System, Design Sources, implementation status, and Decisions.
-   - Use the source priority from [AGENTS.md](../../../AGENTS.md): use-case ACs, then AGENTS, then playbooks, then same-module code.
+   - Use the source priority from [AGENTS.md](../../../AGENTS.md): use-case ACs, then AGENTS, then focused owner docs, then same-module code, then agent judgment.
    - Ask the user for blocking decisions such as authorization model, data ownership, API exposure, integration effects, or UI journey.
    - Do not invent IDs, endpoints, table names, or copy that changes product meaning.
    - Use `## Out Of Scope` only for behavior the flow references or hands off to but does not own.

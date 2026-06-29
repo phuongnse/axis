@@ -13,7 +13,7 @@ Change guidance without growing context load or drifting from the source of trut
 
 Follow [reference.md](../reference.md).
 - One fact, one owner — link instead of duplicating workflow steps from skills.
-- Retired surfaces: apply `$axis-design-gate` retirement contract; no stale-name compatibility prose.
+- Retired surfaces: apply `$axis-design-gate` retirement contract; avoid stale-name compatibility prose unless an explicit compatibility exception requires it.
 - Do not claim review-ready without `$axis-ready-review` when the diff needs review.
 
 ## Inputs
