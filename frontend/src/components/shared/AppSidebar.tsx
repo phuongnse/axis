@@ -11,11 +11,13 @@ export function AppSidebar() {
   const userInitials = useAuthStore((state) => state.userInitials);
 
   return (
-    <aside className="hidden min-h-screen w-64 shrink-0 flex-col border-r border-slate-800 bg-slate-950 text-slate-50 lg:flex">
-      <div className="space-y-4 border-b border-slate-800 px-5 py-5">
+    <aside className="hidden min-h-screen w-64 shrink-0 flex-col border-r border-border bg-card text-foreground lg:flex">
+      <div className="space-y-4 border-b border-border px-5 py-5">
         <div className="flex items-center gap-2">
           <img src={axisLogo} alt="Axis" className="size-8 shrink-0" width={32} height={32} />
-          <p className="text-[11px] uppercase tracking-[0.18em] text-slate-400">Control plane</p>
+          <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+            Control plane
+          </p>
         </div>
       </div>
 
@@ -24,10 +26,10 @@ export function AppSidebar() {
           const Icon = item.icon;
           const active = item.to !== undefined && pathname.startsWith(item.to);
           const baseClass = cn(
-            'flex items-center gap-3 rounded-md border border-transparent px-3 py-2 text-[13px] transition-colors',
-            active && 'border-white/10 bg-white/10 font-medium text-white',
-            !active && !item.disabled && 'text-slate-300 hover:bg-white/10 hover:text-white',
-            item.disabled && 'cursor-not-allowed text-slate-500',
+            'flex items-center gap-3 rounded-lg border border-transparent px-3 py-2 text-[13px] transition-colors',
+            active && 'border-primary/20 bg-primary font-medium text-primary-foreground',
+            !active && !item.disabled && 'text-foreground hover:border-border hover:bg-accent',
+            item.disabled && 'cursor-not-allowed text-muted-foreground/45',
           );
 
           if (item.disabled || !item.to) {
@@ -48,19 +50,19 @@ export function AppSidebar() {
         })}
       </nav>
 
-      <div className="mt-auto border-t border-slate-800 px-4 py-4">
+      <div className="mt-auto border-t border-border px-4 py-4">
         <div className="flex items-center gap-3">
           <div
-            className="flex size-8 shrink-0 items-center justify-center rounded-md border border-white/10 bg-white/10 text-xs font-medium text-white"
+            className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-border bg-accent text-xs font-medium text-accent-foreground"
             aria-hidden
           >
             {userInitials ?? '?'}
           </div>
           <div className="min-w-0">
-            <span className="block truncate text-xs font-medium text-white">
+            <span className="block truncate text-xs font-medium text-foreground">
               {userLabel ?? 'User'}
             </span>
-            <span className="block text-[11px] text-slate-400">Verified account</span>
+            <span className="block text-[11px] text-muted-foreground">Verified account</span>
           </div>
         </div>
       </div>
