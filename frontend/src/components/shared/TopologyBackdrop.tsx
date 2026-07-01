@@ -142,13 +142,14 @@ function getMinimumLineDistance(width: number, height: number) {
 
 function constrainLine(line: RuntimeLine, width: number, height: number) {
   const projectedBounds = getProjectedBounds(line);
+  const minCenterX = projectedBounds.halfWidth;
+  const maxCenterX = width - projectedBounds.halfWidth;
+  const minCenterY = projectedBounds.halfHeight;
+  const maxCenterY = height - projectedBounds.halfHeight;
 
-  line.centerX = clamp(line.centerX, projectedBounds.halfWidth, width - projectedBounds.halfWidth);
-  line.centerY = clamp(
-    line.centerY,
-    projectedBounds.halfHeight,
-    height - projectedBounds.halfHeight,
-  );
+  line.centerX = minCenterX <= maxCenterX ? clamp(line.centerX, minCenterX, maxCenterX) : width / 2;
+  line.centerY =
+    minCenterY <= maxCenterY ? clamp(line.centerY, minCenterY, maxCenterY) : height / 2;
 }
 
 function limitLineSpeed(line: RuntimeLine) {
@@ -284,20 +285,28 @@ export function TopologyBackdrop({ className }: { className?: string }) {
         }
 
         const projectedBounds = getProjectedBounds(runtimeLine);
+        const minCenterX = projectedBounds.halfWidth;
+        const maxCenterX = width - projectedBounds.halfWidth;
+        const minCenterY = projectedBounds.halfHeight;
+        const maxCenterY = height - projectedBounds.halfHeight;
 
-        if (runtimeLine.centerX <= projectedBounds.halfWidth) {
-          runtimeLine.centerX = projectedBounds.halfWidth;
+        if (minCenterX > maxCenterX) {
+          runtimeLine.centerX = width / 2;
+        } else if (runtimeLine.centerX <= minCenterX) {
+          runtimeLine.centerX = minCenterX;
           runtimeLine.speedX = Math.abs(runtimeLine.speedX);
-        } else if (runtimeLine.centerX >= width - projectedBounds.halfWidth) {
-          runtimeLine.centerX = width - projectedBounds.halfWidth;
+        } else if (runtimeLine.centerX >= maxCenterX) {
+          runtimeLine.centerX = maxCenterX;
           runtimeLine.speedX = -Math.abs(runtimeLine.speedX);
         }
 
-        if (runtimeLine.centerY <= projectedBounds.halfHeight) {
-          runtimeLine.centerY = projectedBounds.halfHeight;
+        if (minCenterY > maxCenterY) {
+          runtimeLine.centerY = height / 2;
+        } else if (runtimeLine.centerY <= minCenterY) {
+          runtimeLine.centerY = minCenterY;
           runtimeLine.speedY = Math.abs(runtimeLine.speedY);
-        } else if (runtimeLine.centerY >= height - projectedBounds.halfHeight) {
-          runtimeLine.centerY = height - projectedBounds.halfHeight;
+        } else if (runtimeLine.centerY >= maxCenterY) {
+          runtimeLine.centerY = maxCenterY;
           runtimeLine.speedY = -Math.abs(runtimeLine.speedY);
         }
       }
