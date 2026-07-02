@@ -21,6 +21,7 @@ Tech-stack changes need explicit user approval before implementation. Update thi
 | UI | Tailwind CSS, shadcn/Base UI primitives, lucide-react icons. |
 | Testing | xUnit, Testcontainers, architecture tests, Vitest, Testing Library, Playwright. |
 | Local runtime | Docker Compose with PostgreSQL, Redis, Maildev, API, SPA, and optional observability/e2e profiles. |
+| Dependency automation | Renovate. |
 
 ## Version Owners
 
@@ -29,3 +30,4 @@ Tech-stack changes need explicit user approval before implementation. Update thi
 - Frontend packages: `frontend/package.json`
 - Local container images: `docker-compose.yml`
 - OpenAPI contract: `openapi.json`
+- Dependency automation: `.github/renovate.json5`

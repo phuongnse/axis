@@ -11,6 +11,7 @@
 | .NET SDK | [global.json](../../global.json) / [docs/TECH_STACK.md](../TECH_STACK.md) | build, tests, format, package scan, API contracts |
 | Node.js | [frontend/.nvmrc](../../frontend/.nvmrc) | frontend commands and API types |
 | Lychee | [scripts/axis.py](../../scripts/axis.py) check and [.github/workflows/build-and-test.yml](../../.github/workflows/build-and-test.yml) pin | Markdown link checks |
+| Renovate validator | [scripts/axis.py](../../scripts/axis.py) check | Dependency automation config |
 | Pre-PR review checkpoint | [scripts/axis.py](../../scripts/axis.py) check | `$axis-pull-request` before GitHub PR actions |
 
 Use `python scripts/axis.py doctor` or the exact `check` subcommand to verify local tool resolution.
