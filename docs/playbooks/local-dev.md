@@ -52,7 +52,7 @@ Local overrides live in ignored root `.env.local`. See [.env.example](../../.env
 | API on host | [src/Axis.Api/appsettings.json](../../src/Axis.Api/appsettings.json) | Host-native dev without the API container (`python scripts/axis.py dotnet run-api`). Override with ASP.NET env vars (`Section__Key`) or ignored `appsettings.Development.json`. |
 | EF migrations | `ConnectionStrings__Identity` or `IDENTITY_CONNECTION_STRING` | `python scripts/axis.py dotnet ef ...` only. |
 | Shell adapters | `python scripts/axis.py doctor` | `DOCKER_HOST`, `NVM_DIR`, `PATH` when tools resolve from another context (WSL, Docker Desktop). |
-| E2E on host | [frontend/playwright.config.ts](../../frontend/playwright.config.ts) | `python scripts/axis.py frontend script test:e2e` against a running stack with `E2E_BASE_URL`, `E2E_API_URL`, `E2E_MAILDEV_URL`. Compose E2E profile: `python scripts/axis.py local-dev e2e`. |
+| E2E | [docker-compose.yml](../../docker-compose.yml) and [frontend/playwright.config.ts](../../frontend/playwright.config.ts) | `python scripts/axis.py local-dev e2e` builds and runs the compose E2E profile with API, web, Maildev, service URLs, and browser trust configured. |
 
 Common API settings (compose uses service hostnames; host run uses `localhost`):
 
@@ -76,7 +76,7 @@ Frontend dev (compose `web` service sets these; host Vite uses [frontend/vite.co
 
 ## Daily Operations
 
-Prefer scoped CLI commands: `status`, `up`, `down`, `e2e`, and focused checks. `local-dev shell [service]` runs inside the container; host shell (PowerShell, bash, WSL) does not matter.
+Prefer scoped CLI commands: `status`, `up`, `down`, `e2e`, and focused checks. `python scripts/axis.py local-dev e2e` is the Axis browser E2E workflow; package Playwright scripts stay behind repo wrappers. `local-dev shell [service]` runs inside the container; host shell (PowerShell, bash, WSL) does not matter.
 
 Use runtime-specific dev servers only through the documented Axis wrapper or owning package script.
 
