@@ -1,5 +1,5 @@
-using Axis.Shared.Domain.Primitives;
 using System.Text.Json;
+using Axis.Shared.Domain.Primitives;
 
 namespace Axis.Api.Extensions;
 
