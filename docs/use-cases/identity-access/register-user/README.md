@@ -17,7 +17,7 @@ Register a standalone Axis user with email/password so the user can verify their
 ## Main flow
 
 1. User opens the registration page.
-2. User enters first name, last name, email, password, password confirmation, and accepts the current user-level Terms of Service and Privacy Policy.
+2. User enters full name, email, password, password confirmation, and accepts the current user-level Terms of Service and Privacy Policy.
 3. System verifies email uniqueness and password policy.
 4. System creates the account, creates the user's personal workspace, records legal acceptance, and sends an email verification link.
 5. User opens the verification link.
@@ -26,14 +26,15 @@ Register a standalone Axis user with email/password so the user can verify their
 ## Alternate / error flows
 
 - Duplicate email: show "An account with this email already exists. Sign in instead." as an inline email-field error.
-- Invalid, expired, rate-limited, or already-used verification token: show a clear state and allow resend when allowed.
+- Invalid, expired, or already-used verification token: show a clear state and allow resend when allowed.
+- Rate-limited resend request: show a clear wait state and disable resend while limited.
 - Server error during submission: show a generic retry message and re-enable the submit button.
 
 ## Acceptance Criteria
 
 *Happy path*
 - **AC-001** User registration can be started without any team/setup context.
-- **AC-002** User can register with name fields, email/password, password confirmation, and current user-level legal acceptance.
+- **AC-002** User can register with full name, email/password, password confirmation, and current user-level legal acceptance.
 - **AC-003** Registration creates the standalone account, personal workspace, and legal acceptance without requiring team/setup context.
 - **AC-004** Registration sends an email verification link.
 - **AC-005** After successful email verification, the user is signed in and routed to the dashboard.
@@ -45,7 +46,7 @@ Register a standalone Axis user with email/password so the user can verify their
 - **AC-009** Missing team/setup context is accepted for standalone registration.
 - **AC-010** Field-level errors are shown inline.
 - **AC-011** A 5xx registration response shows a generic retry message and re-enables submit.
-- **AC-012** Expired, invalid, rate-limited, and already-used verification links show clear user-facing states.
+- **AC-012** Expired, invalid, and already-used verification links show clear user-facing states; rate-limited resend shows a clear wait state.
 
 *Edge cases*
 - **AC-013** Multiple rapid submissions are deduplicated with an idempotency key.
@@ -54,20 +55,32 @@ Register a standalone Axis user with email/password so the user can verify their
 
 ## Acceptance Test Matrix
 
-| ID | Level | Scenario | Covers AC | Automated by | Required to close |
+| ID | Boundary | Scenario | Covers AC | Verification | Required |
 |---|---|---|---|---|---|
-| AT-001 | E2E | User registers, opens verification email, completes callback, and reaches the dashboard | AC-001, AC-002, AC-004, AC-005, AC-009 | Playwright | Yes |
-| AT-002 | E2E | Duplicate email shows the exact inline email-field error | AC-006, AC-010 | Playwright | Yes |
-| AT-003 | API | Registration persists account data, personal workspace, legal acceptance, verification token, and no team/setup dependency | AC-003, AC-004, AC-009, AC-015 | xUnit API | Yes |
-| AT-004 | Component | Empty form, invalid email, password confirmation, and backend field errors render inline | AC-006, AC-008, AC-010 | Vitest | Yes |
-| AT-005 | Component | Password policy rejects short/common passwords and accepts leading/trailing spaces as entered | AC-007, AC-014 | Vitest | Yes |
-| AT-006 | Component | 5xx submission failure shows generic retry text and re-enables submit | AC-011 | Vitest | Yes |
-| AT-007 | Component/API | Expired, invalid, rate-limited, and already-used verification links show clear states; resend remains available where allowed | AC-012 | Vitest + xUnit API | Yes |
-| AT-008 | Application | Completed or in-progress idempotency key deduplicates repeated registration attempts | AC-013 | xUnit Application | Yes |
+| AT-001 | Browser journey | User registers, opens verification email, completes callback, and reaches the dashboard | AC-001, AC-002, AC-004, AC-005, AC-009 | Browser automation | Yes |
+| AT-002 | Browser journey | Duplicate email shows the exact inline email-field error | AC-006, AC-010 | Browser automation | Yes |
+| AT-003 | API boundary | Registration persists account data, personal workspace, legal acceptance, verification token, and no team/setup dependency | AC-003, AC-004, AC-009, AC-015 | API integration test | Yes |
+| AT-004 | UI component | Empty form, invalid email, password confirmation, and backend field errors render inline | AC-006, AC-008, AC-010 | UI component test | Yes |
+| AT-005 | UI component | Password policy rejects short/common passwords and accepts leading/trailing spaces as entered | AC-007, AC-014 | UI component test | Yes |
+| AT-006 | UI component | 5xx submission failure shows generic retry text and re-enables submit | AC-011 | UI component test | Yes |
+| AT-007 | UI/API boundaries | Expired, invalid, and already-used verification links show clear states; resend remains available where allowed and rate-limited resend is clear | AC-012 | UI component test + API integration test | Yes |
+| AT-008 | Application boundary | Completed or in-progress idempotency key deduplicates repeated registration attempts | AC-013 | Application test | Yes |
 
 ## Out Of Scope
 
 - Dashboard experience.
+
+## Screen flow
+
+| Screen | Required contract |
+|---|---|
+| `/register` | Render an auth-card form with full name, email, password, password confirmation, current Terms/Privacy acceptance, and a single submit action. Full name is the user-facing field; the system maps it into first and last name for the API. |
+| `/register` validation | Show required-field, invalid-email, duplicate-email, password-policy, password-confirmation, legal-acceptance, backend field, and generic 5xx errors inline or in the form alert described by the relevant AC. Keep the submit button disabled only while submission or legal-version loading is pending. |
+| `/register/confirmation` | Show the submitted email when available, explain that the verification link is required to finish registration, provide resend, show resend success/error/rate-limited states, and keep account-enumeration-safe copy. |
+| `/auth/verify` | Submit the token once, show loading while verification is pending, start the post-verification PKCE flow on success, show expired, invalid, and already-used verification states, and show the resend rate-limited state when resend is limited. |
+| Callback/dashboard handoff | The callback and dashboard experience are owned outside this use case; this use case only requires that successful verification completes browser sign-in and routes to dashboard. |
+
+Required UI quality: labels must be programmatic, invalid fields must expose invalid state, error/help text must remain associated with the field it describes, keyboard navigation must reach every action, and the screens must use existing Axis auth primitives and theme tokens.
 
 ## Diagrams
 
@@ -109,14 +122,14 @@ sequenceDiagram
 > | Application | Done |
 > | Infrastructure | Done |
 > | API | Done |
-> | Frontend | Partial |
+> | Frontend | Done |
 >
-> **Implemented:** The standalone registration backend, API, and currently implemented frontend subset are in place. `POST /api/users/register` owns submission, account creation, personal workspace creation, legal acceptance, idempotency, and verification email creation; the use case also covers email verification, resend states, post-verification PKCE, and dashboard routing.
+> **Implemented:** The standalone registration backend, API, and frontend screens are in place. `POST /api/users/register` owns submission, account creation, personal workspace creation, legal acceptance, idempotency, and verification email creation; the use case also covers email verification, resend states, post-verification PKCE, and dashboard routing.
 >
-> **Gaps vs spec:** Frontend implementation closure remains open. Registration, confirmation, verification, and callback screens still need an approved UI contract for primitives, states, accessibility expectations, and visual treatment before Frontend can move from `Partial` to `Done`.
+> **Gaps vs spec:** N/A.
 >
-> **Deferred follow-ups:** Define and implement the required UI contract for registration, confirmation, verification, and callback screens; then verify the SPA against that contract before marking Frontend `Done`.
+> **Deferred follow-ups:** N/A.
 >
-> **Verification:** Required AT rows are automated by Playwright, Vitest, xUnit API, and xUnit Application. Frontend closure also requires future UI-contract verification once that contract exists, plus affected frontend tests.
+> **Verification:** Required AT rows are covered by browser automation, UI component tests, API integration tests, and application tests.
 >
-> **Decisions:** Dedicated use-case design sections have been retired; UI requirements now live in flows, ACs, and implementation-status gaps.
+> **Decisions:** UI requirements are owned by the Screen flow and ACs in this README. Registration uses one user-facing full-name field and maps it to first/last name for the API. Resend rate limiting is part of resend behavior, not verification-token resolution.

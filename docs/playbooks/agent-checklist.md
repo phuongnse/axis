@@ -17,7 +17,7 @@ Use-case ACs are the contract. Cover validation, edge, authorization, isolation,
 
 AC map: `AC | kind | surface | proving test or exact deferral`.
 
-No blank in-scope rows; required AT rows name automated runners; implementation details stay out of spec matrices; incomplete in-scope ACs block `Done`.
+No blank in-scope rows; required AT rows name verification categories; exact runners and implementation details stay out of spec matrices; incomplete in-scope ACs block `Done`.
 
 ## Review Verification
 

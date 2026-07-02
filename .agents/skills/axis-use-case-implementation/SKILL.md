@@ -20,7 +20,7 @@ Follow [reference.md](../reference.md).
 
 - Owning use-case README with Purpose, flows, ACs, Acceptance Test Matrix, Out Of Scope, optional diagrams, and implementation status.
 - Design Gate dossier and sign-off when the slice is non-trivial or high-risk.
-- In-scope AC/AT rows and the lowest reliable runner for each required behavior.
+- In-scope AC/AT rows and the lowest reliable verification boundary for each required behavior.
 
 ## Workflow
 
@@ -47,7 +47,7 @@ Follow [reference.md](../reference.md).
    - Treat out-of-scope bullets as handoff boundaries, not deferred implementation rows.
    - If an out-of-scope item is unrelated to the flow, tighten the spec with `$axis-use-case-spec`.
    - Give every in-scope row a proving automated test before coding. Use the AT ID in the test title, xUnit trait, or nearby metadata when practical.
-   - Choose the lowest reliable runner: Playwright for browser-level journeys, Vitest for focused UI states/validation, and xUnit API/Application/Infrastructure for backend contracts, side effects, and business rules.
+   - Choose the exact runner for each matrix verification category: Playwright for browser automation, Vitest for UI component tests, and xUnit API/Application/Infrastructure for backend integration, side effects, and business rules.
    - If a required runner is missing, treat installing the harness as a new-library Design Gate decision and get required sign-off before code.
    - Do not mark a layer complete when validation, edge, isolation, or rollback ACs remain open.
 
@@ -71,7 +71,7 @@ Follow [reference.md](../reference.md).
    - Use `$axis-visual-artifact` when Mermaid diagrams or committed visual artifacts changed.
    - Update the domain README or [docs/use-cases/README.md](../../../docs/use-cases/README.md) only when their summarized status changes.
    - Name exact deferred AC bullets under `Deferred follow-ups`; use `N/A` when none.
-   - Update `Verification` with the required AT runners; put pass/fail evidence in the implementation report, not the spec.
+   - Update `Verification` with the required AT evidence categories; put exact runner and pass/fail evidence in the implementation report, not the spec.
    - Do not introduce intentional shortcuts.
 
 9. Verify honestly.

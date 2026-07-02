@@ -56,30 +56,31 @@ IMPLEMENTATION_DETAIL_MATRIX_RE = re.compile(
 )
 ACCEPTANCE_MATRIX_COLUMNS = [
     "ID",
-    "Level",
+    "Boundary",
     "Scenario",
     "Covers AC",
-    "Automated by",
-    "Required to close",
+    "Verification",
+    "Required",
 ]
-ACCEPTANCE_MATRIX_LEVELS = {
-    "E2E",
-    "API",
-    "Application",
-    "Infrastructure",
-    "Domain",
-    "Component",
-    "UI",
+ACCEPTANCE_MATRIX_BOUNDARIES = {
+    "Browser journey",
+    "UI component",
+    "API boundary",
+    "Application boundary",
+    "Infrastructure boundary",
+    "Domain boundary",
+    "UI/API boundaries",
+    "API/Application boundaries",
+    "Application/Infrastructure boundaries",
 }
-AUTOMATED_BY_VALUES = {
-    "Playwright",
-    "Vitest",
-    "xUnit",
-    "xUnit API",
-    "xUnit Application",
-    "xUnit Infrastructure",
-    "xUnit Domain",
-    "xUnit Architecture",
+VERIFICATION_VALUES = {
+    "Browser automation",
+    "UI component test",
+    "API integration test",
+    "Application test",
+    "Infrastructure integration test",
+    "Domain test",
+    "Architecture test",
 }
 IMPLEMENTATION_STATUS_COLUMNS = ["Layer", "Status"]
 USE_CASE_TAIL_SECTION_ORDER = (
@@ -421,24 +422,23 @@ def validate_acceptance_contract(doc: UseCaseDocument, *, require_matrix: bool) 
             seen_at_ids.add(at_id)
             id_prefixes.add(at_id.split("-", 1)[0])
 
-        level = record.get("Level", "")
-        level_parts = [part.strip() for part in level.split("/") if part.strip()]
-        if not level_parts or any(part not in ACCEPTANCE_MATRIX_LEVELS for part in level_parts):
+        boundary = record.get("Boundary", "")
+        if boundary not in ACCEPTANCE_MATRIX_BOUNDARIES:
             issues.append(
-                f"{rel}: Acceptance Test Matrix {row_label} has invalid Level `{level}`",
+                f"{rel}: Acceptance Test Matrix {row_label} has invalid Boundary `{boundary}`",
             )
 
-        automated_by = record.get("Automated by", "")
-        automation_parts = [part.strip() for part in automated_by.split("+") if part.strip()]
-        if not automation_parts or any(part not in AUTOMATED_BY_VALUES for part in automation_parts):
+        verification = record.get("Verification", "")
+        verification_parts = [part.strip() for part in verification.split("+") if part.strip()]
+        if not verification_parts or any(part not in VERIFICATION_VALUES for part in verification_parts):
             issues.append(
-                f"{rel}: Acceptance Test Matrix {row_label} has invalid Automated by `{automated_by}`",
+                f"{rel}: Acceptance Test Matrix {row_label} has invalid Verification `{verification}`",
             )
 
-        required = record.get("Required to close", "")
+        required = record.get("Required", "")
         if required not in {"Yes", "No"}:
             issues.append(
-                f"{rel}: Acceptance Test Matrix {row_label} Required to close must be `Yes` or `No`",
+                f"{rel}: Acceptance Test Matrix {row_label} Required must be `Yes` or `No`",
             )
 
         covers = set(AC_ID_RE.findall(record.get("Covers AC", "")))

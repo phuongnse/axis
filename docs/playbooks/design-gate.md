@@ -13,7 +13,7 @@ For repeatable execution, read [`.agents/skills/axis-design-gate/SKILL.md`](../.
 | Tier | Examples | Required |
 |------|----------|----------|
 | **Trivial** | typo, comment, single-line correction, doc-only | No dossier. Still run the triggered check. |
-| **Standard** | intra-module logic, new test, additive UI on an existing API, refactor with no contract change | Short dossier. No sign-off needed. |
+| **Standard** | intra-module logic, new test, additive UI on an existing API, refactor with no contract change | Compact or full dossier by blast radius. No sign-off needed. |
 | **High-risk** | new/changed endpoint, contract/required field, migration/schema, auth, new/replaced runtime, framework, service, major library, public API surface | Full dossier + user sign-off before code. |
 
 When unsure which tier, treat it as the higher one.
@@ -22,7 +22,12 @@ When unsure which tier, treat it as the higher one.
 
 ## Dossier
 
-For each surface you touch, before coding:
+Scale the dossier to the risk before coding:
+
+- **Compact** for localized standard work with no retirement, wire/schema/auth/stack change, or broad cross-surface blast radius.
+- **Full** for high-risk work and for standard work that retires a supported surface, changes deterministic checks or workflow behavior, or spans multiple ownership surfaces.
+
+Every non-trivial dossier covers:
 
 1. **Governing rules** — quote the owner rules with `file:section`; do not rely on memory.
 2. **Blast radius** — paste the `rg` search that lists affected callers, consumers, tests, docs, and generated artifacts.
@@ -47,7 +52,7 @@ Use the matching repo skill for surface-specific checklist detail:
 | Mermaid or generated visual artifact | `$axis-visual-artifact` |
 | Review feedback | `$axis-review-feedback` |
 
-If no skill fits, quote the owner doc directly and keep the same dossier shape.
+If no skill fits, quote the owner doc directly and keep the same dossier scale.
 
 ---
 

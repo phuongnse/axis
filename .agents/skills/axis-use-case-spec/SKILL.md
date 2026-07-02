@@ -55,7 +55,7 @@ Follow [reference.md](../reference.md).
    - Use only `Done`, `Partial`, `Not started`, or `N/A`.
    - Do not mark a layer or use case done if an in-scope AC lacks a required AT row or required automated evidence is missing.
    - Name exact deferred AC bullets under `Deferred follow-ups`, or write `N/A`.
-   - Add `Verification` naming the required AT runners; passing evidence belongs in the implementation or ready-review report.
+   - Add `Verification` naming the required AT evidence categories; exact runners and passing evidence belong in the implementation or ready-review report.
    - Update the domain README Open work only when the new spec changes prioritized work.
 
 6. Route follow-up implementation.

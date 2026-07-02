@@ -14,7 +14,7 @@ export function AuthCard({ title, children, footer, banner }: AuthCardProps) {
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-background p-4 py-8 sm:p-6">
       <TopologyBackdrop className="opacity-90" />
       <div className="relative z-10 flex w-full max-w-[440px] justify-center">
-        <div className="flex w-full flex-col overflow-hidden rounded-xl border border-border/80 bg-card/95 shadow-[0_24px_80px_hsl(0_0%_0%/0.48),0_0_0_1px_hsl(var(--primary)/0.06)] backdrop-blur">
+        <div className="flex w-full flex-col overflow-hidden rounded-xl border border-border/80 bg-card/95 backdrop-blur">
           <div className="space-y-6 px-6 py-6">
             <BrandHeader label={title} labelElement="h1" />
             {banner}

@@ -132,9 +132,9 @@ class TestUseCaseDocsGate(unittest.TestCase):
             if "## Acceptance Test Matrix" in callout
             else """## Acceptance Test Matrix
 
-| ID | Level | Scenario | Covers AC | Automated by | Required to close |
+| ID | Boundary | Scenario | Covers AC | Verification | Required |
 |---|---|---|---|---|---|
-| AT-001 | E2E | User completes flow | AC-001 | Playwright | Yes |
+| AT-001 | Browser journey | User completes flow | AC-001 | Browser automation | Yes |
 
 """
         )
@@ -325,9 +325,9 @@ Ship user value.
         issues = self.issues_for_use_case(
             """## Acceptance Test Matrix
 
-| ID | Level | Scenario | Covers AC | Evidence source | Automated by | Required to close |
+| ID | Boundary | Scenario | Covers AC | Evidence source | Verification | Required |
 |---|---|---|---|---|---|---|
-| AT-001 | E2E | User completes flow | AC-001 | Main flow | Playwright | Yes |
+| AT-001 | Browser journey | User completes flow | AC-001 | Main flow | Browser automation | Yes |
 
 > **Implementation status**
 >
@@ -408,11 +408,11 @@ Ship user value.
         issues = self.issues_for_use_case(
             """## Acceptance Test Matrix
 
-| ID | Level | Scenario | Covers AC | Automated by | Required to close |
+| ID | Boundary | Scenario | Covers AC | Verification | Required |
 |---|---|---|---|---|---|
-| AT-001 | E2E | User completes flow | AC-001 | `frontend/e2e/sample.pw.ts` | Yes |
-| AT-002 | API | Backend side effect | AC-001 | Axis.Api.Tests | Yes |
-| AT-003 | UI | UI validation | AC-001 | npm run test | Yes |
+| AT-001 | Browser journey | User completes flow | AC-001 | `frontend/e2e/sample.pw.ts` | Yes |
+| AT-002 | API boundary | Backend side effect | AC-001 | Axis.Api.Tests | Yes |
+| AT-003 | UI component | UI validation | AC-001 | npm run test | Yes |
 
 > **Implementation status**
 >
@@ -441,10 +441,10 @@ Ship user value.
         issues = self.issues_for_use_case(
             """## Acceptance Test Matrix
 
-| ID | Level | Scenario | Covers AC | Automated by | Required to close |
+| ID | Boundary | Scenario | Covers AC | Verification | Required |
 |---|---|---|---|---|---|
-| AT-001 | E2E | User completes flow | AC-001 | Playwright | Yes |
-| AT-002 | API | Backend side effect | AC-001 | xUnit API | Yes |
+| AT-001 | Browser journey | User completes flow | AC-001 | Browser automation | Yes |
+| AT-002 | API boundary | Backend side effect | AC-001 | API integration test | Yes |
 
 > **Implementation status**
 >
@@ -472,9 +472,9 @@ Ship user value.
         issues = self.issues_for_use_case(
             """## Acceptance Test Matrix
 
-| ID | Level | Scenario | Covers AC | Automated by | Required to close |
+| ID | Boundary | Scenario | Covers AC | Verification | Required |
 |---|---|---|---|---|---|
-| AT-001 | E2E | User completes flow | AC-999 | Playwright | No |
+| AT-001 | Browser journey | User completes flow | AC-999 | Browser automation | No |
 
 > **Implementation status**
 >
@@ -504,7 +504,7 @@ Ship user value.
         issues = self.issues_for_use_case(
             """## Acceptance Test Matrix
 
-| ID | Level | Scenario | Covers AC | Automated by | Required to close |
+| ID | Boundary | Scenario | Covers AC | Verification | Required |
 |---|---|---|---|---|---|
 | AT-001 | Smoke | User completes flow | AC-001 | Jest | Required |
 
@@ -529,18 +529,18 @@ Ship user value.
         )
 
         joined = "\n".join(issues)
-        self.assertIn("invalid Level `Smoke`", joined)
-        self.assertIn("invalid Automated by `Jest`", joined)
-        self.assertIn("Required to close must be `Yes` or `No`", joined)
+        self.assertIn("invalid Boundary `Smoke`", joined)
+        self.assertIn("invalid Verification `Jest`", joined)
+        self.assertIn("Required must be `Yes` or `No`", joined)
 
     def test_rejects_acceptance_matrix_mixed_id_prefixes(self) -> None:
         issues = self.issues_for_use_case(
             """## Acceptance Test Matrix
 
-| ID | Level | Scenario | Covers AC | Automated by | Required to close |
+| ID | Boundary | Scenario | Covers AC | Verification | Required |
 |---|---|---|---|---|---|
-| AT-001 | E2E | User completes flow | AC-001 | Playwright | Yes |
-| REG-002 | API | Backend side effect | AC-001 | xUnit API | Yes |
+| AT-001 | Browser journey | User completes flow | AC-001 | Browser automation | Yes |
+| REG-002 | API boundary | Backend side effect | AC-001 | API integration test | Yes |
 
 > **Implementation status**
 >
