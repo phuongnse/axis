@@ -97,7 +97,7 @@ Pre-PR review checkpoint:
 
 PR metadata:
 - Title: ... / N/A for push-only branch/diff update
-- Body sections: Summary / Linked spec / Requirements / N/A
+- Body sections: Summary / Linked spec / Requirements & rules followed / N/A
 - Draft validation: command -> pass/fail / N/A
 - Post-push local checks: not run; CI owns post-push validation
 
