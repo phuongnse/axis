@@ -1001,7 +1001,7 @@ SKILL_MD_LINK_RE = re.compile(r"\[[^\]]+\]\((?P<target>[^)]+)\)")
 SKILL_REQUIRED_SKILL_REFS = {
     "axis-api-contract": ("axis-design-gate", "axis-ready-review"),
     "axis-frontend-feature": ("axis-design-gate", "axis-ready-review"),
-    "axis-use-case-implementation": ("axis-design-gate", "axis-ready-review"),
+    "axis-use-case-implementation": ("axis-design-gate", "axis-ready-review", "axis-pull-request"),
     "axis-pull-request": ("axis-ready-review", "axis-review-feedback"),
     "axis-review-feedback": ("axis-ready-review",),
 }
@@ -1014,6 +1014,7 @@ SKILL_HARD_GATE_REQUIREMENTS: dict[str, tuple[str, ...]] = {
         "## Hard gates",
         r"reference\.md",
         r"Do not push",
+        r"published branch",
         r"axis-review-feedback",
         r"axis-ready-review",
     ),
@@ -1025,6 +1026,7 @@ SKILL_HARD_GATE_REQUIREMENTS: dict[str, tuple[str, ...]] = {
         r"reference\.md",
         r"axis-design-gate",
         r"axis-use-case-spec",
+        r"axis-pull-request",
     ),
     "axis-use-case-spec": ("## Hard gates", r"reference\.md", r"axis-use-case-implementation"),
     "axis-visual-artifact": ("## Hard gates", r"reference\.md", r"axis-ready-review"),

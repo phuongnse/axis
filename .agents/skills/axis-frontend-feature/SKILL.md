@@ -18,7 +18,7 @@ Follow [reference.md](../reference.md).
 
 ## Inputs
 
-- Owning use-case, design source, and affected route or feature folder.
+- Owning use-case and affected route or feature folder.
 - Generated API type or API contract dependency, if any.
 - Existing components, hooks, tests, and user-visible states found through `rg`.
 
@@ -34,7 +34,7 @@ Follow [reference.md](../reference.md).
    - [docs/playbooks/frontend.md](../../../docs/playbooks/frontend.md)
    - [docs/playbooks/testing.md](../../../docs/playbooks/testing.md)
    - [docs/playbooks/agent-checklist.md](../../../docs/playbooks/agent-checklist.md)
-   - The owning use-case and design-source docs when behavior or screen shape changes
+   - The owning use-case docs when behavior or screen shape changes
 
 3. Trace the existing feature.
    - Search routes, feature folder exports, generated API types, hooks, test files, and sibling components with `rg`.
@@ -45,7 +45,7 @@ Follow [reference.md](../reference.md).
    - Use TanStack Query for server state and Zustand only for client-only state.
    - Use React Hook Form plus Zod for forms.
    - Include loading, empty, error, validation, disabled, and success states when the workflow needs them.
-   - Match the owning design source/preview when screen shape changes; update the use-case `## Design Sources` row through `$axis-visual-artifact`.
+   - Keep screen shape tied to owning use-case flows, ACs, and implementation-status gaps.
    - Do not store auth tokens in `localStorage`.
    - Keep visible text focused on the product workflow, not developer instructions.
 

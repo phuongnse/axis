@@ -17,7 +17,7 @@ Use-case ACs are the contract. Cover validation, edge, authorization, isolation,
 
 AC map: `AC | kind | surface | proving test or exact deferral`.
 
-No blank in-scope rows; required AT rows name automated runners; implementation details stay out of spec matrices; incomplete in-scope ACs block `Done`.
+No blank in-scope rows; required AT rows name verification categories; exact runners and implementation details stay out of spec matrices; incomplete in-scope ACs block `Done`.
 
 ## Review Verification
 
@@ -32,7 +32,7 @@ Only claim a full local suite when full `python scripts/axis.py dotnet test` ran
 | Behavior/spec/status | Owning use case |
 | Stack/library/manifests | [docs/TECH_STACK.md](../TECH_STACK.md) and owning manifests |
 | Repeated rule class | Focused playbook or [docs/ENFORCEMENT.md](../ENFORCEMENT.md) |
-| Visual/source/preview | `$axis-visual-artifact` |
+| Mermaid or committed visual artifact | `$axis-visual-artifact` |
 
 Pure refactor/style/test-only changes can report docs as not triggered.
 

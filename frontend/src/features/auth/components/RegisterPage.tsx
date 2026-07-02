@@ -110,7 +110,7 @@ export function RegisterPage() {
           name="acceptedTerms"
           render={({ field }) => (
             <Field data-invalid={errors.acceptedTerms ? true : undefined}>
-              <div className="flex items-center gap-2">
+              <div className="flex items-start gap-2">
                 <Checkbox
                   id="acceptedTerms"
                   name={field.name}
@@ -121,13 +121,16 @@ export function RegisterPage() {
                   aria-describedby={errors.acceptedTerms ? 'acceptedTerms-error' : undefined}
                   aria-invalid={errors.acceptedTerms ? true : undefined}
                 />
-                <FieldLabel htmlFor="acceptedTerms" className="font-normal leading-4">
+                <FieldLabel
+                  htmlFor="acceptedTerms"
+                  className="block min-w-0 flex-1 w-full font-normal leading-5"
+                >
                   I agree to the{' '}
                   <a
                     href="/legal/terms"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="font-medium text-primary hover:underline"
+                    className="whitespace-nowrap font-medium text-primary hover:underline"
                   >
                     Terms of Service
                   </a>{' '}
@@ -136,7 +139,7 @@ export function RegisterPage() {
                     href="/legal/privacy"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="font-medium text-primary hover:underline"
+                    className="whitespace-nowrap font-medium text-primary hover:underline"
                   >
                     Privacy Policy
                   </a>

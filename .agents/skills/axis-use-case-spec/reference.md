@@ -13,13 +13,15 @@ Use with [SKILL.md](./SKILL.md) when writing or refreshing use-case acceptance c
 ## Acceptance Test Matrix
 
 - Add an `## Acceptance Test Matrix` with local AT IDs (`AT-001`, `AT-002`, ...). Every in-scope AC must appear in at least one required AT row before the use case can be closed.
-- Keep the matrix high-level: do not add `Evidence source`, test file paths, class names, or commands to use-case specs.
+- Use this column shape: `ID | Boundary | Scenario | Covers AC | Verification | Required`.
+- Keep the matrix high-level: do not add `Evidence source`, exact runner/tool names, test file paths, class names, or commands to use-case specs.
 - Before making a row required, confirm its expected result can cite the spec section, AC ID, or flow step. That citation belongs in the readiness/verification report, not in the use-case matrix.
-- Use `Automated by` values that name runners/tools, not file paths: `Playwright`, `Vitest`, `xUnit API`, `xUnit Application`, `xUnit Infrastructure`, etc.
+- Use `Boundary` values that name the proving boundary: `Browser journey`, `UI component`, `API boundary`, `Application boundary`, `Infrastructure boundary`, or a slash/composite when one row intentionally spans boundaries.
+- Use `Verification` values that name evidence categories, not exact tools: `Browser automation`, `UI component test`, `API integration test`, `Application test`, `Infrastructure integration test`, etc.
 
-## Runner choice
+## Boundary and runner choice
 
-- Choose the lowest reliable level: Playwright for browser-level journeys, Vitest for focused UI states/validation, and xUnit for backend contracts, side effects, and business rules.
+- Choose the lowest reliable boundary in the spec. Exact runners belong in implementation or ready-review evidence: Playwright for browser-level journeys, Vitest for focused UI states/validation, and xUnit for backend contracts, side effects, and business rules.
 - If the selected runner is not installed yet, record that adding the harness is a new-library Design Gate decision before implementation.
 
 ## Slicing

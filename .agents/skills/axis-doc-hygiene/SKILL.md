@@ -27,7 +27,7 @@ Follow [reference.md](../reference.md).
 
 1. Classify by responsibility, not filename.
    - Product/spec/status surface: keep current behavior, gaps, and AC ownership precise.
-   - Process/routing surface: name the decision rule and hand off workflow to the owning skill.
+   - Process/routing surface: name the decision rule, route by intent classes instead of exact phrases, and hand off workflow to the owning skill.
    - Policy/enforcement surface: separate rule owner, deterministic check, and review-only guidance.
    - Stack/library surface: [docs/TECH_STACK.md](../../../docs/TECH_STACK.md) owns the approved baseline and approval rule; manifests own exact versions.
    - Link/navigation surface: repo-doc links stay inline in the sentence; navigation uses the `docs-style` format.
@@ -49,6 +49,7 @@ Follow [reference.md](../reference.md).
 
 3. Edit tightly.
    - Lead with the rule.
+   - Use examples as generalizable cues; do not make phrase-only trigger lists unless exact command text is the contract.
    - Delete historical logs, filler, duplicated command matrices, and process prose.
    - Delete owner/reference dump sections; keep only navigation hubs whose main purpose is discovery.
    - Preserve headings/anchors that are linked from other files.

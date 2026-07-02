@@ -132,9 +132,9 @@ class TestUseCaseDocsGate(unittest.TestCase):
             if "## Acceptance Test Matrix" in callout
             else """## Acceptance Test Matrix
 
-| ID | Level | Scenario | Covers AC | Automated by | Required to close |
+| ID | Boundary | Scenario | Covers AC | Verification | Required |
 |---|---|---|---|---|---|
-| AT-001 | E2E | User completes flow | AC-001 | Playwright | Yes |
+| AT-001 | Browser journey | User completes flow | AC-001 | Browser automation | Yes |
 
 """
         )
@@ -174,18 +174,6 @@ Ship user value.
 ## Out Of Scope
 
 - N/A.
-
-## Design System
-
-| Surface | Contract |
-|---|---|
-| N/A | N/A |
-
-## Design Sources
-
-| Screen | Source | Preview |
-|--------|--------|---------|
-| N/A | N/A | N/A |
 
 """
             + callout
@@ -337,9 +325,9 @@ Ship user value.
         issues = self.issues_for_use_case(
             """## Acceptance Test Matrix
 
-| ID | Level | Scenario | Covers AC | Evidence source | Automated by | Required to close |
+| ID | Boundary | Scenario | Covers AC | Evidence source | Verification | Required |
 |---|---|---|---|---|---|---|
-| AT-001 | E2E | User completes flow | AC-001 | Main flow | Playwright | Yes |
+| AT-001 | Browser journey | User completes flow | AC-001 | Main flow | Browser automation | Yes |
 
 > **Implementation status**
 >
@@ -394,12 +382,6 @@ Ship user value.
 *Happy path*
 - **AC-001** Works.
 
-## Design Sources
-
-| Screen | Source | Preview |
-|--------|--------|---------|
-| N/A | N/A | N/A |
-
 > **Implementation status**
 >
 > | Layer | Status |
@@ -426,11 +408,11 @@ Ship user value.
         issues = self.issues_for_use_case(
             """## Acceptance Test Matrix
 
-| ID | Level | Scenario | Covers AC | Automated by | Required to close |
+| ID | Boundary | Scenario | Covers AC | Verification | Required |
 |---|---|---|---|---|---|
-| AT-001 | E2E | User completes flow | AC-001 | `frontend/e2e/sample.pw.ts` | Yes |
-| AT-002 | API | Backend side effect | AC-001 | Axis.Api.Tests | Yes |
-| AT-003 | UI | UI validation | AC-001 | npm run test | Yes |
+| AT-001 | Browser journey | User completes flow | AC-001 | `frontend/e2e/sample.pw.ts` | Yes |
+| AT-002 | API boundary | Backend side effect | AC-001 | Axis.Api.Tests | Yes |
+| AT-003 | UI component | UI validation | AC-001 | npm run test | Yes |
 
 > **Implementation status**
 >
@@ -459,10 +441,10 @@ Ship user value.
         issues = self.issues_for_use_case(
             """## Acceptance Test Matrix
 
-| ID | Level | Scenario | Covers AC | Automated by | Required to close |
+| ID | Boundary | Scenario | Covers AC | Verification | Required |
 |---|---|---|---|---|---|
-| AT-001 | E2E | User completes flow | AC-001 | Playwright | Yes |
-| AT-002 | API | Backend side effect | AC-001 | xUnit API | Yes |
+| AT-001 | Browser journey | User completes flow | AC-001 | Browser automation | Yes |
+| AT-002 | API boundary | Backend side effect | AC-001 | API integration test | Yes |
 
 > **Implementation status**
 >
@@ -490,9 +472,9 @@ Ship user value.
         issues = self.issues_for_use_case(
             """## Acceptance Test Matrix
 
-| ID | Level | Scenario | Covers AC | Automated by | Required to close |
+| ID | Boundary | Scenario | Covers AC | Verification | Required |
 |---|---|---|---|---|---|
-| AT-001 | E2E | User completes flow | AC-999 | Playwright | No |
+| AT-001 | Browser journey | User completes flow | AC-999 | Browser automation | No |
 
 > **Implementation status**
 >
@@ -522,7 +504,7 @@ Ship user value.
         issues = self.issues_for_use_case(
             """## Acceptance Test Matrix
 
-| ID | Level | Scenario | Covers AC | Automated by | Required to close |
+| ID | Boundary | Scenario | Covers AC | Verification | Required |
 |---|---|---|---|---|---|
 | AT-001 | Smoke | User completes flow | AC-001 | Jest | Required |
 
@@ -547,18 +529,18 @@ Ship user value.
         )
 
         joined = "\n".join(issues)
-        self.assertIn("invalid Level `Smoke`", joined)
-        self.assertIn("invalid Automated by `Jest`", joined)
-        self.assertIn("Required to close must be `Yes` or `No`", joined)
+        self.assertIn("invalid Boundary `Smoke`", joined)
+        self.assertIn("invalid Verification `Jest`", joined)
+        self.assertIn("Required must be `Yes` or `No`", joined)
 
     def test_rejects_acceptance_matrix_mixed_id_prefixes(self) -> None:
         issues = self.issues_for_use_case(
             """## Acceptance Test Matrix
 
-| ID | Level | Scenario | Covers AC | Automated by | Required to close |
+| ID | Boundary | Scenario | Covers AC | Verification | Required |
 |---|---|---|---|---|---|
-| AT-001 | E2E | User completes flow | AC-001 | Playwright | Yes |
-| REG-002 | API | Backend side effect | AC-001 | xUnit API | Yes |
+| AT-001 | Browser journey | User completes flow | AC-001 | Browser automation | Yes |
+| REG-002 | API boundary | Backend side effect | AC-001 | API integration test | Yes |
 
 > **Implementation status**
 >
@@ -581,430 +563,6 @@ Ship user value.
         )
 
         self.assertIn("invalid ID `REG-002`", "\n".join(issues))
-
-    def test_rejects_design_sources_table_schema_drift(self) -> None:
-        issues = self.issues_for_document(
-            """# Sample use case
-
-## Purpose
-
-Ship user value.
-
-## Primary actor
-
-- User
-
-## Trigger
-
-- User starts the flow.
-
-## Main flow
-
-1. User starts.
-2. System responds.
-3. User completes the flow.
-
-## Alternate / error flows
-
-- None.
-
-## Acceptance Criteria
-
-*Happy path*
-- **AC-001** Works.
-
-## Design Sources
-
-| Screen | Preview |
-|--------|---------|
-| N/A | N/A |
-
-> **Implementation status**
->
-> | Layer | Status |
-> |-------|--------|
-> | Domain | N/A |
-> | Application | N/A |
-> | Infrastructure | N/A |
-> | API | N/A |
-> | Frontend | N/A |
->
-> **Gaps vs spec:** none.
->
-> **Deferred follow-ups:** N/A.
->
-> **Verification:** N/A.
->
-> **Decisions:** N/A.
-"""
-        )
-
-        self.assertIn("Design Sources table missing required columns: Source", "\n".join(issues))
-
-    def test_accepts_design_sources_table_with_source_column(self) -> None:
-        issues = self.issues_for_document(
-            """# Sample use case
-
-## Purpose
-
-Ship user value.
-
-## Primary actor
-
-- User
-
-## Trigger
-
-- User starts the flow.
-
-## Main flow
-
-1. User starts.
-2. System responds.
-3. User completes the flow.
-
-## Alternate / error flows
-
-- None.
-
-## Acceptance Criteria
-
-*Happy path*
-- **AC-001** Works.
-
-## Acceptance Test Matrix
-
-| ID | Level | Scenario | Covers AC | Automated by | Required to close |
-|---|---|---|---|---|---|
-| AT-001 | E2E | User completes flow | AC-001 | Playwright | Yes |
-
-## Out Of Scope
-
-- N/A.
-
-## Design System
-
-| Surface | Contract |
-|---|---|
-| N/A | N/A |
-
-## Design Sources
-
-| Screen | Source | Preview |
-|--------|--------|---------|
-| N/A | N/A | N/A |
-
-> **Implementation status**
->
-> | Layer | Status |
-> |-------|--------|
-> | Domain | N/A |
-> | Application | N/A |
-> | Infrastructure | N/A |
-> | API | N/A |
-> | Frontend | N/A |
->
-> **Gaps vs spec:** none.
->
-> **Deferred follow-ups:** N/A.
->
-> **Verification:** N/A.
->
-> **Decisions:** N/A.
-"""
-        )
-
-        self.assertEqual([], issues)
-
-    def test_rejects_implementation_status_before_design_sources(self) -> None:
-        issues = self.issues_for_document(
-            """# Sample use case
-
-## Purpose
-
-Ship user value.
-
-## Primary actor
-
-- User
-
-## Trigger
-
-- User starts the flow.
-
-## Main flow
-
-1. User starts.
-2. System responds.
-3. User completes the flow.
-
-## Alternate / error flows
-
-- None.
-
-## Acceptance Criteria
-
-*Happy path*
-- **AC-001** Works.
-
-## Acceptance Test Matrix
-
-| ID | Level | Scenario | Covers AC | Automated by | Required to close |
-|---|---|---|---|---|---|
-| AT-001 | E2E | User completes flow | AC-001 | Playwright | Yes |
-
-> **Implementation status**
->
-> | Layer | Status |
-> |-------|--------|
-> | Domain | N/A |
-> | Application | N/A |
-> | Infrastructure | N/A |
-> | API | N/A |
-> | Frontend | N/A |
->
-> **Gaps vs spec:** none.
->
-> **Deferred follow-ups:** N/A.
->
-> **Verification:** N/A.
->
-> **Decisions:** N/A.
-
-## Design Sources
-
-| Screen | Source | Preview |
-|--------|--------|---------|
-| N/A | N/A | N/A |
-"""
-        )
-
-        self.assertIn("section order must be", "\n".join(issues))
-
-    def test_rejects_design_source_pointing_to_preview_asset(self) -> None:
-        issues = self.issues_for_document(
-            """# Sample use case
-
-## Purpose
-
-Ship user value.
-
-## Primary actor
-
-- User
-
-## Trigger
-
-- User starts the flow.
-
-## Main flow
-
-1. User starts.
-2. System responds.
-3. User completes the flow.
-
-## Alternate / error flows
-
-- None.
-
-## Acceptance Criteria
-
-*Happy path*
-- **AC-001** Works.
-
-## Acceptance Test Matrix
-
-| ID | Level | Scenario | Covers AC | Automated by | Required to close |
-|---|---|---|---|---|---|
-| AT-001 | E2E | User completes flow | AC-001 | Playwright | Yes |
-
-## Out Of Scope
-
-- N/A.
-
-## Design System
-
-| Surface | Contract |
-|---|---|
-| register | Uses shared UI primitives. |
-
-## Design Sources
-
-| Screen | Source | Preview |
-|--------|--------|---------|
-| register | [source](./register.svg) | [preview](./register.svg) |
-
-> **Implementation status**
->
-> | Layer | Status |
-> |-------|--------|
-> | Domain | N/A |
-> | Application | N/A |
-> | Infrastructure | N/A |
-> | API | N/A |
-> | Frontend | N/A |
->
-> **Gaps vs spec:** none.
->
-> **Deferred follow-ups:** N/A.
->
-> **Verification:** N/A.
->
-> **Decisions:** N/A.
-"""
-        )
-
-        self.assertIn("must link to an editable design source", "\n".join(issues))
-
-    def test_rejects_design_source_preview_without_editable_source(self) -> None:
-        issues = self.issues_for_document(
-            """# Sample use case
-
-## Purpose
-
-Ship user value.
-
-## Primary actor
-
-- User
-
-## Trigger
-
-- User starts the flow.
-
-## Main flow
-
-1. User starts.
-2. System responds.
-3. User completes the flow.
-
-## Alternate / error flows
-
-- None.
-
-## Acceptance Criteria
-
-*Happy path*
-- **AC-001** Works.
-
-## Acceptance Test Matrix
-
-| ID | Level | Scenario | Covers AC | Automated by | Required to close |
-|---|---|---|---|---|---|
-| AT-001 | E2E | User completes flow | AC-001 | Playwright | Yes |
-
-## Out Of Scope
-
-- N/A.
-
-## Design System
-
-| Surface | Contract |
-|---|---|
-| register | Uses shared UI primitives. |
-
-## Design Sources
-
-| Screen | Source | Preview |
-|--------|--------|---------|
-| register | N/A | [preview](./register.png) |
-
-> **Implementation status**
->
-> | Layer | Status |
-> |-------|--------|
-> | Domain | N/A |
-> | Application | N/A |
-> | Infrastructure | N/A |
-> | API | N/A |
-> | Frontend | N/A |
->
-> **Gaps vs spec:** none.
->
-> **Deferred follow-ups:** N/A.
->
-> **Verification:** N/A.
->
-> **Decisions:** N/A.
-"""
-        )
-
-        self.assertIn("has a preview but no editable Source", "\n".join(issues))
-
-    def test_accepts_external_design_source_with_preview(self) -> None:
-        issues = self.issues_for_document(
-            """# Sample use case
-
-## Purpose
-
-Ship user value.
-
-## Primary actor
-
-- User
-
-## Trigger
-
-- User starts the flow.
-
-## Main flow
-
-1. User starts.
-2. System responds.
-3. User completes the flow.
-
-## Alternate / error flows
-
-- None.
-
-## Acceptance Criteria
-
-*Happy path*
-- **AC-001** Works.
-
-## Acceptance Test Matrix
-
-| ID | Level | Scenario | Covers AC | Automated by | Required to close |
-|---|---|---|---|---|---|
-| AT-001 | E2E | User completes flow | AC-001 | Playwright | Yes |
-
-## Out Of Scope
-
-- N/A.
-
-## Design System
-
-| Surface | Contract |
-|---|---|
-| register | Uses shared UI primitives. |
-
-## Design Sources
-
-| Screen | Source | Preview |
-|--------|--------|---------|
-| register | [source](https://design.example/register) | [preview](./register.svg) |
-
-> **Implementation status**
->
-> | Layer | Status |
-> |-------|--------|
-> | Domain | N/A |
-> | Application | N/A |
-> | Infrastructure | N/A |
-> | API | N/A |
-> | Frontend | N/A |
->
-> **Gaps vs spec:** none.
->
-> **Deferred follow-ups:** N/A.
->
-> **Verification:** N/A.
->
-> **Decisions:** N/A.
-"""
-        )
-
-        self.assertEqual([], issues)
 
     def test_rejects_implementation_status_table_schema_drift(self) -> None:
         issues = self.issues_for_use_case(
@@ -1039,7 +597,7 @@ Ship user value.
 >
 > **Gaps vs spec:** old.
 
-## Design Sources
+## Diagrams
 """
         after = before.replace("> **Gaps vs spec:** old.", "> **Gaps vs spec:** new.\n>\n> **Deferred follow-ups:** N/A.")
 
@@ -2966,6 +2524,29 @@ class TestRepoSkillsGate(unittest.TestCase):
         joined = "\n".join(issues)
         self.assertIn("hard-gate contract missing required pattern", joined)
         self.assertIn("must chain to $axis-ready-review", joined)
+
+    def test_pull_request_skill_must_cover_published_branch_push_updates(self) -> None:
+        files = {
+            ".agents/skills/axis-pull-request/SKILL.md": (
+                "---\n"
+                "name: axis-pull-request\n"
+                "description: Prepare, review, validate, create, update, push to, or mark ready Axis pull requests.\n"
+                "---\n"
+                "\n"
+                "# Axis Pull Request\n"
+                "\n"
+                "## Hard gates\n"
+                "\n"
+                "Follow [reference.md](../reference.md).\n"
+                "- Do not push until `$axis-ready-review` and `$axis-review-feedback` finish.\n"
+            ),
+            ".agents/skills/reference.md": "# Reference\n",
+        }
+
+        issues = self.issues_for_skill(files)
+
+        joined = "\n".join(issues)
+        self.assertIn("hard-gate contract missing required pattern `published branch`", joined)
 
     def test_skill_reference_target_resolves_parent_reference(self) -> None:
         with tempfile.TemporaryDirectory() as temp:

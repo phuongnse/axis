@@ -15,12 +15,13 @@ Follow [reference.md](../reference.md).
 - No code when spec readiness is **Blocked** — read `$axis-use-case-spec` first.
 - High-risk: stop for `$axis-design-gate` sign-off before code.
 - Do not mark **Done** while in-scope AC/AT rows lack proving tests or pass evidence.
+- Do not push a non-trivial implementation to a published or PR branch without `$axis-pull-request`.
 
 ## Inputs
 
-- Owning use-case README with Purpose, flows, ACs, Acceptance Test Matrix, Design System, Design Sources, and implementation status.
+- Owning use-case README with Purpose, flows, ACs, Acceptance Test Matrix, Out Of Scope, optional diagrams, and implementation status.
 - Design Gate dossier and sign-off when the slice is non-trivial or high-risk.
-- In-scope AC/AT rows and the lowest reliable runner for each required behavior.
+- In-scope AC/AT rows and the lowest reliable verification boundary for each required behavior.
 
 ## Workflow
 
@@ -47,7 +48,7 @@ Follow [reference.md](../reference.md).
    - Treat out-of-scope bullets as handoff boundaries, not deferred implementation rows.
    - If an out-of-scope item is unrelated to the flow, tighten the spec with `$axis-use-case-spec`.
    - Give every in-scope row a proving automated test before coding. Use the AT ID in the test title, xUnit trait, or nearby metadata when practical.
-   - Choose the lowest reliable runner: Playwright for browser-level journeys, Vitest for focused UI states/validation, and xUnit API/Application/Infrastructure for backend contracts, side effects, and business rules.
+   - Choose the exact runner for each matrix verification category: Playwright for browser automation, Vitest for UI component tests, and xUnit API/Application/Infrastructure for backend integration, side effects, and business rules.
    - If a required runner is missing, treat installing the harness as a new-library Design Gate decision and get required sign-off before code.
    - Do not mark a layer complete when validation, edge, isolation, or rollback ACs remain open.
 
@@ -68,10 +69,10 @@ Follow [reference.md](../reference.md).
 
 8. Update status docs when behavior/status changes.
    - Update the use-case `Implementation status` callout; status values are `Done`, `Partial`, `Not started`, and `N/A`.
-   - Use `$axis-visual-artifact` when frontend screen shape, design-source links, previews, or diagrams changed.
+   - Use `$axis-visual-artifact` when Mermaid diagrams or committed visual artifacts changed.
    - Update the domain README or [docs/use-cases/README.md](../../../docs/use-cases/README.md) only when their summarized status changes.
    - Name exact deferred AC bullets under `Deferred follow-ups`; use `N/A` when none.
-   - Update `Verification` with the required AT runners; put pass/fail evidence in the implementation report, not the spec.
+   - Update `Verification` with the required AT evidence categories; put exact runner and pass/fail evidence in the implementation report, not the spec.
    - Do not introduce intentional shortcuts.
 
 9. Verify honestly.
@@ -79,6 +80,7 @@ Follow [reference.md](../reference.md).
    - Run every required AT row's runner or targeted test before claiming the use case/layer is complete.
    - Report acceptance evidence by AT ID (`AT-001 Playwright passed`, `AT-002 xUnit API passed`, etc.).
    - Use `.agents/skills/axis-ready-review/SKILL.md` (`$axis-ready-review`) before asking for review; it owns `python scripts/axis.py verify` when triggered.
+   - Before pushing committed implementation to a branch with an upstream, open PR, or PR intent, read `$axis-pull-request`; treat it as a branch/diff update.
    - Do not rerun ready-review verification after every small edit.
    - Do not claim the full suite unless full `python scripts/axis.py dotnet test` ran.
 

@@ -114,4 +114,23 @@ public class RegisterUserHandlerTests
         await _emailSender.DidNotReceive().SendVerificationEmailAsync(
             Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
     }
+
+    [Fact]
+    public async Task RegisterUser_WhenIdempotencyKeyInProgress_SkipsRegistration()
+    {
+        _idempotencyRepo.AcquireAsync("idem-1", Arg.Any<CancellationToken>())
+            .Returns(RegistrationIdempotencyAcquireResult.InProgress);
+
+        Result result = await CreateHandler().Handle(ValidCommand(), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        await _userRepo.DidNotReceive().AddAsync(Arg.Any<User>(), Arg.Any<CancellationToken>());
+        await _workspaceRepo.DidNotReceive().AddAsync(Arg.Any<Workspace>(), Arg.Any<CancellationToken>());
+        await _verificationTokenStore.DidNotReceive().CreateAsync(
+            Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>());
+        await _emailSender.DidNotReceive().SendVerificationEmailAsync(
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+        await _idempotencyRepo.DidNotReceive().MarkCompletedAsync(
+            Arg.Any<string>(), Arg.Any<CancellationToken>());
+    }
 }
