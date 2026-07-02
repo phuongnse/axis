@@ -35,7 +35,7 @@ public sealed class GetCurrentUserProfileHandlerTests
     [Fact]
     public async Task Handle_WhenUserExists_ReturnsProfile()
     {
-        User user = User.Create("Ada", "Lovelace", Email.Create("ada@acme.com").Value);
+        User user = User.Create("Ada Lovelace", Email.Create("ada@acme.com").Value);
         Workspace workspace = Workspace.CreatePersonal(
             "Ada Lovelace",
             WorkspaceSlug.Create("ada-lovelace").Value,

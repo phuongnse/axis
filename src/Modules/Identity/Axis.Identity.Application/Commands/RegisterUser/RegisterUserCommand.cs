@@ -3,8 +3,7 @@ using Axis.Shared.Application.CQRS;
 namespace Axis.Identity.Application.Commands.RegisterUser;
 
 public sealed record RegisterUserCommand(
-    string FirstName,
-    string LastName,
+    string FullName,
     string Email,
     string Password,
     string PasswordConfirmation,

@@ -97,8 +97,6 @@ export interface components {
             /** Format: uuid */
             id?: string;
             email?: string;
-            firstName?: string;
-            lastName?: string;
             fullName?: string;
             isActive?: boolean;
             /** Format: uuid */
@@ -123,8 +121,7 @@ export interface components {
             [key: string]: unknown;
         };
         RegisterUserRequest: {
-            firstName?: string;
-            lastName?: string;
+            fullName?: string;
             email?: string;
             password?: string;
             passwordConfirmation?: string;

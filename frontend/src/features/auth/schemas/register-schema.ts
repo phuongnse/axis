@@ -32,18 +32,6 @@ export function createRegisterSchema() {
         });
       }
 
-      const nameParts = values.fullName
-        .trim()
-        .split(/\s+/)
-        .filter((part) => part.length > 0);
-      if (nameParts.length < 2) {
-        context.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: 'Enter both first and last name',
-          path: ['fullName'],
-        });
-      }
-
       if (
         values.password.length >= PASSWORD_MIN_LENGTH &&
         values.password.length <= PASSWORD_MAX_LENGTH &&

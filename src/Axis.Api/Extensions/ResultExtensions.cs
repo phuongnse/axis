@@ -1,4 +1,5 @@
 using Axis.Shared.Domain.Primitives;
+using System.Text.Json;
 
 namespace Axis.Api.Extensions;
 
@@ -16,7 +17,7 @@ public static class ResultExtensions
         if (result.ErrorCode == ErrorCodes.FieldValidation && result.FieldErrors is not null)
         {
             Dictionary<string, string[]> errors = result.FieldErrors
-                .ToDictionary(kv => kv.Key, kv => kv.Value);
+                .ToDictionary(kv => ToJsonFieldName(kv.Key), kv => kv.Value);
             return Results.ValidationProblem(errors, statusCode: StatusCodes.Status422UnprocessableEntity);
         }
 
@@ -43,4 +44,9 @@ public static class ResultExtensions
             _ => Results.Problem(result.Error, statusCode: StatusCodes.Status422UnprocessableEntity),
         };
     }
+
+    private static string ToJsonFieldName(string fieldName) =>
+        string.IsNullOrEmpty(fieldName)
+            ? fieldName
+            : JsonNamingPolicy.CamelCase.ConvertName(fieldName);
 }

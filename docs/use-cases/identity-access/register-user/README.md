@@ -74,7 +74,7 @@ Register a standalone Axis user with email/password so the user can verify their
 
 | Screen | Required contract |
 |---|---|
-| `/register` | Render an auth-card form with full name, email, password, password confirmation, current Terms/Privacy acceptance, and a single submit action. Full name is the user-facing field; the system maps it into first and last name for the API. |
+| `/register` | Render an auth-card form with full name, email, password, password confirmation, current Terms/Privacy acceptance, and a single submit action. Full name is captured and stored as a single account name. |
 | `/register` validation | Show required-field, invalid-email, duplicate-email, password-policy, password-confirmation, legal-acceptance, backend field, and generic 5xx errors inline or in the form alert described by the relevant AC. Keep the submit button disabled only while submission or legal-version loading is pending. |
 | `/register/confirmation` | Show the submitted email when available, explain that the verification link is required to finish registration, provide resend, show resend success/error/rate-limited states, and keep account-enumeration-safe copy. |
 | `/auth/verify` | Submit the token once, show loading while verification is pending, start the post-verification PKCE flow on success, show expired, invalid, and already-used verification states, and show the resend rate-limited state when resend is limited. |
@@ -132,4 +132,4 @@ sequenceDiagram
 >
 > **Verification:** Required AT rows are covered by browser automation, UI component tests, API integration tests, and application tests.
 >
-> **Decisions:** UI requirements are owned by the Screen flow and ACs in this README. Registration uses one user-facing full-name field and maps it to first/last name for the API. Resend rate limiting is part of resend behavior, not verification-token resolution.
+> **Decisions:** UI requirements are owned by the Screen flow and ACs in this README. Registration uses one user-facing full-name field end-to-end. Resend rate limiting is part of resend behavior, not verification-token resolution.

@@ -52,7 +52,7 @@ public sealed class RegisterUserHandler(
                     "An account with this email already exists. Sign in instead.");
             }
 
-            User user = User.Create(command.FirstName, command.LastName, email.Value);
+            User user = User.Create(command.FullName.Trim(), email.Value);
             user.SetPasswordHash(hasher.Hash(command.Password));
             user.RecordLegalAcceptance(command.AcceptedTermsVersion, command.AcceptedPrivacyVersion);
 

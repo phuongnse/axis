@@ -7,8 +7,6 @@ import { renderWithRouter } from './render-with-router';
 const profile = {
   id: '9fc0f6c1-24f6-4e66-a50f-3f742ad10b1a',
   email: 'admin@example.com',
-  firstName: 'Admin',
-  lastName: 'User',
   fullName: 'Admin User',
   isActive: true,
   workspaceId: '3cde5c59-d18b-464f-a021-5fce16b01118',

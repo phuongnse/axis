@@ -211,12 +211,6 @@
           "email": {
             "type": "string"
           },
-          "firstName": {
-            "type": "string"
-          },
-          "lastName": {
-            "type": "string"
-          },
           "fullName": {
             "type": "string"
           },
@@ -288,10 +282,7 @@
       "RegisterUserRequest": {
         "type": "object",
         "properties": {
-          "firstName": {
-            "type": "string"
-          },
-          "lastName": {
+          "fullName": {
             "type": "string"
           },
           "email": {

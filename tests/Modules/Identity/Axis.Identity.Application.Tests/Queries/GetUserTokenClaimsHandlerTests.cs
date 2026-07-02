@@ -46,7 +46,7 @@ public sealed class GetUserTokenClaimsHandlerTests
     [Fact]
     public async Task Handle_WhenWorkspaceIdOmitted_UsesPersonalWorkspace()
     {
-        User user = User.Create("Ada", "Lovelace", Email.Create("ada@example.com").Value);
+        User user = User.Create("Ada Lovelace", Email.Create("ada@example.com").Value);
         Workspace workspace = ActiveWorkspace(user.Id);
         _userRepo.GetByIdPlatformWideAsync(user.Id, Arg.Any<CancellationToken>()).Returns(user);
         _workspaceRepo.GetPersonalByOwnerUserIdAsync(user.Id, Arg.Any<CancellationToken>()).Returns(workspace);
@@ -62,7 +62,7 @@ public sealed class GetUserTokenClaimsHandlerTests
     [Fact]
     public async Task Handle_WhenWorkspaceIdMismatchesUser_ReturnsBusinessRuleFailure()
     {
-        User user = User.Create("Ada", "Lovelace", Email.Create("ada@example.com").Value);
+        User user = User.Create("Ada Lovelace", Email.Create("ada@example.com").Value);
         _userRepo.GetByIdPlatformWideAsync(user.Id, Arg.Any<CancellationToken>()).Returns(user);
         _workspaceRepo.GetByIdAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
             .Returns((Workspace?)null);
@@ -78,7 +78,7 @@ public sealed class GetUserTokenClaimsHandlerTests
     [Fact]
     public async Task Handle_WhenUserActive_ReturnsTokenClaims()
     {
-        User user = User.Create("Ada", "Lovelace", Email.Create("ada@example.com").Value);
+        User user = User.Create("Ada Lovelace", Email.Create("ada@example.com").Value);
         Workspace workspace = ActiveWorkspace(user.Id);
         _userRepo.GetByIdPlatformWideAsync(user.Id, Arg.Any<CancellationToken>()).Returns(user);
         _workspaceRepo.GetByIdAsync(workspace.Id, Arg.Any<CancellationToken>()).Returns(workspace);

@@ -22,7 +22,7 @@ public class ResendVerificationEmailHandlerTests
 
     private static User MakeUnverifiedUser(string email = "alice@acme.com")
     {
-        User user = User.Create("Alice", "Smith", Email.Create(email).Value);
+        User user = User.Create("Alice Smith", Email.Create(email).Value);
         user.SetPasswordHash("hashed");
         return user;
     }

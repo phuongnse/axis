@@ -43,17 +43,6 @@ function pruneVerifyEmailSuccessCache(now: number): void {
   }
 }
 
-export function toAdminNameParts(fullName: string): { firstName: string; lastName: string } {
-  const parts = fullName
-    .trim()
-    .split(/\s+/)
-    .filter((part) => part.length > 0);
-  return {
-    firstName: parts[0] ?? '',
-    lastName: parts.slice(1).join(' '),
-  };
-}
-
 export async function registerUser(
   payload: RegisterUserRequest,
   idempotencyKey: string,

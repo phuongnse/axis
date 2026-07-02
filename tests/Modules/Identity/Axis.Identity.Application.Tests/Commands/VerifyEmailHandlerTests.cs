@@ -26,7 +26,7 @@ public class VerifyEmailHandlerTests
     private static (User User, Workspace Workspace) MakeUnverifiedUserWithWorkspace()
     {
         Email email = Email.Create("alice@acme.com").Value;
-        User user = User.Create("Alice", "Smith", email);
+        User user = User.Create("Alice Smith", email);
         user.SetPasswordHash("hashed");
         Workspace workspace = Workspace.CreatePersonal(
             "Alice Smith",
