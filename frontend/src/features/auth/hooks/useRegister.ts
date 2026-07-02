@@ -4,7 +4,7 @@ import { useNavigate } from '@tanstack/react-router';
 import { useMemo, useRef } from 'react';
 import { type FieldPath, type UseFormReturn, useForm } from 'react-hook-form';
 
-import { createRegisterIdempotencyKey, registerUser, toAdminNameParts } from '@/features/auth/api';
+import { createRegisterIdempotencyKey, registerUser } from '@/features/auth/api';
 import { useLegalVersions } from '@/features/auth/hooks/useLegalVersions';
 import { getProblemDetail } from '@/features/auth/problem-details';
 import { saveRegistrationContext } from '@/features/auth/registration-context';
@@ -31,16 +31,11 @@ function hasLegalVersions(
   return Boolean(legalVersions?.termsVersion && legalVersions.privacyVersion);
 }
 
-function pickFirstError(
+function getFieldError(
   errors: Record<string, string[]> | undefined,
-  ...keys: string[]
+  key: string,
 ): string | undefined {
-  if (!errors) return undefined;
-  for (const key of keys) {
-    const value = errors[key];
-    if (value && value.length > 0) return value[0];
-  }
-  return undefined;
+  return errors?.[key]?.[0];
 }
 
 function applyRegisterValidationErrors(
@@ -49,28 +44,13 @@ function applyRegisterValidationErrors(
 ): boolean {
   let hasMappedFieldError = false;
 
-  const fullNameError = pickFirstError(
-    errorData.errors,
-    'FirstName',
-    'firstName',
-    'LastName',
-    'lastName',
-    'fullName',
-  );
-  const emailError = pickFirstError(errorData.errors, 'Email', 'email');
-  const passwordError = pickFirstError(errorData.errors, 'Password', 'password');
-  const passwordConfirmationError = pickFirstError(
-    errorData.errors,
-    'PasswordConfirmation',
-    'passwordConfirmation',
-  );
-  const termsError = pickFirstError(
-    errorData.errors,
-    'AcceptedTermsVersion',
-    'acceptedTermsVersion',
-    'AcceptedPrivacyVersion',
-    'acceptedPrivacyVersion',
-  );
+  const fullNameError = getFieldError(errorData.errors, 'fullName');
+  const emailError = getFieldError(errorData.errors, 'email');
+  const passwordError = getFieldError(errorData.errors, 'password');
+  const passwordConfirmationError = getFieldError(errorData.errors, 'passwordConfirmation');
+  const termsError =
+    getFieldError(errorData.errors, 'acceptedTermsVersion') ??
+    getFieldError(errorData.errors, 'acceptedPrivacyVersion');
 
   const setFieldError = (field: FieldPath<RegisterFormValues>, message: string) => {
     form.setError(field, { type: 'server', message });
@@ -121,11 +101,9 @@ export function useRegister() {
 
   const mutation = useMutation({
     mutationFn: async ({ values, legalVersions }: RegisterMutationInput) => {
-      const names = toAdminNameParts(values.fullName);
       return registerUser(
         {
-          firstName: names.firstName,
-          lastName: names.lastName,
+          fullName: values.fullName.trim(),
           email: values.email.trim(),
           password: values.password,
           passwordConfirmation: values.passwordConfirmation,

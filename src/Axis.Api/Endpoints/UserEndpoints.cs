@@ -46,8 +46,7 @@ public static class UserEndpoints
         string? idempotencyKey = httpContext.Request.Headers["Idempotency-Key"].FirstOrDefault();
 
         Result result = await mediator.Send(new RegisterUserCommand(
-            request.FirstName,
-            request.LastName,
+            request.FullName,
             request.Email,
             request.Password,
             request.PasswordConfirmation,

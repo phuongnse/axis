@@ -132,8 +132,7 @@ public class RegistrationIdempotencyRepositoryTests(IdentityDatabaseFixture db) 
         await _ctx.SaveChangesAsync();
 
         User unrelated = User.Create(
-            "Pending",
-            "User",
+            "Pending User",
             Email.Create("pending-user@example.com").Value!);
         _ctx.Users.Add(unrelated);
 

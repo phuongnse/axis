@@ -8,13 +8,9 @@ public sealed class RegisterUserCommandValidator : AbstractValidator<RegisterUse
 {
     public RegisterUserCommandValidator()
     {
-        RuleFor(x => x.FirstName)
-            .NotEmpty().WithMessage("First name is required.")
-            .MaximumLength(50);
-
-        RuleFor(x => x.LastName)
-            .NotEmpty().WithMessage("Last name is required.")
-            .MaximumLength(50);
+        RuleFor(x => x.FullName)
+            .NotEmpty().WithMessage("Full name is required.")
+            .MaximumLength(200);
 
         RuleFor(x => x.Email)
             .NotEmpty().WithMessage("Email is required.")
@@ -32,9 +28,9 @@ public sealed class RegisterUserCommandValidator : AbstractValidator<RegisterUse
             .Cascade(CascadeMode.Stop)
             .NotEmpty().WithMessage(PasswordPolicy.RequiredMessage)
             .Must((command, password) =>
-                PasswordPolicy.Validate(password, command.Email, command.FirstName, command.LastName) is null)
+                PasswordPolicy.Validate(password, command.Email, command.FullName) is null)
             .WithMessage((command, password) =>
-                PasswordPolicy.Validate(password, command.Email, command.FirstName, command.LastName)!);
+                PasswordPolicy.Validate(password, command.Email, command.FullName)!);
 
         RuleFor(x => x.PasswordConfirmation)
             .Equal(x => x.Password).WithMessage("Password confirmation must match password.");

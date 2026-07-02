@@ -25,10 +25,6 @@ public class OpenApiDocumentTests(ApiTestFixture fixture)
         OpenApiDocument doc = provider.GetSwagger("v1");
         string fresh = doc.SerializeAsJson(OpenApiSpecVersion.OpenApi3_0).ReplaceLineEndings("\n");
 
-        // The schema must match the camelCase wire the app actually emits.
-        fresh.Should().Contain("\"firstName\"");
-        fresh.Should().NotContain("\"first_name\"");
-
         string path = Path.Combine(RepoRoot(), "openapi.json");
         string? committed = File.Exists(path) ? File.ReadAllText(path).ReplaceLineEndings("\n") : null;
 

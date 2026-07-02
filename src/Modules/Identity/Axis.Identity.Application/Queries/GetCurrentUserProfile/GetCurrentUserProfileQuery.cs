@@ -8,8 +8,6 @@ public sealed record GetCurrentUserProfileQuery(Guid UserId, Guid? workspaceId)
 public sealed record CurrentUserProfileDto(
     Guid Id,
     string Email,
-    string FirstName,
-    string LastName,
     string FullName,
     bool IsActive,
     Guid? WorkspaceId,

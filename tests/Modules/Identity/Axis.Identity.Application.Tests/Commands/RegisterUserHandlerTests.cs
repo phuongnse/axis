@@ -41,8 +41,7 @@ public class RegisterUserHandlerTests
             _uow);
 
     private static RegisterUserCommand ValidCommand() => new(
-        FirstName: "Alice",
-        LastName: "Smith",
+        FullName: "Alice Smith",
         Email: "alice@example.com",
         Password: "maple river sunrise",
         PasswordConfirmation: "maple river sunrise",
@@ -65,6 +64,7 @@ public class RegisterUserHandlerTests
         await _userRepo.Received(1).AddAsync(
             Arg.Is<User>(u =>
                 u.Email.Value == "alice@example.com"
+                && u.FullName == "Alice Smith"
                 && u.PasswordHash == "hashed_password"
                 && u.AcceptedTermsVersion == WellKnownLegalDocuments.TermsVersion
                 && u.AcceptedPrivacyVersion == WellKnownLegalDocuments.PrivacyVersion),
@@ -74,6 +74,7 @@ public class RegisterUserHandlerTests
                 w.Type == WorkspaceType.Personal
                 && w.OwnerUserId.HasValue
                 && w.OwnerEmail.Value == "alice@example.com"
+                && w.Name == "Alice Smith"
                 && w.Status == WorkspaceStatus.PendingVerification),
             Arg.Any<CancellationToken>());
         await _verificationTokenStore.Received(1).CreateAsync(

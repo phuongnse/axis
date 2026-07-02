@@ -1,3 +1,4 @@
+using System.Text.Json;
 using FluentValidation;
 
 namespace Axis.Api.Middleware;
@@ -17,7 +18,7 @@ internal sealed class ValidationExceptionMiddleware(RequestDelegate next)
         catch (ValidationException ex)
         {
             Dictionary<string, string[]> errors = (ex.Errors ?? [])
-                .GroupBy(e => e.PropertyName)
+                .GroupBy(e => ToJsonFieldName(e.PropertyName))
                 .ToDictionary(
                     g => g.Key,
                     g => g.Select(e => e.ErrorMessage).ToArray());
@@ -32,4 +33,9 @@ internal sealed class ValidationExceptionMiddleware(RequestDelegate next)
                 .ExecuteAsync(context);
         }
     }
+
+    private static string ToJsonFieldName(string propertyName) =>
+        string.IsNullOrEmpty(propertyName)
+            ? propertyName
+            : JsonNamingPolicy.CamelCase.ConvertName(propertyName);
 }

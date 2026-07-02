@@ -1,8 +1,7 @@
 namespace Axis.Api.Endpoints;
 
 public sealed record RegisterUserRequest(
-    string FirstName,
-    string LastName,
+    string FullName,
     string Email,
     string Password,
     string PasswordConfirmation,

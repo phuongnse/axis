@@ -41,8 +41,7 @@ async function registerUserViaApi(request: APIRequestContext, email: string): Pr
       'Idempotency-Key': `e2e-seed-${crypto.randomUUID()}`,
     },
     data: {
-      firstName: 'Duplicate',
-      lastName: 'User',
+      fullName: 'Duplicate User',
       email,
       password,
       passwordConfirmation: password,

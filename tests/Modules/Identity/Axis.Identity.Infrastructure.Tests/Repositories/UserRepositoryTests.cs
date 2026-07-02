@@ -22,7 +22,7 @@ public class UserRepositoryTests(IdentityDatabaseFixture db) : IAsyncLifetime
     public async Task DisposeAsync() => await _ctx.DisposeAsync();
 
     private static User MakeUser(string email) =>
-        User.Create("Jane", "Doe", Email.Create(email).Value);
+        User.Create("Jane Doe", Email.Create(email).Value);
 
     [Fact]
     public async Task AddAsync_WhenEntityIsValid_PersistsAndCanBeRetrievedById()
@@ -34,7 +34,7 @@ public class UserRepositoryTests(IdentityDatabaseFixture db) : IAsyncLifetime
 
         loaded.Should().NotBeNull();
         loaded!.Email.Value.Should().Be("getbyid@example.com");
-        loaded.FirstName.Should().Be("Jane");
+        loaded.FullName.Should().Be("Jane Doe");
         loaded.Status.Should().Be(UserStatus.Active);
     }
 

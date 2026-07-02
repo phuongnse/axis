@@ -5,9 +5,7 @@ namespace Axis.Identity.Domain.Aggregates;
 
 public sealed class User : AggregateRoot<Guid>
 {
-    public string FirstName { get; private set; }
-    public string LastName { get; private set; }
-    public string FullName => $"{FirstName} {LastName}";
+    public string FullName { get; private set; }
     public Email Email { get; private set; }
     public string? PasswordHash { get; private set; }
     public UserStatus Status { get; private set; }
@@ -19,23 +17,24 @@ public sealed class User : AggregateRoot<Guid>
 
     private User(
         Guid id,
-        string firstName,
-        string lastName,
+        string fullName,
         Email email,
         DateTime createdAt)
         : base(id)
     {
-        FirstName = firstName;
-        LastName = lastName;
+        FullName = fullName;
         Email = email;
         Status = UserStatus.Active;
         IsEmailVerified = false;
         CreatedAt = createdAt;
     }
 
-    public static User Create(string firstName, string lastName, Email email)
+    public static User Create(string fullName, Email email)
     {
-        return new User(Guid.NewGuid(), firstName, lastName, email, DateTime.UtcNow);
+        if (string.IsNullOrWhiteSpace(fullName))
+            throw new ArgumentException("Full name cannot be empty.", nameof(fullName));
+
+        return new User(Guid.NewGuid(), fullName.Trim(), email, DateTime.UtcNow);
     }
 
     public void SetPasswordHash(string hash)

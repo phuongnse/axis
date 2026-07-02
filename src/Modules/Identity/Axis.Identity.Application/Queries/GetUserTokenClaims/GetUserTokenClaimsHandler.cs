@@ -39,7 +39,7 @@ public sealed class GetUserTokenClaimsHandler(
                 user.Id,
                 null,
                 user.Email.Value,
-                $"{user.FirstName} {user.LastName}"));
+                user.FullName));
         }
 
         if (!workspace.AllowsSignIn())
@@ -53,6 +53,6 @@ public sealed class GetUserTokenClaimsHandler(
             user.Id,
             workspace.Id,
             user.Email.Value,
-            $"{user.FirstName} {user.LastName}"));
+            user.FullName));
     }
 }

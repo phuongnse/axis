@@ -34,8 +34,7 @@ public sealed class RegisterUserFlowTests(ApiTestFixture fixture)
         Email normalizedEmail = Email.Create(email).Value;
 
         User user = await db.Users.SingleAsync(u => u.Email == normalizedEmail);
-        user.FirstName.Should().Be("Alice");
-        user.LastName.Should().Be("Smith");
+        user.FullName.Should().Be("Alice Smith");
         user.PasswordHash.Should().NotBeNullOrWhiteSpace();
         user.IsEmailVerified.Should().BeFalse();
         user.AcceptedTermsVersion.Should().Be(WellKnownLegalDocuments.TermsVersion);
@@ -54,6 +53,18 @@ public sealed class RegisterUserFlowTests(ApiTestFixture fixture)
         int activeTokenCount = await db.EmailVerificationTokens.CountAsync(t =>
             t.UserId == user.Id && t.UsedAt == null && t.ExpiresAt > DateTime.UtcNow);
         activeTokenCount.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task RegisterUser_WhenFullNameIsMissing_ReturnsFullNameValidationError()
+    {
+        HttpResponseMessage response = await RegisterAsync(UniqueEmail(), fullName: "");
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        JsonElement body = await response.Content.ReadFromJsonAsync<JsonElement>(Json);
+        JsonElement errors = body.GetProperty("errors");
+        errors.EnumerateObject().Select(property => property.Name)
+            .Should().ContainSingle().Which.Should().Be("fullName");
     }
 
     [Fact]
@@ -111,11 +122,11 @@ public sealed class RegisterUserFlowTests(ApiTestFixture fixture)
             .Should().Be("Please wait before requesting another email.");
     }
 
-    private async Task<HttpResponseMessage> RegisterAsync(string email)
+    private async Task<HttpResponseMessage> RegisterAsync(string email, string fullName = "Alice Smith")
     {
         using HttpRequestMessage request = new(HttpMethod.Post, "/api/users/register")
         {
-            Content = JsonContent.Create(ValidRegisterRequest(email), options: Json),
+            Content = JsonContent.Create(ValidRegisterRequest(email, fullName), options: Json),
         };
         request.Headers.Add("Idempotency-Key", Guid.NewGuid().ToString("N"));
 
@@ -149,10 +160,9 @@ public sealed class RegisterUserFlowTests(ApiTestFixture fixture)
         return body.GetProperty("detail").GetString();
     }
 
-    private static object ValidRegisterRequest(string email) => new
+    private static object ValidRegisterRequest(string email, string fullName) => new
     {
-        FirstName = "Alice",
-        LastName = "Smith",
+        FullName = fullName,
         Email = email,
         Password = "maple river sunrise",
         PasswordConfirmation = "maple river sunrise",

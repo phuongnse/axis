@@ -11,7 +11,7 @@ public class UserEmailVerificationTests
     [Fact]
     public void User_WhenCreated_IsNotEmailVerified()
     {
-        User user = User.Create("Alice", "Smith", ValidEmail);
+        User user = User.Create("Alice Smith", ValidEmail);
 
         user.IsEmailVerified.Should().BeFalse();
     }
@@ -19,7 +19,7 @@ public class UserEmailVerificationTests
     [Fact]
     public void VerifyEmail_WhenCalled_MarksUserAsVerified()
     {
-        User user = User.Create("Alice", "Smith", ValidEmail);
+        User user = User.Create("Alice Smith", ValidEmail);
 
         user.VerifyEmail();
 
@@ -29,7 +29,7 @@ public class UserEmailVerificationTests
     [Fact]
     public void VerifyEmail_WhenAlreadyVerified_IsIdempotent()
     {
-        User user = User.Create("Alice", "Smith", ValidEmail);
+        User user = User.Create("Alice Smith", ValidEmail);
         user.VerifyEmail();
 
         Action act = () => user.VerifyEmail();

@@ -33,9 +33,7 @@ public sealed class GetCurrentUserProfileHandler(
         return new CurrentUserProfileDto(
             user.Id,
             user.Email.Value,
-            user.FirstName,
-            user.LastName,
-            $"{user.FirstName} {user.LastName}",
+            user.FullName,
             user.Status == UserStatus.Active,
             query.workspaceId,
             workspaces
