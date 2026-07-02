@@ -20,6 +20,24 @@ public class UserTests
     }
 
     [Fact]
+    public void User_WhenCreatedWithSurroundingWhitespace_TrimsFullName()
+    {
+        User user = User.Create("  Alice Smith  ", ValidEmail);
+
+        user.FullName.Should().Be("Alice Smith");
+    }
+
+    [Fact]
+    public void User_WhenCreatedWithoutFullName_Throws()
+    {
+        Action act = () => User.Create("   ", ValidEmail);
+
+        act.Should().Throw<ArgumentException>()
+            .WithMessage("Full name cannot be empty.*")
+            .And.ParamName.Should().Be("fullName");
+    }
+
+    [Fact]
     public void VerifyEmail_WhenCalled_MarksUserVerified()
     {
         User user = User.Create("Alice Smith", ValidEmail);

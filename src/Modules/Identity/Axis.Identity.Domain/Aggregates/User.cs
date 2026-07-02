@@ -31,7 +31,10 @@ public sealed class User : AggregateRoot<Guid>
 
     public static User Create(string fullName, Email email)
     {
-        return new User(Guid.NewGuid(), fullName, email, DateTime.UtcNow);
+        if (string.IsNullOrWhiteSpace(fullName))
+            throw new ArgumentException("Full name cannot be empty.", nameof(fullName));
+
+        return new User(Guid.NewGuid(), fullName.Trim(), email, DateTime.UtcNow);
     }
 
     public void SetPasswordHash(string hash)
