@@ -28,7 +28,7 @@
     "nuget"
   ],
   "rangeStrategy": "bump",
-  "prBodyTemplate": "## Summary\n\nRenovate proposes a dependency update for Axis version owners.\n\n{{{table}}}\n\n## Linked spec\n\nN/A - dependency automation update; version ownership lives in docs/TECH_STACK.md.\n\n## Requirements & rules followed\n\n- [x] **Spec/code** - dependency update follows repository version owners; no product behavior is intended.\n- [x] **Ready review** - CI and reviewer validation happen before merge.\n- [x] **Verification** - triggered CI checks run for changed manifests and lockfiles.\n- [x] **Docs/status** - docs/TECH_STACK.md owns stack categories; per-update docs change only when stack policy changes.\n- [x] **No placeholders** - generated Renovate PR bodies contain no template placeholders.\n",
+  "prBodyTemplate": "## Summary\n\nRenovate proposes a dependency update for Axis version owners.\n\n{{{table}}}\n\n## Linked spec\n\nN/A - dependency automation update; version ownership lives in docs/TECH_STACK.md.\n\n## Requirements & rules followed\n\n- [ ] **Spec/code** - N/A - automated dependency update follows repository version owners; no product behavior is intended.\n- [ ] **Ready review** - N/A - automated dependency PR awaits human review before merge.\n- [ ] **Verification** - N/A - CI runs after the PR opens and must pass before merge.\n- [ ] **Docs/status** - N/A - per-update docs change only when stack policy changes.\n- [ ] **No placeholders** - N/A - generated Renovate body uses fixed Axis text plus the Renovate dependency table.\n",
   "packageRules": [
     {
       "description": "Require deliberate PRs for major updates.",
