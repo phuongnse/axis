@@ -32,7 +32,7 @@ Validate skill changes: `python scripts/axis.py check repo-skills`
 | Docs / guidance / status edits | [axis-doc-hygiene/SKILL.md](./axis-doc-hygiene/SKILL.md) |
 | Repo tooling / compose / local-dev / scripts | [axis-script-scope/SKILL.md](./axis-script-scope/SKILL.md) |
 | Branch ready for review | [axis-ready-review/SKILL.md](./axis-ready-review/SKILL.md) |
-| Open / update / mark-ready PR | [axis-pull-request/SKILL.md](./axis-pull-request/SKILL.md) |
+| Open / push update / mark-ready PR | [axis-pull-request/SKILL.md](./axis-pull-request/SKILL.md) |
 | Review feedback follow-up | [axis-review-feedback/SKILL.md](./axis-review-feedback/SKILL.md) |
 
 ## Typical flow
@@ -41,7 +41,7 @@ Validate skill changes: `python scripts/axis.py check repo-skills`
 spec gap     → axis-use-case-spec
 non-trivial  → axis-design-gate → implement skill → axis-script-scope (checks)
 before review→ axis-ready-review
-PR action    → axis-pull-request → axis-review-feedback (if needed) → then push/PR
+PR/push action→ axis-pull-request → axis-review-feedback (if needed) → then push/PR
 ```
 
 Numbered steps in each skill are sequential gates. See [reference.md](./reference.md).

@@ -15,6 +15,7 @@ Follow [reference.md](../reference.md).
 - No code when spec readiness is **Blocked** — read `$axis-use-case-spec` first.
 - High-risk: stop for `$axis-design-gate` sign-off before code.
 - Do not mark **Done** while in-scope AC/AT rows lack proving tests or pass evidence.
+- Do not push a non-trivial implementation to a published or PR branch without `$axis-pull-request`.
 
 ## Inputs
 
@@ -79,6 +80,7 @@ Follow [reference.md](../reference.md).
    - Run every required AT row's runner or targeted test before claiming the use case/layer is complete.
    - Report acceptance evidence by AT ID (`AT-001 Playwright passed`, `AT-002 xUnit API passed`, etc.).
    - Use `.agents/skills/axis-ready-review/SKILL.md` (`$axis-ready-review`) before asking for review; it owns `python scripts/axis.py verify` when triggered.
+   - Before pushing committed implementation to a branch with an upstream, open PR, or PR intent, read `$axis-pull-request`; treat it as a branch/diff update.
    - Do not rerun ready-review verification after every small edit.
    - Do not claim the full suite unless full `python scripts/axis.py dotnet test` ran.
 

@@ -30,7 +30,7 @@ Shared rules for every `.agents/skills/*/SKILL.md` workflow. Skill-specific gate
 
 ## Publication gate (PR boundary)
 
-Applies to `$axis-pull-request` and [docs/playbooks/scripts.md § Pre-PR review checkpoint](../../docs/playbooks/scripts.md#pre-pr-review-checkpoint).
+Applies to `$axis-pull-request` and [docs/playbooks/scripts.md § Pre-PR review checkpoint](../../docs/playbooks/scripts.md#pre-pr-review-checkpoint). A push-only update to a branch that has an upstream, an open PR, or explicit PR intent is a PR branch/diff update.
 
 The pre-PR review checkpoint is triggered by non-trivial implementation, behavior, contract, or high-risk changes. Docs-only, metadata-only, and small guidance/tooling-text changes record `not triggered` with the reason; when unsure, run the checkpoint.
 
@@ -46,12 +46,12 @@ $axis-ready-review -> Ready
             -> verify --since <checkpoint> when triggered
             -> rerun review scoped to checkpoint
             -> repeat until clean OR user-approved defer/false-positive per item
-  -> ONLY THEN: push + gh pr create / mark ready
+  -> ONLY THEN: push branch / gh pr create / mark ready
 ```
 
 **Forbidden before the publication gate closes:**
 
-- Push the publish branch for PR creation
+- Push new commits to a branch that has an open PR or is being published for one
 - `gh pr create`, mark ready, or PR body claiming review is "follow-up"
 - PR body language such as "follow-up as needed", "non-blocking findings", or "address later" while valid findings remain open
 
@@ -66,5 +66,6 @@ Metadata-only PR title/body edits may skip the checkpoint per `$axis-pull-reques
 | Use-case slice | `$axis-use-case-implementation` (+ design gate when non-trivial) |
 | Before review | `$axis-ready-review` |
 | PR create / update branch / mark ready | `$axis-pull-request` (requires ready-review evidence) |
+| Push/update a published or PR branch | `$axis-pull-request` (branch/diff update) |
 | Pre-PR review findings | `$axis-review-feedback` before push/PR |
 | Review feedback close-out | `$axis-ready-review` before another review pass |

@@ -1,13 +1,13 @@
 ---
 name: axis-pull-request
-description: Prepare, review, validate, create, update, or mark ready Axis pull requests. Use when the user asks to open a PR, run the pre-PR ready/review/publish flow, update PR title/body, convert a draft PR to ready, correct PR metadata, or publish a review-ready branch to GitHub.
+description: Prepare, review, validate, create, update, push to, or mark ready Axis pull requests. Use when the user asks to open a PR, run the pre-PR ready/review/publish flow, update PR title/body, push new commits to an existing PR branch, convert a draft PR to ready, correct PR metadata, or publish a review-ready branch to GitHub.
 ---
 
 # Axis Pull Request
 
 ## Goal
 
-Own the PR publication boundary. This skill prepares the branch for publication, decides whether the pre-PR review checkpoint from [docs/playbooks/scripts.md](../../../docs/playbooks/scripts.md) is triggered, validates the exact title/body before sending it to GitHub, and performs the requested PR action.
+Own the PR publication boundary. This skill prepares the branch for publication, decides whether the pre-PR review checkpoint from [docs/playbooks/scripts.md](../../../docs/playbooks/scripts.md) is triggered, validates PR metadata when metadata changes, and performs the requested PR action.
 
 Do not perform branch readiness auditing here. Read `.agents/skills/axis-ready-review/SKILL.md` (`$axis-ready-review`) first when readiness evidence is missing, stale, or not explicitly provided. The checkpoint is required when triggered, not a machine-enforced CI gate, unless the user explicitly asks to skip it.
 Do not rerun local guards just to create a longer transcript. Run each required guard once, then rerun only when a subsequent change invalidates that evidence.
@@ -17,19 +17,21 @@ Do not rerun local guards just to create a longer transcript. Run each required 
 Follow [reference.md § Publication gate](../reference.md#publication-gate-pr-boundary).
 - Step 1 requires `$axis-ready-review` **Ready** before any PR publication step except metadata-only updates.
 - Step 2 must close the pre-PR review checkpoint when triggered — including `$axis-review-feedback` when findings exist — before push or `gh pr create`.
+- Push-only updates to a published branch or existing PR branch are branch/diff updates; pre-push quick gates are not a substitute.
 - Do not push, open a PR, or mark ready while valid review findings remain open unless the user explicitly deferred each item.
 - Do not describe open findings as follow-up, non-blocking, or later in PR metadata.
 
 ## Inputs
 
-- Requested PR action: create, update, mark ready, or metadata-only update.
+- Requested PR action: create, branch/diff push update, mark ready, or metadata-only update.
 - Fresh ready-review evidence from `.agents/skills/axis-ready-review/SKILL.md` (`$axis-ready-review`) unless the action is metadata-only.
-- Exact title/body draft or enough summary, linked spec, and requirement evidence to draft one.
+- Exact title/body draft or enough summary, linked spec, and requirement evidence to draft one when metadata changes.
 
 ## Workflow
 
 1. Confirm readiness evidence.
-   - If the user asks to open a PR, update the published branch/diff, or mark a PR ready and no fresh ready-review result exists, read `.agents/skills/axis-ready-review/SKILL.md` (`$axis-ready-review`) first.
+   - If the user asks to open a PR, push or update the published branch/diff, or mark a PR ready and no fresh ready-review result exists, read `.agents/skills/axis-ready-review/SKILL.md` (`$axis-ready-review`) first.
+   - Treat a request to push the current branch as a branch/diff update when the branch has an upstream, an open PR, or explicit PR intent.
    - If ready-review reports Not ready, stop before branch/diff PR actions or mark-ready and report the blocker.
    - If the user only asks to update PR metadata, readiness evidence is not required.
 
@@ -45,11 +47,11 @@ Follow [reference.md § Publication gate](../reference.md#publication-gate-pr-bo
 
 3. Determine the PR action.
    - Create PR: branch must be committed first; push only after step 2 is complete.
-   - Update PR: identify the existing PR from the current branch or the user-provided PR number/URL.
+   - Branch/diff push update: identify the existing PR from the current branch or user input when present; no metadata draft is needed unless metadata changes.
    - Mark ready: update and validate metadata before changing draft status.
    - Metadata-only update: update title/body and validate the result.
 
-4. Draft exact PR metadata before any GitHub action.
+4. Draft exact PR metadata before any PR metadata action.
    - Title must be Conventional Commit style: `type(scope): subject` or `type: subject`.
    - Never rely on tool-generated prefixes in PR titles; write Conventional Commit style only.
    - Body must contain only:
@@ -59,13 +61,15 @@ Follow [reference.md § Publication gate](../reference.md#publication-gate-pr-bo
    - Do not include commit lists, CI transcripts, release notes, bot summaries, or extra sections.
    - The body may mention verification results inside the Requirements checklist, but must not paste long logs.
 
-5. Validate the draft locally.
+5. Validate the draft locally when metadata changes.
    - Write the exact body draft to a temporary file.
    - Run `python scripts/axis.py check pr --title "<exact title>" --body-file <draft-body-file>`.
    - If validation fails, revise the draft and rerun. Do not create, update, or mark ready while validation is failing.
+   - For push-only branch/diff updates with no metadata changes, record `N/A`.
 
 6. Perform the PR action with exact metadata.
-   - Create/update the PR using the exact validated title and body.
+   - Push the branch or create/update the PR only after steps 1-5 are satisfied.
+   - Create/update PR metadata using the exact validated title and body.
    - When using a GitHub tool or CLI, pass the exact title/body explicitly; do not accept generated defaults.
    - Keep the PR draft unless the user asked to mark ready and readiness evidence is current.
 
@@ -80,7 +84,7 @@ Report:
 
 ```text
 PR action:
-- create / update / mark-ready / metadata-update
+- create / branch-diff-update / mark-ready / metadata-update
 
 Ready-review source:
 - `.agents/skills/axis-ready-review/SKILL.md` result, existing evidence, or N/A for metadata-only update
@@ -92,9 +96,9 @@ Pre-PR review checkpoint:
 - follow-up review scope:
 
 PR metadata:
-- Title: ...
-- Body sections: Summary / Linked spec / Requirements
-- Draft validation: command -> pass/fail
+- Title: ... / N/A for push-only branch/diff update
+- Body sections: Summary / Linked spec / Requirements / N/A
+- Draft validation: command -> pass/fail / N/A
 - Post-push local checks: not run; CI owns post-push validation
 
 GitHub:

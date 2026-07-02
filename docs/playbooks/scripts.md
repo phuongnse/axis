@@ -17,7 +17,7 @@ Use `python scripts/axis.py doctor` or the exact `check` subcommand to verify lo
 
 ## Pre-PR review checkpoint
 
-Run the checkpoint before create, branch/diff update, or mark-ready PR actions when the diff contains non-trivial implementation, behavior, contract, or high-risk changes. For docs-only, metadata-only, or small guidance/tooling-text changes, record `not triggered` with the reason; when unsure, run the checkpoint.
+Run the checkpoint before create, branch/diff update, push-only update to an existing PR branch, or mark-ready PR actions when the diff contains non-trivial implementation, behavior, contract, or high-risk changes. For docs-only, metadata-only, or small guidance/tooling-text changes, record `not triggered` with the reason; when unsure, run the checkpoint.
 
 When triggered:
 
@@ -38,7 +38,7 @@ Metadata-only PR title/body updates do not require the checkpoint.
 - Add repo workflows as `python scripts/axis.py ...` subcommands.
 - Keep raw Docker, dotnet, npm, Lychee, and OpenSSL calls inside wrappers or package scripts.
 - Use `python scripts/axis.py verify` only at the ready-review boundary; it is changed-path scoped.
-- Use `python scripts/axis.py pre-push` for ordinary Git push sanity.
+- Use `python scripts/axis.py pre-push` for ordinary Git push sanity; it is not a substitute for the pre-PR review checkpoint on published PR branches.
 - Set `AXIS_PRE_PUSH_FULL=1` only when pre-push should run the full ready-review command.
 - CI remains the authoritative merge matrix. [.github/workflows/build-and-test.yml](../../.github/workflows/build-and-test.yml) runs on GitHub Actions only — not a local dev script; `ubuntu-latest` is the merge runner, not a dev OS requirement.
 

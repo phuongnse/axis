@@ -2525,6 +2525,29 @@ class TestRepoSkillsGate(unittest.TestCase):
         self.assertIn("hard-gate contract missing required pattern", joined)
         self.assertIn("must chain to $axis-ready-review", joined)
 
+    def test_pull_request_skill_must_cover_published_branch_push_updates(self) -> None:
+        files = {
+            ".agents/skills/axis-pull-request/SKILL.md": (
+                "---\n"
+                "name: axis-pull-request\n"
+                "description: Prepare, review, validate, create, update, push to, or mark ready Axis pull requests.\n"
+                "---\n"
+                "\n"
+                "# Axis Pull Request\n"
+                "\n"
+                "## Hard gates\n"
+                "\n"
+                "Follow [reference.md](../reference.md).\n"
+                "- Do not push until `$axis-ready-review` and `$axis-review-feedback` finish.\n"
+            ),
+            ".agents/skills/reference.md": "# Reference\n",
+        }
+
+        issues = self.issues_for_skill(files)
+
+        joined = "\n".join(issues)
+        self.assertIn("hard-gate contract missing required pattern `published branch`", joined)
+
     def test_skill_reference_target_resolves_parent_reference(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
