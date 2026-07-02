@@ -31,12 +31,14 @@ ROOT = Path(__file__).resolve().parent.parent
 SCRIPTS = ROOT / "scripts"
 REQUIRED_DOTNET_SDK_MAJOR = "8"
 REQUIRED_LYCHEE_VERSION = "0.23.0"
+REQUIRED_RENOVATE_VALIDATOR_VERSION = "42.99.0"
 MINIMUM_CODERABBIT_CLI_VERSION = "0.6.0"
 TOOL_VERSIONS_DOC = "docs/playbooks/scripts.md#tool-versions"
 TECH_STACK_DOC = "docs/TECH_STACK.md"
 GLOBAL_JSON_PATH = ROOT / "global.json"
 NVMRC_PATH = ROOT / "frontend" / ".nvmrc"
 LOCAL_DEV_COMPOSE_FILE = ROOT / "docker-compose.yml"
+RENOVATE_CONFIG_PATH = ROOT / ".github" / "renovate.json5"
 LOCAL_DEV_ENV_FILE = ROOT / ".env.local"
 LOCAL_DEV_PROJECT_NAME = "axis"
 LOCAL_DEV_POSTGRES_VOLUME = f"{LOCAL_DEV_PROJECT_NAME}_postgres_data"
@@ -70,6 +72,13 @@ import doc_drift_domains  # noqa: E402
 
 class CheckError(RuntimeError):
     """Raised when a command fails."""
+
+
+def configure_cli_text_streams() -> None:
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if callable(reconfigure):
+            reconfigure(encoding="utf-8", errors="replace")
 
 
 def rel(path: Path) -> str:
@@ -1538,6 +1547,7 @@ ENFORCEMENT_TRUTH_REQUIRED_SNIPPETS = [
         [
             ("pull_request:", "CI workflow runs for pull requests"),
             ("run: python scripts/axis.py check pr", "PR metadata guard runs in CI"),
+            ("run: python scripts/axis.py check renovate-config", "Renovate config validation runs in CI"),
             ("run: python scripts/axis.py check docker", "Docker endpoint is available for Testcontainers in CI through the Axis wrapper"),
             ("run: python scripts/axis.py check vulnerable-packages", "vulnerable package gate runs in CI"),
             ("run: python scripts/axis.py check test-naming", ".NET test naming gate runs in CI"),
@@ -1960,12 +1970,21 @@ def _node_exists_in_bin_dir(bin_dir: Path) -> bool:
     return (bin_dir / "node").is_file() or (bin_dir / "node.exe").is_file()
 
 
+def _home_dir() -> Path | None:
+    try:
+        return Path.home()
+    except RuntimeError:
+        return None
+
+
 def _nvm_unix_roots() -> list[Path]:
     roots: list[Path] = []
     nvm_dir = os.environ.get("NVM_DIR")
     if nvm_dir:
         roots.append(Path(nvm_dir) / "versions" / "node")
-    roots.append(Path.home() / ".nvm" / "versions" / "node")
+    home = _home_dir()
+    if home is not None:
+        roots.append(home / ".nvm" / "versions" / "node")
     return roots
 
 
@@ -2044,7 +2063,9 @@ def _node_toolchain_bin_dirs(expected_major: str) -> list[Path]:
     if nvm_symlink:
         add(Path(nvm_symlink))
 
-    add(Path.home() / ".volta" / "bin")
+    home = _home_dir()
+    if home is not None:
+        add(home / ".volta" / "bin")
 
     return sorted(candidates, key=lambda path: _version_sort_key(_node_version_label(path)), reverse=True)
 
@@ -2501,6 +2522,7 @@ def verify(args: argparse.Namespace) -> int:
     build_projects, test_projects = dotnet_projects_for_changed_paths(paths)
 
     frontend = any(is_frontend_path(path) for path in paths)
+    renovate_config = ".github/renovate.json5" in paths
     frontend_api_types = "openapi.json" in paths or "frontend/src/lib/api-types.ts" in paths
     frontend_tests_only = frontend and all(
         path.startswith("frontend/tests/") or path.startswith("frontend/e2e/")
@@ -2522,7 +2544,7 @@ def verify(args: argparse.Namespace) -> int:
     print(
         "verify plan: "
         f"dotnet={dotnet} frontend={frontend} docs={docs} scripts={scripts_changed} "
-        f"skills={skills} markdown-links={markdown_links}"
+        f"skills={skills} markdown-links={markdown_links} renovate-config={renovate_config}"
     )
 
     if not paths:
@@ -2584,6 +2606,9 @@ def verify(args: argparse.Namespace) -> int:
         step("scripts standard", lambda: check_scripts_standard())
         step("policy gate tests", lambda: check_policy_tests())
 
+    if renovate_config:
+        step("Renovate config", lambda: check_renovate_config(None))
+
     if skills:
         step("Repo skills", lambda: check_repo_skills())
 
@@ -2633,6 +2658,7 @@ def pre_push(args: argparse.Namespace) -> int:
     docs = not paths or any(re.search(r"^(AGENTS[.]md|README[.]md|docs/|[.]github/PULL_REQUEST_TEMPLATE[.]md)", p) for p in paths)
     skills = not paths or any(p.startswith(f"{REPO_SKILLS_DIR}/") for p in paths)
     scripts_changed = not paths or any(p.startswith("scripts/") for p in paths)
+    renovate_config = not paths or ".github/renovate.json5" in paths
     failed: list[str] = []
 
     def step(name: str, fn: callable[[], int]) -> None:
@@ -2666,6 +2692,9 @@ def pre_push(args: argparse.Namespace) -> int:
 
     if scripts_changed:
         step("scripts standard", lambda: check_scripts_standard())
+
+    if renovate_config:
+        step("Renovate config", lambda: check_renovate_config(None))
 
     print()
     if not failed:
@@ -3191,7 +3220,34 @@ def check_pr(args: argparse.Namespace) -> int:
     return module_main("check-pr.py", module_args)
 
 
+def check_renovate_config(_args: argparse.Namespace | None = None) -> int:
+    if not RENOVATE_CONFIG_PATH.is_file():
+        print("check-renovate-config FAIL: missing .github/renovate.json5", file=sys.stderr)
+        return 1
+
+    rc = check_frontend_toolchain()
+    if rc != 0:
+        return rc
+
+    return run(
+        [
+            exe("npx"),
+            "--yes",
+            "--package",
+            f"renovate@{REQUIRED_RENOVATE_VALIDATOR_VERSION}",
+            "--",
+            "renovate-config-validator",
+            "--strict",
+            "--no-global",
+            str(RENOVATE_CONFIG_PATH),
+        ],
+        check=False,
+    ).returncode
+
+
 def main(argv: list[str] | None = None) -> int:
+    configure_cli_text_streams()
+
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
 
@@ -3282,6 +3338,7 @@ def main(argv: list[str] | None = None) -> int:
     check_sub.add_parser("text-encoding").set_defaults(func=check_text_encoding)
     check_sub.add_parser("scripts-standard").set_defaults(func=check_scripts_standard)
     check_sub.add_parser("repo-skills").set_defaults(func=check_repo_skills)
+    check_sub.add_parser("renovate-config").set_defaults(func=check_renovate_config)
     check_sub.add_parser("test-naming").set_defaults(func=check_test_naming)
     check_sub.add_parser("test-project-classification").set_defaults(func=check_test_project_classification)
     check_sub.add_parser("docker").set_defaults(func=check_docker)

@@ -1,0 +1,106 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    "helpers:pinGitHubActionDigests"
+  ],
+  "dependencyDashboard": true,
+  "configMigration": true,
+  "timezone": "Asia/Ho_Chi_Minh",
+  "schedule": [
+    "* 0-8 1 * *"
+  ],
+  "labels": [
+    "dependencies"
+  ],
+  "branchPrefix": "renovate/",
+  "semanticCommits": "enabled",
+  "semanticCommitType": "chore",
+  "semanticCommitScope": "deps",
+  "commitMessageLowerCase": "never",
+  "prConcurrentLimit": 5,
+  "prHourlyLimit": 2,
+  "enabledManagers": [
+    "docker-compose",
+    "dockerfile",
+    "github-actions",
+    "npm",
+    "nuget"
+  ],
+  "rangeStrategy": "bump",
+  "prBodyTemplate": "## Summary\n\nRenovate proposes a dependency update for Axis version owners.\n\n{{{table}}}\n\n## Linked spec\n\nN/A - dependency automation update; version ownership lives in docs/TECH_STACK.md.\n\n## Requirements & rules followed\n\n- [x] **Spec/code** - dependency update follows repository version owners; no product behavior is intended.\n- [x] **Ready review** - CI and reviewer validation happen before merge.\n- [x] **Verification** - triggered CI checks run for changed manifests and lockfiles.\n- [x] **Docs/status** - docs/TECH_STACK.md owns stack categories; per-update docs change only when stack policy changes.\n- [x] **No placeholders** - generated Renovate PR bodies contain no template placeholders.\n",
+  "packageRules": [
+    {
+      "description": "Require deliberate PRs for major updates.",
+      "matchUpdateTypes": [
+        "major"
+      ],
+      "enabled": false
+    },
+    {
+      "description": "Do not automate .NET SDK baseline changes.",
+      "matchFileNames": [
+        "global.json"
+      ],
+      "enabled": false
+    },
+    {
+      "description": "Group .NET package updates.",
+      "matchManagers": [
+        "nuget"
+      ],
+      "matchFileNames": [
+        "Directory.Packages.props",
+        "**/*.csproj",
+        "dotnet-tools.json"
+      ],
+      "groupName": ".NET packages",
+      "groupSlug": "dotnet-packages",
+      "commitMessageTopic": ".NET packages"
+    },
+    {
+      "description": "Group frontend runtime dependency updates.",
+      "matchManagers": [
+        "npm"
+      ],
+      "matchDepTypes": [
+        "dependencies"
+      ],
+      "groupName": "frontend runtime dependencies",
+      "groupSlug": "frontend-runtime",
+      "commitMessageTopic": "frontend runtime dependencies"
+    },
+    {
+      "description": "Group frontend tooling dependency updates.",
+      "matchManagers": [
+        "npm"
+      ],
+      "matchDepTypes": [
+        "devDependencies"
+      ],
+      "groupName": "frontend tooling dependencies",
+      "groupSlug": "frontend-tooling",
+      "commitMessageTopic": "frontend tooling dependencies"
+    },
+    {
+      "description": "Group GitHub Actions updates and preserve SHA pinning.",
+      "matchManagers": [
+        "github-actions"
+      ],
+      "groupName": "GitHub Actions",
+      "groupSlug": "github-actions",
+      "semanticCommitType": "ci",
+      "commitMessageTopic": "GitHub Actions dependencies"
+    },
+    {
+      "description": "Group container image updates.",
+      "matchManagers": [
+        "docker-compose",
+        "dockerfile"
+      ],
+      "groupName": "container images",
+      "groupSlug": "container-images",
+      "commitMessageTopic": "container images"
+    }
+  ]
+}

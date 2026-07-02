@@ -20,6 +20,30 @@ import axis_repo  # noqa: E402
 import doc_drift_domains  # noqa: E402
 
 
+class EncodingCheckingStream:
+    def __init__(self) -> None:
+        self.encoding = "cp1252"
+        self.errors = "strict"
+        self.writes: list[str] = []
+        self.reconfigure_calls: list[dict[str, str]] = []
+
+    def reconfigure(self, **kwargs) -> None:
+        self.reconfigure_calls.append(kwargs)
+        self.encoding = kwargs.get("encoding", self.encoding)
+        self.errors = kwargs.get("errors", self.errors)
+
+    def write(self, text: str) -> int:
+        text.encode(self.encoding, self.errors)
+        self.writes.append(text)
+        return len(text)
+
+    def flush(self) -> None:
+        pass
+
+    def getvalue(self) -> str:
+        return "".join(self.writes)
+
+
 def load_script(script_name: str):
     path = SCRIPTS / script_name
     return load_python_file(path)
@@ -39,6 +63,52 @@ def load_python_file(path: Path):
 check_pr = load_script("check-pr.py")
 check_local_dev_docs = load_script("check-local-dev-docs.py")
 check_use_case_docs = load_script("check-use-case-docs.py")
+
+
+class TestCliTextStreams(unittest.TestCase):
+    def test_configures_stdout_and_stderr_as_utf8(self) -> None:
+        stdout = EncodingCheckingStream()
+        stderr = EncodingCheckingStream()
+
+        with mock.patch.object(axis.sys, "stdout", stdout), mock.patch.object(axis.sys, "stderr", stderr):
+            axis.configure_cli_text_streams()
+
+        self.assertEqual([{"encoding": "utf-8", "errors": "replace"}], stdout.reconfigure_calls)
+        self.assertEqual([{"encoding": "utf-8", "errors": "replace"}], stderr.reconfigure_calls)
+
+    def test_main_configures_streams_before_emitting_tool_unicode(self) -> None:
+        stdout = EncodingCheckingStream()
+        stderr = EncodingCheckingStream()
+        lychee_output = "🔍 1 Total (in 0s) ✅ 1 OK 🚫 0 Errors\n"
+
+        with (
+            mock.patch.object(axis.sys, "stdout", stdout),
+            mock.patch.object(axis.sys, "stderr", stderr),
+            mock.patch.object(axis, "find_lychee", return_value="/usr/bin/lychee"),
+            mock.patch.object(
+                axis,
+                "run_optional",
+                return_value=axis.subprocess.CompletedProcess(
+                    ["/usr/bin/lychee", "--version"],
+                    0,
+                    stdout="lychee 0.23.0\n",
+                    stderr="",
+                ),
+            ),
+            mock.patch.object(
+                axis,
+                "run_lychee_markdown_check",
+                return_value=axis.subprocess.CompletedProcess(
+                    ["/usr/bin/lychee"],
+                    0,
+                    stdout=lychee_output,
+                    stderr="",
+                ),
+            ),
+        ):
+            self.assertEqual(0, axis.main(["check", "markdown-links"]))
+
+        self.assertIn(lychee_output, stdout.getvalue())
 
 
 class TestTestNamingGate(unittest.TestCase):
@@ -1929,9 +1999,17 @@ class TestScriptsStandardGate(unittest.TestCase):
             script = root / "scripts" / "check-local-dev-docs.py"
             script.parent.mkdir(parents=True, exist_ok=True)
             script.write_text("#!/usr/bin/env python3\nprint('ok')\n", encoding="utf-8")
-            script.chmod(0o755)
 
-            issues = axis.non_python_utility_script_issues(root=root)
+            original_stat = axis.Path.stat
+
+            def fake_stat(path: Path, *args, **kwargs):
+                result = original_stat(path, *args, **kwargs)
+                if path == script:
+                    return axis.os.stat_result((result.st_mode | 0o111, *result[1:]))
+                return result
+
+            with mock.patch.object(axis.os, "name", "posix"), mock.patch.object(axis.Path, "stat", fake_stat):
+                issues = axis.non_python_utility_script_issues(root=root)
 
         self.assertIn(
             "scripts/check-local-dev-docs.py: top-level Python scripts must not be executable; "
@@ -1981,9 +2059,17 @@ class TestScriptsStandardGate(unittest.TestCase):
                 'os.execv(sys.executable, [sys.executable, str(root / "scripts" / "axis.py"), "pre-push"])\n',
                 encoding="utf-8",
             )
-            hook.chmod(0o755)
 
-            issues = axis.non_python_utility_script_issues(root=root)
+            original_stat = axis.Path.stat
+
+            def fake_stat(path: Path, *args, **kwargs):
+                result = original_stat(path, *args, **kwargs)
+                if path == hook:
+                    return axis.os.stat_result((result.st_mode | 0o111, *result[1:]))
+                return result
+
+            with mock.patch.object(axis.os, "name", "posix"), mock.patch.object(axis.Path, "stat", fake_stat):
+                issues = axis.non_python_utility_script_issues(root=root)
 
         self.assertIn(
             "scripts/hooks/pre-push: committed hook source must not be executable; "
@@ -2325,6 +2411,7 @@ class TestAxisCommandWrappers(unittest.TestCase):
                 mock.patch.object(axis, "LOCALHOST_CERT", cert_dir / "localhost.pem"),
                 mock.patch.object(axis, "run", side_effect=fake_run),
                 mock.patch.object(axis, "find_openssl", return_value="/usr/bin/openssl"),
+                mock.patch.object(axis.os, "name", "posix"),
                 mock.patch.object(axis.Path, "chmod", autospec=True) as chmod,
                 contextlib.redirect_stdout(io.StringIO()),
             ):
