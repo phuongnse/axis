@@ -13,6 +13,8 @@ import type {
   LegalVersionsResponse,
   MessageResponse,
   RegisterUserRequest,
+  SignInResponse,
+  SignInUserRequest,
   VerifyEmailResponse,
 } from './types';
 
@@ -52,6 +54,13 @@ export async function registerUser(
     headers: {
       'Idempotency-Key': idempotencyKey,
     },
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function signInUser(payload: SignInUserRequest): Promise<SignInResponse> {
+  return fetchApi<SignInResponse>('/auth/sign-in', {
+    method: 'POST',
     body: JSON.stringify(payload),
   });
 }
@@ -126,6 +135,10 @@ export async function verifyEmail(token: string): Promise<VerifyEmailResponse> {
 }
 
 export async function completePostVerifyPkceFlow(): Promise<void> {
+  await completePostSignInPkceFlow();
+}
+
+export async function completePostSignInPkceFlow(): Promise<void> {
   const pkce = createPkceSession();
   const authorizeUrl = await buildAuthorizeUrl(pkce.state, pkce.verifier);
   window.location.assign(authorizeUrl);

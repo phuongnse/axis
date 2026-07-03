@@ -14,5 +14,5 @@ export const shellNavItems: ShellNavItem[] = [
 
 export function pageTitleForPath(pathname: string): string {
   if (pathname.startsWith('/dashboard')) return 'Dashboard';
-  return 'Axis';
+  return 'Account';
 }

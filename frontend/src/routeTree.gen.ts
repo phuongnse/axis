@@ -13,6 +13,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 
+const SignInLazyRouteImport = createFileRoute('/sign-in')()
 const RegisterLazyRouteImport = createFileRoute('/register')()
 const CallbackLazyRouteImport = createFileRoute('/callback')()
 const IndexLazyRouteImport = createFileRoute('/')()
@@ -24,6 +25,11 @@ const AuthenticatedDashboardLazyRouteImport = createFileRoute(
   '/_authenticated/dashboard',
 )()
 
+const SignInLazyRoute = SignInLazyRouteImport.update({
+  id: '/sign-in',
+  path: '/sign-in',
+  getParentRoute: () => rootRouteImport,
+} as any).lazy(() => import('./routes/sign-in.lazy').then((d) => d.Route))
 const RegisterLazyRoute = RegisterLazyRouteImport.update({
   id: '/register',
   path: '/register',
@@ -69,6 +75,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexLazyRoute
   '/callback': typeof CallbackLazyRoute
   '/register': typeof RegisterLazyRoute
+  '/sign-in': typeof SignInLazyRoute
   '/dashboard': typeof AuthenticatedDashboardLazyRoute
   '/auth/verify': typeof AuthVerifyLazyRoute
   '/register/confirmation': typeof RegisterConfirmationLazyRoute
@@ -77,6 +84,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexLazyRoute
   '/callback': typeof CallbackLazyRoute
   '/register': typeof RegisterLazyRoute
+  '/sign-in': typeof SignInLazyRoute
   '/dashboard': typeof AuthenticatedDashboardLazyRoute
   '/auth/verify': typeof AuthVerifyLazyRoute
   '/register/confirmation': typeof RegisterConfirmationLazyRoute
@@ -87,6 +95,7 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteWithChildren
   '/callback': typeof CallbackLazyRoute
   '/register': typeof RegisterLazyRoute
+  '/sign-in': typeof SignInLazyRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardLazyRoute
   '/auth/verify': typeof AuthVerifyLazyRoute
   '/register_/confirmation': typeof RegisterConfirmationLazyRoute
@@ -97,6 +106,7 @@ export interface FileRouteTypes {
     | '/'
     | '/callback'
     | '/register'
+    | '/sign-in'
     | '/dashboard'
     | '/auth/verify'
     | '/register/confirmation'
@@ -105,6 +115,7 @@ export interface FileRouteTypes {
     | '/'
     | '/callback'
     | '/register'
+    | '/sign-in'
     | '/dashboard'
     | '/auth/verify'
     | '/register/confirmation'
@@ -114,6 +125,7 @@ export interface FileRouteTypes {
     | '/_authenticated'
     | '/callback'
     | '/register'
+    | '/sign-in'
     | '/_authenticated/dashboard'
     | '/auth/verify'
     | '/register_/confirmation'
@@ -124,12 +136,20 @@ export interface RootRouteChildren {
   AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
   CallbackLazyRoute: typeof CallbackLazyRoute
   RegisterLazyRoute: typeof RegisterLazyRoute
+  SignInLazyRoute: typeof SignInLazyRoute
   AuthVerifyLazyRoute: typeof AuthVerifyLazyRoute
   RegisterConfirmationLazyRoute: typeof RegisterConfirmationLazyRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/sign-in': {
+      id: '/sign-in'
+      path: '/sign-in'
+      fullPath: '/sign-in'
+      preLoaderRoute: typeof SignInLazyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/register': {
       id: '/register'
       path: '/register'
@@ -199,6 +219,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
   CallbackLazyRoute: CallbackLazyRoute,
   RegisterLazyRoute: RegisterLazyRoute,
+  SignInLazyRoute: SignInLazyRoute,
   AuthVerifyLazyRoute: AuthVerifyLazyRoute,
   RegisterConfirmationLazyRoute: RegisterConfirmationLazyRoute,
 }

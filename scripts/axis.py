@@ -814,12 +814,47 @@ def frontend_test_async_boundary_issues(root: Path = ROOT) -> list[str]:
     return issues
 
 
+def frontend_public_route_navigation_issues(root: Path = ROOT) -> list[str]:
+    issues: list[str] = []
+    routes_root = root / "frontend" / "src" / "routes"
+    if not routes_root.exists():
+        return issues
+
+    route_factory = re.compile(r"\bcreate(?:Lazy)?FileRoute\(")
+    for path in iter_files(routes_root, (".tsx",)):
+        normalized = rel(path) if root == ROOT else str(path.relative_to(root)).replace("\\", "/")
+        route_path = str(path.relative_to(routes_root)).replace("\\", "/")
+        text = path.read_text(encoding="utf-8")
+
+        if not route_factory.search(text):
+            continue
+        if route_path == "__root.tsx":
+            continue
+        if route_path.startswith("_authenticated"):
+            continue
+        if route_path == "index.lazy.tsx" and re.search(r"\bNavigate\b", text):
+            continue
+
+        if "export const routeNavigation" not in text or "publicRouteNavigation(" not in text:
+            issues.append(
+                f"{normalized}: public route must export `routeNavigation = publicRouteNavigation(...)` "
+                "so escape navigation is declared at the route boundary"
+            )
+        if "from '@/lib/route-navigation'" not in text:
+            issues.append(
+                f"{normalized}: public route navigation metadata must use '@/lib/route-navigation'"
+            )
+
+    return issues
+
+
 def frontend_quality_issues(root: Path = ROOT) -> list[str]:
     return [
         *frontend_component_file_name_issues(root),
         *frontend_tailwind_opacity_issues(root),
         *frontend_form_schema_type_issues(root),
         *frontend_test_async_boundary_issues(root),
+        *frontend_public_route_navigation_issues(root),
     ]
 
 
@@ -2314,6 +2349,13 @@ def run_frontend_npm(npm_args: list[str], *, cwd: Path = FRONTEND_DIR) -> subpro
     return run([resolve_exe("npm", env=env), *npm_args], cwd=cwd, env=env, check=False)
 
 
+def passthrough_args(raw_args: list[str]) -> list[str]:
+    args = list(raw_args)
+    if args and args[0] == "--":
+        return args[1:]
+    return args
+
+
 def frontend_command(args: argparse.Namespace) -> int:
     rc = check_frontend_toolchain()
     if rc != 0:
@@ -2340,9 +2382,7 @@ def frontend_command(args: argparse.Namespace) -> int:
         return diff.returncode
     if command == "script":
         npm_args = ["run", args.script_name]
-        script_args = list(args.script_args)
-        if script_args and script_args[0] == "--":
-            script_args = script_args[1:]
+        script_args = passthrough_args(args.script_args)
         if script_args:
             npm_args.append("--")
             npm_args.extend(script_args)
@@ -3040,7 +3080,11 @@ def local_dev(args: argparse.Namespace) -> int:
         build = run(local_dev_compose_args("--profile", "e2e", "build", "e2e"), check=False)
         if build.returncode != 0:
             return build.returncode
-        return run(local_dev_compose_args("--profile", "e2e", "run", "--rm", "--no-deps", "e2e"), check=False).returncode
+        e2e_args = passthrough_args(getattr(args, "e2e_args", []))
+        return run(
+            local_dev_compose_args("--profile", "e2e", "run", "--rm", "--no-deps", "e2e", *e2e_args),
+            check=False,
+        ).returncode
 
     if command == "observability":
         obs_command = args.observability_command
@@ -3319,7 +3363,9 @@ def main(argv: list[str] | None = None) -> int:
     local_psql = local_dev_sub.add_parser("psql")
     local_psql.add_argument("--database", default="axis")
     local_psql.set_defaults(func=local_dev)
-    local_dev_sub.add_parser("e2e").set_defaults(func=local_dev)
+    local_e2e = local_dev_sub.add_parser("e2e")
+    local_e2e.add_argument("e2e_args", nargs=argparse.REMAINDER)
+    local_e2e.set_defaults(func=local_dev)
     local_observability = local_dev_sub.add_parser("observability")
     local_observability_sub = local_observability.add_subparsers(dest="observability_command", required=True)
     local_observability_sub.add_parser("up").set_defaults(func=local_dev)

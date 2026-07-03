@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Axis.Api.Extensions;
 using Axis.Identity.Application.Commands.ResendVerificationEmail;
+using Axis.Identity.Application.Commands.SignInUser;
 using Axis.Identity.Application.Commands.VerifyEmail;
 using Axis.Shared.Application;
 using Axis.Shared.Domain.Primitives;
@@ -16,6 +17,17 @@ public static class AuthEndpoints
     public static IEndpointRouteBuilder MapAuthEndpoints(this IEndpointRouteBuilder app)
     {
         RouteGroupBuilder group = app.MapGroup("/api/auth");
+
+        group.MapPost("/sign-in", SignIn)
+            .AllowAnonymous()
+            .RequireRateLimiting("auth")
+            .WithName("SignInUser")
+            .WithSummary("Sign in a standalone user account")
+            .WithTags("Identity")
+            .Produces<SignInSessionEstablishedDto>()
+            .ProducesProblem(400)
+            .ProducesProblem(422)
+            .ProducesProblem(StatusCodes.Status429TooManyRequests);
 
         group.MapPost("/verify-email", VerifyEmail)
             .AllowAnonymous()
@@ -37,6 +49,22 @@ public static class AuthEndpoints
         return app;
     }
 
+    private static async Task<IResult> SignIn(
+        [FromBody] SignInUserRequest request,
+        ISender mediator,
+        HttpContext httpContext,
+        CancellationToken ct)
+    {
+        Result<SignInSuccessDto> result =
+            await mediator.Send(new SignInUserCommand(request.Email, request.Password), ct);
+        if (result.IsFailure)
+            return result.ToProblemDetails();
+
+        await SignInPkceSessionAsync(httpContext, result.Value);
+
+        return Results.Ok(SignInSessionEstablishedDto.From(result.Value));
+    }
+
     private static async Task<IResult> VerifyEmail(
         [FromBody] VerifyEmailRequest request,
         ISender mediator,
@@ -52,6 +80,16 @@ public static class AuthEndpoints
             await SignInPkceSessionAsync(httpContext, result.Value);
 
         return Results.Ok(VerifyEmailSessionEstablishedDto.From(result.Value));
+    }
+
+    private static async Task SignInPkceSessionAsync(HttpContext httpContext, SignInSuccessDto claims)
+    {
+        await SignInPkceSessionAsync(
+            httpContext,
+            claims.UserId,
+            claims.workspaceId,
+            claims.Email,
+            claims.FullName);
     }
 
     private static async Task SignInPkceSessionAsync(HttpContext httpContext, VerifyEmailSuccessDto claims)

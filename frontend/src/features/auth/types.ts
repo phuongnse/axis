@@ -4,10 +4,18 @@ import type { components } from '@/lib/api-types';
 // shapes can never drift from the API. Regenerate with `npm run gen:api-types`.
 export type RegisterUserRequest = components['schemas']['RegisterUserRequest'];
 export type MessageResponse = components['schemas']['MessageResponse'];
+export type SignInUserRequest = components['schemas']['SignInUserRequest'];
+export type SignInResponse = components['schemas']['SignInSessionEstablishedDto'];
 
 export type LegalVersionsResponse = components['schemas']['LegalVersionsDto'];
 
 export interface RegisterValidationErrorData {
+  errors?: Record<string, string[]>;
+  message?: string;
+  title?: string;
+}
+
+export interface SignInValidationErrorData {
   errors?: Record<string, string[]>;
   message?: string;
   title?: string;

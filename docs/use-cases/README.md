@@ -8,8 +8,11 @@ Use cases are the product source of truth. One use case is a complete end-to-end
 
 | Domain | Use case | Status |
 |---|---|---|
-| [docs/use-cases/identity-access/README.md](./identity-access/README.md) | [docs/use-cases/identity-access/register-user/README.md](./identity-access/register-user/README.md) | Done |
+| [docs/use-cases/identity-access/README.md](./identity-access/README.md) | [docs/use-cases/identity-access/register-user.md](./identity-access/register-user.md) | Done |
+| [docs/use-cases/identity-access/README.md](./identity-access/README.md) | [docs/use-cases/identity-access/sign-in-user.md](./identity-access/sign-in-user.md) | Done |
 
 ## Rule
 
-Do not add placeholder use-case folders.
+Each use case lives as a single Markdown file at `docs/use-cases/{domain}/{slug}.md`. Domain folders contain their `README.md` hub plus those use-case files only.
+
+Do not add placeholder use-case files.

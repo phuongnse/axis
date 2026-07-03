@@ -8,6 +8,8 @@ Use `$axis-frontend-feature` for SPA feature work.
 
 Build the workflow, not a landing page or explanation page. Visible copy should help users act and avoid internal architecture terms.
 
+Every route must expose an obvious next navigation path. Auth and public standalone screens declare route-level escape targets with `routeNavigation = publicRouteNavigation(...)` and render a visible sign-in, registration, back, or home-style link in every loading, success, and error state. Authenticated screens satisfy this through the app shell navigation and sign-out.
+
 ## Mobile-first layout and radius
 
 Design from small screens up. Keep cards and controls at restrained radius unless the owning use case says otherwise.

@@ -75,22 +75,22 @@ function VerifyEmailOutcome({
   }[kind];
 
   const Icon = config.icon;
+  const footer =
+    kind === 'already_used' ? (
+      <Link to="/sign-in" className="font-medium text-primary hover:underline">
+        Sign in
+      </Link>
+    ) : (
+      <>
+        Need a fresh start?{' '}
+        <Link to="/register" className="font-medium text-primary hover:underline">
+          Back to registration
+        </Link>
+      </>
+    );
 
   return (
-    <AuthCard
-      title={config.title}
-      footer={
-        kind === 'already_used' ? (
-          <Link to="/register" className="font-medium hover:underline">
-            Register another account
-          </Link>
-        ) : kind === 'invalid' ? (
-          <Link to="/register" className="font-medium hover:underline">
-            Back to registration
-          </Link>
-        ) : undefined
-      }
-    >
+    <AuthCard title={config.title} footer={footer}>
       <div className="space-y-4">
         <div className="flex items-start gap-3">
           <div
@@ -175,7 +175,17 @@ export function VerifyEmailPage() {
 
   if (loading) {
     return (
-      <AuthCard title="Verifying email">
+      <AuthCard
+        title="Verifying email"
+        footer={
+          <>
+            Need to start over?{' '}
+            <Link to="/sign-in" className="font-medium text-primary hover:underline">
+              Sign in
+            </Link>
+          </>
+        }
+      >
         <div className="flex items-center gap-3 text-sm text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
           <span>Confirming your verification link...</span>
@@ -196,7 +206,17 @@ export function VerifyEmailPage() {
   }
 
   return (
-    <AuthCard title="Verifying email">
+    <AuthCard
+      title="Verifying email"
+      footer={
+        <>
+          Need to start over?{' '}
+          <Link to="/sign-in" className="font-medium text-primary hover:underline">
+            Sign in
+          </Link>
+        </>
+      }
+    >
       <div className="flex items-center gap-3 text-sm text-muted-foreground">
         <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
         <span>Completing sign-in...</span>

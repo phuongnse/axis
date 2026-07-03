@@ -1,8 +1,20 @@
-import { useNavigate } from '@tanstack/react-router';
+import { Link, useNavigate } from '@tanstack/react-router';
 import { useEffect, useState } from 'react';
-
 import { exchangeAuthorizationCode } from '@/features/auth/api';
+import { AuthCard } from '@/features/auth/components/AuthCard';
+import { AuthNotice } from '@/features/auth/components/AuthNotice';
 import { clearPkceSession, loadPkceSession } from '@/features/auth/pkce';
+
+function SignInAgainFooter() {
+  return (
+    <>
+      Need to start over?{' '}
+      <Link to="/sign-in" className="font-medium text-primary hover:underline">
+        Sign in
+      </Link>
+    </>
+  );
+}
 
 export function CallbackPage() {
   const navigate = useNavigate();
@@ -16,7 +28,7 @@ export function CallbackPage() {
 
     if (!code || !pkce || state !== pkce.state) {
       clearPkceSession();
-      setError('Invalid authorization response. Please try registering again.');
+      setError('Invalid authorization response. Please try signing in again.');
       return;
     }
 
@@ -26,21 +38,21 @@ export function CallbackPage() {
       })
       .catch(() => {
         clearPkceSession();
-        setError('Token exchange failed. Please try registering again.');
+        setError('Token exchange failed. Please try signing in again.');
       });
   }, [navigate]);
 
   if (error) {
     return (
-      <div className="flex min-h-screen items-center justify-center p-4">
-        <p className="text-destructive">{error}</p>
-      </div>
+      <AuthCard title="Sign-in interrupted" footer={<SignInAgainFooter />}>
+        <AuthNotice variant="destructive">{error}</AuthNotice>
+      </AuthCard>
     );
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center p-4">
-      <p className="text-muted-foreground">Completing sign-in...</p>
-    </div>
+    <AuthCard title="Completing sign-in" footer={<SignInAgainFooter />}>
+      <p className="text-sm text-muted-foreground">Completing sign-in...</p>
+    </AuthCard>
   );
 }

@@ -21,6 +21,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/auth/sign-in": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Sign in a standalone user account */
+        post: operations["SignInUser"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/auth/verify-email": {
         parameters: {
             query?: never;
@@ -131,6 +148,16 @@ export interface components {
         ResendVerificationRequest: {
             email?: string;
         };
+        /** @enum {string} */
+        SignInNextStep: "Dashboard";
+        SignInSessionEstablishedDto: {
+            sessionEstablished?: boolean;
+            nextStep?: components["schemas"]["SignInNextStep"];
+        };
+        SignInUserRequest: {
+            email?: string;
+            password?: string;
+        };
         UserWorkspaceDto: {
             /** Format: uuid */
             id?: string;
@@ -173,6 +200,57 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["LegalVersionsDto"];
+                };
+            };
+        };
+    };
+    SignInUser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SignInUserRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SignInSessionEstablishedDto"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
                 };
             };
         };

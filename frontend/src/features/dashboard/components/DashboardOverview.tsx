@@ -109,7 +109,7 @@ export function DashboardOverview() {
                 {profile.fullName || profile.email}
               </h1>
               <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
-                Your email is verified and your Axis account is ready to use.
+                Your email is verified and your account is ready to use.
               </p>
             </div>
           </div>

@@ -13,7 +13,7 @@ export function AppShell({ children }: AppShellProps) {
 
   function handleSignOut() {
     clearSession();
-    window.location.href = '/register';
+    window.location.href = '/sign-in';
   }
 
   return (

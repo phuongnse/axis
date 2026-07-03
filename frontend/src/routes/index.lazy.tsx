@@ -1,5 +1,5 @@
 import { createLazyFileRoute, Navigate } from '@tanstack/react-router';
 
 export const Route = createLazyFileRoute('/')({
-  component: () => <Navigate to="/register" replace />,
+  component: () => <Navigate to="/sign-in" replace />,
 });

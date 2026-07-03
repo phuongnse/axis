@@ -186,7 +186,7 @@ class TestUseCaseDocsGate(unittest.TestCase):
     def issues_for_document(self, content: str) -> list[str]:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
-            path = root / "docs" / "use-cases" / "example" / "sample" / "README.md"
+            path = root / "docs" / "use-cases" / "example" / "sample.md"
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(content, encoding="utf-8")
             original_root = check_use_case_docs.ROOT
@@ -195,6 +195,54 @@ class TestUseCaseDocsGate(unittest.TestCase):
                 return check_use_case_docs.check_file(path)
             finally:
                 check_use_case_docs.ROOT = original_root
+
+    def test_use_case_inventory_layout_accepts_direct_markdown_files(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            use_cases = root / "docs" / "use-cases"
+            domain = use_cases / "example"
+            domain.mkdir(parents=True)
+            (use_cases / "README.md").write_text("# Use Cases\n", encoding="utf-8")
+            (domain / "README.md").write_text("# Example\n", encoding="utf-8")
+            (domain / "sample.md").write_text("# Sample\n", encoding="utf-8")
+
+            original_root = check_use_case_docs.ROOT
+            original_use_cases = check_use_case_docs.USE_CASES
+            check_use_case_docs.ROOT = root
+            check_use_case_docs.USE_CASES = use_cases
+            try:
+                issues = check_use_case_docs.check_use_case_inventory_layout()
+            finally:
+                check_use_case_docs.ROOT = original_root
+                check_use_case_docs.USE_CASES = original_use_cases
+
+        self.assertEqual([], issues)
+
+    def test_use_case_inventory_layout_rejects_nested_use_case_directories(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            use_cases = root / "docs" / "use-cases"
+            domain = use_cases / "example"
+            nested = domain / "sample"
+            nested.mkdir(parents=True)
+            (use_cases / "README.md").write_text("# Use Cases\n", encoding="utf-8")
+            (domain / "README.md").write_text("# Example\n", encoding="utf-8")
+            (nested / "README.md").write_text("# Sample\n", encoding="utf-8")
+
+            original_root = check_use_case_docs.ROOT
+            original_use_cases = check_use_case_docs.USE_CASES
+            check_use_case_docs.ROOT = root
+            check_use_case_docs.USE_CASES = use_cases
+            try:
+                issues = check_use_case_docs.check_use_case_inventory_layout()
+            finally:
+                check_use_case_docs.ROOT = original_root
+                check_use_case_docs.USE_CASES = original_use_cases
+
+        self.assertIn(
+            "docs/use-cases/example/sample: use cases must be direct Markdown files",
+            "\n".join(issues),
+        )
 
     def issues_for_use_case(self, callout: str, ac_line: str = "- **AC-001** Works.") -> list[str]:
         matrix = (
@@ -679,7 +727,7 @@ Ship user value.
     def test_changed_content_outside_status_uses_merge_base_for_three_dot_range(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
-            path = root / "docs" / "use-cases" / "example" / "sample" / "README.md"
+            path = root / "docs" / "use-cases" / "example" / "sample.md"
             path.parent.mkdir(parents=True, exist_ok=True)
             current = """# Sample
 
@@ -702,7 +750,7 @@ Ship user value.
                 if args[:2] == ["git", "merge-base"]:
                     return check_use_case_docs.subprocess.CompletedProcess(args, 0, stdout="abc123\n")
                 if args[:2] == ["git", "show"]:
-                    self.assertEqual(args[2], "abc123:docs/use-cases/example/sample/README.md")
+                    self.assertEqual(args[2], "abc123:docs/use-cases/example/sample.md")
                     return check_use_case_docs.subprocess.CompletedProcess(args, 0, stdout=previous)
                 raise AssertionError(f"unexpected subprocess call: {args}")
 
@@ -726,10 +774,10 @@ Ship user value.
             calls: list[list[str]] = []
             outputs = {
                 ("git", "rev-parse", "--verify", "origin/main"): "",
-                ("git", "diff", "--name-only", "origin/main...HEAD"): "docs/use-cases/a/README.md\n",
-                ("git", "diff", "--name-only", "--cached"): "docs/use-cases/b/README.md\n",
-                ("git", "diff", "--name-only"): "docs/use-cases/c/README.md\n",
-                ("git", "ls-files", "--others", "--exclude-standard"): "docs/use-cases/d/README.md\n",
+                ("git", "diff", "--name-only", "origin/main...HEAD"): "docs/use-cases/example/a.md\n",
+                ("git", "diff", "--name-only", "--cached"): "docs/use-cases/example/b.md\n",
+                ("git", "diff", "--name-only"): "docs/use-cases/example/c.md\n",
+                ("git", "ls-files", "--others", "--exclude-standard"): "docs/use-cases/example/d.md\n",
             }
 
             def fake_run(args: list[str], **_kwargs):
@@ -747,10 +795,10 @@ Ship user value.
 
         self.assertEqual(
             [
-                root / "docs" / "use-cases" / "a" / "README.md",
-                root / "docs" / "use-cases" / "b" / "README.md",
-                root / "docs" / "use-cases" / "c" / "README.md",
-                root / "docs" / "use-cases" / "d" / "README.md",
+                root / "docs" / "use-cases" / "example" / "a.md",
+                root / "docs" / "use-cases" / "example" / "b.md",
+                root / "docs" / "use-cases" / "example" / "c.md",
+                root / "docs" / "use-cases" / "example" / "d.md",
             ],
             paths,
         )
@@ -1720,6 +1768,50 @@ class TestFrontendQuality(unittest.TestCase):
 
         self.assertEqual([], issues)
 
+    def test_rejects_public_route_without_route_navigation_metadata(self) -> None:
+        issues = self.issues_for_frontend(
+            {
+                "frontend/src/routes/invite.lazy.tsx": (
+                    "import { createLazyFileRoute } from '@tanstack/react-router';\n"
+                    "export const Route = createLazyFileRoute('/invite')({ component: InvitePage });\n"
+                )
+            }
+        )
+
+        joined = "\n".join(issues)
+        self.assertIn("public route must export `routeNavigation = publicRouteNavigation(...)`", joined)
+        self.assertIn("must use '@/lib/route-navigation'", joined)
+
+    def test_accepts_public_route_with_route_navigation_metadata(self) -> None:
+        issues = self.issues_for_frontend(
+            {
+                "frontend/src/routes/invite.lazy.tsx": (
+                    "import { createLazyFileRoute } from '@tanstack/react-router';\n"
+                    "import { publicRouteNavigation } from '@/lib/route-navigation';\n"
+                    "export const routeNavigation = publicRouteNavigation({ escapeTargets: ['/'] });\n"
+                    "export const Route = createLazyFileRoute('/invite')({ component: InvitePage });\n"
+                )
+            }
+        )
+
+        self.assertEqual([], issues)
+
+    def test_skips_redirect_and_authenticated_routes_for_route_navigation_metadata(self) -> None:
+        issues = self.issues_for_frontend(
+            {
+                "frontend/src/routes/index.lazy.tsx": (
+                    "import { createLazyFileRoute, Navigate } from '@tanstack/react-router';\n"
+                    "export const Route = createLazyFileRoute('/')({ component: () => <Navigate to='/sign-in' /> });\n"
+                ),
+                "frontend/src/routes/_authenticated/dashboard.lazy.tsx": (
+                    "import { createLazyFileRoute } from '@tanstack/react-router';\n"
+                    "export const Route = createLazyFileRoute('/_authenticated/dashboard')({ component: DashboardPage });\n"
+                ),
+            }
+        )
+
+        self.assertEqual([], issues)
+
 
 class TestGovernanceOwnerBoundary(unittest.TestCase):
     def issues_for_doc(self, relative_path: str, content: str) -> list[str]:
@@ -2179,7 +2271,7 @@ class TestLocalDevCli(unittest.TestCase):
         )
 
     def test_e2e_builds_and_runs_profile(self) -> None:
-        calls = self.run_local_dev(axis.argparse.Namespace(local_dev_command="e2e"))
+        calls = self.run_local_dev(axis.argparse.Namespace(local_dev_command="e2e", e2e_args=[]))
 
         self.assertEqual(
             ["compose", "-p", "axis", "-f", str(axis.LOCAL_DEV_COMPOSE_FILE), "--profile", "e2e", "build", "e2e"],
@@ -2198,6 +2290,34 @@ class TestLocalDevCli(unittest.TestCase):
                 "--rm",
                 "--no-deps",
                 "e2e",
+            ],
+            calls[1][1:],
+        )
+
+    def test_e2e_forwards_playwright_args(self) -> None:
+        calls = self.run_local_dev(
+            axis.argparse.Namespace(
+                local_dev_command="e2e",
+                e2e_args=["--", "e2e/sign-in-user.pw.ts", "-g", "AT-001"],
+            )
+        )
+
+        self.assertEqual(
+            [
+                "compose",
+                "-p",
+                "axis",
+                "-f",
+                str(axis.LOCAL_DEV_COMPOSE_FILE),
+                "--profile",
+                "e2e",
+                "run",
+                "--rm",
+                "--no-deps",
+                "e2e",
+                "e2e/sign-in-user.pw.ts",
+                "-g",
+                "AT-001",
             ],
             calls[1][1:],
         )

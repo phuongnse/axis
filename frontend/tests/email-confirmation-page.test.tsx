@@ -31,6 +31,10 @@ describe('EmailConfirmationPage', () => {
     ).toBeInTheDocument();
     expect(screen.getByText(/Sent to alex@example.com/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /resend email/i })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /back to registration/i })).toHaveAttribute(
+      'href',
+      '/register',
+    );
   });
 
   it('shows success banner after resend succeeds', async () => {
