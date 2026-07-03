@@ -13,8 +13,6 @@ namespace Axis.Identity.Application.Tests.Commands;
 
 public class SignInUserHandlerTests
 {
-    private const string GenericCredentialError = "Email or password is incorrect.";
-
     private readonly IUserRepository _userRepo = Substitute.For<IUserRepository>();
     private readonly IWorkspaceRepository _workspaceRepo = Substitute.For<IWorkspaceRepository>();
     private readonly IPasswordHasher _hasher = Substitute.For<IPasswordHasher>();
@@ -97,7 +95,7 @@ public class SignInUserHandlerTests
 
         result.IsFailure.Should().BeTrue();
         result.ErrorCode.Should().Be(ErrorCodes.BusinessRule);
-        result.Error.Should().Be(GenericCredentialError);
+        result.Error.Should().Be(SignInUserHandler.GenericCredentialError);
         await _workspaceRepo.DidNotReceive().GetPersonalByOwnerUserIdAsync(
             Arg.Any<Guid>(), Arg.Any<CancellationToken>());
     }
@@ -117,7 +115,7 @@ public class SignInUserHandlerTests
 
         result.IsFailure.Should().BeTrue();
         result.ErrorCode.Should().Be(ErrorCodes.BusinessRule);
-        result.Error.Should().Be("Email verification is required before sign-in.");
+        result.Error.Should().Be(SignInUserHandler.VerificationRequiredError);
         await _workspaceRepo.DidNotReceive().GetPersonalByOwnerUserIdAsync(
             Arg.Any<Guid>(), Arg.Any<CancellationToken>());
     }
@@ -143,7 +141,7 @@ public class SignInUserHandlerTests
 
         result.IsFailure.Should().BeTrue();
         result.ErrorCode.Should().Be(ErrorCodes.BusinessRule);
-        result.Error.Should().Be("Account is not available for sign-in.");
+        result.Error.Should().Be(SignInUserHandler.AccountUnavailableError);
     }
 
     [Fact]
