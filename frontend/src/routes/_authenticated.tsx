@@ -1,4 +1,4 @@
-import { createFileRoute, Outlet, redirect } from '@tanstack/react-router';
+import { createFileRoute, isRedirect, Outlet, redirect } from '@tanstack/react-router';
 import { AppShell } from '@/components/shared/AppShell';
 import { restoreSessionFromBrowserAuth } from '@/features/auth/api';
 import { getAccessToken } from '@/features/auth/auth-store';
@@ -13,8 +13,15 @@ export async function ensureAuthenticatedRouteSession() {
     return;
   }
 
-  const restored = await restoreSessionFromBrowserAuth();
-  if (!restored) {
+  try {
+    const restored = await restoreSessionFromBrowserAuth();
+    if (!restored) {
+      throw redirect({ to: '/sign-in' });
+    }
+  } catch (error) {
+    if (isRedirect(error)) {
+      throw error;
+    }
     throw redirect({ to: '/sign-in' });
   }
 }

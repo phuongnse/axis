@@ -154,13 +154,14 @@ export async function restoreSessionFromBrowserAuth(): Promise<boolean> {
 }
 
 async function restoreSessionFromBrowserAuthOnce(): Promise<boolean> {
-  const pkce = createPkceSession();
-  const authorizeUrl = await buildAuthorizeUrl(pkce.state, pkce.verifier);
-
   try {
+    const pkce = createPkceSession();
+    const authorizeUrl = await buildAuthorizeUrl(pkce.state, pkce.verifier);
+
     const response = await fetch(authorizeUrl, {
       credentials: 'include',
       redirect: 'follow',
+      signal: AbortSignal.timeout(10_000),
     });
 
     if (!response.ok || !response.url) {

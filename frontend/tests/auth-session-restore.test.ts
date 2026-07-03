@@ -94,6 +94,17 @@ describe('auth session restore', () => {
     expect(sessionStorage.getItem('pkce_state')).toBeNull();
   });
 
+  it('redirects the authenticated route when browser session restore fails unexpectedly', async () => {
+    vi.mocked(fetch).mockRejectedValue(new Error('identity server unavailable'));
+
+    await expect(ensureAuthenticatedRouteSession()).rejects.toMatchObject({
+      options: { to: '/sign-in' },
+    });
+    expect(getAccessToken()).toBeNull();
+    expect(sessionStorage.getItem('pkce_verifier')).toBeNull();
+    expect(sessionStorage.getItem('pkce_state')).toBeNull();
+  });
+
   it('returns true immediately when an access token is already in memory', async () => {
     useAuthStore.getState().setSession('existing-token');
 
@@ -117,5 +128,31 @@ describe('auth session restore', () => {
     expect(getAccessToken()).toBeNull();
     expect(sessionStorage.getItem('pkce_verifier')).toBeNull();
     expect(sessionStorage.getItem('pkce_state')).toBeNull();
+  });
+
+  it('returns false and skips network when PKCE setup fails', async () => {
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('storage unavailable');
+    });
+
+    await expect(restoreSessionFromBrowserAuth()).resolves.toBe(false);
+
+    expect(fetch).not.toHaveBeenCalled();
+    expect(getAccessToken()).toBeNull();
+  });
+
+  it('uses a timeout signal for the browser authorization restore request', async () => {
+    vi.mocked(fetch).mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = new URL(String(input), window.location.origin);
+      if (url.pathname === '/connect/authorize') {
+        expect(init?.signal).toBeInstanceOf(AbortSignal);
+        return Promise.resolve(unauthenticatedResponse());
+      }
+      return Promise.reject(new Error(`Unexpected fetch: ${url.toString()}`));
+    });
+
+    await expect(restoreSessionFromBrowserAuth()).resolves.toBe(false);
+
+    expect(fetch).toHaveBeenCalledTimes(1);
   });
 });

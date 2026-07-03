@@ -31,6 +31,14 @@ function jsonResponse(data: unknown): Response {
   } as unknown as Response;
 }
 
+function deferredResponse() {
+  let resolve!: (response: Response) => void;
+  const promise = new Promise<Response>((resolver) => {
+    resolve = resolver;
+  });
+  return { promise, resolve };
+}
+
 function TranslatedFormHarness() {
   const { t } = useTranslation();
 
@@ -149,5 +157,44 @@ describe('language preferences', () => {
     const request = vi.mocked(fetch).mock.calls[0][1];
     expect(request?.method).toBe('PUT');
     expect(String(request?.body)).toContain('"language":"vi"');
+  });
+
+  it('ignores stale authenticated language save responses after a newer selection wins', async () => {
+    const user = userEvent.setup();
+    const vietnameseSave = deferredResponse();
+    const englishSave = deferredResponse();
+    useAuthStore.getState().setSession('header.payload.signature');
+    vi.mocked(fetch).mockImplementation((_input: RequestInfo | URL, init?: RequestInit) => {
+      const body = String(init?.body);
+      if (body.includes('"language":"vi"')) {
+        return vietnameseSave.promise;
+      }
+      if (body.includes('"language":"en"')) {
+        return englishSave.promise;
+      }
+      return Promise.reject(new Error(`Unexpected language request: ${body}`));
+    });
+
+    await renderWithRouter(<LanguageControl authenticated />, { path: '/dashboard' });
+
+    await user.click(screen.getByRole('button', { name: 'VI' }));
+    await user.click(screen.getByRole('button', { name: 'EN' }));
+
+    let staleResponseParsed = false;
+
+    englishSave.resolve(jsonResponse({ language: 'en' }));
+    await waitFor(() => expect(localStorage.getItem(LANGUAGE_STORAGE_KEY)).toBe('en'));
+
+    vietnameseSave.resolve({
+      ok: true,
+      status: 200,
+      text: () => {
+        staleResponseParsed = true;
+        return Promise.resolve(JSON.stringify({ language: 'vi' }));
+      },
+    } as unknown as Response);
+    await waitFor(() => expect(staleResponseParsed).toBe(true));
+    await waitFor(() => expect(localStorage.getItem(LANGUAGE_STORAGE_KEY)).toBe('en'));
+    expect(document.documentElement.lang).toBe('en');
   });
 });

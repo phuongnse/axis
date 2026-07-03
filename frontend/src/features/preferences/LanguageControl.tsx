@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Check, RotateCcw } from 'lucide-react';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
@@ -31,10 +31,17 @@ export function LanguageControl({
   const { i18n, t } = useTranslation();
   const language = currentSiteLanguage();
   const [lastFailedLanguage, setLastFailedLanguage] = useState<SupportedLanguage | null>(null);
+  const latestServerLanguageRef = useRef<SupportedLanguage | null>(null);
 
   const mutation = useMutation({
     mutationFn: updateLanguagePreference,
-    onSuccess: (data) => {
+    onSuccess: (data, variables) => {
+      if (
+        !isSupportedLanguage(variables.language) ||
+        variables.language !== latestServerLanguageRef.current
+      ) {
+        return;
+      }
       if (isSupportedLanguage(data.language)) {
         persistLanguage(data.language);
         queryClient.setQueryData<CurrentUserProfile | undefined>(
@@ -45,9 +52,13 @@ export function LanguageControl({
       setLastFailedLanguage(null);
     },
     onError: (_error, variables) => {
-      setLastFailedLanguage(
-        isSupportedLanguage(variables?.language) ? variables.language : currentSiteLanguage(),
-      );
+      if (
+        !isSupportedLanguage(variables?.language) ||
+        variables.language !== latestServerLanguageRef.current
+      ) {
+        return;
+      }
+      setLastFailedLanguage(variables.language);
     },
   });
 
@@ -58,12 +69,14 @@ export function LanguageControl({
     void changeSiteLanguage(nextLanguage);
     setLastFailedLanguage(null);
     if (shouldPersistToServer) {
+      latestServerLanguageRef.current = nextLanguage;
       mutation.mutate({ language: nextLanguage });
     }
   }
 
   function retrySave() {
     const retryLanguage = lastFailedLanguage ?? language;
+    latestServerLanguageRef.current = retryLanguage;
     mutation.mutate({ language: retryLanguage });
   }
 
