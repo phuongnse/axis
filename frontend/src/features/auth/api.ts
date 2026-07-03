@@ -1,5 +1,5 @@
 import { fetchApi } from '@/lib/api';
-import { useAuthStore } from './auth-store';
+import { getAccessToken, useAuthStore } from './auth-store';
 import {
   buildAuthorizeUrl,
   CLIENT_ID,
@@ -36,6 +36,7 @@ const verifyEmailSuccessCache = new Map<
 >();
 const verifyEmailInFlight = new Map<string, Promise<VerifyEmailResponse>>();
 const verifyEmailSuccessCacheTtlMs = 60_000;
+let browserSessionRestoreInFlight: Promise<boolean> | null = null;
 
 function pruneVerifyEmailSuccessCache(now: number): void {
   for (const [token, entry] of verifyEmailSuccessCache.entries()) {
@@ -136,6 +137,57 @@ export async function verifyEmail(token: string): Promise<VerifyEmailResponse> {
 
 export async function completePostVerifyPkceFlow(): Promise<void> {
   await completePostSignInPkceFlow();
+}
+
+export async function restoreSessionFromBrowserAuth(): Promise<boolean> {
+  if (getAccessToken()) {
+    return true;
+  }
+
+  if (!browserSessionRestoreInFlight) {
+    browserSessionRestoreInFlight = restoreSessionFromBrowserAuthOnce().finally(() => {
+      browserSessionRestoreInFlight = null;
+    });
+  }
+
+  return browserSessionRestoreInFlight;
+}
+
+async function restoreSessionFromBrowserAuthOnce(): Promise<boolean> {
+  try {
+    const pkce = createPkceSession();
+    const authorizeUrl = await buildAuthorizeUrl(pkce.state, pkce.verifier);
+
+    const response = await fetch(authorizeUrl, {
+      credentials: 'include',
+      redirect: 'follow',
+      signal: AbortSignal.timeout(10_000),
+    });
+
+    if (!response.ok || !response.url) {
+      clearPkceSession();
+      return false;
+    }
+
+    const finalUrl = new URL(response.url, window.location.origin);
+    if (finalUrl.pathname !== '/callback') {
+      clearPkceSession();
+      return false;
+    }
+
+    const code = finalUrl.searchParams.get('code');
+    const state = finalUrl.searchParams.get('state');
+    if (!code || state !== pkce.state) {
+      clearPkceSession();
+      return false;
+    }
+
+    await exchangeAuthorizationCode(code);
+    return true;
+  } catch {
+    clearPkceSession();
+    return false;
+  }
 }
 
 export async function completePostSignInPkceFlow(): Promise<void> {

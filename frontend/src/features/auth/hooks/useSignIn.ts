@@ -1,15 +1,20 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
+import { useMemo } from 'react';
 import { type FieldPath, type UseFormReturn, useForm } from 'react-hook-form';
-
+import { useTranslation } from 'react-i18next';
 import { completePostSignInPkceFlow, signInUser } from '@/features/auth/api';
+import { useRefreshClientValidationErrors } from '@/features/auth/hooks/useRefreshClientValidationErrors';
 import { getProblemDetail } from '@/features/auth/problem-details';
-import { type SignInFormValues, signInSchema } from '@/features/auth/schemas/sign-in-schema';
+import { createSignInSchema, type SignInFormValues } from '@/features/auth/schemas/sign-in-schema';
 import type { SignInValidationErrorData } from '@/features/auth/types';
+import { currentSiteLanguage } from '@/features/preferences';
 import { ApiError } from '@/lib/api';
 
 type SignInErrorKind = 'verification_required' | 'rate_limited' | 'form';
+
+const clientValidationFields: FieldPath<SignInFormValues>[] = ['email', 'password'];
 
 function getFieldError(
   errors: Record<string, string[]> | undefined,
@@ -51,7 +56,18 @@ function classifySignInError(error: ApiError): SignInErrorKind {
 
 export function useSignIn() {
   const navigate = useNavigate();
-  const genericSubmitError = 'Something went wrong, please try again';
+  const { t } = useTranslation();
+  const language = currentSiteLanguage();
+  const genericSubmitError = t('auth.genericError');
+  const signInSchema = useMemo(
+    () =>
+      createSignInSchema({
+        emailRequired: t('validation.emailRequired'),
+        emailInvalid: t('validation.emailInvalid'),
+        passwordRequired: t('validation.passwordRequired'),
+      }),
+    [t],
+  );
   const form = useForm<SignInFormValues>({
     resolver: zodResolver(signInSchema),
     defaultValues: {
@@ -60,6 +76,7 @@ export function useSignIn() {
     },
     mode: 'onSubmit',
   });
+  useRefreshClientValidationErrors(form, clientValidationFields, language);
 
   const mutation = useMutation({
     mutationFn: async (values: SignInFormValues) =>
@@ -91,7 +108,7 @@ export function useSignIn() {
         if (errorKind === 'rate_limited') {
           form.setError('root', {
             type: 'server',
-            message: detail || 'Please wait before trying again.',
+            message: detail || t('notice.resendLimited'),
           });
           return;
         }

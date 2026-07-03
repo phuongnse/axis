@@ -76,6 +76,25 @@ describe('RegisterPage', () => {
     ).toBeInTheDocument();
   });
 
+  it('updates client validation errors when language changes', async () => {
+    const user = userEvent.setup();
+    await renderWithRouter(<RegisterPage />, { path: '/register' });
+
+    await user.click(await screen.findByRole('button', { name: /create account/i }));
+
+    expect(screen.getByText('Full name is required')).toBeInTheDocument();
+    expect(screen.getByText('Email address is required')).toBeInTheDocument();
+    expect(screen.getByLabelText('Email address')).toHaveAttribute('aria-invalid', 'true');
+
+    await user.click(screen.getByRole('button', { name: 'Preferences' }));
+    await user.click(screen.getByRole('button', { name: /tiếng việt/i }));
+
+    expect(await screen.findByText('Họ và tên là bắt buộc')).toBeInTheDocument();
+    expect(screen.getByText('Email là bắt buộc')).toBeInTheDocument();
+    expect(screen.queryByText('Full name is required')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Địa chỉ email')).toHaveAttribute('aria-invalid', 'true');
+  });
+
   it('offers a sign-in link so registration is not a dead end', async () => {
     await renderWithRouter(<RegisterPage />, { path: '/register' });
 

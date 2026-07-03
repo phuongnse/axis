@@ -79,6 +79,7 @@ services:
       Email__Host: maildev
       Email__Port: "1025"
       Cors__AllowedOrigins__0: "https://localhost:3000"
+      RateLimiting__Auth__PermitLimit: "1000"
       # OTLP export is off in the default compose API container (no LGTM dependency).
       # For traces in Grafana: `docker compose --profile observability up -d otel-lgtm`
       # then `dotnet run` on the host (appsettings.json → localhost:4318) or set

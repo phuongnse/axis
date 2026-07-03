@@ -48,6 +48,7 @@ Follow [reference.md](../reference.md).
    - Keep screen shape tied to owning use-case flows, ACs, and implementation-status gaps.
    - Do not create dead-end screens. Public/auth route files must declare `routeNavigation = publicRouteNavigation(...)`, and every public/auth route state must render a visible sign-in, registration, back, or home-style link. Authenticated pages rely on app shell navigation and sign-out.
    - Do not store auth tokens in `localStorage`.
+   - On localized surfaces, route visible product copy through the frontend translation layer rather than component-local static text.
    - Keep visible text focused on the product workflow, not developer instructions.
 
 5. Test behavior.
@@ -59,7 +60,7 @@ Follow [reference.md](../reference.md).
 
 6. Verify.
    - During development, run the smallest targeted frontend test that proves changed behavior; use type/lint only for static edits.
-   - For visual or layout-sensitive changes, inspect the route at desktop and mobile sizes with Playwright or an available browser-capable tool when the app is runnable.
+   - For visual, layout-sensitive, or localized-copy changes, inspect the route in the supported languages named by the owning use case at desktop and mobile sizes with Playwright or an available browser-capable tool when the app is runnable.
    - For browser-level journey evidence that needs the local stack, use `python scripts/axis.py local-dev e2e`.
    - Ready review: `$axis-ready-review`.
 

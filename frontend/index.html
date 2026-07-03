@@ -6,27 +6,55 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Account</title>
     <script>
-      // Sync with THEME_STORAGE_KEY/LANGUAGE_STORAGE_KEY in preferences-store.ts.
+      // Sync with THEME_STORAGE_KEY and LANGUAGE_STORAGE_KEY in frontend stores.
       (() => {
+        const supportedLanguages = new Set(['en', 'vi']);
         let themeMode = 'system';
         let prefersDark = false;
         let resolvedTheme = false;
-        let language = null;
 
         try {
           themeMode = localStorage.getItem('axis.theme') || 'system';
+        } catch {
+          themeMode = 'system';
+        }
+
+        try {
           prefersDark = window.matchMedia?.('(prefers-color-scheme: dark)').matches || false;
           resolvedTheme = themeMode === 'dark' || (themeMode === 'system' && prefersDark);
           document.documentElement.classList.toggle('dark', resolvedTheme);
           document.documentElement.dataset.themeMode = themeMode;
           document.documentElement.style.colorScheme = resolvedTheme ? 'dark' : 'light';
-
-          language = localStorage.getItem('axis.language');
-          if (language === 'en' || language === 'vi') {
-            document.documentElement.lang = language;
-          }
         } catch {
           document.documentElement.dataset.themeMode = 'system';
+        }
+
+        const readStoredLanguage = () => {
+          try {
+            return localStorage.getItem('axis.language');
+          } catch {
+            return null;
+          }
+        };
+
+        const normalizeLanguage = (value) => {
+          if (!value) return null;
+          const base = String(value).toLowerCase().split('-')[0];
+          return supportedLanguages.has(base) ? base : null;
+        };
+
+        const browserLanguages =
+          navigator.languages?.length
+            ? navigator.languages
+            : [navigator.language];
+
+        const languageCandidates = [readStoredLanguage(), ...browserLanguages];
+        const resolvedLanguage = languageCandidates.map(normalizeLanguage).find(Boolean) || 'en';
+
+        try {
+          document.documentElement.lang = resolvedLanguage;
+        } catch {
+          document.documentElement.lang = 'en';
         }
       })();
     </script>

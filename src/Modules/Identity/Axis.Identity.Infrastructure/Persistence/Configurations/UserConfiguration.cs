@@ -38,6 +38,13 @@ internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
             .HasColumnName("is_email_verified")
             .IsRequired();
 
+        builder.Property(u => u.LanguagePreference)
+            .HasColumnName("language_preference")
+            .HasMaxLength(UserLanguage.MaxLength)
+            .HasConversion(new ValueConverter<UserLanguage?, string?>(
+                language => language == null ? null : language.Value,
+                value => value == null ? null : UserLanguage.Create(value).Value));
+
         builder.Property(u => u.AcceptedTermsVersion)
             .HasColumnName("accepted_terms_version")
             .HasMaxLength(32);
@@ -55,6 +62,5 @@ internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
 
         builder.Property(u => u.PasswordHash)
             .HasColumnName("password_hash");
-
     }
 }

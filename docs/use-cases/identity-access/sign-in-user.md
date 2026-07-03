@@ -22,7 +22,8 @@ Let a verified standalone Axis user sign in with email/password and reach the ac
 4. System verifies the credentials against the stored password hash.
 5. System verifies the account is active, email verified, and has a sign-in-eligible personal workspace.
 6. System establishes the short-lived browser authorization session.
-7. User completes the existing browser callback and reaches the dashboard.
+7. User completes the existing browser callback, keeps the access token in the frontend memory session, and reaches the dashboard.
+8. On a later authenticated route load where the memory session is absent but the browser authorization session remains valid, system restores a new memory access token through the existing callback handoff and keeps the user on the authenticated route.
 
 ## Alternate / error flows
 
@@ -33,6 +34,7 @@ Let a verified standalone Axis user sign in with email/password and reach the ac
 - Rate-limited sign-in or resend attempt: show a clear wait state and disable the affected action while limited.
 - Server error during sign-in: show a generic retry message and re-enable the submit button.
 - Invalid authorization callback or token exchange failure: show a clear state that lets the user try sign-in again without keeping a stale session.
+- Authenticated route load without a valid memory session or browser authorization session: route the user to `/sign-in` without keeping stale local session state.
 
 ## Acceptance Criteria
 
@@ -42,7 +44,7 @@ Let a verified standalone Axis user sign in with email/password and reach the ac
 - **AC-003** Sign-in verifies the submitted password against the stored password hash for an active standalone account.
 - **AC-004** Sign-in requires the account email to already be verified.
 - **AC-005** Sign-in selects the user's active personal workspace as the current workspace for the session.
-- **AC-006** Successful sign-in establishes the browser authorization session, completes the callback, stores the access token, and routes the user to the dashboard.
+- **AC-006** Successful sign-in establishes the browser authorization session, completes the callback, keeps the access token in the frontend memory session, and routes the user to the dashboard.
 - **AC-007** Unauthenticated access to authenticated Axis routes sends the user to `/sign-in`, while registration remains reachable from the sign-in page.
 
 *Validation & errors*
@@ -62,14 +64,16 @@ Let a verified standalone Axis user sign in with email/password and reach the ac
 - **AC-019** Email input is trimmed before credential lookup.
 - **AC-020** Password input, including leading and trailing spaces, is submitted exactly as entered.
 - **AC-021** Sign-in does not create accounts, workspaces, legal acceptances, or verification tokens except when the user explicitly requests verification resend.
-- **AC-022** Sign-in, verification-required, and callback states always expose a route to registration or sign-in, so the user is never left on a dead-end screen.
+- **AC-022** Sign-in, verification-required, and callback journeys provide a recoverable path when the user cannot complete the current step.
+- **AC-023** A protected route reload with a valid browser authorization session restores an access token through the existing callback handoff, keeps access tokens out of browser storage, and preserves the requested authenticated route.
+- **AC-024** A protected route load without a valid browser authorization session routes to `/sign-in` and clears stale local session state.
 
 ## Acceptance Test Matrix
 
 | ID | Boundary | Scenario | Covers AC | Verification | Required |
 |---|---|---|---|---|---|
 | AT-001 | Browser journey | Verified standalone user signs in and reaches the dashboard | AC-001, AC-002, AC-003, AC-004, AC-005, AC-006 | Browser automation | Yes |
-| AT-002 | Browser journey | Unauthenticated dashboard access routes to sign-in, and sign-in links to registration | AC-007 | Browser automation | Yes |
+| AT-002 | Browser journey | Unauthenticated dashboard access routes to sign-in, and sign-in links to registration | AC-007, AC-024 | Browser automation | Yes |
 | AT-003 | API boundary | Valid sign-in verifies password hash, active user, verified email, and active personal workspace before establishing a browser authorization session | AC-003, AC-004, AC-005, AC-006 | Application test + API integration test | Yes |
 | AT-004 | UI component | Empty form and invalid email render inline field errors | AC-008, AC-009, AC-010 | UI component test | Yes |
 | AT-005 | API boundary | Unknown email, wrong password, and inactive account return the same generic credential failure without a session | AC-011 | Application test + API integration test | Yes |
@@ -80,6 +84,7 @@ Let a verified standalone Axis user sign in with email/password and reach the ac
 | AT-010 | UI component | Rapid submissions are deduplicated, email is trimmed, and password whitespace is preserved | AC-018, AC-019, AC-020 | UI component test + Application test | Yes |
 | AT-011 | Application boundary | Sign-in does not create accounts, workspaces, legal acceptances, or verification tokens unless resend is explicitly requested | AC-021 | Application test | Yes |
 | AT-012 | UI component | Sign-in and callback states expose registration or sign-in escape navigation | AC-022 | UI component test | Yes |
+| AT-013 | Browser journey | Authenticated protected route reload restores from the existing browser authorization session and stays on the authenticated route | AC-006, AC-023 | Browser automation + UI component test | Yes |
 
 ## Out Of Scope
 
@@ -94,9 +99,10 @@ Let a verified standalone Axis user sign in with email/password and reach the ac
 | `/sign-in` | Render an auth-card form with email, password, link to registration, and one submit action. |
 | `/sign-in` validation | Show required-field, invalid-email, generic credential, unverified-account, workspace-unavailable, rate-limited, and generic 5xx states inline or in the form alert described by the relevant AC. Keep submit disabled only while sign-in is pending or rate-limited. |
 | `/sign-in` verification required | Show that email verification is required, allow resend when not limited, and keep resend copy account-enumeration-safe. |
-| Callback/dashboard handoff | Reuse the existing browser callback path to exchange the authorization code, store the access token, route to `/dashboard`, and show sign-in escape navigation while pending or when callback recovery is needed. |
+| Callback/dashboard handoff | Reuse the existing browser callback path to exchange the authorization code, keep the access token in memory, route to `/dashboard`, and show sign-in escape navigation while pending or when callback recovery is needed. |
+| Protected route bootstrap | On authenticated routes with no memory access token, try to restore through the existing browser authorization session and callback handoff; continue on success and route to `/sign-in` on failure. |
 
-Required UI quality: labels must be programmatic, invalid fields must expose invalid state, error/help text must remain associated with the field or form state it describes, keyboard navigation must reach every action, and the screens must use existing Axis auth primitives and theme tokens.
+Required UI quality: labels must be programmatic, invalid fields must expose invalid state, error/help text must remain associated with the field or form state it describes, recovery actions must be visible and keyboard-reachable, and the screens must use existing Axis auth primitives and theme tokens.
 
 ## Diagrams
 
@@ -122,6 +128,18 @@ sequenceDiagram
   Web->>OIDC: POST /connect/token
   OIDC-->>Web: Access token
   Web-->>User: Open dashboard
+
+  Note over User,Web: Later protected route load after page reload
+  Web->>OIDC: Start callback handoff with browser session
+  alt Browser session valid
+    OIDC-->>Web: Redirect /callback?code=...
+    Web->>OIDC: POST /connect/token
+    OIDC-->>Web: Access token
+    Web-->>User: Keep authenticated route
+  else Browser session missing
+    OIDC-->>Web: Authorization unavailable
+    Web-->>User: Open /sign-in
+  end
 ```
 
 > **Implementation status**
@@ -134,7 +152,7 @@ sequenceDiagram
 > | API | Done |
 > | Frontend | Done |
 >
-> **Implemented:** The standalone sign-in backend, API, and frontend screens are in place. `POST /api/auth/sign-in` verifies credentials for an active verified user, requires an active personal workspace, establishes the browser authorization session, and reuses the existing callback/dashboard handoff. `/sign-in` owns the returning-user form, validation states, verification-required resend path, generic credential failures, route-guard redirect entry point, and registration link.
+> **Implemented:** The standalone sign-in backend, API, and frontend screens are in place. `POST /api/auth/sign-in` verifies credentials for an active verified user, requires an active personal workspace, establishes the browser authorization session, and reuses the existing callback/dashboard handoff. `/sign-in` owns the returning-user form, validation states, verification-required resend path, generic credential failures, route-guard redirect entry point, registration link, and protected-route reload restoration from the existing browser authorization session.
 >
 > **Gaps vs spec:** N/A.
 >
@@ -142,4 +160,4 @@ sequenceDiagram
 >
 > **Verification:** Required AT rows are covered by browser automation, UI component tests, API integration tests, and application tests.
 >
-> **Decisions:** This use case owns returning-user email/password sign-in for standalone personal workspaces. Successful sign-in reuses the existing browser callback and dashboard handoff. Sign-in failures keep account-enumeration-safe copy at the credential boundary; unverified accounts and unavailable workspaces use specific non-sensitive states without establishing a session. Public auth screens must expose an escape navigation link instead of relying on browser history.
+> **Decisions:** This use case owns returning-user email/password sign-in for standalone personal workspaces and protected-route session bootstrap from the short-lived browser authorization session. Screen flow owns the product screen contract; Required UI quality owns accessibility and interaction expectations. Access tokens stay in frontend memory and are not persisted to browser storage. Successful sign-in reuses the existing browser callback and dashboard handoff. Sign-in failures keep account-enumeration-safe copy at the credential boundary; unverified accounts and unavailable workspaces use specific non-sensitive states without establishing a session. Public auth screens must expose an escape navigation link instead of relying on browser history.

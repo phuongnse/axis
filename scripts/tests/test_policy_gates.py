@@ -1665,6 +1665,52 @@ class TestFrontendComponentFileNames(unittest.TestCase):
         self.assertEqual([], issues)
 
 
+class TestFrontendApiContracts(unittest.TestCase):
+    def run_frontend_api_contracts(self, files: dict[str, str]) -> tuple[int, str]:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            for relative_path, content in files.items():
+                path = root / relative_path
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(content, encoding="utf-8")
+
+            with (
+                mock.patch.object(axis, "ROOT", root),
+                contextlib.redirect_stdout(io.StringIO()),
+                contextlib.redirect_stderr(io.StringIO()) as stderr,
+            ):
+                rc = axis.check_frontend_api_contracts()
+
+            return rc, stderr.getvalue()
+
+    def test_accepts_generated_schema_alias_split_across_lines(self) -> None:
+        rc, stderr = self.run_frontend_api_contracts(
+            {
+                "frontend/src/features/preferences/api.ts": (
+                    "import type { components } from '@/lib/api-types';\n"
+                    "export type UpdateLanguagePreferenceRequest =\n"
+                    "  components['schemas']['UpdateUserLanguagePreferenceRequest'];\n"
+                )
+            }
+        )
+
+        self.assertEqual(0, rc, stderr)
+
+    def test_rejects_hand_authored_frontend_api_model(self) -> None:
+        rc, stderr = self.run_frontend_api_contracts(
+            {
+                "frontend/src/features/preferences/api.ts": (
+                    "export type UpdateLanguagePreferenceRequest = {\n"
+                    "  language: string;\n"
+                    "};\n"
+                )
+            }
+        )
+
+        self.assertEqual(1, rc)
+        self.assertIn("Hand-authored frontend API model", stderr)
+
+
 class TestFrontendTailwindOpacity(unittest.TestCase):
     def issues_for_frontend(self, component_source: str) -> list[str]:
         with tempfile.TemporaryDirectory() as temp:

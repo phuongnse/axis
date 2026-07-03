@@ -52,7 +52,7 @@ Register a standalone Axis user with email/password so the user can verify their
 - **AC-013** Multiple rapid submissions are deduplicated with an idempotency key.
 - **AC-014** Pasting a password with leading/trailing spaces is accepted as-is.
 - **AC-015** Standalone registration leaves the account independent of team/setup context.
-- **AC-016** Registration, confirmation, and verification screens always expose a clear route to sign in or return to registration, so the user is never left on a dead-end screen.
+- **AC-016** Registration, confirmation, and verification journeys provide a recoverable path when the user cannot complete the current step.
 
 ## Acceptance Test Matrix
 
@@ -82,7 +82,7 @@ Register a standalone Axis user with email/password so the user can verify their
 | `/auth/verify` | Submit the token once, show loading while verification is pending, start the post-verification PKCE flow on success, show expired, invalid, and already-used verification states, show the resend rate-limited state when resend is limited, and include sign-in or registration escape navigation in every visible state. |
 | Callback/dashboard handoff | The callback and dashboard experience are owned outside this use case; this use case only requires that successful verification completes browser sign-in and routes to dashboard. |
 
-Required UI quality: labels must be programmatic, invalid fields must expose invalid state, error/help text must remain associated with the field it describes, keyboard navigation must reach every action, and the screens must use existing Axis auth primitives and theme tokens.
+Required UI quality: labels must be programmatic, invalid fields must expose invalid state, error/help text must remain associated with the field it describes, recovery actions must be visible and keyboard-reachable, and the screens must use existing Axis auth primitives and theme tokens.
 
 ## Diagrams
 
@@ -134,4 +134,4 @@ sequenceDiagram
 >
 > **Verification:** Required AT rows are covered by browser automation, UI component tests, API integration tests, and application tests.
 >
-> **Decisions:** UI requirements are owned by the Screen flow and ACs in this use-case file. Registration uses one user-facing full-name field end-to-end. Resend rate limiting is part of resend behavior, not verification-token resolution. Public auth screens must expose an escape navigation link instead of relying on browser history.
+> **Decisions:** Screen flow owns the product screen contract; Required UI quality owns accessibility and interaction expectations. Registration uses one user-facing full-name field end-to-end. Resend rate limiting is part of resend behavior, not verification-token resolution. Public auth screens must expose an escape navigation link instead of relying on browser history.

@@ -13,11 +13,13 @@ Review checklist only. Workflow lives in repo skills ([`.agents/skills/README.md
 
 ## Acceptance Coverage
 
-Use-case ACs are the contract. Cover validation, edge, authorization, isolation, and dependency-failure paths when in scope.
+Use-case ACs are the product outcome contract. Cover validation, edge, authorization, isolation, and dependency-failure paths when in scope.
+
+Screen flow and Required UI quality carry screen, accessibility, and interaction expectations; keep exact runners and implementation details out of spec matrices.
 
 AC map: `AC | kind | surface | proving test or exact deferral`.
 
-No blank in-scope rows; required AT rows name verification categories; exact runners and implementation details stay out of spec matrices; incomplete in-scope ACs block `Done`.
+No blank in-scope rows; required AT rows name verification categories; incomplete in-scope ACs block `Done`.
 
 ## Review Verification
 

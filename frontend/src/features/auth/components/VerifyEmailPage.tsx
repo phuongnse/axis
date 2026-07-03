@@ -2,27 +2,33 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Link } from '@tanstack/react-router';
 import { AlertCircle, CheckCircle2, Clock, Loader2, Mail } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { type FieldPath, useForm } from 'react-hook-form';
+import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
-
 import { Button } from '@/components/ui/button';
 import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { AuthCard } from '@/features/auth/components/AuthCard';
+import { useRefreshClientValidationErrors } from '@/features/auth/hooks/useRefreshClientValidationErrors';
 import { useResendVerification } from '@/features/auth/hooks/useResendVerification';
 import { useVerifyEmail } from '@/features/auth/hooks/useVerifyEmail';
 import { loadRegistrationContext } from '@/features/auth/registration-context';
 import type { VerifyEmailErrorKind } from '@/features/auth/types';
 import { useQueryParam } from '@/features/auth/use-query-param';
+import { currentSiteLanguage } from '@/features/preferences';
 import { cn } from '@/lib/utils';
 
-function createResendSchema() {
+type Translate = ReturnType<typeof useTranslation>['t'];
+
+function createResendSchema(t: Translate) {
   return z.object({
-    email: z.string().min(1, 'Email address is required').email('Enter a valid email address'),
+    email: z.string().min(1, t('validation.emailRequired')).email(t('validation.emailInvalid')),
   });
 }
 
 type ResendFormValues = z.infer<ReturnType<typeof createResendSchema>>;
+
+const resendClientValidationFields: FieldPath<ResendFormValues>[] = ['email'];
 
 function VerifyEmailOutcome({
   kind,
@@ -35,41 +41,45 @@ function VerifyEmailOutcome({
   onResend: (email: string) => Promise<void>;
   resendLoading: boolean;
 }) {
-  const resendSchema = useMemo(() => createResendSchema(), []);
-  const {
-    register: registerResend,
-    handleSubmit,
-    formState: { errors },
-  } = useForm<ResendFormValues>({
+  const { t } = useTranslation();
+  const language = currentSiteLanguage();
+  const resendSchema = useMemo(() => createResendSchema(t), [t]);
+  const form = useForm<ResendFormValues>({
     resolver: zodResolver(resendSchema),
     mode: 'onSubmit',
     defaultValues: { email },
   });
+  useRefreshClientValidationErrors(form, resendClientValidationFields, language);
+  const {
+    register: registerResend,
+    handleSubmit,
+    formState: { errors },
+  } = form;
   const showResend = kind === 'expired' || kind === 'rate_limited';
 
   const config = {
     expired: {
       icon: Clock,
-      title: 'Verification link expired',
-      body: 'Request a new verification email, then open the latest link.',
+      title: t('verify.expired.title'),
+      body: t('verify.expired.body'),
       iconClass: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-500/15 dark:text-yellow-300',
     },
     already_used: {
       icon: CheckCircle2,
-      title: 'Already verified',
-      body: 'This email link has already been used.',
+      title: t('verify.alreadyUsed.title'),
+      body: t('verify.alreadyUsed.body'),
       iconClass: 'text-muted-foreground bg-muted',
     },
     invalid: {
       icon: AlertCircle,
-      title: 'Invalid verification link',
-      body: 'This link is missing or cannot be verified.',
+      title: t('verify.invalid.title'),
+      body: t('verify.invalid.body'),
       iconClass: 'text-destructive bg-destructive/10',
     },
     rate_limited: {
       icon: Clock,
-      title: 'Please wait',
-      body: 'Too many attempts. Try again shortly.',
+      title: t('verify.rateLimited.title'),
+      body: t('verify.rateLimited.body'),
       iconClass: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-500/15 dark:text-yellow-300',
     },
   }[kind];
@@ -78,13 +88,13 @@ function VerifyEmailOutcome({
   const footer =
     kind === 'already_used' ? (
       <Link to="/sign-in" className="font-medium text-primary hover:underline">
-        Sign in
+        {t('auth.signIn')}
       </Link>
     ) : (
       <>
-        Need a fresh start?{' '}
+        {t('auth.needFreshStart')}{' '}
         <Link to="/register" className="font-medium text-primary hover:underline">
-          Back to registration
+          {t('auth.backToRegistration')}
         </Link>
       </>
     );
@@ -111,7 +121,7 @@ function VerifyEmailOutcome({
             noValidate
           >
             <Field data-invalid={errors.email ? true : undefined}>
-              <FieldLabel htmlFor="resend-email">Email address</FieldLabel>
+              <FieldLabel htmlFor="resend-email">{t('auth.email')}</FieldLabel>
               <Input
                 id="resend-email"
                 type="email"
@@ -124,7 +134,7 @@ function VerifyEmailOutcome({
                 {...registerResend('email')}
               />
               <FieldDescription id="resend-email-help">
-                Use the email that received the verification link.
+                {t('verify.resendEmailHelp')}
               </FieldDescription>
               {errors.email ? (
                 <FieldError id="resend-email-error">{errors.email.message}</FieldError>
@@ -140,7 +150,7 @@ function VerifyEmailOutcome({
               ) : (
                 <Mail className="size-4" aria-hidden />
               )}
-              {resendLoading ? 'Sending...' : 'Resend verification email'}
+              {resendLoading ? t('auth.sending') : t('auth.resendVerification')}
             </Button>
           </form>
         ) : null}
@@ -150,6 +160,7 @@ function VerifyEmailOutcome({
 }
 
 export function VerifyEmailPage() {
+  const { t } = useTranslation();
   const token = useQueryParam('token');
   const context = loadRegistrationContext();
   const { submit, loading, errorKind } = useVerifyEmail();
@@ -176,19 +187,19 @@ export function VerifyEmailPage() {
   if (loading) {
     return (
       <AuthCard
-        title="Verifying email"
+        title={t('verify.title')}
         footer={
           <>
-            Need to start over?{' '}
+            {t('auth.needStartOver')}{' '}
             <Link to="/sign-in" className="font-medium text-primary hover:underline">
-              Sign in
+              {t('auth.signIn')}
             </Link>
           </>
         }
       >
         <div className="flex items-center gap-3 text-sm text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-          <span>Confirming your verification link...</span>
+          <span>{t('verify.confirming')}</span>
         </div>
       </AuthCard>
     );
@@ -207,19 +218,19 @@ export function VerifyEmailPage() {
 
   return (
     <AuthCard
-      title="Verifying email"
+      title={t('verify.title')}
       footer={
         <>
-          Need to start over?{' '}
+          {t('auth.needStartOver')}{' '}
           <Link to="/sign-in" className="font-medium text-primary hover:underline">
-            Sign in
+            {t('auth.signIn')}
           </Link>
         </>
       }
     >
       <div className="flex items-center gap-3 text-sm text-muted-foreground">
         <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-        <span>Completing sign-in...</span>
+        <span>{t('verify.completing')}</span>
       </div>
     </AuthCard>
   );

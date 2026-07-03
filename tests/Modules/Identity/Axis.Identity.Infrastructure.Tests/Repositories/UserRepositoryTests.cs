@@ -71,6 +71,19 @@ public class UserRepositoryTests(IdentityDatabaseFixture db) : IAsyncLifetime
     }
 
     [Fact]
+    public async Task AddAsync_WhenUserHasLanguagePreference_PersistsAndReloadsPreference()
+    {
+        User user = MakeUser($"language-{Guid.NewGuid():N}@example.com");
+        user.SetLanguagePreference(UserLanguage.Create("vi").Value);
+        await _sut.AddAsync(user);
+        await _ctx.SaveChangesAsync();
+
+        User? loaded = await _sut.GetByIdPlatformWideAsync(user.Id);
+
+        loaded!.LanguagePreference!.Value.Should().Be("vi");
+    }
+
+    [Fact]
     public async Task FindByEmailGloballyAsync_WhenEmailExistsInAnyWorkspace_ReturnsUser()
     {
         User user = MakeUser($"global-{Guid.NewGuid():N}@example.com");

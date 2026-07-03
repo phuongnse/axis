@@ -10,6 +10,7 @@ public sealed class User : AggregateRoot<Guid>
     public string? PasswordHash { get; private set; }
     public UserStatus Status { get; private set; }
     public bool IsEmailVerified { get; private set; }
+    public UserLanguage? LanguagePreference { get; private set; }
     public string? AcceptedTermsVersion { get; private set; }
     public string? AcceptedPrivacyVersion { get; private set; }
     public DateTime? LegalAcceptedAt { get; private set; }
@@ -64,4 +65,8 @@ public sealed class User : AggregateRoot<Guid>
         IsEmailVerified = true;
     }
 
+    public void SetLanguagePreference(UserLanguage language)
+    {
+        LanguagePreference = language ?? throw new ArgumentNullException(nameof(language));
+    }
 }

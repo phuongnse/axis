@@ -1,6 +1,7 @@
 using Axis.Api.Extensions;
 using Axis.Api.Infrastructure;
 using Axis.Identity.Application.Commands.RegisterUser;
+using Axis.Identity.Application.Commands.UpdateUserLanguagePreference;
 using Axis.Identity.Application.Queries.GetCurrentUserProfile;
 using Axis.Shared.Application;
 using Axis.Shared.Domain.Primitives;
@@ -31,6 +32,15 @@ public static class UserEndpoints
             .WithSummary("Get the current user's profile")
             .WithTags("Identity")
             .Produces<CurrentUserProfileDto>()
+            .ProducesProblem(401)
+            .ProducesProblem(404);
+
+        group.MapPut("/me/preferences/language", UpdateLanguagePreference)
+            .WithName("UpdateLanguagePreference")
+            .WithSummary("Update the current user's language preference")
+            .WithTags("Identity")
+            .Produces<LanguagePreferenceDto>()
+            .ProducesProblem(400)
             .ProducesProblem(401)
             .ProducesProblem(404);
 
@@ -75,5 +85,23 @@ public static class UserEndpoints
             return Results.NotFound();
 
         return Results.Ok(profile);
+    }
+
+    private static async Task<IResult> UpdateLanguagePreference(
+        [FromBody] UpdateUserLanguagePreferenceRequest request,
+        CurrentUser currentUser,
+        ISender mediator,
+        CancellationToken ct)
+    {
+        Result<LanguagePreferenceDto> result = await mediator.Send(
+            new UpdateUserLanguagePreferenceCommand(
+                currentUser.UserId,
+                request.Language),
+            ct);
+
+        if (result.IsFailure)
+            return result.ToProblemDetails();
+
+        return Results.Ok(result.Value);
     }
 }

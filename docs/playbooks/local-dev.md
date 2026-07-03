@@ -41,6 +41,8 @@ Host ports published by compose: `1025`, `1080`, `3000`, `4318`, `5281`, `5432`,
 
 Use the observability stack only when debugging telemetry.
 
+After frontend manifest or toolchain changes, reconcile running local-dev services with the current manifests before trusting browser smoke or E2E results. Use the Axis local-dev wrapper to recreate affected services when dependency volumes or runtime caches may be stale.
+
 Local overrides live in ignored root `.env.local`. See [.env.example](../../.env.example) for optional Compose variables; stack defaults stay in [docker-compose.yml](../../docker-compose.yml).
 
 ## Environment
@@ -62,6 +64,7 @@ Common API settings (compose uses service hostnames; host run uses `localhost`):
 | Redis | `Redis__ConnectionString` → `redis:6379` | `Redis:ConnectionString` → `localhost:6379` | Sessions, idempotency, caches. |
 | SMTP | `Email__Host` / `Email__Port` → `maildev:1025` | `Email:Host` / `Email:Port` → `localhost:1025` | Outbound mail (Maildev locally). |
 | CORS | `Cors__AllowedOrigins__0` → SPA origin | `Cors:AllowedOrigins` | Browser origins allowed to call the API. |
+| Auth rate limit | `RateLimiting__Auth__PermitLimit` → high local/E2E limit | `RateLimiting:Auth:PermitLimit` → API default | Keeps repeated local browser journeys from exhausting the production-like auth throttle while preserving configurable API behavior. |
 | HTTPS certs | `/https/*.pem` mounts | Kestrel / Vite dev cert env in compose `web` | Local TLS for SPA and API. |
 
 Frontend dev (compose `web` service sets these; host Vite uses [frontend/vite.config.ts](../../frontend/vite.config.ts) defaults):

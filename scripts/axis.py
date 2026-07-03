@@ -644,6 +644,7 @@ def check_ef_domain_mapping(_args: argparse.Namespace | None = None) -> int:
 
 def check_frontend_api_contracts(_args: argparse.Namespace | None = None) -> int:
     pattern = re.compile(r"(^|\s)(export\s+)?(interface|type)\s+[A-Za-z0-9_]*(Request|Response|Dto)\b")
+    generated_contract_pattern = re.compile(r"(components|operations)\[['\"]")
     issues: list[str] = []
     root = ROOT / "frontend" / "src"
     for path in iter_files(root, (".ts", ".tsx")):
@@ -651,12 +652,16 @@ def check_frontend_api_contracts(_args: argparse.Namespace | None = None) -> int
         if normalized.endswith("frontend/src/lib/api-types.ts") or normalized.endswith("frontend/src/routeTree.gen.ts"):
             continue
         text = path.read_text(encoding="utf-8")
-        for idx, line in enumerate(text.splitlines(), 1):
+        lines = text.splitlines()
+        for idx, line in enumerate(lines, 1):
             if not pattern.search(line):
                 continue
-            if "components['schemas']" in line or 'components["schemas"]' in line:
-                continue
-            if "operations['" in line or 'operations["' in line:
+            statement = line
+            for continuation in lines[idx : min(idx + 8, len(lines))]:
+                if ";" in statement or "{" in statement:
+                    break
+                statement = f"{statement}\n{continuation}"
+            if generated_contract_pattern.search(statement):
                 continue
             issues.append(f"{normalized}:{idx}:{line}")
     if issues:

@@ -52,6 +52,24 @@ describe('SignInPage', () => {
     expect(screen.getByText('Password is required')).toBeInTheDocument();
   });
 
+  it('updates client validation errors when language changes', async () => {
+    const user = userEvent.setup();
+    await renderWithRouter(<SignInPage />, { path: '/sign-in' });
+
+    await user.click(screen.getByRole('button', { name: /sign in/i }));
+
+    expect(screen.getByText('Email address is required')).toBeInTheDocument();
+    expect(screen.getByLabelText('Email address')).toHaveAttribute('aria-invalid', 'true');
+
+    await user.click(screen.getByRole('button', { name: 'Preferences' }));
+    await user.click(screen.getByRole('button', { name: /tiếng việt/i }));
+
+    expect(await screen.findByText('Email là bắt buộc')).toBeInTheDocument();
+    expect(screen.getByText('Mật khẩu là bắt buộc')).toBeInTheDocument();
+    expect(screen.queryByText('Email address is required')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Địa chỉ email')).toHaveAttribute('aria-invalid', 'true');
+  });
+
   it('submits trimmed email and exact password then starts PKCE', async () => {
     const user = userEvent.setup();
     let signInBody: Record<string, unknown> | undefined;
