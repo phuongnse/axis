@@ -107,6 +107,17 @@ async function fillSignInForm(page: Page, email: string): Promise<void> {
   await page.getByLabel('Password').fill(password);
 }
 
+function watchLanguagePreferenceWrites(page: Page): () => number {
+  let writes = 0;
+  page.on('request', (request) => {
+    const url = new URL(request.url());
+    if (request.method() === 'PUT' && url.pathname === '/api/users/me/preferences/language') {
+      writes += 1;
+    }
+  });
+  return () => writes;
+}
+
 test.describe('sign in user', () => {
   test.skip(!apiURL, 'Set E2E_API_URL to run sign-in-user API setup.');
 
@@ -121,6 +132,7 @@ test.describe('sign in user', () => {
     test.skip(!maildevURL, 'Set E2E_MAILDEV_URL to run sign-in-user email verification.');
 
     const email = uniqueEmail('sign001');
+    const languageWrites = watchLanguagePreferenceWrites(page);
     await createVerifiedUser(request, email);
 
     await page.goto('/sign-in');
@@ -131,6 +143,7 @@ test.describe('sign in user', () => {
     await expect(page.getByRole('heading', { name: 'Sign In User', level: 1 })).toBeVisible();
     await expect(page.getByRole('definition').filter({ hasText: email })).toBeVisible();
     await expect(page.getByText('Account ready')).toBeVisible();
+    expect(languageWrites()).toBe(0);
   });
 
   test('AT-002 unauthenticated dashboard access routes to sign-in with registration link', async ({
@@ -140,7 +153,51 @@ test.describe('sign in user', () => {
 
     await expect(page).toHaveURL(/\/sign-in$/);
     await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible();
-    await page.getByRole('link', { name: /create an account/i }).click();
+    await page.getByRole('link', { name: /create account/i }).click();
     await expect(page).toHaveURL(/\/register$/);
+  });
+
+  test('AT-004 validation errors relocalize and visibly mark invalid fields', async ({ page }) => {
+    await page.goto('/sign-in');
+    await page.getByRole('button', { name: /sign in/i }).click();
+
+    const emailInput = page.getByLabel('Email address');
+    await expect(page.getByText('Email address is required')).toBeVisible();
+    await expect(page.getByText('Password is required')).toBeVisible();
+    await expect(emailInput).toHaveAttribute('aria-invalid', 'true');
+    await expect(emailInput).toHaveCSS('border-color', 'rgb(239, 68, 68)');
+
+    await page.getByRole('button', { name: 'Preferences' }).click();
+    await page.getByRole('button', { name: /tiếng việt/i }).click();
+
+    const localizedEmailInput = page.getByLabel('Địa chỉ email');
+    await expect(page.getByText('Email là bắt buộc')).toBeVisible();
+    await expect(page.getByText('Mật khẩu là bắt buộc')).toBeVisible();
+    await expect(page.getByText('Email address is required')).toHaveCount(0);
+    await expect(localizedEmailInput).toHaveAttribute('aria-invalid', 'true');
+    await expect(localizedEmailInput).toHaveCSS('border-color', 'rgb(239, 68, 68)');
+  });
+
+  test('AT-013 protected route reload restores from the browser authorization session', async ({
+    page,
+    request,
+  }) => {
+    test.skip(!maildevURL, 'Set E2E_MAILDEV_URL to run sign-in-user email verification.');
+
+    const email = uniqueEmail('sign013');
+    await createVerifiedUser(request, email);
+
+    await page.goto('/sign-in');
+    await fillSignInForm(page, email);
+    await page.getByRole('button', { name: /sign in/i }).click();
+
+    await expect(page).toHaveURL(/\/dashboard$/, { timeout: 30_000 });
+    await expect(page.getByRole('heading', { name: 'Sign In User', level: 1 })).toBeVisible();
+
+    await page.reload();
+
+    await expect(page).toHaveURL(/\/dashboard$/, { timeout: 30_000 });
+    await expect(page.getByRole('heading', { name: 'Sign In User', level: 1 })).toBeVisible();
+    await expect(page.getByText('Account ready')).toBeVisible();
   });
 });

@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { AlertCircle, CheckCircle2, RefreshCw, UserRound } from 'lucide-react';
-
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -23,6 +23,8 @@ function LoadingDashboard() {
 }
 
 function ErrorDashboard({ onRetry }: { onRetry: () => void }) {
+  const { t } = useTranslation();
+
   return (
     <Card className="max-w-3xl border-destructive/30 p-6">
       <div className="flex items-start gap-3">
@@ -30,13 +32,13 @@ function ErrorDashboard({ onRetry }: { onRetry: () => void }) {
           <AlertCircle className="size-4" aria-hidden />
         </span>
         <div className="min-w-0">
-          <h1 className="text-xl font-semibold text-foreground">Unable to load account</h1>
+          <h1 className="text-xl font-semibold text-foreground">{t('dashboard.unableTitle')}</h1>
           <p className="mt-2 text-sm leading-6 text-muted-foreground">
-            Refresh the session and try again.
+            {t('dashboard.unableBody')}
           </p>
           <Button type="button" variant="outline" className="mt-5" onClick={onRetry}>
             <RefreshCw className="size-4" aria-hidden />
-            Retry
+            {t('dashboard.retry')}
           </Button>
         </div>
       </div>
@@ -45,32 +47,33 @@ function ErrorDashboard({ onRetry }: { onRetry: () => void }) {
 }
 
 function ProfileSummary({ profile }: { profile: CurrentUserProfile }) {
+  const { t } = useTranslation();
   const currentWorkspace = profile.workspaces?.find((workspace) => workspace.isCurrent);
 
   return (
     <Card className="p-5">
-      <h2 className="text-sm font-semibold text-foreground">Account details</h2>
+      <h2 className="text-sm font-semibold text-foreground">{t('dashboard.accountDetails')}</h2>
       <dl className="mt-4 grid gap-4 text-sm sm:grid-cols-2">
         <div>
-          <dt className="text-xs text-muted-foreground">Email</dt>
+          <dt className="text-xs text-muted-foreground">{t('dashboard.email')}</dt>
           <dd className="mt-1 font-medium text-foreground">{profile.email}</dd>
         </div>
         <div>
-          <dt className="text-xs text-muted-foreground">Status</dt>
+          <dt className="text-xs text-muted-foreground">{t('dashboard.status')}</dt>
           <dd className="mt-1 font-medium text-foreground">
-            {profile.isActive ? 'Active' : 'Inactive'}
+            {profile.isActive ? t('dashboard.statusActive') : t('dashboard.inactive')}
           </dd>
         </div>
         <div>
-          <dt className="text-xs text-muted-foreground">Workspace</dt>
+          <dt className="text-xs text-muted-foreground">{t('dashboard.workspace')}</dt>
           <dd className="mt-1 font-medium text-foreground">
-            {currentWorkspace?.name ?? 'Personal workspace'}
+            {currentWorkspace?.name ?? t('dashboard.personalWorkspace')}
           </dd>
         </div>
         <div>
-          <dt className="text-xs text-muted-foreground">Workspace type</dt>
+          <dt className="text-xs text-muted-foreground">{t('dashboard.workspaceType')}</dt>
           <dd className="mt-1 font-medium text-foreground">
-            {currentWorkspace?.type ?? 'Personal'}
+            {currentWorkspace?.type ?? t('dashboard.personal')}
           </dd>
         </div>
       </dl>
@@ -79,6 +82,7 @@ function ProfileSummary({ profile }: { profile: CurrentUserProfile }) {
 }
 
 export function DashboardOverview() {
+  const { t } = useTranslation();
   const profileQuery = useQuery({
     queryKey: dashboardQueryKeys.currentUser(),
     queryFn: getCurrentUserProfile,
@@ -101,7 +105,7 @@ export function DashboardOverview() {
           <div className="p-6 sm:p-8">
             <div className="inline-flex items-center gap-2 rounded-md border border-primary/20 bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
               <CheckCircle2 className="size-3.5" aria-hidden />
-              Account ready
+              {t('dashboard.accountReady')}
             </div>
 
             <div className="mt-8 max-w-3xl space-y-3">
@@ -109,14 +113,14 @@ export function DashboardOverview() {
                 {profile.fullName || profile.email}
               </h1>
               <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
-                Your email is verified and your account is ready to use.
+                {t('dashboard.readyBody')}
               </p>
             </div>
           </div>
 
           <div className="border-t border-border bg-muted/30 p-6 sm:p-8 lg:border-l lg:border-t-0">
             <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
-              Session
+              {t('dashboard.session')}
             </p>
             <div className="mt-6 flex items-center gap-3">
               <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-md border border-border bg-background text-muted-foreground">

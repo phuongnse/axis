@@ -4,13 +4,16 @@ import { createRouter, RouterProvider } from '@tanstack/react-router';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import './index.css';
+import './features/preferences/i18n';
 
+import { useTranslation } from 'react-i18next';
 import { shouldRenderDevtools } from './lib/devtools';
 import { queryClient } from './lib/query-client';
 import { routeTree } from './routeTree.gen';
 
 function NotFound() {
-  return <p className="p-8">Page not found</p>;
+  const { t } = useTranslation();
+  return <p className="p-8">{t('app.pageNotFound')}</p>;
 }
 
 const router = createRouter({

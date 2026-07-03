@@ -1,8 +1,24 @@
 import { z } from 'zod';
 
-export const signInSchema = z.object({
-  email: z.string().min(1, 'Email address is required').email('Enter a valid email address'),
-  password: z.string().min(1, 'Password is required'),
-});
+export interface SignInSchemaMessages {
+  emailRequired: string;
+  emailInvalid: string;
+  passwordRequired: string;
+}
 
-export type SignInFormValues = z.infer<typeof signInSchema>;
+const defaultSignInSchemaMessages: SignInSchemaMessages = {
+  emailRequired: 'Email address is required',
+  emailInvalid: 'Enter a valid email address',
+  passwordRequired: 'Password is required',
+};
+
+export function createSignInSchema(messages: SignInSchemaMessages = defaultSignInSchemaMessages) {
+  return z.object({
+    email: z.string().min(1, messages.emailRequired).email(messages.emailInvalid),
+    password: z.string().min(1, messages.passwordRequired),
+  });
+}
+
+export const signInSchema = createSignInSchema();
+
+export type SignInFormValues = z.infer<ReturnType<typeof createSignInSchema>>;

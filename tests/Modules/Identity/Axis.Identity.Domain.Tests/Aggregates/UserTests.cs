@@ -17,6 +17,7 @@ public class UserTests
         user.Email.Should().Be(ValidEmail);
         user.Status.Should().Be(UserStatus.Active);
         user.IsEmailVerified.Should().BeFalse();
+        user.LanguagePreference.Should().BeNull();
     }
 
     [Fact]
@@ -45,5 +46,16 @@ public class UserTests
         user.VerifyEmail();
 
         user.IsEmailVerified.Should().BeTrue();
+    }
+
+    [Fact]
+    public void SetLanguagePreference_WhenLanguageIsSupported_StoresPreference()
+    {
+        User user = User.Create("Alice Smith", ValidEmail);
+        UserLanguage language = UserLanguage.Create("vi").Value;
+
+        user.SetLanguagePreference(language);
+
+        user.LanguagePreference.Should().Be(language);
     }
 }

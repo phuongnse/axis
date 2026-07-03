@@ -10,6 +10,7 @@ public sealed record CurrentUserProfileDto(
     string Email,
     string FullName,
     bool IsActive,
+    string? Language,
     Guid? WorkspaceId,
     IReadOnlyList<UserWorkspaceDto> Workspaces);
 

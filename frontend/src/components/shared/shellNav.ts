@@ -1,18 +1,23 @@
 import type { LucideIcon } from 'lucide-react';
 import { LayoutDashboard } from 'lucide-react';
+import type { TranslationKey } from '@/features/preferences';
 
 export interface ShellNavItem {
-  label: string;
+  labelKey: TranslationKey;
   icon: LucideIcon;
   to?: string;
   disabled?: boolean;
 }
 
 export const shellNavItems: ShellNavItem[] = [
-  { label: 'Dashboard', icon: LayoutDashboard, to: '/dashboard' },
+  {
+    labelKey: 'app.dashboard',
+    icon: LayoutDashboard,
+    to: '/dashboard',
+  },
 ];
 
-export function pageTitleForPath(pathname: string): string {
-  if (pathname.startsWith('/dashboard')) return 'Dashboard';
-  return 'Account';
+export function pageTitleKeyForPath(pathname: string): TranslationKey {
+  if (pathname.startsWith('/dashboard')) return 'app.dashboard';
+  return 'app.account';
 }

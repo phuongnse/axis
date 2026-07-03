@@ -1,6 +1,6 @@
 import { Link } from '@tanstack/react-router';
 import { LogIn, Send } from 'lucide-react';
-
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
@@ -9,18 +9,19 @@ import { AuthNotice } from '@/features/auth/components/AuthNotice';
 import { useResendVerification } from '@/features/auth/hooks/useResendVerification';
 import { useSignIn } from '@/features/auth/hooks/useSignIn';
 
-function SignInFooter() {
+function SignInFooter({ t }: { t: ReturnType<typeof useTranslation>['t'] }) {
   return (
     <span>
-      New here?{' '}
+      {t('auth.newHere')}{' '}
       <Link to="/register" className="font-medium text-primary hover:underline">
-        Create an account
+        {t('auth.createAccount')}
       </Link>
     </span>
   );
 }
 
 export function SignInPage() {
+  const { t } = useTranslation();
   const { form, loading, submit, verificationEmail, rateLimited } = useSignIn();
   const { resend, state: resendState, rateLimitMessage } = useResendVerification();
   const {
@@ -34,10 +35,10 @@ export function SignInPage() {
     !verificationEmail || resendState === 'sending' || resendState === 'rate_limited';
 
   return (
-    <AuthCard title="Sign in" footer={<SignInFooter />}>
+    <AuthCard title={t('auth.signIn')} footer={<SignInFooter t={t} />}>
       <form className="space-y-4" onSubmit={handleSubmit(submit)} noValidate>
         <Field data-invalid={errors.email ? true : undefined}>
-          <FieldLabel htmlFor="email">Email address</FieldLabel>
+          <FieldLabel htmlFor="email">{t('auth.email')}</FieldLabel>
           <Input
             id="email"
             type="email"
@@ -46,12 +47,12 @@ export function SignInPage() {
             aria-invalid={errors.email ? true : undefined}
             {...register('email')}
           />
-          <FieldDescription id="email-help">Use the email for your account.</FieldDescription>
+          <FieldDescription id="email-help">{t('auth.signInEmailHelp')}</FieldDescription>
           {errors.email ? <FieldError id="email-error">{errors.email.message}</FieldError> : null}
         </Field>
 
         <Field data-invalid={errors.password ? true : undefined}>
-          <FieldLabel htmlFor="password">Password</FieldLabel>
+          <FieldLabel htmlFor="password">{t('auth.password')}</FieldLabel>
           <Input
             id="password"
             type="password"
@@ -60,9 +61,7 @@ export function SignInPage() {
             aria-invalid={errors.password ? true : undefined}
             {...register('password')}
           />
-          <FieldDescription id="password-help">
-            Enter the password exactly as created.
-          </FieldDescription>
+          <FieldDescription id="password-help">{t('auth.signInPasswordHelp')}</FieldDescription>
           {errors.password ? (
             <FieldError id="password-error">{errors.password.message}</FieldError>
           ) : null}
@@ -71,7 +70,7 @@ export function SignInPage() {
         {submitError ? (
           <AuthNotice
             variant={showVerificationRequired ? 'default' : 'destructive'}
-            title={showVerificationRequired ? 'Verify your email' : undefined}
+            title={showVerificationRequired ? t('auth.verifyEmail') : undefined}
           >
             {submitError}
           </AuthNotice>
@@ -89,15 +88,17 @@ export function SignInPage() {
               }}
             >
               <Send className="size-4" aria-hidden />
-              {resendState === 'sending' ? 'Sending...' : 'Resend verification email'}
+              {resendState === 'sending' ? t('auth.sending') : t('auth.resendVerification')}
             </Button>
-            {resendState === 'success' ? <AuthNotice>Verification email sent.</AuthNotice> : null}
+            {resendState === 'success' ? (
+              <AuthNotice>{t('notice.verificationEmailSent')}</AuthNotice>
+            ) : null}
             {resendState === 'error' ? (
-              <AuthNotice variant="destructive">Something went wrong, please try again</AuthNotice>
+              <AuthNotice variant="destructive">{t('auth.genericError')}</AuthNotice>
             ) : null}
             {resendState === 'rate_limited' ? (
               <AuthNotice variant="destructive">
-                {rateLimitMessage ?? 'Please wait before requesting another verification email.'}
+                {rateLimitMessage ?? t('notice.resendLimited')}
               </AuthNotice>
             ) : null}
           </div>
@@ -105,7 +106,7 @@ export function SignInPage() {
 
         <Button type="submit" className="h-9 w-full" disabled={loading || rateLimited}>
           <LogIn className="size-4" aria-hidden />
-          {loading ? 'Signing in...' : 'Sign in'}
+          {loading ? t('auth.signingIn') : t('auth.signIn')}
         </Button>
       </form>
     </AuthCard>

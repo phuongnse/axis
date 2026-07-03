@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 
 import { Alert, AlertDescription, AlertTitle } from '../src/components/ui/alert';
@@ -7,7 +8,9 @@ import { Checkbox } from '../src/components/ui/checkbox';
 import { Field, FieldDescription, FieldError, FieldLabel } from '../src/components/ui/field';
 import { Input } from '../src/components/ui/input';
 import { Label } from '../src/components/ui/label';
+import { Popover, PopoverContent, PopoverTrigger } from '../src/components/ui/popover';
 import { Skeleton } from '../src/components/ui/skeleton';
+import { ToggleGroup, ToggleGroupItem } from '../src/components/ui/toggle-group';
 
 describe('Checkbox', () => {
   it('links a Base UI checkbox to a label', () => {
@@ -76,6 +79,42 @@ describe('Label', () => {
     );
 
     expect(screen.getByLabelText('Profile name')).toBeInTheDocument();
+  });
+});
+
+describe('Popover', () => {
+  it('opens shadcn popover content from its trigger', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <Popover>
+        <PopoverTrigger>Open preferences</PopoverTrigger>
+        <PopoverContent>Language choices</PopoverContent>
+      </Popover>,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Open preferences' }));
+
+    expect(screen.getByText('Language choices')).toBeInTheDocument();
+  });
+});
+
+describe('ToggleGroup', () => {
+  it('updates the active item through user interaction', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <ToggleGroup aria-label="View mode" defaultValue={['list']}>
+        <ToggleGroupItem value="list">List</ToggleGroupItem>
+        <ToggleGroupItem value="grid">Grid</ToggleGroupItem>
+      </ToggleGroup>,
+    );
+
+    expect(screen.getByRole('button', { name: 'List' })).toHaveAttribute('aria-pressed', 'true');
+
+    await user.click(screen.getByRole('button', { name: 'Grid' }));
+
+    expect(screen.getByRole('button', { name: 'Grid' })).toHaveAttribute('aria-pressed', 'true');
   });
 });
 

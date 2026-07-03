@@ -1,6 +1,6 @@
 import { Link } from '@tanstack/react-router';
 import { Mail, UserPlus } from 'lucide-react';
-
+import { useTranslation } from 'react-i18next';
 import { ActionLink } from '@/components/shared/ActionLink';
 import { Button } from '@/components/ui/button';
 import { AuthCard } from '@/features/auth/components/AuthCard';
@@ -9,6 +9,7 @@ import { useResendVerification } from '@/features/auth/hooks/useResendVerificati
 import { loadRegistrationContext } from '@/features/auth/registration-context';
 
 export function EmailConfirmationPage() {
+  const { t } = useTranslation();
   const context = loadRegistrationContext();
   const { resend, state, rateLimitMessage, reset } = useResendVerification();
 
@@ -20,12 +21,12 @@ export function EmailConfirmationPage() {
 
   return (
     <AuthCard
-      title="Check your email"
+      title={t('auth.confirm.title')}
       footer={
         <>
-          Need to use another address?{' '}
+          {t('auth.confirm.useAnother')}{' '}
           <Link to="/register" className="font-medium text-primary hover:underline">
-            Back to registration
+            {t('auth.backToRegistration')}
           </Link>
         </>
       }
@@ -36,40 +37,38 @@ export function EmailConfirmationPage() {
             <Mail className="h-4 w-4" aria-hidden />
           </div>
           <div className="space-y-2 text-sm text-muted-foreground">
-            <p>
-              If an account exists for this email, you will receive a verification link shortly.
-            </p>
-            <p>Open that link to finish registration and enter the dashboard.</p>
+            <p>{t('auth.confirm.body1')}</p>
+            <p>{t('auth.confirm.body2')}</p>
             {context?.email ? (
-              <p className="text-xs text-muted-foreground/80">Sent to {context.email}</p>
+              <p className="text-xs text-muted-foreground/80">
+                {t('auth.confirm.sentTo', { email: context.email })}
+              </p>
             ) : null}
           </div>
         </div>
 
         {state === 'sending' ? (
-          <AuthNotice title="Sending verification email">Please wait a moment.</AuthNotice>
+          <AuthNotice title={t('notice.sendingEmailTitle')}>{t('notice.sendingEmail')}</AuthNotice>
         ) : null}
 
         {state === 'success' ? (
-          <AuthNotice title="Verification email sent">
-            Check your inbox for the latest link.
-          </AuthNotice>
+          <AuthNotice title={t('notice.resendSentTitle')}>{t('notice.resendSent')}</AuthNotice>
         ) : null}
 
         {state === 'rate_limited' ? (
-          <AuthNotice title="Please wait">
-            {rateLimitMessage ?? 'Too many requests. Try again shortly.'}
+          <AuthNotice title={t('notice.resendLimitedTitle')}>
+            {rateLimitMessage ?? t('notice.resendLimited')}
           </AuthNotice>
         ) : null}
 
         {state === 'error' ? (
-          <AuthNotice variant="destructive" title="Unable to resend email">
-            Please try again.
+          <AuthNotice variant="destructive" title={t('notice.resendErrorTitle')}>
+            {t('notice.resendError')}
           </AuthNotice>
         ) : null}
 
         <div className="text-sm">
-          <span className="text-muted-foreground">Didn't receive it? </span>
+          <span className="text-muted-foreground">{t('auth.confirm.didNotReceive')} </span>
           {context?.email ? (
             <Button
               type="button"
@@ -79,17 +78,17 @@ export function EmailConfirmationPage() {
               onClick={() => void handleResend()}
             >
               <Mail className="size-3.5" aria-hidden />
-              Resend email
+              {t('auth.resendEmail')}
             </Button>
           ) : (
             <Link to="/register" className="font-medium text-primary hover:underline">
-              Back to registration
+              {t('auth.backToRegistration')}
             </Link>
           )}
         </div>
 
         <ActionLink to="/register" icon={UserPlus} variant="secondary" className="w-full">
-          Register another account
+          {t('auth.confirm.registerAnother')}
         </ActionLink>
       </div>
     </AuthCard>

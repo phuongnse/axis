@@ -59,6 +59,11 @@ namespace Axis.Identity.Infrastructure.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("is_email_verified");
 
+                    b.Property<string>("LanguagePreference")
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("language_preference");
+
                     b.Property<DateTime?>("LegalAcceptedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("legal_accepted_at");

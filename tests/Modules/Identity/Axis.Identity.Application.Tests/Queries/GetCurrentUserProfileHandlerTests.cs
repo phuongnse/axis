@@ -36,6 +36,7 @@ public sealed class GetCurrentUserProfileHandlerTests
     public async Task Handle_WhenUserExists_ReturnsProfile()
     {
         User user = User.Create("Ada Lovelace", Email.Create("ada@acme.com").Value);
+        user.SetLanguagePreference(UserLanguage.Create("vi").Value);
         Workspace workspace = Workspace.CreatePersonal(
             "Ada Lovelace",
             WorkspaceSlug.Create("ada-lovelace").Value,
@@ -55,6 +56,7 @@ public sealed class GetCurrentUserProfileHandlerTests
         dto.Email.Should().Be("ada@acme.com");
         dto.FullName.Should().Be("Ada Lovelace");
         dto.IsActive.Should().BeTrue();
+        dto.Language.Should().Be("vi");
         dto.WorkspaceId.Should().Be(workspace.Id);
         dto.Workspaces.Should().ContainSingle();
         dto.Workspaces[0].Type.Should().Be("Personal");

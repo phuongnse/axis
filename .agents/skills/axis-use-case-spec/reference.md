@@ -4,6 +4,8 @@ Use with [SKILL.md](./SKILL.md) when writing or refreshing use-case acceptance c
 
 ## Acceptance criteria
 
+- Keep ACs focused on user-visible product outcomes, business side effects, validation/failure behavior, and ownership boundaries.
+- Put accessibility, interaction quality, visual stability, and component expectations in Screen flow or Required UI quality unless they are themselves the product outcome being accepted.
 - Group ACs under `Happy path`, `Validation & errors`, and `Edge cases`.
 - When implementing, closing, or materially refreshing this use case, give in-scope AC bullets local IDs (`AC-001`, `AC-002`, ...). Do not bulk-retrofit unrelated use cases.
 - Format ACs as plain contract bullets: `- **AC-001** Requirement text.`
@@ -18,6 +20,12 @@ Use with [SKILL.md](./SKILL.md) when writing or refreshing use-case acceptance c
 - Before making a row required, confirm its expected result can cite the spec section, AC ID, or flow step. That citation belongs in the readiness/verification report, not in the use-case matrix.
 - Use `Boundary` values that name the proving boundary: `Browser journey`, `UI component`, `API boundary`, `Application boundary`, `Infrastructure boundary`, or a slash/composite when one row intentionally spans boundaries.
 - Use `Verification` values that name evidence categories, not exact tools: `Browser automation`, `UI component test`, `API integration test`, `Application test`, `Infrastructure integration test`, etc.
+
+## Screen flow and UI quality
+
+- Use Screen flow for product screen contracts: entry points, visible states, recovery paths, and handoffs between screens.
+- Use Required UI quality for accessibility and interaction expectations: labels, focus, keyboard reachability, visible state, layout stability, copy fit, and shared design-system expectations.
+- Keep both sections implementation-agnostic: name the expected experience, not component internals, CSS classes, test files, or library-specific props.
 
 ## Boundary and runner choice
 

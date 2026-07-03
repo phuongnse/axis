@@ -37,7 +37,7 @@ export function useResendVerification() {
   };
 }
 
-function getRateLimitMessage(error: ApiError): string {
+function getRateLimitMessage(error: ApiError): string | null {
   const data = error.data;
   if (
     typeof data === 'object' &&
@@ -46,5 +46,5 @@ function getRateLimitMessage(error: ApiError): string {
   ) {
     return (data as { detail: string }).detail;
   }
-  return 'Please wait before requesting another verification email.';
+  return null;
 }

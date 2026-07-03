@@ -44,7 +44,8 @@ Follow [reference.md](../reference.md).
    - Follow [reference.md](./reference.md) for AC IDs, Acceptance Test Matrix shape, runner choice, and slice boundaries.
 
 4. Define UI requirements and diagrams.
-   - Put required UI primitives, states, accessibility, and visual constraints in flows, ACs, or implementation-status gaps instead of separate design sections.
+   - Keep ACs focused on product outcomes. Put product screen contracts in `## Screen flow` and accessibility, interaction quality, visual stability, and design-system expectations in Required UI quality.
+   - Keep UI requirements implementation-agnostic; do not encode component internals, CSS classes, test file paths, or library-specific props in use-case specs.
    - If no approved UI contract exists, keep the affected frontend status incomplete and state the missing contract in the implementation-status `Gaps vs spec` / `Deferred follow-ups` fields owned by [docs/playbooks/docs-style.md](../../../docs/playbooks/docs-style.md#implementation-status).
    - Add `## Screen flow` when the journey has more than three screens, branched happy paths, or non-obvious error screens.
    - Add Mermaid diagrams for non-trivial workflow or sequence behavior; use use-case vocabulary and keep local diagrams in the owning use-case file.

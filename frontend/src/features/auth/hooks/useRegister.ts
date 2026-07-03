@@ -3,9 +3,11 @@ import { useMutation } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { useMemo, useRef } from 'react';
 import { type FieldPath, type UseFormReturn, useForm } from 'react-hook-form';
-
+import { useTranslation } from 'react-i18next';
 import { createRegisterIdempotencyKey, registerUser } from '@/features/auth/api';
 import { useLegalVersions } from '@/features/auth/hooks/useLegalVersions';
+import { useRefreshClientValidationErrors } from '@/features/auth/hooks/useRefreshClientValidationErrors';
+import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH } from '@/features/auth/password-policy';
 import { getProblemDetail } from '@/features/auth/problem-details';
 import { saveRegistrationContext } from '@/features/auth/registration-context';
 import {
@@ -13,12 +15,21 @@ import {
   type RegisterFormValues,
 } from '@/features/auth/schemas/register-schema';
 import type { LegalVersionsResponse, RegisterValidationErrorData } from '@/features/auth/types';
+import { currentSiteLanguage } from '@/features/preferences';
 import { ApiError } from '@/lib/api';
 
 type LoadedLegalVersions = LegalVersionsResponse & {
   termsVersion: string;
   privacyVersion: string;
 };
+
+const clientValidationFields: FieldPath<RegisterFormValues>[] = [
+  'fullName',
+  'email',
+  'password',
+  'passwordConfirmation',
+  'acceptedTerms',
+];
 
 interface RegisterMutationInput {
   values: RegisterFormValues;
@@ -78,15 +89,32 @@ function applyRegisterValidationErrors(
 
 export function useRegister() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
+  const language = currentSiteLanguage();
   const {
     data: legalVersions,
     isError: legalVersionsError,
     isLoading: legalVersionsLoading,
   } = useLegalVersions();
   const idempotencyKeyRef = useRef(createRegisterIdempotencyKey());
-  const registerSchema = useMemo(() => createRegisterSchema(), []);
-  const genericSubmitError = 'Something went wrong, please try again';
-  const legalVersionsMissingError = 'Legal document versions are not loaded yet.';
+  const registerSchema = useMemo(
+    () =>
+      createRegisterSchema({
+        fullNameRequired: t('validation.fullNameRequired'),
+        emailRequired: t('validation.emailRequired'),
+        emailInvalid: t('validation.emailInvalid'),
+        passwordRequired: t('validation.passwordRequired'),
+        passwordMin: t('validation.passwordMin', { count: PASSWORD_MIN_LENGTH }),
+        passwordMax: t('validation.passwordMax', { count: PASSWORD_MAX_LENGTH }),
+        passwordConfirmationRequired: t('validation.passwordConfirmationRequired'),
+        acceptTerms: t('validation.acceptTerms'),
+        passwordMismatch: t('validation.passwordMismatch'),
+        passwordHarder: t('validation.passwordHarder'),
+      }),
+    [t],
+  );
+  const genericSubmitError = t('auth.genericError');
+  const legalVersionsMissingError = t('auth.legalDocumentsMissing');
   const form = useForm<RegisterFormValues>({
     resolver: zodResolver(registerSchema),
     defaultValues: {
@@ -98,6 +126,7 @@ export function useRegister() {
     },
     mode: 'onSubmit',
   });
+  useRefreshClientValidationErrors(form, clientValidationFields, language);
 
   const mutation = useMutation({
     mutationFn: async ({ values, legalVersions }: RegisterMutationInput) => {

@@ -1,24 +1,29 @@
 import { Link, useNavigate } from '@tanstack/react-router';
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { exchangeAuthorizationCode } from '@/features/auth/api';
 import { AuthCard } from '@/features/auth/components/AuthCard';
 import { AuthNotice } from '@/features/auth/components/AuthNotice';
 import { clearPkceSession, loadPkceSession } from '@/features/auth/pkce';
 
-function SignInAgainFooter() {
+type CallbackErrorKind = 'invalid' | 'tokenFailed';
+type Translate = ReturnType<typeof useTranslation>['t'];
+
+function SignInAgainFooter({ t }: { t: Translate }) {
   return (
     <>
-      Need to start over?{' '}
+      {t('auth.needStartOver')}{' '}
       <Link to="/sign-in" className="font-medium text-primary hover:underline">
-        Sign in
+        {t('auth.signIn')}
       </Link>
     </>
   );
 }
 
 export function CallbackPage() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<CallbackErrorKind | null>(null);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -28,7 +33,7 @@ export function CallbackPage() {
 
     if (!code || !pkce || state !== pkce.state) {
       clearPkceSession();
-      setError('Invalid authorization response. Please try signing in again.');
+      setError('invalid');
       return;
     }
 
@@ -38,21 +43,23 @@ export function CallbackPage() {
       })
       .catch(() => {
         clearPkceSession();
-        setError('Token exchange failed. Please try signing in again.');
+        setError('tokenFailed');
       });
   }, [navigate]);
 
   if (error) {
+    const message =
+      error === 'invalid' ? t('auth.callback.invalid') : t('auth.callback.tokenFailed');
     return (
-      <AuthCard title="Sign-in interrupted" footer={<SignInAgainFooter />}>
-        <AuthNotice variant="destructive">{error}</AuthNotice>
+      <AuthCard title={t('auth.callback.retryTitle')} footer={<SignInAgainFooter t={t} />}>
+        <AuthNotice variant="destructive">{message}</AuthNotice>
       </AuthCard>
     );
   }
 
   return (
-    <AuthCard title="Completing sign-in" footer={<SignInAgainFooter />}>
-      <p className="text-sm text-muted-foreground">Completing sign-in...</p>
+    <AuthCard title={t('auth.callback.title')} footer={<SignInAgainFooter t={t} />}>
+      <p className="text-sm text-muted-foreground">{t('auth.callback.completing')}</p>
     </AuthCard>
   );
 }
