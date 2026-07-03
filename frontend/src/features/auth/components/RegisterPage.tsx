@@ -1,3 +1,4 @@
+import { Link } from '@tanstack/react-router';
 import { UserPlus } from 'lucide-react';
 import { Controller } from 'react-hook-form';
 
@@ -23,7 +24,17 @@ export function RegisterPage() {
   const password = watch('password');
 
   return (
-    <AuthCard title="Create account">
+    <AuthCard
+      title="Create account"
+      footer={
+        <>
+          Already have an account?{' '}
+          <Link to="/sign-in" className="font-medium text-primary hover:underline">
+            Sign in
+          </Link>
+        </>
+      }
+    >
       <form className="space-y-4" onSubmit={handleSubmit(submit)} noValidate>
         <Field data-invalid={errors.fullName ? true : undefined}>
           <FieldLabel htmlFor="fullName">Full name</FieldLabel>

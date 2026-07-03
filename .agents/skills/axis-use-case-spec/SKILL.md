@@ -1,6 +1,6 @@
 ---
 name: axis-use-case-spec
-description: Draft or complete Axis docs-first use-case specifications before implementation. Use when a requested feature or use case lacks a docs/use-cases README, acceptance criteria, flow, implementation status, diagram inventory, or has unclear product/design decisions that must be resolved before using axis-use-case-implementation.
+description: Draft or complete Axis docs-first use-case specifications before implementation. Use when a requested feature or use case lacks a docs/use-cases file, acceptance criteria, flow, implementation status, diagram inventory, or has unclear product/design decisions that must be resolved before using axis-use-case-implementation.
 ---
 
 # Axis Use Case Spec
@@ -27,7 +27,7 @@ Follow [reference.md](../reference.md).
 1. Locate or create the owning spec.
    - Read [docs/use-cases/README.md](../../../docs/use-cases/README.md) and the domain `README.md`.
    - Search existing docs and code with `rg -n "<feature words>" docs/use-cases src tests frontend`.
-   - If no use-case folder exists, create `docs/use-cases/{domain}/{slug}/README.md` from the template and add the domain README link.
+   - If no use-case file exists, create `docs/use-cases/{domain}/{slug}.md` from the template and add the domain README link.
    - If the domain itself does not exist, stop and ask for scope unless the user explicitly approved a new domain.
 
 2. Establish product boundaries before writing behavior.
@@ -47,7 +47,7 @@ Follow [reference.md](../reference.md).
    - Put required UI primitives, states, accessibility, and visual constraints in flows, ACs, or implementation-status gaps instead of separate design sections.
    - If no approved UI contract exists, keep the affected frontend status incomplete and state the missing contract in the implementation-status `Gaps vs spec` / `Deferred follow-ups` fields owned by [docs/playbooks/docs-style.md](../../../docs/playbooks/docs-style.md#implementation-status).
    - Add `## Screen flow` when the journey has more than three screens, branched happy paths, or non-obvious error screens.
-   - Add Mermaid diagrams for non-trivial workflow or sequence behavior; use use-case vocabulary and keep local diagrams in the owning README.
+   - Add Mermaid diagrams for non-trivial workflow or sequence behavior; use use-case vocabulary and keep local diagrams in the owning use-case file.
    - Omit diagram sections when no local diagram applies.
 
 5. Mark implementation status honestly.
@@ -64,7 +64,7 @@ Follow [reference.md](../reference.md).
    - Use `$axis-use-case-implementation` only after the owning spec exists and blocking decisions are resolved.
 
 7. Verify only what changed.
-   - Use `python scripts/axis.py check use-case-docs` for use-case README shape.
+   - Use `python scripts/axis.py check use-case-docs` for use-case doc shape.
    - Use `python scripts/axis.py check markdown-links` only when links or anchors changed.
    - Use `$axis-visual-artifact` when Mermaid or committed visual docs changed.
    - Leave full ready-review verification to `$axis-ready-review`.

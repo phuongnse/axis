@@ -280,15 +280,50 @@ def callout_section_content(callout: str, marker: str) -> list[str]:
     return []
 
 
+def check_use_case_inventory_layout() -> list[str]:
+    """Validate the docs/use-cases inventory shape before checking content."""
+    issues: list[str] = []
+    if not USE_CASES.is_dir():
+        return [f"{USE_CASES.relative_to(ROOT)}: missing use-case inventory directory"]
+
+    for domain_dir in sorted(USE_CASES.iterdir()):
+        if domain_dir.name.startswith("_"):
+            continue
+        rel = domain_dir.relative_to(ROOT)
+        if domain_dir.is_file():
+            if domain_dir.name != "README.md":
+                issues.append(f"{rel}: use-case domains must be directories with a README.md hub")
+            continue
+        if not domain_dir.is_dir():
+            continue
+
+        if not (domain_dir / "README.md").is_file():
+            issues.append(f"{rel}: missing domain README.md hub")
+
+        for child in sorted(domain_dir.iterdir()):
+            child_rel = child.relative_to(ROOT)
+            if child.is_dir():
+                issues.append(
+                    f"{child_rel}: use cases must be direct Markdown files at docs/use-cases/{{domain}}/{{slug}}.md"
+                )
+                continue
+            if child.name == "README.md":
+                continue
+            if child.suffix != ".md":
+                issues.append(f"{child_rel}: domain inventories may only contain README.md and use-case .md files")
+
+    return issues
+
+
 def iter_use_case_files() -> list[Path]:
     files: list[Path] = []
     for domain_dir in sorted(USE_CASES.iterdir()):
         if not domain_dir.is_dir() or domain_dir.name.startswith("_"):
             continue
-        for readme in sorted(domain_dir.glob("*/README.md")):
-            if readme.parent.name in SKIP_DIRS:
+        for use_case in sorted(domain_dir.glob("*.md")):
+            if use_case.name == "README.md" or use_case.stem in SKIP_DIRS:
                 continue
-            files.append(readme)
+            files.append(use_case)
     return files
 
 
@@ -766,8 +801,9 @@ def main() -> int:
     parser.add_argument("--check", action="store_true", help="validate and exit non-zero on issues")
     _ = parser.parse_args()
 
-    files = iter_use_case_files()
     issues: list[str] = []
+    issues.extend(check_use_case_inventory_layout())
+    files = iter_use_case_files()
     changed_paths: set[Path] = set()
     try:
         changed_paths = set(changed_paths_against_base())

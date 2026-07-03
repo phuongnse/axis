@@ -26,6 +26,67 @@
         }
       }
     },
+    "/api/auth/sign-in": {
+      "post": {
+        "tags": [
+          "Identity"
+        ],
+        "summary": "Sign in a standalone user account",
+        "operationId": "SignInUser",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SignInUserRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SignInSessionEstablishedDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/auth/verify-email": {
       "post": {
         "tags": [
@@ -307,6 +368,36 @@
         "type": "object",
         "properties": {
           "email": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "SignInNextStep": {
+        "enum": [
+          "Dashboard"
+        ],
+        "type": "string"
+      },
+      "SignInSessionEstablishedDto": {
+        "type": "object",
+        "properties": {
+          "sessionEstablished": {
+            "type": "boolean"
+          },
+          "nextStep": {
+            "$ref": "#/components/schemas/SignInNextStep"
+          }
+        },
+        "additionalProperties": false
+      },
+      "SignInUserRequest": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string"
+          },
+          "password": {
             "type": "string"
           }
         },

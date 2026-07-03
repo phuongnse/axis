@@ -1,6 +1,6 @@
 # Register A Standalone User Account
 
-> **Navigation**: [docs/use-cases/identity-access/README.md](../README.md) · [docs/use-cases/README.md](../../README.md) · [docs/README.md](../../../README.md) · [AGENTS.md](../../../../AGENTS.md)
+> **Navigation**: [docs/use-cases/identity-access/README.md](./README.md) · [docs/use-cases/README.md](../README.md) · [docs/README.md](../../README.md) · [AGENTS.md](../../../AGENTS.md)
 
 ## Purpose
 
@@ -52,6 +52,7 @@ Register a standalone Axis user with email/password so the user can verify their
 - **AC-013** Multiple rapid submissions are deduplicated with an idempotency key.
 - **AC-014** Pasting a password with leading/trailing spaces is accepted as-is.
 - **AC-015** Standalone registration leaves the account independent of team/setup context.
+- **AC-016** Registration, confirmation, and verification screens always expose a clear route to sign in or return to registration, so the user is never left on a dead-end screen.
 
 ## Acceptance Test Matrix
 
@@ -65,6 +66,7 @@ Register a standalone Axis user with email/password so the user can verify their
 | AT-006 | UI component | 5xx submission failure shows generic retry text and re-enables submit | AC-011 | UI component test | Yes |
 | AT-007 | UI/API boundaries | Expired, invalid, and already-used verification links show clear states; resend remains available where allowed and rate-limited resend is clear | AC-012 | UI component test + API integration test | Yes |
 | AT-008 | Application boundary | Completed or in-progress idempotency key deduplicates repeated registration attempts | AC-013 | Application test | Yes |
+| AT-009 | UI component | Registration, confirmation, and verification screens expose sign-in or registration escape navigation | AC-016 | UI component test | Yes |
 
 ## Out Of Scope
 
@@ -74,10 +76,10 @@ Register a standalone Axis user with email/password so the user can verify their
 
 | Screen | Required contract |
 |---|---|
-| `/register` | Render an auth-card form with full name, email, password, password confirmation, current Terms/Privacy acceptance, and a single submit action. Full name is captured and stored as a single account name. |
+| `/register` | Render an auth-card form with full name, email, password, password confirmation, current Terms/Privacy acceptance, a single submit action, and a sign-in link. Full name is captured and stored as a single account name. |
 | `/register` validation | Show required-field, invalid-email, duplicate-email, password-policy, password-confirmation, legal-acceptance, backend field, and generic 5xx errors inline or in the form alert described by the relevant AC. Keep the submit button disabled only while submission or legal-version loading is pending. |
-| `/register/confirmation` | Show the submitted email when available, explain that the verification link is required to finish registration, provide resend, show resend success/error/rate-limited states, and keep account-enumeration-safe copy. |
-| `/auth/verify` | Submit the token once, show loading while verification is pending, start the post-verification PKCE flow on success, show expired, invalid, and already-used verification states, and show the resend rate-limited state when resend is limited. |
+| `/register/confirmation` | Show the submitted email when available, explain that the verification link is required to finish registration, provide resend, show resend success/error/rate-limited states, keep account-enumeration-safe copy, and include a route back to registration. |
+| `/auth/verify` | Submit the token once, show loading while verification is pending, start the post-verification PKCE flow on success, show expired, invalid, and already-used verification states, show the resend rate-limited state when resend is limited, and include sign-in or registration escape navigation in every visible state. |
 | Callback/dashboard handoff | The callback and dashboard experience are owned outside this use case; this use case only requires that successful verification completes browser sign-in and routes to dashboard. |
 
 Required UI quality: labels must be programmatic, invalid fields must expose invalid state, error/help text must remain associated with the field it describes, keyboard navigation must reach every action, and the screens must use existing Axis auth primitives and theme tokens.
@@ -132,4 +134,4 @@ sequenceDiagram
 >
 > **Verification:** Required AT rows are covered by browser automation, UI component tests, API integration tests, and application tests.
 >
-> **Decisions:** UI requirements are owned by the Screen flow and ACs in this README. Registration uses one user-facing full-name field end-to-end. Resend rate limiting is part of resend behavior, not verification-token resolution.
+> **Decisions:** UI requirements are owned by the Screen flow and ACs in this use-case file. Registration uses one user-facing full-name field end-to-end. Resend rate limiting is part of resend behavior, not verification-token resolution. Public auth screens must expose an escape navigation link instead of relying on browser history.

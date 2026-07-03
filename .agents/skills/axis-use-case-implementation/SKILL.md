@@ -1,6 +1,6 @@
 ---
 name: axis-use-case-implementation
-description: Implement Axis use-case slices from specs through tests, code, documentation status, and verification. Use when adding or changing behavior for a documented use case in docs/use-cases, touching module Domain/Application/Infrastructure/API/Frontend layers, EF migrations in a use-case slice, or closing implementation-status gaps. If the requested use case has no owning README or acceptance criteria, first read axis-use-case-spec.
+description: Implement Axis use-case slices from specs through tests, code, documentation status, and verification. Use when adding or changing behavior for a documented use case in docs/use-cases, touching module Domain/Application/Infrastructure/API/Frontend layers, EF migrations in a use-case slice, or closing implementation-status gaps. If the requested use case has no owning use-case file or acceptance criteria, first read axis-use-case-spec.
 ---
 
 # Axis Use Case Implementation
@@ -19,7 +19,7 @@ Follow [reference.md](../reference.md).
 
 ## Inputs
 
-- Owning use-case README with Purpose, flows, ACs, Acceptance Test Matrix, Out Of Scope, optional diagrams, and implementation status.
+- Owning use-case file with Purpose, flows, ACs, Acceptance Test Matrix, Out Of Scope, optional diagrams, and implementation status.
 - Design Gate dossier and sign-off when the slice is non-trivial or high-risk.
 - In-scope AC/AT rows and the lowest reliable verification boundary for each required behavior.
 
@@ -28,7 +28,7 @@ Follow [reference.md](../reference.md).
 1. Locate the owning spec.
    - Read [docs/use-cases/README.md](../../../docs/use-cases/README.md), the domain `README.md`, and the use-case file.
    - If the use case is unclear, search with `rg -n "<feature words>" docs/use-cases src tests frontend`.
-   - If no owning use-case README or AC block exists, stop and read `.agents/skills/axis-use-case-spec/SKILL.md` (`$axis-use-case-spec`) first.
+   - If no owning use-case file or AC block exists, stop and read `.agents/skills/axis-use-case-spec/SKILL.md` (`$axis-use-case-spec`) first.
 
 2. Prove spec readiness before code.
    - Record `Spec Readiness Verdict: Ready` only when each required-to-close AC and AT expected result can cite the owning spec section, AC ID, or flow step.

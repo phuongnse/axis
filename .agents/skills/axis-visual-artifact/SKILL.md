@@ -34,7 +34,7 @@ Follow [reference.md](../reference.md).
 3. Edit the source of truth.
    - Edit Mermaid source in Markdown, not rendered output.
    - Use concise labels that match the flow vocabulary, not implementation names by default.
-   - Keep use-case-specific visual files under `docs/use-cases/{domain}/{use-case}/`.
+   - Keep use-case visual sources in the owning Markdown file unless an owner doc explicitly approves a separate committed visual file.
 
 4. Use design agents conservatively.
    - Start read-only: list sources, inspect layer or file structure, and export the current target before changing it.

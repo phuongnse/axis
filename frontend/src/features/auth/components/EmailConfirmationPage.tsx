@@ -24,7 +24,7 @@ export function EmailConfirmationPage() {
       footer={
         <>
           Need to use another address?{' '}
-          <Link to="/register" className="font-medium hover:underline">
+          <Link to="/register" className="font-medium text-primary hover:underline">
             Back to registration
           </Link>
         </>

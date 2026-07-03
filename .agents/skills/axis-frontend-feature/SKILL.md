@@ -46,6 +46,7 @@ Follow [reference.md](../reference.md).
    - Use React Hook Form plus Zod for forms.
    - Include loading, empty, error, validation, disabled, and success states when the workflow needs them.
    - Keep screen shape tied to owning use-case flows, ACs, and implementation-status gaps.
+   - Do not create dead-end screens. Public/auth route files must declare `routeNavigation = publicRouteNavigation(...)`, and every public/auth route state must render a visible sign-in, registration, back, or home-style link. Authenticated pages rely on app shell navigation and sign-out.
    - Do not store auth tokens in `localStorage`.
    - Keep visible text focused on the product workflow, not developer instructions.
 
@@ -54,6 +55,7 @@ Follow [reference.md](../reference.md).
    - Prefer `userEvent`.
    - Assert observable UI behavior and API interaction, not component internals.
    - Cover validation, empty/error states, and permission/visibility behavior when in scope.
+   - Cover escape navigation for public/auth route states when the screen can be reached directly or after a failed flow. Route metadata is a contract declaration, not a substitute for the visible behavior test.
 
 6. Verify.
    - During development, run the smallest targeted frontend test that proves changed behavior; use type/lint only for static edits.

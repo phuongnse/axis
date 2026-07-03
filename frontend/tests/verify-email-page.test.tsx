@@ -104,6 +104,10 @@ describe('VerifyEmailPage', () => {
       screen.getByText('Use the email that received the verification link.'),
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /resend verification email/i })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /back to registration/i })).toHaveAttribute(
+      'href',
+      '/register',
+    );
   });
 
   it('shows invalid message when verification token is missing', async () => {
@@ -129,7 +133,7 @@ describe('VerifyEmailPage', () => {
     await renderWithRouter(<VerifyEmailPage />, { path: '/auth/verify?token=used-token' });
 
     expect(await screen.findByRole('heading', { name: /already verified/i })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /register another account/i })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /sign in/i })).toBeInTheDocument();
   });
 
   it('shows rate-limited message when verification retries are throttled', async () => {
@@ -148,5 +152,9 @@ describe('VerifyEmailPage', () => {
     expect(await screen.findByRole('heading', { name: /please wait/i })).toBeInTheDocument();
     expect(screen.getByLabelText('Email address')).toBeDisabled();
     expect(screen.getByRole('button', { name: /resend verification email/i })).toBeDisabled();
+    expect(screen.getByRole('link', { name: /back to registration/i })).toHaveAttribute(
+      'href',
+      '/register',
+    );
   });
 });

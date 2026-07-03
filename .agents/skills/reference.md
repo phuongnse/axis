@@ -12,6 +12,7 @@ Shared rules for every `.agents/skills/*/SKILL.md` workflow. Skill-specific gate
 6. **Chains are mandatory.** `$axis-*` aliases and `.agents/skills/<name>/SKILL.md` paths name required skills, not optional reading.
 7. **Honest output.** Fill the skill output template. A missing section means the step did not run — do not invent pass status.
 8. **Invalidate and rerun.** After a follow-up edit invalidates evidence, rerun only the checks the skill names for that boundary; do not skip because an earlier run passed.
+9. **Current contracts only.** When adding guidance or deterministic checks, state the supported shape of the system today. Generalize lessons into reusable decision criteria; do not document replaced artifacts or incident-specific remedies unless an owner doc explicitly approves compatibility.
 
 ## Stop vs defer vs skip
 

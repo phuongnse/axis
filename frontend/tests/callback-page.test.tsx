@@ -46,8 +46,10 @@ describe('CallbackPage', () => {
     await renderWithRouter(<CallbackPage />, { path: '/callback?code=auth-code&state=missing' });
 
     expect(
-      await screen.findByText('Invalid authorization response. Please try registering again.'),
+      await screen.findByText('Invalid authorization response. Please try signing in again.'),
     ).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /sign-in interrupted/i })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /sign in/i })).toHaveAttribute('href', '/sign-in');
     expect(exchangeAuthorizationCode).not.toHaveBeenCalled();
     expect(navigateMock).not.toHaveBeenCalled();
   });
@@ -60,6 +62,7 @@ describe('CallbackPage', () => {
     await renderWithRouter(<CallbackPage />, { path: '/callback?code=auth-code&state=state' });
 
     expect(screen.getByText('Completing sign-in...')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /sign in/i })).toHaveAttribute('href', '/sign-in');
     await waitFor(() => {
       expect(exchangeAuthorizationCode).toHaveBeenCalledWith('auth-code');
     });

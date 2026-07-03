@@ -24,7 +24,7 @@ function BrandHeader({ label, labelElement = 'p', tone = 'default' }: BrandHeade
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
-        <img src={axisLogo} alt="Axis" className="size-11 shrink-0" width={44} height={44} />
+        <img src={axisLogo} alt="" className="size-11 shrink-0" width={44} height={44} />
         {label ? <LabelElement className={labelClassName}>{label}</LabelElement> : null}
       </div>
       <HeaderRule tone={tone} />

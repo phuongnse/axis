@@ -76,6 +76,12 @@ describe('RegisterPage', () => {
     ).toBeInTheDocument();
   });
 
+  it('offers a sign-in link so registration is not a dead end', async () => {
+    await renderWithRouter(<RegisterPage />, { path: '/register' });
+
+    expect(screen.getByRole('link', { name: /sign in/i })).toHaveAttribute('href', '/sign-in');
+  });
+
   it('updates password criteria while typing', async () => {
     const user = userEvent.setup();
     await renderWithRouter(<RegisterPage />, { path: '/register' });

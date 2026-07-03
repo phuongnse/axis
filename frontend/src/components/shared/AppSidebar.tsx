@@ -14,7 +14,7 @@ export function AppSidebar() {
     <aside className="hidden min-h-screen w-64 shrink-0 flex-col border-r border-border bg-card text-foreground lg:flex">
       <div className="space-y-4 border-b border-border px-5 py-5">
         <div className="flex items-center gap-2">
-          <img src={axisLogo} alt="Axis" className="size-8 shrink-0" width={32} height={32} />
+          <img src={axisLogo} alt="" className="size-8 shrink-0" width={32} height={32} />
           <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
             Control plane
           </p>

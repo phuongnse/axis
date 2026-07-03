@@ -6,9 +6,9 @@ test.describe('local dev smoke', () => {
   test('SMOKE-001 public app shell loads', async ({ page }) => {
     await page.goto('/');
 
-    await expect(page.getByRole('img', { name: 'Axis' })).toBeVisible();
-    await expect(page).toHaveURL(/\/register$/);
-    await expect(page.getByRole('heading', { name: 'Create account' })).toBeVisible();
+    await expect(page).toHaveURL(/\/sign-in$/);
+    await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Create an account' })).toBeVisible();
   });
 
   test('SMOKE-002 API health is reachable when configured', async ({ request }) => {

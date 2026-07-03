@@ -1,12 +1,12 @@
 import { createLazyFileRoute } from '@tanstack/react-router';
 
-import { RegisterPage } from '@/features/auth/components/RegisterPage';
+import { SignInPage } from '@/features/auth/components/SignInPage';
 import { publicRouteNavigation } from '@/lib/route-navigation';
 
 export const routeNavigation = publicRouteNavigation({
-  escapeTargets: ['/sign-in'],
+  escapeTargets: ['/register'],
 });
 
-export const Route = createLazyFileRoute('/register')({
-  component: RegisterPage,
+export const Route = createLazyFileRoute('/sign-in')({
+  component: SignInPage,
 });
