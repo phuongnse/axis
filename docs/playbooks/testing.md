@@ -8,6 +8,9 @@ Use the smallest test that proves the edit while developing. Use `$axis-ready-re
 
 - Do not skip, weaken, or mock away behavior under test.
 - Test observable behavior and boundary contracts.
+- Treat warnings, flakes, and cleanup failures as lifecycle signals. Identify the setup, render/execute, assertion, unmount, and cleanup boundary that produced the signal before choosing a fix.
+- Prefer semantic test lifecycle fixes over generic suppressors, extra waits, or framework wrappers. Use those mechanisms only when they model the behavior under test, and record that reason in the implementation notes.
+- When the target is a clean warning/failure signal, rerun the focused command and confirm the relevant output is clean, not merely passing.
 - Map touched surfaces to the in-scope paths in [docs/playbooks/agent-checklist.md](./agent-checklist.md#acceptance-coverage).
 
 ## .NET Testing
