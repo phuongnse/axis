@@ -91,7 +91,9 @@ describe('theme preferences', () => {
   });
 
   afterEach(() => {
-    useAuthStore.getState().clearSession();
+    act(() => {
+      useAuthStore.getState().clearSession();
+    });
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
   });
