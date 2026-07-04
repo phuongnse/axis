@@ -87,7 +87,7 @@ describe('RegisterPage', () => {
     expect(screen.getByLabelText('Email address')).toHaveAttribute('aria-invalid', 'true');
 
     await user.click(screen.getByRole('button', { name: 'Preferences' }));
-    await user.click(screen.getByRole('button', { name: /tiếng việt/i }));
+    await user.click(screen.getByRole('button', { name: 'Vietnamese' }));
 
     expect(await screen.findByText('Họ và tên là bắt buộc')).toBeInTheDocument();
     expect(screen.getByText('Email là bắt buộc')).toBeInTheDocument();

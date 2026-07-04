@@ -112,7 +112,7 @@ async function openPreferencesWithoutMovingForm(page: Page): Promise<void> {
   const topBefore = await form.evaluate((node) => node.getBoundingClientRect().top);
 
   await page.getByRole('button', { name: 'Preferences' }).click();
-  await expect(page.getByRole('button', { name: /tiếng việt/i })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Vietnamese' })).toBeVisible();
 
   const topAfter = await form.evaluate((node) => node.getBoundingClientRect().top);
   expect(topAfter).toBeCloseTo(topBefore, 1);
@@ -129,7 +129,7 @@ test.describe('select site language', () => {
     await page.goto('/sign-in');
 
     await openPreferencesWithoutMovingForm(page);
-    await page.getByRole('button', { name: /tiếng việt/i }).click();
+    await page.getByRole('button', { name: 'Vietnamese' }).click();
 
     await expect(page.locator('html')).toHaveAttribute('lang', 'vi');
     await expect(page.getByRole('heading', { name: 'Đăng nhập' })).toBeVisible();
@@ -162,7 +162,7 @@ test.describe('select site language', () => {
     await expect(page.getByRole('heading', { name: 'Language User', level: 1 })).toBeVisible();
 
     await page.getByRole('button', { name: 'Preferences' }).click();
-    await page.getByRole('button', { name: /tiếng việt/i }).click();
+    await page.getByRole('button', { name: 'Vietnamese' }).click();
 
     await expect(page.getByText('Đã lưu ngôn ngữ')).toBeVisible({ timeout: 30_000 });
     await expect(page.locator('html')).toHaveAttribute('lang', 'vi');

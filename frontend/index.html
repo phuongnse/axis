@@ -9,24 +9,33 @@
       // Sync with THEME_STORAGE_KEY and LANGUAGE_STORAGE_KEY in frontend stores.
       (() => {
         const supportedLanguages = new Set(['en', 'vi']);
+        const supportedThemeModes = new Set(['light', 'dark', 'system']);
         let themeMode = 'system';
         let prefersDark = false;
-        let resolvedTheme = false;
+
+        const normalizeThemeMode = (value) =>
+          supportedThemeModes.has(value) ? value : 'system';
 
         try {
-          themeMode = localStorage.getItem('axis.theme') || 'system';
+          themeMode = normalizeThemeMode(localStorage.getItem('axis.theme'));
         } catch {
           themeMode = 'system';
         }
 
         try {
-          prefersDark = window.matchMedia?.('(prefers-color-scheme: dark)').matches || false;
-          resolvedTheme = themeMode === 'dark' || (themeMode === 'system' && prefersDark);
+          prefersDark = window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false;
+        } catch {
+          prefersDark = false;
+        }
+
+        try {
+          const resolvedTheme = themeMode === 'dark' || (themeMode === 'system' && prefersDark);
           document.documentElement.classList.toggle('dark', resolvedTheme);
           document.documentElement.dataset.themeMode = themeMode;
           document.documentElement.style.colorScheme = resolvedTheme ? 'dark' : 'light';
         } catch {
           document.documentElement.dataset.themeMode = 'system';
+          document.documentElement.style.colorScheme = 'light';
         }
 
         const readStoredLanguage = () => {

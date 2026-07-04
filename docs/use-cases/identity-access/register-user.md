@@ -82,7 +82,7 @@ Register a standalone Axis user with email/password so the user can verify their
 | `/auth/verify` | Submit the token once, show loading while verification is pending, start the post-verification PKCE flow on success, show expired, invalid, and already-used verification states, show the resend rate-limited state when resend is limited, and include sign-in or registration escape navigation in every visible state. |
 | Callback/dashboard handoff | The callback and dashboard experience are owned outside this use case; this use case only requires that successful verification completes browser sign-in and routes to dashboard. |
 
-Required UI quality: labels must be programmatic, invalid fields must expose invalid state, error/help text must remain associated with the field it describes, recovery actions must be visible and keyboard-reachable, and the screens must use existing Axis auth primitives and theme tokens.
+Required UI quality: labels must be programmatic, invalid fields must expose invalid state, error/help text must remain associated with the field it describes, recovery actions must be visible and keyboard-reachable, and the screens must use existing Axis auth components and theme tokens.
 
 ## Diagrams
 

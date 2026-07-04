@@ -102,7 +102,7 @@ Let a verified standalone Axis user sign in with email/password and reach the ac
 | Callback/dashboard handoff | Reuse the existing browser callback path to exchange the authorization code, keep the access token in memory, route to `/dashboard`, and show sign-in escape navigation while pending or when callback recovery is needed. |
 | Protected route bootstrap | On authenticated routes with no memory access token, try to restore through the existing browser authorization session and callback handoff; continue on success and route to `/sign-in` on failure. |
 
-Required UI quality: labels must be programmatic, invalid fields must expose invalid state, error/help text must remain associated with the field or form state it describes, recovery actions must be visible and keyboard-reachable, and the screens must use existing Axis auth primitives and theme tokens.
+Required UI quality: labels must be programmatic, invalid fields must expose invalid state, error/help text must remain associated with the field or form state it describes, recovery actions must be visible and keyboard-reachable, and the screens must use existing Axis auth components and theme tokens.
 
 ## Diagrams
 

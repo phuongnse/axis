@@ -168,7 +168,7 @@ test.describe('sign in user', () => {
     await expect(emailInput).toHaveCSS('border-color', 'rgb(239, 68, 68)');
 
     await page.getByRole('button', { name: 'Preferences' }).click();
-    await page.getByRole('button', { name: /tiếng việt/i }).click();
+    await page.getByRole('button', { name: 'Vietnamese' }).click();
 
     const localizedEmailInput = page.getByLabel('Địa chỉ email');
     await expect(page.getByText('Email là bắt buộc')).toBeVisible();

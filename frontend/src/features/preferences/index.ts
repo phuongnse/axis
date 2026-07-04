@@ -14,4 +14,20 @@ export {
   supportedLanguages,
 } from './language-store';
 export { PreferencesMenu } from './PreferencesMenu';
+export { ThemeControl } from './ThemeControl';
+export {
+  applyDocumentTheme,
+  DEFAULT_THEME_MODE,
+  isSupportedThemeMode,
+  persistThemeMode,
+  type ResolvedTheme,
+  readStoredThemeMode,
+  resolveInitialThemeMode,
+  resolveTheme,
+  setThemeMode,
+  supportedThemeModes,
+  THEME_STORAGE_KEY,
+  type ThemeMode,
+  useThemePreference,
+} from './theme-store';
 export type { TranslationKey } from './translations';

@@ -98,11 +98,17 @@ describe('language preferences', () => {
 
     await user.type(screen.getByLabelText('Email address'), 'alex@example.com');
     expect(screen.queryByRole('button', { name: 'VI' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'EN' })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Preferences' }));
-    await user.click(screen.getByRole('button', { name: /tiếng việt/i }));
+    expect(screen.getByRole('button', { name: 'English' })).toBeInTheDocument();
+    expect(screen.getByText('EN')).toHaveAttribute('aria-hidden', 'true');
+    expect(screen.getByText('VI')).toHaveAttribute('aria-hidden', 'true');
+    await user.click(screen.getByRole('button', { name: 'Vietnamese' }));
 
     expect(screen.getByLabelText('Địa chỉ email')).toHaveValue('alex@example.com');
+    expect(screen.getByRole('button', { name: 'Tiếng Anh' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Tiếng Việt' })).toBeInTheDocument();
     expect(document.documentElement.lang).toBe('vi');
     expect(localStorage.getItem(LANGUAGE_STORAGE_KEY)).toBe('vi');
     expect(fetch).not.toHaveBeenCalled();
@@ -146,7 +152,7 @@ describe('language preferences', () => {
     } as unknown as Response);
 
     await renderWithRouter(<LanguageControl authenticated />, { path: '/dashboard' });
-    await user.click(screen.getByRole('button', { name: 'VI' }));
+    await user.click(screen.getByRole('button', { name: 'Vietnamese' }));
 
     expect(document.documentElement.lang).toBe('vi');
     expect(localStorage.getItem(LANGUAGE_STORAGE_KEY)).toBe('vi');
@@ -177,8 +183,8 @@ describe('language preferences', () => {
 
     await renderWithRouter(<LanguageControl authenticated />, { path: '/dashboard' });
 
-    await user.click(screen.getByRole('button', { name: 'VI' }));
-    await user.click(screen.getByRole('button', { name: 'EN' }));
+    await user.click(screen.getByRole('button', { name: 'Vietnamese' }));
+    await user.click(screen.getByRole('button', { name: 'Tiếng Anh' }));
 
     let staleResponseParsed = false;
 

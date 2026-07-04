@@ -31,7 +31,7 @@ API fixtures must create and isolate the module databases/schemas required by th
 ## Frontend Testing
 
 - Use Vitest and Testing Library for component/feature behavior.
-- Place tests beside the feature or shared component they prove.
+- Place tests beside the feature or design-system component they prove.
 - Use clear `*.test.tsx` / `*.test.ts` names matching the surface.
 - Assert UI behavior, API interactions, validation, empty/error states, authorization, and loading/disabled states when in scope.
 - Use Playwright for browser-level journeys and layout-sensitive flows.
