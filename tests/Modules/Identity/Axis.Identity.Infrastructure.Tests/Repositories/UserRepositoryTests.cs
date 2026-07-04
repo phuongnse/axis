@@ -84,6 +84,19 @@ public class UserRepositoryTests(IdentityDatabaseFixture db) : IAsyncLifetime
     }
 
     [Fact]
+    public async Task AddAsync_WhenUserHasThemePreference_PersistsAndReloadsPreference()
+    {
+        User user = MakeUser($"theme-{Guid.NewGuid():N}@example.com");
+        user.SetThemePreference(UserTheme.Create("dark").Value);
+        await _sut.AddAsync(user);
+        await _ctx.SaveChangesAsync();
+
+        User? loaded = await _sut.GetByIdPlatformWideAsync(user.Id);
+
+        loaded!.ThemePreference!.Value.Should().Be("dark");
+    }
+
+    [Fact]
     public async Task FindByEmailGloballyAsync_WhenEmailExistsInAnyWorkspace_ReturnsUser()
     {
         User user = MakeUser($"global-{Guid.NewGuid():N}@example.com");

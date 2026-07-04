@@ -1,10 +1,7 @@
 export const LANGUAGE_STORAGE_KEY = 'axis.language';
 export const DEFAULT_LANGUAGE = 'en';
 
-export const supportedLanguages = [
-  { value: 'en', shortLabel: 'EN', label: 'English' },
-  { value: 'vi', shortLabel: 'VI', label: 'Tiếng Việt' },
-] as const;
+export const supportedLanguages = [{ value: 'en' }, { value: 'vi' }] as const;
 
 export type SupportedLanguage = (typeof supportedLanguages)[number]['value'];
 

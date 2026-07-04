@@ -1,4 +1,4 @@
-import { screen, waitFor } from '@testing-library/react';
+import { cleanup, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useTranslation } from 'react-i18next';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -6,8 +6,8 @@ import { useAuthStore } from '@/features/auth/auth-store';
 import {
   LANGUAGE_STORAGE_KEY,
   LanguageControl,
-  LanguageProfileSync,
   PreferencesMenu,
+  PreferencesProfileSync,
   resolveInitialLanguage,
 } from '@/features/preferences';
 import { renderWithRouter } from './render-with-router';
@@ -56,7 +56,7 @@ function TranslatedProfileHarness() {
 
   return (
     <>
-      <LanguageProfileSync />
+      <PreferencesProfileSync />
       <p>{t('dashboard.accountReady')}</p>
     </>
   );
@@ -69,6 +69,8 @@ describe('language preferences', () => {
   });
 
   afterEach(() => {
+    cleanup();
+    useAuthStore.getState().clearSession();
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
   });
@@ -98,11 +100,17 @@ describe('language preferences', () => {
 
     await user.type(screen.getByLabelText('Email address'), 'alex@example.com');
     expect(screen.queryByRole('button', { name: 'VI' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'EN' })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Preferences' }));
-    await user.click(screen.getByRole('button', { name: /tiếng việt/i }));
+    expect(screen.getByRole('button', { name: 'English' })).toBeInTheDocument();
+    expect(screen.getByText('EN')).toHaveAttribute('aria-hidden', 'true');
+    expect(screen.getByText('VI')).toHaveAttribute('aria-hidden', 'true');
+    await user.click(screen.getByRole('button', { name: 'Vietnamese' }));
 
     expect(screen.getByLabelText('Địa chỉ email')).toHaveValue('alex@example.com');
+    expect(screen.getByRole('button', { name: 'Tiếng Anh' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Tiếng Việt' })).toBeInTheDocument();
     expect(document.documentElement.lang).toBe('vi');
     expect(localStorage.getItem(LANGUAGE_STORAGE_KEY)).toBe('vi');
     expect(fetch).not.toHaveBeenCalled();
@@ -130,9 +138,9 @@ describe('language preferences', () => {
 
     await renderWithRouter(<TranslatedProfileHarness />, { path: '/dashboard' });
 
+    await waitFor(() => expect(localStorage.getItem(LANGUAGE_STORAGE_KEY)).toBe('vi'));
     expect(await screen.findByText('Tài khoản đã sẵn sàng')).toBeInTheDocument();
     expect(document.documentElement.lang).toBe('vi');
-    expect(localStorage.getItem(LANGUAGE_STORAGE_KEY)).toBe('vi');
   });
 
   it('keeps selected authenticated language usable and shows retry state when persistence fails', async () => {
@@ -146,7 +154,7 @@ describe('language preferences', () => {
     } as unknown as Response);
 
     await renderWithRouter(<LanguageControl authenticated />, { path: '/dashboard' });
-    await user.click(screen.getByRole('button', { name: 'VI' }));
+    await user.click(screen.getByRole('button', { name: 'Vietnamese' }));
 
     expect(document.documentElement.lang).toBe('vi');
     expect(localStorage.getItem(LANGUAGE_STORAGE_KEY)).toBe('vi');
@@ -177,8 +185,8 @@ describe('language preferences', () => {
 
     await renderWithRouter(<LanguageControl authenticated />, { path: '/dashboard' });
 
-    await user.click(screen.getByRole('button', { name: 'VI' }));
-    await user.click(screen.getByRole('button', { name: 'EN' }));
+    await user.click(screen.getByRole('button', { name: 'Vietnamese' }));
+    await user.click(screen.getByRole('button', { name: 'Tiếng Anh' }));
 
     let staleResponseParsed = false;
 

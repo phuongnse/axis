@@ -16,7 +16,7 @@ Every route must expose an obvious next navigation path. Auth and public standal
 
 Design from small screens up. Keep cards and controls at restrained radius unless the owning use case says otherwise.
 
-For localized surfaces, validate copy fit in the supported languages named by the owning use case at mobile and desktop sizes. Prefer responsive layout capacity and shared component adjustments over language-specific copy or styling hacks.
+For localized surfaces, validate copy fit in the supported languages named by the owning use case at mobile and desktop sizes. Prefer responsive layout capacity and design-system improvements over language-specific copy or styling hacks.
 
 ## Feature folder anatomy
 
@@ -40,7 +40,9 @@ Use TanStack Router patterns already in the app. Protected routes live under the
 
 ## Component design
 
-Use shadcn components and shared components first. If the shared UI layer lacks a needed component, propose the exact shadcn component or package addition and wait for explicit user sign-off before adding it. Custom UI primitives or bespoke interaction behavior are exceptions only: document why existing shadcn/shared components do not fit and get explicit sign-off before implementation. Use icons for iconable actions, labels/tooltips for clarity, and stable dimensions for fixed controls.
+Use the approved design system first. If the current component contract lacks a needed capability, propose the smallest design-system addition or component API change and wait for explicit user sign-off before adding it. Custom components or bespoke interaction behavior are exceptions only: document why the existing contract does not fit and get explicit sign-off before implementation. Use icons for iconable actions, labels/tooltips for clarity, and stable dimensions for fixed controls.
+
+Treat design-system component visuals as owned by the component contract. Feature code uses defaults and documented props; it does not locally alter component visual treatment through style overrides, selectors, or wrapper styling. If the requested UI needs a visual deviation or component API change, stop before implementation, name the deviation, and get explicit user sign-off; this applies even when the broader change is standard-tier.
 
 ## Styling
 

@@ -11,6 +11,7 @@ public sealed class User : AggregateRoot<Guid>
     public UserStatus Status { get; private set; }
     public bool IsEmailVerified { get; private set; }
     public UserLanguage? LanguagePreference { get; private set; }
+    public UserTheme? ThemePreference { get; private set; }
     public string? AcceptedTermsVersion { get; private set; }
     public string? AcceptedPrivacyVersion { get; private set; }
     public DateTime? LegalAcceptedAt { get; private set; }
@@ -68,5 +69,10 @@ public sealed class User : AggregateRoot<Guid>
     public void SetLanguagePreference(UserLanguage language)
     {
         LanguagePreference = language ?? throw new ArgumentNullException(nameof(language));
+    }
+
+    public void SetThemePreference(UserTheme theme)
+    {
+        ThemePreference = theme ?? throw new ArgumentNullException(nameof(theme));
     }
 }

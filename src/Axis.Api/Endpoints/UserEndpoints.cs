@@ -2,6 +2,7 @@ using Axis.Api.Extensions;
 using Axis.Api.Infrastructure;
 using Axis.Identity.Application.Commands.RegisterUser;
 using Axis.Identity.Application.Commands.UpdateUserLanguagePreference;
+using Axis.Identity.Application.Commands.UpdateUserThemePreference;
 using Axis.Identity.Application.Queries.GetCurrentUserProfile;
 using Axis.Shared.Application;
 using Axis.Shared.Domain.Primitives;
@@ -40,6 +41,15 @@ public static class UserEndpoints
             .WithSummary("Update the current user's language preference")
             .WithTags("Identity")
             .Produces<LanguagePreferenceDto>()
+            .ProducesProblem(400)
+            .ProducesProblem(401)
+            .ProducesProblem(404);
+
+        group.MapPut("/me/preferences/theme", UpdateThemePreference)
+            .WithName("UpdateThemePreference")
+            .WithSummary("Update the current user's theme preference")
+            .WithTags("Identity")
+            .Produces<ThemePreferenceDto>()
             .ProducesProblem(400)
             .ProducesProblem(401)
             .ProducesProblem(404);
@@ -97,6 +107,24 @@ public static class UserEndpoints
             new UpdateUserLanguagePreferenceCommand(
                 currentUser.UserId,
                 request.Language),
+            ct);
+
+        if (result.IsFailure)
+            return result.ToProblemDetails();
+
+        return Results.Ok(result.Value);
+    }
+
+    private static async Task<IResult> UpdateThemePreference(
+        [FromBody] UpdateUserThemePreferenceRequest request,
+        CurrentUser currentUser,
+        ISender mediator,
+        CancellationToken ct)
+    {
+        Result<ThemePreferenceDto> result = await mediator.Send(
+            new UpdateUserThemePreferenceCommand(
+                currentUser.UserId,
+                request.Theme),
             ct);
 
         if (result.IsFailure)

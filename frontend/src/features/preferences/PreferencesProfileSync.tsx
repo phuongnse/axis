@@ -5,8 +5,13 @@ import { useAuthStore } from '@/features/auth/auth-store';
 import { dashboardQueryKeys, getCurrentUserProfile } from '@/features/dashboard/api';
 import { changeSiteLanguage } from '@/features/preferences/i18n';
 import { DEFAULT_LANGUAGE, isSupportedLanguage } from '@/features/preferences/language-store';
+import {
+  DEFAULT_THEME_MODE,
+  isSupportedThemeMode,
+  setThemeMode,
+} from '@/features/preferences/theme-store';
 
-export function LanguageProfileSync() {
+export function PreferencesProfileSync() {
   const accessToken = useAuthStore((state) => state.accessToken);
   const profileQuery = useQuery({
     queryKey: dashboardQueryKeys.currentUser(),
@@ -22,6 +27,15 @@ export function LanguageProfileSync() {
       void changeSiteLanguage(DEFAULT_LANGUAGE);
     }
   }, [profileQuery.data?.language, profileQuery.isSuccess]);
+
+  useEffect(() => {
+    const theme = profileQuery.data?.theme;
+    if (isSupportedThemeMode(theme)) {
+      setThemeMode(theme);
+    } else if (profileQuery.isSuccess && theme) {
+      setThemeMode(DEFAULT_THEME_MODE);
+    }
+  }, [profileQuery.data?.theme, profileQuery.isSuccess]);
 
   return null;
 }

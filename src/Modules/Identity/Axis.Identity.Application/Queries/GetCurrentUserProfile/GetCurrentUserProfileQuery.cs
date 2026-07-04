@@ -11,6 +11,7 @@ public sealed record CurrentUserProfileDto(
     string FullName,
     bool IsActive,
     string? Language,
+    string? Theme,
     Guid? WorkspaceId,
     IReadOnlyList<UserWorkspaceDto> Workspaces);
 

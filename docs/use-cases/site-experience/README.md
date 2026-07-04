@@ -9,3 +9,4 @@ Site Experience owns cross-site user-facing preferences that shape how the web a
 | Use case | Status |
 |---|---|
 | [docs/use-cases/site-experience/select-site-language.md](./select-site-language.md) | Done |
+| [docs/use-cases/site-experience/select-site-theme.md](./select-site-theme.md) | Done |

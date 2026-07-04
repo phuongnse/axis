@@ -123,6 +123,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/users/me/preferences/theme": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Update the current user's theme preference */
+        put: operations["UpdateThemePreference"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -134,6 +151,7 @@ export interface components {
             fullName?: string;
             isActive?: boolean;
             language?: string | null;
+            theme?: string | null;
             /** Format: uuid */
             workspaceId?: string | null;
             workspaces?: components["schemas"]["UserWorkspaceDto"][];
@@ -179,8 +197,14 @@ export interface components {
             email?: string;
             password?: string;
         };
+        ThemePreferenceDto: {
+            theme?: string;
+        };
         UpdateUserLanguagePreferenceRequest: {
             language?: string;
+        };
+        UpdateUserThemePreferenceRequest: {
+            theme?: string;
         };
         UserWorkspaceDto: {
             /** Format: uuid */
@@ -443,6 +467,57 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["LanguagePreferenceDto"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    UpdateThemePreference: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateUserThemePreferenceRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ThemePreferenceDto"];
                 };
             };
             /** @description Bad Request */

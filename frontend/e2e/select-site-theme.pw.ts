@@ -38,10 +38,10 @@ async function registerUserViaApi(request: APIRequestContext, email: string): Pr
   const legalVersions = await getLegalVersions(request);
   const response = await request.post(`${apiURL}/api/users/register`, {
     headers: {
-      'Idempotency-Key': `e2e-sign-in-${crypto.randomUUID()}`,
+      'Idempotency-Key': `e2e-theme-${crypto.randomUUID()}`,
     },
     data: {
-      fullName: 'Sign In User',
+      fullName: 'Theme User',
       email,
       password,
       passwordConfirmation: password,
@@ -107,110 +107,68 @@ async function fillSignInForm(page: Page, email: string): Promise<void> {
   await page.getByLabel('Password').fill(password);
 }
 
-function watchLanguagePreferenceWrites(page: Page): () => number {
-  let writes = 0;
-  page.on('request', (request) => {
-    const url = new URL(request.url());
-    if (request.method() === 'PUT' && url.pathname === '/api/users/me/preferences/language') {
-      writes += 1;
-    }
-  });
-  return () => writes;
-}
-
-function watchThemePreferenceWrites(page: Page): () => number {
-  let writes = 0;
-  page.on('request', (request) => {
-    const url = new URL(request.url());
-    if (request.method() === 'PUT' && url.pathname === '/api/users/me/preferences/theme') {
-      writes += 1;
-    }
-  });
-  return () => writes;
-}
-
-test.describe('sign in user', () => {
-  test.skip(!apiURL, 'Set E2E_API_URL to run sign-in-user API setup.');
-
+test.describe('select site theme', () => {
   test.beforeEach(async ({ request }) => {
     await clearMaildev(request);
   });
 
-  test('AT-001 verified standalone user signs in and reaches dashboard', async ({
-    page,
-    request,
-  }) => {
-    test.skip(!maildevURL, 'Set E2E_MAILDEV_URL to run sign-in-user email verification.');
-
-    const email = uniqueEmail('sign001');
-    const languageWrites = watchLanguagePreferenceWrites(page);
-    const themeWrites = watchThemePreferenceWrites(page);
-    await createVerifiedUser(request, email);
-
+  test('AT-001 visitor selects a supported theme and keeps it after reload', async ({ page }) => {
     await page.goto('/sign-in');
-    await fillSignInForm(page, email);
-    await page.getByRole('button', { name: /sign in/i }).click();
 
-    await expect(page).toHaveURL(/\/dashboard$/, { timeout: 30_000 });
-    await expect(page.getByRole('heading', { name: 'Sign In User', level: 1 })).toBeVisible();
-    await expect(page.getByRole('definition').filter({ hasText: email })).toBeVisible();
-    await expect(page.getByText('Account ready')).toBeVisible();
-    expect(languageWrites()).toBe(0);
-    expect(themeWrites()).toBe(0);
-  });
-
-  test('AT-002 unauthenticated dashboard access routes to sign-in with registration link', async ({
-    page,
-  }) => {
-    await page.goto('/dashboard');
-
-    await expect(page).toHaveURL(/\/sign-in$/);
-    await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible();
-    await page.getByRole('link', { name: /create account/i }).click();
-    await expect(page).toHaveURL(/\/register$/);
-  });
-
-  test('AT-004 validation errors relocalize and visibly mark invalid fields', async ({ page }) => {
-    await page.goto('/sign-in');
-    await page.getByRole('button', { name: /sign in/i }).click();
-
-    const emailInput = page.getByLabel('Email address');
-    await expect(page.getByText('Email address is required')).toBeVisible();
-    await expect(page.getByText('Password is required')).toBeVisible();
-    await expect(emailInput).toHaveAttribute('aria-invalid', 'true');
-    await expect(emailInput).toHaveCSS('border-color', 'rgb(239, 68, 68)');
-
+    await expect(page.locator('html')).toHaveAttribute('data-theme-mode', 'system');
+    await page.getByLabel('Email address').fill('theme@example.com');
     await page.getByRole('button', { name: 'Preferences' }).click();
-    await page.getByRole('button', { name: 'Vietnamese' }).click();
+    await page.getByRole('button', { name: 'Dark' }).click();
+    const selectedThemeOption = page.getByRole('button', { name: 'Dark' });
+    await expect(selectedThemeOption).toHaveAttribute('aria-pressed', 'true');
+    expect(
+      await selectedThemeOption.evaluate((node) => getComputedStyle(node).backgroundColor),
+    ).not.toBe('rgba(0, 0, 0, 0)');
 
-    const localizedEmailInput = page.getByLabel('Địa chỉ email');
-    await expect(page.getByText('Email là bắt buộc')).toBeVisible();
-    await expect(page.getByText('Mật khẩu là bắt buộc')).toBeVisible();
-    await expect(page.getByText('Email address is required')).toHaveCount(0);
-    await expect(localizedEmailInput).toHaveAttribute('aria-invalid', 'true');
-    await expect(localizedEmailInput).toHaveCSS('border-color', 'rgb(239, 68, 68)');
-  });
-
-  test('AT-013 protected route reload restores from the browser authorization session', async ({
-    page,
-    request,
-  }) => {
-    test.skip(!maildevURL, 'Set E2E_MAILDEV_URL to run sign-in-user email verification.');
-
-    const email = uniqueEmail('sign013');
-    await createVerifiedUser(request, email);
-
-    await page.goto('/sign-in');
-    await fillSignInForm(page, email);
-    await page.getByRole('button', { name: /sign in/i }).click();
-
-    await expect(page).toHaveURL(/\/dashboard$/, { timeout: 30_000 });
-    await expect(page.getByRole('heading', { name: 'Sign In User', level: 1 })).toBeVisible();
+    await expect(page.getByLabel('Email address')).toHaveValue('theme@example.com');
+    await expect(page.locator('html')).toHaveClass(/dark/);
+    await expect(page.locator('html')).toHaveAttribute('data-theme-mode', 'dark');
+    expect(await page.evaluate(() => localStorage.getItem('axis.theme'))).toBe('dark');
+    expect(await page.evaluate(() => document.documentElement.style.colorScheme)).toBe('dark');
 
     await page.reload();
 
+    await expect(page.locator('html')).toHaveClass(/dark/);
+    await expect(page.locator('html')).toHaveAttribute('data-theme-mode', 'dark');
+    await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible();
+    expect(await page.evaluate(() => localStorage.getItem('axis.theme'))).toBe('dark');
+  });
+
+  test('AT-002 authenticated theme preference is restored from the server after reload', async ({
+    page,
+    request,
+  }) => {
+    test.skip(!apiURL, 'Set E2E_API_URL to run authenticated theme setup.');
+    test.skip(!maildevURL, 'Set E2E_MAILDEV_URL to run authenticated theme verification.');
+
+    const email = uniqueEmail('theme002');
+    await createVerifiedUser(request, email);
+
+    await page.goto('/sign-in');
+    await fillSignInForm(page, email);
+    await page.getByRole('button', { name: /sign in/i }).click();
+
     await expect(page).toHaveURL(/\/dashboard$/, { timeout: 30_000 });
-    await expect(page.getByRole('heading', { name: 'Sign In User', level: 1 })).toBeVisible();
-    await expect(page.getByText('Account ready')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Theme User', level: 1 })).toBeVisible();
+
+    await page.getByRole('button', { name: 'Preferences' }).click();
+    await page.getByRole('button', { name: 'Dark' }).click();
+
+    await expect(page.getByText('Theme saved')).toBeVisible({ timeout: 30_000 });
+    await expect(page.locator('html')).toHaveClass(/dark/);
+    await expect(page.locator('html')).toHaveAttribute('data-theme-mode', 'dark');
+
+    await page.evaluate(() => localStorage.removeItem('axis.theme'));
+    await page.reload();
+
+    await expect(page).toHaveURL(/\/dashboard$/, { timeout: 30_000 });
+    await expect(page.locator('html')).toHaveClass(/dark/, { timeout: 30_000 });
+    await expect(page.locator('html')).toHaveAttribute('data-theme-mode', 'dark');
+    await expect.poll(() => page.evaluate(() => localStorage.getItem('axis.theme'))).toBe('dark');
   });
 });

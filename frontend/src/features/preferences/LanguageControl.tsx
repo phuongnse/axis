@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Check, RotateCcw } from 'lucide-react';
+import { RotateCcw } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
@@ -14,6 +14,7 @@ import {
   type SupportedLanguage,
   supportedLanguages,
 } from '@/features/preferences/language-store';
+import type { TranslationKey } from '@/features/preferences/translations';
 import { cn } from '@/lib/utils';
 
 interface LanguageControlProps {
@@ -21,6 +22,16 @@ interface LanguageControlProps {
   className?: string;
   variant?: 'segmented' | 'menu';
 }
+
+const languageLabelKeys = {
+  en: 'app.languageEnglish',
+  vi: 'app.languageVietnamese',
+} satisfies Record<SupportedLanguage, TranslationKey>;
+
+const languageBadges = {
+  en: 'EN',
+  vi: 'VI',
+} satisfies Record<SupportedLanguage, string>;
 
 export function LanguageControl({
   authenticated = false,
@@ -99,14 +110,7 @@ export function LanguageControl({
         className,
       )}
     >
-      <fieldset
-        aria-describedby={statusId}
-        className={cn(
-          isMenu
-            ? 'grid gap-1'
-            : 'inline-flex h-8 overflow-hidden rounded-lg border border-border bg-background',
-        )}
-      >
+      <fieldset aria-describedby={statusId} className={cn(isMenu && 'grid gap-1')}>
         <legend
           className={cn(isMenu ? 'mb-1 px-1 text-xs font-medium text-muted-foreground' : 'sr-only')}
         >
@@ -115,52 +119,29 @@ export function LanguageControl({
         <ToggleGroup
           value={[activeLanguage]}
           onValueChange={chooseToggleLanguage}
-          spacing={0}
           orientation={isMenu ? 'vertical' : 'horizontal'}
           variant={isMenu ? 'default' : 'outline'}
           size="sm"
+          width={isMenu ? 'full' : 'auto'}
           aria-label={t('app.language')}
-          className={cn(isMenu ? 'w-full items-stretch gap-1' : 'h-8 rounded-lg')}
         >
-          {supportedLanguages.map((item) => {
-            const selected = activeLanguage === item.value;
-
-            return (
-              <ToggleGroupItem
-                key={item.value}
-                value={item.value}
-                className={cn(
-                  isMenu
-                    ? 'flex h-9 w-full justify-between gap-3 rounded-md px-2.5 text-sm data-[state=on]:bg-primary/10 data-[state=on]:text-primary'
-                    : 'min-w-10 rounded-none border-0 px-2.5 text-xs data-[state=on]:bg-primary data-[state=on]:text-primary-foreground',
-                )}
-              >
-                {isMenu ? (
-                  <>
-                    <span className="flex min-w-0 items-center gap-2">
-                      <span
-                        className={cn(
-                          'flex h-5 min-w-7 items-center justify-center rounded border px-1 text-[10px] font-semibold',
-                          selected
-                            ? 'border-primary/20 bg-background text-primary'
-                            : 'border-border bg-muted/40 text-muted-foreground',
-                        )}
-                      >
-                        {item.shortLabel}
-                      </span>
-                      <span className="truncate">{item.label}</span>
-                    </span>
-                    <Check
-                      className={cn('size-3.5', selected ? 'opacity-100' : 'opacity-0')}
-                      aria-hidden
-                    />
-                  </>
-                ) : (
-                  item.shortLabel
-                )}
-              </ToggleGroupItem>
-            );
-          })}
+          {supportedLanguages.map((item) => (
+            <ToggleGroupItem
+              key={item.value}
+              value={item.value}
+              align={isMenu ? 'start' : 'center'}
+            >
+              {isMenu ? (
+                <span
+                  aria-hidden
+                  className="flex size-4 shrink-0 items-center justify-center text-[8px] font-semibold leading-none"
+                >
+                  {languageBadges[item.value]}
+                </span>
+              ) : null}
+              {t(languageLabelKeys[item.value])}
+            </ToggleGroupItem>
+          ))}
         </ToggleGroup>
       </fieldset>
 
@@ -175,14 +156,8 @@ export function LanguageControl({
           {mutation.isError ? (
             <span className="inline-flex items-center gap-1 text-destructive">
               {t('app.languageSaveFailed')}
-              <Button
-                type="button"
-                variant="link"
-                size="sm"
-                className="h-6 px-1.5 text-[11px]"
-                onClick={retrySave}
-              >
-                <RotateCcw className="size-3" aria-hidden />
+              <Button type="button" variant="link" size="sm" onClick={retrySave}>
+                <RotateCcw aria-hidden />
                 {t('app.retry')}
               </Button>
             </span>

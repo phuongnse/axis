@@ -13,6 +13,7 @@ Implement an Axis frontend slice with generated API types, user-visible states, 
 
 Follow [reference.md](../reference.md).
 - Use `$axis-design-gate` for non-trivial behavior; stop for high-risk sign-off before code.
+- Stop for explicit user sign-off before any feature-level visual deviation from the design-system component contract or any component API change per [docs/playbooks/frontend.md#component-design](../../../docs/playbooks/frontend.md#component-design).
 - Use generated API types — do not hand-write duplicate wire shapes.
 - Do not claim review-ready without `$axis-ready-review`.
 
@@ -50,6 +51,7 @@ Follow [reference.md](../reference.md).
    - Do not store auth tokens in `localStorage`.
    - On localized surfaces, route visible product copy through the frontend translation layer rather than component-local static text.
    - Keep visible text focused on the product workflow, not developer instructions.
+   - Use design-system component defaults and documented props; if the UI requires a visual deviation or component API change, stop for the sign-off required by [docs/playbooks/frontend.md#component-design](../../../docs/playbooks/frontend.md#component-design).
 
 5. Test behavior.
    - Use Vitest and Testing Library.

@@ -81,7 +81,6 @@ Let a visitor or authenticated user view supported web surfaces in a supported l
 - Server persistence for unauthenticated visitors.
 - Workspace-specific language preferences.
 - Locale-sensitive date, number, currency, or timezone formatting beyond text copy and document language metadata in this slice.
-- Color theme selection.
 
 ## Screen flow
 
@@ -138,4 +137,4 @@ sequenceDiagram
 >
 > **Verification:** Required AT rows are covered by browser automation, UI component tests, API integration tests, application tests, infrastructure tests, and frontend static checks.
 >
-> **Decisions:** Site Experience owns the web language selection use case. Screen flow owns the product screen contract; Required UI quality owns accessibility and interaction expectations. Identity owns authenticated user language persistence because the preference belongs to the user profile, not a workspace or shared primitive. Server preference is the authenticated source of truth when present; browser preference supports bootstrapping and unauthenticated use. Protected route session bootstrap is owned by [docs/use-cases/identity-access/sign-in-user.md](../identity-access/sign-in-user.md); this use case relies on it only to reload an authenticated language preference journey. Authentication flows must not silently write server language preference.
+> **Decisions:** Site Experience owns the web language selection use case. Screen flow owns the product screen contract; Required UI quality owns accessibility and interaction expectations. Identity owns authenticated user language persistence because the preference belongs to the user profile, not workspace-scoped or shared platform state. Server preference is the authenticated source of truth when present; browser preference supports bootstrapping and unauthenticated use. Protected route session bootstrap is owned by [docs/use-cases/identity-access/sign-in-user.md](../identity-access/sign-in-user.md); this use case relies on it only to reload an authenticated language preference journey. Authentication flows must not silently write server language preference.

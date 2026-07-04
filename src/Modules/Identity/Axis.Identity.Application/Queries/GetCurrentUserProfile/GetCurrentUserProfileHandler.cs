@@ -36,6 +36,7 @@ public sealed class GetCurrentUserProfileHandler(
             user.FullName,
             user.Status == UserStatus.Active,
             user.LanguagePreference?.Value,
+            user.ThemePreference?.Value,
             query.workspaceId,
             workspaces
                 .OrderBy(workspace => workspace.Type == WorkspaceType.Personal.ToString() ? 0 : 1)

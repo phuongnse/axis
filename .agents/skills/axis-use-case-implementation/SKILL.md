@@ -69,6 +69,7 @@ Follow [reference.md](../reference.md).
 
 8. Update status docs when behavior/status changes.
    - Update the use-case `Implementation status` callout; status values are `Done`, `Partial`, `Not started`, and `N/A`.
+   - Reconcile the layer table against the AC/AT matrix boundaries, changed paths, and acceptance evidence. A layer touched by the slice or required by an in-scope AT row cannot be `N/A`; mark it `Done` only when its required evidence passed, `Partial` when implemented with gaps, and `Not started` when the spec requires it but no implementation exists.
    - Use `$axis-visual-artifact` when Mermaid diagrams or committed visual artifacts changed.
    - Update the domain README or [docs/use-cases/README.md](../../../docs/use-cases/README.md) only when their summarized status changes.
    - Name exact deferred AC bullets under `Deferred follow-ups`; use `N/A` when none.
