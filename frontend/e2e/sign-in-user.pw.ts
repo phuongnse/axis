@@ -118,6 +118,17 @@ function watchLanguagePreferenceWrites(page: Page): () => number {
   return () => writes;
 }
 
+function watchThemePreferenceWrites(page: Page): () => number {
+  let writes = 0;
+  page.on('request', (request) => {
+    const url = new URL(request.url());
+    if (request.method() === 'PUT' && url.pathname === '/api/users/me/preferences/theme') {
+      writes += 1;
+    }
+  });
+  return () => writes;
+}
+
 test.describe('sign in user', () => {
   test.skip(!apiURL, 'Set E2E_API_URL to run sign-in-user API setup.');
 
@@ -133,6 +144,7 @@ test.describe('sign in user', () => {
 
     const email = uniqueEmail('sign001');
     const languageWrites = watchLanguagePreferenceWrites(page);
+    const themeWrites = watchThemePreferenceWrites(page);
     await createVerifiedUser(request, email);
 
     await page.goto('/sign-in');
@@ -144,6 +156,7 @@ test.describe('sign in user', () => {
     await expect(page.getByRole('definition').filter({ hasText: email })).toBeVisible();
     await expect(page.getByText('Account ready')).toBeVisible();
     expect(languageWrites()).toBe(0);
+    expect(themeWrites()).toBe(0);
   });
 
   test('AT-002 unauthenticated dashboard access routes to sign-in with registration link', async ({

@@ -1,4 +1,4 @@
-import { act, screen } from '@testing-library/react';
+import { act, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useTranslation } from 'react-i18next';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -6,6 +6,7 @@ import { useAuthStore } from '@/features/auth/auth-store';
 import {
   changeSiteLanguage,
   PreferencesMenu,
+  PreferencesProfileSync,
   resolveInitialThemeMode,
   setThemeMode,
   THEME_STORAGE_KEY,
@@ -30,6 +31,17 @@ function TranslatedFormHarness() {
       <label htmlFor="email">{t('auth.email')}</label>
       <input id="email" />
     </form>
+  );
+}
+
+function TranslatedProfileHarness() {
+  const { t } = useTranslation();
+
+  return (
+    <>
+      <PreferencesProfileSync />
+      <p>{t('dashboard.accountReady')}</p>
+    </>
   );
 }
 
@@ -79,6 +91,7 @@ describe('theme preferences', () => {
   });
 
   afterEach(() => {
+    useAuthStore.getState().clearSession();
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
   });
@@ -163,16 +176,68 @@ describe('theme preferences', () => {
     expect(document.documentElement.style.colorScheme).toBe('light');
   });
 
-  it('keeps authenticated theme selection browser-owned', async () => {
+  it('persists authenticated theme selection through the API', async () => {
     const user = userEvent.setup();
     useAuthStore.getState().setSession('header.payload.signature');
-    vi.mocked(fetch).mockResolvedValue(jsonResponse({ language: 'en' }));
+    vi.mocked(fetch).mockResolvedValue(jsonResponse({ theme: 'dark' }));
 
-    await renderWithRouter(<ThemeControl />, { path: '/dashboard' });
+    await renderWithRouter(<ThemeControl authenticated />, { path: '/dashboard' });
     await user.click(screen.getByRole('button', { name: 'Dark' }));
 
     expect(document.documentElement.dataset.themeMode).toBe('dark');
-    expect(fetch).not.toHaveBeenCalled();
+    expect(await screen.findByText('Theme saved')).toBeInTheDocument();
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    const request = vi.mocked(fetch).mock.calls[0][1];
+    expect(request?.method).toBe('PUT');
+    expect(String(request?.body)).toContain('"theme":"dark"');
+  });
+
+  it('applies authenticated server theme as source of truth and mirrors it to storage', async () => {
+    useAuthStore.getState().setSession('header.payload.signature');
+    vi.mocked(fetch).mockImplementation((input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input.toString();
+      if (url.includes('/api/users/me')) {
+        return Promise.resolve(
+          jsonResponse({
+            id: '9fc0f6c1-24f6-4e66-a50f-3f742ad10b1a',
+            email: 'admin@example.com',
+            fullName: 'Admin User',
+            isActive: true,
+            language: 'en',
+            theme: 'dark',
+            workspaceId: null,
+            workspaces: [],
+          }),
+        );
+      }
+      return Promise.reject(new Error(`Unexpected fetch: ${url}`));
+    });
+
+    await renderWithRouter(<TranslatedProfileHarness />, { path: '/dashboard' });
+
+    await waitFor(() => expect(localStorage.getItem(THEME_STORAGE_KEY)).toBe('dark'));
+    expect(await screen.findByText('Account ready')).toBeInTheDocument();
+    expect(document.documentElement).toHaveClass('dark');
+    expect(document.documentElement.dataset.themeMode).toBe('dark');
+  });
+
+  it('keeps selected authenticated theme usable and shows retry state when persistence fails', async () => {
+    const user = userEvent.setup();
+    useAuthStore.getState().setSession('header.payload.signature');
+    vi.mocked(fetch).mockResolvedValue({
+      ok: false,
+      status: 500,
+      statusText: 'Internal Server Error',
+      json: () => Promise.resolve({ detail: 'boom' }),
+    } as unknown as Response);
+
+    await renderWithRouter(<ThemeControl authenticated />, { path: '/dashboard' });
+    await user.click(screen.getByRole('button', { name: 'Dark' }));
+
+    expect(document.documentElement.dataset.themeMode).toBe('dark');
+    expect(localStorage.getItem(THEME_STORAGE_KEY)).toBe('dark');
+    expect(await screen.findByText('Theme not saved across devices.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /retry/i })).toBeInTheDocument();
   });
 
   it('localizes theme controls inside the preferences menu', async () => {

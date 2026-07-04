@@ -18,6 +18,7 @@ public class UserTests
         user.Status.Should().Be(UserStatus.Active);
         user.IsEmailVerified.Should().BeFalse();
         user.LanguagePreference.Should().BeNull();
+        user.ThemePreference.Should().BeNull();
     }
 
     [Fact]
@@ -57,5 +58,16 @@ public class UserTests
         user.SetLanguagePreference(language);
 
         user.LanguagePreference.Should().Be(language);
+    }
+
+    [Fact]
+    public void SetThemePreference_WhenThemeIsSupported_StoresPreference()
+    {
+        User user = User.Create("Alice Smith", ValidEmail);
+        UserTheme theme = UserTheme.Create("dark").Value;
+
+        user.SetThemePreference(theme);
+
+        user.ThemePreference.Should().Be(theme);
     }
 }

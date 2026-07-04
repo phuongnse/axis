@@ -37,6 +37,7 @@ public sealed class GetCurrentUserProfileHandlerTests
     {
         User user = User.Create("Ada Lovelace", Email.Create("ada@acme.com").Value);
         user.SetLanguagePreference(UserLanguage.Create("vi").Value);
+        user.SetThemePreference(UserTheme.Create("dark").Value);
         Workspace workspace = Workspace.CreatePersonal(
             "Ada Lovelace",
             WorkspaceSlug.Create("ada-lovelace").Value,
@@ -57,6 +58,7 @@ public sealed class GetCurrentUserProfileHandlerTests
         dto.FullName.Should().Be("Ada Lovelace");
         dto.IsActive.Should().BeTrue();
         dto.Language.Should().Be("vi");
+        dto.Theme.Should().Be("dark");
         dto.WorkspaceId.Should().Be(workspace.Id);
         dto.Workspaces.Should().ContainSingle();
         dto.Workspaces[0].Type.Should().Be("Personal");

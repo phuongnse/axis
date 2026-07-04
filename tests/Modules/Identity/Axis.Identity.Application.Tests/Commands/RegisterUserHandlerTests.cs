@@ -67,6 +67,7 @@ public class RegisterUserHandlerTests
                 && u.FullName == "Alice Smith"
                 && u.PasswordHash == "hashed_password"
                 && u.LanguagePreference == null
+                && u.ThemePreference == null
                 && u.AcceptedTermsVersion == WellKnownLegalDocuments.TermsVersion
                 && u.AcceptedPrivacyVersion == WellKnownLegalDocuments.PrivacyVersion),
             Arg.Any<CancellationToken>());

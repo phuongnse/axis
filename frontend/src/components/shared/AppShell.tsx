@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import { AppHeader } from '@/components/shared/AppHeader';
 import { AppSidebar } from '@/components/shared/AppSidebar';
 import { useAuthStore } from '@/features/auth/auth-store';
-import { LanguageProfileSync } from '@/features/preferences';
+import { PreferencesProfileSync } from '@/features/preferences';
 
 interface AppShellProps {
   children: ReactNode;
@@ -19,7 +19,7 @@ export function AppShell({ children }: AppShellProps) {
 
   return (
     <div className="flex min-h-screen flex-col bg-background lg:flex-row">
-      <LanguageProfileSync />
+      <PreferencesProfileSync />
       <AppSidebar />
       <div className="flex min-w-0 flex-1 flex-col">
         <AppHeader onSignOut={handleSignOut} />

@@ -6,8 +6,8 @@ import { useAuthStore } from '@/features/auth/auth-store';
 import {
   LANGUAGE_STORAGE_KEY,
   LanguageControl,
-  LanguageProfileSync,
   PreferencesMenu,
+  PreferencesProfileSync,
   resolveInitialLanguage,
 } from '@/features/preferences';
 import { renderWithRouter } from './render-with-router';
@@ -56,7 +56,7 @@ function TranslatedProfileHarness() {
 
   return (
     <>
-      <LanguageProfileSync />
+      <PreferencesProfileSync />
       <p>{t('dashboard.accountReady')}</p>
     </>
   );
@@ -69,6 +69,7 @@ describe('language preferences', () => {
   });
 
   afterEach(() => {
+    useAuthStore.getState().clearSession();
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
   });
@@ -136,9 +137,9 @@ describe('language preferences', () => {
 
     await renderWithRouter(<TranslatedProfileHarness />, { path: '/dashboard' });
 
+    await waitFor(() => expect(localStorage.getItem(LANGUAGE_STORAGE_KEY)).toBe('vi'));
     expect(await screen.findByText('Tài khoản đã sẵn sàng')).toBeInTheDocument();
     expect(document.documentElement.lang).toBe('vi');
-    expect(localStorage.getItem(LANGUAGE_STORAGE_KEY)).toBe('vi');
   });
 
   it('keeps selected authenticated language usable and shows retry state when persistence fails', async () => {

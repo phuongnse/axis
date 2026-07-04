@@ -1,6 +1,5 @@
 export { changeSiteLanguage, currentSiteLanguage, i18n } from './i18n';
 export { LanguageControl } from './LanguageControl';
-export { LanguageProfileSync } from './LanguageProfileSync';
 export {
   applyDocumentLanguage,
   DEFAULT_LANGUAGE,
@@ -14,6 +13,7 @@ export {
   supportedLanguages,
 } from './language-store';
 export { PreferencesMenu } from './PreferencesMenu';
+export { PreferencesProfileSync } from './PreferencesProfileSync';
 export { ThemeControl } from './ThemeControl';
 export {
   applyDocumentTheme,

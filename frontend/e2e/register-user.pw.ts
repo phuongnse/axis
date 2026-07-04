@@ -112,6 +112,17 @@ function watchLanguagePreferenceWrites(page: Page): () => number {
   return () => writes;
 }
 
+function watchThemePreferenceWrites(page: Page): () => number {
+  let writes = 0;
+  page.on('request', (request) => {
+    const url = new URL(request.url());
+    if (request.method() === 'PUT' && url.pathname === '/api/users/me/preferences/theme') {
+      writes += 1;
+    }
+  });
+  return () => writes;
+}
+
 test.describe('register user', () => {
   test.skip(!apiURL, 'Set E2E_API_URL to run register-user API setup.');
 
@@ -127,6 +138,7 @@ test.describe('register user', () => {
 
     const email = uniqueEmail('reg001');
     const languageWrites = watchLanguagePreferenceWrites(page);
+    const themeWrites = watchThemePreferenceWrites(page);
 
     await page.goto('/register');
     await fillRegisterForm(page, email);
@@ -143,6 +155,7 @@ test.describe('register user', () => {
     await expect(page.getByRole('definition').filter({ hasText: email })).toBeVisible();
     await expect(page.getByText('Account ready')).toBeVisible();
     expect(languageWrites()).toBe(0);
+    expect(themeWrites()).toBe(0);
   });
 
   test('AT-002 duplicate email shows an inline error', async ({ page, request }) => {

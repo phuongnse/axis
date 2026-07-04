@@ -16,6 +16,8 @@ export const translations = {
     'app.theme': 'Theme',
     'app.themeDark': 'Dark',
     'app.themeLight': 'Light',
+    'app.themeSaved': 'Theme saved',
+    'app.themeSaveFailed': 'Theme not saved across devices.',
     'app.themeSystem': 'System',
 
     'auth.alreadyHaveAccount': 'Already have an account?',
@@ -137,6 +139,8 @@ export const translations = {
     'app.theme': 'Giao diện',
     'app.themeDark': 'Tối',
     'app.themeLight': 'Sáng',
+    'app.themeSaved': 'Đã lưu giao diện',
+    'app.themeSaveFailed': 'Chưa lưu giao diện trên các thiết bị.',
     'app.themeSystem': 'Theo hệ thống',
 
     'auth.alreadyHaveAccount': 'Bạn đã có tài khoản?',

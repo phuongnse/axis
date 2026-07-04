@@ -36,7 +36,7 @@ export function PreferencesMenu({ authenticated = false, className }: Preference
         </PopoverTrigger>
         <PopoverContent aria-label={t('app.preferences')}>
           <LanguageControl authenticated={authenticated} variant="menu" />
-          <ThemeControl variant="menu" />
+          <ThemeControl authenticated={authenticated} variant="menu" />
         </PopoverContent>
       </Popover>
     </div>

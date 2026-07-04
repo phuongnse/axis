@@ -54,6 +54,38 @@ public sealed class UserLanguagePreferenceEndpointTests(ApiTestFixture fixture)
     }
 
     [Fact]
+    public async Task UpdateThemePreference_WhenAuthenticated_PersistsAndReturnsThemeOnProfile()
+    {
+        string email = UniqueEmail();
+        string accessToken = await CreateVerifiedSessionTokenAsync(email);
+
+        HttpResponseMessage updateResponse = await SendWithBearerAsync(
+            HttpMethod.Put,
+            "/api/users/me/preferences/theme",
+            accessToken,
+            new { theme = "dark" });
+
+        updateResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        JsonElement updateBody = await updateResponse.Content.ReadFromJsonAsync<JsonElement>(Json);
+        updateBody.GetProperty("theme").GetString().Should().Be("dark");
+
+        HttpResponseMessage profileResponse = await SendWithBearerAsync(
+            HttpMethod.Get,
+            "/api/users/me",
+            accessToken);
+
+        profileResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        JsonElement profileBody = await profileResponse.Content.ReadFromJsonAsync<JsonElement>(Json);
+        profileBody.GetProperty("theme").GetString().Should().Be("dark");
+
+        using IServiceScope scope = fixture.CreateScope();
+        IdentityDbContext db = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
+        Email normalizedEmail = Email.Create(email).Value;
+        User user = await db.Users.SingleAsync(user => user.Email == normalizedEmail);
+        user.ThemePreference!.Value.Should().Be("dark");
+    }
+
+    [Fact]
     public async Task UpdateLanguagePreference_WhenLanguageIsUnsupported_ReturnsValidationProblem()
     {
         string accessToken = await CreateVerifiedSessionTokenAsync(UniqueEmail());
@@ -72,6 +104,24 @@ public sealed class UserLanguagePreferenceEndpointTests(ApiTestFixture fixture)
     }
 
     [Fact]
+    public async Task UpdateThemePreference_WhenThemeIsUnsupported_ReturnsValidationProblem()
+    {
+        string accessToken = await CreateVerifiedSessionTokenAsync(UniqueEmail());
+
+        HttpResponseMessage response = await SendWithBearerAsync(
+            HttpMethod.Put,
+            "/api/users/me/preferences/theme",
+            accessToken,
+            new { theme = "contrast" });
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        JsonElement body = await response.Content.ReadFromJsonAsync<JsonElement>(Json);
+        body.GetProperty("errors").EnumerateObject()
+            .Select(error => error.Name)
+            .Should().Contain("theme");
+    }
+
+    [Fact]
     public async Task VerifyEmail_WhenAccountSessionIsCreated_DoesNotCreateLanguagePreference()
     {
         string email = UniqueEmail();
@@ -85,6 +135,7 @@ public sealed class UserLanguagePreferenceEndpointTests(ApiTestFixture fixture)
         Email normalizedEmail = Email.Create(email).Value;
         User user = await db.Users.SingleAsync(user => user.Email == normalizedEmail);
         user.LanguagePreference.Should().BeNull();
+        user.ThemePreference.Should().BeNull();
     }
 
     private async Task<string> CreateVerifiedSessionTokenAsync(string email)

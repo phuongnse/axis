@@ -45,6 +45,13 @@ internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
                 language => language == null ? null : language.Value,
                 value => value == null ? null : UserLanguage.Create(value).Value));
 
+        builder.Property(u => u.ThemePreference)
+            .HasColumnName("theme_preference")
+            .HasMaxLength(UserTheme.MaxLength)
+            .HasConversion(new ValueConverter<UserTheme?, string?>(
+                theme => theme == null ? null : theme.Value,
+                value => value == null ? null : UserTheme.Create(value).Value));
+
         builder.Property(u => u.AcceptedTermsVersion)
             .HasColumnName("accepted_terms_version")
             .HasMaxLength(32);
