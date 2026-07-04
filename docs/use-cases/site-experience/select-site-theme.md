@@ -101,13 +101,13 @@ Required UI quality: theme controls must have programmatic labels, keyboard acce
 >
 > | Layer | Status |
 > |-------|--------|
-> | Domain | N/A |
-> | Application | N/A |
-> | Infrastructure | N/A |
-> | API | N/A |
+> | Domain | Done |
+> | Application | Done |
+> | Infrastructure | Done |
+> | API | Done |
 > | Frontend | Done |
 >
-> **Implemented:** Browser-owned theme mode selection for `light`, `dark`, and `system`; boot-time theme resolution from browser storage before React renders; immediate document theme metadata and color-scheme updates; system-mode browser color-scheme tracking while the page is open; localized public and authenticated preferences menu controls; authenticated user theme preference API and persistence; server-profile theme sync; and light/dark theme tokens.
+> **Implemented:** Identity-owned user theme value object and profile preference, command-handler validation, migration-backed persistence, authenticated theme preference API, generated frontend API types, boot-time theme resolution from browser storage before React renders, immediate document theme metadata and color-scheme updates, system-mode browser color-scheme tracking while the page is open, localized public and authenticated preferences menu controls, server-profile theme sync, and light/dark theme tokens.
 >
 > **Gaps vs spec:** N/A.
 >

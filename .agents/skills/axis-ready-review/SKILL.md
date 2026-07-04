@@ -38,6 +38,7 @@ Follow [reference.md](../reference.md).
 
 3. Audit product evidence.
    - Behavior/status changes need the owning use-case callout updated.
+   - Cross-check the use-case `Implementation status` layer table against the AC/AT matrix boundaries, changed paths, and acceptance evidence. Report Not ready when a touched or required layer is `N/A`, or when a `Done` layer lacks proving evidence.
    - Implemented/refreshed use cases need AC IDs and an Acceptance Test Matrix.
    - Every in-scope AC must map to automated evidence or an exact deferral.
    - Required AT expectations must cite a spec section, AC ID, or flow step in the implementation/verification report.
