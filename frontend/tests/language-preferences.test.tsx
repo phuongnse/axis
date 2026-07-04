@@ -1,4 +1,4 @@
-import { act, screen, waitFor } from '@testing-library/react';
+import { cleanup, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useTranslation } from 'react-i18next';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -69,9 +69,8 @@ describe('language preferences', () => {
   });
 
   afterEach(() => {
-    act(() => {
-      useAuthStore.getState().clearSession();
-    });
+    cleanup();
+    useAuthStore.getState().clearSession();
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
   });
