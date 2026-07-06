@@ -1,7 +1,6 @@
-using System.Text.Json;
+using Axis.Api.Infrastructure;
 using Axis.Shared.Domain.Primitives;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.WebUtilities;
 
 namespace Axis.Api.Extensions;
 
@@ -11,9 +10,6 @@ namespace Axis.Api.Extensions;
 /// </summary>
 public static class ResultExtensions
 {
-    private const string ProblemJsonContentType = "application/problem+json";
-    private const string ProblemTypePrefix = "urn:axis:problem:";
-
     public static IResult ToProblemDetails(this Result result)
     {
         if (result.IsSuccess)
@@ -22,7 +18,7 @@ public static class ResultExtensions
         if (result.ErrorCode == ErrorCodes.FieldValidation && result.FieldErrors is not null)
         {
             Dictionary<string, string[]> errors = result.FieldErrors
-                .ToDictionary(kv => ToJsonFieldName(kv.Key), kv => kv.Value);
+                .ToDictionary(kv => ProblemDetailsDefaults.ToJsonFieldName(kv.Key), kv => kv.Value);
             return Problem(
                 result,
                 StatusCodes.Status422UnprocessableEntity,
@@ -64,39 +60,18 @@ public static class ResultExtensions
         int statusCode,
         IReadOnlyDictionary<string, string[]>? validationErrors = null)
     {
-        string code = GetProblemCode(result);
+        string code = ProblemDetailsDefaults.CodeFor(result);
         ProblemDetails problem = validationErrors is null
-            ? new ProblemDetails()
-            : new HttpValidationProblemDetails(
-                validationErrors.ToDictionary(kv => kv.Key, kv => kv.Value));
-        problem.Status = statusCode;
-        problem.Title = ReasonPhrases.GetReasonPhrase(statusCode);
-        problem.Detail = result.Error;
-        problem.Type = $"{ProblemTypePrefix}{code}";
-        problem.Extensions["code"] = code;
+            ? ProblemDetailsDefaults.CreateProblemDetails(statusCode, result.Error, code)
+            : ProblemDetailsDefaults.CreateValidationProblemDetails(
+                validationErrors,
+                statusCode,
+                result.Error,
+                code);
 
         return Results.Json(
             problem,
             statusCode: statusCode,
-            contentType: ProblemJsonContentType);
+            contentType: ProblemDetailsDefaults.JsonContentType);
     }
-
-    private static string GetProblemCode(Result result) =>
-        result.ProblemCode
-        ?? result.ErrorCode switch
-        {
-            ErrorCodes.NotFound => "common.notFound",
-            ErrorCodes.Forbidden => "common.forbidden",
-            ErrorCodes.Conflict => "common.conflict",
-            ErrorCodes.FieldValidation => "common.validation",
-            ErrorCodes.InvalidInput => "common.invalidInput",
-            ErrorCodes.PlanLimit => "common.planLimit",
-            ErrorCodes.RateLimited => "common.rateLimited",
-            _ => "common.businessRule",
-        };
-
-    private static string ToJsonFieldName(string fieldName) =>
-        string.IsNullOrEmpty(fieldName)
-            ? fieldName
-            : JsonNamingPolicy.CamelCase.ConvertName(fieldName);
 }

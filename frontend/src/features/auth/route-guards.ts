@@ -25,8 +25,13 @@ export async function redirectFromAppEntryRoute() {
 }
 
 export async function redirectFromCallbackRoute() {
+  if (getAccessToken()) {
+    throw redirect({ to: '/dashboard', replace: true });
+  }
+
   const params = new URLSearchParams(window.location.search);
   if (params.get('error')) {
+    clearPkceSession();
     return;
   }
 
@@ -50,5 +55,6 @@ export async function redirectFromCallbackRoute() {
     });
   }
 
+  clearPkceSession();
   throw redirect({ to: '/dashboard', replace: true });
 }

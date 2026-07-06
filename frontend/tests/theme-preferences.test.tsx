@@ -187,7 +187,9 @@ describe('theme preferences', () => {
 
     expect(document.documentElement.dataset.themeMode).toBe('dark');
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
-    expect(document.querySelector('#theme-save-status')).not.toBeInTheDocument();
+    await waitFor(() =>
+      expect(document.querySelector('#theme-save-status')).not.toBeInTheDocument(),
+    );
     const request = vi.mocked(fetch).mock.calls[0][1];
     expect(request?.method).toBe('PUT');
     expect(String(request?.body)).toContain('"theme":"dark"');

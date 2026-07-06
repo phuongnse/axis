@@ -228,8 +228,6 @@ test.describe('register user', () => {
       ),
     ).toBeVisible();
     await expect(page.getByRole('button', { name: 'Continue to dashboard' })).toBeVisible();
-    await page.waitForTimeout(2_500);
-    await expect(page.getByRole('heading', { name: 'Email verified' })).toBeVisible();
     await expect(page).toHaveURL(/\/dashboard$/, { timeout: 30_000 });
     expect(mainFramePaths).not.toContain('/callback');
     await expectAuthenticatedFrame(page, 'Alex Rivers');

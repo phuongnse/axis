@@ -34,7 +34,7 @@ Provide the shared frame for authenticated Axis Platform routes without owning d
 *Frame structure*
 - **AC-001** Authenticated routes render page content inside the shared app frame.
 - **AC-002** The frame exposes a top bar with the Axis Platform brand mark, page context, and one account actions menu whose trigger shows profile context and whose panel groups preferences and sign-out.
-- **AC-004** The frame exposes footer app metadata with version information and Axis Platform copyright.
+- **AC-003** The frame exposes footer app metadata with version information and Axis Platform copyright.
 
 *Quality*
 - **AC-005** The frame fits supported desktop and mobile widths without horizontal page overflow and without imposing a maximum content width on authenticated routes.
@@ -44,8 +44,8 @@ Provide the shared frame for authenticated Axis Platform routes without owning d
 
 | ID | Boundary | Scenario | Covers AC | Verification | Required |
 |---|---|---|---|---|---|
-| AT-001 | UI component | App frame renders banner, main content, footer metadata, and grouped account actions without a placeholder route navigation bar. | AC-001, AC-002, AC-004, AC-006 | UI component test | Yes |
-| AT-002 | Browser journey | Desktop and mobile frame render an empty route surface, footer metadata, and account actions without a placeholder route navigation bar, console errors, horizontal overflow, or shell-level content width caps. | AC-001, AC-002, AC-004, AC-005 | Browser automation | Yes |
+| AT-001 | UI component | App frame renders banner, main content, footer metadata, and grouped account actions without a placeholder route navigation bar. | AC-001, AC-002, AC-003, AC-006 | UI component test | Yes |
+| AT-002 | Browser journey | Desktop and mobile frame render an empty route surface, footer metadata, and account actions without a placeholder route navigation bar, console errors, horizontal overflow, or shell-level content width caps. | AC-001, AC-002, AC-003, AC-005 | Browser automation | Yes |
 | AT-003 | Static frontend | Frame code typechecks, lints, and keeps localized copy keys valid. | AC-006 | Frontend CI | Yes |
 
 ## Out Of Scope

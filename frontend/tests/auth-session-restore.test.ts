@@ -253,8 +253,35 @@ describe('auth session restore', () => {
     expect(sessionStorage.getItem('pkce_state')).toBeNull();
   });
 
+  it('routes the callback directly to the dashboard when an access token already exists in memory', async () => {
+    useAuthStore.getState().setSession('existing-token');
+    sessionStorage.setItem('pkce_verifier', 'verifier');
+    sessionStorage.setItem('pkce_state', 'state');
+    setWindowPath('/callback?code=auth-code&state=state');
+
+    await expect(redirectFromCallbackRoute()).rejects.toMatchObject({
+      options: { to: '/dashboard', replace: true },
+    });
+
+    expect(fetch).not.toHaveBeenCalled();
+    expect(getAccessToken()).toBe('existing-token');
+  });
+
   it('lets the callback recovery page render when the callback state is invalid', async () => {
     setWindowPath('/callback?code=auth-code&state=wrong-state');
+
+    await expect(redirectFromCallbackRoute()).resolves.toBeUndefined();
+
+    expect(fetch).not.toHaveBeenCalled();
+    expect(getAccessToken()).toBeNull();
+    expect(sessionStorage.getItem('pkce_verifier')).toBeNull();
+    expect(sessionStorage.getItem('pkce_state')).toBeNull();
+  });
+
+  it('clears PKCE state when the callback has an error query parameter', async () => {
+    sessionStorage.setItem('pkce_verifier', 'verifier');
+    sessionStorage.setItem('pkce_state', 'state');
+    setWindowPath('/callback?error=access_denied');
 
     await expect(redirectFromCallbackRoute()).resolves.toBeUndefined();
 

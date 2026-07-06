@@ -331,7 +331,8 @@ def verification_evidence_issues(
     issues: list[str] = []
     has_e2e_command = any(" frontend script test:e2e" in command or " local-dev e2e" in command for command in commands)
     has_frontend_test_command = any(
-        " frontend script test" in command or command.endswith(" frontend test") for command in commands
+        (" frontend script test" in command and ":e2e" not in command) or command.endswith(" frontend test")
+        for command in commands
     )
 
     if verification == "Browser automation":
@@ -356,7 +357,7 @@ def verification_evidence_issues(
                 f"{ctx.evidence_rel}: Acceptance Evidence {at_id} UI component test Commands must run frontend tests through scripts/axis.py",
             )
     elif verification == "Frontend CI":
-        if "python scripts/axis.py frontend ci" not in commands:
+        if not any("python scripts/axis.py frontend ci" in command for command in commands):
             issues.append(
                 f"{ctx.evidence_rel}: Acceptance Evidence {at_id} Frontend CI Commands must include `python scripts/axis.py frontend ci`",
             )

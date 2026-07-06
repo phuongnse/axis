@@ -1,4 +1,4 @@
-using System.Text.Json;
+using Axis.Api.Infrastructure;
 using FluentValidation;
 using Microsoft.AspNetCore.Mvc;
 
@@ -10,9 +10,6 @@ namespace Axis.Api.Middleware;
 /// </summary>
 internal sealed class ValidationExceptionMiddleware(RequestDelegate next)
 {
-    private const string ProblemJsonContentType = "application/problem+json";
-    private const string ValidationProblemCode = "common.validation";
-
     public async Task InvokeAsync(HttpContext context)
     {
         try
@@ -22,44 +19,38 @@ internal sealed class ValidationExceptionMiddleware(RequestDelegate next)
         catch (ValidationException ex)
         {
             Dictionary<string, string[]> errors = (ex.Errors ?? [])
-                .GroupBy(e => ToJsonFieldName(e.PropertyName))
+                .GroupBy(e => ProblemDetailsDefaults.ToJsonFieldName(e.PropertyName))
                 .ToDictionary(
                     g => g.Key,
                     g => g.Select(e => e.ErrorMessage).ToArray());
             Dictionary<string, string[]> errorCodes = (ex.Errors ?? [])
-                .GroupBy(e => ToJsonFieldName(e.PropertyName))
+                .GroupBy(e => ProblemDetailsDefaults.ToJsonFieldName(e.PropertyName))
                 .ToDictionary(
                     g => g.Key,
                     g => g.Select(e => string.IsNullOrWhiteSpace(e.ErrorCode)
-                        ? ValidationProblemCode
+                        ? ProblemDetailsDefaults.ValidationCode
                         : e.ErrorCode).ToArray());
 
             if (errors.Count == 0 && !string.IsNullOrEmpty(ex.Message))
             {
                 errors[""] = [ex.Message];
-                errorCodes[""] = [ValidationProblemCode];
+                errorCodes[""] = [ProblemDetailsDefaults.ValidationCode];
             }
 
             const int statusCode = StatusCodes.Status400BadRequest;
-            HttpValidationProblemDetails problem = new(errors)
-            {
-                Status = statusCode,
-                Title = "One or more validation errors occurred.",
-                Type = $"urn:axis:problem:{ValidationProblemCode}",
-            };
-            problem.Extensions["code"] = ValidationProblemCode;
-            problem.Extensions["errorCodes"] = errorCodes;
+            HttpValidationProblemDetails problem = ProblemDetailsDefaults.CreateValidationProblemDetails(
+                errors,
+                statusCode,
+                detail: null,
+                code: ProblemDetailsDefaults.ValidationCode,
+                title: "One or more validation errors occurred.",
+                errorCodes: errorCodes);
 
             await Results.Json(
                 problem,
                 statusCode: statusCode,
-                contentType: ProblemJsonContentType)
+                contentType: ProblemDetailsDefaults.JsonContentType)
                 .ExecuteAsync(context);
         }
     }
-
-    private static string ToJsonFieldName(string propertyName) =>
-        string.IsNullOrEmpty(propertyName)
-            ? propertyName
-            : JsonNamingPolicy.CamelCase.ConvertName(propertyName);
 }

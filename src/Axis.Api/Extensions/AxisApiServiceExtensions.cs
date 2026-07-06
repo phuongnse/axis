@@ -25,7 +25,6 @@ namespace Axis.Api.Extensions;
 internal static class AxisApiServiceExtensions
 {
     private const string AuthRateLimiterPolicy = "auth";
-    private const string RateLimitedProblemCode = "common.rateLimited";
 
     public static WebApplicationBuilder AddAxisApiServices(this WebApplicationBuilder builder)
     {
@@ -185,17 +184,14 @@ internal static class AxisApiServiceExtensions
             opts.OnRejected = async (context, cancellationToken) =>
             {
                 const int statusCode = StatusCodes.Status429TooManyRequests;
-                ProblemDetails problem = new()
-                {
-                    Status = statusCode,
-                    Title = "Too Many Requests",
-                    Detail = "Too many requests. Please try again later.",
-                    Type = $"urn:axis:problem:{RateLimitedProblemCode}",
-                };
-                problem.Extensions["code"] = RateLimitedProblemCode;
+                ProblemDetails problem = ProblemDetailsDefaults.CreateProblemDetails(
+                    statusCode,
+                    "Too many requests. Please try again later.",
+                    ProblemDetailsDefaults.RateLimitedCode,
+                    "Too Many Requests");
 
                 context.HttpContext.Response.StatusCode = statusCode;
-                context.HttpContext.Response.ContentType = "application/problem+json";
+                context.HttpContext.Response.ContentType = ProblemDetailsDefaults.JsonContentType;
                 await context.HttpContext.Response.WriteAsJsonAsync(problem, cancellationToken);
             };
         });
