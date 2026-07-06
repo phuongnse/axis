@@ -135,8 +135,14 @@ export async function verifyEmail(token: string): Promise<VerifyEmailResponse> {
   return request;
 }
 
-export async function completePostVerifyPkceFlow(): Promise<void> {
-  await completePostSignInPkceFlow();
+export async function completePostVerifyPkceFlow(): Promise<boolean> {
+  const restored = await restoreSessionFromBrowserAuth();
+  if (restored) {
+    return true;
+  }
+
+  await startBrowserAuthorizationRedirect();
+  return false;
 }
 
 export async function restoreSessionFromBrowserAuth(): Promise<boolean> {
@@ -190,7 +196,17 @@ async function restoreSessionFromBrowserAuthOnce(): Promise<boolean> {
   }
 }
 
-export async function completePostSignInPkceFlow(): Promise<void> {
+export async function completePostSignInPkceFlow(): Promise<boolean> {
+  const restored = await restoreSessionFromBrowserAuth();
+  if (restored) {
+    return true;
+  }
+
+  await startBrowserAuthorizationRedirect();
+  return false;
+}
+
+async function startBrowserAuthorizationRedirect(): Promise<void> {
   const pkce = createPkceSession();
   const authorizeUrl = await buildAuthorizeUrl(pkce.state, pkce.verifier);
   window.location.assign(authorizeUrl);

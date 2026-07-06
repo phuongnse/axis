@@ -1,3 +1,4 @@
+using Axis.Identity.Application;
 using Axis.Identity.Application.Commands.ResendVerificationEmail;
 using Axis.Identity.Application.Repositories;
 using Axis.Identity.Application.Services;
@@ -31,6 +32,7 @@ public class ResendVerificationEmailHandlerTests
     public async Task ResendVerificationEmail_WhenUserExists_ResendsVerificationEmail()
     {
         User user = MakeUnverifiedUser();
+        user.SetLanguagePreference(UserLanguage.Create("vi").Value);
         _userRepo.FindByEmailGloballyAsync(Arg.Any<Email>()).Returns(user);
         _rateLimiter.TryRecordResendAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(Result.Success());
@@ -43,7 +45,7 @@ public class ResendVerificationEmailHandlerTests
         await _tokenStore.Received(1).CreateAsync(
             user.Id, Arg.Any<string>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>());
         await _emailSender.Received(1).SendVerificationEmailAsync(
-            "alice@acme.com", Arg.Any<string>(), Arg.Any<CancellationToken>());
+            "alice@acme.com", Arg.Any<string>(), "vi", Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -61,7 +63,7 @@ public class ResendVerificationEmailHandlerTests
         await _rateLimiter.Received(1).TryRecordResendAsync(
             "unknown@acme.com", Arg.Any<CancellationToken>());
         await _emailSender.DidNotReceive().SendVerificationEmailAsync(
-            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -78,7 +80,7 @@ public class ResendVerificationEmailHandlerTests
             CancellationToken.None);
 
         await _emailSender.DidNotReceive().SendVerificationEmailAsync(
-            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
         await _rateLimiter.Received(1).TryRecordResendAsync(
             "alice@acme.com", Arg.Any<CancellationToken>());
     }
@@ -89,7 +91,8 @@ public class ResendVerificationEmailHandlerTests
         _rateLimiter.TryRecordResendAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(Result.Failure(
                 ErrorCodes.RateLimited,
-                "Please wait before requesting another email."));
+                "Please wait before requesting another email.",
+                IdentityProblemCodes.EmailVerificationResendRateLimited));
 
         Result result = await CreateHandler().Handle(
             new ResendVerificationEmailCommand("alice@acme.com"),
@@ -97,9 +100,10 @@ public class ResendVerificationEmailHandlerTests
 
         result.IsFailure.Should().BeTrue();
         result.ErrorCode.Should().Be(ErrorCodes.RateLimited);
+        result.ProblemCode.Should().Be(IdentityProblemCodes.EmailVerificationResendRateLimited);
         await _userRepo.DidNotReceive().FindByEmailGloballyAsync(
             Arg.Any<Email>(), Arg.Any<CancellationToken>());
         await _emailSender.DidNotReceive().SendVerificationEmailAsync(
-            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
     }
 }

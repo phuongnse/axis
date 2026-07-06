@@ -11,12 +11,14 @@ export type LegalVersionsResponse = components['schemas']['LegalVersionsDto'];
 
 export interface RegisterValidationErrorData {
   errors?: Record<string, string[]>;
+  errorCodes?: Record<string, string[]>;
   message?: string;
   title?: string;
 }
 
 export interface SignInValidationErrorData {
   errors?: Record<string, string[]>;
+  errorCodes?: Record<string, string[]>;
   message?: string;
   title?: string;
 }

@@ -69,16 +69,17 @@ Follow [reference.md](../reference.md).
 
 8. Update status docs when behavior/status changes.
    - Update the use-case `Implementation status` callout; status values are `Done`, `Partial`, `Not started`, and `N/A`.
-   - Reconcile the layer table against the AC/AT matrix boundaries, changed paths, and acceptance evidence. A layer touched by the slice or required by an in-scope AT row cannot be `N/A`; mark it `Done` only when its required evidence passed, `Partial` when implemented with gaps, and `Not started` when the spec requires it but no implementation exists.
+   - Reconcile the layer table against the AC/AT matrix boundaries, changed paths, and the sibling `{slug}.evidence.md` sidecar. A layer touched by the slice or required by an in-scope AT row cannot be `N/A`; mark it `Done` only when its required evidence passed, `Partial` when implemented with gaps, and `Not started` when the spec requires it but no implementation exists.
    - Use `$axis-visual-artifact` when Mermaid diagrams or committed visual artifacts changed.
    - Update the domain README or [docs/use-cases/README.md](../../../docs/use-cases/README.md) only when their summarized status changes.
    - Name exact deferred AC bullets under `Deferred follow-ups`; use `N/A` when none.
-   - Update `Verification` with the required AT evidence categories; put exact runner and pass/fail evidence in the implementation report, not the spec.
+   - Update `Verification` with the required AT evidence categories; put exact evidence paths and runner commands in `{slug}.evidence.md`, not the spec.
    - Do not introduce intentional shortcuts.
 
 9. Verify honestly.
    - During development, run the smallest check that proves the touched surface.
    - Run every required AT row's runner or targeted test before claiming the use case/layer is complete.
+   - Update `{slug}.evidence.md` before claiming complete status; each required AT needs committed evidence paths and exact Axis wrapper commands. Group comma-separated AT IDs in one evidence row only when those proof cells are identical.
    - Report acceptance evidence by AT ID (`AT-001 Playwright passed`, `AT-002 xUnit API passed`, etc.).
    - Use `.agents/skills/axis-ready-review/SKILL.md` (`$axis-ready-review`) before asking for review; it owns `python scripts/axis.py verify` when triggered.
    - Before pushing committed implementation to a branch with an upstream, open PR, or PR intent, read `$axis-pull-request`; treat it as a branch/diff update.

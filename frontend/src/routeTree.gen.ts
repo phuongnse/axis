@@ -11,57 +11,53 @@
 import { createFileRoute } from '@tanstack/react-router'
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as CallbackRouteImport } from './routes/callback'
+import { Route as GuestRouteImport } from './routes/_guest'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
+import { Route as IndexRouteImport } from './routes/index'
 
-const SignInLazyRouteImport = createFileRoute('/sign-in')()
-const RegisterLazyRouteImport = createFileRoute('/register')()
-const CallbackLazyRouteImport = createFileRoute('/callback')()
-const IndexLazyRouteImport = createFileRoute('/')()
-const RegisterConfirmationLazyRouteImport = createFileRoute(
-  '/register_/confirmation',
-)()
-const AuthVerifyLazyRouteImport = createFileRoute('/auth/verify')()
+const GuestSignInLazyRouteImport = createFileRoute('/_guest/sign-in')()
+const GuestRegisterLazyRouteImport = createFileRoute('/_guest/register')()
 const AuthenticatedDashboardLazyRouteImport = createFileRoute(
   '/_authenticated/dashboard',
 )()
+const GuestRegisterConfirmationLazyRouteImport = createFileRoute(
+  '/_guest/register_/confirmation',
+)()
+const GuestAuthVerifyLazyRouteImport = createFileRoute('/_guest/auth/verify')()
 
-const SignInLazyRoute = SignInLazyRouteImport.update({
-  id: '/sign-in',
-  path: '/sign-in',
-  getParentRoute: () => rootRouteImport,
-} as any).lazy(() => import('./routes/sign-in.lazy').then((d) => d.Route))
-const RegisterLazyRoute = RegisterLazyRouteImport.update({
-  id: '/register',
-  path: '/register',
-  getParentRoute: () => rootRouteImport,
-} as any).lazy(() => import('./routes/register.lazy').then((d) => d.Route))
-const CallbackLazyRoute = CallbackLazyRouteImport.update({
+const CallbackRoute = CallbackRouteImport.update({
   id: '/callback',
   path: '/callback',
   getParentRoute: () => rootRouteImport,
-} as any).lazy(() => import('./routes/callback.lazy').then((d) => d.Route))
+} as any)
+const GuestRoute = GuestRouteImport.update({
+  id: '/_guest',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthenticatedRoute = AuthenticatedRouteImport.update({
   id: '/_authenticated',
   getParentRoute: () => rootRouteImport,
 } as any)
-const IndexLazyRoute = IndexLazyRouteImport.update({
+const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
-} as any).lazy(() => import('./routes/index.lazy').then((d) => d.Route))
-const RegisterConfirmationLazyRoute =
-  RegisterConfirmationLazyRouteImport.update({
-    id: '/register_/confirmation',
-    path: '/register/confirmation',
-    getParentRoute: () => rootRouteImport,
-  } as any).lazy(() =>
-    import('./routes/register_.confirmation.lazy').then((d) => d.Route),
-  )
-const AuthVerifyLazyRoute = AuthVerifyLazyRouteImport.update({
-  id: '/auth/verify',
-  path: '/auth/verify',
-  getParentRoute: () => rootRouteImport,
-} as any).lazy(() => import('./routes/auth/verify.lazy').then((d) => d.Route))
+} as any)
+const GuestSignInLazyRoute = GuestSignInLazyRouteImport.update({
+  id: '/sign-in',
+  path: '/sign-in',
+  getParentRoute: () => GuestRoute,
+} as any).lazy(() =>
+  import('./routes/_guest/sign-in.lazy').then((d) => d.Route),
+)
+const GuestRegisterLazyRoute = GuestRegisterLazyRouteImport.update({
+  id: '/register',
+  path: '/register',
+  getParentRoute: () => GuestRoute,
+} as any).lazy(() =>
+  import('./routes/_guest/register.lazy').then((d) => d.Route),
+)
 const AuthenticatedDashboardLazyRoute =
   AuthenticatedDashboardLazyRouteImport.update({
     id: '/dashboard',
@@ -70,98 +66,105 @@ const AuthenticatedDashboardLazyRoute =
   } as any).lazy(() =>
     import('./routes/_authenticated/dashboard.lazy').then((d) => d.Route),
   )
+const GuestRegisterConfirmationLazyRoute =
+  GuestRegisterConfirmationLazyRouteImport.update({
+    id: '/register_/confirmation',
+    path: '/register/confirmation',
+    getParentRoute: () => GuestRoute,
+  } as any).lazy(() =>
+    import('./routes/_guest/register_.confirmation.lazy').then((d) => d.Route),
+  )
+const GuestAuthVerifyLazyRoute = GuestAuthVerifyLazyRouteImport.update({
+  id: '/auth/verify',
+  path: '/auth/verify',
+  getParentRoute: () => GuestRoute,
+} as any).lazy(() =>
+  import('./routes/_guest/auth/verify.lazy').then((d) => d.Route),
+)
 
 export interface FileRoutesByFullPath {
-  '/': typeof IndexLazyRoute
-  '/callback': typeof CallbackLazyRoute
-  '/register': typeof RegisterLazyRoute
-  '/sign-in': typeof SignInLazyRoute
+  '/': typeof IndexRoute
+  '/callback': typeof CallbackRoute
   '/dashboard': typeof AuthenticatedDashboardLazyRoute
-  '/auth/verify': typeof AuthVerifyLazyRoute
-  '/register/confirmation': typeof RegisterConfirmationLazyRoute
+  '/register': typeof GuestRegisterLazyRoute
+  '/sign-in': typeof GuestSignInLazyRoute
+  '/auth/verify': typeof GuestAuthVerifyLazyRoute
+  '/register/confirmation': typeof GuestRegisterConfirmationLazyRoute
 }
 export interface FileRoutesByTo {
-  '/': typeof IndexLazyRoute
-  '/callback': typeof CallbackLazyRoute
-  '/register': typeof RegisterLazyRoute
-  '/sign-in': typeof SignInLazyRoute
+  '/': typeof IndexRoute
+  '/callback': typeof CallbackRoute
   '/dashboard': typeof AuthenticatedDashboardLazyRoute
-  '/auth/verify': typeof AuthVerifyLazyRoute
-  '/register/confirmation': typeof RegisterConfirmationLazyRoute
+  '/register': typeof GuestRegisterLazyRoute
+  '/sign-in': typeof GuestSignInLazyRoute
+  '/auth/verify': typeof GuestAuthVerifyLazyRoute
+  '/register/confirmation': typeof GuestRegisterConfirmationLazyRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
-  '/': typeof IndexLazyRoute
+  '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteWithChildren
-  '/callback': typeof CallbackLazyRoute
-  '/register': typeof RegisterLazyRoute
-  '/sign-in': typeof SignInLazyRoute
+  '/_guest': typeof GuestRouteWithChildren
+  '/callback': typeof CallbackRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardLazyRoute
-  '/auth/verify': typeof AuthVerifyLazyRoute
-  '/register_/confirmation': typeof RegisterConfirmationLazyRoute
+  '/_guest/register': typeof GuestRegisterLazyRoute
+  '/_guest/sign-in': typeof GuestSignInLazyRoute
+  '/_guest/auth/verify': typeof GuestAuthVerifyLazyRoute
+  '/_guest/register_/confirmation': typeof GuestRegisterConfirmationLazyRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
     | '/callback'
+    | '/dashboard'
     | '/register'
     | '/sign-in'
-    | '/dashboard'
     | '/auth/verify'
     | '/register/confirmation'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/callback'
+    | '/dashboard'
     | '/register'
     | '/sign-in'
-    | '/dashboard'
     | '/auth/verify'
     | '/register/confirmation'
   id:
     | '__root__'
     | '/'
     | '/_authenticated'
+    | '/_guest'
     | '/callback'
-    | '/register'
-    | '/sign-in'
     | '/_authenticated/dashboard'
-    | '/auth/verify'
-    | '/register_/confirmation'
+    | '/_guest/register'
+    | '/_guest/sign-in'
+    | '/_guest/auth/verify'
+    | '/_guest/register_/confirmation'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
-  IndexLazyRoute: typeof IndexLazyRoute
+  IndexRoute: typeof IndexRoute
   AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
-  CallbackLazyRoute: typeof CallbackLazyRoute
-  RegisterLazyRoute: typeof RegisterLazyRoute
-  SignInLazyRoute: typeof SignInLazyRoute
-  AuthVerifyLazyRoute: typeof AuthVerifyLazyRoute
-  RegisterConfirmationLazyRoute: typeof RegisterConfirmationLazyRoute
+  GuestRoute: typeof GuestRouteWithChildren
+  CallbackRoute: typeof CallbackRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/sign-in': {
-      id: '/sign-in'
-      path: '/sign-in'
-      fullPath: '/sign-in'
-      preLoaderRoute: typeof SignInLazyRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/register': {
-      id: '/register'
-      path: '/register'
-      fullPath: '/register'
-      preLoaderRoute: typeof RegisterLazyRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/callback': {
       id: '/callback'
       path: '/callback'
       fullPath: '/callback'
-      preLoaderRoute: typeof CallbackLazyRouteImport
+      preLoaderRoute: typeof CallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_guest': {
+      id: '/_guest'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof GuestRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated': {
@@ -175,22 +178,22 @@ declare module '@tanstack/react-router' {
       id: '/'
       path: '/'
       fullPath: '/'
-      preLoaderRoute: typeof IndexLazyRouteImport
+      preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/register_/confirmation': {
-      id: '/register_/confirmation'
-      path: '/register/confirmation'
-      fullPath: '/register/confirmation'
-      preLoaderRoute: typeof RegisterConfirmationLazyRouteImport
-      parentRoute: typeof rootRouteImport
+    '/_guest/sign-in': {
+      id: '/_guest/sign-in'
+      path: '/sign-in'
+      fullPath: '/sign-in'
+      preLoaderRoute: typeof GuestSignInLazyRouteImport
+      parentRoute: typeof GuestRoute
     }
-    '/auth/verify': {
-      id: '/auth/verify'
-      path: '/auth/verify'
-      fullPath: '/auth/verify'
-      preLoaderRoute: typeof AuthVerifyLazyRouteImport
-      parentRoute: typeof rootRouteImport
+    '/_guest/register': {
+      id: '/_guest/register'
+      path: '/register'
+      fullPath: '/register'
+      preLoaderRoute: typeof GuestRegisterLazyRouteImport
+      parentRoute: typeof GuestRoute
     }
     '/_authenticated/dashboard': {
       id: '/_authenticated/dashboard'
@@ -198,6 +201,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/dashboard'
       preLoaderRoute: typeof AuthenticatedDashboardLazyRouteImport
       parentRoute: typeof AuthenticatedRoute
+    }
+    '/_guest/register_/confirmation': {
+      id: '/_guest/register_/confirmation'
+      path: '/register/confirmation'
+      fullPath: '/register/confirmation'
+      preLoaderRoute: typeof GuestRegisterConfirmationLazyRouteImport
+      parentRoute: typeof GuestRoute
+    }
+    '/_guest/auth/verify': {
+      id: '/_guest/auth/verify'
+      path: '/auth/verify'
+      fullPath: '/auth/verify'
+      preLoaderRoute: typeof GuestAuthVerifyLazyRouteImport
+      parentRoute: typeof GuestRoute
     }
   }
 }
@@ -214,14 +231,27 @@ const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
   AuthenticatedRouteChildren,
 )
 
+interface GuestRouteChildren {
+  GuestRegisterLazyRoute: typeof GuestRegisterLazyRoute
+  GuestSignInLazyRoute: typeof GuestSignInLazyRoute
+  GuestAuthVerifyLazyRoute: typeof GuestAuthVerifyLazyRoute
+  GuestRegisterConfirmationLazyRoute: typeof GuestRegisterConfirmationLazyRoute
+}
+
+const GuestRouteChildren: GuestRouteChildren = {
+  GuestRegisterLazyRoute: GuestRegisterLazyRoute,
+  GuestSignInLazyRoute: GuestSignInLazyRoute,
+  GuestAuthVerifyLazyRoute: GuestAuthVerifyLazyRoute,
+  GuestRegisterConfirmationLazyRoute: GuestRegisterConfirmationLazyRoute,
+}
+
+const GuestRouteWithChildren = GuestRoute._addFileChildren(GuestRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
-  IndexLazyRoute: IndexLazyRoute,
+  IndexRoute: IndexRoute,
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
-  CallbackLazyRoute: CallbackLazyRoute,
-  RegisterLazyRoute: RegisterLazyRoute,
-  SignInLazyRoute: SignInLazyRoute,
-  AuthVerifyLazyRoute: AuthVerifyLazyRoute,
-  RegisterConfirmationLazyRoute: RegisterConfirmationLazyRoute,
+  GuestRoute: GuestRouteWithChildren,
+  CallbackRoute: CallbackRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

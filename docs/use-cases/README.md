@@ -15,6 +15,6 @@ Use cases are the product source of truth. One use case is a complete end-to-end
 
 ## Rule
 
-Each use case lives as a single Markdown file at `docs/use-cases/{domain}/{slug}.md`. Domain folders contain their `README.md` hub plus those use-case files only.
+Each use case lives as a single Markdown file at `docs/use-cases/{domain}/{slug}.md`. Complete use cases keep exact proof in `docs/use-cases/{domain}/{slug}.evidence.md`. Domain folders contain their `README.md` hub, use-case files, and matching evidence sidecars only.
 
 Do not add placeholder use-case files.

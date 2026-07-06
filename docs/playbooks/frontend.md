@@ -2,7 +2,7 @@
 
 > **Navigation**: [docs/README.md](../README.md) · [AGENTS.md](../../AGENTS.md)
 
-Use `$axis-frontend-feature` for SPA feature work.
+Use `$axis-frontend-feature` for SPA feature work. Use `$axis-frontend-foundation` for app shell or shared SPA foundation work owned by [docs/foundations/README.md](../foundations/README.md).
 
 ## UX-first product UI
 
@@ -10,7 +10,9 @@ Build the workflow, not a landing page or explanation page. Visible copy should 
 
 On localized surfaces, user-facing product copy must use the frontend translation layer instead of component-local static text. Keep non-product constants, routes, and protocol values separate from visible copy.
 
-Every route must expose an obvious next navigation path. Auth and public standalone screens declare route-level escape targets with `routeNavigation = publicRouteNavigation(...)` and render a visible sign-in, registration, back, or home-style link in every loading, success, and error state. Authenticated screens satisfy this through the app shell navigation and sign-out.
+Every route must expose an obvious next navigation path. Auth and public standalone screens declare route-level escape targets with `routeNavigation = publicRouteNavigation(...)` and render a visible sign-in, registration, back, or home-style link in every loading, success, and error state. Redirect-only route entries that render no screen state are exempt. Authenticated screens satisfy this through the app shell navigation and sign-out.
+
+Technical handoff routes should complete successful handoffs before rendering standalone UI. Use visible handoff screens only when the user needs to read a durable result, wait for a deliberately held confirmation, or recover from an error.
 
 ## Mobile-first layout and radius
 
@@ -36,7 +38,7 @@ Strict TS, no `any`, generated API types for backend contracts.
 
 ## Routing
 
-Use TanStack Router patterns already in the app. Protected routes live under the authenticated layout.
+Use TanStack Router patterns already in the app. Classify every route as authenticated, guest-only, or public-neutral before adding it. Protected routes live under the authenticated layout; guest-only auth or registration routes live under the guest-only layout; public-neutral routes stay outside both access groups.
 
 ## Component design
 

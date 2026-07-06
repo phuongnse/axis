@@ -1,6 +1,6 @@
 import { defineConfig, devices } from '@playwright/test';
 
-const baseURL = process.env.E2E_BASE_URL ?? 'https://localhost:3000';
+const baseURL = process.env.E2E_BASE_URL ?? 'http://127.0.0.1:3000';
 const skipWebServer = process.env.E2E_SKIP_WEB_SERVER === '1';
 const outputDir = process.env.E2E_OUTPUT_DIR ?? './test-results/e2e';
 const reportDir = process.env.E2E_REPORT_DIR ?? './playwright-report';

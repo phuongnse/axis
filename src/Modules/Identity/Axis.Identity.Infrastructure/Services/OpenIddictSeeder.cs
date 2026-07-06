@@ -33,7 +33,7 @@ public sealed class OpenIddictSeeder(IServiceProvider services) : IHostedService
             ClientId = "axis_spa",
             // Public PKCE client; no client secret.
             ClientType = ClientTypes.Public,
-            DisplayName = "Axis SPA",
+            DisplayName = "Axis Platform Web",
             Permissions =
             {
                 Permissions.Endpoints.Authorization,

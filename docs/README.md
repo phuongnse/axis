@@ -11,6 +11,7 @@ Axis is an open-source platform being built for adaptable, workflow-driven busin
 | [docs/ARCHITECTURE.md](./ARCHITECTURE.md) | Current runtime shape and boundaries. |
 | [docs/TECH_STACK.md](./TECH_STACK.md) | Approved stack baseline and version owners. |
 | [docs/use-cases/README.md](./use-cases/README.md) | Implemented or actively specified use cases only. |
+| [docs/foundations/README.md](./foundations/README.md) | Non-use-case foundation contracts with AC/AT. |
 | [docs/ENFORCEMENT.md](./ENFORCEMENT.md) | Enforcement status for recurring rule classes. |
 
 ## Playbooks

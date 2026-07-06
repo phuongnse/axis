@@ -63,6 +63,7 @@ def load_python_file(path: Path):
 check_pr = load_script("check-pr.py")
 check_local_dev_docs = load_script("check-local-dev-docs.py")
 check_use_case_docs = load_script("check-use-case-docs.py")
+check_foundation_docs = load_script("check-foundation-docs.py")
 
 
 class TestCliTextStreams(unittest.TestCase):
@@ -183,12 +184,24 @@ docs/use-cases/example/README.md
 
 
 class TestUseCaseDocsGate(unittest.TestCase):
-    def issues_for_document(self, content: str) -> list[str]:
+    def issues_for_document(
+        self,
+        content: str,
+        *,
+        evidence_doc: str | None = None,
+        evidence_files: tuple[str, ...] = (),
+    ) -> list[str]:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             path = root / "docs" / "use-cases" / "example" / "sample.md"
             path.parent.mkdir(parents=True, exist_ok=True)
+            for evidence_file in evidence_files:
+                evidence_path = root / evidence_file
+                evidence_path.parent.mkdir(parents=True, exist_ok=True)
+                evidence_path.write_text("proof\n", encoding="utf-8")
             path.write_text(content, encoding="utf-8")
+            if evidence_doc is not None:
+                path.with_name("sample.evidence.md").write_text(evidence_doc, encoding="utf-8")
             original_root = check_use_case_docs.ROOT
             check_use_case_docs.ROOT = root
             try:
@@ -586,6 +599,196 @@ Ship user value.
 
         self.assertEqual([], issues)
 
+    def complete_use_case_document(self, matrix: str, *, inline_evidence: str = "") -> str:
+        return f"""# Sample use case
+
+## Purpose
+
+Ship user value.
+
+## Primary actor
+
+- User
+
+## Trigger
+
+- User starts the flow.
+
+## Main flow
+
+1. User starts.
+2. System responds.
+3. User completes the flow.
+
+## Alternate / error flows
+
+- None.
+
+## Acceptance Criteria
+
+*Happy path*
+- **AC-001** Works.
+
+## Acceptance Test Matrix
+
+{matrix}
+
+{inline_evidence}
+## Out Of Scope
+
+- N/A.
+
+> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | Domain | Done |
+> | Application | Done |
+> | Infrastructure | Done |
+> | API | Done |
+> | Frontend | Done |
+>
+> **Gaps vs spec:** none.
+>
+> **Deferred follow-ups:** N/A.
+>
+> **Verification:** Required AT rows are covered.
+>
+> **Decisions:** N/A.
+"""
+
+    def test_complete_use_case_requires_acceptance_evidence_sidecar(self) -> None:
+        issues = self.issues_for_document(
+            self.complete_use_case_document(
+                """| ID | Boundary | Scenario | Covers AC | Verification | Required |
+|---|---|---|---|---|---|
+| AT-001 | UI component | User completes flow | AC-001 | UI component test | Yes |"""
+            )
+        )
+
+        self.assertIn("complete use-case docs must include acceptance evidence sidecar", "\n".join(issues))
+
+    def test_rejects_acceptance_evidence_inside_use_case_spec(self) -> None:
+        issues = self.issues_for_document(
+            self.complete_use_case_document(
+                """| ID | Boundary | Scenario | Covers AC | Verification | Required |
+|---|---|---|---|---|---|
+| AT-001 | UI component | User completes flow | AC-001 | UI component test | Yes |""",
+                inline_evidence="""## Acceptance Evidence
+
+| AT ID | Evidence | Commands |
+|---|---|---|
+| AT-001 | `frontend/tests/sample.test.tsx` | `python scripts/axis.py frontend script test tests/sample.test.tsx` |
+
+""",
+            ),
+            evidence_doc="""# Sample Evidence
+
+> **Navigation**: [docs/use-cases/example/sample.md](./sample.md)
+
+## Acceptance Evidence
+
+| AT ID | Evidence | Commands |
+|---|---|---|
+| AT-001 | `frontend/tests/sample.test.tsx` | `python scripts/axis.py frontend script test tests/sample.test.tsx` |
+""",
+            evidence_files=("frontend/tests/sample.test.tsx",),
+        )
+
+        self.assertIn("Acceptance Evidence belongs in sidecar", "\n".join(issues))
+
+    def test_accepts_complete_use_case_with_required_sidecar_evidence(self) -> None:
+        issues = self.issues_for_document(
+            self.complete_use_case_document(
+                """| ID | Boundary | Scenario | Covers AC | Verification | Required |
+|---|---|---|---|---|---|
+| AT-001 | UI/API boundaries | User completes flow | AC-001 | UI component test + API integration test | Yes |"""
+            ),
+            evidence_doc="""# Sample Evidence
+
+> **Navigation**: [docs/use-cases/example/sample.md](./sample.md)
+
+## Acceptance Evidence
+
+| AT ID | Evidence | Commands |
+|---|---|---|
+| AT-001 | `frontend/tests/sample.test.tsx`, `tests/Api/Axis.Api.Tests/Identity/SampleTests.cs` | `python scripts/axis.py frontend script test tests/sample.test.tsx`, `python scripts/axis.py dotnet test tests/Api/Axis.Api.Tests/Axis.Api.Tests.csproj` |
+""",
+            evidence_files=(
+                "frontend/tests/sample.test.tsx",
+                "tests/Api/Axis.Api.Tests/Identity/SampleTests.cs",
+            ),
+        )
+
+        self.assertEqual([], issues)
+
+    def test_accepts_grouped_at_ids_when_evidence_and_commands_match(self) -> None:
+        issues = self.issues_for_document(
+            self.complete_use_case_document(
+                """| ID | Boundary | Scenario | Covers AC | Verification | Required |
+|---|---|---|---|---|---|
+| AT-001 | UI component | User completes first state | AC-001 | UI component test | Yes |
+| AT-002 | UI component | User completes second state | AC-001 | UI component test | Yes |"""
+            ),
+            evidence_doc="""# Sample Evidence
+
+> **Navigation**: [docs/use-cases/example/sample.md](./sample.md)
+
+## Acceptance Evidence
+
+| AT ID | Evidence | Commands |
+|---|---|---|
+| AT-001, AT-002 | `frontend/tests/sample.test.tsx` | `python scripts/axis.py frontend script test tests/sample.test.tsx` |
+""",
+            evidence_files=("frontend/tests/sample.test.tsx",),
+        )
+
+        self.assertEqual([], issues)
+
+    def test_browser_use_case_evidence_requires_playwright_file(self) -> None:
+        issues = self.issues_for_document(
+            self.complete_use_case_document(
+                """| ID | Boundary | Scenario | Covers AC | Verification | Required |
+|---|---|---|---|---|---|
+| AT-001 | Browser journey | User completes flow | AC-001 | Browser automation | Yes |"""
+            ),
+            evidence_doc="""# Sample Evidence
+
+> **Navigation**: [docs/use-cases/example/sample.md](./sample.md)
+
+## Acceptance Evidence
+
+| AT ID | Evidence | Commands |
+|---|---|---|
+| AT-001 | `frontend/tests/sample.test.tsx` | `python scripts/axis.py frontend script test:e2e -- e2e/sample.pw.ts` |
+""",
+            evidence_files=("frontend/tests/sample.test.tsx",),
+        )
+
+        self.assertIn("Browser automation must reference a committed `frontend/e2e/*.pw.ts` test", "\n".join(issues))
+
+    def test_accepts_infrastructure_test_with_targeted_dotnet_filter(self) -> None:
+        issues = self.issues_for_document(
+            self.complete_use_case_document(
+                """| ID | Boundary | Scenario | Covers AC | Verification | Required |
+|---|---|---|---|---|---|
+| AT-001 | Infrastructure boundary | Infrastructure behavior is proven | AC-001 | Infrastructure test | Yes |"""
+            ),
+            evidence_doc="""# Sample Evidence
+
+> **Navigation**: [docs/use-cases/example/sample.md](./sample.md)
+
+## Acceptance Evidence
+
+| AT ID | Evidence | Commands |
+|---|---|---|
+| AT-001 | `tests/Modules/Example/Example.Infrastructure.Tests/SampleTests.cs` | `python scripts/axis.py dotnet test -- --filter FullyQualifiedName~SampleTests` |
+""",
+            evidence_files=("tests/Modules/Example/Example.Infrastructure.Tests/SampleTests.cs",),
+        )
+
+        self.assertEqual([], issues)
+
     def test_rejects_acceptance_matrix_unknown_and_uncovered_ac_ids(self) -> None:
         issues = self.issues_for_use_case(
             """## Acceptance Test Matrix
@@ -804,6 +1007,173 @@ Ship user value.
         )
         self.assertIn(["git", "diff", "--name-only"], calls)
         self.assertIn(["git", "ls-files", "--others", "--exclude-standard"], calls)
+
+
+class TestFoundationDocsGate(unittest.TestCase):
+    def issues_for_foundation(
+        self,
+        *,
+        evidence_doc: str | None = None,
+        inline_evidence: str = "",
+        evidence_files: tuple[str, ...] = (),
+        status_rows: tuple[tuple[str, str], ...] = (("Contract", "Done"), ("Frontend", "Done"), ("Tests", "Done")),
+    ) -> list[str]:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            path = root / "docs" / "foundations" / "app-shell" / "app-frame.md"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            for evidence_file in evidence_files:
+                evidence_path = root / evidence_file
+                evidence_path.parent.mkdir(parents=True, exist_ok=True)
+                evidence_path.write_text("proof\n", encoding="utf-8")
+
+            status_table = "\n".join(f"> | {layer} | {status} |" for layer, status in status_rows)
+            path.write_text(
+                f"""# App Frame
+
+## Purpose
+
+Provide an app frame.
+
+## Primary actor
+
+- Signed-in user
+
+## Trigger
+
+- User opens an authenticated route.
+
+## Main flow
+
+1. System renders the route.
+2. System renders the frame.
+
+## Alternate / error flows
+
+- Narrow viewport reflows.
+
+## Acceptance Criteria
+
+- **AC-001** Route content renders inside the frame.
+- **AC-002** The frame fits supported widths.
+
+## Acceptance Test Matrix
+
+| ID | Boundary | Scenario | Covers AC | Verification | Required |
+|---|---|---|---|---|---|
+| AT-001 | UI component | Frame renders route content. | AC-001 | UI component test | Yes |
+| AT-002 | Browser journey | Desktop and mobile frame avoid overflow. | AC-002 | Browser automation | Yes |
+
+{inline_evidence}
+## Out Of Scope
+
+- Product workflows.
+
+> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+{status_table}
+>
+> **Gaps vs spec:** N/A.
+>
+> **Deferred follow-ups:** N/A.
+>
+> **Verification:** N/A.
+>
+> **Decisions:** N/A.
+""",
+                encoding="utf-8",
+            )
+            if evidence_doc is not None:
+                path.with_name("app-frame.evidence.md").write_text(evidence_doc, encoding="utf-8")
+
+            original_root = check_foundation_docs.ROOT
+            original_foundations = check_foundation_docs.FOUNDATIONS
+            check_foundation_docs.ROOT = root
+            check_foundation_docs.FOUNDATIONS = root / "docs" / "foundations"
+            try:
+                doc = check_foundation_docs.foundation_document(path)
+                issues: list[str] = []
+                issues.extend(check_foundation_docs.validate_sections(doc))
+                issues.extend(check_foundation_docs.validate_acceptance_contract(doc))
+                issues.extend(check_foundation_docs.validate_acceptance_evidence(doc))
+                issues.extend(check_foundation_docs.validate_implementation_status(doc))
+                return issues
+            finally:
+                check_foundation_docs.ROOT = original_root
+                check_foundation_docs.FOUNDATIONS = original_foundations
+
+    def valid_evidence_doc(self) -> str:
+        return """# App Frame Evidence
+
+> **Navigation**: [docs/foundations/app-shell/app-frame.md](./app-frame.md)
+
+## Acceptance Evidence
+
+| AT ID | Evidence | Commands |
+|---|---|---|
+| AT-001 | `frontend/src/components/shared/AppShell.test.tsx` | `python scripts/axis.py frontend script test src/components/shared/AppShell.test.tsx` |
+| AT-002 | `frontend/e2e/app-frame.pw.ts` | `python scripts/axis.py frontend script test:e2e -- e2e/app-frame.pw.ts` |
+"""
+
+    def test_complete_foundation_requires_acceptance_evidence(self) -> None:
+        issues = self.issues_for_foundation()
+
+        self.assertIn("complete foundation docs must include acceptance evidence sidecar", "\n".join(issues))
+
+    def test_complete_foundation_requires_every_required_at_evidence(self) -> None:
+        issues = self.issues_for_foundation(
+            evidence_doc="""# App Frame Evidence
+
+> **Navigation**: [docs/foundations/app-shell/app-frame.md](./app-frame.md)
+
+## Acceptance Evidence
+
+| AT ID | Evidence | Commands |
+|---|---|---|
+| AT-001 | `frontend/src/components/shared/AppShell.test.tsx` | `python scripts/axis.py frontend script test src/components/shared/AppShell.test.tsx` |
+""",
+            evidence_files=("frontend/src/components/shared/AppShell.test.tsx",),
+        )
+
+        self.assertIn("Acceptance Evidence missing required AT IDs: AT-002", "\n".join(issues))
+
+    def test_browser_automation_requires_committed_playwright_evidence(self) -> None:
+        issues = self.issues_for_foundation(
+            evidence_doc="""# App Frame Evidence
+
+> **Navigation**: [docs/foundations/app-shell/app-frame.md](./app-frame.md)
+
+## Acceptance Evidence
+
+| AT ID | Evidence | Commands |
+|---|---|---|
+| AT-001 | `frontend/src/components/shared/AppShell.test.tsx` | `python scripts/axis.py frontend script test src/components/shared/AppShell.test.tsx` |
+| AT-002 | `frontend/src/components/shared/AppShell.test.tsx` | `python scripts/axis.py frontend script test:e2e -- e2e/app-frame.pw.ts` |
+""",
+            evidence_files=("frontend/src/components/shared/AppShell.test.tsx",),
+        )
+
+        self.assertIn("Browser automation must reference a committed `frontend/e2e/*.pw.ts` test", "\n".join(issues))
+
+    def test_accepts_complete_foundation_with_required_evidence(self) -> None:
+        issues = self.issues_for_foundation(
+            evidence_doc=self.valid_evidence_doc(),
+            evidence_files=(
+                "frontend/src/components/shared/AppShell.test.tsx",
+                "frontend/e2e/app-frame.pw.ts",
+            ),
+        )
+
+        self.assertEqual([], issues)
+
+    def test_allows_pending_foundation_without_evidence(self) -> None:
+        issues = self.issues_for_foundation(
+            status_rows=(("Contract", "Done"), ("Frontend", "Partial"), ("Tests", "Not started")),
+        )
+
+        self.assertNotIn("complete foundation docs must include acceptance evidence sidecar", "\n".join(issues))
 
 
 class TestDocDriftRatchets(unittest.TestCase):
@@ -1606,7 +1976,7 @@ class TestFrontendComponentFileNames(unittest.TestCase):
         issues = self.issues_for_frontend(
             {
                 "frontend/src/components/shared/action-link.tsx": "export function ActionLink() { return null; }\n",
-                "frontend/src/components/shared/shell-nav.ts": "export const shellNavItems = [];\n",
+                "frontend/src/components/shared/layout-state.ts": "export const layoutState = {};\n",
             }
         )
 
@@ -1618,7 +1988,7 @@ class TestFrontendComponentFileNames(unittest.TestCase):
         issues = self.issues_for_frontend(
             {
                 "frontend/src/components/shared/ActionLink.tsx": "export function ActionLink() { return null; }\n",
-                "frontend/src/components/shared/shellNav.ts": "export const shellNavItems = [];\n",
+                "frontend/src/components/shared/layoutState.ts": "export const layoutState = {};\n",
             }
         )
 
@@ -1842,16 +2212,174 @@ class TestFrontendQuality(unittest.TestCase):
 
         self.assertEqual([], issues)
 
-    def test_skips_redirect_and_authenticated_routes_for_route_navigation_metadata(self) -> None:
+    def test_skips_redirect_only_and_authenticated_routes_for_route_navigation_metadata(self) -> None:
         issues = self.issues_for_frontend(
             {
                 "frontend/src/routes/index.lazy.tsx": (
                     "import { createLazyFileRoute, Navigate } from '@tanstack/react-router';\n"
                     "export const Route = createLazyFileRoute('/')({ component: () => <Navigate to='/sign-in' /> });\n"
                 ),
+                "frontend/src/routes/index.tsx": (
+                    "import { createFileRoute } from '@tanstack/react-router';\n"
+                    "import { redirectFromAppEntryRoute } from '@/features/auth/route-guards';\n"
+                    "export const Route = createFileRoute('/')({ beforeLoad: redirectFromAppEntryRoute });\n"
+                ),
                 "frontend/src/routes/_authenticated/dashboard.lazy.tsx": (
                     "import { createLazyFileRoute } from '@tanstack/react-router';\n"
                     "export const Route = createLazyFileRoute('/_authenticated/dashboard')({ component: DashboardPage });\n"
+                ),
+            }
+        )
+
+        self.assertEqual([], issues)
+
+    def test_rejects_guest_only_auth_route_outside_guest_group(self) -> None:
+        issues = self.issues_for_frontend(
+            {
+                "frontend/src/routes/sign-in.lazy.tsx": (
+                    "import { createLazyFileRoute } from '@tanstack/react-router';\n"
+                    "import { publicRouteNavigation } from '@/lib/route-navigation';\n"
+                    "export const routeNavigation = publicRouteNavigation({ escapeTargets: ['/register'] });\n"
+                    "export const Route = createLazyFileRoute('/sign-in')({ component: SignInPage });\n"
+                )
+            }
+        )
+
+        self.assertIn("guest-only auth routes must live under the `_guest`", "\n".join(issues))
+
+    def test_accepts_guest_only_auth_route_under_guest_group(self) -> None:
+        issues = self.issues_for_frontend(
+            {
+                "frontend/src/routes/_guest.tsx": (
+                    "import { createFileRoute, Outlet } from '@tanstack/react-router';\n"
+                    "import { redirectAuthenticatedUserFromGuestRoute } from '@/features/auth/route-guards';\n"
+                    "export const Route = createFileRoute('/_guest')({ beforeLoad: redirectAuthenticatedUserFromGuestRoute, component: Outlet });\n"
+                ),
+                "frontend/src/routes/_guest/sign-in.lazy.tsx": (
+                    "import { createLazyFileRoute } from '@tanstack/react-router';\n"
+                    "import { publicRouteNavigation } from '@/lib/route-navigation';\n"
+                    "export const routeNavigation = publicRouteNavigation({ escapeTargets: ['/register'] });\n"
+                    "export const Route = createLazyFileRoute('/_guest/sign-in')({ component: SignInPage });\n"
+                ),
+            }
+        )
+
+        self.assertEqual([], issues)
+
+    def test_rejects_guest_group_without_guard(self) -> None:
+        issues = self.issues_for_frontend(
+            {
+                "frontend/src/routes/_guest.tsx": (
+                    "import { createFileRoute, Outlet } from '@tanstack/react-router';\n"
+                    "export const Route = createFileRoute('/_guest')({ component: Outlet });\n"
+                ),
+                "frontend/src/routes/_guest/sign-in.lazy.tsx": (
+                    "import { createLazyFileRoute } from '@tanstack/react-router';\n"
+                    "import { publicRouteNavigation } from '@/lib/route-navigation';\n"
+                    "export const routeNavigation = publicRouteNavigation({ escapeTargets: ['/register'] });\n"
+                    "export const Route = createLazyFileRoute('/_guest/sign-in')({ component: SignInPage });\n"
+                ),
+            }
+        )
+
+        self.assertIn("`_guest` route group must own the guest-only redirect guard", "\n".join(issues))
+
+    def test_rejects_guest_leaf_route_with_own_guard(self) -> None:
+        issues = self.issues_for_frontend(
+            {
+                "frontend/src/routes/_guest.tsx": (
+                    "import { createFileRoute, Outlet } from '@tanstack/react-router';\n"
+                    "import { redirectAuthenticatedUserFromGuestRoute } from '@/features/auth/route-guards';\n"
+                    "export const Route = createFileRoute('/_guest')({ beforeLoad: redirectAuthenticatedUserFromGuestRoute, component: Outlet });\n"
+                ),
+                "frontend/src/routes/_guest/sign-in.tsx": (
+                    "import { createFileRoute } from '@tanstack/react-router';\n"
+                    "import { redirectAuthenticatedUserFromGuestRoute } from '@/features/auth/route-guards';\n"
+                    "import { publicRouteNavigation } from '@/lib/route-navigation';\n"
+                    "export const routeNavigation = publicRouteNavigation({ escapeTargets: ['/register'] });\n"
+                    "export const Route = createFileRoute('/_guest/sign-in')({ beforeLoad: redirectAuthenticatedUserFromGuestRoute });\n"
+                ),
+            }
+        )
+
+        self.assertIn("guest leaf routes inherit the `_guest` guard", "\n".join(issues))
+
+    def test_rejects_lazy_callback_route_because_success_handoff_must_preload(self) -> None:
+        issues = self.issues_for_frontend(
+            {
+                "frontend/src/routes/callback.lazy.tsx": (
+                    "import { createLazyFileRoute } from '@tanstack/react-router';\n"
+                    "import { CallbackPage } from '@/features/auth/components/CallbackPage';\n"
+                    "import { publicRouteNavigation } from '@/lib/route-navigation';\n"
+                    "export const routeNavigation = publicRouteNavigation({ escapeTargets: ['/sign-in'] });\n"
+                    "export const Route = createLazyFileRoute('/callback')({ component: CallbackPage });\n"
+                )
+            }
+        )
+
+        self.assertIn("callback success handoffs must run before render", "\n".join(issues))
+
+    def test_rejects_callback_route_without_before_load_handoff(self) -> None:
+        issues = self.issues_for_frontend(
+            {
+                "frontend/src/routes/callback.tsx": (
+                    "import { createFileRoute } from '@tanstack/react-router';\n"
+                    "import { CallbackPage } from '@/features/auth/components/CallbackPage';\n"
+                    "import { publicRouteNavigation } from '@/lib/route-navigation';\n"
+                    "export const routeNavigation = publicRouteNavigation({ escapeTargets: ['/sign-in'] });\n"
+                    "export const Route = createFileRoute('/callback')({ component: CallbackPage });\n"
+                )
+            }
+        )
+
+        self.assertIn("must perform successful token handoff in `beforeLoad`", "\n".join(issues))
+
+    def test_rejects_token_exchange_or_pending_copy_inside_callback_page(self) -> None:
+        issues = self.issues_for_frontend(
+            {
+                "frontend/src/features/auth/components/CallbackPage.tsx": (
+                    "import { exchangeAuthorizationCode } from '@/features/auth/api';\n"
+                    "export function CallbackPage() {\n"
+                    "  void exchangeAuthorizationCode('code');\n"
+                    "  return <p>{t('auth.callback.completing')}</p>;\n"
+                    "}\n"
+                )
+            }
+        )
+
+        joined = "\n".join(issues)
+        self.assertIn("exchange tokens in the route handoff guard", joined)
+        self.assertIn("remove transient callback success copy", joined)
+
+    def test_rejects_stale_callback_pending_translations(self) -> None:
+        issues = self.issues_for_frontend(
+            {
+                "frontend/src/features/preferences/translations.ts": (
+                    "export const translations = {\n"
+                    "  en: { 'auth.callback.title': 'Completing sign-in' },\n"
+                    "};\n"
+                )
+            }
+        )
+
+        self.assertIn("stale callback pending translation", "\n".join(issues))
+
+    def test_accepts_callback_route_with_preload_handoff_and_recovery_component(self) -> None:
+        issues = self.issues_for_frontend(
+            {
+                "frontend/src/routes/callback.tsx": (
+                    "import { createFileRoute } from '@tanstack/react-router';\n"
+                    "import { CallbackPage } from '@/features/auth/components/CallbackPage';\n"
+                    "import { redirectFromCallbackRoute } from '@/features/auth/route-guards';\n"
+                    "import { publicRouteNavigation } from '@/lib/route-navigation';\n"
+                    "export const routeNavigation = publicRouteNavigation({ escapeTargets: ['/sign-in'] });\n"
+                    "export const Route = createFileRoute('/callback')({ beforeLoad: redirectFromCallbackRoute, component: CallbackPage });\n"
+                ),
+                "frontend/src/features/auth/components/CallbackPage.tsx": (
+                    "export function CallbackPage() { return <p>Try signing in again.</p>; }\n"
+                ),
+                "frontend/src/features/preferences/translations.ts": (
+                    "export const translations = { en: { 'auth.callback.invalid': 'Invalid' } };\n"
                 ),
             }
         )
@@ -2253,6 +2781,45 @@ class TestLocalDevCli(unittest.TestCase):
         self.assertEqual({"api": [5281]}, services)
         self.assertEqual({"e2e"}, optional)
         self.assertEqual(["api", "e2e", "worker"], service_names)
+
+    def test_compose_app_base_url_allows_human_local_dev_default(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            compose = Path(temp) / "docker-compose.yml"
+            compose.write_text(
+                "services:\n"
+                "  api:\n"
+                "    environment:\n"
+                "      App__BaseUrl: \"${APP_BASE_URL:-https://localhost:3000}\"\n",
+                encoding="utf-8",
+            )
+
+            self.assertTrue(check_local_dev_docs.compose_has_local_app_base_url(compose))
+
+    def test_compose_app_base_url_rejects_internal_service_origin(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            compose = Path(temp) / "docker-compose.yml"
+            compose.write_text(
+                "services:\n"
+                "  api:\n"
+                "    environment:\n"
+                "      App__BaseUrl: \"https://web:3000\"\n",
+                encoding="utf-8",
+            )
+
+            self.assertFalse(check_local_dev_docs.compose_has_local_app_base_url(compose))
+
+    def test_api_appsettings_base_url_reads_app_base_url(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            appsettings = Path(temp) / "appsettings.json"
+            appsettings.write_text(
+                '{"App": {"BaseUrl": "https://localhost:3000"}}',
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                "https://localhost:3000",
+                check_local_dev_docs.api_appsettings_base_url(appsettings),
+            )
 
     def run_local_dev(
         self,

@@ -1,7 +1,7 @@
 {
   "openapi": "3.0.1",
   "info": {
-    "title": "Axis API",
+    "title": "Axis Platform API",
     "version": "v1"
   },
   "paths": {
@@ -485,6 +485,22 @@
           "instance": {
             "type": "string",
             "nullable": true
+          },
+          "code": {
+            "type": "string",
+            "description": "Stable machine-readable problem code for client behavior and localization.",
+            "nullable": true
+          },
+          "errorCodes": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "description": "Optional field-level machine-readable validation codes keyed by JSON field name.",
+            "nullable": true
           }
         },
         "additionalProperties": { }
@@ -509,6 +525,10 @@
           },
           "acceptedPrivacyVersion": {
             "type": "string"
+          },
+          "preferredLanguage": {
+            "type": "string",
+            "nullable": true
           }
         },
         "additionalProperties": false

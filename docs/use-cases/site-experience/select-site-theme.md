@@ -92,7 +92,7 @@ Let a visitor or authenticated user choose how supported web surfaces resolve li
 | App boot | Resolve initial theme before React renders from supported browser preference or the product fallback theme mode. |
 | Public auth screens | Render the preferences control and allow unauthenticated theme selection without an API call. |
 | Authenticated app shell | Load server-persisted user theme when available, apply it as source of truth, and expose theme selection in an authenticated surface. |
-| Theme persistence state | Show pending, saved, retry, and non-blocking failure states without clearing route or form state. |
+| Theme persistence state | Show pending, retry, and non-blocking failure states without clearing route or form state. Successful saves do not need a visible confirmation message. |
 | System theme mode | Follow browser color-scheme preference and update the resolved presentation when that preference changes. |
 
 Required UI quality: theme controls must have programmatic labels, keyboard access, focus visibility, visible selected state, stable overlay behavior, and copy that fits in every supported language on supported mobile and desktop viewports.

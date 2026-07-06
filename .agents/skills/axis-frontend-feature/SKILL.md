@@ -39,6 +39,7 @@ Follow [reference.md](../reference.md).
 
 3. Trace the existing feature.
    - Search routes, feature folder exports, generated API types, hooks, test files, and sibling components with `rg`.
+   - Classify every affected route as authenticated, guest-only, or public-neutral before editing route files.
    - Keep feature imports through the existing feature `index.ts` pattern.
 
 4. Implement the UI behavior.
@@ -47,7 +48,9 @@ Follow [reference.md](../reference.md).
    - Use React Hook Form plus Zod for forms.
    - Include loading, empty, error, validation, disabled, and success states when the workflow needs them.
    - Keep screen shape tied to owning use-case flows, ACs, and implementation-status gaps.
-   - Do not create dead-end screens. Public/auth route files must declare `routeNavigation = publicRouteNavigation(...)`, and every public/auth route state must render a visible sign-in, registration, back, or home-style link. Authenticated pages rely on app shell navigation and sign-out.
+   - Use route access groups for route policy: authenticated pages live under `_authenticated`, guest-only auth or registration pages live under `_guest`, and public-neutral pages stay outside both groups. Put `beforeLoad` guards on the pathless access group, not on individual leaf routes, unless the owning use case defines a one-off route policy.
+   - Do not create dead-end screens. Public/auth route files that render a screen state must declare `routeNavigation = publicRouteNavigation(...)`, and every public/auth route state must render a visible sign-in, registration, back, or home-style link. Redirect-only route entries that render no screen state are exempt. Authenticated pages rely on app shell navigation and sign-out.
+   - Keep technical handoffs from flashing transient success screens. Successful callback, bootstrap, and redirect handoffs should complete in route loaders, guards, or silent session flows before a standalone screen renders; render a handoff screen only for deliberately held confirmations or recoverable user-action states.
    - Do not store auth tokens in `localStorage`.
    - On localized surfaces, route visible product copy through the frontend translation layer rather than component-local static text.
    - Keep visible text focused on the product workflow, not developer instructions.

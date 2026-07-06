@@ -14,15 +14,10 @@ function decodeJwtPayload(token: string): Record<string, unknown> | null {
   }
 }
 
-export function sessionDisplayFromAccessToken(token: string): {
+export function sessionDisplayFromLabel(label: string): {
   userLabel: string;
   userInitials: string;
 } {
-  const payload = decodeJwtPayload(token);
-  const email = typeof payload?.email === 'string' ? payload.email : null;
-  const name = typeof payload?.name === 'string' ? payload.name : null;
-  const label = name ?? email ?? 'User';
-
   const parts = label.includes('@')
     ? [label.split('@')[0] ?? '']
     : label.split(/\s+/).filter((part) => part.length > 0);
@@ -36,4 +31,16 @@ export function sessionDisplayFromAccessToken(token: string): {
     userLabel: label,
     userInitials: initials.length > 0 ? initials : '?',
   };
+}
+
+export function sessionDisplayFromAccessToken(token: string): {
+  userLabel: string;
+  userInitials: string;
+} {
+  const payload = decodeJwtPayload(token);
+  const email = typeof payload?.email === 'string' ? payload.email : null;
+  const name = typeof payload?.name === 'string' ? payload.name : null;
+  const label = name ?? email ?? 'User';
+
+  return sessionDisplayFromLabel(label);
 }

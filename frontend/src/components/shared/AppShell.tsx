@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 
+import { AppFooter } from '@/components/shared/AppFooter';
 import { AppHeader } from '@/components/shared/AppHeader';
-import { AppSidebar } from '@/components/shared/AppSidebar';
 import { useAuthStore } from '@/features/auth/auth-store';
 import { PreferencesProfileSync } from '@/features/preferences';
 
@@ -18,13 +18,11 @@ export function AppShell({ children }: AppShellProps) {
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-background lg:flex-row">
+    <div className="flex min-h-screen flex-col bg-background text-foreground">
       <PreferencesProfileSync />
-      <AppSidebar />
-      <div className="flex min-w-0 flex-1 flex-col">
-        <AppHeader onSignOut={handleSignOut} />
-        <main className="axis-grid flex-1 overflow-auto p-4 sm:p-6 md:p-8">{children}</main>
-      </div>
+      <AppHeader onSignOut={handleSignOut} />
+      <main className="axis-grid w-full min-w-0 flex-1 px-4 py-6 sm:px-6 lg:px-8">{children}</main>
+      <AppFooter />
     </div>
   );
 }

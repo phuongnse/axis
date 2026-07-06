@@ -27,7 +27,8 @@ public class Result
         string? errorCode,
         string? error,
         IReadOnlyDictionary<string, string[]>? fieldErrors = null,
-        PlanLimitFailureDetails? planLimitDetails = null)
+        PlanLimitFailureDetails? planLimitDetails = null,
+        string? problemCode = null)
     {
         if (isSuccess && error is not null)
             throw new InvalidOperationException("A success result cannot have an error.");
@@ -37,6 +38,7 @@ public class Result
         IsSuccess = isSuccess;
         _errorCode = errorCode;
         _error = error;
+        _problemCode = problemCode;
         // Defensive copy: prevents callers from mutating error payloads after result creation.
         _fieldErrors = fieldErrors?.ToDictionary(kv => kv.Key, kv => kv.Value.ToArray());
         _planLimitDetails = planLimitDetails;
@@ -47,6 +49,7 @@ public class Result
 
     private readonly string? _errorCode;
     private readonly string? _error;
+    private readonly string? _problemCode;
     private readonly IReadOnlyDictionary<string, string[]>? _fieldErrors;
     private readonly PlanLimitFailureDetails? _planLimitDetails;
 
@@ -61,6 +64,11 @@ public class Result
         ? _error!
         : throw new InvalidOperationException("A success result has no error.");
 
+    /// <summary>Stable machine-readable problem identity exposed on RFC 7807 responses.</summary>
+    public string? ProblemCode => IsFailure
+        ? _problemCode
+        : throw new InvalidOperationException("A success result has no problem code.");
+
     /// <summary>Per-field validation errors. Only populated when ErrorCode == ErrorCodes.FieldValidation.</summary>
     public IReadOnlyDictionary<string, string[]>? FieldErrors => _fieldErrors;
 
@@ -71,6 +79,8 @@ public class Result
 
     /// <summary>Failure with a well-known code from <see cref="ErrorCodes"/> — maps to the correct HTTP status.</summary>
     public static Result Failure(string code, string error) => new(false, code, error);
+    public static Result Failure(string code, string error, string problemCode) =>
+        new(false, code, error, problemCode: problemCode);
 
     public static Result PlanLimitFailure(PlanLimitFailureDetails details) =>
         new(false, ErrorCodes.PlanLimit, details.Message, null, details);
@@ -82,6 +92,8 @@ public class Result
     public static Result<TValue> Success<TValue>(TValue value) => Result<TValue>.Success(value);
     public static Result<TValue> Failure<TValue>(string error) => Result<TValue>.Failure(error);
     public static Result<TValue> Failure<TValue>(string code, string error) => Result<TValue>.Failure(code, error);
+    public static Result<TValue> Failure<TValue>(string code, string error, string problemCode) =>
+        Result<TValue>.Failure(code, error, problemCode);
 
     /// <summary>Field-level validation failure returning a typed result.</summary>
     public static Result<TValue> FieldValidation<TValue>(IReadOnlyDictionary<string, string[]> fieldErrors)
@@ -101,8 +113,9 @@ public sealed class Result<TValue> : Result
         string? errorCode,
         string? error,
         IReadOnlyDictionary<string, string[]>? fieldErrors = null,
-        PlanLimitFailureDetails? planLimitDetails = null)
-        : base(isSuccess, errorCode, error, fieldErrors, planLimitDetails)
+        PlanLimitFailureDetails? planLimitDetails = null,
+        string? problemCode = null)
+        : base(isSuccess, errorCode, error, fieldErrors, planLimitDetails, problemCode)
     {
         _value = value;
     }
@@ -114,6 +127,8 @@ public sealed class Result<TValue> : Result
     public static Result<TValue> Success(TValue value) => new(true, value, null, null);
     public new static Result<TValue> Failure(string error) => new(false, default, null, error);
     public new static Result<TValue> Failure(string code, string error) => new(false, default, code, error);
+    public new static Result<TValue> Failure(string code, string error, string problemCode) =>
+        new(false, default, code, error, problemCode: problemCode);
 
     public new static Result<TValue> PlanLimitFailure(PlanLimitFailureDetails details) =>
         new(false, default, ErrorCodes.PlanLimit, details.Message, null, details);

@@ -59,7 +59,7 @@ Let a visitor or authenticated user view supported web surfaces in a supported l
 - **AC-015** Changing language updates `document.documentElement.lang` to the selected supported language.
 - **AC-016** Public auth surfaces, callback recovery states, and authenticated dashboard shell copy render in the selected language for this slice.
 - **AC-017** Language preference is user-owned, not workspace-owned; switching or selecting a workspace must not change the persisted language.
-- **AC-018** Registration, sign-in, verification, and callback flows do not silently create or update a server language preference.
+- **AC-018** Registration may create the account's initial server language preference from the explicitly selected public site language; sign-in, verification, and callback flows do not silently create or update an existing server language preference.
 - **AC-019** Language selection remains available and non-blocking on supported public and authenticated surfaces.
 
 ## Acceptance Test Matrix
@@ -73,11 +73,11 @@ Let a visitor or authenticated user view supported web surfaces in a supported l
 | AT-005 | UI component | Language control exposes the supported language set, updates copy immediately, preserves route/form state, and satisfies the required UI quality bar | AC-001, AC-002, AC-010, AC-019 | UI component test | Yes |
 | AT-006 | UI component | Unsupported or unreadable browser preference falls back without crashing | AC-003, AC-011, AC-014 | UI component test | Yes |
 | AT-007 | UI/API boundaries | Authenticated persistence or profile load failure keeps the current language usable and shows retry/recovery state without claiming cross-device save | AC-012, AC-013 | UI component test + API integration test | Yes |
-| AT-008 | Browser journey | Registration, sign-in, verification, and callback flows do not silently create or update server language preference | AC-018 | Browser automation + Application test | Yes |
+| AT-008 | Browser journey | Registration creates the initial server language preference from the selected public site language, while sign-in, verification, and callback flows do not silently update an existing server language preference | AC-018 | Browser automation + Application test | Yes |
 
 ## Out Of Scope
 
-- Translating outbound email or notification content.
+- Translating outbound email or notification content outside registration verification email.
 - Server persistence for unauthenticated visitors.
 - Workspace-specific language preferences.
 - Locale-sensitive date, number, currency, or timezone formatting beyond text copy and document language metadata in this slice.
@@ -89,7 +89,7 @@ Let a visitor or authenticated user view supported web surfaces in a supported l
 | App boot | Resolve initial language before React renders from supported browser preference, browser language, or the product fallback language. |
 | Public auth screens | Render supported copy in the selected language and allow unauthenticated language selection without an API call. |
 | Authenticated app shell | Load server-persisted user language when available, apply it as source of truth, and expose language selection in an authenticated surface. |
-| Language persistence state | Show pending, saved, retry, and non-blocking failure states without clearing route or form state. |
+| Language persistence state | Show pending, retry, and non-blocking failure states without clearing route or form state. Successful saves do not need a visible confirmation message. |
 
 Required UI quality: language controls must have programmatic labels, keyboard access, focus visibility, visible selected state, stable overlay behavior, and copy that fits in every supported language on supported mobile and desktop viewports.
 
@@ -137,4 +137,4 @@ sequenceDiagram
 >
 > **Verification:** Required AT rows are covered by browser automation, UI component tests, API integration tests, application tests, infrastructure tests, and frontend static checks.
 >
-> **Decisions:** Site Experience owns the web language selection use case. Screen flow owns the product screen contract; Required UI quality owns accessibility and interaction expectations. Identity owns authenticated user language persistence because the preference belongs to the user profile, not workspace-scoped or shared platform state. Server preference is the authenticated source of truth when present; browser preference supports bootstrapping and unauthenticated use. Protected route session bootstrap is owned by [docs/use-cases/identity-access/sign-in-user.md](../identity-access/sign-in-user.md); this use case relies on it only to reload an authenticated language preference journey. Authentication flows must not silently write server language preference.
+> **Decisions:** Site Experience owns the web language selection use case. Screen flow owns the product screen contract; Required UI quality owns accessibility and interaction expectations. Identity owns authenticated user language persistence because the preference belongs to the user profile, not workspace-scoped or shared platform state. Server preference is the authenticated source of truth when present; browser preference supports bootstrapping and unauthenticated use. Protected route session bootstrap is owned by [docs/use-cases/identity-access/sign-in-user.md](../identity-access/sign-in-user.md); this use case relies on it only to reload an authenticated language preference journey. Registration may create the initial server preference from an explicit public language selection; later authentication flows must not silently write server language preference.

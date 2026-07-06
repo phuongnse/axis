@@ -7,6 +7,6 @@ export const routeNavigation = publicRouteNavigation({
   escapeTargets: ['/sign-in', '/register'],
 });
 
-export const Route = createLazyFileRoute('/auth/verify')({
+export const Route = createLazyFileRoute('/_guest/auth/verify')({
   component: VerifyEmailPage,
 });

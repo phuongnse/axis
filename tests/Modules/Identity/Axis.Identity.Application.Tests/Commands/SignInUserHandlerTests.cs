@@ -1,4 +1,5 @@
 using System.Reflection;
+using Axis.Identity.Application;
 using Axis.Identity.Application.Commands.SignInUser;
 using Axis.Identity.Application.Repositories;
 using Axis.Identity.Application.Services;
@@ -95,6 +96,7 @@ public class SignInUserHandlerTests
 
         result.IsFailure.Should().BeTrue();
         result.ErrorCode.Should().Be(ErrorCodes.BusinessRule);
+        result.ProblemCode.Should().Be(IdentityProblemCodes.SignInInvalidCredentials);
         result.Error.Should().Be(SignInUserHandler.GenericCredentialError);
         await _workspaceRepo.DidNotReceive().GetPersonalByOwnerUserIdAsync(
             Arg.Any<Guid>(), Arg.Any<CancellationToken>());
@@ -115,6 +117,7 @@ public class SignInUserHandlerTests
 
         result.IsFailure.Should().BeTrue();
         result.ErrorCode.Should().Be(ErrorCodes.BusinessRule);
+        result.ProblemCode.Should().Be(IdentityProblemCodes.SignInVerificationRequired);
         result.Error.Should().Be(SignInUserHandler.VerificationRequiredError);
         await _workspaceRepo.DidNotReceive().GetPersonalByOwnerUserIdAsync(
             Arg.Any<Guid>(), Arg.Any<CancellationToken>());
@@ -141,6 +144,7 @@ public class SignInUserHandlerTests
 
         result.IsFailure.Should().BeTrue();
         result.ErrorCode.Should().Be(ErrorCodes.BusinessRule);
+        result.ProblemCode.Should().Be(IdentityProblemCodes.SignInAccountUnavailable);
         result.Error.Should().Be(SignInUserHandler.AccountUnavailableError);
     }
 

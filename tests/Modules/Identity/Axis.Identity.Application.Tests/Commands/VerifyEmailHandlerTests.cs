@@ -1,3 +1,4 @@
+using Axis.Identity.Application;
 using Axis.Identity.Application.Commands.VerifyEmail;
 using Axis.Identity.Application.Repositories;
 using Axis.Identity.Application.Services;
@@ -76,6 +77,7 @@ public class VerifyEmailHandlerTests
 
         result.IsFailure.Should().BeTrue();
         result.ErrorCode.Should().Be(ErrorCodes.BusinessRule);
+        result.ProblemCode.Should().Be(IdentityProblemCodes.EmailVerificationInvalidToken);
         result.Error.Should().Contain("Invalid verification link");
         await _uow.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
     }
@@ -93,6 +95,7 @@ public class VerifyEmailHandlerTests
             CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
+        result.ProblemCode.Should().Be(IdentityProblemCodes.EmailVerificationExpiredToken);
         result.Error.Should().Contain("expired");
         await _uow.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
     }

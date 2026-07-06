@@ -27,6 +27,7 @@ Validate skill changes: `python scripts/axis.py check repo-skills`
 | Draft or complete use-case spec | [axis-use-case-spec/SKILL.md](./axis-use-case-spec/SKILL.md) |
 | Implement documented use case | [axis-use-case-implementation/SKILL.md](./axis-use-case-implementation/SKILL.md) |
 | API / OpenAPI / generated types | [axis-api-contract/SKILL.md](./axis-api-contract/SKILL.md) |
+| App shell / shared SPA UI infrastructure | [axis-frontend-foundation/SKILL.md](./axis-frontend-foundation/SKILL.md) |
 | Frontend feature slice | [axis-frontend-feature/SKILL.md](./axis-frontend-feature/SKILL.md) |
 | Mermaid / committed visual artifact | [axis-visual-artifact/SKILL.md](./axis-visual-artifact/SKILL.md) |
 | Docs / guidance / status edits | [axis-doc-hygiene/SKILL.md](./axis-doc-hygiene/SKILL.md) |

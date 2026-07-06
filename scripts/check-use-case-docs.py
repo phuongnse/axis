@@ -15,6 +15,10 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
+from acceptance_evidence import EvidenceValidationContext
+from acceptance_evidence import evidence_file_for
+from acceptance_evidence import validate_acceptance_evidence_sidecar
+
 ROOT = Path(__file__).resolve().parent.parent
 USE_CASES = ROOT / "docs" / "use-cases"
 SKIP_DIRS = set()
@@ -78,6 +82,7 @@ VERIFICATION_VALUES = {
     "UI component test",
     "API integration test",
     "Application test",
+    "Infrastructure test",
     "Infrastructure integration test",
     "Domain test",
     "Architecture test",
@@ -310,7 +315,14 @@ def check_use_case_inventory_layout() -> list[str]:
             if child.name == "README.md":
                 continue
             if child.suffix != ".md":
-                issues.append(f"{child_rel}: domain inventories may only contain README.md and use-case .md files")
+                issues.append(
+                    f"{child_rel}: domain inventories may only contain README.md, use-case .md files, and matching .evidence.md sidecars"
+                )
+                continue
+            if child.name.endswith(".evidence.md"):
+                owner = child.with_name(child.name.removesuffix(".evidence.md") + ".md")
+                if not owner.is_file():
+                    issues.append(f"{child_rel}: evidence sidecar must have a matching use-case file")
 
     return issues
 
@@ -321,7 +333,7 @@ def iter_use_case_files() -> list[Path]:
         if not domain_dir.is_dir() or domain_dir.name.startswith("_"):
             continue
         for use_case in sorted(domain_dir.glob("*.md")):
-            if use_case.name == "README.md" or use_case.stem in SKIP_DIRS:
+            if use_case.name == "README.md" or use_case.name.endswith(".evidence.md") or use_case.stem in SKIP_DIRS:
                 continue
             files.append(use_case)
     return files
@@ -500,6 +512,147 @@ def validate_acceptance_contract(doc: UseCaseDocument, *, require_matrix: bool) 
     return issues
 
 
+def acceptance_matrix_records(doc: UseCaseDocument) -> list[dict[str, str]]:
+    table = first_markdown_table(doc.section("Acceptance Test Matrix"))
+    if table is None or table.headers != ACCEPTANCE_MATRIX_COLUMNS:
+        return []
+    return [record_for_row(table, row) for row in table.rows]
+
+
+def implementation_status_table(doc: UseCaseDocument) -> MarkdownTable | None:
+    callout = implementation_status_callout(doc.text)
+    if not callout:
+        return None
+    return first_markdown_table("\n".join(line.removeprefix(">").strip() for line in callout.splitlines()))
+
+
+def claims_complete(doc: UseCaseDocument) -> bool:
+    table = implementation_status_table(doc)
+    if table is None or table.headers != IMPLEMENTATION_STATUS_COLUMNS:
+        return False
+    statuses = [record_for_row(table, row).get("Status", "") for row in table.rows]
+    return (
+        bool(statuses)
+        and any(status == "Done" for status in statuses)
+        and all(status in {"Done", "N/A"} for status in statuses)
+    )
+
+
+def has_dotnet_test_command(commands: list[str], boundary: str) -> bool:
+    full_suite = "python scripts/axis.py dotnet test"
+    for command in commands:
+        if not command.startswith(full_suite):
+            continue
+        if command == full_suite or boundary in command:
+            return True
+    return False
+
+
+def has_any_dotnet_test_command(commands: list[str]) -> bool:
+    full_suite = "python scripts/axis.py dotnet test"
+    return any(command.startswith(full_suite) for command in commands)
+
+
+def verification_evidence_issues(
+    ctx: EvidenceValidationContext,
+    at_id: str,
+    verification: str,
+    paths: list[str],
+    commands: list[str],
+) -> list[str]:
+    issues: list[str] = []
+    has_e2e_command = any(" frontend script test:e2e" in command or " local-dev e2e" in command for command in commands)
+    has_frontend_test_command = any(
+        " frontend script test" in command or command.endswith(" frontend test") for command in commands
+    )
+
+    if verification == "Browser automation":
+        if not any(path.startswith("frontend/e2e/") and path.endswith(".pw.ts") for path in paths):
+            issues.append(
+                f"{ctx.evidence_rel}: Acceptance Evidence {at_id} Browser automation must reference a committed `frontend/e2e/*.pw.ts` test",
+            )
+        if not has_e2e_command:
+            issues.append(
+                f"{ctx.evidence_rel}: Acceptance Evidence {at_id} Browser automation Commands must run Playwright through scripts/axis.py",
+            )
+    elif verification == "UI component test":
+        if not any(
+            path.startswith(("frontend/src/", "frontend/tests/")) and path.endswith((".test.ts", ".test.tsx"))
+            for path in paths
+        ):
+            issues.append(
+                f"{ctx.evidence_rel}: Acceptance Evidence {at_id} UI component test must reference a committed frontend `*.test.ts` or `*.test.tsx` file",
+            )
+        if not has_frontend_test_command:
+            issues.append(
+                f"{ctx.evidence_rel}: Acceptance Evidence {at_id} UI component test Commands must run frontend tests through scripts/axis.py",
+            )
+    elif verification == "API integration test":
+        if not any(path.startswith("tests/Api/") and path.endswith(".cs") for path in paths):
+            issues.append(
+                f"{ctx.evidence_rel}: Acceptance Evidence {at_id} API integration test must reference a committed `tests/Api/**/*.cs` file",
+            )
+        if not has_dotnet_test_command(commands, "tests/Api/"):
+            issues.append(
+                f"{ctx.evidence_rel}: Acceptance Evidence {at_id} API integration test Commands must run dotnet tests through scripts/axis.py",
+            )
+    elif verification == "Application test":
+        if not any(path.startswith("tests/Modules/") and ".Application.Tests/" in path and path.endswith(".cs") for path in paths):
+            issues.append(
+                f"{ctx.evidence_rel}: Acceptance Evidence {at_id} Application test must reference a committed module application test file",
+            )
+        if not has_dotnet_test_command(commands, ".Application.Tests"):
+            issues.append(
+                f"{ctx.evidence_rel}: Acceptance Evidence {at_id} Application test Commands must run dotnet tests through scripts/axis.py",
+            )
+    elif verification in {"Infrastructure test", "Infrastructure integration test"}:
+        if not any(path.startswith("tests/Modules/") and ".Infrastructure.Tests/" in path and path.endswith(".cs") for path in paths):
+            issues.append(
+                f"{ctx.evidence_rel}: Acceptance Evidence {at_id} {verification} must reference a committed module infrastructure test file",
+            )
+        has_matching_command = (
+            has_dotnet_test_command(commands, ".Infrastructure.Tests")
+            if verification == "Infrastructure integration test"
+            else has_any_dotnet_test_command(commands)
+        )
+        if not has_matching_command:
+            issues.append(
+                f"{ctx.evidence_rel}: Acceptance Evidence {at_id} {verification} Commands must run dotnet tests through scripts/axis.py",
+            )
+    elif verification == "Domain test":
+        if not any(path.startswith("tests/Modules/") and ".Domain.Tests/" in path and path.endswith(".cs") for path in paths):
+            issues.append(
+                f"{ctx.evidence_rel}: Acceptance Evidence {at_id} Domain test must reference a committed module domain test file",
+            )
+        if not has_dotnet_test_command(commands, ".Domain.Tests"):
+            issues.append(
+                f"{ctx.evidence_rel}: Acceptance Evidence {at_id} Domain test Commands must run dotnet tests through scripts/axis.py",
+            )
+    elif verification == "Architecture test":
+        if not any(path.startswith("tests/Architecture/") and path.endswith(".cs") for path in paths):
+            issues.append(
+                f"{ctx.evidence_rel}: Acceptance Evidence {at_id} Architecture test must reference a committed `tests/Architecture/**/*.cs` file",
+            )
+        if not has_dotnet_test_command(commands, "tests/Architecture/"):
+            issues.append(
+                f"{ctx.evidence_rel}: Acceptance Evidence {at_id} Architecture test Commands must run dotnet tests through scripts/axis.py",
+            )
+    return issues
+
+
+def validate_acceptance_evidence(doc: UseCaseDocument) -> list[str]:
+    ctx = EvidenceValidationContext(
+        root=ROOT,
+        owner_rel=doc.rel,
+        owner_sections=doc.sections,
+        evidence_rel=evidence_file_for(doc.path).relative_to(ROOT),
+        matrix_records=acceptance_matrix_records(doc),
+        complete=claims_complete(doc),
+        label="use-case",
+    )
+    return validate_acceptance_evidence_sidecar(ctx, verification_evidence_issues)
+
+
 def validate_diagrams(doc: UseCaseDocument) -> list[str]:
     issues: list[str] = []
     rel = doc.rel
@@ -576,6 +729,7 @@ def check_file(
     issues.extend(validate_sections(doc))
     issues.extend(validate_section_order(doc))
     issues.extend(validate_acceptance_contract(doc, require_matrix=require_acceptance_matrix))
+    issues.extend(validate_acceptance_evidence(doc))
     issues.extend(validate_diagrams(doc))
     issues.extend(validate_implementation_status(doc, strict_status=strict_status))
     return issues

@@ -118,6 +118,11 @@ async function openPreferencesWithoutMovingForm(page: Page): Promise<void> {
   expect(topAfter).toBeCloseTo(topBefore, 1);
 }
 
+async function openAuthenticatedPreferences(page: Page): Promise<void> {
+  await page.getByRole('button', { name: 'Account menu' }).click();
+  await expect(page.getByRole('button', { name: 'Vietnamese' })).toBeVisible();
+}
+
 test.describe('select site language', () => {
   test.beforeEach(async ({ request }) => {
     await clearMaildev(request);
@@ -159,21 +164,21 @@ test.describe('select site language', () => {
     await page.getByRole('button', { name: /sign in/i }).click();
 
     await expect(page).toHaveURL(/\/dashboard$/, { timeout: 30_000 });
-    await expect(page.getByRole('heading', { name: 'Language User', level: 1 })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Account menu' })).toBeVisible();
 
-    await page.getByRole('button', { name: 'Preferences' }).click();
+    await openAuthenticatedPreferences(page);
     await page.getByRole('button', { name: 'Vietnamese' }).click();
 
     await expect(page.getByText('Đã lưu ngôn ngữ')).toBeVisible({ timeout: 30_000 });
     await expect(page.locator('html')).toHaveAttribute('lang', 'vi');
-    await expect(page.getByText('Tài khoản đã sẵn sàng', { exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Menu tài khoản' })).toBeVisible();
 
     await page.evaluate(() => localStorage.removeItem('axis.language'));
     await page.reload();
 
     await expect(page).toHaveURL(/\/dashboard$/, { timeout: 30_000 });
     await expect(page.locator('html')).toHaveAttribute('lang', 'vi', { timeout: 30_000 });
-    await expect(page.getByText('Tài khoản đã sẵn sàng', { exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Menu tài khoản' })).toBeVisible();
     await expect.poll(() => page.evaluate(() => localStorage.getItem('axis.language'))).toBe('vi');
   });
 });

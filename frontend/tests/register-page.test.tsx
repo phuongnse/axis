@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { RegisterPage } from '../src/features/auth/components/RegisterPage';
+import { changeSiteLanguage } from '../src/features/preferences';
 import { renderWithRouter } from './render-with-router';
 
 const navigateMock = vi.fn();
@@ -113,18 +114,22 @@ describe('RegisterPage', () => {
     const passwordInput = screen.getByLabelText('Password');
     await user.type(passwordInput, '1234567890123456790');
 
-    expect(
-      screen.getByRole('listitem', { name: 'Met: At least 15 characters' }),
-    ).toBeInTheDocument();
-    expect(screen.getByRole('listitem', { name: 'Missing: Hard to guess' })).toBeInTheDocument();
+    const metLengthCriteria = screen.getByRole('listitem', {
+      name: 'Met: At least 15 characters',
+    });
+    const missingHardCriteria = screen.getByRole('listitem', { name: 'Missing: Hard to guess' });
+    expect(metLengthCriteria).toHaveClass('text-emerald-700');
+    expect(missingHardCriteria).toHaveClass('text-destructive');
 
     await user.clear(passwordInput);
     await user.type(passwordInput, 'maple river sunrise');
 
-    expect(
-      screen.getByRole('listitem', { name: 'Met: At least 15 characters' }),
-    ).toBeInTheDocument();
-    expect(screen.getByRole('listitem', { name: 'Met: Hard to guess' })).toBeInTheDocument();
+    expect(screen.getByRole('listitem', { name: 'Met: At least 15 characters' })).toHaveClass(
+      'text-emerald-700',
+    );
+    expect(screen.getByRole('listitem', { name: 'Met: Hard to guess' })).toHaveClass(
+      'text-emerald-700',
+    );
   });
 
   it('navigates to confirmation screen after successful submit', async () => {
@@ -238,6 +243,52 @@ describe('RegisterPage', () => {
     });
   });
 
+  it('submits the current site language as the preferred language', async () => {
+    const user = userEvent.setup();
+    let registerBody: Record<string, unknown> | undefined;
+    vi.mocked(fetch).mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input.toString();
+      if (url.includes('/api/legal/versions')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          text: () => Promise.resolve(JSON.stringify(LEGAL_VERSIONS)),
+        } as unknown as Response);
+      }
+      if (url.includes('/api/users/register') && init?.method === 'POST') {
+        registerBody = JSON.parse(String(init.body)) as Record<string, unknown>;
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          text: () =>
+            Promise.resolve(
+              JSON.stringify({
+                message: 'Registration successful. Please check your email to verify your account.',
+              }),
+            ),
+        } as unknown as Response);
+      }
+      return Promise.reject(new Error(`Unexpected fetch: ${url}`));
+    });
+    await changeSiteLanguage('vi');
+
+    await renderWithRouter(<RegisterPage />, { path: '/register' });
+
+    await user.type(screen.getByLabelText('Họ và tên'), 'Alex Brown');
+    await user.type(screen.getByLabelText('Địa chỉ email'), 'alex@example.com');
+    await user.type(screen.getByLabelText('Mật khẩu', { exact: true }), 'maple river sunrise');
+    await user.type(
+      screen.getByLabelText('Xác nhận mật khẩu', { exact: true }),
+      'maple river sunrise',
+    );
+    await user.click(screen.getByRole('checkbox', { name: /điều khoản dịch vụ/i }));
+    await user.click(screen.getByRole('button', { name: /tạo tài khoản/i }));
+
+    await waitFor(() => {
+      expect(registerBody?.preferredLanguage).toBe('vi');
+    });
+  });
+
   it('maps backend validation errors to inline field messages', async () => {
     const user = userEvent.setup();
     vi.mocked(fetch).mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
@@ -257,7 +308,10 @@ describe('RegisterPage', () => {
           json: () =>
             Promise.resolve({
               errors: {
-                email: ['Email is already registered.'],
+                email: ['Do not show this backend fallback.'],
+              },
+              errorCodes: {
+                email: ['identity.register.emailAlreadyExists'],
               },
             }),
         } as unknown as Response);
@@ -270,7 +324,10 @@ describe('RegisterPage', () => {
     await fillRegisterForm(user);
     await user.click(screen.getByRole('button', { name: /create account/i }));
 
-    expect(await screen.findByText('Email is already registered.')).toBeInTheDocument();
+    expect(
+      await screen.findByText('An account with this email already exists. Sign in instead.'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Do not show this backend fallback.')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /create account/i })).toBeEnabled();
   });
 
@@ -292,7 +349,8 @@ describe('RegisterPage', () => {
           statusText: 'Conflict',
           json: () =>
             Promise.resolve({
-              detail: 'An account with this email already exists. Sign in instead.',
+              code: 'identity.register.emailAlreadyExists',
+              detail: 'Do not show this backend fallback.',
             }),
         } as unknown as Response);
       }
@@ -309,6 +367,53 @@ describe('RegisterPage', () => {
     ).toBeInTheDocument();
     expect(screen.getByLabelText('Email address')).toHaveAttribute('aria-invalid', 'true');
     expect(screen.getByRole('button', { name: /create account/i })).toBeEnabled();
+  });
+
+  it('updates duplicate email errors when language changes after submit', async () => {
+    const user = userEvent.setup();
+    vi.mocked(fetch).mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input.toString();
+      if (url.includes('/api/legal/versions')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          text: () => Promise.resolve(JSON.stringify(LEGAL_VERSIONS)),
+        } as unknown as Response);
+      }
+      if (url.includes('/api/users/register') && init?.method === 'POST') {
+        return Promise.resolve({
+          ok: false,
+          status: 409,
+          statusText: 'Conflict',
+          json: () =>
+            Promise.resolve({
+              code: 'identity.register.emailAlreadyExists',
+              detail: 'Do not show this backend fallback.',
+            }),
+        } as unknown as Response);
+      }
+      return Promise.reject(new Error(`Unexpected fetch: ${url}`));
+    });
+
+    await renderWithRouter(<RegisterPage />, { path: '/register' });
+
+    await fillRegisterForm(user);
+    await user.click(screen.getByRole('button', { name: /create account/i }));
+
+    expect(
+      await screen.findByText('An account with this email already exists. Sign in instead.'),
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Preferences' }));
+    await user.click(screen.getByRole('button', { name: 'Vietnamese' }));
+
+    expect(
+      await screen.findByText('Email này đã có tài khoản. Hãy đăng nhập.'),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText('An account with this email already exists. Sign in instead.'),
+    ).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Địa chỉ email')).toHaveAttribute('aria-invalid', 'true');
   });
 
   it('shows generic server error when API returns 5xx', async () => {
@@ -341,6 +446,10 @@ describe('RegisterPage', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Something went wrong, please try again',
     );
-    expect(screen.getByRole('button', { name: /create account/i })).toBeEnabled();
+    await user.click(screen.getByRole('button', { name: 'Preferences' }));
+    await user.click(screen.getByRole('button', { name: 'Vietnamese' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Đã xảy ra lỗi, vui lòng thử lại');
+    expect(screen.queryByText('Something went wrong, please try again')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /tạo tài khoản/i })).toBeEnabled();
   });
 });

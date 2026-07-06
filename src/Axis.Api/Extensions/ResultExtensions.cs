@@ -1,5 +1,6 @@
-using System.Text.Json;
+using Axis.Api.Infrastructure;
 using Axis.Shared.Domain.Primitives;
+using Microsoft.AspNetCore.Mvc;
 
 namespace Axis.Api.Extensions;
 
@@ -17,36 +18,60 @@ public static class ResultExtensions
         if (result.ErrorCode == ErrorCodes.FieldValidation && result.FieldErrors is not null)
         {
             Dictionary<string, string[]> errors = result.FieldErrors
-                .ToDictionary(kv => ToJsonFieldName(kv.Key), kv => kv.Value);
-            return Results.ValidationProblem(errors, statusCode: StatusCodes.Status422UnprocessableEntity);
+                .ToDictionary(kv => ProblemDetailsDefaults.ToJsonFieldName(kv.Key), kv => kv.Value);
+            return Problem(
+                result,
+                StatusCodes.Status422UnprocessableEntity,
+                validationErrors: errors);
         }
 
-        return result.ErrorCode switch
+        if (result.ErrorCode == ErrorCodes.PlanLimit
+            && result.PlanLimitDetails is PlanLimitFailureDetails details)
         {
-            ErrorCodes.NotFound => Results.Problem(result.Error, statusCode: StatusCodes.Status404NotFound),
-            ErrorCodes.Forbidden => Results.Problem(result.Error, statusCode: StatusCodes.Status403Forbidden),
-            ErrorCodes.Conflict => Results.Problem(result.Error, statusCode: StatusCodes.Status409Conflict),
-            ErrorCodes.PlanLimit when result.PlanLimitDetails is PlanLimitFailureDetails details =>
-                Results.Json(
-                    new
-                    {
-                        error = details.Error,
-                        limit_type = details.LimitType,
-                        current = details.Current,
-                        max = details.Max,
-                        upgrade_url = details.UpgradeUrl,
-                        message = details.Message,
-                    },
-                    statusCode: StatusCodes.Status402PaymentRequired),
-            ErrorCodes.PlanLimit => Results.Problem(result.Error, statusCode: StatusCodes.Status402PaymentRequired),
-            ErrorCodes.InvalidInput => Results.Problem(result.Error, statusCode: StatusCodes.Status400BadRequest),
-            ErrorCodes.RateLimited => Results.Problem(result.Error, statusCode: StatusCodes.Status429TooManyRequests),
-            _ => Results.Problem(result.Error, statusCode: StatusCodes.Status422UnprocessableEntity),
+            return Results.Json(
+                new
+                {
+                    error = details.Error,
+                    limit_type = details.LimitType,
+                    current = details.Current,
+                    max = details.Max,
+                    upgrade_url = details.UpgradeUrl,
+                    message = details.Message,
+                },
+                statusCode: StatusCodes.Status402PaymentRequired);
+        }
+
+        int statusCode = result.ErrorCode switch
+        {
+            ErrorCodes.NotFound => StatusCodes.Status404NotFound,
+            ErrorCodes.Forbidden => StatusCodes.Status403Forbidden,
+            ErrorCodes.Conflict => StatusCodes.Status409Conflict,
+            ErrorCodes.PlanLimit => StatusCodes.Status402PaymentRequired,
+            ErrorCodes.InvalidInput => StatusCodes.Status400BadRequest,
+            ErrorCodes.RateLimited => StatusCodes.Status429TooManyRequests,
+            _ => StatusCodes.Status422UnprocessableEntity,
         };
+
+        return Problem(result, statusCode);
     }
 
-    private static string ToJsonFieldName(string fieldName) =>
-        string.IsNullOrEmpty(fieldName)
-            ? fieldName
-            : JsonNamingPolicy.CamelCase.ConvertName(fieldName);
+    private static IResult Problem(
+        Result result,
+        int statusCode,
+        IReadOnlyDictionary<string, string[]>? validationErrors = null)
+    {
+        string code = ProblemDetailsDefaults.CodeFor(result);
+        ProblemDetails problem = validationErrors is null
+            ? ProblemDetailsDefaults.CreateProblemDetails(statusCode, result.Error, code)
+            : ProblemDetailsDefaults.CreateValidationProblemDetails(
+                validationErrors,
+                statusCode,
+                result.Error,
+                code);
+
+        return Results.Json(
+            problem,
+            statusCode: statusCode,
+            contentType: ProblemDetailsDefaults.JsonContentType);
+    }
 }

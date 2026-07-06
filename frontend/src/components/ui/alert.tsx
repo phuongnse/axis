@@ -10,7 +10,11 @@ const alertVariants = cva(
       variant: {
         default: 'bg-card text-card-foreground',
         destructive:
-          'bg-card text-destructive *:data-[slot=alert-description]:text-destructive/90 *:[svg]:text-current',
+          'border-destructive/30 bg-destructive/10 text-destructive *:data-[slot=alert-description]:text-destructive/90 *:[svg]:text-current',
+        success:
+          'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 *:data-[slot=alert-description]:text-emerald-700/90 *:[svg]:text-current dark:text-emerald-300 dark:*:data-[slot=alert-description]:text-emerald-300/90',
+        warning:
+          'border-yellow-500/35 bg-yellow-500/10 text-yellow-700 *:data-[slot=alert-description]:text-yellow-700/90 *:[svg]:text-current dark:text-yellow-300 dark:*:data-[slot=alert-description]:text-yellow-300/90',
       },
     },
     defaultVariants: {
@@ -52,7 +56,7 @@ function AlertDescription({ className, ...props }: React.ComponentProps<'div'>) 
     <div
       data-slot="alert-description"
       className={cn(
-        'text-sm text-balance text-muted-foreground md:text-pretty [&_a]:underline [&_a]:underline-offset-3 [&_a]:hover:text-foreground [&_p:not(:last-child)]:mb-4',
+        'text-sm text-balance text-muted-foreground group-has-[>svg]/alert:col-start-2 md:text-pretty [&_a]:underline [&_a]:underline-offset-3 [&_a]:hover:text-foreground [&_p:not(:last-child)]:mb-4',
         className,
       )}
       {...props}

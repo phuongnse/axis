@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Axis.Api.Tests.Helpers;
+using Axis.Identity.Application;
 using Axis.Identity.Application.Commands.VerifyEmail;
 using Axis.Identity.Application.Services;
 using Axis.Identity.Domain.Aggregates;
@@ -37,6 +38,7 @@ public sealed class RegisterUserFlowTests(ApiTestFixture fixture)
         user.FullName.Should().Be("Alice Smith");
         user.PasswordHash.Should().NotBeNullOrWhiteSpace();
         user.IsEmailVerified.Should().BeFalse();
+        user.LanguagePreference!.Value.Should().Be(UserLanguage.DefaultValue);
         user.AcceptedTermsVersion.Should().Be(WellKnownLegalDocuments.TermsVersion);
         user.AcceptedPrivacyVersion.Should().Be(WellKnownLegalDocuments.PrivacyVersion);
         user.LegalAcceptedAt.Should().NotBeNull();
@@ -53,6 +55,56 @@ public sealed class RegisterUserFlowTests(ApiTestFixture fixture)
         int activeTokenCount = await db.EmailVerificationTokens.CountAsync(t =>
             t.UserId == user.Id && t.UsedAt == null && t.ExpiresAt > DateTime.UtcNow);
         activeTokenCount.Should().Be(1);
+        fixture.EmailCapture.GetVerificationLanguage(email).Should().Be(UserLanguage.DefaultValue);
+    }
+
+    [Fact]
+    public async Task RegisterUser_WhenPreferredLanguageIsSupported_PersistsPreferenceAndSendsLocalizedEmail()
+    {
+        string email = UniqueEmail();
+
+        HttpResponseMessage response = await RegisterAsync(email, preferredLanguage: "vi");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        fixture.EmailCapture.GetVerificationLanguage(email).Should().Be("vi");
+
+        using IServiceScope scope = fixture.CreateScope();
+        IdentityDbContext db = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
+        Email normalizedEmail = Email.Create(email).Value;
+        User user = await db.Users.SingleAsync(u => u.Email == normalizedEmail);
+        user.LanguagePreference!.Value.Should().Be("vi");
+    }
+
+    [Fact]
+    public async Task RegisterUser_WhenPreferredLanguageIsBlank_UsesDefaultLanguage()
+    {
+        string email = UniqueEmail();
+
+        HttpResponseMessage response = await RegisterAsync(email, preferredLanguage: "   ");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        fixture.EmailCapture.GetVerificationLanguage(email).Should().Be(UserLanguage.DefaultValue);
+
+        using IServiceScope scope = fixture.CreateScope();
+        IdentityDbContext db = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
+        Email normalizedEmail = Email.Create(email).Value;
+        User user = await db.Users.SingleAsync(u => u.Email == normalizedEmail);
+        user.LanguagePreference!.Value.Should().Be(UserLanguage.DefaultValue);
+    }
+
+    [Fact]
+    public async Task RegisterUser_WhenPreferredLanguageIsUnsupported_ReturnsLanguageValidationError()
+    {
+        HttpResponseMessage response = await RegisterAsync(UniqueEmail(), preferredLanguage: "fr");
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        JsonElement body = await response.Content.ReadFromJsonAsync<JsonElement>(Json);
+        JsonElement errors = body.GetProperty("errors");
+        errors.EnumerateObject().Select(property => property.Name)
+            .Should().Contain("preferredLanguage");
+        JsonElement errorCodes = body.GetProperty("errorCodes");
+        ReadCodes(errorCodes, "preferredLanguage")
+            .Should().Contain(IdentityProblemCodes.RegisterPreferredLanguageUnsupported);
     }
 
     [Fact]
@@ -65,6 +117,24 @@ public sealed class RegisterUserFlowTests(ApiTestFixture fixture)
         JsonElement errors = body.GetProperty("errors");
         errors.EnumerateObject().Select(property => property.Name)
             .Should().ContainSingle().Which.Should().Be("fullName");
+        JsonElement errorCodes = body.GetProperty("errorCodes");
+        ReadCodes(errorCodes, "fullName")
+            .Should().Contain(IdentityProblemCodes.RegisterFullNameRequired);
+    }
+
+    [Fact]
+    public async Task RegisterUser_WhenEmailAlreadyExists_ReturnsDuplicateEmailProblemCode()
+    {
+        string email = UniqueEmail();
+        HttpResponseMessage firstResponse = await RegisterAsync(email);
+        firstResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        HttpResponseMessage duplicateResponse = await RegisterAsync(email);
+
+        duplicateResponse.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        ApiProblem problem = await ReadProblemAsync(duplicateResponse);
+        problem.Code.Should().Be(IdentityProblemCodes.RegisterEmailAlreadyExists);
+        problem.Type.Should().Be(ProblemType(IdentityProblemCodes.RegisterEmailAlreadyExists));
     }
 
     [Fact]
@@ -73,7 +143,10 @@ public sealed class RegisterUserFlowTests(ApiTestFixture fixture)
         HttpResponseMessage invalidResponse = await VerifyEmailAsync("not-a-real-token");
 
         invalidResponse.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
-        (await ReadProblemDetailAsync(invalidResponse)).Should().Be("Invalid verification link.");
+        ApiProblem invalidProblem = await ReadProblemAsync(invalidResponse);
+        invalidProblem.Detail.Should().Be("Invalid verification link.");
+        invalidProblem.Code.Should().Be(IdentityProblemCodes.EmailVerificationInvalidToken);
+        invalidProblem.Type.Should().Be(ProblemType(IdentityProblemCodes.EmailVerificationInvalidToken));
 
         string expiredEmail = UniqueEmail();
         await RegisterAsync(expiredEmail);
@@ -83,8 +156,11 @@ public sealed class RegisterUserFlowTests(ApiTestFixture fixture)
         HttpResponseMessage expiredResponse = await VerifyEmailAsync(expiredToken);
 
         expiredResponse.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
-        (await ReadProblemDetailAsync(expiredResponse))
+        ApiProblem expiredProblem = await ReadProblemAsync(expiredResponse);
+        expiredProblem.Detail
             .Should().Be("This verification link has expired. Please request a new verification email.");
+        expiredProblem.Code.Should().Be(IdentityProblemCodes.EmailVerificationExpiredToken);
+        expiredProblem.Type.Should().Be(ProblemType(IdentityProblemCodes.EmailVerificationExpiredToken));
 
         string reusedEmail = UniqueEmail();
         await RegisterAsync(reusedEmail);
@@ -99,8 +175,11 @@ public sealed class RegisterUserFlowTests(ApiTestFixture fixture)
         HttpResponseMessage reusedResponse = await VerifyEmailAsync(reusedToken);
 
         reusedResponse.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
-        (await ReadProblemDetailAsync(reusedResponse))
+        ApiProblem reusedProblem = await ReadProblemAsync(reusedResponse);
+        reusedProblem.Detail
             .Should().Be("This link has already been used. Please sign in.");
+        reusedProblem.Code.Should().Be(IdentityProblemCodes.EmailVerificationAlreadyUsedToken);
+        reusedProblem.Type.Should().Be(ProblemType(IdentityProblemCodes.EmailVerificationAlreadyUsedToken));
     }
 
     [Fact]
@@ -118,15 +197,21 @@ public sealed class RegisterUserFlowTests(ApiTestFixture fixture)
         HttpResponseMessage limitedResponse = await ResendVerificationAsync(email);
 
         limitedResponse.StatusCode.Should().Be((HttpStatusCode)429);
-        (await ReadProblemDetailAsync(limitedResponse))
+        ApiProblem limitedProblem = await ReadProblemAsync(limitedResponse);
+        limitedProblem.Detail
             .Should().Be("Please wait before requesting another email.");
+        limitedProblem.Code.Should().Be(IdentityProblemCodes.EmailVerificationResendRateLimited);
+        limitedProblem.Type.Should().Be(ProblemType(IdentityProblemCodes.EmailVerificationResendRateLimited));
     }
 
-    private async Task<HttpResponseMessage> RegisterAsync(string email, string fullName = "Alice Smith")
+    private async Task<HttpResponseMessage> RegisterAsync(
+        string email,
+        string fullName = "Alice Smith",
+        string? preferredLanguage = null)
     {
         using HttpRequestMessage request = new(HttpMethod.Post, "/api/users/register")
         {
-            Content = JsonContent.Create(ValidRegisterRequest(email, fullName), options: Json),
+            Content = JsonContent.Create(ValidRegisterRequest(email, fullName, preferredLanguage), options: Json),
         };
         request.Headers.Add("Idempotency-Key", Guid.NewGuid().ToString("N"));
 
@@ -154,13 +239,23 @@ public sealed class RegisterUserFlowTests(ApiTestFixture fixture)
         fixture.EmailCapture.GetVerificationToken(email)
         ?? throw new InvalidOperationException($"No verification token was captured for {email}.");
 
-    private static async Task<string?> ReadProblemDetailAsync(HttpResponseMessage response)
+    private static async Task<ApiProblem> ReadProblemAsync(HttpResponseMessage response)
     {
         JsonElement body = await response.Content.ReadFromJsonAsync<JsonElement>(Json);
-        return body.GetProperty("detail").GetString();
+        return new ApiProblem(
+            body.GetProperty("detail").GetString(),
+            body.GetProperty("code").GetString(),
+            body.GetProperty("type").GetString());
     }
 
-    private static object ValidRegisterRequest(string email, string fullName) => new
+    private static string ProblemType(string code) => $"urn:axis:problem:{code}";
+
+    private static string[] ReadCodes(JsonElement errorCodes, string field) =>
+        errorCodes.GetProperty(field).EnumerateArray().Select(code => code.GetString()!).ToArray();
+
+    private sealed record ApiProblem(string? Detail, string? Code, string? Type);
+
+    private static object ValidRegisterRequest(string email, string fullName, string? preferredLanguage) => new
     {
         FullName = fullName,
         Email = email,
@@ -168,6 +263,7 @@ public sealed class RegisterUserFlowTests(ApiTestFixture fixture)
         PasswordConfirmation = "maple river sunrise",
         AcceptedTermsVersion = WellKnownLegalDocuments.TermsVersion,
         AcceptedPrivacyVersion = WellKnownLegalDocuments.PrivacyVersion,
+        PreferredLanguage = preferredLanguage,
     };
 
     private static string UniqueEmail() => $"alice-{Guid.NewGuid():N}@example.com";

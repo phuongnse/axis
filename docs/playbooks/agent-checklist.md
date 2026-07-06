@@ -7,7 +7,7 @@ Review checklist only. Workflow lives in repo skills ([`.agents/skills/README.md
 ## Before Code
 
 - Use `$axis-design-gate` for non-trivial work; high-risk surfaces need sign-off.
-- Read the owning use-case/domain docs and same-module code.
+- Read the owning use-case, foundation, or domain docs and same-module code.
 - Map in-scope ACs before behavior work.
 - Resolve or explicitly defer lower-layer gaps before API work.
 

@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Axis.Api.Tests.Helpers;
+using Axis.Identity.Application;
 using Axis.Identity.Application.Commands.SignInUser;
 using Axis.Identity.Application.Commands.VerifyEmail;
 using Axis.Identity.Application.Services;
@@ -54,6 +55,9 @@ public sealed class SignInUserFlowTests(ApiTestFixture fixture)
         JsonElement errors = body.GetProperty("errors");
         errors.EnumerateObject().Select(property => property.Name)
             .Should().BeEquivalentTo(["email", "password"]);
+        JsonElement errorCodes = body.GetProperty("errorCodes");
+        ReadCodes(errorCodes, "email").Should().Contain(IdentityProblemCodes.SignInEmailRequired);
+        ReadCodes(errorCodes, "password").Should().Contain(IdentityProblemCodes.SignInPasswordRequired);
     }
 
     [Fact]
@@ -75,7 +79,10 @@ public sealed class SignInUserFlowTests(ApiTestFixture fixture)
         foreach (HttpResponseMessage response in new[] { unknownResponse, wrongPasswordResponse, inactiveResponse })
         {
             response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
-            (await ReadProblemDetailAsync(response)).Should().Be(SignInUserHandler.GenericCredentialError);
+            ApiProblem problem = await ReadProblemAsync(response);
+            problem.Detail.Should().Be(SignInUserHandler.GenericCredentialError);
+            problem.Code.Should().Be(IdentityProblemCodes.SignInInvalidCredentials);
+            problem.Type.Should().Be(ProblemType(IdentityProblemCodes.SignInInvalidCredentials));
             response.Headers.TryGetValues("Set-Cookie", out _).Should().BeFalse();
         }
     }
@@ -89,7 +96,10 @@ public sealed class SignInUserFlowTests(ApiTestFixture fixture)
         HttpResponseMessage response = await SignInAsync(email, Password);
 
         response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
-        (await ReadProblemDetailAsync(response)).Should().Be(SignInUserHandler.VerificationRequiredError);
+        ApiProblem problem = await ReadProblemAsync(response);
+        problem.Detail.Should().Be(SignInUserHandler.VerificationRequiredError);
+        problem.Code.Should().Be(IdentityProblemCodes.SignInVerificationRequired);
+        problem.Type.Should().Be(ProblemType(IdentityProblemCodes.SignInVerificationRequired));
         response.Headers.TryGetValues("Set-Cookie", out _).Should().BeFalse();
     }
 
@@ -103,7 +113,10 @@ public sealed class SignInUserFlowTests(ApiTestFixture fixture)
         HttpResponseMessage response = await SignInAsync(email, Password);
 
         response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
-        (await ReadProblemDetailAsync(response)).Should().Be(SignInUserHandler.AccountUnavailableError);
+        ApiProblem problem = await ReadProblemAsync(response);
+        problem.Detail.Should().Be(SignInUserHandler.AccountUnavailableError);
+        problem.Code.Should().Be(IdentityProblemCodes.SignInAccountUnavailable);
+        problem.Type.Should().Be(ProblemType(IdentityProblemCodes.SignInAccountUnavailable));
         response.Headers.TryGetValues("Set-Cookie", out _).Should().BeFalse();
     }
 
@@ -158,11 +171,21 @@ public sealed class SignInUserFlowTests(ApiTestFixture fixture)
         fixture.EmailCapture.GetVerificationToken(email)
         ?? throw new InvalidOperationException($"No verification token was captured for {email}.");
 
-    private static async Task<string?> ReadProblemDetailAsync(HttpResponseMessage response)
+    private static async Task<ApiProblem> ReadProblemAsync(HttpResponseMessage response)
     {
         JsonElement body = await response.Content.ReadFromJsonAsync<JsonElement>(Json);
-        return body.GetProperty("detail").GetString();
+        return new ApiProblem(
+            body.GetProperty("detail").GetString(),
+            body.GetProperty("code").GetString(),
+            body.GetProperty("type").GetString());
     }
+
+    private static string ProblemType(string code) => $"urn:axis:problem:{code}";
+
+    private static string[] ReadCodes(JsonElement errorCodes, string field) =>
+        errorCodes.GetProperty(field).EnumerateArray().Select(code => code.GetString()!).ToArray();
+
+    private sealed record ApiProblem(string? Detail, string? Code, string? Type);
 
     private static object ValidRegisterRequest(string email) => new
     {

@@ -22,21 +22,32 @@ function SignInFooter({ t }: { t: ReturnType<typeof useTranslation>['t'] }) {
 
 export function SignInPage() {
   const { t } = useTranslation();
-  const { form, loading, submit, verificationEmail, rateLimited } = useSignIn();
-  const { resend, state: resendState, rateLimitMessage } = useResendVerification();
+  const { form, loading, submit, submitError, verificationEmail, rateLimited } = useSignIn();
+  const { resend, state: resendState } = useResendVerification();
   const {
     register,
     handleSubmit,
     formState: { errors },
   } = form;
-  const submitError = errors.root?.message;
   const showVerificationRequired = Boolean(verificationEmail);
+  const submitErrorTitle = showVerificationRequired
+    ? t('auth.verifyEmail')
+    : t('auth.signInErrorTitle');
   const resendDisabled =
     !verificationEmail || resendState === 'sending' || resendState === 'rate_limited';
 
   return (
     <AuthCard title={t('auth.signIn')} footer={<SignInFooter t={t} />}>
       <form className="space-y-4" onSubmit={handleSubmit(submit)} noValidate>
+        {submitError ? (
+          <AuthNotice
+            variant={showVerificationRequired ? 'warning' : 'destructive'}
+            title={submitErrorTitle}
+          >
+            {submitError}
+          </AuthNotice>
+        ) : null}
+
         <Field data-invalid={errors.email ? true : undefined}>
           <FieldLabel htmlFor="email">{t('auth.email')}</FieldLabel>
           <Input
@@ -67,15 +78,6 @@ export function SignInPage() {
           ) : null}
         </Field>
 
-        {submitError ? (
-          <AuthNotice
-            variant={showVerificationRequired ? 'default' : 'destructive'}
-            title={showVerificationRequired ? t('auth.verifyEmail') : undefined}
-          >
-            {submitError}
-          </AuthNotice>
-        ) : null}
-
         {showVerificationRequired ? (
           <div className="space-y-3">
             <Button
@@ -91,15 +93,13 @@ export function SignInPage() {
               {resendState === 'sending' ? t('auth.sending') : t('auth.resendVerification')}
             </Button>
             {resendState === 'success' ? (
-              <AuthNotice>{t('notice.verificationEmailSent')}</AuthNotice>
+              <AuthNotice variant="success">{t('notice.verificationEmailSent')}</AuthNotice>
             ) : null}
             {resendState === 'error' ? (
               <AuthNotice variant="destructive">{t('auth.genericError')}</AuthNotice>
             ) : null}
             {resendState === 'rate_limited' ? (
-              <AuthNotice variant="destructive">
-                {rateLimitMessage ?? t('notice.resendLimited')}
-              </AuthNotice>
+              <AuthNotice variant="warning">{t('notice.resendLimited')}</AuthNotice>
             ) : null}
           </div>
         ) : null}

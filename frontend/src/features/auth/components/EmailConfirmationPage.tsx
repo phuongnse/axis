@@ -1,7 +1,6 @@
 import { Link } from '@tanstack/react-router';
-import { Mail, UserPlus } from 'lucide-react';
+import { Mail } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { ActionLink } from '@/components/shared/ActionLink';
 import { Button } from '@/components/ui/button';
 import { AuthCard } from '@/features/auth/components/AuthCard';
 import { AuthNotice } from '@/features/auth/components/AuthNotice';
@@ -11,7 +10,7 @@ import { loadRegistrationContext } from '@/features/auth/registration-context';
 export function EmailConfirmationPage() {
   const { t } = useTranslation();
   const context = loadRegistrationContext();
-  const { resend, state, rateLimitMessage, reset } = useResendVerification();
+  const { resend, state, reset } = useResendVerification();
 
   async function handleResend() {
     if (!context?.email || state === 'sending' || state === 'rate_limited') return;
@@ -52,12 +51,14 @@ export function EmailConfirmationPage() {
         ) : null}
 
         {state === 'success' ? (
-          <AuthNotice title={t('notice.resendSentTitle')}>{t('notice.resendSent')}</AuthNotice>
+          <AuthNotice variant="success" title={t('notice.resendSentTitle')}>
+            {t('notice.resendSent')}
+          </AuthNotice>
         ) : null}
 
         {state === 'rate_limited' ? (
-          <AuthNotice title={t('notice.resendLimitedTitle')}>
-            {rateLimitMessage ?? t('notice.resendLimited')}
+          <AuthNotice variant="warning" title={t('notice.resendLimitedTitle')}>
+            {t('notice.resendLimited')}
           </AuthNotice>
         ) : null}
 
@@ -67,13 +68,13 @@ export function EmailConfirmationPage() {
           </AuthNotice>
         ) : null}
 
-        <div className="text-sm">
-          <span className="text-muted-foreground">{t('auth.confirm.didNotReceive')} </span>
+        <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm">
+          <span className="text-muted-foreground">{t('auth.confirm.didNotReceive')}</span>
           {context?.email ? (
             <Button
               type="button"
               variant="link"
-              className="h-auto p-0 text-sm font-medium disabled:text-muted-foreground disabled:no-underline"
+              className="h-auto gap-1 p-0 text-sm font-medium leading-5 disabled:text-muted-foreground disabled:no-underline"
               disabled={state === 'sending' || state === 'rate_limited'}
               onClick={() => void handleResend()}
             >
@@ -86,10 +87,6 @@ export function EmailConfirmationPage() {
             </Link>
           )}
         </div>
-
-        <ActionLink to="/register" icon={UserPlus} variant="secondary" className="w-full">
-          {t('auth.confirm.registerAnother')}
-        </ActionLink>
       </div>
     </AuthCard>
   );

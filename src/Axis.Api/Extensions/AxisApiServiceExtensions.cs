@@ -12,6 +12,7 @@ using Axis.Shared.Infrastructure.Observability;
 using FluentValidation;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.OpenApi.Models;
 using OpenIddict.Validation.AspNetCore;
@@ -180,6 +181,19 @@ internal static class AxisApiServiceExtensions
             });
 
             opts.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+            opts.OnRejected = async (context, cancellationToken) =>
+            {
+                const int statusCode = StatusCodes.Status429TooManyRequests;
+                ProblemDetails problem = ProblemDetailsDefaults.CreateProblemDetails(
+                    statusCode,
+                    "Too many requests. Please try again later.",
+                    ProblemDetailsDefaults.RateLimitedCode,
+                    "Too Many Requests");
+
+                context.HttpContext.Response.StatusCode = statusCode;
+                context.HttpContext.Response.ContentType = ProblemDetailsDefaults.JsonContentType;
+                await context.HttpContext.Response.WriteAsJsonAsync(problem, cancellationToken);
+            };
         });
     }
 
@@ -244,7 +258,7 @@ internal static class AxisApiServiceExtensions
         services.AddEndpointsApiExplorer();
         services.AddSwaggerGen(opts =>
         {
-            opts.SwaggerDoc("v1", new OpenApiInfo { Title = "Axis API", Version = "v1" });
+            opts.SwaggerDoc("v1", new OpenApiInfo { Title = "Axis Platform API", Version = "v1" });
             opts.SupportNonNullableReferenceTypes();
             opts.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
             {
@@ -253,6 +267,7 @@ internal static class AxisApiServiceExtensions
                 BearerFormat = "JWT",
             });
             opts.OperationFilter<AuthorizeOperationFilter>();
+            opts.SchemaFilter<ProblemDetailsSchemaFilter>();
         });
     }
 

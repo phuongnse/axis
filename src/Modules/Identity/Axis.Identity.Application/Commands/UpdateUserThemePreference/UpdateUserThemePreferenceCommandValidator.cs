@@ -1,3 +1,4 @@
+using Axis.Identity.Application;
 using Axis.Identity.Domain.ValueObjects;
 using FluentValidation;
 
@@ -10,7 +11,9 @@ public sealed class UpdateUserThemePreferenceCommandValidator
     {
         RuleFor(command => command.Theme)
             .NotEmpty().WithMessage("Theme is required.")
+            .WithErrorCode(IdentityProblemCodes.PreferenceThemeRequired)
             .Must(UserTheme.IsSupported)
-            .WithMessage("Theme is not supported.");
+            .WithMessage("Theme is not supported.")
+            .WithErrorCode(IdentityProblemCodes.PreferenceThemeUnsupported);
     }
 }

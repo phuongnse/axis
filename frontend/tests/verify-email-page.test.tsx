@@ -1,9 +1,11 @@
 import { screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { StrictMode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { completePostVerifyPkceFlow } from '@/features/auth/api';
-import { VerifyEmailPage } from '@/features/auth/components/VerifyEmailPage';
+import { VerifyEmailPage, verifySuccessHoldMs } from '@/features/auth/components/VerifyEmailPage';
+import { changeSiteLanguage } from '@/features/preferences';
 import { renderWithRouter } from './render-with-router';
 
 const navigateMock = vi.fn();
@@ -21,15 +23,17 @@ vi.mock('@/features/auth/api', async () => {
   const actual = await vi.importActual<typeof import('@/features/auth/api')>('@/features/auth/api');
   return {
     ...actual,
-    completePostVerifyPkceFlow: vi.fn(() => Promise.resolve()),
+    completePostVerifyPkceFlow: vi.fn(() => Promise.resolve(true)),
   };
 });
 
 describe('VerifyEmailPage', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
+    await changeSiteLanguage('en', { persist: false });
     vi.stubGlobal('fetch', vi.fn());
     navigateMock.mockReset();
     vi.mocked(completePostVerifyPkceFlow).mockClear();
+    vi.mocked(completePostVerifyPkceFlow).mockResolvedValue(true);
   });
 
   afterEach(() => {
@@ -37,7 +41,7 @@ describe('VerifyEmailPage', () => {
     vi.restoreAllMocks();
   });
 
-  it('starts PKCE after user verification', async () => {
+  it('shows a readable verified state before starting PKCE after user verification', async () => {
     vi.mocked(fetch).mockResolvedValueOnce({
       ok: true,
       status: 200,
@@ -50,12 +54,82 @@ describe('VerifyEmailPage', () => {
         ),
     } as unknown as Response);
 
-    await renderWithRouter(<VerifyEmailPage />, { path: '/auth/verify?token=valid-token' });
+    const { unmount } = await renderWithRouter(<VerifyEmailPage />, {
+      path: '/auth/verify?token=valid-token',
+    });
+
+    expect(await screen.findByRole('heading', { name: /email verified/i })).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Your email is verified and your account is ready. Continue now, or we'll take you to the dashboard in a few seconds.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /continue to dashboard/i })).toBeInTheDocument();
+    expect(verifySuccessHoldMs).toBeGreaterThanOrEqual(5_000);
+    expect(completePostVerifyPkceFlow).not.toHaveBeenCalled();
+    expect(navigateMock).not.toHaveBeenCalled();
+    unmount();
+  });
+
+  it('lets the user continue manually before the automatic dashboard handoff', async () => {
+    const user = userEvent.setup();
+    vi.mocked(fetch).mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      text: () =>
+        Promise.resolve(
+          JSON.stringify({
+            sessionEstablished: true,
+            nextStep: 'Dashboard',
+          }),
+        ),
+    } as unknown as Response);
+
+    await renderWithRouter(<VerifyEmailPage />, { path: '/auth/verify?token=manual-token' });
+
+    const continueButton = await screen.findByRole('button', {
+      name: /continue to dashboard/i,
+    });
+    expect(completePostVerifyPkceFlow).not.toHaveBeenCalled();
+
+    await user.click(continueButton);
 
     await waitFor(() => {
       expect(completePostVerifyPkceFlow).toHaveBeenCalledWith();
     });
-    expect(navigateMock).not.toHaveBeenCalled();
+    expect(completePostVerifyPkceFlow).toHaveBeenCalledTimes(1);
+    expect(continueButton).toBeDisabled();
+    expect(continueButton).toHaveTextContent('Opening dashboard...');
+    expect(navigateMock).toHaveBeenCalledWith({ to: '/dashboard', replace: true });
+  });
+
+  it('localizes the verified handoff state in the selected language', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      text: () =>
+        Promise.resolve(
+          JSON.stringify({
+            sessionEstablished: true,
+            nextStep: 'Dashboard',
+          }),
+        ),
+    } as unknown as Response);
+    await changeSiteLanguage('vi', { persist: false });
+
+    await renderWithRouter(<VerifyEmailPage />, { path: '/auth/verify?token=valid-token' });
+
+    expect(
+      await screen.findByRole('heading', { name: 'Email đã được xác minh' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'Email của bạn đã được xác minh và tài khoản đã sẵn sàng. Bạn có thể tiếp tục ngay hoặc chúng tôi sẽ tự đưa bạn đến bảng điều khiển sau vài giây.',
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Tiếp tục đến bảng điều khiển' }),
+    ).toBeInTheDocument();
   });
 
   it('submits a verification token only once under React StrictMode', async () => {
@@ -78,9 +152,7 @@ describe('VerifyEmailPage', () => {
       { path: '/auth/verify?token=strict-token' },
     );
 
-    await waitFor(() => {
-      expect(completePostVerifyPkceFlow).toHaveBeenCalledWith();
-    });
+    expect(await screen.findByRole('heading', { name: /email verified/i })).toBeInTheDocument();
     expect(fetch).toHaveBeenCalledTimes(1);
   });
 
@@ -91,7 +163,8 @@ describe('VerifyEmailPage', () => {
       statusText: 'Unprocessable Entity',
       json: () =>
         Promise.resolve({
-          detail: 'This verification link has expired. Please request a new verification email.',
+          code: 'identity.emailVerification.expiredToken',
+          detail: 'Do not parse this backend fallback.',
         }),
     } as unknown as Response);
 
@@ -126,7 +199,8 @@ describe('VerifyEmailPage', () => {
       statusText: 'Unprocessable Entity',
       json: () =>
         Promise.resolve({
-          detail: 'This link has already been used. Please sign in.',
+          code: 'identity.emailVerification.alreadyUsedToken',
+          detail: 'Do not parse this backend fallback.',
         }),
     } as unknown as Response);
 
@@ -143,6 +217,7 @@ describe('VerifyEmailPage', () => {
       statusText: 'Too Many Requests',
       json: () =>
         Promise.resolve({
+          code: 'common.rateLimited',
           detail: 'Please wait before trying again.',
         }),
     } as unknown as Response);

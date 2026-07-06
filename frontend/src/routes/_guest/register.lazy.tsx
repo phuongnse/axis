@@ -7,6 +7,6 @@ export const routeNavigation = publicRouteNavigation({
   escapeTargets: ['/sign-in'],
 });
 
-export const Route = createLazyFileRoute('/register')({
+export const Route = createLazyFileRoute('/_guest/register')({
   component: RegisterPage,
 });
