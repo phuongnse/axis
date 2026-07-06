@@ -1,13 +1,15 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { AnchorHTMLAttributes, ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { signOutUser } from '@/features/auth/api';
 import { useAuthStore } from '@/features/auth/auth-store';
 import { getCurrentUserProfile } from '@/features/dashboard/api';
 import { AppShell } from '../src/components/shared/AppShell';
 
 const routerState = { location: { pathname: '/dashboard' } };
+const navigateMock = vi.fn();
 
 vi.mock('@tanstack/react-router', () => ({
   Link: ({
@@ -21,6 +23,11 @@ vi.mock('@tanstack/react-router', () => ({
   ),
   useRouterState: ({ select }: { select?: (state: typeof routerState) => unknown } = {}) =>
     select ? select(routerState) : routerState,
+  useNavigate: () => navigateMock,
+}));
+
+vi.mock('@/features/auth/api', () => ({
+  signOutUser: vi.fn(() => Promise.resolve()),
 }));
 
 vi.mock('@/features/preferences', async (importActual) => {
@@ -44,6 +51,10 @@ vi.mock('@/features/dashboard/api', () => ({
 
 describe('AppShell', () => {
   beforeEach(() => {
+    navigateMock.mockClear();
+    vi.mocked(signOutUser).mockReset();
+    vi.mocked(signOutUser).mockResolvedValue();
+    sessionStorage.clear();
     vi.mocked(getCurrentUserProfile).mockResolvedValue({
       id: '11111111-1111-4111-8111-111111111111',
       email: 'ada@example.com',
@@ -96,5 +107,106 @@ describe('AppShell', () => {
     expect(screen.getByRole('contentinfo')).toHaveTextContent('Version 0.1.0');
     expect(screen.getByRole('contentinfo')).toHaveTextContent('Axis Platform');
     expect(screen.getByRole('contentinfo')).toHaveTextContent('2026');
+  });
+
+  it('AT-003 signs out after the browser session is ended and clears local session state', async () => {
+    const user = userEvent.setup();
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: {
+          retry: false,
+        },
+      },
+    });
+    queryClient.setQueryData(['dashboard', 'current-user'], { fullName: 'Ada Lovelace' });
+    sessionStorage.setItem('pkce_verifier', 'verifier');
+    sessionStorage.setItem('pkce_state', 'state');
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <AppShell>
+          <section aria-label="Work area">Frame content</section>
+        </AppShell>
+      </QueryClientProvider>,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Account menu' }));
+    await user.click(screen.getByRole('button', { name: 'Sign out' }));
+
+    await waitFor(() => expect(signOutUser).toHaveBeenCalledTimes(1));
+    expect(useAuthStore.getState().accessToken).toBeNull();
+    expect(sessionStorage.getItem('pkce_verifier')).toBeNull();
+    expect(sessionStorage.getItem('pkce_state')).toBeNull();
+    expect(queryClient.getQueryData(['dashboard', 'current-user'])).toBeUndefined();
+    expect(navigateMock).toHaveBeenCalledWith({ to: '/sign-in', replace: true });
+  });
+
+  it('AT-004 disables sign-out while the request is pending', async () => {
+    const user = userEvent.setup();
+    let resolveSignOut!: () => void;
+    vi.mocked(signOutUser).mockReturnValue(
+      new Promise<void>((resolve) => {
+        resolveSignOut = resolve;
+      }),
+    );
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: {
+          retry: false,
+        },
+      },
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <AppShell>
+          <section aria-label="Work area">Frame content</section>
+        </AppShell>
+      </QueryClientProvider>,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Account menu' }));
+    const signOutButton = screen.getByRole('button', { name: 'Sign out' });
+    await user.click(signOutButton);
+
+    expect(signOutButton).toBeDisabled();
+    expect(signOutButton).toHaveTextContent('Signing out');
+    await user.click(signOutButton);
+    expect(signOutUser).toHaveBeenCalledTimes(1);
+
+    resolveSignOut();
+    await waitFor(() =>
+      expect(navigateMock).toHaveBeenCalledWith({ to: '/sign-in', replace: true }),
+    );
+  });
+
+  it('AT-005 keeps the authenticated session active when sign-out fails', async () => {
+    const user = userEvent.setup();
+    vi.mocked(signOutUser).mockRejectedValue(new Error('network failed'));
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: {
+          retry: false,
+        },
+      },
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <AppShell>
+          <section aria-label="Work area">Frame content</section>
+        </AppShell>
+      </QueryClientProvider>,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Account menu' }));
+    await user.click(screen.getByRole('button', { name: 'Sign out' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Sign out did not complete. Try again.',
+    );
+    expect(useAuthStore.getState().accessToken).toBe('token');
+    expect(navigateMock).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'Sign out' })).toBeEnabled();
   });
 });

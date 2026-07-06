@@ -11,6 +11,8 @@ import { LanguageControl, ThemeControl } from '@/features/preferences';
 
 interface AppActionsMenuProps {
   onSignOut: () => void;
+  signOutError?: boolean;
+  signingOut?: boolean;
 }
 
 function firstNonEmpty(...values: Array<string | null | undefined>): string | null {
@@ -21,7 +23,11 @@ function firstNonEmpty(...values: Array<string | null | undefined>): string | nu
   return null;
 }
 
-export function AppActionsMenu({ onSignOut }: AppActionsMenuProps) {
+export function AppActionsMenu({
+  onSignOut,
+  signOutError = false,
+  signingOut = false,
+}: AppActionsMenuProps) {
   const { t } = useTranslation();
   const accessToken = useAuthStore((state) => state.accessToken);
   const userLabel = useAuthStore((state) => state.userLabel);
@@ -75,11 +81,18 @@ export function AppActionsMenu({ onSignOut }: AppActionsMenuProps) {
           variant="outline"
           size="sm"
           className="w-full justify-start text-destructive hover:text-destructive"
+          aria-busy={signingOut}
+          disabled={signingOut}
           onClick={onSignOut}
         >
           <LogOut className="size-3.5" aria-hidden />
-          {t('nav.signOut')}
+          {signingOut ? t('nav.signingOut') : t('nav.signOut')}
         </Button>
+        {signOutError ? (
+          <p role="alert" className="px-1 text-xs text-destructive">
+            {t('nav.signOutFailed')}
+          </p>
+        ) : null}
       </PopoverContent>
     </Popover>
   );

@@ -162,6 +162,20 @@
         }
       }
     },
+    "/api/auth/sign-out": {
+      "post": {
+        "tags": [
+          "Identity"
+        ],
+        "summary": "Sign out the current browser session",
+        "operationId": "SignOutUser",
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      }
+    },
     "/api/users/register": {
       "post": {
         "tags": [
