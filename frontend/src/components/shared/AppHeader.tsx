@@ -4,13 +4,15 @@ import { AppActionsMenu } from '@/components/shared/AppActionsMenu';
 
 interface AppHeaderProps {
   onSignOut: () => void;
+  signOutError?: boolean;
+  signingOut?: boolean;
 }
 
 function pageTitleKeyForPath(pathname: string) {
   return pathname.startsWith('/dashboard') ? 'app.dashboard' : 'app.account';
 }
 
-export function AppHeader({ onSignOut }: AppHeaderProps) {
+export function AppHeader({ onSignOut, signOutError = false, signingOut = false }: AppHeaderProps) {
   const { t } = useTranslation();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const pageTitle = t(pageTitleKeyForPath(pathname));
@@ -26,7 +28,11 @@ export function AppHeader({ onSignOut }: AppHeaderProps) {
         </Link>
 
         <div className="ml-auto flex shrink-0 items-center">
-          <AppActionsMenu onSignOut={onSignOut} />
+          <AppActionsMenu
+            onSignOut={onSignOut}
+            signOutError={signOutError}
+            signingOut={signingOut}
+          />
         </div>
       </div>
     </header>

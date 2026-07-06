@@ -82,7 +82,9 @@ export const translations = {
 
     'nav.accountMenu': 'Account menu',
     'nav.copyright': 'copyright',
+    'nav.signingOut': 'Signing out',
     'nav.signOut': 'Sign out',
+    'nav.signOutFailed': 'Sign out did not complete. Try again.',
     'nav.user': 'User',
     'nav.version': 'Version {version}',
     'nav.verifiedAccount': 'Verified account',
@@ -211,7 +213,9 @@ export const translations = {
 
     'nav.accountMenu': 'Menu tài khoản',
     'nav.copyright': 'bản quyền',
+    'nav.signingOut': 'Đang đăng xuất',
     'nav.signOut': 'Đăng xuất',
+    'nav.signOutFailed': 'Chưa đăng xuất được. Hãy thử lại.',
     'nav.user': 'Người dùng',
     'nav.version': 'Phiên bản {version}',
     'nav.verifiedAccount': 'Tài khoản đã xác minh',

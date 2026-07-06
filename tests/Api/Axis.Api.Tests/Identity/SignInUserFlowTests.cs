@@ -1,5 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using Axis.Api.Tests.Helpers;
 using Axis.Identity.Application;
@@ -12,6 +14,7 @@ using Axis.Identity.Domain.ValueObjects;
 using Axis.Identity.Infrastructure.Persistence;
 using Axis.Identity.Infrastructure.Persistence.Entities;
 using FluentAssertions;
+using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.EntityFrameworkCore;
 
 namespace Axis.Api.Tests.Identity;
@@ -120,6 +123,38 @@ public sealed class SignInUserFlowTests(ApiTestFixture fixture)
         response.Headers.TryGetValues("Set-Cookie", out _).Should().BeFalse();
     }
 
+    [Fact]
+    public async Task SignOutUser_WhenBrowserSessionExistsOrIsAbsent_ClearsBrowserSessionWithoutIdentitySideEffects()
+    {
+        string email = UniqueEmail();
+        await RegisterAsync(email);
+        await VerifyEmailAsync(CapturedToken(email));
+        (int userCountBefore, int workspaceCountBefore, int tokenCountBefore) = await CountRegistrationArtifactsAsync();
+
+        HttpResponseMessage signInResponse = await SignInAsync(email, Password);
+        signInResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        HttpResponseMessage authorizeBeforeSignOut = await AuthorizeAsync();
+        authorizeBeforeSignOut.StatusCode.Should().Be(HttpStatusCode.Redirect);
+
+        HttpResponseMessage signOutResponse = await fixture.Client.PostAsync("/api/auth/sign-out", content: null);
+
+        signOutResponse.StatusCode.Should().Be(HttpStatusCode.NoContent);
+        signOutResponse.Headers.TryGetValues("Set-Cookie", out IEnumerable<string>? cookies).Should().BeTrue();
+        cookies!.Should().Contain(cookie =>
+            cookie.Contains(".AspNetCore.Cookies=;", StringComparison.Ordinal)
+            && cookie.Contains("expires=Thu, 01 Jan 1970", StringComparison.OrdinalIgnoreCase));
+        HttpResponseMessage authorizeAfterSignOut = await AuthorizeAsync();
+        authorizeAfterSignOut.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+
+        HttpResponseMessage absentSessionResponse = await fixture.Client.PostAsync("/api/auth/sign-out", content: null);
+        absentSessionResponse.StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        (int userCountAfter, int workspaceCountAfter, int tokenCountAfter) = await CountRegistrationArtifactsAsync();
+        userCountAfter.Should().Be(userCountBefore);
+        workspaceCountAfter.Should().Be(workspaceCountBefore);
+        tokenCountAfter.Should().Be(tokenCountBefore);
+    }
+
     private async Task<HttpResponseMessage> RegisterAsync(string email)
     {
         using HttpRequestMessage request = new(HttpMethod.Post, "/api/users/register")
@@ -136,6 +171,24 @@ public sealed class SignInUserFlowTests(ApiTestFixture fixture)
 
     private async Task<HttpResponseMessage> SignInAsync(string email, string password) =>
         await fixture.Client.PostAsJsonAsync("/api/auth/sign-in", new { email, password }, Json);
+
+    private async Task<HttpResponseMessage> AuthorizeAsync()
+    {
+        string verifier = CreateCodeVerifier();
+        Dictionary<string, string?> authorizeQuery = new()
+        {
+            ["response_type"] = "code",
+            ["client_id"] = "axis_spa",
+            ["redirect_uri"] = "https://localhost/callback",
+            ["code_challenge"] = CreateCodeChallenge(verifier),
+            ["code_challenge_method"] = "S256",
+            ["scope"] = "openid email profile",
+            ["state"] = Guid.NewGuid().ToString("N"),
+        };
+
+        string authorizeUrl = QueryHelpers.AddQueryString("/connect/authorize", authorizeQuery);
+        return await fixture.Client.GetAsync(authorizeUrl);
+    }
 
     private async Task<(int UserCount, int WorkspaceCount, int TokenCount)> CountRegistrationArtifactsAsync()
     {
@@ -186,6 +239,21 @@ public sealed class SignInUserFlowTests(ApiTestFixture fixture)
         errorCodes.GetProperty(field).EnumerateArray().Select(code => code.GetString()!).ToArray();
 
     private sealed record ApiProblem(string? Detail, string? Code, string? Type);
+
+    private static string CreateCodeVerifier() =>
+        Base64UrlEncode(RandomNumberGenerator.GetBytes(32));
+
+    private static string CreateCodeChallenge(string verifier)
+    {
+        byte[] hash = SHA256.HashData(Encoding.ASCII.GetBytes(verifier));
+        return Base64UrlEncode(hash);
+    }
+
+    private static string Base64UrlEncode(byte[] bytes) =>
+        Convert.ToBase64String(bytes)
+            .TrimEnd('=')
+            .Replace('+', '-')
+            .Replace('/', '_');
 
     private static object ValidRegisterRequest(string email) => new
     {

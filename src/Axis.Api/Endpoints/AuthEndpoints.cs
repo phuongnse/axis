@@ -46,6 +46,13 @@ public static class AuthEndpoints
             .Produces(204)
             .ProducesProblem(StatusCodes.Status429TooManyRequests);
 
+        group.MapPost("/sign-out", (Delegate)SignOut)
+            .AllowAnonymous()
+            .WithName("SignOutUser")
+            .WithSummary("Sign out the current browser session")
+            .WithTags("Identity")
+            .Produces(204);
+
         return app;
     }
 
@@ -142,6 +149,12 @@ public static class AuthEndpoints
         if (result.IsFailure)
             return result.ToProblemDetails();
 
+        return Results.NoContent();
+    }
+
+    private static async Task<IResult> SignOut(HttpContext httpContext)
+    {
+        await httpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
         return Results.NoContent();
     }
 }

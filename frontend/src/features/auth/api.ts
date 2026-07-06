@@ -66,6 +66,12 @@ export async function signInUser(payload: SignInUserRequest): Promise<SignInResp
   });
 }
 
+export async function signOutUser(): Promise<void> {
+  await fetchApi<null>('/auth/sign-out', {
+    method: 'POST',
+  });
+}
+
 export async function getLegalVersions(): Promise<LegalVersionsResponse> {
   return fetchApi<LegalVersionsResponse>('/legal/versions');
 }
