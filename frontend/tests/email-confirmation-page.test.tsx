@@ -30,7 +30,11 @@ describe('EmailConfirmationPage', () => {
       ),
     ).toBeInTheDocument();
     expect(screen.getByText(/Sent to alex@example.com/)).toBeInTheDocument();
+    expect(screen.getByText("Didn't receive it?")).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /resend email/i })).toBeInTheDocument();
+    expect(
+      screen.queryByRole('link', { name: /register another account/i }),
+    ).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: /back to registration/i })).toHaveAttribute(
       'href',
       '/register',
@@ -49,5 +53,31 @@ describe('EmailConfirmationPage', () => {
     await user.click(screen.getByRole('button', { name: /resend email/i }));
 
     expect(await screen.findByText('Verification email sent')).toBeInTheDocument();
+  });
+
+  it('updates resend rate-limit notices when language changes after failure', async () => {
+    const user = userEvent.setup();
+    vi.mocked(fetch).mockResolvedValueOnce({
+      ok: false,
+      status: 429,
+      statusText: 'Too Many Requests',
+      json: () =>
+        Promise.resolve({
+          code: 'identity.emailVerification.resendRateLimited',
+          detail: 'Please wait before trying again.',
+        }),
+    } as unknown as Response);
+
+    await renderWithRouter(<EmailConfirmationPage />, { path: '/register/confirmation' });
+    await user.click(screen.getByRole('button', { name: /resend email/i }));
+
+    expect(await screen.findByText('Too many requests. Try again shortly.')).toBeInTheDocument();
+    expect(screen.queryByText('Please wait before trying again.')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Preferences' }));
+    await user.click(screen.getByRole('button', { name: 'Vietnamese' }));
+
+    expect(await screen.findByText('Quá nhiều yêu cầu. Hãy thử lại sau.')).toBeInTheDocument();
+    expect(screen.queryByText('Too many requests. Try again shortly.')).not.toBeInTheDocument();
   });
 });

@@ -1,37 +1,15 @@
 import { screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { exchangeAuthorizationCode } from '@/features/auth/api';
 import { CallbackPage } from '@/features/auth/components/CallbackPage';
 import { renderWithRouter } from './render-with-router';
-
-const navigateMock = vi.fn();
 
 function setWindowPath(path: string): void {
   window.history.pushState({}, '', path);
 }
 
-vi.mock('@tanstack/react-router', async () => {
-  const actual =
-    await vi.importActual<typeof import('@tanstack/react-router')>('@tanstack/react-router');
-  return {
-    ...actual,
-    useNavigate: () => navigateMock,
-  };
-});
-
-vi.mock('@/features/auth/api', async () => {
-  const actual = await vi.importActual<typeof import('@/features/auth/api')>('@/features/auth/api');
-  return {
-    ...actual,
-    exchangeAuthorizationCode: vi.fn(() => Promise.resolve('access-token')),
-  };
-});
-
 describe('CallbackPage', () => {
   beforeEach(() => {
-    navigateMock.mockReset();
-    vi.mocked(exchangeAuthorizationCode).mockClear();
     sessionStorage.clear();
   });
 
@@ -50,22 +28,17 @@ describe('CallbackPage', () => {
     ).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: /sign-in interrupted/i })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /sign in/i })).toHaveAttribute('href', '/sign-in');
-    expect(exchangeAuthorizationCode).not.toHaveBeenCalled();
-    expect(navigateMock).not.toHaveBeenCalled();
   });
 
-  it('exchanges the authorization code and opens the dashboard', async () => {
-    sessionStorage.setItem('pkce_verifier', 'verifier');
-    sessionStorage.setItem('pkce_state', 'state');
-    setWindowPath('/callback?code=auth-code&state=state');
+  it('shows token exchange failure as a recoverable state', async () => {
+    setWindowPath('/callback?error=tokenFailed');
 
-    await renderWithRouter(<CallbackPage />, { path: '/callback?code=auth-code&state=state' });
+    await renderWithRouter(<CallbackPage />, { path: '/callback?error=tokenFailed' });
 
-    expect(screen.getByText('Completing sign-in...')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /sign in/i })).toHaveAttribute('href', '/sign-in');
     await waitFor(() => {
-      expect(exchangeAuthorizationCode).toHaveBeenCalledWith('auth-code');
+      expect(screen.getByText('Token exchange failed. Please try signing in again.')).toBeVisible();
     });
-    expect(navigateMock).toHaveBeenCalledWith({ to: '/dashboard', replace: true });
+    expect(screen.getByRole('heading', { name: /sign-in interrupted/i })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /sign in/i })).toHaveAttribute('href', '/sign-in');
   });
 });

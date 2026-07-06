@@ -1,3 +1,4 @@
+using Axis.Identity.Application;
 using Axis.Identity.Application.Commands.RegisterUser;
 using Axis.Identity.Application.Repositories;
 using Axis.Identity.Application.Services;
@@ -66,7 +67,7 @@ public class RegisterUserHandlerTests
                 u.Email.Value == "alice@example.com"
                 && u.FullName == "Alice Smith"
                 && u.PasswordHash == "hashed_password"
-                && u.LanguagePreference == null
+                && u.LanguagePreference!.Value == UserLanguage.DefaultValue
                 && u.ThemePreference == null
                 && u.AcceptedTermsVersion == WellKnownLegalDocuments.TermsVersion
                 && u.AcceptedPrivacyVersion == WellKnownLegalDocuments.PrivacyVersion),
@@ -82,8 +83,72 @@ public class RegisterUserHandlerTests
         await _verificationTokenStore.Received(1).CreateAsync(
             Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>());
         await _emailSender.Received(1).SendVerificationEmailAsync(
-            "alice@example.com", Arg.Any<string>(), Arg.Any<CancellationToken>());
+            "alice@example.com", Arg.Any<string>(), UserLanguage.DefaultValue, Arg.Any<CancellationToken>());
         await _idempotencyRepo.Received(1).MarkCompletedAsync("idem-1", Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task RegisterUser_WhenPreferredLanguageIsSupported_StoresLanguageAndSendsLocalizedEmail()
+    {
+        _userRepo.EmailExistsPlatformWideAsync(Arg.Any<Email>(), Arg.Any<CancellationToken>())
+            .Returns(false);
+        _idempotencyRepo.AcquireAsync("idem-1", Arg.Any<CancellationToken>())
+            .Returns(RegistrationIdempotencyAcquireResult.Acquired);
+        _hasher.Hash("maple river sunrise").Returns("hashed_password");
+
+        RegisterUserCommand command = ValidCommand() with { PreferredLanguage = "vi" };
+
+        Result result = await CreateHandler().Handle(command, CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        await _userRepo.Received(1).AddAsync(
+            Arg.Is<User>(u => u.LanguagePreference!.Value == "vi"),
+            Arg.Any<CancellationToken>());
+        await _emailSender.Received(1).SendVerificationEmailAsync(
+            "alice@example.com", Arg.Any<string>(), "vi", Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task RegisterUser_WhenPreferredLanguageIsBlank_UsesDefaultLanguage()
+    {
+        _userRepo.EmailExistsPlatformWideAsync(Arg.Any<Email>(), Arg.Any<CancellationToken>())
+            .Returns(false);
+        _idempotencyRepo.AcquireAsync("idem-1", Arg.Any<CancellationToken>())
+            .Returns(RegistrationIdempotencyAcquireResult.Acquired);
+        _hasher.Hash("maple river sunrise").Returns("hashed_password");
+
+        RegisterUserCommand command = ValidCommand() with { PreferredLanguage = "   " };
+
+        Result result = await CreateHandler().Handle(command, CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        await _userRepo.Received(1).AddAsync(
+            Arg.Is<User>(u => u.LanguagePreference!.Value == UserLanguage.DefaultValue),
+            Arg.Any<CancellationToken>());
+        await _emailSender.Received(1).SendVerificationEmailAsync(
+            "alice@example.com", Arg.Any<string>(), UserLanguage.DefaultValue, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task RegisterUser_WhenPreferredLanguageIsUnsupported_ReturnsInvalidInputWithoutCreatingUser()
+    {
+        _userRepo.EmailExistsPlatformWideAsync(Arg.Any<Email>(), Arg.Any<CancellationToken>())
+            .Returns(false);
+        _idempotencyRepo.AcquireAsync("idem-1", Arg.Any<CancellationToken>())
+            .Returns(RegistrationIdempotencyAcquireResult.Acquired);
+
+        RegisterUserCommand command = ValidCommand() with { PreferredLanguage = "fr" };
+
+        Result result = await CreateHandler().Handle(command, CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue();
+        result.ErrorCode.Should().Be(ErrorCodes.InvalidInput);
+        result.ProblemCode.Should().Be(IdentityProblemCodes.RegisterPreferredLanguageUnsupported);
+        result.Error.Should().Be("Language is not supported.");
+        await _userRepo.DidNotReceive().AddAsync(Arg.Any<User>(), Arg.Any<CancellationToken>());
+        await _workspaceRepo.DidNotReceive().AddAsync(Arg.Any<Workspace>(), Arg.Any<CancellationToken>());
+        await _emailSender.DidNotReceive().SendVerificationEmailAsync(
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -98,10 +163,11 @@ public class RegisterUserHandlerTests
 
         result.IsFailure.Should().BeTrue();
         result.ErrorCode.Should().Be(ErrorCodes.Conflict);
+        result.ProblemCode.Should().Be(IdentityProblemCodes.RegisterEmailAlreadyExists);
         await _userRepo.DidNotReceive().AddAsync(Arg.Any<User>(), Arg.Any<CancellationToken>());
         await _uow.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
         await _emailSender.DidNotReceive().SendVerificationEmailAsync(
-            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -115,7 +181,7 @@ public class RegisterUserHandlerTests
         result.IsSuccess.Should().BeTrue();
         await _userRepo.DidNotReceive().AddAsync(Arg.Any<User>(), Arg.Any<CancellationToken>());
         await _emailSender.DidNotReceive().SendVerificationEmailAsync(
-            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -132,7 +198,7 @@ public class RegisterUserHandlerTests
         await _verificationTokenStore.DidNotReceive().CreateAsync(
             Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>());
         await _emailSender.DidNotReceive().SendVerificationEmailAsync(
-            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
         await _idempotencyRepo.DidNotReceive().MarkCompletedAsync(
             Arg.Any<string>(), Arg.Any<CancellationToken>());
     }

@@ -173,6 +173,12 @@ export interface components {
             status?: number | null;
             detail?: string | null;
             instance?: string | null;
+            /** @description Stable machine-readable problem code for client behavior and localization. */
+            code?: string | null;
+            /** @description Optional field-level machine-readable validation codes keyed by JSON field name. */
+            errorCodes?: {
+                [key: string]: string[];
+            } | null;
         } & {
             [key: string]: unknown;
         };
@@ -183,6 +189,7 @@ export interface components {
             passwordConfirmation?: string;
             acceptedTermsVersion?: string;
             acceptedPrivacyVersion?: string;
+            preferredLanguage?: string | null;
         };
         ResendVerificationRequest: {
             email?: string;

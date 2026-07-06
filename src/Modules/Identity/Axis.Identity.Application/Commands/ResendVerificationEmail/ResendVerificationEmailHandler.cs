@@ -36,7 +36,10 @@ public sealed class ResendVerificationEmailHandler(
             user.Id, tokenHash, DateTime.UtcNow.Add(TokenLifetime), cancellationToken);
 
         await emailSender.SendVerificationEmailAsync(
-            user.Email.Value, rawToken, cancellationToken);
+            user.Email.Value,
+            rawToken,
+            user.LanguagePreference?.Value ?? UserLanguage.DefaultValue,
+            cancellationToken);
 
         return Result.Success();
     }

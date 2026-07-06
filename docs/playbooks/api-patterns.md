@@ -35,6 +35,10 @@ Annotate routes with names, summaries, tags, success type, and problem responses
 | Not found / cross-workspace isolation | `404` |
 | Conflict | `409` |
 
+## Problem details
+
+Problem responses must include a stable machine-readable `code` extension and a `type` URI derived from that code. Validation problem responses must also include field-level `errorCodes` keyed by JSON field name. Keep `detail` as a human-readable fallback only; frontend behavior and localization map from `code`, `type`, or `errorCodes`, not from parsing `detail` text.
+
 ## OpenAPI / Scalar setup
 
 OpenAPI generation is a contract artifact. Regenerate and commit generated files when route/request/response shape changes.

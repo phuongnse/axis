@@ -1,39 +1,32 @@
 import { useMutation } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
+import { useCallback } from 'react';
 
 import { completePostVerifyPkceFlow, verifyEmail } from '@/features/auth/api';
-import { getProblemDetail } from '@/features/auth/problem-details';
-import type { VerifyEmailErrorKind } from '@/features/auth/types';
+import { classifyVerifyEmailError } from '@/features/auth/problem-details';
 import { ApiError } from '@/lib/api';
-
-export function classifyVerifyEmailError(error: ApiError): VerifyEmailErrorKind {
-  if (error.status === 429) return 'rate_limited';
-
-  const detail = getProblemDetail(error).toLowerCase();
-  if (detail.includes('expired')) return 'expired';
-  if (detail.includes('already been used') || detail.includes('sign in')) return 'already_used';
-  return 'invalid';
-}
 
 export function useVerifyEmail() {
   const navigate = useNavigate();
 
   const mutation = useMutation({
     mutationFn: verifyEmail,
-    onSuccess: async (data) => {
-      if (data?.sessionEstablished) {
-        try {
-          await completePostVerifyPkceFlow();
-          return;
-        } catch {
-          void navigate({ to: '/dashboard' });
-          return;
-        }
-      }
-
-      void navigate({ to: '/register' });
+    onSuccess: (data) => {
+      if (!data?.sessionEstablished) void navigate({ to: '/register' });
     },
   });
+
+  const completeSignIn = useCallback(async () => {
+    try {
+      const completed = await completePostVerifyPkceFlow();
+      if (completed) {
+        void navigate({ to: '/dashboard', replace: true });
+        return;
+      }
+    } catch {
+      void navigate({ to: '/dashboard', replace: true });
+    }
+  }, [navigate]);
 
   async function submit(token: string) {
     await mutation.mutateAsync(token);
@@ -44,8 +37,10 @@ export function useVerifyEmail() {
 
   return {
     submit,
+    completeSignIn,
     loading: mutation.isPending,
     errorKind,
     isSuccess: mutation.isSuccess,
+    sessionEstablished: mutation.data?.sessionEstablished === true,
   };
 }

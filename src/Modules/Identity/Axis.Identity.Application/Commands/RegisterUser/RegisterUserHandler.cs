@@ -1,3 +1,4 @@
+using Axis.Identity.Application;
 using Axis.Identity.Application.Repositories;
 using Axis.Identity.Application.Services;
 using Axis.Identity.Domain.Aggregates;
@@ -42,18 +43,35 @@ public sealed class RegisterUserHandler(
             Result<Email> email = Email.Create(command.Email);
             if (email.IsFailure)
             {
-                return Result.Failure(ErrorCodes.InvalidInput, "Email must be a valid email address.");
+                return Result.Failure(
+                    ErrorCodes.InvalidInput,
+                    "Email must be a valid email address.",
+                    IdentityProblemCodes.RegisterEmailInvalid);
             }
 
             if (await userRepo.EmailExistsPlatformWideAsync(email.Value, cancellationToken))
             {
                 return Result.Failure(
                     ErrorCodes.Conflict,
-                    "An account with this email already exists. Sign in instead.");
+                    "An account with this email already exists. Sign in instead.",
+                    IdentityProblemCodes.RegisterEmailAlreadyExists);
+            }
+
+            string preferredLanguageValue = string.IsNullOrWhiteSpace(command.PreferredLanguage)
+                ? UserLanguage.DefaultValue
+                : command.PreferredLanguage;
+            Result<UserLanguage> preferredLanguage = UserLanguage.Create(preferredLanguageValue);
+            if (preferredLanguage.IsFailure)
+            {
+                return Result.Failure(
+                    ErrorCodes.InvalidInput,
+                    preferredLanguage.Error,
+                    IdentityProblemCodes.RegisterPreferredLanguageUnsupported);
             }
 
             User user = User.Create(command.FullName.Trim(), email.Value);
             user.SetPasswordHash(hasher.Hash(command.Password));
+            user.SetLanguagePreference(preferredLanguage.Value);
             user.RecordLegalAcceptance(command.AcceptedTermsVersion, command.AcceptedPrivacyVersion);
 
             await CreatePersonalWorkspaceAsync(user, command, cancellationToken);
@@ -71,6 +89,7 @@ public sealed class RegisterUserHandler(
             await emailSender.SendVerificationEmailAsync(
                 email.Value.Value,
                 rawToken,
+                preferredLanguage.Value.Value,
                 cancellationToken);
 
             await MarkIdempotencyCompletedIfNeededAsync(idempotencyKey, cancellationToken);

@@ -186,8 +186,8 @@ describe('theme preferences', () => {
     await user.click(screen.getByRole('button', { name: 'Dark' }));
 
     expect(document.documentElement.dataset.themeMode).toBe('dark');
-    expect(await screen.findByText('Theme saved')).toBeInTheDocument();
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    expect(document.querySelector('#theme-save-status')).not.toBeInTheDocument();
     const request = vi.mocked(fetch).mock.calls[0][1];
     expect(request?.method).toBe('PUT');
     expect(String(request?.body)).toContain('"theme":"dark"');

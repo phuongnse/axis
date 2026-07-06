@@ -1,3 +1,4 @@
+using Axis.Identity.Application;
 using Axis.Identity.Application.Repositories;
 using Axis.Identity.Application.Services;
 using Axis.Identity.Domain.Aggregates;
@@ -26,7 +27,8 @@ public sealed class SignInUserHandler(
         {
             return Result.Failure<SignInSuccessDto>(
                 ErrorCodes.InvalidInput,
-                "Email must be a valid email address.");
+                "Email must be a valid email address.",
+                IdentityProblemCodes.SignInEmailInvalid);
         }
 
         User? user = await userRepo.FindByEmailGloballyAsync(email.Value, cancellationToken);
@@ -37,14 +39,16 @@ public sealed class SignInUserHandler(
         {
             return Result.Failure<SignInSuccessDto>(
                 ErrorCodes.BusinessRule,
-                GenericCredentialError);
+                GenericCredentialError,
+                IdentityProblemCodes.SignInInvalidCredentials);
         }
 
         if (!user.IsEmailVerified)
         {
             return Result.Failure<SignInSuccessDto>(
                 ErrorCodes.BusinessRule,
-                VerificationRequiredError);
+                VerificationRequiredError,
+                IdentityProblemCodes.SignInVerificationRequired);
         }
 
         Workspace? personalWorkspace = await workspaceRepo.GetPersonalByOwnerUserIdAsync(
@@ -54,7 +58,8 @@ public sealed class SignInUserHandler(
         {
             return Result.Failure<SignInSuccessDto>(
                 ErrorCodes.BusinessRule,
-                AccountUnavailableError);
+                AccountUnavailableError,
+                IdentityProblemCodes.SignInAccountUnavailable);
         }
 
         return Result.Success(new SignInSuccessDto(

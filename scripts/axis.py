@@ -835,9 +835,18 @@ def frontend_public_route_navigation_issues(root: Path = ROOT) -> list[str]:
             continue
         if route_path == "__root.tsx":
             continue
+        if route_path.startswith("_") and "/" not in route_path:
+            continue
         if route_path.startswith("_authenticated"):
             continue
-        if route_path == "index.lazy.tsx" and re.search(r"\bNavigate\b", text):
+        redirect_only_route = re.search(r"\bNavigate\b", text) or (
+            "beforeLoad:" in text
+            and "component:" not in text
+            and "pendingComponent:" not in text
+            and "errorComponent:" not in text
+            and "notFoundComponent:" not in text
+        )
+        if redirect_only_route:
             continue
 
         if "export const routeNavigation" not in text or "publicRouteNavigation(" not in text:
@@ -853,6 +862,112 @@ def frontend_public_route_navigation_issues(root: Path = ROOT) -> list[str]:
     return issues
 
 
+def frontend_route_access_group_issues(root: Path = ROOT) -> list[str]:
+    issues: list[str] = []
+    routes_root = root / "frontend" / "src" / "routes"
+    if not routes_root.exists():
+        return issues
+
+    guest_group_path = routes_root / "_guest.tsx"
+    guest_route_paths = {
+        "auth/verify.lazy.tsx",
+        "auth/verify.tsx",
+        "register.lazy.tsx",
+        "register.tsx",
+        "register_.confirmation.lazy.tsx",
+        "register_.confirmation.tsx",
+        "sign-in.lazy.tsx",
+        "sign-in.tsx",
+    }
+
+    guest_leaf_exists = False
+    for path in iter_files(routes_root, (".tsx",)):
+        route_path = str(path.relative_to(routes_root)).replace("\\", "/")
+        normalized = rel(path) if root == ROOT else str(path.relative_to(root)).replace("\\", "/")
+        text = path.read_text(encoding="utf-8")
+
+        if route_path in guest_route_paths:
+            issues.append(
+                f"{normalized}: guest-only auth routes must live under the `_guest` "
+                "pathless route group instead of declaring per-route guards"
+            )
+
+        if route_path.startswith("_guest/"):
+            guest_leaf_exists = True
+            if "redirectAuthenticatedUserFromGuestRoute" in text or "beforeLoad:" in text:
+                issues.append(
+                    f"{normalized}: guest leaf routes inherit the `_guest` guard; "
+                    "do not attach guest guards to individual leaf routes"
+                )
+
+    if guest_leaf_exists:
+        normalized_group = (
+            rel(guest_group_path)
+            if root == ROOT
+            else str(guest_group_path.relative_to(root)).replace("\\", "/")
+        )
+        if not guest_group_path.exists():
+            issues.append(
+                f"{normalized_group}: guest-only routes require a `_guest` pathless route group"
+            )
+        else:
+            group_text = guest_group_path.read_text(encoding="utf-8")
+            if "redirectAuthenticatedUserFromGuestRoute" not in group_text or "beforeLoad:" not in group_text:
+                issues.append(
+                    f"{normalized_group}: `_guest` route group must own the guest-only redirect guard"
+                )
+
+    return issues
+
+
+def frontend_transient_handoff_issues(root: Path = ROOT) -> list[str]:
+    issues: list[str] = []
+    src_root = root / "frontend" / "src"
+    routes_root = src_root / "routes"
+
+    callback_lazy_route = routes_root / "callback.lazy.tsx"
+    if callback_lazy_route.exists():
+        normalized = rel(callback_lazy_route) if root == ROOT else str(callback_lazy_route.relative_to(root)).replace("\\", "/")
+        issues.append(
+            f"{normalized}: callback success handoffs must run before render; use a non-lazy `/callback` route with `beforeLoad`"
+        )
+
+    callback_route = routes_root / "callback.tsx"
+    if callback_route.exists():
+        normalized = rel(callback_route) if root == ROOT else str(callback_route.relative_to(root)).replace("\\", "/")
+        text = callback_route.read_text(encoding="utf-8")
+        if "beforeLoad:" not in text or "redirectFromCallbackRoute" not in text:
+            issues.append(
+                f"{normalized}: `/callback` must perform successful token handoff in `beforeLoad` before rendering recovery UI"
+            )
+
+    callback_page = src_root / "features" / "auth" / "components" / "CallbackPage.tsx"
+    if callback_page.exists():
+        normalized = rel(callback_page) if root == ROOT else str(callback_page.relative_to(root)).replace("\\", "/")
+        text = callback_page.read_text(encoding="utf-8")
+        forbidden = {
+            "exchangeAuthorizationCode": "exchange tokens in the route handoff guard instead of `CallbackPage`",
+            "auth.callback.completing": "remove transient callback success copy; render only recovery UI",
+            "auth.callback.title": "remove transient callback success copy; render only recovery UI",
+            "Completing sign-in": "remove transient callback success copy; render only recovery UI",
+        }
+        for token, message in forbidden.items():
+            if token in text:
+                issues.append(f"{normalized}: {message}")
+
+    translations = src_root / "features" / "preferences" / "translations.ts"
+    if translations.exists():
+        normalized = rel(translations) if root == ROOT else str(translations.relative_to(root)).replace("\\", "/")
+        text = translations.read_text(encoding="utf-8")
+        for token in ("auth.callback.completing", "auth.callback.title"):
+            if token in text:
+                issues.append(
+                    f"{normalized}: stale callback pending translation `{token}` is not valid; callback success handoffs are silent"
+                )
+
+    return issues
+
+
 def frontend_quality_issues(root: Path = ROOT) -> list[str]:
     return [
         *frontend_component_file_name_issues(root),
@@ -860,6 +975,8 @@ def frontend_quality_issues(root: Path = ROOT) -> list[str]:
         *frontend_form_schema_type_issues(root),
         *frontend_test_async_boundary_issues(root),
         *frontend_public_route_navigation_issues(root),
+        *frontend_route_access_group_issues(root),
+        *frontend_transient_handoff_issues(root),
     ]
 
 
@@ -1937,6 +2054,7 @@ def check_doc_drift(_args: argparse.Namespace | None = None) -> int:
         ("check-frontend-api-contracts", check_frontend_api_contracts),
         ("check-frontend-quality", check_frontend_quality),
         ("check-use-case-docs.py", lambda _=None: run_module_check("check-use-case-docs.py", ["--check"])),
+        ("check-foundation-docs.py", lambda _=None: run_module_check("check-foundation-docs.py", ["--check"])),
         ("check-doc-link-targets.py", lambda _=None: run_module_check("check-doc-link-targets.py", ["--check"])),
         ("check-doc-navigation", check_doc_navigation),
         ("check-doc-size-budgets", check_doc_size_budgets),
@@ -2580,6 +2698,7 @@ def verify(args: argparse.Namespace) -> int:
     markdown_links = any(is_markdown_link_path(path) for path in paths)
     docs = any(is_docs_path(path) for path in paths)
     use_case_docs = any(path.startswith("docs/use-cases/") for path in paths)
+    foundation_docs = any(path.startswith("docs/foundations/") for path in paths)
     skills = any(path.startswith(f"{REPO_SKILLS_DIR}/") for path in paths)
     scripts_changed = any(path.startswith("scripts/") for path in paths)
     text_paths = [path for path in paths if (ROOT / path).is_file() and should_check_text_encoding(path)]
@@ -2663,6 +2782,8 @@ def verify(args: argparse.Namespace) -> int:
         step("doc code fences", lambda: run_module_check("check-doc-code-fences.py", []))
         if use_case_docs:
             step("use-case docs", lambda: run_module_check("check-use-case-docs.py", []))
+        if foundation_docs:
+            step("foundation docs", lambda: run_module_check("check-foundation-docs.py", []))
 
     if markdown_links and (markdown_paths or markdown_links_global):
         step(
@@ -3414,6 +3535,9 @@ def main(argv: list[str] | None = None) -> int:
     )
     check_sub.add_parser("use-case-docs").set_defaults(
         func=lambda _args: run_module_check("check-use-case-docs.py", ["--check"])
+    )
+    check_sub.add_parser("foundation-docs").set_defaults(
+        func=lambda _args: run_module_check("check-foundation-docs.py", ["--check"])
     )
     pr_parser = check_sub.add_parser("pr")
     pr_parser.add_argument("--title")

@@ -24,27 +24,9 @@ export function useResendVerification() {
     state = 'error';
   }
 
-  const rateLimitMessage =
-    mutation.error instanceof ApiError && mutation.error.status === 429
-      ? getRateLimitMessage(mutation.error)
-      : null;
-
   return {
     resend,
     state,
-    rateLimitMessage,
     reset: mutation.reset,
   };
-}
-
-function getRateLimitMessage(error: ApiError): string | null {
-  const data = error.data;
-  if (
-    typeof data === 'object' &&
-    data !== null &&
-    typeof (data as { detail?: string }).detail === 'string'
-  ) {
-    return (data as { detail: string }).detail;
-  }
-  return null;
 }

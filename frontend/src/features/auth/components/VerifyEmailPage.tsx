@@ -1,7 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Link } from '@tanstack/react-router';
-import { AlertCircle, CheckCircle2, Clock, Loader2, Mail } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { AlertCircle, ArrowRight, CheckCircle2, Clock, Loader2, Mail } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { type FieldPath, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
@@ -29,6 +29,7 @@ function createResendSchema(t: Translate) {
 type ResendFormValues = z.infer<ReturnType<typeof createResendSchema>>;
 
 const resendClientValidationFields: FieldPath<ResendFormValues>[] = ['email'];
+export const verifySuccessHoldMs = 5_000;
 
 function VerifyEmailOutcome({
   kind,
@@ -163,15 +164,43 @@ export function VerifyEmailPage() {
   const { t } = useTranslation();
   const token = useQueryParam('token');
   const context = loadRegistrationContext();
-  const { submit, loading, errorKind } = useVerifyEmail();
+  const { submit, completeSignIn, loading, errorKind, sessionEstablished } = useVerifyEmail();
   const { resend, state: resendState } = useResendVerification();
   const [started, setStarted] = useState(false);
+  const [handoffStarted, setHandoffStarted] = useState(false);
+  const completionTimerRef = useRef<number | null>(null);
+  const completionTriggeredRef = useRef(false);
+
+  const continueToDashboard = useCallback(() => {
+    if (completionTriggeredRef.current) return;
+    completionTriggeredRef.current = true;
+    setHandoffStarted(true);
+    if (completionTimerRef.current !== null) {
+      window.clearTimeout(completionTimerRef.current);
+      completionTimerRef.current = null;
+    }
+    void completeSignIn();
+  }, [completeSignIn]);
 
   useEffect(() => {
     if (!token || started) return;
     setStarted(true);
     void submit(token).catch(() => undefined);
   }, [token, started, submit]);
+
+  useEffect(() => {
+    if (!sessionEstablished || completionTriggeredRef.current) return;
+
+    completionTimerRef.current = window.setTimeout(() => {
+      continueToDashboard();
+    }, verifySuccessHoldMs);
+
+    return () => {
+      if (completionTimerRef.current === null) return;
+      window.clearTimeout(completionTimerRef.current);
+      completionTimerRef.current = null;
+    };
+  }, [continueToDashboard, sessionEstablished]);
 
   if (!token) {
     return (
@@ -213,6 +242,44 @@ export function VerifyEmailPage() {
         onResend={resend}
         resendLoading={resendState === 'sending'}
       />
+    );
+  }
+
+  if (sessionEstablished) {
+    return (
+      <AuthCard
+        title={t('verify.success.title')}
+        footer={
+          <>
+            {t('auth.needStartOver')}{' '}
+            <Link to="/sign-in" className="font-medium text-primary hover:underline">
+              {t('auth.signIn')}
+            </Link>
+          </>
+        }
+      >
+        <div className="space-y-4" aria-live="polite">
+          <div className="flex items-start gap-3 text-sm text-muted-foreground">
+            <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">
+              <CheckCircle2 className="h-4 w-4" aria-hidden />
+            </div>
+            <p>{t('verify.success.body')}</p>
+          </div>
+          <Button
+            type="button"
+            className="h-9 w-full"
+            onClick={continueToDashboard}
+            disabled={handoffStarted}
+          >
+            {handoffStarted ? (
+              <Loader2 className="size-4 animate-spin" aria-hidden />
+            ) : (
+              <ArrowRight className="size-4" aria-hidden />
+            )}
+            {handoffStarted ? t('verify.success.continuing') : t('verify.success.action')}
+          </Button>
+        </div>
+      </AuthCard>
     );
   }
 

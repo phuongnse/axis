@@ -25,6 +25,17 @@ public class ResultTests
     }
 
     [Fact]
+    public void Result_WhenFailureHasProblemCode_ExposesProblemCode()
+    {
+        Result result = Result.Failure(
+            ErrorCodes.BusinessRule,
+            "Something went wrong",
+            "identity.example.problem");
+
+        result.ProblemCode.Should().Be("identity.example.problem");
+    }
+
+    [Fact]
     public void ResultT_WhenSuccess_HoldsValue()
     {
         Result<int> result = Result<int>.Success(42);

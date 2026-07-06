@@ -1,3 +1,4 @@
+using Axis.Identity.Application;
 using Axis.Identity.Domain.ValueObjects;
 using FluentValidation;
 
@@ -10,7 +11,9 @@ public sealed class UpdateUserLanguagePreferenceCommandValidator
     {
         RuleFor(command => command.Language)
             .NotEmpty().WithMessage("Language is required.")
+            .WithErrorCode(IdentityProblemCodes.PreferenceLanguageRequired)
             .Must(UserLanguage.IsSupported)
-            .WithMessage("Language is not supported.");
+            .WithMessage("Language is not supported.")
+            .WithErrorCode(IdentityProblemCodes.PreferenceLanguageUnsupported);
     }
 }

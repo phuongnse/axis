@@ -149,7 +149,7 @@ public sealed class ApiTestFixture : IAsyncLifetime
             {
                 ClientId = "axis_spa",
                 ClientType = ClientTypes.Public,
-                DisplayName = "Axis SPA (Test)",
+                DisplayName = "Axis Platform Web (Test)",
                 Permissions =
                 {
                     Permissions.Endpoints.Authorization,

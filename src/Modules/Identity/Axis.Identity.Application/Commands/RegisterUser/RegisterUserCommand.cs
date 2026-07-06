@@ -9,4 +9,5 @@ public sealed record RegisterUserCommand(
     string PasswordConfirmation,
     string AcceptedTermsVersion,
     string AcceptedPrivacyVersion,
+    string? PreferredLanguage = null,
     string? IdempotencyKey = null) : ICommand;

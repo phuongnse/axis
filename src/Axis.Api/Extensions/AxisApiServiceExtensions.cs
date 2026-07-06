@@ -12,6 +12,7 @@ using Axis.Shared.Infrastructure.Observability;
 using FluentValidation;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.OpenApi.Models;
 using OpenIddict.Validation.AspNetCore;
@@ -24,6 +25,7 @@ namespace Axis.Api.Extensions;
 internal static class AxisApiServiceExtensions
 {
     private const string AuthRateLimiterPolicy = "auth";
+    private const string RateLimitedProblemCode = "common.rateLimited";
 
     public static WebApplicationBuilder AddAxisApiServices(this WebApplicationBuilder builder)
     {
@@ -180,6 +182,22 @@ internal static class AxisApiServiceExtensions
             });
 
             opts.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+            opts.OnRejected = async (context, cancellationToken) =>
+            {
+                const int statusCode = StatusCodes.Status429TooManyRequests;
+                ProblemDetails problem = new()
+                {
+                    Status = statusCode,
+                    Title = "Too Many Requests",
+                    Detail = "Too many requests. Please try again later.",
+                    Type = $"urn:axis:problem:{RateLimitedProblemCode}",
+                };
+                problem.Extensions["code"] = RateLimitedProblemCode;
+
+                context.HttpContext.Response.StatusCode = statusCode;
+                context.HttpContext.Response.ContentType = "application/problem+json";
+                await context.HttpContext.Response.WriteAsJsonAsync(problem, cancellationToken);
+            };
         });
     }
 
@@ -244,7 +262,7 @@ internal static class AxisApiServiceExtensions
         services.AddEndpointsApiExplorer();
         services.AddSwaggerGen(opts =>
         {
-            opts.SwaggerDoc("v1", new OpenApiInfo { Title = "Axis API", Version = "v1" });
+            opts.SwaggerDoc("v1", new OpenApiInfo { Title = "Axis Platform API", Version = "v1" });
             opts.SupportNonNullableReferenceTypes();
             opts.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
             {
@@ -253,6 +271,7 @@ internal static class AxisApiServiceExtensions
                 BearerFormat = "JWT",
             });
             opts.OperationFilter<AuthorizeOperationFilter>();
+            opts.SchemaFilter<ProblemDetailsSchemaFilter>();
         });
     }
 

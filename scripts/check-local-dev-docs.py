@@ -9,6 +9,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import json
 import re
 import sys
 from pathlib import Path
@@ -17,6 +18,8 @@ ROOT = Path(__file__).resolve().parent.parent
 MAIN_COMPOSE_FILE = ROOT / "docker-compose.yml"
 LOCAL_DEV_FILE = ROOT / "docs/playbooks/local-dev.md"
 TECH_STACK_FILE = ROOT / "docs/TECH_STACK.md"
+API_APPSETTINGS_FILE = ROOT / "src" / "Axis.Api" / "appsettings.json"
+LOCAL_BROWSER_APP_BASE_URL = "https://localhost:3000"
 
 TECH_STACK_FRAGMENT_LINK = re.compile(r"\]\(\.\./TECH_STACK\.md#([^)]+)\)")
 TECH_STACK_KNOWN_ANCHOR = re.compile(r"\[[^\]]+\]\(#([^)]+)\)")
@@ -30,6 +33,10 @@ PORT_MAPPING = re.compile(
     re.MULTILINE,
 )
 PROFILE_LINE = re.compile(r'^\s+profiles:\s*\[(.+)\]', re.MULTILINE)
+LOCAL_APP_BASE_URL_LINE = re.compile(
+    rf'^\s+App__BaseUrl:\s+"(?:[$]{{APP_BASE_URL:-)?{re.escape(LOCAL_BROWSER_APP_BASE_URL)}(?:}})?"\s*$',
+    re.MULTILINE,
+)
 
 
 def mentions_service(doc: str, service_name: str) -> bool:
@@ -88,6 +95,24 @@ def mandatory_host_ports(services: dict[str, list[int]], optional: set[str]) -> 
     return ports
 
 
+def compose_has_local_app_base_url(compose_file: Path) -> bool:
+    return LOCAL_APP_BASE_URL_LINE.search(compose_file.read_text(encoding="utf-8")) is not None
+
+
+def api_appsettings_base_url(appsettings_file: Path) -> str | None:
+    try:
+        data = json.loads(appsettings_file.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return None
+
+    app_section = data.get("App")
+    if not isinstance(app_section, dict):
+        return None
+
+    base_url = app_section.get("BaseUrl")
+    return base_url if isinstance(base_url, str) else None
+
+
 def check_local_dev_doc() -> list[str]:
     errors: list[str] = []
 
@@ -95,6 +120,8 @@ def check_local_dev_doc() -> list[str]:
         errors.append(f"Missing {MAIN_COMPOSE_FILE.relative_to(ROOT)}")
     if not LOCAL_DEV_FILE.is_file():
         errors.append(f"Missing {LOCAL_DEV_FILE.relative_to(ROOT)}")
+    if not API_APPSETTINGS_FILE.is_file():
+        errors.append(f"Missing {API_APPSETTINGS_FILE.relative_to(ROOT)}")
     if errors:
         return errors
 
@@ -111,6 +138,28 @@ def check_local_dev_doc() -> list[str]:
 
     if "package-manager adapter" not in doc_lower or "binary/shim" not in doc_lower:
         errors.append("local-dev.md should document the generic package-manager adapter")
+
+    if not compose_has_local_app_base_url(MAIN_COMPOSE_FILE):
+        errors.append(
+            "docker-compose.yml api service must set App__BaseUrl to "
+            f"{LOCAL_BROWSER_APP_BASE_URL} for human local-dev verification links"
+        )
+
+    if api_appsettings_base_url(API_APPSETTINGS_FILE) != LOCAL_BROWSER_APP_BASE_URL:
+        errors.append(
+            "src/Axis.Api/appsettings.json App:BaseUrl must default to "
+            f"{LOCAL_BROWSER_APP_BASE_URL} for host-native local dev"
+        )
+
+    if (
+        "App:BaseUrl" not in doc
+        or LOCAL_BROWSER_APP_BASE_URL not in doc
+        or "browser-facing origin" not in doc_lower
+    ):
+        errors.append(
+            "local-dev.md should document App:BaseUrl as the browser-facing origin "
+            "used in verification email links"
+        )
 
     for host_port in sorted(mandatory_host_ports(main_services, main_optional)):
         if str(host_port) not in doc:

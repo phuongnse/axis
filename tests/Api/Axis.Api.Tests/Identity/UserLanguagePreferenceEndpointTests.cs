@@ -122,20 +122,27 @@ public sealed class UserLanguagePreferenceEndpointTests(ApiTestFixture fixture)
     }
 
     [Fact]
-    public async Task VerifyEmail_WhenAccountSessionIsCreated_DoesNotCreateLanguagePreference()
+    public async Task VerifyEmail_WhenAccountSessionIsCreated_DoesNotUpdateLanguagePreference()
     {
         string email = UniqueEmail();
         await RegisterAsync(email);
+        using (IServiceScope beforeScope = fixture.CreateScope())
+        {
+            IdentityDbContext beforeDb = beforeScope.ServiceProvider.GetRequiredService<IdentityDbContext>();
+            Email beforeNormalizedEmail = Email.Create(email).Value;
+            User beforeUser = await beforeDb.Users.SingleAsync(user => user.Email == beforeNormalizedEmail);
+            beforeUser.LanguagePreference!.Value.Should().Be(UserLanguage.DefaultValue);
+        }
 
         HttpResponseMessage response = await VerifyEmailAsync(CapturedToken(email));
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         using IServiceScope scope = fixture.CreateScope();
-        IdentityDbContext db = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
-        Email normalizedEmail = Email.Create(email).Value;
-        User user = await db.Users.SingleAsync(user => user.Email == normalizedEmail);
-        user.LanguagePreference.Should().BeNull();
-        user.ThemePreference.Should().BeNull();
+        IdentityDbContext afterDb = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
+        Email afterNormalizedEmail = Email.Create(email).Value;
+        User afterUser = await afterDb.Users.SingleAsync(user => user.Email == afterNormalizedEmail);
+        afterUser.LanguagePreference!.Value.Should().Be(UserLanguage.DefaultValue);
+        afterUser.ThemePreference.Should().BeNull();
     }
 
     private async Task<string> CreateVerifiedSessionTokenAsync(string email)

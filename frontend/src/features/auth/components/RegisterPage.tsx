@@ -32,7 +32,7 @@ function LegalLink({ children, href }: LegalLinkProps) {
 
 export function RegisterPage() {
   const { t } = useTranslation();
-  const { form, loading, submit } = useRegister();
+  const { form, loading, submit, submitError } = useRegister();
   const {
     register,
     control,
@@ -40,7 +40,6 @@ export function RegisterPage() {
     watch,
     formState: { errors },
   } = form;
-  const submitError = errors.root?.message;
   const password = watch('password');
 
   return (

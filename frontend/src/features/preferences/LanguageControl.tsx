@@ -74,7 +74,8 @@ export function LanguageControl({
   });
 
   const shouldPersistToServer = authenticated && Boolean(getAccessToken());
-  const statusId = authenticated ? 'language-save-status' : undefined;
+  const showSaveStatus = authenticated && (mutation.isPending || mutation.isError);
+  const statusId = showSaveStatus ? 'language-save-status' : undefined;
 
   function chooseLanguage(nextLanguage: SupportedLanguage) {
     void changeSiteLanguage(nextLanguage);
@@ -145,14 +146,13 @@ export function LanguageControl({
         </ToggleGroup>
       </fieldset>
 
-      {authenticated ? (
+      {showSaveStatus ? (
         <div
           id={statusId}
           className={cn('min-h-4 text-[11px] text-muted-foreground', isMenu && 'px-1')}
           aria-live="polite"
         >
           {mutation.isPending ? t('app.saving') : null}
-          {mutation.isSuccess && !mutation.isPending ? t('app.languageSaved') : null}
           {mutation.isError ? (
             <span className="inline-flex items-center gap-1 text-destructive">
               {t('app.languageSaveFailed')}

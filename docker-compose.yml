@@ -76,8 +76,11 @@ services:
       Kestrel__Certificates__Default__KeyPath: "/https/localhost-key.pem"
       ConnectionStrings__Identity: "Host=postgres;Port=5432;Database=axis_identity;Username=axis;Password=axis_dev_pass"
       Redis__ConnectionString: "redis:6379"
+      App__BaseUrl: "${APP_BASE_URL:-https://localhost:3000}"
       Email__Host: maildev
       Email__Port: "1025"
+      Email__FromAddress: "${EMAIL_FROM_ADDRESS:-noreply@axis.localhost}"
+      Email__FromName: "${EMAIL_FROM_NAME:-Axis Platform}"
       Cors__AllowedOrigins__0: "https://localhost:3000"
       RateLimiting__Auth__PermitLimit: "1000"
       # OTLP export is off in the default compose API container (no LGTM dependency).
@@ -148,6 +151,7 @@ services:
       E2E_BASE_URL: "https://web:3000"
       E2E_API_URL: "https://api:8443"
       E2E_MAILDEV_URL: "http://maildev:1080"
+      E2E_VERIFY_ORIGIN: "${APP_BASE_URL:-https://localhost:3000}"
       E2E_SKIP_WEB_SERVER: "1"
       E2E_OUTPUT_DIR: "/tmp/axis-e2e/test-results"
       E2E_REPORT_DIR: "/tmp/axis-e2e/playwright-report"

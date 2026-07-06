@@ -107,6 +107,16 @@ async function fillSignInForm(page: Page, email: string): Promise<void> {
   await page.getByLabel('Password').fill(password);
 }
 
+async function expectAuthenticatedFrame(page: Page, userName: string): Promise<void> {
+  await expect(page.getByRole('banner')).toContainText('Dashboard');
+  await expect(page.getByRole('navigation')).toHaveCount(0);
+  await expect(page.getByRole('main')).toHaveText('');
+  await page.getByRole('button', { name: 'Account menu' }).click();
+  await expect(page.getByText(userName).first()).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible();
+  await page.keyboard.press('Escape');
+}
+
 function watchLanguagePreferenceWrites(page: Page): () => number {
   let writes = 0;
   page.on('request', (request) => {
@@ -129,6 +139,45 @@ function watchThemePreferenceWrites(page: Page): () => number {
   return () => writes;
 }
 
+function installVisitedPathRecorder() {
+  const target = window as Window & { __axisVisitedPaths?: string[] };
+  if (target.__axisVisitedPaths) return;
+
+  const visitedPaths = [window.location.pathname];
+  const recordPath = () => {
+    visitedPaths.push(window.location.pathname);
+  };
+  const originalPushState = window.history.pushState.bind(window.history);
+  const originalReplaceState = window.history.replaceState.bind(window.history);
+
+  window.history.pushState = (...args) => {
+    const result = originalPushState(...args);
+    recordPath();
+    return result;
+  };
+  window.history.replaceState = (...args) => {
+    const result = originalReplaceState(...args);
+    recordPath();
+    return result;
+  };
+  window.addEventListener('popstate', recordPath);
+  Object.defineProperty(window, '__axisVisitedPaths', {
+    configurable: true,
+    value: visitedPaths,
+  });
+}
+
+async function recordVisitedPaths(page: Page): Promise<void> {
+  await page.addInitScript(installVisitedPathRecorder);
+  await page.evaluate(installVisitedPathRecorder);
+}
+
+async function getVisitedPaths(page: Page): Promise<string[]> {
+  return page.evaluate(
+    () => (window as Window & { __axisVisitedPaths?: string[] }).__axisVisitedPaths ?? [],
+  );
+}
+
 test.describe('sign in user', () => {
   test.skip(!apiURL, 'Set E2E_API_URL to run sign-in-user API setup.');
 
@@ -148,13 +197,13 @@ test.describe('sign in user', () => {
     await createVerifiedUser(request, email);
 
     await page.goto('/sign-in');
+    await recordVisitedPaths(page);
     await fillSignInForm(page, email);
     await page.getByRole('button', { name: /sign in/i }).click();
 
     await expect(page).toHaveURL(/\/dashboard$/, { timeout: 30_000 });
-    await expect(page.getByRole('heading', { name: 'Sign In User', level: 1 })).toBeVisible();
-    await expect(page.getByRole('definition').filter({ hasText: email })).toBeVisible();
-    await expect(page.getByText('Account ready')).toBeVisible();
+    await expectAuthenticatedFrame(page, 'Sign In User');
+    await expect.poll(() => getVisitedPaths(page)).not.toContain('/callback');
     expect(languageWrites()).toBe(0);
     expect(themeWrites()).toBe(0);
   });
@@ -205,12 +254,65 @@ test.describe('sign in user', () => {
     await page.getByRole('button', { name: /sign in/i }).click();
 
     await expect(page).toHaveURL(/\/dashboard$/, { timeout: 30_000 });
-    await expect(page.getByRole('heading', { name: 'Sign In User', level: 1 })).toBeVisible();
+    await expectAuthenticatedFrame(page, 'Sign In User');
 
     await page.reload();
 
     await expect(page).toHaveURL(/\/dashboard$/, { timeout: 30_000 });
-    await expect(page.getByRole('heading', { name: 'Sign In User', level: 1 })).toBeVisible();
-    await expect(page.getByText('Account ready')).toBeVisible();
+    await expectAuthenticatedFrame(page, 'Sign In User');
+  });
+
+  test('AT-014 authenticated user is routed away from public auth and registration routes', async ({
+    page,
+    request,
+  }) => {
+    test.skip(!maildevURL, 'Set E2E_MAILDEV_URL to run sign-in-user email verification.');
+
+    const email = uniqueEmail('sign014');
+    await createVerifiedUser(request, email);
+
+    await page.goto('/sign-in');
+    await fillSignInForm(page, email);
+    await page.getByRole('button', { name: /sign in/i }).click();
+
+    await expect(page).toHaveURL(/\/dashboard$/, { timeout: 30_000 });
+    await expectAuthenticatedFrame(page, 'Sign In User');
+
+    for (const path of [
+      '/sign-in',
+      '/register',
+      '/register/confirmation',
+      '/auth/verify?token=already-authenticated',
+    ]) {
+      await page.goto(path);
+      await expect(page).toHaveURL(/\/dashboard$/, { timeout: 30_000 });
+      await expectAuthenticatedFrame(page, 'Sign In User');
+    }
+  });
+
+  test('AT-015 app root routes by the current session state without a guest-route hop', async ({
+    page,
+    request,
+  }) => {
+    test.skip(!maildevURL, 'Set E2E_MAILDEV_URL to run sign-in-user email verification.');
+
+    const email = uniqueEmail('sign015');
+    await createVerifiedUser(request, email);
+
+    await page.goto('/');
+    await expect(page).toHaveURL(/\/sign-in$/);
+    await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible();
+
+    await fillSignInForm(page, email);
+    await page.getByRole('button', { name: /sign in/i }).click();
+    await expect(page).toHaveURL(/\/dashboard$/, { timeout: 30_000 });
+    await expectAuthenticatedFrame(page, 'Sign In User');
+
+    await recordVisitedPaths(page);
+    await page.goto('/');
+
+    await expect(page).toHaveURL(/\/dashboard$/, { timeout: 30_000 });
+    await expectAuthenticatedFrame(page, 'Sign In User');
+    await expect.poll(() => getVisitedPaths(page)).not.toContain('/sign-in');
   });
 });

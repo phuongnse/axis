@@ -21,13 +21,18 @@ vi.mock('@/features/auth/api', async () => {
   const actual = await vi.importActual<typeof import('@/features/auth/api')>('@/features/auth/api');
   return {
     ...actual,
-    completePostSignInPkceFlow: vi.fn(() => Promise.resolve()),
+    completePostSignInPkceFlow: vi.fn(() => Promise.resolve(true)),
   };
 });
 
 async function fillSignInForm(user: ReturnType<typeof userEvent.setup>) {
   await user.type(screen.getByLabelText('Email address'), '  alex@example.com  ');
   await user.type(screen.getByLabelText('Password'), '  maple river sunrise  ');
+}
+
+async function fillVietnameseSignInForm(user: ReturnType<typeof userEvent.setup>) {
+  await user.type(screen.getByLabelText('Địa chỉ email'), '  alex@example.com  ');
+  await user.type(screen.getByLabelText('Mật khẩu'), '  maple river sunrise  ');
 }
 
 describe('SignInPage', () => {
@@ -98,6 +103,8 @@ describe('SignInPage', () => {
     await user.click(screen.getByRole('button', { name: /sign in/i }));
 
     await waitFor(() => expect(completePostSignInPkceFlow).toHaveBeenCalledWith());
+    expect(navigateMock).toHaveBeenCalledWith({ to: '/dashboard', replace: true });
+    expect(screen.getByRole('button', { name: /signing in/i })).toBeDisabled();
     expect(signInBody?.email).toBe('alex@example.com');
     expect(signInBody?.password).toBe('  maple river sunrise  ');
   });
@@ -110,7 +117,8 @@ describe('SignInPage', () => {
       statusText: 'Unprocessable Entity',
       json: () =>
         Promise.resolve({
-          detail: 'Email or password is incorrect.',
+          code: 'identity.signIn.invalidCredentials',
+          detail: 'Do not show this backend fallback.',
         }),
     } as unknown as Response);
 
@@ -119,8 +127,71 @@ describe('SignInPage', () => {
     await fillSignInForm(user);
     await user.click(screen.getByRole('button', { name: /sign in/i }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Email or password is incorrect.');
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('Unable to sign in');
+    expect(alert).toHaveTextContent('Email or password is incorrect.');
+    expect(alert).not.toHaveTextContent('Do not show this backend fallback.');
+    expect(alert.compareDocumentPosition(screen.getByLabelText('Email address'))).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
     expect(screen.getByRole('button', { name: /sign in/i })).toBeEnabled();
+  });
+
+  it('localizes generic credential form alerts in the selected language', async () => {
+    const user = userEvent.setup();
+    vi.mocked(fetch).mockResolvedValueOnce({
+      ok: false,
+      status: 422,
+      statusText: 'Unprocessable Entity',
+      json: () =>
+        Promise.resolve({
+          code: 'identity.signIn.invalidCredentials',
+          detail: 'Do not show this backend fallback.',
+        }),
+    } as unknown as Response);
+
+    await renderWithRouter(<SignInPage />, { path: '/sign-in' });
+
+    await user.click(screen.getByRole('button', { name: 'Preferences' }));
+    await user.click(screen.getByRole('button', { name: 'Vietnamese' }));
+    await fillVietnameseSignInForm(user);
+    await user.click(screen.getByRole('button', { name: 'Đăng nhập' }));
+
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('Không thể đăng nhập');
+    expect(alert).toHaveTextContent('Email hoặc mật khẩu không đúng.');
+    expect(alert).not.toHaveTextContent('Email or password is incorrect.');
+    expect(alert.compareDocumentPosition(screen.getByLabelText('Địa chỉ email'))).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+  });
+
+  it('updates submitted credential alerts when language changes after failure', async () => {
+    const user = userEvent.setup();
+    vi.mocked(fetch).mockResolvedValueOnce({
+      ok: false,
+      status: 422,
+      statusText: 'Unprocessable Entity',
+      json: () =>
+        Promise.resolve({
+          code: 'identity.signIn.invalidCredentials',
+          detail: 'Do not show this backend fallback.',
+        }),
+    } as unknown as Response);
+
+    await renderWithRouter(<SignInPage />, { path: '/sign-in' });
+
+    await fillSignInForm(user);
+    await user.click(screen.getByRole('button', { name: /sign in/i }));
+
+    expect(await screen.findByText('Email or password is incorrect.')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Preferences' }));
+    await user.click(screen.getByRole('button', { name: 'Vietnamese' }));
+
+    expect(await screen.findByText('Email hoặc mật khẩu không đúng.')).toBeInTheDocument();
+    expect(screen.queryByText('Email or password is incorrect.')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Địa chỉ email')).toHaveValue('alex@example.com');
   });
 
   it('shows verification-required state and resends verification email', async () => {
@@ -134,7 +205,8 @@ describe('SignInPage', () => {
           statusText: 'Unprocessable Entity',
           json: () =>
             Promise.resolve({
-              detail: 'Email verification is required before sign-in.',
+              code: 'identity.signIn.verificationRequired',
+              detail: 'Do not show this backend fallback.',
             }),
         } as unknown as Response);
       }
@@ -156,6 +228,7 @@ describe('SignInPage', () => {
     expect(
       await screen.findByText('Email verification is required before sign-in.'),
     ).toBeInTheDocument();
+    expect(screen.queryByText('Do not show this backend fallback.')).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: /resend verification email/i }));
 
     expect(await screen.findByText('Verification email sent.')).toBeInTheDocument();
@@ -169,7 +242,8 @@ describe('SignInPage', () => {
       statusText: 'Unprocessable Entity',
       json: () =>
         Promise.resolve({
-          detail: 'Account is not available for sign-in.',
+          code: 'identity.signIn.accountUnavailable',
+          detail: 'Do not show this backend fallback.',
         }),
     } as unknown as Response);
 
@@ -178,9 +252,10 @@ describe('SignInPage', () => {
     await fillSignInForm(user);
     await user.click(screen.getByRole('button', { name: /sign in/i }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Account is not available for sign-in.',
-    );
+    const workspaceAlert = await screen.findByRole('alert');
+    expect(workspaceAlert).toHaveTextContent('Unable to sign in');
+    expect(workspaceAlert).toHaveTextContent('Account is not available for sign-in.');
+    expect(workspaceAlert).not.toHaveTextContent('Do not show this backend fallback.');
 
     vi.mocked(fetch).mockResolvedValueOnce({
       ok: false,
@@ -190,8 +265,8 @@ describe('SignInPage', () => {
     } as unknown as Response);
     await user.click(screen.getByRole('button', { name: /sign in/i }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Something went wrong, please try again',
+    await waitFor(() =>
+      expect(screen.getByRole('alert')).toHaveTextContent('Something went wrong, please try again'),
     );
     expect(screen.getByRole('button', { name: /sign in/i })).toBeEnabled();
   });
@@ -213,7 +288,9 @@ describe('SignInPage', () => {
     await fillSignInForm(user);
     await user.click(screen.getByRole('button', { name: /sign in/i }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Please wait before trying again.');
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('Unable to sign in');
+    expect(alert).toHaveTextContent('Too many sign-in attempts. Try again shortly.');
     expect(screen.getByRole('button', { name: /sign in/i })).toBeDisabled();
   });
 });

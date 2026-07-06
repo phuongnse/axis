@@ -2,7 +2,7 @@
 
 > **Navigation**: [docs/use-cases/README.md](../README.md) · [docs/README.md](../../README.md) · [AGENTS.md](../../../AGENTS.md)
 
-Identity Access owns account access flows for Axis users.
+Identity Access owns account access flows for Axis Platform users.
 
 ## Current Use Cases
 

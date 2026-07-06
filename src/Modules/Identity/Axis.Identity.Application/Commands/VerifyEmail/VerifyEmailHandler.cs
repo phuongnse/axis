@@ -1,3 +1,4 @@
+using Axis.Identity.Application;
 using Axis.Identity.Application.Repositories;
 using Axis.Identity.Application.Services;
 using Axis.Identity.Domain.Aggregates;
@@ -18,7 +19,12 @@ public sealed class VerifyEmailHandler(
         CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(command.Token))
-            return Result.Failure<VerifyEmailSuccessDto>(ErrorCodes.BusinessRule, "Invalid verification link.");
+        {
+            return Result.Failure<VerifyEmailSuccessDto>(
+                ErrorCodes.BusinessRule,
+                "Invalid verification link.",
+                IdentityProblemCodes.EmailVerificationInvalidToken);
+        }
 
         string tokenHash = OpaqueTokenGenerator.Hash(command.Token.Trim());
         EmailVerificationTokenResolveResult resolved =
@@ -29,19 +35,25 @@ public sealed class VerifyEmailHandler(
             EmailVerificationTokenState.NotFound =>
                 Result.Failure<VerifyEmailSuccessDto>(
                     ErrorCodes.BusinessRule,
-                    "Invalid verification link."),
+                    "Invalid verification link.",
+                    IdentityProblemCodes.EmailVerificationInvalidToken),
             EmailVerificationTokenState.Expired =>
                 Result.Failure<VerifyEmailSuccessDto>(
                     ErrorCodes.BusinessRule,
-                    "This verification link has expired. Please request a new verification email."),
+                    "This verification link has expired. Please request a new verification email.",
+                    IdentityProblemCodes.EmailVerificationExpiredToken),
             EmailVerificationTokenState.AlreadyUsed =>
                 Result.Failure<VerifyEmailSuccessDto>(
                     ErrorCodes.BusinessRule,
-                    "This link has already been used. Please sign in."),
+                    "This link has already been used. Please sign in.",
+                    IdentityProblemCodes.EmailVerificationAlreadyUsedToken),
             EmailVerificationTokenState.Valid => await VerifyUserAsync(
                 resolved.UserId!.Value,
                 cancellationToken),
-            _ => Result.Failure<VerifyEmailSuccessDto>(ErrorCodes.BusinessRule, "Invalid verification link."),
+            _ => Result.Failure<VerifyEmailSuccessDto>(
+                ErrorCodes.BusinessRule,
+                "Invalid verification link.",
+                IdentityProblemCodes.EmailVerificationInvalidToken),
         };
     }
 
@@ -51,13 +63,19 @@ public sealed class VerifyEmailHandler(
     {
         User? user = await userRepo.GetByIdPlatformWideAsync(userId, cancellationToken);
         if (user is null)
-            return Result.Failure<VerifyEmailSuccessDto>(ErrorCodes.BusinessRule, "Invalid verification link.");
+        {
+            return Result.Failure<VerifyEmailSuccessDto>(
+                ErrorCodes.BusinessRule,
+                "Invalid verification link.",
+                IdentityProblemCodes.EmailVerificationInvalidToken);
+        }
 
         if (user.IsEmailVerified)
         {
             return Result.Failure<VerifyEmailSuccessDto>(
                 ErrorCodes.BusinessRule,
-                "This link has already been used. Please sign in.");
+                "This link has already been used. Please sign in.",
+                IdentityProblemCodes.EmailVerificationAlreadyUsedToken);
         }
 
         Workspace? personalWorkspace = await WorkspaceRepo.GetPersonalByOwnerUserIdAsync(user.Id, cancellationToken);
@@ -65,7 +83,8 @@ public sealed class VerifyEmailHandler(
         {
             return Result.Failure<VerifyEmailSuccessDto>(
                 ErrorCodes.BusinessRule,
-                "The account does not have a workspace.");
+                "The account does not have a workspace.",
+                IdentityProblemCodes.EmailVerificationAccountUnavailable);
         }
 
         if (personalWorkspace.Status == WorkspaceStatus.PendingVerification)
@@ -76,7 +95,8 @@ public sealed class VerifyEmailHandler(
         {
             return Result.Failure<VerifyEmailSuccessDto>(
                 ErrorCodes.BusinessRule,
-                "Workspace is not ready for sign-in.");
+                "Workspace is not ready for sign-in.",
+                IdentityProblemCodes.EmailVerificationAccountUnavailable);
         }
 
         user.VerifyEmail();

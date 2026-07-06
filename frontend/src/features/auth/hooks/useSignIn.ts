@@ -1,64 +1,67 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { type FieldPath, type UseFormReturn, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { completePostSignInPkceFlow, signInUser } from '@/features/auth/api';
 import { useRefreshClientValidationErrors } from '@/features/auth/hooks/useRefreshClientValidationErrors';
-import { getProblemDetail } from '@/features/auth/problem-details';
+import {
+  classifySignInError,
+  getFirstFieldError,
+  getSignInCopyKey,
+  getSignInFieldError,
+  type SignInSubmitErrorKind,
+} from '@/features/auth/problem-details';
 import { createSignInSchema, type SignInFormValues } from '@/features/auth/schemas/sign-in-schema';
 import type { SignInValidationErrorData } from '@/features/auth/types';
 import { currentSiteLanguage } from '@/features/preferences';
+import type { TranslationKey } from '@/features/preferences/translations';
 import { ApiError } from '@/lib/api';
 
-type SignInErrorKind = 'verification_required' | 'rate_limited' | 'form';
-
 const clientValidationFields: FieldPath<SignInFormValues>[] = ['email', 'password'];
-
-function getFieldError(
-  errors: Record<string, string[]> | undefined,
-  key: string,
-): string | undefined {
-  return errors?.[key]?.[0];
-}
 
 function applySignInValidationErrors(
   form: UseFormReturn<SignInFormValues>,
   errorData: SignInValidationErrorData,
+  t: ReturnType<typeof useTranslation>['t'],
 ): boolean {
   let hasMappedFieldError = false;
 
-  const setFieldError = (field: FieldPath<SignInFormValues>, message: string) => {
-    form.setError(field, { type: 'server', message });
+  const setFieldError = (
+    field: FieldPath<SignInFormValues>,
+    message: string,
+    key?: TranslationKey,
+  ) => {
+    form.setError(field, { type: 'server', message: key ? t(key) : message });
     hasMappedFieldError = true;
   };
 
-  const emailError = getFieldError(errorData.errors, 'email');
-  const passwordError = getFieldError(errorData.errors, 'password');
+  const emailError = getFirstFieldError(errorData, 'email');
+  const passwordError = getFirstFieldError(errorData, 'password');
   if (emailError) {
-    setFieldError('email', emailError);
+    setFieldError('email', emailError, getSignInFieldError(errorData, 'email')?.key);
   }
   if (passwordError) {
-    setFieldError('password', passwordError);
+    setFieldError('password', passwordError, getSignInFieldError(errorData, 'password')?.key);
   }
 
   return hasMappedFieldError;
 }
 
-function classifySignInError(error: ApiError): SignInErrorKind {
-  if (error.status === 429) return 'rate_limited';
-
-  const detail = getProblemDetail(error).toLowerCase();
-  if (detail.includes('verification is required')) return 'verification_required';
-  return 'form';
+function getSignInFormErrorMessage(
+  errorKind: SignInSubmitErrorKind,
+  t: ReturnType<typeof useTranslation>['t'],
+): string {
+  return t(getSignInCopyKey(errorKind));
 }
 
 export function useSignIn() {
   const navigate = useNavigate();
   const { t } = useTranslation();
   const language = currentSiteLanguage();
-  const genericSubmitError = t('auth.genericError');
+  const [submitErrorKind, setSubmitErrorKind] = useState<SignInSubmitErrorKind | null>(null);
+  const [dashboardHandoffPending, setDashboardHandoffPending] = useState(false);
   const signInSchema = useMemo(
     () =>
       createSignInSchema({
@@ -86,67 +89,60 @@ export function useSignIn() {
       }),
     onSuccess: async (data) => {
       if (data?.sessionEstablished) {
+        setDashboardHandoffPending(true);
         try {
-          await completePostSignInPkceFlow();
+          const completed = await completePostSignInPkceFlow();
+          if (completed) {
+            await navigate({ to: '/dashboard', replace: true });
+          }
           return;
         } catch {
-          void navigate({ to: '/dashboard' });
+          await navigate({ to: '/dashboard' });
           return;
         }
       }
 
-      void navigate({ to: '/sign-in' });
+      await navigate({ to: '/sign-in' });
     },
     onError: (error: unknown) => {
+      setDashboardHandoffPending(false);
       if (error instanceof ApiError && error.status < 500) {
         const errorKind = classifySignInError(error);
-        const detail = getProblemDetail(error);
-        if (errorKind === 'verification_required') {
-          form.setError('root', { type: 'server', message: detail });
-          return;
-        }
-        if (errorKind === 'rate_limited') {
-          form.setError('root', {
-            type: 'server',
-            message: detail || t('notice.resendLimited'),
-          });
+        if (
+          errorKind === 'verification_required' ||
+          errorKind === 'rate_limited' ||
+          errorKind === 'workspace_unavailable'
+        ) {
+          setSubmitErrorKind(errorKind);
           return;
         }
 
         const errorData = error.data as SignInValidationErrorData;
-        const hasMappedFieldError = applySignInValidationErrors(form, errorData);
+        const hasMappedFieldError = applySignInValidationErrors(form, errorData, t);
         if (!hasMappedFieldError) {
-          form.setError('root', {
-            type: 'server',
-            message: detail || errorData.message || errorData.title || genericSubmitError,
-          });
+          setSubmitErrorKind(errorKind);
         }
         return;
       }
 
-      form.setError('root', { type: 'server', message: genericSubmitError });
+      setSubmitErrorKind('generic');
     },
   });
 
   async function submit(values: SignInFormValues) {
-    form.clearErrors('root');
+    setDashboardHandoffPending(false);
+    setSubmitErrorKind(null);
+    form.clearErrors();
     await mutation.mutateAsync(values).catch(() => undefined);
   }
 
-  const error =
-    mutation.error instanceof ApiError
-      ? {
-          kind: classifySignInError(mutation.error),
-          detail: getProblemDetail(mutation.error),
-        }
-      : null;
-
   return {
     form,
-    loading: mutation.isPending,
+    loading: mutation.isPending || dashboardHandoffPending,
     submit,
+    submitError: submitErrorKind ? getSignInFormErrorMessage(submitErrorKind, t) : null,
     verificationEmail:
-      error?.kind === 'verification_required' ? form.getValues('email').trim() : null,
-    rateLimited: error?.kind === 'rate_limited',
+      submitErrorKind === 'verification_required' ? form.getValues('email').trim() : null,
+    rateLimited: submitErrorKind === 'rate_limited',
   };
 }

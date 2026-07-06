@@ -46,7 +46,7 @@ internal static class AxisApiApplicationExtensions
             app.MapScalarApiReference(options =>
             {
                 options.WithOpenApiRoutePattern("/swagger/v1/swagger.json");
-                options.Title = "Axis API";
+                options.Title = "Axis Platform API";
                 options.Theme = ScalarTheme.Moon;
             });
         }

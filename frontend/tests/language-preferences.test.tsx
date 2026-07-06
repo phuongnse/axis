@@ -192,6 +192,7 @@ describe('language preferences', () => {
 
     englishSave.resolve(jsonResponse({ language: 'en' }));
     await waitFor(() => expect(localStorage.getItem(LANGUAGE_STORAGE_KEY)).toBe('en'));
+    expect(document.querySelector('#language-save-status')).not.toBeInTheDocument();
 
     vietnameseSave.resolve({
       ok: true,

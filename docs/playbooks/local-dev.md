@@ -62,7 +62,9 @@ Common API settings (compose uses service hostnames; host run uses `localhost`):
 |---|---|---|---|
 | Identity DB | `ConnectionStrings__Identity` → `postgres` | `ConnectionStrings:Identity` → `localhost:5432` | PostgreSQL for Identity/OpenIddict. |
 | Redis | `Redis__ConnectionString` → `redis:6379` | `Redis:ConnectionString` → `localhost:6379` | Sessions, idempotency, caches. |
+| App base URL | `App__BaseUrl` → `https://localhost:3000` | `App:BaseUrl` → `https://localhost:3000` | Browser-facing origin used in verification email links; use the URL the email recipient's browser can open, not an internal Compose service name. |
 | SMTP | `Email__Host` / `Email__Port` → `maildev:1025` | `Email:Host` / `Email:Port` → `localhost:1025` | Outbound mail (Maildev locally). |
+| Email sender | `Email__FromAddress` / `Email__FromName` → `noreply@axis.localhost` / `Axis Platform` | `Email:FromAddress` / `Email:FromName` → same | Message sender identity; use a verified owned domain outside local dev. |
 | CORS | `Cors__AllowedOrigins__0` → SPA origin | `Cors:AllowedOrigins` | Browser origins allowed to call the API. |
 | Auth rate limit | `RateLimiting__Auth__PermitLimit` → high local/E2E limit | `RateLimiting:Auth:PermitLimit` → API default | Keeps repeated local browser journeys from exhausting the production-like auth throttle while preserving configurable API behavior. |
 | HTTPS certs | `/https/*.pem` mounts | Kestrel / Vite dev cert env in compose `web` | Local TLS for SPA and API. |

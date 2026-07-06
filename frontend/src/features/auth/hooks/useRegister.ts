@@ -1,14 +1,19 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
-import { useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { type FieldPath, type UseFormReturn, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { createRegisterIdempotencyKey, registerUser } from '@/features/auth/api';
 import { useLegalVersions } from '@/features/auth/hooks/useLegalVersions';
 import { useRefreshClientValidationErrors } from '@/features/auth/hooks/useRefreshClientValidationErrors';
 import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH } from '@/features/auth/password-policy';
-import { getProblemDetail } from '@/features/auth/problem-details';
+import {
+  getFirstFieldError,
+  getRegisterFieldError,
+  getRegisterProblemFieldError,
+  type LocalizedErrorDescriptor,
+} from '@/features/auth/problem-details';
 import { saveRegistrationContext } from '@/features/auth/registration-context';
 import {
   createRegisterSchema,
@@ -36,35 +41,44 @@ interface RegisterMutationInput {
   legalVersions: LoadedLegalVersions;
 }
 
+type RegisterRootErrorKind = 'generic' | 'legal_versions_missing';
+type LocalizedRegisterFieldErrors = Partial<
+  Record<FieldPath<RegisterFormValues>, LocalizedErrorDescriptor>
+>;
+
 function hasLegalVersions(
   legalVersions: LegalVersionsResponse | undefined,
 ): legalVersions is LoadedLegalVersions {
   return Boolean(legalVersions?.termsVersion && legalVersions.privacyVersion);
 }
 
-function getFieldError(
-  errors: Record<string, string[]> | undefined,
-  key: string,
-): string | undefined {
-  return errors?.[key]?.[0];
-}
-
 function applyRegisterValidationErrors(
   form: UseFormReturn<RegisterFormValues>,
   errorData: RegisterValidationErrorData,
-): boolean {
+  t: ReturnType<typeof useTranslation>['t'],
+): { hasMappedFieldError: boolean; localizedFieldErrors: LocalizedRegisterFieldErrors } {
   let hasMappedFieldError = false;
+  const localizedFieldErrors: LocalizedRegisterFieldErrors = {};
 
-  const fullNameError = getFieldError(errorData.errors, 'fullName');
-  const emailError = getFieldError(errorData.errors, 'email');
-  const passwordError = getFieldError(errorData.errors, 'password');
-  const passwordConfirmationError = getFieldError(errorData.errors, 'passwordConfirmation');
+  const fullNameError = getFirstFieldError(errorData, 'fullName');
+  const emailError = getFirstFieldError(errorData, 'email');
+  const passwordError = getFirstFieldError(errorData, 'password');
+  const passwordConfirmationError = getFirstFieldError(errorData, 'passwordConfirmation');
   const termsError =
-    getFieldError(errorData.errors, 'acceptedTermsVersion') ??
-    getFieldError(errorData.errors, 'acceptedPrivacyVersion');
+    getFirstFieldError(errorData, 'acceptedTermsVersion') ??
+    getFirstFieldError(errorData, 'acceptedPrivacyVersion');
 
   const setFieldError = (field: FieldPath<RegisterFormValues>, message: string) => {
-    form.setError(field, { type: 'server', message });
+    const localizedError = getRegisterFieldError(errorData, field);
+    if (localizedError) {
+      localizedFieldErrors[field] = localizedError;
+      form.setError(field, {
+        type: 'server',
+        message: getLocalizedErrorMessage(localizedError, t),
+      });
+    } else {
+      form.setError(field, { type: 'server', message });
+    }
     hasMappedFieldError = true;
   };
 
@@ -84,13 +98,36 @@ function applyRegisterValidationErrors(
     setFieldError('acceptedTerms', termsError);
   }
 
-  return hasMappedFieldError;
+  return { hasMappedFieldError, localizedFieldErrors };
+}
+
+function getLocalizedErrorMessage(
+  error: LocalizedErrorDescriptor,
+  t: ReturnType<typeof useTranslation>['t'],
+): string {
+  return t(error.key, error.values);
+}
+
+function getRegisterRootErrorMessage(
+  errorKind: RegisterRootErrorKind,
+  t: ReturnType<typeof useTranslation>['t'],
+): string {
+  switch (errorKind) {
+    case 'generic':
+      return t('auth.genericError');
+    case 'legal_versions_missing':
+      return t('auth.legalDocumentsMissing');
+  }
 }
 
 export function useRegister() {
   const navigate = useNavigate();
   const { t } = useTranslation();
   const language = currentSiteLanguage();
+  const [submitErrorKind, setSubmitErrorKind] = useState<RegisterRootErrorKind | null>(null);
+  const [localizedFieldErrors, setLocalizedFieldErrors] = useState<LocalizedRegisterFieldErrors>(
+    {},
+  );
   const {
     data: legalVersions,
     isError: legalVersionsError,
@@ -113,8 +150,6 @@ export function useRegister() {
       }),
     [t],
   );
-  const genericSubmitError = t('auth.genericError');
-  const legalVersionsMissingError = t('auth.legalDocumentsMissing');
   const form = useForm<RegisterFormValues>({
     resolver: zodResolver(registerSchema),
     defaultValues: {
@@ -128,6 +163,16 @@ export function useRegister() {
   });
   useRefreshClientValidationErrors(form, clientValidationFields, language);
 
+  useEffect(() => {
+    for (const [field, error] of Object.entries(localizedFieldErrors)) {
+      if (!error) continue;
+      form.setError(field as FieldPath<RegisterFormValues>, {
+        type: 'server',
+        message: getLocalizedErrorMessage(error, t),
+      });
+    }
+  }, [form, localizedFieldErrors, t]);
+
   const mutation = useMutation({
     mutationFn: async ({ values, legalVersions }: RegisterMutationInput) => {
       return registerUser(
@@ -138,11 +183,14 @@ export function useRegister() {
           passwordConfirmation: values.passwordConfirmation,
           acceptedTermsVersion: legalVersions.termsVersion,
           acceptedPrivacyVersion: legalVersions.privacyVersion,
+          preferredLanguage: currentSiteLanguage(),
         },
         idempotencyKeyRef.current,
       );
     },
     onSuccess: (_data, { values }) => {
+      setSubmitErrorKind(null);
+      setLocalizedFieldErrors({});
       saveRegistrationContext({
         email: values.email.trim(),
       });
@@ -151,36 +199,44 @@ export function useRegister() {
     },
     onError: (error: unknown) => {
       if (error instanceof ApiError && error.status === 409) {
-        form.setError('email', {
-          type: 'server',
-          message: getProblemDetail(error),
-        });
+        const fieldError = getRegisterProblemFieldError(error);
+        if (fieldError) {
+          setLocalizedFieldErrors({ [fieldError.field]: fieldError.error });
+          form.setError(fieldError.field, {
+            type: 'server',
+            message: getLocalizedErrorMessage(fieldError.error, t),
+          });
+          return;
+        }
+
+        setSubmitErrorKind('generic');
         return;
       }
 
       if (error instanceof ApiError && error.status < 500) {
         const errorData = error.data as RegisterValidationErrorData;
-        const hasMappedFieldError = applyRegisterValidationErrors(form, errorData);
+        const { hasMappedFieldError, localizedFieldErrors } = applyRegisterValidationErrors(
+          form,
+          errorData,
+          t,
+        );
+        setLocalizedFieldErrors(localizedFieldErrors);
         if (!hasMappedFieldError) {
-          form.setError('root', {
-            type: 'server',
-            message: errorData.message ?? errorData.title ?? genericSubmitError,
-          });
+          setSubmitErrorKind('generic');
         }
         return;
       }
 
-      form.setError('root', { type: 'server', message: genericSubmitError });
+      setSubmitErrorKind('generic');
     },
   });
 
   async function submit(values: RegisterFormValues) {
-    form.clearErrors('root');
+    setSubmitErrorKind(null);
+    setLocalizedFieldErrors({});
+    form.clearErrors();
     if (legalVersionsLoading || legalVersionsError || !hasLegalVersions(legalVersions)) {
-      form.setError('root', {
-        type: 'server',
-        message: legalVersionsMissingError,
-      });
+      setSubmitErrorKind('legal_versions_missing');
       return;
     }
 
@@ -191,6 +247,7 @@ export function useRegister() {
     form,
     loading: mutation.isPending || legalVersionsLoading,
     submit,
+    submitError: submitErrorKind ? getRegisterRootErrorMessage(submitErrorKind, t) : null,
     legalVersions,
   };
 }

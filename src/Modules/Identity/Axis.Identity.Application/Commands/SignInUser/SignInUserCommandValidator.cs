@@ -1,3 +1,4 @@
+using Axis.Identity.Application;
 using Axis.Identity.Domain.ValueObjects;
 using FluentValidation;
 
@@ -9,10 +10,13 @@ public sealed class SignInUserCommandValidator : AbstractValidator<SignInUserCom
     {
         RuleFor(x => x.Email)
             .NotEmpty().WithMessage("Email is required.")
+            .WithErrorCode(IdentityProblemCodes.SignInEmailRequired)
             .Must(email => Email.Create(email).IsSuccess)
-            .WithMessage("Email must be a valid email address.");
+            .WithMessage("Email must be a valid email address.")
+            .WithErrorCode(IdentityProblemCodes.SignInEmailInvalid);
 
         RuleFor(x => x.Password)
-            .NotEmpty().WithMessage("Password is required.");
+            .NotEmpty().WithMessage("Password is required.")
+            .WithErrorCode(IdentityProblemCodes.SignInPasswordRequired);
     }
 }

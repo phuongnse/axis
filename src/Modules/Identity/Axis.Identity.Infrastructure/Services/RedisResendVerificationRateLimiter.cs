@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using Axis.Identity.Application;
 using Axis.Identity.Application.Services;
 using Axis.Shared.Domain.Primitives;
 using StackExchange.Redis;
@@ -41,7 +42,8 @@ internal sealed class RedisResendVerificationRateLimiter(IConnectionMultiplexer 
         {
             return Result.Failure(
                 ErrorCodes.RateLimited,
-                "Please wait before requesting another email.");
+                "Please wait before requesting another email.",
+                IdentityProblemCodes.EmailVerificationResendRateLimited);
         }
 
         return Result.Success();

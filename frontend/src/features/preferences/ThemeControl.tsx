@@ -71,7 +71,8 @@ export function ThemeControl({
   });
 
   const shouldPersistToServer = authenticated && Boolean(getAccessToken());
-  const statusId = authenticated ? 'theme-save-status' : undefined;
+  const showSaveStatus = authenticated && (mutation.isPending || mutation.isError);
+  const statusId = showSaveStatus ? 'theme-save-status' : undefined;
 
   function chooseTheme(nextThemeMode: ThemeMode) {
     setThemeMode(nextThemeMode);
@@ -137,14 +138,13 @@ export function ThemeControl({
         </ToggleGroup>
       </fieldset>
 
-      {authenticated ? (
+      {showSaveStatus ? (
         <div
           id={statusId}
           className={cn('min-h-4 text-[11px] text-muted-foreground', isMenu && 'px-1')}
           aria-live="polite"
         >
           {mutation.isPending ? t('app.saving') : null}
-          {mutation.isSuccess && !mutation.isPending ? t('app.themeSaved') : null}
           {mutation.isError ? (
             <span className="inline-flex items-center gap-1 text-destructive">
               {t('app.themeSaveFailed')}

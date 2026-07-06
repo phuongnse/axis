@@ -42,6 +42,10 @@ Use-case READMEs own product behavior and ACs. Keep purpose/actor/trigger, flows
 
 Use `$axis-use-case-spec` for spec shape, `$axis-use-case-implementation` for status, and `$axis-visual-artifact` for diagrams or committed visual artifacts.
 
+Foundation READMEs use the same spec/status shape under [docs/foundations/README.md](../foundations/README.md); use `$axis-frontend-foundation` for app shell or shared SPA foundation contracts.
+
+Use-case and foundation docs marked complete keep exact proof in the sibling `{slug}.evidence.md` file. Spec files keep `Acceptance Test Matrix` high-level; sidecars keep `Acceptance Evidence` rows with committed proof paths and Axis wrapper commands. A row may list comma-separated AT IDs only when the proof paths and commands are identical.
+
 ## Implementation Status
 
 Use one row per layer. Status values are `Done`, `Partial`, `Not started`, and `N/A`.
