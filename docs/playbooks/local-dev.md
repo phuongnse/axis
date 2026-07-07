@@ -52,7 +52,7 @@ Local overrides live in ignored root `.env.local`. See [.env.example](../../.env
 | Docker Compose stack | [docker-compose.yml](../../docker-compose.yml) | Default `local-dev up` — no `.env` file required. |
 | Compose overrides | `.env.local` (copy from [.env.example](../../.env.example)) | Optional; only when a compose default needs changing (e.g. `VITE_USE_POLLING`). |
 | API on host | [src/Axis.Api/appsettings.json](../../src/Axis.Api/appsettings.json) | Host-native dev without the API container (`python scripts/axis.py dotnet run-api`). Override with ASP.NET env vars (`Section__Key`) or ignored `appsettings.Development.json`. |
-| EF migrations | `ConnectionStrings__Identity` or `IDENTITY_CONNECTION_STRING` | `python scripts/axis.py dotnet ef ...` only. |
+| EF migrations | `ConnectionStrings__Identity`, `ConnectionStrings__Objects`, `IDENTITY_CONNECTION_STRING`, or `OBJECTS_CONNECTION_STRING` | `python scripts/axis.py dotnet ef ...` only. |
 | Shell adapters | `python scripts/axis.py doctor` | `DOCKER_HOST`, `NVM_DIR`, `PATH` when tools resolve from another context (WSL, Docker Desktop). |
 | E2E | [docker-compose.yml](../../docker-compose.yml) and [frontend/playwright.config.ts](../../frontend/playwright.config.ts) | `python scripts/axis.py local-dev e2e` builds and runs the compose E2E profile with API, web, Maildev, service URLs, and browser trust configured. Pass Playwright args after `--` to scope a file or title. |
 
@@ -61,6 +61,7 @@ Common API settings (compose uses service hostnames; host run uses `localhost`):
 | Setting | Compose default | Host `appsettings.json` | Purpose |
 |---|---|---|---|
 | Identity DB | `ConnectionStrings__Identity` → `postgres` | `ConnectionStrings:Identity` → `localhost:5432` | PostgreSQL for Identity/OpenIddict. |
+| Objects DB | `ConnectionStrings__Objects` → `postgres` | `ConnectionStrings:Objects` → `localhost:5432` | PostgreSQL for Objects module definitions and published versions. |
 | Redis | `Redis__ConnectionString` → `redis:6379` | `Redis:ConnectionString` → `localhost:6379` | Sessions, idempotency, caches. |
 | App base URL | `App__BaseUrl` → `https://localhost:3000` | `App:BaseUrl` → `https://localhost:3000` | Browser-facing origin used in verification email links; use the URL the email recipient's browser can open, not an internal Compose service name. |
 | SMTP | `Email__Host` / `Email__Port` → `maildev:1025` | `Email:Host` / `Email:Port` → `localhost:1025` | Outbound mail (Maildev locally). |
@@ -91,9 +92,7 @@ Run unit or focused frontend tests while iterating. Integration/API tests need D
 
 Create migrations through `python scripts/axis.py dotnet ef migrations add ...`. Use the owning module Infrastructure project as both project and startup project when a `*DbContextFactory` exists.
 
-Identity dev database startup uses `MigrateAsync`.
-
-Use reset paths only for disposable local data. Do not use schema initialization shortcuts.
+Identity dev database startup uses `MigrateAsync`. Use reset paths only for disposable local data; do not use schema initialization shortcuts.
 
 ## Guardrails
 

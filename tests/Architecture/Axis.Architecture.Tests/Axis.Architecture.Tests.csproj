@@ -39,6 +39,10 @@
     <ProjectReference Include="..\..\..\src\Modules\Identity\Axis.Identity.Domain\Axis.Identity.Domain.csproj" />
     <ProjectReference Include="..\..\..\src\Modules\Identity\Axis.Identity.Application\Axis.Identity.Application.csproj" />
     <ProjectReference Include="..\..\..\src\Modules\Identity\Axis.Identity.Infrastructure\Axis.Identity.Infrastructure.csproj" />
+
+    <ProjectReference Include="..\..\..\src\Modules\Objects\Axis.Objects.Domain\Axis.Objects.Domain.csproj" />
+    <ProjectReference Include="..\..\..\src\Modules\Objects\Axis.Objects.Application\Axis.Objects.Application.csproj" />
+    <ProjectReference Include="..\..\..\src\Modules\Objects\Axis.Objects.Infrastructure\Axis.Objects.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>

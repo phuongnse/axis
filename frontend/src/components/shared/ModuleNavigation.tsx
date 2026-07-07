@@ -14,7 +14,7 @@ interface ModuleNavigationProps {
 }
 
 const iconByToken: Record<ModuleNavigationIcon, typeof Blocks> = {
-  module: Blocks,
+  objects: Blocks,
 };
 
 export function ModuleNavigation({ context, items }: ModuleNavigationProps) {

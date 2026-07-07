@@ -1,5 +1,5 @@
-export type ModuleNavigationIcon = 'module';
-export type ModuleNavigationRouteTarget = '/dashboard';
+export type ModuleNavigationIcon = 'objects';
+export type ModuleNavigationRouteTarget = '/objects';
 
 export interface ModuleNavigationGroup {
   id: string;

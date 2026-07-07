@@ -6,6 +6,8 @@ using Axis.Api.HealthChecks;
 using Axis.Api.Infrastructure;
 using Axis.Identity.Application.Commands.RegisterUser;
 using Axis.Identity.Infrastructure.Extensions;
+using Axis.Objects.Application.Commands.CreateObjectDefinitionDraft;
+using Axis.Objects.Infrastructure.Extensions;
 using Axis.Shared.Application.Behaviors;
 using Axis.Shared.Application.Identity;
 using Axis.Shared.Infrastructure.Observability;
@@ -63,13 +65,15 @@ internal static class AxisApiServiceExtensions
         services.AddMediatR(cfg =>
         {
             cfg.RegisterServicesFromAssemblies(
-                typeof(RegisterUserCommand).Assembly);
+                typeof(RegisterUserCommand).Assembly,
+                typeof(CreateObjectDefinitionDraftCommand).Assembly);
             cfg.AddOpenBehavior(typeof(LoggingBehavior<,>));
             cfg.AddOpenBehavior(typeof(ValidationBehavior<,>));
         });
 
         services.AddValidatorsFromAssemblies([
             typeof(RegisterUserCommand).Assembly,
+            typeof(CreateObjectDefinitionDraftCommand).Assembly,
         ]);
     }
 
@@ -203,6 +207,7 @@ internal static class AxisApiServiceExtensions
         IHostEnvironment environment)
     {
         services.AddIdentityInfrastructure(configuration, environment);
+        services.AddObjectsInfrastructure(configuration);
     }
 
     private static void AddAxisRedis(
