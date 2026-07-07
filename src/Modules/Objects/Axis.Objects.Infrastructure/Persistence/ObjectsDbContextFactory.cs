@@ -10,7 +10,8 @@ public sealed class ObjectsDbContextFactory : IDesignTimeDbContextFactory<Object
         string connectionString =
             Environment.GetEnvironmentVariable("ConnectionStrings__Objects")
             ?? Environment.GetEnvironmentVariable("OBJECTS_CONNECTION_STRING")
-            ?? "Host=localhost;Port=5432;Database=axis_objects;Username=axis;Password=axis";
+            ?? throw new InvalidOperationException(
+                "Set ConnectionStrings__Objects or OBJECTS_CONNECTION_STRING for design-time Objects migrations.");
 
         DbContextOptions<ObjectsDbContext> options = new DbContextOptionsBuilder<ObjectsDbContext>()
             .UseNpgsql(connectionString)
