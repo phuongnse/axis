@@ -90,10 +90,24 @@ async function expectNoPageOverflow(page: Page): Promise<void> {
     .toEqual({ bodyFits: true, documentFits: true });
 }
 
-async function expectShellRegionsUseViewportWidth(page: Page): Promise<void> {
+async function expectNoDocumentScroll(page: Page): Promise<void> {
+  await expect
+    .poll(async () =>
+      page.evaluate(() => {
+        const documentElement = document.documentElement;
+        const tolerance = 1;
+
+        return documentElement.scrollHeight <= window.innerHeight + tolerance;
+      }),
+    )
+    .toBe(true);
+}
+
+async function expectShellRegionsFitViewport(page: Page): Promise<void> {
   const viewportWidth = await page.evaluate(() => window.innerWidth);
   const regions = [
     { name: 'top bar content', locator: page.locator('header > div') },
+    { name: 'module navigation', locator: page.getByRole('navigation', { name: 'Modules' }) },
     { name: 'main content', locator: page.getByRole('main') },
     { name: 'footer content', locator: page.locator('footer > div') },
   ];
@@ -104,12 +118,14 @@ async function expectShellRegionsUseViewportWidth(page: Page): Promise<void> {
       throw new Error(`Expected ${region.name} to be visible`);
     }
 
-    expect(Math.round(box.width), region.name).toBeGreaterThanOrEqual(viewportWidth - 1);
+    expect(Math.round(box.width), region.name).toBeGreaterThan(0);
+    expect(Math.round(box.x), region.name).toBeGreaterThanOrEqual(-1);
+    expect(Math.round(box.x + box.width), region.name).toBeLessThanOrEqual(viewportWidth + 1);
   }
 }
 
 test.describe('app frame', () => {
-  test('AT-002 desktop and mobile frame render without console errors or horizontal overflow', async ({
+  test('AT-002 desktop and mobile frame render without console errors or document overflow', async ({
     page,
   }) => {
     const pageErrors: string[] = [];
@@ -126,29 +142,39 @@ test.describe('app frame', () => {
 
     await expect(page).toHaveURL(/\/dashboard$/);
     await expect(page.getByRole('banner')).toContainText('Dashboard');
-    await expect(page.getByRole('navigation')).toHaveCount(0);
+    await expect(page.getByRole('navigation', { name: 'Modules' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Business objects' })).toHaveAttribute(
+      'href',
+      '/objects',
+    );
     await expect(page.getByRole('main')).toHaveText('');
     await expect(page.getByRole('contentinfo')).toContainText('Version 0.1.0');
     await expect(page.getByRole('contentinfo')).toContainText('Axis Platform');
     await expect(page.getByRole('contentinfo')).toContainText('2026');
-    await expectShellRegionsUseViewportWidth(page);
+    await expectShellRegionsFitViewport(page);
     await page.getByRole('button', { name: 'Account menu' }).click();
     await expect(page.getByText(profile.fullName)).toHaveCount(1);
     await expect(page.getByText('Preferences')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible();
     await expectNoPageOverflow(page);
+    await expectNoDocumentScroll(page);
     await page.keyboard.press('Escape');
 
     await page.setViewportSize({ width: 390, height: 844 });
 
     await expect(page.getByRole('banner')).toContainText('Dashboard');
-    await expect(page.getByRole('navigation')).toHaveCount(0);
+    await expect(page.getByRole('navigation', { name: 'Modules' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Business objects' })).toHaveAttribute(
+      'href',
+      '/objects',
+    );
     await expect(page.getByRole('main')).toHaveText('');
     await expect(page.getByRole('contentinfo')).toContainText('Version 0.1.0');
-    await expectShellRegionsUseViewportWidth(page);
+    await expectShellRegionsFitViewport(page);
     await page.getByRole('button', { name: 'Account menu' }).click();
     await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible();
     await expectNoPageOverflow(page);
+    await expectNoDocumentScroll(page);
     expect(pageErrors).toEqual([]);
   });
 });

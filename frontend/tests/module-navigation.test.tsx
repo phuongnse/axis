@@ -24,9 +24,9 @@ describe('module navigation', () => {
     const contributions: ModuleNavigationContribution[] = [
       {
         id: 'hidden',
-        labelKey: 'nav.modules',
-        icon: 'module',
-        to: '/dashboard',
+        labelKey: 'objects.nav.definitions',
+        icon: 'objects',
+        to: '/objects',
         group: { id: 'workspace', labelKey: 'nav.group.workspace', order: 20 },
         order: 10,
         isVisible: () => false,
@@ -34,56 +34,56 @@ describe('module navigation', () => {
       {
         id: 'invalid',
         labelKey: '',
-        icon: 'module',
-        to: '/dashboard',
+        icon: 'objects',
+        to: '/objects',
         group: { id: 'workspace', labelKey: 'nav.group.workspace', order: 20 },
         order: 20,
       },
       {
-        id: 'module.second',
-        labelKey: 'nav.modules',
-        icon: 'module',
-        to: '/dashboard',
+        id: 'objects.second',
+        labelKey: 'objects.nav.definitions',
+        icon: 'objects',
+        to: '/objects',
         group: { id: 'workspace', labelKey: 'nav.group.workspace', order: 10 },
         order: 20,
       },
       {
-        id: 'module.first',
-        labelKey: 'nav.modules',
-        icon: 'module',
-        to: '/dashboard',
+        id: 'objects.first',
+        labelKey: 'objects.nav.definitions',
+        icon: 'objects',
+        to: '/objects',
         group: { id: 'workspace', labelKey: 'nav.group.workspace', order: 10 },
         order: 10,
       },
     ];
 
-    const visible = visibleModuleNavigationContributions(contributions, { pathname: '/dashboard' });
+    const visible = visibleModuleNavigationContributions(contributions, { pathname: '/objects' });
 
-    expect(visible.map((item) => item.id)).toEqual(['module.first', 'module.second']);
-    expect(visible.every((item) => item.isActive({ pathname: '/dashboard' }))).toBe(true);
+    expect(visible.map((item) => item.id)).toEqual(['objects.first', 'objects.second']);
+    expect(visible.every((item) => item.isActive({ pathname: '/objects/123' }))).toBe(true);
   });
 
   it('renders localized visible contributions with route target and active state', () => {
     const items = visibleModuleNavigationContributions(
       [
         {
-          id: 'module.dashboard',
-          labelKey: 'nav.modules',
-          icon: 'module',
-          to: '/dashboard',
+          id: 'objects.definitions',
+          labelKey: 'objects.nav.definitions',
+          icon: 'objects',
+          to: '/objects',
           group: { id: 'workspace', labelKey: 'nav.group.workspace', order: 100 },
           order: 100,
         },
       ],
-      { pathname: '/dashboard' },
+      { pathname: '/objects' },
     );
 
-    render(<ModuleNavigation context={{ pathname: '/dashboard' }} items={items} />);
+    render(<ModuleNavigation context={{ pathname: '/objects' }} items={items} />);
 
     expect(screen.getByRole('navigation', { name: 'Modules' })).toBeInTheDocument();
     expect(screen.getByText('Workspace')).toBeInTheDocument();
-    const link = screen.getByRole('link', { name: 'Modules' });
-    expect(link).toHaveAttribute('href', '/dashboard');
+    const link = screen.getByRole('link', { name: 'Business objects' });
+    expect(link).toHaveAttribute('href', '/objects');
     expect(link).toHaveAttribute('aria-current', 'page');
   });
 });

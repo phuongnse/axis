@@ -49,7 +49,7 @@ Provide the global authenticated sidebar navigation contract for Axis Platform m
 | AT-001 | UI component | Empty contribution set renders no sidebar or placeholder navigation. | AC-004 | UI component test | Yes |
 | AT-002 | UI component | Visible contributions render in group/order with localized labels, icons, route targets, and active state. | AC-001, AC-002, AC-005 | UI component test | Yes |
 | AT-003 | UI component | Hidden, unauthorized, unavailable, or invalid contributions are not exposed as navigable sidebar items. | AC-003 | UI component test | Yes |
-| AT-004 | Browser journey | Authenticated app frame renders without placeholder sidebar when no contributions are visible and fits desktop/mobile without console errors or horizontal overflow. | AC-004, AC-006 | Browser automation | Yes |
+| AT-004 | Browser journey | Desktop and mobile navigation render without console errors or horizontal overflow. | AC-006 | Browser automation | Yes |
 | AT-005 | Static frontend | Contribution registry and renderer typecheck, lint, and keep localized copy keys valid. | AC-001, AC-002 | Frontend CI | Yes |
 
 ## Out Of Scope
@@ -81,7 +81,7 @@ Required UI quality: navigation controls must be keyboard-reachable, labels must
 > | Frontend | Done |
 > | Tests | Done |
 >
-> **Implemented:** Shared module navigation contribution contract, registry, App Shell renderer, empty-contribution behavior, localized labels, active route state, and desktop/mobile browser coverage.
+> **Implemented:** Shared module navigation contribution contract, registry, App Shell renderer, empty-contribution behavior, Objects module contribution, localized labels, active route state, and desktop/mobile browser coverage.
 >
 > **Gaps vs spec:** None for the initial module-navigation foundation contract.
 >
