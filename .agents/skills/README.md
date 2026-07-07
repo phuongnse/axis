@@ -43,7 +43,7 @@ Validate skill changes: `python scripts/axis.py check repo-skills`
 ```text
 spec gap     → axis-use-case-spec
 module arch  → axis-design-gate → axis-module-architecture
-patterns     → axis-module-architecture → axis-module-patterns
+patterns     → axis-module-architecture (if module/foundation scope changes) → axis-module-patterns
 non-trivial  → axis-design-gate → implement skill → axis-script-scope (checks)
 before review→ axis-ready-review
 PR/push action→ axis-pull-request → axis-review-feedback (if needed) → then push/PR
