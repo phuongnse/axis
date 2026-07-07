@@ -9,6 +9,7 @@ interface AppHeaderProps {
 }
 
 function pageTitleKeyForPath(pathname: string) {
+  if (pathname.startsWith('/objects')) return 'app.objects';
   return pathname.startsWith('/dashboard') ? 'app.dashboard' : 'app.account';
 }
 

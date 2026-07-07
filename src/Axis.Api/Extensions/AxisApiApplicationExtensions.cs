@@ -1,6 +1,7 @@
 using Axis.Api.Endpoints;
 using Axis.Api.Middleware;
 using Axis.Identity.Infrastructure.Persistence;
+using Axis.Objects.Infrastructure.Persistence;
 using Axis.Shared.Infrastructure.Observability;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
@@ -22,6 +23,12 @@ internal static class AxisApiApplicationExtensions
             .Options;
         await using IdentityDbContext identityDb = new(identityOptions);
         await identityDb.Database.MigrateAsync();
+
+        DbContextOptions<ObjectsDbContext> objectsOptions = new DbContextOptionsBuilder<ObjectsDbContext>()
+            .UseNpgsql(RequiredConnectionString(app.Configuration, "Objects"))
+            .Options;
+        await using ObjectsDbContext objectsDb = new(objectsOptions);
+        await objectsDb.Database.MigrateAsync();
     }
 
     private static string RequiredConnectionString(IConfiguration configuration, string name) =>
@@ -67,6 +74,7 @@ internal static class AxisApiApplicationExtensions
         app.MapAuthEndpoints();
         app.MapLegalEndpoints();
         app.MapUserEndpoints();
+        app.MapObjectDefinitionEndpoints();
 
         return app;
     }

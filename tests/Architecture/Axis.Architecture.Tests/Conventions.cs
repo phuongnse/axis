@@ -6,8 +6,7 @@ namespace Axis.Architecture.Tests;
 /// Central knowledge of the Axis assembly layout. Architecture fitness tests use
 /// this to discover modules and load assemblies. Module names are read from
 /// <c>src/Modules/</c> at test run time — adding a module folder is enough; no
-/// edit to a string list is required (project references in the test csproj are
-/// still needed for assemblies to load).
+/// edit to a string list is required.
 /// </summary>
 internal static class Conventions
 {
@@ -15,6 +14,9 @@ internal static class Conventions
     /// Modules under <c>src/Modules/</c>, discovered from the repository layout.
     /// </summary>
     public static string[] ModuleNames => DiscoverModuleNames();
+
+    /// <summary>Repository root discovered from the architecture test bin path.</summary>
+    public static string RepositoryRootPath => RepositoryRoot;
 
     /// <summary>
     /// Per-module layer names. Each (module, layer) pair maps to assembly

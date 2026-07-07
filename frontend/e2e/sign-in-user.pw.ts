@@ -109,7 +109,11 @@ async function fillSignInForm(page: Page, email: string): Promise<void> {
 
 async function expectAuthenticatedFrame(page: Page, userName: string): Promise<void> {
   await expect(page.getByRole('banner')).toContainText('Dashboard');
-  await expect(page.getByRole('navigation')).toHaveCount(0);
+  await expect(page.getByRole('navigation', { name: 'Modules' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Business objects' })).toHaveAttribute(
+    'href',
+    '/objects',
+  );
   await expect(page.getByRole('main')).toHaveText('');
   await page.getByRole('button', { name: 'Account menu' }).click();
   await expect(page.getByText(userName).first()).toBeVisible();

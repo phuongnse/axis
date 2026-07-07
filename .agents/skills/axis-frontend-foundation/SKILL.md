@@ -16,6 +16,7 @@ Follow [reference.md](../reference.md).
 - Use `$axis-design-gate` before non-trivial layout, route, component, or behavior changes; high-risk surfaces still stop for sign-off.
 - Use `$axis-frontend-feature` for SPA implementation after the foundation contract is clear.
 - Use `$axis-doc-hygiene` when changing guidance, routing tables, or durable frontend rules.
+- Stop for explicit user sign-off before adding custom design-system primitives, bypassing the approved shadcn component baseline, or extending a component API beyond the existing contract.
 - Do not claim review-ready without `$axis-ready-review`.
 
 ## Inputs
@@ -49,6 +50,7 @@ Follow [reference.md](../reference.md).
 
 4. Implement the foundation.
    - Build on existing Axis components, tokens, translations, and routing patterns.
+   - Use shadcn-owned `frontend/src/components/ui` primitives before creating or changing shared design-system components.
    - Keep visible copy in the frontend translation layer.
    - Do not add API contracts, auth behavior, storage behavior, or product actions unless the owning use case or contract skill requires them.
    - Avoid design-system component API or visual deviations unless the user has explicitly signed off.

@@ -20,6 +20,10 @@ Paginated list responses should include items plus paging metadata. Keep query p
 
 Endpoints stay thin: bind input, dispatch Application request, map `Result` to response/problem details. Require authorization unless explicitly public.
 
+## Request ownership
+
+Request DTOs accept user-authored decisions and required protocol tokens only. Values the server can derive from trusted input or persisted state are server-owned: derive them in the Application/API boundary, exclude them from client request shapes, and return the authoritative value in the response. Client previews of server-owned values are advisory and must not be accepted as the source of truth.
+
 ## OpenAPI annotation reference
 
 Annotate routes with names, summaries, tags, success type, and problem responses. Contract changes require generated OpenAPI/frontend API type parity.

@@ -115,7 +115,7 @@ export function ThemeControl({
           orientation={isMenu ? 'vertical' : 'horizontal'}
           variant={isMenu ? 'default' : 'outline'}
           size="sm"
-          width={isMenu ? 'full' : 'auto'}
+          className={isMenu ? 'w-full' : undefined}
           aria-label={t('app.theme')}
         >
           {supportedThemeModes.map((item) => {
@@ -126,7 +126,7 @@ export function ThemeControl({
               <ToggleGroupItem
                 key={item.value}
                 value={item.value}
-                align={isMenu ? 'start' : 'center'}
+                className={isMenu ? 'w-full justify-start' : undefined}
                 aria-label={label}
                 title={label}
               >

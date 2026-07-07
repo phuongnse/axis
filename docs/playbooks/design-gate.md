@@ -46,6 +46,8 @@ Use the matching repo skill for surface-specific checklist detail:
 | Surface | Skill |
 |---|---|
 | Missing or incomplete use-case spec | `$axis-use-case-spec` |
+| New module / DDD / CQRS / event sourcing architecture | `$axis-module-architecture` |
+| Tactical DDD / CQRS / persistence / event pattern implementation | `$axis-module-patterns` |
 | Use-case slice | `$axis-use-case-implementation` |
 | REST/OpenAPI/API type change | `$axis-api-contract` |
 | App shell / shared SPA UI infrastructure | `$axis-frontend-foundation` |

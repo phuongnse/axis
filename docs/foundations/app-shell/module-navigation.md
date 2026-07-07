@@ -78,15 +78,15 @@ Required UI quality: navigation controls must be keyboard-reachable, labels must
 > | Layer | Status |
 > |-------|--------|
 > | Contract | Done |
-> | Frontend | Not started |
-> | Tests | Not started |
+> | Frontend | Done |
+> | Tests | Done |
 >
-> **Implemented:** Contract only.
+> **Implemented:** Shared module navigation contribution contract, registry, App Shell renderer, empty-contribution behavior, Objects module contribution, localized labels, active route state, and desktop/mobile browser coverage.
 >
-> **Gaps vs spec:** No module navigation contribution registry, sidebar renderer, responsive navigation affordance, contribution tests, or browser evidence exists yet.
+> **Gaps vs spec:** None for the initial module-navigation foundation contract.
 >
-> **Deferred follow-ups:** Implement this foundation when the first real module navigation contribution exists.
+> **Deferred follow-ups:** Future modules add their own contributions and visibility rules through the registry. User-created extension packaging, runtime loading, sandboxing, marketplace, and installation lifecycle remain excluded from this foundation.
 >
-> **Verification:** Contract shape is covered by `python scripts/axis.py check foundation-docs`; runtime acceptance tests are not present because frontend implementation has not started.
+> **Verification:** Acceptance proof is tracked in the sibling evidence sidecar; foundation status is checked by the foundation docs gate.
 >
 > **Decisions:** Module Navigation is an App Shell foundation, not a use case. App Shell owns the global navigation renderer and empty behavior; modules own the contributed items, labels, routes, ordering hints, and visibility rules. The sidebar must not render when there are no visible contributions. User-created extension mechanics are future platform extensibility contracts; this foundation only defines the navigation boundary they will contribute into.

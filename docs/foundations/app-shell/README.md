@@ -9,4 +9,4 @@ App Shell foundations own authenticated app frame surfaces that future use cases
 | Foundation | Status |
 |---|---|
 | [docs/foundations/app-shell/app-frame.md](./app-frame.md) | Done |
-| [docs/foundations/app-shell/module-navigation.md](./module-navigation.md) | Partial |
+| [docs/foundations/app-shell/module-navigation.md](./module-navigation.md) | Done |

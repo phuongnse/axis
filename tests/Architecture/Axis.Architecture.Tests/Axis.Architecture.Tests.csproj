@@ -27,7 +27,8 @@
     Architecture tests inspect all Axis.* assemblies via reflection. We reference
     every src project so MSBuild resolves the dependency graph and copies the
     DLLs into our bin folder; the tests then load them by name. New module added
-    to the solution → add its csproj reference here so the fitness tests cover it.
+    to the solution → add its csproj reference here; ModuleAssemblyDiscoveryTests
+    fails if a discovered module layer project cannot be loaded.
   -->
   <ItemGroup>
     <ProjectReference Include="..\..\..\src\Axis.Api\Axis.Api.csproj" />
@@ -38,6 +39,10 @@
     <ProjectReference Include="..\..\..\src\Modules\Identity\Axis.Identity.Domain\Axis.Identity.Domain.csproj" />
     <ProjectReference Include="..\..\..\src\Modules\Identity\Axis.Identity.Application\Axis.Identity.Application.csproj" />
     <ProjectReference Include="..\..\..\src\Modules\Identity\Axis.Identity.Infrastructure\Axis.Identity.Infrastructure.csproj" />
+
+    <ProjectReference Include="..\..\..\src\Modules\Objects\Axis.Objects.Domain\Axis.Objects.Domain.csproj" />
+    <ProjectReference Include="..\..\..\src\Modules\Objects\Axis.Objects.Application\Axis.Objects.Application.csproj" />
+    <ProjectReference Include="..\..\..\src\Modules\Objects\Axis.Objects.Infrastructure\Axis.Objects.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>

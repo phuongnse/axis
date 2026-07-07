@@ -20,6 +20,8 @@ Design from small screens up. Keep cards and controls at restrained radius unles
 
 For localized surfaces, validate copy fit in the supported languages named by the owning use case at mobile and desktop sizes. Prefer responsive layout capacity and design-system improvements over language-specific copy or styling hacks.
 
+Fixed-shell product screens must not create document or app-shell scrolling. Constrain overflow to explicit internal regions, and give dense repeat-edit regions a focus/maximized state when they need more working area while keeping authenticated navigation context visible.
+
 ## Feature folder anatomy
 
 Feature code lives under `frontend/src/features/{name}/` and exports through the feature index. Avoid cross-feature deep imports.
@@ -32,9 +34,21 @@ Use TanStack Query for server state. Use local React state or Zustand only for c
 
 Use stable query keys, generated API types, and explicit invalidation after mutations.
 
+Route-owned server state uses query option factories shared by route loaders and components. Initial data needed for first screen paint should load through a TanStack Router loader with `queryClient.ensureQueryData`; use `prefetchQuery` for intent-based warming where rendering must not wait. Router preload only warms business data when a route loader exists.
+
+Prefetch detail, adjacent page, or navigation data on clear user intent such as hover, focus, selection, or route navigation. Keep auth, acceptance criteria, data sensitivity, and request cost in the decision; do not prefetch expensive or sensitive data only because a component renders.
+
+Mutation success handlers should write returned entities into exact detail cache entries and explicitly invalidate or update affected list keys. Use broad feature-prefix invalidation only when multiple known projections intentionally become stale.
+
+Put shareable pagination, filters, and selected record identifiers in route search params. Keep local state for draft-only UI state that should reset on navigation or reload.
+
 ## TypeScript discipline
 
 Strict TS, no `any`, generated API types for backend contracts.
+
+## Server-owned values
+
+Frontend forms submit user-authored decisions and required protocol tokens only. If a value is derived by the system, the UI may show an advisory read-only preview, but the generated API request type must exclude that value and the response remains the source of truth.
 
 ## Routing
 
@@ -42,7 +56,7 @@ Use TanStack Router patterns already in the app. Classify every route as authent
 
 ## Component design
 
-Use the approved design system first. If the current component contract lacks a needed capability, propose the smallest design-system addition or component API change and wait for explicit user sign-off before adding it. Custom components or bespoke interaction behavior are exceptions only: document why the existing contract does not fit and get explicit sign-off before implementation. Use icons for iconable actions, labels/tooltips for clarity, and stable dimensions for fixed controls.
+Use the approved design system first. For Axis today, shared UI primitives come from shadcn-owned `frontend/src/components/ui` contracts unless the Design Gate records an explicit exception. If the current component contract lacks a needed capability, propose the smallest design-system addition or component API change and wait for explicit user sign-off before adding it. Custom components or bespoke interaction behavior are exceptions only: document why the existing contract does not fit and get explicit sign-off before implementation. Use icons for iconable actions, labels/tooltips for clarity, and stable dimensions for fixed controls.
 
 Treat design-system component visuals as owned by the component contract. Feature code uses defaults and documented props; it does not locally alter component visual treatment through style overrides, selectors, or wrapper styling. If the requested UI needs a visual deviation or component API change, stop before implementation, name the deviation, and get explicit user sign-off; this applies even when the broader change is standard-tier.
 

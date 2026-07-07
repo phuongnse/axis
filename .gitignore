@@ -28,6 +28,7 @@ frontend/test-results/
 !.env.example
 .dev-certs/
 .local/
+.tmp/
 
 # Logs
 *.log

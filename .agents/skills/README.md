@@ -24,6 +24,8 @@ Validate skill changes: `python scripts/axis.py check repo-skills`
 |---|---|
 | Explore / audit / read-only | [axis-script-scope/SKILL.md](./axis-script-scope/SKILL.md) |
 | Pre-code dossier / non-trivial change | [axis-design-gate/SKILL.md](./axis-design-gate/SKILL.md) |
+| New module / DDD / CQRS / event sourcing architecture | [axis-module-architecture/SKILL.md](./axis-module-architecture/SKILL.md) |
+| Tactical DDD/CQRS patterns in module code | [axis-module-patterns/SKILL.md](./axis-module-patterns/SKILL.md) |
 | Draft or complete use-case spec | [axis-use-case-spec/SKILL.md](./axis-use-case-spec/SKILL.md) |
 | Implement documented use case | [axis-use-case-implementation/SKILL.md](./axis-use-case-implementation/SKILL.md) |
 | API / OpenAPI / generated types | [axis-api-contract/SKILL.md](./axis-api-contract/SKILL.md) |
@@ -40,6 +42,8 @@ Validate skill changes: `python scripts/axis.py check repo-skills`
 
 ```text
 spec gap     → axis-use-case-spec
+module arch  → axis-design-gate → axis-module-architecture
+patterns     → axis-module-architecture (if module/foundation scope changes) → axis-module-patterns
 non-trivial  → axis-design-gate → implement skill → axis-script-scope (checks)
 before review→ axis-ready-review
 PR/push action→ axis-pull-request → axis-review-feedback (if needed) → then push/PR

@@ -75,6 +75,7 @@ services:
       Kestrel__Certificates__Default__Path: "/https/localhost.pem"
       Kestrel__Certificates__Default__KeyPath: "/https/localhost-key.pem"
       ConnectionStrings__Identity: "Host=postgres;Port=5432;Database=axis_identity;Username=axis;Password=axis_dev_pass"
+      ConnectionStrings__Objects: "Host=postgres;Port=5432;Database=axis_objects;Username=axis;Password=axis_dev_pass"
       Redis__ConnectionString: "redis:6379"
       App__BaseUrl: "${APP_BASE_URL:-https://localhost:3000}"
       Email__Host: maildev

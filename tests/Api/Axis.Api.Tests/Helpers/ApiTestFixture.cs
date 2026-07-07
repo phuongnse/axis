@@ -2,6 +2,7 @@ using System.Text.Json;
 using Axis.Identity.Application.Services;
 using Axis.Identity.Infrastructure.Persistence;
 using Axis.Identity.Infrastructure.Services;
+using Axis.Objects.Infrastructure.Persistence;
 using Axis.Testing;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Hosting;
@@ -31,8 +32,10 @@ public sealed class ApiTestFixture : IAsyncLifetime
         Path.Combine(Path.GetTempPath(), "axis-api-tests", Guid.NewGuid().ToString("N"), "data-protection-keys"));
 
     private string? _previousIdentityConnectionStringEnv;
+    private string? _previousObjectsConnectionStringEnv;
     private WebApplicationFactory<Program> _factory = null!;
     private string _identityConnectionString = null!;
+    private string _objectsConnectionString = null!;
 
     private readonly CapturingEmailSender _emailCapture = new();
 
@@ -53,9 +56,13 @@ public sealed class ApiTestFixture : IAsyncLifetime
         string postgresAdminConnectionString = _postgres.GetConnectionString();
         _identityConnectionString =
             await PostgresModuleTestDatabase.CreateAsync(postgresAdminConnectionString, "axis_identity_test");
+        _objectsConnectionString =
+            await PostgresModuleTestDatabase.CreateAsync(postgresAdminConnectionString, "axis_objects_test");
 
         _previousIdentityConnectionStringEnv = Environment.GetEnvironmentVariable("ConnectionStrings__Identity");
+        _previousObjectsConnectionStringEnv = Environment.GetEnvironmentVariable("ConnectionStrings__Objects");
         Environment.SetEnvironmentVariable("ConnectionStrings__Identity", _identityConnectionString);
+        Environment.SetEnvironmentVariable("ConnectionStrings__Objects", _objectsConnectionString);
 
         DbContextOptions<IdentityDbContext> identityOptions = new DbContextOptionsBuilder<IdentityDbContext>()
             .UseNpgsql(_identityConnectionString)
@@ -64,6 +71,13 @@ public sealed class ApiTestFixture : IAsyncLifetime
         await using (IdentityDbContext identityCtx = new(identityOptions))
         {
             await identityCtx.Database.MigrateAsync();
+        }
+        DbContextOptions<ObjectsDbContext> objectsOptions = new DbContextOptionsBuilder<ObjectsDbContext>()
+            .UseNpgsql(_objectsConnectionString)
+            .Options;
+        await using (ObjectsDbContext objectsCtx = new(objectsOptions))
+        {
+            await objectsCtx.Database.MigrateAsync();
         }
 
         _dataProtectionKeysDirectory.Create();
@@ -77,6 +91,7 @@ public sealed class ApiTestFixture : IAsyncLifetime
                 configBuilder.AddInMemoryCollection(new Dictionary<string, string?>
                 {
                     ["ConnectionStrings:Identity"] = _identityConnectionString,
+                    ["ConnectionStrings:Objects"] = _objectsConnectionString,
                     ["Redis:ConnectionString"] = _redis.GetConnectionString(),
                 });
             });
@@ -92,6 +107,11 @@ public sealed class ApiTestFixture : IAsyncLifetime
                 services.AddDbContext<IdentityDbContext>(opts =>
                     opts.UseNpgsql(_identityConnectionString)
                         .UseOpenIddict());
+
+                services.RemoveAll<DbContextOptions<ObjectsDbContext>>();
+                services.RemoveAll<ObjectsDbContext>();
+                services.AddDbContext<ObjectsDbContext>(opts =>
+                    opts.UseNpgsql(_objectsConnectionString));
 
                 services.RemoveAll<IConnectionMultiplexer>();
                 services.AddSingleton<IConnectionMultiplexer>(_ =>
@@ -134,6 +154,7 @@ public sealed class ApiTestFixture : IAsyncLifetime
         await _postgres.DisposeAsync();
 
         Environment.SetEnvironmentVariable("ConnectionStrings__Identity", _previousIdentityConnectionStringEnv);
+        Environment.SetEnvironmentVariable("ConnectionStrings__Objects", _previousObjectsConnectionStringEnv);
     }
 
     public IServiceScope CreateScope() => _factory.Services.CreateScope();
