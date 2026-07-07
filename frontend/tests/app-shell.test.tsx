@@ -84,7 +84,7 @@ describe('AppShell', () => {
 
     render(
       <QueryClientProvider client={queryClient}>
-        <AppShell>
+        <AppShell navigationContributions={[]}>
           <section aria-label="Work area">Frame content</section>
         </AppShell>
       </QueryClientProvider>,
@@ -124,7 +124,7 @@ describe('AppShell', () => {
 
     render(
       <QueryClientProvider client={queryClient}>
-        <AppShell>
+        <AppShell navigationContributions={[]}>
           <section aria-label="Work area">Frame content</section>
         </AppShell>
       </QueryClientProvider>,
@@ -159,7 +159,7 @@ describe('AppShell', () => {
 
     render(
       <QueryClientProvider client={queryClient}>
-        <AppShell>
+        <AppShell navigationContributions={[]}>
           <section aria-label="Work area">Frame content</section>
         </AppShell>
       </QueryClientProvider>,
@@ -193,7 +193,7 @@ describe('AppShell', () => {
 
     render(
       <QueryClientProvider client={queryClient}>
-        <AppShell>
+        <AppShell navigationContributions={[]}>
           <section aria-label="Work area">Frame content</section>
         </AppShell>
       </QueryClientProvider>,

@@ -37,6 +37,8 @@ Follow [reference.md](../reference.md).
 
 3. Run `.agents/skills/axis-design-gate/SKILL.md` (`$axis-design-gate`) for non-trivial work.
    - Stop for high-risk sign-off before code.
+   - For new modules, module boundaries, foundational DDD/CQRS rules, or event-sourcing changes, stop and run `.agents/skills/axis-module-architecture/SKILL.md` (`$axis-module-architecture`); carry a **Ready** verdict before code.
+   - When the slice adopts tactical DDD/CQRS/persistence/event patterns, run `.agents/skills/axis-module-patterns/SKILL.md` (`$axis-module-patterns`) and carry a **Ready** verdict before code.
    - Carry the dossier decisions into the implementation.
 
 4. Build the AC map.
@@ -65,7 +67,7 @@ Follow [reference.md](../reference.md).
    - Follow same-module patterns before inventing abstractions.
    - Use `Result` / `Result<T>` for business failures.
    - Keep endpoint logic thin: route binding, `mediator.Send`, and problem-details mapping.
-   - Keep frontend server state in TanStack Query and forms in RHF + Zod.
+   - Use `.agents/skills/axis-frontend-feature/SKILL.md` (`$axis-frontend-feature`) for frontend route, server-state loading, prefetch, mutation-cache, and URL-state workflow; keep forms in RHF + Zod.
 
 8. Update status docs when behavior/status changes.
    - Update the use-case `Implementation status` callout; status values are `Done`, `Partial`, `Not started`, and `N/A`.

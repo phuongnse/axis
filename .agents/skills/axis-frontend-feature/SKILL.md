@@ -14,7 +14,10 @@ Implement an Axis frontend slice with generated API types, user-visible states, 
 Follow [reference.md](../reference.md).
 - Use `$axis-design-gate` for non-trivial behavior; stop for high-risk sign-off before code.
 - Stop for explicit user sign-off before any feature-level visual deviation from the design-system component contract or any component API change per [docs/playbooks/frontend.md#component-design](../../../docs/playbooks/frontend.md#component-design).
+- Stop for explicit user sign-off before adding a feature-local reusable UI primitive, bypassing `frontend/src/components/ui`, or implementing bespoke interaction behavior when an approved shadcn component may cover the need.
 - Use generated API types — do not hand-write duplicate wire shapes.
+- Do not submit server-owned derived values from the UI; show advisory read-only previews only when the generated request contract excludes the field.
+- For route-owned server data, follow [docs/playbooks/frontend.md#tanstack-query-patterns](../../../docs/playbooks/frontend.md#tanstack-query-patterns); do not leave initial route data as component-only fetch unless the dossier records why loader/prefetch is not appropriate.
 - Do not claim review-ready without `$axis-ready-review`.
 
 ## Inputs
@@ -41,10 +44,17 @@ Follow [reference.md](../reference.md).
    - Search routes, feature folder exports, generated API types, hooks, test files, and sibling components with `rg`.
    - Classify every affected route as authenticated, guest-only, or public-neutral before editing route files.
    - Keep feature imports through the existing feature `index.ts` pattern.
+   - Trace the server-state path: route loader, query keys/options, API wrapper, component `useQuery`, mutation cache updates, invalidation, URL search state, and tests.
 
 4. Implement the UI behavior.
    - Use generated API types instead of hand-written duplicate shapes.
+   - Submit user-authored decisions and required protocol tokens only; when the workflow displays a server-owned derived value, render it as non-authoritative preview/read-only state and reconcile with the response value after mutation.
    - Use TanStack Query for server state and Zustand only for client-only state.
+   - For route-owned server data, define feature-level query option factories with stable keys and generated response types. Use the same factories from route loaders, prefetch calls, and component `useQuery` calls.
+   - Load first-paint business data through the route file form that supports loaders and call `context.queryClient.ensureQueryData(...)` for required data. Use `prefetchQuery` only for intent-based warming where rendering should not wait.
+   - Prefetch detail, adjacent page, or navigation data only on clear user intent and only within auth, acceptance criteria, sensitivity, and request-cost boundaries.
+   - After mutations, write returned entities into exact detail cache entries and explicitly invalidate or update affected list keys. Avoid broad feature-prefix invalidation unless the dossier names why every projection must be considered stale.
+   - Put shareable pagination, filters, and selected record identifiers in route search params; keep draft-only editor state local.
    - Use React Hook Form plus Zod for forms.
    - Include loading, empty, error, validation, disabled, and success states when the workflow needs them.
    - Keep screen shape tied to owning use-case flows, ACs, and implementation-status gaps.
@@ -54,12 +64,13 @@ Follow [reference.md](../reference.md).
    - Do not store auth tokens in `localStorage`.
    - On localized surfaces, route visible product copy through the frontend translation layer rather than component-local static text.
    - Keep visible text focused on the product workflow, not developer instructions.
-   - Use design-system component defaults and documented props; if the UI requires a visual deviation or component API change, stop for the sign-off required by [docs/playbooks/frontend.md#component-design](../../../docs/playbooks/frontend.md#component-design).
+   - Use shadcn-owned design-system component defaults and documented props from `frontend/src/components/ui`; if the UI requires a custom primitive, bespoke interaction behavior, visual deviation, or component API change, stop for the sign-off required by [docs/playbooks/frontend.md#component-design](../../../docs/playbooks/frontend.md#component-design).
 
 5. Test behavior.
    - Use Vitest and Testing Library.
    - Prefer `userEvent`.
    - Assert observable UI behavior and API interaction, not component internals.
+   - When loader or prefetch behavior changes, test the observable result and the API/cache interaction that proves initial data, intent prefetch, and mutation cache updates.
    - Cover validation, empty/error states, and permission/visibility behavior when in scope.
    - Cover escape navigation for public/auth route states when the screen can be reached directly or after a failed flow. Route metadata is a contract declaration, not a substitute for the visible behavior test.
 
@@ -72,3 +83,4 @@ Follow [reference.md](../reference.md).
 ## Output
 
 Report the feature paths changed, generated API dependency status, frontend tests, visual verification, and docs/status updates or why they were not triggered.
+Include route data-loading decisions when loader, prefetch, cache update, invalidation, or URL search state changed.

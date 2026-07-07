@@ -14,6 +14,7 @@ Change an Axis API surface without drifting from module boundaries, auth default
 Follow [reference.md](../reference.md).
 - Run `$axis-design-gate` before code; high-risk contract changes stop for user sign-off.
 - Regenerate contracts when wire shape changes — do not skip generation silently.
+- Server-owned derived values must not remain client request fields; requests accept user-authored decisions and required protocol tokens only.
 - Do not claim review-ready without `$axis-ready-review`.
 
 ## Inputs
@@ -44,6 +45,7 @@ Follow [reference.md](../reference.md).
    - Keep Minimal API endpoints thin: bind, `mediator.Send`, map `Result` to response or `ToProblemDetails()`.
    - Require `.RequireAuthorization()` unless the route is explicitly public.
    - Put stable request/response DTOs in the owning Application/API contract pattern already used by the module.
+   - Classify every request field as user-authored, required protocol token, or server-owned; derive server-owned values in Application/API code and keep them out of request DTOs.
    - Preserve camelCase JSON and generated frontend type parity.
    - Update API tests when route shape, status code, auth, validation, or response body changes.
 

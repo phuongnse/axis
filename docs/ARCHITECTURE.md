@@ -9,9 +9,12 @@ This file owns durable source and runtime boundaries. Current behavior lives in 
 - `frontend/` calls `Axis.Api` only.
 - `Axis.Api` is the REST/OpenAPI gateway and composes module infrastructure at startup.
 - Modules expose Application contracts to `Axis.Api`; module internals stay inside the module.
+- Module Domain models follow DDD tactical boundaries; aggregate roots own invariants and domain events.
+- Module Application exposes CQRS commands and side-effect-free queries through handlers.
 - Domain projects have zero external dependencies.
 - `Axis.Shared.*` is for shared primitives and cross-cutting helpers only, not product behavior.
 - Module-owned data changes use EF Core migrations.
+- Event sourcing is opt-in and requires an approved event store, replay, projection, and versioning design before source changes.
 - New product behavior starts in an owning use-case spec before source changes.
 
 ## Dependency Direction

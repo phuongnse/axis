@@ -36,6 +36,8 @@ Follow [reference.md](../reference.md).
 2. Read the governing docs for the exact surface.
    - Always read [AGENTS.md](../../../AGENTS.md), [docs/playbooks/design-gate.md](../../../docs/playbooks/design-gate.md), and [docs/playbooks/agent-checklist.md](../../../docs/playbooks/agent-checklist.md).
    - Read only the relevant surface docs: [docs/playbooks/api-patterns.md](../../../docs/playbooks/api-patterns.md), [docs/playbooks/frontend.md](../../../docs/playbooks/frontend.md), [docs/playbooks/testing.md](../../../docs/playbooks/testing.md), or the owning use-case file.
+   - For new modules, module boundaries, DDD/CQRS foundations, or event-sourcing decisions, read `.agents/skills/axis-module-architecture/SKILL.md` (`$axis-module-architecture`) after the dossier and before implementation.
+   - For tactical DDD/CQRS pattern implementation, read `.agents/skills/axis-module-patterns/SKILL.md` (`$axis-module-patterns`) after architecture readiness when applicable.
    - For stack/library changes, read [docs/TECH_STACK.md](../../../docs/TECH_STACK.md) and the touched version owner manifest before deciding whether sign-off is required.
 
 3. Quote governing rules.

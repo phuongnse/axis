@@ -21,9 +21,10 @@ interface AuthNoticeProps {
 
 export function AuthNotice({ title, children, variant = 'default', className }: AuthNoticeProps) {
   const Icon = noticeIcons[variant];
+  const alertVariant = variant === 'destructive' ? 'destructive' : 'default';
 
   return (
-    <Alert variant={variant} className={className}>
+    <Alert variant={alertVariant} className={className}>
       <Icon aria-hidden />
       {title ? <AlertTitle>{title}</AlertTitle> : null}
       {children ? <AlertDescription>{children}</AlertDescription> : null}

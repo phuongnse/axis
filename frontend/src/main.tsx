@@ -7,6 +7,7 @@ import './index.css';
 import './features/preferences/i18n';
 
 import { useTranslation } from 'react-i18next';
+import { TooltipProvider } from '@/components/ui/tooltip';
 import { shouldRenderDevtools } from './lib/devtools';
 import { queryClient } from './lib/query-client';
 import { routeTree } from './routeTree.gen';
@@ -42,8 +43,10 @@ if (!rootElement.innerHTML) {
   root.render(
     <React.StrictMode>
       <QueryClientProvider client={queryClient}>
-        <RouterProvider router={router} />
-        {shouldRenderDevtools() ? <ReactQueryDevtools initialIsOpen={false} /> : null}
+        <TooltipProvider>
+          <RouterProvider router={router} />
+          {shouldRenderDevtools() ? <ReactQueryDevtools initialIsOpen={false} /> : null}
+        </TooltipProvider>
       </QueryClientProvider>
     </React.StrictMode>,
   );

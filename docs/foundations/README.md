@@ -9,7 +9,7 @@ Foundation contracts are the source of truth for enabling surfaces that are not 
 | Surface | Foundation | Status |
 |---|---|---|
 | [docs/foundations/app-shell/README.md](./app-shell/README.md) | [docs/foundations/app-shell/app-frame.md](./app-shell/app-frame.md) | Done |
-| [docs/foundations/app-shell/README.md](./app-shell/README.md) | [docs/foundations/app-shell/module-navigation.md](./app-shell/module-navigation.md) | Partial |
+| [docs/foundations/app-shell/README.md](./app-shell/README.md) | [docs/foundations/app-shell/module-navigation.md](./app-shell/module-navigation.md) | Done |
 
 ## Rule
 
