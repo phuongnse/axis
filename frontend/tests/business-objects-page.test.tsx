@@ -497,10 +497,61 @@ describe('BusinessObjectsPage', () => {
     if (!editorAlert) throw new Error('Expected scoped field validation alert');
 
     expect(editorAlert).toHaveClass('bg-destructive/15');
-    expect(editorAlert).toHaveTextContent('Field keys must start with a lowercase letter.');
+    expect(editorAlert).toHaveTextContent(
+      'Field keys must start with a lowercase letter and be unique.',
+    );
     expect(editorAlert).toHaveTextContent('Field labels are required.');
     expect(fieldKey).toHaveAttribute('aria-invalid', 'true');
     expect(label).toHaveAttribute('aria-invalid', 'true');
+  });
+
+  it('marks every field with a duplicated key as invalid', async () => {
+    const user = userEvent.setup();
+    vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input.toString();
+      const method = init?.method ?? 'GET';
+      const body = typeof init?.body === 'string' ? JSON.parse(init.body) : undefined;
+
+      if (url.includes('/api/object-definitions?')) {
+        return jsonResponse({ items: [], totalCount: 0, page: 1, pageSize: 20 });
+      }
+
+      if (method === 'POST' && url.endsWith('/api/object-definitions')) {
+        return jsonResponse(
+          draftDetail({ name: body.name, objectKey: deriveObjectKey(body.name) }),
+          201,
+        );
+      }
+
+      return Promise.reject(new Error(`Unexpected fetch: ${method} ${url}`));
+    });
+
+    await renderWithRouter(<BusinessObjectsPage />, { path: '/objects' });
+    await user.type(await screen.findByLabelText('Name'), 'Customer');
+    await user.click(screen.getByRole('button', { name: 'Create draft' }));
+    await screen.findByText('Draft created');
+
+    await user.click(screen.getByRole('button', { name: 'Add field' }));
+    await user.click(screen.getByRole('button', { name: 'Add field' }));
+
+    const fieldKeys = screen.getAllByLabelText('Field key');
+    const labels = screen.getAllByLabelText('Label');
+    await user.type(fieldKeys[0], 'customer_name');
+    await user.type(labels[0], 'Customer name');
+    await user.type(fieldKeys[1], 'customer_name');
+    await user.type(labels[1], 'Duplicate customer name');
+    await user.click(screen.getByRole('button', { name: 'Save draft' }));
+
+    const editorForm = screen.getByRole('form', { name: 'Customer' });
+    const editorAlertTitle = within(editorForm).getByText('Check required values');
+    const editorAlert = editorAlertTitle.closest('[role="alert"]');
+    if (!editorAlert) throw new Error('Expected scoped duplicate-key validation alert');
+
+    expect(editorAlert).toHaveTextContent(
+      'Field keys must start with a lowercase letter and be unique.',
+    );
+    expect(fieldKeys[0]).toHaveAttribute('aria-invalid', 'true');
+    expect(fieldKeys[1]).toHaveAttribute('aria-invalid', 'true');
   });
 
   it('disables publication until draft fields are present', async () => {

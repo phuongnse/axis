@@ -8,6 +8,6 @@ internal static partial class DefinitionKeyFormat
 
     public static bool IsValid(string value) => KeyRegex().IsMatch(value);
 
-    [GeneratedRegex("^[a-z][a-z0-9_]{0,62}$")]
+    [GeneratedRegex(@"^[a-z][a-z0-9_]{0,62}\z")]
     private static partial Regex KeyRegex();
 }

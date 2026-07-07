@@ -90,6 +90,8 @@ function draftDetail({
   };
 }
 
+type ObjectDefinitionDetail = ReturnType<typeof draftDetail>;
+
 function deriveObjectKey(name: string): string {
   return (
     name
@@ -101,12 +103,18 @@ function deriveObjectKey(name: string): string {
   );
 }
 
-function publishedDetail(fields: ObjectFieldRequest[]) {
+function publishedDetail(definition: ObjectDefinitionDetail) {
+  const fields = definition.fields.map((field) => ({
+    fieldKey: field.fieldKey,
+    label: field.label,
+    order: field.order,
+  }));
+
   return {
     ...draftDetail({
-      name: 'Customer',
-      objectKey: 'customer',
-      draftVersion: 2,
+      name: definition.name,
+      objectKey: definition.objectKey,
+      draftVersion: definition.draftVersion,
       fields,
     }),
     status: 'Published',
@@ -256,7 +264,7 @@ async function mockObjectDefinitionApi(
     }
 
     if (method === 'POST' && url.pathname === `/api/object-definitions/${definitionId}/publish`) {
-      currentDefinition = publishedDetail(currentDefinition.fields);
+      currentDefinition = publishedDetail(currentDefinition);
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -704,7 +712,9 @@ test.describe('define business object', () => {
     const editorForm = page.getByRole('form', { name: 'Customer' });
     const alert = editorForm.getByRole('alert').filter({ hasText: 'Check required values' });
     await expect(alert).toHaveClass(/bg-destructive\/15/);
-    await expect(alert).toContainText('Field keys must start with a lowercase letter.');
+    await expect(alert).toContainText(
+      'Field keys must start with a lowercase letter and be unique.',
+    );
     await expect(alert).toContainText('Field labels are required.');
     await expect(page.getByLabel('Field key')).toHaveAttribute('aria-invalid', 'true');
     await expect(page.getByLabel('Label')).toHaveAttribute('aria-invalid', 'true');

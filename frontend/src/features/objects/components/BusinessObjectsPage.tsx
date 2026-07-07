@@ -425,6 +425,8 @@ export function BusinessObjectsPage() {
                   type="button"
                   variant="outline"
                   size="sm"
+                  aria-label={t('objects.previousPage')}
+                  title={t('objects.previousPage')}
                   disabled={page <= 1}
                   onFocus={() => prefetchPage(page - 1)}
                   onMouseEnter={() => prefetchPage(page - 1)}
@@ -436,6 +438,8 @@ export function BusinessObjectsPage() {
                   type="button"
                   variant="outline"
                   size="sm"
+                  aria-label={t('objects.nextPage')}
+                  title={t('objects.nextPage')}
                   disabled={page >= totalPages}
                   onFocus={() => prefetchPage(page + 1)}
                   onMouseEnter={() => prefetchPage(page + 1)}
@@ -570,6 +574,7 @@ export function BusinessObjectsPage() {
                     key={field.clientId}
                     field={field}
                     index={index}
+                    isLast={index === fields.length - 1}
                     disabled={isPublished}
                     onChange={(patch) => updateField(field.clientId, patch)}
                     onMove={moveField}
@@ -832,6 +837,7 @@ function deriveObjectKey(name: string) {
 function FieldEditor({
   field,
   index,
+  isLast,
   disabled,
   onChange,
   onMove,
@@ -840,6 +846,7 @@ function FieldEditor({
 }: {
   field: EditableField;
   index: number;
+  isLast: boolean;
   disabled: boolean;
   onChange: (patch: Partial<EditableField>) => void;
   onMove: (clientId: string, direction: -1 | 1) => void;
@@ -890,7 +897,7 @@ function FieldEditor({
           </IconButton>
           <IconButton
             label={t('objects.moveDown')}
-            disabled={disabled}
+            disabled={disabled || isLast}
             onClick={() => onMove(field.clientId, 1)}
           >
             <ArrowDown className="size-4" aria-hidden />
@@ -968,7 +975,7 @@ function validateFields(
 ): FieldValidationResult {
   const errors: string[] = [];
   const fieldErrors: Record<string, EditableFieldErrors> = {};
-  const seenKeys = new Set<string>();
+  const keyCounts = new Map<string, number>();
 
   if (options.requireFields && fields.length === 0) {
     errors.push(t('objects.validationFieldsRequired'));
@@ -976,8 +983,16 @@ function validateFields(
 
   for (const field of fields) {
     const trimmedKey = field.fieldKey.trim();
+    if (!trimmedKey) continue;
 
-    if (!keyPattern.test(trimmedKey) || seenKeys.has(trimmedKey)) {
+    keyCounts.set(trimmedKey, (keyCounts.get(trimmedKey) ?? 0) + 1);
+  }
+
+  for (const field of fields) {
+    const trimmedKey = field.fieldKey.trim();
+    const duplicatedKey = trimmedKey ? (keyCounts.get(trimmedKey) ?? 0) > 1 : false;
+
+    if (!keyPattern.test(trimmedKey) || duplicatedKey) {
       addFieldValidationError(
         fieldErrors,
         errors,
@@ -986,7 +1001,6 @@ function validateFields(
         t('objects.validationFieldKey'),
       );
     }
-    seenKeys.add(trimmedKey);
 
     if (!field.label.trim()) {
       addFieldValidationError(

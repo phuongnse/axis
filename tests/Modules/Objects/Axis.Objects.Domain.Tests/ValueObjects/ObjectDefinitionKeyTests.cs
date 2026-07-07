@@ -17,9 +17,12 @@ public sealed class ObjectDefinitionKeyTests
     [Theory]
     [InlineData("")]
     [InlineData("Customer")]
+    [InlineData(" customer")]
     [InlineData("_customer")]
+    [InlineData("customer ")]
     [InlineData("customer-name")]
     [InlineData("customer account")]
+    [InlineData("customer\n")]
     [InlineData("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")]
     public void Create_WhenValueViolatesSupportedFormat_ReturnsFailure(string value)
     {

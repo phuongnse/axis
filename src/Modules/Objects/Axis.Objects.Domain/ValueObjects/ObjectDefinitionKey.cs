@@ -15,15 +15,15 @@ public sealed class ObjectDefinitionKey : ValueObject
         if (string.IsNullOrWhiteSpace(value))
             return Result<ObjectDefinitionKey>.Failure("Object key is required.");
 
-        string normalized = value.Trim();
-        if (!DefinitionKeyFormat.IsValid(normalized))
+        string candidate = value;
+        if (!DefinitionKeyFormat.IsValid(candidate))
         {
             return Result<ObjectDefinitionKey>.Failure(
                 "Object key must be 1-63 characters, start with a lowercase letter, " +
                 "and contain only lowercase letters, digits, and underscores.");
         }
 
-        return new ObjectDefinitionKey(normalized);
+        return new ObjectDefinitionKey(candidate);
     }
 
     public static Result<ObjectDefinitionKey> CreateFromName(string? name)
