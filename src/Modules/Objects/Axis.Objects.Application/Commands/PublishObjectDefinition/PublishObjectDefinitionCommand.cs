@@ -4,5 +4,5 @@ namespace Axis.Objects.Application.Commands.PublishObjectDefinition;
 
 public sealed record PublishObjectDefinitionCommand(
     Guid ObjectDefinitionId,
-    int ExpectedDraftVersion)
+    int ExpectedRevision)
     : ICommand<ObjectDefinitionDetailDto>;

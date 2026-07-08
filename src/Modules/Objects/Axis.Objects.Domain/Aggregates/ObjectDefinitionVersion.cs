@@ -53,7 +53,7 @@ public sealed class ObjectDefinitionVersion : Entity<ObjectDefinitionVersionId>
             publishedAt);
         version._fields.AddRange(definition.Fields
             .OrderBy(field => field.Order)
-            .Select(ObjectDefinitionVersionField.FromDraft));
+            .Select(ObjectDefinitionVersionField.FromCurrentDefinition));
         return version;
     }
 }

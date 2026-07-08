@@ -12,33 +12,33 @@ public sealed class ObjectDefinitionTests
     private static readonly DateTime Now = new(2026, 7, 6, 10, 0, 0, DateTimeKind.Utc);
 
     [Fact]
-    public void CreateDraft_WhenDefinitionIdentityIsValid_CreatesEditableDraftAtVersionOne()
+    public void CreateUnpublished_WhenDefinitionIdentityIsValid_CreatesEditableUnpublishedDefinitionAtRevisionOne()
     {
-        ObjectDefinition definition = CreateDraft();
+        ObjectDefinition definition = CreateUnpublished();
 
         definition.WorkspaceId.Should().Be(WorkspaceId);
         definition.Name.Should().Be("Customer");
         definition.Key.Value.Should().Be("customer");
-        definition.Status.Should().Be(ObjectDefinitionStatus.Draft);
-        definition.DraftVersion.Should().Be(1);
+        definition.Status.Should().Be(ObjectDefinitionStatus.Unpublished);
+        definition.Revision.Should().Be(1);
         definition.Fields.Should().BeEmpty();
     }
 
     [Fact]
-    public void SaveDraft_WhenFieldDefinitionsAreValid_PreservesStableFieldsAndIncrementsDraftVersion()
+    public void SaveUnpublished_WhenFieldDefinitionsAreValid_PreservesStableFieldsAndIncrementsRevision()
     {
-        ObjectDefinition definition = CreateDraft();
+        ObjectDefinition definition = CreateUnpublished();
 
-        Result result = definition.SaveDraft(
+        Result result = definition.SaveUnpublished(
             "Customer Account",
             ValidFields(),
-            expectedDraftVersion: 1,
+            expectedRevision: 1,
             Now.AddMinutes(1));
 
         result.IsSuccess.Should().BeTrue();
         definition.Name.Should().Be("Customer Account");
         definition.Key.Value.Should().Be("customer");
-        definition.DraftVersion.Should().Be(2);
+        definition.Revision.Should().Be(2);
         definition.Fields.Select(field => field.Key.Value)
             .Should().Equal("name", "credit_limit", "opened_on");
         definition.Fields.Select(field => field.Label)
@@ -46,39 +46,39 @@ public sealed class ObjectDefinitionTests
     }
 
     [Fact]
-    public void SaveDraft_WhenFieldKeyAlreadyExists_ReturnsInvalidInputWithoutChangingDraft()
+    public void SaveUnpublished_WhenFieldKeyAlreadyExists_ReturnsInvalidInputWithoutChangingUnpublishedDefinition()
     {
-        ObjectDefinition definition = CreateDraft();
+        ObjectDefinition definition = CreateUnpublished();
 
-        Result result = definition.SaveDraft(
+        Result result = definition.SaveUnpublished(
             "Customer",
             [
                 Field("name", "Name", order: 0),
                 Field("name", "Display name", order: 1),
             ],
-            expectedDraftVersion: 1,
+            expectedRevision: 1,
             Now);
 
         result.IsFailure.Should().BeTrue();
         result.ErrorCode.Should().Be(ErrorCodes.InvalidInput);
-        definition.DraftVersion.Should().Be(1);
+        definition.Revision.Should().Be(1);
         definition.Fields.Should().BeEmpty();
     }
 
     [Fact]
-    public void SaveDraft_WhenExpectedDraftVersionIsStale_ReturnsConflictWithoutOverwrite()
+    public void SaveUnpublished_WhenExpectedRevisionIsStale_ReturnsConflictWithoutOverwrite()
     {
-        ObjectDefinition definition = CreateDraft();
-        definition.SaveDraft(
+        ObjectDefinition definition = CreateUnpublished();
+        definition.SaveUnpublished(
             "Customer",
             [Field("name", "Name", order: 0)],
-            expectedDraftVersion: 1,
+            expectedRevision: 1,
             Now).IsSuccess.Should().BeTrue();
 
-        Result stale = definition.SaveDraft(
+        Result stale = definition.SaveUnpublished(
             "Customer stale",
             [Field("new_name", "New name", order: 0)],
-            expectedDraftVersion: 1,
+            expectedRevision: 1,
             Now);
 
         stale.IsFailure.Should().BeTrue();
@@ -88,14 +88,14 @@ public sealed class ObjectDefinitionTests
     }
 
     [Fact]
-    public void SaveDraft_WhenFieldLabelIsMissing_ReturnsInvalidInput()
+    public void SaveUnpublished_WhenFieldLabelIsMissing_ReturnsInvalidInput()
     {
-        ObjectDefinition definition = CreateDraft();
+        ObjectDefinition definition = CreateUnpublished();
 
-        Result result = definition.SaveDraft(
+        Result result = definition.SaveUnpublished(
             "Customer",
             [Field("name", " ", order: 0)],
-            expectedDraftVersion: 1,
+            expectedRevision: 1,
             Now);
 
         result.IsFailure.Should().BeTrue();
@@ -103,17 +103,17 @@ public sealed class ObjectDefinitionTests
     }
 
     [Fact]
-    public void Publish_WhenDraftIsValid_CreatesImmutableVersionOneSnapshot()
+    public void Publish_WhenUnpublishedDefinitionIsValid_CreatesImmutableVersionOneSnapshot()
     {
-        ObjectDefinition definition = CreateDraft();
-        definition.SaveDraft(
+        ObjectDefinition definition = CreateUnpublished();
+        definition.SaveUnpublished(
             "Customer",
             ValidFields(),
-            expectedDraftVersion: 1,
+            expectedRevision: 1,
             Now).IsSuccess.Should().BeTrue();
 
         Result<ObjectDefinitionVersion> result = definition.Publish(
-            expectedDraftVersion: 2,
+            expectedRevision: 2,
             UserId,
             Now.AddMinutes(2));
 
@@ -133,12 +133,12 @@ public sealed class ObjectDefinitionTests
     }
 
     [Fact]
-    public void Publish_WhenDraftHasNoFields_ReturnsInvalidInput()
+    public void Publish_WhenUnpublishedDefinitionHasNoFields_ReturnsInvalidInput()
     {
-        ObjectDefinition definition = CreateDraft();
+        ObjectDefinition definition = CreateUnpublished();
 
         Result<ObjectDefinitionVersion> result = definition.Publish(
-            expectedDraftVersion: 1,
+            expectedRevision: 1,
             UserId,
             Now);
 
@@ -146,9 +146,9 @@ public sealed class ObjectDefinitionTests
         result.ErrorCode.Should().Be(ErrorCodes.InvalidInput);
     }
 
-    private static ObjectDefinition CreateDraft()
+    private static ObjectDefinition CreateUnpublished()
     {
-        Result<ObjectDefinition> result = ObjectDefinition.CreateDraft(
+        Result<ObjectDefinition> result = ObjectDefinition.CreateUnpublished(
             WorkspaceId,
             "Customer",
             ObjectDefinitionKey.Create("customer").Value,

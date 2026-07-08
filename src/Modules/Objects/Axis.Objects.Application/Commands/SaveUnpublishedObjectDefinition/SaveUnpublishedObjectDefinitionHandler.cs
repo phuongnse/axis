@@ -7,16 +7,16 @@ using Axis.Shared.Application.CQRS;
 using Axis.Shared.Application.Identity;
 using Axis.Shared.Domain.Primitives;
 
-namespace Axis.Objects.Application.Commands.SaveObjectDefinitionDraft;
+namespace Axis.Objects.Application.Commands.SaveUnpublishedObjectDefinition;
 
-public sealed class SaveObjectDefinitionDraftHandler(
+public sealed class SaveUnpublishedObjectDefinitionHandler(
     ICurrentUser currentUser,
     IObjectDefinitionRepository repository,
     IUnitOfWork unitOfWork)
-    : ICommandHandler<SaveObjectDefinitionDraftCommand, ObjectDefinitionDetailDto>
+    : ICommandHandler<SaveUnpublishedObjectDefinitionCommand, ObjectDefinitionDetailDto>
 {
     public async Task<Result<ObjectDefinitionDetailDto>> Handle(
-        SaveObjectDefinitionDraftCommand command,
+        SaveUnpublishedObjectDefinitionCommand command,
         CancellationToken cancellationToken)
     {
         if (currentUser.workspaceId is not Guid workspaceId)
@@ -28,10 +28,10 @@ public sealed class SaveObjectDefinitionDraftHandler(
         if (definition is null)
             return ObjectDefinitionFailures.NotFound<ObjectDefinitionDetailDto>();
 
-        Result saved = definition.SaveDraft(
+        Result saved = definition.SaveUnpublished(
             command.Name,
             ObjectDefinitionMapper.ToDomainSpecs(command.Fields),
-            command.ExpectedDraftVersion,
+            command.ExpectedRevision,
             DateTime.UtcNow);
         if (saved.IsFailure)
             return MapDomainFailure(saved);
@@ -43,7 +43,7 @@ public sealed class SaveObjectDefinitionDraftHandler(
         catch (ConcurrencyException)
         {
             return ObjectDefinitionFailures.Conflict<ObjectDefinitionDetailDto>(
-                "The object definition draft has changed.");
+                "The object definition has changed.");
         }
         catch (UniqueConstraintException)
         {

@@ -10,11 +10,10 @@ import {
   Maximize2,
   Minimize2,
   Plus,
-  Save,
   Trash2,
   UploadCloud,
 } from 'lucide-react';
-import { type ReactNode, useEffect, useState } from 'react';
+import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { type UseFormSetError, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
@@ -24,11 +23,24 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
+import {
+  Item,
+  ItemActions,
+  ItemContent,
+  ItemDescription,
+  ItemHeader,
+  ItemTitle,
+} from '@/components/ui/item';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { defaultDebounceMs, useDebouncedValue } from '@/hooks/use-debounced-value';
+import {
+  defaultMinimumPendingIndicatorMs,
+  useMinimumVisiblePending,
+} from '@/hooks/use-minimum-visible-pending';
 import { ApiError } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import {
-  createObjectDefinitionDraft,
+  createObjectDefinition,
   type ObjectDefinitionDetail,
   type ObjectFieldDefinitionInput,
   objectDefinitionDetailQueryOptions,
@@ -36,10 +48,12 @@ import {
   objectDefinitionsDefaultPageSize,
   objectDefinitionsListQueryOptions,
   publishObjectDefinition,
-  saveObjectDefinitionDraft,
+  saveUnpublishedObjectDefinition,
 } from '../api';
 
 const keyPattern = /^[a-z][a-z0-9_]{0,62}$/;
+const autosaveDebounceMs = defaultDebounceMs;
+const autosaveSavingMinimumMs = defaultMinimumPendingIndicatorMs;
 
 const identitySchema = z.object({
   name: z.string().trim().min(1, 'objects.validationName'),
@@ -67,8 +81,23 @@ interface EditableFieldErrors {
   label?: string;
 }
 
+type EditableFieldInput = keyof EditableFieldErrors;
+type FieldInputTouches = Partial<Record<EditableFieldInput, true>>;
+type TouchedFieldInputs = Record<string, FieldInputTouches>;
+
+interface DefinitionSnapshotField {
+  fieldKey: string;
+  label: string;
+}
+
+interface DefinitionSnapshot {
+  name: string;
+  fields: DefinitionSnapshotField[];
+}
+
 interface FieldValidationResult {
   messages: string[];
+  formMessages: string[];
   fieldErrors: Record<string, EditableFieldErrors>;
 }
 
@@ -81,12 +110,27 @@ export function BusinessObjectsPage() {
   const [fields, setFields] = useState<EditableField[]>([]);
   const [feedback, setFeedback] = useState<FeedbackState | null>(null);
   const [fieldValidationMode, setFieldValidationMode] = useState<'save' | 'publish' | null>(null);
+  const [validatedFieldIds, setValidatedFieldIds] = useState<string[] | null>(null);
+  const [touchedFieldInputs, setTouchedFieldInputs] = useState<TouchedFieldInputs>({});
   const [fieldsExpanded, setFieldsExpanded] = useState(false);
+  const [savedSnapshot, setSavedSnapshot] = useState<DefinitionSnapshot | null>(null);
+  const [hasAutosaveActivity, setHasAutosaveActivity] = useState(false);
 
   const identityForm = useForm<IdentityFormValues>({
     resolver: zodResolver(identitySchema),
     defaultValues: { name: '' },
   });
+  const watchedName = identityForm.watch('name');
+  const currentSnapshot = useMemo(
+    () => toDefinitionSnapshot(watchedName, fields),
+    [fields, watchedName],
+  );
+  const debouncedSnapshot = useDebouncedValue(currentSnapshot, autosaveDebounceMs);
+  const currentSnapshotRef = useRef<DefinitionSnapshot>(currentSnapshot);
+
+  useEffect(() => {
+    currentSnapshotRef.current = currentSnapshot;
+  }, [currentSnapshot]);
 
   const listQuery = useQuery(objectDefinitionsListQueryOptions(page));
   const detailQuery = useQuery({
@@ -95,21 +139,25 @@ export function BusinessObjectsPage() {
   });
 
   const createMutation = useMutation({
-    mutationFn: createObjectDefinitionDraft,
+    mutationFn: createObjectDefinition,
     onSuccess: (definition) => {
       setSelectedId(definition.id ?? null);
       setSelectedDefinition(definition);
-      setFields(fromDefinitionFields(definition));
+      const definitionFields = fromDefinitionFields(definition);
+      setFields(definitionFields);
       identityForm.reset({
         name: definition.name ?? '',
       });
+      setSavedSnapshot(toDefinitionSnapshot(definition.name ?? '', definitionFields));
+      setHasAutosaveActivity(false);
+      setTouchedFieldInputs({});
       setFeedback({ scope: 'identity', variant: 'success', titleKey: 'objects.created' });
-      setFieldValidationMode(null);
+      clearFieldValidation();
       cacheObjectDefinitionResult(queryClient, definition);
     },
     onError: (error) => {
-      applyIdentityApiErrors(error, identityForm.setError);
-      setFeedback(apiErrorFeedback(error, 'identity'));
+      const hasIdentityError = applyIdentityApiErrors(error, identityForm.setError);
+      setFeedback(apiErrorFeedback(error, 'identity', hasIdentityError ? ['name'] : []));
     },
   });
 
@@ -119,34 +167,60 @@ export function BusinessObjectsPage() {
       request,
     }: {
       id: string;
-      request: Parameters<typeof saveObjectDefinitionDraft>[1];
-    }) => saveObjectDefinitionDraft(id, request),
-    onSuccess: (definition) => {
+      request: Parameters<typeof saveUnpublishedObjectDefinition>[1];
+      snapshot: DefinitionSnapshot;
+    }) => saveUnpublishedObjectDefinition(id, request),
+    onSuccess: (definition, variables) => {
       setSelectedId(definition.id ?? null);
       setSelectedDefinition(definition);
-      setFields(fromDefinitionFields(definition));
-      setFeedback({ scope: 'fields', variant: 'success', titleKey: 'objects.saved' });
-      setFieldValidationMode(null);
+      const definitionFields = fromDefinitionFields(definition);
+      const serverSnapshot = toDefinitionSnapshot(definition.name ?? '', definitionFields);
+      setSavedSnapshot(serverSnapshot);
+      if (definitionSnapshotsEqual(currentSnapshotRef.current, variables.snapshot)) {
+        setFields(definitionFields);
+        identityForm.reset({
+          name: definition.name ?? '',
+        });
+        setHasAutosaveActivity(true);
+        setTouchedFieldInputs({});
+        setFeedback(null);
+        clearFieldValidation();
+      } else {
+        setHasAutosaveActivity(false);
+      }
       cacheObjectDefinitionResult(queryClient, definition);
     },
     onError: (error) => {
       const hasIdentityError = applyIdentityApiErrors(error, identityForm.setError);
-      setFeedback(apiErrorFeedback(error, hasIdentityError ? 'identity' : 'fields'));
+      setFeedback(
+        apiErrorFeedback(
+          error,
+          hasIdentityError ? 'identity' : 'fields',
+          hasIdentityError ? ['name'] : [],
+        ),
+      );
     },
   });
 
   const publishMutation = useMutation({
-    mutationFn: ({ id, expectedDraftVersion }: { id: string; expectedDraftVersion: number }) =>
-      publishObjectDefinition(id, { expectedDraftVersion }),
+    mutationFn: ({ id, expectedRevision }: { id: string; expectedRevision: number }) =>
+      publishObjectDefinition(id, { expectedRevision }),
     onSuccess: (definition) => {
       setSelectedId(definition.id ?? null);
       setSelectedDefinition(definition);
-      setFields(fromDefinitionFields(definition));
+      const definitionFields = fromDefinitionFields(definition);
+      setFields(definitionFields);
+      setSavedSnapshot(toDefinitionSnapshot(definition.name ?? '', definitionFields));
+      setHasAutosaveActivity(false);
+      setTouchedFieldInputs({});
       setFeedback({ scope: 'publish', variant: 'success', titleKey: 'objects.published' });
-      setFieldValidationMode(null);
+      clearFieldValidation();
       cacheObjectDefinitionResult(queryClient, definition);
     },
     onError: (error) => setFeedback(apiErrorFeedback(error, 'publish')),
+  });
+  const showSavingStatus = useMinimumVisiblePending(saveMutation.isPending, {
+    minimumMs: autosaveSavingMinimumMs,
   });
 
   useEffect(() => {
@@ -158,17 +232,22 @@ export function BusinessObjectsPage() {
 
   useEffect(() => {
     if (!detailQuery.data) return;
+    if (detailQuery.data.id && detailQuery.data.id === selectedDefinition?.id) return;
 
     setSelectedDefinition(detailQuery.data);
-    setFields(fromDefinitionFields(detailQuery.data));
+    const definitionFields = fromDefinitionFields(detailQuery.data);
+    setFields(definitionFields);
     identityForm.reset({
       name: detailQuery.data.name ?? '',
     });
-  }, [detailQuery.data, identityForm]);
+    setSavedSnapshot(toDefinitionSnapshot(detailQuery.data.name ?? '', definitionFields));
+    setHasAutosaveActivity(false);
+    setTouchedFieldInputs({});
+  }, [detailQuery.data, identityForm, selectedDefinition?.id]);
 
   const totalCount = listQuery.data?.totalCount ?? 0;
   const totalPages = Math.max(1, Math.ceil(totalCount / objectDefinitionsDefaultPageSize));
-  const selectedStatus = selectedDefinition?.status ?? 'Draft';
+  const selectedStatus = selectedDefinition?.status ?? 'Unpublished';
   const isPublished = selectedStatus === 'Published';
   const busy = createMutation.isPending || saveMutation.isPending || publishMutation.isPending;
   const addFieldUnavailable = !selectedDefinition || isPublished;
@@ -176,10 +255,36 @@ export function BusinessObjectsPage() {
   const publishValidation = selectedDefinition
     ? validateFields(fields, t, { requireFields: true })
     : emptyFieldValidationResult();
+  const hasUnsavedChanges = Boolean(
+    selectedDefinition &&
+      savedSnapshot &&
+      !definitionSnapshotsEqual(currentSnapshot, savedSnapshot),
+  );
+  const autosaveIdentityResult = identitySchema.safeParse({ name: currentSnapshot.name });
+  const autosaveValidation = selectedDefinition
+    ? validateFields(fields, t, { requireFields: false })
+    : emptyFieldValidationResult();
+  const canAutosaveCurrentSnapshot = Boolean(
+    selectedDefinition &&
+      savedSnapshot &&
+      hasUnsavedChanges &&
+      autosaveIdentityResult.success &&
+      autosaveValidation.messages.length === 0,
+  );
+  const showAutosavePending = canAutosaveCurrentSnapshot || showSavingStatus;
   const publishUnavailable =
-    !selectedDefinition || busy || isPublished || publishValidation.messages.length > 0;
+    !selectedDefinition ||
+    busy ||
+    isPublished ||
+    hasUnsavedChanges ||
+    showAutosavePending ||
+    publishValidation.messages.length > 0;
   const activeFieldValidation = fieldValidationMode
-    ? validateFields(fields, t, { requireFields: fieldValidationMode === 'publish' })
+    ? validateFields(fields, t, {
+        requireFields: fieldValidationMode === 'publish',
+        fieldIds: validatedFieldIds,
+        fieldTouches: fieldValidationMode === 'save' ? touchedFieldInputs : undefined,
+      })
     : emptyFieldValidationResult();
   const identityFeedback = feedback?.scope === 'identity' ? feedback : null;
   const fieldsFeedback =
@@ -194,8 +299,107 @@ export function BusinessObjectsPage() {
           activeFieldValidation,
         )
       : null;
-  const objectKeyPreview =
-    selectedDefinition?.objectKey ?? deriveObjectKey(identityForm.watch('name'));
+  const objectKeyPreview = selectedDefinition?.objectKey ?? deriveObjectKey(watchedName);
+  const autosaveStatusKind = showAutosavePending
+    ? 'pending'
+    : hasAutosaveActivity && !publishUnavailable
+      ? 'saved'
+      : 'idle';
+  const autosaveStatusLabel =
+    autosaveStatusKind === 'pending'
+      ? t('objects.autosavePendingLabel')
+      : autosaveStatusKind === 'saved'
+        ? t('objects.autosaveSaved')
+        : '';
+  const autosaveStatusPlaceholder = t('objects.autosaveSaved');
+
+  useEffect(() => {
+    if (
+      !selectedDefinition?.id ||
+      selectedDefinition.revision == null ||
+      isPublished ||
+      !savedSnapshot
+    ) {
+      return;
+    }
+
+    if (!definitionSnapshotsEqual(currentSnapshot, debouncedSnapshot)) {
+      return;
+    }
+
+    if (definitionSnapshotsEqual(debouncedSnapshot, savedSnapshot)) {
+      return;
+    }
+
+    if (saveMutation.isPending) return;
+
+    const definitionId = selectedDefinition.id;
+    const expectedRevision = selectedDefinition.revision;
+    const identityResult = identitySchema.safeParse({ name: debouncedSnapshot.name });
+    const fullValidation = validateFields(fields, t, { requireFields: false });
+    const visibleValidation = validateFields(fields, t, {
+      requireFields: false,
+      fieldTouches: touchedFieldInputs,
+    });
+
+    if (!identityResult.success || fullValidation.messages.length > 0) {
+      if (!identityResult.success) {
+        identityForm.setError('name', {
+          type: 'client',
+          message: 'objects.validationName',
+        });
+      } else {
+        identityForm.clearErrors('name');
+      }
+
+      setHasAutosaveActivity(false);
+      if (visibleValidation.messages.length > 0) {
+        setFieldValidationMode('save');
+      } else {
+        setFieldValidationMode(null);
+      }
+      setValidatedFieldIds(null);
+      setFeedback(
+        visibleValidation.formMessages.length > 0
+          ? {
+              scope: 'fields',
+              variant: 'destructive',
+              titleKey: 'objects.validationTitle',
+              detail: visibleValidation.formMessages.join(' '),
+            }
+          : null,
+      );
+      return;
+    }
+
+    identityForm.clearErrors('name');
+    setFieldValidationMode(null);
+    setValidatedFieldIds(null);
+    setFeedback(null);
+    setHasAutosaveActivity(true);
+    saveMutation.mutate({
+      id: definitionId,
+      snapshot: debouncedSnapshot,
+      request: {
+        expectedRevision,
+        name: identityResult.data.name,
+        fields: toRequestFields(debouncedSnapshot),
+      },
+    });
+  }, [
+    currentSnapshot,
+    debouncedSnapshot,
+    fields,
+    identityForm,
+    isPublished,
+    saveMutation.isPending,
+    saveMutation.mutate,
+    savedSnapshot,
+    selectedDefinition?.id,
+    selectedDefinition?.revision,
+    t,
+    touchedFieldInputs,
+  ]);
 
   async function handleCreate(values: IdentityFormValues) {
     setFeedback(null);
@@ -205,12 +409,15 @@ export function BusinessObjectsPage() {
     });
   }
 
-  function handleNewDraft() {
+  function handleNewDefinition() {
     setSelectedDefinition(null);
     setSelectedId(null);
     setFields([]);
     setFeedback(null);
-    setFieldValidationMode(null);
+    setSavedSnapshot(null);
+    setHasAutosaveActivity(false);
+    setTouchedFieldInputs({});
+    clearFieldValidation();
     setFieldsExpanded(false);
     identityForm.reset({ name: '' });
   }
@@ -219,7 +426,9 @@ export function BusinessObjectsPage() {
     if (!id) return;
     setSelectedId(id);
     setFeedback(null);
-    setFieldValidationMode(null);
+    setHasAutosaveActivity(false);
+    setTouchedFieldInputs({});
+    clearFieldValidation();
   }
 
   function prefetchDefinition(id: string | undefined) {
@@ -243,13 +452,36 @@ export function BusinessObjectsPage() {
     ]);
   }
 
+  function startFieldValidation(mode: 'save' | 'publish') {
+    setFieldValidationMode(mode);
+    setValidatedFieldIds(fields.map((field) => field.clientId));
+  }
+
+  function clearFieldValidation() {
+    setFieldValidationMode(null);
+    setValidatedFieldIds(null);
+  }
+
   function updateField(clientId: string, patch: Partial<EditableField>) {
+    const touchedInputs = Object.keys(patch).filter(
+      (key): key is EditableFieldInput => key === 'fieldKey' || key === 'label',
+    );
+    if (touchedInputs.length > 0) {
+      setTouchedFieldInputs((current) => ({
+        ...current,
+        [clientId]: {
+          ...current[clientId],
+          ...Object.fromEntries(touchedInputs.map((key) => [key, true])),
+        },
+      }));
+    }
     setFields((current) =>
       current.map((field) => (field.clientId === clientId ? { ...field, ...patch } : field)),
     );
   }
 
   function removeField(clientId: string) {
+    setTouchedFieldInputs((current) => omitRecordKey(current, clientId));
     setFields((current) => current.filter((field) => field.clientId !== clientId));
   }
 
@@ -265,53 +497,30 @@ export function BusinessObjectsPage() {
     });
   }
 
-  async function handleSave(values: IdentityFormValues) {
-    if (!selectedDefinition?.id || !selectedDefinition.draftVersion) return;
-
-    const validation = validateFields(fields, t, { requireFields: false });
-    setFieldValidationMode('save');
-    if (validation.messages.length > 0) {
-      setFeedback({
-        scope: 'fields',
-        variant: 'destructive',
-        titleKey: 'objects.validationTitle',
-        detail: validation.messages.join(' '),
-      });
-      return;
-    }
-
-    setFeedback(null);
-    setFieldValidationMode(null);
-    saveMutation.mutate({
-      id: selectedDefinition.id,
-      request: {
-        expectedDraftVersion: selectedDefinition.draftVersion,
-        name: values.name,
-        fields: fields.map(toFieldInput),
-      },
-    });
-  }
-
   function handlePublish() {
-    if (!selectedDefinition?.id || !selectedDefinition.draftVersion) return;
+    if (!selectedDefinition?.id || selectedDefinition.revision == null) return;
 
     const validation = validateFields(fields, t, { requireFields: true });
-    setFieldValidationMode('publish');
+    startFieldValidation('publish');
     if (validation.messages.length > 0) {
-      setFeedback({
-        scope: 'publish',
-        variant: 'destructive',
-        titleKey: 'objects.validationTitle',
-        detail: validation.messages.join(' '),
-      });
+      setFeedback(
+        validation.formMessages.length > 0
+          ? {
+              scope: 'publish',
+              variant: 'destructive',
+              titleKey: 'objects.validationTitle',
+              detail: validation.formMessages.join(' '),
+            }
+          : null,
+      );
       return;
     }
 
     setFeedback(null);
-    setFieldValidationMode(null);
+    clearFieldValidation();
     publishMutation.mutate({
       id: selectedDefinition.id,
-      expectedDraftVersion: selectedDefinition.draftVersion,
+      expectedRevision: selectedDefinition.revision,
     });
   }
 
@@ -327,7 +536,7 @@ export function BusinessObjectsPage() {
           <h1 className="text-2xl font-semibold text-foreground">{t('objects.title')}</h1>
           <p className="mt-1 text-sm text-muted-foreground">{t('objects.pageDescription')}</p>
         </div>
-        <Button type="button" onClick={handleNewDraft}>
+        <Button type="button" onClick={handleNewDefinition}>
           <FilePlus2 className="size-4" aria-hidden />
           {t('objects.new')}
         </Button>
@@ -377,40 +586,44 @@ export function BusinessObjectsPage() {
                   </p>
                 </div>
               ) : null}
-              <div className="flex flex-col gap-1">
+              <div className="flex flex-col gap-1.5">
                 {(listQuery.data?.items ?? []).map((definition) => {
                   const active =
                     definition.id === selectedId || definition.id === selectedDefinition?.id;
                   return (
-                    <Button
+                    <Item
                       key={definition.id}
-                      type="button"
                       variant="outline"
+                      size="xs"
+                      render={<Button type="button" variant="ghost" />}
+                      aria-current={active ? 'true' : undefined}
                       onFocus={() => prefetchDefinition(definition.id)}
                       onMouseEnter={() => prefetchDefinition(definition.id)}
                       onClick={() => handleSelect(definition.id)}
                       className={cn(
-                        'h-auto w-full min-w-0 justify-start rounded-md border-transparent bg-transparent px-2.5 py-2 text-left shadow-none hover:bg-accent focus-visible:ring-3 focus-visible:ring-ring/35',
+                        'h-auto justify-start rounded-md bg-transparent text-left whitespace-normal hover:bg-accent hover:text-foreground dark:hover:bg-accent',
                         active && 'bg-accent',
                       )}
                     >
-                      <span className="flex min-w-0 items-center justify-between gap-2">
-                        <span className="truncate text-sm font-medium text-foreground">
-                          {definition.name}
-                        </span>
-                        {definition.latestPublishedVersionNumber ? (
-                          <span className="shrink-0 text-xs text-muted-foreground">
-                            {t('objects.latestVersion', {
-                              version: definition.latestPublishedVersionNumber,
-                            })}
-                          </span>
-                        ) : null}
-                      </span>
-                      <span className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
-                        <span className="truncate">{definition.objectKey}</span>
-                        <StatusBadge status={definition.status ?? 'Draft'} />
-                      </span>
-                    </Button>
+                      <ItemContent className="min-w-0">
+                        <ItemHeader className="min-w-0">
+                          <ItemTitle className="min-w-0 flex-1">
+                            <span className="truncate">{definition.name}</span>
+                          </ItemTitle>
+                          {definition.latestPublishedVersionNumber ? (
+                            <ItemActions className="shrink-0 text-xs text-muted-foreground">
+                              {t('objects.latestVersion', {
+                                version: definition.latestPublishedVersionNumber,
+                              })}
+                            </ItemActions>
+                          ) : null}
+                        </ItemHeader>
+                        <ItemDescription className="flex min-w-0 items-center gap-2">
+                          <span className="truncate">{definition.objectKey}</span>
+                          <StatusBadge status={definition.status ?? 'Unpublished'} />
+                        </ItemDescription>
+                      </ItemContent>
+                    </Item>
                   );
                 })}
               </div>
@@ -461,7 +674,12 @@ export function BusinessObjectsPage() {
             id="objects-definition-form"
             aria-labelledby="objects-editor-title"
             className="flex h-full min-h-0 min-w-0 flex-col"
-            onSubmit={identityForm.handleSubmit(selectedDefinition ? handleSave : handleCreate)}
+            onSubmit={
+              selectedDefinition
+                ? (event) => event.preventDefault()
+                : identityForm.handleSubmit(handleCreate)
+            }
+            noValidate
           >
             <div className="flex shrink-0 flex-col gap-3 border-b border-border px-4 py-4 sm:flex-row sm:items-start sm:justify-between">
               <div className="min-w-0">
@@ -485,19 +703,27 @@ export function BusinessObjectsPage() {
             {fieldsExpanded ? null : (
               <div className="grid shrink-0 gap-4 p-4 sm:grid-cols-2">
                 <Field data-invalid={Boolean(identityForm.formState.errors.name)}>
-                  <FieldLabel htmlFor="object-name">{t('objects.name')}</FieldLabel>
+                  <FieldLabel htmlFor="object-name" required>
+                    {t('objects.name')}
+                  </FieldLabel>
                   <Input
                     id="object-name"
+                    required
+                    aria-describedby={
+                      identityForm.formState.errors.name
+                        ? 'object-name-help object-name-error'
+                        : 'object-name-help'
+                    }
                     aria-invalid={Boolean(identityForm.formState.errors.name)}
                     disabled={isPublished}
                     {...identityForm.register('name')}
                   />
-                  <FieldError>
+                  <FieldError id="object-name-error">
                     {identityForm.formState.errors.name?.message
                       ? t(identityForm.formState.errors.name.message)
                       : null}
                   </FieldError>
-                  <FieldDescription>{t('objects.nameHelp')}</FieldDescription>
+                  <FieldDescription id="object-name-help">{t('objects.nameHelp')}</FieldDescription>
                 </Field>
                 <Field>
                   <FieldLabel htmlFor="object-key">{t('objects.objectKey')}</FieldLabel>
@@ -602,49 +828,67 @@ export function BusinessObjectsPage() {
             {!isPublished ? (
               <CardFooter className="flex shrink-0 flex-col items-stretch gap-3">
                 {publishFeedback ? <FeedbackAlert feedback={publishFeedback} /> : null}
-                <div className="flex shrink-0 flex-col gap-2 sm:flex-row sm:justify-end">
-                  <DisabledActionHint
-                    active={editorSubmitUnavailable}
-                    label={t('objects.actionUnavailable')}
-                  >
-                    <Button
-                      type="submit"
-                      form="objects-definition-form"
-                      variant={editorSubmitUnavailable ? 'outline' : 'default'}
-                      disabled={editorSubmitUnavailable}
-                      className="w-full sm:w-auto"
-                    >
-                      {selectedDefinition ? (
-                        <Save className="size-4" aria-hidden />
-                      ) : (
-                        <Plus className="size-4" aria-hidden />
-                      )}
-                      {selectedDefinition
-                        ? saveMutation.isPending
-                          ? t('objects.saving')
-                          : t('objects.saveDraft')
-                        : createMutation.isPending
-                          ? t('objects.creating')
-                          : t('objects.create')}
-                    </Button>
-                  </DisabledActionHint>
+                <div className="flex shrink-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                   {selectedDefinition ? (
-                    <DisabledActionHint
-                      active={publishUnavailable}
-                      label={t('objects.actionUnavailable')}
+                    <p
+                      role={autosaveStatusLabel ? 'status' : undefined}
+                      aria-live="polite"
+                      aria-atomic="true"
+                      className="min-h-5 min-w-20 text-xs font-medium text-muted-foreground"
                     >
-                      <Button
-                        type="button"
-                        variant={publishUnavailable ? 'outline' : 'default'}
-                        disabled={publishUnavailable}
-                        onClick={handlePublish}
-                        className="w-full sm:w-auto"
-                      >
-                        <UploadCloud className="size-4" aria-hidden />
-                        {publishMutation.isPending ? t('objects.publishing') : t('objects.publish')}
-                      </Button>
-                    </DisabledActionHint>
+                      {autosaveStatusKind === 'pending' ? (
+                        <>
+                          <span className="sr-only">{autosaveStatusLabel}</span>
+                          <AutosavePendingDots />
+                        </>
+                      ) : (
+                        <span
+                          aria-hidden={autosaveStatusLabel ? undefined : true}
+                          className={cn(!autosaveStatusLabel && 'invisible')}
+                        >
+                          {autosaveStatusLabel || autosaveStatusPlaceholder}
+                        </span>
+                      )}
+                    </p>
                   ) : null}
+                  <div className="flex flex-col gap-2 sm:ml-auto sm:flex-row sm:justify-end">
+                    {!selectedDefinition ? (
+                      <DisabledActionHint
+                        active={editorSubmitUnavailable}
+                        label={t('objects.actionUnavailable')}
+                      >
+                        <Button
+                          type="submit"
+                          form="objects-definition-form"
+                          variant={editorSubmitUnavailable ? 'outline' : 'default'}
+                          disabled={editorSubmitUnavailable}
+                          className="w-full sm:w-auto"
+                        >
+                          <Plus className="size-4" aria-hidden />
+                          {createMutation.isPending ? t('objects.creating') : t('objects.create')}
+                        </Button>
+                      </DisabledActionHint>
+                    ) : null}
+                    {selectedDefinition ? (
+                      <DisabledActionHint
+                        active={publishUnavailable}
+                        label={t('objects.actionUnavailable')}
+                      >
+                        <Button
+                          type="button"
+                          variant={publishUnavailable ? 'outline' : 'default'}
+                          disabled={publishUnavailable}
+                          onClick={handlePublish}
+                          className="w-full sm:w-auto"
+                        >
+                          <UploadCloud className="size-4" aria-hidden />
+                          {publishMutation.isPending
+                            ? t('objects.publishing')
+                            : t('objects.publish')}
+                        </Button>
+                      </DisabledActionHint>
+                    ) : null}
+                  </div>
                 </div>
               </CardFooter>
             ) : null}
@@ -669,8 +913,8 @@ export function BusinessObjectsPage() {
                 <ol className="text-sm" aria-label={t('objects.workflowLabel')}>
                   <WorkflowStep
                     index={1}
-                    title={t('objects.workflowDraftTitle')}
-                    detail={t('objects.workflowDraftDetail')}
+                    title={t('objects.workflowIdentityTitle')}
+                    detail={t('objects.workflowIdentityDetail')}
                   />
                   <WorkflowStep
                     index={2}
@@ -749,10 +993,11 @@ function currentValidationFeedback(
 ): FeedbackState | null {
   if (!active) return feedback;
   if (validation.messages.length === 0) return null;
+  if (validation.formMessages.length === 0) return null;
 
   return {
     ...feedback,
-    detail: validation.messages.join(' '),
+    detail: validation.formMessages.join(' '),
   };
 }
 
@@ -855,19 +1100,18 @@ function FieldEditor({
 }) {
   const { t } = useTranslation();
   const prefix = `field-${field.clientId}`;
-  const hasErrors = Boolean(errors?.fieldKey || errors?.label);
 
   return (
-    <div
-      data-invalid={hasErrors}
-      className="rounded-lg border border-border bg-background/45 p-3 data-[invalid=true]:border-destructive data-[invalid=true]:bg-destructive/5"
-    >
-      <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
+    <div className="rounded-lg border border-border bg-background/45 p-3">
+      <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] lg:items-start">
         <Field data-invalid={Boolean(errors?.fieldKey)}>
-          <FieldLabel htmlFor={`${prefix}-key`}>{t('objects.fieldKey')}</FieldLabel>
+          <FieldLabel htmlFor={`${prefix}-key`} required>
+            {t('objects.fieldKey')}
+          </FieldLabel>
           <Input
             id={`${prefix}-key`}
             value={field.fieldKey}
+            required
             aria-invalid={Boolean(errors?.fieldKey)}
             aria-describedby={errors?.fieldKey ? `${prefix}-key-error` : undefined}
             disabled={disabled}
@@ -876,10 +1120,13 @@ function FieldEditor({
           <FieldError id={`${prefix}-key-error`}>{errors?.fieldKey}</FieldError>
         </Field>
         <Field data-invalid={Boolean(errors?.label)}>
-          <FieldLabel htmlFor={`${prefix}-label`}>{t('objects.label')}</FieldLabel>
+          <FieldLabel htmlFor={`${prefix}-label`} required>
+            {t('objects.label')}
+          </FieldLabel>
           <Input
             id={`${prefix}-label`}
             value={field.label}
+            required
             aria-invalid={Boolean(errors?.label)}
             aria-describedby={errors?.label ? `${prefix}-label-error` : undefined}
             disabled={disabled}
@@ -887,7 +1134,7 @@ function FieldEditor({
           />
           <FieldError id={`${prefix}-label-error`}>{errors?.label}</FieldError>
         </Field>
-        <div className="flex items-end gap-1">
+        <div className="flex items-start gap-1 lg:self-start lg:pt-7">
           <IconButton
             label={t('objects.moveUp')}
             disabled={disabled || index === 0}
@@ -942,13 +1189,30 @@ function IconButton({
   );
 }
 
+function AutosavePendingDots() {
+  return (
+    <span aria-hidden="true" className="inline-flex min-h-5 items-center gap-1">
+      <span className="size-[5px] animate-pulse rounded-full bg-muted-foreground/80 [animation-delay:0ms]" />
+      <span className="size-[5px] animate-pulse rounded-full bg-muted-foreground/80 [animation-delay:150ms]" />
+      <span className="size-[5px] animate-pulse rounded-full bg-muted-foreground/80 [animation-delay:300ms]" />
+    </span>
+  );
+}
+
 function StatusBadge({ status }: { status: string }) {
   const { t } = useTranslation();
   const published = status === 'Published';
 
   return (
-    <Badge variant={published ? 'secondary' : 'outline'}>
-      {published ? t('objects.published') : t('objects.draft')}
+    <Badge
+      variant="outline"
+      className={cn(
+        published
+          ? 'border-emerald-600/30 bg-emerald-500/15 text-emerald-800 dark:border-emerald-400/30 dark:bg-emerald-400/15 dark:text-emerald-200'
+          : 'border-amber-500/35 bg-amber-400/20 text-amber-900 dark:border-amber-300/30 dark:bg-amber-300/15 dark:text-amber-100',
+      )}
+    >
+      {published ? t('objects.published') : t('objects.unpublished')}
     </Badge>
   );
 }
@@ -961,24 +1225,58 @@ function fromDefinitionFields(definition: ObjectDefinitionDetail): EditableField
   }));
 }
 
-function toFieldInput(field: EditableField): ObjectFieldDefinitionInput {
+function toDefinitionSnapshot(name: string, fields: readonly EditableField[]): DefinitionSnapshot {
   return {
+    name,
+    fields: fields.map((field) => ({
+      fieldKey: field.fieldKey,
+      label: field.label,
+    })),
+  };
+}
+
+function toRequestFields(snapshot: DefinitionSnapshot): ObjectFieldDefinitionInput[] {
+  return snapshot.fields.map((field) => ({
     fieldKey: field.fieldKey.trim(),
     label: field.label.trim(),
-  };
+  }));
+}
+
+function definitionSnapshotsEqual(left: DefinitionSnapshot, right: DefinitionSnapshot): boolean {
+  if (left.name !== right.name) return false;
+  if (left.fields.length !== right.fields.length) return false;
+
+  return left.fields.every((field, index) => {
+    const other = right.fields[index];
+    return field.fieldKey === other?.fieldKey && field.label === other?.label;
+  });
+}
+
+function omitRecordKey<T>(record: Record<string, T>, keyToOmit: string): Record<string, T> {
+  const { [keyToOmit]: _omitted, ...next } = record;
+  return next;
 }
 
 function validateFields(
   fields: readonly EditableField[],
   t: (key: string) => string,
-  options: { requireFields: boolean },
+  options: {
+    requireFields: boolean;
+    fieldIds?: readonly string[] | null;
+    fieldTouches?: TouchedFieldInputs;
+  },
 ): FieldValidationResult {
   const errors: string[] = [];
+  const formErrors: string[] = [];
   const fieldErrors: Record<string, EditableFieldErrors> = {};
+  const validatedFieldIds = options.fieldIds ? new Set(options.fieldIds) : null;
+  const fieldsToValidate = validatedFieldIds
+    ? fields.filter((field) => validatedFieldIds.has(field.clientId))
+    : fields;
   const keyCounts = new Map<string, number>();
 
-  if (options.requireFields && fields.length === 0) {
-    errors.push(t('objects.validationFieldsRequired'));
+  if (options.requireFields && fieldsToValidate.length === 0) {
+    addFormValidationError(errors, formErrors, t('objects.validationFieldsRequired'));
   }
 
   for (const field of fields) {
@@ -988,11 +1286,22 @@ function validateFields(
     keyCounts.set(trimmedKey, (keyCounts.get(trimmedKey) ?? 0) + 1);
   }
 
-  for (const field of fields) {
+  for (const field of fieldsToValidate) {
     const trimmedKey = field.fieldKey.trim();
     const duplicatedKey = trimmedKey ? (keyCounts.get(trimmedKey) ?? 0) > 1 : false;
+    const touchedInputs = options.fieldTouches?.[field.clientId];
+    const shouldValidateFieldKey = !options.fieldTouches || touchedInputs?.fieldKey;
+    const shouldValidateLabel = !options.fieldTouches || touchedInputs?.label;
 
-    if (!keyPattern.test(trimmedKey) || duplicatedKey) {
+    if (shouldValidateFieldKey && !trimmedKey) {
+      addFieldValidationError(
+        fieldErrors,
+        errors,
+        field.clientId,
+        'fieldKey',
+        t('objects.validationFieldKeyRequired'),
+      );
+    } else if (shouldValidateFieldKey && (!keyPattern.test(trimmedKey) || duplicatedKey)) {
       addFieldValidationError(
         fieldErrors,
         errors,
@@ -1002,7 +1311,7 @@ function validateFields(
       );
     }
 
-    if (!field.label.trim()) {
+    if (shouldValidateLabel && !field.label.trim()) {
       addFieldValidationError(
         fieldErrors,
         errors,
@@ -1015,6 +1324,7 @@ function validateFields(
 
   return {
     messages: [...new Set(errors)],
+    formMessages: [...new Set(formErrors)],
     fieldErrors,
   };
 }
@@ -1022,8 +1332,14 @@ function validateFields(
 function emptyFieldValidationResult(): FieldValidationResult {
   return {
     messages: [],
+    formMessages: [],
     fieldErrors: {},
   };
+}
+
+function addFormValidationError(messages: string[], formMessages: string[], message: string) {
+  messages.push(message);
+  formMessages.push(message);
 }
 
 function addFieldValidationError(
@@ -1040,11 +1356,19 @@ function addFieldValidationError(
   messages.push(message);
 }
 
-function apiErrorFeedback(error: unknown, scope: FeedbackScope): FeedbackState {
+function apiErrorFeedback(
+  error: unknown,
+  scope: FeedbackScope,
+  excludedValidationFields: readonly string[] = [],
+): FeedbackState | null {
   if (error instanceof ApiError) {
-    const detail = apiErrorDetail(error.data);
+    const detail = apiErrorDetail(error.data, excludedValidationFields);
 
     if (!detail) {
+      if (excludedValidationFields.length > 0 && apiErrorHasValidationErrors(error.data)) {
+        return null;
+      }
+
       return {
         scope,
         variant: 'destructive',
@@ -1085,24 +1409,40 @@ function applyIdentityApiErrors(
   return true;
 }
 
-function apiErrorDetail(data: unknown): string | undefined {
+function apiErrorDetail(
+  data: unknown,
+  excludedValidationFields: readonly string[] = [],
+): string | undefined {
   const record = objectRecord(data);
   if (!record) return undefined;
 
-  return (
-    validationErrorsText(record.errors) ?? firstText(record.detail, record.title, record.message)
-  );
+  const validationText = validationErrorsText(record.errors, excludedValidationFields);
+  if (validationText) return validationText;
+  if (apiErrorHasValidationErrors(data)) return undefined;
+
+  return firstText(record.detail, record.title, record.message);
 }
 
-function validationErrorsText(errors: unknown): string | undefined {
+function validationErrorsText(
+  errors: unknown,
+  excludedValidationFields: readonly string[] = [],
+): string | undefined {
   const record = objectRecord(errors);
   if (!record) return undefined;
+  const excludedFields = new Set(excludedValidationFields.map((field) => field.toLowerCase()));
 
-  const messages = Object.values(record)
+  const messages = Object.entries(record)
+    .filter(([key]) => !excludedFields.has(key.toLowerCase()))
+    .map(([, value]) => value)
     .flatMap((value) => (Array.isArray(value) ? value : [value]))
     .filter(isNonEmptyString);
 
   return messages.length > 0 ? [...new Set(messages)].join(' ') : undefined;
+}
+
+function apiErrorHasValidationErrors(data: unknown): boolean {
+  const record = objectRecord(data);
+  return Boolean(record && validationErrorsText(record.errors));
 }
 
 function apiErrorMessagesByField(error: unknown): Record<string, string[]> {

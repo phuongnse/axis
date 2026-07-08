@@ -44,17 +44,17 @@ public sealed class ObjectDefinitionEndpointTests(ApiTestFixture fixture)
         createResponse.Headers.Location!.ToString().Should().StartWith($"/api/object-definitions/");
         JsonElement created = await createResponse.Content.ReadFromJsonAsync<JsonElement>(Json);
         Guid definitionId = created.GetProperty("id").GetGuid();
-        created.GetProperty("status").GetString().Should().Be(nameof(ObjectDefinitionStatus.Draft));
+        created.GetProperty("status").GetString().Should().Be(nameof(ObjectDefinitionStatus.Unpublished));
         created.GetProperty("objectKey").GetString().Should().Be(objectKey);
-        created.GetProperty("draftVersion").GetInt32().Should().Be(1);
+        created.GetProperty("revision").GetInt32().Should().Be(1);
 
         HttpResponseMessage saveResponse = await SendWithBearerAsync(
             HttpMethod.Put,
-            $"/api/object-definitions/{definitionId}/draft",
+            $"/api/object-definitions/{definitionId}/unpublished",
             accessToken,
             new
             {
-                expectedDraftVersion = 1,
+                expectedRevision = 1,
                 name = $"{objectName} renamed",
                 fields = new object[]
                 {
@@ -74,14 +74,14 @@ public sealed class ObjectDefinitionEndpointTests(ApiTestFixture fixture)
         saveResponse.StatusCode.Should().Be(HttpStatusCode.OK);
         JsonElement saved = await saveResponse.Content.ReadFromJsonAsync<JsonElement>(Json);
         saved.GetProperty("objectKey").GetString().Should().Be(objectKey);
-        saved.GetProperty("draftVersion").GetInt32().Should().Be(2);
+        saved.GetProperty("revision").GetInt32().Should().Be(2);
         saved.GetProperty("fields").GetArrayLength().Should().Be(2);
 
         HttpResponseMessage publishResponse = await SendWithBearerAsync(
             HttpMethod.Post,
             $"/api/object-definitions/{definitionId}/publish",
             accessToken,
-            new { expectedDraftVersion = 2 });
+            new { expectedRevision = 2 });
 
         publishResponse.StatusCode.Should().Be(HttpStatusCode.OK);
         JsonElement published = await publishResponse.Content.ReadFromJsonAsync<JsonElement>(Json);
@@ -113,23 +113,23 @@ public sealed class ObjectDefinitionEndpointTests(ApiTestFixture fixture)
     }
 
     [Fact]
-    public async Task SaveDraft_WhenExpectedVersionIsStale_ReturnsConflictProblemCode()
+    public async Task SaveUnpublished_WhenExpectedRevisionIsStale_ReturnsConflictProblemCode()
     {
         string accessToken = await CreateVerifiedSessionTokenAsync(UniqueEmail());
         string objectKey = UniqueKey("invoice");
-        Guid definitionId = await CreateDraftAsync(accessToken, ObjectNameFromKey(objectKey));
+        Guid definitionId = await CreateUnpublishedAsync(accessToken, ObjectNameFromKey(objectKey));
 
         HttpResponseMessage firstSave = await SaveWithOneFieldAsync(
             accessToken,
             definitionId,
-            expectedDraftVersion: 1,
+            expectedRevision: 1,
             fieldKey: "number");
         firstSave.StatusCode.Should().Be(HttpStatusCode.OK);
 
         HttpResponseMessage staleSave = await SaveWithOneFieldAsync(
             accessToken,
             definitionId,
-            expectedDraftVersion: 1,
+            expectedRevision: 1,
             fieldKey: "total");
 
         staleSave.StatusCode.Should().Be(HttpStatusCode.Conflict);
@@ -139,12 +139,12 @@ public sealed class ObjectDefinitionEndpointTests(ApiTestFixture fixture)
     }
 
     [Fact]
-    public async Task CreateDraft_WhenObjectKeyAlreadyExistsInWorkspace_ReturnsConflictProblemCode()
+    public async Task CreateUnpublished_WhenObjectKeyAlreadyExistsInWorkspace_ReturnsConflictProblemCode()
     {
         string accessToken = await CreateVerifiedSessionTokenAsync(UniqueEmail());
         string objectKey = UniqueKey("account");
         string objectName = ObjectNameFromKey(objectKey);
-        await CreateDraftAsync(accessToken, objectName);
+        await CreateUnpublishedAsync(accessToken, objectName);
 
         HttpResponseMessage duplicateResponse = await SendWithBearerAsync(
             HttpMethod.Post,
@@ -163,7 +163,7 @@ public sealed class ObjectDefinitionEndpointTests(ApiTestFixture fixture)
     {
         string ownerToken = await CreateVerifiedSessionTokenAsync(UniqueEmail());
         string otherToken = await CreateVerifiedSessionTokenAsync(UniqueEmail());
-        Guid definitionId = await CreateDraftAsync(
+        Guid definitionId = await CreateUnpublishedAsync(
             ownerToken,
             ObjectNameFromKey(UniqueKey("private_object")));
 
@@ -178,7 +178,7 @@ public sealed class ObjectDefinitionEndpointTests(ApiTestFixture fixture)
     }
 
     [Fact]
-    public async Task CreateDraft_WhenClientSendsObjectKey_IgnoresClientValueAndReturnsDerivedKey()
+    public async Task CreateUnpublished_WhenClientSendsObjectKey_IgnoresClientValueAndReturnsDerivedKey()
     {
         string accessToken = await CreateVerifiedSessionTokenAsync(UniqueEmail());
         string objectKey = UniqueKey("client_owned");
@@ -194,7 +194,7 @@ public sealed class ObjectDefinitionEndpointTests(ApiTestFixture fixture)
         body.GetProperty("objectKey").GetString().Should().Be(objectKey);
     }
 
-    private async Task<Guid> CreateDraftAsync(string accessToken, string objectName)
+    private async Task<Guid> CreateUnpublishedAsync(string accessToken, string objectName)
     {
         HttpResponseMessage response = await SendWithBearerAsync(
             HttpMethod.Post,
@@ -210,15 +210,15 @@ public sealed class ObjectDefinitionEndpointTests(ApiTestFixture fixture)
     private async Task<HttpResponseMessage> SaveWithOneFieldAsync(
         string accessToken,
         Guid definitionId,
-        int expectedDraftVersion,
+        int expectedRevision,
         string fieldKey) =>
         await SendWithBearerAsync(
             HttpMethod.Put,
-            $"/api/object-definitions/{definitionId}/draft",
+            $"/api/object-definitions/{definitionId}/unpublished",
             accessToken,
             new
             {
-                expectedDraftVersion,
+                expectedRevision,
                 name = "Business Object",
                 fields = new object[]
                 {

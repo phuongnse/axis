@@ -1,17 +1,17 @@
 using FluentValidation;
 
-namespace Axis.Objects.Application.Commands.SaveObjectDefinitionDraft;
+namespace Axis.Objects.Application.Commands.SaveUnpublishedObjectDefinition;
 
-public sealed class SaveObjectDefinitionDraftCommandValidator
-    : AbstractValidator<SaveObjectDefinitionDraftCommand>
+public sealed class SaveUnpublishedObjectDefinitionCommandValidator
+    : AbstractValidator<SaveUnpublishedObjectDefinitionCommand>
 {
-    public SaveObjectDefinitionDraftCommandValidator()
+    public SaveUnpublishedObjectDefinitionCommandValidator()
     {
         RuleFor(command => command.ObjectDefinitionId)
             .NotEmpty()
             .WithErrorCode(ObjectsProblemCodes.ObjectDefinitionInvalid);
 
-        RuleFor(command => command.ExpectedDraftVersion)
+        RuleFor(command => command.ExpectedRevision)
             .GreaterThan(0)
             .WithErrorCode(ObjectsProblemCodes.ObjectDefinitionInvalid);
 

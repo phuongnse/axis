@@ -11,7 +11,7 @@ public sealed class PublishObjectDefinitionCommandValidator
             .NotEmpty()
             .WithErrorCode(ObjectsProblemCodes.ObjectDefinitionInvalid);
 
-        RuleFor(command => command.ExpectedDraftVersion)
+        RuleFor(command => command.ExpectedRevision)
             .GreaterThan(0)
             .WithErrorCode(ObjectsProblemCodes.ObjectDefinitionInvalid);
     }

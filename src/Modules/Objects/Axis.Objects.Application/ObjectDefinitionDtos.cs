@@ -21,7 +21,7 @@ public sealed record ObjectDefinitionDetailDto(
     string Name,
     string ObjectKey,
     ObjectDefinitionStatus Status,
-    int DraftVersion,
+    int Revision,
     int? LatestPublishedVersionNumber,
     DateTime CreatedAt,
     DateTime UpdatedAt,
@@ -33,7 +33,7 @@ public sealed record ObjectDefinitionListItemDto(
     string Name,
     string ObjectKey,
     ObjectDefinitionStatus Status,
-    int DraftVersion,
+    int Revision,
     int? LatestPublishedVersionNumber,
     DateTime UpdatedAt);
 

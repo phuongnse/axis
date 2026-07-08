@@ -1,5 +1,5 @@
 import { QueryClient } from '@tanstack/react-query';
-import { screen, waitFor, within } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { objectDefinitionQueryKeys } from '@/features/objects/api';
@@ -60,7 +60,7 @@ describe('BusinessObjectsPage', () => {
 
   it('prefetches definition detail on list item intent and reuses the cache on selection', async () => {
     const user = userEvent.setup();
-    const detail = draftDetail({ name: 'Customer', objectKey: 'customer', draftVersion: 3 });
+    const detail = unpublishedDetail({ name: 'Customer', objectKey: 'customer', revision: 3 });
     let detailRequestCount = 0;
 
     vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -75,7 +75,7 @@ describe('BusinessObjectsPage', () => {
               name: detail.name,
               objectKey: detail.objectKey,
               status: detail.status,
-              draftVersion: detail.draftVersion,
+              revision: detail.revision,
               latestPublishedVersionNumber: null,
               updatedAt: detail.updatedAt,
             },
@@ -97,13 +97,17 @@ describe('BusinessObjectsPage', () => {
     await renderWithRouter(<BusinessObjectsPage />, { path: '/objects' });
 
     const listItem = await screen.findByRole('button', { name: /Customer/ });
+    expect(listItem).toHaveClass('border-border');
     await user.hover(listItem);
 
     await waitFor(() => expect(detailRequestCount).toBe(1));
     await user.click(listItem);
 
+    expect(listItem).toHaveAttribute('aria-current', 'true');
+    expect(listItem).toHaveClass('bg-accent');
     expect(await screen.findByLabelText('Object key')).toHaveValue('customer');
-    expect(screen.queryByText('Draft 3')).not.toBeInTheDocument();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(screen.queryByText('Not published 3')).not.toBeInTheDocument();
     await waitFor(() => expect(detailRequestCount).toBe(1));
   });
 
@@ -133,7 +137,7 @@ describe('BusinessObjectsPage', () => {
       'before:bg-border',
     );
     expect(steps[0]).toHaveTextContent('1');
-    expect(steps[0]).toHaveTextContent('Create draft identity');
+    expect(steps[0]).toHaveTextContent('Create definition identity');
     expect(steps[1]).toHaveTextContent('2');
     expect(steps[1]).toHaveTextContent('Shape the contract');
     expect(steps[2]).toHaveTextContent('3');
@@ -142,7 +146,7 @@ describe('BusinessObjectsPage', () => {
     expect(steps[0]).not.toHaveClass('rounded-lg', 'border', 'bg-card');
   });
 
-  it('creates, saves, and publishes a business object definition draft', async () => {
+  it('creates, saves, and publishes a business object definition', async () => {
     const user = userEvent.setup();
     const listItems: unknown[] = [];
     const requests: { method: string; url: string; body?: unknown }[] = [];
@@ -163,28 +167,28 @@ describe('BusinessObjectsPage', () => {
       }
 
       if (method === 'POST' && url.endsWith('/api/object-definitions')) {
-        const detail = draftDetail({
+        const detail = unpublishedDetail({
           name: body.name,
           objectKey: deriveObjectKey(body.name),
-          draftVersion: 1,
+          revision: 1,
         });
         listItems.splice(0, listItems.length, {
           id: detail.id,
           name: detail.name,
           objectKey: detail.objectKey,
           status: detail.status,
-          draftVersion: detail.draftVersion,
+          revision: detail.revision,
           latestPublishedVersionNumber: null,
           updatedAt: detail.updatedAt,
         });
         return jsonResponse(detail, 201);
       }
 
-      if (method === 'PUT' && url.endsWith(`/api/object-definitions/${definitionId}/draft`)) {
-        const detail = draftDetail({
+      if (method === 'PUT' && url.endsWith(`/api/object-definitions/${definitionId}/unpublished`)) {
+        const detail = unpublishedDetail({
           name: body.name,
           objectKey: 'customer',
-          draftVersion: 2,
+          revision: 2,
           fields: body.fields,
         });
         listItems.splice(0, listItems.length, {
@@ -192,7 +196,7 @@ describe('BusinessObjectsPage', () => {
           name: detail.name,
           objectKey: detail.objectKey,
           status: detail.status,
-          draftVersion: detail.draftVersion,
+          revision: detail.revision,
           latestPublishedVersionNumber: null,
           updatedAt: detail.updatedAt,
         });
@@ -201,10 +205,10 @@ describe('BusinessObjectsPage', () => {
 
       if (method === 'POST' && url.endsWith(`/api/object-definitions/${definitionId}/publish`)) {
         const detail = {
-          ...draftDetail({
+          ...unpublishedDetail({
             name: 'Customer',
             objectKey: 'customer',
-            draftVersion: 2,
+            revision: 2,
             fields: [
               {
                 id: fieldId,
@@ -236,7 +240,7 @@ describe('BusinessObjectsPage', () => {
           name: detail.name,
           objectKey: detail.objectKey,
           status: detail.status,
-          draftVersion: detail.draftVersion,
+          revision: detail.revision,
           latestPublishedVersionNumber: 1,
           updatedAt: detail.updatedAt,
         });
@@ -251,13 +255,13 @@ describe('BusinessObjectsPage', () => {
     expect(await screen.findAllByText('No business objects')).not.toHaveLength(0);
     expect(
       screen.getByText(
-        'Create a draft to define the structure and rules for a reusable business object.',
+        'Start a definition to capture the structure and rules for a reusable business object.',
       ),
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Add field' })).toBeDisabled();
     expect(
       within(screen.getByRole('form', { name: 'Define business object' })).getByRole('button', {
-        name: 'Create draft',
+        name: 'Start definition',
       }),
     ).toBeEnabled();
     expect(
@@ -266,30 +270,22 @@ describe('BusinessObjectsPage', () => {
       }),
     ).not.toBeInTheDocument();
 
+    expect(screen.getByLabelText('Name')).toBeRequired();
     await user.type(screen.getByLabelText('Name'), 'Customer');
     expect(screen.getByLabelText('Object key')).toHaveValue('customer');
     expect(screen.getByLabelText('Object key')).toHaveAttribute('readonly');
     expect(screen.queryByRole('button', { name: 'Managed by the system' })).not.toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Create draft' }));
+    await user.click(screen.getByRole('button', { name: 'Start definition' }));
 
-    expect(await screen.findByText('Draft created')).toBeInTheDocument();
-    expect(screen.getAllByText('Draft', { exact: true })).toHaveLength(1);
-    expect(screen.queryByText('Draft 1')).not.toBeInTheDocument();
+    expect(await screen.findByText('Definition created')).toBeInTheDocument();
+    expect(screen.getAllByText('Not published', { exact: true })).toHaveLength(1);
+    expect(screen.queryByText('Not published 1')).not.toBeInTheDocument();
     expect(
-      screen.getByText('Add at least one field before publishing this draft.'),
+      screen.getByText('Add at least one field before publishing this definition.'),
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Add field' })).toBeEnabled();
     expect(screen.getByRole('button', { name: 'Add field' })).toHaveClass('bg-primary');
-    expect(
-      within(screen.getByRole('form', { name: 'Customer' })).getByRole('button', {
-        name: 'Save draft',
-      }),
-    ).toBeEnabled();
-    expect(
-      within(screen.getByRole('form', { name: 'Customer' })).getByRole('button', {
-        name: 'Save draft',
-      }),
-    ).toHaveClass('bg-primary');
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
     expect(
       within(screen.getByRole('form', { name: 'Customer' })).getByRole('button', {
         name: 'Publish',
@@ -297,23 +293,36 @@ describe('BusinessObjectsPage', () => {
     ).toBeDisabled();
     expect(
       within(screen.getByRole('form', { name: 'Customer' })).queryByRole('button', {
-        name: 'Create draft',
+        name: 'Start definition',
       }),
     ).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Add field' }));
+    expect(screen.getByLabelText('Field key')).toBeRequired();
+    expect(screen.getByLabelText('Label')).toBeRequired();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
     await user.type(screen.getByLabelText('Field key'), 'name');
     await user.type(screen.getByLabelText('Label'), 'Name');
     expect(
       within(screen.getByRole('form', { name: 'Customer' })).getByRole('button', {
         name: 'Publish',
       }),
-    ).toHaveClass('bg-primary');
-    await user.click(screen.getByRole('button', { name: 'Save draft' }));
+    ).toBeDisabled();
 
-    expect(await screen.findByText('Draft saved')).toBeInTheDocument();
-    expect(screen.getAllByText('Draft', { exact: true })).toHaveLength(1);
-    expect(screen.queryByText('Draft 2')).not.toBeInTheDocument();
+    await waitFor(() =>
+      expect(requests.map((request) => `${request.method} ${requestPath(request.url)}`)).toContain(
+        `PUT /api/object-definitions/${definitionId}/unpublished`,
+      ),
+    );
+
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Saved'));
+    expect(screen.getAllByText('Not published', { exact: true })).toHaveLength(1);
+    expect(screen.queryByText('Not published 2')).not.toBeInTheDocument();
+    expect(
+      within(screen.getByRole('form', { name: 'Customer' })).getByRole('button', {
+        name: 'Publish',
+      }),
+    ).toHaveClass('bg-primary');
     await user.click(screen.getByRole('button', { name: 'Publish' }));
 
     expect(await screen.findAllByText('Published')).not.toHaveLength(0);
@@ -329,7 +338,7 @@ describe('BusinessObjectsPage', () => {
       'POST /api/object-definitions',
     );
     expect(requests.map((request) => `${request.method} ${requestPath(request.url)}`)).toContain(
-      `PUT /api/object-definitions/${definitionId}/draft`,
+      `PUT /api/object-definitions/${definitionId}/unpublished`,
     );
     expect(requests.map((request) => `${request.method} ${requestPath(request.url)}`)).toContain(
       `POST /api/object-definitions/${definitionId}/publish`,
@@ -340,23 +349,98 @@ describe('BusinessObjectsPage', () => {
           request.method === 'POST' && requestPath(request.url) === '/api/object-definitions',
       )?.body,
     ).not.toHaveProperty('objectKey');
-    const saveDraftRequest = requests.find(
+    const saveRequest = requests.find(
       (request) =>
         request.method === 'PUT' &&
-        requestPath(request.url) === `/api/object-definitions/${definitionId}/draft`,
+        requestPath(request.url) === `/api/object-definitions/${definitionId}/unpublished`,
     );
-    expect(saveDraftRequest?.body).toMatchObject({ expectedDraftVersion: 1, name: 'Customer' });
-    expect(saveDraftRequest?.body).not.toHaveProperty('objectKey');
+    expect(saveRequest?.body).toMatchObject({ expectedRevision: 1, name: 'Customer' });
+    expect(saveRequest?.body).not.toHaveProperty('objectKey');
     expect(
       requests.find(
         (request) =>
           request.method === 'POST' &&
           requestPath(request.url) === `/api/object-definitions/${definitionId}/publish`,
       )?.body,
-    ).toEqual({ expectedDraftVersion: 2 });
+    ).toEqual({ expectedRevision: 2 });
   });
 
-  it('shows server problem details when draft creation fails', async () => {
+  it('shows the autosave pending indicator before the debounced save starts', async () => {
+    const user = userEvent.setup();
+    let resolveSave: (() => void) | undefined;
+    let saveRequestCount = 0;
+
+    vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input.toString();
+      const method = init?.method ?? 'GET';
+      const body = typeof init?.body === 'string' ? JSON.parse(init.body) : undefined;
+
+      if (url.includes('/api/object-definitions?')) {
+        return jsonResponse({ items: [], totalCount: 0, page: 1, pageSize: 20 });
+      }
+
+      if (method === 'POST' && url.endsWith('/api/object-definitions')) {
+        return jsonResponse(
+          unpublishedDetail({
+            name: body.name,
+            objectKey: deriveObjectKey(body.name),
+            revision: 1,
+          }),
+          201,
+        );
+      }
+
+      if (method === 'PUT' && url.endsWith(`/api/object-definitions/${definitionId}/unpublished`)) {
+        saveRequestCount += 1;
+        const detail = unpublishedDetail({
+          name: body.name,
+          objectKey: 'customer',
+          revision: 2,
+          fields: body.fields,
+        });
+        return new Promise<Response>((resolve) => {
+          resolveSave = () => resolve(jsonResponse(detail));
+        });
+      }
+
+      return Promise.reject(new Error(`Unexpected fetch: ${method} ${url}`));
+    });
+
+    await renderWithRouter(<BusinessObjectsPage />, { path: '/objects' });
+    await user.type(await screen.findByLabelText('Name'), 'Customer');
+    await user.click(screen.getByRole('button', { name: 'Start definition' }));
+    await screen.findByText('Definition created');
+
+    await user.click(screen.getByRole('button', { name: 'Add field' }));
+    await user.type(screen.getByLabelText('Field key'), 'name');
+    await user.type(screen.getByLabelText('Label'), 'Name');
+
+    const getPublishButton = () =>
+      within(screen.getByRole('form', { name: 'Customer' })).getByRole('button', {
+        name: 'Publish',
+      });
+    expect(screen.getByRole('status')).toHaveTextContent('Saving changes');
+    expect(screen.queryByText('Saving...')).not.toBeInTheDocument();
+    expect(getPublishButton()).toBeDisabled();
+    expect(saveRequestCount).toBe(0);
+    await waitFor(() => expect(resolveSave).toBeDefined());
+    expect(saveRequestCount).toBe(1);
+
+    await act(async () => {
+      resolveSave?.();
+      await Promise.resolve();
+    });
+
+    expect(screen.getByRole('status')).toHaveTextContent('Saving changes');
+    expect(getPublishButton()).toBeDisabled();
+
+    await waitFor(() => {
+      expect(screen.getByRole('status')).toHaveTextContent('Saved');
+      expect(getPublishButton()).toBeEnabled();
+    });
+  });
+
+  it('shows server problem details when definition creation fails', async () => {
     const user = userEvent.setup();
 
     vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -388,24 +472,21 @@ describe('BusinessObjectsPage', () => {
     await renderWithRouter(<BusinessObjectsPage />, { path: '/objects' });
 
     await user.type(await screen.findByLabelText('Name'), 'Application');
-    await user.click(screen.getByRole('button', { name: 'Create draft' }));
+    await user.click(screen.getByRole('button', { name: 'Start definition' }));
 
-    const alertTitle = await within(
-      screen.getByRole('form', { name: 'Define business object' }),
-    ).findByText('Check required values');
-    const alert = alertTitle.closest('[role="alert"]');
-    if (!alert) throw new Error('Expected scoped identity alert');
+    const editorForm = screen.getByRole('form', { name: 'Define business object' });
+    const name = await screen.findByLabelText('Name');
 
-    expect(alert).toHaveClass('bg-destructive/15');
-    expect(screen.getByText('Check required values')).toBeInTheDocument();
     expect(
-      within(alert).getByText('Object names must be unique in this workspace.'),
-    ).toBeInTheDocument();
-    expect(screen.getByLabelText('Name')).toHaveAttribute('aria-invalid', 'true');
+      within(editorForm).queryByText('This definition needs attention'),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText('Object names must be unique in this workspace.')).toBeInTheDocument();
+    expect(name).toHaveAttribute('aria-invalid', 'true');
+    expect(name).toHaveAccessibleDescription(/Object names must be unique in this workspace\./);
     expect(screen.queryByText('Something went wrong, please try again')).not.toBeInTheDocument();
   });
 
-  it('maximizes and restores the fields editor only after a draft exists', async () => {
+  it('maximizes and restores the fields editor only after a definition exists', async () => {
     const user = userEvent.setup();
 
     vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -419,7 +500,7 @@ describe('BusinessObjectsPage', () => {
 
       if (method === 'POST' && url.endsWith('/api/object-definitions')) {
         return jsonResponse(
-          draftDetail({ name: body.name, objectKey: deriveObjectKey(body.name) }),
+          unpublishedDetail({ name: body.name, objectKey: deriveObjectKey(body.name) }),
           201,
         );
       }
@@ -434,8 +515,8 @@ describe('BusinessObjectsPage', () => {
     expect(screen.queryByRole('button', { name: 'Expand editor' })).not.toBeInTheDocument();
 
     await user.type(screen.getByLabelText('Name'), 'Customer');
-    await user.click(screen.getByRole('button', { name: 'Create draft' }));
-    expect(await screen.findByText('Draft created')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Start definition' }));
+    expect(await screen.findByText('Definition created')).toBeInTheDocument();
     expect(
       screen.getByText('Fields define the text data this business object captures.'),
     ).toBeInTheDocument();
@@ -473,7 +554,7 @@ describe('BusinessObjectsPage', () => {
 
       if (method === 'POST' && url.endsWith('/api/object-definitions')) {
         return jsonResponse(
-          draftDetail({ name: body.name, objectKey: deriveObjectKey(body.name) }),
+          unpublishedDetail({ name: body.name, objectKey: deriveObjectKey(body.name) }),
           201,
         );
       }
@@ -483,26 +564,103 @@ describe('BusinessObjectsPage', () => {
 
     await renderWithRouter(<BusinessObjectsPage />, { path: '/objects' });
     await user.type(await screen.findByLabelText('Name'), 'Customer');
-    await user.click(screen.getByRole('button', { name: 'Create draft' }));
-    await screen.findByText('Draft created');
+    await user.click(screen.getByRole('button', { name: 'Start definition' }));
+    await screen.findByText('Definition created');
 
     await user.click(screen.getByRole('button', { name: 'Add field' }));
-    await user.click(screen.getByRole('button', { name: 'Save draft' }));
 
     const editorForm = screen.getByRole('form', { name: 'Customer' });
     const fieldKey = screen.getByLabelText('Field key');
     const label = screen.getByLabelText('Label');
-    const editorAlertTitle = within(editorForm).getByText('Check required values');
-    const editorAlert = editorAlertTitle.closest('[role="alert"]');
-    if (!editorAlert) throw new Error('Expected scoped field validation alert');
 
-    expect(editorAlert).toHaveClass('bg-destructive/15');
-    expect(editorAlert).toHaveTextContent(
+    expect(
+      within(editorForm).queryByText('This definition needs attention'),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(screen.queryByText('Field keys are required.')).not.toBeInTheDocument();
+    expect(screen.queryByText('Field labels are required.')).not.toBeInTheDocument();
+    expect(fieldKey).not.toHaveAttribute('aria-invalid', 'true');
+    expect(label).not.toHaveAttribute('aria-invalid', 'true');
+
+    await user.type(fieldKey, '1bad');
+
+    expect(
+      await screen.findByText('Field keys must start with a lowercase letter and be unique.'),
+    ).toBeInTheDocument();
+    const fieldRow = fieldKey.closest('[data-slot="field"]')?.parentElement?.parentElement;
+    const fieldActions = screen.getByRole('button', { name: 'Remove field' }).parentElement;
+
+    expect(fieldRow).toHaveClass('border-border', 'bg-background/45');
+    expect(fieldRow).not.toHaveAttribute('data-invalid');
+    expect(fieldActions).toHaveClass('items-start', 'lg:pt-7');
+    expect(fieldKey).toHaveAttribute('aria-invalid', 'true');
+    expect(label).not.toHaveAttribute('aria-invalid', 'true');
+    expect(fieldKey).toHaveAccessibleDescription(
       'Field keys must start with a lowercase letter and be unique.',
     );
-    expect(editorAlert).toHaveTextContent('Field labels are required.');
-    expect(fieldKey).toHaveAttribute('aria-invalid', 'true');
-    expect(label).toHaveAttribute('aria-invalid', 'true');
+    expect(label).not.toHaveAccessibleDescription('Field labels are required.');
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(
+      vi.mocked(fetch).mock.calls.some(([input, init]) => {
+        const url = typeof input === 'string' ? input : input.toString();
+        return init?.method === 'PUT' && requestPath(url).endsWith('/unpublished');
+      }),
+    ).toBe(false);
+  });
+
+  it('keeps newly added fields neutral while previous validation errors are visible', async () => {
+    const user = userEvent.setup();
+    vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input.toString();
+      const method = init?.method ?? 'GET';
+      const body = typeof init?.body === 'string' ? JSON.parse(init.body) : undefined;
+
+      if (url.includes('/api/object-definitions?')) {
+        return jsonResponse({ items: [], totalCount: 0, page: 1, pageSize: 20 });
+      }
+
+      if (method === 'POST' && url.endsWith('/api/object-definitions')) {
+        return jsonResponse(
+          unpublishedDetail({ name: body.name, objectKey: deriveObjectKey(body.name) }),
+          201,
+        );
+      }
+
+      return Promise.reject(new Error(`Unexpected fetch: ${method} ${url}`));
+    });
+
+    await renderWithRouter(<BusinessObjectsPage />, { path: '/objects' });
+    await user.type(await screen.findByLabelText('Name'), 'Customer');
+    await user.click(screen.getByRole('button', { name: 'Start definition' }));
+    await screen.findByText('Definition created');
+
+    await user.click(screen.getByRole('button', { name: 'Add field' }));
+    const firstFieldKey = screen.getByLabelText('Field key');
+    await user.type(firstFieldKey, '1bad');
+
+    await waitFor(() =>
+      expect(
+        screen.getAllByText('Field keys must start with a lowercase letter and be unique.'),
+      ).toHaveLength(1),
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Add field' }));
+
+    const fieldKeys = screen.getAllByLabelText('Field key');
+    const labels = screen.getAllByLabelText('Label');
+
+    expect(fieldKeys).toHaveLength(2);
+    expect(labels).toHaveLength(2);
+    expect(
+      screen.getAllByText('Field keys must start with a lowercase letter and be unique.'),
+    ).toHaveLength(1);
+    expect(screen.queryByText('Field labels are required.')).not.toBeInTheDocument();
+    expect(fieldKeys[0]).toHaveAttribute('aria-invalid', 'true');
+    expect(labels[0]).not.toHaveAttribute('aria-invalid', 'true');
+    expect(fieldKeys[1]).not.toHaveAttribute('aria-invalid', 'true');
+    expect(labels[1]).not.toHaveAttribute('aria-invalid', 'true');
+    expect(fieldKeys[1]).not.toHaveAccessibleDescription('Field keys are required.');
+    expect(labels[1]).not.toHaveAccessibleDescription('Field labels are required.');
   });
 
   it('marks every field with a duplicated key as invalid', async () => {
@@ -518,7 +676,7 @@ describe('BusinessObjectsPage', () => {
 
       if (method === 'POST' && url.endsWith('/api/object-definitions')) {
         return jsonResponse(
-          draftDetail({ name: body.name, objectKey: deriveObjectKey(body.name) }),
+          unpublishedDetail({ name: body.name, objectKey: deriveObjectKey(body.name) }),
           201,
         );
       }
@@ -528,33 +686,44 @@ describe('BusinessObjectsPage', () => {
 
     await renderWithRouter(<BusinessObjectsPage />, { path: '/objects' });
     await user.type(await screen.findByLabelText('Name'), 'Customer');
-    await user.click(screen.getByRole('button', { name: 'Create draft' }));
-    await screen.findByText('Draft created');
+    await user.click(screen.getByRole('button', { name: 'Start definition' }));
+    await screen.findByText('Definition created');
 
     await user.click(screen.getByRole('button', { name: 'Add field' }));
     await user.click(screen.getByRole('button', { name: 'Add field' }));
 
     const fieldKeys = screen.getAllByLabelText('Field key');
     const labels = screen.getAllByLabelText('Label');
-    await user.type(fieldKeys[0], 'customer_name');
-    await user.type(labels[0], 'Customer name');
-    await user.type(fieldKeys[1], 'customer_name');
-    await user.type(labels[1], 'Duplicate customer name');
-    await user.click(screen.getByRole('button', { name: 'Save draft' }));
+    await user.click(fieldKeys[0]);
+    await user.paste('name');
+    await user.click(labels[0]);
+    await user.paste('Name');
+    await user.click(fieldKeys[1]);
+    await user.paste('name');
+    await user.click(labels[1]);
+    await user.paste('Name 2');
 
     const editorForm = screen.getByRole('form', { name: 'Customer' });
-    const editorAlertTitle = within(editorForm).getByText('Check required values');
-    const editorAlert = editorAlertTitle.closest('[role="alert"]');
-    if (!editorAlert) throw new Error('Expected scoped duplicate-key validation alert');
 
-    expect(editorAlert).toHaveTextContent(
+    expect(
+      within(editorForm).queryByText('This definition needs attention'),
+    ).not.toBeInTheDocument();
+    await waitFor(() =>
+      expect(
+        screen.getAllByText('Field keys must start with a lowercase letter and be unique.'),
+      ).toHaveLength(2),
+    );
+    expect(fieldKeys[0]).toHaveAccessibleDescription(
+      'Field keys must start with a lowercase letter and be unique.',
+    );
+    expect(fieldKeys[1]).toHaveAccessibleDescription(
       'Field keys must start with a lowercase letter and be unique.',
     );
     expect(fieldKeys[0]).toHaveAttribute('aria-invalid', 'true');
     expect(fieldKeys[1]).toHaveAttribute('aria-invalid', 'true');
   });
 
-  it('disables publication until draft fields are present', async () => {
+  it('disables publication until fields are present', async () => {
     const user = userEvent.setup();
     vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === 'string' ? input : input.toString();
@@ -567,7 +736,7 @@ describe('BusinessObjectsPage', () => {
 
       if (method === 'POST' && url.endsWith('/api/object-definitions')) {
         return jsonResponse(
-          draftDetail({ name: body.name, objectKey: deriveObjectKey(body.name) }),
+          unpublishedDetail({ name: body.name, objectKey: deriveObjectKey(body.name) }),
           201,
         );
       }
@@ -578,12 +747,12 @@ describe('BusinessObjectsPage', () => {
     await renderWithRouter(<BusinessObjectsPage />, { path: '/objects' });
     await user.type(await screen.findByLabelText('Name'), 'Customer');
     expect(screen.getByLabelText('Object key')).toHaveValue('customer');
-    await user.click(screen.getByRole('button', { name: 'Create draft' }));
-    await screen.findByText('Draft created');
+    await user.click(screen.getByRole('button', { name: 'Start definition' }));
+    await screen.findByText('Definition created');
 
     expect(screen.getByRole('button', { name: 'Publish' })).toBeDisabled();
     expect(
-      screen.getByText('Add at least one field before publishing this draft.'),
+      screen.getByText('Add at least one field before publishing this definition.'),
     ).toBeInTheDocument();
     await waitFor(() => {
       const publishCalls = vi.mocked(fetch).mock.calls.filter(([input, init]) => {
@@ -606,15 +775,15 @@ function deriveObjectKey(name: string): string {
   );
 }
 
-function draftDetail({
+function unpublishedDetail({
   name,
   objectKey,
-  draftVersion = 1,
+  revision = 1,
   fields = [],
 }: {
   name: string;
   objectKey: string;
-  draftVersion?: number;
+  revision?: number;
   fields?: unknown[];
 }) {
   return {
@@ -622,8 +791,8 @@ function draftDetail({
     workspaceId,
     name,
     objectKey,
-    status: 'Draft',
-    draftVersion,
+    status: 'Unpublished',
+    revision,
     latestPublishedVersionNumber: null,
     createdAt: now,
     updatedAt: now,

@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Axis.Objects.Infrastructure.Migrations
 {
     [DbContext(typeof(ObjectsDbContext))]
-    [Migration("20260707114839_InitialObjects")]
+    [Migration("20260708001726_InitialObjects")]
     partial class InitialObjects
     {
         /// <inheritdoc />
@@ -35,10 +35,6 @@ namespace Axis.Objects.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
-                    b.Property<int>("DraftVersion")
-                        .HasColumnType("integer")
-                        .HasColumnName("draft_version");
-
                     b.Property<string>("Key")
                         .IsRequired()
                         .HasMaxLength(63)
@@ -54,6 +50,10 @@ namespace Axis.Objects.Infrastructure.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
                         .HasColumnName("name");
+
+                    b.Property<int>("Revision")
+                        .HasColumnType("integer")
+                        .HasColumnName("revision");
 
                     b.Property<string>("Status")
                         .IsRequired()
