@@ -1,5 +1,5 @@
 using Axis.Objects.Application;
-using Axis.Objects.Application.Commands.CreateObjectDefinitionDraft;
+using Axis.Objects.Application.Commands.CreateObjectDefinition;
 using Axis.Objects.Domain.Aggregates;
 using Axis.Objects.Domain.ValueObjects;
 using Axis.Shared.Application;
@@ -9,12 +9,12 @@ using NSubstitute;
 
 namespace Axis.Objects.Application.Tests.Commands;
 
-public sealed class CreateObjectDefinitionDraftHandlerTests
+public sealed class CreateObjectDefinitionHandlerTests
 {
     private readonly ObjectDefinitionHandlerTestContext _context = new();
 
     [Fact]
-    public async Task CreateDraft_WhenWorkspaceScopedKeyIsAvailable_AddsDraftAndReturnsVersionOne()
+    public async Task CreateUnpublished_WhenWorkspaceScopedKeyIsAvailable_AddsUnpublishedDefinitionAndReturnsRevisionOne()
     {
         _context.Repository.ObjectKeyExistsAsync(
                 ObjectDefinitionHandlerTestContext.WorkspaceId,
@@ -23,20 +23,20 @@ public sealed class CreateObjectDefinitionDraftHandlerTests
                 Arg.Any<CancellationToken>())
             .Returns(false);
 
-        CreateObjectDefinitionDraftHandler sut = new(
+        CreateObjectDefinitionHandler sut = new(
             _context.CurrentUser,
             _context.Repository,
             _context.UnitOfWork);
 
         Result<ObjectDefinitionDetailDto> result = await sut.Handle(
-            new CreateObjectDefinitionDraftCommand("Customer"),
+            new CreateObjectDefinitionCommand("Customer"),
             CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
         result.Value.WorkspaceId.Should().Be(ObjectDefinitionHandlerTestContext.WorkspaceId);
         result.Value.ObjectKey.Should().Be("customer");
-        result.Value.DraftVersion.Should().Be(1);
-        result.Value.Status.Should().Be(ObjectDefinitionStatus.Draft);
+        result.Value.Revision.Should().Be(1);
+        result.Value.Status.Should().Be(ObjectDefinitionStatus.Unpublished);
         await _context.Repository.Received(1).AddAsync(
             Arg.Any<ObjectDefinition>(),
             Arg.Any<CancellationToken>());
@@ -44,16 +44,16 @@ public sealed class CreateObjectDefinitionDraftHandlerTests
     }
 
     [Fact]
-    public async Task CreateDraft_WhenWorkspaceScopeIsMissing_ReturnsForbiddenWithoutMutation()
+    public async Task CreateUnpublished_WhenWorkspaceScopeIsMissing_ReturnsForbiddenWithoutMutation()
     {
         _context.CurrentUser.workspaceId = null;
-        CreateObjectDefinitionDraftHandler sut = new(
+        CreateObjectDefinitionHandler sut = new(
             _context.CurrentUser,
             _context.Repository,
             _context.UnitOfWork);
 
         Result<ObjectDefinitionDetailDto> result = await sut.Handle(
-            new CreateObjectDefinitionDraftCommand("Customer"),
+            new CreateObjectDefinitionCommand("Customer"),
             CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
@@ -64,7 +64,7 @@ public sealed class CreateObjectDefinitionDraftHandlerTests
     }
 
     [Fact]
-    public async Task CreateDraft_WhenNameNeedsNormalization_DerivesServerOwnedObjectKey()
+    public async Task CreateUnpublished_WhenNameNeedsNormalization_DerivesServerOwnedObjectKey()
     {
         _context.Repository.ObjectKeyExistsAsync(
                 ObjectDefinitionHandlerTestContext.WorkspaceId,
@@ -72,13 +72,13 @@ public sealed class CreateObjectDefinitionDraftHandlerTests
                 null,
                 Arg.Any<CancellationToken>())
             .Returns(false);
-        CreateObjectDefinitionDraftHandler sut = new(
+        CreateObjectDefinitionHandler sut = new(
             _context.CurrentUser,
             _context.Repository,
             _context.UnitOfWork);
 
         Result<ObjectDefinitionDetailDto> result = await sut.Handle(
-            new CreateObjectDefinitionDraftCommand("Customer Account 2026!"),
+            new CreateObjectDefinitionCommand("Customer Account 2026!"),
             CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
@@ -86,7 +86,7 @@ public sealed class CreateObjectDefinitionDraftHandlerTests
     }
 
     [Fact]
-    public async Task CreateDraft_WhenObjectKeyAlreadyExists_ReturnsConflict()
+    public async Task CreateUnpublished_WhenObjectKeyAlreadyExists_ReturnsConflict()
     {
         _context.Repository.ObjectKeyExistsAsync(
                 ObjectDefinitionHandlerTestContext.WorkspaceId,
@@ -94,13 +94,13 @@ public sealed class CreateObjectDefinitionDraftHandlerTests
                 null,
                 Arg.Any<CancellationToken>())
             .Returns(true);
-        CreateObjectDefinitionDraftHandler sut = new(
+        CreateObjectDefinitionHandler sut = new(
             _context.CurrentUser,
             _context.Repository,
             _context.UnitOfWork);
 
         Result<ObjectDefinitionDetailDto> result = await sut.Handle(
-            new CreateObjectDefinitionDraftCommand("Customer"),
+            new CreateObjectDefinitionCommand("Customer"),
             CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();

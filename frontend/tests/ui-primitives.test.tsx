@@ -126,6 +126,26 @@ describe('Field', () => {
     expect(input).toHaveAttribute('aria-invalid', 'true');
   });
 
+  it('shows a required marker without changing the control label', () => {
+    render(
+      <Field>
+        <FieldLabel htmlFor="workspace-name" required>
+          Workspace name
+        </FieldLabel>
+        <Input id="workspace-name" required />
+      </Field>,
+    );
+
+    expect(screen.getByLabelText('Workspace name')).toBeRequired();
+    expect(screen.getByText('Workspace name')).toHaveAttribute('data-required', 'true');
+    expect(screen.getByText('Workspace name').className).toContain(
+      "data-[required=true]:after:content-['*']",
+    );
+    expect(screen.getByText('Workspace name').className).toContain(
+      'data-[required=true]:after:-ml-1.5',
+    );
+  });
+
   it('keeps disabled field labels and controls visually explicit', () => {
     render(
       <Field>

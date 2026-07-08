@@ -49,11 +49,14 @@ export function SignInPage() {
         ) : null}
 
         <Field data-invalid={errors.email ? true : undefined}>
-          <FieldLabel htmlFor="email">{t('auth.email')}</FieldLabel>
+          <FieldLabel htmlFor="email" required>
+            {t('auth.email')}
+          </FieldLabel>
           <Input
             id="email"
             type="email"
             autoComplete="email"
+            required
             aria-describedby={errors.email ? 'email-help email-error' : 'email-help'}
             aria-invalid={errors.email ? true : undefined}
             {...register('email')}
@@ -63,11 +66,14 @@ export function SignInPage() {
         </Field>
 
         <Field data-invalid={errors.password ? true : undefined}>
-          <FieldLabel htmlFor="password">{t('auth.password')}</FieldLabel>
+          <FieldLabel htmlFor="password" required>
+            {t('auth.password')}
+          </FieldLabel>
           <Input
             id="password"
             type="password"
             autoComplete="current-password"
+            required
             aria-describedby={errors.password ? 'password-help password-error' : 'password-help'}
             aria-invalid={errors.password ? true : undefined}
             {...register('password')}

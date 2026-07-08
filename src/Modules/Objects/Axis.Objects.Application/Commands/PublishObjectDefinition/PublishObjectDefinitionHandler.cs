@@ -33,7 +33,7 @@ public sealed class PublishObjectDefinitionHandler(
             return ObjectDefinitionFailures.NotFound<ObjectDefinitionDetailDto>();
 
         Result<ObjectDefinitionVersion> published = definition.Publish(
-            command.ExpectedDraftVersion,
+            command.ExpectedRevision,
             userId,
             DateTime.UtcNow);
         if (published.IsFailure)
@@ -46,7 +46,7 @@ public sealed class PublishObjectDefinitionHandler(
         catch (ConcurrencyException)
         {
             return ObjectDefinitionFailures.Conflict<ObjectDefinitionDetailDto>(
-                "The object definition draft has changed.");
+                "The object definition has changed.");
         }
 
         return ObjectDefinitionMapper.ToDetailDto(definition);

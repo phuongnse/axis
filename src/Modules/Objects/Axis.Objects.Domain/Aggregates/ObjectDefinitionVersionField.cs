@@ -21,7 +21,7 @@ public sealed class ObjectDefinitionVersionField : Entity<ObjectFieldDefinitionI
         Order = order;
     }
 
-    public static ObjectDefinitionVersionField FromDraft(ObjectFieldDefinition field) =>
+    public static ObjectDefinitionVersionField FromCurrentDefinition(ObjectFieldDefinition field) =>
         new(
             ObjectFieldDefinitionId.New(),
             field.Key,

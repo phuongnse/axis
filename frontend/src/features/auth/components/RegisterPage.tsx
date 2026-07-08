@@ -56,10 +56,13 @@ export function RegisterPage() {
     >
       <form className="space-y-4" onSubmit={handleSubmit(submit)} noValidate>
         <Field data-invalid={errors.fullName ? true : undefined}>
-          <FieldLabel htmlFor="fullName">{t('auth.fullName')}</FieldLabel>
+          <FieldLabel htmlFor="fullName" required>
+            {t('auth.fullName')}
+          </FieldLabel>
           <Input
             id="fullName"
             autoComplete="name"
+            required
             aria-describedby={errors.fullName ? 'fullName-help fullName-error' : 'fullName-help'}
             aria-invalid={errors.fullName ? true : undefined}
             {...register('fullName')}
@@ -71,11 +74,14 @@ export function RegisterPage() {
         </Field>
 
         <Field data-invalid={errors.email ? true : undefined}>
-          <FieldLabel htmlFor="email">{t('auth.email')}</FieldLabel>
+          <FieldLabel htmlFor="email" required>
+            {t('auth.email')}
+          </FieldLabel>
           <Input
             id="email"
             type="email"
             autoComplete="email"
+            required
             aria-describedby={errors.email ? 'email-help email-error' : 'email-help'}
             aria-invalid={errors.email ? true : undefined}
             {...register('email')}
@@ -85,11 +91,14 @@ export function RegisterPage() {
         </Field>
 
         <Field data-invalid={errors.password ? true : undefined}>
-          <FieldLabel htmlFor="password">{t('auth.password')}</FieldLabel>
+          <FieldLabel htmlFor="password" required>
+            {t('auth.password')}
+          </FieldLabel>
           <Input
             id="password"
             type="password"
             autoComplete="new-password"
+            required
             aria-describedby={
               errors.password
                 ? 'password-help password-criteria password-error'
@@ -106,11 +115,14 @@ export function RegisterPage() {
         </Field>
 
         <Field data-invalid={errors.passwordConfirmation ? true : undefined}>
-          <FieldLabel htmlFor="passwordConfirmation">{t('auth.passwordConfirmation')}</FieldLabel>
+          <FieldLabel htmlFor="passwordConfirmation" required>
+            {t('auth.passwordConfirmation')}
+          </FieldLabel>
           <Input
             id="passwordConfirmation"
             type="password"
             autoComplete="new-password"
+            required
             aria-describedby={
               errors.passwordConfirmation
                 ? 'passwordConfirmation-help passwordConfirmation-error'
@@ -144,9 +156,11 @@ export function RegisterPage() {
                   onCheckedChange={(checked) => field.onChange(checked)}
                   aria-describedby={errors.acceptedTerms ? 'acceptedTerms-error' : undefined}
                   aria-invalid={errors.acceptedTerms ? true : undefined}
+                  aria-required="true"
                 />
                 <FieldLabel
                   htmlFor="acceptedTerms"
+                  required
                   className="block min-w-0 flex-1 w-full font-normal leading-5"
                 >
                   <Trans

@@ -13,9 +13,9 @@ public sealed class PublishObjectDefinitionHandlerTests
     private readonly ObjectDefinitionHandlerTestContext _context = new();
 
     [Fact]
-    public async Task Publish_WhenDraftIsValid_PersistsPublishedVersionAuditMetadata()
+    public async Task Publish_WhenUnpublishedDefinitionIsValid_PersistsPublishedVersionAuditMetadata()
     {
-        ObjectDefinition definition = ObjectDefinitionHandlerTestContext.DraftWithOneSave();
+        ObjectDefinition definition = ObjectDefinitionHandlerTestContext.UnpublishedWithOneSave();
         _context.Repository.GetByIdForWorkspaceAsync(
                 definition.Id,
                 ObjectDefinitionHandlerTestContext.WorkspaceId,
@@ -27,7 +27,7 @@ public sealed class PublishObjectDefinitionHandlerTests
             _context.UnitOfWork);
 
         Result<ObjectDefinitionDetailDto> result = await sut.Handle(
-            new PublishObjectDefinitionCommand(definition.Id.Value, ExpectedDraftVersion: 2),
+            new PublishObjectDefinitionCommand(definition.Id.Value, ExpectedRevision: 2),
             CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
@@ -51,7 +51,7 @@ public sealed class PublishObjectDefinitionHandlerTests
             _context.UnitOfWork);
 
         Result<ObjectDefinitionDetailDto> result = await sut.Handle(
-            new PublishObjectDefinitionCommand(Guid.NewGuid(), ExpectedDraftVersion: 1),
+            new PublishObjectDefinitionCommand(Guid.NewGuid(), ExpectedRevision: 1),
             CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();

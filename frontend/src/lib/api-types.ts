@@ -167,8 +167,8 @@ export interface paths {
         /** List business object definitions for the current workspace */
         get: operations["ListObjectDefinitions"];
         put?: never;
-        /** Create a business object definition draft */
-        post: operations["CreateObjectDefinitionDraft"];
+        /** Create an unpublished business object definition */
+        post: operations["CreateObjectDefinition"];
         delete?: never;
         options?: never;
         head?: never;
@@ -192,7 +192,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/object-definitions/{id}/draft": {
+    "/api/object-definitions/{id}/unpublished": {
         parameters: {
             query?: never;
             header?: never;
@@ -200,8 +200,8 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Save a business object definition draft */
-        put: operations["SaveObjectDefinitionDraft"];
+        /** Save an unpublished business object definition */
+        put: operations["SaveUnpublishedObjectDefinition"];
         post?: never;
         delete?: never;
         options?: never;
@@ -218,7 +218,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Publish a business object definition draft */
+        /** Publish an unpublished business object definition */
         post: operations["PublishObjectDefinition"];
         delete?: never;
         options?: never;
@@ -230,7 +230,7 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
-        CreateObjectDefinitionDraftRequest: {
+        CreateObjectDefinitionRequest: {
             name?: string;
         };
         CurrentUserProfileDto: {
@@ -264,7 +264,7 @@ export interface components {
             objectKey?: string;
             status?: components["schemas"]["ObjectDefinitionStatus"];
             /** Format: int32 */
-            draftVersion?: number;
+            revision?: number;
             /** Format: int32 */
             latestPublishedVersionNumber?: number | null;
             /** Format: date-time */
@@ -281,7 +281,7 @@ export interface components {
             objectKey?: string;
             status?: components["schemas"]["ObjectDefinitionStatus"];
             /** Format: int32 */
-            draftVersion?: number;
+            revision?: number;
             /** Format: int32 */
             latestPublishedVersionNumber?: number | null;
             /** Format: date-time */
@@ -297,7 +297,7 @@ export interface components {
             pageSize?: number;
         };
         /** @enum {string} */
-        ObjectDefinitionStatus: "Draft" | "Published";
+        ObjectDefinitionStatus: "Unpublished" | "Published";
         ObjectDefinitionVersionDto: {
             /** Format: uuid */
             id?: string;
@@ -339,7 +339,7 @@ export interface components {
         };
         PublishObjectDefinitionRequest: {
             /** Format: int32 */
-            expectedDraftVersion?: number;
+            expectedRevision?: number;
         };
         RegisterUserRequest: {
             fullName?: string;
@@ -353,9 +353,9 @@ export interface components {
         ResendVerificationRequest: {
             email?: string;
         };
-        SaveObjectDefinitionDraftRequest: {
+        SaveUnpublishedObjectDefinitionRequest: {
             /** Format: int32 */
-            expectedDraftVersion?: number;
+            expectedRevision?: number;
             name?: string;
             fields?: components["schemas"]["ObjectFieldDefinitionInput"][];
         };
@@ -789,7 +789,7 @@ export interface operations {
             };
         };
     };
-    CreateObjectDefinitionDraft: {
+    CreateObjectDefinition: {
         parameters: {
             query?: never;
             header?: never;
@@ -798,7 +798,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["CreateObjectDefinitionDraftRequest"];
+                "application/json": components["schemas"]["CreateObjectDefinitionRequest"];
             };
         };
         responses: {
@@ -898,7 +898,7 @@ export interface operations {
             };
         };
     };
-    SaveObjectDefinitionDraft: {
+    SaveUnpublishedObjectDefinition: {
         parameters: {
             query?: never;
             header?: never;
@@ -909,7 +909,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["SaveObjectDefinitionDraftRequest"];
+                "application/json": components["schemas"]["SaveUnpublishedObjectDefinitionRequest"];
             };
         };
         responses: {

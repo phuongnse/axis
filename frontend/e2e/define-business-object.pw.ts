@@ -38,7 +38,7 @@ interface ObjectDefinitionRequest {
 type TestTheme = 'light' | 'dark';
 
 interface MockObjectDefinitionApiOptions {
-  createDraftFailure?: {
+  createDefinitionFailure?: {
     status: number;
     body: unknown;
   };
@@ -60,15 +60,15 @@ function accessToken(): string {
   ].join('.');
 }
 
-function draftDetail({
+function unpublishedDetail({
   name,
   objectKey,
-  draftVersion,
+  revision,
   fields = [],
 }: {
   name: string;
   objectKey: string;
-  draftVersion: number;
+  revision: number;
   fields?: ObjectFieldRequest[];
 }) {
   return {
@@ -76,8 +76,8 @@ function draftDetail({
     workspaceId: profile.workspaceId,
     name,
     objectKey,
-    status: 'Draft',
-    draftVersion,
+    status: 'Unpublished',
+    revision,
     latestPublishedVersionNumber: null,
     createdAt: now,
     updatedAt: now,
@@ -90,7 +90,7 @@ function draftDetail({
   };
 }
 
-type ObjectDefinitionDetail = ReturnType<typeof draftDetail>;
+type ObjectDefinitionDetail = ReturnType<typeof unpublishedDetail>;
 
 function deriveObjectKey(name: string): string {
   return (
@@ -111,10 +111,10 @@ function publishedDetail(definition: ObjectDefinitionDetail) {
   }));
 
   return {
-    ...draftDetail({
+    ...unpublishedDetail({
       name: definition.name,
       objectKey: definition.objectKey,
-      draftVersion: definition.draftVersion,
+      revision: definition.revision,
       fields,
     }),
     status: 'Published',
@@ -180,7 +180,11 @@ async function mockObjectDefinitionApi(
   page: Page,
   options: MockObjectDefinitionApiOptions = {},
 ): Promise<() => string[]> {
-  let currentDefinition = draftDetail({ name: 'Customer', objectKey: 'customer', draftVersion: 1 });
+  let currentDefinition = unpublishedDetail({
+    name: 'Customer',
+    objectKey: 'customer',
+    revision: 1,
+  });
   let hasDefinition = false;
   const requests: string[] = [];
 
@@ -198,7 +202,7 @@ async function mockObjectDefinitionApi(
               name: currentDefinition.name,
               objectKey: currentDefinition.objectKey,
               status: currentDefinition.status,
-              draftVersion: currentDefinition.draftVersion,
+              revision: currentDefinition.revision,
               latestPublishedVersionNumber: currentDefinition.latestPublishedVersionNumber,
               updatedAt: currentDefinition.updatedAt,
             },
@@ -223,20 +227,20 @@ async function mockObjectDefinitionApi(
     }
 
     if (method === 'POST' && url.pathname === '/api/object-definitions') {
-      if (options.createDraftFailure) {
+      if (options.createDefinitionFailure) {
         await route.fulfill({
-          status: options.createDraftFailure.status,
+          status: options.createDefinitionFailure.status,
           contentType: 'application/problem+json',
-          body: JSON.stringify(options.createDraftFailure.body),
+          body: JSON.stringify(options.createDefinitionFailure.body),
         });
         return;
       }
 
       const body = request.postDataJSON() as ObjectDefinitionRequest;
-      currentDefinition = draftDetail({
+      currentDefinition = unpublishedDetail({
         name: body.name,
         objectKey: deriveObjectKey(body.name),
-        draftVersion: 1,
+        revision: 1,
       });
       hasDefinition = true;
       await route.fulfill({
@@ -247,12 +251,15 @@ async function mockObjectDefinitionApi(
       return;
     }
 
-    if (method === 'PUT' && url.pathname === `/api/object-definitions/${definitionId}/draft`) {
+    if (
+      method === 'PUT' &&
+      url.pathname === `/api/object-definitions/${definitionId}/unpublished`
+    ) {
       const body = request.postDataJSON() as ObjectDefinitionRequest;
-      currentDefinition = draftDetail({
+      currentDefinition = unpublishedDetail({
         name: body.name,
         objectKey: currentDefinition.objectKey,
-        draftVersion: 2,
+        revision: 2,
         fields: body.fields,
       });
       await route.fulfill({
@@ -560,11 +567,11 @@ test.describe('define business object', () => {
     await expect(page.getByRole('button', { name: 'Add field' })).toBeDisabled();
     await expectDisabledActionAffordance(page, 'Add field');
     await expectActionWidthHugsContent(page, 'Add field');
-    await expect(editorForm.getByRole('button', { name: 'Create draft' })).toBeVisible();
+    await expect(editorForm.getByRole('button', { name: 'Start definition' })).toBeVisible();
     await expect(editorForm.getByRole('button', { name: 'Publish', exact: true })).toHaveCount(0);
     await expect(page.getByRole('region', { name: 'Publish readiness' })).toHaveCount(0);
     await expect(
-      page.getByText('Create the draft, then add text fields with stable keys and labels.'),
+      page.getByText('Start the definition, then add text fields with stable keys and labels.'),
     ).toBeVisible();
     await expectNoDesktopDocumentScroll(page);
 
@@ -573,26 +580,26 @@ test.describe('define business object', () => {
     await expect(page.getByLabel('Object key')).toHaveValue('customer');
     await expect(page.getByLabel('Object key')).toHaveJSProperty('readOnly', true);
     await expect(page.getByRole('button', { name: 'Managed by the system' })).toHaveCount(0);
-    await page.getByRole('button', { name: 'Create draft' }).click();
+    await page.getByRole('button', { name: 'Start definition' }).click();
 
-    await expect(page.getByText('Draft created')).toBeVisible();
-    await expect(page.getByText('Draft', { exact: true })).toHaveCount(1);
-    await expect(page.getByText('Draft 1', { exact: true })).toHaveCount(0);
+    await expect(page.getByText('Definition created')).toBeVisible();
+    await expect(page.getByText('Not published', { exact: true })).toHaveCount(1);
+    await expect(page.getByText('Not published 1', { exact: true })).toHaveCount(0);
     const customerForm = page.getByRole('form', { name: 'Customer' });
-    await expect(customerForm.getByRole('button', { name: 'Save draft' })).toBeVisible();
+    await expect(customerForm.getByRole('button', { name: 'Save changes' })).toBeVisible();
     await expect(customerForm.getByRole('button', { name: 'Publish', exact: true })).toBeDisabled();
     await expectPrimaryAction(page, 'Add field');
-    await expectPrimaryAction(page, 'Save draft');
+    await expectPrimaryAction(page, 'Save changes');
 
     await page.getByRole('button', { name: 'Add field' }).click();
     await page.getByLabel('Field key').fill('name');
     await page.getByLabel('Label').fill('Name');
     await expectPrimaryAction(page, 'Publish');
-    await page.getByRole('button', { name: 'Save draft' }).click();
+    await page.getByRole('button', { name: 'Save changes' }).click();
 
-    await expect(page.getByText('Draft saved')).toBeVisible();
-    await expect(page.getByText('Draft', { exact: true })).toHaveCount(1);
-    await expect(page.getByText('Draft 2', { exact: true })).toHaveCount(0);
+    await expect(page.getByText('Changes saved')).toBeVisible();
+    await expect(page.getByText('Not published', { exact: true })).toHaveCount(1);
+    await expect(page.getByText('Not published 2', { exact: true })).toHaveCount(0);
     await page.getByRole('button', { name: 'Publish', exact: true }).click();
 
     await expect(page.getByText('Published').first()).toBeVisible();
@@ -605,7 +612,7 @@ test.describe('define business object', () => {
     await expectNoPageOverflow(page);
 
     expect(objectRequests()).toContain('POST /api/object-definitions');
-    expect(objectRequests()).toContain(`PUT /api/object-definitions/${definitionId}/draft`);
+    expect(objectRequests()).toContain(`PUT /api/object-definitions/${definitionId}/unpublished`);
     expect(objectRequests()).toContain(`POST /api/object-definitions/${definitionId}/publish`);
     expect(pageErrors).toEqual([]);
   });
@@ -635,8 +642,8 @@ test.describe('define business object', () => {
     await expect(page.getByRole('button', { name: 'Expand editor' })).toHaveCount(0);
 
     await page.getByLabel('Name').fill('Customer');
-    await page.getByRole('button', { name: 'Create draft' }).click();
-    await expect(page.getByText('Draft created')).toBeVisible();
+    await page.getByRole('button', { name: 'Start definition' }).click();
+    await expect(page.getByText('Definition created')).toBeVisible();
     await expect(
       page.getByText('Fields define the text data this business object captures.'),
     ).toBeVisible();
@@ -662,10 +669,10 @@ test.describe('define business object', () => {
     await expect(page.getByRole('region', { name: 'Publish readiness' })).toHaveCount(0);
   });
 
-  test('create draft errors stay contextual without document scroll', async ({ page }) => {
+  test('definition creation errors stay contextual without document scroll', async ({ page }) => {
     await mockAuthenticatedSession(page, { theme: 'dark' });
     await mockObjectDefinitionApi(page, {
-      createDraftFailure: {
+      createDefinitionFailure: {
         status: 409,
         body: {
           type: 'urn:axis:problem:objects.objectKeyAlreadyExists',
@@ -681,10 +688,10 @@ test.describe('define business object', () => {
     await page.goto('/objects');
 
     await page.getByLabel('Name').fill('Application');
-    await page.getByRole('button', { name: 'Create draft' }).click();
+    await page.getByRole('button', { name: 'Start definition' }).click();
 
     const alert = page.getByRole('form', { name: 'Define business object' }).getByRole('alert');
-    await expect(alert).toContainText('Check required values');
+    await expect(alert).toContainText('This definition needs attention');
     await expect(alert).toContainText(
       'An object definition with this key already exists in the current workspace.',
     );
@@ -703,19 +710,19 @@ test.describe('define business object', () => {
     await page.goto('/objects');
 
     await page.getByLabel('Name').fill('Customer');
-    await page.getByRole('button', { name: 'Create draft' }).click();
-    await expect(page.getByText('Draft created')).toBeVisible();
+    await page.getByRole('button', { name: 'Start definition' }).click();
+    await expect(page.getByText('Definition created')).toBeVisible();
 
     await page.getByRole('button', { name: 'Add field' }).click();
-    await page.getByRole('button', { name: 'Save draft' }).click();
+    await page.getByRole('button', { name: 'Save changes' }).click();
 
     const editorForm = page.getByRole('form', { name: 'Customer' });
-    const alert = editorForm.getByRole('alert').filter({ hasText: 'Check required values' });
-    await expect(alert).toHaveClass(/bg-destructive\/15/);
-    await expect(alert).toContainText(
-      'Field keys must start with a lowercase letter and be unique.',
-    );
-    await expect(alert).toContainText('Field labels are required.');
+    const alert = editorForm
+      .getByRole('alert')
+      .filter({ hasText: 'This definition needs attention' });
+    await expect(alert).toHaveCount(0);
+    await expect(editorForm.getByText('Field keys are required.')).toBeVisible();
+    await expect(editorForm.getByText('Field labels are required.')).toBeVisible();
     await expect(page.getByLabel('Field key')).toHaveAttribute('aria-invalid', 'true');
     await expect(page.getByLabel('Label')).toHaveAttribute('aria-invalid', 'true');
     await expectNoDesktopDocumentScroll(page);

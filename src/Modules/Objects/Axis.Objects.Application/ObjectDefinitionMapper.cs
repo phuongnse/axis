@@ -16,7 +16,7 @@ internal static class ObjectDefinitionMapper
             definition.Name,
             definition.Key.Value,
             definition.Status,
-            definition.DraftVersion,
+            definition.Revision,
             definition.LatestPublishedVersionNumber,
             definition.CreatedAt,
             definition.UpdatedAt,
@@ -30,7 +30,7 @@ internal static class ObjectDefinitionMapper
             definition.Name,
             definition.Key.Value,
             definition.Status,
-            definition.DraftVersion,
+            definition.Revision,
             definition.LatestPublishedVersionNumber,
             definition.UpdatedAt);
 

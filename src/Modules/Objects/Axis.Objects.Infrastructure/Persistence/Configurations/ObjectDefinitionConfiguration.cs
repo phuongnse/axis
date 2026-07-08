@@ -41,8 +41,8 @@ internal sealed class ObjectDefinitionConfiguration : IEntityTypeConfiguration<O
             .HasMaxLength(32)
             .IsRequired();
 
-        builder.Property(definition => definition.DraftVersion)
-            .HasColumnName("draft_version")
+        builder.Property(definition => definition.Revision)
+            .HasColumnName("revision")
             .IsRequired();
 
         builder.Property(definition => definition.LatestPublishedVersionNumber)

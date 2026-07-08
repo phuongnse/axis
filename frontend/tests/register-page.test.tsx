@@ -65,6 +65,17 @@ describe('RegisterPage', () => {
     expect(
       screen.getByText('We will send a verification link to this address.'),
     ).toBeInTheDocument();
+    expect(screen.getByLabelText('Full name')).toBeRequired();
+    expect(screen.getByLabelText('Email address')).toBeRequired();
+    expect(screen.getByLabelText('Password')).toBeRequired();
+    expect(screen.getByLabelText('Confirm password')).toBeRequired();
+    expect(screen.getByRole('checkbox', { name: /terms of service/i })).toHaveAttribute(
+      'aria-required',
+      'true',
+    );
+    expect(
+      document.querySelectorAll('[data-slot="field-label"][data-required="true"]'),
+    ).toHaveLength(5);
 
     await user.click(await screen.findByRole('button', { name: /create account/i }));
 

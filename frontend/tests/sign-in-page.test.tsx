@@ -51,6 +51,12 @@ describe('SignInPage', () => {
     const user = userEvent.setup();
     await renderWithRouter(<SignInPage />, { path: '/sign-in' });
 
+    expect(screen.getByLabelText('Email address')).toBeRequired();
+    expect(screen.getByLabelText('Password')).toBeRequired();
+    expect(
+      document.querySelectorAll('[data-slot="field-label"][data-required="true"]'),
+    ).toHaveLength(2);
+
     await user.click(screen.getByRole('button', { name: /sign in/i }));
 
     expect(screen.getByText('Email address is required')).toBeInTheDocument();

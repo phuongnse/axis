@@ -484,13 +484,13 @@
         "tags": [
           "Objects"
         ],
-        "summary": "Create a business object definition draft",
-        "operationId": "CreateObjectDefinitionDraft",
+        "summary": "Create an unpublished business object definition",
+        "operationId": "CreateObjectDefinition",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CreateObjectDefinitionDraftRequest"
+                "$ref": "#/components/schemas/CreateObjectDefinitionRequest"
               }
             }
           },
@@ -622,13 +622,13 @@
         ]
       }
     },
-    "/api/object-definitions/{id}/draft": {
+    "/api/object-definitions/{id}/unpublished": {
       "put": {
         "tags": [
           "Objects"
         ],
-        "summary": "Save a business object definition draft",
-        "operationId": "SaveObjectDefinitionDraft",
+        "summary": "Save an unpublished business object definition",
+        "operationId": "SaveUnpublishedObjectDefinition",
         "parameters": [
           {
             "name": "id",
@@ -644,7 +644,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/SaveObjectDefinitionDraftRequest"
+                "$ref": "#/components/schemas/SaveUnpublishedObjectDefinitionRequest"
               }
             }
           },
@@ -724,7 +724,7 @@
         "tags": [
           "Objects"
         ],
-        "summary": "Publish a business object definition draft",
+        "summary": "Publish an unpublished business object definition",
         "operationId": "PublishObjectDefinition",
         "parameters": [
           {
@@ -819,7 +819,7 @@
   },
   "components": {
     "schemas": {
-      "CreateObjectDefinitionDraftRequest": {
+      "CreateObjectDefinitionRequest": {
         "type": "object",
         "properties": {
           "name": {
@@ -916,7 +916,7 @@
           "status": {
             "$ref": "#/components/schemas/ObjectDefinitionStatus"
           },
-          "draftVersion": {
+          "revision": {
             "type": "integer",
             "format": "int32"
           },
@@ -961,7 +961,7 @@
           "status": {
             "$ref": "#/components/schemas/ObjectDefinitionStatus"
           },
-          "draftVersion": {
+          "revision": {
             "type": "integer",
             "format": "int32"
           },
@@ -1003,7 +1003,7 @@
       },
       "ObjectDefinitionStatus": {
         "enum": [
-          "Draft",
+          "Unpublished",
           "Published"
         ],
         "type": "string"
@@ -1114,7 +1114,7 @@
       "PublishObjectDefinitionRequest": {
         "type": "object",
         "properties": {
-          "expectedDraftVersion": {
+          "expectedRevision": {
             "type": "integer",
             "format": "int32"
           }
@@ -1158,10 +1158,10 @@
         },
         "additionalProperties": false
       },
-      "SaveObjectDefinitionDraftRequest": {
+      "SaveUnpublishedObjectDefinitionRequest": {
         "type": "object",
         "properties": {
-          "expectedDraftVersion": {
+          "expectedRevision": {
             "type": "integer",
             "format": "int32"
           },

@@ -29,15 +29,15 @@ public sealed class ObjectDefinitionRepositoryTests(ObjectsDatabaseFixture db) :
     public async Task DisposeAsync() => await _ctx.DisposeAsync();
 
     [Fact]
-    public async Task AddAsync_WhenDefinitionGraphIsPublished_PersistsDraftAndVersionSnapshot()
+    public async Task AddAsync_WhenDefinitionGraphIsPublished_PersistsUnpublishedAndVersionSnapshot()
     {
         Guid workspaceId = Guid.NewGuid();
         string objectKey = UniqueKey("customer");
-        ObjectDefinition definition = CreateDraft(workspaceId, "Customer", objectKey);
-        definition.SaveDraft(
+        ObjectDefinition definition = CreateUnpublished(workspaceId, "Customer", objectKey);
+        definition.SaveUnpublished(
             "Customer",
             [Field("name", "Name", 0), Field("status", "Status", 1)],
-            expectedDraftVersion: 1,
+            expectedRevision: 1,
             DateTime.UtcNow).IsSuccess.Should().BeTrue();
         definition.Publish(2, Guid.NewGuid(), DateTime.UtcNow).IsSuccess.Should().BeTrue();
 
@@ -60,15 +60,15 @@ public sealed class ObjectDefinitionRepositoryTests(ObjectsDatabaseFixture db) :
     }
 
     [Fact]
-    public async Task SaveDraft_WhenExistingFieldKeyRemains_ReusesStableId()
+    public async Task SaveUnpublished_WhenExistingFieldKeyRemains_ReusesStableId()
     {
         Guid workspaceId = Guid.NewGuid();
         string objectKey = UniqueKey("account");
-        ObjectDefinition definition = CreateDraft(workspaceId, "Account", objectKey);
-        definition.SaveDraft(
+        ObjectDefinition definition = CreateUnpublished(workspaceId, "Account", objectKey);
+        definition.SaveUnpublished(
             "Account",
             [Field("status", "Status", 0)],
-            expectedDraftVersion: 1,
+            expectedRevision: 1,
             DateTime.UtcNow).IsSuccess.Should().BeTrue();
         ObjectFieldDefinitionId originalFieldId = definition.Fields.Single().Id;
 
@@ -76,12 +76,12 @@ public sealed class ObjectDefinitionRepositoryTests(ObjectsDatabaseFixture db) :
         await _unitOfWork.SaveChangesAsync();
 
         ObjectDefinition loaded = (await _repository.GetByIdForWorkspaceAsync(definition.Id, workspaceId))!;
-        loaded.SaveDraft(
+        loaded.SaveUnpublished(
             "Account",
             [
                 Field("status", "Lifecycle status", 0),
             ],
-            expectedDraftVersion: 2,
+            expectedRevision: 2,
             DateTime.UtcNow).IsSuccess.Should().BeTrue();
         await _unitOfWork.SaveChangesAsync();
 
@@ -100,8 +100,8 @@ public sealed class ObjectDefinitionRepositoryTests(ObjectsDatabaseFixture db) :
         Guid workspaceId = Guid.NewGuid();
         string objectKey = UniqueKey("invoice");
 
-        await _repository.AddAsync(CreateDraft(workspaceId, "Invoice", objectKey));
-        await _repository.AddAsync(CreateDraft(workspaceId, "Duplicate invoice", objectKey));
+        await _repository.AddAsync(CreateUnpublished(workspaceId, "Invoice", objectKey));
+        await _repository.AddAsync(CreateUnpublished(workspaceId, "Duplicate invoice", objectKey));
 
         Func<Task> act = () => _unitOfWork.SaveChangesAsync();
 
@@ -113,7 +113,7 @@ public sealed class ObjectDefinitionRepositoryTests(ObjectsDatabaseFixture db) :
     {
         Guid workspaceId = Guid.NewGuid();
         string objectKey = UniqueKey("order");
-        ObjectDefinition definition = CreateDraft(workspaceId, "Order", objectKey);
+        ObjectDefinition definition = CreateUnpublished(workspaceId, "Order", objectKey);
         await _repository.AddAsync(definition);
         await _unitOfWork.SaveChangesAsync();
 
@@ -134,22 +134,22 @@ public sealed class ObjectDefinitionRepositoryTests(ObjectsDatabaseFixture db) :
     {
         Guid workspaceId = Guid.NewGuid();
         Guid otherWorkspaceId = Guid.NewGuid();
-        ObjectDefinition first = CreateDraft(workspaceId, "Customer", UniqueKey("customer"));
-        first.SaveDraft(
+        ObjectDefinition first = CreateUnpublished(workspaceId, "Customer", UniqueKey("customer"));
+        first.SaveUnpublished(
             first.Name,
             [Field("name", "Name", 0)],
-            expectedDraftVersion: 1,
+            expectedRevision: 1,
             DateTime.UtcNow.AddMinutes(-2)).IsSuccess.Should().BeTrue();
-        ObjectDefinition second = CreateDraft(workspaceId, "Invoice", UniqueKey("invoice"));
-        second.SaveDraft(
+        ObjectDefinition second = CreateUnpublished(workspaceId, "Invoice", UniqueKey("invoice"));
+        second.SaveUnpublished(
             second.Name,
             [Field("number", "Number", 0)],
-            expectedDraftVersion: 1,
+            expectedRevision: 1,
             DateTime.UtcNow).IsSuccess.Should().BeTrue();
 
         await _repository.AddAsync(first);
         await _repository.AddAsync(second);
-        await _repository.AddAsync(CreateDraft(otherWorkspaceId, "Other", UniqueKey("other")));
+        await _repository.AddAsync(CreateUnpublished(otherWorkspaceId, "Other", UniqueKey("other")));
         await _unitOfWork.SaveChangesAsync();
 
         int total = await _repository.CountForWorkspaceAsync(workspaceId);
@@ -164,11 +164,11 @@ public sealed class ObjectDefinitionRepositoryTests(ObjectsDatabaseFixture db) :
     }
 
     [Fact]
-    public async Task SaveChangesAsync_WhenConcurrentDraftUpdateWins_ThrowsConcurrencyException()
+    public async Task SaveChangesAsync_WhenConcurrentUnpublishedUpdateWins_ThrowsConcurrencyException()
     {
         Guid workspaceId = Guid.NewGuid();
         string objectKey = UniqueKey("lead");
-        ObjectDefinition definition = CreateDraft(workspaceId, "Lead", objectKey);
+        ObjectDefinition definition = CreateUnpublished(workspaceId, "Lead", objectKey);
         await _repository.AddAsync(definition);
         await _unitOfWork.SaveChangesAsync();
 
@@ -181,15 +181,15 @@ public sealed class ObjectDefinitionRepositoryTests(ObjectsDatabaseFixture db) :
 
         ObjectDefinition first = (await firstRepository.GetByIdForWorkspaceAsync(definition.Id, workspaceId))!;
         ObjectDefinition second = (await secondRepository.GetByIdForWorkspaceAsync(definition.Id, workspaceId))!;
-        first.SaveDraft(
+        first.SaveUnpublished(
             "Lead",
             [Field("name", "Name", 0)],
-            expectedDraftVersion: 1,
+            expectedRevision: 1,
             DateTime.UtcNow).IsSuccess.Should().BeTrue();
-        second.SaveDraft(
+        second.SaveUnpublished(
             "Lead",
             [Field("company", "Company", 0)],
-            expectedDraftVersion: 1,
+            expectedRevision: 1,
             DateTime.UtcNow).IsSuccess.Should().BeTrue();
 
         await firstUnitOfWork.SaveChangesAsync();
@@ -198,9 +198,9 @@ public sealed class ObjectDefinitionRepositoryTests(ObjectsDatabaseFixture db) :
         await act.Should().ThrowAsync<ConcurrencyException>();
     }
 
-    private static ObjectDefinition CreateDraft(Guid workspaceId, string name, string key)
+    private static ObjectDefinition CreateUnpublished(Guid workspaceId, string name, string key)
     {
-        Result<ObjectDefinition> result = ObjectDefinition.CreateDraft(
+        Result<ObjectDefinition> result = ObjectDefinition.CreateUnpublished(
             workspaceId,
             name,
             ObjectDefinitionKey.Create(key).Value,

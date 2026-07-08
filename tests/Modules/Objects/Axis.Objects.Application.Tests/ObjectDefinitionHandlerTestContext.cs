@@ -22,20 +22,20 @@ internal sealed class ObjectDefinitionHandlerTestContext
         workspaceId = WorkspaceId,
     };
 
-    public static ObjectDefinition DraftWithOneSave()
+    public static ObjectDefinition UnpublishedWithOneSave()
     {
-        ObjectDefinition definition = CreateDraft("Customer", "customer");
-        definition.SaveDraft(
+        ObjectDefinition definition = CreateUnpublished("Customer", "customer");
+        definition.SaveUnpublished(
             "Customer",
             [FieldSpec("name", "Name", order: 0)],
-            expectedDraftVersion: 1,
+            expectedRevision: 1,
             DateTime.UtcNow).IsSuccess.Should().BeTrue();
         return definition;
     }
 
-    public static ObjectDefinition CreateDraft(string name, string key)
+    public static ObjectDefinition CreateUnpublished(string name, string key)
     {
-        Result<ObjectDefinition> result = ObjectDefinition.CreateDraft(
+        Result<ObjectDefinition> result = ObjectDefinition.CreateUnpublished(
             WorkspaceId,
             name,
             ObjectDefinitionKey.Create(key).Value,

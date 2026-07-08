@@ -12,7 +12,7 @@ public sealed class ObjectDefinition : AggregateRoot<ObjectDefinitionId>
     public string Name { get; private set; }
     public ObjectDefinitionKey Key { get; private set; }
     public ObjectDefinitionStatus Status { get; private set; }
-    public int DraftVersion { get; private set; }
+    public int Revision { get; private set; }
     public int? LatestPublishedVersionNumber { get; private set; }
     public DateTime CreatedAt { get; private set; }
     public DateTime UpdatedAt { get; private set; }
@@ -30,13 +30,13 @@ public sealed class ObjectDefinition : AggregateRoot<ObjectDefinitionId>
         WorkspaceId = workspaceId;
         Name = name;
         Key = key;
-        Status = ObjectDefinitionStatus.Draft;
-        DraftVersion = 1;
+        Status = ObjectDefinitionStatus.Unpublished;
+        Revision = 1;
         CreatedAt = createdAt;
         UpdatedAt = createdAt;
     }
 
-    public static Result<ObjectDefinition> CreateDraft(
+    public static Result<ObjectDefinition> CreateUnpublished(
         Guid workspaceId,
         string name,
         ObjectDefinitionKey key,
@@ -57,55 +57,55 @@ public sealed class ObjectDefinition : AggregateRoot<ObjectDefinitionId>
             createdAt);
     }
 
-    public Result SaveDraft(
+    public Result SaveUnpublished(
         string name,
         IReadOnlyList<ObjectFieldDefinitionSpec> fields,
-        int expectedDraftVersion,
+        int expectedRevision,
         DateTime updatedAt)
     {
-        if (Status != ObjectDefinitionStatus.Draft)
+        if (Status != ObjectDefinitionStatus.Unpublished)
             return Result.Failure(ErrorCodes.Conflict, "Published definitions cannot be edited by this use case.");
 
-        if (expectedDraftVersion != DraftVersion)
-            return Result.Failure(ErrorCodes.Conflict, "The object definition draft has changed.");
+        if (expectedRevision != Revision)
+            return Result.Failure(ErrorCodes.Conflict, "The object definition has changed.");
 
         Result normalizedName = ValidateName(name);
         if (normalizedName.IsFailure)
             return normalizedName;
 
-        Result<IReadOnlyList<ObjectFieldDefinition>> draftFields = CreateDraftFields(fields);
-        if (draftFields.IsFailure)
-            return Result.Failure(ErrorCodes.InvalidInput, draftFields.Error);
+        Result<IReadOnlyList<ObjectFieldDefinition>> unpublishedFields = CreateUnpublishedFields(fields);
+        if (unpublishedFields.IsFailure)
+            return Result.Failure(ErrorCodes.InvalidInput, unpublishedFields.Error);
 
         Name = name.Trim();
-        ReplaceDraftFields(draftFields.Value);
-        DraftVersion += 1;
+        ReplaceUnpublishedFields(unpublishedFields.Value);
+        Revision += 1;
         UpdatedAt = updatedAt;
         return Result.Success();
     }
 
     public Result<ObjectDefinitionVersion> Publish(
-        int expectedDraftVersion,
+        int expectedRevision,
         Guid publishedByUserId,
         DateTime publishedAt)
     {
         if (publishedByUserId == Guid.Empty)
             return Result.Failure<ObjectDefinitionVersion>("Publishing user is required.");
 
-        if (Status != ObjectDefinitionStatus.Draft)
+        if (Status != ObjectDefinitionStatus.Unpublished)
             return Result.Failure<ObjectDefinitionVersion>(
                 ErrorCodes.Conflict,
                 "The object definition is already published.");
 
-        if (expectedDraftVersion != DraftVersion)
+        if (expectedRevision != Revision)
             return Result.Failure<ObjectDefinitionVersion>(
                 ErrorCodes.Conflict,
-                "The object definition draft has changed.");
+                "The object definition has changed.");
 
         if (_fields.Count == 0)
             return Result.Failure<ObjectDefinitionVersion>(
                 ErrorCodes.InvalidInput,
-                "Object definition drafts must have at least one field before publication.");
+                "Unpublished object definitions must have at least one field before publication.");
 
         const int firstPublishedVersion = 1;
         ObjectDefinitionVersion version = ObjectDefinitionVersion.Create(
@@ -120,7 +120,7 @@ public sealed class ObjectDefinition : AggregateRoot<ObjectDefinitionId>
         return version;
     }
 
-    private Result<IReadOnlyList<ObjectFieldDefinition>> CreateDraftFields(
+    private Result<IReadOnlyList<ObjectFieldDefinition>> CreateUnpublishedFields(
         IReadOnlyList<ObjectFieldDefinitionSpec> specs)
     {
         HashSet<string> seenKeys = new(StringComparer.Ordinal);
@@ -150,7 +150,7 @@ public sealed class ObjectDefinition : AggregateRoot<ObjectDefinitionId>
         return fields;
     }
 
-    private void ReplaceDraftFields(IReadOnlyList<ObjectFieldDefinition> plannedFields)
+    private void ReplaceUnpublishedFields(IReadOnlyList<ObjectFieldDefinition> plannedFields)
     {
         Dictionary<string, ObjectFieldDefinition> existingFieldsByKey = _fields
             .ToDictionary(field => field.Key.Value, StringComparer.Ordinal);

@@ -5,10 +5,9 @@ import type { components } from '@/lib/api-types';
 export type ObjectDefinitionDetail = components['schemas']['ObjectDefinitionDetailDto'];
 export type ObjectDefinitionListItem = components['schemas']['ObjectDefinitionListItemDto'];
 export type ObjectDefinitionPage = components['schemas']['ObjectDefinitionListItemDtoPagedResult'];
-export type CreateObjectDefinitionDraftRequest =
-  components['schemas']['CreateObjectDefinitionDraftRequest'];
-export type SaveObjectDefinitionDraftRequest =
-  components['schemas']['SaveObjectDefinitionDraftRequest'];
+export type CreateObjectDefinitionRequest = components['schemas']['CreateObjectDefinitionRequest'];
+export type SaveUnpublishedObjectDefinitionRequest =
+  components['schemas']['SaveUnpublishedObjectDefinitionRequest'];
 export type PublishObjectDefinitionRequest =
   components['schemas']['PublishObjectDefinitionRequest'];
 export type ObjectFieldDefinitionInput = components['schemas']['ObjectFieldDefinitionInput'];
@@ -49,8 +48,8 @@ export async function listObjectDefinitions(page: number, pageSize: number) {
   return fetchApi<ObjectDefinitionPage>(`/object-definitions?${search.toString()}`);
 }
 
-export async function createObjectDefinitionDraft(
-  request: CreateObjectDefinitionDraftRequest,
+export async function createObjectDefinition(
+  request: CreateObjectDefinitionRequest,
 ): Promise<ObjectDefinitionDetail> {
   return fetchApi<ObjectDefinitionDetail>('/object-definitions', {
     method: 'POST',
@@ -62,11 +61,11 @@ export async function getObjectDefinition(id: string): Promise<ObjectDefinitionD
   return fetchApi<ObjectDefinitionDetail>(`/object-definitions/${id}`);
 }
 
-export async function saveObjectDefinitionDraft(
+export async function saveUnpublishedObjectDefinition(
   id: string,
-  request: SaveObjectDefinitionDraftRequest,
+  request: SaveUnpublishedObjectDefinitionRequest,
 ): Promise<ObjectDefinitionDetail> {
-  return fetchApi<ObjectDefinitionDetail>(`/object-definitions/${id}/draft`, {
+  return fetchApi<ObjectDefinitionDetail>(`/object-definitions/${id}/unpublished`, {
     method: 'PUT',
     body: JSON.stringify(request),
   });

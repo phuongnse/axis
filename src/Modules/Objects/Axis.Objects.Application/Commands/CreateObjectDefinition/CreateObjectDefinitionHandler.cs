@@ -7,16 +7,16 @@ using Axis.Shared.Application.CQRS;
 using Axis.Shared.Application.Identity;
 using Axis.Shared.Domain.Primitives;
 
-namespace Axis.Objects.Application.Commands.CreateObjectDefinitionDraft;
+namespace Axis.Objects.Application.Commands.CreateObjectDefinition;
 
-public sealed class CreateObjectDefinitionDraftHandler(
+public sealed class CreateObjectDefinitionHandler(
     ICurrentUser currentUser,
     IObjectDefinitionRepository repository,
     IUnitOfWork unitOfWork)
-    : ICommandHandler<CreateObjectDefinitionDraftCommand, ObjectDefinitionDetailDto>
+    : ICommandHandler<CreateObjectDefinitionCommand, ObjectDefinitionDetailDto>
 {
     public async Task<Result<ObjectDefinitionDetailDto>> Handle(
-        CreateObjectDefinitionDraftCommand command,
+        CreateObjectDefinitionCommand command,
         CancellationToken cancellationToken)
     {
         if (currentUser.workspaceId is not Guid workspaceId)
@@ -29,15 +29,15 @@ public sealed class CreateObjectDefinitionDraftHandler(
         if (await repository.ObjectKeyExistsAsync(workspaceId, key.Value, ct: cancellationToken))
             return ObjectDefinitionFailures.DuplicateObjectKey<ObjectDefinitionDetailDto>();
 
-        Result<ObjectDefinition> draft = ObjectDefinition.CreateDraft(
+        Result<ObjectDefinition> definition = ObjectDefinition.CreateUnpublished(
             workspaceId,
             command.Name,
             key.Value,
             DateTime.UtcNow);
-        if (draft.IsFailure)
-            return ObjectDefinitionFailures.Invalid<ObjectDefinitionDetailDto>(draft.Error);
+        if (definition.IsFailure)
+            return ObjectDefinitionFailures.Invalid<ObjectDefinitionDetailDto>(definition.Error);
 
-        await repository.AddAsync(draft.Value, cancellationToken);
+        await repository.AddAsync(definition.Value, cancellationToken);
 
         try
         {
@@ -48,6 +48,6 @@ public sealed class CreateObjectDefinitionDraftHandler(
             return ObjectDefinitionFailures.DuplicateObjectKey<ObjectDefinitionDetailDto>();
         }
 
-        return ObjectDefinitionMapper.ToDetailDto(draft.Value);
+        return ObjectDefinitionMapper.ToDetailDto(definition.Value);
     }
 }

@@ -1,8 +1,8 @@
 using Axis.Api.Extensions;
 using Axis.Objects.Application;
-using Axis.Objects.Application.Commands.CreateObjectDefinitionDraft;
+using Axis.Objects.Application.Commands.CreateObjectDefinition;
 using Axis.Objects.Application.Commands.PublishObjectDefinition;
-using Axis.Objects.Application.Commands.SaveObjectDefinitionDraft;
+using Axis.Objects.Application.Commands.SaveUnpublishedObjectDefinition;
 using Axis.Objects.Application.Queries.GetObjectDefinition;
 using Axis.Objects.Application.Queries.ListObjectDefinitions;
 using Axis.Shared.Application;
@@ -28,9 +28,9 @@ public static class ObjectDefinitionEndpoints
             .ProducesProblem(403)
             .ProducesProblem(400);
 
-        group.MapPost("", CreateDraft)
-            .WithName("CreateObjectDefinitionDraft")
-            .WithSummary("Create a business object definition draft")
+        group.MapPost("", CreateUnpublished)
+            .WithName("CreateObjectDefinition")
+            .WithSummary("Create an unpublished business object definition")
             .Produces<ObjectDefinitionDetailDto>(StatusCodes.Status201Created)
             .ProducesProblem(401)
             .ProducesProblem(403)
@@ -45,9 +45,9 @@ public static class ObjectDefinitionEndpoints
             .ProducesProblem(403)
             .ProducesProblem(404);
 
-        group.MapPut("/{id:guid}/draft", SaveDraft)
-            .WithName("SaveObjectDefinitionDraft")
-            .WithSummary("Save a business object definition draft")
+        group.MapPut("/{id:guid}/unpublished", SaveUnpublished)
+            .WithName("SaveUnpublishedObjectDefinition")
+            .WithSummary("Save an unpublished business object definition")
             .Produces<ObjectDefinitionDetailDto>()
             .ProducesProblem(401)
             .ProducesProblem(403)
@@ -57,7 +57,7 @@ public static class ObjectDefinitionEndpoints
 
         group.MapPost("/{id:guid}/publish", Publish)
             .WithName("PublishObjectDefinition")
-            .WithSummary("Publish a business object definition draft")
+            .WithSummary("Publish an unpublished business object definition")
             .Produces<ObjectDefinitionDetailDto>()
             .ProducesProblem(401)
             .ProducesProblem(403)
@@ -83,13 +83,13 @@ public static class ObjectDefinitionEndpoints
             : Results.Ok(result.Value);
     }
 
-    private static async Task<IResult> CreateDraft(
-        [FromBody] CreateObjectDefinitionDraftRequest request,
+    private static async Task<IResult> CreateUnpublished(
+        [FromBody] CreateObjectDefinitionRequest request,
         ISender mediator,
         CancellationToken ct)
     {
         Result<ObjectDefinitionDetailDto> result = await mediator.Send(
-            new CreateObjectDefinitionDraftCommand(request.Name),
+            new CreateObjectDefinitionCommand(request.Name),
             ct);
 
         return result.IsFailure
@@ -111,16 +111,16 @@ public static class ObjectDefinitionEndpoints
             : Results.Ok(result.Value);
     }
 
-    private static async Task<IResult> SaveDraft(
+    private static async Task<IResult> SaveUnpublished(
         Guid id,
-        [FromBody] SaveObjectDefinitionDraftRequest request,
+        [FromBody] SaveUnpublishedObjectDefinitionRequest request,
         ISender mediator,
         CancellationToken ct)
     {
         Result<ObjectDefinitionDetailDto> result = await mediator.Send(
-            new SaveObjectDefinitionDraftCommand(
+            new SaveUnpublishedObjectDefinitionCommand(
                 id,
-                request.ExpectedDraftVersion,
+                request.ExpectedRevision,
                 request.Name,
                 request.Fields),
             ct);
@@ -137,7 +137,7 @@ public static class ObjectDefinitionEndpoints
         CancellationToken ct)
     {
         Result<ObjectDefinitionDetailDto> result = await mediator.Send(
-            new PublishObjectDefinitionCommand(id, request.ExpectedDraftVersion),
+            new PublishObjectDefinitionCommand(id, request.ExpectedRevision),
             ct);
 
         return result.IsFailure

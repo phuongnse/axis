@@ -1,5 +1,5 @@
 using Axis.Objects.Application;
-using Axis.Objects.Application.Commands.SaveObjectDefinitionDraft;
+using Axis.Objects.Application.Commands.SaveUnpublishedObjectDefinition;
 using Axis.Objects.Domain.Aggregates;
 using Axis.Objects.Domain.ValueObjects;
 using Axis.Shared.Application;
@@ -9,28 +9,28 @@ using NSubstitute;
 
 namespace Axis.Objects.Application.Tests.Commands;
 
-public sealed class SaveObjectDefinitionDraftHandlerTests
+public sealed class SaveUnpublishedObjectDefinitionHandlerTests
 {
     private readonly ObjectDefinitionHandlerTestContext _context = new();
 
     [Fact]
-    public async Task SaveDraft_WhenExpectedVersionMatches_UpdatesFieldsAndReturnsNextDraftVersion()
+    public async Task SaveUnpublished_WhenExpectedRevisionMatches_UpdatesFieldsAndReturnsNextRevision()
     {
-        ObjectDefinition definition = ObjectDefinitionHandlerTestContext.DraftWithOneSave();
+        ObjectDefinition definition = ObjectDefinitionHandlerTestContext.UnpublishedWithOneSave();
         _context.Repository.GetByIdForWorkspaceAsync(
                 definition.Id,
                 ObjectDefinitionHandlerTestContext.WorkspaceId,
                 Arg.Any<CancellationToken>())
             .Returns(definition);
-        SaveObjectDefinitionDraftHandler sut = new(
+        SaveUnpublishedObjectDefinitionHandler sut = new(
             _context.CurrentUser,
             _context.Repository,
             _context.UnitOfWork);
 
         Result<ObjectDefinitionDetailDto> result = await sut.Handle(
-            new SaveObjectDefinitionDraftCommand(
+            new SaveUnpublishedObjectDefinitionCommand(
                 definition.Id.Value,
-                ExpectedDraftVersion: 2,
+                ExpectedRevision: 2,
                 Name: "Customer Account",
                 Fields: [ObjectDefinitionHandlerTestContext.FieldInput("credit_limit", "Credit limit")]),
             CancellationToken.None);
@@ -38,7 +38,7 @@ public sealed class SaveObjectDefinitionDraftHandlerTests
         result.IsSuccess.Should().BeTrue();
         result.Value.Name.Should().Be("Customer Account");
         result.Value.ObjectKey.Should().Be("customer");
-        result.Value.DraftVersion.Should().Be(3);
+        result.Value.Revision.Should().Be(3);
         result.Value.Fields.Should().ContainSingle(field => field.FieldKey == "credit_limit");
         result.Value.Fields[0].Label.Should().Be("Credit limit");
         await _context.Repository.DidNotReceive().ObjectKeyExistsAsync(
@@ -50,23 +50,23 @@ public sealed class SaveObjectDefinitionDraftHandlerTests
     }
 
     [Fact]
-    public async Task SaveDraft_WhenExpectedVersionIsStale_ReturnsConflictWithoutCommit()
+    public async Task SaveUnpublished_WhenExpectedRevisionIsStale_ReturnsConflictWithoutCommit()
     {
-        ObjectDefinition definition = ObjectDefinitionHandlerTestContext.DraftWithOneSave();
+        ObjectDefinition definition = ObjectDefinitionHandlerTestContext.UnpublishedWithOneSave();
         _context.Repository.GetByIdForWorkspaceAsync(
                 definition.Id,
                 ObjectDefinitionHandlerTestContext.WorkspaceId,
                 Arg.Any<CancellationToken>())
             .Returns(definition);
-        SaveObjectDefinitionDraftHandler sut = new(
+        SaveUnpublishedObjectDefinitionHandler sut = new(
             _context.CurrentUser,
             _context.Repository,
             _context.UnitOfWork);
 
         Result<ObjectDefinitionDetailDto> result = await sut.Handle(
-            new SaveObjectDefinitionDraftCommand(
+            new SaveUnpublishedObjectDefinitionCommand(
                 definition.Id.Value,
-                ExpectedDraftVersion: 1,
+                ExpectedRevision: 1,
                 Name: "Customer",
                 Fields: [ObjectDefinitionHandlerTestContext.FieldInput("name", "Name")]),
             CancellationToken.None);

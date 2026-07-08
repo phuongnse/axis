@@ -15,8 +15,8 @@ public sealed class ListObjectDefinitionsHandlerTests
     [Fact]
     public async Task ListObjectDefinitions_WhenWorkspaceScoped_ReturnsPagedDeterministicItems()
     {
-        ObjectDefinition first = ObjectDefinitionHandlerTestContext.CreateDraft("Customer", "customer");
-        ObjectDefinition second = ObjectDefinitionHandlerTestContext.CreateDraft("Invoice", "invoice");
+        ObjectDefinition first = ObjectDefinitionHandlerTestContext.CreateUnpublished("Customer", "customer");
+        ObjectDefinition second = ObjectDefinitionHandlerTestContext.CreateUnpublished("Invoice", "invoice");
         _context.Repository.CountForWorkspaceAsync(
                 ObjectDefinitionHandlerTestContext.WorkspaceId,
                 Arg.Any<CancellationToken>())

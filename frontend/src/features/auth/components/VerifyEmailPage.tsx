@@ -122,11 +122,14 @@ function VerifyEmailOutcome({
             noValidate
           >
             <Field data-invalid={errors.email ? true : undefined}>
-              <FieldLabel htmlFor="resend-email">{t('auth.email')}</FieldLabel>
+              <FieldLabel htmlFor="resend-email" required>
+                {t('auth.email')}
+              </FieldLabel>
               <Input
                 id="resend-email"
                 type="email"
                 autoComplete="email"
+                required
                 aria-describedby={
                   errors.email ? 'resend-email-help resend-email-error' : 'resend-email-help'
                 }

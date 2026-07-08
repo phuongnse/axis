@@ -6,7 +6,7 @@ using Axis.Api.HealthChecks;
 using Axis.Api.Infrastructure;
 using Axis.Identity.Application.Commands.RegisterUser;
 using Axis.Identity.Infrastructure.Extensions;
-using Axis.Objects.Application.Commands.CreateObjectDefinitionDraft;
+using Axis.Objects.Application.Commands.CreateObjectDefinition;
 using Axis.Objects.Infrastructure.Extensions;
 using Axis.Shared.Application.Behaviors;
 using Axis.Shared.Application.Identity;
@@ -66,14 +66,14 @@ internal static class AxisApiServiceExtensions
         {
             cfg.RegisterServicesFromAssemblies(
                 typeof(RegisterUserCommand).Assembly,
-                typeof(CreateObjectDefinitionDraftCommand).Assembly);
+                typeof(CreateObjectDefinitionCommand).Assembly);
             cfg.AddOpenBehavior(typeof(LoggingBehavior<,>));
             cfg.AddOpenBehavior(typeof(ValidationBehavior<,>));
         });
 
         services.AddValidatorsFromAssemblies([
             typeof(RegisterUserCommand).Assembly,
-            typeof(CreateObjectDefinitionDraftCommand).Assembly,
+            typeof(CreateObjectDefinitionCommand).Assembly,
         ]);
     }
 

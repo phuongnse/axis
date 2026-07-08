@@ -28,7 +28,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { ApiError } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import {
-  createObjectDefinitionDraft,
+  createObjectDefinition,
   type ObjectDefinitionDetail,
   type ObjectFieldDefinitionInput,
   objectDefinitionDetailQueryOptions,
@@ -36,7 +36,7 @@ import {
   objectDefinitionsDefaultPageSize,
   objectDefinitionsListQueryOptions,
   publishObjectDefinition,
-  saveObjectDefinitionDraft,
+  saveUnpublishedObjectDefinition,
 } from '../api';
 
 const keyPattern = /^[a-z][a-z0-9_]{0,62}$/;
@@ -69,6 +69,7 @@ interface EditableFieldErrors {
 
 interface FieldValidationResult {
   messages: string[];
+  formMessages: string[];
   fieldErrors: Record<string, EditableFieldErrors>;
 }
 
@@ -95,7 +96,7 @@ export function BusinessObjectsPage() {
   });
 
   const createMutation = useMutation({
-    mutationFn: createObjectDefinitionDraft,
+    mutationFn: createObjectDefinition,
     onSuccess: (definition) => {
       setSelectedId(definition.id ?? null);
       setSelectedDefinition(definition);
@@ -108,8 +109,8 @@ export function BusinessObjectsPage() {
       cacheObjectDefinitionResult(queryClient, definition);
     },
     onError: (error) => {
-      applyIdentityApiErrors(error, identityForm.setError);
-      setFeedback(apiErrorFeedback(error, 'identity'));
+      const hasIdentityError = applyIdentityApiErrors(error, identityForm.setError);
+      setFeedback(apiErrorFeedback(error, 'identity', hasIdentityError ? ['name'] : []));
     },
   });
 
@@ -119,8 +120,8 @@ export function BusinessObjectsPage() {
       request,
     }: {
       id: string;
-      request: Parameters<typeof saveObjectDefinitionDraft>[1];
-    }) => saveObjectDefinitionDraft(id, request),
+      request: Parameters<typeof saveUnpublishedObjectDefinition>[1];
+    }) => saveUnpublishedObjectDefinition(id, request),
     onSuccess: (definition) => {
       setSelectedId(definition.id ?? null);
       setSelectedDefinition(definition);
@@ -131,13 +132,19 @@ export function BusinessObjectsPage() {
     },
     onError: (error) => {
       const hasIdentityError = applyIdentityApiErrors(error, identityForm.setError);
-      setFeedback(apiErrorFeedback(error, hasIdentityError ? 'identity' : 'fields'));
+      setFeedback(
+        apiErrorFeedback(
+          error,
+          hasIdentityError ? 'identity' : 'fields',
+          hasIdentityError ? ['name'] : [],
+        ),
+      );
     },
   });
 
   const publishMutation = useMutation({
-    mutationFn: ({ id, expectedDraftVersion }: { id: string; expectedDraftVersion: number }) =>
-      publishObjectDefinition(id, { expectedDraftVersion }),
+    mutationFn: ({ id, expectedRevision }: { id: string; expectedRevision: number }) =>
+      publishObjectDefinition(id, { expectedRevision }),
     onSuccess: (definition) => {
       setSelectedId(definition.id ?? null);
       setSelectedDefinition(definition);
@@ -168,7 +175,7 @@ export function BusinessObjectsPage() {
 
   const totalCount = listQuery.data?.totalCount ?? 0;
   const totalPages = Math.max(1, Math.ceil(totalCount / objectDefinitionsDefaultPageSize));
-  const selectedStatus = selectedDefinition?.status ?? 'Draft';
+  const selectedStatus = selectedDefinition?.status ?? 'Unpublished';
   const isPublished = selectedStatus === 'Published';
   const busy = createMutation.isPending || saveMutation.isPending || publishMutation.isPending;
   const addFieldUnavailable = !selectedDefinition || isPublished;
@@ -205,7 +212,7 @@ export function BusinessObjectsPage() {
     });
   }
 
-  function handleNewDraft() {
+  function handleNewDefinition() {
     setSelectedDefinition(null);
     setSelectedId(null);
     setFields([]);
@@ -266,17 +273,21 @@ export function BusinessObjectsPage() {
   }
 
   async function handleSave(values: IdentityFormValues) {
-    if (!selectedDefinition?.id || !selectedDefinition.draftVersion) return;
+    if (!selectedDefinition?.id || selectedDefinition.revision == null) return;
 
     const validation = validateFields(fields, t, { requireFields: false });
     setFieldValidationMode('save');
     if (validation.messages.length > 0) {
-      setFeedback({
-        scope: 'fields',
-        variant: 'destructive',
-        titleKey: 'objects.validationTitle',
-        detail: validation.messages.join(' '),
-      });
+      setFeedback(
+        validation.formMessages.length > 0
+          ? {
+              scope: 'fields',
+              variant: 'destructive',
+              titleKey: 'objects.validationTitle',
+              detail: validation.formMessages.join(' '),
+            }
+          : null,
+      );
       return;
     }
 
@@ -285,7 +296,7 @@ export function BusinessObjectsPage() {
     saveMutation.mutate({
       id: selectedDefinition.id,
       request: {
-        expectedDraftVersion: selectedDefinition.draftVersion,
+        expectedRevision: selectedDefinition.revision,
         name: values.name,
         fields: fields.map(toFieldInput),
       },
@@ -293,17 +304,21 @@ export function BusinessObjectsPage() {
   }
 
   function handlePublish() {
-    if (!selectedDefinition?.id || !selectedDefinition.draftVersion) return;
+    if (!selectedDefinition?.id || selectedDefinition.revision == null) return;
 
     const validation = validateFields(fields, t, { requireFields: true });
     setFieldValidationMode('publish');
     if (validation.messages.length > 0) {
-      setFeedback({
-        scope: 'publish',
-        variant: 'destructive',
-        titleKey: 'objects.validationTitle',
-        detail: validation.messages.join(' '),
-      });
+      setFeedback(
+        validation.formMessages.length > 0
+          ? {
+              scope: 'publish',
+              variant: 'destructive',
+              titleKey: 'objects.validationTitle',
+              detail: validation.formMessages.join(' '),
+            }
+          : null,
+      );
       return;
     }
 
@@ -311,7 +326,7 @@ export function BusinessObjectsPage() {
     setFieldValidationMode(null);
     publishMutation.mutate({
       id: selectedDefinition.id,
-      expectedDraftVersion: selectedDefinition.draftVersion,
+      expectedRevision: selectedDefinition.revision,
     });
   }
 
@@ -327,7 +342,7 @@ export function BusinessObjectsPage() {
           <h1 className="text-2xl font-semibold text-foreground">{t('objects.title')}</h1>
           <p className="mt-1 text-sm text-muted-foreground">{t('objects.pageDescription')}</p>
         </div>
-        <Button type="button" onClick={handleNewDraft}>
+        <Button type="button" onClick={handleNewDefinition}>
           <FilePlus2 className="size-4" aria-hidden />
           {t('objects.new')}
         </Button>
@@ -408,7 +423,7 @@ export function BusinessObjectsPage() {
                       </span>
                       <span className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
                         <span className="truncate">{definition.objectKey}</span>
-                        <StatusBadge status={definition.status ?? 'Draft'} />
+                        <StatusBadge status={definition.status ?? 'Unpublished'} />
                       </span>
                     </Button>
                   );
@@ -462,6 +477,7 @@ export function BusinessObjectsPage() {
             aria-labelledby="objects-editor-title"
             className="flex h-full min-h-0 min-w-0 flex-col"
             onSubmit={identityForm.handleSubmit(selectedDefinition ? handleSave : handleCreate)}
+            noValidate
           >
             <div className="flex shrink-0 flex-col gap-3 border-b border-border px-4 py-4 sm:flex-row sm:items-start sm:justify-between">
               <div className="min-w-0">
@@ -485,19 +501,27 @@ export function BusinessObjectsPage() {
             {fieldsExpanded ? null : (
               <div className="grid shrink-0 gap-4 p-4 sm:grid-cols-2">
                 <Field data-invalid={Boolean(identityForm.formState.errors.name)}>
-                  <FieldLabel htmlFor="object-name">{t('objects.name')}</FieldLabel>
+                  <FieldLabel htmlFor="object-name" required>
+                    {t('objects.name')}
+                  </FieldLabel>
                   <Input
                     id="object-name"
+                    required
+                    aria-describedby={
+                      identityForm.formState.errors.name
+                        ? 'object-name-help object-name-error'
+                        : 'object-name-help'
+                    }
                     aria-invalid={Boolean(identityForm.formState.errors.name)}
                     disabled={isPublished}
                     {...identityForm.register('name')}
                   />
-                  <FieldError>
+                  <FieldError id="object-name-error">
                     {identityForm.formState.errors.name?.message
                       ? t(identityForm.formState.errors.name.message)
                       : null}
                   </FieldError>
-                  <FieldDescription>{t('objects.nameHelp')}</FieldDescription>
+                  <FieldDescription id="object-name-help">{t('objects.nameHelp')}</FieldDescription>
                 </Field>
                 <Field>
                   <FieldLabel htmlFor="object-key">{t('objects.objectKey')}</FieldLabel>
@@ -622,7 +646,7 @@ export function BusinessObjectsPage() {
                       {selectedDefinition
                         ? saveMutation.isPending
                           ? t('objects.saving')
-                          : t('objects.saveDraft')
+                          : t('objects.saveChanges')
                         : createMutation.isPending
                           ? t('objects.creating')
                           : t('objects.create')}
@@ -669,8 +693,8 @@ export function BusinessObjectsPage() {
                 <ol className="text-sm" aria-label={t('objects.workflowLabel')}>
                   <WorkflowStep
                     index={1}
-                    title={t('objects.workflowDraftTitle')}
-                    detail={t('objects.workflowDraftDetail')}
+                    title={t('objects.workflowIdentityTitle')}
+                    detail={t('objects.workflowIdentityDetail')}
                   />
                   <WorkflowStep
                     index={2}
@@ -749,10 +773,11 @@ function currentValidationFeedback(
 ): FeedbackState | null {
   if (!active) return feedback;
   if (validation.messages.length === 0) return null;
+  if (validation.formMessages.length === 0) return null;
 
   return {
     ...feedback,
-    detail: validation.messages.join(' '),
+    detail: validation.formMessages.join(' '),
   };
 }
 
@@ -864,10 +889,13 @@ function FieldEditor({
     >
       <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
         <Field data-invalid={Boolean(errors?.fieldKey)}>
-          <FieldLabel htmlFor={`${prefix}-key`}>{t('objects.fieldKey')}</FieldLabel>
+          <FieldLabel htmlFor={`${prefix}-key`} required>
+            {t('objects.fieldKey')}
+          </FieldLabel>
           <Input
             id={`${prefix}-key`}
             value={field.fieldKey}
+            required
             aria-invalid={Boolean(errors?.fieldKey)}
             aria-describedby={errors?.fieldKey ? `${prefix}-key-error` : undefined}
             disabled={disabled}
@@ -876,10 +904,13 @@ function FieldEditor({
           <FieldError id={`${prefix}-key-error`}>{errors?.fieldKey}</FieldError>
         </Field>
         <Field data-invalid={Boolean(errors?.label)}>
-          <FieldLabel htmlFor={`${prefix}-label`}>{t('objects.label')}</FieldLabel>
+          <FieldLabel htmlFor={`${prefix}-label`} required>
+            {t('objects.label')}
+          </FieldLabel>
           <Input
             id={`${prefix}-label`}
             value={field.label}
+            required
             aria-invalid={Boolean(errors?.label)}
             aria-describedby={errors?.label ? `${prefix}-label-error` : undefined}
             disabled={disabled}
@@ -948,7 +979,7 @@ function StatusBadge({ status }: { status: string }) {
 
   return (
     <Badge variant={published ? 'secondary' : 'outline'}>
-      {published ? t('objects.published') : t('objects.draft')}
+      {published ? t('objects.published') : t('objects.unpublished')}
     </Badge>
   );
 }
@@ -974,11 +1005,12 @@ function validateFields(
   options: { requireFields: boolean },
 ): FieldValidationResult {
   const errors: string[] = [];
+  const formErrors: string[] = [];
   const fieldErrors: Record<string, EditableFieldErrors> = {};
   const keyCounts = new Map<string, number>();
 
   if (options.requireFields && fields.length === 0) {
-    errors.push(t('objects.validationFieldsRequired'));
+    addFormValidationError(errors, formErrors, t('objects.validationFieldsRequired'));
   }
 
   for (const field of fields) {
@@ -992,7 +1024,15 @@ function validateFields(
     const trimmedKey = field.fieldKey.trim();
     const duplicatedKey = trimmedKey ? (keyCounts.get(trimmedKey) ?? 0) > 1 : false;
 
-    if (!keyPattern.test(trimmedKey) || duplicatedKey) {
+    if (!trimmedKey) {
+      addFieldValidationError(
+        fieldErrors,
+        errors,
+        field.clientId,
+        'fieldKey',
+        t('objects.validationFieldKeyRequired'),
+      );
+    } else if (!keyPattern.test(trimmedKey) || duplicatedKey) {
       addFieldValidationError(
         fieldErrors,
         errors,
@@ -1015,6 +1055,7 @@ function validateFields(
 
   return {
     messages: [...new Set(errors)],
+    formMessages: [...new Set(formErrors)],
     fieldErrors,
   };
 }
@@ -1022,8 +1063,14 @@ function validateFields(
 function emptyFieldValidationResult(): FieldValidationResult {
   return {
     messages: [],
+    formMessages: [],
     fieldErrors: {},
   };
+}
+
+function addFormValidationError(messages: string[], formMessages: string[], message: string) {
+  messages.push(message);
+  formMessages.push(message);
 }
 
 function addFieldValidationError(
@@ -1040,11 +1087,19 @@ function addFieldValidationError(
   messages.push(message);
 }
 
-function apiErrorFeedback(error: unknown, scope: FeedbackScope): FeedbackState {
+function apiErrorFeedback(
+  error: unknown,
+  scope: FeedbackScope,
+  excludedValidationFields: readonly string[] = [],
+): FeedbackState | null {
   if (error instanceof ApiError) {
-    const detail = apiErrorDetail(error.data);
+    const detail = apiErrorDetail(error.data, excludedValidationFields);
 
     if (!detail) {
+      if (excludedValidationFields.length > 0 && apiErrorHasValidationErrors(error.data)) {
+        return null;
+      }
+
       return {
         scope,
         variant: 'destructive',
@@ -1085,24 +1140,40 @@ function applyIdentityApiErrors(
   return true;
 }
 
-function apiErrorDetail(data: unknown): string | undefined {
+function apiErrorDetail(
+  data: unknown,
+  excludedValidationFields: readonly string[] = [],
+): string | undefined {
   const record = objectRecord(data);
   if (!record) return undefined;
 
-  return (
-    validationErrorsText(record.errors) ?? firstText(record.detail, record.title, record.message)
-  );
+  const validationText = validationErrorsText(record.errors, excludedValidationFields);
+  if (validationText) return validationText;
+  if (apiErrorHasValidationErrors(data)) return undefined;
+
+  return firstText(record.detail, record.title, record.message);
 }
 
-function validationErrorsText(errors: unknown): string | undefined {
+function validationErrorsText(
+  errors: unknown,
+  excludedValidationFields: readonly string[] = [],
+): string | undefined {
   const record = objectRecord(errors);
   if (!record) return undefined;
+  const excludedFields = new Set(excludedValidationFields.map((field) => field.toLowerCase()));
 
-  const messages = Object.values(record)
+  const messages = Object.entries(record)
+    .filter(([key]) => !excludedFields.has(key.toLowerCase()))
+    .map(([, value]) => value)
     .flatMap((value) => (Array.isArray(value) ? value : [value]))
     .filter(isNonEmptyString);
 
   return messages.length > 0 ? [...new Set(messages)].join(' ') : undefined;
+}
+
+function apiErrorHasValidationErrors(data: unknown): boolean {
+  const record = objectRecord(data);
+  return Boolean(record && validationErrorsText(record.errors));
 }
 
 function apiErrorMessagesByField(error: unknown): Record<string, string[]> {
