@@ -595,13 +595,13 @@ export function BusinessObjectsPage() {
                       key={definition.id}
                       variant="outline"
                       size="xs"
-                      render={<button type="button" />}
+                      render={<Button type="button" variant="ghost" />}
                       aria-current={active ? 'true' : undefined}
                       onFocus={() => prefetchDefinition(definition.id)}
                       onMouseEnter={() => prefetchDefinition(definition.id)}
                       onClick={() => handleSelect(definition.id)}
                       className={cn(
-                        'rounded-md bg-transparent text-left hover:bg-accent dark:hover:bg-accent',
+                        'h-auto justify-start rounded-md bg-transparent text-left whitespace-normal hover:bg-accent hover:text-foreground dark:hover:bg-accent',
                         active && 'bg-accent',
                       )}
                     >
