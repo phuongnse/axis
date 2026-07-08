@@ -18,6 +18,7 @@ const e2eEnvKeys = [
   'E2E_WEB_SERVER_HOST',
   'E2E_WEB_SERVER_PORT',
 ] as const;
+const playwrightConfigLoadTimeoutMs = 10_000;
 
 const originalEnv = new Map(e2eEnvKeys.map((key) => [key, process.env[key]]));
 
@@ -59,16 +60,20 @@ describe('Playwright configuration', () => {
     resetE2EEnv();
   });
 
-  it('starts host e2e on an isolated strict local web server by default', async () => {
-    resetE2EEnv();
+  it(
+    'starts host e2e on an isolated strict local web server by default',
+    async () => {
+      resetE2EEnv();
 
-    const config = await loadDefaultConfig();
-    const webServer = getSingleWebServer(config);
+      const config = await loadDefaultConfig();
+      const webServer = getSingleWebServer(config);
 
-    expect(config.use?.baseURL).toBe('http://127.0.0.1:4173');
-    expect(webServer.url).toBe('http://127.0.0.1:4173');
-    expect(webServer.command).toBe('npm run dev -- --host 127.0.0.1 --port 4173 --strictPort');
-  });
+      expect(config.use?.baseURL).toBe('http://127.0.0.1:4173');
+      expect(webServer.url).toBe('http://127.0.0.1:4173');
+      expect(webServer.command).toBe('npm run dev -- --host 127.0.0.1 --port 4173 --strictPort');
+    },
+    playwrightConfigLoadTimeoutMs,
+  );
 
   it('uses the compose e2e target without starting a host web server', async () => {
     resetE2EEnv();

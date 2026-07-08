@@ -1,5 +1,5 @@
 import { QueryClient } from '@tanstack/react-query';
-import { screen, waitFor, within } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { objectDefinitionQueryKeys } from '@/features/objects/api';
@@ -97,12 +97,16 @@ describe('BusinessObjectsPage', () => {
     await renderWithRouter(<BusinessObjectsPage />, { path: '/objects' });
 
     const listItem = await screen.findByRole('button', { name: /Customer/ });
+    expect(listItem).toHaveClass('border-border');
     await user.hover(listItem);
 
     await waitFor(() => expect(detailRequestCount).toBe(1));
     await user.click(listItem);
 
+    expect(listItem).toHaveAttribute('aria-current', 'true');
+    expect(listItem).toHaveClass('bg-accent');
     expect(await screen.findByLabelText('Object key')).toHaveValue('customer');
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
     expect(screen.queryByText('Not published 3')).not.toBeInTheDocument();
     await waitFor(() => expect(detailRequestCount).toBe(1));
   });
@@ -281,16 +285,7 @@ describe('BusinessObjectsPage', () => {
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Add field' })).toBeEnabled();
     expect(screen.getByRole('button', { name: 'Add field' })).toHaveClass('bg-primary');
-    expect(
-      within(screen.getByRole('form', { name: 'Customer' })).getByRole('button', {
-        name: 'Save changes',
-      }),
-    ).toBeEnabled();
-    expect(
-      within(screen.getByRole('form', { name: 'Customer' })).getByRole('button', {
-        name: 'Save changes',
-      }),
-    ).toHaveClass('bg-primary');
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
     expect(
       within(screen.getByRole('form', { name: 'Customer' })).getByRole('button', {
         name: 'Publish',
@@ -305,18 +300,29 @@ describe('BusinessObjectsPage', () => {
     await user.click(screen.getByRole('button', { name: 'Add field' }));
     expect(screen.getByLabelText('Field key')).toBeRequired();
     expect(screen.getByLabelText('Label')).toBeRequired();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
     await user.type(screen.getByLabelText('Field key'), 'name');
     await user.type(screen.getByLabelText('Label'), 'Name');
     expect(
       within(screen.getByRole('form', { name: 'Customer' })).getByRole('button', {
         name: 'Publish',
       }),
-    ).toHaveClass('bg-primary');
-    await user.click(screen.getByRole('button', { name: 'Save changes' }));
+    ).toBeDisabled();
 
-    expect(await screen.findByText('Changes saved')).toBeInTheDocument();
+    await waitFor(() =>
+      expect(requests.map((request) => `${request.method} ${requestPath(request.url)}`)).toContain(
+        `PUT /api/object-definitions/${definitionId}/unpublished`,
+      ),
+    );
+
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Saved'));
     expect(screen.getAllByText('Not published', { exact: true })).toHaveLength(1);
     expect(screen.queryByText('Not published 2')).not.toBeInTheDocument();
+    expect(
+      within(screen.getByRole('form', { name: 'Customer' })).getByRole('button', {
+        name: 'Publish',
+      }),
+    ).toHaveClass('bg-primary');
     await user.click(screen.getByRole('button', { name: 'Publish' }));
 
     expect(await screen.findAllByText('Published')).not.toHaveLength(0);
@@ -357,6 +363,81 @@ describe('BusinessObjectsPage', () => {
           requestPath(request.url) === `/api/object-definitions/${definitionId}/publish`,
       )?.body,
     ).toEqual({ expectedRevision: 2 });
+  });
+
+  it('shows the autosave pending indicator before the debounced save starts', async () => {
+    const user = userEvent.setup();
+    let resolveSave: (() => void) | undefined;
+    let saveRequestCount = 0;
+
+    vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input.toString();
+      const method = init?.method ?? 'GET';
+      const body = typeof init?.body === 'string' ? JSON.parse(init.body) : undefined;
+
+      if (url.includes('/api/object-definitions?')) {
+        return jsonResponse({ items: [], totalCount: 0, page: 1, pageSize: 20 });
+      }
+
+      if (method === 'POST' && url.endsWith('/api/object-definitions')) {
+        return jsonResponse(
+          unpublishedDetail({
+            name: body.name,
+            objectKey: deriveObjectKey(body.name),
+            revision: 1,
+          }),
+          201,
+        );
+      }
+
+      if (method === 'PUT' && url.endsWith(`/api/object-definitions/${definitionId}/unpublished`)) {
+        saveRequestCount += 1;
+        const detail = unpublishedDetail({
+          name: body.name,
+          objectKey: 'customer',
+          revision: 2,
+          fields: body.fields,
+        });
+        return new Promise<Response>((resolve) => {
+          resolveSave = () => resolve(jsonResponse(detail));
+        });
+      }
+
+      return Promise.reject(new Error(`Unexpected fetch: ${method} ${url}`));
+    });
+
+    await renderWithRouter(<BusinessObjectsPage />, { path: '/objects' });
+    await user.type(await screen.findByLabelText('Name'), 'Customer');
+    await user.click(screen.getByRole('button', { name: 'Start definition' }));
+    await screen.findByText('Definition created');
+
+    await user.click(screen.getByRole('button', { name: 'Add field' }));
+    await user.type(screen.getByLabelText('Field key'), 'name');
+    await user.type(screen.getByLabelText('Label'), 'Name');
+
+    const getPublishButton = () =>
+      within(screen.getByRole('form', { name: 'Customer' })).getByRole('button', {
+        name: 'Publish',
+      });
+    expect(screen.getByRole('status')).toHaveTextContent('Saving changes');
+    expect(screen.queryByText('Saving...')).not.toBeInTheDocument();
+    expect(getPublishButton()).toBeDisabled();
+    expect(saveRequestCount).toBe(0);
+    await waitFor(() => expect(resolveSave).toBeDefined());
+    expect(saveRequestCount).toBe(1);
+
+    await act(async () => {
+      resolveSave?.();
+      await Promise.resolve();
+    });
+
+    expect(screen.getByRole('status')).toHaveTextContent('Saving changes');
+    expect(getPublishButton()).toBeDisabled();
+
+    await waitFor(() => {
+      expect(screen.getByRole('status')).toHaveTextContent('Saved');
+      expect(getPublishButton()).toBeEnabled();
+    });
   });
 
   it('shows server problem details when definition creation fails', async () => {
@@ -487,7 +568,6 @@ describe('BusinessObjectsPage', () => {
     await screen.findByText('Definition created');
 
     await user.click(screen.getByRole('button', { name: 'Add field' }));
-    await user.click(screen.getByRole('button', { name: 'Save changes' }));
 
     const editorForm = screen.getByRole('form', { name: 'Customer' });
     const fieldKey = screen.getByLabelText('Field key');
@@ -496,18 +576,91 @@ describe('BusinessObjectsPage', () => {
     expect(
       within(editorForm).queryByText('This definition needs attention'),
     ).not.toBeInTheDocument();
-    expect(screen.getByText('Field keys are required.')).toBeInTheDocument();
-    expect(screen.getByText('Field labels are required.')).toBeInTheDocument();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(screen.queryByText('Field keys are required.')).not.toBeInTheDocument();
+    expect(screen.queryByText('Field labels are required.')).not.toBeInTheDocument();
+    expect(fieldKey).not.toHaveAttribute('aria-invalid', 'true');
+    expect(label).not.toHaveAttribute('aria-invalid', 'true');
+
+    await user.type(fieldKey, '1bad');
+
+    expect(
+      await screen.findByText('Field keys must start with a lowercase letter and be unique.'),
+    ).toBeInTheDocument();
+    const fieldRow = fieldKey.closest('[data-slot="field"]')?.parentElement?.parentElement;
+    const fieldActions = screen.getByRole('button', { name: 'Remove field' }).parentElement;
+
+    expect(fieldRow).toHaveClass('border-border', 'bg-background/45');
+    expect(fieldRow).not.toHaveAttribute('data-invalid');
+    expect(fieldActions).toHaveClass('items-start', 'lg:pt-7');
     expect(fieldKey).toHaveAttribute('aria-invalid', 'true');
-    expect(label).toHaveAttribute('aria-invalid', 'true');
-    expect(fieldKey).toHaveAccessibleDescription('Field keys are required.');
-    expect(label).toHaveAccessibleDescription('Field labels are required.');
+    expect(label).not.toHaveAttribute('aria-invalid', 'true');
+    expect(fieldKey).toHaveAccessibleDescription(
+      'Field keys must start with a lowercase letter and be unique.',
+    );
+    expect(label).not.toHaveAccessibleDescription('Field labels are required.');
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
     expect(
       vi.mocked(fetch).mock.calls.some(([input, init]) => {
         const url = typeof input === 'string' ? input : input.toString();
         return init?.method === 'PUT' && requestPath(url).endsWith('/unpublished');
       }),
     ).toBe(false);
+  });
+
+  it('keeps newly added fields neutral while previous validation errors are visible', async () => {
+    const user = userEvent.setup();
+    vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input.toString();
+      const method = init?.method ?? 'GET';
+      const body = typeof init?.body === 'string' ? JSON.parse(init.body) : undefined;
+
+      if (url.includes('/api/object-definitions?')) {
+        return jsonResponse({ items: [], totalCount: 0, page: 1, pageSize: 20 });
+      }
+
+      if (method === 'POST' && url.endsWith('/api/object-definitions')) {
+        return jsonResponse(
+          unpublishedDetail({ name: body.name, objectKey: deriveObjectKey(body.name) }),
+          201,
+        );
+      }
+
+      return Promise.reject(new Error(`Unexpected fetch: ${method} ${url}`));
+    });
+
+    await renderWithRouter(<BusinessObjectsPage />, { path: '/objects' });
+    await user.type(await screen.findByLabelText('Name'), 'Customer');
+    await user.click(screen.getByRole('button', { name: 'Start definition' }));
+    await screen.findByText('Definition created');
+
+    await user.click(screen.getByRole('button', { name: 'Add field' }));
+    const firstFieldKey = screen.getByLabelText('Field key');
+    await user.type(firstFieldKey, '1bad');
+
+    await waitFor(() =>
+      expect(
+        screen.getAllByText('Field keys must start with a lowercase letter and be unique.'),
+      ).toHaveLength(1),
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Add field' }));
+
+    const fieldKeys = screen.getAllByLabelText('Field key');
+    const labels = screen.getAllByLabelText('Label');
+
+    expect(fieldKeys).toHaveLength(2);
+    expect(labels).toHaveLength(2);
+    expect(
+      screen.getAllByText('Field keys must start with a lowercase letter and be unique.'),
+    ).toHaveLength(1);
+    expect(screen.queryByText('Field labels are required.')).not.toBeInTheDocument();
+    expect(fieldKeys[0]).toHaveAttribute('aria-invalid', 'true');
+    expect(labels[0]).not.toHaveAttribute('aria-invalid', 'true');
+    expect(fieldKeys[1]).not.toHaveAttribute('aria-invalid', 'true');
+    expect(labels[1]).not.toHaveAttribute('aria-invalid', 'true');
+    expect(fieldKeys[1]).not.toHaveAccessibleDescription('Field keys are required.');
+    expect(labels[1]).not.toHaveAccessibleDescription('Field labels are required.');
   });
 
   it('marks every field with a duplicated key as invalid', async () => {
@@ -541,20 +694,25 @@ describe('BusinessObjectsPage', () => {
 
     const fieldKeys = screen.getAllByLabelText('Field key');
     const labels = screen.getAllByLabelText('Label');
-    await user.type(fieldKeys[0], 'customer_name');
-    await user.type(labels[0], 'Customer name');
-    await user.type(fieldKeys[1], 'customer_name');
-    await user.type(labels[1], 'Duplicate customer name');
-    await user.click(screen.getByRole('button', { name: 'Save changes' }));
+    await user.click(fieldKeys[0]);
+    await user.paste('name');
+    await user.click(labels[0]);
+    await user.paste('Name');
+    await user.click(fieldKeys[1]);
+    await user.paste('name');
+    await user.click(labels[1]);
+    await user.paste('Name 2');
 
     const editorForm = screen.getByRole('form', { name: 'Customer' });
 
     expect(
       within(editorForm).queryByText('This definition needs attention'),
     ).not.toBeInTheDocument();
-    expect(
-      screen.getAllByText('Field keys must start with a lowercase letter and be unique.'),
-    ).toHaveLength(2);
+    await waitFor(() =>
+      expect(
+        screen.getAllByText('Field keys must start with a lowercase letter and be unique.'),
+      ).toHaveLength(2),
+    );
     expect(fieldKeys[0]).toHaveAccessibleDescription(
       'Field keys must start with a lowercase letter and be unique.',
     );

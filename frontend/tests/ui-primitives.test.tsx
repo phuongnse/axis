@@ -137,13 +137,15 @@ describe('Field', () => {
     );
 
     expect(screen.getByLabelText('Workspace name')).toBeRequired();
-    expect(screen.getByText('Workspace name')).toHaveAttribute('data-required', 'true');
-    expect(screen.getByText('Workspace name').className).toContain(
-      "data-[required=true]:after:content-['*']",
-    );
-    expect(screen.getByText('Workspace name').className).toContain(
-      'data-[required=true]:after:-ml-1.5',
-    );
+    const label = screen.getByText('Workspace name');
+    const requiredIcon = label.querySelector('[data-slot="field-required-icon"]');
+
+    expect(label).toHaveAttribute('data-required', 'true');
+    expect(label).toHaveClass('items-center', 'gap-1');
+    expect(label.className).not.toContain('after:content');
+    expect(requiredIcon).toBeInTheDocument();
+    expect(requiredIcon).toHaveAttribute('aria-hidden', 'true');
+    expect(requiredIcon).toHaveClass('size-3', 'self-center', 'text-destructive');
   });
 
   it('keeps disabled field labels and controls visually explicit', () => {
