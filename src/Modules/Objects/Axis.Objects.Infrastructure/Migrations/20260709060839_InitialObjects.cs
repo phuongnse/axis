@@ -39,6 +39,7 @@ namespace Axis.Objects.Infrastructure.Migrations
                     field_key = table.Column<string>(type: "character varying(63)", maxLength: 63, nullable: false),
                     label = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
                     sort_order = table.Column<int>(type: "integer", nullable: false),
+                    field_type = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false),
                     object_definition_id = table.Column<Guid>(type: "uuid", nullable: false)
                 },
                 constraints: table =>
@@ -77,6 +78,27 @@ namespace Axis.Objects.Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "object_definition_field_rules",
+                columns: table => new
+                {
+                    id = table.Column<Guid>(type: "uuid", nullable: false),
+                    definition_key = table.Column<string>(type: "character varying(120)", maxLength: 120, nullable: false),
+                    sort_order = table.Column<int>(type: "integer", nullable: false),
+                    object_field_definition_id = table.Column<Guid>(type: "uuid", nullable: false),
+                    parameters = table.Column<string>(type: "jsonb", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_object_definition_field_rules", x => x.id);
+                    table.ForeignKey(
+                        name: "FK_object_definition_field_rules_object_definition_fields_obje~",
+                        column: x => x.object_field_definition_id,
+                        principalTable: "object_definition_fields",
+                        principalColumn: "id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "object_definition_version_fields",
                 columns: table => new
                 {
@@ -84,6 +106,7 @@ namespace Axis.Objects.Infrastructure.Migrations
                     field_key = table.Column<string>(type: "character varying(63)", maxLength: 63, nullable: false),
                     label = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
                     sort_order = table.Column<int>(type: "integer", nullable: false),
+                    field_type = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false),
                     object_definition_version_id = table.Column<Guid>(type: "uuid", nullable: false)
                 },
                 constraints: table =>
@@ -97,6 +120,38 @@ namespace Axis.Objects.Infrastructure.Migrations
                         onDelete: ReferentialAction.Cascade);
                 });
 
+            migrationBuilder.CreateTable(
+                name: "object_definition_version_field_rules",
+                columns: table => new
+                {
+                    id = table.Column<Guid>(type: "uuid", nullable: false),
+                    definition_key = table.Column<string>(type: "character varying(120)", maxLength: 120, nullable: false),
+                    sort_order = table.Column<int>(type: "integer", nullable: false),
+                    object_definition_version_field_id = table.Column<Guid>(type: "uuid", nullable: false),
+                    parameters = table.Column<string>(type: "jsonb", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_object_definition_version_field_rules", x => x.id);
+                    table.ForeignKey(
+                        name: "FK_object_definition_version_field_rules_object_definition_ver~",
+                        column: x => x.object_definition_version_field_id,
+                        principalTable: "object_definition_version_fields",
+                        principalColumn: "id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_object_definition_field_rules_object_field_definition_id_de~",
+                table: "object_definition_field_rules",
+                columns: new[] { "object_field_definition_id", "definition_key" },
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_object_definition_field_rules_object_field_definition_id_so~",
+                table: "object_definition_field_rules",
+                columns: new[] { "object_field_definition_id", "sort_order" });
+
             migrationBuilder.CreateIndex(
                 name: "IX_object_definition_fields_object_definition_id_field_key",
                 table: "object_definition_fields",
@@ -107,6 +162,17 @@ namespace Axis.Objects.Infrastructure.Migrations
                 name: "IX_object_definition_fields_object_definition_id_sort_order",
                 table: "object_definition_fields",
                 columns: new[] { "object_definition_id", "sort_order" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_object_definition_version_field_rules_object_definition_ve~1",
+                table: "object_definition_version_field_rules",
+                columns: new[] { "object_definition_version_field_id", "sort_order" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_object_definition_version_field_rules_object_definition_ver~",
+                table: "object_definition_version_field_rules",
+                columns: new[] { "object_definition_version_field_id", "definition_key" },
+                unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "IX_object_definition_version_fields_object_definition_version_~",
@@ -141,6 +207,12 @@ namespace Axis.Objects.Infrastructure.Migrations
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.DropTable(
+                name: "object_definition_field_rules");
+
+            migrationBuilder.DropTable(
+                name: "object_definition_version_field_rules");
+
             migrationBuilder.DropTable(
                 name: "object_definition_fields");
 

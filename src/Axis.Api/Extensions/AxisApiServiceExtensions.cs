@@ -8,6 +8,8 @@ using Axis.Identity.Application.Commands.RegisterUser;
 using Axis.Identity.Infrastructure.Extensions;
 using Axis.Objects.Application.Commands.CreateObjectDefinition;
 using Axis.Objects.Infrastructure.Extensions;
+using Axis.Rules.Application.Queries.ListFieldRuleDefinitions;
+using Axis.Rules.Infrastructure.Extensions;
 using Axis.Shared.Application.Behaviors;
 using Axis.Shared.Application.Identity;
 using Axis.Shared.Infrastructure.Observability;
@@ -66,7 +68,8 @@ internal static class AxisApiServiceExtensions
         {
             cfg.RegisterServicesFromAssemblies(
                 typeof(RegisterUserCommand).Assembly,
-                typeof(CreateObjectDefinitionCommand).Assembly);
+                typeof(CreateObjectDefinitionCommand).Assembly,
+                typeof(ListFieldRuleDefinitionsQuery).Assembly);
             cfg.AddOpenBehavior(typeof(LoggingBehavior<,>));
             cfg.AddOpenBehavior(typeof(ValidationBehavior<,>));
         });
@@ -74,6 +77,7 @@ internal static class AxisApiServiceExtensions
         services.AddValidatorsFromAssemblies([
             typeof(RegisterUserCommand).Assembly,
             typeof(CreateObjectDefinitionCommand).Assembly,
+            typeof(ListFieldRuleDefinitionsQuery).Assembly,
         ]);
     }
 
@@ -207,6 +211,7 @@ internal static class AxisApiServiceExtensions
         IHostEnvironment environment)
     {
         services.AddIdentityInfrastructure(configuration, environment);
+        services.AddRulesInfrastructure();
         services.AddObjectsInfrastructure(configuration);
     }
 

@@ -33,6 +33,9 @@ REQUIRED_DOTNET_SDK_MAJOR = "8"
 REQUIRED_LYCHEE_VERSION = "0.23.0"
 REQUIRED_RENOVATE_VALIDATOR_VERSION = "42.99.0"
 MINIMUM_CODERABBIT_CLI_VERSION = "0.6.0"
+VERSION_PROBE_TIMEOUT_SECONDS = 15
+PLAYWRIGHT_BROWSER_PROBE_TIMEOUT_SECONDS = 20
+DOCKER_PROBE_TIMEOUT_SECONDS = 20
 TOOL_VERSIONS_DOC = "docs/playbooks/scripts.md#tool-versions"
 TECH_STACK_DOC = "docs/TECH_STACK.md"
 GLOBAL_JSON_PATH = ROOT / "global.json"
@@ -42,6 +45,9 @@ RENOVATE_CONFIG_PATH = ROOT / ".github" / "renovate.json5"
 LOCAL_DEV_ENV_FILE = ROOT / ".env.local"
 LOCAL_DEV_PROJECT_NAME = "axis"
 LOCAL_DEV_POSTGRES_VOLUME = f"{LOCAL_DEV_PROJECT_NAME}_postgres_data"
+LOCAL_DEV_BROWSER_BASE_URL = "https://localhost:3000"
+LOCAL_DEV_API_BASE_URL = "https://localhost:5281"
+LOCAL_DEV_SMOKE_SERVICES = ("api", "web")
 API_PROJECT = ROOT / "src" / "Axis.Api" / "Axis.Api.csproj"
 FRONTEND_DIR = ROOT / "frontend"
 LOCAL_CERT_DIR = ROOT / ".dev-certs"
@@ -126,22 +132,30 @@ def run(
     check: bool = True,
     capture: bool = False,
     env: dict[str, str] | None = None,
+    timeout: float | None = None,
 ) -> subprocess.CompletedProcess[str]:
     merged_env = os.environ.copy()
     merged_env["PYTHONDONTWRITEBYTECODE"] = "1"
     if env:
         merged_env.update(env)
-    result = subprocess.run(
-        args,
-        cwd=cwd,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        stdout=subprocess.PIPE if capture else None,
-        stderr=subprocess.PIPE if capture else None,
-        check=False,
-        env=merged_env,
-    )
+    try:
+        result = subprocess.run(
+            args,
+            cwd=cwd,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            stdout=subprocess.PIPE if capture else None,
+            stderr=subprocess.PIPE if capture else None,
+            check=False,
+            env=merged_env,
+            timeout=timeout,
+        )
+    except subprocess.TimeoutExpired as exc:
+        stdout = exc.stdout if isinstance(exc.stdout, str) else ""
+        stderr = exc.stderr if isinstance(exc.stderr, str) else ""
+        message = f"{' '.join(args)} timed out after {timeout:g} seconds" if timeout else f"{' '.join(args)} timed out"
+        result = subprocess.CompletedProcess(args, 124, stdout=stdout, stderr=stderr or message)
     if check and result.returncode != 0:
         raise CheckError(f"{' '.join(args)} failed with exit code {result.returncode}")
     return result
@@ -152,9 +166,10 @@ def run_optional(
     *,
     cwd: Path = ROOT,
     env: dict[str, str] | None = None,
+    timeout: float | None = None,
 ) -> subprocess.CompletedProcess[str] | None:
     try:
-        return run(args, cwd=cwd, capture=True, check=False, env=env)
+        return run(args, cwd=cwd, capture=True, check=False, env=env, timeout=timeout)
     except OSError:
         return None
 
@@ -2081,7 +2096,7 @@ def command_version_line(name: str, *version_args: str, env: dict[str, str] | No
     if resolved is None:
         return False, f"{name} not found in PATH", command
 
-    result = run_optional([command, *version_args], env=env)
+    result = run_optional([command, *version_args], env=env, timeout=VERSION_PROBE_TIMEOUT_SECONDS)
     if result is None:
         return False, f"{name} not executable from PATH", resolved
     if result.returncode != 0:
@@ -2350,12 +2365,59 @@ def check_frontend_toolchain(_args: argparse.Namespace | None = None) -> int:
     return 0
 
 
+def playwright_chromium_status(env: dict[str, str] | None = None) -> tuple[bool, str]:
+    env = frontend_toolchain_env() if env is None else env
+    probe = run(
+        [
+            resolve_exe("node", env=env),
+            "--input-type=module",
+            "-e",
+            (
+                "import { chromium } from '@playwright/test';"
+                "import { existsSync } from 'node:fs';"
+                "const path = chromium.executablePath();"
+                "if (!existsSync(path)) {"
+                "  console.error(path);"
+                "  process.exit(1);"
+                "}"
+                "console.log(path);"
+            ),
+        ],
+        cwd=FRONTEND_DIR,
+        capture=True,
+        check=False,
+        env=env,
+        timeout=PLAYWRIGHT_BROWSER_PROBE_TIMEOUT_SECONDS,
+    )
+    detail = (probe.stdout or probe.stderr or "").strip().splitlines()
+    browser_path = detail[-1] if detail else "Playwright Chromium executable not found"
+    if probe.returncode == 0:
+        return True, browser_path
+    return (
+        False,
+        f"{browser_path}; run `python scripts/axis.py frontend install-browsers`",
+    )
+
+
+def check_playwright_browsers(_args: argparse.Namespace | None = None) -> int:
+    rc = check_frontend_toolchain()
+    if rc != 0:
+        return rc
+
+    ok, detail = playwright_chromium_status()
+    if not ok:
+        print(f"playwright-browsers: FAIL - {detail}", file=sys.stderr)
+        return 1
+    print(f"playwright-browsers: OK (chromium: {detail})")
+    return 0
+
+
 def find_lychee() -> str | None:
     return shutil.which("lychee")
 
 
 def lychee_version_status(lychee: str) -> tuple[bool, str]:
-    result = run_optional([lychee, "--version"])
+    result = run_optional([lychee, "--version"], timeout=VERSION_PROBE_TIMEOUT_SECONDS)
     if result is None:
         return False, f"{lychee} is not executable"
     if result.returncode != 0:
@@ -2430,6 +2492,29 @@ def coderabbit_cli_status() -> tuple[bool, str]:
     return True, f"{version_line} ({resolved}); expected >= {MINIMUM_CODERABBIT_CLI_VERSION}"
 
 
+def coderabbit_doctor_status(*, strict: bool) -> tuple[str, str]:
+    if strict:
+        ok, detail = coderabbit_cli_status()
+        return ("OK" if ok else "FAIL", detail)
+
+    resolved = shutil.which(resolve_exe("coderabbit")) or shutil.which("coderabbit")
+    if resolved is None:
+        return (
+            "FAIL",
+            f"coderabbit not found in PATH; CodeRabbit CLI is required for the local pre-PR review checkpoint. See {TOOL_VERSIONS_DOC}.",
+        )
+
+    suffix = Path(resolved).suffix.lower()
+    if os.name == "nt" and suffix in {".cmd", ".bat"}:
+        return (
+            "WARN",
+            f"{resolved}; version check skipped for Windows command shim. Run `python scripts/axis.py check coderabbit-cli` before PR review.",
+        )
+
+    ok, detail = coderabbit_cli_status()
+    return ("OK" if ok else "FAIL", detail)
+
+
 def check_coderabbit_cli(_args: argparse.Namespace | None = None) -> int:
     ok, detail = coderabbit_cli_status()
     if not ok:
@@ -2467,8 +2552,15 @@ def dotnet_command(args: argparse.Namespace) -> int:
     raise CheckError(f"Unknown dotnet command: {command}")
 
 
-def run_frontend_npm(npm_args: list[str], *, cwd: Path = FRONTEND_DIR) -> subprocess.CompletedProcess[str]:
+def run_frontend_npm(
+    npm_args: list[str],
+    *,
+    cwd: Path = FRONTEND_DIR,
+    env_overrides: dict[str, str] | None = None,
+) -> subprocess.CompletedProcess[str]:
     env = frontend_toolchain_env()
+    if env_overrides:
+        env.update(env_overrides)
     return run([resolve_exe("npm", env=env), *npm_args], cwd=cwd, env=env, check=False)
 
 
@@ -2487,6 +2579,8 @@ def frontend_command(args: argparse.Namespace) -> int:
     command = args.frontend_command
     if command == "install":
         return run_frontend_npm(["ci"]).returncode
+    if command == "install-browsers":
+        return run_frontend_npm(["exec", "--", "playwright", "install", "chromium"]).returncode
     if command == "ci":
         return run_frontend_npm(["run", "ci"]).returncode
     if command == "test":
@@ -2990,14 +3084,14 @@ def _docker_host_ping_ok(docker_host: str | None) -> bool:
 def _docker_info_ok(env: dict[str, str] | None = None) -> bool:
     if shutil.which(exe("docker")) is None and shutil.which("docker") is None:
         return False
-    result = run_optional([exe("docker"), "info"], env=env)
+    result = run_optional([exe("docker"), "info"], env=env, timeout=DOCKER_PROBE_TIMEOUT_SECONDS)
     return result is not None and result.returncode == 0
 
 
 def _docker_compose_ok() -> bool:
     if shutil.which(exe("docker")) is None and shutil.which("docker") is None:
         return False
-    result = run_optional([exe("docker"), "compose", "version"])
+    result = run_optional([exe("docker"), "compose", "version"], timeout=DOCKER_PROBE_TIMEOUT_SECONDS)
     return result is not None and result.returncode == 0
 
 
@@ -3033,6 +3127,63 @@ def local_dev_shell_argv(service: str, exec_command: list[str]) -> list[str]:
     if command:
         return command
     return [LOCAL_DEV_SERVICE_SHELL.get(service, LOCAL_DEV_DEFAULT_SHELL)]
+
+
+def local_dev_smoke_env() -> dict[str, str]:
+    env = {
+        "E2E_API_URL": LOCAL_DEV_API_BASE_URL,
+        "E2E_BASE_URL": LOCAL_DEV_BROWSER_BASE_URL,
+        "E2E_SKIP_WEB_SERVER": "1",
+        "E2E_VERIFY_ORIGIN": LOCAL_DEV_BROWSER_BASE_URL,
+    }
+    if LOCAL_ROOT_CA_PEM.is_file():
+        env["NODE_EXTRA_CA_CERTS"] = str(LOCAL_ROOT_CA_PEM)
+    return env
+
+
+def require_local_dev_smoke_services() -> int:
+    result = run(
+        local_dev_compose_args("ps", "--services", "--status", "running"),
+        capture=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        emit_captured_process(result)
+        return result.returncode
+
+    running = {line.strip() for line in (result.stdout or "").splitlines() if line.strip()}
+    missing = [service for service in LOCAL_DEV_SMOKE_SERVICES if service not in running]
+    if missing:
+        print(
+            "local-dev smoke: required services are not running: "
+            f"{', '.join(missing)}. Run `python scripts/axis.py local-dev up` first.",
+            file=sys.stderr,
+        )
+        return 1
+    return 0
+
+
+def local_dev_smoke(args: argparse.Namespace) -> int:
+    rc = check_frontend_toolchain()
+    if rc != 0:
+        return rc
+
+    ok, detail = playwright_chromium_status()
+    if not ok:
+        print(f"local-dev smoke: Playwright Chromium unavailable - {detail}", file=sys.stderr)
+        return 1
+
+    rc = require_local_dev_smoke_services()
+    if rc != 0:
+        return rc
+
+    smoke_args = passthrough_args(getattr(args, "smoke_args", []))
+    if not smoke_args:
+        smoke_args = ["e2e/local-dev-smoke.pw.ts"]
+    return run_frontend_npm(
+        ["run", "test:e2e", "--", *smoke_args],
+        env_overrides=local_dev_smoke_env(),
+    ).returncode
 
 
 def require_docker_compose(label: str) -> int:
@@ -3212,6 +3363,9 @@ def local_dev(args: argparse.Namespace) -> int:
             check=False,
         ).returncode
 
+    if command == "smoke":
+        return local_dev_smoke(args)
+
     if command == "observability":
         obs_command = args.observability_command
         if obs_command == "up":
@@ -3251,7 +3405,10 @@ def local_dev(args: argparse.Namespace) -> int:
 def _wsl_docker_ok() -> bool:
     if os.name != "nt" or shutil.which("wsl.exe") is None:
         return False
-    result = run_optional(["wsl.exe", "bash", "-lc", "docker info >/dev/null 2>&1"])
+    result = run_optional(
+        ["wsl.exe", "bash", "-lc", "docker info >/dev/null 2>&1"],
+        timeout=DOCKER_PROBE_TIMEOUT_SECONDS,
+    )
     return result is not None and result.returncode == 0
 
 
@@ -3284,8 +3441,8 @@ def doctor(args: argparse.Namespace) -> int:
         lychee_ok, lychee_detail = lychee_version_status(lychee)
         record("OK" if lychee_ok else "FAIL", "lychee", lychee_detail)
 
-    coderabbit_ok, coderabbit_detail = coderabbit_cli_status()
-    record("OK" if coderabbit_ok else "FAIL", "coderabbit", coderabbit_detail)
+    coderabbit_status, coderabbit_detail = coderabbit_doctor_status(strict=args.strict)
+    record(coderabbit_status, "coderabbit", coderabbit_detail)
 
     dotnet_ok, dotnet_detail = dotnet_sdk_status()
     record("OK" if dotnet_ok else "FAIL", ".NET SDK", dotnet_detail)
@@ -3293,6 +3450,16 @@ def doctor(args: argparse.Namespace) -> int:
     frontend_env = frontend_toolchain_env()
     node_ok, node_detail = node_version_status(frontend_env)
     record("OK" if node_ok else "FAIL", "node", node_detail)
+
+    if node_ok:
+        chromium_ok, chromium_detail = playwright_chromium_status(frontend_env)
+        record("OK" if chromium_ok else "WARN", "playwright chromium", chromium_detail)
+    else:
+        record(
+            "WARN",
+            "playwright chromium",
+            "Node must resolve before checking Playwright browser artifacts",
+        )
 
     for name, version_args in (
         ("git", ("--version",)),
@@ -3450,6 +3617,7 @@ def main(argv: list[str] | None = None) -> int:
     frontend_parser = sub.add_parser("frontend")
     frontend_sub = frontend_parser.add_subparsers(dest="frontend_command", required=True)
     frontend_sub.add_parser("install").set_defaults(func=frontend_command)
+    frontend_sub.add_parser("install-browsers").set_defaults(func=frontend_command)
     frontend_sub.add_parser("ci").set_defaults(func=frontend_command)
     frontend_sub.add_parser("test").set_defaults(func=frontend_command)
     frontend_gen_api = frontend_sub.add_parser("gen-api-types")
@@ -3492,6 +3660,9 @@ def main(argv: list[str] | None = None) -> int:
     local_e2e = local_dev_sub.add_parser("e2e")
     local_e2e.add_argument("e2e_args", nargs=argparse.REMAINDER)
     local_e2e.set_defaults(func=local_dev)
+    local_smoke = local_dev_sub.add_parser("smoke")
+    local_smoke.add_argument("smoke_args", nargs=argparse.REMAINDER)
+    local_smoke.set_defaults(func=local_dev)
     local_observability = local_dev_sub.add_parser("observability")
     local_observability_sub = local_observability.add_subparsers(dest="observability_command", required=True)
     local_observability_sub.add_parser("up").set_defaults(func=local_dev)
@@ -3516,6 +3687,7 @@ def main(argv: list[str] | None = None) -> int:
     check_sub.add_parser("docker").set_defaults(func=check_docker)
     check_sub.add_parser("dotnet-sdk").set_defaults(func=check_dotnet_sdk)
     check_sub.add_parser("frontend-toolchain").set_defaults(func=check_frontend_toolchain)
+    check_sub.add_parser("playwright-browsers").set_defaults(func=check_playwright_browsers)
     check_sub.add_parser("vulnerable-packages").set_defaults(func=check_vulnerable_packages)
     check_sub.add_parser("ef-domain-mapping").set_defaults(func=check_ef_domain_mapping)
     check_sub.add_parser("frontend-api-contracts").set_defaults(func=check_frontend_api_contracts)

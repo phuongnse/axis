@@ -815,6 +815,55 @@
           }
         ]
       }
+    },
+    "/api/rules/field-rule-definitions": {
+      "get": {
+        "tags": [
+          "Rules"
+        ],
+        "summary": "List system field rule definitions",
+        "operationId": "ListFieldRuleDefinitions",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/FieldRuleDefinitionDto"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -865,6 +914,61 @@
           }
         },
         "additionalProperties": false
+      },
+      "FieldRuleDefinitionDto": {
+        "type": "object",
+        "properties": {
+          "definitionKey": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "supportedFieldTypes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "parameters": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FieldRuleParameterDefinitionDto"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "FieldRuleParameterDefinitionDto": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "type": {
+            "$ref": "#/components/schemas/FieldRuleParameterType"
+          },
+          "isRequired": {
+            "type": "boolean"
+          },
+          "allowMultiple": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "FieldRuleParameterType": {
+        "enum": [
+          "Text",
+          "Integer",
+          "Decimal",
+          "Date",
+          "Boolean"
+        ],
+        "type": "string"
       },
       "LanguagePreferenceDto": {
         "type": "object",
@@ -1056,10 +1160,10 @@
           "fieldType": {
             "$ref": "#/components/schemas/ObjectFieldType"
           },
-          "variants": {
+          "rules": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/ObjectFieldVariantDto"
+              "$ref": "#/components/schemas/ObjectFieldRuleDto"
             }
           }
         },
@@ -1077,10 +1181,47 @@
           "fieldType": {
             "$ref": "#/components/schemas/ObjectFieldType"
           },
-          "variants": {
+          "rules": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/ObjectFieldVariantInput"
+              "$ref": "#/components/schemas/ObjectFieldRuleInput"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "ObjectFieldRuleDto": {
+        "type": "object",
+        "properties": {
+          "definitionKey": {
+            "type": "string"
+          },
+          "parameters": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "ObjectFieldRuleInput": {
+        "type": "object",
+        "properties": {
+          "definitionKey": {
+            "type": "string"
+          },
+          "parameters": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
             },
             "nullable": true
           }
@@ -1095,116 +1236,6 @@
           "Date",
           "Boolean",
           "SingleSelect"
-        ],
-        "type": "string"
-      },
-      "ObjectFieldVariantDto": {
-        "type": "object",
-        "properties": {
-          "kind": {
-            "$ref": "#/components/schemas/ObjectFieldVariantKind"
-          },
-          "minNumber": {
-            "type": "number",
-            "format": "double",
-            "nullable": true
-          },
-          "maxNumber": {
-            "type": "number",
-            "format": "double",
-            "nullable": true
-          },
-          "minDate": {
-            "type": "string",
-            "format": "date",
-            "nullable": true
-          },
-          "maxDate": {
-            "type": "string",
-            "format": "date",
-            "nullable": true
-          },
-          "minLength": {
-            "type": "integer",
-            "format": "int32",
-            "nullable": true
-          },
-          "maxLength": {
-            "type": "integer",
-            "format": "int32",
-            "nullable": true
-          },
-          "pattern": {
-            "type": "string",
-            "nullable": true
-          },
-          "options": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          }
-        },
-        "additionalProperties": false
-      },
-      "ObjectFieldVariantInput": {
-        "type": "object",
-        "properties": {
-          "kind": {
-            "$ref": "#/components/schemas/ObjectFieldVariantKind"
-          },
-          "minNumber": {
-            "type": "number",
-            "format": "double",
-            "nullable": true
-          },
-          "maxNumber": {
-            "type": "number",
-            "format": "double",
-            "nullable": true
-          },
-          "minDate": {
-            "type": "string",
-            "format": "date",
-            "nullable": true
-          },
-          "maxDate": {
-            "type": "string",
-            "format": "date",
-            "nullable": true
-          },
-          "minLength": {
-            "type": "integer",
-            "format": "int32",
-            "nullable": true
-          },
-          "maxLength": {
-            "type": "integer",
-            "format": "int32",
-            "nullable": true
-          },
-          "pattern": {
-            "type": "string",
-            "nullable": true
-          },
-          "options": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            },
-            "nullable": true
-          }
-        },
-        "additionalProperties": false
-      },
-      "ObjectFieldVariantKind": {
-        "enum": [
-          "Required",
-          "NumericRange",
-          "DateRange",
-          "TextLength",
-          "TextPattern",
-          "SingleSelectOptions"
         ],
         "type": "string"
       },

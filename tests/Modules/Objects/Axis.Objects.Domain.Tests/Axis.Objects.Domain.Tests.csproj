@@ -22,6 +22,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\..\..\src\Modules\Objects\Axis.Objects.Domain\Axis.Objects.Domain.csproj" />
+    <ProjectReference Include="..\..\..\..\src\Modules\Rules\Axis.Rules.Contracts\Axis.Rules.Contracts.csproj" />
     <ProjectReference Include="..\..\..\Shared\Axis.Testing\Axis.Testing.csproj" />
   </ItemGroup>
 

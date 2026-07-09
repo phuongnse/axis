@@ -20,6 +20,28 @@ const profile = {
   ],
 };
 
+const fieldRuleDefinitions = [
+  {
+    definitionKey: 'field.required',
+    displayName: 'Required',
+    description: 'Requires a value before publishing records.',
+    supportedFieldTypes: ['Text', 'Integer', 'Decimal', 'Date', 'Boolean', 'SingleSelect'],
+    parameters: [],
+    category: 'Contract',
+  },
+  {
+    definitionKey: 'field.text_length',
+    displayName: 'Text length',
+    description: 'Constrains text values to an accepted length range.',
+    supportedFieldTypes: ['Text'],
+    parameters: [
+      { key: 'min', type: 'Integer', isRequired: false, allowMultiple: false },
+      { key: 'max', type: 'Integer', isRequired: false, allowMultiple: false },
+    ],
+    category: 'Text',
+  },
+];
+
 function base64UrlJson(value: unknown): string {
   return Buffer.from(JSON.stringify(value), 'utf8').toString('base64url');
 }
@@ -69,6 +91,14 @@ async function mockAuthenticatedSession(page: Page): Promise<void> {
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify(profile),
+    });
+  });
+
+  await page.route('**/api/rules/field-rule-definitions', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(fieldRuleDefinitions),
     });
   });
 }
@@ -124,6 +154,46 @@ async function expectShellRegionsFitViewport(page: Page): Promise<void> {
   }
 }
 
+async function expectRouteViewportTouchesMain(
+  page: Page,
+  expectedPaddingBottom: string,
+): Promise<void> {
+  await expect
+    .poll(async () =>
+      page.evaluate(() => {
+        const main = document.querySelector('main');
+        const routeRoot = main?.firstElementChild as HTMLElement | null;
+
+        if (!main || !routeRoot) {
+          return null;
+        }
+
+        const mainBox = main.getBoundingClientRect();
+        const routeBox = routeRoot.getBoundingClientRect();
+        const tolerance = 1;
+
+        return {
+          mainPadding: getComputedStyle(main).padding,
+          routePaddingBottom: getComputedStyle(routeRoot).paddingBottom,
+          touchesBottom: Math.abs(routeBox.bottom - mainBox.bottom) <= tolerance,
+          touchesRight: Math.abs(routeBox.right - mainBox.right) <= tolerance,
+          touchesTop: Math.abs(routeBox.top - mainBox.top) <= tolerance,
+        };
+      }),
+    )
+    .toEqual({
+      mainPadding: '0px',
+      routePaddingBottom: expectedPaddingBottom,
+      touchesBottom: true,
+      touchesRight: true,
+      touchesTop: true,
+    });
+}
+
+async function expectAppFrameReady(page: Page, title: string): Promise<void> {
+  await expect(page.getByRole('banner')).toContainText(title, { timeout: 15_000 });
+}
+
 test.describe('app frame', () => {
   test('AT-002 desktop and mobile frame render without console errors or document overflow', async ({
     page,
@@ -138,15 +208,16 @@ test.describe('app frame', () => {
 
     await mockAuthenticatedSession(page);
     await page.setViewportSize({ width: 1280, height: 900 });
-    await page.goto('/dashboard');
+    await page.goto('/dashboard', { waitUntil: 'domcontentloaded' });
 
     await expect(page).toHaveURL(/\/dashboard$/);
-    await expect(page.getByRole('banner')).toContainText('Dashboard');
+    await expectAppFrameReady(page, 'Dashboard');
     await expect(page.getByRole('navigation', { name: 'Modules' })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Business objects' })).toHaveAttribute(
       'href',
       '/objects',
     );
+    await expect(page.getByRole('link', { name: 'Rules' })).toHaveAttribute('href', '/rules');
     await expect(page.getByRole('main')).toHaveText('');
     await expect(page.getByRole('contentinfo')).toContainText('Version 0.1.0');
     await expect(page.getByRole('contentinfo')).toContainText('Axis Platform');
@@ -160,9 +231,19 @@ test.describe('app frame', () => {
     await expectNoDocumentScroll(page);
     await page.keyboard.press('Escape');
 
+    await page.getByRole('link', { name: 'Rules' }).click();
+    await expect(page).toHaveURL(/\/rules$/);
+    await expect(page.getByRole('heading', { name: 'Rules', exact: true })).toBeVisible();
+    await expectRouteViewportTouchesMain(page, '48px');
+    await expectNoPageOverflow(page);
+    await expectNoDocumentScroll(page);
+
+    await page.goBack();
+    await expect(page).toHaveURL(/\/dashboard$/);
+
     await page.setViewportSize({ width: 390, height: 844 });
 
-    await expect(page.getByRole('banner')).toContainText('Dashboard');
+    await expectAppFrameReady(page, 'Dashboard');
     await expect(page.getByRole('navigation', { name: 'Modules' })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Business objects' })).toHaveAttribute(
       'href',
@@ -173,6 +254,14 @@ test.describe('app frame', () => {
     await expectShellRegionsFitViewport(page);
     await page.getByRole('button', { name: 'Account menu' }).click();
     await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible();
+    await expectNoPageOverflow(page);
+    await expectNoDocumentScroll(page);
+
+    await page.keyboard.press('Escape');
+    await page.getByRole('link', { name: 'Rules' }).click();
+    await expect(page).toHaveURL(/\/rules$/);
+    await expect(page.getByRole('heading', { name: 'Rules', exact: true })).toBeVisible();
+    await expectRouteViewportTouchesMain(page, '32px');
     await expectNoPageOverflow(page);
     await expectNoDocumentScroll(page);
     expect(pageErrors).toEqual([]);

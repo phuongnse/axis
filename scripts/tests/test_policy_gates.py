@@ -254,7 +254,7 @@ class TestUseCaseDocsGate(unittest.TestCase):
 
         self.assertIn(
             "docs/use-cases/example/sample: use cases must be direct Markdown files",
-            "\n".join(issues),
+            "\n".join(issues).replace("\\", "/"),
         )
 
     def issues_for_use_case(self, callout: str, ac_line: str = "- **AC-001** Works.") -> list[str]:
@@ -1547,6 +1547,17 @@ class TestVulnerablePackageGate(unittest.TestCase):
 
 
 class TestToolVersionGates(unittest.TestCase):
+    def test_run_returns_timeout_result_when_optional_command_hangs(self) -> None:
+        with mock.patch.object(
+            axis.subprocess,
+            "run",
+            side_effect=axis.subprocess.TimeoutExpired(["tool", "--version"], 8),
+        ):
+            result = axis.run(["tool", "--version"], capture=True, check=False, timeout=8)
+
+        self.assertEqual(124, result.returncode)
+        self.assertIn("timed out after 8 seconds", result.stderr)
+
     def test_dotnet_sdk_rejects_global_json_major_drift(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             global_json = Path(temp) / "global.json"
@@ -1671,6 +1682,61 @@ class TestToolVersionGates(unittest.TestCase):
             dirs = axis._windows_git_usr_bin_dirs()
         expected = Path(localappdata) / "Programs" / "Git" / "usr" / "bin"
         self.assertIn(expected, dirs)
+
+    def test_playwright_chromium_status_reports_missing_browser(self) -> None:
+        def fake_run(command: list[str], **_kwargs):
+            return axis.subprocess.CompletedProcess(command, 1, stdout="", stderr="/missing/chromium\n")
+
+        with (
+            mock.patch.object(axis, "run", side_effect=fake_run),
+            mock.patch.object(axis, "resolve_exe", side_effect=lambda name, **_kwargs: name),
+        ):
+            ok, detail = axis.playwright_chromium_status({"PATH": "/tmp/node"})
+
+        self.assertFalse(ok)
+        self.assertIn("/missing/chromium", detail)
+        self.assertIn("python scripts/axis.py frontend install-browsers", detail)
+
+    def test_doctor_warns_when_playwright_chromium_is_missing(self) -> None:
+        with (
+            mock.patch.object(axis, "find_lychee", return_value="/usr/bin/lychee"),
+            mock.patch.object(axis, "lychee_version_status", return_value=(True, "lychee 0.23.0")),
+            mock.patch.object(axis, "coderabbit_cli_status", return_value=(True, "coderabbit 0.6.0")),
+            mock.patch.object(axis, "dotnet_sdk_status", return_value=(True, "8.0.100")),
+            mock.patch.object(axis, "frontend_toolchain_env", return_value={}),
+            mock.patch.object(axis, "node_version_status", return_value=(True, "v22.23.0")),
+            mock.patch.object(
+                axis,
+                "playwright_chromium_status",
+                return_value=(False, "missing; run `python scripts/axis.py frontend install-browsers`"),
+            ),
+            mock.patch.object(axis, "_command_version", return_value=("OK", "/usr/bin/tool")),
+            mock.patch.object(axis, "find_openssl", return_value="/usr/bin/openssl"),
+            mock.patch.object(axis, "_docker_info_ok", return_value=True),
+            mock.patch.object(axis, "_docker_host_ping_ok", return_value=False),
+            mock.patch.object(axis, "_http_ok", return_value=False),
+            mock.patch.object(axis, "_wsl_docker_ok", return_value=False),
+            mock.patch.object(axis, "_docker_compose_ok", return_value=True),
+            contextlib.redirect_stdout(io.StringIO()) as stdout,
+            contextlib.redirect_stderr(io.StringIO()) as stderr,
+        ):
+            self.assertEqual(0, axis.doctor(axis.argparse.Namespace(strict=True)))
+
+        self.assertIn("[WARN] playwright chromium", stdout.getvalue())
+        self.assertEqual("", stderr.getvalue())
+
+    def test_coderabbit_doctor_skips_windows_command_shim_in_non_strict_mode(self) -> None:
+        with (
+            mock.patch.object(axis.os, "name", "nt"),
+            mock.patch.object(axis, "resolve_exe", return_value="coderabbit.cmd"),
+            mock.patch.object(axis.shutil, "which", return_value=r"C:\Users\alice\.local\bin\coderabbit.cmd"),
+            mock.patch.object(axis, "coderabbit_cli_status") as version_check,
+        ):
+            status, detail = axis.coderabbit_doctor_status(strict=False)
+
+        self.assertEqual("WARN", status)
+        self.assertIn("version check skipped", detail)
+        version_check.assert_not_called()
 
 
 class TestMarkdownLinkGate(unittest.TestCase):
@@ -2935,6 +3001,89 @@ class TestLocalDevCli(unittest.TestCase):
             calls[1][1:],
         )
 
+    def test_smoke_runs_host_playwright_against_running_local_stack(self) -> None:
+        calls: list[list[str]] = []
+        envs: list[dict[str, str] | None] = []
+
+        def fake_run(command: list[str], **kwargs):
+            calls.append(command)
+            envs.append(kwargs.get("env"))
+            if command[1:] == [
+                "compose",
+                "-p",
+                "axis",
+                "-f",
+                str(axis.LOCAL_DEV_COMPOSE_FILE),
+                "ps",
+                "--services",
+                "--status",
+                "running",
+            ]:
+                return axis.subprocess.CompletedProcess(command, 0, stdout="api\nweb\n", stderr="")
+            return axis.subprocess.CompletedProcess(command, 0, stdout="", stderr="")
+
+        with tempfile.TemporaryDirectory() as temp:
+            root_ca = Path(temp) / "rootCA.pem"
+            root_ca.write_text("test root ca", encoding="utf-8")
+
+            with (
+                mock.patch.object(axis, "LOCAL_ROOT_CA_PEM", root_ca),
+                mock.patch.object(axis, "_docker_compose_ok", return_value=True),
+                mock.patch.object(axis, "check_frontend_toolchain", return_value=0),
+                mock.patch.object(axis, "playwright_chromium_status", return_value=(True, "chromium")),
+                mock.patch.object(axis, "frontend_toolchain_env", return_value={"PATH": "node-bin"}),
+                mock.patch.object(axis, "run", side_effect=fake_run),
+            ):
+                result = axis.local_dev(
+                    axis.argparse.Namespace(
+                        local_dev_command="smoke",
+                        smoke_args=["--", "e2e/app-frame.pw.ts", "-g", "AT-002"],
+                    )
+                )
+
+        self.assertEqual(0, result)
+        self.assertEqual(
+            [
+                "compose",
+                "-p",
+                "axis",
+                "-f",
+                str(axis.LOCAL_DEV_COMPOSE_FILE),
+                "ps",
+                "--services",
+                "--status",
+                "running",
+            ],
+            calls[0][1:],
+        )
+        self.assertEqual(["run", "test:e2e", "--", "e2e/app-frame.pw.ts", "-g", "AT-002"], calls[1][1:])
+        self.assertEqual("https://localhost:5281", envs[1]["E2E_API_URL"])
+        self.assertEqual("https://localhost:3000", envs[1]["E2E_BASE_URL"])
+        self.assertEqual("1", envs[1]["E2E_SKIP_WEB_SERVER"])
+        self.assertEqual("https://localhost:3000", envs[1]["E2E_VERIFY_ORIGIN"])
+        self.assertEqual(str(root_ca), envs[1]["NODE_EXTRA_CA_CERTS"])
+
+    def test_smoke_fails_when_required_local_services_are_not_running(self) -> None:
+        calls: list[list[str]] = []
+
+        def fake_run(command: list[str], **_kwargs):
+            calls.append(command)
+            return axis.subprocess.CompletedProcess(command, 0, stdout="api\n", stderr="")
+
+        stderr = io.StringIO()
+        with (
+            mock.patch.object(axis, "_docker_compose_ok", return_value=True),
+            mock.patch.object(axis, "check_frontend_toolchain", return_value=0),
+            mock.patch.object(axis, "playwright_chromium_status", return_value=(True, "chromium")),
+            mock.patch.object(axis, "run", side_effect=fake_run),
+            mock.patch.object(axis.sys, "stderr", stderr),
+        ):
+            result = axis.local_dev(axis.argparse.Namespace(local_dev_command="smoke", smoke_args=[]))
+
+        self.assertEqual(1, result)
+        self.assertEqual(1, len(calls))
+        self.assertIn("required services are not running: web", stderr.getvalue())
+
     def test_shell_uses_service_default_inside_container(self) -> None:
         calls = self.run_local_dev(
             axis.argparse.Namespace(local_dev_command="shell", service="web", exec_command=[])
@@ -3121,6 +3270,14 @@ class TestAxisCommandWrappers(unittest.TestCase):
             self.assertEqual(0, axis.frontend_command(axis.argparse.Namespace(frontend_command="ci")))
 
         self.assertEqual(frontend_env, calls[0]["env"])
+
+    def test_frontend_install_browsers_installs_playwright_chromium(self) -> None:
+        calls = self.run_with_fake_process(
+            axis.frontend_command,
+            axis.argparse.Namespace(frontend_command="install-browsers"),
+        )
+
+        self.assertEqual(["npm", "exec", "--", "playwright", "install", "chromium"], calls[0])
 
     def test_local_dev_certs_writes_extension_and_runs_openssl(self) -> None:
         with tempfile.TemporaryDirectory() as temp:

@@ -58,7 +58,7 @@ Follow [reference.md](../reference.md).
 5. Test observable behavior.
    - Use Vitest and Testing Library for component or route behavior.
    - Assert navigation, responsive affordances, accessible labels, localized copy, and enabled/disabled behavior when in scope.
-   - Use Playwright or an available browser-capable tool for layout-sensitive desktop/mobile evidence when the app is runnable.
+   - Use Playwright or an available browser-capable tool for layout-sensitive desktop/mobile evidence when the app is runnable; prefer `python scripts/axis.py local-dev smoke -- <playwright-args>` for fast host-browser smoke against an already-running local stack.
    - Before marking every implementation status row `Done` or `N/A`, create or update the sibling `{slug}.evidence.md` sidecar with `## Acceptance Evidence` rows for every required AT. Each row must name committed evidence files and exact `python scripts/axis.py ...` commands; group comma-separated AT IDs in one row only when those cells are identical.
    - Do not put evidence paths or runner commands in the foundation spec file.
    - Do not count temporary browser smoke, screenshots, console output, or manual inspection as required AT evidence unless the proof is committed and referenced by the evidence table.

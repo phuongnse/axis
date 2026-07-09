@@ -10,6 +10,7 @@
 |---|---|---|
 | .NET SDK | [global.json](../../global.json) / [docs/TECH_STACK.md](../TECH_STACK.md) | build, tests, format, package scan, API contracts |
 | Node.js | [frontend/.nvmrc](../../frontend/.nvmrc) | frontend commands and API types |
+| Playwright Chromium | [frontend/package.json](../../frontend/package.json) and `python scripts/axis.py frontend install-browsers` | `local-dev smoke`, host browser E2E, and fast layout smoke |
 | Lychee | [scripts/axis.py](../../scripts/axis.py) check and [.github/workflows/build-and-test.yml](../../.github/workflows/build-and-test.yml) pin | Markdown link checks |
 | Renovate validator | [scripts/axis.py](../../scripts/axis.py) check | Dependency automation config |
 | Pre-PR review checkpoint | [scripts/axis.py](../../scripts/axis.py) check | `$axis-pull-request` before GitHub PR actions |
@@ -38,6 +39,7 @@ Metadata-only PR title/body updates do not require the checkpoint.
 
 - Add repo workflows as `python scripts/axis.py ...` subcommands.
 - Keep raw Docker, dotnet, npm, Lychee, and OpenSSL calls inside wrappers or package scripts.
+- Use `python scripts/axis.py local-dev smoke -- <playwright-args>` for fast host-browser smoke against a running local stack; use `python scripts/axis.py local-dev e2e -- <playwright-args>` for Compose-backed browser evidence.
 - Use `python scripts/axis.py verify` only at the ready-review boundary; it is changed-path scoped.
 - Use `python scripts/axis.py pre-push` for ordinary Git push sanity; it is not a substitute for the pre-PR review checkpoint on published PR branches.
 - Set `AXIS_PRE_PUSH_FULL=1` only when pre-push should run the full ready-review command.

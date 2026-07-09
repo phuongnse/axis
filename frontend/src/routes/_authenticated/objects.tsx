@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { objectDefinitionsListQueryOptions } from '@/features/objects/api';
+import { fieldRuleDefinitionsListQueryOptions } from '@/features/rules';
 import type { MyRouterContext } from '../__root';
 
 export const Route = createFileRoute('/_authenticated/objects')({
@@ -7,5 +8,8 @@ export const Route = createFileRoute('/_authenticated/objects')({
 });
 
 export function loadObjectDefinitionsRoute({ queryClient }: MyRouterContext) {
-  return queryClient.ensureQueryData(objectDefinitionsListQueryOptions());
+  return Promise.all([
+    queryClient.ensureQueryData(objectDefinitionsListQueryOptions()),
+    queryClient.ensureQueryData(fieldRuleDefinitionsListQueryOptions()),
+  ]);
 }

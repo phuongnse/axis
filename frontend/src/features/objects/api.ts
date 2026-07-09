@@ -12,9 +12,8 @@ export type PublishObjectDefinitionRequest =
   components['schemas']['PublishObjectDefinitionRequest'];
 export type ObjectFieldDefinitionInput = components['schemas']['ObjectFieldDefinitionInput'];
 export type ObjectFieldType = components['schemas']['ObjectFieldType'];
-export type ObjectFieldVariantDto = components['schemas']['ObjectFieldVariantDto'];
-export type ObjectFieldVariantInput = components['schemas']['ObjectFieldVariantInput'];
-export type ObjectFieldVariantKind = components['schemas']['ObjectFieldVariantKind'];
+export type ObjectFieldRuleDto = components['schemas']['ObjectFieldRuleDto'];
+export type ObjectFieldRuleInput = components['schemas']['ObjectFieldRuleInput'];
 
 export const objectDefinitionsDefaultPageSize = 20;
 export const objectDefinitionStaleTimeMs = 1000 * 60 * 5;

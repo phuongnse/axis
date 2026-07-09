@@ -5,6 +5,7 @@ using Axis.Objects.Domain.ValueObjects;
 using Axis.Objects.Infrastructure.Persistence;
 using Axis.Objects.Infrastructure.Repositories;
 using Axis.Objects.Infrastructure.Tests.Fixtures;
+using Axis.Rules.Contracts;
 using Axis.Shared.Application;
 using Axis.Shared.Domain.Primitives;
 using FluentAssertions;
@@ -61,7 +62,7 @@ public sealed class ObjectDefinitionRepositoryTests(ObjectsDatabaseFixture db) :
     }
 
     [Fact]
-    public async Task AddAsync_WhenDefinitionHasFieldVariants_PersistsCurrentAndPublishedVariantSnapshots()
+    public async Task AddAsync_WhenDefinitionHasFieldRules_PersistsCurrentAndPublishedRuleSnapshots()
     {
         Guid workspaceId = Guid.NewGuid();
         string objectKey = UniqueKey("request");
@@ -74,16 +75,16 @@ public sealed class ObjectDefinitionRepositoryTests(ObjectsDatabaseFixture db) :
                     "Amount",
                     0,
                     ObjectFieldType.Decimal,
-                    [new(ObjectFieldVariantKind.NumericRange, MinNumber: 0, MaxNumber: 100000)]),
+                    [Rule(FieldRuleDefinitionKeys.NumericRange, Params(("min", ["0"]), ("max", ["100000"])))]),
                 Field(
                     "status",
                     "Status",
                     1,
                     ObjectFieldType.SingleSelect,
                     [
-                        new(
-                            ObjectFieldVariantKind.SingleSelectOptions,
-                            Options: ["Draft", "Submitted", "Approved"]),
+                        Rule(
+                            FieldRuleDefinitionKeys.SingleSelectOptions,
+                            Params(("options", ["Draft", "Submitted", "Approved"]))),
                     ]),
             ],
             expectedRevision: 1,
@@ -101,15 +102,16 @@ public sealed class ObjectDefinitionRepositoryTests(ObjectsDatabaseFixture db) :
 
         ObjectFieldDefinition amount = loaded.Fields.Single(field => field.Key.Value == "amount");
         amount.FieldType.Should().Be(ObjectFieldType.Decimal);
-        amount.Variants.Should().ContainSingle();
-        amount.Variants[0].Kind.Should().Be(ObjectFieldVariantKind.NumericRange);
-        amount.Variants[0].MinNumber.Should().Be(0);
-        amount.Variants[0].MaxNumber.Should().Be(100000);
+        amount.Rules.Should().ContainSingle();
+        amount.Rules[0].DefinitionKey.Should().Be(FieldRuleDefinitionKeys.NumericRange);
+        amount.Rules[0].Parameters["min"].Should().Equal("0");
+        amount.Rules[0].Parameters["max"].Should().Equal("100000");
         ObjectDefinitionVersionField statusVersionField = loaded.Versions.Single().Fields
             .Single(field => field.Key.Value == "status");
         statusVersionField.FieldType.Should().Be(ObjectFieldType.SingleSelect);
-        statusVersionField.Variants.Should().ContainSingle();
-        statusVersionField.Variants[0].Options.Should().Equal("Draft", "Submitted", "Approved");
+        statusVersionField.Rules.Should().ContainSingle();
+        statusVersionField.Rules[0].Parameters["options"]
+            .Should().Equal("Draft", "Submitted", "Approved");
     }
 
     [Fact]
@@ -148,7 +150,7 @@ public sealed class ObjectDefinitionRepositoryTests(ObjectsDatabaseFixture db) :
     }
 
     [Fact]
-    public async Task SaveUnpublished_WhenFieldVariantsChange_ReplacesCurrentVariantConfiguration()
+    public async Task SaveUnpublished_WhenFieldRulesChange_ReplacesCurrentRuleConfiguration()
     {
         Guid workspaceId = Guid.NewGuid();
         string objectKey = UniqueKey("application");
@@ -161,7 +163,7 @@ public sealed class ObjectDefinitionRepositoryTests(ObjectsDatabaseFixture db) :
                     "Code",
                     0,
                     ObjectFieldType.Text,
-                    [new(ObjectFieldVariantKind.TextLength, MinLength: 2, MaxLength: 10)]),
+                    [Rule(FieldRuleDefinitionKeys.TextLength, Params(("min", ["2"]), ("max", ["10"])))]),
             ],
             expectedRevision: 1,
             DateTime.UtcNow).IsSuccess.Should().BeTrue();
@@ -177,7 +179,7 @@ public sealed class ObjectDefinitionRepositoryTests(ObjectsDatabaseFixture db) :
                     "Code",
                     0,
                     ObjectFieldType.Text,
-                    [new(ObjectFieldVariantKind.TextPattern, Pattern: "^[A-Z]{2}[0-9]{4}$")]),
+                    [Rule(FieldRuleDefinitionKeys.TextPattern, Params(("pattern", ["^[A-Z]{2}[0-9]{4}$"])))]),
             ],
             expectedRevision: 2,
             DateTime.UtcNow).IsSuccess.Should().BeTrue();
@@ -188,9 +190,9 @@ public sealed class ObjectDefinitionRepositoryTests(ObjectsDatabaseFixture db) :
         ObjectDefinition reloaded = (await reloadRepository.GetByIdForWorkspaceAsync(definition.Id, workspaceId))!;
         ObjectFieldDefinition field = reloaded.Fields.Single();
 
-        field.Variants.Should().ContainSingle();
-        field.Variants[0].Kind.Should().Be(ObjectFieldVariantKind.TextPattern);
-        field.Variants[0].Pattern.Should().Be("^[A-Z]{2}[0-9]{4}$");
+        field.Rules.Should().ContainSingle();
+        field.Rules[0].DefinitionKey.Should().Be(FieldRuleDefinitionKeys.TextPattern);
+        field.Rules[0].Parameters["pattern"].Should().Equal("^[A-Z]{2}[0-9]{4}$");
     }
 
     [Fact]
@@ -313,8 +315,20 @@ public sealed class ObjectDefinitionRepositoryTests(ObjectsDatabaseFixture db) :
         string label,
         int order,
         ObjectFieldType fieldType = ObjectFieldType.Text,
-        IReadOnlyList<ObjectFieldVariantSpec>? variants = null) =>
-        new(key, label, order, fieldType, variants);
+        IReadOnlyList<ObjectFieldRuleSpec>? rules = null) =>
+        new(key, label, order, fieldType, rules);
+
+    private static ObjectFieldRuleSpec Rule(
+        string definitionKey,
+        IReadOnlyDictionary<string, IReadOnlyList<string>>? parameters = null) =>
+        new(definitionKey, parameters);
+
+    private static IReadOnlyDictionary<string, IReadOnlyList<string>> Params(
+        params (string Key, string[] Values)[] parameters) =>
+        parameters.ToDictionary(
+            parameter => parameter.Key,
+            parameter => (IReadOnlyList<string>)parameter.Values,
+            StringComparer.Ordinal);
 
     private static string UniqueKey(string prefix) =>
         $"{prefix}_{Guid.NewGuid():N}"[..Math.Min(63, prefix.Length + 9)];

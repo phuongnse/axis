@@ -8,6 +8,7 @@ using Axis.Api.Tests.Helpers;
 using Axis.Identity.Domain.Legal;
 using Axis.Objects.Application;
 using Axis.Objects.Domain.Aggregates;
+using Axis.Rules.Contracts;
 using FluentAssertions;
 using Microsoft.AspNetCore.WebUtilities;
 
@@ -63,17 +64,21 @@ public sealed class ObjectDefinitionEndpointTests(ApiTestFixture fixture)
                         fieldKey = "name",
                         label = "Name",
                         fieldType = "Text",
-                        variants = new object[]
+                        rules = new object[]
                         {
                             new
                             {
-                                kind = "Required",
+                                definitionKey = FieldRuleDefinitionKeys.Required,
+                                parameters = new { },
                             },
                             new
                             {
-                                kind = "TextLength",
-                                minLength = 1,
-                                maxLength = 120,
+                                definitionKey = FieldRuleDefinitionKeys.TextLength,
+                                parameters = new
+                                {
+                                    min = new[] { "1" },
+                                    max = new[] { "120" },
+                                },
                             },
                         },
                     },
@@ -82,12 +87,15 @@ public sealed class ObjectDefinitionEndpointTests(ApiTestFixture fixture)
                         fieldKey = "status",
                         label = "Status",
                         fieldType = "SingleSelect",
-                        variants = new object[]
+                        rules = new object[]
                         {
                             new
                             {
-                                kind = "SingleSelectOptions",
-                                options = new[] { "Draft", "Submitted", "Approved" },
+                                definitionKey = FieldRuleDefinitionKeys.SingleSelectOptions,
+                                parameters = new
+                                {
+                                    options = new[] { "Draft", "Submitted", "Approved" },
+                                },
                             },
                         },
                     },
@@ -101,12 +109,18 @@ public sealed class ObjectDefinitionEndpointTests(ApiTestFixture fixture)
         saved.GetProperty("fields").GetArrayLength().Should().Be(2);
         JsonElement savedNameField = saved.GetProperty("fields")[0];
         savedNameField.GetProperty("fieldType").GetString().Should().Be("Text");
-        savedNameField.GetProperty("variants").GetArrayLength().Should().Be(2);
-        savedNameField.GetProperty("variants")[1].GetProperty("kind").GetString().Should().Be("TextLength");
-        savedNameField.GetProperty("variants")[1].GetProperty("maxLength").GetInt32().Should().Be(120);
+        savedNameField.GetProperty("rules").GetArrayLength().Should().Be(2);
+        savedNameField.GetProperty("rules")[1].GetProperty("definitionKey").GetString()
+            .Should().Be(FieldRuleDefinitionKeys.TextLength);
+        savedNameField.GetProperty("rules")[1]
+            .GetProperty("parameters")
+            .GetProperty("max")[0]
+            .GetString()
+            .Should().Be("120");
         JsonElement savedStatusField = saved.GetProperty("fields")[1];
         savedStatusField.GetProperty("fieldType").GetString().Should().Be("SingleSelect");
-        savedStatusField.GetProperty("variants")[0]
+        savedStatusField.GetProperty("rules")[0]
+            .GetProperty("parameters")
             .GetProperty("options")
             .EnumerateArray()
             .Select(option => option.GetString())
@@ -129,7 +143,8 @@ public sealed class ObjectDefinitionEndpointTests(ApiTestFixture fixture)
         JsonElement publishedStatusField = published.GetProperty("latestPublishedVersion")
             .GetProperty("fields")[1];
         publishedStatusField.GetProperty("fieldType").GetString().Should().Be("SingleSelect");
-        publishedStatusField.GetProperty("variants")[0]
+        publishedStatusField.GetProperty("rules")[0]
+            .GetProperty("parameters")
             .GetProperty("options")
             .EnumerateArray()
             .Select(option => option.GetString())

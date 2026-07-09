@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
+    <ProjectReference Include="..\..\Rules\Axis.Rules.Contracts\Axis.Rules.Contracts.csproj" />
     <ProjectReference Include="..\Axis.Objects.Domain\Axis.Objects.Domain.csproj" />
     <ProjectReference Include="..\..\..\Shared\Axis.Shared.Domain\Axis.Shared.Domain.csproj" />
     <ProjectReference Include="..\..\..\Shared\Axis.Shared.Application\Axis.Shared.Application.csproj" />

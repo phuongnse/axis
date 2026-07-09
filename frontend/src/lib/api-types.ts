@@ -226,6 +226,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/rules/field-rule-definitions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List system field rule definitions */
+        get: operations["ListFieldRuleDefinitions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -245,6 +262,21 @@ export interface components {
             workspaceId?: string | null;
             workspaces?: components["schemas"]["UserWorkspaceDto"][];
         };
+        FieldRuleDefinitionDto: {
+            definitionKey?: string;
+            displayName?: string;
+            description?: string;
+            supportedFieldTypes?: string[];
+            parameters?: components["schemas"]["FieldRuleParameterDefinitionDto"][];
+        };
+        FieldRuleParameterDefinitionDto: {
+            key?: string;
+            type?: components["schemas"]["FieldRuleParameterType"];
+            isRequired?: boolean;
+            allowMultiple?: boolean;
+        };
+        /** @enum {string} */
+        FieldRuleParameterType: "Text" | "Integer" | "Decimal" | "Date" | "Boolean";
         LanguagePreferenceDto: {
             language?: string;
         };
@@ -317,52 +349,28 @@ export interface components {
             /** Format: int32 */
             order?: number;
             fieldType?: components["schemas"]["ObjectFieldType"];
-            variants?: components["schemas"]["ObjectFieldVariantDto"][];
+            rules?: components["schemas"]["ObjectFieldRuleDto"][];
         };
         ObjectFieldDefinitionInput: {
             fieldKey?: string;
             label?: string;
             fieldType?: components["schemas"]["ObjectFieldType"];
-            variants?: components["schemas"]["ObjectFieldVariantInput"][] | null;
+            rules?: components["schemas"]["ObjectFieldRuleInput"][] | null;
+        };
+        ObjectFieldRuleDto: {
+            definitionKey?: string;
+            parameters?: {
+                [key: string]: string[];
+            };
+        };
+        ObjectFieldRuleInput: {
+            definitionKey?: string;
+            parameters?: {
+                [key: string]: string[];
+            } | null;
         };
         /** @enum {string} */
         ObjectFieldType: "Text" | "Integer" | "Decimal" | "Date" | "Boolean" | "SingleSelect";
-        ObjectFieldVariantDto: {
-            kind?: components["schemas"]["ObjectFieldVariantKind"];
-            /** Format: double */
-            minNumber?: number | null;
-            /** Format: double */
-            maxNumber?: number | null;
-            /** Format: date */
-            minDate?: string | null;
-            /** Format: date */
-            maxDate?: string | null;
-            /** Format: int32 */
-            minLength?: number | null;
-            /** Format: int32 */
-            maxLength?: number | null;
-            pattern?: string | null;
-            options?: string[];
-        };
-        ObjectFieldVariantInput: {
-            kind?: components["schemas"]["ObjectFieldVariantKind"];
-            /** Format: double */
-            minNumber?: number | null;
-            /** Format: double */
-            maxNumber?: number | null;
-            /** Format: date */
-            minDate?: string | null;
-            /** Format: date */
-            maxDate?: string | null;
-            /** Format: int32 */
-            minLength?: number | null;
-            /** Format: int32 */
-            maxLength?: number | null;
-            pattern?: string | null;
-            options?: string[] | null;
-        };
-        /** @enum {string} */
-        ObjectFieldVariantKind: "Required" | "NumericRange" | "DateRange" | "TextLength" | "TextPattern" | "SingleSelectOptions";
         ProblemDetails: {
             type?: string | null;
             title?: string | null;
@@ -1073,6 +1081,44 @@ export interface operations {
             };
             /** @description Conflict */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ListFieldRuleDefinitions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FieldRuleDefinitionDto"][];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };

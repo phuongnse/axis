@@ -48,14 +48,14 @@ internal sealed class ObjectDefinitionVersionFieldConfiguration : IEntityTypeCon
 
         builder.HasIndex("ObjectDefinitionVersionId", nameof(ObjectDefinitionVersionField.Order));
 
-        builder.HasMany(field => field.Variants)
+        builder.HasMany(field => field.Rules)
             .WithOne()
             .HasForeignKey("ObjectDefinitionVersionFieldId")
             .OnDelete(DeleteBehavior.Cascade)
             .IsRequired();
 
-        builder.Navigation(field => field.Variants)
-            .HasField("_variants")
+        builder.Navigation(field => field.Rules)
+            .HasField("_rules")
             .UsePropertyAccessMode(PropertyAccessMode.Field);
     }
 }

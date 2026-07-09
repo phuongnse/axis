@@ -8,18 +8,11 @@ public sealed record ObjectFieldDefinitionDto(
     string Label,
     int Order,
     ObjectFieldType FieldType,
-    IReadOnlyList<ObjectFieldVariantDto> Variants);
+    IReadOnlyList<ObjectFieldRuleDto> Rules);
 
-public sealed record ObjectFieldVariantDto(
-    ObjectFieldVariantKind Kind,
-    decimal? MinNumber,
-    decimal? MaxNumber,
-    DateOnly? MinDate,
-    DateOnly? MaxDate,
-    int? MinLength,
-    int? MaxLength,
-    string? Pattern,
-    IReadOnlyList<string> Options);
+public sealed record ObjectFieldRuleDto(
+    string DefinitionKey,
+    IReadOnlyDictionary<string, IReadOnlyList<string>> Parameters);
 
 public sealed record ObjectDefinitionVersionDto(
     Guid Id,
@@ -54,15 +47,8 @@ public sealed record ObjectFieldDefinitionInput(
     string FieldKey,
     string Label,
     ObjectFieldType FieldType = ObjectFieldType.Text,
-    IReadOnlyList<ObjectFieldVariantInput>? Variants = null);
+    IReadOnlyList<ObjectFieldRuleInput>? Rules = null);
 
-public sealed record ObjectFieldVariantInput(
-    ObjectFieldVariantKind Kind,
-    decimal? MinNumber = null,
-    decimal? MaxNumber = null,
-    DateOnly? MinDate = null,
-    DateOnly? MaxDate = null,
-    int? MinLength = null,
-    int? MaxLength = null,
-    string? Pattern = null,
-    IReadOnlyList<string>? Options = null);
+public sealed record ObjectFieldRuleInput(
+    string DefinitionKey,
+    IReadOnlyDictionary<string, IReadOnlyList<string>>? Parameters = null);

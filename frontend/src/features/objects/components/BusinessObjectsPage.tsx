@@ -6,6 +6,7 @@ import {
   ArrowUp,
   CheckCircle2,
   FilePlus2,
+  ListChecks,
   LockKeyhole,
   Maximize2,
   Minimize2,
@@ -35,6 +36,15 @@ import {
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
 import { Textarea } from '@/components/ui/textarea';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import {
+  compareFieldRuleDefinitions,
+  type FieldRuleDefinition,
+  fieldRuleDefinitionKeys,
+  fieldRuleDefinitionsListQueryOptions,
+  fieldRuleDescriptionTranslationKey,
+  fieldRuleNameTranslationKey,
+  fieldTypeTranslationKey,
+} from '@/features/rules';
 import { defaultDebounceMs, useDebouncedValue } from '@/hooks/use-debounced-value';
 import {
   defaultMinimumPendingIndicatorMs,
@@ -46,8 +56,8 @@ import {
   createObjectDefinition,
   type ObjectDefinitionDetail,
   type ObjectFieldDefinitionInput,
+  type ObjectFieldRuleInput,
   type ObjectFieldType,
-  type ObjectFieldVariantInput,
   objectDefinitionDetailQueryOptions,
   objectDefinitionQueryKeys,
   objectDefinitionsDefaultPageSize,
@@ -116,8 +126,8 @@ interface EditableFieldErrors {
 type EditableFieldInput = keyof EditableFieldErrors;
 type FieldInputTouches = Partial<Record<EditableFieldInput, true>>;
 type TouchedFieldInputs = Record<string, FieldInputTouches>;
-type ObjectFieldVariantContract = NonNullable<
-  NonNullable<ObjectDefinitionDetail['fields']>[number]['variants']
+type ObjectFieldRuleContract = NonNullable<
+  NonNullable<ObjectDefinitionDetail['fields']>[number]['rules']
 >[number];
 
 interface DefinitionSnapshotField {
@@ -178,6 +188,7 @@ export function BusinessObjectsPage() {
   }, [currentSnapshot]);
 
   const listQuery = useQuery(objectDefinitionsListQueryOptions(page));
+  const fieldRuleDefinitionsQuery = useQuery(fieldRuleDefinitionsListQueryOptions());
   const detailQuery = useQuery({
     ...objectDefinitionDetailQueryOptions(selectedId ?? ''),
     enabled: Boolean(selectedId),
@@ -291,6 +302,7 @@ export function BusinessObjectsPage() {
   }, [detailQuery.data, identityForm, selectedDefinition?.id]);
 
   const totalCount = listQuery.data?.totalCount ?? 0;
+  const fieldRuleDefinitions = fieldRuleDefinitionsQuery.data ?? [];
   const totalPages = Math.max(1, Math.ceil(totalCount / objectDefinitionsDefaultPageSize));
   const selectedStatus = selectedDefinition?.status ?? 'Unpublished';
   const isPublished = selectedStatus === 'Published';
@@ -571,7 +583,7 @@ export function BusinessObjectsPage() {
   return (
     <div
       className={cn(
-        'flex h-full min-h-0 w-full min-w-0 flex-col gap-4 overflow-x-hidden',
+        'flex h-full min-h-0 w-full min-w-0 flex-col gap-4 overflow-x-hidden p-4 sm:p-6 lg:p-8',
         fieldsExpanded ? 'overflow-hidden' : 'overflow-y-auto 2xl:overflow-hidden',
       )}
     >
@@ -850,6 +862,9 @@ export function BusinessObjectsPage() {
                     onMove={moveField}
                     onRemove={removeField}
                     errors={activeFieldValidation.fieldErrors[field.clientId]}
+                    ruleDefinitions={fieldRuleDefinitions}
+                    ruleCatalogLoading={fieldRuleDefinitionsQuery.isLoading}
+                    ruleCatalogUnavailable={fieldRuleDefinitionsQuery.isError}
                   />
                 ))}
                 {fields.length === 0 ? (
@@ -1132,6 +1147,9 @@ function FieldEditor({
   onMove,
   onRemove,
   errors,
+  ruleDefinitions,
+  ruleCatalogLoading,
+  ruleCatalogUnavailable,
 }: {
   field: EditableField;
   index: number;
@@ -1141,9 +1159,16 @@ function FieldEditor({
   onMove: (clientId: string, direction: -1 | 1) => void;
   onRemove: (clientId: string) => void;
   errors?: EditableFieldErrors;
+  ruleDefinitions: readonly FieldRuleDefinition[];
+  ruleCatalogLoading: boolean;
+  ruleCatalogUnavailable: boolean;
 }) {
   const { t } = useTranslation();
   const prefix = `field-${field.clientId}`;
+  const compatibleRules = compatibleRuleDefinitions(ruleDefinitions, field.fieldType);
+  const displayedRules =
+    compatibleRules.length > 0 ? compatibleRules : fallbackRuleDefinitions(field.fieldType);
+  const configuredRuleCount = configuredFieldRuleCount(field);
 
   return (
     <div className="rounded-lg border border-border bg-background/45 p-3">
@@ -1228,156 +1253,215 @@ function FieldEditor({
           </IconButton>
         </div>
       </div>
-      <div className="mt-3 grid gap-3 border-t border-border pt-3 sm:grid-cols-2 xl:grid-cols-3">
-        <Field>
-          <div className="flex items-start gap-2 pt-1">
-            <Checkbox
-              id={`${prefix}-required`}
-              checked={field.required}
-              onCheckedChange={(checked) => onChange({ required: checked === true })}
-              disabled={disabled}
-              aria-describedby={`${prefix}-required-help`}
-            />
-            <div className="min-w-0">
-              <FieldLabel htmlFor={`${prefix}-required`} className="font-normal">
-                {t('objects.variantRequired')}
-              </FieldLabel>
-              <FieldDescription id={`${prefix}-required-help`}>
-                {t('objects.variantRequiredHelp')}
-              </FieldDescription>
+      <section
+        aria-labelledby={`${prefix}-rules-title`}
+        aria-describedby={`${prefix}-rules-help`}
+        className="mt-3 rounded-lg border border-border bg-muted/20"
+      >
+        <div className="flex min-w-0 flex-col gap-3 border-b border-border px-3 py-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0">
+            <div className="flex min-w-0 items-center gap-2">
+              <ListChecks className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+              <h4 id={`${prefix}-rules-title`} className="text-sm font-semibold text-foreground">
+                {t('objects.fieldRulesTitle')}
+              </h4>
             </div>
+            <p id={`${prefix}-rules-help`} className="mt-1 text-sm text-muted-foreground">
+              {t('objects.fieldRulesDescription', {
+                fieldType: t(fieldTypeTranslationKey(field.fieldType)),
+              })}
+            </p>
           </div>
-        </Field>
-        {field.fieldType === 'Text' ? (
-          <>
-            <Field data-invalid={Boolean(errors?.minLength || errors?.maxLength)}>
-              <FieldLabel htmlFor={`${prefix}-min-length`}>{t('objects.minLength')}</FieldLabel>
+          <Badge variant={configuredRuleCount > 0 ? 'default' : 'outline'} className="rounded-md">
+            {t('objects.configuredRulesCount', { count: configuredRuleCount })}
+          </Badge>
+        </div>
+
+        {ruleCatalogUnavailable ? (
+          <div className="px-3 pt-3">
+            <Alert variant="destructive">
+              <AlertCircle className="size-4" aria-hidden />
+              <AlertTitle>{t('objects.rulesCatalogUnavailableTitle')}</AlertTitle>
+              <AlertDescription>{t('objects.rulesCatalogUnavailableDescription')}</AlertDescription>
+            </Alert>
+          </div>
+        ) : null}
+
+        <div className="flex min-w-0 flex-col gap-2 border-b border-border px-3 py-3">
+          <p className="text-xs font-medium text-muted-foreground">
+            {t('objects.compatibleRules')}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {ruleCatalogLoading && compatibleRules.length === 0 ? (
+              <span className="text-sm text-muted-foreground">
+                {t('objects.rulesCatalogLoading')}
+              </span>
+            ) : (
+              displayedRules.map((definition) => (
+                <Badge
+                  key={definition.definitionKey}
+                  variant="secondary"
+                  className="rounded-md"
+                  title={fieldRuleDescription(definition, t)}
+                >
+                  {fieldRuleDisplayName(definition, t)}
+                </Badge>
+              ))
+            )}
+          </div>
+        </div>
+
+        <div className="grid gap-3 p-3 sm:grid-cols-2 xl:grid-cols-3">
+          <Field>
+            <div className="flex items-start gap-2 pt-1">
+              <Checkbox
+                id={`${prefix}-required`}
+                checked={field.required}
+                onCheckedChange={(checked) => onChange({ required: checked === true })}
+                disabled={disabled}
+                aria-describedby={`${prefix}-required-help`}
+              />
+              <div className="min-w-0">
+                <FieldLabel htmlFor={`${prefix}-required`} className="font-normal">
+                  {t('objects.ruleRequired')}
+                </FieldLabel>
+                <FieldDescription id={`${prefix}-required-help`}>
+                  {t('objects.ruleRequiredHelp')}
+                </FieldDescription>
+              </div>
+            </div>
+          </Field>
+          {field.fieldType === 'Text' ? (
+            <>
+              <Field data-invalid={Boolean(errors?.minLength || errors?.maxLength)}>
+                <FieldLabel htmlFor={`${prefix}-min-length`}>{t('objects.minLength')}</FieldLabel>
+                <div className="grid grid-cols-2 gap-2">
+                  <Input
+                    id={`${prefix}-min-length`}
+                    type="number"
+                    inputMode="numeric"
+                    min={0}
+                    value={field.minLength}
+                    aria-invalid={Boolean(errors?.minLength)}
+                    aria-describedby={errors?.minLength ? `${prefix}-min-length-error` : undefined}
+                    disabled={disabled}
+                    onChange={(event) => onChange({ minLength: event.target.value })}
+                  />
+                  <Input
+                    id={`${prefix}-max-length`}
+                    type="number"
+                    inputMode="numeric"
+                    min={0}
+                    value={field.maxLength}
+                    aria-label={t('objects.maxLength')}
+                    aria-invalid={Boolean(errors?.maxLength)}
+                    aria-describedby={errors?.maxLength ? `${prefix}-max-length-error` : undefined}
+                    disabled={disabled}
+                    onChange={(event) => onChange({ maxLength: event.target.value })}
+                  />
+                </div>
+                <FieldError id={`${prefix}-min-length-error`}>{errors?.minLength}</FieldError>
+                <FieldError id={`${prefix}-max-length-error`}>{errors?.maxLength}</FieldError>
+              </Field>
+              <Field data-invalid={Boolean(errors?.pattern)}>
+                <FieldLabel htmlFor={`${prefix}-pattern`}>{t('objects.pattern')}</FieldLabel>
+                <Input
+                  id={`${prefix}-pattern`}
+                  value={field.pattern}
+                  aria-invalid={Boolean(errors?.pattern)}
+                  aria-describedby={errors?.pattern ? `${prefix}-pattern-error` : undefined}
+                  disabled={disabled}
+                  onChange={(event) => onChange({ pattern: event.target.value })}
+                />
+                <FieldError id={`${prefix}-pattern-error`}>{errors?.pattern}</FieldError>
+              </Field>
+            </>
+          ) : null}
+          {field.fieldType === 'Integer' || field.fieldType === 'Decimal' ? (
+            <Field data-invalid={Boolean(errors?.minNumber || errors?.maxNumber)}>
+              <FieldLabel htmlFor={`${prefix}-min-number`}>{t('objects.numericRange')}</FieldLabel>
               <div className="grid grid-cols-2 gap-2">
                 <Input
-                  id={`${prefix}-min-length`}
+                  id={`${prefix}-min-number`}
                   type="number"
-                  inputMode="numeric"
-                  min={0}
-                  value={field.minLength}
-                  aria-invalid={Boolean(errors?.minLength)}
-                  aria-describedby={errors?.minLength ? `${prefix}-min-length-error` : undefined}
+                  inputMode={field.fieldType === 'Integer' ? 'numeric' : 'decimal'}
+                  value={field.minNumber}
+                  aria-label={t('objects.numericMin')}
+                  aria-invalid={Boolean(errors?.minNumber)}
+                  aria-describedby={errors?.minNumber ? `${prefix}-min-number-error` : undefined}
                   disabled={disabled}
-                  onChange={(event) => onChange({ minLength: event.target.value })}
+                  onChange={(event) => onChange({ minNumber: event.target.value })}
                 />
                 <Input
-                  id={`${prefix}-max-length`}
+                  id={`${prefix}-max-number`}
                   type="number"
-                  inputMode="numeric"
-                  min={0}
-                  value={field.maxLength}
-                  aria-label={t('objects.maxLength')}
-                  aria-invalid={Boolean(errors?.maxLength)}
-                  aria-describedby={errors?.maxLength ? `${prefix}-max-length-error` : undefined}
+                  inputMode={field.fieldType === 'Integer' ? 'numeric' : 'decimal'}
+                  value={field.maxNumber}
+                  aria-label={t('objects.numericMax')}
+                  aria-invalid={Boolean(errors?.maxNumber)}
+                  aria-describedby={errors?.maxNumber ? `${prefix}-max-number-error` : undefined}
                   disabled={disabled}
-                  onChange={(event) => onChange({ maxLength: event.target.value })}
+                  onChange={(event) => onChange({ maxNumber: event.target.value })}
                 />
               </div>
-              <FieldError id={`${prefix}-min-length-error`}>{errors?.minLength}</FieldError>
-              <FieldError id={`${prefix}-max-length-error`}>{errors?.maxLength}</FieldError>
+              <FieldError id={`${prefix}-min-number-error`}>{errors?.minNumber}</FieldError>
+              <FieldError id={`${prefix}-max-number-error`}>{errors?.maxNumber}</FieldError>
             </Field>
-            <Field data-invalid={Boolean(errors?.pattern)}>
-              <FieldLabel htmlFor={`${prefix}-pattern`}>{t('objects.pattern')}</FieldLabel>
-              <Input
-                id={`${prefix}-pattern`}
-                value={field.pattern}
-                aria-invalid={Boolean(errors?.pattern)}
-                aria-describedby={errors?.pattern ? `${prefix}-pattern-error` : undefined}
-                disabled={disabled}
-                onChange={(event) => onChange({ pattern: event.target.value })}
-              />
-              <FieldError id={`${prefix}-pattern-error`}>{errors?.pattern}</FieldError>
+          ) : null}
+          {field.fieldType === 'Date' ? (
+            <Field data-invalid={Boolean(errors?.minDate || errors?.maxDate)}>
+              <FieldLabel htmlFor={`${prefix}-min-date`}>{t('objects.dateRange')}</FieldLabel>
+              <div className="grid grid-cols-2 gap-2">
+                <Input
+                  id={`${prefix}-min-date`}
+                  type="date"
+                  value={field.minDate}
+                  aria-label={t('objects.dateMin')}
+                  aria-invalid={Boolean(errors?.minDate)}
+                  aria-describedby={errors?.minDate ? `${prefix}-min-date-error` : undefined}
+                  disabled={disabled}
+                  onChange={(event) => onChange({ minDate: event.target.value })}
+                />
+                <Input
+                  id={`${prefix}-max-date`}
+                  type="date"
+                  value={field.maxDate}
+                  aria-label={t('objects.dateMax')}
+                  aria-invalid={Boolean(errors?.maxDate)}
+                  aria-describedby={errors?.maxDate ? `${prefix}-max-date-error` : undefined}
+                  disabled={disabled}
+                  onChange={(event) => onChange({ maxDate: event.target.value })}
+                />
+              </div>
+              <FieldError id={`${prefix}-min-date-error`}>{errors?.minDate}</FieldError>
+              <FieldError id={`${prefix}-max-date-error`}>{errors?.maxDate}</FieldError>
             </Field>
-          </>
-        ) : null}
-        {field.fieldType === 'Integer' || field.fieldType === 'Decimal' ? (
-          <Field data-invalid={Boolean(errors?.minNumber || errors?.maxNumber)}>
-            <FieldLabel htmlFor={`${prefix}-min-number`}>{t('objects.numericRange')}</FieldLabel>
-            <div className="grid grid-cols-2 gap-2">
-              <Input
-                id={`${prefix}-min-number`}
-                type="number"
-                inputMode={field.fieldType === 'Integer' ? 'numeric' : 'decimal'}
-                value={field.minNumber}
-                aria-label={t('objects.numericMin')}
-                aria-invalid={Boolean(errors?.minNumber)}
-                aria-describedby={errors?.minNumber ? `${prefix}-min-number-error` : undefined}
+          ) : null}
+          {field.fieldType === 'SingleSelect' ? (
+            <Field data-invalid={Boolean(errors?.optionsText)} className="sm:col-span-2">
+              <FieldLabel htmlFor={`${prefix}-options`} required>
+                {t('objects.options')}
+              </FieldLabel>
+              <Textarea
+                id={`${prefix}-options`}
+                value={field.optionsText}
+                aria-invalid={Boolean(errors?.optionsText)}
+                aria-describedby={
+                  errors?.optionsText
+                    ? `${prefix}-options-help ${prefix}-options-error`
+                    : `${prefix}-options-help`
+                }
                 disabled={disabled}
-                onChange={(event) => onChange({ minNumber: event.target.value })}
+                onChange={(event) => onChange({ optionsText: event.target.value })}
               />
-              <Input
-                id={`${prefix}-max-number`}
-                type="number"
-                inputMode={field.fieldType === 'Integer' ? 'numeric' : 'decimal'}
-                value={field.maxNumber}
-                aria-label={t('objects.numericMax')}
-                aria-invalid={Boolean(errors?.maxNumber)}
-                aria-describedby={errors?.maxNumber ? `${prefix}-max-number-error` : undefined}
-                disabled={disabled}
-                onChange={(event) => onChange({ maxNumber: event.target.value })}
-              />
-            </div>
-            <FieldError id={`${prefix}-min-number-error`}>{errors?.minNumber}</FieldError>
-            <FieldError id={`${prefix}-max-number-error`}>{errors?.maxNumber}</FieldError>
-          </Field>
-        ) : null}
-        {field.fieldType === 'Date' ? (
-          <Field data-invalid={Boolean(errors?.minDate || errors?.maxDate)}>
-            <FieldLabel htmlFor={`${prefix}-min-date`}>{t('objects.dateRange')}</FieldLabel>
-            <div className="grid grid-cols-2 gap-2">
-              <Input
-                id={`${prefix}-min-date`}
-                type="date"
-                value={field.minDate}
-                aria-label={t('objects.dateMin')}
-                aria-invalid={Boolean(errors?.minDate)}
-                aria-describedby={errors?.minDate ? `${prefix}-min-date-error` : undefined}
-                disabled={disabled}
-                onChange={(event) => onChange({ minDate: event.target.value })}
-              />
-              <Input
-                id={`${prefix}-max-date`}
-                type="date"
-                value={field.maxDate}
-                aria-label={t('objects.dateMax')}
-                aria-invalid={Boolean(errors?.maxDate)}
-                aria-describedby={errors?.maxDate ? `${prefix}-max-date-error` : undefined}
-                disabled={disabled}
-                onChange={(event) => onChange({ maxDate: event.target.value })}
-              />
-            </div>
-            <FieldError id={`${prefix}-min-date-error`}>{errors?.minDate}</FieldError>
-            <FieldError id={`${prefix}-max-date-error`}>{errors?.maxDate}</FieldError>
-          </Field>
-        ) : null}
-        {field.fieldType === 'SingleSelect' ? (
-          <Field data-invalid={Boolean(errors?.optionsText)} className="sm:col-span-2">
-            <FieldLabel htmlFor={`${prefix}-options`} required>
-              {t('objects.options')}
-            </FieldLabel>
-            <Textarea
-              id={`${prefix}-options`}
-              value={field.optionsText}
-              aria-invalid={Boolean(errors?.optionsText)}
-              aria-describedby={
-                errors?.optionsText
-                  ? `${prefix}-options-help ${prefix}-options-error`
-                  : `${prefix}-options-help`
-              }
-              disabled={disabled}
-              onChange={(event) => onChange({ optionsText: event.target.value })}
-            />
-            <FieldError id={`${prefix}-options-error`}>{errors?.optionsText}</FieldError>
-            <FieldDescription id={`${prefix}-options-help`}>
-              {t('objects.optionsHelp')}
-            </FieldDescription>
-          </Field>
-        ) : null}
-      </div>
+              <FieldError id={`${prefix}-options-error`}>{errors?.optionsText}</FieldError>
+              <FieldDescription id={`${prefix}-options-help`}>
+                {t('objects.optionsHelp')}
+              </FieldDescription>
+            </Field>
+          ) : null}
+        </div>
+      </section>
     </div>
   );
 }
@@ -1442,7 +1526,7 @@ function fromDefinitionFields(definition: ObjectDefinitionDetail): EditableField
     clientId: field.id ?? crypto.randomUUID(),
     fieldKey: field.fieldKey ?? '',
     label: field.label ?? '',
-    ...configurationFromVariants(field.fieldType ?? 'Text', field.variants ?? []),
+    ...configurationFromRules(field.fieldType ?? 'Text', field.rules ?? []),
   }));
 }
 
@@ -1471,7 +1555,7 @@ function toRequestFields(snapshot: DefinitionSnapshot): ObjectFieldDefinitionInp
     fieldKey: field.fieldKey.trim(),
     label: field.label.trim(),
     fieldType: field.fieldType,
-    variants: toRequestVariants(field),
+    rules: toRequestRules(field),
   }));
 }
 
@@ -1513,36 +1597,37 @@ function defaultFieldConfiguration(): Omit<EditableField, 'clientId' | 'fieldKey
   };
 }
 
-function configurationFromVariants(
+function configurationFromRules(
   fieldType: ObjectFieldType,
-  variants: readonly ObjectFieldVariantContract[],
+  rules: readonly ObjectFieldRuleContract[],
 ): Omit<EditableField, 'clientId' | 'fieldKey' | 'label'> {
   const base = fieldTypePatch(fieldType);
-  const numericRange = findVariant(variants, 'NumericRange');
-  const dateRange = findVariant(variants, 'DateRange');
-  const textLength = findVariant(variants, 'TextLength');
-  const textPattern = findVariant(variants, 'TextPattern');
-  const singleSelectOptions = findVariant(variants, 'SingleSelectOptions');
+  const numericRange = findRule(rules, fieldRuleDefinitionKeys.numericRange);
+  const dateRange = findRule(rules, fieldRuleDefinitionKeys.dateRange);
+  const textLength = findRule(rules, fieldRuleDefinitionKeys.textLength);
+  const textPattern = findRule(rules, fieldRuleDefinitionKeys.textPattern);
+  const singleSelectOptions = findRule(rules, fieldRuleDefinitionKeys.singleSelectOptions);
 
   return {
     ...base,
-    required: Boolean(findVariant(variants, 'Required')),
-    minNumber: optionalNumberText(numericRange?.minNumber),
-    maxNumber: optionalNumberText(numericRange?.maxNumber),
-    minDate: dateRange?.minDate ?? '',
-    maxDate: dateRange?.maxDate ?? '',
-    minLength: optionalNumberText(textLength?.minLength),
-    maxLength: optionalNumberText(textLength?.maxLength),
-    pattern: textPattern?.pattern ?? '',
-    optionsText: (singleSelectOptions?.options ?? []).join('\n'),
+    required: Boolean(findRule(rules, fieldRuleDefinitionKeys.required)),
+    minNumber: ruleParameterValue(numericRange, 'min'),
+    maxNumber: ruleParameterValue(numericRange, 'max'),
+    minDate: ruleParameterValue(dateRange, 'min'),
+    maxDate: ruleParameterValue(dateRange, 'max'),
+    minLength: ruleParameterValue(textLength, 'min'),
+    maxLength: ruleParameterValue(textLength, 'max'),
+    pattern: ruleParameterValue(textPattern, 'pattern'),
+    optionsText: (singleSelectOptions?.parameters?.options ?? []).join('\n'),
   };
 }
 
-function findVariant(
-  variants: readonly ObjectFieldVariantContract[],
-  kind: NonNullable<ObjectFieldVariantContract['kind']>,
-) {
-  return variants.find((variant) => variant.kind === kind);
+function findRule(rules: readonly ObjectFieldRuleContract[], definitionKey: string) {
+  return rules.find((rule) => rule.definitionKey === definitionKey);
+}
+
+function ruleParameterValue(rule: ObjectFieldRuleContract | undefined, key: string): string {
+  return rule?.parameters?.[key]?.[0] ?? '';
 }
 
 function fieldTypePatch(fieldType: ObjectFieldType): Omit<
@@ -1564,29 +1649,32 @@ function fieldTypePatch(fieldType: ObjectFieldType): Omit<
   };
 }
 
-function toRequestVariants(field: DefinitionSnapshotField): ObjectFieldVariantInput[] {
-  const variants: ObjectFieldVariantInput[] = [];
+function toRequestRules(field: DefinitionSnapshotField): ObjectFieldRuleInput[] {
+  const rules: ObjectFieldRuleInput[] = [];
 
   if (field.required) {
-    variants.push({ kind: 'Required' });
+    rules.push(fieldRule(fieldRuleDefinitionKeys.required));
   }
 
   if (field.fieldType === 'Text') {
     const minLength = optionalInteger(field.minLength);
     const maxLength = optionalInteger(field.maxLength);
     if (minLength !== null || maxLength !== null) {
-      variants.push({
-        kind: 'TextLength',
-        minLength,
-        maxLength,
-      });
+      rules.push(
+        fieldRule(
+          fieldRuleDefinitionKeys.textLength,
+          optionalRuleParameters([
+            ['min', minLength],
+            ['max', maxLength],
+          ]),
+        ),
+      );
     }
 
     if (field.pattern.trim()) {
-      variants.push({
-        kind: 'TextPattern',
-        pattern: field.pattern.trim(),
-      });
+      rules.push(
+        fieldRule(fieldRuleDefinitionKeys.textPattern, { pattern: [field.pattern.trim()] }),
+      );
     }
   }
 
@@ -1594,34 +1682,56 @@ function toRequestVariants(field: DefinitionSnapshotField): ObjectFieldVariantIn
     const minNumber = optionalNumber(field.minNumber);
     const maxNumber = optionalNumber(field.maxNumber);
     if (minNumber !== null || maxNumber !== null) {
-      variants.push({
-        kind: 'NumericRange',
-        minNumber,
-        maxNumber,
-      });
+      rules.push(
+        fieldRule(
+          fieldRuleDefinitionKeys.numericRange,
+          optionalRuleParameters([
+            ['min', minNumber],
+            ['max', maxNumber],
+          ]),
+        ),
+      );
     }
   }
 
   if (field.fieldType === 'Date' && (field.minDate || field.maxDate)) {
-    variants.push({
-      kind: 'DateRange',
-      minDate: field.minDate || null,
-      maxDate: field.maxDate || null,
-    });
+    rules.push(
+      fieldRule(
+        fieldRuleDefinitionKeys.dateRange,
+        optionalRuleParameters([
+          ['min', field.minDate || null],
+          ['max', field.maxDate || null],
+        ]),
+      ),
+    );
   }
 
   if (field.fieldType === 'SingleSelect') {
-    variants.push({
-      kind: 'SingleSelectOptions',
-      options: optionValues(field.optionsText),
-    });
+    rules.push(
+      fieldRule(fieldRuleDefinitionKeys.singleSelectOptions, {
+        options: optionValues(field.optionsText),
+      }),
+    );
   }
 
-  return variants;
+  return rules;
 }
 
-function optionalNumberText(value: number | null | undefined): string {
-  return value === null || value === undefined ? '' : String(value);
+function fieldRule(
+  definitionKey: string,
+  parameters: NonNullable<ObjectFieldRuleInput['parameters']> = {},
+): ObjectFieldRuleInput {
+  return { definitionKey, parameters };
+}
+
+function optionalRuleParameters(
+  values: readonly (readonly [string, string | number | null])[],
+): NonNullable<ObjectFieldRuleInput['parameters']> {
+  return Object.fromEntries(
+    values
+      .filter(([, value]) => value !== null)
+      .map(([key, value]) => [key, [String(value)] as string[]]),
+  );
 }
 
 function optionalNumber(value: string): number | null {
@@ -1641,10 +1751,6 @@ function optionValues(value: string): string[] {
     .filter(Boolean);
 }
 
-function fieldTypeTranslationKey(fieldType: ObjectFieldType): string {
-  return `objects.fieldType${fieldType}`;
-}
-
 function isEditableFieldInput(key: string): key is EditableFieldInput {
   return [
     'fieldKey',
@@ -1660,6 +1766,77 @@ function isEditableFieldInput(key: string): key is EditableFieldInput {
     'pattern',
     'optionsText',
   ].includes(key);
+}
+
+function compatibleRuleDefinitions(
+  definitions: readonly FieldRuleDefinition[],
+  fieldType: ObjectFieldType,
+): FieldRuleDefinition[] {
+  return definitions
+    .filter((definition) => definition.supportedFieldTypes?.includes(fieldType))
+    .sort(compareFieldRuleDefinitions);
+}
+
+function fallbackRuleDefinitions(fieldType: ObjectFieldType): FieldRuleDefinition[] {
+  const keys: string[] = [fieldRuleDefinitionKeys.required];
+
+  if (fieldType === 'Text') {
+    keys.push(fieldRuleDefinitionKeys.textLength, fieldRuleDefinitionKeys.textPattern);
+  }
+
+  if (fieldType === 'Integer' || fieldType === 'Decimal') {
+    keys.push(fieldRuleDefinitionKeys.numericRange);
+  }
+
+  if (fieldType === 'Date') {
+    keys.push(fieldRuleDefinitionKeys.dateRange);
+  }
+
+  if (fieldType === 'SingleSelect') {
+    keys.push(fieldRuleDefinitionKeys.singleSelectOptions);
+  }
+
+  return keys.map((definitionKey) => ({ definitionKey }));
+}
+
+function fieldRuleDisplayName(definition: FieldRuleDefinition, t: (key: string) => string): string {
+  const key = fieldRuleNameTranslationKey(definition.definitionKey);
+  return key
+    ? t(key)
+    : (definition.displayName ?? definition.definitionKey ?? t('rules.unknownRule'));
+}
+
+function fieldRuleDescription(definition: FieldRuleDefinition, t: (key: string) => string): string {
+  const key = fieldRuleDescriptionTranslationKey(definition.definitionKey);
+  return key
+    ? t(key)
+    : (definition.description ?? definition.definitionKey ?? t('rules.unknownRuleDescription'));
+}
+
+function configuredFieldRuleCount(field: EditableField): number {
+  let count = field.required ? 1 : 0;
+
+  if (field.fieldType === 'Text') {
+    if (field.minLength.trim() || field.maxLength.trim()) count += 1;
+    if (field.pattern.trim()) count += 1;
+  }
+
+  if (
+    (field.fieldType === 'Integer' || field.fieldType === 'Decimal') &&
+    (field.minNumber.trim() || field.maxNumber.trim())
+  ) {
+    count += 1;
+  }
+
+  if (field.fieldType === 'Date' && (field.minDate || field.maxDate)) {
+    count += 1;
+  }
+
+  if (field.fieldType === 'SingleSelect') {
+    count += 1;
+  }
+
+  return count;
 }
 
 function omitRecordKey<T>(record: Record<string, T>, keyToOmit: string): Record<string, T> {

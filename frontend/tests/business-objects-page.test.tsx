@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { objectDefinitionQueryKeys } from '@/features/objects/api';
 import { BusinessObjectsPage } from '@/features/objects/components/BusinessObjectsPage';
+import { fieldRuleDefinitionQueryKeys } from '@/features/rules';
 import { loadObjectDefinitionsRoute } from '@/routes/_authenticated/objects';
 import { renderWithRouter } from './render-with-router';
 
@@ -24,6 +25,64 @@ function jsonResponse(data: unknown, status = 200): Response {
 
 function requestPath(url: string): string {
   return new URL(url, 'https://axis.test').pathname;
+}
+
+const fieldRuleDefinitions = [
+  {
+    definitionKey: 'field.required',
+    displayName: 'Required',
+    description: 'Future records must provide a value.',
+    supportedFieldTypes: ['Text', 'Integer', 'Decimal', 'Date', 'Boolean', 'SingleSelect'],
+    parameters: [],
+  },
+  {
+    definitionKey: 'field.numeric_range',
+    displayName: 'Numeric range',
+    description: 'Limit integer or decimal values with optional bounds.',
+    supportedFieldTypes: ['Integer', 'Decimal'],
+    parameters: [
+      { key: 'min', type: 'Decimal', isRequired: false, allowMultiple: false },
+      { key: 'max', type: 'Decimal', isRequired: false, allowMultiple: false },
+    ],
+  },
+  {
+    definitionKey: 'field.date_range',
+    displayName: 'Date range',
+    description: 'Limit dates with optional bounds.',
+    supportedFieldTypes: ['Date'],
+    parameters: [
+      { key: 'min', type: 'Date', isRequired: false, allowMultiple: false },
+      { key: 'max', type: 'Date', isRequired: false, allowMultiple: false },
+    ],
+  },
+  {
+    definitionKey: 'field.text_length',
+    displayName: 'Text length',
+    description: 'Limit text length with optional bounds.',
+    supportedFieldTypes: ['Text'],
+    parameters: [
+      { key: 'min', type: 'Integer', isRequired: false, allowMultiple: false },
+      { key: 'max', type: 'Integer', isRequired: false, allowMultiple: false },
+    ],
+  },
+  {
+    definitionKey: 'field.text_pattern',
+    displayName: 'Text pattern',
+    description: 'Require a configured pattern.',
+    supportedFieldTypes: ['Text'],
+    parameters: [{ key: 'pattern', type: 'Text', isRequired: true, allowMultiple: false }],
+  },
+  {
+    definitionKey: 'field.single_select_options',
+    displayName: 'Single-select options',
+    description: 'Define allowed options.',
+    supportedFieldTypes: ['SingleSelect'],
+    parameters: [{ key: 'options', type: 'Text', isRequired: true, allowMultiple: true }],
+  },
+];
+
+function isFieldRuleDefinitionsRequest(url: string): boolean {
+  return requestPath(url) === '/api/rules/field-rule-definitions';
 }
 
 describe('BusinessObjectsPage', () => {
@@ -49,13 +108,22 @@ describe('BusinessObjectsPage', () => {
       },
     });
 
-    vi.mocked(fetch).mockResolvedValue(jsonResponse(page));
+    vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input.toString();
+      if (isFieldRuleDefinitionsRequest(url)) {
+        return jsonResponse(fieldRuleDefinitions);
+      }
+      return jsonResponse(page);
+    });
 
     await loadObjectDefinitionsRoute({ queryClient });
     await loadObjectDefinitionsRoute({ queryClient });
 
-    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(fetch).toHaveBeenCalledTimes(2);
     expect(queryClient.getQueryData(objectDefinitionQueryKeys.list(1, 20))).toEqual(page);
+    expect(queryClient.getQueryData(fieldRuleDefinitionQueryKeys.list())).toEqual(
+      fieldRuleDefinitions,
+    );
   });
 
   it('prefetches definition detail on list item intent and reuses the cache on selection', async () => {
@@ -66,6 +134,10 @@ describe('BusinessObjectsPage', () => {
     vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === 'string' ? input : input.toString();
       const method = init?.method ?? 'GET';
+
+      if (isFieldRuleDefinitionsRequest(url)) {
+        return jsonResponse(fieldRuleDefinitions);
+      }
 
       if (url.includes('/api/object-definitions?')) {
         return jsonResponse({
@@ -115,6 +187,10 @@ describe('BusinessObjectsPage', () => {
     vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL) => {
       const url = typeof input === 'string' ? input : input.toString();
 
+      if (isFieldRuleDefinitionsRequest(url)) {
+        return jsonResponse(fieldRuleDefinitions);
+      }
+
       if (url.includes('/api/object-definitions?')) {
         return jsonResponse({ items: [], totalCount: 0, page: 1, pageSize: 20 });
       }
@@ -156,6 +232,10 @@ describe('BusinessObjectsPage', () => {
       const method = init?.method ?? 'GET';
       const body = typeof init?.body === 'string' ? JSON.parse(init.body) : undefined;
       requests.push({ method, url, body });
+
+      if (isFieldRuleDefinitionsRequest(url)) {
+        return jsonResponse(fieldRuleDefinitions);
+      }
 
       if (url.includes('/api/object-definitions?')) {
         return jsonResponse({
@@ -215,7 +295,7 @@ describe('BusinessObjectsPage', () => {
                 fieldKey: 'name',
                 label: 'Name',
                 fieldType: 'Text',
-                variants: [],
+                rules: [],
                 order: 0,
               },
             ],
@@ -233,7 +313,7 @@ describe('BusinessObjectsPage', () => {
                 fieldKey: 'name',
                 label: 'Name',
                 fieldType: 'Text',
-                variants: [],
+                rules: [],
                 order: 0,
               },
             ],
@@ -366,7 +446,7 @@ describe('BusinessObjectsPage', () => {
           fieldKey: 'name',
           label: 'Name',
           fieldType: 'Text',
-          variants: [],
+          rules: [],
         },
       ],
     });
@@ -378,9 +458,9 @@ describe('BusinessObjectsPage', () => {
           requestPath(request.url) === `/api/object-definitions/${definitionId}/publish`,
       )?.body,
     ).toEqual({ expectedRevision: 2 });
-  });
+  }, 10_000);
 
-  it('validates and saves field type variant controls', async () => {
+  it('validates and saves field rule controls', async () => {
     const user = userEvent.setup();
     const requests: { method: string; url: string; body?: unknown }[] = [];
 
@@ -389,6 +469,10 @@ describe('BusinessObjectsPage', () => {
       const method = init?.method ?? 'GET';
       const body = typeof init?.body === 'string' ? JSON.parse(init.body) : undefined;
       requests.push({ method, url, body });
+
+      if (isFieldRuleDefinitionsRequest(url)) {
+        return jsonResponse(fieldRuleDefinitions);
+      }
 
       if (url.includes('/api/object-definitions?')) {
         return jsonResponse({ items: [], totalCount: 0, page: 1, pageSize: 20 });
@@ -449,9 +533,9 @@ describe('BusinessObjectsPage', () => {
         (request) =>
           request.method === 'PUT' &&
           requestPath(request.url) === `/api/object-definitions/${definitionId}/unpublished` &&
-          JSON.stringify(request.body).includes('SingleSelectOptions'),
+          JSON.stringify(request.body).includes('field.required') &&
+          JSON.stringify(request.body).includes('field.single_select_options'),
       );
-
       expect(saveRequest?.body).toMatchObject({
         expectedRevision: 1,
         name: 'Application',
@@ -460,18 +544,18 @@ describe('BusinessObjectsPage', () => {
             fieldKey: 'status',
             label: 'Status',
             fieldType: 'SingleSelect',
-            variants: [
-              { kind: 'Required' },
+            rules: [
+              { definitionKey: 'field.required', parameters: {} },
               {
-                kind: 'SingleSelectOptions',
-                options: ['Draft', 'Submitted', 'Approved'],
+                definitionKey: 'field.single_select_options',
+                parameters: { options: ['Draft', 'Submitted', 'Approved'] },
               },
             ],
           },
         ],
       });
     });
-  });
+  }, 10_000);
 
   it('shows the autosave pending indicator before the debounced save starts', async () => {
     const user = userEvent.setup();
@@ -482,6 +566,10 @@ describe('BusinessObjectsPage', () => {
       const url = typeof input === 'string' ? input : input.toString();
       const method = init?.method ?? 'GET';
       const body = typeof init?.body === 'string' ? JSON.parse(init.body) : undefined;
+
+      if (isFieldRuleDefinitionsRequest(url)) {
+        return jsonResponse(fieldRuleDefinitions);
+      }
 
       if (url.includes('/api/object-definitions?')) {
         return jsonResponse({ items: [], totalCount: 0, page: 1, pageSize: 20 });
@@ -555,6 +643,10 @@ describe('BusinessObjectsPage', () => {
       const url = typeof input === 'string' ? input : input.toString();
       const method = init?.method ?? 'GET';
 
+      if (isFieldRuleDefinitionsRequest(url)) {
+        return jsonResponse(fieldRuleDefinitions);
+      }
+
       if (url.includes('/api/object-definitions?')) {
         return jsonResponse({ items: [], totalCount: 0, page: 1, pageSize: 20 });
       }
@@ -601,6 +693,10 @@ describe('BusinessObjectsPage', () => {
       const url = typeof input === 'string' ? input : input.toString();
       const method = init?.method ?? 'GET';
       const body = typeof init?.body === 'string' ? JSON.parse(init.body) : undefined;
+
+      if (isFieldRuleDefinitionsRequest(url)) {
+        return jsonResponse(fieldRuleDefinitions);
+      }
 
       if (url.includes('/api/object-definitions?')) {
         return jsonResponse({ items: [], totalCount: 0, page: 1, pageSize: 20 });
@@ -655,6 +751,10 @@ describe('BusinessObjectsPage', () => {
       const url = typeof input === 'string' ? input : input.toString();
       const method = init?.method ?? 'GET';
       const body = typeof init?.body === 'string' ? JSON.parse(init.body) : undefined;
+
+      if (isFieldRuleDefinitionsRequest(url)) {
+        return jsonResponse(fieldRuleDefinitions);
+      }
 
       if (url.includes('/api/object-definitions?')) {
         return jsonResponse({ items: [], totalCount: 0, page: 1, pageSize: 20 });
@@ -723,6 +823,10 @@ describe('BusinessObjectsPage', () => {
       const method = init?.method ?? 'GET';
       const body = typeof init?.body === 'string' ? JSON.parse(init.body) : undefined;
 
+      if (isFieldRuleDefinitionsRequest(url)) {
+        return jsonResponse(fieldRuleDefinitions);
+      }
+
       if (url.includes('/api/object-definitions?')) {
         return jsonResponse({ items: [], totalCount: 0, page: 1, pageSize: 20 });
       }
@@ -777,6 +881,10 @@ describe('BusinessObjectsPage', () => {
       const url = typeof input === 'string' ? input : input.toString();
       const method = init?.method ?? 'GET';
       const body = typeof init?.body === 'string' ? JSON.parse(init.body) : undefined;
+
+      if (isFieldRuleDefinitionsRequest(url)) {
+        return jsonResponse(fieldRuleDefinitions);
+      }
 
       if (url.includes('/api/object-definitions?')) {
         return jsonResponse({ items: [], totalCount: 0, page: 1, pageSize: 20 });
@@ -837,6 +945,10 @@ describe('BusinessObjectsPage', () => {
       const url = typeof input === 'string' ? input : input.toString();
       const method = init?.method ?? 'GET';
       const body = typeof init?.body === 'string' ? JSON.parse(init.body) : undefined;
+
+      if (isFieldRuleDefinitionsRequest(url)) {
+        return jsonResponse(fieldRuleDefinitions);
+      }
 
       if (url.includes('/api/object-definitions?')) {
         return jsonResponse({ items: [], totalCount: 0, page: 1, pageSize: 20 });

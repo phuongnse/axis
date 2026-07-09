@@ -2,6 +2,7 @@ using Axis.Objects.Application.Repositories;
 using Axis.Objects.Application.Services;
 using Axis.Objects.Domain.Aggregates;
 using Axis.Objects.Domain.ValueObjects;
+using Axis.Rules.Contracts;
 using Axis.Shared.Application;
 using Axis.Shared.Application.CQRS;
 using Axis.Shared.Application.Identity;
@@ -12,7 +13,8 @@ namespace Axis.Objects.Application.Commands.SaveUnpublishedObjectDefinition;
 public sealed class SaveUnpublishedObjectDefinitionHandler(
     ICurrentUser currentUser,
     IObjectDefinitionRepository repository,
-    IUnitOfWork unitOfWork)
+    IUnitOfWork unitOfWork,
+    IFieldRuleApplicationValidator fieldRuleValidator)
     : ICommandHandler<SaveUnpublishedObjectDefinitionCommand, ObjectDefinitionDetailDto>
 {
     public async Task<Result<ObjectDefinitionDetailDto>> Handle(
@@ -28,9 +30,15 @@ public sealed class SaveUnpublishedObjectDefinitionHandler(
         if (definition is null)
             return ObjectDefinitionFailures.NotFound<ObjectDefinitionDetailDto>();
 
+        Result<IReadOnlyList<ObjectFieldDefinitionSpec>> fields = ObjectDefinitionMapper.ToDomainSpecs(
+            command.Fields,
+            fieldRuleValidator);
+        if (fields.IsFailure)
+            return ObjectDefinitionFailures.Invalid<ObjectDefinitionDetailDto>(fields.Error);
+
         Result saved = definition.SaveUnpublished(
             command.Name,
-            ObjectDefinitionMapper.ToDomainSpecs(command.Fields),
+            fields.Value,
             command.ExpectedRevision,
             DateTime.UtcNow);
         if (saved.IsFailure)

@@ -9,6 +9,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Modules\Identity\Axis.Identity.Infrastructure\Axis.Identity.Infrastructure.csproj" />
     <ProjectReference Include="..\Modules\Objects\Axis.Objects.Infrastructure\Axis.Objects.Infrastructure.csproj" />
+    <ProjectReference Include="..\Modules\Rules\Axis.Rules.Infrastructure\Axis.Rules.Infrastructure.csproj" />
   </ItemGroup>
 
   <ItemGroup>

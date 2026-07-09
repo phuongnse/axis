@@ -8,7 +8,10 @@ test.describe('local dev smoke', () => {
 
     await expect(page).toHaveURL(/\/sign-in$/);
     await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Create an account' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Create account' })).toHaveAttribute(
+      'href',
+      '/register',
+    );
   });
 
   test('SMOKE-002 API health is reachable when configured', async ({ request }) => {

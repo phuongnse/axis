@@ -77,7 +77,8 @@ Follow [reference.md](../reference.md).
 6. Verify.
    - During development, run the smallest targeted frontend test that proves changed behavior; use type/lint only for static edits.
    - For visual, layout-sensitive, or localized-copy changes, inspect the route in the supported languages named by the owning use case at desktop and mobile sizes with Playwright or an available browser-capable tool when the app is runnable.
-   - For browser-level journey evidence that needs the local stack, use `python scripts/axis.py local-dev e2e`.
+   - Use `python scripts/axis.py local-dev smoke -- <playwright-args>` for fast host-browser layout/UI smoke against an already-running local stack.
+   - For Compose-backed browser journey or acceptance evidence that needs the local stack, use `python scripts/axis.py local-dev e2e`.
    - Ready review: `$axis-ready-review`.
 
 ## Output

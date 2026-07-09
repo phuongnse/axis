@@ -1,4 +1,6 @@
 using Axis.Objects.Domain.Aggregates;
+using Axis.Rules.Contracts;
+using Axis.Shared.Domain.Primitives;
 
 namespace Axis.Objects.Application;
 
@@ -42,16 +44,28 @@ internal static class ObjectDefinitionMapper
             version.PublishedAt,
             version.Fields.OrderBy(field => field.Order).Select(ToVersionFieldDto).ToList());
 
-    public static IReadOnlyList<ObjectFieldDefinitionSpec> ToDomainSpecs(
-        IReadOnlyList<ObjectFieldDefinitionInput> fields) =>
-        fields
-            .Select((field, index) => new ObjectFieldDefinitionSpec(
+    public static Result<IReadOnlyList<ObjectFieldDefinitionSpec>> ToDomainSpecs(
+        IReadOnlyList<ObjectFieldDefinitionInput> fields,
+        IFieldRuleApplicationValidator fieldRuleValidator)
+    {
+        List<ObjectFieldDefinitionSpec> specs = [];
+        for (int index = 0; index < fields.Count; index++)
+        {
+            ObjectFieldDefinitionInput field = fields[index];
+            Result<IReadOnlyList<ObjectFieldRuleSpec>> rules = ToDomainRuleSpecs(field, fieldRuleValidator);
+            if (rules.IsFailure)
+                return Result.Failure<IReadOnlyList<ObjectFieldDefinitionSpec>>(rules.Error);
+
+            specs.Add(new ObjectFieldDefinitionSpec(
                 field.FieldKey,
                 field.Label,
                 index,
                 field.FieldType,
-                ToDomainVariantSpecs(field.Variants)))
-            .ToList();
+                rules.Value));
+        }
+
+        return specs;
+    }
 
     private static ObjectFieldDefinitionDto ToFieldDto(ObjectFieldDefinition field) =>
         new(
@@ -60,7 +74,7 @@ internal static class ObjectDefinitionMapper
             field.Label,
             field.Order,
             field.FieldType,
-            field.Variants.OrderBy(variant => variant.Order).Select(ToVariantDto).ToList());
+            field.Rules.OrderBy(rule => rule.Order).Select(ToRuleDto).ToList());
 
     private static ObjectFieldDefinitionDto ToVersionFieldDto(ObjectDefinitionVersionField field) =>
         new(
@@ -69,45 +83,49 @@ internal static class ObjectDefinitionMapper
             field.Label,
             field.Order,
             field.FieldType,
-            field.Variants.OrderBy(variant => variant.Order).Select(ToVariantDto).ToList());
+            field.Rules.OrderBy(rule => rule.Order).Select(ToRuleDto).ToList());
 
-    private static IReadOnlyList<ObjectFieldVariantSpec> ToDomainVariantSpecs(
-        IReadOnlyList<ObjectFieldVariantInput>? variants) =>
-        variants?
-            .Select(variant => new ObjectFieldVariantSpec(
-                variant.Kind,
-                variant.MinNumber,
-                variant.MaxNumber,
-                variant.MinDate,
-                variant.MaxDate,
-                variant.MinLength,
-                variant.MaxLength,
-                variant.Pattern,
-                variant.Options))
-            .ToList()
-        ?? [];
+    private static Result<IReadOnlyList<ObjectFieldRuleSpec>> ToDomainRuleSpecs(
+        ObjectFieldDefinitionInput field,
+        IFieldRuleApplicationValidator fieldRuleValidator)
+    {
+        if (field.Rules is null || field.Rules.Count == 0)
+            return Array.Empty<ObjectFieldRuleSpec>();
 
-    private static ObjectFieldVariantDto ToVariantDto(ObjectFieldVariant variant) =>
+        List<ObjectFieldRuleSpec> rules = [];
+        foreach (ObjectFieldRuleInput rule in field.Rules)
+        {
+            IReadOnlyDictionary<string, IReadOnlyList<string>> parameters =
+                rule.Parameters ?? new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal);
+            FieldRuleApplicationValidationResult validation =
+                fieldRuleValidator.ValidateFieldRuleApplication(
+                    rule.DefinitionKey,
+                    field.FieldType.ToString(),
+                    parameters);
+
+            if (!validation.IsValid)
+                return Result.Failure<IReadOnlyList<ObjectFieldRuleSpec>>(validation.Error!);
+
+            rules.Add(new ObjectFieldRuleSpec(rule.DefinitionKey, parameters));
+        }
+
+        return rules;
+    }
+
+    private static ObjectFieldRuleDto ToRuleDto(ObjectFieldRule rule) =>
         new(
-            variant.Kind,
-            variant.MinNumber,
-            variant.MaxNumber,
-            variant.MinDate,
-            variant.MaxDate,
-            variant.MinLength,
-            variant.MaxLength,
-            variant.Pattern,
-            variant.Options);
+            rule.DefinitionKey,
+            ToParameterDto(rule.Parameters));
 
-    private static ObjectFieldVariantDto ToVariantDto(ObjectDefinitionVersionFieldVariant variant) =>
+    private static ObjectFieldRuleDto ToRuleDto(ObjectDefinitionVersionFieldRule rule) =>
         new(
-            variant.Kind,
-            variant.MinNumber,
-            variant.MaxNumber,
-            variant.MinDate,
-            variant.MaxDate,
-            variant.MinLength,
-            variant.MaxLength,
-            variant.Pattern,
-            variant.Options);
+            rule.DefinitionKey,
+            ToParameterDto(rule.Parameters));
+
+    private static IReadOnlyDictionary<string, IReadOnlyList<string>> ToParameterDto(
+        IReadOnlyDictionary<string, string[]> parameters) =>
+        parameters.ToDictionary(
+            pair => pair.Key,
+            pair => (IReadOnlyList<string>)pair.Value.ToArray(),
+            StringComparer.Ordinal);
 }

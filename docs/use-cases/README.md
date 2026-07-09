@@ -11,8 +11,9 @@ Use cases are the product source of truth. One use case is a complete end-to-end
 | [docs/use-cases/identity-access/README.md](./identity-access/README.md) | [docs/use-cases/identity-access/register-user.md](./identity-access/register-user.md) | Done |
 | [docs/use-cases/identity-access/README.md](./identity-access/README.md) | [docs/use-cases/identity-access/sign-in-user.md](./identity-access/sign-in-user.md) | Done |
 | [docs/use-cases/identity-access/README.md](./identity-access/README.md) | [docs/use-cases/identity-access/sign-out-user.md](./identity-access/sign-out-user.md) | Done |
-| [docs/use-cases/objects/README.md](./objects/README.md) | [docs/use-cases/objects/configure-field-variants.md](./objects/configure-field-variants.md) | Not started |
+| [docs/use-cases/objects/README.md](./objects/README.md) | [docs/use-cases/objects/configure-field-rules.md](./objects/configure-field-rules.md) | Done |
 | [docs/use-cases/objects/README.md](./objects/README.md) | [docs/use-cases/objects/define-business-object.md](./objects/define-business-object.md) | Done |
+| [docs/use-cases/rules/README.md](./rules/README.md) | [docs/use-cases/rules/provide-system-field-rule-definitions.md](./rules/provide-system-field-rule-definitions.md) | Done |
 | [docs/use-cases/site-experience/README.md](./site-experience/README.md) | [docs/use-cases/site-experience/select-site-language.md](./site-experience/select-site-language.md) | Done |
 | [docs/use-cases/site-experience/README.md](./site-experience/README.md) | [docs/use-cases/site-experience/select-site-theme.md](./site-experience/select-site-theme.md) | Done |
 

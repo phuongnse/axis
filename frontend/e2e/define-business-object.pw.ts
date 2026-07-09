@@ -23,10 +23,72 @@ const definitionId = '33333333-3333-4333-8333-333333333333';
 const fieldId = '44444444-4444-4444-8444-444444444444';
 const versionId = '55555555-5555-4555-8555-555555555555';
 const now = '2026-07-07T00:00:00Z';
+const fieldRuleDefinitions = [
+  {
+    definitionKey: 'field.required',
+    displayName: 'Required',
+    description: 'Future records must provide a value.',
+    supportedFieldTypes: ['Text', 'Integer', 'Decimal', 'Date', 'Boolean', 'SingleSelect'],
+    parameters: [],
+  },
+  {
+    definitionKey: 'field.numeric_range',
+    displayName: 'Numeric range',
+    description: 'Limit integer or decimal values with optional bounds.',
+    supportedFieldTypes: ['Integer', 'Decimal'],
+    parameters: [
+      { key: 'min', type: 'Decimal', isRequired: false, allowMultiple: false },
+      { key: 'max', type: 'Decimal', isRequired: false, allowMultiple: false },
+    ],
+  },
+  {
+    definitionKey: 'field.date_range',
+    displayName: 'Date range',
+    description: 'Limit dates with optional bounds.',
+    supportedFieldTypes: ['Date'],
+    parameters: [
+      { key: 'min', type: 'Date', isRequired: false, allowMultiple: false },
+      { key: 'max', type: 'Date', isRequired: false, allowMultiple: false },
+    ],
+  },
+  {
+    definitionKey: 'field.text_length',
+    displayName: 'Text length',
+    description: 'Limit text values with optional bounds.',
+    supportedFieldTypes: ['Text'],
+    parameters: [
+      { key: 'min', type: 'Integer', isRequired: false, allowMultiple: false },
+      { key: 'max', type: 'Integer', isRequired: false, allowMultiple: false },
+    ],
+  },
+  {
+    definitionKey: 'field.text_pattern',
+    displayName: 'Text pattern',
+    description: 'Require text values to match a pattern.',
+    supportedFieldTypes: ['Text'],
+    parameters: [{ key: 'pattern', type: 'Text', isRequired: true, allowMultiple: false }],
+  },
+  {
+    definitionKey: 'field.single_select_options',
+    displayName: 'Single-select options',
+    description: 'Define allowed options.',
+    supportedFieldTypes: ['SingleSelect'],
+    parameters: [{ key: 'options', type: 'Text', isRequired: true, allowMultiple: true }],
+  },
+];
+
+type ObjectFieldType = 'Text' | 'Integer' | 'Decimal' | 'Date' | 'Boolean' | 'SingleSelect';
+
+interface ObjectFieldRuleRequest {
+  definitionKey: string;
+  parameters?: Record<string, string[]>;
+}
 
 interface ObjectFieldRequest {
   fieldKey: string;
   label: string;
+  fieldType?: ObjectFieldType;
+  rules?: ObjectFieldRuleRequest[];
   order?: number;
 }
 
@@ -43,6 +105,16 @@ interface MockObjectDefinitionApiOptions {
     body: unknown;
   };
 }
+
+interface MockObjectDefinitionRequest {
+  method: string;
+  path: string;
+  body?: unknown;
+}
+
+type ObjectDefinitionRequests = (() => string[]) & {
+  details: () => readonly MockObjectDefinitionRequest[];
+};
 
 function base64UrlJson(value: unknown): string {
   return Buffer.from(JSON.stringify(value), 'utf8').toString('base64url');
@@ -108,6 +180,8 @@ function publishedDetail(definition: ObjectDefinitionDetail) {
     fieldKey: field.fieldKey,
     label: field.label,
     order: field.order,
+    fieldType: field.fieldType ?? 'Text',
+    rules: field.rules ?? [],
   }));
 
   return {
@@ -179,20 +253,29 @@ async function mockAuthenticatedSession(
 async function mockObjectDefinitionApi(
   page: Page,
   options: MockObjectDefinitionApiOptions = {},
-): Promise<() => string[]> {
+): Promise<ObjectDefinitionRequests> {
   let currentDefinition = unpublishedDetail({
     name: 'Customer',
     objectKey: 'customer',
     revision: 1,
   });
   let hasDefinition = false;
-  const requests: string[] = [];
+  const requests: MockObjectDefinitionRequest[] = [];
+
+  await page.route('**/api/rules/field-rule-definitions', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(fieldRuleDefinitions),
+    });
+  });
 
   await page.route('**/api/object-definitions**', async (route) => {
     const request = route.request();
     const url = new URL(request.url());
     const method = request.method();
-    requests.push(`${method} ${url.pathname}`);
+    const requestEntry: MockObjectDefinitionRequest = { method, path: url.pathname };
+    requests.push(requestEntry);
 
     if (method === 'GET' && url.pathname === '/api/object-definitions') {
       const items = hasDefinition
@@ -237,6 +320,7 @@ async function mockObjectDefinitionApi(
       }
 
       const body = request.postDataJSON() as ObjectDefinitionRequest;
+      requestEntry.body = body;
       currentDefinition = unpublishedDetail({
         name: body.name,
         objectKey: deriveObjectKey(body.name),
@@ -256,6 +340,7 @@ async function mockObjectDefinitionApi(
       url.pathname === `/api/object-definitions/${definitionId}/unpublished`
     ) {
       const body = request.postDataJSON() as ObjectDefinitionRequest;
+      requestEntry.body = body;
       currentDefinition = unpublishedDetail({
         name: body.name,
         objectKey: currentDefinition.objectKey,
@@ -283,7 +368,11 @@ async function mockObjectDefinitionApi(
     await route.fulfill({ status: 404, body: `${method} ${url.pathname}` });
   });
 
-  return () => requests;
+  const requestPaths = (() =>
+    requests.map((request) => `${request.method} ${request.path}`)) as ObjectDefinitionRequests;
+  requestPaths.details = () => requests;
+
+  return requestPaths;
 }
 
 async function expectNoPageOverflow(page: Page): Promise<void> {
@@ -613,6 +702,86 @@ test.describe('define business object', () => {
 
     expect(objectRequests()).toContain('POST /api/object-definitions');
     expect(objectRequests()).toContain(`PUT /api/object-definitions/${definitionId}/unpublished`);
+    expect(objectRequests()).toContain(`POST /api/object-definitions/${definitionId}/publish`);
+    expect(pageErrors).toEqual([]);
+  });
+
+  test('AT-008 browser journey configures field rules and publishes the typed contract', async ({
+    page,
+  }, testInfo) => {
+    testInfo.setTimeout(60_000);
+    const pageErrors: string[] = [];
+    page.on('console', (message) => {
+      if (message.type() === 'error') {
+        pageErrors.push(message.text());
+      }
+    });
+    page.on('pageerror', (error) => pageErrors.push(error.message));
+
+    await mockAuthenticatedSession(page);
+    const objectRequests = await mockObjectDefinitionApi(page);
+
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.goto('/objects');
+    await page.getByLabel('Name').fill('Application');
+    await page.getByRole('button', { name: 'Start definition' }).click();
+    await expect(page.getByText('Definition created')).toBeVisible();
+
+    await page.getByRole('button', { name: 'Add field' }).click();
+    await page.getByLabel('Field key').fill('status');
+    await page.getByLabel('Label').fill('Status');
+    await page.getByLabel('Type').selectOption('SingleSelect');
+
+    await expect(page.getByRole('button', { name: 'Publish', exact: true })).toBeDisabled();
+    await expect(page.getByText('Single-select fields need at least one option.')).toBeVisible();
+
+    await page.getByLabel('Options').fill('Draft\nSubmitted\nApproved');
+    await page.getByRole('checkbox', { name: 'Required' }).click();
+
+    await expect
+      .poll(
+        () =>
+          objectRequests
+            .details()
+            .find(
+              (request) =>
+                request.method === 'PUT' &&
+                request.path === `/api/object-definitions/${definitionId}/unpublished` &&
+                JSON.stringify(request.body).includes('field.required') &&
+                JSON.stringify(request.body).includes('field.single_select_options'),
+            )?.body,
+      )
+      .toMatchObject({
+        name: 'Application',
+        fields: [
+          {
+            fieldKey: 'status',
+            label: 'Status',
+            fieldType: 'SingleSelect',
+            rules: [
+              { definitionKey: 'field.required', parameters: {} },
+              {
+                definitionKey: 'field.single_select_options',
+                parameters: { options: ['Draft', 'Submitted', 'Approved'] },
+              },
+            ],
+          },
+        ],
+      });
+    await expect(page.getByRole('button', { name: 'Publish', exact: true })).toBeEnabled();
+
+    await page.getByRole('button', { name: 'Publish', exact: true }).click();
+
+    await expect(page.getByText('Published').first()).toBeVisible();
+    await expect(page.getByLabel('Type')).toHaveValue('SingleSelect');
+    await expect(page.getByLabel('Options')).toHaveValue('Draft\nSubmitted\nApproved');
+    await expectNoDesktopDocumentScroll(page);
+    await expectNoPageOverflow(page);
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await expect(page.getByText('Published').first()).toBeVisible();
+    await expectNoPageOverflow(page);
+
     expect(objectRequests()).toContain(`POST /api/object-definitions/${definitionId}/publish`);
     expect(pageErrors).toEqual([]);
   });

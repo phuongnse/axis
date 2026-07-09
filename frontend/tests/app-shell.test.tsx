@@ -51,6 +51,7 @@ vi.mock('@/features/dashboard/api', () => ({
 
 describe('AppShell', () => {
   beforeEach(() => {
+    routerState.location.pathname = '/dashboard';
     navigateMock.mockClear();
     vi.mocked(signOutUser).mockReset();
     vi.mocked(signOutUser).mockResolvedValue();
@@ -107,6 +108,27 @@ describe('AppShell', () => {
     expect(screen.getByRole('contentinfo')).toHaveTextContent('Version 0.1.0');
     expect(screen.getByRole('contentinfo')).toHaveTextContent('Axis Platform');
     expect(screen.getByRole('contentinfo')).toHaveTextContent('2026');
+  });
+
+  it('renders the Rules route title in the authenticated app frame', () => {
+    routerState.location.pathname = '/rules';
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: {
+          retry: false,
+        },
+      },
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <AppShell navigationContributions={[]}>
+          <section aria-label="Work area">Rules content</section>
+        </AppShell>
+      </QueryClientProvider>,
+    );
+
+    expect(screen.getByRole('banner')).toHaveTextContent('Rules');
   });
 
   it('AT-003 signs out after the browser session is ended and clears local session state', async () => {

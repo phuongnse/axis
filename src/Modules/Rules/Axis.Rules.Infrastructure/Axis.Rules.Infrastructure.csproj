@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\Axis.Rules.Application\Axis.Rules.Application.csproj" />
+    <ProjectReference Include="..\Axis.Rules.Contracts\Axis.Rules.Contracts.csproj" />
+    <ProjectReference Include="..\Axis.Rules.Domain\Axis.Rules.Domain.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+</Project>

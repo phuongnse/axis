@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Axis.Objects.Infrastructure.Migrations
 {
     [DbContext(typeof(ObjectsDbContext))]
-    [Migration("20260708001726_InitialObjects")]
+    [Migration("20260709060839_InitialObjects")]
     partial class InitialObjects
     {
         /// <inheritdoc />
@@ -138,6 +138,12 @@ namespace Axis.Objects.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<string>("FieldType")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("field_type");
+
                     b.Property<string>("Key")
                         .IsRequired()
                         .HasMaxLength(63)
@@ -169,11 +175,53 @@ namespace Axis.Objects.Infrastructure.Migrations
                     b.ToTable("object_definition_version_fields", (string)null);
                 });
 
+            modelBuilder.Entity("Axis.Objects.Domain.Aggregates.ObjectDefinitionVersionFieldRule", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("DefinitionKey")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("definition_key");
+
+                    b.Property<Guid>("ObjectDefinitionVersionFieldId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("object_definition_version_field_id");
+
+                    b.Property<int>("Order")
+                        .HasColumnType("integer")
+                        .HasColumnName("sort_order");
+
+                    b.Property<string>("_parameters")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("parameters");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ObjectDefinitionVersionFieldId", "DefinitionKey")
+                        .IsUnique();
+
+                    b.HasIndex("ObjectDefinitionVersionFieldId", "Order")
+                        .HasDatabaseName("IX_object_definition_version_field_rules_object_definition_ve~1");
+
+                    b.ToTable("object_definition_version_field_rules", (string)null);
+                });
+
             modelBuilder.Entity("Axis.Objects.Domain.Aggregates.ObjectFieldDefinition", b =>
                 {
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid")
                         .HasColumnName("id");
+
+                    b.Property<string>("FieldType")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("field_type");
 
                     b.Property<string>("Key")
                         .IsRequired()
@@ -205,6 +253,41 @@ namespace Axis.Objects.Infrastructure.Migrations
                     b.ToTable("object_definition_fields", (string)null);
                 });
 
+            modelBuilder.Entity("Axis.Objects.Domain.Aggregates.ObjectFieldRule", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("DefinitionKey")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("definition_key");
+
+                    b.Property<Guid>("ObjectFieldDefinitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("object_field_definition_id");
+
+                    b.Property<int>("Order")
+                        .HasColumnType("integer")
+                        .HasColumnName("sort_order");
+
+                    b.Property<string>("_parameters")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("parameters");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ObjectFieldDefinitionId", "DefinitionKey")
+                        .IsUnique();
+
+                    b.HasIndex("ObjectFieldDefinitionId", "Order");
+
+                    b.ToTable("object_definition_field_rules", (string)null);
+                });
+
             modelBuilder.Entity("Axis.Objects.Domain.Aggregates.ObjectDefinitionVersion", b =>
                 {
                     b.HasOne("Axis.Objects.Domain.Aggregates.ObjectDefinition", null)
@@ -223,11 +306,29 @@ namespace Axis.Objects.Infrastructure.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Axis.Objects.Domain.Aggregates.ObjectDefinitionVersionFieldRule", b =>
+                {
+                    b.HasOne("Axis.Objects.Domain.Aggregates.ObjectDefinitionVersionField", null)
+                        .WithMany("Rules")
+                        .HasForeignKey("ObjectDefinitionVersionFieldId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Axis.Objects.Domain.Aggregates.ObjectFieldDefinition", b =>
                 {
                     b.HasOne("Axis.Objects.Domain.Aggregates.ObjectDefinition", null)
                         .WithMany("Fields")
                         .HasForeignKey("ObjectDefinitionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Axis.Objects.Domain.Aggregates.ObjectFieldRule", b =>
+                {
+                    b.HasOne("Axis.Objects.Domain.Aggregates.ObjectFieldDefinition", null)
+                        .WithMany("Rules")
+                        .HasForeignKey("ObjectFieldDefinitionId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
@@ -242,6 +343,16 @@ namespace Axis.Objects.Infrastructure.Migrations
             modelBuilder.Entity("Axis.Objects.Domain.Aggregates.ObjectDefinitionVersion", b =>
                 {
                     b.Navigation("Fields");
+                });
+
+            modelBuilder.Entity("Axis.Objects.Domain.Aggregates.ObjectDefinitionVersionField", b =>
+                {
+                    b.Navigation("Rules");
+                });
+
+            modelBuilder.Entity("Axis.Objects.Domain.Aggregates.ObjectFieldDefinition", b =>
+                {
+                    b.Navigation("Rules");
                 });
 #pragma warning restore 612, 618
         }

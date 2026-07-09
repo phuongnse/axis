@@ -1,5 +1,5 @@
 import { Link } from '@tanstack/react-router';
-import { Blocks } from 'lucide-react';
+import { Blocks, ListChecks } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type {
   ModuleNavigationContext,
@@ -15,6 +15,7 @@ interface ModuleNavigationProps {
 
 const iconByToken: Record<ModuleNavigationIcon, typeof Blocks> = {
   objects: Blocks,
+  rules: ListChecks,
 };
 
 export function ModuleNavigation({ context, items }: ModuleNavigationProps) {

@@ -43,6 +43,11 @@
     <ProjectReference Include="..\..\..\src\Modules\Objects\Axis.Objects.Domain\Axis.Objects.Domain.csproj" />
     <ProjectReference Include="..\..\..\src\Modules\Objects\Axis.Objects.Application\Axis.Objects.Application.csproj" />
     <ProjectReference Include="..\..\..\src\Modules\Objects\Axis.Objects.Infrastructure\Axis.Objects.Infrastructure.csproj" />
+
+    <ProjectReference Include="..\..\..\src\Modules\Rules\Axis.Rules.Contracts\Axis.Rules.Contracts.csproj" />
+    <ProjectReference Include="..\..\..\src\Modules\Rules\Axis.Rules.Domain\Axis.Rules.Domain.csproj" />
+    <ProjectReference Include="..\..\..\src\Modules\Rules\Axis.Rules.Application\Axis.Rules.Application.csproj" />
+    <ProjectReference Include="..\..\..\src\Modules\Rules\Axis.Rules.Infrastructure\Axis.Rules.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>

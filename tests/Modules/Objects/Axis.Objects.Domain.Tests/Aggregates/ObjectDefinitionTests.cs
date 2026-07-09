@@ -1,5 +1,6 @@
 using Axis.Objects.Domain.Aggregates;
 using Axis.Objects.Domain.ValueObjects;
+using Axis.Rules.Contracts;
 using Axis.Shared.Domain.Primitives;
 using FluentAssertions;
 
@@ -41,12 +42,10 @@ public sealed class ObjectDefinitionTests
         definition.Revision.Should().Be(2);
         definition.Fields.Select(field => field.Key.Value)
             .Should().Equal("name", "credit_limit", "opened_on");
-        definition.Fields.Select(field => field.Label)
-            .Should().Equal("Name", "Credit limit", "Opened on");
     }
 
     [Fact]
-    public void SaveUnpublished_WhenFieldTypesAndVariantsAreValid_PreservesTypedConfiguration()
+    public void SaveUnpublished_WhenFieldRulesAreValid_PreservesAppliedRuleSnapshots()
     {
         ObjectDefinition definition = CreateUnpublished();
 
@@ -59,25 +58,18 @@ public sealed class ObjectDefinitionTests
                     order: 0,
                     ObjectFieldType.Text,
                     [
-                        new(ObjectFieldVariantKind.Required),
-                        new(ObjectFieldVariantKind.TextLength, MinLength: 2, MaxLength: 80),
-                        new(ObjectFieldVariantKind.TextPattern, Pattern: "^[A-Z].+"),
+                        Rule(FieldRuleDefinitionKeys.Required),
+                        Rule(FieldRuleDefinitionKeys.TextLength, Params(("max", ["80"]))),
                     ]),
-                Field(
-                    "credit_limit",
-                    "Credit limit",
-                    order: 1,
-                    ObjectFieldType.Decimal,
-                    [new(ObjectFieldVariantKind.NumericRange, MinNumber: 0, MaxNumber: 100000)]),
                 Field(
                     "status",
                     "Status",
-                    order: 2,
+                    order: 1,
                     ObjectFieldType.SingleSelect,
                     [
-                        new(
-                            ObjectFieldVariantKind.SingleSelectOptions,
-                            Options: ["Draft", "Submitted", "Approved"]),
+                        Rule(
+                            FieldRuleDefinitionKeys.SingleSelectOptions,
+                            Params(("options", ["Draft", "Submitted", "Approved"]))),
                     ]),
             ],
             expectedRevision: 1,
@@ -85,19 +77,15 @@ public sealed class ObjectDefinitionTests
 
         result.IsSuccess.Should().BeTrue();
         ObjectFieldDefinition name = definition.Fields.Single(field => field.Key.Value == "name");
-        name.FieldType.Should().Be(ObjectFieldType.Text);
-        name.Variants.Select(variant => variant.Kind)
-            .Should().Equal(
-                ObjectFieldVariantKind.Required,
-                ObjectFieldVariantKind.TextLength,
-                ObjectFieldVariantKind.TextPattern);
-        name.Variants.Single(variant => variant.Kind == ObjectFieldVariantKind.TextLength)
-            .MaxLength.Should().Be(80);
-        ObjectFieldVariant options = definition.Fields
+        name.Rules.Select(rule => rule.DefinitionKey)
+            .Should().Equal(FieldRuleDefinitionKeys.Required, FieldRuleDefinitionKeys.TextLength);
+        name.Rules.Single(rule => rule.DefinitionKey == FieldRuleDefinitionKeys.TextLength)
+            .Parameters["max"].Should().Equal("80");
+        ObjectFieldRule options = definition.Fields
             .Single(field => field.Key.Value == "status")
-            .Variants
+            .Rules
             .Single();
-        options.Options.Should().Equal("Draft", "Submitted", "Approved");
+        options.Parameters["options"].Should().Equal("Draft", "Submitted", "Approved");
     }
 
     [Fact]
@@ -174,7 +162,7 @@ public sealed class ObjectDefinitionTests
     }
 
     [Fact]
-    public void SaveUnpublished_WhenVariantIsIncompatibleWithFieldType_ReturnsInvalidInput()
+    public void SaveUnpublished_WhenFieldRuleDefinitionKeyIsDuplicated_ReturnsInvalidInput()
     {
         ObjectDefinition definition = CreateUnpublished();
 
@@ -182,110 +170,44 @@ public sealed class ObjectDefinitionTests
             "Customer",
             [
                 Field(
-                    "is_active",
-                    "Is active",
-                    order: 0,
-                    ObjectFieldType.Boolean,
-                    [new(ObjectFieldVariantKind.TextLength, MinLength: 1)]),
-            ],
-            expectedRevision: 1,
-            Now);
-
-        result.IsFailure.Should().BeTrue();
-        result.ErrorCode.Should().Be(ErrorCodes.InvalidInput);
-        result.Error.Should().Be("Field variant is not compatible with the selected field type.");
-    }
-
-    [Fact]
-    public void SaveUnpublished_WhenVariantParametersAreInvalid_ReturnsInvalidInput()
-    {
-        ObjectDefinition definition = CreateUnpublished();
-
-        Result result = definition.SaveUnpublished(
-            "Customer",
-            [
-                Field(
-                    "amount",
-                    "Amount",
-                    order: 0,
-                    ObjectFieldType.Decimal,
-                    [new(ObjectFieldVariantKind.NumericRange, MinNumber: 100, MaxNumber: 10)]),
-            ],
-            expectedRevision: 1,
-            Now);
-
-        result.IsFailure.Should().BeTrue();
-        result.ErrorCode.Should().Be(ErrorCodes.InvalidInput);
-        result.Error.Should().Be("Numeric range minimum cannot exceed maximum.");
-    }
-
-    [Fact]
-    public void SaveUnpublished_WhenIntegerRangeHasFractionalBound_ReturnsInvalidInput()
-    {
-        ObjectDefinition definition = CreateUnpublished();
-
-        Result result = definition.SaveUnpublished(
-            "Customer",
-            [
-                Field(
-                    "quantity",
-                    "Quantity",
-                    order: 0,
-                    ObjectFieldType.Integer,
-                    [new(ObjectFieldVariantKind.NumericRange, MinNumber: 1.5m, MaxNumber: 10)]),
-            ],
-            expectedRevision: 1,
-            Now);
-
-        result.IsFailure.Should().BeTrue();
-        result.ErrorCode.Should().Be(ErrorCodes.InvalidInput);
-        result.Error.Should().Be("Numeric range bounds for integer fields must be whole numbers.");
-    }
-
-    [Fact]
-    public void SaveUnpublished_WhenSingleSelectOptionsAreDuplicated_ReturnsInvalidInput()
-    {
-        ObjectDefinition definition = CreateUnpublished();
-
-        Result result = definition.SaveUnpublished(
-            "Customer",
-            [
-                Field(
-                    "status",
-                    "Status",
-                    order: 0,
-                    ObjectFieldType.SingleSelect,
-                    [new(ObjectFieldVariantKind.SingleSelectOptions, Options: ["Draft", "Draft"])]),
-            ],
-            expectedRevision: 1,
-            Now);
-
-        result.IsFailure.Should().BeTrue();
-        result.ErrorCode.Should().Be(ErrorCodes.InvalidInput);
-        result.Error.Should().Be("Single-select option values must be unique.");
-    }
-
-    [Fact]
-    public void SaveUnpublished_WhenTextPatternIsInvalid_ReturnsInvalidInput()
-    {
-        ObjectDefinition definition = CreateUnpublished();
-
-        Result result = definition.SaveUnpublished(
-            "Customer",
-            [
-                Field(
-                    "code",
-                    "Code",
+                    "name",
+                    "Name",
                     order: 0,
                     ObjectFieldType.Text,
-                    [new(ObjectFieldVariantKind.TextPattern, Pattern: "[")]),
+                    [
+                        Rule(FieldRuleDefinitionKeys.Required),
+                        Rule(FieldRuleDefinitionKeys.Required),
+                    ]),
             ],
             expectedRevision: 1,
             Now);
 
         result.IsFailure.Should().BeTrue();
         result.ErrorCode.Should().Be(ErrorCodes.InvalidInput);
-        result.Error.Should().Be("Text pattern is invalid.");
+        result.Error.Should().Be("Field rules must be unique per field.");
+    }
+
+    [Fact]
+    public void SaveUnpublished_WhenFieldRuleShapeIsInvalid_ReturnsInvalidInput()
+    {
+        ObjectDefinition definition = CreateUnpublished();
+
+        Result result = definition.SaveUnpublished(
+            "Customer",
+            [
+                Field(
+                    "name",
+                    "Name",
+                    order: 0,
+                    ObjectFieldType.Text,
+                    [Rule("Field.Required")]),
+            ],
+            expectedRevision: 1,
+            Now);
+
+        result.IsFailure.Should().BeTrue();
+        result.ErrorCode.Should().Be(ErrorCodes.InvalidInput);
+        result.Error.Should().Be("Field rule definition key format is invalid.");
     }
 
     [Fact]
@@ -312,16 +234,12 @@ public sealed class ObjectDefinitionTests
         version.PublishedAt.Should().Be(Now.AddMinutes(2));
         version.Fields.Select(field => field.Key.Value)
             .Should().Equal("name", "credit_limit", "opened_on");
-        version.Fields.Select(field => field.Label)
-            .Should().Equal("Name", "Credit limit", "Opened on");
-        version.Fields.Select(field => field.FieldType)
-            .Should().Equal(ObjectFieldType.Text, ObjectFieldType.Text, ObjectFieldType.Text);
         definition.Status.Should().Be(ObjectDefinitionStatus.Published);
         definition.LatestPublishedVersionNumber.Should().Be(1);
     }
 
     [Fact]
-    public void Publish_WhenFieldVariantsAreConfigured_PreservesImmutableVariantSnapshot()
+    public void Publish_WhenFieldRulesAreConfigured_PreservesImmutableRuleSnapshot()
     {
         ObjectDefinition definition = CreateUnpublished();
         definition.SaveUnpublished(
@@ -333,9 +251,9 @@ public sealed class ObjectDefinitionTests
                     order: 0,
                     ObjectFieldType.SingleSelect,
                     [
-                        new(
-                            ObjectFieldVariantKind.SingleSelectOptions,
-                            Options: ["Draft", "Submitted", "Approved"]),
+                        Rule(
+                            FieldRuleDefinitionKeys.SingleSelectOptions,
+                            Params(("options", ["Draft", "Submitted", "Approved"]))),
                     ]),
             ],
             expectedRevision: 1,
@@ -349,9 +267,9 @@ public sealed class ObjectDefinitionTests
         result.IsSuccess.Should().BeTrue();
         ObjectDefinitionVersionField field = result.Value.Fields.Single();
         field.FieldType.Should().Be(ObjectFieldType.SingleSelect);
-        field.Variants.Should().ContainSingle();
-        field.Variants[0].Kind.Should().Be(ObjectFieldVariantKind.SingleSelectOptions);
-        field.Variants[0].Options.Should().Equal("Draft", "Submitted", "Approved");
+        field.Rules.Should().ContainSingle();
+        field.Rules[0].DefinitionKey.Should().Be(FieldRuleDefinitionKeys.SingleSelectOptions);
+        field.Rules[0].Parameters["options"].Should().Equal("Draft", "Submitted", "Approved");
     }
 
     [Fact]
@@ -385,8 +303,20 @@ public sealed class ObjectDefinitionTests
         string label,
         int order,
         ObjectFieldType fieldType = ObjectFieldType.Text,
-        IReadOnlyList<ObjectFieldVariantSpec>? variants = null) =>
-        new(key, label, order, fieldType, variants);
+        IReadOnlyList<ObjectFieldRuleSpec>? rules = null) =>
+        new(key, label, order, fieldType, rules);
+
+    private static ObjectFieldRuleSpec Rule(
+        string definitionKey,
+        IReadOnlyDictionary<string, IReadOnlyList<string>>? parameters = null) =>
+        new(definitionKey, parameters);
+
+    private static IReadOnlyDictionary<string, IReadOnlyList<string>> Params(
+        params (string Key, string[] Values)[] parameters) =>
+        parameters.ToDictionary(
+            parameter => parameter.Key,
+            parameter => (IReadOnlyList<string>)parameter.Values,
+            StringComparer.Ordinal);
 
     private static IReadOnlyList<ObjectFieldDefinitionSpec> ValidFields() =>
     [

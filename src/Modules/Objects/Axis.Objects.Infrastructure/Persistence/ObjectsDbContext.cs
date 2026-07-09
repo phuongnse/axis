@@ -12,9 +12,9 @@ public sealed class ObjectsDbContext(DbContextOptions<ObjectsDbContext> options)
     {
         modelBuilder.ApplyConfiguration(new ObjectDefinitionConfiguration());
         modelBuilder.ApplyConfiguration(new ObjectFieldDefinitionConfiguration());
-        modelBuilder.ApplyConfiguration(new ObjectFieldVariantConfiguration());
+        modelBuilder.ApplyConfiguration(new ObjectFieldRuleConfiguration());
         modelBuilder.ApplyConfiguration(new ObjectDefinitionVersionConfiguration());
         modelBuilder.ApplyConfiguration(new ObjectDefinitionVersionFieldConfiguration());
-        modelBuilder.ApplyConfiguration(new ObjectDefinitionVersionFieldVariantConfiguration());
+        modelBuilder.ApplyConfiguration(new ObjectDefinitionVersionFieldRuleConfiguration());
     }
 }

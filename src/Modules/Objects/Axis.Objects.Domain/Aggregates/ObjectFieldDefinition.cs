@@ -5,13 +5,13 @@ namespace Axis.Objects.Domain.Aggregates;
 
 public sealed class ObjectFieldDefinition : Entity<ObjectFieldDefinitionId>
 {
-    private readonly List<ObjectFieldVariant> _variants = [];
+    private readonly List<ObjectFieldRule> _rules = [];
 
     public ObjectFieldKey Key { get; private set; }
     public string Label { get; private set; }
     public int Order { get; private set; }
     public ObjectFieldType FieldType { get; private set; }
-    public IReadOnlyList<ObjectFieldVariant> Variants => _variants.AsReadOnly();
+    public IReadOnlyList<ObjectFieldRule> Rules => _rules.AsReadOnly();
 
     private ObjectFieldDefinition(
         ObjectFieldDefinitionId id,
@@ -29,14 +29,14 @@ public sealed class ObjectFieldDefinition : Entity<ObjectFieldDefinitionId>
         string label,
         int order,
         ObjectFieldType fieldType,
-        IReadOnlyList<ObjectFieldVariant> variants)
+        IReadOnlyList<ObjectFieldRule> rules)
         : base(id)
     {
         Key = key;
         Label = label;
         Order = order;
         FieldType = fieldType;
-        _variants.AddRange(variants.OrderBy(variant => variant.Order));
+        _rules.AddRange(rules.OrderBy(rule => rule.Order));
     }
 
     public static Result<ObjectFieldDefinition> Create(
@@ -53,10 +53,9 @@ public sealed class ObjectFieldDefinition : Entity<ObjectFieldDefinitionId>
         if (!Enum.IsDefined(spec.FieldType))
             return Result.Failure<ObjectFieldDefinition>("Field type is not supported.");
 
-        Result<IReadOnlyList<ObjectFieldVariant>> variants =
-            ObjectFieldVariant.CreateMany(spec.FieldType, spec.Variants);
-        if (variants.IsFailure)
-            return Result.Failure<ObjectFieldDefinition>(variants.Error);
+        Result<IReadOnlyList<ObjectFieldRule>> rules = ObjectFieldRule.CreateMany(spec.Rules);
+        if (rules.IsFailure)
+            return Result.Failure<ObjectFieldDefinition>(rules.Error);
 
         return new ObjectFieldDefinition(
             id,
@@ -64,7 +63,7 @@ public sealed class ObjectFieldDefinition : Entity<ObjectFieldDefinitionId>
             spec.Label.Trim(),
             spec.Order,
             spec.FieldType,
-            variants.Value);
+            rules.Value);
     }
 
     public ObjectFieldDefinition Snapshot() =>
@@ -74,7 +73,7 @@ public sealed class ObjectFieldDefinition : Entity<ObjectFieldDefinitionId>
             Label,
             Order,
             FieldType,
-            _variants.Select(variant => variant.Snapshot()).ToList());
+            _rules.Select(rule => rule.Snapshot()).ToList());
 
     internal void Apply(ObjectFieldDefinition source)
     {
@@ -82,7 +81,7 @@ public sealed class ObjectFieldDefinition : Entity<ObjectFieldDefinitionId>
         Label = source.Label;
         Order = source.Order;
         FieldType = source.FieldType;
-        _variants.Clear();
-        _variants.AddRange(source.Variants.Select(variant => variant.Snapshot()));
+        _rules.Clear();
+        _rules.AddRange(source.Rules.Select(rule => rule.Snapshot()));
     }
 }

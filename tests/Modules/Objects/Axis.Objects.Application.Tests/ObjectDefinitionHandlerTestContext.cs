@@ -2,6 +2,8 @@ using Axis.Objects.Application.Repositories;
 using Axis.Objects.Application.Services;
 using Axis.Objects.Domain.Aggregates;
 using Axis.Objects.Domain.ValueObjects;
+using Axis.Rules.Application;
+using Axis.Rules.Contracts;
 using Axis.Shared.Application.Identity;
 using Axis.Shared.Domain.Primitives;
 using FluentAssertions;
@@ -16,6 +18,7 @@ internal sealed class ObjectDefinitionHandlerTestContext
 
     public IObjectDefinitionRepository Repository { get; } = Substitute.For<IObjectDefinitionRepository>();
     public IUnitOfWork UnitOfWork { get; } = Substitute.For<IUnitOfWork>();
+    public IFieldRuleApplicationValidator FieldRuleValidator { get; } = new FieldRuleApplicationValidator();
     public FakeCurrentUser CurrentUser { get; } = new()
     {
         UserId = UserId,
@@ -52,8 +55,8 @@ internal sealed class ObjectDefinitionHandlerTestContext
         string key,
         string label,
         ObjectFieldType fieldType,
-        IReadOnlyList<ObjectFieldVariantInput>? variants = null) =>
-        new(key, label, fieldType, variants);
+        IReadOnlyList<ObjectFieldRuleInput>? rules = null) =>
+        new(key, label, fieldType, rules);
 
     public static ObjectFieldDefinitionSpec FieldSpec(string key, string label, int order) =>
         new(key, label, order);

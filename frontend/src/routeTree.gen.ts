@@ -15,6 +15,7 @@ import { Route as CallbackRouteImport } from './routes/callback'
 import { Route as GuestRouteImport } from './routes/_guest'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthenticatedRulesRouteImport } from './routes/_authenticated/rules'
 import { Route as AuthenticatedObjectsRouteImport } from './routes/_authenticated/objects'
 
 const GuestSignInLazyRouteImport = createFileRoute('/_guest/sign-in')()
@@ -67,6 +68,13 @@ const AuthenticatedDashboardLazyRoute =
   } as any).lazy(() =>
     import('./routes/_authenticated/dashboard.lazy').then((d) => d.Route),
   )
+const AuthenticatedRulesRoute = AuthenticatedRulesRouteImport.update({
+  id: '/rules',
+  path: '/rules',
+  getParentRoute: () => AuthenticatedRoute,
+} as any).lazy(() =>
+  import('./routes/_authenticated/rules.lazy').then((d) => d.Route),
+)
 const AuthenticatedObjectsRoute = AuthenticatedObjectsRouteImport.update({
   id: '/objects',
   path: '/objects',
@@ -94,6 +102,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/callback': typeof CallbackRoute
   '/objects': typeof AuthenticatedObjectsRoute
+  '/rules': typeof AuthenticatedRulesRoute
   '/dashboard': typeof AuthenticatedDashboardLazyRoute
   '/register': typeof GuestRegisterLazyRoute
   '/sign-in': typeof GuestSignInLazyRoute
@@ -104,6 +113,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/callback': typeof CallbackRoute
   '/objects': typeof AuthenticatedObjectsRoute
+  '/rules': typeof AuthenticatedRulesRoute
   '/dashboard': typeof AuthenticatedDashboardLazyRoute
   '/register': typeof GuestRegisterLazyRoute
   '/sign-in': typeof GuestSignInLazyRoute
@@ -117,6 +127,7 @@ export interface FileRoutesById {
   '/_guest': typeof GuestRouteWithChildren
   '/callback': typeof CallbackRoute
   '/_authenticated/objects': typeof AuthenticatedObjectsRoute
+  '/_authenticated/rules': typeof AuthenticatedRulesRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardLazyRoute
   '/_guest/register': typeof GuestRegisterLazyRoute
   '/_guest/sign-in': typeof GuestSignInLazyRoute
@@ -129,6 +140,7 @@ export interface FileRouteTypes {
     | '/'
     | '/callback'
     | '/objects'
+    | '/rules'
     | '/dashboard'
     | '/register'
     | '/sign-in'
@@ -139,6 +151,7 @@ export interface FileRouteTypes {
     | '/'
     | '/callback'
     | '/objects'
+    | '/rules'
     | '/dashboard'
     | '/register'
     | '/sign-in'
@@ -151,6 +164,7 @@ export interface FileRouteTypes {
     | '/_guest'
     | '/callback'
     | '/_authenticated/objects'
+    | '/_authenticated/rules'
     | '/_authenticated/dashboard'
     | '/_guest/register'
     | '/_guest/sign-in'
@@ -216,6 +230,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDashboardLazyRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/rules': {
+      id: '/_authenticated/rules'
+      path: '/rules'
+      fullPath: '/rules'
+      preLoaderRoute: typeof AuthenticatedRulesRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/objects': {
       id: '/_authenticated/objects'
       path: '/objects'
@@ -242,11 +263,13 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedRouteChildren {
   AuthenticatedObjectsRoute: typeof AuthenticatedObjectsRoute
+  AuthenticatedRulesRoute: typeof AuthenticatedRulesRoute
   AuthenticatedDashboardLazyRoute: typeof AuthenticatedDashboardLazyRoute
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedObjectsRoute: AuthenticatedObjectsRoute,
+  AuthenticatedRulesRoute: AuthenticatedRulesRoute,
   AuthenticatedDashboardLazyRoute: AuthenticatedDashboardLazyRoute,
 }
 

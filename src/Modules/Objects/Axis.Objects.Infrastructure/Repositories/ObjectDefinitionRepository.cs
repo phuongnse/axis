@@ -59,8 +59,8 @@ internal sealed class ObjectDefinitionRepository(ObjectsDbContext context) : IOb
         context.ObjectDefinitions
             .AsSplitQuery()
             .Include(definition => definition.Fields)
-            .ThenInclude(field => field.Variants)
+            .ThenInclude(field => field.Rules)
             .Include(definition => definition.Versions)
             .ThenInclude(version => version.Fields)
-            .ThenInclude(field => field.Variants);
+            .ThenInclude(field => field.Rules);
 }

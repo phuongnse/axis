@@ -5,4 +5,4 @@ public sealed record ObjectFieldDefinitionSpec(
     string Label,
     int Order,
     ObjectFieldType FieldType = ObjectFieldType.Text,
-    IReadOnlyList<ObjectFieldVariantSpec>? Variants = null);
+    IReadOnlyList<ObjectFieldRuleSpec>? Rules = null);
