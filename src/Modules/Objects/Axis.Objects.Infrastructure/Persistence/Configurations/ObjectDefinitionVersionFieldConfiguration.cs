@@ -37,9 +37,25 @@ internal sealed class ObjectDefinitionVersionFieldConfiguration : IEntityTypeCon
             .HasColumnName("sort_order")
             .IsRequired();
 
+        builder.Property(field => field.FieldType)
+            .HasColumnName("field_type")
+            .HasConversion<string>()
+            .HasMaxLength(32)
+            .IsRequired();
+
         builder.HasIndex("ObjectDefinitionVersionId", nameof(ObjectDefinitionVersionField.Key))
             .IsUnique();
 
         builder.HasIndex("ObjectDefinitionVersionId", nameof(ObjectDefinitionVersionField.Order));
+
+        builder.HasMany(field => field.Variants)
+            .WithOne()
+            .HasForeignKey("ObjectDefinitionVersionFieldId")
+            .OnDelete(DeleteBehavior.Cascade)
+            .IsRequired();
+
+        builder.Navigation(field => field.Variants)
+            .HasField("_variants")
+            .UsePropertyAccessMode(PropertyAccessMode.Field);
     }
 }

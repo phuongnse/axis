@@ -3,6 +3,7 @@ using System;
 using Axis.Objects.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Axis.Objects.Infrastructure.Migrations
 {
     [DbContext(typeof(ObjectsDbContext))]
-    partial class ObjectsDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260708155858_AddFieldVariants")]
+    partial class AddFieldVariants
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

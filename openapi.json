@@ -1052,6 +1052,15 @@
           "order": {
             "type": "integer",
             "format": "int32"
+          },
+          "fieldType": {
+            "$ref": "#/components/schemas/ObjectFieldType"
+          },
+          "variants": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ObjectFieldVariantDto"
+            }
           }
         },
         "additionalProperties": false
@@ -1064,9 +1073,140 @@
           },
           "label": {
             "type": "string"
+          },
+          "fieldType": {
+            "$ref": "#/components/schemas/ObjectFieldType"
+          },
+          "variants": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ObjectFieldVariantInput"
+            },
+            "nullable": true
           }
         },
         "additionalProperties": false
+      },
+      "ObjectFieldType": {
+        "enum": [
+          "Text",
+          "Integer",
+          "Decimal",
+          "Date",
+          "Boolean",
+          "SingleSelect"
+        ],
+        "type": "string"
+      },
+      "ObjectFieldVariantDto": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/ObjectFieldVariantKind"
+          },
+          "minNumber": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "maxNumber": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "minDate": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "maxDate": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "minLength": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "maxLength": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "pattern": {
+            "type": "string",
+            "nullable": true
+          },
+          "options": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "ObjectFieldVariantInput": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/ObjectFieldVariantKind"
+          },
+          "minNumber": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "maxNumber": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "minDate": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "maxDate": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "minLength": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "maxLength": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "pattern": {
+            "type": "string",
+            "nullable": true
+          },
+          "options": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "ObjectFieldVariantKind": {
+        "enum": [
+          "Required",
+          "NumericRange",
+          "DateRange",
+          "TextLength",
+          "TextPattern",
+          "SingleSelectOptions"
+        ],
+        "type": "string"
       },
       "ProblemDetails": {
         "type": "object",

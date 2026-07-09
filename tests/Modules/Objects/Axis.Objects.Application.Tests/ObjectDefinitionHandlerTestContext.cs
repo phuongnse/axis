@@ -48,6 +48,13 @@ internal sealed class ObjectDefinitionHandlerTestContext
     public static ObjectFieldDefinitionInput FieldInput(string key, string label) =>
         new(key, label);
 
+    public static ObjectFieldDefinitionInput FieldInput(
+        string key,
+        string label,
+        ObjectFieldType fieldType,
+        IReadOnlyList<ObjectFieldVariantInput>? variants = null) =>
+        new(key, label, fieldType, variants);
+
     public static ObjectFieldDefinitionSpec FieldSpec(string key, string label, int order) =>
         new(key, label, order);
 

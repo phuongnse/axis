@@ -62,11 +62,34 @@ public sealed class ObjectDefinitionEndpointTests(ApiTestFixture fixture)
                     {
                         fieldKey = "name",
                         label = "Name",
+                        fieldType = "Text",
+                        variants = new object[]
+                        {
+                            new
+                            {
+                                kind = "Required",
+                            },
+                            new
+                            {
+                                kind = "TextLength",
+                                minLength = 1,
+                                maxLength = 120,
+                            },
+                        },
                     },
                     new
                     {
                         fieldKey = "status",
                         label = "Status",
+                        fieldType = "SingleSelect",
+                        variants = new object[]
+                        {
+                            new
+                            {
+                                kind = "SingleSelectOptions",
+                                options = new[] { "Draft", "Submitted", "Approved" },
+                            },
+                        },
                     },
                 },
             });
@@ -76,6 +99,18 @@ public sealed class ObjectDefinitionEndpointTests(ApiTestFixture fixture)
         saved.GetProperty("objectKey").GetString().Should().Be(objectKey);
         saved.GetProperty("revision").GetInt32().Should().Be(2);
         saved.GetProperty("fields").GetArrayLength().Should().Be(2);
+        JsonElement savedNameField = saved.GetProperty("fields")[0];
+        savedNameField.GetProperty("fieldType").GetString().Should().Be("Text");
+        savedNameField.GetProperty("variants").GetArrayLength().Should().Be(2);
+        savedNameField.GetProperty("variants")[1].GetProperty("kind").GetString().Should().Be("TextLength");
+        savedNameField.GetProperty("variants")[1].GetProperty("maxLength").GetInt32().Should().Be(120);
+        JsonElement savedStatusField = saved.GetProperty("fields")[1];
+        savedStatusField.GetProperty("fieldType").GetString().Should().Be("SingleSelect");
+        savedStatusField.GetProperty("variants")[0]
+            .GetProperty("options")
+            .EnumerateArray()
+            .Select(option => option.GetString())
+            .Should().Equal("Draft", "Submitted", "Approved");
 
         HttpResponseMessage publishResponse = await SendWithBearerAsync(
             HttpMethod.Post,
@@ -91,6 +126,14 @@ public sealed class ObjectDefinitionEndpointTests(ApiTestFixture fixture)
             .GetProperty("fields")
             .GetArrayLength()
             .Should().Be(2);
+        JsonElement publishedStatusField = published.GetProperty("latestPublishedVersion")
+            .GetProperty("fields")[1];
+        publishedStatusField.GetProperty("fieldType").GetString().Should().Be("SingleSelect");
+        publishedStatusField.GetProperty("variants")[0]
+            .GetProperty("options")
+            .EnumerateArray()
+            .Select(option => option.GetString())
+            .Should().Equal("Draft", "Submitted", "Approved");
 
         HttpResponseMessage getResponse = await SendWithBearerAsync(
             HttpMethod.Get,

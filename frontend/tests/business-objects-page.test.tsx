@@ -214,6 +214,8 @@ describe('BusinessObjectsPage', () => {
                 id: fieldId,
                 fieldKey: 'name',
                 label: 'Name',
+                fieldType: 'Text',
+                variants: [],
                 order: 0,
               },
             ],
@@ -230,6 +232,8 @@ describe('BusinessObjectsPage', () => {
                 id: fieldId,
                 fieldKey: 'name',
                 label: 'Name',
+                fieldType: 'Text',
+                variants: [],
                 order: 0,
               },
             ],
@@ -354,7 +358,18 @@ describe('BusinessObjectsPage', () => {
         request.method === 'PUT' &&
         requestPath(request.url) === `/api/object-definitions/${definitionId}/unpublished`,
     );
-    expect(saveRequest?.body).toMatchObject({ expectedRevision: 1, name: 'Customer' });
+    expect(saveRequest?.body).toMatchObject({
+      expectedRevision: 1,
+      name: 'Customer',
+      fields: [
+        {
+          fieldKey: 'name',
+          label: 'Name',
+          fieldType: 'Text',
+          variants: [],
+        },
+      ],
+    });
     expect(saveRequest?.body).not.toHaveProperty('objectKey');
     expect(
       requests.find(
@@ -363,6 +378,99 @@ describe('BusinessObjectsPage', () => {
           requestPath(request.url) === `/api/object-definitions/${definitionId}/publish`,
       )?.body,
     ).toEqual({ expectedRevision: 2 });
+  });
+
+  it('validates and saves field type variant controls', async () => {
+    const user = userEvent.setup();
+    const requests: { method: string; url: string; body?: unknown }[] = [];
+
+    vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input.toString();
+      const method = init?.method ?? 'GET';
+      const body = typeof init?.body === 'string' ? JSON.parse(init.body) : undefined;
+      requests.push({ method, url, body });
+
+      if (url.includes('/api/object-definitions?')) {
+        return jsonResponse({ items: [], totalCount: 0, page: 1, pageSize: 20 });
+      }
+
+      if (method === 'POST' && url.endsWith('/api/object-definitions')) {
+        return jsonResponse(
+          unpublishedDetail({
+            name: body.name,
+            objectKey: deriveObjectKey(body.name),
+            revision: 1,
+          }),
+          201,
+        );
+      }
+
+      if (method === 'PUT' && url.endsWith(`/api/object-definitions/${definitionId}/unpublished`)) {
+        return jsonResponse(
+          unpublishedDetail({
+            name: body.name,
+            objectKey: 'application',
+            revision: 2,
+            fields: body.fields,
+          }),
+        );
+      }
+
+      return Promise.reject(new Error(`Unexpected fetch: ${method} ${url}`));
+    });
+
+    await renderWithRouter(<BusinessObjectsPage />, { path: '/objects' });
+    await user.type(await screen.findByLabelText('Name'), 'Application');
+    await user.click(screen.getByRole('button', { name: 'Start definition' }));
+    await screen.findByText('Definition created');
+
+    await user.click(screen.getByRole('button', { name: 'Add field' }));
+    await user.type(screen.getByLabelText('Field key'), 'status');
+    await user.type(screen.getByLabelText('Label'), 'Status');
+    await user.selectOptions(screen.getByLabelText('Type'), 'SingleSelect');
+
+    expect(screen.getByRole('button', { name: 'Publish' })).toBeDisabled();
+    expect(
+      await screen.findByText('Single-select fields need at least one option.'),
+    ).toBeInTheDocument();
+    expect(
+      requests.some(
+        (request) =>
+          request.method === 'PUT' &&
+          requestPath(request.url) === `/api/object-definitions/${definitionId}/unpublished`,
+      ),
+    ).toBe(false);
+
+    await user.type(screen.getByLabelText('Options'), 'Draft\nSubmitted\nApproved');
+    await user.click(screen.getByRole('checkbox', { name: 'Required' }));
+
+    await waitFor(() => {
+      const saveRequest = requests.find(
+        (request) =>
+          request.method === 'PUT' &&
+          requestPath(request.url) === `/api/object-definitions/${definitionId}/unpublished` &&
+          JSON.stringify(request.body).includes('SingleSelectOptions'),
+      );
+
+      expect(saveRequest?.body).toMatchObject({
+        expectedRevision: 1,
+        name: 'Application',
+        fields: [
+          {
+            fieldKey: 'status',
+            label: 'Status',
+            fieldType: 'SingleSelect',
+            variants: [
+              { kind: 'Required' },
+              {
+                kind: 'SingleSelectOptions',
+                options: ['Draft', 'Submitted', 'Approved'],
+              },
+            ],
+          },
+        ],
+      });
+    });
   });
 
   it('shows the autosave pending indicator before the debounced save starts', async () => {
@@ -518,7 +626,7 @@ describe('BusinessObjectsPage', () => {
     await user.click(screen.getByRole('button', { name: 'Start definition' }));
     expect(await screen.findByText('Definition created')).toBeInTheDocument();
     expect(
-      screen.getByText('Fields define the text data this business object captures.'),
+      screen.getByText('Fields define the typed data this business object captures.'),
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Add field' })).toBeEnabled();
     expect(screen.getByRole('button', { name: 'Expand editor' })).toBeInTheDocument();

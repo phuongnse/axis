@@ -48,7 +48,9 @@ internal static class ObjectDefinitionMapper
             .Select((field, index) => new ObjectFieldDefinitionSpec(
                 field.FieldKey,
                 field.Label,
-                index))
+                index,
+                field.FieldType,
+                ToDomainVariantSpecs(field.Variants)))
             .ToList();
 
     private static ObjectFieldDefinitionDto ToFieldDto(ObjectFieldDefinition field) =>
@@ -56,12 +58,56 @@ internal static class ObjectDefinitionMapper
             field.Id.Value,
             field.Key.Value,
             field.Label,
-            field.Order);
+            field.Order,
+            field.FieldType,
+            field.Variants.OrderBy(variant => variant.Order).Select(ToVariantDto).ToList());
 
     private static ObjectFieldDefinitionDto ToVersionFieldDto(ObjectDefinitionVersionField field) =>
         new(
             field.Id.Value,
             field.Key.Value,
             field.Label,
-            field.Order);
+            field.Order,
+            field.FieldType,
+            field.Variants.OrderBy(variant => variant.Order).Select(ToVariantDto).ToList());
+
+    private static IReadOnlyList<ObjectFieldVariantSpec> ToDomainVariantSpecs(
+        IReadOnlyList<ObjectFieldVariantInput>? variants) =>
+        variants?
+            .Select(variant => new ObjectFieldVariantSpec(
+                variant.Kind,
+                variant.MinNumber,
+                variant.MaxNumber,
+                variant.MinDate,
+                variant.MaxDate,
+                variant.MinLength,
+                variant.MaxLength,
+                variant.Pattern,
+                variant.Options))
+            .ToList()
+        ?? [];
+
+    private static ObjectFieldVariantDto ToVariantDto(ObjectFieldVariant variant) =>
+        new(
+            variant.Kind,
+            variant.MinNumber,
+            variant.MaxNumber,
+            variant.MinDate,
+            variant.MaxDate,
+            variant.MinLength,
+            variant.MaxLength,
+            variant.Pattern,
+            variant.Options);
+
+    private static ObjectFieldVariantDto ToVariantDto(ObjectDefinitionVersionFieldVariant variant) =>
+        new(
+            variant.Kind,
+            variant.MinNumber,
+            variant.MaxNumber,
+            variant.MinDate,
+            variant.MaxDate,
+            variant.MinLength,
+            variant.MaxLength,
+            variant.Pattern,
+            variant.Options);
 }

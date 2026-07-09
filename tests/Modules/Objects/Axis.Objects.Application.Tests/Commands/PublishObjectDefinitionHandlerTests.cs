@@ -38,6 +38,7 @@ public sealed class PublishObjectDefinitionHandlerTests
             .Should().Be(ObjectDefinitionHandlerTestContext.UserId);
         result.Value.LatestPublishedVersion.Fields.Should()
             .ContainSingle(field => field.FieldKey == "name");
+        result.Value.LatestPublishedVersion.Fields[0].FieldType.Should().Be(ObjectFieldType.Text);
         await _context.UnitOfWork.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 

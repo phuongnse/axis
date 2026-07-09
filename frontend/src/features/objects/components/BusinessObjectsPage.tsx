@@ -21,6 +21,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import {
@@ -31,6 +32,8 @@ import {
   ItemHeader,
   ItemTitle,
 } from '@/components/ui/item';
+import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
+import { Textarea } from '@/components/ui/textarea';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { defaultDebounceMs, useDebouncedValue } from '@/hooks/use-debounced-value';
 import {
@@ -43,6 +46,8 @@ import {
   createObjectDefinition,
   type ObjectDefinitionDetail,
   type ObjectFieldDefinitionInput,
+  type ObjectFieldType,
+  type ObjectFieldVariantInput,
   objectDefinitionDetailQueryOptions,
   objectDefinitionQueryKeys,
   objectDefinitionsDefaultPageSize,
@@ -54,6 +59,14 @@ import {
 const keyPattern = /^[a-z][a-z0-9_]{0,62}$/;
 const autosaveDebounceMs = defaultDebounceMs;
 const autosaveSavingMinimumMs = defaultMinimumPendingIndicatorMs;
+const supportedFieldTypes = [
+  'Text',
+  'Integer',
+  'Decimal',
+  'Date',
+  'Boolean',
+  'SingleSelect',
+] as const satisfies readonly ObjectFieldType[];
 
 const identitySchema = z.object({
   name: z.string().trim().min(1, 'objects.validationName'),
@@ -65,6 +78,16 @@ interface EditableField {
   clientId: string;
   fieldKey: string;
   label: string;
+  fieldType: ObjectFieldType;
+  required: boolean;
+  minNumber: string;
+  maxNumber: string;
+  minDate: string;
+  maxDate: string;
+  minLength: string;
+  maxLength: string;
+  pattern: string;
+  optionsText: string;
 }
 
 type FeedbackScope = 'identity' | 'fields' | 'publish';
@@ -79,15 +102,37 @@ interface FeedbackState {
 interface EditableFieldErrors {
   fieldKey?: string;
   label?: string;
+  fieldType?: string;
+  minNumber?: string;
+  maxNumber?: string;
+  minDate?: string;
+  maxDate?: string;
+  minLength?: string;
+  maxLength?: string;
+  pattern?: string;
+  optionsText?: string;
 }
 
 type EditableFieldInput = keyof EditableFieldErrors;
 type FieldInputTouches = Partial<Record<EditableFieldInput, true>>;
 type TouchedFieldInputs = Record<string, FieldInputTouches>;
+type ObjectFieldVariantContract = NonNullable<
+  NonNullable<ObjectDefinitionDetail['fields']>[number]['variants']
+>[number];
 
 interface DefinitionSnapshotField {
   fieldKey: string;
   label: string;
+  fieldType: ObjectFieldType;
+  required: boolean;
+  minNumber: string;
+  maxNumber: string;
+  minDate: string;
+  maxDate: string;
+  minLength: string;
+  maxLength: string;
+  pattern: string;
+  optionsText: string;
 }
 
 interface DefinitionSnapshot {
@@ -448,6 +493,7 @@ export function BusinessObjectsPage() {
         clientId: crypto.randomUUID(),
         fieldKey: '',
         label: '',
+        ...defaultFieldConfiguration(),
       },
     ]);
   }
@@ -463,9 +509,7 @@ export function BusinessObjectsPage() {
   }
 
   function updateField(clientId: string, patch: Partial<EditableField>) {
-    const touchedInputs = Object.keys(patch).filter(
-      (key): key is EditableFieldInput => key === 'fieldKey' || key === 'label',
-    );
+    const touchedInputs = Object.keys(patch).filter(isEditableFieldInput);
     if (touchedInputs.length > 0) {
       setTouchedFieldInputs((current) => ({
         ...current,
@@ -1103,7 +1147,7 @@ function FieldEditor({
 
   return (
     <div className="rounded-lg border border-border bg-background/45 p-3">
-      <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] lg:items-start">
+      <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_12rem_auto] lg:items-start">
         <Field data-invalid={Boolean(errors?.fieldKey)}>
           <FieldLabel htmlFor={`${prefix}-key`} required>
             {t('objects.fieldKey')}
@@ -1134,6 +1178,32 @@ function FieldEditor({
           />
           <FieldError id={`${prefix}-label-error`}>{errors?.label}</FieldError>
         </Field>
+        <Field data-invalid={Boolean(errors?.fieldType)}>
+          <FieldLabel htmlFor={`${prefix}-type`} required>
+            {t('objects.fieldType')}
+          </FieldLabel>
+          <NativeSelect
+            id={`${prefix}-type`}
+            value={field.fieldType}
+            aria-invalid={Boolean(errors?.fieldType)}
+            aria-describedby={
+              errors?.fieldType ? `${prefix}-type-error ${prefix}-type-help` : `${prefix}-type-help`
+            }
+            disabled={disabled}
+            onChange={(event) => onChange(fieldTypePatch(event.target.value as ObjectFieldType))}
+            className="w-full"
+          >
+            {supportedFieldTypes.map((fieldType) => (
+              <NativeSelectOption key={fieldType} value={fieldType}>
+                {t(fieldTypeTranslationKey(fieldType))}
+              </NativeSelectOption>
+            ))}
+          </NativeSelect>
+          <FieldError id={`${prefix}-type-error`}>{errors?.fieldType}</FieldError>
+          <FieldDescription id={`${prefix}-type-help`}>
+            {t('objects.fieldTypeHelp')}
+          </FieldDescription>
+        </Field>
         <div className="flex items-start gap-1 lg:self-start lg:pt-7">
           <IconButton
             label={t('objects.moveUp')}
@@ -1157,6 +1227,156 @@ function FieldEditor({
             <Trash2 className="size-4" aria-hidden />
           </IconButton>
         </div>
+      </div>
+      <div className="mt-3 grid gap-3 border-t border-border pt-3 sm:grid-cols-2 xl:grid-cols-3">
+        <Field>
+          <div className="flex items-start gap-2 pt-1">
+            <Checkbox
+              id={`${prefix}-required`}
+              checked={field.required}
+              onCheckedChange={(checked) => onChange({ required: checked === true })}
+              disabled={disabled}
+              aria-describedby={`${prefix}-required-help`}
+            />
+            <div className="min-w-0">
+              <FieldLabel htmlFor={`${prefix}-required`} className="font-normal">
+                {t('objects.variantRequired')}
+              </FieldLabel>
+              <FieldDescription id={`${prefix}-required-help`}>
+                {t('objects.variantRequiredHelp')}
+              </FieldDescription>
+            </div>
+          </div>
+        </Field>
+        {field.fieldType === 'Text' ? (
+          <>
+            <Field data-invalid={Boolean(errors?.minLength || errors?.maxLength)}>
+              <FieldLabel htmlFor={`${prefix}-min-length`}>{t('objects.minLength')}</FieldLabel>
+              <div className="grid grid-cols-2 gap-2">
+                <Input
+                  id={`${prefix}-min-length`}
+                  type="number"
+                  inputMode="numeric"
+                  min={0}
+                  value={field.minLength}
+                  aria-invalid={Boolean(errors?.minLength)}
+                  aria-describedby={errors?.minLength ? `${prefix}-min-length-error` : undefined}
+                  disabled={disabled}
+                  onChange={(event) => onChange({ minLength: event.target.value })}
+                />
+                <Input
+                  id={`${prefix}-max-length`}
+                  type="number"
+                  inputMode="numeric"
+                  min={0}
+                  value={field.maxLength}
+                  aria-label={t('objects.maxLength')}
+                  aria-invalid={Boolean(errors?.maxLength)}
+                  aria-describedby={errors?.maxLength ? `${prefix}-max-length-error` : undefined}
+                  disabled={disabled}
+                  onChange={(event) => onChange({ maxLength: event.target.value })}
+                />
+              </div>
+              <FieldError id={`${prefix}-min-length-error`}>{errors?.minLength}</FieldError>
+              <FieldError id={`${prefix}-max-length-error`}>{errors?.maxLength}</FieldError>
+            </Field>
+            <Field data-invalid={Boolean(errors?.pattern)}>
+              <FieldLabel htmlFor={`${prefix}-pattern`}>{t('objects.pattern')}</FieldLabel>
+              <Input
+                id={`${prefix}-pattern`}
+                value={field.pattern}
+                aria-invalid={Boolean(errors?.pattern)}
+                aria-describedby={errors?.pattern ? `${prefix}-pattern-error` : undefined}
+                disabled={disabled}
+                onChange={(event) => onChange({ pattern: event.target.value })}
+              />
+              <FieldError id={`${prefix}-pattern-error`}>{errors?.pattern}</FieldError>
+            </Field>
+          </>
+        ) : null}
+        {field.fieldType === 'Integer' || field.fieldType === 'Decimal' ? (
+          <Field data-invalid={Boolean(errors?.minNumber || errors?.maxNumber)}>
+            <FieldLabel htmlFor={`${prefix}-min-number`}>{t('objects.numericRange')}</FieldLabel>
+            <div className="grid grid-cols-2 gap-2">
+              <Input
+                id={`${prefix}-min-number`}
+                type="number"
+                inputMode={field.fieldType === 'Integer' ? 'numeric' : 'decimal'}
+                value={field.minNumber}
+                aria-label={t('objects.numericMin')}
+                aria-invalid={Boolean(errors?.minNumber)}
+                aria-describedby={errors?.minNumber ? `${prefix}-min-number-error` : undefined}
+                disabled={disabled}
+                onChange={(event) => onChange({ minNumber: event.target.value })}
+              />
+              <Input
+                id={`${prefix}-max-number`}
+                type="number"
+                inputMode={field.fieldType === 'Integer' ? 'numeric' : 'decimal'}
+                value={field.maxNumber}
+                aria-label={t('objects.numericMax')}
+                aria-invalid={Boolean(errors?.maxNumber)}
+                aria-describedby={errors?.maxNumber ? `${prefix}-max-number-error` : undefined}
+                disabled={disabled}
+                onChange={(event) => onChange({ maxNumber: event.target.value })}
+              />
+            </div>
+            <FieldError id={`${prefix}-min-number-error`}>{errors?.minNumber}</FieldError>
+            <FieldError id={`${prefix}-max-number-error`}>{errors?.maxNumber}</FieldError>
+          </Field>
+        ) : null}
+        {field.fieldType === 'Date' ? (
+          <Field data-invalid={Boolean(errors?.minDate || errors?.maxDate)}>
+            <FieldLabel htmlFor={`${prefix}-min-date`}>{t('objects.dateRange')}</FieldLabel>
+            <div className="grid grid-cols-2 gap-2">
+              <Input
+                id={`${prefix}-min-date`}
+                type="date"
+                value={field.minDate}
+                aria-label={t('objects.dateMin')}
+                aria-invalid={Boolean(errors?.minDate)}
+                aria-describedby={errors?.minDate ? `${prefix}-min-date-error` : undefined}
+                disabled={disabled}
+                onChange={(event) => onChange({ minDate: event.target.value })}
+              />
+              <Input
+                id={`${prefix}-max-date`}
+                type="date"
+                value={field.maxDate}
+                aria-label={t('objects.dateMax')}
+                aria-invalid={Boolean(errors?.maxDate)}
+                aria-describedby={errors?.maxDate ? `${prefix}-max-date-error` : undefined}
+                disabled={disabled}
+                onChange={(event) => onChange({ maxDate: event.target.value })}
+              />
+            </div>
+            <FieldError id={`${prefix}-min-date-error`}>{errors?.minDate}</FieldError>
+            <FieldError id={`${prefix}-max-date-error`}>{errors?.maxDate}</FieldError>
+          </Field>
+        ) : null}
+        {field.fieldType === 'SingleSelect' ? (
+          <Field data-invalid={Boolean(errors?.optionsText)} className="sm:col-span-2">
+            <FieldLabel htmlFor={`${prefix}-options`} required>
+              {t('objects.options')}
+            </FieldLabel>
+            <Textarea
+              id={`${prefix}-options`}
+              value={field.optionsText}
+              aria-invalid={Boolean(errors?.optionsText)}
+              aria-describedby={
+                errors?.optionsText
+                  ? `${prefix}-options-help ${prefix}-options-error`
+                  : `${prefix}-options-help`
+              }
+              disabled={disabled}
+              onChange={(event) => onChange({ optionsText: event.target.value })}
+            />
+            <FieldError id={`${prefix}-options-error`}>{errors?.optionsText}</FieldError>
+            <FieldDescription id={`${prefix}-options-help`}>
+              {t('objects.optionsHelp')}
+            </FieldDescription>
+          </Field>
+        ) : null}
       </div>
     </div>
   );
@@ -1222,6 +1442,7 @@ function fromDefinitionFields(definition: ObjectDefinitionDetail): EditableField
     clientId: field.id ?? crypto.randomUUID(),
     fieldKey: field.fieldKey ?? '',
     label: field.label ?? '',
+    ...configurationFromVariants(field.fieldType ?? 'Text', field.variants ?? []),
   }));
 }
 
@@ -1231,6 +1452,16 @@ function toDefinitionSnapshot(name: string, fields: readonly EditableField[]): D
     fields: fields.map((field) => ({
       fieldKey: field.fieldKey,
       label: field.label,
+      fieldType: field.fieldType,
+      required: field.required,
+      minNumber: field.minNumber,
+      maxNumber: field.maxNumber,
+      minDate: field.minDate,
+      maxDate: field.maxDate,
+      minLength: field.minLength,
+      maxLength: field.maxLength,
+      pattern: field.pattern,
+      optionsText: field.optionsText,
     })),
   };
 }
@@ -1239,6 +1470,8 @@ function toRequestFields(snapshot: DefinitionSnapshot): ObjectFieldDefinitionInp
   return snapshot.fields.map((field) => ({
     fieldKey: field.fieldKey.trim(),
     label: field.label.trim(),
+    fieldType: field.fieldType,
+    variants: toRequestVariants(field),
   }));
 }
 
@@ -1248,8 +1481,185 @@ function definitionSnapshotsEqual(left: DefinitionSnapshot, right: DefinitionSna
 
   return left.fields.every((field, index) => {
     const other = right.fields[index];
-    return field.fieldKey === other?.fieldKey && field.label === other?.label;
+    return (
+      field.fieldKey === other?.fieldKey &&
+      field.label === other?.label &&
+      field.fieldType === other?.fieldType &&
+      field.required === other?.required &&
+      field.minNumber === other?.minNumber &&
+      field.maxNumber === other?.maxNumber &&
+      field.minDate === other?.minDate &&
+      field.maxDate === other?.maxDate &&
+      field.minLength === other?.minLength &&
+      field.maxLength === other?.maxLength &&
+      field.pattern === other?.pattern &&
+      field.optionsText === other?.optionsText
+    );
   });
+}
+
+function defaultFieldConfiguration(): Omit<EditableField, 'clientId' | 'fieldKey' | 'label'> {
+  return {
+    fieldType: 'Text',
+    required: false,
+    minNumber: '',
+    maxNumber: '',
+    minDate: '',
+    maxDate: '',
+    minLength: '',
+    maxLength: '',
+    pattern: '',
+    optionsText: '',
+  };
+}
+
+function configurationFromVariants(
+  fieldType: ObjectFieldType,
+  variants: readonly ObjectFieldVariantContract[],
+): Omit<EditableField, 'clientId' | 'fieldKey' | 'label'> {
+  const base = fieldTypePatch(fieldType);
+  const numericRange = findVariant(variants, 'NumericRange');
+  const dateRange = findVariant(variants, 'DateRange');
+  const textLength = findVariant(variants, 'TextLength');
+  const textPattern = findVariant(variants, 'TextPattern');
+  const singleSelectOptions = findVariant(variants, 'SingleSelectOptions');
+
+  return {
+    ...base,
+    required: Boolean(findVariant(variants, 'Required')),
+    minNumber: optionalNumberText(numericRange?.minNumber),
+    maxNumber: optionalNumberText(numericRange?.maxNumber),
+    minDate: dateRange?.minDate ?? '',
+    maxDate: dateRange?.maxDate ?? '',
+    minLength: optionalNumberText(textLength?.minLength),
+    maxLength: optionalNumberText(textLength?.maxLength),
+    pattern: textPattern?.pattern ?? '',
+    optionsText: (singleSelectOptions?.options ?? []).join('\n'),
+  };
+}
+
+function findVariant(
+  variants: readonly ObjectFieldVariantContract[],
+  kind: NonNullable<ObjectFieldVariantContract['kind']>,
+) {
+  return variants.find((variant) => variant.kind === kind);
+}
+
+function fieldTypePatch(fieldType: ObjectFieldType): Omit<
+  EditableField,
+  'clientId' | 'fieldKey' | 'label' | 'required'
+> & {
+  required?: boolean;
+} {
+  return {
+    fieldType,
+    minNumber: '',
+    maxNumber: '',
+    minDate: '',
+    maxDate: '',
+    minLength: '',
+    maxLength: '',
+    pattern: '',
+    optionsText: '',
+  };
+}
+
+function toRequestVariants(field: DefinitionSnapshotField): ObjectFieldVariantInput[] {
+  const variants: ObjectFieldVariantInput[] = [];
+
+  if (field.required) {
+    variants.push({ kind: 'Required' });
+  }
+
+  if (field.fieldType === 'Text') {
+    const minLength = optionalInteger(field.minLength);
+    const maxLength = optionalInteger(field.maxLength);
+    if (minLength !== null || maxLength !== null) {
+      variants.push({
+        kind: 'TextLength',
+        minLength,
+        maxLength,
+      });
+    }
+
+    if (field.pattern.trim()) {
+      variants.push({
+        kind: 'TextPattern',
+        pattern: field.pattern.trim(),
+      });
+    }
+  }
+
+  if (field.fieldType === 'Integer' || field.fieldType === 'Decimal') {
+    const minNumber = optionalNumber(field.minNumber);
+    const maxNumber = optionalNumber(field.maxNumber);
+    if (minNumber !== null || maxNumber !== null) {
+      variants.push({
+        kind: 'NumericRange',
+        minNumber,
+        maxNumber,
+      });
+    }
+  }
+
+  if (field.fieldType === 'Date' && (field.minDate || field.maxDate)) {
+    variants.push({
+      kind: 'DateRange',
+      minDate: field.minDate || null,
+      maxDate: field.maxDate || null,
+    });
+  }
+
+  if (field.fieldType === 'SingleSelect') {
+    variants.push({
+      kind: 'SingleSelectOptions',
+      options: optionValues(field.optionsText),
+    });
+  }
+
+  return variants;
+}
+
+function optionalNumberText(value: number | null | undefined): string {
+  return value === null || value === undefined ? '' : String(value);
+}
+
+function optionalNumber(value: string): number | null {
+  const trimmed = value.trim();
+  return trimmed ? Number(trimmed) : null;
+}
+
+function optionalInteger(value: string): number | null {
+  const parsed = optionalNumber(value);
+  return parsed === null ? null : Math.trunc(parsed);
+}
+
+function optionValues(value: string): string[] {
+  return value
+    .split(/\r?\n/)
+    .map((option) => option.trim())
+    .filter(Boolean);
+}
+
+function fieldTypeTranslationKey(fieldType: ObjectFieldType): string {
+  return `objects.fieldType${fieldType}`;
+}
+
+function isEditableFieldInput(key: string): key is EditableFieldInput {
+  return [
+    'fieldKey',
+    'label',
+    'fieldType',
+    'required',
+    'minNumber',
+    'maxNumber',
+    'minDate',
+    'maxDate',
+    'minLength',
+    'maxLength',
+    'pattern',
+    'optionsText',
+  ].includes(key);
 }
 
 function omitRecordKey<T>(record: Record<string, T>, keyToOmit: string): Record<string, T> {
@@ -1290,10 +1700,10 @@ function validateFields(
     const trimmedKey = field.fieldKey.trim();
     const duplicatedKey = trimmedKey ? (keyCounts.get(trimmedKey) ?? 0) > 1 : false;
     const touchedInputs = options.fieldTouches?.[field.clientId];
-    const shouldValidateFieldKey = !options.fieldTouches || touchedInputs?.fieldKey;
-    const shouldValidateLabel = !options.fieldTouches || touchedInputs?.label;
+    const shouldValidate = (key: EditableFieldInput) =>
+      !options.fieldTouches || touchedInputs?.[key];
 
-    if (shouldValidateFieldKey && !trimmedKey) {
+    if (shouldValidate('fieldKey') && !trimmedKey) {
       addFieldValidationError(
         fieldErrors,
         errors,
@@ -1301,7 +1711,7 @@ function validateFields(
         'fieldKey',
         t('objects.validationFieldKeyRequired'),
       );
-    } else if (shouldValidateFieldKey && (!keyPattern.test(trimmedKey) || duplicatedKey)) {
+    } else if (shouldValidate('fieldKey') && (!keyPattern.test(trimmedKey) || duplicatedKey)) {
       addFieldValidationError(
         fieldErrors,
         errors,
@@ -1311,7 +1721,7 @@ function validateFields(
       );
     }
 
-    if (shouldValidateLabel && !field.label.trim()) {
+    if (shouldValidate('label') && !field.label.trim()) {
       addFieldValidationError(
         fieldErrors,
         errors,
@@ -1319,6 +1729,154 @@ function validateFields(
         'label',
         t('objects.validationFieldLabel'),
       );
+    }
+
+    if (shouldValidate('fieldType') && !isSupportedFieldType(field.fieldType)) {
+      addFieldValidationError(
+        fieldErrors,
+        errors,
+        field.clientId,
+        'fieldType',
+        t('objects.validationFieldType'),
+      );
+    }
+
+    if (field.fieldType === 'Text') {
+      validateIntegerBound(
+        field.minLength,
+        'minLength',
+        t('objects.validationLengthInteger'),
+        shouldValidate,
+        fieldErrors,
+        errors,
+        field.clientId,
+      );
+      validateIntegerBound(
+        field.maxLength,
+        'maxLength',
+        t('objects.validationLengthInteger'),
+        shouldValidate,
+        fieldErrors,
+        errors,
+        field.clientId,
+      );
+
+      const minLength = optionalNumber(field.minLength);
+      const maxLength = optionalNumber(field.maxLength);
+      if (
+        (shouldValidate('minLength') || shouldValidate('maxLength')) &&
+        minLength !== null &&
+        maxLength !== null &&
+        Number.isInteger(minLength) &&
+        Number.isInteger(maxLength) &&
+        minLength >= 0 &&
+        maxLength >= 0 &&
+        minLength > maxLength
+      ) {
+        addFieldValidationError(
+          fieldErrors,
+          errors,
+          field.clientId,
+          shouldValidate('minLength') ? 'minLength' : 'maxLength',
+          t('objects.validationLengthRange'),
+        );
+      }
+
+      if (shouldValidate('pattern') && field.pattern.trim()) {
+        try {
+          new RegExp(field.pattern.trim());
+        } catch {
+          addFieldValidationError(
+            fieldErrors,
+            errors,
+            field.clientId,
+            'pattern',
+            t('objects.validationPattern'),
+          );
+        }
+      }
+    }
+
+    if (field.fieldType === 'Integer' || field.fieldType === 'Decimal') {
+      validateNumberBound(
+        field.minNumber,
+        'minNumber',
+        field.fieldType,
+        t,
+        shouldValidate,
+        fieldErrors,
+        errors,
+        field.clientId,
+      );
+      validateNumberBound(
+        field.maxNumber,
+        'maxNumber',
+        field.fieldType,
+        t,
+        shouldValidate,
+        fieldErrors,
+        errors,
+        field.clientId,
+      );
+
+      const minNumber = optionalNumber(field.minNumber);
+      const maxNumber = optionalNumber(field.maxNumber);
+      if (
+        (shouldValidate('minNumber') || shouldValidate('maxNumber')) &&
+        minNumber !== null &&
+        maxNumber !== null &&
+        Number.isFinite(minNumber) &&
+        Number.isFinite(maxNumber) &&
+        minNumber > maxNumber
+      ) {
+        addFieldValidationError(
+          fieldErrors,
+          errors,
+          field.clientId,
+          shouldValidate('minNumber') ? 'minNumber' : 'maxNumber',
+          t('objects.validationNumericRange'),
+        );
+      }
+    }
+
+    if (
+      field.fieldType === 'Date' &&
+      (shouldValidate('minDate') || shouldValidate('maxDate')) &&
+      field.minDate &&
+      field.maxDate &&
+      field.minDate > field.maxDate
+    ) {
+      addFieldValidationError(
+        fieldErrors,
+        errors,
+        field.clientId,
+        shouldValidate('minDate') ? 'minDate' : 'maxDate',
+        t('objects.validationDateRange'),
+      );
+    }
+
+    if (
+      field.fieldType === 'SingleSelect' &&
+      (!options.fieldTouches || touchedInputs?.optionsText || touchedInputs?.fieldType)
+    ) {
+      const optionsList = optionValues(field.optionsText);
+      if (optionsList.length === 0) {
+        addFieldValidationError(
+          fieldErrors,
+          errors,
+          field.clientId,
+          'optionsText',
+          t('objects.validationOptionsRequired'),
+        );
+      } else if (new Set(optionsList).size !== optionsList.length) {
+        addFieldValidationError(
+          fieldErrors,
+          errors,
+          field.clientId,
+          'optionsText',
+          t('objects.validationOptionsUnique'),
+        );
+      }
     }
   }
 
@@ -1335,6 +1893,50 @@ function emptyFieldValidationResult(): FieldValidationResult {
     formMessages: [],
     fieldErrors: {},
   };
+}
+
+function isSupportedFieldType(fieldType: ObjectFieldType): boolean {
+  return supportedFieldTypes.includes(fieldType);
+}
+
+function validateIntegerBound(
+  value: string,
+  key: 'minLength' | 'maxLength',
+  message: string,
+  shouldValidate: (key: EditableFieldInput) => boolean | undefined,
+  fieldErrors: Record<string, EditableFieldErrors>,
+  messages: string[],
+  clientId: string,
+) {
+  if (!shouldValidate(key) || !value.trim()) return;
+
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 0) {
+    addFieldValidationError(fieldErrors, messages, clientId, key, message);
+  }
+}
+
+function validateNumberBound(
+  value: string,
+  key: 'minNumber' | 'maxNumber',
+  fieldType: ObjectFieldType,
+  t: (key: string) => string,
+  shouldValidate: (key: EditableFieldInput) => boolean | undefined,
+  fieldErrors: Record<string, EditableFieldErrors>,
+  messages: string[],
+  clientId: string,
+) {
+  if (!shouldValidate(key) || !value.trim()) return;
+
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) {
+    addFieldValidationError(fieldErrors, messages, clientId, key, t('objects.validationNumber'));
+    return;
+  }
+
+  if (fieldType === 'Integer' && !Number.isInteger(parsed)) {
+    addFieldValidationError(fieldErrors, messages, clientId, key, t('objects.validationInteger'));
+  }
 }
 
 function addFormValidationError(messages: string[], formMessages: string[], message: string) {

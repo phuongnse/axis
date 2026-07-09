@@ -316,11 +316,53 @@ export interface components {
             label?: string;
             /** Format: int32 */
             order?: number;
+            fieldType?: components["schemas"]["ObjectFieldType"];
+            variants?: components["schemas"]["ObjectFieldVariantDto"][];
         };
         ObjectFieldDefinitionInput: {
             fieldKey?: string;
             label?: string;
+            fieldType?: components["schemas"]["ObjectFieldType"];
+            variants?: components["schemas"]["ObjectFieldVariantInput"][] | null;
         };
+        /** @enum {string} */
+        ObjectFieldType: "Text" | "Integer" | "Decimal" | "Date" | "Boolean" | "SingleSelect";
+        ObjectFieldVariantDto: {
+            kind?: components["schemas"]["ObjectFieldVariantKind"];
+            /** Format: double */
+            minNumber?: number | null;
+            /** Format: double */
+            maxNumber?: number | null;
+            /** Format: date */
+            minDate?: string | null;
+            /** Format: date */
+            maxDate?: string | null;
+            /** Format: int32 */
+            minLength?: number | null;
+            /** Format: int32 */
+            maxLength?: number | null;
+            pattern?: string | null;
+            options?: string[];
+        };
+        ObjectFieldVariantInput: {
+            kind?: components["schemas"]["ObjectFieldVariantKind"];
+            /** Format: double */
+            minNumber?: number | null;
+            /** Format: double */
+            maxNumber?: number | null;
+            /** Format: date */
+            minDate?: string | null;
+            /** Format: date */
+            maxDate?: string | null;
+            /** Format: int32 */
+            minLength?: number | null;
+            /** Format: int32 */
+            maxLength?: number | null;
+            pattern?: string | null;
+            options?: string[] | null;
+        };
+        /** @enum {string} */
+        ObjectFieldVariantKind: "Required" | "NumericRange" | "DateRange" | "TextLength" | "TextPattern" | "SingleSelectOptions";
         ProblemDetails: {
             type?: string | null;
             title?: string | null;
