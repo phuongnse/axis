@@ -1,8 +1,9 @@
 using System.Text.Json;
+using Axis.BusinessObjects.Infrastructure.Persistence;
 using Axis.Identity.Application.Services;
 using Axis.Identity.Infrastructure.Persistence;
 using Axis.Identity.Infrastructure.Services;
-using Axis.Objects.Infrastructure.Persistence;
+using Axis.Rules.Infrastructure.Persistence;
 using Axis.Testing;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Hosting;
@@ -32,10 +33,12 @@ public sealed class ApiTestFixture : IAsyncLifetime
         Path.Combine(Path.GetTempPath(), "axis-api-tests", Guid.NewGuid().ToString("N"), "data-protection-keys"));
 
     private string? _previousIdentityConnectionStringEnv;
-    private string? _previousObjectsConnectionStringEnv;
+    private string? _previousBusinessObjectsConnectionStringEnv;
+    private string? _previousRulesConnectionStringEnv;
     private WebApplicationFactory<Program> _factory = null!;
     private string _identityConnectionString = null!;
-    private string _objectsConnectionString = null!;
+    private string _businessObjectsConnectionString = null!;
+    private string _rulesConnectionString = null!;
 
     private readonly CapturingEmailSender _emailCapture = new();
 
@@ -56,13 +59,17 @@ public sealed class ApiTestFixture : IAsyncLifetime
         string postgresAdminConnectionString = _postgres.GetConnectionString();
         _identityConnectionString =
             await PostgresModuleTestDatabase.CreateAsync(postgresAdminConnectionString, "axis_identity_test");
-        _objectsConnectionString =
-            await PostgresModuleTestDatabase.CreateAsync(postgresAdminConnectionString, "axis_objects_test");
+        _businessObjectsConnectionString =
+            await PostgresModuleTestDatabase.CreateAsync(postgresAdminConnectionString, "axis_business_objects_test");
+        _rulesConnectionString =
+            await PostgresModuleTestDatabase.CreateAsync(postgresAdminConnectionString, "axis_rules_test");
 
         _previousIdentityConnectionStringEnv = Environment.GetEnvironmentVariable("ConnectionStrings__Identity");
-        _previousObjectsConnectionStringEnv = Environment.GetEnvironmentVariable("ConnectionStrings__Objects");
+        _previousBusinessObjectsConnectionStringEnv = Environment.GetEnvironmentVariable("ConnectionStrings__BusinessObjects");
+        _previousRulesConnectionStringEnv = Environment.GetEnvironmentVariable("ConnectionStrings__Rules");
         Environment.SetEnvironmentVariable("ConnectionStrings__Identity", _identityConnectionString);
-        Environment.SetEnvironmentVariable("ConnectionStrings__Objects", _objectsConnectionString);
+        Environment.SetEnvironmentVariable("ConnectionStrings__BusinessObjects", _businessObjectsConnectionString);
+        Environment.SetEnvironmentVariable("ConnectionStrings__Rules", _rulesConnectionString);
 
         DbContextOptions<IdentityDbContext> identityOptions = new DbContextOptionsBuilder<IdentityDbContext>()
             .UseNpgsql(_identityConnectionString)
@@ -72,12 +79,19 @@ public sealed class ApiTestFixture : IAsyncLifetime
         {
             await identityCtx.Database.MigrateAsync();
         }
-        DbContextOptions<ObjectsDbContext> objectsOptions = new DbContextOptionsBuilder<ObjectsDbContext>()
-            .UseNpgsql(_objectsConnectionString)
+        DbContextOptions<BusinessObjectsDbContext> objectsOptions = new DbContextOptionsBuilder<BusinessObjectsDbContext>()
+            .UseNpgsql(_businessObjectsConnectionString)
             .Options;
-        await using (ObjectsDbContext objectsCtx = new(objectsOptions))
+        await using (BusinessObjectsDbContext objectsCtx = new(objectsOptions))
         {
             await objectsCtx.Database.MigrateAsync();
+        }
+        DbContextOptions<RulesDbContext> rulesOptions = new DbContextOptionsBuilder<RulesDbContext>()
+            .UseNpgsql(_rulesConnectionString)
+            .Options;
+        await using (RulesDbContext rulesCtx = new(rulesOptions))
+        {
+            await rulesCtx.Database.MigrateAsync();
         }
 
         _dataProtectionKeysDirectory.Create();
@@ -91,7 +105,8 @@ public sealed class ApiTestFixture : IAsyncLifetime
                 configBuilder.AddInMemoryCollection(new Dictionary<string, string?>
                 {
                     ["ConnectionStrings:Identity"] = _identityConnectionString,
-                    ["ConnectionStrings:Objects"] = _objectsConnectionString,
+                    ["ConnectionStrings:BusinessObjects"] = _businessObjectsConnectionString,
+                    ["ConnectionStrings:Rules"] = _rulesConnectionString,
                     ["Redis:ConnectionString"] = _redis.GetConnectionString(),
                 });
             });
@@ -108,10 +123,15 @@ public sealed class ApiTestFixture : IAsyncLifetime
                     opts.UseNpgsql(_identityConnectionString)
                         .UseOpenIddict());
 
-                services.RemoveAll<DbContextOptions<ObjectsDbContext>>();
-                services.RemoveAll<ObjectsDbContext>();
-                services.AddDbContext<ObjectsDbContext>(opts =>
-                    opts.UseNpgsql(_objectsConnectionString));
+                services.RemoveAll<DbContextOptions<BusinessObjectsDbContext>>();
+                services.RemoveAll<BusinessObjectsDbContext>();
+                services.AddDbContext<BusinessObjectsDbContext>(opts =>
+                    opts.UseNpgsql(_businessObjectsConnectionString));
+
+                services.RemoveAll<DbContextOptions<RulesDbContext>>();
+                services.RemoveAll<RulesDbContext>();
+                services.AddDbContext<RulesDbContext>(opts =>
+                    opts.UseNpgsql(_rulesConnectionString));
 
                 services.RemoveAll<IConnectionMultiplexer>();
                 services.AddSingleton<IConnectionMultiplexer>(_ =>
@@ -154,7 +174,8 @@ public sealed class ApiTestFixture : IAsyncLifetime
         await _postgres.DisposeAsync();
 
         Environment.SetEnvironmentVariable("ConnectionStrings__Identity", _previousIdentityConnectionStringEnv);
-        Environment.SetEnvironmentVariable("ConnectionStrings__Objects", _previousObjectsConnectionStringEnv);
+        Environment.SetEnvironmentVariable("ConnectionStrings__BusinessObjects", _previousBusinessObjectsConnectionStringEnv);
+        Environment.SetEnvironmentVariable("ConnectionStrings__Rules", _previousRulesConnectionStringEnv);
     }
 
     public IServiceScope CreateScope() => _factory.Services.CreateScope();

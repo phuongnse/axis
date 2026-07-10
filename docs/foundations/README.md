@@ -10,6 +10,8 @@ Foundation contracts are the source of truth for enabling surfaces that are not 
 |---|---|---|
 | [docs/foundations/app-shell/README.md](./app-shell/README.md) | [docs/foundations/app-shell/app-frame.md](./app-shell/app-frame.md) | Done |
 | [docs/foundations/app-shell/README.md](./app-shell/README.md) | [docs/foundations/app-shell/module-navigation.md](./app-shell/module-navigation.md) | Done |
+| [docs/foundations/data-display/README.md](./data-display/README.md) | [docs/foundations/data-display/collection-page.md](./data-display/collection-page.md) | Not started |
+| [docs/foundations/data-display/README.md](./data-display/README.md) | [docs/foundations/data-display/data-table.md](./data-display/data-table.md) | Partial |
 
 ## Rule
 

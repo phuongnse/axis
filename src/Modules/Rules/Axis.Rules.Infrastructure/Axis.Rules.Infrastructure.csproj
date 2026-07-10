@@ -4,6 +4,16 @@
     <ProjectReference Include="..\Axis.Rules.Application\Axis.Rules.Application.csproj" />
     <ProjectReference Include="..\Axis.Rules.Contracts\Axis.Rules.Contracts.csproj" />
     <ProjectReference Include="..\Axis.Rules.Domain\Axis.Rules.Domain.csproj" />
+    <ProjectReference Include="..\..\..\Shared\Axis.Shared.Infrastructure\Axis.Shared.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
   </ItemGroup>
 
   <PropertyGroup>

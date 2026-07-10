@@ -24,6 +24,10 @@ vi.mock('@tanstack/react-router', () => ({
   useRouterState: ({ select }: { select?: (state: typeof routerState) => unknown } = {}) =>
     select ? select(routerState) : routerState,
   useNavigate: () => navigateMock,
+  getRouteApi: () => ({
+    useSearch: () => ({}),
+    useNavigate: () => navigateMock,
+  }),
 }));
 
 vi.mock('@/features/auth/api', () => ({
@@ -93,14 +97,18 @@ describe('AppShell', () => {
 
     expect(screen.getByRole('banner')).toHaveTextContent('Dashboard');
     expect(await screen.findByText('Ada Lovelace')).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Account menu' }));
+    const accountMenu = screen.getByRole('button', { name: 'Account menu' });
+    expect(accountMenu).toHaveAttribute('data-size', 'account');
+    await user.click(accountMenu);
     expect(screen.queryByText('Profile')).not.toBeInTheDocument();
     expect(screen.getAllByText('AL')).toHaveLength(1);
     expect(screen.getAllByText('Ada Lovelace')).toHaveLength(1);
     expect(screen.getByText('Preferences')).toBeInTheDocument();
     expect(screen.getByText('Language control')).toBeInTheDocument();
     expect(screen.getByText('Theme control')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Sign out' })).toBeInTheDocument();
+    const signOut = screen.getByRole('button', { name: 'Sign out' });
+    expect(signOut).toHaveAttribute('data-variant', 'destructiveOutline');
+    expect(signOut).toHaveAttribute('data-size', 'menu');
 
     expect(screen.queryByRole('navigation')).not.toBeInTheDocument();
 

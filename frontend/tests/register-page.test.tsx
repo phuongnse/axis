@@ -76,8 +76,11 @@ describe('RegisterPage', () => {
     expect(
       document.querySelectorAll('[data-slot="field-label"][data-required="true"]'),
     ).toHaveLength(5);
+    expect(document.querySelector('[data-slot="field-label"][data-variant="body"]')).not.toBeNull();
 
-    await user.click(await screen.findByRole('button', { name: /create account/i }));
+    const createAccount = await screen.findByRole('button', { name: /create account/i });
+    expect(createAccount).toHaveAttribute('data-size', 'lg');
+    await user.click(createAccount);
 
     expect(screen.getByText('Full name is required')).toBeInTheDocument();
     expect(screen.getByText('Email address is required')).toBeInTheDocument();

@@ -89,7 +89,8 @@ export function SignInPage() {
             <Button
               type="button"
               variant="outline"
-              className="h-9 w-full"
+              size="lg"
+              className="w-full"
               disabled={resendDisabled}
               onClick={() => {
                 if (verificationEmail) void resend(verificationEmail);
@@ -110,7 +111,7 @@ export function SignInPage() {
           </div>
         ) : null}
 
-        <Button type="submit" className="h-9 w-full" disabled={loading || rateLimited}>
+        <Button type="submit" size="lg" className="w-full" disabled={loading || rateLimited}>
           <LogIn className="size-4" aria-hidden />
           {loading ? t('auth.signingIn') : t('auth.signIn')}
         </Button>

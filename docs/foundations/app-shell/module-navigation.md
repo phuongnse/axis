@@ -81,7 +81,7 @@ Required UI quality: navigation controls must be keyboard-reachable, labels must
 > | Frontend | Done |
 > | Tests | Done |
 >
-> **Implemented:** Shared module navigation contribution contract, registry, App Shell renderer, empty-contribution behavior, Objects and Rules module contributions, localized labels, active route state, and desktop/mobile browser coverage.
+> **Implemented:** Shared module navigation contribution contract, registry, App Shell renderer, empty-contribution behavior, Business Objects and Rules module contributions, localized labels, active route state, and desktop/mobile browser coverage.
 >
 > **Gaps vs spec:** None for the initial module-navigation foundation contract.
 >

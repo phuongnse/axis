@@ -123,15 +123,10 @@ export function LanguageControl({
           orientation={isMenu ? 'vertical' : 'horizontal'}
           variant={isMenu ? 'default' : 'outline'}
           size="sm"
-          className={isMenu ? 'w-full' : undefined}
           aria-label={t('app.language')}
         >
           {supportedLanguages.map((item) => (
-            <ToggleGroupItem
-              key={item.value}
-              value={item.value}
-              className={isMenu ? 'w-full justify-start' : undefined}
-            >
+            <ToggleGroupItem key={item.value} value={item.value}>
               {isMenu ? (
                 <span
                   aria-hidden

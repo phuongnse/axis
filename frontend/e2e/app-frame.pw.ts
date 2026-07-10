@@ -20,27 +20,43 @@ const profile = {
   ],
 };
 
-const fieldRuleDefinitions = [
-  {
-    definitionKey: 'field.required',
-    displayName: 'Required',
-    description: 'Requires a value before publishing records.',
-    supportedFieldTypes: ['Text', 'Integer', 'Decimal', 'Date', 'Boolean', 'SingleSelect'],
-    parameters: [],
-    category: 'Contract',
-  },
-  {
-    definitionKey: 'field.text_length',
-    displayName: 'Text length',
-    description: 'Constrains text values to an accepted length range.',
-    supportedFieldTypes: ['Text'],
-    parameters: [
-      { key: 'min', type: 'Integer', isRequired: false, allowMultiple: false },
-      { key: 'max', type: 'Integer', isRequired: false, allowMultiple: false },
-    ],
-    category: 'Text',
-  },
-];
+const systemRule = (definitionKey: string, name: string, targetTypeKeys: string[]) => ({
+  definitionKey,
+  name,
+  description: `${name} validation.`,
+  origin: 'System',
+  scope: 'Field',
+  outcomeKind: 'Validation',
+  status: 'Published',
+  latestPublishedVersion: 1,
+  applicability: { targetTypeKeys, configurationConstraints: {} },
+  parameters: [],
+});
+
+const fieldRuleDefinitions = {
+  items: [
+    systemRule('field.required', 'Required value', [
+      'Text',
+      'Integer',
+      'Decimal',
+      'Date',
+      'DateTime',
+      'Boolean',
+      'Choice',
+    ]),
+    systemRule('field.text_length', 'Text length', ['Text']),
+    systemRule('field.numeric_range', 'Numeric range', ['Integer', 'Decimal']),
+    systemRule('field.decimal_precision', 'Decimal precision', ['Decimal']),
+    systemRule('field.date_range', 'Date range', ['Date']),
+    systemRule('field.datetime_range', 'Date and time range', ['DateTime']),
+    systemRule('field.text_pattern', 'Text pattern', ['Text']),
+    systemRule('field.text_format', 'Text format', ['Text']),
+    systemRule('field.choice_selection_count', 'Choice selection count', ['Choice']),
+  ],
+  totalCount: 9,
+  page: 1,
+  pageSize: 100,
+};
 
 function base64UrlJson(value: unknown): string {
   return Buffer.from(JSON.stringify(value), 'utf8').toString('base64url');
@@ -94,7 +110,7 @@ async function mockAuthenticatedSession(page: Page): Promise<void> {
     });
   });
 
-  await page.route('**/api/rules/field-rule-definitions', async (route) => {
+  await page.route('**/api/rules?**', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -131,6 +147,26 @@ async function expectNoDocumentScroll(page: Page): Promise<void> {
       }),
     )
     .toBe(true);
+}
+
+async function expectRulesCatalogScrolls(page: Page): Promise<void> {
+  const viewport = page.locator('[data-slot="scroll-area-viewport"]');
+  await expect(viewport).toBeVisible();
+  await expect
+    .poll(() =>
+      viewport.evaluate((element) => ({
+        clientHeight: element.clientHeight,
+        scrollHeight: element.scrollHeight,
+      })),
+    )
+    .toMatchObject({ clientHeight: expect.any(Number), scrollHeight: expect.any(Number) });
+
+  const canScroll = await viewport.evaluate(
+    (element) => element.scrollHeight > element.clientHeight,
+  );
+  expect(canScroll).toBe(true);
+  await viewport.evaluate((element) => element.scrollTo({ top: element.scrollHeight }));
+  await expect.poll(() => viewport.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
 }
 
 async function expectShellRegionsFitViewport(page: Page): Promise<void> {
@@ -207,7 +243,7 @@ test.describe('app frame', () => {
     page.on('pageerror', (error) => pageErrors.push(error.message));
 
     await mockAuthenticatedSession(page);
-    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.setViewportSize({ width: 1280, height: 720 });
     await page.goto('/dashboard', { waitUntil: 'domcontentloaded' });
 
     await expect(page).toHaveURL(/\/dashboard$/);
@@ -215,7 +251,7 @@ test.describe('app frame', () => {
     await expect(page.getByRole('navigation', { name: 'Modules' })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Business objects' })).toHaveAttribute(
       'href',
-      '/objects',
+      '/business-objects',
     );
     await expect(page.getByRole('link', { name: 'Rules' })).toHaveAttribute('href', '/rules');
     await expect(page.getByRole('main')).toHaveText('');
@@ -234,9 +270,10 @@ test.describe('app frame', () => {
     await page.getByRole('link', { name: 'Rules' }).click();
     await expect(page).toHaveURL(/\/rules$/);
     await expect(page.getByRole('heading', { name: 'Rules', exact: true })).toBeVisible();
-    await expectRouteViewportTouchesMain(page, '48px');
+    await expectRouteViewportTouchesMain(page, '32px');
     await expectNoPageOverflow(page);
     await expectNoDocumentScroll(page);
+    await expectRulesCatalogScrolls(page);
 
     await page.goBack();
     await expect(page).toHaveURL(/\/dashboard$/);
@@ -247,7 +284,7 @@ test.describe('app frame', () => {
     await expect(page.getByRole('navigation', { name: 'Modules' })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Business objects' })).toHaveAttribute(
       'href',
-      '/objects',
+      '/business-objects',
     );
     await expect(page.getByRole('main')).toHaveText('');
     await expect(page.getByRole('contentinfo')).toContainText('Version 0.1.0');
@@ -261,9 +298,10 @@ test.describe('app frame', () => {
     await page.getByRole('link', { name: 'Rules' }).click();
     await expect(page).toHaveURL(/\/rules$/);
     await expect(page.getByRole('heading', { name: 'Rules', exact: true })).toBeVisible();
-    await expectRouteViewportTouchesMain(page, '32px');
+    await expectRouteViewportTouchesMain(page, '16px');
     await expectNoPageOverflow(page);
     await expectNoDocumentScroll(page);
+    await expectRulesCatalogScrolls(page);
     expect(pageErrors).toEqual([]);
   });
 });

@@ -115,7 +115,6 @@ export function ThemeControl({
           orientation={isMenu ? 'vertical' : 'horizontal'}
           variant={isMenu ? 'default' : 'outline'}
           size="sm"
-          className={isMenu ? 'w-full' : undefined}
           aria-label={t('app.theme')}
         >
           {supportedThemeModes.map((item) => {
@@ -123,13 +122,7 @@ export function ThemeControl({
             const label = t(item.labelKey);
 
             return (
-              <ToggleGroupItem
-                key={item.value}
-                value={item.value}
-                className={isMenu ? 'w-full justify-start' : undefined}
-                aria-label={label}
-                title={label}
-              >
+              <ToggleGroupItem key={item.value} value={item.value} aria-label={label} title={label}>
                 <Icon aria-hidden />
                 {isMenu ? label : <span className="sr-only">{label}</span>}
               </ToggleGroupItem>

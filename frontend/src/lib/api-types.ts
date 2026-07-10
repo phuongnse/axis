@@ -4,6 +4,75 @@
  */
 
 export interface paths {
+    "/api/business-object-definitions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List business object definitions for the current workspace */
+        get: operations["ListBusinessObjectDefinitions"];
+        put?: never;
+        /** Create an unpublished business object definition */
+        post: operations["CreateBusinessObjectDefinition"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/business-object-definitions/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get a business object definition */
+        get: operations["GetBusinessObjectDefinition"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/business-object-definitions/{id}/unpublished": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Save an unpublished business object definition */
+        put: operations["SaveUnpublishedBusinessObjectDefinition"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/business-object-definitions/{id}/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Publish an unpublished business object definition */
+        post: operations["PublishBusinessObjectDefinition"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/legal/versions": {
         parameters: {
             query?: never;
@@ -157,33 +226,33 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/object-definitions": {
+    "/api/rules": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** List business object definitions for the current workspace */
-        get: operations["ListObjectDefinitions"];
+        /** List system and workspace rule definitions */
+        get: operations["ListRuleDefinitions"];
         put?: never;
-        /** Create an unpublished business object definition */
-        post: operations["CreateObjectDefinition"];
+        /** Create a workspace rule draft */
+        post: operations["CreateRuleDefinition"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/object-definitions/{id}": {
+    "/api/rules/context-schemas": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Get a business object definition */
-        get: operations["GetObjectDefinition"];
+        /** List rule context schemas available to the workspace */
+        get: operations["ListRuleContextSchemas"];
         put?: never;
         post?: never;
         delete?: never;
@@ -192,7 +261,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/object-definitions/{id}/unpublished": {
+    "/api/rules/{definitionKey}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get a workspace rule definition and its versions */
+        get: operations["GetRuleDefinition"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/rules/{definitionKey}/draft": {
         parameters: {
             query?: never;
             header?: never;
@@ -200,16 +286,17 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Save an unpublished business object definition */
-        put: operations["SaveUnpublishedObjectDefinition"];
-        post?: never;
+        /** Save a workspace rule draft */
+        put: operations["SaveRuleDefinitionDraft"];
+        /** Start the next draft from a published workspace rule */
+        post: operations["StartRuleDefinitionDraft"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/object-definitions/{id}/publish": {
+    "/api/rules/{definitionKey}/publish": {
         parameters: {
             query?: never;
             header?: never;
@@ -218,25 +305,42 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Publish an unpublished business object definition */
-        post: operations["PublishObjectDefinition"];
+        /** Publish an immutable workspace rule version */
+        post: operations["PublishRuleDefinition"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/rules/field-rule-definitions": {
+    "/api/rules/{definitionKey}/archive": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** List system field rule definitions */
-        get: operations["ListFieldRuleDefinitions"];
+        get?: never;
         put?: never;
-        post?: never;
+        /** Archive a workspace rule definition */
+        post: operations["ArchiveRuleDefinition"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/rules/{definitionKey}/simulate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Simulate a workspace rule draft or exact published version */
+        post: operations["SimulateRuleDefinition"];
         delete?: never;
         options?: never;
         head?: never;
@@ -247,8 +351,178 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
-        CreateObjectDefinitionRequest: {
+        BusinessObjectChoiceFieldConfigurationDto: {
+            selectionMode?: components["schemas"]["BusinessObjectChoiceSelectionMode"];
+            options?: components["schemas"]["BusinessObjectChoiceOptionDto"][];
+        };
+        BusinessObjectChoiceFieldConfigurationInput: {
+            selectionMode?: components["schemas"]["BusinessObjectChoiceSelectionMode"];
+            options?: components["schemas"]["BusinessObjectChoiceOptionInput"][];
+        };
+        BusinessObjectChoiceOptionDto: {
+            /** Format: uuid */
+            id?: string;
+            optionKey?: string;
+            label?: string;
+            /** Format: int32 */
+            order?: number;
+        };
+        BusinessObjectChoiceOptionInput: {
+            optionKey?: string;
+            label?: string;
+            /** Format: uuid */
+            id?: string | null;
+        };
+        /** @enum {string} */
+        BusinessObjectChoiceSelectionMode: "Single" | "Multiple";
+        BusinessObjectDefinitionDetailDto: {
+            /** Format: uuid */
+            id?: string;
+            /** Format: uuid */
+            workspaceId?: string;
             name?: string;
+            objectKey?: string;
+            status?: components["schemas"]["BusinessObjectDefinitionStatus"];
+            /** Format: int32 */
+            revision?: number;
+            /** Format: int32 */
+            latestPublishedVersionNumber?: number | null;
+            /** Format: date-time */
+            createdAt?: string;
+            /** Format: date-time */
+            updatedAt?: string;
+            fields?: components["schemas"]["BusinessObjectFieldDefinitionDto"][];
+            latestPublishedVersion?: components["schemas"]["BusinessObjectDefinitionVersionDto"];
+        };
+        BusinessObjectDefinitionListItemDto: {
+            /** Format: uuid */
+            id?: string;
+            name?: string;
+            objectKey?: string;
+            status?: components["schemas"]["BusinessObjectDefinitionStatus"];
+            /** Format: int32 */
+            revision?: number;
+            /** Format: int32 */
+            latestPublishedVersionNumber?: number | null;
+            /** Format: date-time */
+            updatedAt?: string;
+        };
+        BusinessObjectDefinitionListItemDtoPagedResult: {
+            items?: components["schemas"]["BusinessObjectDefinitionListItemDto"][];
+            /** Format: int32 */
+            totalCount?: number;
+            /** Format: int32 */
+            page?: number;
+            /** Format: int32 */
+            pageSize?: number;
+        };
+        /** @enum {string} */
+        BusinessObjectDefinitionStatus: "Unpublished" | "Published";
+        BusinessObjectDefinitionVersionChoiceFieldConfigurationDto: {
+            selectionMode?: components["schemas"]["BusinessObjectChoiceSelectionMode"];
+            options?: components["schemas"]["BusinessObjectDefinitionVersionChoiceOptionDto"][];
+        };
+        BusinessObjectDefinitionVersionChoiceOptionDto: {
+            /** Format: uuid */
+            id?: string;
+            /** Format: uuid */
+            sourceChoiceOptionId?: string;
+            optionKey?: string;
+            label?: string;
+            /** Format: int32 */
+            order?: number;
+        };
+        BusinessObjectDefinitionVersionDto: {
+            /** Format: uuid */
+            id?: string;
+            /** Format: uuid */
+            sourceDefinitionId?: string;
+            /** Format: int32 */
+            versionNumber?: number;
+            /** Format: uuid */
+            publishedByUserId?: string;
+            /** Format: date-time */
+            publishedAt?: string;
+            fields?: components["schemas"]["BusinessObjectDefinitionVersionFieldDto"][];
+        };
+        BusinessObjectDefinitionVersionFieldDto: {
+            /** Format: uuid */
+            id?: string;
+            /** Format: uuid */
+            sourceFieldDefinitionId?: string;
+            fieldKey?: string;
+            label?: string;
+            /** Format: int32 */
+            order?: number;
+            fieldType?: components["schemas"]["BusinessObjectFieldType"];
+            choiceConfiguration?: components["schemas"]["BusinessObjectDefinitionVersionChoiceFieldConfigurationDto"];
+            rules?: components["schemas"]["BusinessObjectDefinitionVersionFieldRuleDto"][];
+        };
+        BusinessObjectDefinitionVersionFieldRuleDto: {
+            /** Format: uuid */
+            id?: string;
+            /** Format: uuid */
+            sourceFieldRuleId?: string;
+            definitionKey?: string;
+            /** Format: int32 */
+            definitionVersion?: number;
+            parameters?: {
+                [key: string]: string[];
+            };
+        };
+        BusinessObjectFieldDefinitionDto: {
+            /** Format: uuid */
+            id?: string;
+            fieldKey?: string;
+            label?: string;
+            /** Format: int32 */
+            order?: number;
+            fieldType?: components["schemas"]["BusinessObjectFieldType"];
+            choiceConfiguration?: components["schemas"]["BusinessObjectChoiceFieldConfigurationDto"];
+            rules?: components["schemas"]["BusinessObjectFieldRuleDto"][];
+        };
+        BusinessObjectFieldDefinitionInput: {
+            fieldKey?: string;
+            label?: string;
+            fieldType?: components["schemas"]["BusinessObjectFieldType"];
+            rules?: components["schemas"]["BusinessObjectFieldRuleInput"][] | null;
+            choiceConfiguration?: components["schemas"]["BusinessObjectChoiceFieldConfigurationInput"];
+            /** Format: uuid */
+            id?: string | null;
+        };
+        BusinessObjectFieldRuleDto: {
+            /** Format: uuid */
+            id?: string;
+            definitionKey?: string;
+            /** Format: int32 */
+            definitionVersion?: number;
+            parameters?: {
+                [key: string]: string[];
+            };
+        };
+        BusinessObjectFieldRuleInput: {
+            definitionKey?: string;
+            /** Format: int32 */
+            definitionVersion?: number;
+            parameters?: {
+                [key: string]: string[];
+            } | null;
+            /** Format: uuid */
+            id?: string | null;
+        };
+        /** @enum {string} */
+        BusinessObjectFieldType: "Text" | "Integer" | "Decimal" | "Date" | "DateTime" | "Boolean" | "Choice";
+        CreateBusinessObjectDefinitionRequest: {
+            name?: string;
+        };
+        CreateRuleDefinitionRequest: {
+            name?: string;
+            description?: string;
+            scope?: components["schemas"]["RuleScope"];
+            contextKey?: string;
+            /** Format: int32 */
+            contextSchemaVersion?: number;
+            outcomeKind?: components["schemas"]["RuleOutcomeKind"];
         };
         CurrentUserProfileDto: {
             /** Format: uuid */
@@ -262,21 +536,6 @@ export interface components {
             workspaceId?: string | null;
             workspaces?: components["schemas"]["UserWorkspaceDto"][];
         };
-        FieldRuleDefinitionDto: {
-            definitionKey?: string;
-            displayName?: string;
-            description?: string;
-            supportedFieldTypes?: string[];
-            parameters?: components["schemas"]["FieldRuleParameterDefinitionDto"][];
-        };
-        FieldRuleParameterDefinitionDto: {
-            key?: string;
-            type?: components["schemas"]["FieldRuleParameterType"];
-            isRequired?: boolean;
-            allowMultiple?: boolean;
-        };
-        /** @enum {string} */
-        FieldRuleParameterType: "Text" | "Integer" | "Decimal" | "Date" | "Boolean";
         LanguagePreferenceDto: {
             language?: string;
         };
@@ -287,90 +546,6 @@ export interface components {
         MessageResponse: {
             message?: string;
         };
-        ObjectDefinitionDetailDto: {
-            /** Format: uuid */
-            id?: string;
-            /** Format: uuid */
-            workspaceId?: string;
-            name?: string;
-            objectKey?: string;
-            status?: components["schemas"]["ObjectDefinitionStatus"];
-            /** Format: int32 */
-            revision?: number;
-            /** Format: int32 */
-            latestPublishedVersionNumber?: number | null;
-            /** Format: date-time */
-            createdAt?: string;
-            /** Format: date-time */
-            updatedAt?: string;
-            fields?: components["schemas"]["ObjectFieldDefinitionDto"][];
-            latestPublishedVersion?: components["schemas"]["ObjectDefinitionVersionDto"];
-        };
-        ObjectDefinitionListItemDto: {
-            /** Format: uuid */
-            id?: string;
-            name?: string;
-            objectKey?: string;
-            status?: components["schemas"]["ObjectDefinitionStatus"];
-            /** Format: int32 */
-            revision?: number;
-            /** Format: int32 */
-            latestPublishedVersionNumber?: number | null;
-            /** Format: date-time */
-            updatedAt?: string;
-        };
-        ObjectDefinitionListItemDtoPagedResult: {
-            items?: components["schemas"]["ObjectDefinitionListItemDto"][];
-            /** Format: int32 */
-            totalCount?: number;
-            /** Format: int32 */
-            page?: number;
-            /** Format: int32 */
-            pageSize?: number;
-        };
-        /** @enum {string} */
-        ObjectDefinitionStatus: "Unpublished" | "Published";
-        ObjectDefinitionVersionDto: {
-            /** Format: uuid */
-            id?: string;
-            /** Format: int32 */
-            versionNumber?: number;
-            /** Format: uuid */
-            publishedByUserId?: string;
-            /** Format: date-time */
-            publishedAt?: string;
-            fields?: components["schemas"]["ObjectFieldDefinitionDto"][];
-        };
-        ObjectFieldDefinitionDto: {
-            /** Format: uuid */
-            id?: string;
-            fieldKey?: string;
-            label?: string;
-            /** Format: int32 */
-            order?: number;
-            fieldType?: components["schemas"]["ObjectFieldType"];
-            rules?: components["schemas"]["ObjectFieldRuleDto"][];
-        };
-        ObjectFieldDefinitionInput: {
-            fieldKey?: string;
-            label?: string;
-            fieldType?: components["schemas"]["ObjectFieldType"];
-            rules?: components["schemas"]["ObjectFieldRuleInput"][] | null;
-        };
-        ObjectFieldRuleDto: {
-            definitionKey?: string;
-            parameters?: {
-                [key: string]: string[];
-            };
-        };
-        ObjectFieldRuleInput: {
-            definitionKey?: string;
-            parameters?: {
-                [key: string]: string[];
-            } | null;
-        };
-        /** @enum {string} */
-        ObjectFieldType: "Text" | "Integer" | "Decimal" | "Date" | "Boolean" | "SingleSelect";
         ProblemDetails: {
             type?: string | null;
             title?: string | null;
@@ -387,7 +562,7 @@ export interface components {
         } & {
             [key: string]: unknown;
         };
-        PublishObjectDefinitionRequest: {
+        PublishBusinessObjectDefinitionRequest: {
             /** Format: int32 */
             expectedRevision?: number;
         };
@@ -403,11 +578,190 @@ export interface components {
         ResendVerificationRequest: {
             email?: string;
         };
-        SaveUnpublishedObjectDefinitionRequest: {
+        RuleApplicabilityDto: {
+            targetTypeKeys?: string[];
+            configurationConstraints?: {
+                [key: string]: string[];
+            };
+        };
+        RuleConditionNodeDto: {
+            nodeId?: string;
+            logicalOperator?: components["schemas"]["RuleLogicalOperator"];
+            predicateOperator?: components["schemas"]["RulePredicateOperator"];
+            left?: components["schemas"]["RuleOperandDto"];
+            right?: components["schemas"]["RuleOperandDto"];
+            children?: components["schemas"]["RuleConditionNodeDto"][];
+        };
+        RuleContextFieldDto: {
+            path?: string;
+            displayName?: string;
+            type?: components["schemas"]["RuleValueType"];
+            allowMultiple?: boolean;
+        };
+        RuleContextSchemaDto: {
+            contextKey?: string;
+            /** Format: int32 */
+            version?: number;
+            scope?: components["schemas"]["RuleScope"];
+            displayName?: string;
+            fields?: components["schemas"]["RuleContextFieldDto"][];
+            targetTypeKey?: string | null;
+            configuration?: {
+                [key: string]: string[];
+            } | null;
+        };
+        /** @enum {string} */
+        RuleDecision: "Allow" | "Deny";
+        RuleDefinitionDetailDto: {
+            definitionKey?: string;
+            name?: string;
+            description?: string;
+            origin?: components["schemas"]["RuleOrigin"];
+            scope?: components["schemas"]["RuleScope"];
+            outcomeKind?: components["schemas"]["RuleOutcomeKind"];
+            status?: components["schemas"]["RuleLifecycleStatus"];
+            /** Format: int32 */
+            revision?: number;
+            /** Format: int32 */
+            latestPublishedVersion?: number | null;
+            contextKey?: string;
+            /** Format: int32 */
+            contextSchemaVersion?: number;
+            parameters?: components["schemas"]["RuleParameterDefinitionDto"][];
+            condition?: components["schemas"]["RuleConditionNodeDto"];
+            outcome?: components["schemas"]["RuleOutcomeDto"];
+            versions?: components["schemas"]["RuleDefinitionVersionDto"][];
+            /** Format: date-time */
+            createdAt?: string;
+            /** Format: date-time */
+            updatedAt?: string;
+            /** Format: date-time */
+            archivedAt?: string | null;
+        };
+        RuleDefinitionSummaryDto: {
+            definitionKey?: string;
+            name?: string;
+            description?: string;
+            origin?: components["schemas"]["RuleOrigin"];
+            scope?: components["schemas"]["RuleScope"];
+            outcomeKind?: components["schemas"]["RuleOutcomeKind"];
+            status?: components["schemas"]["RuleLifecycleStatus"];
+            /** Format: int32 */
+            revision?: number | null;
+            /** Format: int32 */
+            latestPublishedVersion?: number | null;
+            contextKey?: string | null;
+            /** Format: int32 */
+            contextSchemaVersion?: number | null;
+            applicability?: components["schemas"]["RuleApplicabilityDto"];
+            parameters?: components["schemas"]["RuleParameterDefinitionDto"][];
+            /** Format: date-time */
+            updatedAt?: string | null;
+        };
+        RuleDefinitionSummaryDtoPagedResult: {
+            items?: components["schemas"]["RuleDefinitionSummaryDto"][];
+            /** Format: int32 */
+            totalCount?: number;
+            /** Format: int32 */
+            page?: number;
+            /** Format: int32 */
+            pageSize?: number;
+        };
+        RuleDefinitionVersionDto: {
+            /** Format: int32 */
+            version?: number;
+            name?: string;
+            description?: string;
+            scope?: components["schemas"]["RuleScope"];
+            outcomeKind?: components["schemas"]["RuleOutcomeKind"];
+            contextKey?: string;
+            /** Format: int32 */
+            contextSchemaVersion?: number;
+            parameters?: components["schemas"]["RuleParameterDefinitionDto"][];
+            condition?: components["schemas"]["RuleConditionNodeDto"];
+            outcome?: components["schemas"]["RuleOutcomeDto"];
+            /** Format: uuid */
+            publishedByUserId?: string;
+            /** Format: date-time */
+            publishedAt?: string;
+        };
+        /** @enum {string} */
+        RuleLifecycleStatus: "Draft" | "Published" | "Archived";
+        /** @enum {string} */
+        RuleLogicalOperator: "All" | "Any" | "Not";
+        RuleNodeDiagnosticDto: {
+            nodeId?: string;
+            isMatch?: boolean;
+        };
+        RuleOperandDto: {
+            kind?: components["schemas"]["RuleOperandKind"];
+            reference?: string | null;
+            literal?: components["schemas"]["RuleValueDto"];
+        };
+        /** @enum {string} */
+        RuleOperandKind: "Context" | "Parameter" | "Literal";
+        /** @enum {string} */
+        RuleOrigin: "System" | "Workspace";
+        RuleOutcomeDto: {
+            kind?: components["schemas"]["RuleOutcomeKind"];
+            violationCode?: string | null;
+            severity?: components["schemas"]["RuleSeverity"];
+            message?: string | null;
+            decision?: components["schemas"]["RuleDecision"];
+        };
+        /** @enum {string} */
+        RuleOutcomeKind: "Validation" | "Decision";
+        RuleParameterDefinitionDto: {
+            key?: string;
+            type?: components["schemas"]["RuleValueType"];
+            isRequired?: boolean;
+            allowMultiple?: boolean;
+            allowedValues?: string[];
+        };
+        /** @enum {string} */
+        RulePredicateOperator: "Equal" | "NotEqual" | "GreaterThan" | "GreaterThanOrEqual" | "LessThan" | "LessThanOrEqual" | "Contains" | "StartsWith" | "EndsWith" | "IsNull" | "IsNotNull";
+        RuleRevisionRequest: {
+            /** Format: int32 */
+            expectedRevision?: number;
+        };
+        /** @enum {string} */
+        RuleScope: "Field" | "Object" | "Record" | "Lifecycle";
+        /** @enum {string} */
+        RuleSeverity: "Info" | "Warning" | "Error";
+        RuleSimulationResultDto: {
+            definitionKey?: string;
+            /** Format: int32 */
+            definitionVersion?: number | null;
+            isMatch?: boolean;
+            outcome?: components["schemas"]["RuleOutcomeDto"];
+            diagnostics?: components["schemas"]["RuleNodeDiagnosticDto"][];
+            correlationId?: string;
+        };
+        RuleValueDto: {
+            type?: components["schemas"]["RuleValueType"];
+            values?: string[];
+        };
+        /** @enum {string} */
+        RuleValueType: "Text" | "Integer" | "Decimal" | "Date" | "DateTime" | "Boolean";
+        SaveRuleDefinitionDraftRequest: {
             /** Format: int32 */
             expectedRevision?: number;
             name?: string;
-            fields?: components["schemas"]["ObjectFieldDefinitionInput"][];
+            description?: string;
+            scope?: components["schemas"]["RuleScope"];
+            contextKey?: string;
+            /** Format: int32 */
+            contextSchemaVersion?: number;
+            outcomeKind?: components["schemas"]["RuleOutcomeKind"];
+            parameters?: components["schemas"]["RuleParameterDefinitionDto"][];
+            condition?: components["schemas"]["RuleConditionNodeDto"];
+            outcome?: components["schemas"]["RuleOutcomeDto"];
+        };
+        SaveUnpublishedBusinessObjectDefinitionRequest: {
+            /** Format: int32 */
+            expectedRevision?: number;
+            name?: string;
+            fields?: components["schemas"]["BusinessObjectFieldDefinitionInput"][];
         };
         /** @enum {string} */
         SignInNextStep: "Dashboard";
@@ -418,6 +772,17 @@ export interface components {
         SignInUserRequest: {
             email?: string;
             password?: string;
+        };
+        SimulateRuleRequest: {
+            /** Format: int32 */
+            definitionVersion?: number | null;
+            parameters?: {
+                [key: string]: components["schemas"]["RuleValueDto"];
+            };
+            context?: {
+                [key: string]: components["schemas"]["RuleValueDto"];
+            };
+            correlationId?: string;
         };
         ThemePreferenceDto: {
             theme?: string;
@@ -454,6 +819,307 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    ListBusinessObjectDefinitions: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BusinessObjectDefinitionListItemDtoPagedResult"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CreateBusinessObjectDefinition: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateBusinessObjectDefinitionRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BusinessObjectDefinitionDetailDto"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetBusinessObjectDefinition: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BusinessObjectDefinitionDetailDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SaveUnpublishedBusinessObjectDefinition: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SaveUnpublishedBusinessObjectDefinitionRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BusinessObjectDefinitionDetailDto"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PublishBusinessObjectDefinition: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PublishBusinessObjectDefinitionRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BusinessObjectDefinitionDetailDto"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
     GetLegalVersions: {
         parameters: {
             query?: never;
@@ -789,11 +1455,14 @@ export interface operations {
             };
         };
     };
-    ListObjectDefinitions: {
+    ListRuleDefinitions: {
         parameters: {
             query?: {
                 page?: number;
                 pageSize?: number;
+                scope?: components["schemas"]["RuleScope"];
+                origin?: components["schemas"]["RuleOrigin"];
+                status?: components["schemas"]["RuleLifecycleStatus"];
             };
             header?: never;
             path?: never;
@@ -807,7 +1476,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ObjectDefinitionListItemDtoPagedResult"];
+                    "application/json": components["schemas"]["RuleDefinitionSummaryDtoPagedResult"];
                 };
             };
             /** @description Bad Request */
@@ -839,7 +1508,7 @@ export interface operations {
             };
         };
     };
-    CreateObjectDefinition: {
+    CreateRuleDefinition: {
         parameters: {
             query?: never;
             header?: never;
@@ -848,7 +1517,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["CreateObjectDefinitionRequest"];
+                "application/json": components["schemas"]["CreateRuleDefinitionRequest"];
             };
         };
         responses: {
@@ -858,7 +1527,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ObjectDefinitionDetailDto"];
+                    "application/json": components["schemas"]["RuleDefinitionDetailDto"];
                 };
             };
             /** @description Bad Request */
@@ -899,198 +1568,7 @@ export interface operations {
             };
         };
     };
-    GetObjectDefinition: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ObjectDefinitionDetailDto"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ProblemDetails"];
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ProblemDetails"];
-                };
-            };
-            /** @description Not Found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ProblemDetails"];
-                };
-            };
-        };
-    };
-    SaveUnpublishedObjectDefinition: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["SaveUnpublishedObjectDefinitionRequest"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ObjectDefinitionDetailDto"];
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ProblemDetails"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ProblemDetails"];
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ProblemDetails"];
-                };
-            };
-            /** @description Not Found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ProblemDetails"];
-                };
-            };
-            /** @description Conflict */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ProblemDetails"];
-                };
-            };
-        };
-    };
-    PublishObjectDefinition: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["PublishObjectDefinitionRequest"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ObjectDefinitionDetailDto"];
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ProblemDetails"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ProblemDetails"];
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ProblemDetails"];
-                };
-            };
-            /** @description Not Found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ProblemDetails"];
-                };
-            };
-            /** @description Conflict */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ProblemDetails"];
-                };
-            };
-        };
-    };
-    ListFieldRuleDefinitions: {
+    ListRuleContextSchemas: {
         parameters: {
             query?: never;
             header?: never;
@@ -1105,7 +1583,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["FieldRuleDefinitionDto"][];
+                    "application/json": components["schemas"]["RuleContextSchemaDto"][];
                 };
             };
             /** @description Unauthorized */
@@ -1119,6 +1597,401 @@ export interface operations {
             };
             /** @description Forbidden */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetRuleDefinition: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                definitionKey: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RuleDefinitionDetailDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SaveRuleDefinitionDraft: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                definitionKey: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SaveRuleDefinitionDraftRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RuleDefinitionDetailDto"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    StartRuleDefinitionDraft: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                definitionKey: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RuleRevisionRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RuleDefinitionDetailDto"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PublishRuleDefinition: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                definitionKey: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RuleRevisionRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RuleDefinitionDetailDto"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ArchiveRuleDefinition: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                definitionKey: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RuleRevisionRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RuleDefinitionDetailDto"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SimulateRuleDefinition: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                definitionKey: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SimulateRuleRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RuleSimulationResultDto"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

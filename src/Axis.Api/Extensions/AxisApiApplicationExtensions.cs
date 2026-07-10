@@ -1,7 +1,8 @@
 using Axis.Api.Endpoints;
 using Axis.Api.Middleware;
+using Axis.BusinessObjects.Infrastructure.Persistence;
 using Axis.Identity.Infrastructure.Persistence;
-using Axis.Objects.Infrastructure.Persistence;
+using Axis.Rules.Infrastructure.Persistence;
 using Axis.Shared.Infrastructure.Observability;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
@@ -24,11 +25,17 @@ internal static class AxisApiApplicationExtensions
         await using IdentityDbContext identityDb = new(identityOptions);
         await identityDb.Database.MigrateAsync();
 
-        DbContextOptions<ObjectsDbContext> objectsOptions = new DbContextOptionsBuilder<ObjectsDbContext>()
-            .UseNpgsql(RequiredConnectionString(app.Configuration, "Objects"))
+        DbContextOptions<BusinessObjectsDbContext> businessObjectsOptions = new DbContextOptionsBuilder<BusinessObjectsDbContext>()
+            .UseNpgsql(RequiredConnectionString(app.Configuration, "BusinessObjects"))
             .Options;
-        await using ObjectsDbContext objectsDb = new(objectsOptions);
-        await objectsDb.Database.MigrateAsync();
+        await using BusinessObjectsDbContext businessObjectsDb = new(businessObjectsOptions);
+        await businessObjectsDb.Database.MigrateAsync();
+
+        DbContextOptions<RulesDbContext> rulesOptions = new DbContextOptionsBuilder<RulesDbContext>()
+            .UseNpgsql(RequiredConnectionString(app.Configuration, "Rules"))
+            .Options;
+        await using RulesDbContext rulesDb = new(rulesOptions);
+        await rulesDb.Database.MigrateAsync();
     }
 
     private static string RequiredConnectionString(IConfiguration configuration, string name) =>
@@ -74,8 +81,8 @@ internal static class AxisApiApplicationExtensions
         app.MapAuthEndpoints();
         app.MapLegalEndpoints();
         app.MapUserEndpoints();
-        app.MapFieldRuleDefinitionEndpoints();
-        app.MapObjectDefinitionEndpoints();
+        app.MapRuleDefinitionEndpoints();
+        app.MapBusinessObjectDefinitionEndpoints();
 
         return app;
     }

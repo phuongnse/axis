@@ -18,6 +18,10 @@ vi.mock('@tanstack/react-router', () => ({
       {children}
     </a>
   ),
+  getRouteApi: () => ({
+    useSearch: () => ({}),
+    useNavigate: () => vi.fn(),
+  }),
 }));
 
 describe('module navigation', () => {
@@ -25,9 +29,9 @@ describe('module navigation', () => {
     const contributions: ModuleNavigationContribution[] = [
       {
         id: 'hidden',
-        labelKey: 'objects.nav.definitions',
-        icon: 'objects',
-        to: '/objects',
+        labelKey: 'businessObjects.nav.definitions',
+        icon: 'businessObjects',
+        to: '/business-objects',
         group: { id: 'workspace', labelKey: 'nav.group.workspace', order: 20 },
         order: 10,
         isVisible: () => false,
@@ -35,24 +39,24 @@ describe('module navigation', () => {
       {
         id: 'invalid',
         labelKey: '',
-        icon: 'objects',
-        to: '/objects',
+        icon: 'businessObjects',
+        to: '/business-objects',
         group: { id: 'workspace', labelKey: 'nav.group.workspace', order: 20 },
         order: 20,
       },
       {
-        id: 'objects.second',
-        labelKey: 'objects.nav.definitions',
-        icon: 'objects',
-        to: '/objects',
+        id: 'businessObjects.second',
+        labelKey: 'businessObjects.nav.definitions',
+        icon: 'businessObjects',
+        to: '/business-objects',
         group: { id: 'workspace', labelKey: 'nav.group.workspace', order: 10 },
         order: 20,
       },
       {
-        id: 'objects.first',
-        labelKey: 'objects.nav.definitions',
-        icon: 'objects',
-        to: '/objects',
+        id: 'businessObjects.first',
+        labelKey: 'businessObjects.nav.definitions',
+        icon: 'businessObjects',
+        to: '/business-objects',
         group: { id: 'workspace', labelKey: 'nav.group.workspace', order: 10 },
         order: 10,
       },
@@ -66,15 +70,17 @@ describe('module navigation', () => {
       },
     ];
 
-    const visible = visibleModuleNavigationContributions(contributions, { pathname: '/objects' });
+    const visible = visibleModuleNavigationContributions(contributions, {
+      pathname: '/business-objects',
+    });
 
     expect(visible.map((item) => item.id)).toEqual([
-      'objects.first',
-      'objects.second',
+      'businessObjects.first',
+      'businessObjects.second',
       'rules.catalog',
     ]);
-    expect(visible[0].isActive({ pathname: '/objects/123' })).toBe(true);
-    expect(visible[1].isActive({ pathname: '/objects/123' })).toBe(true);
+    expect(visible[0].isActive({ pathname: '/business-objects/123' })).toBe(true);
+    expect(visible[1].isActive({ pathname: '/business-objects/123' })).toBe(true);
     expect(visible[2].isActive({ pathname: '/rules' })).toBe(true);
   });
 
@@ -82,10 +88,10 @@ describe('module navigation', () => {
     const items = visibleModuleNavigationContributions(
       [
         {
-          id: 'objects.definitions',
-          labelKey: 'objects.nav.definitions',
-          icon: 'objects',
-          to: '/objects',
+          id: 'businessObjects.definitions',
+          labelKey: 'businessObjects.nav.definitions',
+          icon: 'businessObjects',
+          to: '/business-objects',
           group: { id: 'workspace', labelKey: 'nav.group.workspace', order: 100 },
           order: 100,
         },
@@ -107,16 +113,16 @@ describe('module navigation', () => {
     expect(screen.getByText('Workspace')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Business objects' })).toHaveAttribute(
       'href',
-      '/objects',
+      '/business-objects',
     );
     const rulesLink = screen.getByRole('link', { name: 'Rules' });
     expect(rulesLink).toHaveAttribute('href', '/rules');
     expect(rulesLink).toHaveAttribute('aria-current', 'page');
   });
 
-  it('registers Objects and Rules as workspace navigation contributions', () => {
+  it('registers Business Objects and Rules as workspace navigation contributions', () => {
     expect(moduleNavigationContributions.map((item) => item.id)).toEqual([
-      'objects.definitions',
+      'businessObjects.definitions',
       'rules.fieldDefinitions',
     ]);
   });

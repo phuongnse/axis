@@ -40,9 +40,9 @@
     <ProjectReference Include="..\..\..\src\Modules\Identity\Axis.Identity.Application\Axis.Identity.Application.csproj" />
     <ProjectReference Include="..\..\..\src\Modules\Identity\Axis.Identity.Infrastructure\Axis.Identity.Infrastructure.csproj" />
 
-    <ProjectReference Include="..\..\..\src\Modules\Objects\Axis.Objects.Domain\Axis.Objects.Domain.csproj" />
-    <ProjectReference Include="..\..\..\src\Modules\Objects\Axis.Objects.Application\Axis.Objects.Application.csproj" />
-    <ProjectReference Include="..\..\..\src\Modules\Objects\Axis.Objects.Infrastructure\Axis.Objects.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\..\src\Modules\BusinessObjects\Axis.BusinessObjects.Domain\Axis.BusinessObjects.Domain.csproj" />
+    <ProjectReference Include="..\..\..\src\Modules\BusinessObjects\Axis.BusinessObjects.Application\Axis.BusinessObjects.Application.csproj" />
+    <ProjectReference Include="..\..\..\src\Modules\BusinessObjects\Axis.BusinessObjects.Infrastructure\Axis.BusinessObjects.Infrastructure.csproj" />
 
     <ProjectReference Include="..\..\..\src\Modules\Rules\Axis.Rules.Contracts\Axis.Rules.Contracts.csproj" />
     <ProjectReference Include="..\..\..\src\Modules\Rules\Axis.Rules.Domain\Axis.Rules.Domain.csproj" />

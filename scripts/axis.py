@@ -9,6 +9,7 @@ details behind the wrapper.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import importlib
 import importlib.util
 import json
@@ -48,6 +49,7 @@ LOCAL_DEV_POSTGRES_VOLUME = f"{LOCAL_DEV_PROJECT_NAME}_postgres_data"
 LOCAL_DEV_BROWSER_BASE_URL = "https://localhost:3000"
 LOCAL_DEV_API_BASE_URL = "https://localhost:5281"
 LOCAL_DEV_SMOKE_SERVICES = ("api", "web")
+LOCAL_DEV_BROWSER_HOME = ROOT / ".dev-browser"
 API_PROJECT = ROOT / "src" / "Axis.Api" / "Axis.Api.csproj"
 FRONTEND_DIR = ROOT / "frontend"
 LOCAL_CERT_DIR = ROOT / ".dev-certs"
@@ -735,21 +737,33 @@ def frontend_component_file_name_issues(root: Path = ROOT) -> list[str]:
                     )
 
     if src_root.exists():
-        standard_control = re.compile(r"<\s*(button|input|label|select|textarea)\b")
+        standard_control = re.compile(
+            r"<\s*(button|caption|dialog|input|label|option|optgroup|progress|select|table|tbody|td|textarea|tfoot|th|thead|tr)\b"
+        )
+        unformatted_select_value = re.compile(r"<\s*SelectValue\b[^>]*?/\s*>", re.DOTALL)
         for path in iter_files(src_root, (".tsx",)):
             normalized = rel(path) if root == ROOT else str(path.relative_to(root)).replace("\\", "/")
             text = path.read_text(encoding="utf-8")
             in_ui_primitives = path.is_relative_to(ui_root) if hasattr(path, "is_relative_to") else False
             if not in_ui_primitives:
                 for idx, line in enumerate(text.splitlines(), 1):
-                    if "@base-ui/react" in line:
+                    if "@base-ui/react" in line or "@radix-ui" in line:
                         issues.append(
                             f"{normalized}:{idx}: headless UI primitives belong in shadcn primitives under frontend/src/components/ui, not feature components"
+                        )
+                    if "components/ui/native-select" in line:
+                        issues.append(
+                            f"{normalized}:{idx}: native fallback primitives require an approved platform-native behavior exception; use the interaction-consistent shadcn primitive by default"
                         )
                     for match in standard_control.finditer(line):
                         issues.append(
                             f"{normalized}:{idx}: standard UI control <{match.group(1)}> must use a shared shadcn UI primitive from frontend/src/components/ui"
                         )
+                for match in unformatted_select_value.finditer(text):
+                    line_number = text.count("\n", 0, match.start()) + 1
+                    issues.append(
+                        f"{normalized}:{line_number}: SelectValue must format the selected value from the same display-label source as SelectItem"
+                    )
     return issues
 
 
@@ -1190,7 +1204,22 @@ SKILL_HARD_GATE_REQUIREMENTS: dict[str, tuple[str, ...]] = {
     "axis-api-contract": ("## Hard gates", r"reference\.md", r"axis-design-gate", r"axis-ready-review"),
     "axis-design-gate": ("## Hard gates", r"reference\.md", r"Do not edit implementation"),
     "axis-doc-hygiene": ("## Hard gates", r"reference\.md", r"axis-ready-review"),
-    "axis-frontend-feature": ("## Hard gates", r"reference\.md", r"axis-design-gate", r"axis-ready-review"),
+    "axis-frontend-feature": (
+        "## Hard gates",
+        r"reference\.md",
+        r"axis-design-gate",
+        r"axis-ready-review",
+        r"visual override audit",
+        r"layout-only",
+        r"shared variant",
+    ),
+    "axis-frontend-foundation": (
+        "## Hard gates",
+        r"reference\.md",
+        r"visual override audit",
+        r"layout-only",
+        r"shared variant",
+    ),
     "axis-pull-request": (
         "## Hard gates",
         r"reference\.md",
@@ -2586,17 +2615,24 @@ def frontend_command(args: argparse.Namespace) -> int:
     if command == "test":
         return run_frontend_npm(["run", "test"]).returncode
     if command == "gen-api-types":
+        generated_path = FRONTEND_DIR / "src" / "lib" / "api-types.ts"
+        original = generated_path.read_bytes() if generated_path.exists() else None
         result = run_frontend_npm(["run", "gen:api-types"])
         if result.returncode != 0 or not args.check:
             return result.returncode
-        diff = run([exe("git"), "diff", "--exit-code", "--", "frontend/src/lib/api-types.ts"], check=False)
-        if diff.returncode != 0:
+        generated = generated_path.read_bytes() if generated_path.exists() else None
+        if generated != original:
+            if original is None:
+                generated_path.unlink(missing_ok=True)
+            else:
+                generated_path.write_bytes(original)
             print(
                 "frontend gen-api-types: frontend/src/lib/api-types.ts is stale - "
                 "run `python scripts/axis.py frontend gen-api-types` and commit the result",
                 file=sys.stderr,
             )
-        return diff.returncode
+            return 1
+        return 0
     if command == "script":
         npm_args = ["run", args.script_name]
         script_args = passthrough_args(args.script_args)
@@ -3133,12 +3169,75 @@ def local_dev_smoke_env() -> dict[str, str]:
     env = {
         "E2E_API_URL": LOCAL_DEV_API_BASE_URL,
         "E2E_BASE_URL": LOCAL_DEV_BROWSER_BASE_URL,
+        "E2E_BROWSER_HOME": str(LOCAL_DEV_BROWSER_HOME),
         "E2E_SKIP_WEB_SERVER": "1",
         "E2E_VERIFY_ORIGIN": LOCAL_DEV_BROWSER_BASE_URL,
     }
     if LOCAL_ROOT_CA_PEM.is_file():
         env["NODE_EXTRA_CA_CERTS"] = str(LOCAL_ROOT_CA_PEM)
     return env
+
+
+def ensure_local_dev_smoke_browser_trust() -> int:
+    if not LOCAL_ROOT_CA_PEM.is_file():
+        print(
+            "local-dev smoke: local root CA is missing. "
+            "Run `python scripts/axis.py local-dev certs` first.",
+            file=sys.stderr,
+        )
+        return 1
+
+    fingerprint = hashlib.sha256(LOCAL_ROOT_CA_PEM.read_bytes()).hexdigest()
+    marker = LOCAL_DEV_BROWSER_HOME / ".axis-root-ca.sha256"
+    nss_database = LOCAL_DEV_BROWSER_HOME / ".pki" / "nssdb"
+
+    if (
+        (nss_database / "cert9.db").is_file()
+        and marker.is_file()
+        and marker.read_text(encoding="utf-8").strip() == fingerprint
+    ):
+        return 0
+
+    LOCAL_DEV_BROWSER_HOME.mkdir(parents=True, exist_ok=True)
+    LOCAL_DEV_BROWSER_HOME.chmod(0o700)
+
+    build = run(local_dev_compose_args("--profile", "e2e", "build", "e2e"), check=False)
+    if build.returncode != 0:
+        return build.returncode
+
+    user_args: list[str] = []
+    getuid = getattr(os, "getuid", None)
+    getgid = getattr(os, "getgid", None)
+    if callable(getuid) and callable(getgid):
+        user_args = ["--user", f"{getuid()}:{getgid()}"]
+
+    trust = run(
+        local_dev_compose_args(
+            "--profile",
+            "e2e",
+            "run",
+            "--rm",
+            "--no-deps",
+            *user_args,
+            "--entrypoint",
+            "sh",
+            "-v",
+            f"{LOCAL_DEV_BROWSER_HOME}:/browser-home",
+            "e2e",
+            "./scripts/import-browser-ca.sh",
+            "/browser-home/.pki/nssdb",
+            "/https/rootCA.pem",
+        ),
+        check=False,
+    )
+    if trust.returncode != 0:
+        return trust.returncode
+    if not (nss_database / "cert9.db").is_file():
+        print("local-dev smoke: Chromium trust store was not created", file=sys.stderr)
+        return 1
+
+    marker.write_text(f"{fingerprint}\n", encoding="utf-8")
+    return 0
 
 
 def require_local_dev_smoke_services() -> int:
@@ -3174,6 +3273,10 @@ def local_dev_smoke(args: argparse.Namespace) -> int:
         return 1
 
     rc = require_local_dev_smoke_services()
+    if rc != 0:
+        return rc
+
+    rc = ensure_local_dev_smoke_browser_trust()
     if rc != 0:
         return rc
 

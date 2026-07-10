@@ -14,7 +14,7 @@ interface ModuleNavigationProps {
 }
 
 const iconByToken: Record<ModuleNavigationIcon, typeof Blocks> = {
-  objects: Blocks,
+  businessObjects: Blocks,
   rules: ListChecks,
 };
 

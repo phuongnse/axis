@@ -1,292 +1,599 @@
-import { useQuery } from '@tanstack/react-query';
-import { AlertCircle, DatabaseZap, ListChecks, RefreshCw, ShieldCheck } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { getRouteApi } from '@tanstack/react-router';
+import type { TFunction } from 'i18next';
+import { Plus } from 'lucide-react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import {
+  createDataTableMessages,
+  DataTable,
+  type DataTableColumnDef,
+  type DataTableDefinition,
+} from '@/components/shared/data-table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Skeleton } from '@/components/ui/skeleton';
 import {
-  type FieldRuleDefinition,
-  type FieldRuleParameterDefinition,
-  fieldRuleDefinitionsListQueryOptions,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field';
+import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import { ApiError } from '@/lib/api';
+import {
+  createRuleDefinition,
+  type RuleDefinitionDetail,
+  type RuleDefinitionSummary,
+  type RuleScope,
+  ruleContextSchemasQueryOptions,
+  ruleDefinitionQueryKeys,
+  ruleDefinitionsListQueryOptions,
 } from '../api';
 import {
-  compareFieldRuleDefinitions,
   compareFieldTypes,
-  fieldRuleCategoryTranslationKey,
-  fieldRuleDescriptionTranslationKey,
-  fieldRuleNameTranslationKey,
+  compareRuleDefinitions,
   fieldTypeTranslationKey,
+  ruleDescriptionTranslationKey,
+  ruleNameTranslationKey,
+  ruleSetupTranslationKey,
 } from '../metadata';
+import { RuleEditorDialog } from './RuleEditorDialog';
+
+const scopes: RuleScope[] = ['Field', 'Object', 'Record', 'Lifecycle'];
+const route = getRouteApi('/_authenticated/rules');
 
 export function RulesPage() {
   const { t } = useTranslation();
-  const definitionsQuery = useQuery(fieldRuleDefinitionsListQueryOptions());
+  const search = route.useSearch();
+  const navigate = route.useNavigate();
+  const definitionsQuery = useQuery(ruleDefinitionsListQueryOptions());
+  const definitions = definitionsQuery.data?.items ?? [];
+  const tableDefinition = useMemo<DataTableDefinition<RuleDefinitionSummary>>(() => {
+    const appliesTo = new Map<string, string>();
+    for (const definition of definitions) {
+      const targetTypes = definition.applicability?.targetTypeKeys ?? [];
+      for (const fieldType of targetTypes) {
+        appliesTo.set(fieldType, t(fieldTypeTranslationKey(fieldType)));
+      }
+      if (targetTypes.length === 0 && definition.contextKey) {
+        appliesTo.set(
+          definition.contextKey,
+          humanizeContext(definition.contextKey, t('rules.contextUnavailable')),
+        );
+      }
+    }
 
-  if (definitionsQuery.isLoading) {
-    return <RulesLoadingPage />;
-  }
+    const columns: DataTableColumnDef<RuleDefinitionSummary>[] = [
+      {
+        id: 'rule',
+        accessorFn: (definition) => localizedRuleName(definition, t),
+        sortingFn: (left, right) => compareRuleDefinitions(left.original, right.original),
+        size: 360,
+        minSize: 280,
+        enableGrouping: false,
+        meta: {
+          label: t('rules.ruleColumn'),
+          searchable: true,
+          searchValue: (definition) => [
+            localizedRuleName(definition, t),
+            localizedRuleDescription(definition, t),
+          ],
+          filter: {
+            kind: 'text',
+            getValue: (definition) => [
+              localizedRuleName(definition, t),
+              localizedRuleDescription(definition, t),
+            ],
+          },
+        },
+        cell: ({ row }) => (
+          <RuleIdentityCell
+            definition={row.original}
+            onOpen={
+              row.original.origin === 'Workspace' && row.original.definitionKey
+                ? () => {
+                    void navigate({
+                      search: { dialog: 'edit', definitionKey: row.original.definitionKey },
+                    });
+                  }
+                : undefined
+            }
+          />
+        ),
+      },
+      {
+        id: 'appliesTo',
+        accessorFn: ruleTargets,
+        size: 240,
+        minSize: 200,
+        enableGrouping: false,
+        meta: {
+          label: t('rules.appliesToColumn'),
+          searchable: true,
+          searchValue: (definition) =>
+            ruleTargets(definition).map((value) => appliesTo.get(value) ?? value),
+          filter: {
+            kind: 'multiChoice',
+            options: [...appliesTo].map(([value, label]) => ({ value, label })),
+            getValue: ruleTargets,
+          },
+        },
+        cell: ({ row }) => <RuleTargetsCell definition={row.original} />,
+      },
+      {
+        id: 'scope',
+        accessorFn: (definition) => definition.scope ?? 'Object',
+        size: 180,
+        minSize: 150,
+        enableGrouping: true,
+        meta: {
+          label: t('rules.scope'),
+          searchable: true,
+          searchValue: (definition) => t(`rules.scope${definition.scope ?? 'Object'}`),
+          filter: {
+            kind: 'singleChoice',
+            options: scopes.map((scope) => ({ value: scope, label: t(`rules.scope${scope}`) })),
+          },
+        },
+        cell: ({ row }) => <RuleScopeCell definition={row.original} />,
+      },
+      {
+        id: 'status',
+        accessorFn: ruleStatusValues,
+        size: 130,
+        minSize: 120,
+        enableGrouping: true,
+        meta: {
+          label: t('rules.status'),
+          searchable: true,
+          searchValue: (definition) =>
+            ruleStatusValues(definition).map((value) =>
+              value === 'System'
+                ? t('rules.builtIn')
+                : value === 'Workspace'
+                  ? t('rules.originWorkspace')
+                  : t(`rules.status${value}`),
+            ),
+          filter: {
+            kind: 'multiChoice',
+            options: [
+              { value: 'System', label: t('rules.builtIn') },
+              { value: 'Workspace', label: t('rules.originWorkspace') },
+              { value: 'Published', label: t('rules.statusPublished') },
+              { value: 'Draft', label: t('rules.statusDraft') },
+              { value: 'Archived', label: t('rules.statusArchived') },
+            ],
+            getValue: ruleStatusValues,
+          },
+        },
+        cell: ({ row }) => <OriginStatusBadge definition={row.original} />,
+      },
+    ];
 
-  if (definitionsQuery.isError) {
-    return <RulesErrorPage onRetry={() => void definitionsQuery.refetch()} />;
-  }
-
-  const definitions = [...(definitionsQuery.data ?? [])].sort(compareFieldRuleDefinitions);
-  const supportedFieldTypes = [
-    ...new Set(definitions.flatMap((definition) => definition.supportedFieldTypes ?? [])),
-  ].sort(compareFieldTypes);
-  const parameterCount = definitions.reduce(
-    (count, definition) => count + (definition.parameters?.length ?? 0),
-    0,
-  );
+    return {
+      ariaLabel: t('rules.catalogTitle'),
+      source: { mode: 'client', data: definitions, pagination: { pageSize: 20 } },
+      columns,
+      messages: createDataTableMessages(t, {
+        searchLabel: t('rules.searchLabel'),
+        searchPlaceholder: t('rules.searchPlaceholder'),
+        emptyTitle: t('rules.emptyTitle'),
+        emptyDescription: t('rules.emptyDescription'),
+        errorTitle: t('rules.loadErrorTitle'),
+        errorDescription: t('rules.loadErrorBody'),
+      }),
+      getRowId: (definition) =>
+        definition.definitionKey ??
+        `${definition.origin ?? 'Unknown'}:${definition.name ?? definition.contextKey ?? 'rule'}`,
+      initialState: {
+        sorting: [{ id: 'rule', desc: false }],
+      },
+      enableColumnResizing: true,
+      globalSearch: true,
+      columnControls: true,
+      renderToolbarActions: () => (
+        <Button
+          type="button"
+          size="sm"
+          onClick={() => void navigate({ search: { dialog: 'create' } })}
+        >
+          <Plus aria-hidden />
+          {t('rules.newRule')}
+        </Button>
+      ),
+      loading: definitionsQuery.isLoading,
+      error: definitionsQuery.isError,
+      onRetry: () => void definitionsQuery.refetch(),
+    };
+  }, [
+    definitions,
+    definitionsQuery.isError,
+    definitionsQuery.isLoading,
+    definitionsQuery.refetch,
+    navigate,
+    t,
+  ]);
 
   return (
-    <div className="flex h-full min-h-0 w-full min-w-0 flex-col gap-4 overflow-y-auto overflow-x-hidden px-4 pb-8 pt-4 sm:px-6 sm:pb-10 sm:pt-6 lg:px-8 lg:pb-12 lg:pt-8">
-      <header className="flex min-w-0 shrink-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+    <div className="flex h-full min-h-0 w-full min-w-0 flex-col gap-4 overflow-hidden p-4 sm:p-6 lg:p-8">
+      <header className="min-w-0 shrink-0">
         <div className="min-w-0">
           <h1 className="text-2xl font-semibold text-foreground">{t('rules.title')}</h1>
-          <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
+          <p className="mt-1 max-w-3xl text-sm leading-6 text-muted-foreground">
             {t('rules.pageDescription')}
           </p>
         </div>
-        <Badge variant="outline" className="h-7 rounded-md px-2.5">
-          <ShieldCheck className="size-3.5" aria-hidden />
-          {t('rules.systemManaged')}
-        </Badge>
       </header>
 
-      <div className="grid shrink-0 gap-3 sm:grid-cols-3">
-        <Metric label={t('rules.definitionCount', { count: definitions.length })} value="01" />
-        <Metric label={t('rules.parameterCount', { count: parameterCount })} value="02" />
-        <Metric
-          label={t('rules.supportedTypeCount', { count: supportedFieldTypes.length })}
-          value="03"
-        />
+      <div className="min-h-0 flex-1">
+        <DataTable definition={tableDefinition} />
       </div>
 
-      <div className="grid min-h-0 min-w-0 gap-4 xl:grid-cols-[minmax(0,1fr)_20rem]">
-        <section aria-labelledby="rules-catalog-title" className="min-w-0">
-          <Card size="sm" className="min-w-0 gap-0 py-0">
-            <div className="flex min-w-0 items-start justify-between gap-3 border-b border-border px-4 py-4">
-              <div className="min-w-0">
-                <h2 id="rules-catalog-title" className="text-sm font-semibold">
-                  {t('rules.catalogTitle')}
-                </h2>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  {t('rules.catalogDescription')}
-                </p>
-              </div>
-              <Badge variant="secondary" className="rounded-md">
-                {t('rules.readOnly')}
-              </Badge>
-            </div>
-
-            <CardContent className="px-0">
-              {definitions.length === 0 ? (
-                <div className="px-4 py-5">
-                  <p className="text-sm font-medium text-foreground">{t('rules.emptyTitle')}</p>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    {t('rules.emptyDescription')}
-                  </p>
-                </div>
-              ) : (
-                <div className="divide-y divide-border">
-                  {definitions.map((definition) => (
-                    <RuleDefinitionRow key={definition.definitionKey} definition={definition} />
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </section>
-
-        <aside className="grid content-start gap-4">
-          <Card size="sm">
-            <CardHeader>
-              <CardTitle>{t('rules.contractTitle')}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm leading-6 text-muted-foreground">
-                {t('rules.contractDescription')}
-              </p>
-              <div className="mt-4 grid gap-2 text-sm">
-                <ContractFact icon={<ListChecks className="size-4" aria-hidden />}>
-                  {t('rules.contractStableKeys')}
-                </ContractFact>
-                <ContractFact icon={<DatabaseZap className="size-4" aria-hidden />}>
-                  {t('rules.contractParameters')}
-                </ContractFact>
-                <ContractFact icon={<ShieldCheck className="size-4" aria-hidden />}>
-                  {t('rules.contractNoCustom')}
-                </ContractFact>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card size="sm">
-            <CardHeader>
-              <CardTitle>{t('rules.fieldTypesTitle')}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm leading-6 text-muted-foreground">
-                {t('rules.fieldTypesDescription')}
-              </p>
-              <div className="mt-4 flex flex-wrap gap-2">
-                {supportedFieldTypes.map((fieldType) => (
-                  <Badge key={fieldType} variant="outline" className="rounded-md">
-                    {t(fieldTypeTranslationKey(fieldType))}
-                  </Badge>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </aside>
-      </div>
+      <CreateRuleDialog
+        open={search.dialog === 'create'}
+        onOpenChange={(open) => {
+          if (!open) void navigate({ search: {} });
+        }}
+        onCreated={(definition) => {
+          void navigate({
+            replace: true,
+            search: definition.definitionKey
+              ? { dialog: 'edit', definitionKey: definition.definitionKey }
+              : {},
+          });
+        }}
+      />
+      <RuleEditorDialog
+        definitionKey={search.definitionKey ?? null}
+        open={search.dialog === 'edit' && Boolean(search.definitionKey)}
+        onOpenChange={(open) => {
+          if (!open) void navigate({ search: {} });
+        }}
+      />
     </div>
   );
 }
 
-function RulesLoadingPage() {
+function RuleIdentityCell({
+  definition,
+  onOpen,
+}: {
+  definition: RuleDefinitionSummary;
+  onOpen?: () => void;
+}) {
   const { t } = useTranslation();
-
+  const name = localizedRuleName(definition, t);
   return (
-    <div className="flex h-full min-h-0 w-full flex-col gap-4 overflow-y-auto overflow-x-hidden px-4 pb-8 pt-4 sm:px-6 sm:pb-10 sm:pt-6 lg:px-8 lg:pb-12 lg:pt-8">
-      <div>
-        <h1 className="text-2xl font-semibold text-foreground">{t('rules.title')}</h1>
-        <p className="mt-1 text-sm text-muted-foreground">{t('rules.pageDescription')}</p>
-      </div>
-      <Card size="sm" className="max-w-5xl p-4">
-        <Skeleton className="h-4 w-40" />
-        <Skeleton className="mt-6 h-16 w-full" />
-        <Skeleton className="mt-3 h-16 w-full" />
-        <Skeleton className="mt-3 h-16 w-full" />
-      </Card>
-    </div>
-  );
-}
-
-function RulesErrorPage({ onRetry }: { onRetry: () => void }) {
-  const { t } = useTranslation();
-
-  return (
-    <div className="h-full w-full overflow-y-auto overflow-x-hidden px-4 pb-8 pt-4 sm:px-6 sm:pb-10 sm:pt-6 lg:px-8 lg:pb-12 lg:pt-8">
-      <div className="max-w-3xl">
-        <Alert variant="destructive">
-          <AlertCircle className="size-4" aria-hidden />
-          <AlertTitle>{t('rules.loadErrorTitle')}</AlertTitle>
-          <AlertDescription>{t('rules.loadErrorBody')}</AlertDescription>
-        </Alert>
-        <Button type="button" variant="outline" className="mt-4" onClick={onRetry}>
-          <RefreshCw className="size-4" aria-hidden />
-          {t('app.retry')}
+    <div className="min-w-0 whitespace-normal">
+      {onOpen ? (
+        <Button type="button" variant="link" size="inline" onClick={onOpen}>
+          {name}
         </Button>
-      </div>
+      ) : (
+        <p className="font-semibold text-foreground">{name}</p>
+      )}
+      <p className="mt-1 line-clamp-2 text-sm leading-5 text-muted-foreground">
+        {localizedRuleDescription(definition, t)}
+      </p>
     </div>
   );
 }
 
-function Metric({ label, value }: { label: string; value: string }) {
-  return (
-    <Card size="sm" className="gap-1 p-4">
-      <p className="text-xs font-medium text-muted-foreground">{label}</p>
-      <p className="text-xl font-semibold text-foreground">{value}</p>
-    </Card>
+function RuleTargetsCell({ definition }: { definition: RuleDefinitionSummary }) {
+  const { t } = useTranslation();
+  const targetTypes = [...(definition.applicability?.targetTypeKeys ?? [])].sort(compareFieldTypes);
+  return targetTypes.length > 0 ? (
+    <div className="flex flex-wrap gap-1.5 whitespace-normal">
+      {targetTypes.map((fieldType) => (
+        <Badge key={fieldType} variant="primaryOutline">
+          {t(fieldTypeTranslationKey(fieldType))}
+        </Badge>
+      ))}
+    </div>
+  ) : (
+    <span className="whitespace-normal text-sm text-foreground">
+      {humanizeContext(definition.contextKey, t('rules.contextUnavailable'))}
+    </span>
   );
 }
 
-function RuleDefinitionRow({ definition }: { definition: FieldRuleDefinition }) {
+function RuleScopeCell({ definition }: { definition: RuleDefinitionSummary }) {
   const { t } = useTranslation();
-  const nameKey = fieldRuleNameTranslationKey(definition.definitionKey);
-  const descriptionKey = fieldRuleDescriptionTranslationKey(definition.definitionKey);
-  const categoryKey = fieldRuleCategoryTranslationKey(definition.definitionKey);
-  const displayName = nameKey
-    ? t(nameKey)
-    : (definition.displayName ?? definition.definitionKey ?? t('rules.unknownRule'));
-  const description = descriptionKey
+  const setupKey = ruleSetupTranslationKey(definition.definitionKey);
+  return (
+    <div className="whitespace-normal">
+      <div className="flex flex-wrap gap-1.5">
+        <ScopeBadge scope={definition.scope} />
+        {definition.outcomeKind === 'Decision' ? (
+          <Badge variant="muted">{t('rules.outcomeDecision')}</Badge>
+        ) : null}
+      </div>
+      <p className="mt-1.5 text-xs text-muted-foreground">
+        {setupKey ? t(setupKey) : t('rules.setup.configured')}
+      </p>
+    </div>
+  );
+}
+
+function OriginStatusBadge({ definition }: { definition: RuleDefinitionSummary }) {
+  const { t } = useTranslation();
+  if (definition.origin === 'System') {
+    return <Badge variant="primaryOutline">{t('rules.builtIn')}</Badge>;
+  }
+  if (definition.status === 'Published') {
+    return <Badge variant="successOutline">{t('rules.statusPublished')}</Badge>;
+  }
+  if (definition.status === 'Archived') {
+    return <Badge variant="muted">{t('rules.statusArchived')}</Badge>;
+  }
+  return <Badge variant="warningOutline">{t('rules.statusDraft')}</Badge>;
+}
+
+function ScopeBadge({ scope }: { scope: RuleScope | undefined }) {
+  const { t } = useTranslation();
+  const variant =
+    scope === 'Record'
+      ? 'successOutline'
+      : scope === 'Lifecycle'
+        ? 'warningOutline'
+        : scope === 'Field'
+          ? 'primaryOutline'
+          : 'secondary';
+  return <Badge variant={variant}>{t(`rules.scope${scope ?? 'Object'}`)}</Badge>;
+}
+
+function CreateRuleDialog({
+  open,
+  onOpenChange,
+  onCreated,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onCreated: (definition: RuleDefinitionDetail) => void;
+}) {
+  const { t } = useTranslation();
+  const queryClient = useQueryClient();
+  const schemasQuery = useQuery({ ...ruleContextSchemasQueryOptions(), enabled: open });
+  const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
+  const [scope, setScope] = useState<RuleScope>('Field');
+  const [contextKey, setContextKey] = useState('');
+  const [outcomeKind, setOutcomeKind] = useState<'Validation' | 'Decision'>('Validation');
+  const [error, setError] = useState('');
+  const schemas = Array.isArray(schemasQuery.data) ? schemasQuery.data : [];
+  const availableSchemas = schemas.filter((schema) => schema.scope === scope);
+  const selectedSchema = availableSchemas.find((schema) => schema.contextKey === contextKey);
+
+  const createMutation = useMutation({
+    mutationFn: createRuleDefinition,
+    onSuccess: async (definition) => {
+      await queryClient.invalidateQueries({ queryKey: ruleDefinitionQueryKeys.all });
+      reset();
+      onCreated(definition);
+    },
+    onError: (mutationError) => setError(readApiError(mutationError, t('rules.createError'))),
+  });
+
+  function reset() {
+    setName('');
+    setDescription('');
+    setScope('Field');
+    setContextKey('');
+    setOutcomeKind('Validation');
+    setError('');
+  }
+
+  function changeScope(nextScope: RuleScope) {
+    setScope(nextScope);
+    const firstSchema = schemas.find((schema) => schema.scope === nextScope);
+    setContextKey(firstSchema?.contextKey ?? '');
+  }
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen) reset();
+        onOpenChange(nextOpen);
+      }}
+    >
+      <DialogContent size="form" closeLabel={t('rules.close')}>
+        <DialogHeader>
+          <DialogTitle>{t('rules.createTitle')}</DialogTitle>
+          <DialogDescription>{t('rules.createDescription')}</DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field className="sm:col-span-2">
+            <FieldLabel htmlFor="rule-name" required>
+              {t('rules.name')}
+            </FieldLabel>
+            <Input
+              id="rule-name"
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              maxLength={200}
+            />
+            <FieldDescription>
+              {t('rules.derivedKey', { key: deriveRuleKey(name) })}
+            </FieldDescription>
+          </Field>
+          <Field className="sm:col-span-2">
+            <FieldLabel htmlFor="rule-description" required>
+              {t('rules.description')}
+            </FieldLabel>
+            <Textarea
+              id="rule-description"
+              value={description}
+              onChange={(event) => setDescription(event.target.value)}
+              maxLength={1000}
+            />
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="rule-scope" required>
+              {t('rules.scope')}
+            </FieldLabel>
+            <Select
+              value={scope}
+              onValueChange={(value) => value && changeScope(value as RuleScope)}
+            >
+              <SelectTrigger id="rule-scope">
+                <SelectValue>{(value) => t(`rules.scope${value}`)}</SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {scopes.map((value) => (
+                  <SelectItem key={value} value={value}>
+                    {t(`rules.scope${value}`)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="rule-outcome-kind" required>
+              {t('rules.outcome')}
+            </FieldLabel>
+            <Select
+              value={outcomeKind}
+              onValueChange={(value) => value && setOutcomeKind(value as 'Validation' | 'Decision')}
+            >
+              <SelectTrigger id="rule-outcome-kind">
+                <SelectValue>
+                  {(value) =>
+                    value === 'Decision' ? t('rules.outcomeDecision') : t('rules.outcomeValidation')
+                  }
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Validation">{t('rules.outcomeValidation')}</SelectItem>
+                <SelectItem value="Decision">{t('rules.outcomeDecision')}</SelectItem>
+              </SelectContent>
+            </Select>
+          </Field>
+          <Field className="sm:col-span-2">
+            <FieldLabel htmlFor="rule-context" required>
+              {t('rules.context')}
+            </FieldLabel>
+            <Select
+              value={contextKey || null}
+              onValueChange={(value) => setContextKey(value ?? '')}
+              disabled={schemasQuery.isLoading || availableSchemas.length === 0}
+            >
+              <SelectTrigger id="rule-context">
+                <SelectValue>
+                  {(value) =>
+                    availableSchemas.find((schema) => schema.contextKey === value)?.displayName ??
+                    t('rules.selectContext')
+                  }
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {availableSchemas.map((schema) => (
+                  <SelectItem
+                    key={`${schema.contextKey}:${schema.version}`}
+                    value={schema.contextKey}
+                  >
+                    {schema.displayName}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {availableSchemas.length === 0 && !schemasQuery.isLoading ? (
+              <FieldDescription>{t('rules.noContextForScope')}</FieldDescription>
+            ) : null}
+          </Field>
+          <FieldError className="sm:col-span-2">{error}</FieldError>
+        </div>
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            {t('app.cancel')}
+          </Button>
+          <Button
+            type="button"
+            disabled={
+              createMutation.isPending ||
+              !name.trim() ||
+              !description.trim() ||
+              !selectedSchema?.contextKey
+            }
+            onClick={() => {
+              if (!selectedSchema?.contextKey || selectedSchema.version === undefined) return;
+              setError('');
+              createMutation.mutate({
+                name: name.trim(),
+                description: description.trim(),
+                scope,
+                contextKey: selectedSchema.contextKey,
+                contextSchemaVersion: selectedSchema.version,
+                outcomeKind,
+              });
+            }}
+          >
+            {t('rules.createAction')}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function humanizeContext(contextKey: string | null | undefined, fallback: string): string {
+  if (!contextKey) return fallback;
+  const label = contextKey.split('.').slice(1).join(' ');
+  return label.charAt(0).toUpperCase() + label.slice(1);
+}
+
+function localizedRuleName(definition: RuleDefinitionSummary, t: TFunction): string {
+  const nameKey = ruleNameTranslationKey(definition.definitionKey);
+  return nameKey ? t(nameKey) : (definition.name ?? t('rules.unknownRule'));
+}
+
+function localizedRuleDescription(definition: RuleDefinitionSummary, t: TFunction): string {
+  const descriptionKey = ruleDescriptionTranslationKey(definition.definitionKey);
+  return descriptionKey
     ? t(descriptionKey)
     : (definition.description ?? t('rules.unknownRuleDescription'));
-  const supportedFieldTypes = [...(definition.supportedFieldTypes ?? [])].sort(compareFieldTypes);
-
-  return (
-    <article className="grid min-w-0 gap-4 px-4 py-4 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,24rem)]">
-      <div className="min-w-0">
-        <div className="flex min-w-0 flex-wrap items-center gap-2">
-          <h3 className="text-sm font-semibold text-foreground">{displayName}</h3>
-          {categoryKey ? (
-            <Badge variant="outline" className="rounded-md">
-              {t(categoryKey)}
-            </Badge>
-          ) : null}
-        </div>
-        <p className="mt-1 text-sm leading-6 text-muted-foreground">{description}</p>
-        <dl className="mt-3 grid gap-1 text-xs">
-          <div className="flex min-w-0 flex-wrap gap-x-2 gap-y-1">
-            <dt className="font-medium text-muted-foreground">{t('rules.definitionKey')}</dt>
-            <dd className="font-mono text-foreground">{definition.definitionKey}</dd>
-          </div>
-        </dl>
-        <div className="mt-3 flex flex-wrap gap-2">
-          {supportedFieldTypes.map((fieldType) => (
-            <Badge key={fieldType} variant="secondary" className="rounded-md">
-              {t(fieldTypeTranslationKey(fieldType))}
-            </Badge>
-          ))}
-        </div>
-      </div>
-
-      <div className="min-w-0 rounded-md border border-border bg-muted/25 p-3">
-        <h4 className="text-xs font-semibold text-muted-foreground">{t('rules.parameters')}</h4>
-        {definition.parameters?.length ? (
-          <div className="mt-3 grid gap-2">
-            {[...definition.parameters].sort(compareParameters).map((parameter) => (
-              <ParameterRow key={parameter.key} parameter={parameter} />
-            ))}
-          </div>
-        ) : (
-          <p className="mt-2 text-sm text-muted-foreground">{t('rules.noParameters')}</p>
-        )}
-      </div>
-    </article>
-  );
 }
 
-function ParameterRow({ parameter }: { parameter: FieldRuleParameterDefinition }) {
-  const { t } = useTranslation();
-
-  return (
-    <div className="flex min-w-0 flex-wrap items-center gap-2 text-sm">
-      <span className="font-mono text-foreground">{parameter.key}</span>
-      <Badge variant="outline" className="rounded-md">
-        {parameter.type
-          ? t(`rules.parameterType${parameter.type}`)
-          : t('rules.unknownParameterType')}
-      </Badge>
-      <Badge variant={parameter.isRequired ? 'default' : 'secondary'} className="rounded-md">
-        {parameter.isRequired ? t('rules.parameterRequired') : t('rules.parameterOptional')}
-      </Badge>
-      <span className="text-xs text-muted-foreground">
-        {parameter.allowMultiple ? t('rules.parameterMultiple') : t('rules.parameterSingle')}
-      </span>
-    </div>
-  );
+function ruleTargets(definition: RuleDefinitionSummary): string[] {
+  const targetTypes = definition.applicability?.targetTypeKeys ?? [];
+  return targetTypes.length > 0
+    ? [...targetTypes]
+    : definition.contextKey
+      ? [definition.contextKey]
+      : [];
 }
 
-function ContractFact({ icon, children }: { icon: ReactNode; children: ReactNode }) {
-  return (
-    <div className="flex items-center gap-2 text-foreground">
-      <span className="inline-flex size-7 shrink-0 items-center justify-center rounded-md border border-border bg-background text-muted-foreground">
-        {icon}
-      </span>
-      <span>{children}</span>
-    </div>
-  );
+function ruleStatusValues(definition: RuleDefinitionSummary): string[] {
+  return definition.origin === 'System' ? ['System'] : ['Workspace', definition.status ?? 'Draft'];
 }
 
-function compareParameters(
-  left: FieldRuleParameterDefinition,
-  right: FieldRuleParameterDefinition,
-): number {
-  return (left.key ?? '').localeCompare(right.key ?? '');
+function deriveRuleKey(name: string): string {
+  const normalized = name
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
+    .toLocaleLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+  const key = /^[a-z]/.test(normalized) ? normalized : normalized ? `rule_${normalized}` : 'rule';
+  return key.slice(0, 63).replace(/_+$/g, '') || 'rule';
+}
+
+function readApiError(error: unknown, fallback: string): string {
+  if (!(error instanceof ApiError) || typeof error.data !== 'object' || error.data === null) {
+    return fallback;
+  }
+  const detail = (error.data as { detail?: unknown }).detail;
+  return typeof detail === 'string' && detail ? detail : fallback;
 }

@@ -1,19 +1,25 @@
-export const fieldRuleDefinitionKeys = {
+export const ruleDefinitionKeys = {
   required: 'field.required',
   numericRange: 'field.numeric_range',
+  decimalPrecision: 'field.decimal_precision',
   dateRange: 'field.date_range',
+  dateTimeRange: 'field.datetime_range',
   textLength: 'field.text_length',
   textPattern: 'field.text_pattern',
-  singleSelectOptions: 'field.single_select_options',
+  textFormat: 'field.text_format',
+  choiceSelectionCount: 'field.choice_selection_count',
 } as const;
 
-export const fieldRuleDefinitionOrder = [
-  fieldRuleDefinitionKeys.required,
-  fieldRuleDefinitionKeys.numericRange,
-  fieldRuleDefinitionKeys.dateRange,
-  fieldRuleDefinitionKeys.textLength,
-  fieldRuleDefinitionKeys.textPattern,
-  fieldRuleDefinitionKeys.singleSelectOptions,
+export const ruleDefinitionOrder = [
+  ruleDefinitionKeys.required,
+  ruleDefinitionKeys.numericRange,
+  ruleDefinitionKeys.decimalPrecision,
+  ruleDefinitionKeys.dateRange,
+  ruleDefinitionKeys.dateTimeRange,
+  ruleDefinitionKeys.textLength,
+  ruleDefinitionKeys.textPattern,
+  ruleDefinitionKeys.textFormat,
+  ruleDefinitionKeys.choiceSelectionCount,
 ] as const;
 
 export const fieldTypeOrder = [
@@ -21,99 +27,56 @@ export const fieldTypeOrder = [
   'Integer',
   'Decimal',
   'Date',
+  'DateTime',
   'Boolean',
-  'SingleSelect',
+  'Choice',
 ] as const;
 
-export type FieldRuleDefinitionKey =
-  (typeof fieldRuleDefinitionKeys)[keyof typeof fieldRuleDefinitionKeys];
+export type RuleDefinitionKey = (typeof ruleDefinitionKeys)[keyof typeof ruleDefinitionKeys];
 
 export function fieldTypeTranslationKey(fieldType: string): string {
-  return `objects.fieldType${fieldType}`;
+  return `businessObjects.fieldType${fieldType}`;
 }
 
-export function fieldRuleNameTranslationKey(definitionKey: string | undefined): string | undefined {
-  switch (definitionKey) {
-    case fieldRuleDefinitionKeys.required:
-      return 'rules.rule.required.name';
-    case fieldRuleDefinitionKeys.numericRange:
-      return 'rules.rule.numericRange.name';
-    case fieldRuleDefinitionKeys.dateRange:
-      return 'rules.rule.dateRange.name';
-    case fieldRuleDefinitionKeys.textLength:
-      return 'rules.rule.textLength.name';
-    case fieldRuleDefinitionKeys.textPattern:
-      return 'rules.rule.textPattern.name';
-    case fieldRuleDefinitionKeys.singleSelectOptions:
-      return 'rules.rule.singleSelectOptions.name';
-    default:
-      return undefined;
-  }
+export function ruleNameTranslationKey(definitionKey: string | undefined): string | undefined {
+  const segment = definitionKey ? ruleTranslationSegment(definitionKey) : undefined;
+  return segment ? `rules.rule.${segment}.name` : undefined;
 }
 
-export function fieldRuleDescriptionTranslationKey(
+export function ruleDescriptionTranslationKey(
   definitionKey: string | undefined,
 ): string | undefined {
-  switch (definitionKey) {
-    case fieldRuleDefinitionKeys.required:
-      return 'rules.rule.required.description';
-    case fieldRuleDefinitionKeys.numericRange:
-      return 'rules.rule.numericRange.description';
-    case fieldRuleDefinitionKeys.dateRange:
-      return 'rules.rule.dateRange.description';
-    case fieldRuleDefinitionKeys.textLength:
-      return 'rules.rule.textLength.description';
-    case fieldRuleDefinitionKeys.textPattern:
-      return 'rules.rule.textPattern.description';
-    case fieldRuleDefinitionKeys.singleSelectOptions:
-      return 'rules.rule.singleSelectOptions.description';
-    default:
-      return undefined;
-  }
+  const segment = definitionKey ? ruleTranslationSegment(definitionKey) : undefined;
+  return segment ? `rules.rule.${segment}.description` : undefined;
 }
 
-export function fieldRuleCategoryTranslationKey(
-  definitionKey: string | undefined,
-): string | undefined {
-  switch (definitionKey) {
-    case fieldRuleDefinitionKeys.required:
-      return 'rules.categoryContract';
-    case fieldRuleDefinitionKeys.numericRange:
-    case fieldRuleDefinitionKeys.dateRange:
-      return 'rules.categoryRange';
-    case fieldRuleDefinitionKeys.textLength:
-    case fieldRuleDefinitionKeys.textPattern:
-      return 'rules.categoryText';
-    case fieldRuleDefinitionKeys.singleSelectOptions:
-      return 'rules.categoryOptions';
-    default:
-      return undefined;
-  }
+export function ruleSetupTranslationKey(definitionKey: string | undefined): string | undefined {
+  const segment = definitionKey ? ruleTranslationSegment(definitionKey) : undefined;
+  return segment ? `rules.setup.${segment}` : undefined;
 }
 
-export function compareFieldRuleDefinitions(
+export function compareRuleDefinitions(
   left: { definitionKey?: string },
   right: { definitionKey?: string },
 ): number {
-  const leftIndex = fieldRuleDefinitionOrder.indexOf(left.definitionKey as FieldRuleDefinitionKey);
-  const rightIndex = fieldRuleDefinitionOrder.indexOf(
-    right.definitionKey as FieldRuleDefinitionKey,
-  );
-
+  const leftIndex = ruleDefinitionOrder.indexOf(left.definitionKey as RuleDefinitionKey);
+  const rightIndex = ruleDefinitionOrder.indexOf(right.definitionKey as RuleDefinitionKey);
   if (leftIndex >= 0 && rightIndex >= 0) return leftIndex - rightIndex;
   if (leftIndex >= 0) return -1;
   if (rightIndex >= 0) return 1;
-
   return (left.definitionKey ?? '').localeCompare(right.definitionKey ?? '');
 }
 
 export function compareFieldTypes(left: string, right: string): number {
   const leftIndex = fieldTypeOrder.indexOf(left as (typeof fieldTypeOrder)[number]);
   const rightIndex = fieldTypeOrder.indexOf(right as (typeof fieldTypeOrder)[number]);
-
   if (leftIndex >= 0 && rightIndex >= 0) return leftIndex - rightIndex;
   if (leftIndex >= 0) return -1;
   if (rightIndex >= 0) return 1;
-
   return left.localeCompare(right);
+}
+
+function ruleTranslationSegment(definitionKey: string): string | undefined {
+  const match = Object.entries(ruleDefinitionKeys).find(([, key]) => key === definitionKey);
+  return match?.[0];
 }

@@ -18,7 +18,7 @@ Run `python scripts/axis.py doctor` when toolchain resolution feels wrong.
 
 Cert material stays local under `.dev-certs/`, which is ignored.
 
-- `.dev-certs/rootCA.pem` is for containers and E2E Node trust.
+- `.dev-certs/rootCA.pem` is for containers, E2E Node trust, and Playwright browser trust stores.
 - `.dev-certs/rootCA.cer` is for host OS trust.
 - `.dev-certs/localhost.pem` and `.dev-certs/localhost-key.pem` cover `localhost`, loopback, `api`, and `web`.
 
@@ -51,9 +51,9 @@ Local overrides live in ignored root `.env.local`. See [.env.example](../../.env
 | Docker Compose stack | [docker-compose.yml](../../docker-compose.yml) | Default `local-dev up` — no `.env` file required. |
 | Compose overrides | `.env.local` (copy from [.env.example](../../.env.example)) | Optional; only when a compose default needs changing (e.g. `VITE_USE_POLLING`). |
 | API on host | [src/Axis.Api/appsettings.json](../../src/Axis.Api/appsettings.json) | Host-native dev without the API container (`python scripts/axis.py dotnet run-api`). Override with ASP.NET env vars (`Section__Key`) or ignored `appsettings.Development.json`. |
-| EF migrations | `ConnectionStrings__Identity`, `ConnectionStrings__Objects`, `IDENTITY_CONNECTION_STRING`, or `OBJECTS_CONNECTION_STRING` | `python scripts/axis.py dotnet ef ...` only. |
+| EF migrations | `ConnectionStrings__Identity`, `ConnectionStrings__BusinessObjects`, `IDENTITY_CONNECTION_STRING`, or `BUSINESS_OBJECTS_CONNECTION_STRING` | `python scripts/axis.py dotnet ef ...` only. |
 | Shell adapters | `python scripts/axis.py doctor` | `DOCKER_HOST`, `NVM_DIR`, `PATH` when tools resolve from another context (WSL, Docker Desktop). |
-| Host browser smoke | [frontend/playwright.config.ts](../../frontend/playwright.config.ts) and a running local stack | `python scripts/axis.py local-dev smoke -- <playwright-args>` reuses host Chromium against `https://localhost:3000` and API health at `https://localhost:5281` without rebuilding the E2E profile. |
+| Host browser smoke | [frontend/playwright.config.ts](../../frontend/playwright.config.ts) and a running local stack | `python scripts/axis.py local-dev smoke -- <playwright-args>` reuses host Chromium against `https://localhost:3000`, skips the dev server, and imports the local CA into the ignored repo-local `.dev-browser/` NSS store. |
 | E2E | [docker-compose.yml](../../docker-compose.yml) and [frontend/playwright.config.ts](../../frontend/playwright.config.ts) | `python scripts/axis.py local-dev e2e` builds and runs the compose E2E profile with API, web, Maildev, service URLs, and browser trust configured. Pass Playwright args after `--` to scope a file or title. |
 
 Common API settings (compose uses service hostnames; host run uses `localhost`):
@@ -61,7 +61,7 @@ Common API settings (compose uses service hostnames; host run uses `localhost`):
 | Setting | Compose default | Host `appsettings.json` | Purpose |
 |---|---|---|---|
 | Identity DB | `ConnectionStrings__Identity` → `postgres` | `ConnectionStrings:Identity` → `localhost:5432` | PostgreSQL for Identity/OpenIddict. |
-| Objects DB | `ConnectionStrings__Objects` → `postgres` | `ConnectionStrings:Objects` → `localhost:5432` | PostgreSQL for Objects module definitions and published versions. |
+| Business Objects DB | `ConnectionStrings__BusinessObjects` → `postgres` | `ConnectionStrings:BusinessObjects` → `localhost:5432` | PostgreSQL for business object definitions and published versions. |
 | Redis | `Redis__ConnectionString` → `redis:6379` | `Redis:ConnectionString` → `localhost:6379` | Sessions, idempotency, caches. |
 | App base URL | `App__BaseUrl` → `https://localhost:3000` | `App:BaseUrl` → `https://localhost:3000` | Browser-facing origin used in verification email links; use the URL the email recipient's browser can open, not an internal Compose service name. |
 | SMTP | `Email__Host` / `Email__Port` → `maildev:1025` | `Email:Host` / `Email:Port` → `localhost:1025` | Outbound mail (Maildev locally). |
@@ -82,7 +82,7 @@ Frontend dev (compose `web` service sets these; host Vite uses [frontend/vite.co
 
 ## Daily Operations
 
-Prefer scoped CLI commands: `status`, `up`, `down`, `smoke`, `e2e`, and focused checks. Use `python scripts/axis.py local-dev smoke -- <playwright-args>` for fast host-browser layout or UI smoke against an already-running local stack; the wrapper sets the browser-facing base URL, skips the Playwright dev server, and uses the local root CA when present. Use `python scripts/axis.py local-dev e2e -- e2e/sign-in-user.pw.ts` for Compose-backed evidence; add Playwright filters such as `-g "AT-001"` when one acceptance row is in scope. Running `python scripts/axis.py local-dev e2e` with no args remains the full Axis browser E2E workflow. Package Playwright scripts stay behind repo wrappers. `local-dev shell [service]` runs inside the container; host shell (PowerShell, bash, WSL) does not matter.
+Prefer scoped CLI commands: `status`, `up`, `down`, `smoke`, `e2e`, and focused checks. Use `python scripts/axis.py local-dev smoke -- <playwright-args>` for fast host-browser layout or UI smoke against an already-running local stack; the wrapper sets the browser-facing base URL, skips the Playwright dev server, and prepares an isolated Chromium NSS trust store from the local CA. The store is rebuilt only when the CA fingerprint changes, and HTTPS verification stays enabled. Compose E2E imports the same CA into its container-local Chromium trust store. Use `python scripts/axis.py local-dev e2e -- e2e/sign-in-user.pw.ts` for Compose-backed evidence; add Playwright filters such as `-g "AT-001"` when one acceptance row is in scope. Running `python scripts/axis.py local-dev e2e` with no args remains the full Axis browser E2E workflow. Package Playwright scripts stay behind repo wrappers. `local-dev shell [service]` runs inside the container; host shell (PowerShell, bash, WSL) does not matter.
 
 Use runtime-specific dev servers only through the documented Axis wrapper or owning package script.
 
