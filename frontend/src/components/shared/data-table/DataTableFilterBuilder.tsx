@@ -6,7 +6,7 @@ import {
   ShadcnQueryBuilderAction,
   ShadcnQueryBuilderSelector,
   ShadcnQueryBuilderValueEditor,
-} from './query-builder-shadcn';
+} from './QueryBuilderShadcn';
 import type {
   DataTableFilterDefinition,
   DataTableFilterGroup,

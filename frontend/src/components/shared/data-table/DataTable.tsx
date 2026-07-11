@@ -354,15 +354,17 @@ export function DataTable<TData>({ definition }: { definition: DataTableDefiniti
                     </DataTableColumnHeader>
                   )}
                   {header.column.getCanResize() ? (
-                    <button
+                    <Button
                       type="button"
+                      variant="ghost"
+                      size="inline"
                       aria-label={`${header.column.columnDef.meta?.label ?? header.column.id}: resize`}
                       data-slot="data-table-resizer"
                       data-resizing={header.column.getIsResizing()}
                       onDoubleClick={() => header.column.resetSize()}
                       onMouseDown={header.getResizeHandler()}
                       onTouchStart={header.getResizeHandler()}
-                      className="absolute top-0 right-0 h-full w-1 cursor-col-resize touch-none bg-transparent hover:bg-primary/30 data-[resizing=true]:bg-primary"
+                      className="absolute top-0 right-0 h-full w-1 cursor-col-resize touch-none rounded-none p-0 hover:bg-primary/30 data-[resizing=true]:bg-primary"
                     />
                   ) : null}
                 </TableHead>
@@ -585,7 +587,7 @@ function DataRow<TData>({
         {visibleCells.map((cell, index) => {
           const grouped = cell.getIsGrouped();
           const aggregated = cell.getIsAggregated();
-          const placeholder = cell.getIsPlaceholder();
+          const isAggregateCell = cell.getIsPlaceholder();
           const canExpand =
             index === (visibleCells[0]?.column.id === selectionColumnId ? 1 : 0) &&
             row.getCanExpand();
@@ -623,7 +625,7 @@ function DataRow<TData>({
                     cell.column.columnDef.aggregatedCell ?? cell.column.columnDef.cell,
                     cell.getContext(),
                   )
-                ) : placeholder ? null : (
+                ) : isAggregateCell ? null : (
                   flexRender(cell.column.columnDef.cell, cell.getContext())
                 )}
               </div>
@@ -777,7 +779,7 @@ function DataTableFooter<TData>({
               onValueChange={(value) => value && table.setPageSize(Number(value))}
             >
               <SelectTrigger size="sm" aria-label={messages.rowsPerPage}>
-                <SelectValue />
+                <SelectValue>{String(table.getState().pagination.pageSize)}</SelectValue>
               </SelectTrigger>
               <SelectContent align="end">
                 {pageSizeOptions.map((size) => (

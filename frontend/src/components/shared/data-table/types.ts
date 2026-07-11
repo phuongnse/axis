@@ -22,7 +22,7 @@ interface DataTableFilterBase<TData> {
 }
 
 export type DataTableFilterDefinition<TData> =
-  | (DataTableFilterBase<TData> & { kind: 'text'; placeholder?: string })
+  | (DataTableFilterBase<TData> & { kind: 'text'; inputHint?: string })
   | (DataTableFilterBase<TData> & { kind: 'number' })
   | (DataTableFilterBase<TData> & { kind: 'date' })
   | (DataTableFilterBase<TData> & { kind: 'dateTime' })
