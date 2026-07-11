@@ -2,7 +2,9 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   createMemoryHistory,
   createRootRoute,
+  createRoute,
   createRouter,
+  Outlet,
   RouterProvider,
 } from '@tanstack/react-router';
 import { act, type RenderOptions, type RenderResult, render } from '@testing-library/react';
@@ -10,6 +12,7 @@ import type { ReactElement } from 'react';
 
 interface RenderWithRouterOptions extends Omit<RenderOptions, 'wrapper'> {
   path?: string;
+  authenticatedPath?: string;
 }
 
 interface RenderWithRouterResult extends RenderResult {
@@ -20,7 +23,7 @@ export async function renderWithRouter(
   ui: ReactElement,
   options: RenderWithRouterOptions = {},
 ): Promise<RenderWithRouterResult> {
-  const { path = '/', ...renderOptions } = options;
+  const { path = '/', authenticatedPath, ...renderOptions } = options;
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: { retry: false },
@@ -28,12 +31,25 @@ export async function renderWithRouter(
     },
   });
 
-  const rootRoute = createRootRoute({
-    component: () => ui,
-  });
+  const rootRoute = createRootRoute({ component: authenticatedPath ? Outlet : () => ui });
+  let routeTree = rootRoute;
+  if (authenticatedPath) {
+    const authenticatedRoute = createRoute({
+      getParentRoute: () => rootRoute,
+      id: '_authenticated',
+      component: Outlet,
+    });
+    const pageRoute = createRoute({
+      getParentRoute: () => authenticatedRoute,
+      path: authenticatedPath,
+      validateSearch: (search: Record<string, unknown>) => search,
+      component: () => ui,
+    });
+    routeTree = rootRoute.addChildren([authenticatedRoute.addChildren([pageRoute])]);
+  }
 
   const router = createRouter({
-    routeTree: rootRoute,
+    routeTree,
     context: { queryClient },
     history: createMemoryHistory({ initialEntries: [path] }),
   });

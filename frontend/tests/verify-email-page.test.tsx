@@ -180,7 +180,10 @@ describe('VerifyEmailPage', () => {
     expect(
       document.querySelectorAll('[data-slot="field-label"][data-required="true"]'),
     ).toHaveLength(1);
-    expect(screen.getByRole('button', { name: /resend verification email/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /resend verification email/i })).toHaveAttribute(
+      'data-size',
+      'lg',
+    );
     expect(screen.getByRole('link', { name: /back to registration/i })).toHaveAttribute(
       'href',
       '/register',

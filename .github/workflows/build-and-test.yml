@@ -199,14 +199,8 @@ jobs:
         with:
           node-version-file: frontend/.nvmrc
 
-      - name: Test policy gates
-        run: python scripts/axis.py check policy-tests
-
-      - name: Validate Renovate config
-        run: python scripts/axis.py check renovate-config
-
-      - name: Check doc drift
-        run: python scripts/axis.py check doc-drift
+      - name: Run shared policy profile
+        run: python scripts/axis.py ready-review --policy-only
         env:
           BASE_BRANCH: main
 

@@ -17,6 +17,9 @@ Follow [reference.md](../reference.md).
 - Use `$axis-frontend-feature` for SPA implementation after the foundation contract is clear.
 - Use `$axis-doc-hygiene` when changing guidance, routing tables, or durable frontend rules.
 - Stop for explicit user sign-off before adding custom design-system primitives, bypassing the approved shadcn component baseline, or extending a component API beyond the existing contract.
+- Treat native fallback variants as exceptions even when they exist in the shadcn registry. Use the interaction-consistent shadcn primitive unless the dossier records a platform-native behavior requirement and the user signs off.
+- Select triggers and options must resolve from the same localized display-label source; do not render raw protocol values through a bare `SelectValue`.
+- Before and after edits, complete a **visual override audit** for every touched `@/components/ui` call site. `className` may carry outer layout-only concerns; internal size/spacing, typography, radius, color, border, background, shadow, and state styling require an existing prop or explicit sign-off for a shared variant/API change.
 - Do not claim review-ready without `$axis-ready-review`.
 
 ## Inputs
@@ -39,6 +42,8 @@ Follow [reference.md](../reference.md).
 2. Read governing rules.
    - Read [AGENTS.md](../../../AGENTS.md), [docs/playbooks/frontend.md](../../../docs/playbooks/frontend.md), [docs/playbooks/testing.md](../../../docs/playbooks/testing.md), and [docs/playbooks/agent-checklist.md](../../../docs/playbooks/agent-checklist.md).
    - Read existing same-surface components, routes, translations, and tests with `rg`.
+   - Inventory touched design-system call sites. Record the existing prop/variant for each visual requirement and separate layout-only classes from component visual overrides before editing.
+   - Inventory the installed `frontend/src/components/ui` primitives for every interactive element in scope. Record the selected shadcn primitive or the signed-off exception before editing.
    - Read related use-case docs only to preserve dependencies; do not expand their acceptance criteria from foundation work.
 
 3. Establish foundation boundaries before writing behavior.
@@ -51,14 +56,18 @@ Follow [reference.md](../reference.md).
 4. Implement the foundation.
    - Build on existing Axis components, tokens, translations, and routing patterns.
    - Use shadcn-owned `frontend/src/components/ui` primitives before creating or changing shared design-system components.
+   - Prefer interaction-consistent primitives over native fallback variants. Do not import a native fallback into product code without the documented exception required by the component-design contract.
+   - Format every selected value through `SelectValue` children from the same label source as its `SelectItem`; test the initial and changed trigger labels when they differ from protocol values.
    - Keep visible copy in the frontend translation layer.
    - Do not add API contracts, auth behavior, storage behavior, or product actions unless the owning use case or contract skill requires them.
    - Avoid design-system component API or visual deviations unless the user has explicitly signed off.
+   - Keep shared primitive call sites free of local visual utilities. After sign-off, put the treatment in the owning primitive as a named shared variant and select it through props from consumers.
 
 5. Test observable behavior.
    - Use Vitest and Testing Library for component or route behavior.
    - Assert navigation, responsive affordances, accessible labels, localized copy, and enabled/disabled behavior when in scope.
-   - Use Playwright or an available browser-capable tool for layout-sensitive desktop/mobile evidence when the app is runnable.
+   - Use Playwright or an available browser-capable tool for layout-sensitive desktop/mobile evidence when the app is runnable; prefer `python scripts/axis.py local-dev smoke -- <playwright-args>` for fast host-browser smoke against an already-running local stack.
+   - When adding a shared variant, test its component contract and consuming prop; then repeat the visual override audit. An unresolved local visual override fails verification.
    - Before marking every implementation status row `Done` or `N/A`, create or update the sibling `{slug}.evidence.md` sidecar with `## Acceptance Evidence` rows for every required AT. Each row must name committed evidence files and exact `python scripts/axis.py ...` commands; group comma-separated AT IDs in one row only when those cells are identical.
    - Do not put evidence paths or runner commands in the foundation spec file.
    - Do not count temporary browser smoke, screenshots, console output, or manual inspection as required AT evidence unless the proof is committed and referenced by the evidence table.
@@ -88,4 +97,7 @@ Next skill:
 
 Checks:
 - ...
+
+Design-system audit:
+- Primitives inspected, layout-only classes retained, shared variants added with sign-off, and unresolved overrides.
 ```

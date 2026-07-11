@@ -42,6 +42,8 @@ const itemVariants = cva(
         default: "border-transparent",
         outline: "border-border",
         muted: "border-transparent bg-muted/50",
+        selectable:
+          "h-auto justify-start rounded-md border-border bg-transparent text-left whitespace-normal hover:bg-accent hover:text-foreground aria-current:bg-accent dark:hover:bg-accent",
       },
       size: {
         default: "gap-2.5 px-3 py-2.5",

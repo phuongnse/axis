@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Rules\Axis.Rules.Contracts\Axis.Rules.Contracts.csproj" />
+    <ProjectReference Include="..\Axis.BusinessObjects.Domain\Axis.BusinessObjects.Domain.csproj" />
+    <ProjectReference Include="..\..\..\Shared\Axis.Shared.Domain\Axis.Shared.Domain.csproj" />
+    <ProjectReference Include="..\..\..\Shared\Axis.Shared.Application\Axis.Shared.Application.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="FluentValidation" />
+    <PackageReference Include="MediatR" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+</Project>

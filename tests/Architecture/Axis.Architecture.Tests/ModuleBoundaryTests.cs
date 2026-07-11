@@ -7,7 +7,7 @@ namespace Axis.Architecture.Tests;
 /// <summary>
 /// Enforces module isolation:
 /// <list type="bullet">
-/// <item>No project reference from <c>Axis.{ModuleA}.*</c> to <c>Axis.{ModuleB}.*</c>.</item>
+/// <item>No project reference from <c>Axis.{ModuleA}.*</c> to another module's internals.</item>
 /// <item>No in-process method call into another module's Application or Infrastructure.</item>
 /// </list>
 /// </summary>

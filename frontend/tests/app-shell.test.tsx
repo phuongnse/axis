@@ -24,6 +24,10 @@ vi.mock('@tanstack/react-router', () => ({
   useRouterState: ({ select }: { select?: (state: typeof routerState) => unknown } = {}) =>
     select ? select(routerState) : routerState,
   useNavigate: () => navigateMock,
+  getRouteApi: () => ({
+    useSearch: () => ({}),
+    useNavigate: () => navigateMock,
+  }),
 }));
 
 vi.mock('@/features/auth/api', () => ({
@@ -51,6 +55,7 @@ vi.mock('@/features/dashboard/api', () => ({
 
 describe('AppShell', () => {
   beforeEach(() => {
+    routerState.location.pathname = '/dashboard';
     navigateMock.mockClear();
     vi.mocked(signOutUser).mockReset();
     vi.mocked(signOutUser).mockResolvedValue();
@@ -92,14 +97,18 @@ describe('AppShell', () => {
 
     expect(screen.getByRole('banner')).toHaveTextContent('Dashboard');
     expect(await screen.findByText('Ada Lovelace')).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Account menu' }));
+    const accountMenu = screen.getByRole('button', { name: 'Account menu' });
+    expect(accountMenu).toHaveAttribute('data-size', 'account');
+    await user.click(accountMenu);
     expect(screen.queryByText('Profile')).not.toBeInTheDocument();
     expect(screen.getAllByText('AL')).toHaveLength(1);
     expect(screen.getAllByText('Ada Lovelace')).toHaveLength(1);
     expect(screen.getByText('Preferences')).toBeInTheDocument();
     expect(screen.getByText('Language control')).toBeInTheDocument();
     expect(screen.getByText('Theme control')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Sign out' })).toBeInTheDocument();
+    const signOut = screen.getByRole('button', { name: 'Sign out' });
+    expect(signOut).toHaveAttribute('data-variant', 'destructiveOutline');
+    expect(signOut).toHaveAttribute('data-size', 'menu');
 
     expect(screen.queryByRole('navigation')).not.toBeInTheDocument();
 
@@ -107,6 +116,27 @@ describe('AppShell', () => {
     expect(screen.getByRole('contentinfo')).toHaveTextContent('Version 0.1.0');
     expect(screen.getByRole('contentinfo')).toHaveTextContent('Axis Platform');
     expect(screen.getByRole('contentinfo')).toHaveTextContent('2026');
+  });
+
+  it('renders the Rules route title in the authenticated app frame', () => {
+    routerState.location.pathname = '/rules';
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: {
+          retry: false,
+        },
+      },
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <AppShell navigationContributions={[]}>
+          <section aria-label="Work area">Rules content</section>
+        </AppShell>
+      </QueryClientProvider>,
+    );
+
+    expect(screen.getByRole('banner')).toHaveTextContent('Rules');
   });
 
   it('AT-003 signs out after the browser session is ended and clears local session state', async () => {

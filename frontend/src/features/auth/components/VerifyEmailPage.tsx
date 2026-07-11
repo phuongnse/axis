@@ -146,7 +146,8 @@ function VerifyEmailOutcome({
             </Field>
             <Button
               type="submit"
-              className="w-full h-9"
+              size="lg"
+              className="w-full"
               disabled={kind === 'rate_limited' || resendLoading}
             >
               {resendLoading ? (
@@ -270,7 +271,8 @@ export function VerifyEmailPage() {
           </div>
           <Button
             type="button"
-            className="h-9 w-full"
+            size="lg"
+            className="w-full"
             onClick={continueToDashboard}
             disabled={handoffStarted}
           >

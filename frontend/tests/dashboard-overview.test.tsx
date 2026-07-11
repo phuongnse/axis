@@ -53,7 +53,7 @@ describe('DashboardOverview', () => {
     await renderWithRouter(<DashboardOverview />, { path: '/dashboard' });
 
     expect(await screen.findByRole('heading', { name: 'Admin User' })).toBeInTheDocument();
-    expect(screen.getByText('Account ready')).toBeInTheDocument();
+    expect(screen.getByText('Account ready')).toHaveAttribute('data-variant', 'primaryOutline');
     expect(screen.getAllByText('admin@example.com')).toHaveLength(2);
     expect(screen.getByText('Personal')).toBeInTheDocument();
 
@@ -73,6 +73,13 @@ describe('DashboardOverview', () => {
     expect(
       await screen.findByRole('heading', { name: /unable to load account/i }),
     ).toBeInTheDocument();
+    const errorCard = screen
+      .getByRole('heading', { name: /unable to load account/i })
+      .closest('[data-slot="card"]');
+    if (!errorCard) {
+      throw new Error('Dashboard error card was not rendered');
+    }
+    expect(errorCard).toHaveAttribute('data-variant', 'destructive');
     expect(screen.getByRole('button', { name: /retry/i })).toBeInTheDocument();
   });
 });

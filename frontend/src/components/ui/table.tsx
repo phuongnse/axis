@@ -4,11 +4,23 @@ import * as React from "react"
 
 import { cn } from "@/lib/utils"
 
-function Table({ className, ...props }: React.ComponentProps<"table">) {
+function Table({
+  className,
+  containerClassName,
+  containerRef,
+  onContainerScroll,
+  ...props
+}: React.ComponentProps<"table"> & {
+  containerClassName?: string
+  containerRef?: React.Ref<HTMLDivElement>
+  onContainerScroll?: React.UIEventHandler<HTMLDivElement>
+}) {
   return (
     <div
       data-slot="table-container"
-      className="relative w-full overflow-x-auto"
+      ref={containerRef}
+      onScroll={onContainerScroll}
+      className={cn("relative w-full overflow-x-auto", containerClassName)}
     >
       <table
         data-slot="table"

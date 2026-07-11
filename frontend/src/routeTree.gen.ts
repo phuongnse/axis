@@ -15,7 +15,8 @@ import { Route as CallbackRouteImport } from './routes/callback'
 import { Route as GuestRouteImport } from './routes/_guest'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as AuthenticatedObjectsRouteImport } from './routes/_authenticated/objects'
+import { Route as AuthenticatedRulesRouteImport } from './routes/_authenticated/rules'
+import { Route as AuthenticatedBusinessObjectsRouteImport } from './routes/_authenticated/business-objects'
 
 const GuestSignInLazyRouteImport = createFileRoute('/_guest/sign-in')()
 const GuestRegisterLazyRouteImport = createFileRoute('/_guest/register')()
@@ -67,13 +68,23 @@ const AuthenticatedDashboardLazyRoute =
   } as any).lazy(() =>
     import('./routes/_authenticated/dashboard.lazy').then((d) => d.Route),
   )
-const AuthenticatedObjectsRoute = AuthenticatedObjectsRouteImport.update({
-  id: '/objects',
-  path: '/objects',
+const AuthenticatedRulesRoute = AuthenticatedRulesRouteImport.update({
+  id: '/rules',
+  path: '/rules',
   getParentRoute: () => AuthenticatedRoute,
 } as any).lazy(() =>
-  import('./routes/_authenticated/objects.lazy').then((d) => d.Route),
+  import('./routes/_authenticated/rules.lazy').then((d) => d.Route),
 )
+const AuthenticatedBusinessObjectsRoute =
+  AuthenticatedBusinessObjectsRouteImport.update({
+    id: '/business-objects',
+    path: '/business-objects',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any).lazy(() =>
+    import('./routes/_authenticated/business-objects.lazy').then(
+      (d) => d.Route,
+    ),
+  )
 const GuestRegisterConfirmationLazyRoute =
   GuestRegisterConfirmationLazyRouteImport.update({
     id: '/register_/confirmation',
@@ -93,7 +104,8 @@ const GuestAuthVerifyLazyRoute = GuestAuthVerifyLazyRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/callback': typeof CallbackRoute
-  '/objects': typeof AuthenticatedObjectsRoute
+  '/business-objects': typeof AuthenticatedBusinessObjectsRoute
+  '/rules': typeof AuthenticatedRulesRoute
   '/dashboard': typeof AuthenticatedDashboardLazyRoute
   '/register': typeof GuestRegisterLazyRoute
   '/sign-in': typeof GuestSignInLazyRoute
@@ -103,7 +115,8 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/callback': typeof CallbackRoute
-  '/objects': typeof AuthenticatedObjectsRoute
+  '/business-objects': typeof AuthenticatedBusinessObjectsRoute
+  '/rules': typeof AuthenticatedRulesRoute
   '/dashboard': typeof AuthenticatedDashboardLazyRoute
   '/register': typeof GuestRegisterLazyRoute
   '/sign-in': typeof GuestSignInLazyRoute
@@ -116,7 +129,8 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteWithChildren
   '/_guest': typeof GuestRouteWithChildren
   '/callback': typeof CallbackRoute
-  '/_authenticated/objects': typeof AuthenticatedObjectsRoute
+  '/_authenticated/business-objects': typeof AuthenticatedBusinessObjectsRoute
+  '/_authenticated/rules': typeof AuthenticatedRulesRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardLazyRoute
   '/_guest/register': typeof GuestRegisterLazyRoute
   '/_guest/sign-in': typeof GuestSignInLazyRoute
@@ -128,7 +142,8 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/callback'
-    | '/objects'
+    | '/business-objects'
+    | '/rules'
     | '/dashboard'
     | '/register'
     | '/sign-in'
@@ -138,7 +153,8 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/callback'
-    | '/objects'
+    | '/business-objects'
+    | '/rules'
     | '/dashboard'
     | '/register'
     | '/sign-in'
@@ -150,7 +166,8 @@ export interface FileRouteTypes {
     | '/_authenticated'
     | '/_guest'
     | '/callback'
-    | '/_authenticated/objects'
+    | '/_authenticated/business-objects'
+    | '/_authenticated/rules'
     | '/_authenticated/dashboard'
     | '/_guest/register'
     | '/_guest/sign-in'
@@ -216,11 +233,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDashboardLazyRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
-    '/_authenticated/objects': {
-      id: '/_authenticated/objects'
-      path: '/objects'
-      fullPath: '/objects'
-      preLoaderRoute: typeof AuthenticatedObjectsRouteImport
+    '/_authenticated/rules': {
+      id: '/_authenticated/rules'
+      path: '/rules'
+      fullPath: '/rules'
+      preLoaderRoute: typeof AuthenticatedRulesRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/business-objects': {
+      id: '/_authenticated/business-objects'
+      path: '/business-objects'
+      fullPath: '/business-objects'
+      preLoaderRoute: typeof AuthenticatedBusinessObjectsRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_guest/register_/confirmation': {
@@ -241,12 +265,14 @@ declare module '@tanstack/react-router' {
 }
 
 interface AuthenticatedRouteChildren {
-  AuthenticatedObjectsRoute: typeof AuthenticatedObjectsRoute
+  AuthenticatedBusinessObjectsRoute: typeof AuthenticatedBusinessObjectsRoute
+  AuthenticatedRulesRoute: typeof AuthenticatedRulesRoute
   AuthenticatedDashboardLazyRoute: typeof AuthenticatedDashboardLazyRoute
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
-  AuthenticatedObjectsRoute: AuthenticatedObjectsRoute,
+  AuthenticatedBusinessObjectsRoute: AuthenticatedBusinessObjectsRoute,
+  AuthenticatedRulesRoute: AuthenticatedRulesRoute,
   AuthenticatedDashboardLazyRoute: AuthenticatedDashboardLazyRoute,
 }
 

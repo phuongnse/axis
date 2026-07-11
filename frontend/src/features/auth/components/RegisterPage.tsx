@@ -161,7 +161,8 @@ export function RegisterPage() {
                 <FieldLabel
                   htmlFor="acceptedTerms"
                   required
-                  className="block min-w-0 flex-1 w-full font-normal leading-5"
+                  variant="body"
+                  className="block min-w-0 w-full flex-1"
                 >
                   <Trans
                     i18nKey="auth.termsAgreement"
@@ -181,7 +182,7 @@ export function RegisterPage() {
 
         {submitError ? <AuthNotice variant="destructive">{submitError}</AuthNotice> : null}
 
-        <Button type="submit" className="h-9 w-full" disabled={loading}>
+        <Button type="submit" size="lg" className="w-full" disabled={loading}>
           <UserPlus className="size-4" aria-hidden />
           {loading ? t('auth.creatingAccount') : t('auth.createAccount')}
         </Button>

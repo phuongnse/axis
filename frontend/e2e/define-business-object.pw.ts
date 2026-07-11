@@ -23,26 +23,93 @@ const definitionId = '33333333-3333-4333-8333-333333333333';
 const fieldId = '44444444-4444-4444-8444-444444444444';
 const versionId = '55555555-5555-4555-8555-555555555555';
 const now = '2026-07-07T00:00:00Z';
+const systemRule = (definitionKey: string, name: string, targetTypeKeys: string[]) => ({
+  definitionKey,
+  name,
+  description: `${name} validation.`,
+  origin: 'System',
+  scope: 'Field',
+  outcomeKind: 'Validation',
+  status: 'Published',
+  latestPublishedVersion: 1,
+  applicability: { targetTypeKeys, configurationConstraints: {} },
+  parameters: [],
+});
+const fieldRuleDefinitions = {
+  items: [
+    systemRule('field.required', 'Required value', [
+      'Text',
+      'Integer',
+      'Decimal',
+      'Date',
+      'DateTime',
+      'Boolean',
+      'Choice',
+    ]),
+    systemRule('field.numeric_range', 'Numeric range', ['Integer', 'Decimal']),
+    systemRule('field.date_range', 'Date range', ['Date']),
+    systemRule('field.datetime_range', 'Date and time range', ['DateTime']),
+    systemRule('field.text_length', 'Text length', ['Text']),
+    systemRule('field.text_pattern', 'Text pattern', ['Text']),
+    systemRule('field.text_format', 'Text format', ['Text']),
+    systemRule('field.decimal_precision', 'Decimal precision', ['Decimal']),
+    systemRule('field.choice_selection_count', 'Choice selection count', ['Choice']),
+  ],
+  totalCount: 9,
+  page: 1,
+  pageSize: 100,
+};
 
-interface ObjectFieldRequest {
+type BusinessObjectFieldType =
+  | 'Text'
+  | 'Integer'
+  | 'Decimal'
+  | 'Date'
+  | 'DateTime'
+  | 'Boolean'
+  | 'Choice';
+
+interface BusinessObjectFieldRuleRequest {
+  definitionKey: string;
+  definitionVersion?: number;
+  parameters?: Record<string, string[]>;
+}
+
+interface BusinessObjectFieldRequest {
   fieldKey: string;
   label: string;
+  fieldType?: BusinessObjectFieldType;
+  rules?: BusinessObjectFieldRuleRequest[];
+  choiceConfiguration?: {
+    selectionMode: 'Single' | 'Multiple';
+    options: { optionKey: string; label: string }[];
+  };
   order?: number;
 }
 
-interface ObjectDefinitionRequest {
+interface BusinessObjectDefinitionRequest {
   name: string;
-  fields?: ObjectFieldRequest[];
+  fields?: BusinessObjectFieldRequest[];
 }
 
 type TestTheme = 'light' | 'dark';
 
-interface MockObjectDefinitionApiOptions {
+interface MockBusinessObjectDefinitionApiOptions {
   createDefinitionFailure?: {
     status: number;
     body: unknown;
   };
 }
+
+interface MockBusinessObjectDefinitionRequest {
+  method: string;
+  path: string;
+  body?: unknown;
+}
+
+type BusinessObjectDefinitionRequests = (() => string[]) & {
+  details: () => readonly MockBusinessObjectDefinitionRequest[];
+};
 
 function base64UrlJson(value: unknown): string {
   return Buffer.from(JSON.stringify(value), 'utf8').toString('base64url');
@@ -69,7 +136,7 @@ function unpublishedDetail({
   name: string;
   objectKey: string;
   revision: number;
-  fields?: ObjectFieldRequest[];
+  fields?: BusinessObjectFieldRequest[];
 }) {
   return {
     id: definitionId,
@@ -90,7 +157,7 @@ function unpublishedDetail({
   };
 }
 
-type ObjectDefinitionDetail = ReturnType<typeof unpublishedDetail>;
+type BusinessObjectDefinitionDetail = ReturnType<typeof unpublishedDetail>;
 
 function deriveObjectKey(name: string): string {
   return (
@@ -103,11 +170,14 @@ function deriveObjectKey(name: string): string {
   );
 }
 
-function publishedDetail(definition: ObjectDefinitionDetail) {
+function publishedDetail(definition: BusinessObjectDefinitionDetail) {
   const fields = definition.fields.map((field) => ({
     fieldKey: field.fieldKey,
     label: field.label,
     order: field.order,
+    fieldType: field.fieldType ?? 'Text',
+    rules: field.rules ?? [],
+    choiceConfiguration: field.choiceConfiguration,
   }));
 
   return {
@@ -176,25 +246,34 @@ async function mockAuthenticatedSession(
   });
 }
 
-async function mockObjectDefinitionApi(
+async function mockBusinessObjectDefinitionApi(
   page: Page,
-  options: MockObjectDefinitionApiOptions = {},
-): Promise<() => string[]> {
+  options: MockBusinessObjectDefinitionApiOptions = {},
+): Promise<BusinessObjectDefinitionRequests> {
   let currentDefinition = unpublishedDetail({
     name: 'Customer',
     objectKey: 'customer',
     revision: 1,
   });
   let hasDefinition = false;
-  const requests: string[] = [];
+  const requests: MockBusinessObjectDefinitionRequest[] = [];
 
-  await page.route('**/api/object-definitions**', async (route) => {
+  await page.route('**/api/rules?**', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(fieldRuleDefinitions),
+    });
+  });
+
+  await page.route('**/api/business-object-definitions**', async (route) => {
     const request = route.request();
     const url = new URL(request.url());
     const method = request.method();
-    requests.push(`${method} ${url.pathname}`);
+    const requestEntry: MockBusinessObjectDefinitionRequest = { method, path: url.pathname };
+    requests.push(requestEntry);
 
-    if (method === 'GET' && url.pathname === '/api/object-definitions') {
+    if (method === 'GET' && url.pathname === '/api/business-object-definitions') {
       const items = hasDefinition
         ? [
             {
@@ -217,7 +296,7 @@ async function mockObjectDefinitionApi(
       return;
     }
 
-    if (method === 'GET' && url.pathname === `/api/object-definitions/${definitionId}`) {
+    if (method === 'GET' && url.pathname === `/api/business-object-definitions/${definitionId}`) {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -226,7 +305,7 @@ async function mockObjectDefinitionApi(
       return;
     }
 
-    if (method === 'POST' && url.pathname === '/api/object-definitions') {
+    if (method === 'POST' && url.pathname === '/api/business-object-definitions') {
       if (options.createDefinitionFailure) {
         await route.fulfill({
           status: options.createDefinitionFailure.status,
@@ -236,7 +315,8 @@ async function mockObjectDefinitionApi(
         return;
       }
 
-      const body = request.postDataJSON() as ObjectDefinitionRequest;
+      const body = request.postDataJSON() as BusinessObjectDefinitionRequest;
+      requestEntry.body = body;
       currentDefinition = unpublishedDetail({
         name: body.name,
         objectKey: deriveObjectKey(body.name),
@@ -253,9 +333,10 @@ async function mockObjectDefinitionApi(
 
     if (
       method === 'PUT' &&
-      url.pathname === `/api/object-definitions/${definitionId}/unpublished`
+      url.pathname === `/api/business-object-definitions/${definitionId}/unpublished`
     ) {
-      const body = request.postDataJSON() as ObjectDefinitionRequest;
+      const body = request.postDataJSON() as BusinessObjectDefinitionRequest;
+      requestEntry.body = body;
       currentDefinition = unpublishedDetail({
         name: body.name,
         objectKey: currentDefinition.objectKey,
@@ -270,7 +351,10 @@ async function mockObjectDefinitionApi(
       return;
     }
 
-    if (method === 'POST' && url.pathname === `/api/object-definitions/${definitionId}/publish`) {
+    if (
+      method === 'POST' &&
+      url.pathname === `/api/business-object-definitions/${definitionId}/publish`
+    ) {
       currentDefinition = publishedDetail(currentDefinition);
       await route.fulfill({
         status: 200,
@@ -283,7 +367,13 @@ async function mockObjectDefinitionApi(
     await route.fulfill({ status: 404, body: `${method} ${url.pathname}` });
   });
 
-  return () => requests;
+  const requestPaths = (() =>
+    requests.map(
+      (request) => `${request.method} ${request.path}`,
+    )) as BusinessObjectDefinitionRequests;
+  requestPaths.details = () => requests;
+
+  return requestPaths;
 }
 
 async function expectNoPageOverflow(page: Page): Promise<void> {
@@ -312,49 +402,6 @@ async function expectNoDesktopDocumentScroll(page: Page): Promise<void> {
 
         return documentElement.scrollHeight <= window.innerHeight + tolerance;
       }),
-    )
-    .toBe(true);
-}
-
-async function expectDisabledActionAffordance(page: Page, actionName: string): Promise<void> {
-  await page.getByRole('button', { name: actionName, exact: true }).hover({ force: true });
-
-  await expect
-    .poll(async () =>
-      page.evaluate((name) => {
-        const actionButton = [...document.querySelectorAll('button')].find((button) =>
-          button.textContent?.includes(name),
-        );
-        if (!actionButton) return false;
-
-        const actionRect = actionButton.getBoundingClientRect();
-        const hintWrapper = actionButton.closest('[data-disabled-action-hint="true"]');
-        const textNode = [...actionButton.childNodes].find(
-          (node) => node.nodeType === Node.TEXT_NODE && node.textContent?.includes(name),
-        );
-        if (!hintWrapper || !textNode) return false;
-
-        const textRange = document.createRange();
-        textRange.selectNodeContents(textNode);
-        const textRect = textRange.getBoundingClientRect();
-        const iconRect = actionButton.querySelector('svg')?.getBoundingClientRect();
-        const contentLeft = Math.min(iconRect?.left ?? textRect.left, textRect.left);
-        const contentRight = Math.max(iconRect?.right ?? textRect.right, textRect.right);
-        const contentCenter = (contentLeft + contentRight) / 2;
-        const actionCenter = (actionRect.left + actionRect.right) / 2;
-        const trailingHintButton = hintWrapper.querySelector(
-          'button[aria-label="Action unavailable in the current state"]',
-        );
-        const actionStyle = getComputedStyle(actionButton);
-        const hintWrapperStyle = getComputedStyle(hintWrapper);
-
-        return (
-          trailingHintButton === null &&
-          hintWrapperStyle.cursor === 'not-allowed' &&
-          Number(actionStyle.opacity) >= 0.99 &&
-          Math.abs(contentCenter - actionCenter) <= 2
-        );
-      }, actionName),
     )
     .toBe(true);
 }
@@ -502,42 +549,6 @@ async function expectDarkInactiveSurfaceContrast(locator: Locator): Promise<void
     .toBe(true);
 }
 
-async function expectActionWidthHugsContent(page: Page, actionName: string): Promise<void> {
-  await expect
-    .poll(async () =>
-      page.evaluate((name) => {
-        const actionButton = [...document.querySelectorAll('button')].find((button) =>
-          button.textContent?.includes(name),
-        );
-        const textNode = [...(actionButton?.childNodes ?? [])].find(
-          (node) => node.nodeType === Node.TEXT_NODE && node.textContent?.includes(name),
-        );
-        if (!actionButton || !textNode) return false;
-
-        const textRange = document.createRange();
-        textRange.selectNodeContents(textNode);
-        const textRect = textRange.getBoundingClientRect();
-        const iconRect = actionButton.querySelector('svg')?.getBoundingClientRect();
-        const contentLeft = Math.min(iconRect?.left ?? textRect.left, textRect.left);
-        const contentRight = Math.max(iconRect?.right ?? textRect.right, textRect.right);
-        const contentWidth = contentRight - contentLeft;
-        const actionWidth = actionButton.getBoundingClientRect().width;
-
-        return actionWidth - contentWidth <= 48;
-      }, actionName),
-    )
-    .toBe(true);
-}
-
-async function expectPrimaryAction(page: Page, actionName: string): Promise<void> {
-  const actionButton = page.getByRole('button', { name: actionName, exact: true }).first();
-
-  await expect(actionButton).toBeEnabled();
-  await expect
-    .poll(async () => actionButton.evaluate((button) => button.classList.contains('bg-primary')))
-    .toBe(true);
-}
-
 test.describe('define business object', () => {
   test('AT-013 browser journey creates, saves, and publishes a definition', async ({ page }) => {
     const pageErrors: string[] = [];
@@ -549,154 +560,245 @@ test.describe('define business object', () => {
     page.on('pageerror', (error) => pageErrors.push(error.message));
 
     await mockAuthenticatedSession(page);
-    const objectRequests = await mockObjectDefinitionApi(page);
+    const objectRequests = await mockBusinessObjectDefinitionApi(page);
 
     await page.setViewportSize({ width: 1920, height: 940 });
-    await page.goto('/objects');
+    await page.goto('/business-objects');
 
-    await expect(page).toHaveURL(/\/objects$/);
-    await expect(page.getByRole('banner')).toContainText('Objects');
+    await expect(page).toHaveURL(/\/business-objects\?page=1$/);
+    await expect(page.getByRole('banner')).toContainText('Business Objects');
     await expect(page.getByRole('heading', { name: 'Business objects' })).toBeVisible();
     await expect(page.getByRole('navigation', { name: 'Modules' })).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Business objects' })).toHaveAttribute(
+    await expect(page.getByRole('link', { name: 'Business objects', exact: true })).toHaveAttribute(
       'aria-current',
       'page',
     );
-    const editorForm = page.getByRole('form', { name: 'Define business object' });
     await expect(page.getByLabel('Definitions').getByText('No business objects')).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Add field' })).toBeDisabled();
-    await expectDisabledActionAffordance(page, 'Add field');
-    await expectActionWidthHugsContent(page, 'Add field');
-    await expect(editorForm.getByRole('button', { name: 'Start definition' })).toBeVisible();
-    await expect(editorForm.getByRole('button', { name: 'Publish', exact: true })).toHaveCount(0);
-    await expect(page.getByRole('region', { name: 'Publish readiness' })).toHaveCount(0);
-    await expect(
-      page.getByText('Start the definition, then add text fields with stable keys and labels.'),
-    ).toBeVisible();
     await expectNoDesktopDocumentScroll(page);
 
     await page.setViewportSize({ width: 1280, height: 900 });
-    await page.getByLabel('Name').fill('Customer');
-    await expect(page.getByLabel('Object key')).toHaveValue('customer');
-    await expect(page.getByLabel('Object key')).toHaveJSProperty('readOnly', true);
-    await expect(page.getByRole('button', { name: 'Managed by the system' })).toHaveCount(0);
-    await page.getByRole('button', { name: 'Start definition' }).click();
+    await page.getByRole('button', { name: 'New definition' }).click();
+    const dialog = page.locator('[data-slot="dialog-content"]');
+    await expect(dialog.getByRole('heading', { name: 'Define business object' })).toBeVisible();
+    await dialog.getByLabel('Name', { exact: true }).fill('Customer');
+    await expect(dialog.getByLabel('Object key')).toHaveValue('customer');
+    await expect(dialog.getByLabel('Object key')).toHaveJSProperty('readOnly', true);
+    await dialog.getByRole('button', { name: 'Start definition' }).click();
 
-    await expect(page.getByText('Definition created')).toBeVisible();
-    await expect(page.getByText('Not published', { exact: true })).toHaveCount(1);
-    await expect(page.getByText('Not published 1', { exact: true })).toHaveCount(0);
-    const customerForm = page.getByRole('form', { name: 'Customer' });
-    await expect(customerForm.getByRole('button', { name: 'Save changes' })).toBeVisible();
-    await expect(customerForm.getByRole('button', { name: 'Publish', exact: true })).toBeDisabled();
-    await expectPrimaryAction(page, 'Add field');
-    await expectPrimaryAction(page, 'Save changes');
+    await expect(page).toHaveURL(
+      new RegExp(`/business-objects\\?page=1&dialog=edit&recordId=${definitionId}$`),
+    );
+    await expect(dialog.getByRole('heading', { name: 'Customer' })).toBeVisible();
+    await dialog.getByRole('tab', { name: 'Fields' }).click();
+    await expect(dialog.getByRole('button', { name: 'Publish', exact: true })).toBeDisabled();
 
-    await page.getByRole('button', { name: 'Add field' }).click();
-    await page.getByLabel('Field key').fill('name');
-    await page.getByLabel('Label').fill('Name');
-    await expectPrimaryAction(page, 'Publish');
-    await page.getByRole('button', { name: 'Save changes' }).click();
+    await dialog.getByRole('button', { name: 'Add field' }).click();
+    await dialog.getByLabel('Label', { exact: true }).fill('Name');
+    await dialog.getByLabel('Field key').fill('name');
+    await dialog.getByRole('button', { name: 'Save changes' }).click();
+    await expect(dialog.getByRole('button', { name: 'Save changes' })).toBeDisabled();
+    await expect(dialog.getByRole('button', { name: 'Publish', exact: true })).toBeEnabled();
 
-    await expect(page.getByText('Changes saved')).toBeVisible();
-    await expect(page.getByText('Not published', { exact: true })).toHaveCount(1);
-    await expect(page.getByText('Not published 2', { exact: true })).toHaveCount(0);
-    await page.getByRole('button', { name: 'Publish', exact: true }).click();
+    await dialog.getByRole('button', { name: 'Publish', exact: true }).click();
 
-    await expect(page.getByText('Published').first()).toBeVisible();
-    await expect(customerForm.getByRole('button', { name: 'Publish', exact: true })).toHaveCount(0);
+    await expect(dialog.getByRole('tab', { name: 'Published version' })).toBeVisible();
+    await expect(dialog.getByRole('button', { name: 'Publish', exact: true })).toHaveCount(0);
     await expectNoPageOverflow(page);
 
     await page.setViewportSize({ width: 390, height: 844 });
-    await expect(page.getByRole('navigation', { name: 'Modules' })).toBeVisible();
-    await expect(page.getByText('Published').first()).toBeVisible();
+    await expect(dialog).toBeVisible();
     await expectNoPageOverflow(page);
 
-    expect(objectRequests()).toContain('POST /api/object-definitions');
-    expect(objectRequests()).toContain(`PUT /api/object-definitions/${definitionId}/unpublished`);
-    expect(objectRequests()).toContain(`POST /api/object-definitions/${definitionId}/publish`);
+    await dialog.locator('[data-slot="dialog-close"]').click();
+    await expect(dialog).toBeHidden();
+    await expect(page.getByText('Published', { exact: true })).toBeVisible();
+
+    expect(objectRequests()).toContain('POST /api/business-object-definitions');
+    expect(objectRequests()).toContain(
+      `PUT /api/business-object-definitions/${definitionId}/unpublished`,
+    );
+    expect(objectRequests()).toContain(
+      `POST /api/business-object-definitions/${definitionId}/publish`,
+    );
     expect(pageErrors).toEqual([]);
   });
 
-  test('disabled action affordance remains readable in dark mode', async ({ page }) => {
-    await mockAuthenticatedSession(page, { theme: 'dark' });
-    await mockObjectDefinitionApi(page);
+  test('AT-008 browser journey configures field rules and publishes the typed contract', async ({
+    page,
+  }, testInfo) => {
+    testInfo.setTimeout(60_000);
+    const pageErrors: string[] = [];
+    page.on('console', (message) => {
+      if (message.type() === 'error') {
+        pageErrors.push(message.text());
+      }
+    });
+    page.on('pageerror', (error) => pageErrors.push(error.message));
+
+    await mockAuthenticatedSession(page);
+    const objectRequests = await mockBusinessObjectDefinitionApi(page);
 
     await page.setViewportSize({ width: 1280, height: 900 });
-    await page.goto('/objects');
+    await page.goto('/business-objects');
+    await page.getByRole('button', { name: 'New definition' }).click();
+    const dialog = page.locator('[data-slot="dialog-content"]');
+    await dialog.getByLabel('Name', { exact: true }).fill('Application');
+    await dialog.getByRole('button', { name: 'Start definition' }).click();
+    await expect(dialog.getByRole('heading', { name: 'Application' })).toBeVisible();
+    await dialog.getByRole('tab', { name: 'Fields' }).click();
 
-    await expect(page.locator('html')).toHaveClass(/dark/);
-    await expect(page.getByRole('button', { name: 'Add field' })).toBeDisabled();
-    await expectDisabledActionAffordance(page, 'Add field');
-    await expectDarkInactiveSurfaceContrast(page.getByRole('button', { name: 'Add field' }));
-    await expectDarkInactiveSurfaceContrast(page.getByLabel('Object key'));
-  });
+    await dialog.getByRole('button', { name: 'Add field' }).click();
+    await dialog.getByLabel('Field key').fill('status');
+    await dialog.getByLabel('Label', { exact: true }).fill('Status');
+    await dialog.getByLabel('Type').click();
+    await page.getByRole('option', { name: 'Choice' }).click();
 
-  test('fields editor maximizes inside the app shell without document scroll', async ({ page }) => {
-    await mockAuthenticatedSession(page, { theme: 'dark' });
-    await mockObjectDefinitionApi(page);
+    await expect(dialog.getByRole('button', { name: 'Publish', exact: true })).toBeDisabled();
+    const options = dialog.getByRole('region', { name: 'Options' });
+    for (const [key, label] of [
+      ['draft', 'Draft'],
+      ['submitted', 'Submitted'],
+      ['approved', 'Approved'],
+    ] as const) {
+      await options.getByRole('button', { name: 'Add option' }).click();
+      const optionIndex = (await options.getByLabel('Option key').count()) - 1;
+      await options.getByLabel('Option key').nth(optionIndex).fill(key);
+      await options.getByLabel('Label', { exact: true }).nth(optionIndex).fill(label);
+    }
+    await dialog.getByLabel('Add rule').click();
+    await page.getByRole('option', { name: 'Required value' }).click();
+    await dialog.getByRole('button', { name: 'Save changes' }).click();
 
-    await page.setViewportSize({ width: 1280, height: 900 });
-    await page.goto('/objects');
+    await expect
+      .poll(
+        () =>
+          objectRequests
+            .details()
+            .find(
+              (request) =>
+                request.method === 'PUT' &&
+                request.path === `/api/business-object-definitions/${definitionId}/unpublished` &&
+                JSON.stringify(request.body).includes('field.required') &&
+                JSON.stringify(request.body).includes('choiceConfiguration'),
+            )?.body,
+      )
+      .toMatchObject({
+        name: 'Application',
+        fields: [
+          {
+            fieldKey: 'status',
+            label: 'Status',
+            fieldType: 'Choice',
+            choiceConfiguration: {
+              selectionMode: 'Single',
+              options: [
+                { optionKey: 'draft', label: 'Draft' },
+                { optionKey: 'submitted', label: 'Submitted' },
+                { optionKey: 'approved', label: 'Approved' },
+              ],
+            },
+            rules: [{ definitionKey: 'field.required', definitionVersion: 1, parameters: {} }],
+          },
+        ],
+      });
+    await expect(dialog.getByRole('button', { name: 'Publish', exact: true })).toBeEnabled();
 
-    await expect(page.getByRole('button', { name: 'Add field' })).toBeDisabled();
-    await expect(page.getByRole('button', { name: 'Expand editor' })).toHaveCount(0);
+    await dialog.getByRole('button', { name: 'Publish', exact: true }).click();
 
-    await page.getByLabel('Name').fill('Customer');
-    await page.getByRole('button', { name: 'Start definition' }).click();
-    await expect(page.getByText('Definition created')).toBeVisible();
-    await expect(
-      page.getByText('Fields define the text data this business object captures.'),
-    ).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Add field' })).toBeEnabled();
-    await expect(page.getByRole('group', { name: /field actions/i })).toHaveCount(0);
-    await page.getByRole('button', { name: 'Expand editor' }).click();
-
-    await expect(page.getByRole('banner')).toContainText('Objects');
-    await expect(page.getByRole('navigation', { name: 'Modules' })).toBeVisible();
-    await expect(page.getByRole('form', { name: 'Customer' })).toBeVisible();
-    await expect(page.getByRole('region', { name: 'Fields' })).toBeVisible();
-    await expect(page.getByRole('region', { name: 'Definitions' })).toHaveCount(0);
-    await expect(page.getByRole('region', { name: 'Publish readiness' })).toHaveCount(0);
-    await expect(page.getByRole('button', { name: 'Restore layout' })).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    );
+    await expect(dialog.getByRole('tab', { name: 'Published version' })).toBeVisible();
+    await expect(dialog.getByLabel('Type')).toContainText('Choice');
+    await expect(options.getByLabel('Option key').nth(0)).toHaveValue('draft');
+    await expect(options.getByLabel('Label', { exact: true }).nth(2)).toHaveValue('Approved');
     await expectNoDesktopDocumentScroll(page);
     await expectNoPageOverflow(page);
 
-    await page.getByRole('button', { name: 'Restore layout' }).click();
-    await expect(page.getByRole('region', { name: 'Definitions' })).toBeVisible();
-    await expect(page.getByRole('region', { name: 'Publish readiness' })).toHaveCount(0);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await expect(dialog).toBeVisible();
+    await expectNoPageOverflow(page);
+
+    expect(objectRequests()).toContain(
+      `POST /api/business-object-definitions/${definitionId}/publish`,
+    );
+    expect(pageErrors).toEqual([]);
+  });
+
+  test('workspace dialog remains readable in dark mode', async ({ page }) => {
+    await mockAuthenticatedSession(page, { theme: 'dark' });
+    await mockBusinessObjectDefinitionApi(page);
+
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.goto('/business-objects');
+
+    await expect(page.locator('html')).toHaveClass(/dark/);
+    await page.getByRole('button', { name: 'New definition' }).click();
+    const dialog = page.locator('[data-slot="dialog-content"]');
+    await expect(dialog).toBeVisible();
+    await expectDarkInactiveSurfaceContrast(dialog.getByLabel('Object key'));
+    await expectNoDesktopDocumentScroll(page);
+    await expectNoPageOverflow(page);
+  });
+
+  test('fields editor scrolls inside the workspace dialog without document scroll', async ({
+    page,
+  }) => {
+    await mockAuthenticatedSession(page, { theme: 'dark' });
+    await mockBusinessObjectDefinitionApi(page);
+
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await page.goto('/business-objects');
+    await page.getByRole('button', { name: 'New definition' }).click();
+    const dialog = page.locator('[data-slot="dialog-content"]');
+    await dialog.getByLabel('Name', { exact: true }).fill('Customer');
+    await dialog.getByRole('button', { name: 'Start definition' }).click();
+    await dialog.getByRole('tab', { name: 'Fields' }).click();
+    for (let index = 0; index < 4; index += 1) {
+      await dialog.getByRole('button', { name: 'Add field' }).click();
+    }
+
+    const dialogBody = dialog.locator('[data-slot="dialog-body"]');
+    await expect
+      .poll(() => dialogBody.evaluate((element) => element.scrollHeight > element.clientHeight))
+      .toBe(true);
+    await dialogBody.evaluate((element) => element.scrollTo({ top: element.scrollHeight }));
+    await expect.poll(() => dialogBody.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
+    await expect(dialog.getByRole('heading', { name: 'Customer' })).toBeVisible();
+    await expectNoDesktopDocumentScroll(page);
+    await expectNoPageOverflow(page);
   });
 
   test('definition creation errors stay contextual without document scroll', async ({ page }) => {
     await mockAuthenticatedSession(page, { theme: 'dark' });
-    await mockObjectDefinitionApi(page, {
+    await mockBusinessObjectDefinitionApi(page, {
       createDefinitionFailure: {
         status: 409,
         body: {
-          type: 'urn:axis:problem:objects.objectKeyAlreadyExists',
+          type: 'urn:axis:problem:business-objects.objectKeyAlreadyExists',
           title: 'Conflict',
           status: 409,
           detail: 'An object definition with this key already exists in the current workspace.',
-          code: 'objects.objectKeyAlreadyExists',
+          code: 'businessObjects.objectKeyAlreadyExists',
         },
       },
     });
 
     await page.setViewportSize({ width: 1280, height: 900 });
-    await page.goto('/objects');
+    await page.goto('/business-objects');
 
-    await page.getByLabel('Name').fill('Application');
-    await page.getByRole('button', { name: 'Start definition' }).click();
+    await page.getByRole('button', { name: 'New definition' }).click();
+    const dialog = page.locator('[data-slot="dialog-content"]');
+    await dialog.getByLabel('Name', { exact: true }).fill('Application');
+    await dialog.getByRole('button', { name: 'Start definition' }).click();
 
-    const alert = page.getByRole('form', { name: 'Define business object' }).getByRole('alert');
-    await expect(alert).toContainText('This definition needs attention');
+    const alert = dialog.getByRole('alert');
+    await expect(alert).toContainText('Unable to update business object');
     await expect(alert).toContainText(
       'An object definition with this key already exists in the current workspace.',
     );
     await expect(alert).toHaveClass(/bg-destructive\/15/);
-    await expect(page.getByLabel('Name')).toHaveAttribute('aria-invalid', 'false');
+    await expect(dialog.getByLabel('Name', { exact: true })).toHaveAttribute(
+      'aria-invalid',
+      'false',
+    );
     await expect(alert).not.toContainText('Something went wrong, please try again');
     await expectNoDesktopDocumentScroll(page);
     await expectNoPageOverflow(page);
@@ -704,27 +806,31 @@ test.describe('define business object', () => {
 
   test('field validation stays contextual to editor inputs', async ({ page }) => {
     await mockAuthenticatedSession(page, { theme: 'dark' });
-    await mockObjectDefinitionApi(page);
+    await mockBusinessObjectDefinitionApi(page);
 
     await page.setViewportSize({ width: 1280, height: 900 });
-    await page.goto('/objects');
+    await page.goto('/business-objects');
 
-    await page.getByLabel('Name').fill('Customer');
-    await page.getByRole('button', { name: 'Start definition' }).click();
-    await expect(page.getByText('Definition created')).toBeVisible();
+    await page.getByRole('button', { name: 'New definition' }).click();
+    const dialog = page.locator('[data-slot="dialog-content"]');
+    await dialog.getByLabel('Name', { exact: true }).fill('Customer');
+    await dialog.getByRole('button', { name: 'Start definition' }).click();
+    await dialog.getByRole('tab', { name: 'Fields' }).click();
 
-    await page.getByRole('button', { name: 'Add field' }).click();
-    await page.getByRole('button', { name: 'Save changes' }).click();
+    await dialog.getByRole('button', { name: 'Add field' }).click();
+    await dialog.getByLabel('Field key').fill('temporary');
+    await dialog.getByLabel('Field key').clear();
+    await dialog.getByLabel('Label', { exact: true }).fill('Temporary');
+    await dialog.getByLabel('Label', { exact: true }).clear();
+    await dialog.getByRole('button', { name: 'Save changes' }).click();
 
-    const editorForm = page.getByRole('form', { name: 'Customer' });
-    const alert = editorForm
-      .getByRole('alert')
-      .filter({ hasText: 'This definition needs attention' });
-    await expect(alert).toHaveCount(0);
-    await expect(editorForm.getByText('Field keys are required.')).toBeVisible();
-    await expect(editorForm.getByText('Field labels are required.')).toBeVisible();
-    await expect(page.getByLabel('Field key')).toHaveAttribute('aria-invalid', 'true');
-    await expect(page.getByLabel('Label')).toHaveAttribute('aria-invalid', 'true');
+    await expect(dialog.getByText('Field keys are required.')).toBeVisible();
+    await expect(dialog.getByText('Field labels are required.')).toBeVisible();
+    await expect(dialog.getByLabel('Field key')).toHaveAttribute('aria-invalid', 'true');
+    await expect(dialog.getByLabel('Label', { exact: true })).toHaveAttribute(
+      'aria-invalid',
+      'true',
+    );
     await expectNoDesktopDocumentScroll(page);
     await expectNoPageOverflow(page);
   });

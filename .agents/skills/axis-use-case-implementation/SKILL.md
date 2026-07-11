@@ -83,7 +83,7 @@ Follow [reference.md](../reference.md).
    - Run every required AT row's runner or targeted test before claiming the use case/layer is complete.
    - Update `{slug}.evidence.md` before claiming complete status; each required AT needs committed evidence paths and exact Axis wrapper commands. Group comma-separated AT IDs in one evidence row only when those proof cells are identical.
    - Report acceptance evidence by AT ID (`AT-001 Playwright passed`, `AT-002 xUnit API passed`, etc.).
-   - Use `.agents/skills/axis-ready-review/SKILL.md` (`$axis-ready-review`) before asking for review; it owns `python scripts/axis.py verify` when triggered.
+   - Use `.agents/skills/axis-ready-review/SKILL.md` (`$axis-ready-review`) before asking for review; it owns `python scripts/axis.py ready-review` when triggered.
    - Before pushing committed implementation to a branch with an upstream, open PR, or PR intent, read `$axis-pull-request`; treat it as a branch/diff update.
    - Do not rerun ready-review verification after every small edit.
    - Do not claim the full suite unless full `python scripts/axis.py dotnet test` ran.

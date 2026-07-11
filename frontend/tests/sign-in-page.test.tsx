@@ -57,7 +57,9 @@ describe('SignInPage', () => {
       document.querySelectorAll('[data-slot="field-label"][data-required="true"]'),
     ).toHaveLength(2);
 
-    await user.click(screen.getByRole('button', { name: /sign in/i }));
+    const signIn = screen.getByRole('button', { name: /sign in/i });
+    expect(signIn).toHaveAttribute('data-size', 'lg');
+    await user.click(signIn);
 
     expect(screen.getByText('Email address is required')).toBeInTheDocument();
     expect(screen.getByText('Password is required')).toBeInTheDocument();

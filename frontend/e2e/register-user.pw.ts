@@ -158,7 +158,7 @@ async function expectAuthenticatedFrame(page: Page, userName: string): Promise<v
   await expect(page.getByRole('navigation', { name: 'Modules' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Business objects' })).toHaveAttribute(
     'href',
-    '/objects',
+    '/business-objects',
   );
   await expect(page.getByRole('main')).toHaveText('');
   await page.getByRole('button', { name: 'Account menu' }).click();

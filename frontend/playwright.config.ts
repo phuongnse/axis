@@ -5,6 +5,7 @@ const defaultWebServerPort = '4173';
 const baseURL =
   process.env.E2E_BASE_URL ?? `http://${defaultWebServerHost}:${defaultWebServerPort}`;
 const skipWebServer = process.env.E2E_SKIP_WEB_SERVER === '1';
+const browserHome = process.env.E2E_BROWSER_HOME;
 const outputDir = process.env.E2E_OUTPUT_DIR ?? './test-results/e2e';
 const reportDir = process.env.E2E_REPORT_DIR ?? './playwright-report';
 const baseUrlParts = new URL(baseURL);
@@ -24,6 +25,7 @@ export default defineConfig({
   reporter: [['list'], ['html', { outputFolder: reportDir, open: 'never' }]],
   use: {
     baseURL,
+    ...(browserHome ? { launchOptions: { env: { HOME: browserHome } } } : {}),
     screenshot: 'only-on-failure',
     trace: 'retain-on-failure',
     video: 'retain-on-failure',

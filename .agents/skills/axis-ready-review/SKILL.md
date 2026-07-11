@@ -26,7 +26,7 @@ Follow [reference.md](../reference.md).
 
 1. Inspect the diff.
    - Run `git status --short`.
-   - Run `git diff --name-only HEAD`.
+   - Run `git diff --name-only "$(git merge-base origin/main HEAD)"...HEAD` so a clean checkpoint still reports the full branch scope.
    - Classify paths as docs/skills/scripts/source/tests/API/frontend/visuals/stack manifests.
    - Treat [global.json](../../../global.json), [Directory.Packages.props](../../../Directory.Packages.props), [frontend/package.json](../../../frontend/package.json), [frontend/package-lock.json](../../../frontend/package-lock.json), [docker-compose.yml](../../../docker-compose.yml), `Dockerfile*`, and project-level package references as stack-manifest changes.
 
@@ -48,8 +48,10 @@ Follow [reference.md](../reference.md).
 4. Run verification at the boundary.
    - Run narrow checks only when they are missing, stale, or needed to debug failure.
    - Skill changes: `python scripts/axis.py check repo-skills`.
-   - Before PR review, run `python scripts/axis.py verify` once when triggered.
-   - If `verify` fails, report Not ready and list the failing step.
+   - Create an intentional checkpoint commit so review evidence can bind to an immutable HEAD.
+   - Before PR review, run `python scripts/axis.py ready-review` once when triggered. For a committed follow-up delta, use `python scripts/axis.py ready-review --since <reviewed-checkpoint>`.
+   - The command owns changed-path verification and the deterministic policy profile shared with CI. Do not substitute `verify` or pre-push output.
+   - If ready-review fails, report Not ready and list the failing step.
    - If full local suite is claimed, it must include the relevant repo suite for touched surfaces, with integration/API tests when applicable.
 
 5. Keep review-only audits honest.
@@ -72,7 +74,7 @@ Changed path classes:
 - ...
 
 Verification:
-- command -> pass/fail/not run with reason
+- ready-review command -> pass/fail/not run with reason
 
 Review-only audits:
 - Design Gate: ...

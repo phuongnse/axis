@@ -49,8 +49,8 @@ export function AppActionsMenu({
           <Button
             type="button"
             variant="outline"
-            size="sm"
-            className="max-w-56 justify-start rounded-full pl-0 pr-2 sm:pr-2.5"
+            size="account"
+            className="max-w-56"
             aria-label={t('nav.accountMenu')}
             title={t('nav.accountMenu')}
           >
@@ -62,7 +62,7 @@ export function AppActionsMenu({
       />
       <PopoverContent
         align="end"
-        className="w-80 max-w-[calc(100vw_-_2rem)] gap-3"
+        className="w-80 max-w-[calc(100vw_-_2rem)]"
         aria-label={t('nav.accountMenu')}
       >
         <section aria-label={t('app.preferences')} className="grid gap-3">
@@ -78,9 +78,9 @@ export function AppActionsMenu({
 
         <Button
           type="button"
-          variant="outline"
-          size="sm"
-          className="w-full justify-start text-destructive hover:text-destructive"
+          variant="destructiveOutline"
+          size="menu"
+          className="w-full"
           aria-busy={signingOut}
           disabled={signingOut}
           onClick={onSignOut}

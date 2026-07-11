@@ -25,6 +25,7 @@ internal static class Conventions
     /// </summary>
     public static readonly string[] LayerNames =
     [
+        "Contracts",
         "Domain",
         "Application",
         "Infrastructure",

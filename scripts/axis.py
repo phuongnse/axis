@@ -9,6 +9,7 @@ details behind the wrapper.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import importlib
 import importlib.util
 import json
@@ -33,6 +34,9 @@ REQUIRED_DOTNET_SDK_MAJOR = "8"
 REQUIRED_LYCHEE_VERSION = "0.23.0"
 REQUIRED_RENOVATE_VALIDATOR_VERSION = "42.99.0"
 MINIMUM_CODERABBIT_CLI_VERSION = "0.6.0"
+VERSION_PROBE_TIMEOUT_SECONDS = 15
+PLAYWRIGHT_BROWSER_PROBE_TIMEOUT_SECONDS = 20
+DOCKER_PROBE_TIMEOUT_SECONDS = 20
 TOOL_VERSIONS_DOC = "docs/playbooks/scripts.md#tool-versions"
 TECH_STACK_DOC = "docs/TECH_STACK.md"
 GLOBAL_JSON_PATH = ROOT / "global.json"
@@ -42,6 +46,10 @@ RENOVATE_CONFIG_PATH = ROOT / ".github" / "renovate.json5"
 LOCAL_DEV_ENV_FILE = ROOT / ".env.local"
 LOCAL_DEV_PROJECT_NAME = "axis"
 LOCAL_DEV_POSTGRES_VOLUME = f"{LOCAL_DEV_PROJECT_NAME}_postgres_data"
+LOCAL_DEV_BROWSER_BASE_URL = "https://localhost:3000"
+LOCAL_DEV_API_BASE_URL = "https://localhost:5281"
+LOCAL_DEV_SMOKE_SERVICES = ("api", "web")
+LOCAL_DEV_BROWSER_HOME = ROOT / ".dev-browser"
 API_PROJECT = ROOT / "src" / "Axis.Api" / "Axis.Api.csproj"
 FRONTEND_DIR = ROOT / "frontend"
 LOCAL_CERT_DIR = ROOT / ".dev-certs"
@@ -126,22 +134,30 @@ def run(
     check: bool = True,
     capture: bool = False,
     env: dict[str, str] | None = None,
+    timeout: float | None = None,
 ) -> subprocess.CompletedProcess[str]:
     merged_env = os.environ.copy()
     merged_env["PYTHONDONTWRITEBYTECODE"] = "1"
     if env:
         merged_env.update(env)
-    result = subprocess.run(
-        args,
-        cwd=cwd,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        stdout=subprocess.PIPE if capture else None,
-        stderr=subprocess.PIPE if capture else None,
-        check=False,
-        env=merged_env,
-    )
+    try:
+        result = subprocess.run(
+            args,
+            cwd=cwd,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            stdout=subprocess.PIPE if capture else None,
+            stderr=subprocess.PIPE if capture else None,
+            check=False,
+            env=merged_env,
+            timeout=timeout,
+        )
+    except subprocess.TimeoutExpired as exc:
+        stdout = exc.stdout if isinstance(exc.stdout, str) else ""
+        stderr = exc.stderr if isinstance(exc.stderr, str) else ""
+        message = f"{' '.join(args)} timed out after {timeout:g} seconds" if timeout else f"{' '.join(args)} timed out"
+        result = subprocess.CompletedProcess(args, 124, stdout=stdout, stderr=stderr or message)
     if check and result.returncode != 0:
         raise CheckError(f"{' '.join(args)} failed with exit code {result.returncode}")
     return result
@@ -152,9 +168,10 @@ def run_optional(
     *,
     cwd: Path = ROOT,
     env: dict[str, str] | None = None,
+    timeout: float | None = None,
 ) -> subprocess.CompletedProcess[str] | None:
     try:
-        return run(args, cwd=cwd, capture=True, check=False, env=env)
+        return run(args, cwd=cwd, capture=True, check=False, env=env, timeout=timeout)
     except OSError:
         return None
 
@@ -227,7 +244,7 @@ def changed_paths(range_spec: str | None = None) -> list[str]:
 
 def changed_paths_since(ref: str) -> list[str]:
     if not ref_exists(f"{ref}^{{commit}}"):
-        raise CheckError(f"verify --since: git ref not found: {ref}")
+        raise CheckError(f"changed-path scope: git ref not found: {ref}")
     return unique_paths(
         [
             *git_lines(["diff", "--name-only", f"{ref}..HEAD"], label=f"changed_paths_since {ref}..HEAD"),
@@ -720,21 +737,33 @@ def frontend_component_file_name_issues(root: Path = ROOT) -> list[str]:
                     )
 
     if src_root.exists():
-        standard_control = re.compile(r"<\s*(button|input|label|select|textarea)\b")
+        standard_control = re.compile(
+            r"<\s*(button|caption|dialog|input|label|option|optgroup|progress|select|table|tbody|td|textarea|tfoot|th|thead|tr)\b"
+        )
+        unformatted_select_value = re.compile(r"<\s*SelectValue\b[^>]*?/\s*>", re.DOTALL)
         for path in iter_files(src_root, (".tsx",)):
             normalized = rel(path) if root == ROOT else str(path.relative_to(root)).replace("\\", "/")
             text = path.read_text(encoding="utf-8")
             in_ui_primitives = path.is_relative_to(ui_root) if hasattr(path, "is_relative_to") else False
             if not in_ui_primitives:
                 for idx, line in enumerate(text.splitlines(), 1):
-                    if "@base-ui/react" in line:
+                    if "@base-ui/react" in line or "@radix-ui" in line:
                         issues.append(
                             f"{normalized}:{idx}: headless UI primitives belong in shadcn primitives under frontend/src/components/ui, not feature components"
+                        )
+                    if "components/ui/native-select" in line:
+                        issues.append(
+                            f"{normalized}:{idx}: native fallback primitives require an approved platform-native behavior exception; use the interaction-consistent shadcn primitive by default"
                         )
                     for match in standard_control.finditer(line):
                         issues.append(
                             f"{normalized}:{idx}: standard UI control <{match.group(1)}> must use a shared shadcn UI primitive from frontend/src/components/ui"
                         )
+                for match in unformatted_select_value.finditer(text):
+                    line_number = text.count("\n", 0, match.start()) + 1
+                    issues.append(
+                        f"{normalized}:{line_number}: SelectValue must format the selected value from the same display-label source as SelectItem"
+                    )
     return issues
 
 
@@ -1175,7 +1204,22 @@ SKILL_HARD_GATE_REQUIREMENTS: dict[str, tuple[str, ...]] = {
     "axis-api-contract": ("## Hard gates", r"reference\.md", r"axis-design-gate", r"axis-ready-review"),
     "axis-design-gate": ("## Hard gates", r"reference\.md", r"Do not edit implementation"),
     "axis-doc-hygiene": ("## Hard gates", r"reference\.md", r"axis-ready-review"),
-    "axis-frontend-feature": ("## Hard gates", r"reference\.md", r"axis-design-gate", r"axis-ready-review"),
+    "axis-frontend-feature": (
+        "## Hard gates",
+        r"reference\.md",
+        r"axis-design-gate",
+        r"axis-ready-review",
+        r"visual override audit",
+        r"layout-only",
+        r"shared variant",
+    ),
+    "axis-frontend-foundation": (
+        "## Hard gates",
+        r"reference\.md",
+        r"visual override audit",
+        r"layout-only",
+        r"shared variant",
+    ),
     "axis-pull-request": (
         "## Hard gates",
         r"reference\.md",
@@ -1704,7 +1748,7 @@ ENFORCEMENT_TRUTH_REQUIRED_SNIPPETS = [
         [
             ("pull_request:", "CI workflow runs for pull requests"),
             ("run: python scripts/axis.py check pr", "PR metadata guard runs in CI"),
-            ("run: python scripts/axis.py check renovate-config", "Renovate config validation runs in CI"),
+            ("run: python scripts/axis.py ready-review --policy-only", "shared ready-review policy profile runs in CI"),
             ("run: python scripts/axis.py check docker", "Docker endpoint is available for Testcontainers in CI through the Axis wrapper"),
             ("run: python scripts/axis.py check vulnerable-packages", "vulnerable package gate runs in CI"),
             ("run: python scripts/axis.py check test-naming", ".NET test naming gate runs in CI"),
@@ -1717,8 +1761,6 @@ ENFORCEMENT_TRUTH_REQUIRED_SNIPPETS = [
             ("run: python scripts/axis.py frontend gen-api-types --check", "frontend API type generation runs in CI through the Axis wrapper"),
             ("run: python scripts/axis.py frontend ci", "frontend typecheck/lint runs in CI through the Axis wrapper"),
             ("run: python scripts/axis.py frontend test", "frontend tests run in CI through the Axis wrapper"),
-            ("run: python scripts/axis.py check policy-tests", "policy gate tests run in CI"),
-            ("run: python scripts/axis.py check doc-drift", "doc drift runs in CI"),
             ("uses: lycheeverse/lychee-action", "markdown link check runs in CI"),
             ("lycheeVersion: v0.23.0", "markdown link check pins the documented Lychee version"),
             ("args: --config ./lychee.toml './**/*.md'", "markdown link check uses shared lychee config"),
@@ -1735,7 +1777,9 @@ ENFORCEMENT_TRUTH_REQUIRED_SNIPPETS = [
             ('step("doc navigation", lambda: check_doc_navigation())', "local verify runs docs checks when docs change"),
             ('step("markdown links (changed files)",', "local verify runs markdown link checks for changed markdown paths"),
             ('def pre_push(args: argparse.Namespace) -> int:', "pre-push quick gate is implemented in Python"),
-            ('return verify(args)', "pre-push can opt into full verify with AXIS_PRE_PUSH_FULL"),
+            ('return ready_review(argparse.Namespace(since=None, policy_only=False))', "pre-push can opt into ready-review with AXIS_PRE_PUSH_FULL"),
+            ('def ready_review(args: argparse.Namespace) -> int:', "ready-review owns local review-boundary verification"),
+            ('gates.append(("doc drift", lambda: check_doc_drift(None)))', "ready-review and CI share the doc-drift policy profile"),
             ("for issue in governance_owner_boundary_issues():", "doc drift checks governance owner boundaries"),
             ("for issue in enforcement_ledger_issues():", "doc drift checks enforcement ledger rows"),
             ("for issue in enforcement_truth_audit_issues():", "doc drift checks enforcement truth wiring"),
@@ -2081,7 +2125,7 @@ def command_version_line(name: str, *version_args: str, env: dict[str, str] | No
     if resolved is None:
         return False, f"{name} not found in PATH", command
 
-    result = run_optional([command, *version_args], env=env)
+    result = run_optional([command, *version_args], env=env, timeout=VERSION_PROBE_TIMEOUT_SECONDS)
     if result is None:
         return False, f"{name} not executable from PATH", resolved
     if result.returncode != 0:
@@ -2350,12 +2394,59 @@ def check_frontend_toolchain(_args: argparse.Namespace | None = None) -> int:
     return 0
 
 
+def playwright_chromium_status(env: dict[str, str] | None = None) -> tuple[bool, str]:
+    env = frontend_toolchain_env() if env is None else env
+    probe = run(
+        [
+            resolve_exe("node", env=env),
+            "--input-type=module",
+            "-e",
+            (
+                "import { chromium } from '@playwright/test';"
+                "import { existsSync } from 'node:fs';"
+                "const path = chromium.executablePath();"
+                "if (!existsSync(path)) {"
+                "  console.error(path);"
+                "  process.exit(1);"
+                "}"
+                "console.log(path);"
+            ),
+        ],
+        cwd=FRONTEND_DIR,
+        capture=True,
+        check=False,
+        env=env,
+        timeout=PLAYWRIGHT_BROWSER_PROBE_TIMEOUT_SECONDS,
+    )
+    detail = (probe.stdout or probe.stderr or "").strip().splitlines()
+    browser_path = detail[-1] if detail else "Playwright Chromium executable not found"
+    if probe.returncode == 0:
+        return True, browser_path
+    return (
+        False,
+        f"{browser_path}; run `python scripts/axis.py frontend install-browsers`",
+    )
+
+
+def check_playwright_browsers(_args: argparse.Namespace | None = None) -> int:
+    rc = check_frontend_toolchain()
+    if rc != 0:
+        return rc
+
+    ok, detail = playwright_chromium_status()
+    if not ok:
+        print(f"playwright-browsers: FAIL - {detail}", file=sys.stderr)
+        return 1
+    print(f"playwright-browsers: OK (chromium: {detail})")
+    return 0
+
+
 def find_lychee() -> str | None:
     return shutil.which("lychee")
 
 
 def lychee_version_status(lychee: str) -> tuple[bool, str]:
-    result = run_optional([lychee, "--version"])
+    result = run_optional([lychee, "--version"], timeout=VERSION_PROBE_TIMEOUT_SECONDS)
     if result is None:
         return False, f"{lychee} is not executable"
     if result.returncode != 0:
@@ -2430,6 +2521,29 @@ def coderabbit_cli_status() -> tuple[bool, str]:
     return True, f"{version_line} ({resolved}); expected >= {MINIMUM_CODERABBIT_CLI_VERSION}"
 
 
+def coderabbit_doctor_status(*, strict: bool) -> tuple[str, str]:
+    if strict:
+        ok, detail = coderabbit_cli_status()
+        return ("OK" if ok else "FAIL", detail)
+
+    resolved = shutil.which(resolve_exe("coderabbit")) or shutil.which("coderabbit")
+    if resolved is None:
+        return (
+            "FAIL",
+            f"coderabbit not found in PATH; CodeRabbit CLI is required for the local pre-PR review checkpoint. See {TOOL_VERSIONS_DOC}.",
+        )
+
+    suffix = Path(resolved).suffix.lower()
+    if os.name == "nt" and suffix in {".cmd", ".bat"}:
+        return (
+            "WARN",
+            f"{resolved}; version check skipped for Windows command shim. Run `python scripts/axis.py check coderabbit-cli` before PR review.",
+        )
+
+    ok, detail = coderabbit_cli_status()
+    return ("OK" if ok else "FAIL", detail)
+
+
 def check_coderabbit_cli(_args: argparse.Namespace | None = None) -> int:
     ok, detail = coderabbit_cli_status()
     if not ok:
@@ -2467,8 +2581,15 @@ def dotnet_command(args: argparse.Namespace) -> int:
     raise CheckError(f"Unknown dotnet command: {command}")
 
 
-def run_frontend_npm(npm_args: list[str], *, cwd: Path = FRONTEND_DIR) -> subprocess.CompletedProcess[str]:
+def run_frontend_npm(
+    npm_args: list[str],
+    *,
+    cwd: Path = FRONTEND_DIR,
+    env_overrides: dict[str, str] | None = None,
+) -> subprocess.CompletedProcess[str]:
     env = frontend_toolchain_env()
+    if env_overrides:
+        env.update(env_overrides)
     return run([resolve_exe("npm", env=env), *npm_args], cwd=cwd, env=env, check=False)
 
 
@@ -2487,22 +2608,31 @@ def frontend_command(args: argparse.Namespace) -> int:
     command = args.frontend_command
     if command == "install":
         return run_frontend_npm(["ci"]).returncode
+    if command == "install-browsers":
+        return run_frontend_npm(["exec", "--", "playwright", "install", "chromium"]).returncode
     if command == "ci":
         return run_frontend_npm(["run", "ci"]).returncode
     if command == "test":
         return run_frontend_npm(["run", "test"]).returncode
     if command == "gen-api-types":
+        generated_path = FRONTEND_DIR / "src" / "lib" / "api-types.ts"
+        original = generated_path.read_bytes() if generated_path.exists() else None
         result = run_frontend_npm(["run", "gen:api-types"])
         if result.returncode != 0 or not args.check:
             return result.returncode
-        diff = run([exe("git"), "diff", "--exit-code", "--", "frontend/src/lib/api-types.ts"], check=False)
-        if diff.returncode != 0:
+        generated = generated_path.read_bytes() if generated_path.exists() else None
+        if generated != original:
+            if original is None:
+                generated_path.unlink(missing_ok=True)
+            else:
+                generated_path.write_bytes(original)
             print(
                 "frontend gen-api-types: frontend/src/lib/api-types.ts is stale - "
                 "run `python scripts/axis.py frontend gen-api-types` and commit the result",
                 file=sys.stderr,
             )
-        return diff.returncode
+            return 1
+        return 0
     if command == "script":
         npm_args = ["run", args.script_name]
         script_args = passthrough_args(args.script_args)
@@ -2806,11 +2936,89 @@ def verify(args: argparse.Namespace) -> int:
     return 1
 
 
+def ready_review_policy_gates(
+    paths: list[str],
+    *,
+    policy_tests_covered: bool = False,
+) -> list[tuple[str, callable[[], int]]]:
+    gates: list[tuple[str, callable[[], int]]] = []
+    if any(path.startswith("scripts/") for path in paths) and not policy_tests_covered:
+        gates.append(("policy gate tests", check_policy_tests))
+    if ".github/renovate.json5" in paths:
+        gates.append(("Renovate config", lambda: check_renovate_config(None)))
+    gates.append(("doc drift", lambda: check_doc_drift(None)))
+    return gates
+
+
+def run_ready_review_policy(
+    paths: list[str],
+    *,
+    policy_tests_covered: bool = False,
+) -> tuple[int, list[str]]:
+    failed: list[str] = []
+    executed: list[str] = []
+    for name, checker in ready_review_policy_gates(paths, policy_tests_covered=policy_tests_covered):
+        print()
+        print(f"> ready-review: {name}")
+        executed.append(name)
+        try:
+            rc = checker()
+        except CheckError as exc:
+            print(exc, file=sys.stderr)
+            rc = 1
+        if rc == 0:
+            print(f"OK ready-review: {name}")
+        else:
+            print(f"FAIL ready-review: {name}")
+            failed.append(name)
+    return (0 if not failed else 1), executed
+
+
+def ready_review(args: argparse.Namespace) -> int:
+    if working_tree_paths():
+        print(
+            "ready-review: FAIL - create an intentional checkpoint commit before review-boundary verification",
+            file=sys.stderr,
+        )
+        return 1
+
+    try:
+        _scope, paths = verify_scope_paths(getattr(args, "since", None))
+    except CheckError as exc:
+        print(exc, file=sys.stderr)
+        return 1
+
+    policy_only = bool(getattr(args, "policy_only", False))
+    executed: list[str] = []
+    if not policy_only:
+        if verify(args) != 0:
+            print("ready-review: FAIL - changed-path verification failed", file=sys.stderr)
+            return 1
+        executed.append("verify")
+
+    scripts_changed = any(path.startswith("scripts/") for path in paths)
+    policy_rc, policy_gates = run_ready_review_policy(
+        paths,
+        policy_tests_covered=not policy_only and scripts_changed,
+    )
+    executed.extend(policy_gates)
+    if policy_rc != 0:
+        print("ready-review: FAIL - policy profile failed", file=sys.stderr)
+        return 1
+
+    if policy_only:
+        print("ready-review: PASS (policy profile)")
+        return 0
+
+    print(f"ready-review: PASS ({', '.join(executed)})")
+    return 0
+
+
 def pre_push(args: argparse.Namespace) -> int:
     full = os.environ.get("AXIS_PRE_PUSH_FULL", "").lower() in {"1", "true", "yes", "on"}
     if full:
-        print("pre-push: AXIS_PRE_PUSH_FULL is set; running full verify.")
-        return verify(args)
+        print("pre-push: AXIS_PRE_PUSH_FULL is set; running ready-review.")
+        return ready_review(argparse.Namespace(since=None, policy_only=False))
 
     range_spec = diff_range()
     paths = changed_paths(range_spec)
@@ -2843,7 +3051,7 @@ def pre_push(args: argparse.Namespace) -> int:
 
     print("pre-push: quick gate")
     print("  Runs cheap sanity checks before the network push.")
-    print("  Run `python scripts/axis.py verify` before marking a PR ready for review.")
+    print("  Run `python scripts/axis.py ready-review` before marking a PR ready for review.")
 
     if dotnet:
         step(".NET test naming", lambda: check_test_naming())
@@ -2990,14 +3198,14 @@ def _docker_host_ping_ok(docker_host: str | None) -> bool:
 def _docker_info_ok(env: dict[str, str] | None = None) -> bool:
     if shutil.which(exe("docker")) is None and shutil.which("docker") is None:
         return False
-    result = run_optional([exe("docker"), "info"], env=env)
+    result = run_optional([exe("docker"), "info"], env=env, timeout=DOCKER_PROBE_TIMEOUT_SECONDS)
     return result is not None and result.returncode == 0
 
 
 def _docker_compose_ok() -> bool:
     if shutil.which(exe("docker")) is None and shutil.which("docker") is None:
         return False
-    result = run_optional([exe("docker"), "compose", "version"])
+    result = run_optional([exe("docker"), "compose", "version"], timeout=DOCKER_PROBE_TIMEOUT_SECONDS)
     return result is not None and result.returncode == 0
 
 
@@ -3033,6 +3241,130 @@ def local_dev_shell_argv(service: str, exec_command: list[str]) -> list[str]:
     if command:
         return command
     return [LOCAL_DEV_SERVICE_SHELL.get(service, LOCAL_DEV_DEFAULT_SHELL)]
+
+
+def local_dev_smoke_env() -> dict[str, str]:
+    env = {
+        "E2E_API_URL": LOCAL_DEV_API_BASE_URL,
+        "E2E_BASE_URL": LOCAL_DEV_BROWSER_BASE_URL,
+        "E2E_BROWSER_HOME": str(LOCAL_DEV_BROWSER_HOME),
+        "E2E_SKIP_WEB_SERVER": "1",
+        "E2E_VERIFY_ORIGIN": LOCAL_DEV_BROWSER_BASE_URL,
+    }
+    if LOCAL_ROOT_CA_PEM.is_file():
+        env["NODE_EXTRA_CA_CERTS"] = str(LOCAL_ROOT_CA_PEM)
+    return env
+
+
+def ensure_local_dev_smoke_browser_trust() -> int:
+    if not LOCAL_ROOT_CA_PEM.is_file():
+        print(
+            "local-dev smoke: local root CA is missing. "
+            "Run `python scripts/axis.py local-dev certs` first.",
+            file=sys.stderr,
+        )
+        return 1
+
+    fingerprint = hashlib.sha256(LOCAL_ROOT_CA_PEM.read_bytes()).hexdigest()
+    marker = LOCAL_DEV_BROWSER_HOME / ".axis-root-ca.sha256"
+    nss_database = LOCAL_DEV_BROWSER_HOME / ".pki" / "nssdb"
+
+    if (
+        (nss_database / "cert9.db").is_file()
+        and marker.is_file()
+        and marker.read_text(encoding="utf-8").strip() == fingerprint
+    ):
+        return 0
+
+    LOCAL_DEV_BROWSER_HOME.mkdir(parents=True, exist_ok=True)
+    LOCAL_DEV_BROWSER_HOME.chmod(0o700)
+
+    build = run(local_dev_compose_args("--profile", "e2e", "build", "e2e"), check=False)
+    if build.returncode != 0:
+        return build.returncode
+
+    user_args: list[str] = []
+    getuid = getattr(os, "getuid", None)
+    getgid = getattr(os, "getgid", None)
+    if callable(getuid) and callable(getgid):
+        user_args = ["--user", f"{getuid()}:{getgid()}"]
+
+    trust = run(
+        local_dev_compose_args(
+            "--profile",
+            "e2e",
+            "run",
+            "--rm",
+            "--no-deps",
+            *user_args,
+            "--entrypoint",
+            "sh",
+            "-v",
+            f"{LOCAL_DEV_BROWSER_HOME}:/browser-home",
+            "e2e",
+            "./scripts/import-browser-ca.sh",
+            "/browser-home/.pki/nssdb",
+            "/https/rootCA.pem",
+        ),
+        check=False,
+    )
+    if trust.returncode != 0:
+        return trust.returncode
+    if not (nss_database / "cert9.db").is_file():
+        print("local-dev smoke: Chromium trust store was not created", file=sys.stderr)
+        return 1
+
+    marker.write_text(f"{fingerprint}\n", encoding="utf-8")
+    return 0
+
+
+def require_local_dev_smoke_services() -> int:
+    result = run(
+        local_dev_compose_args("ps", "--services", "--status", "running"),
+        capture=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        emit_captured_process(result)
+        return result.returncode
+
+    running = {line.strip() for line in (result.stdout or "").splitlines() if line.strip()}
+    missing = [service for service in LOCAL_DEV_SMOKE_SERVICES if service not in running]
+    if missing:
+        print(
+            "local-dev smoke: required services are not running: "
+            f"{', '.join(missing)}. Run `python scripts/axis.py local-dev up` first.",
+            file=sys.stderr,
+        )
+        return 1
+    return 0
+
+
+def local_dev_smoke(args: argparse.Namespace) -> int:
+    rc = check_frontend_toolchain()
+    if rc != 0:
+        return rc
+
+    ok, detail = playwright_chromium_status()
+    if not ok:
+        print(f"local-dev smoke: Playwright Chromium unavailable - {detail}", file=sys.stderr)
+        return 1
+
+    rc = require_local_dev_smoke_services()
+    if rc != 0:
+        return rc
+
+    rc = ensure_local_dev_smoke_browser_trust()
+    if rc != 0:
+        return rc
+
+    smoke_args = passthrough_args(getattr(args, "smoke_args", []))
+    if not smoke_args:
+        smoke_args = ["e2e/local-dev-smoke.pw.ts"]
+    return run_frontend_npm(
+        ["run", "test:e2e", "--", *smoke_args],
+        env_overrides=local_dev_smoke_env(),
+    ).returncode
 
 
 def require_docker_compose(label: str) -> int:
@@ -3212,6 +3544,9 @@ def local_dev(args: argparse.Namespace) -> int:
             check=False,
         ).returncode
 
+    if command == "smoke":
+        return local_dev_smoke(args)
+
     if command == "observability":
         obs_command = args.observability_command
         if obs_command == "up":
@@ -3251,7 +3586,10 @@ def local_dev(args: argparse.Namespace) -> int:
 def _wsl_docker_ok() -> bool:
     if os.name != "nt" or shutil.which("wsl.exe") is None:
         return False
-    result = run_optional(["wsl.exe", "bash", "-lc", "docker info >/dev/null 2>&1"])
+    result = run_optional(
+        ["wsl.exe", "bash", "-lc", "docker info >/dev/null 2>&1"],
+        timeout=DOCKER_PROBE_TIMEOUT_SECONDS,
+    )
     return result is not None and result.returncode == 0
 
 
@@ -3284,8 +3622,8 @@ def doctor(args: argparse.Namespace) -> int:
         lychee_ok, lychee_detail = lychee_version_status(lychee)
         record("OK" if lychee_ok else "FAIL", "lychee", lychee_detail)
 
-    coderabbit_ok, coderabbit_detail = coderabbit_cli_status()
-    record("OK" if coderabbit_ok else "FAIL", "coderabbit", coderabbit_detail)
+    coderabbit_status, coderabbit_detail = coderabbit_doctor_status(strict=args.strict)
+    record(coderabbit_status, "coderabbit", coderabbit_detail)
 
     dotnet_ok, dotnet_detail = dotnet_sdk_status()
     record("OK" if dotnet_ok else "FAIL", ".NET SDK", dotnet_detail)
@@ -3293,6 +3631,16 @@ def doctor(args: argparse.Namespace) -> int:
     frontend_env = frontend_toolchain_env()
     node_ok, node_detail = node_version_status(frontend_env)
     record("OK" if node_ok else "FAIL", "node", node_detail)
+
+    if node_ok:
+        chromium_ok, chromium_detail = playwright_chromium_status(frontend_env)
+        record("OK" if chromium_ok else "WARN", "playwright chromium", chromium_detail)
+    else:
+        record(
+            "WARN",
+            "playwright chromium",
+            "Node must resolve before checking Playwright browser artifacts",
+        )
 
     for name, version_args in (
         ("git", ("--version",)),
@@ -3426,6 +3774,14 @@ def main(argv: list[str] | None = None) -> int:
     doctor_parser.set_defaults(func=doctor)
     sub.add_parser("install-hooks").set_defaults(func=install_hooks)
     sub.add_parser("pre-push").set_defaults(func=pre_push)
+    ready_review_parser = sub.add_parser("ready-review")
+    ready_review_parser.add_argument("--since", help="Scope expensive verification after this checkpoint")
+    ready_review_parser.add_argument(
+        "--policy-only",
+        action="store_true",
+        help="Run only the deterministic policy profile shared with CI",
+    )
+    ready_review_parser.set_defaults(func=ready_review)
     verify_parser = sub.add_parser("verify")
     verify_parser.add_argument("--since", help="Scope verification to changes after this checkpoint plus the working tree")
     verify_parser.set_defaults(func=verify)
@@ -3450,6 +3806,7 @@ def main(argv: list[str] | None = None) -> int:
     frontend_parser = sub.add_parser("frontend")
     frontend_sub = frontend_parser.add_subparsers(dest="frontend_command", required=True)
     frontend_sub.add_parser("install").set_defaults(func=frontend_command)
+    frontend_sub.add_parser("install-browsers").set_defaults(func=frontend_command)
     frontend_sub.add_parser("ci").set_defaults(func=frontend_command)
     frontend_sub.add_parser("test").set_defaults(func=frontend_command)
     frontend_gen_api = frontend_sub.add_parser("gen-api-types")
@@ -3492,6 +3849,9 @@ def main(argv: list[str] | None = None) -> int:
     local_e2e = local_dev_sub.add_parser("e2e")
     local_e2e.add_argument("e2e_args", nargs=argparse.REMAINDER)
     local_e2e.set_defaults(func=local_dev)
+    local_smoke = local_dev_sub.add_parser("smoke")
+    local_smoke.add_argument("smoke_args", nargs=argparse.REMAINDER)
+    local_smoke.set_defaults(func=local_dev)
     local_observability = local_dev_sub.add_parser("observability")
     local_observability_sub = local_observability.add_subparsers(dest="observability_command", required=True)
     local_observability_sub.add_parser("up").set_defaults(func=local_dev)
@@ -3516,6 +3876,7 @@ def main(argv: list[str] | None = None) -> int:
     check_sub.add_parser("docker").set_defaults(func=check_docker)
     check_sub.add_parser("dotnet-sdk").set_defaults(func=check_dotnet_sdk)
     check_sub.add_parser("frontend-toolchain").set_defaults(func=check_frontend_toolchain)
+    check_sub.add_parser("playwright-browsers").set_defaults(func=check_playwright_browsers)
     check_sub.add_parser("vulnerable-packages").set_defaults(func=check_vulnerable_packages)
     check_sub.add_parser("ef-domain-mapping").set_defaults(func=check_ef_domain_mapping)
     check_sub.add_parser("frontend-api-contracts").set_defaults(func=check_frontend_api_contracts)

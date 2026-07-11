@@ -17,7 +17,7 @@ Tech-stack changes need explicit user approval before implementation. Update thi
 | Auth | OpenIddict Authorization Code + PKCE, BCrypt password hashing, MailKit SMTP. |
 | Observability | Serilog, OpenTelemetry, optional local OTEL/LGTM stack. |
 | API contract | OpenAPI via Swashbuckle/Scalar; SPA types generated with `openapi-typescript`. |
-| Frontend | React, TypeScript, Vite, TanStack Router, TanStack Query, Zustand, react-hook-form, Zod, i18next/react-i18next. |
+| Frontend | React, TypeScript, Vite, TanStack Router, TanStack Query, TanStack Table, TanStack Virtual, React Query Builder, Zustand, react-hook-form, Zod, i18next/react-i18next. |
 | UI | Tailwind CSS 4, shadcn components, Base UI-backed shared primitives, lucide-react icons. |
 | Testing | xUnit, Testcontainers, architecture tests, Vitest, Testing Library, Playwright. |
 | Local runtime | Docker Compose with PostgreSQL, Redis, Maildev, API, SPA, and optional observability/e2e profiles. |

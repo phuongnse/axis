@@ -27,22 +27,22 @@ Follow [reference.md](../reference.md).
 1. Classify the moment.
    - Exploring: prefer read-only commands such as `rg`, `git status`, `git diff`, and targeted file reads.
    - Inner loop: run the smallest command that proves the edit.
-   - Boundary: read `.agents/skills/axis-ready-review/SKILL.md` (`$axis-ready-review`) before review; it owns `python scripts/axis.py verify` when triggered.
+   - Boundary: read `.agents/skills/axis-ready-review/SKILL.md` (`$axis-ready-review`) before review; it owns `python scripts/axis.py ready-review` when triggered.
    - CI/debugging: run broader checks only to reproduce or diagnose a failing gate.
 
 2. Pick the narrow check.
    - Docs: focused docs check; read `.agents/skills/axis-doc-hygiene/SKILL.md` (`$axis-doc-hygiene`) when changing docs.
    - Skills: `python scripts/axis.py check repo-skills`.
    - Scripts/policy: focused script/policy test, then `python scripts/axis.py check policy-tests` when rule wiring changed.
-   - Local-dev / compose / cross-platform: read [docs/playbooks/local-dev.md](../../../docs/playbooks/local-dev.md); use `python scripts/axis.py doctor`, `python scripts/axis.py check local-dev-docs`, and `python scripts/axis.py local-dev e2e -- <playwright-args>` only when stack behavior or E2E evidence is in scope. When a local-dev request is meant for a human to exercise account access, prove the real Maildev/browser path uses that environment's browser-facing origin; mocked auth sessions or mocked email/token journeys only prove the mocked surface they name. When frontend manifests or toolchain dependencies change, confirm the running local-dev service resolves the current approved stack before interpreting browser smoke or E2E failures. Scope E2E to the relevant file or title during the inner loop; run all E2E only for stack-wide smoke, review-boundary evidence, or debugging broad failures.
+   - Local-dev / compose / cross-platform: read [docs/playbooks/local-dev.md](../../../docs/playbooks/local-dev.md); use `python scripts/axis.py doctor`, `python scripts/axis.py check local-dev-docs`, `python scripts/axis.py local-dev smoke -- <playwright-args>` for fast host-browser layout/UI smoke against an already-running stack, and `python scripts/axis.py local-dev e2e -- <playwright-args>` only when Compose-backed journey or acceptance evidence is in scope. When a local-dev request is meant for a human to exercise account access, prove the real Maildev/browser path uses that environment's browser-facing origin; mocked auth sessions or mocked email/token journeys only prove the mocked surface they name. When frontend manifests or toolchain dependencies change, confirm the running local-dev service resolves the current approved stack before interpreting browser smoke or E2E failures. Scope browser runs to the relevant file or title during the inner loop; run all E2E only for stack-wide smoke, review-boundary evidence, or debugging broad failures.
    - EF migrations / schema: targeted dotnet tests; read `.agents/skills/axis-design-gate/SKILL.md` (`$axis-design-gate`) for high-risk sign-off before code.
    - Backend: targeted test or `python scripts/axis.py dotnet build`; unit tests when behavior changed.
    - Frontend: focused Vitest/Playwright or `python scripts/axis.py frontend ci` for type/lint risk.
    - API contract: regenerate/check generated contracts only when route/request/response shape changed.
-   - Review follow-up: when a reviewed checkpoint exists, run `python scripts/axis.py verify --since <checkpoint>` so the wrapper selects checks from the follow-up delta plus working tree.
+   - Review follow-up: commit the follow-up, then run `python scripts/axis.py ready-review --since <checkpoint>` so expensive verification is delta-scoped while the shared policy profile still checks the publishable branch.
 
 3. Avoid waste.
-   - Do not run `verify` after every small edit.
+   - Do not run `verify` or `ready-review` after every small edit.
    - Do not run full `.NET` test suite unless debugging CI, high-risk backend behavior, or claiming full-suite evidence.
    - Do not run local-dev stack unless the workflow needs external services or smoke evidence.
    - Do not rerun passing checks unless the diff changed in a way that invalidates them.

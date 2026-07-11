@@ -9,6 +9,7 @@ This file owns durable source and runtime boundaries. Current behavior lives in 
 - `frontend/` calls `Axis.Api` only.
 - `Axis.Api` is the REST/OpenAPI gateway and composes module infrastructure at startup.
 - Modules expose Application contracts to `Axis.Api`; module internals stay inside the module.
+- Modules may expose optional `Axis.{Module}.Contracts` projects for stable cross-module contracts; consumers may reference another module's Contracts project only, not its Domain, Application, or Infrastructure projects.
 - Module Domain models follow DDD tactical boundaries; aggregate roots own invariants and domain events.
 - Module Application exposes CQRS commands and side-effect-free queries through handlers.
 - Domain projects have zero external dependencies.
@@ -22,11 +23,16 @@ This file owns durable source and runtime boundaries. Current behavior lives in 
 ```text
 frontend
   -> Axis.Api
+    -> Module.Contracts
     -> Module.Application
       -> Module.Domain
     -> Module.Infrastructure
       -> Module.Application
       -> Module.Domain
+
+Module.Application
+  -> Same Module.Domain
+  -> Other Module.Contracts only when a use case needs a public cross-module contract
 
 Axis.Shared.* supports layers without owning product behavior.
 ```

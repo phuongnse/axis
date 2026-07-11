@@ -254,7 +254,7 @@ class TestUseCaseDocsGate(unittest.TestCase):
 
         self.assertIn(
             "docs/use-cases/example/sample: use cases must be direct Markdown files",
-            "\n".join(issues),
+            "\n".join(issues).replace("\\", "/"),
         )
 
     def issues_for_use_case(self, callout: str, ac_line: str = "- **AC-001** Works.") -> list[str]:
@@ -1547,6 +1547,17 @@ class TestVulnerablePackageGate(unittest.TestCase):
 
 
 class TestToolVersionGates(unittest.TestCase):
+    def test_run_returns_timeout_result_when_optional_command_hangs(self) -> None:
+        with mock.patch.object(
+            axis.subprocess,
+            "run",
+            side_effect=axis.subprocess.TimeoutExpired(["tool", "--version"], 8),
+        ):
+            result = axis.run(["tool", "--version"], capture=True, check=False, timeout=8)
+
+        self.assertEqual(124, result.returncode)
+        self.assertIn("timed out after 8 seconds", result.stderr)
+
     def test_dotnet_sdk_rejects_global_json_major_drift(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             global_json = Path(temp) / "global.json"
@@ -1671,6 +1682,61 @@ class TestToolVersionGates(unittest.TestCase):
             dirs = axis._windows_git_usr_bin_dirs()
         expected = Path(localappdata) / "Programs" / "Git" / "usr" / "bin"
         self.assertIn(expected, dirs)
+
+    def test_playwright_chromium_status_reports_missing_browser(self) -> None:
+        def fake_run(command: list[str], **_kwargs):
+            return axis.subprocess.CompletedProcess(command, 1, stdout="", stderr="/missing/chromium\n")
+
+        with (
+            mock.patch.object(axis, "run", side_effect=fake_run),
+            mock.patch.object(axis, "resolve_exe", side_effect=lambda name, **_kwargs: name),
+        ):
+            ok, detail = axis.playwright_chromium_status({"PATH": "/tmp/node"})
+
+        self.assertFalse(ok)
+        self.assertIn("/missing/chromium", detail)
+        self.assertIn("python scripts/axis.py frontend install-browsers", detail)
+
+    def test_doctor_warns_when_playwright_chromium_is_missing(self) -> None:
+        with (
+            mock.patch.object(axis, "find_lychee", return_value="/usr/bin/lychee"),
+            mock.patch.object(axis, "lychee_version_status", return_value=(True, "lychee 0.23.0")),
+            mock.patch.object(axis, "coderabbit_cli_status", return_value=(True, "coderabbit 0.6.0")),
+            mock.patch.object(axis, "dotnet_sdk_status", return_value=(True, "8.0.100")),
+            mock.patch.object(axis, "frontend_toolchain_env", return_value={}),
+            mock.patch.object(axis, "node_version_status", return_value=(True, "v22.23.0")),
+            mock.patch.object(
+                axis,
+                "playwright_chromium_status",
+                return_value=(False, "missing; run `python scripts/axis.py frontend install-browsers`"),
+            ),
+            mock.patch.object(axis, "_command_version", return_value=("OK", "/usr/bin/tool")),
+            mock.patch.object(axis, "find_openssl", return_value="/usr/bin/openssl"),
+            mock.patch.object(axis, "_docker_info_ok", return_value=True),
+            mock.patch.object(axis, "_docker_host_ping_ok", return_value=False),
+            mock.patch.object(axis, "_http_ok", return_value=False),
+            mock.patch.object(axis, "_wsl_docker_ok", return_value=False),
+            mock.patch.object(axis, "_docker_compose_ok", return_value=True),
+            contextlib.redirect_stdout(io.StringIO()) as stdout,
+            contextlib.redirect_stderr(io.StringIO()) as stderr,
+        ):
+            self.assertEqual(0, axis.doctor(axis.argparse.Namespace(strict=True)))
+
+        self.assertIn("[WARN] playwright chromium", stdout.getvalue())
+        self.assertEqual("", stderr.getvalue())
+
+    def test_coderabbit_doctor_skips_windows_command_shim_in_non_strict_mode(self) -> None:
+        with (
+            mock.patch.object(axis.os, "name", "nt"),
+            mock.patch.object(axis, "resolve_exe", return_value="coderabbit.cmd"),
+            mock.patch.object(axis.shutil, "which", return_value=r"C:\Users\alice\.local\bin\coderabbit.cmd"),
+            mock.patch.object(axis, "coderabbit_cli_status") as version_check,
+        ):
+            status, detail = axis.coderabbit_doctor_status(strict=False)
+
+        self.assertEqual("WARN", status)
+        self.assertIn("version check skipped", detail)
+        version_check.assert_not_called()
 
 
 class TestMarkdownLinkGate(unittest.TestCase):
@@ -1798,6 +1864,83 @@ class TestVerifyGate(unittest.TestCase):
             ],
             calls,
         )
+
+
+class TestReviewVerificationGates(unittest.TestCase):
+    def test_rejects_dirty_worktree_before_running_checks(self) -> None:
+        with (
+            mock.patch.object(axis, "working_tree_paths", return_value=["scripts/axis.py"]),
+            mock.patch.object(axis, "verify") as verify,
+            mock.patch.object(axis, "run_ready_review_policy") as policy,
+            contextlib.redirect_stderr(io.StringIO()),
+        ):
+            result = axis.ready_review(axis.argparse.Namespace(since=None, policy_only=False))
+
+        self.assertEqual(1, result)
+        verify.assert_not_called()
+        policy.assert_not_called()
+
+    def test_runs_verify_and_shared_policy_profile(self) -> None:
+        with (
+            mock.patch.object(axis, "working_tree_paths", return_value=[]),
+            mock.patch.object(axis, "verify_scope_paths", return_value=("base...HEAD", ["frontend/src/App.tsx"])),
+            mock.patch.object(axis, "verify", return_value=0) as verify,
+            mock.patch.object(axis, "run_ready_review_policy", return_value=(0, ["doc drift"])) as policy,
+            contextlib.redirect_stdout(io.StringIO()),
+        ):
+            result = axis.ready_review(axis.argparse.Namespace(since=None, policy_only=False))
+
+        self.assertEqual(0, result)
+        verify.assert_called_once()
+        policy.assert_called_once_with(["frontend/src/App.tsx"], policy_tests_covered=False)
+
+    def test_policy_only_uses_same_profile_without_verify(self) -> None:
+        with (
+            mock.patch.object(axis, "working_tree_paths", return_value=[]),
+            mock.patch.object(axis, "verify_scope_paths", return_value=("base...HEAD", ["scripts/axis.py"])),
+            mock.patch.object(axis, "verify") as verify,
+            mock.patch.object(axis, "run_ready_review_policy", return_value=(0, ["policy gate tests", "doc drift"])) as policy,
+            contextlib.redirect_stdout(io.StringIO()),
+        ):
+            result = axis.ready_review(axis.argparse.Namespace(since=None, policy_only=True))
+
+        self.assertEqual(0, result)
+        verify.assert_not_called()
+        policy.assert_called_once_with(["scripts/axis.py"], policy_tests_covered=False)
+
+    def test_policy_registry_routes_only_triggered_expensive_checks(self) -> None:
+        names = [
+            name
+            for name, _checker in axis.ready_review_policy_gates(
+                ["scripts/axis.py", ".github/renovate.json5"]
+            )
+        ]
+
+        self.assertEqual(["policy gate tests", "Renovate config", "doc drift"], names)
+        self.assertEqual(
+            ["doc drift"],
+            [
+                name
+                for name, _checker in axis.ready_review_policy_gates(
+                    ["frontend/src/App.tsx"],
+                    policy_tests_covered=True,
+                )
+            ],
+        )
+
+    def test_pre_push_full_delegates_to_ready_review(self) -> None:
+        with (
+            mock.patch.dict(axis.os.environ, {"AXIS_PRE_PUSH_FULL": "1"}),
+            mock.patch.object(axis, "ready_review", return_value=0) as ready_review,
+            contextlib.redirect_stdout(io.StringIO()),
+        ):
+            result = axis.pre_push(object())
+
+        self.assertEqual(0, result)
+        ready_review.assert_called_once()
+        delegated = ready_review.call_args.args[0]
+        self.assertIsNone(delegated.since)
+        self.assertFalse(delegated.policy_only)
 
     def test_runs_script_checks_for_script_changes(self) -> None:
         calls: list[str] = []
@@ -2009,6 +2152,24 @@ class TestFrontendComponentFileNames(unittest.TestCase):
         self.assertIn("standard UI control <button> must use a shared shadcn UI primitive", joined)
         self.assertIn("standard UI control <input> must use a shared shadcn UI primitive", joined)
 
+    def test_rejects_raw_structured_controls_with_shared_primitives(self) -> None:
+        issues = self.issues_for_frontend(
+            {
+                "frontend/src/features/rules/components/RuleTable.tsx": (
+                    "export function RuleTable() {\n"
+                    "  return <dialog><progress /><table><tbody><tr><td>Rule</td></tr></tbody></table></dialog>;\n"
+                    "}\n"
+                )
+            }
+        )
+
+        joined = "\n".join(issues)
+        for element in ("dialog", "progress", "table", "tbody", "tr", "td"):
+            self.assertIn(
+                f"standard UI control <{element}> must use a shared shadcn UI primitive",
+                joined,
+            )
+
     def test_rejects_headless_ui_import_outside_ui_primitives(self) -> None:
         issues = self.issues_for_frontend(
             {
@@ -2020,6 +2181,62 @@ class TestFrontendComponentFileNames(unittest.TestCase):
         )
 
         self.assertIn("headless UI primitives belong in shadcn primitives", "\n".join(issues))
+
+    def test_rejects_radix_ui_import_outside_ui_primitives(self) -> None:
+        issues = self.issues_for_frontend(
+            {
+                "frontend/src/features/auth/components/CustomMenu.tsx": (
+                    "import * as Menu from '@radix-ui/react-dropdown-menu';\n"
+                    "export function CustomMenu() { return null; }\n"
+                )
+            }
+        )
+
+        self.assertIn("headless UI primitives belong in shadcn primitives", "\n".join(issues))
+
+    def test_rejects_native_fallback_import_in_product_code(self) -> None:
+        issues = self.issues_for_frontend(
+            {
+                "frontend/src/features/rules/components/RuleFilter.tsx": (
+                    "import { NativeSelect } from '@/components/ui/native-select';\n"
+                    "export function RuleFilter() { return <NativeSelect />; }\n"
+                )
+            }
+        )
+
+        self.assertIn(
+            "native fallback primitives require an approved platform-native behavior exception",
+            "\n".join(issues),
+        )
+
+    def test_rejects_unformatted_select_value_in_product_code(self) -> None:
+        issues = self.issues_for_frontend(
+            {
+                "frontend/src/features/rules/components/RuleFilter.tsx": (
+                    "import { SelectValue } from '@/components/ui/select';\n"
+                    "export function RuleFilter() { return <SelectValue placeholder=\"All origins\" />; }\n"
+                )
+            }
+        )
+
+        self.assertIn(
+            "SelectValue must format the selected value from the same display-label source as SelectItem",
+            "\n".join(issues),
+        )
+
+    def test_accepts_select_value_with_display_label_formatter(self) -> None:
+        issues = self.issues_for_frontend(
+            {
+                "frontend/src/features/rules/components/RuleFilter.tsx": (
+                    "import { SelectValue } from '@/components/ui/select';\n"
+                    "export function RuleFilter() {\n"
+                    "  return <SelectValue>{(value) => value === 'All' ? 'All origins' : value}</SelectValue>;\n"
+                    "}\n"
+                )
+            }
+        )
+
+        self.assertEqual([], issues)
 
     def test_accepts_native_standard_controls_inside_shadcn_ui_primitives(self) -> None:
         issues = self.issues_for_frontend(
@@ -2497,14 +2714,17 @@ class TestEnforcementTruthAudit(unittest.TestCase):
     def test_rejects_ci_without_doc_drift(self) -> None:
         def mutate(files: dict[Path, str]) -> None:
             workflow = Path(".github/workflows/build-and-test.yml")
-            files[workflow] = files[workflow].replace("run: python scripts/axis.py check doc-drift\n", "")
+            files[workflow] = files[workflow].replace(
+                "run: python scripts/axis.py ready-review --policy-only\n",
+                "",
+            )
 
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             self.write_truth_repo(root, mutate)
             issues = axis.enforcement_truth_audit_issues(root=root)
 
-        self.assertIn("doc drift runs in CI", "\n".join(issues))
+        self.assertIn("shared ready-review policy profile runs in CI", "\n".join(issues))
 
     def test_rejects_local_verify_without_markdown_links(self) -> None:
         def mutate(files: dict[Path, str]) -> None:
@@ -2935,6 +3155,125 @@ class TestLocalDevCli(unittest.TestCase):
             calls[1][1:],
         )
 
+    def test_smoke_runs_host_playwright_against_running_local_stack(self) -> None:
+        calls: list[list[str]] = []
+        envs: list[dict[str, str] | None] = []
+
+        def fake_run(command: list[str], **kwargs):
+            calls.append(command)
+            envs.append(kwargs.get("env"))
+            if command[1:] == [
+                "compose",
+                "-p",
+                "axis",
+                "-f",
+                str(axis.LOCAL_DEV_COMPOSE_FILE),
+                "ps",
+                "--services",
+                "--status",
+                "running",
+            ]:
+                return axis.subprocess.CompletedProcess(command, 0, stdout="api\nweb\n", stderr="")
+            return axis.subprocess.CompletedProcess(command, 0, stdout="", stderr="")
+
+        with tempfile.TemporaryDirectory() as temp:
+            root_ca = Path(temp) / "rootCA.pem"
+            root_ca.write_text("test root ca", encoding="utf-8")
+            browser_home = Path(temp) / "browser-home"
+
+            with (
+                mock.patch.object(axis, "LOCAL_ROOT_CA_PEM", root_ca),
+                mock.patch.object(axis, "LOCAL_DEV_BROWSER_HOME", browser_home),
+                mock.patch.object(axis, "_docker_compose_ok", return_value=True),
+                mock.patch.object(axis, "check_frontend_toolchain", return_value=0),
+                mock.patch.object(axis, "playwright_chromium_status", return_value=(True, "chromium")),
+                mock.patch.object(axis, "ensure_local_dev_smoke_browser_trust", return_value=0),
+                mock.patch.object(axis, "frontend_toolchain_env", return_value={"PATH": "node-bin"}),
+                mock.patch.object(axis, "run", side_effect=fake_run),
+            ):
+                result = axis.local_dev(
+                    axis.argparse.Namespace(
+                        local_dev_command="smoke",
+                        smoke_args=["--", "e2e/app-frame.pw.ts", "-g", "AT-002"],
+                    )
+                )
+
+        self.assertEqual(0, result)
+        self.assertEqual(
+            [
+                "compose",
+                "-p",
+                "axis",
+                "-f",
+                str(axis.LOCAL_DEV_COMPOSE_FILE),
+                "ps",
+                "--services",
+                "--status",
+                "running",
+            ],
+            calls[0][1:],
+        )
+        self.assertEqual(["run", "test:e2e", "--", "e2e/app-frame.pw.ts", "-g", "AT-002"], calls[1][1:])
+        self.assertEqual("https://localhost:5281", envs[1]["E2E_API_URL"])
+        self.assertEqual("https://localhost:3000", envs[1]["E2E_BASE_URL"])
+        self.assertEqual(str(browser_home), envs[1]["E2E_BROWSER_HOME"])
+        self.assertEqual("1", envs[1]["E2E_SKIP_WEB_SERVER"])
+        self.assertEqual("https://localhost:3000", envs[1]["E2E_VERIFY_ORIGIN"])
+        self.assertEqual(str(root_ca), envs[1]["NODE_EXTRA_CA_CERTS"])
+
+    def test_smoke_browser_trust_imports_root_ca_into_isolated_nss_db(self) -> None:
+        calls: list[list[str]] = []
+
+        with tempfile.TemporaryDirectory() as temp:
+            root_ca = Path(temp) / "rootCA.pem"
+            root_ca.write_text("test root ca", encoding="utf-8")
+            browser_home = Path(temp) / "browser-home"
+
+            def fake_run(command: list[str], **_kwargs):
+                calls.append(command)
+                if "run" in command:
+                    nss_db = browser_home / ".pki" / "nssdb"
+                    nss_db.mkdir(parents=True, exist_ok=True)
+                    (nss_db / "cert9.db").write_text("trusted", encoding="utf-8")
+                return axis.subprocess.CompletedProcess(command, 0, stdout="", stderr="")
+
+            with (
+                mock.patch.object(axis, "LOCAL_ROOT_CA_PEM", root_ca),
+                mock.patch.object(axis, "LOCAL_DEV_BROWSER_HOME", browser_home),
+                mock.patch.object(axis, "run", side_effect=fake_run),
+            ):
+                result = axis.ensure_local_dev_smoke_browser_trust()
+
+            self.assertEqual(0, result)
+            self.assertEqual(2, len(calls))
+            self.assertEqual(
+                ["--profile", "e2e", "build", "e2e"],
+                calls[0][-4:],
+            )
+            self.assertIn(f"{browser_home}:/browser-home", calls[1])
+            self.assertTrue((browser_home / ".axis-root-ca.sha256").is_file())
+
+    def test_smoke_fails_when_required_local_services_are_not_running(self) -> None:
+        calls: list[list[str]] = []
+
+        def fake_run(command: list[str], **_kwargs):
+            calls.append(command)
+            return axis.subprocess.CompletedProcess(command, 0, stdout="api\n", stderr="")
+
+        stderr = io.StringIO()
+        with (
+            mock.patch.object(axis, "_docker_compose_ok", return_value=True),
+            mock.patch.object(axis, "check_frontend_toolchain", return_value=0),
+            mock.patch.object(axis, "playwright_chromium_status", return_value=(True, "chromium")),
+            mock.patch.object(axis, "run", side_effect=fake_run),
+            mock.patch.object(axis.sys, "stderr", stderr),
+        ):
+            result = axis.local_dev(axis.argparse.Namespace(local_dev_command="smoke", smoke_args=[]))
+
+        self.assertEqual(1, result)
+        self.assertEqual(1, len(calls))
+        self.assertIn("required services are not running: web", stderr.getvalue())
+
     def test_shell_uses_service_default_inside_container(self) -> None:
         calls = self.run_local_dev(
             axis.argparse.Namespace(local_dev_command="shell", service="web", exec_command=[])
@@ -3095,14 +3434,38 @@ class TestAxisCommandWrappers(unittest.TestCase):
 
         self.assertEqual(["dotnet", "format", "Axis.sln", "--verify-no-changes"], calls[0])
 
-    def test_frontend_gen_api_types_check_diffs_generated_file(self) -> None:
+    def test_frontend_gen_api_types_check_generates_without_diffing_head(self) -> None:
         calls = self.run_with_fake_process(
             axis.frontend_command,
             axis.argparse.Namespace(frontend_command="gen-api-types", check=True),
         )
 
         self.assertEqual(["npm", "run", "gen:api-types"], calls[0])
-        self.assertEqual(["git", "diff", "--exit-code", "--", "frontend/src/lib/api-types.ts"], calls[1])
+        self.assertEqual(1, len(calls))
+
+    def test_frontend_gen_api_types_check_restores_stale_working_file(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            frontend = Path(temp)
+            generated = frontend / "src" / "lib" / "api-types.ts"
+            generated.parent.mkdir(parents=True)
+            generated.write_text("current", encoding="utf-8")
+
+            def generate(_args: list[str]) -> subprocess.CompletedProcess[str]:
+                generated.write_text("generated", encoding="utf-8")
+                return subprocess.CompletedProcess([], 0)
+
+            with (
+                mock.patch.object(axis, "FRONTEND_DIR", frontend),
+                mock.patch.object(axis, "check_frontend_toolchain", return_value=0),
+                mock.patch.object(axis, "run_frontend_npm", side_effect=generate),
+                contextlib.redirect_stderr(io.StringIO()),
+            ):
+                rc = axis.frontend_command(
+                    axis.argparse.Namespace(frontend_command="gen-api-types", check=True)
+                )
+
+            self.assertEqual(1, rc)
+            self.assertEqual("current", generated.read_text(encoding="utf-8"))
 
     def test_frontend_command_runs_npm_with_resolved_frontend_env(self) -> None:
         calls: list[dict[str, dict[str, str] | None]] = []
@@ -3121,6 +3484,14 @@ class TestAxisCommandWrappers(unittest.TestCase):
             self.assertEqual(0, axis.frontend_command(axis.argparse.Namespace(frontend_command="ci")))
 
         self.assertEqual(frontend_env, calls[0]["env"])
+
+    def test_frontend_install_browsers_installs_playwright_chromium(self) -> None:
+        calls = self.run_with_fake_process(
+            axis.frontend_command,
+            axis.argparse.Namespace(frontend_command="install-browsers"),
+        )
+
+        self.assertEqual(["npm", "exec", "--", "playwright", "install", "chromium"], calls[0])
 
     def test_local_dev_certs_writes_extension_and_runs_openssl(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -3344,6 +3715,31 @@ class TestRepoSkillsGate(unittest.TestCase):
         joined = "\n".join(issues)
         self.assertIn("hard-gate contract missing required pattern", joined)
         self.assertIn("must chain to $axis-ready-review", joined)
+
+    def test_frontend_skills_require_visual_override_audit_contract(self) -> None:
+        for skill_name in ("axis-frontend-feature", "axis-frontend-foundation"):
+            files = {
+                ".agents/skills/reference.md": "# Reference\n",
+                f".agents/skills/{skill_name}/SKILL.md": (
+                    "---\n"
+                    f"name: {skill_name}\n"
+                    "description: Use for concrete frontend work with shared design-system components.\n"
+                    "---\n"
+                    "\n"
+                    f"# {skill_name}\n"
+                    "\n"
+                    "## Hard gates\n"
+                    "\n"
+                    "Follow [reference.md](../reference.md).\n"
+                    "Use $axis-design-gate before code and $axis-ready-review before review.\n"
+                ),
+            }
+
+            issues = "\n".join(self.issues_for_skill(files))
+
+            self.assertIn("visual override audit", issues)
+            self.assertIn("layout-only", issues)
+            self.assertIn("shared variant", issues)
 
     def test_pull_request_skill_must_cover_published_branch_push_updates(self) -> None:
         files = {

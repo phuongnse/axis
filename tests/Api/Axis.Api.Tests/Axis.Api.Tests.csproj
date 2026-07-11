@@ -29,7 +29,9 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\..\src\Axis.Api\Axis.Api.csproj" />
-    <ProjectReference Include="..\..\..\src\Modules\Objects\Axis.Objects.Infrastructure\Axis.Objects.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\..\src\Modules\BusinessObjects\Axis.BusinessObjects.Infrastructure\Axis.BusinessObjects.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\..\src\Modules\Rules\Axis.Rules.Contracts\Axis.Rules.Contracts.csproj" />
+    <ProjectReference Include="..\..\..\src\Modules\Rules\Axis.Rules.Infrastructure\Axis.Rules.Infrastructure.csproj" />
     <ProjectReference Include="..\..\Shared\Axis.Testing\Axis.Testing.csproj" />
   </ItemGroup>
 

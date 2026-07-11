@@ -3,11 +3,14 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 
 import { Alert, AlertDescription, AlertTitle } from '../src/components/ui/alert';
-import { Card } from '../src/components/ui/card';
+import { Badge } from '../src/components/ui/badge';
+import { Button } from '../src/components/ui/button';
+import { Card, CardFooter } from '../src/components/ui/card';
 import { Checkbox } from '../src/components/ui/checkbox';
 import { Field, FieldDescription, FieldError, FieldLabel } from '../src/components/ui/field';
 import { Input } from '../src/components/ui/input';
 import { InputGroup, InputGroupInput } from '../src/components/ui/input-group';
+import { Item } from '../src/components/ui/item';
 import { Label } from '../src/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '../src/components/ui/popover';
 import {
@@ -18,6 +21,7 @@ import {
   SelectValue,
 } from '../src/components/ui/select';
 import { Skeleton } from '../src/components/ui/skeleton';
+import { Tabs, TabsList, TabsTrigger } from '../src/components/ui/tabs';
 import { Textarea } from '../src/components/ui/textarea';
 import { ToggleGroup, ToggleGroupItem } from '../src/components/ui/toggle-group';
 
@@ -91,6 +95,87 @@ describe('Alert', () => {
   });
 });
 
+describe('Button', () => {
+  it('owns inline, account-menu, and destructive-menu treatments', () => {
+    render(
+      <>
+        <Button variant="link" size="inline">
+          Inline action
+        </Button>
+        <Button variant="outline" size="account">
+          Account menu
+        </Button>
+        <Button variant="destructiveOutline" size="menu">
+          Sign out
+        </Button>
+      </>,
+    );
+
+    expect(screen.getByRole('button', { name: 'Inline action' })).toHaveAttribute(
+      'data-size',
+      'inline',
+    );
+    expect(screen.getByRole('button', { name: 'Account menu' })).toHaveAttribute(
+      'data-size',
+      'account',
+    );
+    expect(screen.getByRole('button', { name: 'Sign out' })).toHaveAttribute(
+      'data-variant',
+      'destructiveOutline',
+    );
+  });
+});
+
+describe('Badge', () => {
+  it('owns primary, success, and warning outline treatments', () => {
+    render(
+      <>
+        <Badge variant="primaryOutline">Ready</Badge>
+        <Badge variant="successOutline">Published</Badge>
+        <Badge variant="warningOutline">Not published</Badge>
+      </>,
+    );
+
+    expect(screen.getByText('Ready')).toHaveClass(
+      'border-primary/20',
+      'bg-primary/10',
+      'text-primary',
+    );
+    expect(screen.getByText('Published')).toHaveClass(
+      'border-emerald-600/30',
+      'bg-emerald-500/15',
+      'text-emerald-800',
+    );
+    expect(screen.getByText('Not published')).toHaveClass(
+      'border-amber-500/35',
+      'bg-amber-400/20',
+      'text-amber-900',
+    );
+  });
+});
+
+describe('Tabs', () => {
+  it('owns the soft active-tab treatment', () => {
+    render(
+      <Tabs defaultValue="rules">
+        <TabsList variant="soft">
+          <TabsTrigger value="rules">Rules</TabsTrigger>
+        </TabsList>
+      </Tabs>,
+    );
+
+    expect(screen.getByRole('tablist')).toHaveAttribute('data-variant', 'soft');
+    expect(screen.getByRole('tab', { name: 'Rules' })).toHaveClass(
+      'group-data-[variant=soft]/tabs-list:data-active:border-transparent',
+      'group-data-[variant=soft]/tabs-list:data-active:bg-chart-1/25',
+      'group-data-[variant=soft]/tabs-list:data-active:font-semibold',
+      'group-data-[variant=soft]/tabs-list:data-active:text-foreground',
+      'group-data-[variant=soft]/tabs-list:data-active:shadow-none',
+      'group-data-[variant=soft]/tabs-list:data-active:[&_svg]:text-chart-1',
+    );
+  });
+});
+
 describe('Card', () => {
   it('renders caller-owned card content', () => {
     render(<Card>All checks are current.</Card>);
@@ -103,6 +188,50 @@ describe('Card', () => {
 
     expect(screen.getByText('All checks are current.')).toHaveClass('border');
     expect(screen.getByText('All checks are current.')).toHaveClass('border-border/80');
+  });
+
+  it('owns large, flush, and destructive surface treatments', () => {
+    render(
+      <>
+        <Card size="lg">Large card</Card>
+        <Card size="flush">Flush card</Card>
+        <Card variant="destructive">Destructive card</Card>
+      </>,
+    );
+
+    expect(screen.getByText('Large card')).toHaveAttribute('data-size', 'lg');
+    expect(screen.getByText('Flush card')).toHaveAttribute('data-size', 'flush');
+    expect(screen.getByText('Destructive card')).toHaveAttribute('data-variant', 'destructive');
+  });
+
+  it('owns vertical footer layout', () => {
+    render(
+      <Card>
+        <CardFooter orientation="vertical">Footer actions</CardFooter>
+      </Card>,
+    );
+
+    expect(screen.getByText('Footer actions')).toHaveAttribute('data-orientation', 'vertical');
+    expect(screen.getByText('Footer actions')).toHaveClass('flex-col', 'items-stretch', 'gap-3');
+  });
+});
+
+describe('Item', () => {
+  it('owns selectable navigation treatment', () => {
+    render(
+      <Item variant="selectable" size="xs" render={<Button type="button" />} aria-current="true">
+        Customer
+      </Item>,
+    );
+
+    expect(screen.getByRole('button', { name: 'Customer' })).toHaveAttribute(
+      'data-variant',
+      'selectable',
+    );
+    expect(screen.getByRole('button', { name: 'Customer' })).toHaveClass(
+      'justify-start',
+      'aria-current:bg-accent',
+    );
   });
 });
 
@@ -166,6 +295,13 @@ describe('Field', () => {
       'disabled:text-muted-foreground',
       'disabled:opacity-100',
     );
+  });
+
+  it('owns body-style checkbox labels', () => {
+    render(<FieldLabel variant="body">Agreement</FieldLabel>);
+
+    expect(screen.getByText('Agreement')).toHaveAttribute('data-variant', 'body');
+    expect(screen.getByText('Agreement')).toHaveClass('font-normal', 'leading-5');
   });
 });
 
@@ -246,6 +382,33 @@ describe('Popover', () => {
 });
 
 describe('Select', () => {
+  it('anchors the menu to the trigger instead of the selected item by default', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <>
+        <Label htmlFor="positioned-field-type">Field type</Label>
+        <Select defaultValue="decimal">
+          <SelectTrigger id="positioned-field-type">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="text">Text</SelectItem>
+            <SelectItem value="integer">Integer</SelectItem>
+            <SelectItem value="decimal">Decimal</SelectItem>
+          </SelectContent>
+        </Select>
+      </>,
+    );
+
+    await user.click(screen.getByLabelText('Field type'));
+
+    expect(screen.getByRole('listbox').closest('[data-slot="select-content"]')).toHaveAttribute(
+      'data-align-trigger',
+      'false',
+    );
+  });
+
   it('links a select trigger to its label', () => {
     render(
       <>
@@ -316,16 +479,18 @@ describe('ToggleGroup', () => {
 
   it('supports start-aligned full-width toggle items through the component API', () => {
     const { container } = render(
-      <ToggleGroup aria-label="Preferences" defaultValue={['language']} className="w-full">
-        <ToggleGroupItem value="language" className="w-full justify-start">
-          Language
-        </ToggleGroupItem>
+      <ToggleGroup aria-label="Preferences" defaultValue={['language']} orientation="vertical">
+        <ToggleGroupItem value="language">Language</ToggleGroupItem>
       </ToggleGroup>,
     );
 
-    expect(container.querySelector('[data-slot="toggle-group"]')).toHaveClass('w-full');
-    expect(screen.getByRole('button', { name: 'Language' })).toHaveClass('justify-start');
-    expect(screen.getByRole('button', { name: 'Language' })).toHaveClass('w-full');
+    expect(container.querySelector('[data-slot="toggle-group"]')).toHaveClass(
+      'data-vertical:w-full',
+    );
+    expect(screen.getByRole('button', { name: 'Language' })).toHaveClass(
+      'group-data-vertical/toggle-group:justify-start',
+      'group-data-vertical/toggle-group:w-full',
+    );
   });
 });
 

@@ -74,7 +74,7 @@ export function EmailConfirmationPage() {
             <Button
               type="button"
               variant="link"
-              className="h-auto gap-1 p-0 text-sm font-medium leading-5 disabled:text-muted-foreground disabled:no-underline"
+              size="inline"
               disabled={state === 'sending' || state === 'rate_limited'}
               onClick={() => void handleResend()}
             >
