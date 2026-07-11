@@ -1871,12 +1871,14 @@ class TestReviewVerificationGates(unittest.TestCase):
         with (
             mock.patch.object(axis, "working_tree_paths", return_value=["scripts/axis.py"]),
             mock.patch.object(axis, "verify") as verify,
+            mock.patch.object(axis, "run_ready_review_policy") as policy,
             contextlib.redirect_stderr(io.StringIO()),
         ):
             result = axis.ready_review(axis.argparse.Namespace(since=None, policy_only=False))
 
         self.assertEqual(1, result)
         verify.assert_not_called()
+        policy.assert_not_called()
 
     def test_runs_verify_and_shared_policy_profile(self) -> None:
         with (
@@ -1936,6 +1938,9 @@ class TestReviewVerificationGates(unittest.TestCase):
 
         self.assertEqual(0, result)
         ready_review.assert_called_once()
+        delegated = ready_review.call_args.args[0]
+        self.assertIsNone(delegated.since)
+        self.assertFalse(delegated.policy_only)
 
     def test_runs_script_checks_for_script_changes(self) -> None:
         calls: list[str] = []
