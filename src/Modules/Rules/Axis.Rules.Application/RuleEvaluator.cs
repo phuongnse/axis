@@ -374,11 +374,19 @@ public sealed class RuleEvaluator(
         Dictionary<string, RuleValueDto> values = new(StringComparer.Ordinal);
         foreach ((string key, IReadOnlyList<string> rawValues) in parameters)
         {
+            if (key is null || rawValues is null)
+                return Result.Failure<IReadOnlyDictionary<string, RuleValue>>("Rule parameters are invalid.");
+
+            string normalizedKey = key.Trim();
             RuleParameterDefinition? definition = definitions.SingleOrDefault(candidate =>
-                candidate.Key.Equals(key.Trim(), StringComparison.Ordinal));
+                candidate.Key.Equals(normalizedKey, StringComparison.Ordinal));
             if (definition is null)
                 return Result.Failure<IReadOnlyDictionary<string, RuleValue>>("Rule parameter is not supported.");
-            values[key.Trim()] = new RuleValueDto(
+
+            if (values.ContainsKey(normalizedKey))
+                return Result.Failure<IReadOnlyDictionary<string, RuleValue>>("Rule parameter keys must be unique.");
+
+            values[normalizedKey] = new RuleValueDto(
                 (Contracts.RuleValueType)definition.Type,
                 rawValues);
         }

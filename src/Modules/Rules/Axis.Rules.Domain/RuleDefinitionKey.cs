@@ -5,9 +5,13 @@ using Axis.Shared.Domain.Primitives;
 
 namespace Axis.Rules.Domain;
 
-public readonly partial record struct RuleDefinitionKey(string Value)
+public readonly partial record struct RuleDefinitionKey
 {
     private const int MaxLength = 120;
+
+    private RuleDefinitionKey(string value) => Value = value;
+
+    public string Value { get; }
 
     public static Result<RuleDefinitionKey> Create(string? value)
     {

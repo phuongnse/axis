@@ -4,7 +4,7 @@ namespace Axis.Rules.Domain;
 
 public static class SystemRuleCatalog
 {
-    public static IReadOnlyList<SystemRuleDefinition> Definitions { get; } =
+    public static IReadOnlyList<SystemRuleDefinition> Definitions { get; } = Array.AsReadOnly<SystemRuleDefinition>(
     [
         Definition(
             "field.required",
@@ -82,7 +82,7 @@ public static class SystemRuleCatalog
             {
                 ["selection_mode"] = ["Multiple"],
             }),
-    ];
+    ]);
 
     public static SystemRuleDefinition? Find(string key, int version) =>
         Definitions.SingleOrDefault(definition =>

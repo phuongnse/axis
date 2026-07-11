@@ -83,6 +83,19 @@ public sealed class RuleApplicationValidatorTests
         result.ErrorCode.Should().Be("definition_not_found");
     }
 
+    [Fact]
+    public async Task ValidateAsync_WhenNormalizedParameterKeysCollide_ReturnsInvalid()
+    {
+        RuleApplicationValidationResult result = await _sut.ValidateAsync(
+            Request(
+                RuleDefinitionKeys.NumericRange,
+                "Decimal",
+                Params(("min", ["0"]), (" min ", ["1"]))));
+
+        result.IsValid.Should().BeFalse();
+        result.ErrorCode.Should().Be("parameter_invalid");
+    }
+
     private static RuleApplicationValidationRequest Request(
         string definitionKey,
         string targetType,

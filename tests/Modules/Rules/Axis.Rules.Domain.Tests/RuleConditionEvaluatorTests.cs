@@ -6,6 +6,24 @@ namespace Axis.Rules.Domain.Tests;
 public sealed class RuleConditionEvaluatorTests
 {
     [Fact]
+    public void CreateGroup_WhenChildrenCollectionIsMutated_PreservesCondition()
+    {
+        RulePredicateCondition leaf = RulePredicateCondition.Create(
+            "leaf",
+            RulePredicateOperator.IsNull,
+            RuleOperand.Context("field.value").Value).Value;
+        RuleConditionGroup group = RuleConditionGroup.Create(
+            "root",
+            RuleLogicalOperator.All,
+            [leaf]).Value;
+
+        Action mutate = () => ((IList<RuleConditionNode>)group.Children).Clear();
+
+        mutate.Should().Throw<NotSupportedException>();
+        group.Children.Should().ContainSingle();
+    }
+
+    [Fact]
     public void Evaluate_WhenNestedConditionMatches_ReturnsDeterministicDiagnostics()
     {
         RuleContextSchema schema = Schema();

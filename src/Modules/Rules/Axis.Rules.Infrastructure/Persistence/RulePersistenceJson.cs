@@ -82,24 +82,37 @@ internal static class RulePersistenceJson
 
     private static RuleConditionNode ToDomain(RuleConditionNodeDto node)
     {
-        if (node.LogicalOperator is not null)
+        bool isGroup = node.LogicalOperator is not null &&
+            node.PredicateOperator is null &&
+            node.Left is null &&
+            node.Right is null &&
+            node.Children is not null;
+        bool isPredicate = node.LogicalOperator is null &&
+            node.PredicateOperator is not null &&
+            node.Left is not null &&
+            node.Children is not null &&
+            node.Children.Count == 0;
+        if (!isGroup && !isPredicate)
+            throw new InvalidOperationException("Persisted rule condition shape is invalid.");
+
+        if (isGroup)
         {
-            RuleConditionNode[] children = node.Children.Select(ToDomain).ToArray();
+            if (node.Children!.Any(child => child is null))
+                throw new InvalidOperationException("Persisted rule condition shape is invalid.");
+
+            RuleConditionNode[] children = node.Children!.Select(ToDomain).ToArray();
             Shared.Domain.Primitives.Result<RuleConditionGroup> group = RuleConditionGroup.Create(
                 node.NodeId,
-                (DomainLogicalOperator)node.LogicalOperator.Value,
+                (DomainLogicalOperator)node.LogicalOperator!.Value,
                 children);
             return group.IsSuccess ? group.Value : throw new InvalidOperationException(group.Error);
         }
 
-        if (node.PredicateOperator is null || node.Left is null)
-            throw new InvalidOperationException("Persisted rule condition shape is invalid.");
-
-        RuleOperand left = ToDomain(node.Left);
+        RuleOperand left = ToDomain(node.Left!);
         RuleOperand? right = node.Right is null ? null : ToDomain(node.Right);
         Shared.Domain.Primitives.Result<RulePredicateCondition> predicate = RulePredicateCondition.Create(
             node.NodeId,
-            (DomainPredicateOperator)node.PredicateOperator.Value,
+            (DomainPredicateOperator)node.PredicateOperator!.Value,
             left,
             right);
         return predicate.IsSuccess ? predicate.Value : throw new InvalidOperationException(predicate.Error);

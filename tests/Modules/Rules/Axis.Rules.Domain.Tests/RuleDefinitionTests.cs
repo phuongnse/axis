@@ -73,6 +73,47 @@ public sealed class RuleDefinitionTests
         definition.FindVersion(1).Should().BeSameAs(published);
     }
 
+    [Fact]
+    public void CreateDraft_WhenTypedKeysAreDefault_ReturnsFailure()
+    {
+        Result<RuleDefinition> result = RuleDefinition.CreateDraft(
+            WorkspaceId,
+            default,
+            "Amount approval",
+            "Requires approval for high-value records.",
+            RuleScope.Record,
+            default,
+            contextSchemaVersion: 1,
+            RuleOutcomeKind.Validation,
+            UserId,
+            Now);
+
+        result.IsFailure.Should().BeTrue();
+    }
+
+    [Fact]
+    public void SaveDraft_WhenContextKeyIsDefault_ReturnsFailureWithoutMutation()
+    {
+        RuleDefinition definition = Draft();
+
+        Result result = definition.SaveDraft(
+            definition.Revision,
+            definition.Name,
+            definition.Description,
+            definition.Scope,
+            default,
+            definition.ContextSchemaVersion,
+            definition.OutcomeKind,
+            [],
+            Condition(),
+            Outcome("Should not save"),
+            UserId,
+            Now);
+
+        result.IsFailure.Should().BeTrue();
+        definition.Condition.Should().BeNull();
+    }
+
     private static RuleDefinition Draft() => RuleDefinition.CreateDraft(
         WorkspaceId,
         RuleDefinitionKey.Create("amount_approval").Value,

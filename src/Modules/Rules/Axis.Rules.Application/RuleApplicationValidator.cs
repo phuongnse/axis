@@ -111,9 +111,15 @@ public sealed class RuleApplicationValidator(IRuleDefinitionRepository repositor
         Dictionary<string, RuleValueDto> typedParameters = new(StringComparer.Ordinal);
         foreach ((string rawKey, IReadOnlyList<string> values) in parameters)
         {
+            if (rawKey is null || values is null)
+                return Invalid("parameter_invalid", "Rule parameters are invalid.");
+
             string key = rawKey.Trim();
             if (!schema.TryGetValue(key, out RuleParameterDefinition? parameter))
                 return Invalid("parameter_unknown", "Rule parameter is not supported.");
+
+            if (typedParameters.ContainsKey(key))
+                return Invalid("parameter_invalid", "Rule parameter keys must be unique.");
 
             typedParameters[key] = new RuleValueDto(
                 (Contracts.RuleValueType)parameter.Type,

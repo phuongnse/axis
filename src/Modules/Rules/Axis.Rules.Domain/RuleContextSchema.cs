@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using System.Text.RegularExpressions;
 using Axis.Shared.Domain.Primitives;
 
@@ -91,8 +92,11 @@ public sealed record RuleContextSchema
         if (string.IsNullOrWhiteSpace(displayName))
             return Result.Failure<RuleContextSchema>("Rule context display name is required.");
 
-        if (fields.Count == 0)
+        if (fields is null || fields.Count == 0)
             return Result.Failure<RuleContextSchema>("Rule context schema must define at least one field.");
+
+        if (fields.Any(field => field is null))
+            return Result.Failure<RuleContextSchema>("Rule context schema fields are invalid.");
 
         if (fields.Select(field => field.Path).Distinct(StringComparer.Ordinal).Count() != fields.Count)
             return Result.Failure<RuleContextSchema>("Rule context field paths must be unique.");
@@ -104,6 +108,9 @@ public sealed record RuleContextSchema
         foreach ((string rawKey, IReadOnlyList<string> rawValues) in configuration
                      ?? new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal))
         {
+            if (rawKey is null || rawValues is null || rawValues.Any(value => value is null))
+                return Result.Failure<RuleContextSchema>("Rule context configuration is invalid.");
+
             string normalizedKey = rawKey.Trim();
             string[] normalizedValues = rawValues
                 .Select(value => value.Trim())
@@ -113,7 +120,9 @@ public sealed record RuleContextSchema
                 .ToArray();
             if (normalizedKey.Length == 0 || normalizedValues.Length == 0)
                 return Result.Failure<RuleContextSchema>("Rule context configuration is invalid.");
-            normalizedConfiguration[normalizedKey] = normalizedValues;
+
+            if (!normalizedConfiguration.TryAdd(normalizedKey, Array.AsReadOnly(normalizedValues)))
+                return Result.Failure<RuleContextSchema>("Rule context configuration keys must be unique.");
         }
 
         return new RuleContextSchema(
@@ -121,9 +130,9 @@ public sealed record RuleContextSchema
             version,
             scope,
             displayName.Trim(),
-            fields.OrderBy(field => field.Path, StringComparer.Ordinal).ToArray(),
+            Array.AsReadOnly(fields.OrderBy(field => field.Path, StringComparer.Ordinal).ToArray()),
             normalizedTargetType,
-            normalizedConfiguration);
+            new ReadOnlyDictionary<string, IReadOnlyList<string>>(normalizedConfiguration));
     }
 
     public RuleContextField? FindField(string path) =>

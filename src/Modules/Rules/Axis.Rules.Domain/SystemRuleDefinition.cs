@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using Axis.Shared.Domain.Primitives;
 
 namespace Axis.Rules.Domain;
@@ -19,6 +20,9 @@ public sealed record RuleApplicability
         IReadOnlyList<string> targetTypeKeys,
         IReadOnlyDictionary<string, IReadOnlyList<string>>? configurationConstraints = null)
     {
+        if (targetTypeKeys is null)
+            return Result.Failure<RuleApplicability>("Rule applicability requires at least one target type.");
+
         string[] normalizedTypes = targetTypeKeys
             .Select(type => type?.Trim() ?? string.Empty)
             .Where(type => type.Length > 0)
@@ -32,6 +36,9 @@ public sealed record RuleApplicability
         foreach ((string key, IReadOnlyList<string> values) in configurationConstraints
                      ?? new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal))
         {
+            if (key is null || values is null || values.Any(value => value is null))
+                return Result.Failure<RuleApplicability>("Rule applicability configuration constraints are invalid.");
+
             string normalizedKey = key?.Trim() ?? string.Empty;
             string[] normalizedValues = values
                 .Select(value => value?.Trim() ?? string.Empty)
@@ -42,10 +49,13 @@ public sealed record RuleApplicability
             if (normalizedKey.Length == 0 || normalizedValues.Length == 0)
                 return Result.Failure<RuleApplicability>("Rule applicability configuration constraints are invalid.");
 
-            normalizedConstraints[normalizedKey] = normalizedValues;
+            if (!normalizedConstraints.TryAdd(normalizedKey, Array.AsReadOnly(normalizedValues)))
+                return Result.Failure<RuleApplicability>("Rule applicability configuration keys must be unique.");
         }
 
-        return new RuleApplicability(normalizedTypes, normalizedConstraints);
+        return new RuleApplicability(
+            Array.AsReadOnly(normalizedTypes),
+            new ReadOnlyDictionary<string, IReadOnlyList<string>>(normalizedConstraints));
     }
 }
 
@@ -108,6 +118,12 @@ public sealed record SystemRuleDefinition
         if (!Enum.IsDefined(scope) || !Enum.IsDefined(outcomeKind))
             return Result.Failure<SystemRuleDefinition>("System rule scope or outcome is not supported.");
 
+        if (applicability is null)
+            return Result.Failure<SystemRuleDefinition>("System rule applicability is required.");
+
+        if (parameters is null || parameters.Any(parameter => parameter is null))
+            return Result.Failure<SystemRuleDefinition>("System rule parameters are required.");
+
         if (parameters.Select(parameter => parameter.Key).Distinct(StringComparer.Ordinal).Count() != parameters.Count)
             return Result.Failure<SystemRuleDefinition>("System rule parameter keys must be unique.");
 
@@ -119,6 +135,6 @@ public sealed record SystemRuleDefinition
             scope,
             outcomeKind,
             applicability,
-            parameters.ToArray());
+            Array.AsReadOnly(parameters.ToArray()));
     }
 }

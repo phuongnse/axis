@@ -3,9 +3,13 @@ using Axis.Shared.Domain.Primitives;
 
 namespace Axis.Rules.Domain;
 
-public readonly partial record struct RuleContextKey(string Value)
+public readonly partial record struct RuleContextKey
 {
     private const int MaxLength = 120;
+
+    private RuleContextKey(string value) => Value = value;
+
+    public string Value { get; }
 
     public static Result<RuleContextKey> Create(string? value)
     {

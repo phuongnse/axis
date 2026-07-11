@@ -1,4 +1,5 @@
 using Axis.Rules.Domain;
+using Axis.Shared.Domain.Primitives;
 using FluentAssertions;
 
 namespace Axis.Rules.Domain.Tests;
@@ -58,5 +59,33 @@ public sealed class SystemRuleCatalogTests
     public void Find_WhenVersionIsUnknown_ReturnsNull()
     {
         SystemRuleCatalog.Find("field.required", version: 2).Should().BeNull();
+    }
+
+    [Fact]
+    public void Definitions_WhenCastToMutableCollections_RejectMutation()
+    {
+        SystemRuleDefinition definition = SystemRuleCatalog.Definitions[0];
+
+        Action mutateCatalog = () => ((IList<SystemRuleDefinition>)SystemRuleCatalog.Definitions).Clear();
+        Action mutateTargets = () => ((IList<string>)definition.Applicability.TargetTypeKeys).Clear();
+        Action mutateParameters = () => ((IList<RuleParameterDefinition>)definition.Parameters).Clear();
+
+        mutateCatalog.Should().Throw<NotSupportedException>();
+        mutateTargets.Should().Throw<NotSupportedException>();
+        mutateParameters.Should().Throw<NotSupportedException>();
+    }
+
+    [Fact]
+    public void Applicability_WhenNormalizedConfigurationKeysCollide_ReturnsFailure()
+    {
+        Result<RuleApplicability> result = RuleApplicability.Create(
+            ["Text"],
+            new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal)
+            {
+                ["mode"] = ["One"],
+                [" mode "] = ["Two"],
+            });
+
+        result.IsFailure.Should().BeTrue();
     }
 }

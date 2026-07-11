@@ -45,13 +45,16 @@ public sealed record RuleConditionGroup : RuleConditionNode
             return Result.Failure<RuleConditionGroup>("Rule logical operator is not supported.");
 
         int requiredChildren = @operator == RuleLogicalOperator.Not ? 1 : 0;
-        if (children.Count == 0 || requiredChildren > 0 && children.Count != requiredChildren)
+        if (children is null || children.Count == 0 || requiredChildren > 0 && children.Count != requiredChildren)
             return Result.Failure<RuleConditionGroup>(
                 @operator == RuleLogicalOperator.Not
                     ? "A not condition must contain exactly one child."
                     : "A condition group must contain at least one child.");
 
-        return new RuleConditionGroup(nodeId.Trim(), @operator, children.ToArray());
+        if (children.Any(child => child is null))
+            return Result.Failure<RuleConditionGroup>("Rule condition children are invalid.");
+
+        return new RuleConditionGroup(nodeId.Trim(), @operator, Array.AsReadOnly(children.ToArray()));
     }
 }
 
@@ -85,6 +88,9 @@ public sealed record RulePredicateCondition : RuleConditionNode
 
         if (!Enum.IsDefined(@operator))
             return Result.Failure<RulePredicateCondition>("Rule predicate operator is not supported.");
+
+        if (left is null)
+            return Result.Failure<RulePredicateCondition>("Rule predicate left operand is required.");
 
         bool unary = @operator is RulePredicateOperator.IsNull or RulePredicateOperator.IsNotNull;
         if (unary && right is not null)

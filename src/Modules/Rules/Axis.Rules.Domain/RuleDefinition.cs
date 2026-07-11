@@ -86,6 +86,14 @@ public sealed class RuleDefinition : AggregateRoot<RuleDefinitionId>
         if (createdByUserId == Guid.Empty)
             return Result.Failure<RuleDefinition>("Creating user is required.");
 
+        Result<RuleDefinitionKey> canonicalKey = RuleDefinitionKey.Create(key.Value);
+        if (canonicalKey.IsFailure)
+            return Result.Failure<RuleDefinition>(canonicalKey.Error);
+
+        Result<RuleContextKey> canonicalContextKey = RuleContextKey.Create(contextKey.Value);
+        if (canonicalContextKey.IsFailure)
+            return Result.Failure<RuleDefinition>(canonicalContextKey.Error);
+
         Result identity = ValidateIdentity(name, description, scope, contextSchemaVersion, outcomeKind);
         if (identity.IsFailure)
             return Result.Failure<RuleDefinition>(identity.Error);
@@ -93,11 +101,11 @@ public sealed class RuleDefinition : AggregateRoot<RuleDefinitionId>
         return new RuleDefinition(
             RuleDefinitionId.New(),
             workspaceId,
-            key,
+            canonicalKey.Value,
             name.Trim(),
             description.Trim(),
             scope,
-            contextKey,
+            canonicalContextKey.Value,
             contextSchemaVersion,
             outcomeKind,
             createdByUserId,
@@ -129,6 +137,10 @@ public sealed class RuleDefinition : AggregateRoot<RuleDefinitionId>
         if (identity.IsFailure)
             return identity;
 
+        Result<RuleContextKey> canonicalContextKey = RuleContextKey.Create(contextKey.Value);
+        if (canonicalContextKey.IsFailure)
+            return Result.Failure(ErrorCodes.InvalidInput, canonicalContextKey.Error);
+
         Result draft = ValidateDraft(parameters, condition, outcome, outcomeKind);
         if (draft.IsFailure)
             return draft;
@@ -136,7 +148,7 @@ public sealed class RuleDefinition : AggregateRoot<RuleDefinitionId>
         Name = name.Trim();
         Description = description.Trim();
         Scope = scope;
-        ContextKey = contextKey;
+        ContextKey = canonicalContextKey.Value;
         ContextSchemaVersion = contextSchemaVersion;
         OutcomeKind = outcomeKind;
         _parameters.Clear();
@@ -260,6 +272,9 @@ public sealed class RuleDefinition : AggregateRoot<RuleDefinitionId>
         RuleOutcome outcome,
         RuleOutcomeKind outcomeKind)
     {
+        if (parameters is null || parameters.Any(parameter => parameter is null))
+            return Result.Failure(ErrorCodes.InvalidInput, "Rule parameters are required.");
+
         if (parameters.Select(parameter => parameter.Key).Distinct(StringComparer.Ordinal).Count() != parameters.Count)
             return Result.Failure(ErrorCodes.InvalidInput, "Rule parameter keys must be unique.");
 
