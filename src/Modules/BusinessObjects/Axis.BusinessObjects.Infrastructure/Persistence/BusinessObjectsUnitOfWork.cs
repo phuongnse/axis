@@ -21,7 +21,9 @@ internal sealed class BusinessObjectsUnitOfWork(BusinessObjectsDbContext context
             when (ex.InnerException is PostgresException pg && pg.SqlState == "23505")
         {
             throw new UniqueConstraintException(
-                "An object definition with a conflicting unique key already exists.", ex);
+                $"A record with a conflicting unique value already exists " +
+                $"(constraint: {pg.ConstraintName ?? "unknown"}).",
+                ex);
         }
     }
 }

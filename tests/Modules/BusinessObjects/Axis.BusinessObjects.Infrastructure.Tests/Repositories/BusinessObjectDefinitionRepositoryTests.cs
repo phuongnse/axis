@@ -9,6 +9,7 @@ using Axis.Rules.Contracts;
 using Axis.Shared.Application;
 using Axis.Shared.Domain.Primitives;
 using FluentAssertions;
+using FluentAssertions.Specialized;
 
 namespace Axis.BusinessObjects.Infrastructure.Tests.Repositories;
 
@@ -217,7 +218,10 @@ public sealed class BusinessObjectDefinitionRepositoryTests(BusinessObjectsDatab
 
         Func<Task> act = () => _unitOfWork.SaveChangesAsync();
 
-        await act.Should().ThrowAsync<UniqueConstraintException>();
+        ExceptionAssertions<UniqueConstraintException> exception =
+            await act.Should().ThrowAsync<UniqueConstraintException>();
+        exception.Which.Message.Should().Contain(
+            "IX_business_object_definitions_workspace_id_object_key");
     }
 
     [Fact]

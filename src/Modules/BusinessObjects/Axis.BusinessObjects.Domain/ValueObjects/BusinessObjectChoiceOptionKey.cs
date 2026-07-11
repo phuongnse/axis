@@ -3,8 +3,12 @@ using Axis.Shared.Domain.Primitives;
 
 namespace Axis.BusinessObjects.Domain.ValueObjects;
 
-public readonly partial record struct BusinessObjectChoiceOptionKey(string Value)
+public readonly partial record struct BusinessObjectChoiceOptionKey
 {
+    public string Value { get; }
+
+    private BusinessObjectChoiceOptionKey(string value) => Value = value;
+
     public static Result<BusinessObjectChoiceOptionKey> Create(string? value)
     {
         string normalized = value?.Trim() ?? string.Empty;
