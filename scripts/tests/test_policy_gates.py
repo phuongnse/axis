@@ -1865,6 +1865,78 @@ class TestVerifyGate(unittest.TestCase):
             calls,
         )
 
+
+class TestReviewVerificationGates(unittest.TestCase):
+    def test_rejects_dirty_worktree_before_running_checks(self) -> None:
+        with (
+            mock.patch.object(axis, "working_tree_paths", return_value=["scripts/axis.py"]),
+            mock.patch.object(axis, "verify") as verify,
+            contextlib.redirect_stderr(io.StringIO()),
+        ):
+            result = axis.ready_review(axis.argparse.Namespace(since=None, policy_only=False))
+
+        self.assertEqual(1, result)
+        verify.assert_not_called()
+
+    def test_runs_verify_and_shared_policy_profile(self) -> None:
+        with (
+            mock.patch.object(axis, "working_tree_paths", return_value=[]),
+            mock.patch.object(axis, "verify_scope_paths", return_value=("base...HEAD", ["frontend/src/App.tsx"])),
+            mock.patch.object(axis, "verify", return_value=0) as verify,
+            mock.patch.object(axis, "run_ready_review_policy", return_value=(0, ["doc drift"])) as policy,
+            contextlib.redirect_stdout(io.StringIO()),
+        ):
+            result = axis.ready_review(axis.argparse.Namespace(since=None, policy_only=False))
+
+        self.assertEqual(0, result)
+        verify.assert_called_once()
+        policy.assert_called_once_with(["frontend/src/App.tsx"], policy_tests_covered=False)
+
+    def test_policy_only_uses_same_profile_without_verify(self) -> None:
+        with (
+            mock.patch.object(axis, "working_tree_paths", return_value=[]),
+            mock.patch.object(axis, "verify_scope_paths", return_value=("base...HEAD", ["scripts/axis.py"])),
+            mock.patch.object(axis, "verify") as verify,
+            mock.patch.object(axis, "run_ready_review_policy", return_value=(0, ["policy gate tests", "doc drift"])) as policy,
+            contextlib.redirect_stdout(io.StringIO()),
+        ):
+            result = axis.ready_review(axis.argparse.Namespace(since=None, policy_only=True))
+
+        self.assertEqual(0, result)
+        verify.assert_not_called()
+        policy.assert_called_once_with(["scripts/axis.py"], policy_tests_covered=False)
+
+    def test_policy_registry_routes_only_triggered_expensive_checks(self) -> None:
+        names = [
+            name
+            for name, _checker in axis.ready_review_policy_gates(
+                ["scripts/axis.py", ".github/renovate.json5"]
+            )
+        ]
+
+        self.assertEqual(["policy gate tests", "Renovate config", "doc drift"], names)
+        self.assertEqual(
+            ["doc drift"],
+            [
+                name
+                for name, _checker in axis.ready_review_policy_gates(
+                    ["frontend/src/App.tsx"],
+                    policy_tests_covered=True,
+                )
+            ],
+        )
+
+    def test_pre_push_full_delegates_to_ready_review(self) -> None:
+        with (
+            mock.patch.dict(axis.os.environ, {"AXIS_PRE_PUSH_FULL": "1"}),
+            mock.patch.object(axis, "ready_review", return_value=0) as ready_review,
+            contextlib.redirect_stdout(io.StringIO()),
+        ):
+            result = axis.pre_push(object())
+
+        self.assertEqual(0, result)
+        ready_review.assert_called_once()
+
     def test_runs_script_checks_for_script_changes(self) -> None:
         calls: list[str] = []
 
@@ -2637,14 +2709,17 @@ class TestEnforcementTruthAudit(unittest.TestCase):
     def test_rejects_ci_without_doc_drift(self) -> None:
         def mutate(files: dict[Path, str]) -> None:
             workflow = Path(".github/workflows/build-and-test.yml")
-            files[workflow] = files[workflow].replace("run: python scripts/axis.py check doc-drift\n", "")
+            files[workflow] = files[workflow].replace(
+                "run: python scripts/axis.py ready-review --policy-only\n",
+                "",
+            )
 
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             self.write_truth_repo(root, mutate)
             issues = axis.enforcement_truth_audit_issues(root=root)
 
-        self.assertIn("doc drift runs in CI", "\n".join(issues))
+        self.assertIn("shared ready-review policy profile runs in CI", "\n".join(issues))
 
     def test_rejects_local_verify_without_markdown_links(self) -> None:
         def mutate(files: dict[Path, str]) -> None:

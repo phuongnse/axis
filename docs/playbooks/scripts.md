@@ -28,7 +28,7 @@ When triggered:
 3. Review only committed work that will be published. If the user blocks committing, stop PR publication until a delta-safe reviewed commit exists.
 4. Review the committed diff with the CodeRabbit CLI: full branch diff on the first pass; for follow-up reruns, scope with `--base-commit <reviewed-checkpoint>` and optional `--dir` for affected directories.
 5. If the review raises issues, record `git rev-parse HEAD`, read `.agents/skills/axis-review-feedback/SKILL.md` (`$axis-review-feedback`), commit the follow-up, then rerun scoped to the checkpoint.
-6. For follow-up verification when a checkpoint exists, run `python scripts/axis.py verify --since <reviewed-checkpoint>`; use full `verify` only at the review boundary or when the follow-up scope cannot be represented by a checkpoint.
+6. For follow-up verification when a checkpoint exists, run `python scripts/axis.py ready-review --since <reviewed-checkpoint>`; omit `--since` when the follow-up scope cannot be represented by a checkpoint.
 7. Push and open the PR only after steps 4–6 are complete or explicitly skipped with user approval.
 
 Skip only when the user explicitly requested no pre-PR review. If the checkpoint is triggered and the tool is unavailable, unauthenticated, fails, or times out, stop and report the blocker.
@@ -40,9 +40,10 @@ Metadata-only PR title/body updates do not require the checkpoint.
 - Add repo workflows as `python scripts/axis.py ...` subcommands.
 - Keep raw Docker, dotnet, npm, Lychee, and OpenSSL calls inside wrappers or package scripts.
 - Use `python scripts/axis.py local-dev smoke -- <playwright-args>` for fast host-browser smoke against a running local stack; use `python scripts/axis.py local-dev e2e -- <playwright-args>` for Compose-backed browser evidence.
-- Use `python scripts/axis.py verify` only at the ready-review boundary; it is changed-path scoped.
+- Use `python scripts/axis.py ready-review` on a clean checkpoint commit at the review boundary. It runs changed-path verification plus the deterministic policy profile shared with CI.
+- Treat `python scripts/axis.py verify` as the changed-path verification engine behind ready-review, not as complete PR-readiness evidence by itself.
 - Use `python scripts/axis.py pre-push` for ordinary Git push sanity; it is not a substitute for the pre-PR review checkpoint on published PR branches.
-- Set `AXIS_PRE_PUSH_FULL=1` only when pre-push should run the full ready-review command.
+- Set `AXIS_PRE_PUSH_FULL=1` only when an explicit workflow wants pre-push to run `ready-review`; ordinary pre-push remains a quick gate.
 - CI remains the authoritative merge matrix. [.github/workflows/build-and-test.yml](../../.github/workflows/build-and-test.yml) runs on GitHub Actions only — not a local dev script; `ubuntu-latest` is the merge runner, not a dev OS requirement.
 
 ## Script Rules

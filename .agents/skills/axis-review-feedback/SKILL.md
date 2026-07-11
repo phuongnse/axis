@@ -63,7 +63,7 @@ Follow [reference.md](../reference.md).
 
 6. Verify the touched surface.
    - Run the narrow test or policy check for the files changed.
-   - When a reviewed checkpoint exists, prefer `python scripts/axis.py verify --since <reviewed-checkpoint>` so follow-up verification is scoped to the changed delta plus working tree.
+   - Commit the follow-up and run `python scripts/axis.py ready-review --since <reviewed-checkpoint>` so expensive verification is scoped to the delta while the shared policy profile checks the publishable branch.
    - Run `$axis-ready-review` before asking for another review pass.
    - If this feedback was part of `$axis-pull-request`, return control to that skill with the reviewed checkpoint, the files changed by the follow-up, and whether the follow-up is committed.
    - When rerunning the pre-PR review checkpoint after follow-up changes, review only the follow-up delta when possible per [docs/playbooks/scripts.md § Pre-PR review checkpoint](../../../docs/playbooks/scripts.md#pre-pr-review-checkpoint). Do not rerun the full branch diff and describe it as follow-up-only review.

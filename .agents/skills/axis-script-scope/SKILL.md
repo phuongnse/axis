@@ -27,7 +27,7 @@ Follow [reference.md](../reference.md).
 1. Classify the moment.
    - Exploring: prefer read-only commands such as `rg`, `git status`, `git diff`, and targeted file reads.
    - Inner loop: run the smallest command that proves the edit.
-   - Boundary: read `.agents/skills/axis-ready-review/SKILL.md` (`$axis-ready-review`) before review; it owns `python scripts/axis.py verify` when triggered.
+   - Boundary: read `.agents/skills/axis-ready-review/SKILL.md` (`$axis-ready-review`) before review; it owns `python scripts/axis.py ready-review` when triggered.
    - CI/debugging: run broader checks only to reproduce or diagnose a failing gate.
 
 2. Pick the narrow check.
@@ -39,10 +39,10 @@ Follow [reference.md](../reference.md).
    - Backend: targeted test or `python scripts/axis.py dotnet build`; unit tests when behavior changed.
    - Frontend: focused Vitest/Playwright or `python scripts/axis.py frontend ci` for type/lint risk.
    - API contract: regenerate/check generated contracts only when route/request/response shape changed.
-   - Review follow-up: when a reviewed checkpoint exists, run `python scripts/axis.py verify --since <checkpoint>` so the wrapper selects checks from the follow-up delta plus working tree.
+   - Review follow-up: commit the follow-up, then run `python scripts/axis.py ready-review --since <checkpoint>` so expensive verification is delta-scoped while the shared policy profile still checks the publishable branch.
 
 3. Avoid waste.
-   - Do not run `verify` after every small edit.
+   - Do not run `verify` or `ready-review` after every small edit.
    - Do not run full `.NET` test suite unless debugging CI, high-risk backend behavior, or claiming full-suite evidence.
    - Do not run local-dev stack unless the workflow needs external services or smoke evidence.
    - Do not rerun passing checks unless the diff changed in a way that invalidates them.

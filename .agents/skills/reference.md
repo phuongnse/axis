@@ -44,7 +44,7 @@ $axis-ready-review -> Ready
        -> pre-PR review (CodeRabbit CLI)
        -> IF findings:
             -> $axis-review-feedback (fix valid items, commit)
-            -> verify --since <checkpoint> when triggered
+            -> ready-review --since <checkpoint> when triggered
             -> rerun review scoped to checkpoint
             -> repeat until clean OR user-approved defer/false-positive per item
   -> ONLY THEN: push branch / gh pr create / mark ready

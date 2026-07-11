@@ -244,7 +244,7 @@ def changed_paths(range_spec: str | None = None) -> list[str]:
 
 def changed_paths_since(ref: str) -> list[str]:
     if not ref_exists(f"{ref}^{{commit}}"):
-        raise CheckError(f"verify --since: git ref not found: {ref}")
+        raise CheckError(f"changed-path scope: git ref not found: {ref}")
     return unique_paths(
         [
             *git_lines(["diff", "--name-only", f"{ref}..HEAD"], label=f"changed_paths_since {ref}..HEAD"),
@@ -1748,7 +1748,7 @@ ENFORCEMENT_TRUTH_REQUIRED_SNIPPETS = [
         [
             ("pull_request:", "CI workflow runs for pull requests"),
             ("run: python scripts/axis.py check pr", "PR metadata guard runs in CI"),
-            ("run: python scripts/axis.py check renovate-config", "Renovate config validation runs in CI"),
+            ("run: python scripts/axis.py ready-review --policy-only", "shared ready-review policy profile runs in CI"),
             ("run: python scripts/axis.py check docker", "Docker endpoint is available for Testcontainers in CI through the Axis wrapper"),
             ("run: python scripts/axis.py check vulnerable-packages", "vulnerable package gate runs in CI"),
             ("run: python scripts/axis.py check test-naming", ".NET test naming gate runs in CI"),
@@ -1761,8 +1761,6 @@ ENFORCEMENT_TRUTH_REQUIRED_SNIPPETS = [
             ("run: python scripts/axis.py frontend gen-api-types --check", "frontend API type generation runs in CI through the Axis wrapper"),
             ("run: python scripts/axis.py frontend ci", "frontend typecheck/lint runs in CI through the Axis wrapper"),
             ("run: python scripts/axis.py frontend test", "frontend tests run in CI through the Axis wrapper"),
-            ("run: python scripts/axis.py check policy-tests", "policy gate tests run in CI"),
-            ("run: python scripts/axis.py check doc-drift", "doc drift runs in CI"),
             ("uses: lycheeverse/lychee-action", "markdown link check runs in CI"),
             ("lycheeVersion: v0.23.0", "markdown link check pins the documented Lychee version"),
             ("args: --config ./lychee.toml './**/*.md'", "markdown link check uses shared lychee config"),
@@ -1779,7 +1777,9 @@ ENFORCEMENT_TRUTH_REQUIRED_SNIPPETS = [
             ('step("doc navigation", lambda: check_doc_navigation())', "local verify runs docs checks when docs change"),
             ('step("markdown links (changed files)",', "local verify runs markdown link checks for changed markdown paths"),
             ('def pre_push(args: argparse.Namespace) -> int:', "pre-push quick gate is implemented in Python"),
-            ('return verify(args)', "pre-push can opt into full verify with AXIS_PRE_PUSH_FULL"),
+            ('return ready_review(argparse.Namespace(since=None, policy_only=False))', "pre-push can opt into ready-review with AXIS_PRE_PUSH_FULL"),
+            ('def ready_review(args: argparse.Namespace) -> int:', "ready-review owns local review-boundary verification"),
+            ('gates.append(("doc drift", lambda: check_doc_drift(None)))', "ready-review and CI share the doc-drift policy profile"),
             ("for issue in governance_owner_boundary_issues():", "doc drift checks governance owner boundaries"),
             ("for issue in enforcement_ledger_issues():", "doc drift checks enforcement ledger rows"),
             ("for issue in enforcement_truth_audit_issues():", "doc drift checks enforcement truth wiring"),
@@ -2936,11 +2936,89 @@ def verify(args: argparse.Namespace) -> int:
     return 1
 
 
+def ready_review_policy_gates(
+    paths: list[str],
+    *,
+    policy_tests_covered: bool = False,
+) -> list[tuple[str, callable[[], int]]]:
+    gates: list[tuple[str, callable[[], int]]] = []
+    if any(path.startswith("scripts/") for path in paths) and not policy_tests_covered:
+        gates.append(("policy gate tests", check_policy_tests))
+    if ".github/renovate.json5" in paths:
+        gates.append(("Renovate config", lambda: check_renovate_config(None)))
+    gates.append(("doc drift", lambda: check_doc_drift(None)))
+    return gates
+
+
+def run_ready_review_policy(
+    paths: list[str],
+    *,
+    policy_tests_covered: bool = False,
+) -> tuple[int, list[str]]:
+    failed: list[str] = []
+    executed: list[str] = []
+    for name, checker in ready_review_policy_gates(paths, policy_tests_covered=policy_tests_covered):
+        print()
+        print(f"> ready-review: {name}")
+        executed.append(name)
+        try:
+            rc = checker()
+        except CheckError as exc:
+            print(exc, file=sys.stderr)
+            rc = 1
+        if rc == 0:
+            print(f"OK ready-review: {name}")
+        else:
+            print(f"FAIL ready-review: {name}")
+            failed.append(name)
+    return (0 if not failed else 1), executed
+
+
+def ready_review(args: argparse.Namespace) -> int:
+    if working_tree_paths():
+        print(
+            "ready-review: FAIL - create an intentional checkpoint commit before review-boundary verification",
+            file=sys.stderr,
+        )
+        return 1
+
+    try:
+        _scope, paths = verify_scope_paths(getattr(args, "since", None))
+    except CheckError as exc:
+        print(exc, file=sys.stderr)
+        return 1
+
+    policy_only = bool(getattr(args, "policy_only", False))
+    executed: list[str] = []
+    if not policy_only:
+        if verify(args) != 0:
+            print("ready-review: FAIL - changed-path verification failed", file=sys.stderr)
+            return 1
+        executed.append("verify")
+
+    scripts_changed = any(path.startswith("scripts/") for path in paths)
+    policy_rc, policy_gates = run_ready_review_policy(
+        paths,
+        policy_tests_covered=not policy_only and scripts_changed,
+    )
+    executed.extend(policy_gates)
+    if policy_rc != 0:
+        print("ready-review: FAIL - policy profile failed", file=sys.stderr)
+        return 1
+
+    if policy_only:
+        print("ready-review: PASS (policy profile)")
+        return 0
+
+    print(f"ready-review: PASS ({', '.join(executed)})")
+    return 0
+
+
 def pre_push(args: argparse.Namespace) -> int:
     full = os.environ.get("AXIS_PRE_PUSH_FULL", "").lower() in {"1", "true", "yes", "on"}
     if full:
-        print("pre-push: AXIS_PRE_PUSH_FULL is set; running full verify.")
-        return verify(args)
+        print("pre-push: AXIS_PRE_PUSH_FULL is set; running ready-review.")
+        return ready_review(argparse.Namespace(since=None, policy_only=False))
 
     range_spec = diff_range()
     paths = changed_paths(range_spec)
@@ -2973,7 +3051,7 @@ def pre_push(args: argparse.Namespace) -> int:
 
     print("pre-push: quick gate")
     print("  Runs cheap sanity checks before the network push.")
-    print("  Run `python scripts/axis.py verify` before marking a PR ready for review.")
+    print("  Run `python scripts/axis.py ready-review` before marking a PR ready for review.")
 
     if dotnet:
         step(".NET test naming", lambda: check_test_naming())
@@ -3696,6 +3774,14 @@ def main(argv: list[str] | None = None) -> int:
     doctor_parser.set_defaults(func=doctor)
     sub.add_parser("install-hooks").set_defaults(func=install_hooks)
     sub.add_parser("pre-push").set_defaults(func=pre_push)
+    ready_review_parser = sub.add_parser("ready-review")
+    ready_review_parser.add_argument("--since", help="Scope expensive verification after this checkpoint")
+    ready_review_parser.add_argument(
+        "--policy-only",
+        action="store_true",
+        help="Run only the deterministic policy profile shared with CI",
+    )
+    ready_review_parser.set_defaults(func=ready_review)
     verify_parser = sub.add_parser("verify")
     verify_parser.add_argument("--since", help="Scope verification to changes after this checkpoint plus the working tree")
     verify_parser.set_defaults(func=verify)
