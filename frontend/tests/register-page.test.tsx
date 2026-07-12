@@ -73,13 +73,8 @@ describe('RegisterPage', () => {
       'aria-required',
       'true',
     );
-    expect(
-      document.querySelectorAll('[data-slot="field-label"][data-required="true"]'),
-    ).toHaveLength(5);
-    expect(document.querySelector('[data-slot="field-label"][data-variant="body"]')).not.toBeNull();
 
     const createAccount = await screen.findByRole('button', { name: /create account/i });
-    expect(createAccount).toHaveAttribute('data-size', 'lg');
     await user.click(createAccount);
 
     expect(screen.getByText('Full name is required')).toBeInTheDocument();
@@ -132,17 +127,17 @@ describe('RegisterPage', () => {
       name: 'Met: At least 15 characters',
     });
     const missingHardCriteria = screen.getByRole('listitem', { name: 'Missing: Hard to guess' });
-    expect(metLengthCriteria).toHaveClass('text-emerald-700');
+    expect(metLengthCriteria).toHaveClass('text-secondary');
     expect(missingHardCriteria).toHaveClass('text-destructive');
 
     await user.clear(passwordInput);
     await user.type(passwordInput, 'maple river sunrise');
 
     expect(screen.getByRole('listitem', { name: 'Met: At least 15 characters' })).toHaveClass(
-      'text-emerald-700',
+      'text-secondary',
     );
     expect(screen.getByRole('listitem', { name: 'Met: Hard to guess' })).toHaveClass(
-      'text-emerald-700',
+      'text-secondary',
     );
   });
 

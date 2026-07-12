@@ -36,14 +36,7 @@ describe('Button', () => {
     const button = screen.getByTestId('btn');
     expect(button).toBeDisabled();
     expect(button).toHaveAttribute('aria-label', 'test-label');
-    expect(button).toHaveClass(
-      'disabled:cursor-not-allowed',
-      'disabled:bg-muted',
-      'disabled:text-muted-foreground',
-      'disabled:opacity-100',
-      'dark:disabled:border-foreground/30',
-      'dark:disabled:bg-accent',
-    );
+    expect(button).toHaveClass('disabled:pointer-events-none', 'disabled:opacity-50');
   });
 
   it('should render icon children with standard button semantics', () => {

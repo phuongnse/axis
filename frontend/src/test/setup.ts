@@ -4,6 +4,11 @@ import { beforeEach } from 'vitest';
 import { useAuthStore } from '@/features/auth/auth-store';
 import { changeSiteLanguage, setThemeMode } from '@/features/preferences';
 
+Object.defineProperty(window, 'scrollTo', {
+  configurable: true,
+  value: () => undefined,
+});
+
 beforeEach(async () => {
   useAuthStore.getState().clearSession();
   localStorage.removeItem('axis.language');

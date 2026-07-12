@@ -115,9 +115,14 @@ describe('module navigation', () => {
       'href',
       '/business-objects',
     );
+    expect(screen.getByRole('link', { name: 'Business objects' })).toHaveClass(
+      'hover:bg-muted',
+      'hover:text-foreground',
+    );
     const rulesLink = screen.getByRole('link', { name: 'Rules' });
     expect(rulesLink).toHaveAttribute('href', '/rules');
     expect(rulesLink).toHaveAttribute('aria-current', 'page');
+    expect(rulesLink).toHaveClass('bg-secondary', 'text-secondary-foreground');
   });
 
   it('registers Business Objects and Rules as workspace navigation contributions', () => {

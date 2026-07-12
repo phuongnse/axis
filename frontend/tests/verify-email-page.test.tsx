@@ -177,13 +177,7 @@ describe('VerifyEmailPage', () => {
       screen.getByText('Use the email that received the verification link.'),
     ).toBeInTheDocument();
     expect(screen.getByLabelText('Email address')).toBeRequired();
-    expect(
-      document.querySelectorAll('[data-slot="field-label"][data-required="true"]'),
-    ).toHaveLength(1);
-    expect(screen.getByRole('button', { name: /resend verification email/i })).toHaveAttribute(
-      'data-size',
-      'lg',
-    );
+    expect(screen.getByRole('button', { name: /resend verification email/i })).toHaveClass('h-9');
     expect(screen.getByRole('link', { name: /back to registration/i })).toHaveAttribute(
       'href',
       '/register',

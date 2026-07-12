@@ -178,6 +178,9 @@ jobs:
       - name: API types in sync with openapi.json
         run: python scripts/axis.py frontend gen-api-types --check
 
+      - name: Approved UI baseline in sync
+        run: python scripts/axis.py check ui-baseline
+
       - name: Type check and lint (zero errors, zero warnings)
         run: python scripts/axis.py frontend ci
 

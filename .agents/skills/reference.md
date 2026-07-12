@@ -63,6 +63,7 @@ Metadata-only PR title/body edits may skip the checkpoint per `$axis-pull-reques
 | From | Must read before proceeding |
 |---|---|
 | Non-trivial implementation | `$axis-design-gate` |
+| UI customization, shadcn sync, or component-provider change | `$axis-design-gate` then `$axis-ui-system` |
 | New module, module boundary, DDD/CQRS foundation, or event-sourcing change | `$axis-design-gate` then `$axis-module-architecture` |
 | Tactical DDD/CQRS pattern implementation | `$axis-module-architecture` when module/foundation scope changed, then `$axis-module-patterns` |
 | Spec gap | `$axis-use-case-spec` |

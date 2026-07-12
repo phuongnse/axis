@@ -3,6 +3,7 @@ from __future__ import annotations
 import contextlib
 import importlib.util
 import io
+import json
 import subprocess
 import sys
 import tempfile
@@ -2118,7 +2119,7 @@ class TestFrontendComponentFileNames(unittest.TestCase):
     def test_rejects_non_pascal_case_shared_component_filename(self) -> None:
         issues = self.issues_for_frontend(
             {
-                "frontend/src/components/shared/action-link.tsx": "export function ActionLink() { return null; }\n",
+                "frontend/src/components/shared/example-control.tsx": "export function ExampleControl() { return null; }\n",
                 "frontend/src/components/shared/layout-state.ts": "export const layoutState = {};\n",
             }
         )
@@ -2130,7 +2131,7 @@ class TestFrontendComponentFileNames(unittest.TestCase):
     def test_accepts_shared_component_filename_conventions(self) -> None:
         issues = self.issues_for_frontend(
             {
-                "frontend/src/components/shared/ActionLink.tsx": "export function ActionLink() { return null; }\n",
+                "frontend/src/components/shared/ExampleControl.tsx": "export function ExampleControl() { return null; }\n",
                 "frontend/src/components/shared/layoutState.ts": "export const layoutState = {};\n",
             }
         )
@@ -2250,6 +2251,157 @@ class TestFrontendComponentFileNames(unittest.TestCase):
         )
 
         self.assertEqual([], issues)
+
+
+class TestFrontendUiSystemPolicy(unittest.TestCase):
+    def issues_for_frontend(self, files: dict[str, str]) -> list[str]:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            for relative_path, content in files.items():
+                path = root / relative_path
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(content, encoding="utf-8")
+            return axis.frontend_ui_system_issues(root=root)
+
+    def test_rejects_app_dependency_from_registry_primitive(self) -> None:
+        issues = self.issues_for_frontend(
+            {
+                "frontend/src/components/ui/button.tsx": (
+                    "import { RulesPage } from '@/features/rules/components/RulesPage';\n"
+                )
+            }
+        )
+
+        self.assertIn("registry primitives cannot depend on feature", "\n".join(issues))
+
+    def test_rejects_palette_arbitrary_value_and_inline_color_outside_upstream_zone(self) -> None:
+        issues = self.issues_for_frontend(
+            {
+                "frontend/src/features/rules/components/RuleStatus.tsx": (
+                    "export const classes = 'bg-red-500 text-white size-[1.625rem]';\n"
+                    "export const style = { color: '#fff' };\n"
+                )
+            }
+        )
+
+        joined = "\n".join(issues)
+        self.assertIn("hard-coded Tailwind palette utility `bg-red-500`", joined)
+        self.assertIn("hard-coded Tailwind palette utility `text-white`", joined)
+        self.assertIn("arbitrary Tailwind value `size-[1.625rem]`", joined)
+        self.assertIn("component-local hard-coded color", joined)
+
+    def test_accepts_semantic_tokens_and_standard_tailwind_scale(self) -> None:
+        issues = self.issues_for_frontend(
+            {
+                "frontend/src/components/shared/RuleStatus.tsx": (
+                    "export const classes = 'grid grid-cols-4 gap-2 bg-card text-foreground';\n"
+                )
+            }
+        )
+
+        self.assertEqual([], issues)
+
+    def test_allows_registry_owned_implementation_details(self) -> None:
+        issues = self.issues_for_frontend(
+            {
+                "frontend/src/components/ui/example.tsx": (
+                    "export const classes = 'bg-red-500 w-[--anchor-width]';\n"
+                )
+            }
+        )
+
+        self.assertEqual([], issues)
+
+
+class TestUiBaseline(unittest.TestCase):
+    def create_baseline(self, root: Path) -> None:
+        files = {
+            "frontend/components.json": '{"style":"base-nova"}\n',
+            "frontend/src/index.css": '@import "tailwindcss";\n',
+            "frontend/src/components/ui/button.tsx": "export function Button() { return null; }\n",
+        }
+        for relative_path, content in files.items():
+            path = root / relative_path
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(content, encoding="utf-8")
+        with contextlib.redirect_stdout(io.StringIO()):
+            axis.write_ui_baseline(root)
+
+    def test_accepts_unchanged_approved_ui_baseline(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            self.create_baseline(root)
+
+            issues = axis.ui_baseline_issues(root)
+
+        self.assertEqual([], issues)
+
+    def test_rejects_changed_approved_ui_file(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            self.create_baseline(root)
+            (root / "frontend/src/components/ui/button.tsx").write_text("changed\n", encoding="utf-8")
+
+            issues = axis.ui_baseline_issues(root)
+
+        self.assertIn("approved UI baseline drift", "\n".join(issues))
+
+    def test_rejects_unreviewed_registry_file(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            self.create_baseline(root)
+            (root / "frontend/src/components/ui/input.tsx").write_text("new\n", encoding="utf-8")
+
+            issues = axis.ui_baseline_issues(root)
+
+        self.assertIn("UI baseline has an unreviewed tracked file", "\n".join(issues))
+
+    def test_rejects_unreviewed_registry_support_file(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            self.create_baseline(root)
+            path = root / "frontend/src/hooks/use-mobile.ts"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("export const mobile = false;\n", encoding="utf-8")
+
+            issues = axis.ui_baseline_issues(root)
+
+        self.assertIn("frontend/src/hooks/use-mobile.ts", "\n".join(issues))
+
+    def test_preserves_valid_exception_metadata_when_refreshing_hashes(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            self.create_baseline(root)
+            baseline_path = root / "frontend/ui-baseline.json"
+            baseline = json.loads(baseline_path.read_text(encoding="utf-8"))
+            baseline["exceptions"] = {
+                "src/components/ui/button.tsx": {
+                    "reason": "Compatibility with strict TypeScript settings.",
+                    "signOff": "Approved decision reference.",
+                }
+            }
+            baseline_path.write_text(f"{json.dumps(baseline)}\n", encoding="utf-8")
+
+            with contextlib.redirect_stdout(io.StringIO()):
+                axis.write_ui_baseline(root)
+            refreshed = json.loads(baseline_path.read_text(encoding="utf-8"))
+
+        self.assertEqual(baseline["exceptions"], refreshed["exceptions"])
+
+    def test_rejects_incomplete_exception_metadata(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            self.create_baseline(root)
+            baseline_path = root / "frontend/ui-baseline.json"
+            baseline = json.loads(baseline_path.read_text(encoding="utf-8"))
+            baseline["exceptions"] = {
+                "src/components/ui/button.tsx": {"reason": "", "signOff": ""}
+            }
+            baseline_path.write_text(f"{json.dumps(baseline)}\n", encoding="utf-8")
+
+            issues = axis.ui_baseline_issues(root)
+
+        self.assertIn("requires non-empty `reason` and `signOff`", "\n".join(issues))
 
 
 class TestFrontendApiContracts(unittest.TestCase):
@@ -3485,6 +3637,19 @@ class TestAxisCommandWrappers(unittest.TestCase):
 
         self.assertEqual(frontend_env, calls[0]["env"])
 
+    def test_frontend_ui_baseline_write_uses_deterministic_python_generator(self) -> None:
+        with (
+            mock.patch.object(axis, "write_ui_baseline") as write_baseline,
+            mock.patch.object(axis, "check_frontend_toolchain") as check_toolchain,
+        ):
+            rc = axis.frontend_command(
+                axis.argparse.Namespace(frontend_command="ui-baseline", write=True)
+            )
+
+        self.assertEqual(0, rc)
+        write_baseline.assert_called_once_with()
+        check_toolchain.assert_not_called()
+
     def test_frontend_install_browsers_installs_playwright_chromium(self) -> None:
         calls = self.run_with_fake_process(
             axis.frontend_command,
@@ -3731,7 +3896,8 @@ class TestRepoSkillsGate(unittest.TestCase):
                     "## Hard gates\n"
                     "\n"
                     "Follow [reference.md](../reference.md).\n"
-                    "Use $axis-design-gate before code and $axis-ready-review before review.\n"
+                    "Use $axis-design-gate before code, $axis-ui-system for UI ownership, "
+                    "and $axis-ready-review before review.\n"
                 ),
             }
 
@@ -3739,7 +3905,7 @@ class TestRepoSkillsGate(unittest.TestCase):
 
             self.assertIn("visual override audit", issues)
             self.assertIn("layout-only", issues)
-            self.assertIn("shared variant", issues)
+            self.assertIn("app-owned shared", issues)
 
     def test_pull_request_skill_must_cover_published_branch_push_updates(self) -> None:
         files = {

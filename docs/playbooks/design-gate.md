@@ -52,6 +52,7 @@ Use the matching repo skill for surface-specific checklist detail:
 | REST/OpenAPI/API type change | `$axis-api-contract` |
 | App shell / shared SPA UI infrastructure | `$axis-frontend-foundation` |
 | Frontend feature or SPA caller | `$axis-frontend-feature` |
+| UI customization / shadcn sync / component provider | `$axis-ui-system` |
 | Mermaid or generated visual artifact | `$axis-visual-artifact` |
 | Review feedback | `$axis-review-feedback` |
 

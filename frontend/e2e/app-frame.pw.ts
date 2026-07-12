@@ -150,7 +150,7 @@ async function expectNoDocumentScroll(page: Page): Promise<void> {
 }
 
 async function expectRulesCatalogScrolls(page: Page): Promise<void> {
-  const viewport = page.locator('[data-slot="scroll-area-viewport"]');
+  const viewport = page.locator('[data-slot="data-table"] [data-slot="data-table-viewport"]');
   await expect(viewport).toBeVisible();
   await expect
     .poll(() =>

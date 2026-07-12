@@ -277,7 +277,7 @@ function RuleIdentityCell({
   return (
     <div className="min-w-0 whitespace-normal">
       {onOpen ? (
-        <Button type="button" variant="link" size="inline" onClick={onOpen}>
+        <Button type="button" variant="link" onClick={onOpen}>
           {name}
         </Button>
       ) : (
@@ -296,7 +296,7 @@ function RuleTargetsCell({ definition }: { definition: RuleDefinitionSummary }) 
   return targetTypes.length > 0 ? (
     <div className="flex flex-wrap gap-1.5 whitespace-normal">
       {targetTypes.map((fieldType) => (
-        <Badge key={fieldType} variant="primaryOutline">
+        <Badge key={fieldType} variant="outline">
           {t(fieldTypeTranslationKey(fieldType))}
         </Badge>
       ))}
@@ -316,7 +316,7 @@ function RuleScopeCell({ definition }: { definition: RuleDefinitionSummary }) {
       <div className="flex flex-wrap gap-1.5">
         <ScopeBadge scope={definition.scope} />
         {definition.outcomeKind === 'Decision' ? (
-          <Badge variant="muted">{t('rules.outcomeDecision')}</Badge>
+          <Badge variant="outline">{t('rules.outcomeDecision')}</Badge>
         ) : null}
       </div>
       <p className="mt-1.5 text-xs text-muted-foreground">
@@ -329,28 +329,20 @@ function RuleScopeCell({ definition }: { definition: RuleDefinitionSummary }) {
 function OriginStatusBadge({ definition }: { definition: RuleDefinitionSummary }) {
   const { t } = useTranslation();
   if (definition.origin === 'System') {
-    return <Badge variant="primaryOutline">{t('rules.builtIn')}</Badge>;
+    return <Badge variant="outline">{t('rules.builtIn')}</Badge>;
   }
   if (definition.status === 'Published') {
-    return <Badge variant="successOutline">{t('rules.statusPublished')}</Badge>;
+    return <Badge variant="outline">{t('rules.statusPublished')}</Badge>;
   }
   if (definition.status === 'Archived') {
-    return <Badge variant="muted">{t('rules.statusArchived')}</Badge>;
+    return <Badge variant="outline">{t('rules.statusArchived')}</Badge>;
   }
-  return <Badge variant="warningOutline">{t('rules.statusDraft')}</Badge>;
+  return <Badge variant="outline">{t('rules.statusDraft')}</Badge>;
 }
 
 function ScopeBadge({ scope }: { scope: RuleScope | undefined }) {
   const { t } = useTranslation();
-  const variant =
-    scope === 'Record'
-      ? 'successOutline'
-      : scope === 'Lifecycle'
-        ? 'warningOutline'
-        : scope === 'Field'
-          ? 'primaryOutline'
-          : 'secondary';
-  return <Badge variant={variant}>{t(`rules.scope${scope ?? 'Object'}`)}</Badge>;
+  return <Badge variant="outline">{t(`rules.scope${scope ?? 'Object'}`)}</Badge>;
 }
 
 function CreateRuleDialog({
@@ -408,16 +400,14 @@ function CreateRuleDialog({
         onOpenChange(nextOpen);
       }}
     >
-      <DialogContent size="form" closeLabel={t('rules.close')}>
+      <DialogContent>
         <DialogHeader>
           <DialogTitle>{t('rules.createTitle')}</DialogTitle>
           <DialogDescription>{t('rules.createDescription')}</DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field className="sm:col-span-2">
-            <FieldLabel htmlFor="rule-name" required>
-              {t('rules.name')}
-            </FieldLabel>
+            <FieldLabel htmlFor="rule-name">{t('rules.name')}</FieldLabel>
             <Input
               id="rule-name"
               value={name}
@@ -429,9 +419,7 @@ function CreateRuleDialog({
             </FieldDescription>
           </Field>
           <Field className="sm:col-span-2">
-            <FieldLabel htmlFor="rule-description" required>
-              {t('rules.description')}
-            </FieldLabel>
+            <FieldLabel htmlFor="rule-description">{t('rules.description')}</FieldLabel>
             <Textarea
               id="rule-description"
               value={description}
@@ -440,9 +428,7 @@ function CreateRuleDialog({
             />
           </Field>
           <Field>
-            <FieldLabel htmlFor="rule-scope" required>
-              {t('rules.scope')}
-            </FieldLabel>
+            <FieldLabel htmlFor="rule-scope">{t('rules.scope')}</FieldLabel>
             <Select
               value={scope}
               onValueChange={(value) => value && changeScope(value as RuleScope)}
@@ -460,9 +446,7 @@ function CreateRuleDialog({
             </Select>
           </Field>
           <Field>
-            <FieldLabel htmlFor="rule-outcome-kind" required>
-              {t('rules.outcome')}
-            </FieldLabel>
+            <FieldLabel htmlFor="rule-outcome-kind">{t('rules.outcome')}</FieldLabel>
             <Select
               value={outcomeKind}
               onValueChange={(value) => value && setOutcomeKind(value as 'Validation' | 'Decision')}
@@ -481,9 +465,7 @@ function CreateRuleDialog({
             </Select>
           </Field>
           <Field className="sm:col-span-2">
-            <FieldLabel htmlFor="rule-context" required>
-              {t('rules.context')}
-            </FieldLabel>
+            <FieldLabel htmlFor="rule-context">{t('rules.context')}</FieldLabel>
             <Select
               value={contextKey || null}
               onValueChange={(value) => setContextKey(value ?? '')}

@@ -72,7 +72,6 @@ export function BusinessObjectsPage() {
           <Button
             type="button"
             variant="link"
-            size="inline"
             onFocus={() => prefetchDefinition(row.original.id)}
             onMouseEnter={() => prefetchDefinition(row.original.id)}
             onClick={() => openDefinition(row.original)}
@@ -230,8 +229,8 @@ export function BusinessObjectsPage() {
 function DefinitionStatusBadge({ status }: { status?: 'Unpublished' | 'Published' }) {
   const { t } = useTranslation();
   return status === 'Published' ? (
-    <Badge variant="successOutline">{t('businessObjects.published')}</Badge>
+    <Badge variant="outline">{t('businessObjects.published')}</Badge>
   ) : (
-    <Badge variant="warningOutline">{t('businessObjects.unpublished')}</Badge>
+    <Badge variant="outline">{t('businessObjects.unpublished')}</Badge>
   );
 }

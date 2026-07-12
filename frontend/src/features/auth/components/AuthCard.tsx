@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { BrandHeader } from '@/components/shared/BrandHeader';
-import { TopologyBackdrop } from '@/components/shared/TopologyBackdrop';
+import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
 import { PreferencesMenu } from '@/features/preferences';
 
 interface AuthCardProps {
@@ -12,24 +12,27 @@ interface AuthCardProps {
 
 export function AuthCard({ title, children, footer, banner }: AuthCardProps) {
   return (
-    <div className="relative min-h-screen overflow-hidden bg-background p-4 pb-8 pt-40 sm:p-6">
-      <TopologyBackdrop className="opacity-90" />
-      <div className="absolute right-4 top-4 z-20 sm:right-6 sm:top-6">
+    <div className="flex min-h-screen flex-col bg-background p-4 sm:p-6">
+      <div className="self-end">
         <PreferencesMenu />
       </div>
-      <div className="relative z-10 mx-auto flex min-h-[calc(100vh-12rem)] w-full max-w-[520px] items-center justify-center sm:min-h-[calc(100vh-3rem)]">
-        <div className="flex w-full flex-col overflow-hidden rounded-xl border border-border/80 bg-card/95 backdrop-blur">
-          <div className="space-y-6 px-6 py-6">
+      <div className="mx-auto flex w-full max-w-lg flex-1 items-center justify-center">
+        <Card className="w-full">
+          <CardHeader>
             <BrandHeader label={title} labelElement="h1" />
-            {banner}
-            {children}
-          </div>
-          {footer ? (
-            <div className="border-t border-border bg-muted/35 px-6 py-4 text-center text-xs text-muted-foreground">
-              {footer}
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-6">
+              {banner}
+              {children}
             </div>
+          </CardContent>
+          {footer ? (
+            <CardFooter className="justify-center">
+              <div className="text-center text-xs text-muted-foreground">{footer}</div>
+            </CardFooter>
           ) : null}
-        </div>
+        </Card>
       </div>
     </div>
   );

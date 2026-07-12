@@ -406,7 +406,7 @@ async function expectNoDesktopDocumentScroll(page: Page): Promise<void> {
     .toBe(true);
 }
 
-async function expectDarkInactiveSurfaceContrast(locator: Locator): Promise<void> {
+async function expectDarkReadableContrast(locator: Locator): Promise<void> {
   await expect
     .poll(async () =>
       locator.evaluate((element) => {
@@ -458,6 +458,23 @@ async function expectDarkInactiveSurfaceContrast(locator: Locator): Promise<void
                 b: Number.parseFloat(parts[2]) * 255,
                 a: alpha(parts[3]),
               };
+            }
+          }
+
+          const oklchMatch = normalized.match(/^oklch\((.+)\)$/);
+          if (oklchMatch) {
+            const parts = oklchMatch[1]
+              .replace(/\s*\/\s*/g, ' ')
+              .split(/\s+/)
+              .filter(Boolean);
+            if (parts.length >= 3) {
+              const chroma = Number.parseFloat(parts[1]);
+              const hue = (Number.parseFloat(parts[2]) * Math.PI) / 180;
+              const alphaPart = parts[3] ? ` / ${parts[3]}` : '';
+
+              return parseCssColor(
+                `oklab(${parts[0]} ${chroma * Math.cos(hue)} ${chroma * Math.sin(hue)}${alphaPart})`,
+              );
             }
           }
 
@@ -533,17 +550,12 @@ async function expectDarkInactiveSurfaceContrast(locator: Locator): Promise<void
         const elementStyle = getComputedStyle(element);
         const pageBackground = parseCssColor(getComputedStyle(document.body).backgroundColor);
         const surfaceBackground = parseCssColor(elementStyle.backgroundColor);
-        const surfaceBorder = parseCssColor(elementStyle.borderTopColor);
+        const textColor = parseCssColor(elementStyle.color);
 
-        if (!pageBackground || !surfaceBackground || !surfaceBorder) return false;
+        if (!pageBackground || !surfaceBackground || !textColor) return false;
 
         const compositedBackground = composite(surfaceBackground, pageBackground);
-        const compositedBorder = composite(surfaceBorder, pageBackground);
-
-        return (
-          distance(compositedBackground, pageBackground) >= 35 &&
-          distance(compositedBorder, pageBackground) >= 35
-        );
+        return distance(textColor, compositedBackground) >= 35;
       }),
     )
     .toBe(true);
@@ -733,7 +745,7 @@ test.describe('define business object', () => {
     await page.getByRole('button', { name: 'New definition' }).click();
     const dialog = page.locator('[data-slot="dialog-content"]');
     await expect(dialog).toBeVisible();
-    await expectDarkInactiveSurfaceContrast(dialog.getByLabel('Object key'));
+    await expectDarkReadableContrast(dialog.getByLabel('Object key'));
     await expectNoDesktopDocumentScroll(page);
     await expectNoPageOverflow(page);
   });
@@ -794,7 +806,7 @@ test.describe('define business object', () => {
     await expect(alert).toContainText(
       'An object definition with this key already exists in the current workspace.',
     );
-    await expect(alert).toHaveClass(/bg-destructive\/15/);
+    await expect(alert).toHaveClass(/text-destructive/);
     await expect(dialog.getByLabel('Name', { exact: true })).toHaveAttribute(
       'aria-invalid',
       'false',

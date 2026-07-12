@@ -1,6 +1,7 @@
 import { Link } from '@tanstack/react-router';
 import { Mail } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { AuthCard } from '@/features/auth/components/AuthCard';
 import { AuthNotice } from '@/features/auth/components/AuthNotice';
@@ -31,20 +32,18 @@ export function EmailConfirmationPage() {
       }
     >
       <div className="space-y-4">
-        <div className="flex items-start gap-3">
-          <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-100 text-blue-800 dark:bg-blue-500/15 dark:text-blue-300">
-            <Mail className="h-4 w-4" aria-hidden />
-          </div>
-          <div className="space-y-2 text-sm text-muted-foreground">
-            <p>{t('auth.confirm.body1')}</p>
-            <p>{t('auth.confirm.body2')}</p>
-            {context?.email ? (
-              <p className="text-xs text-muted-foreground/80">
-                {t('auth.confirm.sentTo', { email: context.email })}
-              </p>
-            ) : null}
-          </div>
-        </div>
+        <Alert>
+          <Mail aria-hidden />
+          <AlertDescription>
+            <div className="space-y-2">
+              <p>{t('auth.confirm.body1')}</p>
+              <p>{t('auth.confirm.body2')}</p>
+              {context?.email ? (
+                <p className="text-xs">{t('auth.confirm.sentTo', { email: context.email })}</p>
+              ) : null}
+            </div>
+          </AlertDescription>
+        </Alert>
 
         {state === 'sending' ? (
           <AuthNotice title={t('notice.sendingEmailTitle')}>{t('notice.sendingEmail')}</AuthNotice>
@@ -74,7 +73,6 @@ export function EmailConfirmationPage() {
             <Button
               type="button"
               variant="link"
-              size="inline"
               disabled={state === 'sending' || state === 'rate_limited'}
               onClick={() => void handleResend()}
             >

@@ -31,6 +31,7 @@ Validate skill changes: `python scripts/axis.py check repo-skills`
 | API / OpenAPI / generated types | [axis-api-contract/SKILL.md](./axis-api-contract/SKILL.md) |
 | App shell / shared SPA UI infrastructure | [axis-frontend-foundation/SKILL.md](./axis-frontend-foundation/SKILL.md) |
 | Frontend feature slice | [axis-frontend-feature/SKILL.md](./axis-frontend-feature/SKILL.md) |
+| UI customization / shadcn sync / component provider | [axis-ui-system/SKILL.md](./axis-ui-system/SKILL.md) |
 | Mermaid / committed visual artifact | [axis-visual-artifact/SKILL.md](./axis-visual-artifact/SKILL.md) |
 | Docs / guidance / status edits | [axis-doc-hygiene/SKILL.md](./axis-doc-hygiene/SKILL.md) |
 | Repo tooling / compose / local-dev / scripts | [axis-script-scope/SKILL.md](./axis-script-scope/SKILL.md) |
@@ -45,6 +46,7 @@ spec gap     → axis-use-case-spec
 module arch  → axis-design-gate → axis-module-architecture
 patterns     → axis-module-architecture (if module/foundation scope changes) → axis-module-patterns
 non-trivial  → axis-design-gate → implement skill → axis-script-scope (checks)
+UI system    → axis-design-gate → axis-ui-system
 before review→ axis-ready-review
 PR/push action→ axis-pull-request → axis-review-feedback (if needed) → then push/PR
 ```

@@ -56,9 +56,7 @@ export function RegisterPage() {
     >
       <form className="space-y-4" onSubmit={handleSubmit(submit)} noValidate>
         <Field data-invalid={errors.fullName ? true : undefined}>
-          <FieldLabel htmlFor="fullName" required>
-            {t('auth.fullName')}
-          </FieldLabel>
+          <FieldLabel htmlFor="fullName">{t('auth.fullName')}</FieldLabel>
           <Input
             id="fullName"
             autoComplete="name"
@@ -74,9 +72,7 @@ export function RegisterPage() {
         </Field>
 
         <Field data-invalid={errors.email ? true : undefined}>
-          <FieldLabel htmlFor="email" required>
-            {t('auth.email')}
-          </FieldLabel>
+          <FieldLabel htmlFor="email">{t('auth.email')}</FieldLabel>
           <Input
             id="email"
             type="email"
@@ -91,9 +87,7 @@ export function RegisterPage() {
         </Field>
 
         <Field data-invalid={errors.password ? true : undefined}>
-          <FieldLabel htmlFor="password" required>
-            {t('auth.password')}
-          </FieldLabel>
+          <FieldLabel htmlFor="password">{t('auth.password')}</FieldLabel>
           <Input
             id="password"
             type="password"
@@ -115,9 +109,7 @@ export function RegisterPage() {
         </Field>
 
         <Field data-invalid={errors.passwordConfirmation ? true : undefined}>
-          <FieldLabel htmlFor="passwordConfirmation" required>
-            {t('auth.passwordConfirmation')}
-          </FieldLabel>
+          <FieldLabel htmlFor="passwordConfirmation">{t('auth.passwordConfirmation')}</FieldLabel>
           <Input
             id="passwordConfirmation"
             type="password"
@@ -158,12 +150,7 @@ export function RegisterPage() {
                   aria-invalid={errors.acceptedTerms ? true : undefined}
                   aria-required="true"
                 />
-                <FieldLabel
-                  htmlFor="acceptedTerms"
-                  required
-                  variant="body"
-                  className="block min-w-0 w-full flex-1"
-                >
+                <FieldLabel htmlFor="acceptedTerms">
                   <Trans
                     i18nKey="auth.termsAgreement"
                     components={{

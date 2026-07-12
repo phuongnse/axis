@@ -9,6 +9,7 @@ Review checklist only. Workflow lives in repo skills ([`.agents/skills/README.md
 - Use `$axis-design-gate` for non-trivial work; high-risk surfaces need sign-off.
 - Use `$axis-module-architecture` before new modules or foundational modular-monolith, DDD, CQRS, or event-sourcing changes.
 - Use `$axis-module-patterns` before implementing adopted tactical DDD, CQRS, persistence, or event patterns.
+- Use `$axis-ui-system` before semantic token, shared visual pattern, shadcn source, UI baseline, style/base, or component-provider changes.
 - Read the owning use-case, foundation, or domain docs and same-module code.
 - Map in-scope ACs before behavior work.
 - Resolve or explicitly defer lower-layer gaps before API work.

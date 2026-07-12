@@ -12,7 +12,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Input } from '@/components/ui/input';
+import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group';
 import { Popover, PopoverContent, PopoverTitle, PopoverTrigger } from '@/components/ui/popover';
 import { DataTableFilterBuilder, type DataTableFilterField } from './DataTableFilterBuilder';
 import { countFilterConditions, createEmptyFilterExpression } from './filtering';
@@ -72,18 +72,18 @@ export function DataTableToolbar<TData>({
       className="flex min-w-0 shrink-0 flex-wrap items-center gap-2 border-b border-border bg-card px-3 py-2.5"
     >
       {globalSearch ? (
-        <div className="relative min-w-48 flex-1 sm:max-w-sm">
-          <Search
-            className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
-            aria-hidden
-          />
-          <Input
-            value={String(table.getState().globalFilter ?? '')}
-            onChange={(event) => table.setGlobalFilter(event.target.value)}
-            placeholder={messages.searchPlaceholder}
-            aria-label={messages.searchLabel}
-            className="pl-8"
-          />
+        <div className="min-w-48 flex-1 sm:max-w-sm">
+          <InputGroup>
+            <InputGroupAddon>
+              <Search aria-hidden />
+            </InputGroupAddon>
+            <InputGroupInput
+              value={String(table.getState().globalFilter ?? '')}
+              onChange={(event) => table.setGlobalFilter(event.target.value)}
+              placeholder={messages.searchPlaceholder}
+              aria-label={messages.searchLabel}
+            />
+          </InputGroup>
         </div>
       ) : null}
 
@@ -104,7 +104,7 @@ export function DataTableToolbar<TData>({
           </PopoverTrigger>
           <PopoverContent
             align="start"
-            className="max-h-[min(36rem,var(--available-height))] w-[min(52rem,calc(100vw-2rem))] overflow-y-auto"
+            className="max-h-96 w-80 overflow-y-auto sm:w-xl md:w-2xl lg:w-4xl"
           >
             <div className="mb-3 flex items-center justify-between gap-3">
               <PopoverTitle>{messages.filters}</PopoverTitle>

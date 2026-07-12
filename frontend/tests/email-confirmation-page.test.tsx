@@ -31,10 +31,7 @@ describe('EmailConfirmationPage', () => {
     ).toBeInTheDocument();
     expect(screen.getByText(/Sent to alex@example.com/)).toBeInTheDocument();
     expect(screen.getByText("Didn't receive it?")).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /resend email/i })).toHaveAttribute(
-      'data-size',
-      'inline',
-    );
+    expect(screen.getByRole('button', { name: /resend email/i })).toHaveClass('h-8');
     expect(
       screen.queryByRole('link', { name: /register another account/i }),
     ).not.toBeInTheDocument();

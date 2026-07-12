@@ -20,7 +20,6 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
-  DialogBody,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -291,11 +290,7 @@ export function BusinessObjectDefinitionDialog({
           if (!nextOpen) requestClose();
         }}
       >
-        <DialogContent
-          size="workspace"
-          closeLabel={t('businessObjects.close')}
-          showCloseButton={!busy}
-        >
+        <DialogContent showCloseButton={!busy}>
           <DialogHeader>
             <DialogTitle>{title}</DialogTitle>
             <DialogDescription>
@@ -306,7 +301,7 @@ export function BusinessObjectDefinitionDialog({
           </DialogHeader>
 
           <form className="contents" onSubmit={submit} noValidate>
-            <DialogBody>
+            <div data-slot="dialog-body" className="max-h-96 min-h-0 overflow-y-auto">
               {detailQuery.isLoading && mode !== 'create' ? (
                 <p role="status">{t('table.loading')}</p>
               ) : null}
@@ -325,7 +320,7 @@ export function BusinessObjectDefinitionDialog({
 
               {!detailQuery.isLoading || mode === 'create' ? (
                 <Tabs defaultValue="details">
-                  <TabsList variant="soft" aria-label={t('businessObjects.definitionSections')}>
+                  <TabsList aria-label={t('businessObjects.definitionSections')}>
                     <TabsTrigger value="details">{t('businessObjects.details')}</TabsTrigger>
                     {mode !== 'create' ? (
                       <TabsTrigger value="fields">{t('businessObjects.fields')}</TabsTrigger>
@@ -375,7 +370,7 @@ export function BusinessObjectDefinitionDialog({
                   ) : null}
                 </Tabs>
               ) : null}
-            </DialogBody>
+            </div>
 
             <DialogFooter>
               <Button type="button" variant="outline" disabled={busy} onClick={requestClose}>
@@ -469,9 +464,7 @@ function DefinitionDetails({
   return (
     <div className="grid gap-4 pt-4 md:grid-cols-2">
       <Field data-invalid={Boolean(nameError)}>
-        <FieldLabel htmlFor="business-object-name" required>
-          {t('businessObjects.name')}
-        </FieldLabel>
+        <FieldLabel htmlFor="business-object-name">{t('businessObjects.name')}</FieldLabel>
         <Input
           id="business-object-name"
           value={name}
@@ -570,7 +563,7 @@ function FieldsEditor({
             <ItemContent>
               <div className="grid gap-4 md:grid-cols-3">
                 <Field data-invalid={Boolean(errors?.[index]?.label)}>
-                  <FieldLabel htmlFor={`field-${field.clientId}-label`} required>
+                  <FieldLabel htmlFor={`field-${field.clientId}-label`}>
                     {t('businessObjects.label')}
                   </FieldLabel>
                   <Input
@@ -585,7 +578,7 @@ function FieldsEditor({
                   </FieldError>
                 </Field>
                 <Field data-invalid={Boolean(errors?.[index]?.fieldKey)}>
-                  <FieldLabel htmlFor={`field-${field.clientId}-key`} required>
+                  <FieldLabel htmlFor={`field-${field.clientId}-key`}>
                     {t('businessObjects.fieldKey')}
                   </FieldLabel>
                   <Input
@@ -600,7 +593,7 @@ function FieldsEditor({
                   </FieldError>
                 </Field>
                 <Field>
-                  <FieldLabel htmlFor={`field-${field.clientId}-type`} required>
+                  <FieldLabel htmlFor={`field-${field.clientId}-type`}>
                     {t('businessObjects.fieldType')}
                   </FieldLabel>
                   <Select
@@ -683,7 +676,7 @@ function ChoiceOptionsEditor({
     <section aria-label={t('businessObjects.options')} className="mt-4">
       <div className="grid gap-4 md:grid-cols-2">
         <Field>
-          <FieldLabel htmlFor={`field-${field.clientId}-selection-mode`} required>
+          <FieldLabel htmlFor={`field-${field.clientId}-selection-mode`}>
             {t('businessObjects.selectionMode')}
           </FieldLabel>
           <Select
@@ -731,7 +724,7 @@ function ChoiceOptionsEditor({
               <ItemContent>
                 <div className="grid gap-3 md:grid-cols-2">
                   <Field data-invalid={Boolean(currentErrors?.optionKey)}>
-                    <FieldLabel htmlFor={`option-${option.clientId}-key`} required>
+                    <FieldLabel htmlFor={`option-${option.clientId}-key`}>
                       {t('businessObjects.optionKey')}
                     </FieldLabel>
                     <Input
@@ -750,7 +743,7 @@ function ChoiceOptionsEditor({
                     </FieldError>
                   </Field>
                   <Field data-invalid={Boolean(currentErrors?.label)}>
-                    <FieldLabel htmlFor={`option-${option.clientId}-label`} required>
+                    <FieldLabel htmlFor={`option-${option.clientId}-label`}>
                       {t('businessObjects.label')}
                     </FieldLabel>
                     <Input
@@ -887,7 +880,7 @@ function RulesEditor({
                   {definition ? ruleDisplayName(definition, t) : rule.definitionKey}
                 </ItemTitle>
                 <ItemActions>
-                  <Badge variant="primaryOutline">
+                  <Badge variant="outline">
                     {t('businessObjects.ruleVersion', { version: rule.definitionVersion })}
                   </Badge>
                   {!readOnly ? (
@@ -971,9 +964,7 @@ function RuleParameterEditor({
 
   return (
     <Field>
-      <FieldLabel htmlFor={`rule-parameter-${key}`} required={parameter.isRequired}>
-        {humanize(key)}
-      </FieldLabel>
+      <FieldLabel htmlFor={`rule-parameter-${key}`}>{humanize(key)}</FieldLabel>
       <div className="flex flex-col gap-2">
         {currentValues.map((value, valueIndex) => (
           <div key={valueIds[valueIndex]} className="flex items-center gap-2">
@@ -1089,7 +1080,7 @@ function PublishedVersion({ definition }: { definition: BusinessObjectDefinition
             <ItemContent>
               <ItemTitle>{field.label}</ItemTitle>
               <div className="flex flex-wrap gap-2">
-                <Badge variant="primaryOutline">{field.fieldKey}</Badge>
+                <Badge variant="outline">{field.fieldKey}</Badge>
                 <Badge variant="secondary">
                   {t(`businessObjects.fieldType${field.fieldType ?? 'Text'}`)}
                 </Badge>

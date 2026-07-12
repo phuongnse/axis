@@ -116,27 +116,25 @@ describe('RulesPage', () => {
     expect(
       await within(catalog).findByRole('button', { name: 'Credit threshold' }),
     ).toBeInTheDocument();
-    const catalogViewport = catalog.querySelector('[data-slot="table-container"]');
+    const catalogViewport = catalog.querySelector('[data-slot="data-table-viewport"]');
     const catalogHeader = within(catalog).getByRole('columnheader', { name: /Rule/ });
     expect(catalogViewport).not.toBeNull();
-    expect(catalogViewport).toContainElement(catalogHeader);
+    expect(catalog).toContainElement(catalogHeader);
     const requiredRow = within(catalog).getByText('Required value').closest('tr');
     if (!requiredRow) throw new Error('Required rule row was not rendered');
     expect(catalogViewport).toContainElement(requiredRow);
-    expect(within(requiredRow).getByText('Built-in')).toHaveAttribute(
-      'data-variant',
-      'primaryOutline',
-    );
+    expect(within(requiredRow).getByText('Built-in')).toHaveAttribute('data-variant', 'outline');
     expect(within(requiredRow).getByText('Date and time')).toHaveAttribute(
       'data-variant',
-      'primaryOutline',
+      'outline',
     );
+    expect(within(requiredRow).getByText('Field')).toHaveAttribute('data-variant', 'outline');
     expect(within(catalog).getByText('Decimal precision')).toBeInTheDocument();
     expect(within(catalog).getByText('Date and time range')).toBeInTheDocument();
     expect(within(catalog).getByText('Text format')).toBeInTheDocument();
     expect(within(catalog).getByText('Choice selection count')).toBeInTheDocument();
     expect(within(catalog).getByText('Credit threshold')).toBeInTheDocument();
-    expect(within(catalog).getByText('Draft')).toHaveAttribute('data-variant', 'warningOutline');
+    expect(within(catalog).getByText('Draft')).toHaveAttribute('data-variant', 'outline');
     expect(within(catalog).queryByText('Validation')).not.toBeInTheDocument();
     expect(within(catalog).queryByText('field.required')).not.toBeInTheDocument();
     expect(within(catalog).queryByText(/Single-select options/)).not.toBeInTheDocument();
@@ -224,7 +222,7 @@ describe('RulesPage', () => {
     const editorName = await screen.findByLabelText('Name');
     await user.clear(editorName);
     await user.type(editorName, 'Updated credit value');
-    await user.click(screen.getByRole('button', { name: 'Close rule' }));
+    await user.click(screen.getByRole('button', { name: 'Close' }));
     expect(screen.getByRole('heading', { name: 'Discard unsaved changes?' })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Keep editing' }));
     expect(screen.getByLabelText('Name')).toHaveValue('Updated credit value');

@@ -1,42 +1,20 @@
 import * as React from "react"
-import { cva, type VariantProps } from "class-variance-authority"
 
 import { cn } from "@/lib/utils"
-
-const cardVariants = cva(
-  "group/card flex flex-col gap-(--card-spacing) overflow-hidden rounded-xl border border-border/80 bg-card py-(--card-spacing) text-sm text-card-foreground shadow-xs [--card-spacing:--spacing(4)] has-data-[slot=card-footer]:pb-0 has-[>img:first-child]:pt-0 dark:border-border *:[img:first-child]:rounded-t-xl *:[img:last-child]:rounded-b-xl",
-  {
-    variants: {
-      size: {
-        default: "",
-        sm: "[--card-spacing:--spacing(3)]",
-        lg: "[--card-spacing:--spacing(6)] sm:[--card-spacing:--spacing(8)]",
-        flush: "gap-0 py-0 [--card-spacing:--spacing(0)]",
-      },
-      variant: {
-        default: "",
-        destructive: "border-destructive/30",
-      },
-    },
-    defaultVariants: {
-      size: "default",
-      variant: "default",
-    },
-  }
-)
 
 function Card({
   className,
   size = "default",
-  variant = "default",
   ...props
-}: React.ComponentProps<"div"> & VariantProps<typeof cardVariants>) {
+}: React.ComponentProps<"div"> & { size?: "default" | "sm" }) {
   return (
     <div
       data-slot="card"
       data-size={size}
-      data-variant={variant}
-      className={cn(cardVariants({ size, variant }), className)}
+      className={cn(
+        "group/card flex flex-col gap-(--card-spacing) overflow-hidden rounded-xl bg-card py-(--card-spacing) text-sm text-card-foreground ring-1 ring-foreground/10 [--card-spacing:--spacing(4)] has-data-[slot=card-footer]:pb-0 has-[>img:first-child]:pt-0 data-[size=sm]:[--card-spacing:--spacing(3)] data-[size=sm]:has-data-[slot=card-footer]:pb-0 *:[img:first-child]:rounded-t-xl *:[img:last-child]:rounded-b-xl",
+        className
+      )}
       {...props}
     />
   )
@@ -60,7 +38,7 @@ function CardTitle({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="card-title"
       className={cn(
-        "text-base leading-snug font-medium group-data-[size=sm]/card:text-sm",
+        "font-heading text-base leading-snug font-medium group-data-[size=sm]/card:text-sm",
         className
       )}
       {...props}
@@ -101,31 +79,14 @@ function CardContent({ className, ...props }: React.ComponentProps<"div">) {
   )
 }
 
-const cardFooterVariants = cva(
-  "flex items-center rounded-b-xl border-t bg-muted/50 p-(--card-spacing)",
-  {
-    variants: {
-      orientation: {
-        horizontal: "",
-        vertical: "flex-col items-stretch gap-3",
-      },
-    },
-    defaultVariants: {
-      orientation: "horizontal",
-    },
-  }
-)
-
-function CardFooter({
-  className,
-  orientation = "horizontal",
-  ...props
-}: React.ComponentProps<"div"> & VariantProps<typeof cardFooterVariants>) {
+function CardFooter({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="card-footer"
-      data-orientation={orientation}
-      className={cn(cardFooterVariants({ orientation }), className)}
+      className={cn(
+        "flex items-center rounded-b-xl border-t bg-muted/50 p-(--card-spacing)",
+        className
+      )}
       {...props}
     />
   )
@@ -139,6 +100,4 @@ export {
   CardAction,
   CardDescription,
   CardContent,
-  cardFooterVariants,
-  cardVariants,
 }

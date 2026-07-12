@@ -694,6 +694,176 @@ def check_frontend_api_contracts(_args: argparse.Namespace | None = None) -> int
     return 0
 
 
+def ui_baseline_payload(root: Path = ROOT) -> dict[str, object]:
+    frontend_root = root / "frontend"
+    config_path = frontend_root / "components.json"
+    theme_path = frontend_root / "src" / "index.css"
+    ui_root = frontend_root / "src" / "components" / "ui"
+    required = (config_path, theme_path)
+    missing = [str(path.relative_to(root)).replace("\\", "/") for path in required if not path.is_file()]
+    if missing:
+        raise CheckError(f"missing UI baseline source: {', '.join(missing)}")
+
+    try:
+        config = json.loads(config_path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError) as exc:
+        raise CheckError(f"invalid frontend/components.json: {exc}") from exc
+
+    support_paths = [
+        frontend_root / "src" / "hooks" / "use-mobile.ts",
+        frontend_root / "src" / "lib" / "utils.ts",
+    ]
+    paths = [
+        config_path,
+        theme_path,
+        *(path for path in support_paths if path.is_file()),
+        *sorted(ui_root.rglob("*.tsx")),
+    ]
+    files = {
+        str(path.relative_to(frontend_root)).replace("\\", "/"): hashlib.sha256(path.read_bytes()).hexdigest()
+        for path in paths
+    }
+    return {
+        "schemaVersion": 2,
+        "registry": "@shadcn",
+        "style": config.get("style"),
+        "files": files,
+    }
+
+
+def ui_baseline_issues(root: Path = ROOT) -> list[str]:
+    baseline_path = root / "frontend" / "ui-baseline.json"
+    if not baseline_path.is_file():
+        return [
+            "frontend/ui-baseline.json: approved UI baseline is missing; "
+            "create it only after registry/default review and sign-off"
+        ]
+
+    try:
+        approved = json.loads(baseline_path.read_text(encoding="utf-8"))
+        current = ui_baseline_payload(root)
+    except (json.JSONDecodeError, OSError, CheckError) as exc:
+        return [f"frontend/ui-baseline.json: cannot validate approved UI baseline: {exc}"]
+    if not isinstance(approved, dict):
+        return ["frontend/ui-baseline.json: root value must be an object"]
+
+    issues: list[str] = []
+    for field in ("schemaVersion", "registry", "style"):
+        if approved.get(field) != current[field]:
+            issues.append(
+                f"frontend/ui-baseline.json: `{field}` is {approved.get(field)!r}, "
+                f"current value is {current[field]!r}"
+            )
+
+    approved_files = approved.get("files")
+    if not isinstance(approved_files, dict):
+        return ["frontend/ui-baseline.json: `files` must be an object of path-to-SHA256 entries"]
+
+    exceptions = approved.get("exceptions")
+    if not isinstance(exceptions, dict):
+        issues.append("frontend/ui-baseline.json: `exceptions` must be an object")
+        exceptions = {}
+    for path, decision in sorted(exceptions.items()):
+        if path not in approved_files:
+            issues.append(f"frontend/ui-baseline.json: exception `{path}` is not a tracked baseline file")
+        if not isinstance(decision, dict) or any(
+            not isinstance(decision.get(field), str) or not decision[field].strip()
+            for field in ("reason", "signOff")
+        ):
+            issues.append(
+                f"frontend/ui-baseline.json: exception `{path}` requires non-empty `reason` and `signOff`"
+            )
+
+    current_files = current["files"]
+    assert isinstance(current_files, dict)
+    for path in sorted(set(approved_files) | set(current_files)):
+        if path not in approved_files:
+            issues.append(f"frontend/{path}: UI baseline has an unreviewed tracked file")
+        elif path not in current_files:
+            issues.append(f"frontend/{path}: approved UI baseline file is missing")
+        elif approved_files[path] != current_files[path]:
+            issues.append(f"frontend/{path}: approved UI baseline drift")
+    return issues
+
+
+def write_ui_baseline(root: Path = ROOT) -> None:
+    baseline_path = root / "frontend" / "ui-baseline.json"
+    exceptions: dict[str, object] = {}
+    if baseline_path.is_file():
+        try:
+            existing = json.loads(baseline_path.read_text(encoding="utf-8"))
+            if isinstance(existing, dict) and isinstance(existing.get("exceptions"), dict):
+                exceptions = existing["exceptions"]
+        except (json.JSONDecodeError, OSError):
+            pass
+    payload = ui_baseline_payload(root)
+    payload["exceptions"] = exceptions
+    baseline_path.write_text(
+        f"{json.dumps(payload, indent=2, sort_keys=True)}\n",
+        encoding="utf-8",
+    )
+    print(f"ui-baseline: wrote {baseline_path.relative_to(root)}")
+
+
+def check_ui_baseline(_args: argparse.Namespace | None = None) -> int:
+    issues = ui_baseline_issues()
+    if issues:
+        print("check-ui-baseline FAIL:", file=sys.stderr)
+        for issue in issues:
+            print(f"  - {issue}", file=sys.stderr)
+        print(
+            "\nReview registry/theme changes and required sign-off before running "
+            "`python scripts/axis.py frontend ui-baseline --write`.",
+            file=sys.stderr,
+        )
+        return 1
+    print("check-ui-baseline: OK")
+    return 0
+
+
+def frontend_ui_system_issues(root: Path = ROOT) -> list[str]:
+    issues: list[str] = []
+    src_root = root / "frontend" / "src"
+    ui_root = src_root / "components" / "ui"
+    palette_utility = re.compile(
+        r"\b(?:bg|text|border|ring|outline|fill|stroke|from|via|to|divide|placeholder|decoration)-"
+        r"(?:(?:slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|"
+        r"blue|indigo|violet|purple|fuchsia|pink|rose)-[0-9]{2,3}(?:/[0-9]{1,3})?|black|white)\b"
+    )
+    arbitrary_value = re.compile(r"(?<![A-Za-z0-9_])(?:[A-Za-z0-9_:/.]+-)+\[[^\]\n]+\]")
+    inline_color = re.compile(
+        r"\b(?:color|background|backgroundColor|borderColor|fill|stroke)\s*:\s*['\"](?:#|rgba?[(]|hsla?[(]|oklch[(])",
+        re.IGNORECASE,
+    )
+
+    for path in iter_files(src_root, (".ts", ".tsx")):
+        normalized = rel(path) if root == ROOT else str(path.relative_to(root)).replace("\\", "/")
+        text = path.read_text(encoding="utf-8")
+        in_ui_primitives = path.is_relative_to(ui_root) if hasattr(path, "is_relative_to") else False
+        if in_ui_primitives:
+            for idx, line in enumerate(text.splitlines(), 1):
+                if re.search(r"@/(?:features|components/shared|routes)/", line):
+                    issues.append(
+                        f"{normalized}:{idx}: registry primitives cannot depend on feature, shared, or route code"
+                    )
+            continue
+
+        for idx, line in enumerate(text.splitlines(), 1):
+            for match in palette_utility.finditer(line):
+                issues.append(
+                    f"{normalized}:{idx}: hard-coded Tailwind palette utility `{match.group(0)}`; use a semantic token"
+                )
+            for match in arbitrary_value.finditer(line):
+                issues.append(
+                    f"{normalized}:{idx}: arbitrary Tailwind value `{match.group(0)}`; use the standard scale or layout"
+                )
+            if inline_color.search(line):
+                issues.append(
+                    f"{normalized}:{idx}: component-local hard-coded color; use a semantic token"
+                )
+    return issues
+
+
 def frontend_component_file_name_issues(root: Path = ROOT) -> list[str]:
     issues: list[str] = []
     src_root = root / "frontend" / "src"
@@ -999,6 +1169,7 @@ def frontend_transient_handoff_issues(root: Path = ROOT) -> list[str]:
 
 def frontend_quality_issues(root: Path = ROOT) -> list[str]:
     return [
+        *frontend_ui_system_issues(root),
         *frontend_component_file_name_issues(root),
         *frontend_tailwind_opacity_issues(root),
         *frontend_form_schema_type_issues(root),
@@ -1014,7 +1185,7 @@ def check_frontend_quality(_args: argparse.Namespace | None = None) -> int:
     if issues:
         for issue in issues:
             print(f"check-frontend-quality FAIL: {issue}", file=sys.stderr)
-        print("\nSee docs/playbooks/frontend.md#state-management", file=sys.stderr)
+        print("\nSee docs/playbooks/frontend.md#component-design", file=sys.stderr)
         return 1
     print("check-frontend-quality: OK")
     return 0
@@ -1195,10 +1366,13 @@ SKILL_REPO_REF_RE = re.compile(
 SKILL_MD_LINK_RE = re.compile(r"\[[^\]]+\]\((?P<target>[^)]+)\)")
 SKILL_REQUIRED_SKILL_REFS = {
     "axis-api-contract": ("axis-design-gate", "axis-ready-review"),
-    "axis-frontend-feature": ("axis-design-gate", "axis-ready-review"),
+    "axis-frontend-feature": ("axis-design-gate", "axis-ui-system", "axis-ready-review"),
+    "axis-frontend-foundation": ("axis-design-gate", "axis-ui-system", "axis-ready-review"),
+    "axis-ui-system": ("axis-design-gate", "axis-ready-review"),
     "axis-use-case-implementation": ("axis-design-gate", "axis-ready-review", "axis-pull-request"),
     "axis-pull-request": ("axis-ready-review", "axis-review-feedback"),
     "axis-review-feedback": ("axis-ready-review",),
+    "axis-script-scope": ("axis-ui-system", "axis-ready-review"),
 }
 SKILL_HARD_GATE_REQUIREMENTS: dict[str, tuple[str, ...]] = {
     "axis-api-contract": ("## Hard gates", r"reference\.md", r"axis-design-gate", r"axis-ready-review"),
@@ -1211,14 +1385,22 @@ SKILL_HARD_GATE_REQUIREMENTS: dict[str, tuple[str, ...]] = {
         r"axis-ready-review",
         r"visual override audit",
         r"layout-only",
-        r"shared variant",
+        r"app-owned shared",
     ),
     "axis-frontend-foundation": (
         "## Hard gates",
         r"reference\.md",
         r"visual override audit",
         r"layout-only",
-        r"shared variant",
+        r"app-owned shared",
+    ),
+    "axis-ui-system": (
+        "## Hard gates",
+        r"reference\.md",
+        r"axis-design-gate",
+        r"axis-ready-review",
+        r"explicit user sign-off",
+        r"ui-baseline",
     ),
     "axis-pull-request": (
         "## Hard gates",
@@ -1230,7 +1412,13 @@ SKILL_HARD_GATE_REQUIREMENTS: dict[str, tuple[str, ...]] = {
     ),
     "axis-ready-review": ("## Hard gates", r"reference\.md", r"Not ready", r"axis-pull-request"),
     "axis-review-feedback": ("## Hard gates", r"reference\.md", r"axis-ready-review", r"axis-pull-request"),
-    "axis-script-scope": ("## Hard gates", r"reference\.md", r"axis-ready-review"),
+    "axis-script-scope": (
+        "## Hard gates",
+        r"reference\.md",
+        r"axis-ui-system",
+        r"ui-baseline",
+        r"axis-ready-review",
+    ),
     "axis-use-case-implementation": (
         "## Hard gates",
         r"reference\.md",
@@ -1759,6 +1947,7 @@ ENFORCEMENT_TRUTH_REQUIRED_SNIPPETS = [
             ("node-version-file: frontend/.nvmrc", "frontend CI setup uses the documented Node source"),
             ("run: python scripts/axis.py frontend install", "frontend dependencies install through the Axis wrapper"),
             ("run: python scripts/axis.py frontend gen-api-types --check", "frontend API type generation runs in CI through the Axis wrapper"),
+            ("run: python scripts/axis.py check ui-baseline", "approved frontend UI baseline is checked in CI"),
             ("run: python scripts/axis.py frontend ci", "frontend typecheck/lint runs in CI through the Axis wrapper"),
             ("run: python scripts/axis.py frontend test", "frontend tests run in CI through the Axis wrapper"),
             ("uses: lycheeverse/lychee-action", "markdown link check runs in CI"),
@@ -2096,6 +2285,7 @@ def check_doc_drift(_args: argparse.Namespace | None = None) -> int:
         ("check-repo-skills", check_repo_skills),
         ("check-ef-domain-mapping", check_ef_domain_mapping),
         ("check-frontend-api-contracts", check_frontend_api_contracts),
+        ("check-ui-baseline", check_ui_baseline),
         ("check-frontend-quality", check_frontend_quality),
         ("check-use-case-docs.py", lambda _=None: run_module_check("check-use-case-docs.py", ["--check"])),
         ("check-foundation-docs.py", lambda _=None: run_module_check("check-foundation-docs.py", ["--check"])),
@@ -2601,11 +2791,17 @@ def passthrough_args(raw_args: list[str]) -> list[str]:
 
 
 def frontend_command(args: argparse.Namespace) -> int:
+    command = args.frontend_command
+    if command == "ui-baseline":
+        if args.write:
+            write_ui_baseline()
+            return 0
+        return check_ui_baseline()
+
     rc = check_frontend_toolchain()
     if rc != 0:
         return rc
 
-    command = args.frontend_command
     if command == "install":
         return run_frontend_npm(["ci"]).returncode
     if command == "install-browsers":
@@ -3812,6 +4008,9 @@ def main(argv: list[str] | None = None) -> int:
     frontend_gen_api = frontend_sub.add_parser("gen-api-types")
     frontend_gen_api.add_argument("--check", action="store_true", help="Fail if generated frontend API types are stale")
     frontend_gen_api.set_defaults(func=frontend_command)
+    frontend_ui_baseline = frontend_sub.add_parser("ui-baseline")
+    frontend_ui_baseline.add_argument("--write", action="store_true", help="Write the reviewed approved UI baseline")
+    frontend_ui_baseline.set_defaults(func=frontend_command)
     frontend_script = frontend_sub.add_parser("script")
     frontend_script.add_argument("script_name")
     frontend_script.add_argument("script_args", nargs=argparse.REMAINDER)
@@ -3880,6 +4079,7 @@ def main(argv: list[str] | None = None) -> int:
     check_sub.add_parser("vulnerable-packages").set_defaults(func=check_vulnerable_packages)
     check_sub.add_parser("ef-domain-mapping").set_defaults(func=check_ef_domain_mapping)
     check_sub.add_parser("frontend-api-contracts").set_defaults(func=check_frontend_api_contracts)
+    check_sub.add_parser("ui-baseline").set_defaults(func=check_ui_baseline)
     check_sub.add_parser("frontend-quality").set_defaults(func=check_frontend_quality)
     check_sub.add_parser("coderabbit-cli").set_defaults(func=check_coderabbit_cli)
     check_sub.add_parser("local-dev-docs").set_defaults(

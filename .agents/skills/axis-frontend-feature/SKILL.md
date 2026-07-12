@@ -13,8 +13,9 @@ Implement an Axis frontend slice with generated API types, user-visible states, 
 
 Follow [reference.md](../reference.md).
 - Use `$axis-design-gate` for non-trivial behavior; stop for high-risk sign-off before code.
+- Use `$axis-ui-system` for semantic token, shared visual pattern, shadcn source, UI baseline, or component-provider changes.
 - Stop for explicit user sign-off before any feature-level visual deviation from the design-system component contract or any component API change per [docs/playbooks/frontend.md#component-design](../../../docs/playbooks/frontend.md#component-design).
-- Before and after edits, complete a **visual override audit** for every touched `@/components/ui` call site. `className` may carry outer layout-only concerns; internal size/spacing, typography, radius, color, border, background, shadow, and state styling require an existing prop or explicit sign-off for a shared variant/API change.
+- Before and after edits, complete a **visual override audit** for every touched `@/components/ui` call site. `className` may carry outer layout-only concerns; internal size/spacing, typography, radius, color, border, background, shadow, and state styling require an existing prop or explicit sign-off for an app-owned shared pattern/API change.
 - Stop for explicit user sign-off before adding a feature-local reusable UI primitive, bypassing `frontend/src/components/ui`, or implementing bespoke interaction behavior when an approved shadcn component may cover the need.
 - Treat native fallback variants as exceptions even when they exist in the shadcn registry. Use the interaction-consistent shadcn primitive unless the dossier records a platform-native behavior requirement and the user signs off.
 - Select triggers and options must resolve from the same localized display-label source; do not render raw protocol values through a bare `SelectValue`.
@@ -35,6 +36,7 @@ Follow [reference.md](../reference.md).
    - Use `$axis-use-case-implementation` when the work implements a documented use case.
    - Use `$axis-api-contract` first when the frontend change needs an API shape change.
    - Use `$axis-design-gate` for non-trivial frontend behavior.
+   - Use `$axis-ui-system` when the request changes a UI-system owner surface.
 
 2. Read the owning rules.
    - [AGENTS.md](../../../AGENTS.md)
@@ -72,7 +74,7 @@ Follow [reference.md](../reference.md).
    - Use shadcn-owned design-system component defaults and documented props from `frontend/src/components/ui`; if the UI requires a custom primitive, bespoke interaction behavior, visual deviation, or component API change, stop for the sign-off required by [docs/playbooks/frontend.md#component-design](../../../docs/playbooks/frontend.md#component-design).
    - Prefer interaction-consistent primitives over native fallback variants. Do not import a native fallback into product code without the documented exception required by the component-design contract.
    - Format every selected value through `SelectValue` children from the same label source as its `SelectItem`; test the initial and changed trigger labels when they differ from protocol values.
-   - Keep shared primitive call sites free of local visual utilities. After sign-off, put the treatment in the owning primitive as a named shared variant and select it through props from the feature.
+   - Keep primitive call sites free of local visual utilities. After sign-off, put reusable treatment in an app-owned `components/shared` pattern with a narrow prop contract; keep the registry primitive unchanged.
 
 5. Test behavior.
    - Use Vitest and Testing Library.
@@ -81,7 +83,7 @@ Follow [reference.md](../reference.md).
    - When loader or prefetch behavior changes, test the observable result and the API/cache interaction that proves initial data, intent prefetch, and mutation cache updates.
    - Cover validation, empty/error states, and permission/visibility behavior when in scope.
    - Cover escape navigation for public/auth route states when the screen can be reached directly or after a failed flow. Route metadata is a contract declaration, not a substitute for the visible behavior test.
-   - When adding a shared variant, test both its component contract and the feature call site's selected variant.
+   - When adding an app-owned shared pattern, test its contract and the feature call site's selected semantic prop.
 
 6. Verify.
    - During development, run the smallest targeted frontend test that proves changed behavior; use type/lint only for static edits.
@@ -94,5 +96,5 @@ Follow [reference.md](../reference.md).
 ## Output
 
 Report the feature paths changed, generated API dependency status, frontend tests, visual verification, and docs/status updates or why they were not triggered.
-Report the design-system audit: primitives inspected, layout-only classes retained, shared variants added with sign-off, and unresolved overrides.
+Report the design-system audit: primitives inspected, layout-only classes retained, app-owned shared patterns added with sign-off, and unresolved overrides.
 Include route data-loading decisions when loader, prefetch, cache update, invalidation, or URL search state changed.

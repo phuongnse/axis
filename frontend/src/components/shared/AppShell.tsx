@@ -64,7 +64,7 @@ export function AppShell({
       <AppHeader onSignOut={handleSignOut} signOutError={signOutError} signingOut={signingOut} />
       <div className="flex min-h-0 min-w-0 flex-1 flex-col md:flex-row">
         <ModuleNavigation context={navigationContext} items={visibleNavigationItems} />
-        <main className="axis-grid flex min-h-0 w-full min-w-0 flex-1 overflow-hidden">
+        <main className="flex min-h-0 w-full min-w-0 flex-1 overflow-hidden bg-background">
           {children}
         </main>
       </div>
