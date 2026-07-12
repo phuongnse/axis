@@ -1,5 +1,14 @@
 {
-  "exceptions": {},
+  "exceptions": {
+    "src/components/ui/navigation-menu.tsx": {
+      "reason": "Restore Base UI's bracketed data-attribute selectors so directional transitions compile and run correctly.",
+      "signOff": "User-approved CodeRabbit follow-up in the Codex task on 2026-07-12."
+    },
+    "src/components/ui/tabs.tsx": {
+      "reason": "Forward the declared orientation to Base UI Root so vertical tabs preserve primitive behavior and ARIA semantics.",
+      "signOff": "User-approved CodeRabbit follow-up in the Codex task on 2026-07-12."
+    }
+  },
   "files": {
     "components.json": "156858e2da20785ac0f1853580c7e34d5b8496f519e8839d2176e85947d4f779",
     "src/components/ui/accordion.tsx": "38fec90a34d857fff15ca47b4fab0f12171dbb44cb55a37d1f65f63a4eaf0c20",
@@ -40,7 +49,7 @@
     "src/components/ui/message-scroller.tsx": "901c4a6a2a7d3f6227344f3a758debb7d0cb2f77f92c9acaf72a5e9e0ffdf777",
     "src/components/ui/message.tsx": "9d2952bf3b641081f09aa2739535e6bbd1be0a4946789752a2c20d8aaef43185",
     "src/components/ui/native-select.tsx": "0010395c3c1cbedf60c47e52df4417a7a66944f0a85c8f9304ee900a2493648f",
-    "src/components/ui/navigation-menu.tsx": "076ba62c2d4292970470455ab9719badec7fedd74aaaaa40a7955cc366128e97",
+    "src/components/ui/navigation-menu.tsx": "9e2b9371a7e738c52baf7866fb3a46fdb556a643f526bdf8c80ce84a309dd0ee",
     "src/components/ui/pagination.tsx": "0aba86a91ba0a8d99e92846f10b395d0ddc1a8901a4f54418e8802c12fad57c1",
     "src/components/ui/popover.tsx": "59a0d01d22af44dc9969c3c2aac7cc2f5b712c51ee4c73e8453d81f3d9819ed1",
     "src/components/ui/progress.tsx": "1094f7bfab6d69aa0fd8132987147be4ea3583efd826050278344629e9a6d555",
@@ -56,7 +65,7 @@
     "src/components/ui/spinner.tsx": "900f722c961fa6e1c28104809d56831c9056dc69599e49d364cc13a6f33966a3",
     "src/components/ui/switch.tsx": "5762b1a46dd7739e535bfdefbccc3afe4932023800c74d6160c49fd59f6a1e6b",
     "src/components/ui/table.tsx": "a13f55a7c1406197608f223006cf16f211a257b213362caaef0d2abf3a389c8f",
-    "src/components/ui/tabs.tsx": "84c1ebcee9c620b4b9543b1fe097307051a68ee7bd2901241a962360337f1191",
+    "src/components/ui/tabs.tsx": "fbdc34b6edaa3562e7cfcea5117ad596d808c3e588c40844457d41670285385f",
     "src/components/ui/textarea.tsx": "58b58d84fc54ba5f4ca46937870c619349fd9eccc4d494250ac7bc73a94e05e9",
     "src/components/ui/toggle-group.tsx": "f7776d68b06148d9742fe4f21df45f931b2a259592192d4bda16a7039f508d15",
     "src/components/ui/toggle.tsx": "290d2cd01c768d1e3c894bfebcf9c3d1532191ae7ec1e48da1e405dab0a95c4c",

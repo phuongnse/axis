@@ -27,6 +27,7 @@ jobs:
         env:
           PR_TITLE: ${{ github.event.pull_request.title }}
           PR_BODY: ${{ github.event.pull_request.body }}
+          PR_HEAD_REF: ${{ github.head_ref }}
 
   # Detects which scopes the PR actually touches so the heavy jobs below
   # can skip themselves on PRs that don't affect them. Job-level `if:`

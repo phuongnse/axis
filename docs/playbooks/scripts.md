@@ -34,6 +34,7 @@ Use `python scripts/axis.py doctor` or the exact `check` subcommand to verify lo
 - Use `python scripts/axis.py ready-review` on a clean checkpoint commit at the review boundary. It runs changed-path verification plus the deterministic policy profile shared with CI.
 - Treat `python scripts/axis.py verify` as the changed-path verification engine behind ready-review, not as complete PR-readiness evidence by itself.
 - Use `python scripts/axis.py pre-push` for ordinary Git push sanity; it is not a substitute for the pre-PR review checkpoint on published PR branches.
+- Use `python scripts/axis.py check pr` to validate the current or CI head branch plus PR title/body before publication.
 - Set `AXIS_PRE_PUSH_FULL=1` only when an explicit workflow wants pre-push to run `ready-review`; ordinary pre-push remains a quick gate.
 - CI remains the authoritative merge matrix. [.github/workflows/build-and-test.yml](../../.github/workflows/build-and-test.yml) runs on GitHub Actions only — not a local dev script; `ubuntu-latest` is the merge runner, not a dev OS requirement.
 

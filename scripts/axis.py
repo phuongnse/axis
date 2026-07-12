@@ -4023,6 +4023,8 @@ def check_pr(args: argparse.Namespace) -> int:
         module_args.extend(["--title", args.title])
     if args.body_file is not None:
         module_args.extend(["--body-file", str(args.body_file)])
+    if args.branch is not None:
+        module_args.extend(["--branch", args.branch])
     return module_main("check-pr.py", module_args)
 
 
@@ -4195,6 +4197,7 @@ def main(argv: list[str] | None = None) -> int:
     pr_parser = check_sub.add_parser("pr")
     pr_parser.add_argument("--title")
     pr_parser.add_argument("--body-file", type=Path)
+    pr_parser.add_argument("--branch")
     pr_parser.set_defaults(func=check_pr)
 
     test = sub.add_parser("test")

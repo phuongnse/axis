@@ -159,6 +159,24 @@ public sealed class ExampleTests
 
 
 class TestPrGuard(unittest.TestCase):
+    def test_accepts_project_branch_convention(self) -> None:
+        for branch in (
+            "feat/add-workspace",
+            "fix/restore-tabs",
+            "docs/clarify-workflow",
+            "refactor/standardize-ui-governance",
+            "test/cover-branch-policy",
+            "chore/update-tooling",
+            "renovate/all-non-major",
+        ):
+            with self.subTest(branch=branch):
+                self.assertEqual([], check_pr.validate_branch(branch))
+
+    def test_rejects_non_project_branch_convention(self) -> None:
+        for branch in ("", "main", "agent/add-workspace", "feat/AddWorkspace", "feat/nested/name"):
+            with self.subTest(branch=branch):
+                self.assertTrue(check_pr.validate_branch(branch))
+
     def test_rejects_unchecked_requirement_without_na_reason(self) -> None:
         body = """## Summary
 This summary is long enough.

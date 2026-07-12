@@ -6,6 +6,7 @@ Axis uses docs-first development. Use-case specs under [docs/use-cases/README.md
 
 - Branch from `main`; do not push directly to `main`.
 - Use `{type}/{short-description}` in kebab-case with `feat`, `fix`, `docs`, `refactor`, `test`, or `chore`.
+- Renovate-owned dependency branches use the configured `renovate/` prefix.
 - Use Conventional Commits in imperative mood, max 72 characters, no trailing period.
 
 ## Before a PR

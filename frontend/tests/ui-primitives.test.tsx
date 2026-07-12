@@ -137,6 +137,18 @@ describe('Tabs', () => {
     expect(screen.getByRole('tablist')).toHaveAttribute('data-variant', 'default');
     expect(screen.getByRole('tab', { name: 'Rules' })).toHaveClass('data-active:bg-background');
   });
+
+  it('forwards vertical orientation to the tablist', () => {
+    render(
+      <Tabs defaultValue="rules" orientation="vertical">
+        <TabsList>
+          <TabsTrigger value="rules">Rules</TabsTrigger>
+        </TabsList>
+      </Tabs>,
+    );
+
+    expect(screen.getByRole('tablist')).toHaveAttribute('aria-orientation', 'vertical');
+  });
 });
 
 describe('Card', () => {
