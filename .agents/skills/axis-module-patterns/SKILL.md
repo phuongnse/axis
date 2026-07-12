@@ -30,7 +30,7 @@ Follow [reference.md](../reference.md).
 3. Implement command/query coordination, validation ownership, Unit of Work, repositories, read models, deterministic ordering/pagination, and concurrency only as selected.
 4. Implement event dispatch, integration delivery, inbox/outbox, or event sourcing only when the supplied architecture decision covers their operational semantics.
 5. Prove behavior, persistence, stale-write, ordering, delivery, or replay properties at the lowest reliable boundary required by the selected pattern.
-6. Add deterministic checks only for recurring invariants, update enforcement status, and return implementation evidence to the caller.
+6. Add deterministic checks only for reusable invariants, update enforcement status, and return implementation evidence to the caller.
 
 ## Output
 

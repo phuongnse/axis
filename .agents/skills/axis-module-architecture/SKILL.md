@@ -29,7 +29,7 @@ Follow [reference.md](../reference.md).
 3. Decide aggregates/invariants, CQRS requests/handlers, validation, idempotency, authorization/workspace scope, and business-failure mapping.
 4. Decide module-owned persistence, migrations, transaction/repository boundary, read models, concurrency, and rollback needs.
 5. Decide domain/integration/event-sourcing semantics, including delivery, idempotency, versioning, replay, retention, and rebuild concerns only when those patterns are in scope.
-6. Name deterministic enforcement and review-only gaps; update [docs/ENFORCEMENT.md](../../../docs/ENFORCEMENT.md) only for recurring rule classes.
+6. Name deterministic enforcement and review-only gaps; update [docs/ENFORCEMENT.md](../../../docs/ENFORCEMENT.md) only for reusable rule classes.
 7. Return a **Ready** or **Blocked** decision record to the caller. A **Ready** workflow **Delegates** only its adopted tactical items to `$axis-module-patterns`.
 
 ## Output

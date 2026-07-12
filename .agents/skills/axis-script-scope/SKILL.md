@@ -28,7 +28,7 @@ Follow [reference.md](../reference.md).
 2. Select by surface: focused docs/skills/policy checks, related .NET tests, focused Vitest/Playwright, contract generation/parity, or the local-dev wrappers defined by [docs/playbooks/local-dev.md](../../../docs/playbooks/local-dev.md).
 3. Avoid waste: do not rerun valid evidence, full suites, containers, or browser journeys unless the changed risk invalidates narrower proof.
 4. Use `python scripts/axis.py ...` for repo workflows. Add a missing reusable wrapper in [scripts/axis.py](../../../scripts/axis.py); keep package-native commands inside their owner wrapper.
-5. Encode only deterministic recurring invariants. Apply [reference.md § Improvement loop](../reference.md#improvement-loop) before adding or removing a check.
+5. Encode only deterministic reusable invariants. Apply [reference.md § Improvement loop](../reference.md#improvement-loop) before adding or removing a check.
 
 ## Output
 
