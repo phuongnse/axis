@@ -67,7 +67,7 @@ Use these ownership layers:
 - **App-pattern zone** — `frontend/src/components/shared` owns reusable Axis composition and adapters. Give them narrow Axis-owned props such as product state, not provider variants, types, selectors, or DOM assumptions.
 - **Feature zone** — feature components compose defaults and app patterns. Consumer `className` is outer layout-only and must not alter primitive visuals.
 
-Use `$axis-ui-system` for token/customization decisions, registry diffs, baseline refreshes, or provider changes. Never bulk-overwrite unrelated registry components. A registry update, baseline refresh, cross-feature visual/API convention, primitive exception, style/base/provider change, or new semantic token requires Design Gate evidence and explicit user sign-off before implementation.
+Use `$axis-ui-system` for token/customization decisions, registry diffs, baseline refreshes, or provider changes. Never bulk-overwrite unrelated registry components. A reviewed upstream sync and matching baseline refresh need provenance but no additional sign-off when they introduce no customization or exception. Explicit sign-off is required for semantic-token visual changes, cross-feature visual/API conventions, primitive exceptions, style/base/provider or major-library changes, and all customizations.
 
 ## Styling
 

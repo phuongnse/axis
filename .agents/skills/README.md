@@ -1,54 +1,34 @@
 # Axis Repo Skills
 
-Portable agent workflows for this repository. Standard layout: one directory per skill with a required `SKILL.md` (YAML frontmatter + markdown body). Optional extras: `reference.md`, `examples.md`, `scripts/`.
+Repo skills are executable workflows. [reference.md](./reference.md) owns universal execution semantics; this catalog owns intent routing; each linked skill owns only its domain workflow.
 
-Project skills live under [`.agents/skills/`](.) as the canonical, tool-neutral repo workflow path.
+## Usage
 
-Shared workflow contract: [reference.md](./reference.md) — sequential steps, stop/defer/skip rules, and the PR publication gate.
+1. Select one entry owner from the catalog by user intent.
+2. Read [reference.md](./reference.md) and the full owner skill before editing.
+3. Follow only handoffs explicitly typed as **Requires**, **Delegates**, or **Returns to**.
+4. Reuse current evidence; do not recurse into an already-satisfied prerequisite.
+5. Run repository commands through `python scripts/axis.py ...`.
 
-## How agents use skills
+`$axis-*` aliases map to `.agents/skills/<name>/SKILL.md`.
 
-1. Match the task to a skill in the table below (or use the skill `description` in frontmatter).
-2. **Read [reference.md](./reference.md) and the full `SKILL.md` file before editing** implementation files.
-3. Execute numbered workflow steps **in order**; each skill's `## Hard gates` section adds skill-specific stop rules.
-4. Follow chained skills the same way: read their `SKILL.md` paths, not just the alias name.
-5. Run repo commands through `python scripts/axis.py ...` as written in the skill.
+## Responsibility catalog
 
-`$axis-*` names in docs are **aliases** for `.agents/skills/<name>/SKILL.md`.
+| Intent | Entry owner | Boundary |
+|---|---|---|
+| Risk dossier, sign-off, or retirement | [axis-design-gate/SKILL.md](./axis-design-gate/SKILL.md) | Decides risk before implementation; does not implement the surface |
+| Draft or repair a product contract | [axis-use-case-spec/SKILL.md](./axis-use-case-spec/SKILL.md) | Owns use-case readiness and AC/AT authoring |
+| Implement a documented product slice | [axis-use-case-implementation/SKILL.md](./axis-use-case-implementation/SKILL.md) | Orchestrates layer work and acceptance evidence |
+| Decide module boundaries or foundational patterns | [axis-module-architecture/SKILL.md](./axis-module-architecture/SKILL.md) | Decides architecture; does not implement tactical patterns |
+| Implement adopted module patterns | [axis-module-patterns/SKILL.md](./axis-module-patterns/SKILL.md) | Implements only decisions required by current ACs or architecture |
+| Change REST/OpenAPI wire shape | [axis-api-contract/SKILL.md](./axis-api-contract/SKILL.md) | Owns contract shape, generation, and parity |
+| Implement SPA feature behavior | [axis-frontend-feature/SKILL.md](./axis-frontend-feature/SKILL.md) | Owns route, state, form, and feature behavior |
+| Define shared SPA foundation contracts | [axis-frontend-foundation/SKILL.md](./axis-frontend-foundation/SKILL.md) | Owns product-neutral foundation specs, not product journeys |
+| Change UI tokens, primitives, shared visual APIs, or providers | [axis-ui-system/SKILL.md](./axis-ui-system/SKILL.md) | Owns UI source boundaries and safe replacement |
+| Change durable docs, guidance, diagrams, or ownership | [axis-doc-hygiene/SKILL.md](./axis-doc-hygiene/SKILL.md) | Owns clarity and single-source hygiene, not domain decisions |
+| Select or change repository commands and checks | [axis-script-scope/SKILL.md](./axis-script-scope/SKILL.md) | Chooses the smallest proof and owns wrappers |
+| Decide local review readiness | [axis-ready-review/SKILL.md](./axis-ready-review/SKILL.md) | Audits immutable evidence; does not commit or publish |
+| Resolve review findings | [axis-review-feedback/SKILL.md](./axis-review-feedback/SKILL.md) | Classifies and fixes findings, then returns evidence |
+| Publish or update a PR branch | [axis-pull-request/SKILL.md](./axis-pull-request/SKILL.md) | Owns commits required for publication, review loop, metadata, and GitHub actions |
 
-Validate skill changes: `python scripts/axis.py check repo-skills`
-
-## Task → skill
-
-| Task | Read first |
-|---|---|
-| Explore / audit / read-only | [axis-script-scope/SKILL.md](./axis-script-scope/SKILL.md) |
-| Pre-code dossier / non-trivial change | [axis-design-gate/SKILL.md](./axis-design-gate/SKILL.md) |
-| New module / DDD / CQRS / event sourcing architecture | [axis-module-architecture/SKILL.md](./axis-module-architecture/SKILL.md) |
-| Tactical DDD/CQRS patterns in module code | [axis-module-patterns/SKILL.md](./axis-module-patterns/SKILL.md) |
-| Draft or complete use-case spec | [axis-use-case-spec/SKILL.md](./axis-use-case-spec/SKILL.md) |
-| Implement documented use case | [axis-use-case-implementation/SKILL.md](./axis-use-case-implementation/SKILL.md) |
-| API / OpenAPI / generated types | [axis-api-contract/SKILL.md](./axis-api-contract/SKILL.md) |
-| App shell / shared SPA UI infrastructure | [axis-frontend-foundation/SKILL.md](./axis-frontend-foundation/SKILL.md) |
-| Frontend feature slice | [axis-frontend-feature/SKILL.md](./axis-frontend-feature/SKILL.md) |
-| UI customization / shadcn sync / component provider | [axis-ui-system/SKILL.md](./axis-ui-system/SKILL.md) |
-| Mermaid / committed visual artifact | [axis-visual-artifact/SKILL.md](./axis-visual-artifact/SKILL.md) |
-| Docs / guidance / status edits | [axis-doc-hygiene/SKILL.md](./axis-doc-hygiene/SKILL.md) |
-| Repo tooling / compose / local-dev / scripts | [axis-script-scope/SKILL.md](./axis-script-scope/SKILL.md) |
-| Branch ready for review | [axis-ready-review/SKILL.md](./axis-ready-review/SKILL.md) |
-| Open / push update / mark-ready PR | [axis-pull-request/SKILL.md](./axis-pull-request/SKILL.md) |
-| Review feedback follow-up | [axis-review-feedback/SKILL.md](./axis-review-feedback/SKILL.md) |
-
-## Typical flow
-
-```text
-spec gap     → axis-use-case-spec
-module arch  → axis-design-gate → axis-module-architecture
-patterns     → axis-module-architecture (if module/foundation scope changes) → axis-module-patterns
-non-trivial  → axis-design-gate → implement skill → axis-script-scope (checks)
-UI system    → axis-design-gate → axis-ui-system
-before review→ axis-ready-review
-PR/push action→ axis-pull-request → axis-review-feedback (if needed) → then push/PR
-```
-
-Numbered steps in each skill are sequential gates. See [reference.md](./reference.md).
+Validate the system with `python scripts/axis.py check repo-skills`.

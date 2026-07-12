@@ -41,22 +41,7 @@ Skip a row only with an explicit `N/A because ...`.
 
 ## Surface Routing
 
-Use the matching repo skill for surface-specific checklist detail:
-
-| Surface | Skill |
-|---|---|
-| Missing or incomplete use-case spec | `$axis-use-case-spec` |
-| New module / DDD / CQRS / event sourcing architecture | `$axis-module-architecture` |
-| Tactical DDD / CQRS / persistence / event pattern implementation | `$axis-module-patterns` |
-| Use-case slice | `$axis-use-case-implementation` |
-| REST/OpenAPI/API type change | `$axis-api-contract` |
-| App shell / shared SPA UI infrastructure | `$axis-frontend-foundation` |
-| Frontend feature or SPA caller | `$axis-frontend-feature` |
-| UI customization / shadcn sync / component provider | `$axis-ui-system` |
-| Mermaid or generated visual artifact | `$axis-visual-artifact` |
-| Review feedback | `$axis-review-feedback` |
-
-If no skill fits, quote the owner doc directly and keep the same dossier scale.
+[`.agents/skills/README.md`](../../.agents/skills/README.md) owns intent-to-skill routing. After the dossier, delegate to the selected surface owner and retain the Design Gate evidence; do not restart the gate when that evidence remains current.
 
 ---
 

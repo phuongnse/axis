@@ -1,87 +1,36 @@
 ---
 name: axis-ready-review
-description: Prepare an Axis branch for review by auditing changed paths, running triggered verification once, checking docs/status, and producing an honest PR-readiness summary. Use when deciding whether branch work is ready for review.
+description: Decide whether an immutable Axis checkpoint is ready for review. Use to audit changed paths, reconcile Design Gate and product evidence, run review-boundary verification once, and report readiness without committing or publishing.
 ---
 
 # Axis Ready Review
 
 ## Goal
 
-Decide whether the branch is ready for review. Run evidence once, avoid transcript inflation, and never turn missing evidence into a green claim.
+Return an evidence-backed **Ready** or **Not ready** verdict for an immutable checkpoint.
 
 ## Hard gates
 
 Follow [reference.md](../reference.md).
-- Do not perform GitHub PR actions or draft PR metadata here; hand off to `$axis-pull-request` only when status is **Ready**.
-- If verification fails or evidence is missing, output **Not ready** and stop — do not claim Ready.
-- Do not skip Design Gate reconciliation for non-trivial diffs.
+- Do not create commits, draft PR metadata, push, or publish.
+- Dirty or missing checkpoint evidence is **Not ready**.
+- Failed, missing, or stale required evidence cannot become a green claim.
 
 ## Inputs
 
-- Current branch diff and changed path classes.
-- Existing Design Gate, sign-off, verification, and docs/status evidence.
-- User intent for review readiness, not PR publication.
+- Clean committed checkpoint and comparison base.
+- Design Gate/sign-off evidence when triggered.
+- Product AC/AT, docs/status, and verification evidence relevant to the diff.
 
 ## Workflow
 
-1. Inspect the diff.
-   - Run `git status --short`.
-   - Run `git diff --name-only "$(git merge-base origin/main HEAD)"...HEAD` so a clean checkpoint still reports the full branch scope.
-   - Classify paths as docs/skills/scripts/source/tests/API/frontend/visuals/stack manifests.
-   - Treat [global.json](../../../global.json), [Directory.Packages.props](../../../Directory.Packages.props), [frontend/package.json](../../../frontend/package.json), [frontend/package-lock.json](../../../frontend/package-lock.json), [docker-compose.yml](../../../docker-compose.yml), `Dockerfile*`, and project-level package references as stack-manifest changes.
-
-2. Reconcile the Design Gate.
-   - Confirm `.agents/skills/axis-design-gate/SKILL.md` (`$axis-design-gate`) was used for non-trivial work.
-   - Confirm user sign-off happened before code for high-risk surfaces.
-   - For stack-manifest changes, confirm user approval and [docs/TECH_STACK.md](../../../docs/TECH_STACK.md) updates when the baseline changes; otherwise record why the stack doc was not triggered.
-   - Self-review the diff against the dossier: governing rules, blast radius, contract decision, and verification plan.
-
-3. Audit product evidence.
-   - Behavior/status changes need the owning use-case callout updated.
-   - Cross-check the use-case `Implementation status` layer table against the AC/AT matrix boundaries, changed paths, and the sibling `{slug}.evidence.md` sidecar. Report Not ready when a touched or required layer is `N/A`, or when a `Done` layer lacks proving evidence.
-   - Implemented/refreshed use cases need AC IDs and an Acceptance Test Matrix.
-   - Every in-scope AC must map to automated evidence or an exact deferral.
-   - Required AT expectations must cite a spec section, AC ID, or flow step in the implementation/verification report.
-   - `Deferred follow-ups` must name exact ACs or say `N/A`.
-   - Intentional shortcuts are not allowed.
-
-4. Run verification at the boundary.
-   - Run narrow checks only when they are missing, stale, or needed to debug failure.
-   - Skill changes: `python scripts/axis.py check repo-skills`.
-   - Create an intentional checkpoint commit so review evidence can bind to an immutable HEAD.
-   - Before PR review, run `python scripts/axis.py ready-review` once when triggered. For a committed follow-up delta, use `python scripts/axis.py ready-review --since <reviewed-checkpoint>`.
-   - The command owns changed-path verification and the deterministic policy profile shared with CI. Do not substitute `verify` or pre-push output.
-   - If ready-review fails, report Not ready and list the failing step.
-   - If full local suite is claimed, it must include the relevant repo suite for touched surfaces, with integration/API tests when applicable.
-
-5. Keep review-only audits honest.
-   - AC map complete: pass/fail/N/A with reason.
-   - Docs review: updated/not triggered/deferred with owner, including [docs/TECH_STACK.md](../../../docs/TECH_STACK.md) for stack-manifest changes.
-   - Retrospective review: answer each line from [docs/playbooks/agent-checklist.md](../../../docs/playbooks/agent-checklist.md).
-   - Enforcement status: use [docs/ENFORCEMENT.md](../../../docs/ENFORCEMENT.md) terms; do not call review-only work a gate.
-
-6. Hand off PR publication separately.
-   - If Ready and the user wants a PR action, read `.agents/skills/axis-pull-request/SKILL.md` (`$axis-pull-request`).
-   - Do not draft PR metadata or perform GitHub actions in this skill.
+1. Inspect `git status --short` and the committed diff from its merge base; classify changed path owners and stack manifests.
+2. Reconcile the diff with the Design Gate, sign-off, retirement, and contract decisions.
+3. Audit product evidence only when behavior/status is touched: AC coverage, implementation status, evidence sidecar, and exact deferrals.
+4. Run `python scripts/axis.py ready-review` once, or `--since <checkpoint>` for an immutable follow-up delta. Debug failures with narrow checks only.
+5. Apply [reference.md § Improvement loop](../reference.md#improvement-loop) and [docs/playbooks/agent-checklist.md](../../../docs/playbooks/agent-checklist.md); update one owner only when evidence justifies promotion or retirement.
+6. Return the verdict and evidence to the caller. Publication is a separate user-authorized workflow.
 
 ## Output
 
-```text
-Ready status:
-- Ready / Not ready
-
-Changed path classes:
-- ...
-
-Verification:
-- ready-review command -> pass/fail/not run with reason
-
-Review-only audits:
-- Design Gate: ...
-- AC map: ...
-- Docs review: ...
-- Retrospective review: ...
-
-Blocking issues:
-- ...
-```
+Report verdict, changed owners, command result, Design Gate/AC/docs review, improvement outcome, blockers, and every deferral with its exact scope and supporting evidence.
