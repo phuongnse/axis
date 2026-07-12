@@ -694,6 +694,197 @@ def check_frontend_api_contracts(_args: argparse.Namespace | None = None) -> int
     return 0
 
 
+def ui_baseline_payload(root: Path = ROOT) -> dict[str, object]:
+    frontend_root = root / "frontend"
+    config_path = frontend_root / "components.json"
+    theme_path = frontend_root / "src" / "index.css"
+    ui_root = frontend_root / "src" / "components" / "ui"
+    required = (config_path, theme_path)
+    missing = [str(path.relative_to(root)).replace("\\", "/") for path in required if not path.is_file()]
+    if missing:
+        raise CheckError(f"missing UI baseline source: {', '.join(missing)}")
+
+    try:
+        config = json.loads(config_path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError) as exc:
+        raise CheckError(f"invalid frontend/components.json: {exc}") from exc
+    if not isinstance(config, dict):
+        raise CheckError("invalid frontend/components.json: root value must be an object")
+
+    support_paths = [
+        frontend_root / "src" / "hooks" / "use-mobile.ts",
+        frontend_root / "src" / "lib" / "utils.ts",
+    ]
+    paths = [
+        config_path,
+        theme_path,
+        *(path for path in support_paths if path.is_file()),
+        *sorted(ui_root.rglob("*.tsx")),
+    ]
+    files = {
+        str(path.relative_to(frontend_root)).replace("\\", "/"): hashlib.sha256(path.read_bytes()).hexdigest()
+        for path in paths
+    }
+    return {
+        "schemaVersion": 2,
+        "registry": "@shadcn",
+        "style": config.get("style"),
+        "files": files,
+    }
+
+
+def ui_baseline_issues(root: Path = ROOT) -> list[str]:
+    baseline_path = root / "frontend" / "ui-baseline.json"
+    if not baseline_path.is_file():
+        return [
+            "frontend/ui-baseline.json: approved UI baseline is missing; "
+            "create it only after registry/default review and sign-off"
+        ]
+
+    try:
+        approved = json.loads(baseline_path.read_text(encoding="utf-8"))
+        current = ui_baseline_payload(root)
+    except (json.JSONDecodeError, OSError, CheckError) as exc:
+        return [f"frontend/ui-baseline.json: cannot validate approved UI baseline: {exc}"]
+    if not isinstance(approved, dict):
+        return ["frontend/ui-baseline.json: root value must be an object"]
+
+    issues: list[str] = []
+    for field in ("schemaVersion", "registry", "style"):
+        if approved.get(field) != current[field]:
+            issues.append(
+                f"frontend/ui-baseline.json: `{field}` is {approved.get(field)!r}, "
+                f"current value is {current[field]!r}"
+            )
+
+    approved_files = approved.get("files")
+    if not isinstance(approved_files, dict):
+        return ["frontend/ui-baseline.json: `files` must be an object of path-to-SHA256 entries"]
+
+    exceptions = approved.get("exceptions")
+    if not isinstance(exceptions, dict):
+        issues.append("frontend/ui-baseline.json: `exceptions` must be an object")
+        exceptions = {}
+    for path, decision in sorted(exceptions.items()):
+        if path not in approved_files:
+            issues.append(f"frontend/ui-baseline.json: exception `{path}` is not a tracked baseline file")
+        if not isinstance(decision, dict) or any(
+            not isinstance(decision.get(field), str) or not decision[field].strip()
+            for field in ("reason", "signOff")
+        ):
+            issues.append(
+                f"frontend/ui-baseline.json: exception `{path}` requires non-empty `reason` and `signOff`"
+            )
+
+    current_files = current["files"]
+    assert isinstance(current_files, dict)
+    for path in sorted(set(approved_files) | set(current_files)):
+        if path not in approved_files:
+            issues.append(f"frontend/{path}: UI baseline has an unreviewed tracked file")
+        elif path not in current_files:
+            issues.append(f"frontend/{path}: approved UI baseline file is missing")
+        elif approved_files[path] != current_files[path]:
+            issues.append(f"frontend/{path}: approved UI baseline drift")
+    return issues
+
+
+def write_ui_baseline(root: Path = ROOT) -> None:
+    baseline_path = root / "frontend" / "ui-baseline.json"
+    exceptions: dict[str, object] = {}
+    if baseline_path.is_file():
+        try:
+            existing = json.loads(baseline_path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError) as exc:
+            raise CheckError(f"cannot preserve existing UI baseline: {exc}") from exc
+        if not isinstance(existing, dict):
+            raise CheckError("cannot preserve existing UI baseline: root value must be an object")
+        existing_exceptions = existing.get("exceptions")
+        if not isinstance(existing_exceptions, dict):
+            raise CheckError("cannot preserve existing UI baseline: `exceptions` must be an object")
+        exceptions = existing_exceptions
+    payload = ui_baseline_payload(root)
+    payload["exceptions"] = exceptions
+    baseline_path.write_text(
+        f"{json.dumps(payload, indent=2, sort_keys=True)}\n",
+        encoding="utf-8",
+    )
+    print(f"ui-baseline: wrote {baseline_path.relative_to(root)}")
+
+
+def check_ui_baseline(_args: argparse.Namespace | None = None) -> int:
+    issues = ui_baseline_issues()
+    if issues:
+        print("check-ui-baseline FAIL:", file=sys.stderr)
+        for issue in issues:
+            print(f"  - {issue}", file=sys.stderr)
+        print(
+            "\nReview registry/theme changes and required sign-off before running "
+            "`python scripts/axis.py frontend ui-baseline --write`.",
+            file=sys.stderr,
+        )
+        return 1
+    print("check-ui-baseline: OK")
+    return 0
+
+
+def frontend_ui_system_issues(root: Path = ROOT) -> list[str]:
+    issues: list[str] = []
+    src_root = root / "frontend" / "src"
+    ui_root = src_root / "components" / "ui"
+    palette_utility = re.compile(
+        r"\b(?:bg|text|border|ring|outline|fill|stroke|from|via|to|divide|placeholder|decoration)-"
+        r"(?:(?:slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|"
+        r"blue|indigo|violet|purple|fuchsia|pink|rose)-[0-9]{2,3}(?:/[0-9]{1,3})?|black|white)\b"
+    )
+    arbitrary_value = re.compile(r"(?<![A-Za-z0-9_])(?:[A-Za-z0-9_:/.]+-)+\[[^\]\n]+\]")
+    inline_color = re.compile(
+        r"\b(?:color|background|backgroundColor|borderColor|fill|stroke)\s*:\s*['\"](?:#|rgba?[(]|hsla?[(]|oklch[(])",
+        re.IGNORECASE,
+    )
+    import_target = re.compile(r"(?:\bfrom\s*|\bimport\s*)['\"](?P<target>[^'\"]+)['\"]")
+    forbidden_roots = (
+        src_root / "features",
+        src_root / "components" / "shared",
+        src_root / "routes",
+    )
+
+    for path in iter_files(src_root, (".ts", ".tsx")):
+        normalized = rel(path) if root == ROOT else str(path.relative_to(root)).replace("\\", "/")
+        text = path.read_text(encoding="utf-8")
+        in_ui_primitives = path.is_relative_to(ui_root) if hasattr(path, "is_relative_to") else False
+        if in_ui_primitives:
+            for idx, line in enumerate(text.splitlines(), 1):
+                targets = [match.group("target") for match in import_target.finditer(line)]
+                has_forbidden_import = any(
+                    re.match(r"@/(?:features|components/shared|routes)(?:/|$)", target)
+                    or (
+                        target.startswith(".")
+                        and any((path.parent / target).resolve().is_relative_to(root_path.resolve()) for root_path in forbidden_roots)
+                    )
+                    for target in targets
+                )
+                if has_forbidden_import:
+                    issues.append(
+                        f"{normalized}:{idx}: registry primitives cannot depend on feature, shared, or route code"
+                    )
+            continue
+
+        for idx, line in enumerate(text.splitlines(), 1):
+            for match in palette_utility.finditer(line):
+                issues.append(
+                    f"{normalized}:{idx}: hard-coded Tailwind palette utility `{match.group(0)}`; use a semantic token"
+                )
+            for match in arbitrary_value.finditer(line):
+                issues.append(
+                    f"{normalized}:{idx}: arbitrary Tailwind value `{match.group(0)}`; use the standard scale or layout"
+                )
+            if inline_color.search(line):
+                issues.append(
+                    f"{normalized}:{idx}: component-local hard-coded color; use a semantic token"
+                )
+    return issues
+
+
 def frontend_component_file_name_issues(root: Path = ROOT) -> list[str]:
     issues: list[str] = []
     src_root = root / "frontend" / "src"
@@ -999,6 +1190,7 @@ def frontend_transient_handoff_issues(root: Path = ROOT) -> list[str]:
 
 def frontend_quality_issues(root: Path = ROOT) -> list[str]:
     return [
+        *frontend_ui_system_issues(root),
         *frontend_component_file_name_issues(root),
         *frontend_tailwind_opacity_issues(root),
         *frontend_form_schema_type_issues(root),
@@ -1014,7 +1206,7 @@ def check_frontend_quality(_args: argparse.Namespace | None = None) -> int:
     if issues:
         for issue in issues:
             print(f"check-frontend-quality FAIL: {issue}", file=sys.stderr)
-        print("\nSee docs/playbooks/frontend.md#state-management", file=sys.stderr)
+        print("\nSee docs/playbooks/frontend.md#component-design", file=sys.stderr)
         return 1
     print("check-frontend-quality: OK")
     return 0
@@ -1182,7 +1374,7 @@ def check_scripts_standard(_args: argparse.Namespace | None = None) -> int:
 SKILL_NAME_RE = re.compile(r"^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$")
 REPO_SKILLS_DIR = ".agents/skills"
 FRONTMATTER_RE = re.compile(r"\A---\n(?P<header>.*?)\n---\n", re.DOTALL)
-SKILL_MAX_LINES = 115
+SKILL_MAX_LINES = 80
 SKILL_AMBIGUOUS_WORD_RE = re.compile(
     r"\b(best[- ]effort|if you have time|nice to have|maybe|probably|hopefully)\b",
     re.IGNORECASE,
@@ -1193,79 +1385,13 @@ SKILL_REPO_REF_RE = re.compile(
     r"frontend/[A-Za-z0-9._/#-]+))`"
 )
 SKILL_MD_LINK_RE = re.compile(r"\[[^\]]+\]\((?P<target>[^)]+)\)")
-SKILL_REQUIRED_SKILL_REFS = {
-    "axis-api-contract": ("axis-design-gate", "axis-ready-review"),
-    "axis-frontend-feature": ("axis-design-gate", "axis-ready-review"),
-    "axis-use-case-implementation": ("axis-design-gate", "axis-ready-review", "axis-pull-request"),
-    "axis-pull-request": ("axis-ready-review", "axis-review-feedback"),
-    "axis-review-feedback": ("axis-ready-review",),
-}
-SKILL_HARD_GATE_REQUIREMENTS: dict[str, tuple[str, ...]] = {
-    "axis-api-contract": ("## Hard gates", r"reference\.md", r"axis-design-gate", r"axis-ready-review"),
-    "axis-design-gate": ("## Hard gates", r"reference\.md", r"Do not edit implementation"),
-    "axis-doc-hygiene": ("## Hard gates", r"reference\.md", r"axis-ready-review"),
-    "axis-frontend-feature": (
-        "## Hard gates",
-        r"reference\.md",
-        r"axis-design-gate",
-        r"axis-ready-review",
-        r"visual override audit",
-        r"layout-only",
-        r"shared variant",
-    ),
-    "axis-frontend-foundation": (
-        "## Hard gates",
-        r"reference\.md",
-        r"visual override audit",
-        r"layout-only",
-        r"shared variant",
-    ),
-    "axis-pull-request": (
-        "## Hard gates",
-        r"reference\.md",
-        r"Do not push",
-        r"published branch",
-        r"axis-review-feedback",
-        r"axis-ready-review",
-    ),
-    "axis-ready-review": ("## Hard gates", r"reference\.md", r"Not ready", r"axis-pull-request"),
-    "axis-review-feedback": ("## Hard gates", r"reference\.md", r"axis-ready-review", r"axis-pull-request"),
-    "axis-script-scope": ("## Hard gates", r"reference\.md", r"axis-ready-review"),
-    "axis-use-case-implementation": (
-        "## Hard gates",
-        r"reference\.md",
-        r"axis-design-gate",
-        r"axis-use-case-spec",
-        r"axis-pull-request",
-    ),
-    "axis-use-case-spec": ("## Hard gates", r"reference\.md", r"axis-use-case-implementation"),
-    "axis-visual-artifact": ("## Hard gates", r"reference\.md", r"axis-ready-review"),
-}
-
-
-def repo_skill_hard_gate_issues(skill_name: str, text: str, *, skill_md: Path, root: Path) -> list[str]:
-    issues: list[str] = []
-    requirements = SKILL_HARD_GATE_REQUIREMENTS.get(skill_name)
-    if requirements is None:
-        return issues
-    rel = rel_from(skill_md, root)
-    for pattern in requirements:
-        if re.search(pattern, text, re.IGNORECASE) is None:
-            issues.append(f"{rel}: hard-gate contract missing required pattern `{pattern}`")
-    return issues
-
-
-def skill_chain_referenced(text: str, skill_name: str) -> bool:
-    if re.search(rf"(?<![A-Za-z0-9_-])\${re.escape(skill_name)}(?![A-Za-z0-9_-])", text):
-        return True
-    skill_path = f"{REPO_SKILLS_DIR}/{skill_name}/SKILL.md"
-    skill_dir = f"{REPO_SKILLS_DIR}/{skill_name}"
-    return (
-        re.search(rf"(?<![A-Za-z0-9._/#-]){re.escape(skill_path)}(?![A-Za-z0-9._/#-])", text)
-        is not None
-        or re.search(rf"(?<![A-Za-z0-9._/#-]){re.escape(skill_dir)}/?(?![A-Za-z0-9._/#-])", text)
-        is not None
-    )
+SKILL_REQUIRED_HEADINGS = ("## Goal", "## Hard gates", "## Inputs", "## Workflow", "## Output")
+SKILL_ALIAS_RE = re.compile(r"(?<![A-Za-z0-9_-])\$(?P<name>axis-[a-z0-9-]+)(?![A-Za-z0-9_-])")
+SKILL_REQUIRES_RE = re.compile(r"[*][*]Requires[*][*]")
+SKILL_HANDOFF_WORD_RE = re.compile(r"\b(?:requires?|delegat(?:e|es|ed|ing)|returns?\s+to)\b", re.IGNORECASE)
+SKILL_TYPED_HANDOFF_RE = re.compile(r"[*][*](?:Requires|Delegates|Returns to)[*][*]")
+SKILL_CATALOG_LINK_RE = re.compile(r"\]\(\./(?P<name>axis-[a-z0-9-]+)/SKILL[.]md(?:#[^)]+)?\)")
+SKILL_DUPLICATE_INSTRUCTION_MIN_LENGTH = 80
 
 
 def simple_yaml_value(text: str, key: str) -> str:
@@ -1368,15 +1494,115 @@ def repo_skill_raw_command_issues(skill_md: Path, text: str, *, root: Path) -> l
     return issues
 
 
+def repo_skill_catalog_issues(skills_root: Path, skill_names: set[str], *, root: Path) -> list[str]:
+    catalog_path = skills_root / "README.md"
+    if not catalog_path.is_file():
+        return [f"{rel_from(catalog_path, root)}: responsibility catalog is missing"]
+
+    counts: dict[str, int] = {}
+    for match in SKILL_CATALOG_LINK_RE.finditer(catalog_path.read_text(encoding="utf-8")):
+        name = match.group("name")
+        counts[name] = counts.get(name, 0) + 1
+
+    issues: list[str] = []
+    for name in sorted(skill_names):
+        count = counts.get(name, 0)
+        if count == 0:
+            issues.append(f"{rel_from(catalog_path, root)}: missing responsibility entry for `{name}`")
+        elif count > 1:
+            issues.append(f"{rel_from(catalog_path, root)}: `{name}` must have exactly one responsibility entry")
+    for name in sorted(set(counts) - skill_names):
+        issues.append(f"{rel_from(catalog_path, root)}: catalog references unknown skill `{name}`")
+    return issues
+
+
+def repo_skill_duplicate_instruction_issues(
+    records: list[tuple[Path, str]], *, root: Path
+) -> list[str]:
+    locations: dict[str, list[tuple[Path, int]]] = {}
+    for skill_md, text in records:
+        in_fence = False
+        for idx, line in enumerate(text.splitlines(), 1):
+            if line.strip().startswith("```"):
+                in_fence = not in_fence
+                continue
+            normalized = re.sub(r"\s+", " ", line.strip())
+            if (
+                in_fence
+                or not normalized.startswith("- ")
+                or len(normalized) < SKILL_DUPLICATE_INSTRUCTION_MIN_LENGTH
+            ):
+                continue
+            locations.setdefault(normalized, []).append((skill_md, idx))
+
+    issues: list[str] = []
+    for instruction, duplicates in sorted(locations.items()):
+        if len(duplicates) < 2:
+            continue
+        owner_path, owner_line = duplicates[0]
+        owner = f"{rel_from(owner_path, root)}:{owner_line}"
+        for duplicate_path, duplicate_line in duplicates[1:]:
+            issues.append(
+                f"{rel_from(duplicate_path, root)}:{duplicate_line}: duplicate substantive instruction; "
+                f"move it to one owner and link `{owner}`: {instruction}"
+            )
+    return issues
+
+
+def repo_skill_required_cycle_issues(records: list[tuple[Path, str]]) -> list[str]:
+    skill_names = {path.parent.name for path, _text in records}
+    graph: dict[str, set[str]] = {name: set() for name in skill_names}
+    for skill_md, text in records:
+        source = skill_md.parent.name
+        for line in text.splitlines():
+            if SKILL_REQUIRES_RE.search(line) is None:
+                continue
+            graph[source].update(
+                match.group("name")
+                for match in SKILL_ALIAS_RE.finditer(line)
+                if match.group("name") in skill_names
+            )
+
+    issues: list[str] = []
+    visited: set[str] = set()
+    visiting: list[str] = []
+    reported: set[frozenset[str]] = set()
+
+    def visit(name: str) -> None:
+        if name in visiting:
+            cycle = visiting[visiting.index(name) :] + [name]
+            key = frozenset(cycle)
+            if key not in reported:
+                reported.add(key)
+                issues.append(
+                    f"{REPO_SKILLS_DIR}: recursive **Requires** handoff: {' -> '.join(cycle)}; "
+                    "make one edge a delegate/return or reuse current prerequisite evidence"
+                )
+            return
+        if name in visited:
+            return
+        visiting.append(name)
+        for target in sorted(graph[name]):
+            visit(target)
+        visiting.pop()
+        visited.add(name)
+
+    for name in sorted(graph):
+        visit(name)
+    return issues
+
+
 def repo_skill_issues(*, root: Path = ROOT) -> list[str]:
     issues: list[str] = []
     skills_root = root / REPO_SKILLS_DIR.replace("/", os.sep)
     if not skills_root.exists():
         return issues
 
-    for skill_dir in sorted(skills_root.iterdir()):
-        if not skill_dir.is_dir():
-            continue
+    skill_dirs = sorted(path for path in skills_root.iterdir() if path.is_dir())
+    skill_names = {path.name for path in skill_dirs}
+    records: list[tuple[Path, str]] = []
+
+    for skill_dir in skill_dirs:
         skill_path = rel_from(skill_dir, root)
 
         skill_name = skill_dir.name
@@ -1396,6 +1622,7 @@ def repo_skill_issues(*, root: Path = ROOT) -> list[str]:
             continue
 
         text = skill_md.read_text(encoding="utf-8")
+        records.append((skill_md, text))
         if "TODO" in text or "[TODO" in text:
             issues.append(f"{rel_from(skill_md, root)}: remove template TODO text before committing")
         line_count = len(text.splitlines())
@@ -1408,6 +1635,15 @@ def repo_skill_issues(*, root: Path = ROOT) -> list[str]:
                 issues.append(
                     f"{rel_from(skill_md, root)}:{idx}: replace ambiguous best-effort wording with a concrete action"
                 )
+            if (
+                SKILL_ALIAS_RE.search(line)
+                and SKILL_HANDOFF_WORD_RE.search(line)
+                and SKILL_TYPED_HANDOFF_RE.search(line) is None
+            ):
+                issues.append(
+                    f"{rel_from(skill_md, root)}:{idx}: type the skill handoff as "
+                    "**Requires**, **Delegates**, or **Returns to**"
+                )
         issues.extend(repo_skill_raw_command_issues(skill_md, text, root=root))
 
         frontmatter = FRONTMATTER_RE.match(text)
@@ -1416,6 +1652,13 @@ def repo_skill_issues(*, root: Path = ROOT) -> list[str]:
             continue
 
         header = frontmatter.group("header")
+        header_keys = set(re.findall(r"(?m)^([A-Za-z0-9_-]+):", header))
+        unsupported_keys = sorted(header_keys - {"name", "description"})
+        if unsupported_keys:
+            issues.append(
+                f"{rel_from(skill_md, root)}: frontmatter supports only `name` and `description`; "
+                f"remove {unsupported_keys}"
+            )
         declared_name = simple_yaml_value(header, "name")
         description = simple_yaml_value(header, "description")
         if declared_name != skill_name:
@@ -1429,17 +1672,23 @@ def repo_skill_issues(*, root: Path = ROOT) -> list[str]:
             issues.append(f"{rel_from(skill_md, root)}: frontmatter description is too vague")
 
         body = text[frontmatter.end() :]
-        if not re.search(r"(?m)^#\s+\S", body):
-            issues.append(f"{rel_from(skill_md, root)}: body must start with a Markdown H1")
-        for required_skill in SKILL_REQUIRED_SKILL_REFS.get(skill_name, ()):
-            if not skill_chain_referenced(text, required_skill):
+        if re.search(r"(?m)^#\s+\S", body) is None:
+            issues.append(f"{rel_from(skill_md, root)}: body must contain a Markdown H1")
+        for heading in SKILL_REQUIRED_HEADINGS:
+            if re.search(rf"(?m)^{re.escape(heading)}\s*$", body) is None:
                 issues.append(
-                    f"{rel_from(skill_md, root)}: must chain to ${required_skill} "
-                    f"or `{REPO_SKILLS_DIR}/{required_skill}/SKILL.md`"
+                    f"{rel_from(skill_md, root)}: missing required section `{heading}`"
                 )
-        issues.extend(repo_skill_hard_gate_issues(skill_name, text, skill_md=skill_md, root=root))
+        if "../reference.md" not in text:
+            issues.append(f"{rel_from(skill_md, root)}: must link the universal `../reference.md` contract")
+        for alias in sorted({match.group("name") for match in SKILL_ALIAS_RE.finditer(text)}):
+            if alias not in skill_names:
+                issues.append(f"{rel_from(skill_md, root)}: unknown skill alias `${alias}`")
         issues.extend(repo_skill_reference_issues(skill_md, text, root=root))
 
+    issues.extend(repo_skill_catalog_issues(skills_root, skill_names, root=root))
+    issues.extend(repo_skill_duplicate_instruction_issues(records, root=root))
+    issues.extend(repo_skill_required_cycle_issues(records))
     return issues
 
 
@@ -1759,6 +2008,7 @@ ENFORCEMENT_TRUTH_REQUIRED_SNIPPETS = [
             ("node-version-file: frontend/.nvmrc", "frontend CI setup uses the documented Node source"),
             ("run: python scripts/axis.py frontend install", "frontend dependencies install through the Axis wrapper"),
             ("run: python scripts/axis.py frontend gen-api-types --check", "frontend API type generation runs in CI through the Axis wrapper"),
+            ("run: python scripts/axis.py check ui-baseline", "approved frontend UI baseline is checked in CI"),
             ("run: python scripts/axis.py frontend ci", "frontend typecheck/lint runs in CI through the Axis wrapper"),
             ("run: python scripts/axis.py frontend test", "frontend tests run in CI through the Axis wrapper"),
             ("uses: lycheeverse/lychee-action", "markdown link check runs in CI"),
@@ -2019,6 +2269,7 @@ def enforcement_ledger_issues(*, root: Path | None = None) -> list[str]:
 def check_doc_drift(_args: argparse.Namespace | None = None) -> int:
     range_spec = diff_range()
     issues: list[str] = []
+    skip_checkers = set(getattr(_args, "skip_checkers", ()) or ())
 
     discovery = doc_drift_domains.validate_discovery()
     if discovery:
@@ -2096,6 +2347,7 @@ def check_doc_drift(_args: argparse.Namespace | None = None) -> int:
         ("check-repo-skills", check_repo_skills),
         ("check-ef-domain-mapping", check_ef_domain_mapping),
         ("check-frontend-api-contracts", check_frontend_api_contracts),
+        ("check-ui-baseline", check_ui_baseline),
         ("check-frontend-quality", check_frontend_quality),
         ("check-use-case-docs.py", lambda _=None: run_module_check("check-use-case-docs.py", ["--check"])),
         ("check-foundation-docs.py", lambda _=None: run_module_check("check-foundation-docs.py", ["--check"])),
@@ -2106,6 +2358,8 @@ def check_doc_drift(_args: argparse.Namespace | None = None) -> int:
         ("check-local-dev-docs.py", lambda _=None: run_module_check("check-local-dev-docs.py", ["--check"])),
     ]
     for name, checker in checkers:
+        if name in skip_checkers:
+            continue
         if checker() != 0:
             issues.append(f"{name} failed")
 
@@ -2601,11 +2855,17 @@ def passthrough_args(raw_args: list[str]) -> list[str]:
 
 
 def frontend_command(args: argparse.Namespace) -> int:
+    command = args.frontend_command
+    if command == "ui-baseline":
+        if args.write:
+            write_ui_baseline()
+            return 0
+        return check_ui_baseline()
+
     rc = check_frontend_toolchain()
     if rc != 0:
         return rc
 
-    command = args.frontend_command
     if command == "install":
         return run_frontend_npm(["ci"]).returncode
     if command == "install-browsers":
@@ -2936,17 +3196,39 @@ def verify(args: argparse.Namespace) -> int:
     return 1
 
 
+def ready_review_doc_drift_coverage(paths: list[str]) -> set[str]:
+    covered: set[str] = set()
+    if any(path.startswith("scripts/") for path in paths):
+        covered.add("check-scripts-standard")
+    if any(path.startswith(f"{REPO_SKILLS_DIR}/") for path in paths):
+        covered.add("check-repo-skills")
+    if any(is_docs_path(path) for path in paths):
+        covered.update({"check-doc-navigation", "check-doc-size-budgets", "check-doc-code-fences.py"})
+    if any(path.startswith("docs/use-cases/") for path in paths):
+        covered.add("check-use-case-docs.py")
+    if any(path.startswith("docs/foundations/") for path in paths):
+        covered.add("check-foundation-docs.py")
+    return covered
+
+
 def ready_review_policy_gates(
     paths: list[str],
     *,
     policy_tests_covered: bool = False,
+    doc_drift_covered: set[str] | None = None,
 ) -> list[tuple[str, callable[[], int]]]:
     gates: list[tuple[str, callable[[], int]]] = []
     if any(path.startswith("scripts/") for path in paths) and not policy_tests_covered:
         gates.append(("policy gate tests", check_policy_tests))
     if ".github/renovate.json5" in paths:
         gates.append(("Renovate config", lambda: check_renovate_config(None)))
-    gates.append(("doc drift", lambda: check_doc_drift(None)))
+    skip_checkers = set(doc_drift_covered or ())
+    gates.append(
+        (
+            "doc drift",
+            lambda: check_doc_drift(argparse.Namespace(skip_checkers=skip_checkers)),
+        )
+    )
     return gates
 
 
@@ -2954,10 +3236,15 @@ def run_ready_review_policy(
     paths: list[str],
     *,
     policy_tests_covered: bool = False,
+    doc_drift_covered: set[str] | None = None,
 ) -> tuple[int, list[str]]:
     failed: list[str] = []
     executed: list[str] = []
-    for name, checker in ready_review_policy_gates(paths, policy_tests_covered=policy_tests_covered):
+    for name, checker in ready_review_policy_gates(
+        paths,
+        policy_tests_covered=policy_tests_covered,
+        doc_drift_covered=doc_drift_covered,
+    ):
         print()
         print(f"> ready-review: {name}")
         executed.append(name)
@@ -3000,6 +3287,7 @@ def ready_review(args: argparse.Namespace) -> int:
     policy_rc, policy_gates = run_ready_review_policy(
         paths,
         policy_tests_covered=not policy_only and scripts_changed,
+        doc_drift_covered=set() if policy_only else ready_review_doc_drift_coverage(paths),
     )
     executed.extend(policy_gates)
     if policy_rc != 0:
@@ -3735,6 +4023,8 @@ def check_pr(args: argparse.Namespace) -> int:
         module_args.extend(["--title", args.title])
     if args.body_file is not None:
         module_args.extend(["--body-file", str(args.body_file)])
+    if args.branch is not None:
+        module_args.extend(["--branch", args.branch])
     return module_main("check-pr.py", module_args)
 
 
@@ -3812,6 +4102,9 @@ def main(argv: list[str] | None = None) -> int:
     frontend_gen_api = frontend_sub.add_parser("gen-api-types")
     frontend_gen_api.add_argument("--check", action="store_true", help="Fail if generated frontend API types are stale")
     frontend_gen_api.set_defaults(func=frontend_command)
+    frontend_ui_baseline = frontend_sub.add_parser("ui-baseline")
+    frontend_ui_baseline.add_argument("--write", action="store_true", help="Write the reviewed approved UI baseline")
+    frontend_ui_baseline.set_defaults(func=frontend_command)
     frontend_script = frontend_sub.add_parser("script")
     frontend_script.add_argument("script_name")
     frontend_script.add_argument("script_args", nargs=argparse.REMAINDER)
@@ -3880,6 +4173,7 @@ def main(argv: list[str] | None = None) -> int:
     check_sub.add_parser("vulnerable-packages").set_defaults(func=check_vulnerable_packages)
     check_sub.add_parser("ef-domain-mapping").set_defaults(func=check_ef_domain_mapping)
     check_sub.add_parser("frontend-api-contracts").set_defaults(func=check_frontend_api_contracts)
+    check_sub.add_parser("ui-baseline").set_defaults(func=check_ui_baseline)
     check_sub.add_parser("frontend-quality").set_defaults(func=check_frontend_quality)
     check_sub.add_parser("coderabbit-cli").set_defaults(func=check_coderabbit_cli)
     check_sub.add_parser("local-dev-docs").set_defaults(
@@ -3903,6 +4197,7 @@ def main(argv: list[str] | None = None) -> int:
     pr_parser = check_sub.add_parser("pr")
     pr_parser.add_argument("--title")
     pr_parser.add_argument("--body-file", type=Path)
+    pr_parser.add_argument("--branch")
     pr_parser.set_defaults(func=check_pr)
 
     test = sub.add_parser("test")

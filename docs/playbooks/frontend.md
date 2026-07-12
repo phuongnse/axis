@@ -56,13 +56,22 @@ Use TanStack Router patterns already in the app. Classify every route as authent
 
 ## Component design
 
-Use the approved design system first. For Axis today, shared UI primitives come from shadcn-owned `frontend/src/components/ui` contracts unless the Design Gate records an explicit exception. Product UI uses the interaction-consistent shadcn primitive when one exists; native fallback variants are exception-only and require a documented platform-native behavior need plus explicit sign-off. Select triggers and options use the same user-facing display-label source; never expose raw protocol values as the selected label. If the current component contract lacks a needed capability, propose the smallest design-system addition or component API change and wait for explicit user sign-off before adding it. Custom components or bespoke interaction behavior are exceptions only: document why the existing contract does not fit and get explicit sign-off before implementation. Use icons for iconable actions, labels/tooltips for clarity, and stable dimensions for fixed controls.
+Use the approved design system first. Product UI uses the interaction-consistent shadcn primitive when one exists; native fallback variants require a documented platform-native behavior need and explicit sign-off. Select triggers and options use the same user-facing display-label source; never expose raw protocol values as the selected label. Use icons for iconable actions, labels/tooltips for clarity, and stable dimensions for fixed controls.
 
 Treat design-system component visuals as owned by the component contract. Feature code uses defaults and documented props; it does not locally alter component visual treatment through style overrides, selectors, or wrapper styling. If the requested UI needs a visual deviation or component API change, stop before implementation, name the deviation, and get explicit user sign-off; this applies even when the broader change is standard-tier.
 
+Use these ownership layers:
+
+- **Upstream zone** — `frontend/src/components/ui` plus baseline-tracked shadcn support files contain reviewed registry source. Keep registry-default visuals and APIs; do not add product variants, business logic, feature/shared imports, or internal styling. `frontend/ui-baseline.json` records the approved snapshot and the reason/sign-off reference for each explicit exception.
+- **Theme zone** — `frontend/src/index.css` owns approved semantic tokens. Consumers use semantic utilities; new tokens use background/foreground pairs and require sign-off.
+- **App-pattern zone** — `frontend/src/components/shared` owns reusable Axis composition and adapters. Give them narrow Axis-owned props such as product state, not provider variants, types, selectors, or DOM assumptions.
+- **Feature zone** — feature components compose defaults and app patterns. Consumer `className` is outer layout-only and must not alter primitive visuals.
+
+Use `$axis-ui-system` for token/customization decisions, registry diffs, baseline refreshes, or provider changes. Never bulk-overwrite unrelated registry components. A reviewed upstream sync and matching baseline refresh need provenance but no additional sign-off when they introduce no customization or exception. Explicit sign-off is required for semantic-token visual changes, cross-feature visual/API conventions, primitive exceptions, style/base/provider or major-library changes, and all customizations.
+
 ## Styling
 
-Use Tailwind utilities consistently. Avoid one-off local visual systems. Remove obsolete styling and component API surface when the UI path that used them is removed or replaced.
+Use Tailwind utilities consistently. Outside the upstream and theme zones, use semantic tokens and standard utilities only: no hard-coded palette utilities, arbitrary Tailwind values, component-local colors, selector-based custom CSS, or one-off visual systems. Remove obsolete styling and component API surface when the UI path that used them is removed or replaced.
 
 ## Security
 

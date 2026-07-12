@@ -1,95 +1,36 @@
 ---
 name: axis-use-case-spec
-description: Draft or complete Axis docs-first use-case specifications before implementation. Use when a requested feature or use case lacks a docs/use-cases file, acceptance criteria, flow, implementation status, diagram inventory, or has unclear product/design decisions that must be resolved before using axis-use-case-implementation.
+description: Create or repair Axis product use-case contracts before implementation. Use when purpose, actor, flow, acceptance criteria, Acceptance Test Matrix, UI contract, decisions, status, or ownership is missing or ambiguous.
 ---
 
 # Axis Use Case Spec
 
 ## Goal
 
-Create or tighten the owning use-case spec so implementation can follow spec -> tests -> code -> verification without invented behavior, blank AC rows, placeholder docs, or missing diagrams.
+Produce a testable product contract without inventing behavior or mixing implementation evidence into the spec.
 
 ## Hard gates
 
 Follow [reference.md](../reference.md).
-- Do not route to `$axis-use-case-implementation` while blocking decisions remain open.
-- Do not invent product behavior, IDs, endpoints, or tables.
-- New domain without user scope approval: stop and ask.
+- Do not delegate implementation while blocking product decisions remain open.
+- Do not invent behavior, identifiers, endpoints, tables, authorization, or integrations.
+- An unapproved new product domain stops for user scope.
 
 ## Inputs
 
-- User feature request, domain candidate, and use-case slug when known.
-- Existing related use-case docs, code, tests, and product decisions found through `rg`.
-- Blocking decisions needed from the user before behavior becomes required.
+- User request, domain/slug candidate, and known decisions.
+- Related use cases, code, tests, and product vocabulary found through `rg`.
+- Blocking decisions only the user can supply.
 
 ## Workflow
 
-1. Locate or create the owning spec.
-   - Read [docs/use-cases/README.md](../../../docs/use-cases/README.md) and the domain `README.md`.
-   - Search existing docs and code with `rg -n "<feature words>" docs/use-cases src tests frontend`.
-   - If no use-case file exists, create `docs/use-cases/{domain}/{slug}.md` from the template and add the domain README link.
-   - If the domain itself does not exist, stop and ask for scope unless the user explicitly approved a new domain.
-
-2. Establish product boundaries before writing behavior.
-   - Capture Purpose, Primary actor, Trigger, Main flow, Alternate/error flows, Acceptance Criteria, Acceptance Test Matrix, Out Of Scope, optional Screen flow, optional Diagrams, implementation status, and Decisions.
-   - Use the source priority from [AGENTS.md](../../../AGENTS.md): use-case ACs, then AGENTS, then focused owner docs, then same-module code, then agent judgment.
-   - Ask the user for blocking decisions such as authorization model, data ownership, API exposure, integration effects, or UI journey.
-   - Do not invent IDs, endpoints, table names, or copy that changes product meaning.
-   - Use `## Out Of Scope` only for behavior the flow references or hands off to but does not own.
-   - Do not list unrelated future features as out of scope.
-   - Treat the spec as ready only when each in-scope required-to-close AC has a cited actor, entry point, precondition, observable outcome, business side effect, failure/validation behavior, and testable expected result.
-   - Cite readiness evidence by spec section, AC ID, or flow step. If an expected behavior cannot be cited from the spec, record it under Open decisions instead of turning it into a test expectation.
-
-3. Write acceptance criteria and acceptance tests for implementation.
-   - Follow [reference.md](./reference.md) for AC IDs, Acceptance Test Matrix shape, runner choice, and slice boundaries.
-
-4. Define UI requirements and diagrams.
-   - Keep ACs focused on product outcomes. Put product screen contracts in `## Screen flow` and accessibility, interaction quality, visual stability, and design-system expectations in Required UI quality.
-   - Keep UI requirements implementation-agnostic; do not encode component internals, CSS classes, test file paths, or library-specific props in use-case specs.
-   - If no approved UI contract exists, keep the affected frontend status incomplete and state the missing contract in the implementation-status `Gaps vs spec` / `Deferred follow-ups` fields owned by [docs/playbooks/docs-style.md](../../../docs/playbooks/docs-style.md#implementation-status).
-   - Add `## Screen flow` when the journey has more than three screens, branched happy paths, or non-obvious error screens.
-   - Add Mermaid diagrams for non-trivial workflow or sequence behavior; use use-case vocabulary and keep local diagrams in the owning use-case file.
-   - Omit diagram sections when no local diagram applies.
-
-5. Mark implementation status honestly.
-   - Add the `> **Implementation status**` callout after visual sections using the template layer table.
-   - Use only `Done`, `Partial`, `Not started`, or `N/A`.
-   - Do not mark a layer or use case done if an in-scope AC lacks a required AT row or required automated evidence is missing.
-   - Name exact deferred AC bullets under `Deferred follow-ups`, or write `N/A`.
-   - Add `Verification` naming the required AT evidence categories; exact paths, runner commands, and pass evidence belong in the sibling `{slug}.evidence.md` sidecar when work is complete.
-   - Update the domain README Open work only when the new spec changes prioritized work.
-
-6. Route follow-up implementation.
-   - Use `$axis-api-contract` for new or changed REST/OpenAPI/API type surfaces.
-   - Use `$axis-frontend-feature` for SPA routes, feature folders, forms, data fetching, or UI behavior.
-   - Use `$axis-use-case-implementation` only after the owning spec exists and blocking decisions are resolved.
-
-7. Verify only what changed.
-   - Use `python scripts/axis.py check use-case-docs` for use-case doc shape.
-   - Use `python scripts/axis.py check markdown-links` only when links or anchors changed.
-   - Use `$axis-visual-artifact` when Mermaid or committed visual docs changed.
-   - Leave full ready-review verification to `$axis-ready-review`.
+1. Locate the owner under [docs/use-cases/README.md](../../../docs/use-cases/README.md); create a file/domain only within approved scope and never create placeholders.
+2. Establish purpose, actor, trigger, flows, boundaries, decisions, and failure behavior from the source priority in [AGENTS.md](../../../AGENTS.md).
+3. Author ACs and the Acceptance Test Matrix through [reference.md](./reference.md); unresolved expected behavior remains an open decision, not a required test.
+4. Define implementation-agnostic Screen flow and Required UI quality when the journey needs them. This workflow **Delegates** diagram/document hygiene to `$axis-doc-hygiene` without moving product ownership.
+5. Mark layer status honestly; exact evidence paths and Axis commands belong only in the sibling evidence sidecar when implementation exists.
+6. Run `python scripts/axis.py check use-case-docs` plus link checks when links/anchors changed, then return readiness and open decisions to the caller.
 
 ## Output
 
-Report:
-
-```text
-Spec created/updated:
-- ...
-
-Decisions resolved:
-- ...
-
-Open decisions:
-- ...
-
-Visual artifacts:
-- diagrams/committed visuals updated or N/A
-
-Next skill:
-- $axis-use-case-implementation / $axis-api-contract / $axis-frontend-feature / none yet
-
-Checks:
-- command -> pass/fail/not run with reason
-```
+Report owner/spec, readiness, resolved/open decisions, AC/AT scope, visual/doc changes, checks, and next owner.

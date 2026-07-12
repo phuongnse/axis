@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import os
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -19,6 +20,8 @@ HEADING_RE = re.compile(r"^##\s+(.+?)\s*$", re.MULTILINE)
 CHECKBOX_RE = re.compile(r"^\s*-\s+\[(?P<state>[ xX])\]\s+(?P<label>.+)$", re.MULTILINE)
 NA_REASON_RE = re.compile(r"\bN/A\b\s*(?:[-:\u2014]|\()\s*\S+", re.IGNORECASE)
 PR_TITLE_RE = re.compile(r"^[a-z]+(?:\([a-z0-9-]+\))?!?: .{8,}$")
+BRANCH_RE = re.compile(r"^(?:feat|fix|docs|refactor|test|chore)/[a-z0-9]+(?:-[a-z0-9]+)*$")
+RENOVATE_BRANCH_RE = re.compile(r"^renovate/[a-z0-9](?:[a-z0-9._/-]*[a-z0-9])?$")
 
 REQUIRED_SECTIONS = (
     "Summary",
@@ -27,6 +30,7 @@ REQUIRED_SECTIONS = (
 )
 
 PR_TITLE_EXAMPLE = "feat(identity): implement standalone user registration"
+BRANCH_EXAMPLE = "feat/short-description"
 
 
 def strip_comments(text: str) -> str:
@@ -69,6 +73,19 @@ def validate_title(title: str) -> list[str]:
     return []
 
 
+def validate_branch(branch: str) -> list[str]:
+    branch = branch.strip()
+    if not branch:
+        return ["PR branch is unavailable; run from a named branch or pass `--branch`"]
+    if BRANCH_RE.fullmatch(branch) or RENOVATE_BRANCH_RE.fullmatch(branch):
+        return []
+    return [
+        "PR branch must follow CONTRIBUTING.md: "
+        "`{type}/{short-description}` in kebab-case, "
+        f"e.g. `{BRANCH_EXAMPLE}`"
+    ]
+
+
 def validate_body(body: str) -> list[str]:
     body = body.lstrip("\ufeff")
     issues: list[str] = []
@@ -107,14 +124,33 @@ def validate_body(body: str) -> list[str]:
     return issues
 
 
-def validate(title: str, body: str) -> list[str]:
-    return [*validate_title(title), *validate_body(body)]
+def validate(title: str, body: str, branch: str | None = None) -> list[str]:
+    branch_issues = validate_branch(branch) if branch is not None else []
+    return [*validate_title(title), *validate_body(body), *branch_issues]
+
+
+def resolve_branch(explicit: str | None) -> str:
+    if explicit is not None:
+        return explicit
+    if head_ref := os.environ.get("PR_HEAD_REF", "").strip():
+        return head_ref
+    try:
+        result = subprocess.run(
+            ["git", "branch", "--show-current"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except OSError:
+        return ""
+    return result.stdout.strip() if result.returncode == 0 else ""
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--title", help="PR title. Defaults to PR_TITLE env var")
     parser.add_argument("--body-file", type=Path, help="Read PR body from a file")
+    parser.add_argument("--branch", help="PR head branch. Defaults to PR_HEAD_REF or current branch")
     args = parser.parse_args()
 
     title = args.title if args.title is not None else os.environ.get("PR_TITLE", "")
@@ -123,7 +159,7 @@ def main() -> int:
     else:
         body = os.environ.get("PR_BODY", "")
 
-    issues = validate(title, body)
+    issues = validate(title, body, resolve_branch(args.branch))
     if issues:
         print("check-pr FAIL:", file=sys.stderr)
         for issue in issues:

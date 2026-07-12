@@ -2,8 +2,10 @@ import { useQuery } from '@tanstack/react-query';
 import { ChevronDown, LogOut, Settings2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { AccountAvatar } from '@/components/shared/AccountAvatar';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Separator } from '@/components/ui/separator';
 import { useAuthStore } from '@/features/auth/auth-store';
 import { sessionDisplayFromLabel } from '@/features/auth/session-from-token';
 import { dashboardQueryKeys, getCurrentUserProfile } from '@/features/dashboard/api';
@@ -49,7 +51,7 @@ export function AppActionsMenu({
           <Button
             type="button"
             variant="outline"
-            size="account"
+            size="sm"
             className="max-w-56"
             aria-label={t('nav.accountMenu')}
             title={t('nav.accountMenu')}
@@ -60,11 +62,7 @@ export function AppActionsMenu({
           </Button>
         }
       />
-      <PopoverContent
-        align="end"
-        className="w-80 max-w-[calc(100vw_-_2rem)]"
-        aria-label={t('nav.accountMenu')}
-      >
+      <PopoverContent align="end" className="w-80" aria-label={t('nav.accountMenu')}>
         <section aria-label={t('app.preferences')} className="grid gap-3">
           <div className="flex items-center gap-2 px-1 text-xs font-medium text-muted-foreground">
             <Settings2 className="size-3.5" aria-hidden />
@@ -74,12 +72,12 @@ export function AppActionsMenu({
           <ThemeControl authenticated variant="menu" />
         </section>
 
-        <div className="h-px bg-border" />
+        <Separator />
 
         <Button
           type="button"
-          variant="destructiveOutline"
-          size="menu"
+          variant="destructive"
+          size="sm"
           className="w-full"
           aria-busy={signingOut}
           disabled={signingOut}
@@ -89,9 +87,9 @@ export function AppActionsMenu({
           {signingOut ? t('nav.signingOut') : t('nav.signOut')}
         </Button>
         {signOutError ? (
-          <p role="alert" className="px-1 text-xs text-destructive">
-            {t('nav.signOutFailed')}
-          </p>
+          <Alert variant="destructive">
+            <AlertDescription>{t('nav.signOutFailed')}</AlertDescription>
+          </Alert>
         ) : null}
       </PopoverContent>
     </Popover>

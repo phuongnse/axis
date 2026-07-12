@@ -1,5 +1,3 @@
-"use client"
-
 import * as React from "react"
 import { Dialog as DialogPrimitive } from "@base-ui/react/dialog"
 
@@ -43,22 +41,17 @@ function DialogContent({
   className,
   children,
   showCloseButton = true,
-  closeLabel = "Close",
-  size = "default",
   ...props
 }: DialogPrimitive.Popup.Props & {
   showCloseButton?: boolean
-  closeLabel?: string
-  size?: "default" | "form" | "workspace"
 }) {
   return (
     <DialogPortal>
       <DialogOverlay />
       <DialogPrimitive.Popup
         data-slot="dialog-content"
-        data-size={size}
         className={cn(
-          "group/dialog-content fixed top-1/2 left-1/2 z-50 grid w-full -translate-x-1/2 -translate-y-1/2 rounded-xl bg-popover text-sm text-popover-foreground ring-1 ring-foreground/10 duration-100 outline-none data-[size=default]:max-w-[calc(100%-2rem)] data-[size=form]:max-h-[calc(100dvh-2rem)] data-[size=form]:max-w-[calc(100%-2rem)] data-[size=default]:gap-4 data-[size=form]:gap-4 data-[size=default]:p-4 data-[size=form]:overflow-y-auto data-[size=form]:p-4 data-[size=workspace]:h-[calc(100dvh-1rem)] data-[size=workspace]:max-w-[calc(100%-1rem)] data-[size=workspace]:grid-rows-[auto_minmax(0,1fr)_auto] data-[size=workspace]:gap-0 sm:data-[size=default]:max-w-sm sm:data-[size=form]:max-w-lg sm:data-[size=workspace]:h-[min(90dvh,56rem)] sm:data-[size=workspace]:max-w-5xl data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
+          "fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-xl bg-popover p-4 text-sm text-popover-foreground ring-1 ring-foreground/10 duration-100 outline-none sm:max-w-sm data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
           className
         )}
         {...props}
@@ -77,7 +70,7 @@ function DialogContent({
           >
             <XIcon
             />
-            <span className="sr-only">{closeLabel}</span>
+            <span className="sr-only">Close</span>
           </DialogPrimitive.Close>
         )}
       </DialogPrimitive.Popup>
@@ -89,20 +82,7 @@ function DialogHeader({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="dialog-header"
-      className={cn(
-        "flex flex-col gap-2 group-data-[size=workspace]/dialog-content:border-b group-data-[size=workspace]/dialog-content:p-4",
-        className
-      )}
-      {...props}
-    />
-  )
-}
-
-function DialogBody({ className, ...props }: React.ComponentProps<"div">) {
-  return (
-    <div
-      data-slot="dialog-body"
-      className={cn("min-h-0 overflow-y-auto p-4", className)}
+      className={cn("flex flex-col gap-2", className)}
       {...props}
     />
   )
@@ -121,7 +101,6 @@ function DialogFooter({
       data-slot="dialog-footer"
       className={cn(
         "-mx-4 -mb-4 flex flex-col-reverse gap-2 rounded-b-xl border-t bg-muted/50 p-4 sm:flex-row sm:justify-end",
-        "group-data-[size=workspace]/dialog-content:mx-0 group-data-[size=workspace]/dialog-content:mb-0",
         className
       )}
       {...props}
@@ -141,7 +120,7 @@ function DialogTitle({ className, ...props }: DialogPrimitive.Title.Props) {
     <DialogPrimitive.Title
       data-slot="dialog-title"
       className={cn(
-        "text-base leading-none font-medium",
+        "font-heading text-base leading-none font-medium",
         className
       )}
       {...props}
@@ -168,7 +147,6 @@ function DialogDescription({
 export {
   Dialog,
   DialogClose,
-  DialogBody,
   DialogContent,
   DialogDescription,
   DialogFooter,

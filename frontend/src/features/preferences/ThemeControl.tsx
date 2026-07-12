@@ -134,7 +134,7 @@ export function ThemeControl({
       {showSaveStatus ? (
         <div
           id={statusId}
-          className={cn('min-h-4 text-[11px] text-muted-foreground', isMenu && 'px-1')}
+          className={cn('min-h-4 text-xs text-muted-foreground', isMenu && 'px-1')}
           aria-live="polite"
         >
           {mutation.isPending ? t('app.saving') : null}

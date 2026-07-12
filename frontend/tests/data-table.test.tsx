@@ -236,6 +236,8 @@ describe('DataTable', () => {
       'aria-current',
       'page',
     );
+    expect(within(table).getByRole('button', { name: 'Page 2 of 2' })).toHaveClass('bg-primary');
+    expect(within(table).getByRole('button', { name: 'Page 1 of 2' })).toHaveClass('border-border');
 
     await user.type(within(table).getByLabelText('Search records'), 'beta');
     expect(within(table).getByText('Beta')).toBeInTheDocument();

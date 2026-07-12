@@ -40,7 +40,7 @@ Do not add reference-owner sections or bottom reference lists for repo docs.
 
 Use-case READMEs own product behavior and ACs. Keep purpose/actor/trigger, flows, ACs, Acceptance Test Matrix, Out Of Scope, optional Screen flow, optional Diagrams, and implementation status.
 
-Use `$axis-use-case-spec` for spec shape, `$axis-use-case-implementation` for status, and `$axis-visual-artifact` for diagrams or committed visual artifacts.
+Use `$axis-use-case-spec` for spec shape, `$axis-use-case-implementation` for status, and `$axis-doc-hygiene` for diagrams or committed visual artifacts.
 
 Foundation READMEs use the same spec/status shape under [docs/foundations/README.md](../foundations/README.md); use `$axis-frontend-foundation` for app shell or shared SPA foundation contracts.
 

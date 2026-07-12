@@ -7,17 +7,14 @@ Review checklist only. Workflow lives in repo skills ([`.agents/skills/README.md
 ## Before Code
 
 - Use `$axis-design-gate` for non-trivial work; high-risk surfaces need sign-off.
-- Use `$axis-module-architecture` before new modules or foundational modular-monolith, DDD, CQRS, or event-sourcing changes.
-- Use `$axis-module-patterns` before implementing adopted tactical DDD, CQRS, persistence, or event patterns.
+- Select the entry owner from [`.agents/skills/README.md`](../../.agents/skills/README.md) and preserve current prerequisite evidence across typed handoffs.
 - Read the owning use-case, foundation, or domain docs and same-module code.
 - Map in-scope ACs before behavior work.
 - Resolve or explicitly defer lower-layer gaps before API work.
 
 ## Acceptance Coverage
 
-Use-case ACs are the product outcome contract. Cover validation, edge, authorization, isolation, and dependency-failure paths when in scope.
-
-Screen flow and Required UI quality carry screen, accessibility, and interaction expectations; keep exact runners and implementation details out of spec matrices.
+Use [`.agents/skills/axis-use-case-spec/reference.md`](../../.agents/skills/axis-use-case-spec/reference.md) for AC/AT schema. Review that validation, edge, authorization, isolation, dependency-failure, screen, accessibility, and interaction expectations are covered when in scope.
 
 AC map: `AC | kind | surface | proving test or exact deferral`.
 
@@ -36,13 +33,13 @@ Only claim a full local suite when full `python scripts/axis.py dotnet test` ran
 | Behavior/spec/status | Owning use case |
 | Stack/library/manifests | [docs/TECH_STACK.md](../TECH_STACK.md) and owning manifests |
 | Repeated rule class | Focused playbook or [docs/ENFORCEMENT.md](../ENFORCEMENT.md) |
-| Mermaid or committed visual artifact | `$axis-visual-artifact` |
+| Mermaid or committed visual artifact | `$axis-doc-hygiene` and the owning spec |
 
 Pure refactor/style/test-only changes can report docs as not triggered.
 
 ## Retrospective Review
 
-Use `$axis-ready-review`. Update the owner when the diff creates a new rule, invariant, stack baseline drift, review gap, spec gap, or repeat finding.
+Use `$axis-ready-review` and apply [`.agents/skills/reference.md § Improvement loop`](../../.agents/skills/reference.md#improvement-loop). Record one outcome instead of adding retrospective prose.
 
 ## Layer Status
 

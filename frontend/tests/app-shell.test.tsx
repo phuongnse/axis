@@ -98,7 +98,7 @@ describe('AppShell', () => {
     expect(screen.getByRole('banner')).toHaveTextContent('Dashboard');
     expect(await screen.findByText('Ada Lovelace')).toBeInTheDocument();
     const accountMenu = screen.getByRole('button', { name: 'Account menu' });
-    expect(accountMenu).toHaveAttribute('data-size', 'account');
+    expect(accountMenu).toHaveClass('h-7');
     await user.click(accountMenu);
     expect(screen.queryByText('Profile')).not.toBeInTheDocument();
     expect(screen.getAllByText('AL')).toHaveLength(1);
@@ -107,8 +107,7 @@ describe('AppShell', () => {
     expect(screen.getByText('Language control')).toBeInTheDocument();
     expect(screen.getByText('Theme control')).toBeInTheDocument();
     const signOut = screen.getByRole('button', { name: 'Sign out' });
-    expect(signOut).toHaveAttribute('data-variant', 'destructiveOutline');
-    expect(signOut).toHaveAttribute('data-size', 'menu');
+    expect(signOut).toHaveClass('text-destructive', 'h-7');
 
     expect(screen.queryByRole('navigation')).not.toBeInTheDocument();
 

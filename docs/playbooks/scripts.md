@@ -19,21 +19,12 @@ Use `python scripts/axis.py doctor` or the exact `check` subcommand to verify lo
 
 ## Pre-PR review checkpoint
 
-Run the checkpoint before create, branch/diff update, push-only update to an existing PR branch, or mark-ready PR actions when the diff contains non-trivial implementation, behavior, contract, or high-risk changes. For docs-only, metadata-only, or small guidance/tooling-text changes, record `not triggered` with the reason; when unsure, run the checkpoint.
+`$axis-pull-request` owns trigger decisions, checkpoint commits, feedback loops, and publication. This playbook owns command behavior:
 
-When triggered:
-
-1. Confirm toolchain: `python scripts/axis.py check coderabbit-cli`
-2. After readiness passes, create an intentional checkpoint commit on the branch that will be published.
-3. Review only committed work that will be published. If the user blocks committing, stop PR publication until a delta-safe reviewed commit exists.
-4. Review the committed diff with the CodeRabbit CLI: full branch diff on the first pass; for follow-up reruns, scope with `--base-commit <reviewed-checkpoint>` and optional `--dir` for affected directories.
-5. If the review raises issues, record `git rev-parse HEAD`, read `.agents/skills/axis-review-feedback/SKILL.md` (`$axis-review-feedback`), commit the follow-up, then rerun scoped to the checkpoint.
-6. For follow-up verification when a checkpoint exists, run `python scripts/axis.py ready-review --since <reviewed-checkpoint>`; omit `--since` when the follow-up scope cannot be represented by a checkpoint.
-7. Push and open the PR only after steps 4–6 are complete or explicitly skipped with user approval.
-
-Skip only when the user explicitly requested no pre-PR review. If the checkpoint is triggered and the tool is unavailable, unauthenticated, fails, or times out, stop and report the blocker.
-
-Metadata-only PR title/body updates do not require the checkpoint.
+- `python scripts/axis.py check coderabbit-cli` validates the review tool before a triggered review.
+- First review covers the committed publishable branch diff; follow-up review uses `--base-commit <reviewed-checkpoint>` and optional `--dir`.
+- Follow-up verification uses `python scripts/axis.py ready-review --since <reviewed-checkpoint>` when the delta has an immutable checkpoint.
+- Tool failure, missing authentication, timeout, or unresolved valid findings blocks publication unless the user explicitly approves the exact skip or deferral.
 
 ## Command Boundaries
 
@@ -43,6 +34,7 @@ Metadata-only PR title/body updates do not require the checkpoint.
 - Use `python scripts/axis.py ready-review` on a clean checkpoint commit at the review boundary. It runs changed-path verification plus the deterministic policy profile shared with CI.
 - Treat `python scripts/axis.py verify` as the changed-path verification engine behind ready-review, not as complete PR-readiness evidence by itself.
 - Use `python scripts/axis.py pre-push` for ordinary Git push sanity; it is not a substitute for the pre-PR review checkpoint on published PR branches.
+- Use `python scripts/axis.py check pr` to validate the current or CI head branch plus PR title/body before publication.
 - Set `AXIS_PRE_PUSH_FULL=1` only when an explicit workflow wants pre-push to run `ready-review`; ordinary pre-push remains a quick gate.
 - CI remains the authoritative merge matrix. [.github/workflows/build-and-test.yml](../../.github/workflows/build-and-test.yml) runs on GitHub Actions only — not a local dev script; `ubuntu-latest` is the merge runner, not a dev OS requirement.
 
@@ -52,7 +44,7 @@ Metadata-only PR title/body updates do not require the checkpoint.
 - Put shared repository discovery in [scripts/axis_repo.py](../../scripts/axis_repo.py) or small Python helpers.
 - Keep top-level `scripts/*.py` files non-executable.
 - Keep [scripts/hooks/pre-push](../../scripts/hooks/pre-push) non-executable in the worktree; installation writes the executable copy under `.git/hooks`.
-- New deterministic guards encode reusable current invariants, not one-off incidents or removed artifact names.
+- New deterministic guards encode reusable current invariants. Keep incident details in regression fixtures, not guard rules or retired artifact names.
 - Command tests prove supported subcommands and current behavior.
 - Removed or renamed commands, markers, headings, and artifacts get a one-time `rg` sweep plus current owner links, not permanent denylist checks.
 - Diff-aware checks include PR range plus staged, unstaged, and untracked files.

@@ -130,7 +130,7 @@ export function LanguageControl({
               {isMenu ? (
                 <span
                   aria-hidden
-                  className="flex size-4 shrink-0 items-center justify-center text-[8px] font-semibold leading-none"
+                  className="flex size-4 shrink-0 items-center justify-center text-xs font-semibold leading-none"
                 >
                   {languageBadges[item.value]}
                 </span>
@@ -144,7 +144,7 @@ export function LanguageControl({
       {showSaveStatus ? (
         <div
           id={statusId}
-          className={cn('min-h-4 text-[11px] text-muted-foreground', isMenu && 'px-1')}
+          className={cn('min-h-4 text-xs text-muted-foreground', isMenu && 'px-1')}
           aria-live="polite"
         >
           {mutation.isPending ? t('app.saving') : null}

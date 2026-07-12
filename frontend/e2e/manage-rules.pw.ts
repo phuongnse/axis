@@ -331,6 +331,7 @@ test('workspace rule authoring supports simulation, immutable revisions, and arc
   await search.clear();
 
   await catalog.getByRole('button', { name: 'Filters', exact: true }).click();
+  await expectNoDocumentOverflow(page);
   await page.getByRole('button', { name: 'Add condition' }).click();
   await page.getByTestId('fields').click();
   await page.getByRole('option', { name: 'Status', exact: true }).click();
@@ -378,7 +379,7 @@ test('workspace rule authoring supports simulation, immutable revisions, and arc
   await expect(page.getByRole('menuitemcheckbox', { name: 'Status', exact: true })).toBeHidden();
 
   const catalogHeader = catalog.getByRole('columnheader', { name: /Rule/ });
-  const catalogViewport = catalog.locator('[data-slot="table-container"]');
+  const catalogViewport = catalog.locator('[data-slot="data-table-viewport"]');
   await expect
     .poll(() =>
       catalogViewport.evaluate((element) => element.scrollWidth <= element.clientWidth + 1),
@@ -393,7 +394,7 @@ test('workspace rule authoring supports simulation, immutable revisions, and arc
   if (!headerBoxBeforeScroll || !viewportBox) {
     throw new Error('Rules catalog header or viewport did not render a bounding box');
   }
-  expect(headerBoxBeforeScroll.y).toBeGreaterThanOrEqual(viewportBox.y - 1);
+  expect(headerBoxBeforeScroll.y).toBeLessThanOrEqual(viewportBox.y + 1);
   await catalogViewport.evaluate((element) => element.scrollTo({ top: element.scrollHeight }));
   const headerBoxAfterScroll = await catalogHeader.boundingBox();
   if (!headerBoxAfterScroll) throw new Error('Rules catalog header disappeared after scrolling');
@@ -503,15 +504,20 @@ test('workspace rule authoring supports simulation, immutable revisions, and arc
   await expect(editorDialog).toBeHidden();
   await expect(catalog).toBeVisible();
   await expectNoDocumentOverflow(page);
+  await catalog.getByRole('button', { name: 'Filters', exact: true }).click();
+  await expectNoDocumentOverflow(page);
+  await page.keyboard.press('Escape');
+  const catalogHorizontalViewport = catalog.locator('[data-slot="table-container"]').last();
   await expect
     .poll(() =>
-      catalogViewport.evaluate((element) => ({
+      catalogHorizontalViewport.evaluate((element) => ({
         hasHorizontalOverflow: element.scrollWidth > element.clientWidth,
         contained: element.getBoundingClientRect().right <= window.innerWidth + 1,
       })),
     )
     .toEqual({ hasHorizontalOverflow: true, contained: true });
-  await catalogViewport.evaluate((element) => element.scrollTo({ top: 0, left: 0 }));
+  await catalogViewport.evaluate((element) => element.scrollTo({ top: 0 }));
+  await catalogHorizontalViewport.evaluate((element) => element.scrollTo({ left: 0 }));
   await testInfo.attach('rules-table-mobile', {
     body: await page.screenshot(),
     contentType: 'image/png',

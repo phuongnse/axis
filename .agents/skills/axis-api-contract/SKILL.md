@@ -1,64 +1,37 @@
 ---
 name: axis-api-contract
-description: Change Axis REST/OpenAPI contracts safely. Use when adding or modifying Minimal API endpoints, request or response DTOs, required fields, status codes, generated OpenAPI, frontend API types, SPA callers, or migration-backed schema that changes wire shape.
+description: Change Axis REST/OpenAPI wire contracts. Use for routes, request/response DTOs, required fields, status codes, auth exposure, generated OpenAPI/frontend types, and SPA callers affected by wire shape.
 ---
 
 # Axis API Contract
 
 ## Goal
 
-Change an Axis API surface without drifting from module boundaries, auth defaults, generated contracts, or frontend type parity.
+Change one wire surface without drifting from module ownership, auth defaults, generation, or frontend parity.
 
 ## Hard gates
 
 Follow [reference.md](../reference.md).
-- Run `$axis-design-gate` before code; high-risk contract changes stop for user sign-off.
-- Regenerate contracts when wire shape changes — do not skip generation silently.
-- Server-owned derived values must not remain client request fields; requests accept user-authored decisions and required protocol tokens only.
-- Do not claim review-ready without `$axis-ready-review`.
+- Contract entry work **Requires** `$axis-design-gate`; public contract changes stop for its high-risk sign-off.
+- Regenerate every affected contract artifact; do not hand-maintain generated parity.
+- Request fields represent user-authored decisions or required protocol tokens; server-owned derived values stay out of the request.
 
 ## Inputs
 
-- API surface being added or changed: route, DTO, status code, generated type, or SPA caller.
-- Owning use-case/spec and Design Gate risk decision.
-- Existing endpoint, handler, DTO, OpenAPI, frontend type, and caller references from `rg`.
+- Route/DTO/status/auth change and owning product contract.
+- Current Design Gate evidence.
+- Endpoint, handler, DTO, OpenAPI, generated type, and caller references.
 
 ## Workflow
 
-1. Run `.agents/skills/axis-design-gate/SKILL.md` (`$axis-design-gate`).
-   - API endpoint, required-field, response-shape, status-code, or public contract changes are high-risk.
-   - Stop for user sign-off before code when the dossier marks the change high-risk.
-
-2. Read the owning rules.
-   - [AGENTS.md](../../../AGENTS.md)
-   - [docs/playbooks/design-gate.md](../../../docs/playbooks/design-gate.md)
-   - [docs/playbooks/agent-checklist.md](../../../docs/playbooks/agent-checklist.md)
-   - [docs/playbooks/api-patterns.md](../../../docs/playbooks/api-patterns.md)
-   - [docs/playbooks/frontend.md](../../../docs/playbooks/frontend.md) when the SPA consumes the contract
-   - The owning use-case file when behavior or status changes
-
-3. Trace the contract.
-   - Search the route, endpoint group, DTO, handler, field name, generated API type, and frontend callers with `rg`.
-   - Identify whether the API shape is produced by Application DTOs, endpoint response mappings, OpenAPI generation, or frontend generated types.
-
-4. Implement the API shape narrowly.
-   - Keep Minimal API endpoints thin: bind, `mediator.Send`, map `Result` to response or `ToProblemDetails()`.
-   - Require `.RequireAuthorization()` unless the route is explicitly public.
-   - Put stable request/response DTOs in the owning Application/API contract pattern already used by the module.
-   - Classify every request field as user-authored, required protocol token, or server-owned; derive server-owned values in Application/API code and keep them out of request DTOs.
-   - Preserve camelCase JSON and generated frontend type parity.
-   - Update API tests when route shape, status code, auth, validation, or response body changes.
-
-5. Regenerate contracts when API shape changes.
-   - Run `python scripts/axis.py generate api-contracts`.
-   - Commit the generated OpenAPI and `frontend/src/lib/api-types.ts` changes when they are touched.
-   - If only a frontend caller changes and the server contract does not, state that generation was not triggered.
-
-6. Verify.
-   - Run affected API tests and generated-contract parity when the contract changes: wire shape, auth, validation, status code, or response body.
-   - For frontend consumers, run the smallest frontend check that proves the caller still matches the generated type.
-   - Ready review: `.agents/skills/axis-ready-review/SKILL.md` (`$axis-ready-review`).
+1. Carry current Design Gate evidence; do not rerun it when delegated by a use-case orchestrator.
+2. Read [docs/playbooks/api-patterns.md](../../../docs/playbooks/api-patterns.md), the owning use case, and frontend contract rules when the SPA consumes the surface.
+3. Trace route, DTO, handler, field names, tests, OpenAPI, generated frontend types, and callers with `rg`.
+4. Implement narrowly: thin endpoint, explicit authorization/public decision, stable DTOs, generated casing parity, and business-safe result mapping.
+5. Run `python scripts/axis.py generate api-contracts` when wire shape changes; otherwise record generation as not triggered.
+6. Test route shape, auth, validation, status/body, generation parity, and affected callers at the lowest reliable boundary.
+7. Return the changed contract, generated artifacts, tests, and unresolved decisions to the caller.
 
 ## Output
 
-Report the route or contract changed, generated files updated or not triggered, tests run, and any explicit deferrals.
+Report route/shape, auth decision, generation result, tests, and exact deferrals.

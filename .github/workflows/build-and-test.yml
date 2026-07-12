@@ -27,6 +27,7 @@ jobs:
         env:
           PR_TITLE: ${{ github.event.pull_request.title }}
           PR_BODY: ${{ github.event.pull_request.body }}
+          PR_HEAD_REF: ${{ github.head_ref }}
 
   # Detects which scopes the PR actually touches so the heavy jobs below
   # can skip themselves on PRs that don't affect them. Job-level `if:`
@@ -177,6 +178,9 @@ jobs:
 
       - name: API types in sync with openapi.json
         run: python scripts/axis.py frontend gen-api-types --check
+
+      - name: Approved UI baseline in sync
+        run: python scripts/axis.py check ui-baseline
 
       - name: Type check and lint (zero errors, zero warnings)
         run: python scripts/axis.py frontend ci

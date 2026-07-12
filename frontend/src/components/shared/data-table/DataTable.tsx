@@ -320,23 +320,12 @@ export function DataTable<TData>({ definition }: { definition: DataTableDefiniti
       ) : null}
 
       <Table
-        containerRef={scrollRef}
-        onContainerScroll={fetchMoreIfNeeded}
-        containerClassName="min-h-0 flex-1 overscroll-contain"
         className={cn('table-fixed', virtualized && 'grid')}
         style={{ width: table.getTotalSize(), minWidth: '100%' }}
       >
-        <TableHeader
-          className={cn(
-            'sticky top-0 z-20 bg-card shadow-[0_1px_0_var(--border)]',
-            virtualized && 'grid',
-          )}
-        >
+        <TableHeader className={cn(virtualized && 'grid')}>
           {table.getHeaderGroups().map((headerGroup) => (
-            <TableRow
-              key={headerGroup.id}
-              className={cn('hover:bg-transparent', virtualized && 'flex w-full')}
-            >
+            <TableRow key={headerGroup.id} className={cn(virtualized && 'flex w-full')}>
               {headerGroup.headers.map((header) => (
                 <TableHead
                   key={header.id}
@@ -345,7 +334,7 @@ export function DataTable<TData>({ definition }: { definition: DataTableDefiniti
                     width: header.getSize(),
                     ...pinnedColumnStyle(header.column),
                   }}
-                  className="relative bg-card"
+                  className="relative"
                 >
                   {header.isPlaceholder ? null : (
                     <DataTableColumnHeader column={header.column} messages={messages}>
@@ -354,97 +343,111 @@ export function DataTable<TData>({ definition }: { definition: DataTableDefiniti
                     </DataTableColumnHeader>
                   )}
                   {header.column.getCanResize() ? (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="inline"
-                      aria-label={`${header.column.columnDef.meta?.label ?? header.column.id}: resize`}
-                      data-slot="data-table-resizer"
-                      data-resizing={header.column.getIsResizing()}
-                      onDoubleClick={() => header.column.resetSize()}
-                      onMouseDown={header.getResizeHandler()}
-                      onTouchStart={header.getResizeHandler()}
-                      className="absolute top-0 right-0 h-full w-1 cursor-col-resize touch-none rounded-none p-0 hover:bg-primary/30 data-[resizing=true]:bg-primary"
-                    />
+                    <div className="absolute inset-y-0 right-0 flex items-center">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-xs"
+                        aria-label={`${header.column.columnDef.meta?.label ?? header.column.id}: resize`}
+                        data-slot="data-table-resizer"
+                        data-resizing={header.column.getIsResizing()}
+                        onDoubleClick={() => header.column.resetSize()}
+                        onMouseDown={header.getResizeHandler()}
+                        onTouchStart={header.getResizeHandler()}
+                        className="cursor-col-resize touch-none"
+                      />
+                    </div>
                   ) : null}
                 </TableHead>
               ))}
             </TableRow>
           ))}
         </TableHeader>
+      </Table>
 
-        <TableBody
-          className={cn(virtualized && 'relative grid')}
-          style={virtualized ? { height: rowVirtualizer.getTotalSize() } : undefined}
+      <div
+        ref={scrollRef}
+        onScroll={fetchMoreIfNeeded}
+        data-slot="data-table-viewport"
+        className="min-h-0 flex-1 overflow-auto overscroll-contain"
+      >
+        <Table
+          className={cn('table-fixed', virtualized && 'grid')}
+          style={{ width: table.getTotalSize(), minWidth: '100%' }}
         >
-          {definition.loading ? (
-            <LoadingRows
-              columnIds={table.getVisibleLeafColumns().map((column) => column.id)}
-              messages={messages}
-            />
-          ) : definition.error ? (
-            <StateRow columnCount={visibleColumnCount}>
-              <Empty role="alert">
-                <EmptyHeader>
-                  <EmptyMedia variant="icon">
-                    <TriangleAlert aria-hidden />
-                  </EmptyMedia>
-                  <EmptyTitle>{messages.errorTitle}</EmptyTitle>
-                  <EmptyDescription>{messages.errorDescription}</EmptyDescription>
-                </EmptyHeader>
-                {definition.onRetry ? (
-                  <EmptyContent>
-                    <Button type="button" variant="outline" onClick={definition.onRetry}>
-                      <RefreshCw aria-hidden />
-                      {messages.retry}
-                    </Button>
-                  </EmptyContent>
-                ) : null}
-              </Empty>
-            </StateRow>
-          ) : hasRows ? (
-            virtualized ? (
-              rowVirtualizer.getVirtualItems().map((virtualRow) => {
-                const row = rows[virtualRow.index];
-                return (
+          <TableBody
+            className={cn(virtualized && 'relative grid')}
+            style={virtualized ? { height: rowVirtualizer.getTotalSize() } : undefined}
+          >
+            {definition.loading ? (
+              <LoadingRows
+                columnIds={table.getVisibleLeafColumns().map((column) => column.id)}
+                messages={messages}
+              />
+            ) : definition.error ? (
+              <StateRow columnCount={visibleColumnCount}>
+                <Empty role="alert">
+                  <EmptyHeader>
+                    <EmptyMedia variant="icon">
+                      <TriangleAlert aria-hidden />
+                    </EmptyMedia>
+                    <EmptyTitle>{messages.errorTitle}</EmptyTitle>
+                    <EmptyDescription>{messages.errorDescription}</EmptyDescription>
+                  </EmptyHeader>
+                  {definition.onRetry ? (
+                    <EmptyContent>
+                      <Button type="button" variant="outline" onClick={definition.onRetry}>
+                        <RefreshCw aria-hidden />
+                        {messages.retry}
+                      </Button>
+                    </EmptyContent>
+                  ) : null}
+                </Empty>
+              </StateRow>
+            ) : hasRows ? (
+              virtualized ? (
+                rowVirtualizer.getVirtualItems().map((virtualRow) => {
+                  const row = rows[virtualRow.index];
+                  return (
+                    <DataRow
+                      key={row.id}
+                      row={row}
+                      messages={messages}
+                      renderDetail={definition.renderDetail}
+                      virtual={{ start: virtualRow.start, measure: rowVirtualizer.measureElement }}
+                    />
+                  );
+                })
+              ) : (
+                rows.map((row) => (
                   <DataRow
                     key={row.id}
                     row={row}
                     messages={messages}
                     renderDetail={definition.renderDetail}
-                    virtual={{ start: virtualRow.start, measure: rowVirtualizer.measureElement }}
                   />
-                );
-              })
+                ))
+              )
             ) : (
-              rows.map((row) => (
-                <DataRow
-                  key={row.id}
-                  row={row}
-                  messages={messages}
-                  renderDetail={definition.renderDetail}
-                />
-              ))
-            )
-          ) : (
-            <StateRow columnCount={visibleColumnCount}>
-              <Empty>
-                <EmptyHeader>
-                  <EmptyMedia variant="icon">
-                    <ListX aria-hidden />
-                  </EmptyMedia>
-                  <EmptyTitle>
-                    {hasQuery ? messages.noResultsTitle : messages.emptyTitle}
-                  </EmptyTitle>
-                  <EmptyDescription>
-                    {hasQuery ? messages.noResultsDescription : messages.emptyDescription}
-                  </EmptyDescription>
-                </EmptyHeader>
-              </Empty>
-            </StateRow>
-          )}
-        </TableBody>
-      </Table>
+              <StateRow columnCount={visibleColumnCount}>
+                <Empty>
+                  <EmptyHeader>
+                    <EmptyMedia variant="icon">
+                      <ListX aria-hidden />
+                    </EmptyMedia>
+                    <EmptyTitle>
+                      {hasQuery ? messages.noResultsTitle : messages.emptyTitle}
+                    </EmptyTitle>
+                    <EmptyDescription>
+                      {hasQuery ? messages.noResultsDescription : messages.emptyDescription}
+                    </EmptyDescription>
+                  </EmptyHeader>
+                </Empty>
+              </StateRow>
+            )}
+          </TableBody>
+        </Table>
+      </div>
 
       <DataTableFooter table={table} source={source} messages={messages} />
     </section>
@@ -635,9 +638,7 @@ function DataRow<TData>({
       </TableRow>
       {detail ? (
         <TableRow>
-          <TableCell colSpan={visibleCells.length} className="bg-muted/30 p-4">
-            {detail}
-          </TableCell>
+          <TableCell colSpan={visibleCells.length}>{detail}</TableCell>
         </TableRow>
       ) : null}
     </Fragment>
@@ -646,7 +647,7 @@ function DataRow<TData>({
 
 function StateRow({ columnCount, children }: { columnCount: number; children: React.ReactNode }) {
   return (
-    <TableRow className="hover:bg-transparent">
+    <TableRow>
       <TableCell colSpan={columnCount} className="h-56 whitespace-normal">
         {children}
       </TableCell>
@@ -740,7 +741,7 @@ function DataTableFooter<TData>({
               <Button
                 key={index}
                 type="button"
-                variant={index === page - 1 ? 'secondary' : 'ghost'}
+                variant={index === page - 1 ? 'default' : 'outline'}
                 size="icon-sm"
                 aria-current={index === page - 1 ? 'page' : undefined}
                 aria-label={messages.pageStatus(index + 1, pageCount)}

@@ -1,74 +1,42 @@
-# Axis skill workflow contract
+# Axis Skill Workflow Contract
 
-Shared rules for every `.agents/skills/*/SKILL.md` workflow. Skill-specific gates sit in each skill's `## Hard gates` section.
+Universal semantics for every repo skill. Intent routing lives in [README.md](./README.md); domain decisions stay in the selected owner skill or owner document.
 
-## Hard gates (universal)
+## Universal gates
 
-1. **Read before edit.** Read the full matching `SKILL.md` (and every chained skill) before changing source, tests, scripts, migrations, contracts, frontend behavior, or docs status.
-2. **Sequential steps.** Numbered workflow steps are ordered gates. Step *N+1* is forbidden until step *N* is complete and its output evidence is recorded.
-3. **STOP means stop.** When a step says stop, do not push, open or update a PR, mark ready, edit implementation files, or claim ready/done. Report the blocker instead.
-4. **No silent deferral.** Do not substitute "follow-up", "later", "non-blocking", or PR-body notes for completing a gate. Defer only a **specific item** with **explicit user approval** for that item.
-5. **Skip is explicit.** Skip a step only when the user explicitly requested skipping **that step**. Record the skip reason in the skill output.
-6. **Chains are mandatory.** `$axis-*` aliases and `.agents/skills/<name>/SKILL.md` paths name required skills, not optional reading.
-7. **Honest output.** Fill the skill output template. A missing section means the step did not run — do not invent pass status.
-8. **Invalidate and rerun.** After a follow-up edit invalidates evidence, rerun only the checks the skill names for that boundary; do not skip because an earlier run passed.
-9. **Current contracts only.** When adding guidance or deterministic checks, state the supported shape of the system today. Generalize lessons into reusable decision criteria; do not document replaced artifacts or incident-specific remedies unless an owner doc explicitly approves compatibility.
+1. **Read before edit.** Read the full entry skill and every resource marked **Requires** before changing its surface.
+2. **Follow order.** Numbered steps are sequential unless the skill explicitly marks them independent.
+3. **Stop means stop.** Do not edit, publish, or claim completion until the named condition is resolved.
+4. **No silent deferral.** Defer one specific item only with explicit user approval and an owner.
+5. **Skip is explicit.** Record the exact user-approved skip and do not assume dependent steps are waived.
+6. **Use typed handoffs.** Plain skill links are navigation, not automatic chains.
+7. **Reuse evidence.** A current satisfied prerequisite is idempotent; do not recurse or rerun it.
+8. **Report honestly.** Missing or stale evidence is `not run` or `blocked`, never pass.
+9. **Keep current contracts only.** Remove superseded guidance instead of documenting incident history or retired names.
 
-## Stop vs defer vs skip
+## Handoff types
 
-| Outcome | When | Allowed next action |
-|---|---|---|
-| **Stop** | Required input missing, verification failed, sign-off missing, tool blocked | Fix blocker or ask user; do not proceed |
-| **Defer** | One specific item cannot close now | User approves deferral; record exact owner and AC/item |
-| **Skip** | User explicitly waived a step | Record reason; later steps that depend on it still stop unless user waived those too |
-
-## Intent routing
-
-- Route by the user's intended next workflow action, not exact words.
-- Treat examples and trigger phrases as cues, not exhaustive command strings.
-- Name concrete signal classes and explicit overrides when a skill has multiple directions, phases, or publication boundaries.
-- Ask one question only when two workflow directions remain plausible or conflicting after local inspection.
-
-## Publication gate (PR boundary)
-
-Applies to `$axis-pull-request` and [docs/playbooks/scripts.md § Pre-PR review checkpoint](../../docs/playbooks/scripts.md#pre-pr-review-checkpoint). A push-only update to a branch that has an upstream, an open PR, or explicit PR intent is a PR branch/diff update.
-
-The pre-PR review checkpoint is triggered by non-trivial implementation, behavior, contract, or high-risk changes. Docs-only, metadata-only, and small guidance/tooling-text changes record `not triggered` with the reason; when unsure, run the checkpoint.
-
-```text
-$axis-ready-review -> Ready
-  -> IF pre-PR review checkpoint not triggered:
-       -> record not triggered with reason
-  -> IF pre-PR review checkpoint triggered:
-       -> checkpoint commit on publish branch
-       -> pre-PR review (CodeRabbit CLI)
-       -> IF findings:
-            -> $axis-review-feedback (fix valid items, commit)
-            -> ready-review --since <checkpoint> when triggered
-            -> rerun review scoped to checkpoint
-            -> repeat until clean OR user-approved defer/false-positive per item
-  -> ONLY THEN: push branch / gh pr create / mark ready
-```
-
-**Forbidden before the publication gate closes:**
-
-- Push new commits to a branch that has an open PR or is being published for one
-- `gh pr create`, mark ready, or PR body claiming review is "follow-up"
-- PR body language such as "follow-up as needed", "non-blocking findings", or "address later" while valid findings remain open
-
-Metadata-only PR title/body edits may skip the checkpoint per `$axis-pull-request`.
-
-## Chaining map
-
-| From | Must read before proceeding |
+| Type | Meaning |
 |---|---|
-| Non-trivial implementation | `$axis-design-gate` |
-| New module, module boundary, DDD/CQRS foundation, or event-sourcing change | `$axis-design-gate` then `$axis-module-architecture` |
-| Tactical DDD/CQRS pattern implementation | `$axis-module-architecture` when module/foundation scope changed, then `$axis-module-patterns` |
-| Spec gap | `$axis-use-case-spec` |
-| Use-case slice | `$axis-use-case-implementation` (+ design gate when non-trivial) |
-| Before review | `$axis-ready-review` |
-| PR create / update branch / mark ready | `$axis-pull-request` (requires ready-review evidence) |
-| Push/update a published or PR branch | `$axis-pull-request` (branch/diff update) |
-| Pre-PR review findings | `$axis-review-feedback` before push/PR |
-| Review feedback close-out | `$axis-ready-review` before another review pass |
+| **Requires** | Complete the target first; reuse current evidence when still valid |
+| **Delegates** | Caller remains orchestrator; target returns the requested result |
+| **Returns to** | Resume the named caller with evidence and unresolved decisions |
+| Plain link | Reference or optional navigation only |
+
+Delegated skills do not auto-route back, commit, publish, or invoke another workflow unless their caller explicitly requested that action.
+
+## Improvement loop
+
+Apply at review boundaries and to validated feedback:
+
+1. **Trigger from evidence.** Use a reproducer, review finding, gate escape, false positive, or stale rule—not a hypothetical.
+2. **Classify by scope.** Decide whether the evidence proves a local defect, reusable decision/invariant, or obsolete rule. A first occurrence may still expose a systemic class.
+3. **Promote by value.** Fix local defects in their owner; put reusable decisions in one owner; add a checker plus regression test when the invariant is deterministic; delete obsolete rules and checks. Do not generalize merely to memorialize an incident.
+4. **Verify the class.** Prove fail-before/pass-after at the lowest reliable boundary and keep incident details in the regression fixture, not guidance.
+5. **Prune.** Replace duplicate prose with owner links and sweep retired identifiers.
+
+Report `Improvement: local fix / owner updated / enforcement updated / rule retired / N/A` with evidence.
+
+## Output envelope
+
+Use only fields that carry information: status, decisions, evidence, gaps, and next owner. Domain skills may add unique fields; omit empty boilerplate.

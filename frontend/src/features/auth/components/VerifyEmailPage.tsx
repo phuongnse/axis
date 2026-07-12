@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { type FieldPath, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
@@ -16,7 +17,6 @@ import { loadRegistrationContext } from '@/features/auth/registration-context';
 import type { VerifyEmailErrorKind } from '@/features/auth/types';
 import { useQueryParam } from '@/features/auth/use-query-param';
 import { currentSiteLanguage } from '@/features/preferences';
-import { cn } from '@/lib/utils';
 
 type Translate = ReturnType<typeof useTranslation>['t'];
 
@@ -58,32 +58,34 @@ function VerifyEmailOutcome({
   } = form;
   const showResend = kind === 'expired' || kind === 'rate_limited';
 
-  const config = {
-    expired: {
-      icon: Clock,
-      title: t('verify.expired.title'),
-      body: t('verify.expired.body'),
-      iconClass: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-500/15 dark:text-yellow-300',
-    },
-    already_used: {
-      icon: CheckCircle2,
-      title: t('verify.alreadyUsed.title'),
-      body: t('verify.alreadyUsed.body'),
-      iconClass: 'text-muted-foreground bg-muted',
-    },
-    invalid: {
-      icon: AlertCircle,
-      title: t('verify.invalid.title'),
-      body: t('verify.invalid.body'),
-      iconClass: 'text-destructive bg-destructive/10',
-    },
-    rate_limited: {
-      icon: Clock,
-      title: t('verify.rateLimited.title'),
-      body: t('verify.rateLimited.body'),
-      iconClass: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-500/15 dark:text-yellow-300',
-    },
-  }[kind];
+  const config = (
+    {
+      expired: {
+        icon: Clock,
+        title: t('verify.expired.title'),
+        body: t('verify.expired.body'),
+        variant: 'default',
+      },
+      already_used: {
+        icon: CheckCircle2,
+        title: t('verify.alreadyUsed.title'),
+        body: t('verify.alreadyUsed.body'),
+        variant: 'default',
+      },
+      invalid: {
+        icon: AlertCircle,
+        title: t('verify.invalid.title'),
+        body: t('verify.invalid.body'),
+        variant: 'destructive',
+      },
+      rate_limited: {
+        icon: Clock,
+        title: t('verify.rateLimited.title'),
+        body: t('verify.rateLimited.body'),
+        variant: 'default',
+      },
+    } as const
+  )[kind];
 
   const Icon = config.icon;
   const footer =
@@ -103,17 +105,10 @@ function VerifyEmailOutcome({
   return (
     <AuthCard title={config.title} footer={footer}>
       <div className="space-y-4">
-        <div className="flex items-start gap-3">
-          <div
-            className={cn(
-              'mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full',
-              config.iconClass,
-            )}
-          >
-            <Icon className="h-4 w-4" aria-hidden />
-          </div>
-          <p className="text-sm text-muted-foreground">{config.body}</p>
-        </div>
+        <Alert variant={config.variant}>
+          <Icon aria-hidden />
+          <AlertDescription>{config.body}</AlertDescription>
+        </Alert>
 
         {showResend ? (
           <form
@@ -122,9 +117,7 @@ function VerifyEmailOutcome({
             noValidate
           >
             <Field data-invalid={errors.email ? true : undefined}>
-              <FieldLabel htmlFor="resend-email" required>
-                {t('auth.email')}
-              </FieldLabel>
+              <FieldLabel htmlFor="resend-email">{t('auth.email')}</FieldLabel>
               <Input
                 id="resend-email"
                 type="email"
@@ -263,12 +256,10 @@ export function VerifyEmailPage() {
         }
       >
         <div className="space-y-4" aria-live="polite">
-          <div className="flex items-start gap-3 text-sm text-muted-foreground">
-            <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">
-              <CheckCircle2 className="h-4 w-4" aria-hidden />
-            </div>
-            <p>{t('verify.success.body')}</p>
-          </div>
+          <Alert>
+            <CheckCircle2 aria-hidden />
+            <AlertDescription>{t('verify.success.body')}</AlertDescription>
+          </Alert>
           <Button
             type="button"
             size="lg"

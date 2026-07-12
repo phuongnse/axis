@@ -3,6 +3,7 @@ from __future__ import annotations
 import contextlib
 import importlib.util
 import io
+import json
 import subprocess
 import sys
 import tempfile
@@ -158,6 +159,24 @@ public sealed class ExampleTests
 
 
 class TestPrGuard(unittest.TestCase):
+    def test_accepts_project_branch_convention(self) -> None:
+        for branch in (
+            "feat/add-workspace",
+            "fix/restore-tabs",
+            "docs/clarify-workflow",
+            "refactor/standardize-ui-governance",
+            "test/cover-branch-policy",
+            "chore/update-tooling",
+            "renovate/all-non-major",
+        ):
+            with self.subTest(branch=branch):
+                self.assertEqual([], check_pr.validate_branch(branch))
+
+    def test_rejects_non_project_branch_convention(self) -> None:
+        for branch in ("", "main", "agent/add-workspace", "feat/AddWorkspace", "feat/nested/name"):
+            with self.subTest(branch=branch):
+                self.assertTrue(check_pr.validate_branch(branch))
+
     def test_rejects_unchecked_requirement_without_na_reason(self) -> None:
         body = """## Summary
 This summary is long enough.
@@ -1892,7 +1911,11 @@ class TestReviewVerificationGates(unittest.TestCase):
 
         self.assertEqual(0, result)
         verify.assert_called_once()
-        policy.assert_called_once_with(["frontend/src/App.tsx"], policy_tests_covered=False)
+        policy.assert_called_once_with(
+            ["frontend/src/App.tsx"],
+            policy_tests_covered=False,
+            doc_drift_covered=set(),
+        )
 
     def test_policy_only_uses_same_profile_without_verify(self) -> None:
         with (
@@ -1906,7 +1929,11 @@ class TestReviewVerificationGates(unittest.TestCase):
 
         self.assertEqual(0, result)
         verify.assert_not_called()
-        policy.assert_called_once_with(["scripts/axis.py"], policy_tests_covered=False)
+        policy.assert_called_once_with(
+            ["scripts/axis.py"],
+            policy_tests_covered=False,
+            doc_drift_covered=set(),
+        )
 
     def test_policy_registry_routes_only_triggered_expensive_checks(self) -> None:
         names = [
@@ -1927,6 +1954,42 @@ class TestReviewVerificationGates(unittest.TestCase):
                 )
             ],
         )
+
+    def test_ready_review_reuses_verify_coverage_in_doc_drift(self) -> None:
+        paths = [
+            "scripts/axis.py",
+            ".agents/skills/axis-script-scope/SKILL.md",
+            "docs/use-cases/example.md",
+            "docs/foundations/example.md",
+        ]
+
+        self.assertEqual(
+            {
+                "check-scripts-standard",
+                "check-repo-skills",
+                "check-doc-navigation",
+                "check-doc-size-budgets",
+                "check-doc-code-fences.py",
+                "check-use-case-docs.py",
+                "check-foundation-docs.py",
+            },
+            axis.ready_review_doc_drift_coverage(paths),
+        )
+
+    def test_doc_drift_gate_receives_covered_checks(self) -> None:
+        covered = {"check-repo-skills"}
+        gates = dict(
+            axis.ready_review_policy_gates(
+                [".agents/skills/axis-example/SKILL.md"],
+                doc_drift_covered=covered,
+            )
+        )
+
+        with mock.patch.object(axis, "check_doc_drift", return_value=0) as doc_drift:
+            self.assertEqual(0, gates["doc drift"]())
+
+        args = doc_drift.call_args.args[0]
+        self.assertEqual(covered, args.skip_checkers)
 
     def test_pre_push_full_delegates_to_ready_review(self) -> None:
         with (
@@ -2118,7 +2181,7 @@ class TestFrontendComponentFileNames(unittest.TestCase):
     def test_rejects_non_pascal_case_shared_component_filename(self) -> None:
         issues = self.issues_for_frontend(
             {
-                "frontend/src/components/shared/action-link.tsx": "export function ActionLink() { return null; }\n",
+                "frontend/src/components/shared/example-control.tsx": "export function ExampleControl() { return null; }\n",
                 "frontend/src/components/shared/layout-state.ts": "export const layoutState = {};\n",
             }
         )
@@ -2130,7 +2193,7 @@ class TestFrontendComponentFileNames(unittest.TestCase):
     def test_accepts_shared_component_filename_conventions(self) -> None:
         issues = self.issues_for_frontend(
             {
-                "frontend/src/components/shared/ActionLink.tsx": "export function ActionLink() { return null; }\n",
+                "frontend/src/components/shared/ExampleControl.tsx": "export function ExampleControl() { return null; }\n",
                 "frontend/src/components/shared/layoutState.ts": "export const layoutState = {};\n",
             }
         )
@@ -2250,6 +2313,213 @@ class TestFrontendComponentFileNames(unittest.TestCase):
         )
 
         self.assertEqual([], issues)
+
+
+class TestFrontendUiSystemPolicy(unittest.TestCase):
+    def issues_for_frontend(self, files: dict[str, str]) -> list[str]:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            for relative_path, content in files.items():
+                path = root / relative_path
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(content, encoding="utf-8")
+            return axis.frontend_ui_system_issues(root=root)
+
+    def test_rejects_app_dependency_from_registry_primitive(self) -> None:
+        issues = self.issues_for_frontend(
+            {
+                "frontend/src/components/ui/button.tsx": (
+                    "import { RulesPage } from '@/features/rules/components/RulesPage';\n"
+                )
+            }
+        )
+
+        self.assertIn("registry primitives cannot depend on feature", "\n".join(issues))
+
+    def test_rejects_relative_app_dependency_from_registry_primitive(self) -> None:
+        issues = self.issues_for_frontend(
+            {
+                "frontend/src/components/ui/button.tsx": (
+                    "import { RulesPage } from '../../features/rules/components/RulesPage';\n"
+                )
+            }
+        )
+
+        self.assertIn("registry primitives cannot depend on feature", "\n".join(issues))
+
+    def test_rejects_palette_arbitrary_value_and_inline_color_outside_upstream_zone(self) -> None:
+        issues = self.issues_for_frontend(
+            {
+                "frontend/src/features/rules/components/RuleStatus.tsx": (
+                    "export const classes = 'bg-red-500 text-white size-[1.625rem]';\n"
+                    "export const style = { color: '#fff' };\n"
+                )
+            }
+        )
+
+        joined = "\n".join(issues)
+        self.assertIn("hard-coded Tailwind palette utility `bg-red-500`", joined)
+        self.assertIn("hard-coded Tailwind palette utility `text-white`", joined)
+        self.assertIn("arbitrary Tailwind value `size-[1.625rem]`", joined)
+        self.assertIn("component-local hard-coded color", joined)
+
+    def test_accepts_semantic_tokens_and_standard_tailwind_scale(self) -> None:
+        issues = self.issues_for_frontend(
+            {
+                "frontend/src/components/shared/RuleStatus.tsx": (
+                    "export const classes = 'grid grid-cols-4 gap-2 bg-card text-foreground';\n"
+                )
+            }
+        )
+
+        self.assertEqual([], issues)
+
+    def test_allows_registry_owned_implementation_details(self) -> None:
+        issues = self.issues_for_frontend(
+            {
+                "frontend/src/components/ui/example.tsx": (
+                    "export const classes = 'bg-red-500 w-[--anchor-width]';\n"
+                )
+            }
+        )
+
+        self.assertEqual([], issues)
+
+
+class TestUiBaseline(unittest.TestCase):
+    def create_baseline(self, root: Path) -> None:
+        files = {
+            "frontend/components.json": '{"style":"base-nova"}\n',
+            "frontend/src/index.css": '@import "tailwindcss";\n',
+            "frontend/src/components/ui/button.tsx": "export function Button() { return null; }\n",
+        }
+        for relative_path, content in files.items():
+            path = root / relative_path
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(content, encoding="utf-8")
+        with contextlib.redirect_stdout(io.StringIO()):
+            axis.write_ui_baseline(root)
+
+    def test_accepts_unchanged_approved_ui_baseline(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            self.create_baseline(root)
+
+            issues = axis.ui_baseline_issues(root)
+
+        self.assertEqual([], issues)
+
+    def test_rejects_non_object_components_config(self) -> None:
+        for value in ("[]", "null", "1"):
+            with self.subTest(value=value), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp)
+                config = root / "frontend/components.json"
+                theme = root / "frontend/src/index.css"
+                config.parent.mkdir(parents=True)
+                theme.parent.mkdir(parents=True)
+                config.write_text(f"{value}\n", encoding="utf-8")
+                theme.write_text('@import "tailwindcss";\n', encoding="utf-8")
+
+                with self.assertRaisesRegex(axis.CheckError, "root value must be an object"):
+                    axis.ui_baseline_payload(root)
+
+    def test_rejects_changed_approved_ui_file(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            self.create_baseline(root)
+            (root / "frontend/src/components/ui/button.tsx").write_text("changed\n", encoding="utf-8")
+
+            issues = axis.ui_baseline_issues(root)
+
+        self.assertIn("approved UI baseline drift", "\n".join(issues))
+
+    def test_rejects_unreviewed_registry_file(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            self.create_baseline(root)
+            (root / "frontend/src/components/ui/input.tsx").write_text("new\n", encoding="utf-8")
+
+            issues = axis.ui_baseline_issues(root)
+
+        self.assertIn("UI baseline has an unreviewed tracked file", "\n".join(issues))
+
+    def test_rejects_unreviewed_registry_support_file(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            self.create_baseline(root)
+            path = root / "frontend/src/hooks/use-mobile.ts"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("export const mobile = false;\n", encoding="utf-8")
+
+            issues = axis.ui_baseline_issues(root)
+
+        self.assertIn("frontend/src/hooks/use-mobile.ts", "\n".join(issues))
+
+    def test_preserves_valid_exception_metadata_when_refreshing_hashes(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            self.create_baseline(root)
+            baseline_path = root / "frontend/ui-baseline.json"
+            baseline = json.loads(baseline_path.read_text(encoding="utf-8"))
+            baseline["exceptions"] = {
+                "src/components/ui/button.tsx": {
+                    "reason": "Compatibility with strict TypeScript settings.",
+                    "signOff": "Approved decision reference.",
+                }
+            }
+            baseline_path.write_text(f"{json.dumps(baseline)}\n", encoding="utf-8")
+
+            with contextlib.redirect_stdout(io.StringIO()):
+                axis.write_ui_baseline(root)
+            refreshed = json.loads(baseline_path.read_text(encoding="utf-8"))
+
+        self.assertEqual(baseline["exceptions"], refreshed["exceptions"])
+
+    def test_refresh_fails_closed_for_invalid_existing_baseline(self) -> None:
+        cases = {
+            "cannot preserve existing UI baseline": "{\n",
+            "root value": "[]\n",
+            "`exceptions`": '{"exceptions": []}\n',
+        }
+        for expected, content in cases.items():
+            with self.subTest(expected=expected), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp)
+                self.create_baseline(root)
+                (root / "frontend/ui-baseline.json").write_text(content, encoding="utf-8")
+
+                with self.assertRaisesRegex(axis.CheckError, expected):
+                    axis.write_ui_baseline(root)
+
+    def test_refresh_fails_closed_when_existing_baseline_cannot_be_read(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            self.create_baseline(root)
+            baseline_path = root / "frontend/ui-baseline.json"
+            original_read_text = Path.read_text
+
+            def read_text(path: Path, *args: object, **kwargs: object) -> str:
+                if path == baseline_path:
+                    raise OSError("read failed")
+                return original_read_text(path, *args, **kwargs)
+
+            with mock.patch.object(Path, "read_text", autospec=True, side_effect=read_text):
+                with self.assertRaisesRegex(axis.CheckError, "read failed"):
+                    axis.write_ui_baseline(root)
+
+    def test_rejects_incomplete_exception_metadata(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            self.create_baseline(root)
+            baseline_path = root / "frontend/ui-baseline.json"
+            baseline = json.loads(baseline_path.read_text(encoding="utf-8"))
+            baseline["exceptions"] = {
+                "src/components/ui/button.tsx": {"reason": "", "signOff": ""}
+            }
+            baseline_path.write_text(f"{json.dumps(baseline)}\n", encoding="utf-8")
+
+            issues = axis.ui_baseline_issues(root)
+
+        self.assertIn("requires non-empty `reason` and `signOff`", "\n".join(issues))
 
 
 class TestFrontendApiContracts(unittest.TestCase):
@@ -3485,6 +3755,19 @@ class TestAxisCommandWrappers(unittest.TestCase):
 
         self.assertEqual(frontend_env, calls[0]["env"])
 
+    def test_frontend_ui_baseline_write_uses_deterministic_python_generator(self) -> None:
+        with (
+            mock.patch.object(axis, "write_ui_baseline") as write_baseline,
+            mock.patch.object(axis, "check_frontend_toolchain") as check_toolchain,
+        ):
+            rc = axis.frontend_command(
+                axis.argparse.Namespace(frontend_command="ui-baseline", write=True)
+            )
+
+        self.assertEqual(0, rc)
+        write_baseline.assert_called_once_with()
+        check_toolchain.assert_not_called()
+
     def test_frontend_install_browsers_installs_playwright_chromium(self) -> None:
         calls = self.run_with_fake_process(
             axis.frontend_command,
@@ -3609,6 +3892,13 @@ class TestRepoSkillsGate(unittest.TestCase):
 
     def valid_skill_files(self) -> dict[str, str]:
         return {
+            ".agents/skills/README.md": (
+                "# Skills\n\n"
+                "| Intent | Owner |\n"
+                "|---|---|\n"
+                "| Example | [axis-example/SKILL.md](./axis-example/SKILL.md) |\n"
+            ),
+            ".agents/skills/reference.md": "# Contract\n",
             ".agents/skills/axis-example/SKILL.md": (
                 "---\n"
                 "name: axis-example\n"
@@ -3617,7 +3907,11 @@ class TestRepoSkillsGate(unittest.TestCase):
                 "\n"
                 "# Axis Example\n"
                 "\n"
-                "Run the example workflow.\n"
+                "## Goal\n\nRun the example workflow.\n\n"
+                "## Hard gates\n\nFollow [reference.md](../reference.md).\n\n"
+                "## Inputs\n\n- Example input.\n\n"
+                "## Workflow\n\n1. Perform the example.\n\n"
+                "## Output\n\nReport the result.\n"
             ),
         }
 
@@ -3635,134 +3929,114 @@ class TestRepoSkillsGate(unittest.TestCase):
 
         self.assertIn("remove legacy agents/ vendor metadata", "\n".join(issues))
 
-    def test_accepts_required_chain_via_skill_path(self) -> None:
-        files = {
-            ".agents/skills/reference.md": "# Reference\n",
-            ".agents/skills/axis-design-gate/SKILL.md": (
-                "---\n"
-                "name: axis-design-gate\n"
-                "description: Prepare the Axis Design Gate dossier before non-trivial code changes.\n"
-                "---\n"
-                "\n"
-                "# Axis Design Gate\n"
-                "\n"
-                "## Hard gates\n"
-                "\n"
-                "Follow [reference.md](../reference.md).\n"
-                "- Do not edit implementation files until the dossier is complete.\n"
-            ),
-            ".agents/skills/axis-ready-review/SKILL.md": (
-                "---\n"
-                "name: axis-ready-review\n"
-                "description: Prepare an Axis branch for review with honest verification evidence.\n"
-                "---\n"
-                "\n"
-                "# Axis Ready Review\n"
-                "\n"
-                "## Hard gates\n"
-                "\n"
-                "Follow [reference.md](../reference.md).\n"
-                "- Not ready stops publication;**Ready** hands off to `$axis-pull-request`.\n"
-            ),
-            ".agents/skills/axis-api-contract/SKILL.md": (
-                "---\n"
-                "name: axis-api-contract\n"
-                "description: Use when an agent changes Axis REST API contracts with generated frontend types.\n"
-                "---\n"
-                "\n"
-                "# Axis API Contract\n"
-                "\n"
-                "## Hard gates\n"
-                "\n"
-                "Follow [reference.md](../reference.md).\n"
-                "- `$axis-design-gate` before code; `$axis-ready-review` before review.\n"
-                "\n"
-                "1. Read `.agents/skills/axis-design-gate/SKILL.md`.\n"
-                "2. Before review, read `.agents/skills/axis-ready-review/SKILL.md`.\n"
-            ),
-        }
+    def test_accepts_reference_to_known_skill_alias(self) -> None:
+        files = self.valid_skill_files()
+        files[".agents/skills/axis-other/SKILL.md"] = files[
+            ".agents/skills/axis-example/SKILL.md"
+        ].replace("axis-example", "axis-other").replace("Axis Example", "Axis Other")
+        files[".agents/skills/README.md"] += (
+            "| Other | [axis-other/SKILL.md](./axis-other/SKILL.md) |\n"
+        )
+        files[".agents/skills/axis-example/SKILL.md"] += "\nPlain link: `$axis-other`.\n"
 
         self.assertEqual([], self.issues_for_skill(files))
 
-    def test_skill_chain_referenced_ignores_prefix_skill_names(self) -> None:
-        text = (
-            "See $axis-design-gate-extended and "
-            "`.agents/skills/axis-design-gate-extended/SKILL.md`."
+    def test_rejects_recursive_required_handoffs(self) -> None:
+        files = self.valid_skill_files()
+        files[".agents/skills/axis-other/SKILL.md"] = files[
+            ".agents/skills/axis-example/SKILL.md"
+        ].replace("axis-example", "axis-other").replace("Axis Example", "Axis Other")
+        files[".agents/skills/README.md"] += (
+            "| Other | [axis-other/SKILL.md](./axis-other/SKILL.md) |\n"
         )
-        self.assertFalse(axis.skill_chain_referenced(text, "axis-design-gate"))
-        self.assertTrue(axis.skill_chain_referenced(text, "axis-design-gate-extended"))
+        files[".agents/skills/axis-example/SKILL.md"] += (
+            "\n- **Requires** `$axis-other` before continuing.\n"
+        )
+        files[".agents/skills/axis-other/SKILL.md"] += (
+            "\n- **Requires** `$axis-example` before continuing.\n"
+        )
 
-    def test_skill_chain_referenced_matches_dollar_and_path(self) -> None:
-        text = "Read $axis-ready-review and `.agents/skills/axis-ready-review/SKILL.md`."
-        self.assertTrue(axis.skill_chain_referenced(text, "axis-ready-review"))
+        self.assertIn("recursive **Requires** handoff", "\n".join(self.issues_for_skill(files)))
 
-    def test_rejects_skill_missing_hard_gate_contract(self) -> None:
-        files = {
-            ".agents/skills/axis-pull-request/SKILL.md": (
-                "---\n"
-                "name: axis-pull-request\n"
-                "description: Prepare, review, validate, create, update, or mark ready Axis pull requests.\n"
-                "---\n"
-                "\n"
-                "# Axis Pull Request\n"
-                "\n"
-                "Create PR immediately.\n"
-            ),
-        }
+    def test_allows_delegate_and_return_handoffs(self) -> None:
+        files = self.valid_skill_files()
+        files[".agents/skills/axis-other/SKILL.md"] = files[
+            ".agents/skills/axis-example/SKILL.md"
+        ].replace("axis-example", "axis-other").replace("Axis Example", "Axis Other")
+        files[".agents/skills/README.md"] += (
+            "| Other | [axis-other/SKILL.md](./axis-other/SKILL.md) |\n"
+        )
+        files[".agents/skills/axis-example/SKILL.md"] += (
+            "\n- **Delegates** to `$axis-other` and waits for evidence.\n"
+        )
+        files[".agents/skills/axis-other/SKILL.md"] += (
+            "\n- **Returns to** `$axis-example` without restarting it.\n"
+        )
 
-        issues = self.issues_for_skill(files)
+        self.assertEqual([], self.issues_for_skill(files))
 
-        joined = "\n".join(issues)
-        self.assertIn("hard-gate contract missing required pattern", joined)
-        self.assertIn("must chain to $axis-ready-review", joined)
+    def test_rejects_unknown_skill_alias(self) -> None:
+        files = self.valid_skill_files()
+        files[".agents/skills/axis-example/SKILL.md"] += "\nDelegate to `$axis-missing`.\n"
 
-    def test_frontend_skills_require_visual_override_audit_contract(self) -> None:
-        for skill_name in ("axis-frontend-feature", "axis-frontend-foundation"):
-            files = {
-                ".agents/skills/reference.md": "# Reference\n",
-                f".agents/skills/{skill_name}/SKILL.md": (
-                    "---\n"
-                    f"name: {skill_name}\n"
-                    "description: Use for concrete frontend work with shared design-system components.\n"
-                    "---\n"
-                    "\n"
-                    f"# {skill_name}\n"
-                    "\n"
-                    "## Hard gates\n"
-                    "\n"
-                    "Follow [reference.md](../reference.md).\n"
-                    "Use $axis-design-gate before code and $axis-ready-review before review.\n"
-                ),
-            }
+        self.assertIn("unknown skill alias `$axis-missing`", "\n".join(self.issues_for_skill(files)))
 
-            issues = "\n".join(self.issues_for_skill(files))
+    def test_rejects_untyped_skill_handoff(self) -> None:
+        files = self.valid_skill_files()
+        files[".agents/skills/axis-other/SKILL.md"] = files[
+            ".agents/skills/axis-example/SKILL.md"
+        ].replace("axis-example", "axis-other").replace("Axis Example", "Axis Other")
+        files[".agents/skills/README.md"] += (
+            "| Other | [axis-other/SKILL.md](./axis-other/SKILL.md) |\n"
+        )
+        files[".agents/skills/axis-example/SKILL.md"] += "\nDelegate to `$axis-other`.\n"
 
-            self.assertIn("visual override audit", issues)
-            self.assertIn("layout-only", issues)
-            self.assertIn("shared variant", issues)
+        self.assertIn("type the skill handoff", "\n".join(self.issues_for_skill(files)))
 
-    def test_pull_request_skill_must_cover_published_branch_push_updates(self) -> None:
-        files = {
-            ".agents/skills/axis-pull-request/SKILL.md": (
-                "---\n"
-                "name: axis-pull-request\n"
-                "description: Prepare, review, validate, create, update, push to, or mark ready Axis pull requests.\n"
-                "---\n"
-                "\n"
-                "# Axis Pull Request\n"
-                "\n"
-                "## Hard gates\n"
-                "\n"
-                "Follow [reference.md](../reference.md).\n"
-                "- Do not push until `$axis-ready-review` and `$axis-review-feedback` finish.\n"
-            ),
-            ".agents/skills/reference.md": "# Reference\n",
-        }
+    def test_rejects_missing_catalog_entry(self) -> None:
+        files = self.valid_skill_files()
+        files[".agents/skills/README.md"] = "# Skills\n"
 
-        issues = self.issues_for_skill(files)
+        self.assertIn("missing responsibility entry", "\n".join(self.issues_for_skill(files)))
 
-        joined = "\n".join(issues)
-        self.assertIn("hard-gate contract missing required pattern `published branch`", joined)
+    def test_rejects_duplicate_catalog_entry(self) -> None:
+        files = self.valid_skill_files()
+        files[".agents/skills/README.md"] += (
+            "[duplicate](./axis-example/SKILL.md)\n"
+        )
+
+        self.assertIn("exactly one responsibility entry", "\n".join(self.issues_for_skill(files)))
+
+    def test_rejects_missing_universal_contract_link(self) -> None:
+        files = self.valid_skill_files()
+        files[".agents/skills/axis-example/SKILL.md"] = files[
+            ".agents/skills/axis-example/SKILL.md"
+        ].replace("Follow [reference.md](../reference.md).", "Follow the contract.")
+
+        self.assertIn("must link the universal", "\n".join(self.issues_for_skill(files)))
+
+    def test_rejects_missing_required_section(self) -> None:
+        files = self.valid_skill_files()
+        files[".agents/skills/axis-example/SKILL.md"] = files[
+            ".agents/skills/axis-example/SKILL.md"
+        ].replace("## Output", "## Result")
+
+        self.assertIn("missing required section `## Output`", "\n".join(self.issues_for_skill(files)))
+
+    def test_rejects_duplicate_substantive_instruction(self) -> None:
+        files = self.valid_skill_files()
+        duplicate = (
+            "- Keep this long reusable instruction in exactly one owner and link every other skill to that owner instead.\n"
+        )
+        files[".agents/skills/axis-example/SKILL.md"] += duplicate
+        files[".agents/skills/axis-other/SKILL.md"] = files[
+            ".agents/skills/axis-example/SKILL.md"
+        ].replace("axis-example", "axis-other").replace("Axis Example", "Axis Other")
+        files[".agents/skills/README.md"] += (
+            "| Other | [axis-other/SKILL.md](./axis-other/SKILL.md) |\n"
+        )
+
+        self.assertIn("duplicate substantive instruction", "\n".join(self.issues_for_skill(files)))
 
     def test_skill_reference_target_resolves_parent_reference(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -3795,6 +4069,14 @@ class TestRepoSkillsGate(unittest.TestCase):
         issues = self.issues_for_skill(files)
 
         self.assertIn("frontmatter name must match folder name", "\n".join(issues))
+
+    def test_rejects_extra_frontmatter_fields(self) -> None:
+        files = self.valid_skill_files()
+        files[".agents/skills/axis-example/SKILL.md"] = files[
+            ".agents/skills/axis-example/SKILL.md"
+        ].replace("description:", "metadata: extra\ndescription:")
+
+        self.assertIn("frontmatter supports only", "\n".join(self.issues_for_skill(files)))
 
     def test_rejects_missing_skill_doc_reference(self) -> None:
         files = self.valid_skill_files()
@@ -3858,26 +4140,6 @@ class TestRepoSkillsGate(unittest.TestCase):
         self.assertIn("raw skill workflow command `python docs/scripts/render-visuals.py`", joined)
         self.assertIn("use an approved project wrapper", joined)
         self.assertIn("raw skill workflow command `npm run test`", joined)
-
-    def test_rejects_api_contract_skill_without_required_chaining(self) -> None:
-        files = {
-            ".agents/skills/axis-api-contract/SKILL.md": (
-                "---\n"
-                "name: axis-api-contract\n"
-                "description: Use when an agent changes Axis REST API contracts with generated frontend types.\n"
-                "---\n"
-                "\n"
-                "# Axis API Contract\n"
-                "\n"
-                "Change the API contract.\n"
-            ),
-        }
-
-        issues = self.issues_for_skill(files)
-
-        joined = "\n".join(issues)
-        self.assertIn("must chain to $axis-design-gate or `.agents/skills/axis-design-gate/SKILL.md`", joined)
-        self.assertIn("must chain to $axis-ready-review or `.agents/skills/axis-ready-review/SKILL.md`", joined)
 
     def test_current_repository_skills_still_pass(self) -> None:
         with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):

@@ -50,7 +50,6 @@ export function ShadcnQueryBuilderAction({
 }
 
 export function ShadcnQueryBuilderSelector({
-  className,
   handleOnChange,
   options,
   value,
@@ -75,7 +74,6 @@ export function ShadcnQueryBuilderSelector({
               type="button"
               variant="outline"
               size="sm"
-              className={className}
               title={title}
               disabled={disabled}
               data-testid={testID}
@@ -84,22 +82,24 @@ export function ShadcnQueryBuilderSelector({
         >
           {selectedLabels.length > 0 ? selectedLabels.join(', ') : title}
         </PopoverTrigger>
-        <PopoverContent align="start" className="max-h-72 w-64 overflow-y-auto p-2">
-          <div className="grid gap-1">
-            {flatOptions.map((option) => (
-              <MultiSelectOption
-                key={option.name}
-                option={option}
-                checked={selected.includes(option.name)}
-                onCheckedChange={(checked) =>
-                  handleOnChange(
-                    checked
-                      ? [...selected, option.name]
-                      : selected.filter((item) => item !== option.name),
-                  )
-                }
-              />
-            ))}
+        <PopoverContent align="start">
+          <div className="max-h-72 overflow-y-auto">
+            <div className="grid gap-1">
+              {flatOptions.map((option) => (
+                <MultiSelectOption
+                  key={option.name}
+                  option={option}
+                  checked={selected.includes(option.name)}
+                  onCheckedChange={(checked) =>
+                    handleOnChange(
+                      checked
+                        ? [...selected, option.name]
+                        : selected.filter((item) => item !== option.name),
+                    )
+                  }
+                />
+              ))}
+            </div>
           </div>
         </PopoverContent>
       </Popover>
@@ -114,7 +114,7 @@ export function ShadcnQueryBuilderSelector({
         if (nextValue !== null) handleOnChange(nextValue);
       }}
     >
-      <SelectTrigger data-testid={testID} className={className} title={title}>
+      <SelectTrigger data-testid={testID} title={title}>
         <SelectValue>{selectedLabels[0] ?? title}</SelectValue>
       </SelectTrigger>
       <SelectContent>
@@ -150,7 +150,7 @@ function MultiSelectOption({
 }) {
   const id = useId();
   return (
-    <Label htmlFor={id} className="min-h-9 rounded-sm px-2 hover:bg-accent">
+    <Label htmlFor={id}>
       <Checkbox
         id={id}
         checked={checked}
@@ -171,7 +171,6 @@ export function ShadcnQueryBuilderValueEditor(props: ValueEditorProps): JSX.Elem
     values = [],
     disabled,
     testID,
-    className,
     title,
     separator,
   } = props;
@@ -209,7 +208,6 @@ export function ShadcnQueryBuilderValueEditor(props: ValueEditorProps): JSX.Elem
     <Input
       data-testid={testID}
       type={list ? 'text' : (inputType ?? 'text')}
-      className={className}
       value={list && Array.isArray(value) ? value.join(', ') : (value ?? '')}
       disabled={disabled}
       title={title}

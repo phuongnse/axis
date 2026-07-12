@@ -18,7 +18,6 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
   Dialog,
-  DialogBody,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -329,7 +328,7 @@ export function RuleEditorDialog({
 
   return (
     <Dialog open={open} onOpenChange={requestOpenChange}>
-      <DialogContent size="workspace" closeLabel={t('rules.close')}>
+      <DialogContent>
         <DialogHeader>
           <div className="flex min-w-0 flex-wrap items-center gap-2">
             <DialogTitle>{detail?.name ?? t('rules.loadingRule')}</DialogTitle>
@@ -338,25 +337,21 @@ export function RuleEditorDialog({
           <DialogDescription>{detail?.description ?? t('rules.loadingRule')}</DialogDescription>
         </DialogHeader>
 
-        <DialogBody className="p-0">
+        <div data-slot="dialog-body" className="max-h-96 min-h-0 overflow-y-auto">
           {detailQuery.isError ? (
-            <div className="p-4">
-              <Alert variant="destructive">
-                <AlertCircle className="size-4" aria-hidden />
-                <AlertTitle>{t('rules.loadErrorTitle')}</AlertTitle>
-                <AlertDescription>{t('rules.loadErrorBody')}</AlertDescription>
-              </Alert>
-            </div>
+            <Alert variant="destructive">
+              <AlertCircle className="size-4" aria-hidden />
+              <AlertTitle>{t('rules.loadErrorTitle')}</AlertTitle>
+              <AlertDescription>{t('rules.loadErrorBody')}</AlertDescription>
+            </Alert>
           ) : null}
 
           {detail && editor && schema ? (
-            <div className="divide-y divide-border">
+            <div className="space-y-6">
               {feedback ? (
-                <div className="p-4">
-                  <Alert variant={feedback.variant === 'destructive' ? 'destructive' : 'default'}>
-                    <AlertDescription>{feedback.text}</AlertDescription>
-                  </Alert>
-                </div>
+                <Alert variant={feedback.variant === 'destructive' ? 'destructive' : 'default'}>
+                  <AlertDescription>{feedback.text}</AlertDescription>
+                </Alert>
               ) : null}
               <RuleIdentitySection
                 editor={editor}
@@ -395,12 +390,12 @@ export function RuleEditorDialog({
               <VersionHistory detail={detail} />
             </div>
           ) : detailQuery.isLoading ? (
-            <div className="p-4 text-sm text-muted-foreground">{t('rules.loadingRule')}</div>
+            <p className="text-sm text-muted-foreground">{t('rules.loadingRule')}</p>
           ) : null}
-        </DialogBody>
+        </div>
 
         {detail && editor ? (
-          <DialogFooter className="justify-between sm:justify-between">
+          <DialogFooter>
             <div>
               {detail.status !== 'Archived' && detail.latestPublishedVersion ? (
                 <Button
@@ -526,9 +521,7 @@ function RuleIdentitySection({
     <EditorSection title={t('rules.definitionSection')} description={t('rules.definitionHelp')}>
       <div className="grid gap-3 sm:grid-cols-2">
         <Field>
-          <FieldLabel htmlFor="rule-editor-name" required>
-            {t('rules.name')}
-          </FieldLabel>
+          <FieldLabel htmlFor="rule-editor-name">{t('rules.name')}</FieldLabel>
           <Input
             id="rule-editor-name"
             value={editor.name}
@@ -537,9 +530,7 @@ function RuleIdentitySection({
           />
         </Field>
         <Field>
-          <FieldLabel htmlFor="rule-editor-context" required>
-            {t('rules.context')}
-          </FieldLabel>
+          <FieldLabel htmlFor="rule-editor-context">{t('rules.context')}</FieldLabel>
           <Select
             value={editor.contextKey}
             disabled={disabled}
@@ -574,9 +565,7 @@ function RuleIdentitySection({
           </Select>
         </Field>
         <Field className="sm:col-span-2">
-          <FieldLabel htmlFor="rule-editor-description" required>
-            {t('rules.description')}
-          </FieldLabel>
+          <FieldLabel htmlFor="rule-editor-description">{t('rules.description')}</FieldLabel>
           <Textarea
             id="rule-editor-description"
             value={editor.description}
@@ -605,7 +594,7 @@ function ParameterSection({
         {parameters.map((parameter) => (
           <div
             key={parameter.id}
-            className="grid gap-2 border-b border-border pb-3 last:border-0 last:pb-0 sm:grid-cols-[minmax(8rem,1fr)_9rem_minmax(10rem,1fr)_auto_auto_2rem] sm:items-end"
+            className="grid gap-2 border-b border-border pb-3 last:border-0 last:pb-0 sm:grid-cols-2 lg:grid-cols-3 lg:items-end"
           >
             <Field>
               <FieldLabel htmlFor={`parameter-${parameter.id}-key`}>{t('rules.key')}</FieldLabel>
@@ -786,7 +775,7 @@ function ConditionNodeEditor({
     const contextField = schema.fields?.find((field) => field.path === node.contextPath);
     const unary = node.operator === 'IsNull' || node.operator === 'IsNotNull';
     return (
-      <div className="grid gap-2 border-l-2 border-border pl-3 sm:grid-cols-[minmax(10rem,1fr)_10rem_8rem_minmax(9rem,1fr)_2rem] sm:items-end">
+      <div className="grid gap-2 border-l-2 border-border pl-3 sm:grid-cols-2 lg:grid-cols-3 lg:items-end">
         <Field>
           <FieldLabel htmlFor={`condition-${node.id}-field`}>{t('rules.contextField')}</FieldLabel>
           <Select
@@ -1107,9 +1096,7 @@ function OutcomeSection({
       {editor.outcomeKind === 'Validation' ? (
         <div className="grid gap-3 sm:grid-cols-2">
           <Field>
-            <FieldLabel htmlFor="rule-violation-code" required>
-              {t('rules.violationCode')}
-            </FieldLabel>
+            <FieldLabel htmlFor="rule-violation-code">{t('rules.violationCode')}</FieldLabel>
             <Input
               id="rule-violation-code"
               value={editor.violationCode}
@@ -1118,9 +1105,7 @@ function OutcomeSection({
             />
           </Field>
           <Field>
-            <FieldLabel htmlFor="rule-severity" required>
-              {t('rules.severity')}
-            </FieldLabel>
+            <FieldLabel htmlFor="rule-severity">{t('rules.severity')}</FieldLabel>
             <Select
               value={editor.severity}
               disabled={disabled}
@@ -1147,9 +1132,7 @@ function OutcomeSection({
             </Select>
           </Field>
           <Field className="sm:col-span-2">
-            <FieldLabel htmlFor="rule-message" required>
-              {t('rules.message')}
-            </FieldLabel>
+            <FieldLabel htmlFor="rule-message">{t('rules.message')}</FieldLabel>
             <Input
               id="rule-message"
               value={editor.message}
@@ -1160,9 +1143,7 @@ function OutcomeSection({
         </div>
       ) : (
         <Field>
-          <FieldLabel htmlFor="rule-decision" required>
-            {t('rules.decision')}
-          </FieldLabel>
+          <FieldLabel htmlFor="rule-decision">{t('rules.decision')}</FieldLabel>
           <Select
             value={editor.decision}
             disabled={disabled}
@@ -1244,7 +1225,7 @@ function SimulationSection({
           {t('rules.runSimulation')}
         </Button>
         {result ? (
-          <Badge variant={result.isMatch ? 'warningOutline' : 'successOutline'}>
+          <Badge variant="outline">
             {result.isMatch ? t('rules.simulationMatched') : t('rules.simulationNotMatched')}
           </Badge>
         ) : null}
@@ -1283,7 +1264,7 @@ function VersionHistory({ detail }: { detail: RuleDefinitionDetail }) {
                       : t('rules.dateUnavailable')}
                   </p>
                 </div>
-                <Badge variant="successOutline">{t('rules.immutable')}</Badge>
+                <Badge variant="outline">{t('rules.immutable')}</Badge>
               </div>
             ))}
         </div>
@@ -1302,10 +1283,12 @@ function EditorSection({
   children: React.ReactNode;
 }) {
   return (
-    <section className="p-4 sm:p-5">
-      <h3 className="text-sm font-semibold text-foreground">{title}</h3>
-      <p className="mt-1 text-sm text-muted-foreground">{description}</p>
-      <div className="mt-4">{children}</div>
+    <section className="space-y-4">
+      <div>
+        <h3 className="text-sm font-semibold text-foreground">{title}</h3>
+        <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+      </div>
+      <div>{children}</div>
     </section>
   );
 }
@@ -1403,9 +1386,7 @@ function LabeledCheckbox({
         disabled={disabled}
         onCheckedChange={(value) => onChange(value === true)}
       />
-      <FieldLabel htmlFor={id} variant="body">
-        {label}
-      </FieldLabel>
+      <FieldLabel htmlFor={id}>{label}</FieldLabel>
     </div>
   );
 }
@@ -1413,12 +1394,12 @@ function LabeledCheckbox({
 function LifecycleBadge({ detail }: { detail: RuleDefinitionDetail }) {
   const { t } = useTranslation();
   if (detail.status === 'Published') {
-    return <Badge variant="successOutline">{t('rules.statusPublished')}</Badge>;
+    return <Badge variant="outline">{t('rules.statusPublished')}</Badge>;
   }
   if (detail.status === 'Archived') {
-    return <Badge variant="muted">{t('rules.statusArchived')}</Badge>;
+    return <Badge variant="outline">{t('rules.statusArchived')}</Badge>;
   }
-  return <Badge variant="warningOutline">{t('rules.statusDraft')}</Badge>;
+  return <Badge variant="outline">{t('rules.statusDraft')}</Badge>;
 }
 
 const valueTypes: RuleValueType[] = ['Text', 'Integer', 'Decimal', 'Date', 'DateTime', 'Boolean'];

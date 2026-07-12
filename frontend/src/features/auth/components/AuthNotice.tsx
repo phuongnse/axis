@@ -16,15 +16,19 @@ interface AuthNoticeProps {
   title?: ReactNode;
   children?: ReactNode;
   variant?: AuthNoticeVariant;
-  className?: string;
 }
 
-export function AuthNotice({ title, children, variant = 'default', className }: AuthNoticeProps) {
+export function AuthNotice({ title, children, variant = 'default' }: AuthNoticeProps) {
   const Icon = noticeIcons[variant];
-  const alertVariant = variant === 'destructive' ? 'destructive' : 'default';
+  const alertVariant = {
+    default: 'default',
+    destructive: 'destructive',
+    success: 'default',
+    warning: 'default',
+  } as const;
 
   return (
-    <Alert variant={alertVariant} className={className}>
+    <Alert variant={alertVariant[variant]}>
       <Icon aria-hidden />
       {title ? <AlertTitle>{title}</AlertTitle> : null}
       {children ? <AlertDescription>{children}</AlertDescription> : null}

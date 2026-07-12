@@ -1,69 +1,36 @@
 ---
 name: axis-doc-hygiene
-description: Keep Axis guidance concise, correct, linked, and stable over time. Use when changing any artifact that instructs humans, agents, bots, or checks how to understand or work with Axis, including docs, status/spec text, guidance configs, policy text, anchors, navigation, or documentation ownership.
+description: Keep durable Axis documentation, guidance, diagrams, links, status text, and ownership concise and current. Use when those artifacts change; this skill governs documentation quality, not the underlying domain decision.
 ---
 
 # Axis Doc Hygiene
 
 ## Goal
 
-Change guidance without growing context load or drifting from the source of truth.
+Keep one owner per fact and prevent guidance from accumulating duplicate workflow, incident history, or stale names.
 
 ## Hard gates
 
 Follow [reference.md](../reference.md).
-- One fact, one owner — link instead of duplicating workflow steps from skills.
-- Retired surfaces: apply `$axis-design-gate` retirement contract; avoid stale-name compatibility prose unless an explicit compatibility exception requires it.
-- Do not claim review-ready without `$axis-ready-review` when the diff needs review.
+- Preserve the decision supplied by the domain owner; do not create product, stack, or architecture policy here.
+- Use [docs/playbooks/design-gate.md § Dossier](../../../docs/playbooks/design-gate.md#dossier) for retired guidance surfaces.
+- Keep enforcement status only in [docs/ENFORCEMENT.md](../../../docs/ENFORCEMENT.md).
 
 ## Inputs
 
-- Guidance artifact being changed and the rule, workflow, or owner fact it carries.
-- Current owner doc or skill for that fact.
-- Old token or renamed surface when the change removes or renames guidance.
-- Retired identifiers from `$axis-design-gate` when the request removes, renames, replaces, drops, disables, deprecates, or otherwise retires a supported surface.
+- Changed guidance or visual artifact and its current owner.
+- Domain decision supplied by the entry workflow.
+- Retired identifiers, when applicable.
 
 ## Workflow
 
-1. Classify by responsibility, not filename.
-   - Product/spec/status surface: keep current behavior, gaps, and AC ownership precise.
-   - Process/routing surface: name the decision rule, route by intent classes instead of exact phrases, and hand off workflow to the owning skill.
-   - Policy/enforcement surface: separate rule owner, deterministic check, and review-only guidance.
-   - Stack/library surface: [docs/TECH_STACK.md](../../../docs/TECH_STACK.md) owns the approved baseline and approval rule; manifests own exact versions.
-   - Link/navigation surface: repo-doc links stay inline in the sentence; navigation uses the `docs-style` format.
-   - Tool/bot/agent guidance surface: cite current owners with inline repo links and avoid stale source names.
-   - Visual or script-command surface: use the matching visual/script skill.
-
-2. Preserve ownership.
-   - One fact has one owner; link instead of restating.
-   - Put owner links inline where the rule or fact is stated; do not add reference-owner dumps.
-   - Skill text follows the same link rule: owner docs use markdown links, not plain path text.
-   - Keep exact runtime, package, container, and tool versions in the owning manifests or script checks; keep only the baseline/category in [docs/TECH_STACK.md](../../../docs/TECH_STACK.md).
-   - Prefer durable categories over inventories of current files, commands, statuses, or tools.
-   - For renamed, removed, replaced, dropped, disabled, deprecated, or otherwise retired names, apply `$axis-design-gate`'s retirement contract: run pre- and post-edit `rg` sweeps, update current owner links, and remove old-name guidance instead of keeping "do not use old name" prose.
-   - Do not keep docs, migration notes, compatibility prose, denylist checks, or tests that mention a retired name unless an owner doc or explicit user decision requires a compatibility exception.
-   - Generalize review or incident learning into decision criteria; do not publish symptom-to-remedy recipes.
-   - Put repeatable workflow in skills, not prose docs.
-   - Treat guidance configs and skill text as maintained docs, not throwaway config.
-   - Keep enforcement status in the enforcement ledger, not scattered prose.
-
-3. Edit tightly.
-   - Lead with the rule.
-   - Use examples as generalizable cues; do not make phrase-only trigger lists unless exact command text is the contract.
-   - Delete historical logs, filler, duplicated command matrices, and process prose.
-   - Delete owner/reference dump sections; keep only navigation hubs whose main purpose is discovery.
-   - Preserve headings/anchors that are linked from other files.
-   - Replace stale source names, renamed skills, and removed anchors immediately.
-   - Prefer repo-path labels such as [docs/TECH_STACK.md](../../../docs/TECH_STACK.md) over display labels such as `Tech Stack`.
-   - Replace low-level lists with high-level strict rules unless the file is the owner inventory.
-   - Add new guidance only for a separate responsibility that justifies another surface.
-
-4. Check the right things.
-   - Use `$axis-script-scope` to choose the smallest proof for the changed surface.
-   - Validate skill text when skills changed.
-   - Validate size, links, shape, or drift when that responsibility changed.
-   - Use `$axis-ready-review` before review.
+1. Classify the responsibility: product/spec/status, process/routing, policy/enforcement, stack, navigation/link, or visual source.
+2. Locate the single owner. Edit it once and replace other copies with inline owner links.
+3. Apply [docs/playbooks/docs-style.md](../../../docs/playbooks/docs-style.md): lead with the rule, keep current contracts, remove filler/history, and preserve linked anchors.
+4. For Mermaid or committed visuals, edit the owning source, use product vocabulary, verify labels/connectors/clipping, and keep local URLs, keys, tokens, and personal exports out of the repo.
+5. Apply [reference.md § Improvement loop](../reference.md#improvement-loop) when feedback exposes a reusable gap; do not publish symptom-to-remedy recipes.
+6. Run the narrow docs/skills/link check directly, or this workflow **Delegates** command selection to `$axis-script-scope` and resumes with its evidence.
 
 ## Output
 
-Report changed docs, ownership decisions, generalization check, retired-name sweep results, accepted compatibility exceptions, checks run, and any deferred cleanup with an owner.
+Report owner changed, duplicates pruned, visual result when applicable, retirement sweep, checks, and unresolved ownership decisions.

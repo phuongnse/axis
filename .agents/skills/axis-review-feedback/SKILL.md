@@ -1,79 +1,36 @@
 ---
 name: axis-review-feedback
-description: Handle Axis PR review feedback safely. Use when addressing automated pre-PR review output, GitHub review bot or human review comments, follow-up review commits, requested changes, or suggestions that may affect design, tests, docs, or PR readiness.
+description: Resolve Axis automated or human review findings. Use for local review output, PR comments, requested changes, false positives, and follow-up deltas that need classification, correction, and fresh evidence.
 ---
 
 # Axis Review Feedback
 
 ## Goal
 
-Resolve review feedback by improving the codebase, not merely silencing a thread or making CI green.
+Resolve each finding against current owners, improve the underlying class when reusable, and return delta evidence to the caller.
 
 ## Hard gates
 
 Follow [reference.md](../reference.md).
-- Resolve or classify every finding before returning to `$axis-pull-request` or asking for another review pass.
-- Do not claim ready while triggered verification is failing.
-- When pre-PR review raised findings, return to pull-request only after commit and scoped rerun per [scripts.md § Pre-PR review checkpoint](../../../docs/playbooks/scripts.md#pre-pr-review-checkpoint).
+- Classify every finding as fixed, false positive with evidence, or explicitly user-deferred.
+- Do not claim readiness while required verification fails.
+- Preserve the reviewed checkpoint before changing a follow-up delta.
 
 ## Inputs
 
-- Review comments or tool output, including severity and affected file/line when available.
-- Reviewed checkpoint or branch diff that produced the feedback.
-- User constraints: minimal fix, broader cleanup, or follow-up review expectation.
+- Finding text, severity, file/line, and reviewed checkpoint.
+- Caller and expected return state.
+- User-approved constraints or deferrals.
 
 ## Workflow
 
-1. Gather the feedback.
-   - Read the review comment, affected diff, and surrounding code.
-   - If comments come from a tool, treat them as signal to validate against Axis rules.
-   - If feedback came from a local automated review run without a GitHub thread, preserve the issue text, severity, and file path in your working notes.
-   - Before editing, record the reviewed checkpoint when follow-up review is expected:
-     - For committed work, record `git rev-parse HEAD`.
-     - For uncommitted work, commit the reviewed state first or stop and report that a true delta-only checkpoint rerun is unavailable.
-
-2. Classify each item.
-   - Correctness bug or missing AC.
-   - Boundary or architecture concern.
-   - Test gap or weakened assertion.
-   - Docs/status drift.
-   - Style, readability, or generated-file issue.
-   - False positive, with evidence.
-
-3. Re-read the governing source.
-   - [AGENTS.md](../../../AGENTS.md)
-   - [docs/playbooks/agent-checklist.md](../../../docs/playbooks/agent-checklist.md)
-   - The focused playbook for the touched surface, such as [docs/playbooks/api-patterns.md](../../../docs/playbooks/api-patterns.md), [docs/playbooks/frontend.md](../../../docs/playbooks/frontend.md), or [docs/playbooks/testing.md](../../../docs/playbooks/testing.md)
-   - The owning use-case and tests when behavior is involved
-   - [docs/ENFORCEMENT.md](../../../docs/ENFORCEMENT.md) when the issue looks repeatable
-
-4. Prefer the defensible change.
-   - Look for the existing module pattern before accepting a reviewer-proposed simplification.
-   - Improve ownership, transaction boundaries, error handling, or test coverage when that is the real issue.
-   - Keep tests semantically honest: strengthen assertions or rename tests when the stated behavior and proved behavior drift apart.
-   - If the user explicitly asked for the smallest change, keep the diff minimal and say so.
-   - If a better resolution is deliberately deferred, record an exact `Deferred follow-ups` line.
-
-5. Generalize repeatable lessons.
-   - For each valid finding, decide whether it is a one-off defect, missing deterministic check, missing workflow rule, stale doc/status rule, or retired-surface cleanup miss.
-   - When the issue class can recur, improve the owning skill, wrapper, checker, or test in a general form before asking for another review.
-   - When the issue is a one-off defect, record `N/A: one-off defect`; do not broaden scope just to create a generalized lesson.
-   - Do not add example-specific denylist checks, compatibility notes, or "do not use old name" prose for retired surfaces; apply `$axis-design-gate`'s retirement contract and sweep old identifiers instead.
-   - Keep lessons broad enough to prevent the class of mistake, but do not create new product behavior, stack policy, or use-case scope from a review comment alone.
-
-6. Verify the touched surface.
-   - Run the narrow test or policy check for the files changed.
-   - Commit the follow-up and run `python scripts/axis.py ready-review --since <reviewed-checkpoint>` so expensive verification is scoped to the delta while the shared policy profile checks the publishable branch.
-   - Run `$axis-ready-review` before asking for another review pass.
-   - If this feedback was part of `$axis-pull-request`, return control to that skill with the reviewed checkpoint, the files changed by the follow-up, and whether the follow-up is committed.
-   - When rerunning the pre-PR review checkpoint after follow-up changes, review only the follow-up delta when possible per [docs/playbooks/scripts.md § Pre-PR review checkpoint](../../../docs/playbooks/scripts.md#pre-pr-review-checkpoint). Do not rerun the full branch diff and describe it as follow-up-only review.
-
-7. Report resolution.
-   - Mark each comment as resolved, improved beyond suggestion, false positive with evidence, or deferred with owner.
-   - Do not claim ready status while triggered verification is failing.
-   - Include the generalized lesson only for repeatable issue classes, or say `N/A: one-off defect`.
-   - Include the follow-up review scope: `follow-up delta`, `full diff with reason`, or `not rerun`.
+1. Read the finding, affected diff, surrounding code, and governing ACs, contracts, docs, and code. Surface conflicts for a decision instead of treating review text as authoritative.
+2. Classify correctness, boundary, test, docs/status, generated output, readability, or false positive.
+3. Implement the smallest defensible resolution; preserve behavior, safety, and test honesty.
+4. Apply [reference.md § Improvement loop](../reference.md#improvement-loop) to valid findings. Promote a rule only when the evidence supports a reusable decision or invariant, even if first observed once.
+5. Run focused proof, commit only when the caller authorized a follow-up change, and produce delta-ready evidence for `$axis-ready-review`.
+6. Return to the caller with the reviewed checkpoint, changed paths, classifications, evidence, and unresolved decisions; do not auto-publish.
 
 ## Output
 
-Report review follow-ups as `improved` or `minimal`, list generalized lessons only for repeatable issue classes, verification, retired-identifier sweep results when applicable, and any unresolved or deferred comments.
+Report each finding outcome, improvement outcome, delta scope, verification, and exact deferrals.

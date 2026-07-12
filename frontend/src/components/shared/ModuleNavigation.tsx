@@ -1,6 +1,7 @@
 import { Link } from '@tanstack/react-router';
 import { Blocks, ListChecks } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { buttonVariants } from '@/components/ui/button';
 import type {
   ModuleNavigationContext,
   ModuleNavigationIcon,
@@ -48,8 +49,8 @@ export function ModuleNavigation({ context, items }: ModuleNavigationProps) {
                     to={item.to}
                     aria-current={active ? 'page' : undefined}
                     className={cn(
-                      'inline-flex h-9 min-w-0 shrink-0 items-center gap-2 rounded-lg px-2.5 text-sm font-medium text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:ring-3 focus-visible:ring-ring/35 md:w-full',
-                      active && 'bg-accent text-accent-foreground',
+                      buttonVariants({ variant: active ? 'secondary' : 'ghost' }),
+                      'md:w-full',
                     )}
                   >
                     <Icon className="size-4 shrink-0" aria-hidden />

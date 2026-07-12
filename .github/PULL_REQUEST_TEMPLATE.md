@@ -14,4 +14,5 @@
 - [ ] **Ready review** — completed before publication.
 - [ ] **Verification** — triggered local checks ran and passed.
 - [ ] **Docs/status** — owning docs updated when behavior, status, or workflow changed.
+- [ ] **UI system** — baseline unchanged, or provenance, required sign-off/exception metadata, and baseline evidence are included.
 - [ ] **No placeholders** — no new TODO/FIXME/stub/placeholder markers.

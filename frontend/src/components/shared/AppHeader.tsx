@@ -24,7 +24,7 @@ export function AppHeader({ onSignOut, signOutError = false, signingOut = false 
       <div className="flex min-h-16 w-full min-w-0 flex-wrap items-center gap-3 px-4 py-3 sm:px-6 lg:px-8">
         <Link to="/dashboard" className="flex min-w-0 items-center gap-3">
           <img src="/axis-logo.svg" alt="" className="size-11 shrink-0" width={44} height={44} />
-          <span className="block min-w-0 truncate text-xs uppercase tracking-[0.18em] text-muted-foreground">
+          <span className="block min-w-0 truncate text-xs uppercase tracking-widest text-muted-foreground">
             {pageTitle}
           </span>
         </Link>
