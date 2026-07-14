@@ -132,12 +132,13 @@ async function openPreferencesWithoutMovingForm(page: Page): Promise<void> {
   const menuBox = await page
     .locator('[data-slot="popover-content"][aria-label="Preferences"]')
     .boundingBox();
+  if (!triggerBox || !menuBox) {
+    throw new Error('Preferences trigger/menu layout was not measurable.');
+  }
   expect(topAfter).toBeCloseTo(topBefore, 1);
-  expect(
-    Math.abs(
-      (triggerBox?.x ?? 0) + (triggerBox?.width ?? 0) - (menuBox?.x ?? 0) - (menuBox?.width ?? 0),
-    ),
-  ).toBeLessThanOrEqual(1);
+  expect(Math.abs(triggerBox.x + triggerBox.width - menuBox.x - menuBox.width)).toBeLessThanOrEqual(
+    1,
+  );
 }
 
 async function openAuthenticatedPreferences(page: Page): Promise<void> {

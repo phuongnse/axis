@@ -203,6 +203,7 @@ describe('theme preferences', () => {
     await waitFor(() =>
       expect(document.querySelector('#theme-save-status')).not.toBeInTheDocument(),
     );
+    expect(screen.getByRole('button', { name: 'Dark' })).toHaveAttribute('aria-pressed', 'true');
     const request = vi.mocked(fetch).mock.calls[0][1];
     expect(request?.method).toBe('PUT');
     expect(String(request?.body)).toContain('"theme":"dark"');

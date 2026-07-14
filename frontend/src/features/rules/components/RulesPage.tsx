@@ -548,7 +548,8 @@ function CreateRuleDialog({
               createMutation.isPending ||
               !name.trim() ||
               !description.trim() ||
-              !selectedSchema?.contextKey
+              !selectedSchema?.contextKey ||
+              selectedSchema.version === undefined
             }
             onClick={() => {
               if (

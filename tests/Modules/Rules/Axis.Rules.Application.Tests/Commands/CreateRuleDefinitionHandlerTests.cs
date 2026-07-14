@@ -65,6 +65,9 @@ public sealed class CreateRuleDefinitionHandlerTests
             CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
+        result.ErrorCode.Should().Be(Shared.Domain.Primitives.ErrorCodes.InvalidInput);
+        result.ProblemCode.Should().Be(RulesProblemCodes.DefinitionInvalid);
+        result.Error.Should().Be("Rule context schema is unavailable or incompatible.");
         await _context.Repository.DidNotReceive().AddAsync(
             Arg.Any<Axis.Rules.Domain.RuleDefinition>(),
             Arg.Any<CancellationToken>());

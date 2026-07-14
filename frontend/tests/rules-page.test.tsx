@@ -202,9 +202,9 @@ describe('RulesPage', () => {
     await waitFor(() => expect(screen.getByLabelText('Context')).toBeEnabled());
     expect(screen.getByLabelText('Scope')).toHaveTextContent('Field');
     await user.click(screen.getByLabelText('Scope'));
-    expect(await screen.findByRole('option', { name: 'Field' })).toBeInTheDocument();
+    await user.click(await screen.findByRole('option', { name: 'Field' }));
+    expect(screen.getByLabelText('Scope')).toHaveTextContent('Field');
     expect(screen.queryByRole('option', { name: 'Object' })).not.toBeInTheDocument();
-    await user.keyboard('{Escape}');
     await user.click(screen.getByLabelText('Context'));
     await user.click(await screen.findByRole('option', { name: 'Decimal field value' }));
     expect(screen.getByLabelText('Context')).toHaveTextContent('Decimal field value');
