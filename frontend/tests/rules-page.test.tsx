@@ -100,11 +100,11 @@ describe('RulesPage', () => {
 
     await renderWithRouter(<RulesPage />, { path: '/rules', authenticatedPath: 'rules' });
 
-    expect(screen.getByRole('region', { name: 'Built-in field rules' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Rules catalog' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Rules' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'New rule' })).toBeInTheDocument();
 
-    const catalog = screen.getByRole('region', { name: 'Built-in field rules' });
+    const catalog = screen.getByRole('region', { name: 'Rules catalog' });
     const toolbarActions = catalog.querySelector('[data-slot="data-table-toolbar-actions"]');
     expect(toolbarActions).not.toBeNull();
     expect(within(toolbarActions as HTMLElement).getByRole('button', { name: 'New rule' })).toBe(
@@ -123,18 +123,19 @@ describe('RulesPage', () => {
     const requiredRow = within(catalog).getByText('Required value').closest('tr');
     if (!requiredRow) throw new Error('Required rule row was not rendered');
     expect(catalogViewport).toContainElement(requiredRow);
-    expect(within(requiredRow).getByText('Built-in')).toHaveAttribute('data-variant', 'outline');
-    expect(within(requiredRow).getByText('Date and time')).toHaveAttribute(
-      'data-variant',
-      'outline',
-    );
-    expect(within(requiredRow).getByText('Field')).toHaveAttribute('data-variant', 'outline');
+    expect(requiredRow.querySelectorAll('[data-slot="rule-table-value"]')).toHaveLength(5);
+    expect(within(requiredRow).getByText('Built-in')).toBeInTheDocument();
+    expect(within(requiredRow).getByText('Published')).toHaveClass('text-success');
+    expect(within(requiredRow).getByText(/Date and time/)).toBeInTheDocument();
+    expect(within(requiredRow).getByText('Field')).toBeInTheDocument();
+    expect(within(catalog).getByRole('columnheader', { name: /Origin/ })).toBeInTheDocument();
+    expect(within(catalog).getByRole('columnheader', { name: /Status/ })).toBeInTheDocument();
     expect(within(catalog).getByText('Decimal precision')).toBeInTheDocument();
     expect(within(catalog).getByText('Date and time range')).toBeInTheDocument();
     expect(within(catalog).getByText('Text format')).toBeInTheDocument();
     expect(within(catalog).getByText('Choice selection count')).toBeInTheDocument();
     expect(within(catalog).getByText('Credit threshold')).toBeInTheDocument();
-    expect(within(catalog).getByText('Draft')).toHaveAttribute('data-variant', 'outline');
+    expect(within(catalog).getByText('Draft')).toHaveAttribute('data-variant', 'secondary');
     expect(within(catalog).queryByText('Validation')).not.toBeInTheDocument();
     expect(within(catalog).queryByText('field.required')).not.toBeInTheDocument();
     expect(within(catalog).queryByText(/Single-select options/)).not.toBeInTheDocument();
@@ -143,9 +144,9 @@ describe('RulesPage', () => {
     await user.click(within(catalog).getByRole('button', { name: 'Filters' }));
     await user.click(screen.getByRole('button', { name: 'Add condition' }));
     await user.click(screen.getByTestId('fields'));
-    await user.click(await screen.findByRole('option', { name: 'Status' }));
+    await user.click(await screen.findByRole('option', { name: 'Origin' }));
     await user.click(screen.getByTestId('value-editor'));
-    await user.click(screen.getByRole('checkbox', { name: 'Built-in' }));
+    await user.click(await screen.findByRole('option', { name: 'Built-in' }));
     expect(within(catalog).queryByText('Credit threshold')).not.toBeInTheDocument();
     expect(within(catalog).getAllByText('Built-in')).not.toHaveLength(0);
     await user.keyboard('{Escape}');
@@ -199,6 +200,11 @@ describe('RulesPage', () => {
       ).toBe(true),
     );
     await waitFor(() => expect(screen.getByLabelText('Context')).toBeEnabled());
+    expect(screen.getByLabelText('Scope')).toHaveTextContent('Field');
+    await user.click(screen.getByLabelText('Scope'));
+    await user.click(await screen.findByRole('option', { name: 'Field' }));
+    expect(screen.getByLabelText('Scope')).toHaveTextContent('Field');
+    expect(screen.queryByRole('option', { name: 'Object' })).not.toBeInTheDocument();
     await user.click(screen.getByLabelText('Context'));
     await user.click(await screen.findByRole('option', { name: 'Decimal field value' }));
     expect(screen.getByLabelText('Context')).toHaveTextContent('Decimal field value');
@@ -238,7 +244,7 @@ describe('RulesPage', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Unable to load rules');
     await user.click(screen.getByRole('button', { name: 'Retry' }));
-    expect(await screen.findByRole('region', { name: 'Built-in field rules' })).toBeInTheDocument();
+    expect(await screen.findByRole('region', { name: 'Rules catalog' })).toBeInTheDocument();
     expect(fetch).toHaveBeenCalledTimes(2);
   });
 });

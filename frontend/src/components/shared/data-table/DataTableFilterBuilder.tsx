@@ -133,7 +133,7 @@ export function DataTableFilterBuilder<TData>({
           ruleGroup: 'grid gap-2 rounded-sm border border-border bg-muted/20 p-2',
           header: 'flex flex-wrap items-center gap-2',
           body: 'grid gap-2',
-          rule: 'grid gap-2 rounded-sm border border-border bg-card p-2 sm:grid-cols-2 lg:grid-cols-4',
+          rule: 'flex flex-wrap items-center gap-2 rounded-sm border border-border bg-card p-2',
           fields: 'w-full',
           operators: 'w-full',
           value: 'w-full',

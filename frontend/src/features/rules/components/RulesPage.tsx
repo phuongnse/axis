@@ -10,7 +10,7 @@ import {
   type DataTableColumnDef,
   type DataTableDefinition,
 } from '@/components/shared/data-table';
-import { Badge } from '@/components/ui/badge';
+import { StatusBadge, type StatusBadgeTone } from '@/components/shared/StatusBadge';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -50,7 +50,6 @@ import {
 } from '../metadata';
 import { RuleEditorDialog } from './RuleEditorDialog';
 
-const scopes: RuleScope[] = ['Field', 'Object', 'Record', 'Lifecycle'];
 const route = getRouteApi('/_authenticated/rules');
 
 export function RulesPage() {
@@ -73,13 +72,16 @@ export function RulesPage() {
         );
       }
     }
+    const catalogScopes = distinctDefined(definitions.map((definition) => definition.scope));
+    const origins = distinctDefined(definitions.map((definition) => definition.origin));
+    const statuses = distinctDefined(definitions.map((definition) => definition.status));
 
     const columns: DataTableColumnDef<RuleDefinitionSummary>[] = [
       {
         id: 'rule',
         accessorFn: (definition) => localizedRuleName(definition, t),
         sortingFn: (left, right) => compareRuleDefinitions(left.original, right.original),
-        size: 360,
+        size: 330,
         minSize: 280,
         enableGrouping: false,
         meta: {
@@ -115,7 +117,7 @@ export function RulesPage() {
       {
         id: 'appliesTo',
         accessorFn: ruleTargets,
-        size: 240,
+        size: 220,
         minSize: 200,
         enableGrouping: false,
         meta: {
@@ -133,24 +135,53 @@ export function RulesPage() {
       },
       {
         id: 'scope',
-        accessorFn: (definition) => definition.scope ?? 'Object',
-        size: 180,
+        accessorFn: (definition) => definition.scope,
+        size: 160,
         minSize: 150,
         enableGrouping: true,
         meta: {
           label: t('rules.scope'),
           searchable: true,
-          searchValue: (definition) => t(`rules.scope${definition.scope ?? 'Object'}`),
+          searchValue: (definition) =>
+            definition.scope ? t(`rules.scope${definition.scope}`) : [],
           filter: {
             kind: 'singleChoice',
-            options: scopes.map((scope) => ({ value: scope, label: t(`rules.scope${scope}`) })),
+            options: catalogScopes.map((scope) => ({
+              value: scope,
+              label: t(`rules.scope${scope}`),
+            })),
           },
         },
         cell: ({ row }) => <RuleScopeCell definition={row.original} />,
       },
       {
+        id: 'origin',
+        accessorFn: (definition) => definition.origin,
+        size: 130,
+        minSize: 120,
+        enableGrouping: true,
+        meta: {
+          label: t('rules.origin'),
+          searchable: true,
+          searchValue: (definition) =>
+            definition.origin
+              ? definition.origin === 'System'
+                ? t('rules.builtIn')
+                : t('rules.originWorkspace')
+              : [],
+          filter: {
+            kind: 'singleChoice',
+            options: origins.map((origin) => ({
+              value: origin,
+              label: origin === 'System' ? t('rules.builtIn') : t('rules.originWorkspace'),
+            })),
+          },
+        },
+        cell: ({ row }) => <RuleOriginCell definition={row.original} />,
+      },
+      {
         id: 'status',
-        accessorFn: ruleStatusValues,
+        accessorFn: (definition) => definition.status,
         size: 130,
         minSize: 120,
         enableGrouping: true,
@@ -158,26 +189,16 @@ export function RulesPage() {
           label: t('rules.status'),
           searchable: true,
           searchValue: (definition) =>
-            ruleStatusValues(definition).map((value) =>
-              value === 'System'
-                ? t('rules.builtIn')
-                : value === 'Workspace'
-                  ? t('rules.originWorkspace')
-                  : t(`rules.status${value}`),
-            ),
+            definition.status ? t(`rules.status${definition.status}`) : [],
           filter: {
-            kind: 'multiChoice',
-            options: [
-              { value: 'System', label: t('rules.builtIn') },
-              { value: 'Workspace', label: t('rules.originWorkspace') },
-              { value: 'Published', label: t('rules.statusPublished') },
-              { value: 'Draft', label: t('rules.statusDraft') },
-              { value: 'Archived', label: t('rules.statusArchived') },
-            ],
-            getValue: ruleStatusValues,
+            kind: 'singleChoice',
+            options: statuses.map((status) => ({
+              value: status,
+              label: t(`rules.status${status}`),
+            })),
           },
         },
-        cell: ({ row }) => <OriginStatusBadge definition={row.original} />,
+        cell: ({ row }) => <RuleStatusCell definition={row.original} />,
       },
     ];
 
@@ -229,7 +250,9 @@ export function RulesPage() {
     <div className="flex h-full min-h-0 w-full min-w-0 flex-col gap-4 overflow-hidden p-4 sm:p-6 lg:p-8">
       <header className="min-w-0 shrink-0">
         <div className="min-w-0">
-          <h1 className="text-2xl font-semibold text-foreground">{t('rules.title')}</h1>
+          <h1 className="font-heading text-2xl font-semibold text-foreground">
+            {t('rules.title')}
+          </h1>
           <p className="mt-1 max-w-3xl text-sm leading-6 text-muted-foreground">
             {t('rules.pageDescription')}
           </p>
@@ -281,7 +304,9 @@ function RuleIdentityCell({
           {name}
         </Button>
       ) : (
-        <p className="font-semibold text-foreground">{name}</p>
+        <p data-slot="rule-table-value" className="font-semibold text-foreground">
+          {name}
+        </p>
       )}
       <p className="mt-1 line-clamp-2 text-sm leading-5 text-muted-foreground">
         {localizedRuleDescription(definition, t)}
@@ -294,15 +319,11 @@ function RuleTargetsCell({ definition }: { definition: RuleDefinitionSummary }) 
   const { t } = useTranslation();
   const targetTypes = [...(definition.applicability?.targetTypeKeys ?? [])].sort(compareFieldTypes);
   return targetTypes.length > 0 ? (
-    <div className="flex flex-wrap gap-1.5 whitespace-normal">
-      {targetTypes.map((fieldType) => (
-        <Badge key={fieldType} variant="outline">
-          {t(fieldTypeTranslationKey(fieldType))}
-        </Badge>
-      ))}
-    </div>
+    <span data-slot="rule-table-value" className="whitespace-normal text-sm text-foreground">
+      {targetTypes.map((fieldType) => t(fieldTypeTranslationKey(fieldType))).join(', ')}
+    </span>
   ) : (
-    <span className="whitespace-normal text-sm text-foreground">
+    <span data-slot="rule-table-value" className="whitespace-normal text-sm text-foreground">
       {humanizeContext(definition.contextKey, t('rules.contextUnavailable'))}
     </span>
   );
@@ -313,10 +334,15 @@ function RuleScopeCell({ definition }: { definition: RuleDefinitionSummary }) {
   const setupKey = ruleSetupTranslationKey(definition.definitionKey);
   return (
     <div className="whitespace-normal">
-      <div className="flex flex-wrap gap-1.5">
-        <ScopeBadge scope={definition.scope} />
+      <div className="flex flex-wrap gap-x-1.5 text-sm font-medium text-foreground">
+        <span data-slot="rule-table-value">
+          {definition.scope ? t(`rules.scope${definition.scope}`) : '—'}
+        </span>
         {definition.outcomeKind === 'Decision' ? (
-          <Badge variant="outline">{t('rules.outcomeDecision')}</Badge>
+          <>
+            <span aria-hidden>·</span>
+            <span>{t('rules.outcomeDecision')}</span>
+          </>
         ) : null}
       </div>
       <p className="mt-1.5 text-xs text-muted-foreground">
@@ -326,23 +352,35 @@ function RuleScopeCell({ definition }: { definition: RuleDefinitionSummary }) {
   );
 }
 
-function OriginStatusBadge({ definition }: { definition: RuleDefinitionSummary }) {
+function RuleOriginCell({ definition }: { definition: RuleDefinitionSummary }) {
   const { t } = useTranslation();
-  if (definition.origin === 'System') {
-    return <Badge variant="outline">{t('rules.builtIn')}</Badge>;
-  }
-  if (definition.status === 'Published') {
-    return <Badge variant="outline">{t('rules.statusPublished')}</Badge>;
-  }
-  if (definition.status === 'Archived') {
-    return <Badge variant="outline">{t('rules.statusArchived')}</Badge>;
-  }
-  return <Badge variant="outline">{t('rules.statusDraft')}</Badge>;
+  const label =
+    definition.origin === 'System'
+      ? t('rules.builtIn')
+      : definition.origin === 'Workspace'
+        ? t('rules.originWorkspace')
+        : '—';
+  return (
+    <span data-slot="rule-table-value" className="text-sm font-medium text-foreground">
+      {label}
+    </span>
+  );
 }
 
-function ScopeBadge({ scope }: { scope: RuleScope | undefined }) {
+function RuleStatusCell({ definition }: { definition: RuleDefinitionSummary }) {
   const { t } = useTranslation();
-  return <Badge variant="outline">{t(`rules.scope${scope ?? 'Object'}`)}</Badge>;
+  const label = definition.status ? t(`rules.status${definition.status}`) : '—';
+  const tone: StatusBadgeTone =
+    definition.status === 'Published'
+      ? 'success'
+      : definition.status === 'Draft'
+        ? 'neutral'
+        : 'muted';
+  return (
+    <StatusBadge data-slot="rule-table-value" tone={tone}>
+      {label}
+    </StatusBadge>
+  );
 }
 
 function CreateRuleDialog({
@@ -359,12 +397,15 @@ function CreateRuleDialog({
   const schemasQuery = useQuery({ ...ruleContextSchemasQueryOptions(), enabled: open });
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-  const [scope, setScope] = useState<RuleScope>('Field');
+  const [scope, setScope] = useState<RuleScope | null>(null);
   const [contextKey, setContextKey] = useState('');
   const [outcomeKind, setOutcomeKind] = useState<'Validation' | 'Decision'>('Validation');
   const [error, setError] = useState('');
   const schemas = Array.isArray(schemasQuery.data) ? schemasQuery.data : [];
-  const availableSchemas = schemas.filter((schema) => schema.scope === scope);
+  const availableScopes = distinctDefined(schemas.map((schema) => schema.scope));
+  const selectedScope =
+    scope && availableScopes.includes(scope) ? scope : (availableScopes[0] ?? null);
+  const availableSchemas = schemas.filter((schema) => schema.scope === selectedScope);
   const selectedSchema = availableSchemas.find((schema) => schema.contextKey === contextKey);
 
   const createMutation = useMutation({
@@ -380,7 +421,7 @@ function CreateRuleDialog({
   function reset() {
     setName('');
     setDescription('');
-    setScope('Field');
+    setScope(null);
     setContextKey('');
     setOutcomeKind('Validation');
     setError('');
@@ -430,14 +471,15 @@ function CreateRuleDialog({
           <Field>
             <FieldLabel htmlFor="rule-scope">{t('rules.scope')}</FieldLabel>
             <Select
-              value={scope}
+              value={selectedScope}
               onValueChange={(value) => value && changeScope(value as RuleScope)}
+              disabled={schemasQuery.isLoading || availableScopes.length === 0}
             >
               <SelectTrigger id="rule-scope">
                 <SelectValue>{(value) => t(`rules.scope${value}`)}</SelectValue>
               </SelectTrigger>
               <SelectContent>
-                {scopes.map((value) => (
+                {availableScopes.map((value) => (
                   <SelectItem key={value} value={value}>
                     {t(`rules.scope${value}`)}
                   </SelectItem>
@@ -506,15 +548,21 @@ function CreateRuleDialog({
               createMutation.isPending ||
               !name.trim() ||
               !description.trim() ||
-              !selectedSchema?.contextKey
+              !selectedSchema?.contextKey ||
+              selectedSchema.version === undefined
             }
             onClick={() => {
-              if (!selectedSchema?.contextKey || selectedSchema.version === undefined) return;
+              if (
+                !selectedScope ||
+                !selectedSchema?.contextKey ||
+                selectedSchema.version === undefined
+              )
+                return;
               setError('');
               createMutation.mutate({
                 name: name.trim(),
                 description: description.trim(),
-                scope,
+                scope: selectedScope,
                 contextKey: selectedSchema.contextKey,
                 contextSchemaVersion: selectedSchema.version,
                 outcomeKind,
@@ -556,8 +604,8 @@ function ruleTargets(definition: RuleDefinitionSummary): string[] {
       : [];
 }
 
-function ruleStatusValues(definition: RuleDefinitionSummary): string[] {
-  return definition.origin === 'System' ? ['System'] : ['Workspace', definition.status ?? 'Draft'];
+function distinctDefined<T>(values: (T | null | undefined)[]): T[] {
+  return [...new Set(values.filter((value): value is T => value != null))];
 }
 
 function deriveRuleKey(name: string): string {

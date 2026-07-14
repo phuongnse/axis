@@ -127,17 +127,17 @@ describe('RegisterPage', () => {
       name: 'Met: At least 15 characters',
     });
     const missingHardCriteria = screen.getByRole('listitem', { name: 'Missing: Hard to guess' });
-    expect(metLengthCriteria).toHaveClass('text-secondary');
+    expect(metLengthCriteria).toHaveClass('text-success');
     expect(missingHardCriteria).toHaveClass('text-destructive');
 
     await user.clear(passwordInput);
     await user.type(passwordInput, 'maple river sunrise');
 
     expect(screen.getByRole('listitem', { name: 'Met: At least 15 characters' })).toHaveClass(
-      'text-secondary',
+      'text-success',
     );
     expect(screen.getByRole('listitem', { name: 'Met: Hard to guess' })).toHaveClass(
-      'text-secondary',
+      'text-success',
     );
   });
 

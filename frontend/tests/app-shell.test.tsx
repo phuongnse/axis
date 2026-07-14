@@ -98,8 +98,14 @@ describe('AppShell', () => {
     expect(screen.getByRole('banner')).toHaveTextContent('Dashboard');
     expect(await screen.findByText('Ada Lovelace')).toBeInTheDocument();
     const accountMenu = screen.getByRole('button', { name: 'Account menu' });
-    expect(accountMenu).toHaveClass('h-7');
+    expect(accountMenu).toHaveClass('h-9', 'hover:bg-muted', 'dark:hover:bg-muted/50');
+    expect(accountMenu).not.toHaveClass('border-border', 'bg-background');
+    expect(accountMenu.querySelector('[data-slot="avatar"]')).toHaveAttribute(
+      'data-size',
+      'default',
+    );
     await user.click(accountMenu);
+    expect(accountMenu).toHaveAttribute('aria-expanded', 'true');
     expect(screen.queryByText('Profile')).not.toBeInTheDocument();
     expect(screen.getAllByText('AL')).toHaveLength(1);
     expect(screen.getAllByText('Ada Lovelace')).toHaveLength(1);

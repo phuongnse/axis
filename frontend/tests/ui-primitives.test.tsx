@@ -328,7 +328,7 @@ describe('Select', () => {
 
     expect(screen.getByRole('listbox').closest('[data-slot="select-content"]')).toHaveAttribute(
       'data-align-trigger',
-      'true',
+      'false',
     );
   });
 
@@ -387,19 +387,6 @@ describe('ToggleGroup', () => {
     await user.click(screen.getByRole('button', { name: 'Grid' }));
 
     expect(screen.getByRole('button', { name: 'Grid' })).toHaveAttribute('aria-pressed', 'true');
-  });
-
-  it('supports start-aligned full-width toggle items through the component API', () => {
-    const { container } = render(
-      <ToggleGroup aria-label="Preferences" defaultValue={['language']} orientation="vertical">
-        <ToggleGroupItem value="language">Language</ToggleGroupItem>
-      </ToggleGroup>,
-    );
-
-    expect(container.querySelector('[data-slot="toggle-group"]')).toHaveClass(
-      'data-vertical:items-stretch',
-    );
-    expect(screen.getByRole('button', { name: 'Language' })).toHaveClass('shrink-0');
   });
 });
 

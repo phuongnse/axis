@@ -3,12 +3,12 @@ import { UserPlus } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { Controller } from 'react-hook-form';
 import { Trans, useTranslation } from 'react-i18next';
+import { StatusNotice } from '@/components/shared/StatusNotice';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { AuthCard } from '@/features/auth/components/AuthCard';
-import { AuthNotice } from '@/features/auth/components/AuthNotice';
 import { PasswordCriteria } from '@/features/auth/components/PasswordCriteria';
 import { useRegister } from '@/features/auth/hooks/useRegister';
 
@@ -167,7 +167,7 @@ export function RegisterPage() {
           )}
         />
 
-        {submitError ? <AuthNotice variant="destructive">{submitError}</AuthNotice> : null}
+        {submitError ? <StatusNotice tone="destructive">{submitError}</StatusNotice> : null}
 
         <Button type="submit" size="lg" className="w-full" disabled={loading}>
           <UserPlus className="size-4" aria-hidden />

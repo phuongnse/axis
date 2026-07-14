@@ -831,6 +831,7 @@ def frontend_ui_system_issues(root: Path = ROOT) -> list[str]:
     issues: list[str] = []
     src_root = root / "frontend" / "src"
     ui_root = src_root / "components" / "ui"
+    interaction_state_owner = src_root / "components" / "shared" / "interactionStates.ts"
     palette_utility = re.compile(
         r"\b(?:bg|text|border|ring|outline|fill|stroke|from|via|to|divide|placeholder|decoration)-"
         r"(?:(?:slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|"
@@ -840,6 +841,13 @@ def frontend_ui_system_issues(root: Path = ROOT) -> list[str]:
     inline_color = re.compile(
         r"\b(?:color|background|backgroundColor|borderColor|fill|stroke)\s*:\s*['\"](?:#|rgba?[(]|hsla?[(]|oklch[(])",
         re.IGNORECASE,
+    )
+    interaction_state_visual = re.compile(
+        r"(?<![A-Za-z0-9_-])(?:(?:dark|sm|md|lg|xl|2xl):)*"
+        r"(?:(?:(?:group|peer|not|has)-)?(?:hover|focus|focus-visible|active|"
+        r"aria-(?:\[[^\]]+\]|[A-Za-z0-9_-]+)|data-(?:\[[^\]]+\]|[A-Za-z0-9_-]+))"
+        r"(?:/[A-Za-z0-9_-]+)?:)+"
+        r"(?:\*{1,2}:)?(?:bg|text|border|ring|outline)-[A-Za-z0-9_./-]+"
     )
     import_target = re.compile(r"(?:\bfrom\s*|\bimport\s*)['\"](?P<target>[^'\"]+)['\"]")
     forbidden_roots = (
@@ -852,6 +860,7 @@ def frontend_ui_system_issues(root: Path = ROOT) -> list[str]:
         normalized = rel(path) if root == ROOT else str(path.relative_to(root)).replace("\\", "/")
         text = path.read_text(encoding="utf-8")
         in_ui_primitives = path.is_relative_to(ui_root) if hasattr(path, "is_relative_to") else False
+        owns_interaction_states = path == interaction_state_owner
         if in_ui_primitives:
             for idx, line in enumerate(text.splitlines(), 1):
                 targets = [match.group("target") for match in import_target.finditer(line)]
@@ -882,6 +891,12 @@ def frontend_ui_system_issues(root: Path = ROOT) -> list[str]:
                 issues.append(
                     f"{normalized}:{idx}: component-local hard-coded color; use a semantic token"
                 )
+            for match in interaction_state_visual.finditer(line):
+                if not owns_interaction_states:
+                    issues.append(
+                        f"{normalized}:{idx}: interaction-state visual `{match.group(0)}` must be owned by "
+                        "a registry primitive or frontend/src/components/shared/interactionStates.ts"
+                    )
     return issues
 
 
@@ -2821,7 +2836,12 @@ def dotnet_command(args: argparse.Namespace) -> int:
     if command == "build":
         return run([exe("dotnet"), "build", "Axis.sln", "--nologo", *dotnet_args], check=False).returncode
     if command == "test":
-        return run([exe("dotnet"), "test", "Axis.sln", "--nologo", *dotnet_args], check=False).returncode
+        target = "Axis.sln"
+        if dotnet_args and Path(dotnet_args[0]).suffix.lower() in {".csproj", ".sln"}:
+            target = dotnet_args.pop(0)
+            if dotnet_args and dotnet_args[0] == "--":
+                dotnet_args = dotnet_args[1:]
+        return run([exe("dotnet"), "test", target, "--nologo", *dotnet_args], check=False).returncode
     if command == "format":
         format_args = ["format", "Axis.sln"]
         if args.check:

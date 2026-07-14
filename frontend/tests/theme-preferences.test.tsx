@@ -22,6 +22,14 @@ function jsonResponse(data: unknown): Response {
   } as unknown as Response;
 }
 
+function deferredResponse() {
+  let resolve!: (response: Response) => void;
+  const promise = new Promise<Response>((resolver) => {
+    resolve = resolver;
+  });
+  return { promise, resolve };
+}
+
 function TranslatedFormHarness() {
   const { t } = useTranslation();
 
@@ -179,17 +187,23 @@ describe('theme preferences', () => {
 
   it('persists authenticated theme selection through the API', async () => {
     const user = userEvent.setup();
+    const themeSave = deferredResponse();
     useAuthStore.getState().setSession('header.payload.signature');
-    vi.mocked(fetch).mockResolvedValue(jsonResponse({ theme: 'dark' }));
+    vi.mocked(fetch).mockReturnValue(themeSave.promise);
 
-    await renderWithRouter(<ThemeControl authenticated />, { path: '/dashboard' });
+    await renderWithRouter(<ThemeControl authenticated variant="menu" />, {
+      path: '/dashboard',
+    });
     await user.click(screen.getByRole('button', { name: 'Dark' }));
 
     expect(document.documentElement.dataset.themeMode).toBe('dark');
+    expect(screen.getByText('Saving...')).toHaveClass('absolute', 'top-0', 'right-1');
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    themeSave.resolve(jsonResponse({ theme: 'dark' }));
     await waitFor(() =>
       expect(document.querySelector('#theme-save-status')).not.toBeInTheDocument(),
     );
+    expect(screen.getByRole('button', { name: 'Dark' })).toHaveAttribute('aria-pressed', 'true');
     const request = vi.mocked(fetch).mock.calls[0][1];
     expect(request?.method).toBe('PUT');
     expect(String(request?.body)).toContain('"theme":"dark"');

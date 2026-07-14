@@ -1,10 +1,10 @@
 import { Link } from '@tanstack/react-router';
 import { Mail } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { StatusNotice } from '@/components/shared/StatusNotice';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { AuthCard } from '@/features/auth/components/AuthCard';
-import { AuthNotice } from '@/features/auth/components/AuthNotice';
 import { useResendVerification } from '@/features/auth/hooks/useResendVerification';
 import { loadRegistrationContext } from '@/features/auth/registration-context';
 
@@ -46,25 +46,27 @@ export function EmailConfirmationPage() {
         </Alert>
 
         {state === 'sending' ? (
-          <AuthNotice title={t('notice.sendingEmailTitle')}>{t('notice.sendingEmail')}</AuthNotice>
+          <StatusNotice title={t('notice.sendingEmailTitle')}>
+            {t('notice.sendingEmail')}
+          </StatusNotice>
         ) : null}
 
         {state === 'success' ? (
-          <AuthNotice variant="success" title={t('notice.resendSentTitle')}>
+          <StatusNotice tone="success" title={t('notice.resendSentTitle')}>
             {t('notice.resendSent')}
-          </AuthNotice>
+          </StatusNotice>
         ) : null}
 
         {state === 'rate_limited' ? (
-          <AuthNotice variant="warning" title={t('notice.resendLimitedTitle')}>
+          <StatusNotice tone="warning" title={t('notice.resendLimitedTitle')}>
             {t('notice.resendLimited')}
-          </AuthNotice>
+          </StatusNotice>
         ) : null}
 
         {state === 'error' ? (
-          <AuthNotice variant="destructive" title={t('notice.resendErrorTitle')}>
+          <StatusNotice tone="destructive" title={t('notice.resendErrorTitle')}>
             {t('notice.resendError')}
-          </AuthNotice>
+          </StatusNotice>
         ) : null}
 
         <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm">

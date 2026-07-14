@@ -8,6 +8,7 @@ import type {
   VisibleModuleNavigationContribution,
 } from '@/lib/module-navigation';
 import { cn } from '@/lib/utils';
+import { persistentItemHighlight, transientItemHighlight } from './interactionStates';
 
 interface ModuleNavigationProps {
   context: ModuleNavigationContext;
@@ -49,8 +50,10 @@ export function ModuleNavigation({ context, items }: ModuleNavigationProps) {
                     to={item.to}
                     aria-current={active ? 'page' : undefined}
                     className={cn(
-                      buttonVariants({ variant: active ? 'secondary' : 'ghost' }),
-                      'md:w-full',
+                      buttonVariants({ variant: 'ghost' }),
+                      'md:w-full md:justify-start',
+                      transientItemHighlight,
+                      active && persistentItemHighlight,
                     )}
                   >
                     <Icon className="size-4 shrink-0" aria-hidden />

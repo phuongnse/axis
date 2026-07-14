@@ -2374,6 +2374,51 @@ class TestFrontendUiSystemPolicy(unittest.TestCase):
 
         self.assertEqual([], issues)
 
+    def test_rejects_feature_owned_interaction_state_visuals(self) -> None:
+        issues = self.issues_for_frontend(
+            {
+                "frontend/src/features/rules/components/RuleOption.tsx": (
+                    "export const classes = "
+                    "'hover:bg-accent aria-pressed:text-secondary-foreground group-hover:bg-muted "
+                    "md:hover:bg-accent group-hover/menu:text-foreground "
+                    "data-open:hover:bg-secondary';\n"
+                )
+            }
+        )
+
+        joined = "\n".join(issues)
+        self.assertIn("interaction-state visual `hover:bg-accent`", joined)
+        self.assertIn(
+            "interaction-state visual `aria-pressed:text-secondary-foreground`",
+            joined,
+        )
+        self.assertIn("interaction-state visual `group-hover:bg-muted`", joined)
+        self.assertIn("interaction-state visual `md:hover:bg-accent`", joined)
+        self.assertIn("interaction-state visual `group-hover/menu:text-foreground`", joined)
+        self.assertIn("interaction-state visual `data-open:hover:bg-secondary`", joined)
+
+    def test_rejects_interaction_state_visuals_outside_the_shared_owner(self) -> None:
+        issues = self.issues_for_frontend(
+            {
+                "frontend/src/components/shared/OptionList.tsx": (
+                    "export const classes = 'hover:bg-accent aria-pressed:bg-secondary';\n"
+                )
+            }
+        )
+
+        self.assertIn("interaction-state visual `hover:bg-accent`", "\n".join(issues))
+
+    def test_accepts_interaction_state_visuals_in_the_shared_owner(self) -> None:
+        issues = self.issues_for_frontend(
+            {
+                "frontend/src/components/shared/interactionStates.ts": (
+                    "export const classes = 'hover:bg-accent aria-pressed:bg-secondary';\n"
+                )
+            }
+        )
+
+        self.assertEqual([], issues)
+
     def test_allows_registry_owned_implementation_details(self) -> None:
         issues = self.issues_for_frontend(
             {
@@ -3695,6 +3740,36 @@ class TestAxisCommandWrappers(unittest.TestCase):
         )
 
         self.assertEqual(["dotnet", "build", "Axis.sln", "--nologo", "--no-restore"], calls[0])
+
+    def test_dotnet_test_uses_solution_by_default(self) -> None:
+        calls = self.run_with_fake_process(
+            axis.dotnet_command,
+            axis.argparse.Namespace(dotnet_command="test", dotnet_args=["--", "--no-build"]),
+        )
+
+        self.assertEqual(["dotnet", "test", "Axis.sln", "--nologo", "--no-build"], calls[0])
+
+    def test_dotnet_test_accepts_project_target(self) -> None:
+        project = "tests/Modules/Rules/Axis.Rules.Application.Tests/Axis.Rules.Application.Tests.csproj"
+        calls = self.run_with_fake_process(
+            axis.dotnet_command,
+            axis.argparse.Namespace(
+                dotnet_command="test",
+                dotnet_args=[project, "--", "--filter", "FullyQualifiedName~CreateRuleDefinitionHandlerTests"],
+            ),
+        )
+
+        self.assertEqual(
+            [
+                "dotnet",
+                "test",
+                project,
+                "--nologo",
+                "--filter",
+                "FullyQualifiedName~CreateRuleDefinitionHandlerTests",
+            ],
+            calls[0],
+        )
 
     def test_dotnet_format_check_uses_verify_no_changes(self) -> None:
         calls = self.run_with_fake_process(

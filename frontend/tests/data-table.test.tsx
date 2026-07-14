@@ -226,9 +226,23 @@ describe('DataTable', () => {
         name: 'Export 2 rows with 0 filters',
       }),
     ).toBeInTheDocument();
-    expect(within(table).getByRole('columnheader', { name: /Name/ })).toBeInTheDocument();
-    expect(within(table).getByText('Alpha')).toBeInTheDocument();
+    const nameHeader = within(table).getByRole('columnheader', { name: /Name/ });
+    const nameSort = within(nameHeader).getByRole('button', { name: 'Name: Sort ascending' });
+    expect(nameHeader).toHaveClass('first:pl-3');
+    expect(nameHeader.querySelector('[data-slot="data-table-column-label"]')).not.toBeNull();
+    const alphaCell = within(table).getByText('Alpha').closest('td');
+    expect(alphaCell).toHaveClass('align-top', 'first:pl-3');
+    expect(alphaCell?.querySelector('[data-slot="data-table-cell-content"]')).not.toBeNull();
     expect(within(table).queryByText('Gamma')).not.toBeInTheDocument();
+
+    expect(table.querySelectorAll('[data-slot="table"]')).toHaveLength(1);
+    const viewport = table.querySelector<HTMLElement>('[data-slot="data-table-viewport"]');
+    expect(viewport).not.toBeNull();
+    if (viewport) {
+      viewport.scrollLeft = 64;
+      fireEvent.scroll(viewport);
+      expect(viewport.scrollLeft).toBe(64);
+    }
 
     await user.click(within(table).getByRole('button', { name: 'Next page' }));
     expect(within(table).getByText('Gamma')).toBeInTheDocument();
@@ -244,7 +258,7 @@ describe('DataTable', () => {
     expect(within(table).queryByText('Alpha')).not.toBeInTheDocument();
 
     await user.clear(within(table).getByLabelText('Search records'));
-    await user.click(within(table).getByRole('button', { name: 'Name: Sort ascending' }));
+    await user.click(nameSort);
     expect(
       within(table).getByRole('button', { name: 'Name: Sort descending' }),
     ).toBeInTheDocument();
@@ -372,6 +386,9 @@ describe('DataTable', () => {
     expect(screen.getAllByRole('button', { name: 'Collapse row' }).length).toBeGreaterThan(0);
     const rowCheckboxes = screen.getAllByRole('checkbox', { name: 'Select row' });
     await user.click(rowCheckboxes[0]);
+    const selectedRow = rowCheckboxes[0].closest('tr');
+    expect(selectedRow).toHaveClass('bg-secondary', 'hover:bg-secondary');
+    expect(selectedRow?.querySelector('td')).toHaveClass('bg-inherit');
     expect(screen.getByRole('button', { name: 'Archive 1' })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Archive 1' }));
     expect(screen.queryByRole('button', { name: 'Archive 1' })).not.toBeInTheDocument();

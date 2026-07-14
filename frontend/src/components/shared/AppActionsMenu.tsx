@@ -50,15 +50,15 @@ export function AppActionsMenu({
         render={
           <Button
             type="button"
-            variant="outline"
-            size="sm"
-            className="max-w-56"
+            variant="ghost"
+            size="lg"
+            className="max-w-56 gap-2 px-2 text-foreground"
             aria-label={t('nav.accountMenu')}
             title={t('nav.accountMenu')}
           >
-            <AccountAvatar initials={displayInitials} />
+            <AccountAvatar initials={displayInitials} size="md" />
             <span className="hidden min-w-0 truncate sm:inline">{displayName}</span>
-            <ChevronDown className="size-3.5" aria-hidden />
+            <ChevronDown className="size-3.5 text-muted-foreground" aria-hidden />
           </Button>
         }
       />

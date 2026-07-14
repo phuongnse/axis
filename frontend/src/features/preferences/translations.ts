@@ -336,7 +336,7 @@ export const translations = {
 
     'rules.appliesToColumn': 'Applies to',
     'rules.catalogDescription': 'Read-only definitions supplied by the Rules module.',
-    'rules.catalogTitle': 'Built-in field rules',
+    'rules.catalogTitle': 'Rules catalog',
     'rules.categoryContract': 'Contract',
     'rules.categoryOptions': 'Options',
     'rules.categoryRange': 'Range',
@@ -458,6 +458,7 @@ export const translations = {
     'rules.operatorLessThanOrEqual': 'Less than or equal',
     'rules.operatorNotEqual': 'Does not equal',
     'rules.operatorStartsWith': 'Starts with',
+    'rules.origin': 'Origin',
     'rules.originAll': 'All origins',
     'rules.originFilter': 'Filter by origin',
     'rules.originSystem': 'Built-in',
@@ -899,7 +900,7 @@ export const translations = {
 
     'rules.appliesToColumn': 'Áp dụng cho',
     'rules.catalogDescription': 'Các định nghĩa read-only do module Rules cung cấp.',
-    'rules.catalogTitle': 'Built-in field rules',
+    'rules.catalogTitle': 'Danh mục rule',
     'rules.categoryContract': 'Contract',
     'rules.categoryOptions': 'Tùy chọn',
     'rules.categoryRange': 'Khoảng',
@@ -1021,6 +1022,7 @@ export const translations = {
     'rules.operatorLessThanOrEqual': 'Nhỏ hơn hoặc bằng',
     'rules.operatorNotEqual': 'Không bằng',
     'rules.operatorStartsWith': 'Bắt đầu bằng',
+    'rules.origin': 'Nguồn',
     'rules.originAll': 'Mọi nguồn',
     'rules.originFilter': 'Lọc theo nguồn',
     'rules.originSystem': 'Tích hợp sẵn',

@@ -57,7 +57,7 @@ Provide a reusable, typed data-table foundation that lets product features defin
 
 *Quality*
 - **AC-013** Table controls use approved shared UI primitives, localized consumer copy, keyboard interaction, labels, and visible focus states.
-- **AC-014** The table fits supported desktop and mobile widths without document-level overflow and keeps header, body, and footer regions visually coherent.
+- **AC-014** The table fits supported desktop and mobile widths without document-level overflow, aligns body cells to the row start, and keeps header, body, and footer regions visually coherent.
 - **AC-015** The foundation API does not depend on TanStack Query, Router, a product API contract, or feature-specific data types.
 
 ## Acceptance Test Matrix
@@ -87,7 +87,7 @@ Provide a reusable, typed data-table foundation that lets product features defin
 |---|---|
 | Table toolbar | Show configured global search, typed visible-column filter builder, active-filter reset, grouping controls, column controls, and consumer-defined domain actions without layout shift. |
 | Header | Show localized labels, accessible sort state, resize affordances when enabled, and pinned columns when configured. |
-| Body | Render semantic cells, grouped or hierarchical rows, selection, and detail content inside the owned scroll viewport. |
+| Body | Render row-start-aligned semantic cells, grouped or hierarchical rows, selection, and detail content inside the owned scroll viewport. |
 | Footer | Show numbered paging, loaded/total progress, or infinite loading state according to the selected data mode. |
 | Non-data states | Preserve the table region while showing localized loading, error, empty, or no-result content and an available retry action. |
 
@@ -109,4 +109,4 @@ Required UI quality: controls must be keyboard-reachable, visible copy must come
 >
 > **Verification:** `python scripts/axis.py frontend ci`; `python scripts/axis.py frontend script test -- data-table.test.tsx rules-page.test.tsx`; `python scripts/axis.py local-dev e2e -- e2e/manage-rules.pw.ts`.
 >
-> **Decisions:** One typed definition packages data and semantic column metadata; raw data reflection is rejected. Client, manual page, and infinite modes are explicit. Manual modes own whole-dataset processing on the server. Filter fields follow visible columns, use an Axis-owned serializable expression instead of a library-owned wire contract, and clear hidden-field conditions. Advanced capabilities are opt-in so simple consumers do not inherit unused controls.
+> **Decisions:** One typed definition packages data and semantic column metadata; raw data reflection is rejected. Client, manual page, and infinite modes are explicit. Manual modes own whole-dataset processing on the server. Filter fields follow visible columns, use an Axis-owned serializable expression instead of a library-owned wire contract, and clear hidden-field conditions. Header and body share one native table layout and one scroll viewport; virtualization changes row rendering without introducing a second table layout. Advanced capabilities are opt-in so simple consumers do not inherit unused controls.

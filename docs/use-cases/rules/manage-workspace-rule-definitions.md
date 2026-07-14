@@ -19,8 +19,8 @@ Let a signed-in workspace user define, validate, publish, revise, and archive re
 
 1. User opens the workspace Rules catalog containing system and workspace definitions.
 2. User starts a workspace-owned draft with a name; system derives a stable workspace-unique rule key and displays it read-only after creation.
-3. User selects a supported scope: Field, Object, Record, or Lifecycle.
-4. User selects an available context key and schema version registered by the consumer that owns the target business context.
+3. System offers the scopes exposed by context schemas currently registered by consumers.
+4. User selects an available scope, context key, and schema version owned by the target business context.
 5. User selects a pure outcome kind: Validation or Decision.
 6. System exposes the context fields and typed operators registered for that scope and context version.
 7. User builds a structured condition tree from context operands, literals, parameters, comparison operators, and all/any/not groups.
@@ -45,7 +45,7 @@ Let a signed-in workspace user define, validate, publish, revise, and archive re
 
 *Happy path*
 - **AC-001** User can create a workspace-scoped draft rule with required name, server-derived stable key, description, scope, registered context key/schema version, and outcome kind.
-- **AC-002** Supported scopes are Field, Object, Record, and Lifecycle; supported outcomes are pure Validation and Decision outcomes.
+- **AC-002** A workspace rule can be authored only for a currently registered context schema, and its scope must match that schema; supported outcomes are pure Validation and Decision outcomes.
 - **AC-003** Conditions use a structured, typed tree with context, literal, and parameter operands plus comparison, all, any, and not operators; free-form executable code is not accepted.
 - **AC-004** Consumer-owned context schemas and operator metadata are registered through Rules public contracts, identified by stable context key and positive schema version, and versioned independently from workspace business state.
 - **AC-005** Validation outcomes carry stable violation code, severity, and message; Decision outcomes carry explicit Allow or Deny semantics.
@@ -53,7 +53,7 @@ Let a signed-in workspace user define, validate, publish, revise, and archive re
 - **AC-007** Publishing creates immutable version 1 with canonical condition, parameter schema, outcome, publisher, and publication time.
 - **AC-008** Revising a published definition creates a new draft and later immutable version while all prior versions remain unchanged and resolvable.
 - **AC-009** Archiving prevents new applications but preserves exact-version resolution for existing applied snapshots.
-- **AC-010** Rules catalog lists system and current-workspace definitions with origin, scope, lifecycle status, and latest version using deterministic ordering and pagination.
+- **AC-010** Rules catalog lists system and current-workspace definitions with distinct origin, scope, lifecycle status, and latest version using deterministic ordering and pagination.
 
 *Validation & errors*
 - **AC-011** Rule keys are required, workspace unique, server derived, stable after creation, 1-63 characters, start with a lowercase letter, and contain lowercase letters, digits, and underscores.
@@ -76,8 +76,8 @@ Let a signed-in workspace user define, validate, publish, revise, and archive re
 | ID | Boundary | Scenario | Covers AC | Verification | Required |
 |---|---|---|---|---|---|
 | AT-001 | Domain boundary | Valid workspace rule lifecycle creates a stable draft, publishes immutable versions, revises, and archives without history mutation | AC-001, AC-007, AC-008, AC-009, AC-011, AC-016, AC-021 | Domain test | Yes |
-| AT-002 | Domain boundary | Structured conditions and outcomes enforce supported scopes, typed operators, metadata, and complexity limits | AC-002, AC-003, AC-005, AC-012, AC-013, AC-014, AC-017 | Domain test | Yes |
-| AT-003 | Application boundary | Draft validation and simulation return contextual results without business-state mutation | AC-004, AC-006, AC-013, AC-014, AC-017, AC-020 | Application test | Yes |
+| AT-002 | Domain boundary | Structured conditions and outcomes enforce supported scope values, typed operators, metadata, and complexity limits | AC-003, AC-005, AC-012, AC-013, AC-014, AC-017 | Domain test | Yes |
+| AT-003 | Application boundary | Authoring enforces registered scope/context compatibility; draft validation and simulation return contextual results without business-state mutation | AC-002, AC-004, AC-006, AC-013, AC-014, AC-017, AC-020 | Application test | Yes |
 | AT-004 | Application boundary | Stale update, concurrent publish, invalid archive, and system-definition mutation attempts fail safely | AC-015, AC-016, AC-021, AC-022 | Application test | Yes |
 | AT-005 | Infrastructure boundary | Repository persists workspace isolation, immutable versions, audit metadata, concurrency, indexes, and atomic lifecycle changes | AC-007, AC-008, AC-009, AC-011, AC-015, AC-018, AC-019, AC-021 | Infrastructure integration test | Yes |
 | AT-006 | API boundary | Authorized lifecycle endpoints expose stable request/response contracts, problem codes, pagination, and generated frontend parity | AC-001, AC-006, AC-007, AC-008, AC-009, AC-010, AC-011, AC-015 | API integration test | Yes |
@@ -98,7 +98,7 @@ Let a signed-in workspace user define, validate, publish, revise, and archive re
 | Screen | Required contract |
 |---|---|
 | Rules catalog | List system and workspace rules with useful scope, status, origin, and version context; provide creation only for workspace rules. |
-| New rule identity | Capture name and description, display the derived stable key, and select scope and outcome kind. |
+| New rule identity | Capture name and description, display the derived stable key, and select a scope exposed by a registered context schema plus an outcome kind. |
 | Condition builder | Build typed nested conditions using context-aware operands and operators without exposing raw serialized expressions. |
 | Outcome editor | Configure Validation or Decision outcome details with contextual validation. |
 | Validate and simulate | Show node-specific errors or deterministic result and outcome for sample context without mutation. |
@@ -159,4 +159,4 @@ sequenceDiagram
 >
 > **Verification:** Acceptance proof is tracked in the sibling evidence sidecar.
 >
-> **Decisions:** Workspace rules use structured typed conditions rather than free-form code. Definitions have draft/published/archived lifecycle with immutable published versions and optimistic concurrency. Rules support pure Validation and Decision outcomes across Field, Object, Record, and Lifecycle scopes. System rules share the catalog but remain code-owned and read-only. Consumers register versioned context schemas and own applications, enforcement transactions, and all side effects. Published versions are never edited or deleted. Event sourcing, integration events, inbox/outbox, scripting, plugins, and automation actions are rejected for this slice.
+> **Decisions:** Workspace rules use structured typed conditions rather than free-form code. Definitions have draft/published/archived lifecycle with immutable published versions and optimistic concurrency. Workspace rules use only scopes exposed by registered context schemas and produce pure Validation or Decision outcomes. System rules share the catalog but remain code-owned and read-only. Consumers register versioned context schemas and own applications, enforcement transactions, and all side effects. Published versions are never edited or deleted. Event sourcing, integration events, inbox/outbox, scripting, plugins, and automation actions are rejected for this slice.

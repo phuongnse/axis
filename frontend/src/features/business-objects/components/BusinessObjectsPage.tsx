@@ -9,7 +9,7 @@ import {
   type DataTableColumnDef,
   type DataTableDefinition,
 } from '@/components/shared/data-table';
-import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/shared/StatusBadge';
 import { Button } from '@/components/ui/button';
 import { ruleDefinitionsListQueryOptions } from '@/features/rules';
 import {
@@ -196,7 +196,9 @@ export function BusinessObjectsPage() {
   return (
     <div className="flex h-full min-h-0 w-full min-w-0 flex-col gap-4 overflow-hidden p-4 sm:p-6 lg:p-8">
       <header className="min-w-0 shrink-0">
-        <h1 className="text-2xl font-semibold text-foreground">{t('businessObjects.title')}</h1>
+        <h1 className="font-heading text-2xl font-semibold text-foreground">
+          {t('businessObjects.title')}
+        </h1>
         <p className="mt-1 max-w-3xl text-sm leading-6 text-muted-foreground">
           {t('businessObjects.pageDescription')}
         </p>
@@ -229,8 +231,8 @@ export function BusinessObjectsPage() {
 function DefinitionStatusBadge({ status }: { status?: 'Unpublished' | 'Published' }) {
   const { t } = useTranslation();
   return status === 'Published' ? (
-    <Badge variant="outline">{t('businessObjects.published')}</Badge>
+    <StatusBadge tone="success">{t('businessObjects.published')}</StatusBadge>
   ) : (
-    <Badge variant="outline">{t('businessObjects.unpublished')}</Badge>
+    <StatusBadge tone="neutral">{t('businessObjects.unpublished')}</StatusBadge>
   );
 }

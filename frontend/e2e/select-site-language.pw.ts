@@ -107,15 +107,38 @@ async function fillSignInForm(page: Page, email: string): Promise<void> {
   await page.getByLabel('Password').fill(password);
 }
 
+async function expectOptionListLayout(page: Page): Promise<void> {
+  const group = page.locator('[data-slot="toggle-group"][aria-label="Language"]');
+  const option = page.getByRole('button', { name: 'Vietnamese' });
+  const [groupBox, optionBox] = await Promise.all([group.boundingBox(), option.boundingBox()]);
+
+  if (!groupBox || !optionBox) throw new Error('Language option layout was not measurable.');
+
+  expect(Math.abs(groupBox.width - optionBox.width)).toBeLessThanOrEqual(1);
+  expect(await option.evaluate((node) => getComputedStyle(node).justifyContent)).toBe('flex-start');
+}
+
 async function openPreferencesWithoutMovingForm(page: Page): Promise<void> {
   const form = page.locator('form');
   const topBefore = await form.evaluate((node) => node.getBoundingClientRect().top);
+  const trigger = page.getByRole('button', { name: 'Preferences' });
+  const triggerBox = await trigger.boundingBox();
 
-  await page.getByRole('button', { name: 'Preferences' }).click();
+  await trigger.click();
   await expect(page.getByRole('button', { name: 'Vietnamese' })).toBeVisible();
+  await expectOptionListLayout(page);
 
   const topAfter = await form.evaluate((node) => node.getBoundingClientRect().top);
+  const menuBox = await page
+    .locator('[data-slot="popover-content"][aria-label="Preferences"]')
+    .boundingBox();
+  if (!triggerBox || !menuBox) {
+    throw new Error('Preferences trigger/menu layout was not measurable.');
+  }
   expect(topAfter).toBeCloseTo(topBefore, 1);
+  expect(Math.abs(triggerBox.x + triggerBox.width - menuBox.x - menuBox.width)).toBeLessThanOrEqual(
+    1,
+  );
 }
 
 async function openAuthenticatedPreferences(page: Page): Promise<void> {

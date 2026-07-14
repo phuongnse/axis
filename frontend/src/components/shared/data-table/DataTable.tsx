@@ -34,6 +34,10 @@ import {
   TriangleAlert,
 } from 'lucide-react';
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  persistentItemHighlight,
+  transientItemHighlight,
+} from '@/components/shared/interactionStates';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -280,6 +284,7 @@ export function DataTable<TData>({ definition }: { definition: DataTableDefiniti
 
   const selectedRows = table.getSelectedRowModel().flatRows;
   const hasRows = rows.length > 0;
+  const renderVirtualRows = virtualized && hasRows && !definition.loading && !definition.error;
   const hasQuery = Boolean(query.globalFilter) || countFilterConditions(query.filterExpression) > 0;
   const visibleColumnCount = Math.max(table.getVisibleLeafColumns().length, 1);
 
@@ -319,73 +324,83 @@ export function DataTable<TData>({ definition }: { definition: DataTableDefiniti
         </div>
       ) : null}
 
-      <Table
-        className={cn('table-fixed', virtualized && 'grid')}
-        style={{ width: table.getTotalSize(), minWidth: '100%' }}
-      >
-        <TableHeader className={cn(virtualized && 'grid')}>
-          {table.getHeaderGroups().map((headerGroup) => (
-            <TableRow key={headerGroup.id} className={cn(virtualized && 'flex w-full')}>
-              {headerGroup.headers.map((header) => (
-                <TableHead
-                  key={header.id}
-                  colSpan={header.colSpan}
-                  style={{
-                    width: header.getSize(),
-                    ...pinnedColumnStyle(header.column),
-                  }}
-                  className="relative"
-                >
-                  {header.isPlaceholder ? null : (
-                    <DataTableColumnHeader column={header.column} messages={messages}>
-                      {header.column.columnDef.meta?.label ??
-                        flexRender(header.column.columnDef.header, header.getContext())}
-                    </DataTableColumnHeader>
-                  )}
-                  {header.column.getCanResize() ? (
-                    <div className="absolute inset-y-0 right-0 flex items-center">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon-xs"
-                        aria-label={`${header.column.columnDef.meta?.label ?? header.column.id}: resize`}
-                        data-slot="data-table-resizer"
-                        data-resizing={header.column.getIsResizing()}
-                        onDoubleClick={() => header.column.resetSize()}
-                        onMouseDown={header.getResizeHandler()}
-                        onTouchStart={header.getResizeHandler()}
-                        className="cursor-col-resize touch-none"
-                      />
-                    </div>
-                  ) : null}
-                </TableHead>
-              ))}
-            </TableRow>
-          ))}
-        </TableHeader>
-      </Table>
-
       <div
         ref={scrollRef}
         onScroll={fetchMoreIfNeeded}
         data-slot="data-table-viewport"
-        className="min-h-0 flex-1 overflow-auto overscroll-contain"
+        className="relative min-h-0 flex-1 overflow-auto overscroll-contain"
       >
         <Table
+          containerClassName="overflow-visible"
           className={cn('table-fixed', virtualized && 'grid')}
           style={{ width: table.getTotalSize(), minWidth: '100%' }}
         >
+          {!virtualized ? (
+            <colgroup>
+              {table.getVisibleLeafColumns().map((column) => (
+                <col key={column.id} style={{ width: column.getSize() }} />
+              ))}
+            </colgroup>
+          ) : null}
+          <TableHeader className={cn('sticky top-0 z-20 bg-card', virtualized && 'grid')}>
+            {table.getHeaderGroups().map((headerGroup) => (
+              <TableRow key={headerGroup.id} className={cn(virtualized && 'flex w-full')}>
+                {headerGroup.headers.map((header) => (
+                  <TableHead
+                    key={header.id}
+                    colSpan={header.colSpan}
+                    style={{
+                      width: header.getSize(),
+                      ...pinnedColumnStyle(header.column),
+                    }}
+                    className={cn(
+                      'relative bg-card first:pl-3',
+                      virtualized && 'flex shrink-0 items-center',
+                    )}
+                  >
+                    {header.isPlaceholder ? null : (
+                      <DataTableColumnHeader column={header.column} messages={messages}>
+                        {header.column.columnDef.meta?.label ??
+                          flexRender(header.column.columnDef.header, header.getContext())}
+                      </DataTableColumnHeader>
+                    )}
+                    {header.column.getCanResize() ? (
+                      <div className="absolute inset-y-0 right-0 flex items-center">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon-xs"
+                          aria-label={`${header.column.columnDef.meta?.label ?? header.column.id}: resize`}
+                          data-slot="data-table-resizer"
+                          data-resizing={header.column.getIsResizing()}
+                          onDoubleClick={() => header.column.resetSize()}
+                          onMouseDown={header.getResizeHandler()}
+                          onTouchStart={header.getResizeHandler()}
+                          className="cursor-col-resize touch-none"
+                        />
+                      </div>
+                    ) : null}
+                  </TableHead>
+                ))}
+              </TableRow>
+            ))}
+          </TableHeader>
           <TableBody
             className={cn(virtualized && 'relative grid')}
-            style={virtualized ? { height: rowVirtualizer.getTotalSize() } : undefined}
+            style={renderVirtualRows ? { height: rowVirtualizer.getTotalSize() } : undefined}
           >
             {definition.loading ? (
               <LoadingRows
-                columnIds={table.getVisibleLeafColumns().map((column) => column.id)}
+                columns={table.getVisibleLeafColumns()}
                 messages={messages}
+                virtualized={virtualized}
               />
             ) : definition.error ? (
-              <StateRow columnCount={visibleColumnCount}>
+              <StateRow
+                columnCount={visibleColumnCount}
+                tableWidth={table.getTotalSize()}
+                virtualized={virtualized}
+              >
                 <Empty role="alert">
                   <EmptyHeader>
                     <EmptyMedia variant="icon">
@@ -405,7 +420,7 @@ export function DataTable<TData>({ definition }: { definition: DataTableDefiniti
                 </Empty>
               </StateRow>
             ) : hasRows ? (
-              virtualized ? (
+              renderVirtualRows ? (
                 rowVirtualizer.getVirtualItems().map((virtualRow) => {
                   const row = rows[virtualRow.index];
                   return (
@@ -429,7 +444,11 @@ export function DataTable<TData>({ definition }: { definition: DataTableDefiniti
                 ))
               )
             ) : (
-              <StateRow columnCount={visibleColumnCount}>
+              <StateRow
+                columnCount={visibleColumnCount}
+                tableWidth={table.getTotalSize()}
+                virtualized={virtualized}
+              >
                 <Empty>
                   <EmptyHeader>
                     <EmptyMedia variant="icon">
@@ -472,7 +491,7 @@ function DataTableColumnHeader<TData>({
           type="button"
           variant="ghost"
           size="sm"
-          className="min-w-0 justify-start"
+          className="-ml-2 min-w-0 justify-start px-2"
           aria-label={`${column.columnDef.meta?.label ?? column.id}: ${
             sorted === 'asc'
               ? messages.sortDescending
@@ -488,7 +507,9 @@ function DataTableColumnHeader<TData>({
                 : column.toggleSorting(false)
           }
         >
-          <span className="truncate">{children}</span>
+          <span data-slot="data-table-column-label" className="truncate">
+            {children}
+          </span>
           {sorted === 'asc' ? (
             <ArrowUp aria-hidden />
           ) : sorted === 'desc' ? (
@@ -498,7 +519,9 @@ function DataTableColumnHeader<TData>({
           )}
         </Button>
       ) : (
-        <span className="truncate">{children}</span>
+        <span data-slot="data-table-column-label" className="truncate">
+          {children}
+        </span>
       )}
       {configurable ? (
         <DropdownMenu>
@@ -583,8 +606,12 @@ function DataRow<TData>({
       <TableRow
         ref={virtual ? virtual.measure : undefined}
         data-index={virtual ? row.index : undefined}
-        data-state={row.getIsSelected() ? 'selected' : undefined}
-        className={cn(virtual && 'absolute flex w-full')}
+        className={cn(
+          'bg-card',
+          transientItemHighlight,
+          row.getIsSelected() && persistentItemHighlight,
+          virtual && 'absolute flex w-full',
+        )}
         style={virtual ? { transform: `translateY(${virtual.start}px)` } : undefined}
       >
         {visibleCells.map((cell, index) => {
@@ -601,9 +628,13 @@ function DataRow<TData>({
                 width: cell.column.getSize(),
                 ...pinnedColumnStyle(cell.column),
               }}
-              className={cn('bg-card', virtual && 'flex shrink-0 items-center')}
+              className={cn(
+                'bg-inherit align-top first:pl-3',
+                virtual && 'flex shrink-0 items-start',
+              )}
             >
               <div
+                data-slot="data-table-cell-content"
                 className="flex min-w-0 items-center gap-1.5"
                 style={canExpand && row.depth > 0 ? { paddingLeft: row.depth * 16 } : undefined}
               >
@@ -645,29 +676,49 @@ function DataRow<TData>({
   );
 }
 
-function StateRow({ columnCount, children }: { columnCount: number; children: React.ReactNode }) {
+function StateRow({
+  columnCount,
+  tableWidth,
+  virtualized,
+  children,
+}: {
+  columnCount: number;
+  tableWidth: number;
+  virtualized: boolean;
+  children: React.ReactNode;
+}) {
   return (
-    <TableRow>
-      <TableCell colSpan={columnCount} className="h-56 whitespace-normal">
+    <TableRow className={cn(virtualized && 'flex w-full')}>
+      <TableCell
+        colSpan={columnCount}
+        className={cn('h-56 whitespace-normal first:pl-3', virtualized && 'block shrink-0')}
+        style={virtualized ? { width: tableWidth } : undefined}
+      >
         {children}
       </TableCell>
     </TableRow>
   );
 }
 
-function LoadingRows({
-  columnIds,
+function LoadingRows<TData>({
+  columns,
   messages,
+  virtualized,
 }: {
-  columnIds: readonly string[];
+  columns: readonly Column<TData, unknown>[];
   messages: DataTableMessages;
+  virtualized: boolean;
 }) {
   return (
     <>
       {loadingRowIds.map((rowId, row) => (
-        <TableRow key={`loading-${rowId}`}>
-          {columnIds.map((columnId, column) => (
-            <TableCell key={`loading-${rowId}-${columnId}`}>
+        <TableRow key={`loading-${rowId}`} className={cn(virtualized && 'flex w-full')}>
+          {columns.map((columnDefinition, column) => (
+            <TableCell
+              key={`loading-${rowId}-${columnDefinition.id}`}
+              className={cn('first:pl-3', virtualized && 'flex shrink-0 items-center')}
+              style={virtualized ? { width: columnDefinition.getSize() } : undefined}
+            >
               <Skeleton className="h-5 w-full max-w-48" />
               {row === 0 && column === 0 ? (
                 <span className="sr-only">{messages.loading}</span>

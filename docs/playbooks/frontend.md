@@ -67,6 +67,19 @@ Use these ownership layers:
 - **App-pattern zone** — `frontend/src/components/shared` owns reusable Axis composition and adapters. Give them narrow Axis-owned props such as product state, not provider variants, types, selectors, or DOM assumptions.
 - **Feature zone** — feature components compose defaults and app patterns. Consumer `className` is outer layout-only and must not alter primitive visuals.
 
+Every interactive surface follows one state-role hierarchy:
+
+| State role | Examples | Visual contract | Relative emphasis |
+|---|---|---|---|
+| Transient item | pointer hover, keyboard highlight, open item context | `accent` pair | lower |
+| Persistent item | selected, current, toggled | `secondary` pair, retained on hover | higher than transient |
+| Keyboard focus | `focus-visible` | ring, independent of fill | accessibility-owned |
+| Disabled or destructive | unavailable or dangerous action | owning semantic pair/opacity | meaning-owned |
+
+Persistent item emphasis must exceed transient item emphasis in light and dark mode. Compare equivalent state roles across overlays, navigation, collections/tables, and form options; action variants keep their component contract. Outside registry primitives, `frontend/src/components/shared/interactionStates.ts` is the only visual-state class owner; other shared, feature, and route code composes it without local state colors. Stacked single-choice options use `OptionList` for full-width, inline-start content.
+
+Cross-feature informational, success, warning, and destructive feedback uses the app-owned `StatusNotice` pattern so text, icon, and semantic tone stay aligned; lifecycle labels use `StatusBadge` with published as success, draft/unpublished as neutral, and archived as muted.
+
 Use `$axis-ui-system` for token/customization decisions, registry diffs, baseline refreshes, or provider changes. Never bulk-overwrite unrelated registry components. A reviewed upstream sync and matching baseline refresh need provenance but no additional sign-off when they introduce no customization or exception. Explicit sign-off is required for semantic-token visual changes, cross-feature visual/API conventions, primitive exceptions, style/base/provider or major-library changes, and all customizations.
 
 ## Styling

@@ -1,5 +1,5 @@
 import { Buffer } from 'node:buffer';
-import { expect, type Page, test } from '@playwright/test';
+import { expect, type Locator, type Page, test } from '@playwright/test';
 
 const profile = {
   id: '11111111-1111-4111-8111-111111111111',
@@ -117,6 +117,14 @@ async function mockAuthenticatedSession(page: Page): Promise<void> {
       body: JSON.stringify(fieldRuleDefinitions),
     });
   });
+
+  await page.route('**/api/business-object-definitions?**', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ items: [], totalCount: 0, page: 1, pageSize: 20 }),
+    });
+  });
 }
 
 async function expectNoPageOverflow(page: Page): Promise<void> {
@@ -230,7 +238,163 @@ async function expectAppFrameReady(page: Page, title: string): Promise<void> {
   await expect(page.getByRole('banner')).toContainText(title, { timeout: 15_000 });
 }
 
+async function visualState(locator: Locator) {
+  return locator.evaluate((node) => {
+    const style = getComputedStyle(node);
+    return { backgroundColor: style.backgroundColor, color: style.color };
+  });
+}
+
+async function settledVisualState(locator: Locator) {
+  await locator.evaluate((element) => {
+    const animations = new Set<Animation>();
+    for (let node: Element | null = element; node; node = node.parentElement) {
+      for (const animation of node.getAnimations()) animations.add(animation);
+    }
+    return Promise.allSettled([...animations].map((animation) => animation.finished));
+  });
+  return visualState(locator);
+}
+
+async function hoveredVisualState(locator: Locator) {
+  await locator.hover();
+  return settledVisualState(locator);
+}
+
+async function colorDistance(page: Page, first: string, second: string) {
+  return page.evaluate(
+    ([left, right]) => {
+      const canvas = document.createElement('canvas');
+      const context = canvas.getContext('2d', { willReadFrequently: true });
+      if (!context) throw new Error('Expected a 2D canvas context');
+
+      const rgb = (color: string) => {
+        context.clearRect(0, 0, 1, 1);
+        context.fillStyle = color;
+        context.fillRect(0, 0, 1, 1);
+        return context.getImageData(0, 0, 1, 1).data;
+      };
+      const leftRgb = rgb(left);
+      const rightRgb = rgb(right);
+      return Math.hypot(
+        leftRgb[0] - rightRgb[0],
+        leftRgb[1] - rightRgb[1],
+        leftRgb[2] - rightRgb[2],
+      );
+    },
+    [first, second] as const,
+  );
+}
+
 test.describe('app frame', () => {
+  test('interaction states share one convention across overlays, navigation, and table menus', async ({
+    page,
+  }) => {
+    await mockAuthenticatedSession(page);
+    await page.route('**/api/users/me/preferences/theme', async (route) => {
+      const theme = JSON.parse(route.request().postData() ?? '{}').theme ?? 'light';
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ theme }),
+      });
+    });
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await page.goto('/dashboard', { waitUntil: 'domcontentloaded' });
+
+    await expect(page).toHaveURL(/\/dashboard$/);
+    await page
+      .getByRole('navigation', { name: 'Modules' })
+      .getByRole('link', { name: 'Rules' })
+      .click();
+    await expect(page).toHaveURL(/\/rules$/);
+    await expect(page.getByRole('heading', { name: 'Rules', exact: true })).toBeVisible();
+
+    for (const mode of ['light', 'dark'] as const) {
+      await page.getByRole('button', { name: 'Account menu' }).click();
+      if (mode === 'dark') {
+        await page.getByRole('button', { name: 'Dark' }).click();
+        await expect(page.locator('html')).toHaveClass(/dark/);
+      } else {
+        await expect(page.locator('html')).not.toHaveClass(/dark/);
+      }
+
+      const selectedOptionState = await settledVisualState(
+        page.getByRole('button', { name: 'English' }),
+      );
+      const selectedOptionHoverState = await hoveredVisualState(
+        page.getByRole('button', { name: 'English' }),
+      );
+      const optionSurfaceState = await visualState(
+        page.locator('[data-slot="popover-content"][aria-label="Account menu"]'),
+      );
+      const optionHoverState = await hoveredVisualState(
+        page.getByRole('button', { name: 'Vietnamese' }),
+      );
+      await page.keyboard.press('Escape');
+
+      const moduleNavigation = page.getByRole('navigation', { name: 'Modules' });
+      const currentNavigationState = await settledVisualState(
+        moduleNavigation.getByRole('link', { name: 'Rules' }),
+      );
+      const transientNavigationState = await hoveredVisualState(
+        moduleNavigation.getByRole('link', { name: 'Business objects' }),
+      );
+
+      const columnMenuTrigger = page
+        .locator('[data-slot="table-header"] [data-slot="dropdown-menu-trigger"]')
+        .first();
+      await columnMenuTrigger.click();
+      const tableMenuHighlightState = await hoveredVisualState(
+        page.locator('[data-slot="dropdown-menu-item"]:visible').first(),
+      );
+      await page.keyboard.press('Escape');
+
+      await page.getByRole('combobox', { name: 'Rows per page' }).click();
+      const selectHighlightState = await hoveredVisualState(
+        page.getByRole('option', { name: '10', exact: true }),
+      );
+      await page.keyboard.press('Escape');
+
+      expect(currentNavigationState, `${mode} persistent row state`).toEqual(selectedOptionState);
+      expect(selectedOptionHoverState, `${mode} persistent state retained on hover`).toEqual(
+        selectedOptionState,
+      );
+      expect(transientNavigationState, `${mode} navigation transient state`).toEqual(
+        optionHoverState,
+      );
+      expect(tableMenuHighlightState, `${mode} table-menu transient state`).toEqual(
+        optionHoverState,
+      );
+      expect(selectHighlightState, `${mode} select transient state`).toEqual(optionHoverState);
+
+      const tableRowHighlightState = await hoveredVisualState(
+        page
+          .locator('[data-slot="table-body"] [data-slot="table-row"]')
+          .first()
+          .locator('[data-slot="table-cell"]')
+          .first(),
+      );
+      expect(tableRowHighlightState, `${mode} table-row transient state`).toEqual(optionHoverState);
+      expect(optionHoverState, `${mode} transient and persistent states differ`).not.toEqual(
+        selectedOptionState,
+      );
+      const transientDistance = await colorDistance(
+        page,
+        optionHoverState.backgroundColor,
+        optionSurfaceState.backgroundColor,
+      );
+      const persistentDistance = await colorDistance(
+        page,
+        selectedOptionState.backgroundColor,
+        optionSurfaceState.backgroundColor,
+      );
+      expect(persistentDistance, `${mode} persistent emphasis exceeds transient`).toBeGreaterThan(
+        transientDistance * 1.25,
+      );
+    }
+  });
+
   test('AT-002 desktop and mobile frame render without console errors or document overflow', async ({
     page,
   }) => {
@@ -243,6 +407,17 @@ test.describe('app frame', () => {
     page.on('pageerror', (error) => pageErrors.push(error.message));
 
     await mockAuthenticatedSession(page);
+    let completeThemeSave: (() => void) | undefined;
+    await page.route('**/api/users/me/preferences/theme', async (route) => {
+      await new Promise<void>((resolve) => {
+        completeThemeSave = resolve;
+      });
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ theme: 'dark' }),
+      });
+    });
     await page.setViewportSize({ width: 1280, height: 720 });
     await page.goto('/dashboard', { waitUntil: 'domcontentloaded' });
 
@@ -253,7 +428,11 @@ test.describe('app frame', () => {
       'href',
       '/business-objects',
     );
-    await expect(page.getByRole('link', { name: 'Rules' })).toHaveAttribute('href', '/rules');
+    const rulesLink = page.getByRole('link', { name: 'Rules' });
+    await expect(rulesLink).toHaveAttribute('href', '/rules');
+    expect(await rulesLink.evaluate((node) => getComputedStyle(node).justifyContent)).toBe(
+      'flex-start',
+    );
     await expect(page.getByRole('main')).toHaveText('');
     await expect(page.getByRole('contentinfo')).toContainText('Version 0.1.0');
     await expect(page.getByRole('contentinfo')).toContainText('Axis Platform');
@@ -263,6 +442,19 @@ test.describe('app frame', () => {
     await expect(page.getByText(profile.fullName)).toHaveCount(1);
     await expect(page.getByText('Preferences')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible();
+    const accountMenu = page.locator('[data-slot="popover-content"][aria-label="Account menu"]');
+    await accountMenu.evaluate((element) =>
+      Promise.all(element.getAnimations({ subtree: true }).map((animation) => animation.finished)),
+    );
+    const initialMenuBox = await accountMenu.boundingBox();
+    await page.getByRole('button', { name: 'Dark' }).click();
+    await expect(page.getByText('Saving...')).toBeVisible();
+    const pendingMenuBox = await accountMenu.boundingBox();
+    expect(Math.round(pendingMenuBox?.height ?? 0)).toBe(Math.round(initialMenuBox?.height ?? 0));
+    completeThemeSave?.();
+    await expect(page.getByText('Saving...')).toBeHidden();
+    const savedMenuBox = await accountMenu.boundingBox();
+    expect(Math.round(savedMenuBox?.height ?? 0)).toBe(Math.round(initialMenuBox?.height ?? 0));
     await expectNoPageOverflow(page);
     await expectNoDocumentScroll(page);
     await page.keyboard.press('Escape');

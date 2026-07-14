@@ -34,7 +34,7 @@ export function PreferencesMenu({ authenticated = false, className }: Preference
           <span>{t('app.preferences')}</span>
           <ChevronDown aria-hidden />
         </PopoverTrigger>
-        <PopoverContent aria-label={t('app.preferences')}>
+        <PopoverContent align="end" aria-label={t('app.preferences')}>
           <LanguageControl authenticated={authenticated} variant="menu" />
           <ThemeControl authenticated={authenticated} variant="menu" />
         </PopoverContent>

@@ -2,6 +2,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertCircle, Archive, Braces, Play, Plus, Save, Send, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { StatusBadge } from '@/components/shared/StatusBadge';
+import { StatusNotice } from '@/components/shared/StatusNotice';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
   AlertDialog,
@@ -349,9 +351,7 @@ export function RuleEditorDialog({
           {detail && editor && schema ? (
             <div className="space-y-6">
               {feedback ? (
-                <Alert variant={feedback.variant === 'destructive' ? 'destructive' : 'default'}>
-                  <AlertDescription>{feedback.text}</AlertDescription>
-                </Alert>
+                <StatusNotice tone={feedback.variant}>{feedback.text}</StatusNotice>
               ) : null}
               <RuleIdentitySection
                 editor={editor}
@@ -1394,12 +1394,12 @@ function LabeledCheckbox({
 function LifecycleBadge({ detail }: { detail: RuleDefinitionDetail }) {
   const { t } = useTranslation();
   if (detail.status === 'Published') {
-    return <Badge variant="outline">{t('rules.statusPublished')}</Badge>;
+    return <StatusBadge tone="success">{t('rules.statusPublished')}</StatusBadge>;
   }
   if (detail.status === 'Archived') {
-    return <Badge variant="outline">{t('rules.statusArchived')}</Badge>;
+    return <StatusBadge tone="muted">{t('rules.statusArchived')}</StatusBadge>;
   }
-  return <Badge variant="outline">{t('rules.statusDraft')}</Badge>;
+  return <StatusBadge tone="neutral">{t('rules.statusDraft')}</StatusBadge>;
 }
 
 const valueTypes: RuleValueType[] = ['Text', 'Integer', 'Decimal', 'Date', 'DateTime', 'Boolean'];
