@@ -328,7 +328,7 @@ describe('Select', () => {
 
     expect(screen.getByRole('listbox').closest('[data-slot="select-content"]')).toHaveAttribute(
       'data-align-trigger',
-      'true',
+      'false',
     );
   });
 

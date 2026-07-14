@@ -375,7 +375,33 @@ test('workspace rule authoring supports simulation, immutable revisions, and arc
   await catalog.getByRole('button', { name: 'Filters', exact: true }).click();
   await expectNoDocumentOverflow(page);
   await page.getByRole('button', { name: 'Add condition' }).click();
-  await page.getByTestId('fields').click();
+  const filterField = page.getByTestId('fields');
+  const filterOperator = page.getByTestId('operators');
+  const filterValue = page.getByTestId('value-editor');
+  const removeCondition = page.getByRole('button', { name: 'Remove condition', exact: true });
+  const [fieldBox, operatorBox, valueBox, removeBox] = await Promise.all([
+    filterField.boundingBox(),
+    filterOperator.boundingBox(),
+    filterValue.boundingBox(),
+    removeCondition.boundingBox(),
+  ]);
+  if (!fieldBox || !operatorBox || !valueBox || !removeBox) {
+    throw new Error('Filter condition controls did not render bounding boxes');
+  }
+  expect(operatorBox.x - (fieldBox.x + fieldBox.width)).toBeLessThanOrEqual(12);
+  expect(valueBox.x - (operatorBox.x + operatorBox.width)).toBeLessThanOrEqual(12);
+  expect(removeBox.x - (valueBox.x + valueBox.width)).toBeLessThanOrEqual(12);
+
+  await filterField.click();
+  const selectContent = page.locator('[data-slot="select-content"][data-open]');
+  await expect(selectContent).toBeVisible();
+  const [triggerBox, contentBox] = await Promise.all([
+    filterField.boundingBox(),
+    selectContent.boundingBox(),
+  ]);
+  if (!triggerBox || !contentBox) throw new Error('Select trigger or popup did not render');
+  expect(contentBox.y).toBeGreaterThanOrEqual(triggerBox.y + triggerBox.height);
+  expect(contentBox.x).toBeCloseTo(triggerBox.x, 0);
   await page.getByRole('option', { name: 'Origin', exact: true }).click();
   await page.getByTestId('value-editor').click();
   await page.getByRole('option', { name: 'Built-in', exact: true }).click();

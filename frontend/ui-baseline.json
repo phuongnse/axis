@@ -4,6 +4,10 @@
       "reason": "Restore Base UI's bracketed data-attribute selectors so directional transitions compile and run correctly.",
       "signOff": "Approved by project owner."
     },
+    "src/components/ui/select.tsx": {
+      "reason": "Open Select popups below and align them with the trigger start instead of overlaying the selected item.",
+      "signOff": "Approved by project owner."
+    },
     "src/components/ui/table.tsx": {
       "reason": "Expose the wrapper class so shared data tables can use one scroll viewport and one native table layout.",
       "signOff": "Approved by project owner."
@@ -59,7 +63,7 @@
     "src/components/ui/progress.tsx": "1094f7bfab6d69aa0fd8132987147be4ea3583efd826050278344629e9a6d555",
     "src/components/ui/radio-group.tsx": "e008134cd81946231c4676f2ebc62c7c23572d6b3cfa26f131bf51a17d92ec21",
     "src/components/ui/resizable.tsx": "6e3f0f912a0d68614281e7570f4077a966a0517f8adcde65aed5cf9c88af073c",
-    "src/components/ui/select.tsx": "ca3bd1b370ea67b84632d435c22d8270752fa6013c06c365162af265e4a0e87e",
+    "src/components/ui/select.tsx": "836ed4332ec142b1ac1b4825418e36ffa74425103d2e2a1bb290f0d1f4a88e92",
     "src/components/ui/separator.tsx": "75085bd84ff6965e4a356c53a4689799cabf65caa93c0bba064d5a0c6fa78f13",
     "src/components/ui/sheet.tsx": "e80712ffb97f01a3568523bc67c85823c882e86fb4ec922f5af13831ed3e22fe",
     "src/components/ui/sidebar.tsx": "31756aab2499ea597f8da88a63f35ea2b0d002c52f51e9a9e9add408e404ddc2",
