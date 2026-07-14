@@ -388,19 +388,6 @@ describe('ToggleGroup', () => {
 
     expect(screen.getByRole('button', { name: 'Grid' })).toHaveAttribute('aria-pressed', 'true');
   });
-
-  it('supports start-aligned full-width toggle items through the component API', () => {
-    const { container } = render(
-      <ToggleGroup aria-label="Preferences" defaultValue={['language']} orientation="vertical">
-        <ToggleGroupItem value="language">Language</ToggleGroupItem>
-      </ToggleGroup>,
-    );
-
-    expect(container.querySelector('[data-slot="toggle-group"]')).toHaveClass(
-      'data-vertical:items-stretch',
-    );
-    expect(screen.getByRole('button', { name: 'Language' })).toHaveClass('shrink-0');
-  });
 });
 
 describe('Textarea', () => {

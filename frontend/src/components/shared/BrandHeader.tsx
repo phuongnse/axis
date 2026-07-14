@@ -15,7 +15,7 @@ function BrandHeader({ label, labelElement = 'p' }: BrandHeaderProps) {
       <div className="flex items-center gap-3">
         <img src="/axis-logo.svg" alt="" className="size-11 shrink-0" width={44} height={44} />
         {label ? (
-          <LabelElement className="text-xs uppercase tracking-widest text-muted-foreground">
+          <LabelElement className="font-heading text-xs font-semibold uppercase tracking-widest text-muted-foreground">
             {label}
           </LabelElement>
         ) : null}

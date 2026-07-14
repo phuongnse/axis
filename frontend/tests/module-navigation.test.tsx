@@ -111,11 +111,22 @@ describe('module navigation', () => {
 
     expect(screen.getByRole('navigation', { name: 'Modules' })).toBeInTheDocument();
     expect(screen.getByText('Workspace')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Business objects' })).toHaveAttribute(
-      'href',
-      '/business-objects',
+    const businessObjectsLink = screen.getByRole('link', { name: 'Business objects' });
+    expect(businessObjectsLink).toHaveAttribute('href', '/business-objects');
+    expect(businessObjectsLink).toHaveClass(
+      'hover:bg-accent',
+      'hover:text-accent-foreground',
+      'dark:hover:bg-accent',
     );
+    expect(businessObjectsLink).not.toHaveClass('dark:hover:bg-muted/50');
     const rulesLink = screen.getByRole('link', { name: 'Rules' });
+    expect(rulesLink).toHaveClass(
+      'md:w-full',
+      'md:justify-start',
+      'bg-secondary',
+      'text-secondary-foreground',
+    );
+    expect(rulesLink).not.toHaveClass('bg-accent');
     expect(rulesLink).toHaveAttribute('href', '/rules');
     expect(rulesLink).toHaveAttribute('aria-current', 'page');
   });

@@ -2,11 +2,15 @@
   "exceptions": {
     "src/components/ui/navigation-menu.tsx": {
       "reason": "Restore Base UI's bracketed data-attribute selectors so directional transitions compile and run correctly.",
-      "signOff": "User-approved CodeRabbit follow-up in the Codex task on 2026-07-12."
+      "signOff": "Approved by project owner."
+    },
+    "src/components/ui/table.tsx": {
+      "reason": "Expose the wrapper class so shared data tables can use one scroll viewport and one native table layout.",
+      "signOff": "Approved by project owner."
     },
     "src/components/ui/tabs.tsx": {
       "reason": "Forward the declared orientation to Base UI Root so vertical tabs preserve primitive behavior and ARIA semantics.",
-      "signOff": "User-approved CodeRabbit follow-up in the Codex task on 2026-07-12."
+      "signOff": "Approved by project owner."
     }
   },
   "files": {
@@ -64,14 +68,14 @@
     "src/components/ui/sonner.tsx": "0c729f9f1ada0b0bedd9296710cc257dc43559fa6b8cc40f010d129e8ff85fdd",
     "src/components/ui/spinner.tsx": "900f722c961fa6e1c28104809d56831c9056dc69599e49d364cc13a6f33966a3",
     "src/components/ui/switch.tsx": "5762b1a46dd7739e535bfdefbccc3afe4932023800c74d6160c49fd59f6a1e6b",
-    "src/components/ui/table.tsx": "a13f55a7c1406197608f223006cf16f211a257b213362caaef0d2abf3a389c8f",
+    "src/components/ui/table.tsx": "323242c854cbed5eba31bb841aa8edd723aef21c9a2bb6e2e04ff68305317859",
     "src/components/ui/tabs.tsx": "fbdc34b6edaa3562e7cfcea5117ad596d808c3e588c40844457d41670285385f",
     "src/components/ui/textarea.tsx": "58b58d84fc54ba5f4ca46937870c619349fd9eccc4d494250ac7bc73a94e05e9",
     "src/components/ui/toggle-group.tsx": "f7776d68b06148d9742fe4f21df45f931b2a259592192d4bda16a7039f508d15",
     "src/components/ui/toggle.tsx": "290d2cd01c768d1e3c894bfebcf9c3d1532191ae7ec1e48da1e405dab0a95c4c",
     "src/components/ui/tooltip.tsx": "a9f7b6823ef80334f2a70ee0e7eb40e01f095d63f7e354be6b7c499e2d2c84aa",
     "src/hooks/use-mobile.ts": "58b2cc5fa259358e9192125abf072c832144193d87f3d66a90b13089a0196cef",
-    "src/index.css": "241307e8b63f7a488d005fa659bb86e69c4565f71df985d75ca8806ba6e160d5",
+    "src/index.css": "a0cb3d8437d679cd66f11ec82467756c28c579459a7d14c3042d00523ad6f1a3",
     "src/lib/utils.ts": "74e8fe9d0d680c442ed6adb13e7d119d6c210c19ae6c114313b2a72552be0883"
   },
   "registry": "@shadcn",

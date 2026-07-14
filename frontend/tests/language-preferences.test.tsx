@@ -183,9 +183,12 @@ describe('language preferences', () => {
       return Promise.reject(new Error(`Unexpected language request: ${body}`));
     });
 
-    await renderWithRouter(<LanguageControl authenticated />, { path: '/dashboard' });
+    await renderWithRouter(<LanguageControl authenticated variant="menu" />, {
+      path: '/dashboard',
+    });
 
     await user.click(screen.getByRole('button', { name: 'Vietnamese' }));
+    expect(screen.getByText('Đang lưu...')).toHaveClass('absolute', 'top-0', 'right-1');
     await user.click(screen.getByRole('button', { name: 'Tiếng Anh' }));
 
     let staleResponseParsed = false;

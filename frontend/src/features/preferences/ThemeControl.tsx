@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Monitor, Moon, RotateCcw, Sun } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { OptionList, OptionListItem } from '@/components/shared/OptionList';
 import { Button } from '@/components/ui/button';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { getAccessToken } from '@/features/auth/auth-store';
@@ -99,7 +100,7 @@ export function ThemeControl({
   return (
     <div
       className={cn(
-        isMenu ? 'grid gap-2' : 'flex flex-wrap items-center justify-end gap-2',
+        isMenu ? 'relative grid gap-2' : 'flex flex-wrap items-center justify-end gap-2',
         className,
       )}
     >
@@ -109,32 +110,61 @@ export function ThemeControl({
         >
           {t('app.theme')}
         </legend>
-        <ToggleGroup
-          value={[mode]}
-          onValueChange={chooseToggleTheme}
-          orientation={isMenu ? 'vertical' : 'horizontal'}
-          variant={isMenu ? 'default' : 'outline'}
-          size="sm"
-          aria-label={t('app.theme')}
-        >
-          {supportedThemeModes.map((item) => {
-            const Icon = themeModeIcons[item.value];
-            const label = t(item.labelKey);
+        {isMenu ? (
+          <OptionList
+            label={t('app.theme')}
+            value={mode}
+            onValueChange={(value) => chooseToggleTheme([value])}
+          >
+            {supportedThemeModes.map((item) => {
+              const Icon = themeModeIcons[item.value];
+              const label = t(item.labelKey);
 
-            return (
-              <ToggleGroupItem key={item.value} value={item.value} aria-label={label} title={label}>
-                <Icon aria-hidden />
-                {isMenu ? label : <span className="sr-only">{label}</span>}
-              </ToggleGroupItem>
-            );
-          })}
-        </ToggleGroup>
+              return (
+                <OptionListItem key={item.value} value={item.value}>
+                  <Icon aria-hidden />
+                  {label}
+                </OptionListItem>
+              );
+            })}
+          </OptionList>
+        ) : (
+          <ToggleGroup
+            aria-label={t('app.theme')}
+            orientation="horizontal"
+            size="sm"
+            value={[mode]}
+            variant="outline"
+            onValueChange={chooseToggleTheme}
+          >
+            {supportedThemeModes.map((item) => {
+              const Icon = themeModeIcons[item.value];
+              const label = t(item.labelKey);
+
+              return (
+                <ToggleGroupItem
+                  key={item.value}
+                  value={item.value}
+                  aria-label={label}
+                  title={label}
+                >
+                  <Icon aria-hidden />
+                  <span className="sr-only">{label}</span>
+                </ToggleGroupItem>
+              );
+            })}
+          </ToggleGroup>
+        )}
       </fieldset>
 
       {showSaveStatus ? (
         <div
           id={statusId}
-          className={cn('min-h-4 text-xs text-muted-foreground', isMenu && 'px-1')}
+          className={cn(
+            'min-h-4 text-xs text-muted-foreground',
+            isMenu && 'px-1',
+            isMenu && mutation.isPending && 'pointer-events-none absolute top-0 right-1',
+          )}
           aria-live="polite"
         >
           {mutation.isPending ? t('app.saving') : null}

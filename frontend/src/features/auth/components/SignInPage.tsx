@@ -1,11 +1,11 @@
 import { Link } from '@tanstack/react-router';
 import { LogIn, Send } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { StatusNotice } from '@/components/shared/StatusNotice';
 import { Button } from '@/components/ui/button';
 import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { AuthCard } from '@/features/auth/components/AuthCard';
-import { AuthNotice } from '@/features/auth/components/AuthNotice';
 import { useResendVerification } from '@/features/auth/hooks/useResendVerification';
 import { useSignIn } from '@/features/auth/hooks/useSignIn';
 
@@ -40,12 +40,12 @@ export function SignInPage() {
     <AuthCard title={t('auth.signIn')} footer={<SignInFooter t={t} />}>
       <form className="space-y-4" onSubmit={handleSubmit(submit)} noValidate>
         {submitError ? (
-          <AuthNotice
-            variant={showVerificationRequired ? 'warning' : 'destructive'}
+          <StatusNotice
+            tone={showVerificationRequired ? 'warning' : 'destructive'}
             title={submitErrorTitle}
           >
             {submitError}
-          </AuthNotice>
+          </StatusNotice>
         ) : null}
 
         <Field data-invalid={errors.email ? true : undefined}>
@@ -96,13 +96,13 @@ export function SignInPage() {
               {resendState === 'sending' ? t('auth.sending') : t('auth.resendVerification')}
             </Button>
             {resendState === 'success' ? (
-              <AuthNotice variant="success">{t('notice.verificationEmailSent')}</AuthNotice>
+              <StatusNotice tone="success">{t('notice.verificationEmailSent')}</StatusNotice>
             ) : null}
             {resendState === 'error' ? (
-              <AuthNotice variant="destructive">{t('auth.genericError')}</AuthNotice>
+              <StatusNotice tone="destructive">{t('auth.genericError')}</StatusNotice>
             ) : null}
             {resendState === 'rate_limited' ? (
-              <AuthNotice variant="warning">{t('notice.resendLimited')}</AuthNotice>
+              <StatusNotice tone="warning">{t('notice.resendLimited')}</StatusNotice>
             ) : null}
           </div>
         ) : null}

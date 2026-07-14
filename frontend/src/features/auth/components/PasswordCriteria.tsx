@@ -35,7 +35,7 @@ function PasswordCriteria({ id, password }: PasswordCriteriaProps) {
             aria-label={`${status}: ${item.label}`}
             className={cn(
               'flex items-center gap-2 text-xs leading-5',
-              item.met ? 'text-secondary' : hasValue ? 'text-destructive' : 'text-muted-foreground',
+              item.met ? 'text-success' : hasValue ? 'text-destructive' : 'text-muted-foreground',
             )}
           >
             <Icon className="size-3.5 shrink-0" aria-hidden />

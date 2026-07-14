@@ -1,11 +1,11 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Link } from '@tanstack/react-router';
-import { AlertCircle, ArrowRight, CheckCircle2, Clock, Loader2, Mail } from 'lucide-react';
+import { ArrowRight, Loader2, Mail } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { type FieldPath, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { StatusNotice, type StatusNoticeTone } from '@/components/shared/StatusNotice';
 import { Button } from '@/components/ui/button';
 import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
@@ -61,33 +61,31 @@ function VerifyEmailOutcome({
   const config = (
     {
       expired: {
-        icon: Clock,
         title: t('verify.expired.title'),
         body: t('verify.expired.body'),
-        variant: 'default',
+        tone: 'warning',
       },
       already_used: {
-        icon: CheckCircle2,
         title: t('verify.alreadyUsed.title'),
         body: t('verify.alreadyUsed.body'),
-        variant: 'default',
+        tone: 'success',
       },
       invalid: {
-        icon: AlertCircle,
         title: t('verify.invalid.title'),
         body: t('verify.invalid.body'),
-        variant: 'destructive',
+        tone: 'destructive',
       },
       rate_limited: {
-        icon: Clock,
         title: t('verify.rateLimited.title'),
         body: t('verify.rateLimited.body'),
-        variant: 'default',
+        tone: 'warning',
       },
-    } as const
+    } satisfies Record<
+      VerifyEmailErrorKind,
+      { title: string; body: string; tone: StatusNoticeTone }
+    >
   )[kind];
 
-  const Icon = config.icon;
   const footer =
     kind === 'already_used' ? (
       <Link to="/sign-in" className="font-medium text-primary hover:underline">
@@ -105,10 +103,7 @@ function VerifyEmailOutcome({
   return (
     <AuthCard title={config.title} footer={footer}>
       <div className="space-y-4">
-        <Alert variant={config.variant}>
-          <Icon aria-hidden />
-          <AlertDescription>{config.body}</AlertDescription>
-        </Alert>
+        <StatusNotice tone={config.tone}>{config.body}</StatusNotice>
 
         {showResend ? (
           <form
@@ -256,10 +251,7 @@ export function VerifyEmailPage() {
         }
       >
         <div className="space-y-4" aria-live="polite">
-          <Alert>
-            <CheckCircle2 aria-hidden />
-            <AlertDescription>{t('verify.success.body')}</AlertDescription>
-          </Alert>
+          <StatusNotice tone="success">{t('verify.success.body')}</StatusNotice>
           <Button
             type="button"
             size="lg"

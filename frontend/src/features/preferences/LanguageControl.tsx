@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { RotateCcw } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { OptionList, OptionListItem } from '@/components/shared/OptionList';
 import { Button } from '@/components/ui/button';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { getAccessToken } from '@/features/auth/auth-store';
@@ -107,7 +108,7 @@ export function LanguageControl({
   return (
     <div
       className={cn(
-        isMenu ? 'grid gap-2' : 'flex flex-wrap items-center justify-end gap-2',
+        isMenu ? 'relative grid gap-2' : 'flex flex-wrap items-center justify-end gap-2',
         className,
       )}
     >
@@ -117,34 +118,50 @@ export function LanguageControl({
         >
           {t('app.language')}
         </legend>
-        <ToggleGroup
-          value={[activeLanguage]}
-          onValueChange={chooseToggleLanguage}
-          orientation={isMenu ? 'vertical' : 'horizontal'}
-          variant={isMenu ? 'default' : 'outline'}
-          size="sm"
-          aria-label={t('app.language')}
-        >
-          {supportedLanguages.map((item) => (
-            <ToggleGroupItem key={item.value} value={item.value}>
-              {isMenu ? (
+        {isMenu ? (
+          <OptionList
+            label={t('app.language')}
+            value={activeLanguage}
+            onValueChange={(value) => chooseToggleLanguage([value])}
+          >
+            {supportedLanguages.map((item) => (
+              <OptionListItem key={item.value} value={item.value}>
                 <span
                   aria-hidden
                   className="flex size-4 shrink-0 items-center justify-center text-xs font-semibold leading-none"
                 >
                   {languageBadges[item.value]}
                 </span>
-              ) : null}
-              {t(languageLabelKeys[item.value])}
-            </ToggleGroupItem>
-          ))}
-        </ToggleGroup>
+                {t(languageLabelKeys[item.value])}
+              </OptionListItem>
+            ))}
+          </OptionList>
+        ) : (
+          <ToggleGroup
+            aria-label={t('app.language')}
+            orientation="horizontal"
+            size="sm"
+            value={[activeLanguage]}
+            variant="outline"
+            onValueChange={chooseToggleLanguage}
+          >
+            {supportedLanguages.map((item) => (
+              <ToggleGroupItem key={item.value} value={item.value}>
+                {t(languageLabelKeys[item.value])}
+              </ToggleGroupItem>
+            ))}
+          </ToggleGroup>
+        )}
       </fieldset>
 
       {showSaveStatus ? (
         <div
           id={statusId}
-          className={cn('min-h-4 text-xs text-muted-foreground', isMenu && 'px-1')}
+          className={cn(
+            'min-h-4 text-xs text-muted-foreground',
+            isMenu && 'px-1',
+            isMenu && mutation.isPending && 'pointer-events-none absolute top-0 right-1',
+          )}
           aria-live="polite"
         >
           {mutation.isPending ? t('app.saving') : null}

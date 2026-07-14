@@ -1,5 +1,5 @@
 import { Buffer } from 'node:buffer';
-import { expect, type Page, test } from '@playwright/test';
+import { expect, type Locator, type Page, test } from '@playwright/test';
 import type { components } from '../src/lib/api-types';
 
 type CreateRuleRequest = components['schemas']['CreateRuleDefinitionRequest'];
@@ -305,6 +305,39 @@ async function expectNoDocumentOverflow(page: Page): Promise<void> {
     .toEqual({ horizontal: true, vertical: true });
 }
 
+async function expectTableColumnsAligned(table: Locator): Promise<void> {
+  const columns = await table.evaluate((root) => {
+    const headerCells = [...root.querySelectorAll('[data-slot="table-header"] th')];
+    const bodyCells = [...root.querySelectorAll('[data-slot="table-body"] tr:first-child td')];
+    return headerCells.map((header, index) => {
+      const body = bodyCells[index];
+      const label = header.querySelector('[data-slot="data-table-column-label"]');
+      const content = body?.querySelector('[data-slot="data-table-cell-content"]');
+      const value = content?.querySelector('[data-slot="rule-table-value"]');
+      if (!body || !label || !content) {
+        throw new Error(`Data table column ${index} is missing a geometry anchor`);
+      }
+      return {
+        headerLeft: header.getBoundingClientRect().left,
+        bodyLeft: body.getBoundingClientRect().left,
+        labelLeft: label.getBoundingClientRect().left,
+        contentLeft: content.getBoundingClientRect().left,
+        valueLeft: value?.getBoundingClientRect().left,
+        verticalAlign: getComputedStyle(body).verticalAlign,
+      };
+    });
+  });
+
+  expect(columns.length).toBeGreaterThan(0);
+  for (const column of columns) {
+    expect(Math.abs(column.bodyLeft - column.headerLeft)).toBeLessThanOrEqual(1);
+    expect(Math.abs(column.contentLeft - column.labelLeft)).toBeLessThanOrEqual(1);
+    expect(column.valueLeft).toBeDefined();
+    expect(Math.abs((column.valueLeft ?? 0) - column.labelLeft)).toBeLessThanOrEqual(1);
+    expect(column.verticalAlign).toBe('top');
+  }
+}
+
 test('workspace rule authoring supports simulation, immutable revisions, and archive', async ({
   page,
 }, testInfo) => {
@@ -320,7 +353,7 @@ test('workspace rule authoring supports simulation, immutable revisions, and arc
   await page.setViewportSize({ width: 1280, height: 720 });
   await page.goto('/rules');
 
-  const catalog = page.getByRole('region', { name: 'Built-in field rules' });
+  const catalog = page.getByRole('region', { name: 'Rules catalog' });
   const toolbarActions = catalog.locator('[data-slot="data-table-toolbar-actions"]');
   await expect(toolbarActions.getByRole('button', { name: 'New rule' })).toBeVisible();
   await expect(catalog.getByRole('columnheader', { name: /Actions/ })).toHaveCount(0);
@@ -329,16 +362,24 @@ test('workspace rule authoring supports simulation, immutable revisions, and arc
   await expect(catalog.getByText('Date and time range', { exact: true })).toBeVisible();
   await expect(catalog.getByText('Required value', { exact: true })).toHaveCount(0);
   await search.clear();
+  await expect(catalog.getByText('Required value', { exact: true })).toBeVisible();
+  await expect(catalog.getByRole('columnheader', { name: /Origin/ })).toBeVisible();
+  await expect(catalog.getByRole('columnheader', { name: /Status/ })).toBeVisible();
+  const requiredRow = catalog
+    .getByText('Required value', { exact: true })
+    .locator('xpath=ancestor::tr');
+  await expect(requiredRow.getByText('Built-in', { exact: true })).toBeVisible();
+  await expect(requiredRow.getByText('Published', { exact: true })).toBeVisible();
+  await expectTableColumnsAligned(catalog);
 
   await catalog.getByRole('button', { name: 'Filters', exact: true }).click();
   await expectNoDocumentOverflow(page);
   await page.getByRole('button', { name: 'Add condition' }).click();
   await page.getByTestId('fields').click();
-  await page.getByRole('option', { name: 'Status', exact: true }).click();
+  await page.getByRole('option', { name: 'Origin', exact: true }).click();
   await page.getByTestId('value-editor').click();
-  const builtInFilter = page.getByRole('checkbox', { name: 'Built-in', exact: true });
-  await builtInFilter.click();
-  await expect(builtInFilter).toBeChecked();
+  await page.getByRole('option', { name: 'Built-in', exact: true }).click();
+  await expect(page.getByTestId('value-editor')).toContainText('Built-in');
   await page.keyboard.press('Escape');
   await page.keyboard.press('Escape');
   await expect(catalog.getByRole('button', { name: 'Filters', exact: true })).toHaveAttribute(
@@ -347,9 +388,9 @@ test('workspace rule authoring supports simulation, immutable revisions, and arc
   );
 
   await catalog.getByRole('button', { name: 'Columns', exact: true }).click();
-  const statusColumn = page.getByRole('menuitemcheckbox', { name: 'Status', exact: true });
-  await statusColumn.click();
-  await expect(catalog.getByRole('columnheader', { name: /Status/ })).toHaveCount(0);
+  const originColumn = page.getByRole('menuitemcheckbox', { name: 'Origin', exact: true });
+  await originColumn.click();
+  await expect(catalog.getByRole('columnheader', { name: /Origin/ })).toHaveCount(0);
   await expect(catalog.getByRole('button', { name: 'Clear filters' })).toHaveCount(0);
   await page.keyboard.press('Escape');
   await expect(catalog.getByRole('button', { name: 'Columns', exact: true })).toHaveAttribute(
@@ -360,7 +401,7 @@ test('workspace rule authoring supports simulation, immutable revisions, and arc
   await catalog.getByRole('button', { name: 'Filters', exact: true }).click();
   await page.getByRole('button', { name: 'Add condition' }).click();
   await page.getByTestId('fields').click();
-  await expect(page.getByRole('option', { name: 'Status', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('option', { name: 'Origin', exact: true })).toHaveCount(0);
   await page.keyboard.press('Escape');
   await page.keyboard.press('Escape');
   await expect(catalog.getByRole('button', { name: 'Filters', exact: true })).toHaveAttribute(
@@ -369,14 +410,14 @@ test('workspace rule authoring supports simulation, immutable revisions, and arc
   );
 
   await catalog.getByRole('button', { name: 'Columns', exact: true }).click();
-  await page.getByRole('menuitemcheckbox', { name: 'Status', exact: true }).click();
-  await expect(catalog.getByRole('columnheader', { name: /Status/ })).toBeVisible();
+  await page.getByRole('menuitemcheckbox', { name: 'Origin', exact: true }).click();
+  await expect(catalog.getByRole('columnheader', { name: /Origin/ })).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(catalog.getByRole('button', { name: 'Columns', exact: true })).toHaveAttribute(
     'aria-expanded',
     'false',
   );
-  await expect(page.getByRole('menuitemcheckbox', { name: 'Status', exact: true })).toBeHidden();
+  await expect(page.getByRole('menuitemcheckbox', { name: 'Origin', exact: true })).toBeHidden();
 
   const catalogHeader = catalog.getByRole('columnheader', { name: /Rule/ });
   const catalogViewport = catalog.locator('[data-slot="data-table-viewport"]');
@@ -507,7 +548,8 @@ test('workspace rule authoring supports simulation, immutable revisions, and arc
   await catalog.getByRole('button', { name: 'Filters', exact: true }).click();
   await expectNoDocumentOverflow(page);
   await page.keyboard.press('Escape');
-  const catalogHorizontalViewport = catalog.locator('[data-slot="table-container"]').last();
+  const catalogHorizontalViewport = catalog.locator('[data-slot="data-table-viewport"]');
+  await expect(catalog.locator('[data-slot="table"]')).toHaveCount(1);
   await expect
     .poll(() =>
       catalogHorizontalViewport.evaluate((element) => ({
@@ -516,6 +558,11 @@ test('workspace rule authoring supports simulation, immutable revisions, and arc
       })),
     )
     .toEqual({ hasHorizontalOverflow: true, contained: true });
+  await catalogHorizontalViewport.evaluate((element) => element.scrollTo({ left: 120 }));
+  await expect
+    .poll(() => catalogHorizontalViewport.evaluate((element) => element.scrollLeft))
+    .toBeGreaterThan(0);
+  await expectTableColumnsAligned(catalog);
   await catalogViewport.evaluate((element) => element.scrollTo({ top: 0 }));
   await catalogHorizontalViewport.evaluate((element) => element.scrollTo({ left: 0 }));
   await testInfo.attach('rules-table-mobile', {
