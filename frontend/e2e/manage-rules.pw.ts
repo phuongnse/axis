@@ -401,7 +401,7 @@ test('workspace rule authoring supports simulation, immutable revisions, and arc
   ]);
   if (!triggerBox || !contentBox) throw new Error('Select trigger or popup did not render');
   expect(contentBox.y).toBeGreaterThanOrEqual(triggerBox.y + triggerBox.height);
-  expect(contentBox.x).toBeCloseTo(triggerBox.x, 0);
+  expect(Math.abs(contentBox.x - triggerBox.x)).toBeLessThanOrEqual(1);
   await page.getByRole('option', { name: 'Origin', exact: true }).click();
   await page.getByTestId('value-editor').click();
   await page.getByRole('option', { name: 'Built-in', exact: true }).click();

@@ -106,7 +106,7 @@ export function DataTableToolbar<TData>({
             align="start"
             className="max-h-96 w-80 overflow-y-auto sm:w-xl md:w-2xl lg:w-4xl"
           >
-            <div className="mb-3 flex items-center justify-between gap-3">
+            <div className="flex items-center justify-between gap-3">
               <PopoverTitle>{messages.filters}</PopoverTitle>
               {hasQuery ? (
                 <Button type="button" variant="ghost" size="xs" onClick={clearFilters}>
