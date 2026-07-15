@@ -31,7 +31,6 @@ sys.dont_write_bytecode = True
 ROOT = Path(__file__).resolve().parent.parent
 SCRIPTS = ROOT / "scripts"
 REQUIRED_DOTNET_SDK_MAJOR = "8"
-REQUIRED_LYCHEE_VERSION = "0.23.0"
 REQUIRED_RENOVATE_VALIDATOR_VERSION = "42.99.0"
 MINIMUM_CODERABBIT_CLI_VERSION = "0.6.0"
 VERSION_PROBE_TIMEOUT_SECONDS = 15
@@ -75,6 +74,7 @@ if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
 
 import axis_repo  # noqa: E402
+import axis_setup  # noqa: E402
 import doc_drift_domains  # noqa: E402
 from axis_frontend_policy import (  # noqa: E402
     check_frontend_quality,
@@ -125,6 +125,12 @@ def env_path(env: dict[str, str] | None = None) -> str | None:
 
 
 def resolve_exe(name: str, *, env: dict[str, str] | None = None) -> str:
+    try:
+        managed = axis_setup.managed_executable(name)
+    except axis_setup.SetupError:
+        managed = None
+    if managed is not None and managed.is_file():
+        return str(managed)
     path = env_path(env)
     if os.name == "nt" and not name.endswith(".exe"):
         cmd = shutil.which(f"{name}.cmd", path=path)
@@ -135,6 +141,9 @@ def resolve_exe(name: str, *, env: dict[str, str] | None = None) -> str:
 
 
 def command_exists(name: str, *, env: dict[str, str] | None = None) -> bool:
+    resolved = resolve_exe(name, env=env)
+    if Path(resolved).is_file():
+        return True
     path = env_path(env)
     return shutil.which(name, path=path) is not None or shutil.which(f"{name}.cmd", path=path) is not None
 
@@ -2121,6 +2130,11 @@ def _node_toolchain_bin_dirs(expected_major: str) -> list[Path]:
         seen.add(resolved)
         candidates.append(resolved)
 
+    try:
+        add(axis_setup.managed_bin_dir("node"))
+    except axis_setup.SetupError:
+        pass
+
     for root in _nvm_unix_roots():
         if not root.is_dir():
             continue
@@ -2316,7 +2330,8 @@ def check_playwright_browsers(_args: argparse.Namespace | None = None) -> int:
 
 
 def find_lychee() -> str | None:
-    return shutil.which("lychee")
+    resolved = resolve_exe("lychee")
+    return resolved if Path(resolved).is_file() else shutil.which("lychee")
 
 
 def lychee_version_status(lychee: str) -> tuple[bool, str]:
@@ -2329,7 +2344,7 @@ def lychee_version_status(lychee: str) -> tuple[bool, str]:
 
     first_line = (result.stdout or result.stderr or "").strip().splitlines()
     version_line = first_line[0] if first_line else ""
-    expected = f"lychee {REQUIRED_LYCHEE_VERSION}"
+    expected = f"lychee {axis_setup.LYCHEE_VERSION}"
     if version_line != expected:
         return (
             False,
@@ -2358,7 +2373,7 @@ def check_markdown_links_for_paths(paths: list[str] | None) -> int:
     lychee = find_lychee()
     if lychee is None:
         print(
-            f"check-markdown-links: Lychee {REQUIRED_LYCHEE_VERSION} is required, "
+            f"check-markdown-links: Lychee {axis_setup.LYCHEE_VERSION} is required, "
             "but `lychee` was not found in PATH. See docs/playbooks/scripts.md#tool-versions.",
             file=sys.stderr,
         )
@@ -2366,7 +2381,7 @@ def check_markdown_links_for_paths(paths: list[str] | None) -> int:
     version_ok, version_detail = lychee_version_status(lychee)
     if not version_ok:
         print(
-            f"check-markdown-links: Lychee {REQUIRED_LYCHEE_VERSION} is required; {version_detail}. "
+            f"check-markdown-links: Lychee {axis_setup.LYCHEE_VERSION} is required; {version_detail}. "
             "Install the documented version or put it earlier in PATH. "
             "See docs/playbooks/scripts.md#tool-versions.",
             file=sys.stderr,
@@ -3524,17 +3539,93 @@ def _wsl_docker_ok() -> bool:
     return result is not None and result.returncode == 0
 
 
+def setup_tool_ready(tool: str) -> bool:
+    if tool == "dotnet":
+        return dotnet_sdk_status()[0]
+    if tool == "node":
+        return node_version_status()[0]
+    if tool == "lychee":
+        resolved = find_lychee()
+        return resolved is not None and lychee_version_status(resolved)[0]
+    if tool == "gh":
+        ok, version_line, _resolved = command_version_line("gh", "--version")
+        match = re.search(r"\bgh version ([0-9]+(?:[.][0-9]+)+)\b", version_line)
+        return bool(
+            ok
+            and match is not None
+            and _version_sort_key(match.group(1)) >= _version_sort_key(axis_setup.GH_VERSION)
+        )
+    raise CheckError(f"Unknown setup-managed tool: {tool}")
+
+
+def setup_preflight(profile: str) -> int:
+    normalized = "review" if profile == "all" else profile
+    rc = doctor(argparse.Namespace(profile=profile, strict=True))
+    if rc != 0:
+        if normalized == "review" and not setup_tool_ready("lychee"):
+            print("setup: rerun with --install-user-tools to install the pinned Lychee artifact", file=sys.stderr)
+        return rc
+    if normalized in {"local-dev", "review"} and find_openssl() is None:
+        print(
+            "setup: FAIL - OpenSSL is required for local HTTPS certificates; "
+            "Axis will not install an OS package automatically",
+            file=sys.stderr,
+        )
+        return 1
+    return 0
+
+
 def setup(args: argparse.Namespace) -> int:
-    print("axis setup")
-    for label, check in (
-        (".NET SDK", check_dotnet_sdk),
-        ("frontend toolchain", check_frontend_toolchain),
-    ):
-        print(f"> check {label}")
-        rc = check()
-        if rc != 0:
-            print(f"setup: FAIL - {label} prerequisite is unavailable", file=sys.stderr)
-            return rc
+    profile = getattr(args, "profile", "build")
+    browsers = getattr(args, "browsers", False)
+    install_user_tools = getattr(args, "install_user_tools", False)
+    plan_only = getattr(args, "plan_only", False)
+    try:
+        platform_spec = axis_setup.detect_platform()
+        plan = axis_setup.setup_plan(
+            profile=profile,
+            install_user_tools=install_user_tools,
+            browsers=browsers,
+            platform_spec=platform_spec,
+        )
+    except axis_setup.SetupError as exc:
+        print(f"setup: FAIL - {exc}", file=sys.stderr)
+        return 1
+
+    print(f"axis setup (profile={profile}, platform={platform_spec.label})")
+    if plan_only:
+        for index, label in enumerate(plan, 1):
+            print(f"{index}. {label}")
+        print("setup plan: no checks, downloads, or repository mutations were performed")
+        return 0
+
+    if install_user_tools:
+        managed_tools = axis_setup.managed_tools_for_profile(profile)
+        missing = tuple(tool for tool in managed_tools if not setup_tool_ready(tool))
+        try:
+            for tool in missing:
+                try:
+                    axis_setup.asset_name(tool, platform_spec)
+                except axis_setup.SetupError as exc:
+                    raise axis_setup.SetupError(
+                        f"no verified portable artifact is available for missing `{tool}`: {exc}"
+                    ) from exc
+            axis_setup.confirm_install(
+                missing,
+                assume_yes=getattr(args, "yes", False),
+                stdin=sys.stdin,
+            )
+            for tool in missing:
+                print(f"> install pinned user-local {tool} {axis_setup.tool_version(tool)}")
+                installed = axis_setup.install_tool(tool, platform_spec=platform_spec)
+                print(f"  installed: {installed}")
+        except (OSError, axis_setup.SetupError) as exc:
+            print(f"setup: FAIL - {exc}", file=sys.stderr)
+            return 1
+
+    rc = setup_preflight(profile)
+    if rc != 0:
+        return rc
 
     steps: list[tuple[str, callable[[], int]]] = [
         (
@@ -3543,12 +3634,20 @@ def setup(args: argparse.Namespace) -> int:
         ),
         ("install frontend dependencies", lambda: run_frontend_npm(["ci"]).returncode),
     ]
-    if getattr(args, "browsers", False):
+    normalized = "review" if profile == "all" else profile
+    if browsers or normalized in {"local-dev", "review"}:
         steps.append(
             (
                 "install Playwright Chromium",
                 lambda: run_frontend_npm(["exec", "--", "playwright", "install", "chromium"]).returncode,
             )
+        )
+    if normalized in {"local-dev", "review"}:
+        steps.extend(
+            [
+                ("generate local HTTPS certificates", lambda: local_dev_certs(args)),
+                ("install repository pre-push hook", lambda: install_hooks(args)),
+            ]
         )
 
     for label, action in steps:
@@ -3559,6 +3658,8 @@ def setup(args: argparse.Namespace) -> int:
             return rc
 
     print("setup: OK")
+    if normalized == "review":
+        print("review authentication remains interactive: run `gh auth status` and `coderabbit auth status`")
     return 0
 
 
@@ -3677,7 +3778,7 @@ def doctor(args: argparse.Namespace) -> int:
             record(
                 "FAIL",
                 "lychee",
-                f"Lychee {REQUIRED_LYCHEE_VERSION} is required; install it per {TOOL_VERSIONS_DOC}",
+                f"Lychee {axis_setup.LYCHEE_VERSION} is required; install it per {TOOL_VERSIONS_DOC}",
             )
         else:
             lychee_ok, lychee_detail = lychee_version_status(lychee)
@@ -3744,11 +3845,32 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
 
-    setup_parser = sub.add_parser("setup", help="Restore repository dependencies for first-time development")
+    setup_parser = sub.add_parser("setup", help="Prepare a portable repository development profile")
+    setup_parser.add_argument(
+        "--profile",
+        choices=("build", "local-dev", "review", "all"),
+        default="build",
+        help="Cumulative setup profile (default: build)",
+    )
     setup_parser.add_argument(
         "--browsers",
         action="store_true",
-        help="Also install the Playwright Chromium browser artifact",
+        help="Compatibility option: add Playwright Chromium to any profile",
+    )
+    setup_parser.add_argument(
+        "--plan-only",
+        action="store_true",
+        help="Print the platform-specific setup plan without checks, downloads, or mutations",
+    )
+    setup_parser.add_argument(
+        "--install-user-tools",
+        action="store_true",
+        help="Install missing pinned tools into the current user's Axis data directory",
+    )
+    setup_parser.add_argument(
+        "--yes",
+        action="store_true",
+        help="Confirm user-local tool downloads without an interactive prompt",
     )
     setup_parser.set_defaults(func=setup)
     doctor_parser = sub.add_parser("doctor", help="Diagnose tools required by a selected workflow profile")

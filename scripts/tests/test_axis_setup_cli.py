@@ -1,0 +1,178 @@
+from __future__ import annotations
+
+import argparse
+import contextlib
+import io
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+from unittest import mock
+
+ROOT = Path(__file__).resolve().parents[2]
+SCRIPTS = ROOT / "scripts"
+if str(SCRIPTS) not in sys.path:
+    sys.path.insert(0, str(SCRIPTS))
+
+import axis  # noqa: E402
+import axis_setup  # noqa: E402
+
+
+def setup_args(**overrides: object) -> argparse.Namespace:
+    values: dict[str, object] = {
+        "profile": "build",
+        "browsers": False,
+        "plan_only": False,
+        "install_user_tools": False,
+        "yes": False,
+    }
+    values.update(overrides)
+    return argparse.Namespace(**values)
+
+
+class TestPortableSetupCli(unittest.TestCase):
+    def test_preflight_reuses_strict_doctor_for_the_selected_profile(self) -> None:
+        with mock.patch.object(axis, "doctor", return_value=0) as doctor:
+            self.assertEqual(0, axis.setup_preflight("build"))
+
+        called = doctor.call_args.args[0]
+        self.assertEqual("build", called.profile)
+        self.assertTrue(called.strict)
+
+    def test_resolve_exe_uses_a_managed_tool_when_path_has_no_match(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            managed = Path(temp) / "dotnet"
+            managed.write_text("", encoding="utf-8")
+            with (
+                mock.patch.object(axis.shutil, "which", return_value=None),
+                mock.patch.object(axis.axis_setup, "managed_executable", return_value=managed),
+            ):
+                self.assertEqual(str(managed), axis.resolve_exe("dotnet"))
+
+    def test_setup_treats_an_old_github_cli_as_missing(self) -> None:
+        with mock.patch.object(
+            axis,
+            "command_version_line",
+            return_value=(True, "gh version 2.40.0", "/usr/bin/gh"),
+        ):
+            self.assertFalse(axis.setup_tool_ready("gh"))
+
+    def test_plan_only_prints_the_portable_plan_without_checks_or_mutations(self) -> None:
+        platform_spec = axis_setup.SetupPlatform("windows", "arm64")
+        with (
+            mock.patch.object(axis.axis_setup, "detect_platform", return_value=platform_spec),
+            mock.patch.object(axis, "setup_tool_ready") as tool_ready,
+            mock.patch.object(axis.axis_setup, "install_tool") as install_tool,
+            mock.patch.object(axis, "run") as run,
+            mock.patch.object(axis, "run_frontend_npm") as run_npm,
+            contextlib.redirect_stdout(io.StringIO()) as stdout,
+        ):
+            self.assertEqual(
+                0,
+                axis.setup(
+                    setup_args(
+                        profile="review",
+                        plan_only=True,
+                        install_user_tools=True,
+                    )
+                ),
+            )
+
+        self.assertIn("platform=windows-arm64", stdout.getvalue())
+        self.assertIn("GitHub CLI 2.96.0", stdout.getvalue())
+        tool_ready.assert_not_called()
+        install_tool.assert_not_called()
+        run.assert_not_called()
+        run_npm.assert_not_called()
+
+    def test_build_profile_preserves_locked_dependency_restore(self) -> None:
+        calls: list[list[str]] = []
+
+        def fake_run(command: list[str], **_kwargs):
+            calls.append(command)
+            return axis.subprocess.CompletedProcess(command, 0)
+
+        def fake_npm(command: list[str], **_kwargs):
+            calls.append(["npm", *command])
+            return axis.subprocess.CompletedProcess(command, 0)
+
+        with (
+            mock.patch.object(axis.axis_setup, "detect_platform", return_value=axis_setup.SetupPlatform("linux", "x64")),
+            mock.patch.object(axis, "setup_preflight", return_value=0),
+            mock.patch.object(axis, "run", side_effect=fake_run),
+            mock.patch.object(axis, "run_frontend_npm", side_effect=fake_npm),
+            mock.patch.object(axis, "exe", side_effect=lambda name: name),
+            contextlib.redirect_stdout(io.StringIO()),
+        ):
+            self.assertEqual(0, axis.setup(setup_args()))
+
+        self.assertEqual(
+            [["dotnet", "restore", "Axis.sln"], ["npm", "ci"]],
+            calls,
+        )
+
+    def test_local_dev_profile_owns_browser_certificates_and_hooks(self) -> None:
+        calls: list[str] = []
+        with (
+            mock.patch.object(axis.axis_setup, "detect_platform", return_value=axis_setup.SetupPlatform("darwin", "arm64")),
+            mock.patch.object(axis, "setup_preflight", return_value=0),
+            mock.patch.object(
+                axis,
+                "run",
+                return_value=axis.subprocess.CompletedProcess([], 0),
+            ),
+            mock.patch.object(
+                axis,
+                "run_frontend_npm",
+                side_effect=lambda args, **_kwargs: calls.append(" ".join(args))
+                or axis.subprocess.CompletedProcess(args, 0),
+            ),
+            mock.patch.object(axis, "local_dev_certs", side_effect=lambda _args: calls.append("certs") or 0),
+            mock.patch.object(axis, "install_hooks", side_effect=lambda _args: calls.append("hooks") or 0),
+            contextlib.redirect_stdout(io.StringIO()),
+        ):
+            self.assertEqual(0, axis.setup(setup_args(profile="local-dev")))
+
+        self.assertEqual(["ci", "exec -- playwright install chromium", "certs", "hooks"], calls)
+
+    def test_install_user_tools_installs_only_missing_profile_tools_before_preflight(self) -> None:
+        ready = {"dotnet": False, "node": True}
+        installed: list[str] = []
+
+        def fake_install(tool: str, **_kwargs):
+            installed.append(tool)
+            ready[tool] = True
+            return Path("/managed") / tool
+
+        with (
+            mock.patch.object(axis.axis_setup, "detect_platform", return_value=axis_setup.SetupPlatform("linux", "x64")),
+            mock.patch.object(axis, "setup_tool_ready", side_effect=lambda tool: ready[tool]),
+            mock.patch.object(axis.axis_setup, "confirm_install") as confirm,
+            mock.patch.object(axis.axis_setup, "install_tool", side_effect=fake_install),
+            mock.patch.object(axis, "setup_preflight", return_value=0),
+            mock.patch.object(axis, "run", return_value=axis.subprocess.CompletedProcess([], 0)),
+            mock.patch.object(axis, "run_frontend_npm", return_value=axis.subprocess.CompletedProcess([], 0)),
+            contextlib.redirect_stdout(io.StringIO()),
+        ):
+            self.assertEqual(0, axis.setup(setup_args(install_user_tools=True, yes=True)))
+
+        confirm.assert_called_once()
+        self.assertEqual(["dotnet"], installed)
+
+    def test_install_stops_before_download_when_a_missing_tool_has_no_verified_artifact(self) -> None:
+        with (
+            mock.patch.object(axis.axis_setup, "detect_platform", return_value=axis_setup.SetupPlatform("windows", "arm64")),
+            mock.patch.object(axis, "setup_tool_ready", return_value=False),
+            mock.patch.object(axis.axis_setup, "install_tool") as install_tool,
+            contextlib.redirect_stdout(io.StringIO()),
+            contextlib.redirect_stderr(io.StringIO()) as stderr,
+        ):
+            rc = axis.setup(setup_args(profile="review", install_user_tools=True, yes=True))
+
+        self.assertEqual(1, rc)
+        self.assertIn("no verified portable artifact", stderr.getvalue())
+        install_tool.assert_not_called()
+
+
+if __name__ == "__main__":
+    unittest.main()

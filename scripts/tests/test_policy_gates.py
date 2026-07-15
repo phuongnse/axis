@@ -3105,8 +3105,7 @@ class TestAxisCommandWrappers(unittest.TestCase):
             return axis.subprocess.CompletedProcess(args, 0)
 
         with (
-            mock.patch.object(axis, "check_dotnet_sdk", return_value=0),
-            mock.patch.object(axis, "check_frontend_toolchain", return_value=0),
+            mock.patch.object(axis, "setup_preflight", return_value=0),
             mock.patch.object(axis, "run", side_effect=fake_run),
             mock.patch.object(axis, "run_frontend_npm", side_effect=fake_frontend),
             mock.patch.object(axis, "exe", side_effect=lambda name: name),
@@ -3125,8 +3124,7 @@ class TestAxisCommandWrappers(unittest.TestCase):
 
     def test_setup_fails_before_mutating_when_a_toolchain_is_missing(self) -> None:
         with (
-            mock.patch.object(axis, "check_dotnet_sdk", return_value=1),
-            mock.patch.object(axis, "check_frontend_toolchain") as frontend_check,
+            mock.patch.object(axis, "setup_preflight", return_value=1),
             mock.patch.object(axis, "run") as run,
             mock.patch.object(axis, "run_frontend_npm") as run_npm,
             contextlib.redirect_stdout(io.StringIO()),
@@ -3134,7 +3132,6 @@ class TestAxisCommandWrappers(unittest.TestCase):
         ):
             self.assertEqual(1, axis.setup(axis.argparse.Namespace(browsers=False)))
 
-        frontend_check.assert_not_called()
         run.assert_not_called()
         run_npm.assert_not_called()
 

@@ -24,7 +24,7 @@ Follow [reference.md](../reference.md).
 
 ## Workflow
 
-1. Classify the moment. Bootstrap runs `doctor --profile build --strict` before `setup`; other diagnosis selects the narrowest `doctor --profile`; exploration is read-only; inner loop uses focused proof; review uses `$axis-ready-review`; CI debugging reproduces only the failing boundary.
+1. Classify the moment. Bootstrap runs `setup --profile build` or the required cumulative profile; use `--plan-only` before downloads and `--install-user-tools` only with user authorization. Other diagnosis selects the narrowest `doctor --profile`; exploration is read-only; inner loop uses focused proof; review uses `$axis-ready-review`; CI debugging reproduces only the failing boundary.
 2. Select by surface: focused docs/skills/policy checks, related .NET tests, focused Vitest/Playwright, dependency audit, contract generation/parity, or the local-dev wrappers defined by [docs/playbooks/local-dev.md](../../../docs/playbooks/local-dev.md).
 3. Avoid waste: do not rerun valid evidence, full suites, containers, or browser journeys unless the changed risk invalidates narrower proof.
 4. Use `python scripts/axis.py ...` for repo workflows. Add a missing reusable wrapper in [scripts/axis.py](../../../scripts/axis.py); keep coherent policy logic in a focused `scripts/axis_*_policy.py` module and package-native commands inside their owner wrapper.

@@ -6,14 +6,12 @@ Use `python scripts/axis.py local-dev ...` for local stack work. Do not document
 
 ## Prerequisites
 
-- Python 3; use `python3` on WSL/Linux or `py -3` on Windows when `python` is unavailable.
-- .NET SDK from [global.json](../../global.json).
-- Node from [frontend/.nvmrc](../../frontend/.nvmrc).
-- Docker reachable from the shell running tests.
-- Optional: Playwright Chromium from `python scripts/axis.py frontend install-browsers` for `local-dev smoke` and host browser E2E.
-- Local certs from `python scripts/axis.py local-dev certs` when HTTPS is needed.
+- Python 3 and Git; use `python3` on WSL/Linux or `py -3` on Windows when `python` is unavailable.
+- Docker Engine with Compose reachable from the shell running tests. Native Docker Engine inside WSL is supported; Docker Desktop is not required.
+- OpenSSL on PATH, or from Git for Windows, for local HTTPS certificates.
+- .NET SDK from [global.json](../../global.json) and Node from [frontend/.nvmrc](../../frontend/.nvmrc), either already available or installed user-locally by Axis.
 
-Run `python scripts/axis.py doctor --profile local-dev --strict` when toolchain resolution feels wrong. First-time dependency restore is `python scripts/axis.py setup`; add `--browsers` when browser tooling is needed.
+First-time preparation is `python scripts/axis.py setup --profile local-dev --install-user-tools`. This validates the cumulative doctor profile, restores locked dependencies, installs Playwright Chromium, generates local certificates, and installs the pre-push hook. Use `--plan-only` before execution or `--yes` for confirmed non-interactive downloads. Run `python scripts/axis.py doctor --profile local-dev --strict` for diagnosis without setup mutations.
 
 ## HTTPS
 
@@ -29,7 +27,7 @@ Trust the root CA in the OS that runs the browser. On WSL with a Windows browser
 
 If Docker Engine is native to WSL or reachable through another execution context, correct the active shell environment instead of changing tests.
 
-The package-manager adapter resolves the documented Node/npm binary/shim path from PATH, nvm, nvm-windows, or Volta. OpenSSL for certs resolves PATH or Git for Windows.
+The package-manager adapter resolves the documented Node/npm binary/shim path from Axis's user-local tool directory, PATH, nvm, nvm-windows, or Volta. OpenSSL for certs resolves PATH or Git for Windows. Setup diagnoses Docker and OpenSSL but never invokes an OS package manager, `sudo`, or service configuration.
 
 ## Stack
 

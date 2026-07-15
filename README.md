@@ -10,22 +10,20 @@ Axis is an open-source platform being built for adaptable, workflow-driven busin
 
 ## Quickstart
 
-Install Python 3, the .NET SDK from `global.json`, Node from `frontend/.nvmrc`, and Docker Engine with Compose.
+Install Python 3, Git, Docker Engine with Compose, and OpenSSL in the environment where Axis will run. `axis setup` can install the pinned .NET SDK and Node.js into a user-local Axis directory; it never installs OS packages, changes services, or requires Docker Desktop.
 
 WSL/Linux:
 
 ```bash
-python3 scripts/axis.py doctor --profile build --strict
-python3 scripts/axis.py setup --browsers
+python3 scripts/axis.py setup --profile local-dev --install-user-tools
 python3 scripts/axis.py local-dev up
 ```
 
 Windows PowerShell:
 
 ```powershell
-py -3 scripts/axis.py doctor --profile build --strict
-py -3 scripts/axis.py setup --browsers
+py -3 scripts/axis.py setup --profile local-dev --install-user-tools
 py -3 scripts/axis.py local-dev up
 ```
 
-Open the web app at <https://localhost:3000>. For ports, HTTPS setup, troubleshooting, and observability, see [docs/playbooks/local-dev.md](./docs/playbooks/local-dev.md).
+Add `--plan-only` to inspect the platform-specific work without changing anything, or `--yes` for confirmed non-interactive user-local installs. Open the web app at <https://localhost:3000>. For supported platforms, Docker-in-WSL, HTTPS setup, troubleshooting, and observability, see [docs/playbooks/local-dev.md](./docs/playbooks/local-dev.md).

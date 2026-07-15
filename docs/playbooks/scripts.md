@@ -8,10 +8,11 @@
 
 | Tool | Required source | Used by |
 |---|---|---|
-| .NET SDK | [global.json](../../global.json) / [docs/TECH_STACK.md](../TECH_STACK.md) | build, tests, format, package scan, API contracts |
-| Node.js | [frontend/.nvmrc](../../frontend/.nvmrc) | frontend commands and API types |
+| .NET SDK | [global.json](../../global.json) / [docs/TECH_STACK.md](../TECH_STACK.md); portable setup pin in [scripts/axis_setup.py](../../scripts/axis_setup.py) | build, tests, format, package scan, API contracts |
+| Node.js | [frontend/.nvmrc](../../frontend/.nvmrc); portable setup pin in [scripts/axis_setup.py](../../scripts/axis_setup.py) | frontend commands and API types |
 | Playwright Chromium | [frontend/package.json](../../frontend/package.json) and `python scripts/axis.py frontend install-browsers` | `local-dev smoke`, host browser E2E, and fast layout smoke |
 | Lychee | [scripts/axis.py](../../scripts/axis.py) check and [.github/workflows/build-and-test.yml](../../.github/workflows/build-and-test.yml) pin | Markdown link checks |
+| GitHub CLI | portable setup pin in [scripts/axis_setup.py](../../scripts/axis_setup.py) | optional publication adapter |
 | Renovate validator | [scripts/axis.py](../../scripts/axis.py) check | Dependency automation config |
 | Pre-PR review checkpoint | [scripts/axis.py](../../scripts/axis.py) check | `$axis-pull-request` before GitHub PR actions |
 
@@ -19,8 +20,13 @@ Project commands use `python`; substitute `python3` on WSL/Linux or `py -3` on W
 
 ## Bootstrap and diagnosis
 
-- Run `python scripts/axis.py doctor --profile build --strict`, then `python scripts/axis.py setup`; add `--browsers` when Playwright Chromium is needed.
-- `setup` validates both toolchains before restoring `Axis.sln` and installing locked frontend dependencies; it does not install OS packages or Docker.
+- Python 3 and Git are external prerequisites. Run `python scripts/axis.py setup --profile build`; select `local-dev`, `review`, or `all` for cumulative preparation.
+- Add `--install-user-tools` to install a missing pinned .NET SDK and Node.js. The review profile can also install pinned Lychee and GitHub CLI artifacts. Downloads require interactive confirmation or `--yes`, use HTTPS, verify the publisher's SHA-256/SHA-512 digest, and land under the native user data directory. `AXIS_TOOLS_DIR` overrides that location.
+- Portable executables still rely on publisher-documented host libraries. For example, the Linux .NET SDK requires ICU and other native runtime libraries; strict doctor output identifies these as external OS prerequisites rather than setting globalization fallbacks or installing packages silently.
+- Use `--plan-only` to print the selected OS/architecture plan without checks, network access, downloads, or repository mutations. The legacy `--browsers` option remains an additive compatibility alias; `local-dev` and `review` include Chromium automatically.
+- `local-dev` and `review` also generate local HTTPS certificates and install the repository pre-push hook. They require Docker Engine, Compose, and OpenSSL in the active shell before dependency mutations.
+- Build and local-dev setup support Windows, Linux/WSL, and macOS on x64/arm64. Review-tool auto-install follows published artifacts: Lychee is portable on Linux x64/arm64, macOS arm64, and Windows x64; other review hosts must provide the pinned version externally. Setup never invokes an OS package manager, `sudo`, Docker Desktop, or service configuration. Missing system tools get diagnostic guidance.
+- CodeRabbit is not auto-installed because its release service does not publish checksums and its official installer does not support Windows native. Install and authenticate it separately; use WSL for the review profile on Windows when needed. Authentication for GitHub CLI and CodeRabbit always remains interactive and outside setup.
 - Doctor profiles are cumulative: `core`, `build`, `local-dev`, `review`, and `all`. The default is `local-dev`; review-only tools such as Lychee and CodeRabbit are checked by `review`/`all`.
 - Use the exact `check` subcommand for one machine-readable prerequisite or policy gate.
 
@@ -50,7 +56,7 @@ Project commands use `python`; substitute `python3` on WSL/Linux or `py -3` on W
 ## Script Rules
 
 - Keep repo maintenance scripts in Python.
-- Put shared repository discovery in [scripts/axis_repo.py](../../scripts/axis_repo.py); keep coherent policy domains in small modules such as [scripts/axis_frontend_policy.py](../../scripts/axis_frontend_policy.py).
+- Put shared repository discovery in [scripts/axis_repo.py](../../scripts/axis_repo.py), portable setup ownership in [scripts/axis_setup.py](../../scripts/axis_setup.py), and coherent policy domains in small modules such as [scripts/axis_frontend_policy.py](../../scripts/axis_frontend_policy.py).
 - Keep top-level `scripts/*.py` files non-executable.
 - Keep [scripts/hooks/pre-push](../../scripts/hooks/pre-push) non-executable in the worktree; installation writes the executable copy under `.git/hooks`.
 - New deterministic guards encode reusable current invariants. Keep incident details in regression fixtures, not guard rules or retired artifact names.
