@@ -3567,6 +3567,8 @@ def setup_tool_ready(tool: str) -> bool:
         return dotnet_sdk_status()[0]
     if tool == "node":
         env = frontend_toolchain_env()
+        if not env:
+            return False
         node_ok = node_version_status(env)[0]
         npm_status, _npm_detail = _command_version("npm", "--version", env=env)
         return node_ok and npm_status == "OK"

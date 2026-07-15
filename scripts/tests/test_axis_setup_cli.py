@@ -71,6 +71,14 @@ class TestPortableSetupCli(unittest.TestCase):
         ):
             self.assertFalse(axis.setup_tool_ready("node"))
 
+    def test_setup_rejects_node_when_no_paired_toolchain_environment_resolves(self) -> None:
+        with (
+            mock.patch.object(axis, "frontend_toolchain_env", return_value={}),
+            mock.patch.object(axis, "node_version_status", return_value=(True, "v22.23.1")),
+            mock.patch.object(axis, "_command_version", return_value=("OK", "10.9.8")),
+        ):
+            self.assertFalse(axis.setup_tool_ready("node"))
+
     def test_frontend_toolchain_pairs_managed_node_with_its_adjacent_npm(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             managed_bin = Path(temp) / "managed" / "bin"

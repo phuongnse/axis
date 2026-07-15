@@ -74,7 +74,7 @@ def detect_platform(
             f"unsupported architecture `{machine or platform.machine()}`; "
             "Axis setup supports x64 and arm64"
         )
-    if system_name == "linux":
+    if system_name == "linux" and (system is None or libc is not None):
         libc_name = (libc if libc is not None else platform.libc_ver()[0]).strip().lower()
         if libc_name != "glibc":
             label = libc_name or "unknown libc"
@@ -521,9 +521,9 @@ def install_artifact(
         if platform_spec.os != "windows":
             staged_expected.chmod(staged_expected.stat().st_mode | 0o111)
 
-        if final_root.exists():
-            final_root.rename(previous)
         try:
+            if final_root.exists():
+                final_root.rename(previous)
             staged.rename(final_root)
         except BaseException:
             if previous.exists() and not final_root.exists():

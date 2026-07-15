@@ -44,6 +44,12 @@ class TestSetupPlatform(unittest.TestCase):
         with self.assertRaisesRegex(axis_setup.SetupError, "glibc Linux"):
             axis_setup.detect_platform(system="Linux", machine="x86_64", libc="musl")
 
+    def test_injected_linux_platform_does_not_probe_the_host_libc(self) -> None:
+        with mock.patch.object(axis_setup.platform, "libc_ver", side_effect=AssertionError("host probe")):
+            detected = axis_setup.detect_platform(system="Linux", machine="x86_64")
+
+        self.assertEqual(axis_setup.SetupPlatform("linux", "x64"), detected)
+
     def test_selects_portable_asset_names(self) -> None:
         windows = axis_setup.SetupPlatform("windows", "x64")
         linux_arm = axis_setup.SetupPlatform("linux", "arm64")
@@ -321,6 +327,46 @@ class TestVerifiedArtifacts(unittest.TestCase):
             with (
                 mock.patch.object(Path, "rename", new=fail_publish),
                 self.assertRaisesRegex(KeyboardInterrupt, "publish interrupted"),
+            ):
+                axis_setup.install_artifact(
+                    artifact,
+                    platform_spec=platform_spec,
+                    root=root / "tools",
+                    downloader=lambda _url, destination: shutil.copyfile(source, destination),
+                )
+
+            self.assertEqual(b"previous", existing.read_bytes())
+
+    def test_install_restores_when_interrupted_after_the_backup_rename(self) -> None:
+        platform_spec = axis_setup.SetupPlatform("windows", "x64")
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            source = root / "source.zip"
+            with zipfile.ZipFile(source, "w") as handle:
+                handle.writestr("gh_2.96.0_windows_amd64/bin/gh.exe", b"verified")
+            artifact = axis_setup.Artifact(
+                "gh",
+                "2.96.0",
+                "gh_2.96.0_windows_amd64.zip",
+                "https://example.invalid/gh.zip",
+                "sha256",
+                hashlib.sha256(source.read_bytes()).hexdigest(),
+            )
+            final_root = root / "tools" / "gh" / "2.96.0"
+            existing = final_root / "bin" / "gh.exe"
+            existing.parent.mkdir(parents=True)
+            existing.write_bytes(b"previous")
+            original_rename = Path.rename
+
+            def interrupt_backup(path: Path, target: Path):
+                result = original_rename(path, target)
+                if path == final_root:
+                    raise KeyboardInterrupt("backup interrupted")
+                return result
+
+            with (
+                mock.patch.object(Path, "rename", new=interrupt_backup),
+                self.assertRaisesRegex(KeyboardInterrupt, "backup interrupted"),
             ):
                 axis_setup.install_artifact(
                     artifact,
