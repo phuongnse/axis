@@ -31,7 +31,6 @@ sys.dont_write_bytecode = True
 ROOT = Path(__file__).resolve().parent.parent
 SCRIPTS = ROOT / "scripts"
 REQUIRED_DOTNET_SDK_MAJOR = "8"
-REQUIRED_LYCHEE_VERSION = "0.23.0"
 REQUIRED_RENOVATE_VALIDATOR_VERSION = "42.99.0"
 MINIMUM_CODERABBIT_CLI_VERSION = "0.6.0"
 VERSION_PROBE_TIMEOUT_SECONDS = 15
@@ -75,7 +74,20 @@ if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
 
 import axis_repo  # noqa: E402
+import axis_setup  # noqa: E402
 import doc_drift_domains  # noqa: E402
+from axis_frontend_policy import (  # noqa: E402
+    check_frontend_quality,
+    frontend_component_file_name_issues,
+    frontend_form_schema_type_issues,
+    frontend_public_route_navigation_issues,
+    frontend_quality_issues,
+    frontend_route_access_group_issues,
+    frontend_tailwind_opacity_issues,
+    frontend_test_async_boundary_issues,
+    frontend_transient_handoff_issues,
+    frontend_ui_system_issues,
+)
 
 
 class CheckError(RuntimeError):
@@ -112,8 +124,27 @@ def env_path(env: dict[str, str] | None = None) -> str | None:
     return env.get("PATH") if env and "PATH" in env else None
 
 
+def resolved_file(path: str) -> bool:
+    candidate = Path(path)
+    return candidate.is_absolute() and candidate.is_file()
+
+
 def resolve_exe(name: str, *, env: dict[str, str] | None = None) -> str:
     path = env_path(env)
+    if env is not None:
+        if os.name == "nt" and not name.endswith(".exe"):
+            cmd = shutil.which(f"{name}.cmd", path=path)
+            if cmd:
+                return cmd
+        found = shutil.which(name, path=path)
+        if found:
+            return found
+    try:
+        managed = axis_setup.managed_executable(name)
+    except axis_setup.SetupError:
+        managed = None
+    if managed is not None and managed.is_file():
+        return str(managed)
     if os.name == "nt" and not name.endswith(".exe"):
         cmd = shutil.which(f"{name}.cmd", path=path)
         if cmd:
@@ -123,6 +154,9 @@ def resolve_exe(name: str, *, env: dict[str, str] | None = None) -> str:
 
 
 def command_exists(name: str, *, env: dict[str, str] | None = None) -> bool:
+    resolved = resolve_exe(name, env=env)
+    if resolved_file(resolved):
+        return True
     path = env_path(env)
     return shutil.which(name, path=path) is not None or shutil.which(f"{name}.cmd", path=path) is not None
 
@@ -306,34 +340,7 @@ def run_module_check(script_name: str, args: list[str]) -> int:
 
 
 def iter_files(root: Path, suffixes: tuple[str, ...]) -> Iterable[Path]:
-    if not root.exists():
-        return []
-    try:
-        relative_root = root.relative_to(ROOT)
-    except ValueError:
-        relative_root = None
-
-    if relative_root is not None:
-        try:
-            paths = repo_files(str(relative_root))
-        except CheckError:
-            paths = []
-        else:
-            return (
-                ROOT / path
-                for path in paths
-                if (ROOT / path).is_file() and (ROOT / path).suffix in suffixes
-            )
-
-    return (
-        p
-        for p in root.rglob("*")
-        if p.is_file()
-        and p.suffix in suffixes
-        and "bin" not in p.parts
-        and "obj" not in p.parts
-        and "node_modules" not in p.parts
-    )
+    return axis_repo.iter_files(root, suffixes)
 
 
 def git_ls_files(pattern: str | None = None) -> list[str]:
@@ -606,6 +613,23 @@ def check_vulnerable_packages(_args: argparse.Namespace | None = None) -> int:
     return 0
 
 
+def check_frontend_vulnerable_packages(_args: argparse.Namespace | None = None) -> int:
+    rc = check_frontend_toolchain()
+    if rc != 0:
+        return rc
+
+    result = run_frontend_npm(["audit", "--audit-level=high"])
+    if result.returncode != 0:
+        print(
+            "check-frontend-vulnerable-packages: FAIL - npm reported a high or critical vulnerability",
+            file=sys.stderr,
+        )
+        return result.returncode
+
+    print("check-frontend-vulnerable-packages: OK")
+    return 0
+
+
 def scan_text_files(
     roots: list[Path],
     suffixes: tuple[str, ...],
@@ -826,405 +850,6 @@ def check_ui_baseline(_args: argparse.Namespace | None = None) -> int:
     print("check-ui-baseline: OK")
     return 0
 
-
-def frontend_ui_system_issues(root: Path = ROOT) -> list[str]:
-    issues: list[str] = []
-    src_root = root / "frontend" / "src"
-    ui_root = src_root / "components" / "ui"
-    interaction_state_owner = src_root / "components" / "shared" / "interactionStates.ts"
-    palette_utility = re.compile(
-        r"\b(?:bg|text|border|ring|outline|fill|stroke|from|via|to|divide|placeholder|decoration)-"
-        r"(?:(?:slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|"
-        r"blue|indigo|violet|purple|fuchsia|pink|rose)-[0-9]{2,3}(?:/[0-9]{1,3})?|black|white)\b"
-    )
-    arbitrary_value = re.compile(r"(?<![A-Za-z0-9_])(?:[A-Za-z0-9_:/.]+-)+\[[^\]\n]+\]")
-    inline_color = re.compile(
-        r"\b(?:color|background|backgroundColor|borderColor|fill|stroke)\s*:\s*['\"](?:#|rgba?[(]|hsla?[(]|oklch[(])",
-        re.IGNORECASE,
-    )
-    interaction_state_visual = re.compile(
-        r"(?<![A-Za-z0-9_-])(?:(?:dark|sm|md|lg|xl|2xl):)*"
-        r"(?:(?:(?:group|peer|not|has)-)?(?:hover|focus|focus-visible|active|"
-        r"aria-(?:\[[^\]]+\]|[A-Za-z0-9_-]+)|data-(?:\[[^\]]+\]|[A-Za-z0-9_-]+))"
-        r"(?:/[A-Za-z0-9_-]+)?:)+"
-        r"(?:\*{1,2}:)?(?:bg|text|border|ring|outline)-[A-Za-z0-9_./-]+"
-    )
-    import_target = re.compile(r"(?:\bfrom\s*|\bimport\s*)['\"](?P<target>[^'\"]+)['\"]")
-    forbidden_roots = (
-        src_root / "features",
-        src_root / "components" / "shared",
-        src_root / "routes",
-    )
-
-    for path in iter_files(src_root, (".ts", ".tsx")):
-        normalized = rel(path) if root == ROOT else str(path.relative_to(root)).replace("\\", "/")
-        text = path.read_text(encoding="utf-8")
-        in_ui_primitives = path.is_relative_to(ui_root) if hasattr(path, "is_relative_to") else False
-        owns_interaction_states = path == interaction_state_owner
-        if in_ui_primitives:
-            for idx, line in enumerate(text.splitlines(), 1):
-                targets = [match.group("target") for match in import_target.finditer(line)]
-                has_forbidden_import = any(
-                    re.match(r"@/(?:features|components/shared|routes)(?:/|$)", target)
-                    or (
-                        target.startswith(".")
-                        and any((path.parent / target).resolve().is_relative_to(root_path.resolve()) for root_path in forbidden_roots)
-                    )
-                    for target in targets
-                )
-                if has_forbidden_import:
-                    issues.append(
-                        f"{normalized}:{idx}: registry primitives cannot depend on feature, shared, or route code"
-                    )
-            continue
-
-        for idx, line in enumerate(text.splitlines(), 1):
-            for match in palette_utility.finditer(line):
-                issues.append(
-                    f"{normalized}:{idx}: hard-coded Tailwind palette utility `{match.group(0)}`; use a semantic token"
-                )
-            for match in arbitrary_value.finditer(line):
-                issues.append(
-                    f"{normalized}:{idx}: arbitrary Tailwind value `{match.group(0)}`; use the standard scale or layout"
-                )
-            if inline_color.search(line):
-                issues.append(
-                    f"{normalized}:{idx}: component-local hard-coded color; use a semantic token"
-                )
-            for match in interaction_state_visual.finditer(line):
-                if not owns_interaction_states:
-                    issues.append(
-                        f"{normalized}:{idx}: interaction-state visual `{match.group(0)}` must be owned by "
-                        "a registry primitive or frontend/src/components/shared/interactionStates.ts"
-                    )
-    return issues
-
-
-def frontend_component_file_name_issues(root: Path = ROOT) -> list[str]:
-    issues: list[str] = []
-    src_root = root / "frontend" / "src"
-    route_root = src_root / "routes"
-    ui_root = src_root / "components" / "ui"
-    shared_root = src_root / "components" / "shared"
-
-    if ui_root.exists():
-        shadcn_file_name = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*[.]tsx$")
-        for path in iter_files(ui_root, (".tsx",)):
-            normalized = rel(path) if root == ROOT else str(path.relative_to(root)).replace("\\", "/")
-            if not shadcn_file_name.fullmatch(path.name):
-                issues.append(
-                    f"{normalized}: shadcn UI primitive files must use registry kebab-case names"
-                )
-
-    if shared_root.exists():
-        pascal_component_name = re.compile(r"^[A-Z][A-Za-z0-9]*[.]tsx$")
-        camel_module_name = re.compile(r"^[a-z][A-Za-z0-9]*[.]ts$")
-        for path in iter_files(shared_root, (".ts", ".tsx")):
-            normalized = rel(path) if root == ROOT else str(path.relative_to(root)).replace("\\", "/")
-            if path.suffix == ".tsx" and not pascal_component_name.fullmatch(path.name):
-                issues.append(
-                    f"{normalized}: shared React component files must use PascalCase names"
-                )
-            if path.suffix == ".ts" and not camel_module_name.fullmatch(path.name):
-                issues.append(
-                    f"{normalized}: shared non-component modules must use camelCase names"
-                )
-
-    if route_root.exists():
-        for path in iter_files(route_root, (".tsx",)):
-            normalized = rel(path) if root == ROOT else str(path.relative_to(root)).replace("\\", "/")
-            if normalized.endswith("routeTree.gen.ts"):
-                continue
-            text = path.read_text(encoding="utf-8")
-            for idx, line in enumerate(text.splitlines(), 1):
-                if "className=" in line:
-                    issues.append(
-                        f"{normalized}:{idx}: route files compose page components only; move styled UI into a component"
-                    )
-
-    if src_root.exists():
-        standard_control = re.compile(
-            r"<\s*(button|caption|dialog|input|label|option|optgroup|progress|select|table|tbody|td|textarea|tfoot|th|thead|tr)\b"
-        )
-        unformatted_select_value = re.compile(r"<\s*SelectValue\b[^>]*?/\s*>", re.DOTALL)
-        for path in iter_files(src_root, (".tsx",)):
-            normalized = rel(path) if root == ROOT else str(path.relative_to(root)).replace("\\", "/")
-            text = path.read_text(encoding="utf-8")
-            in_ui_primitives = path.is_relative_to(ui_root) if hasattr(path, "is_relative_to") else False
-            if not in_ui_primitives:
-                for idx, line in enumerate(text.splitlines(), 1):
-                    if "@base-ui/react" in line or "@radix-ui" in line:
-                        issues.append(
-                            f"{normalized}:{idx}: headless UI primitives belong in shadcn primitives under frontend/src/components/ui, not feature components"
-                        )
-                    if "components/ui/native-select" in line:
-                        issues.append(
-                            f"{normalized}:{idx}: native fallback primitives require an approved platform-native behavior exception; use the interaction-consistent shadcn primitive by default"
-                        )
-                    for match in standard_control.finditer(line):
-                        issues.append(
-                            f"{normalized}:{idx}: standard UI control <{match.group(1)}> must use a shared shadcn UI primitive from frontend/src/components/ui"
-                        )
-                for match in unformatted_select_value.finditer(text):
-                    line_number = text.count("\n", 0, match.start()) + 1
-                    issues.append(
-                        f"{normalized}:{line_number}: SelectValue must format the selected value from the same display-label source as SelectItem"
-                    )
-    return issues
-
-
-def frontend_tailwind_opacity_issues(root: Path = ROOT) -> list[str]:
-    issues: list[str] = []
-    src_root = root / "frontend" / "src"
-    if not src_root.exists():
-        return issues
-
-    allowed = {str(value) for value in range(0, 101, 5)}
-    opacity_token = re.compile(
-        r"\b(?:bg|text|border|from|via|to|ring|divide|placeholder|decoration|outline)-[A-Za-z0-9_-]+/(\d{1,3})\b"
-    )
-    opacity_utility = re.compile(r"\bopacity-(\d{1,3})\b")
-    for path in iter_files(src_root, (".ts", ".tsx")):
-        normalized = rel(path) if root == ROOT else str(path.relative_to(root)).replace("\\", "/")
-        text = path.read_text(encoding="utf-8")
-        for idx, line in enumerate(text.splitlines(), 1):
-            for match in opacity_token.finditer(line):
-                value = match.group(1)
-                if value not in allowed:
-                    issues.append(
-                        f"{normalized}:{idx}: unsupported Tailwind opacity /{value}; use 0,5,10...100 or bracket syntax like /[0.{value}]"
-                    )
-            for match in opacity_utility.finditer(line):
-                value = match.group(1)
-                if value not in allowed:
-                    issues.append(
-                        f"{normalized}:{idx}: unsupported Tailwind opacity-{value}; use opacity-0, opacity-5, opacity-10...opacity-100"
-                    )
-    return issues
-
-
-def frontend_form_schema_type_issues(root: Path = ROOT) -> list[str]:
-    issues: list[str] = []
-    features_root = root / "frontend" / "src" / "features"
-    if not features_root.exists():
-        return issues
-
-    form_values_interface = re.compile(r"\b(?:export\s+)?interface\s+([A-Za-z0-9_]*FormValues)\b")
-    form_values_type = re.compile(r"\b(?:export\s+)?type\s+([A-Za-z0-9_]*FormValues)\s*=")
-    for path in iter_files(features_root, (".ts", ".tsx")):
-        normalized = rel(path) if root == ROOT else str(path.relative_to(root)).replace("\\", "/")
-        if "/schemas/" not in normalized:
-            continue
-
-        text = path.read_text(encoding="utf-8")
-        for idx, line in enumerate(text.splitlines(), 1):
-            interface_match = form_values_interface.search(line)
-            if interface_match:
-                issues.append(
-                    f"{normalized}:{idx}: {interface_match.group(1)} must be inferred from the Zod schema, not hand-authored"
-                )
-                continue
-
-            type_match = form_values_type.search(line)
-            if type_match and "z.infer" not in line:
-                issues.append(
-                    f"{normalized}:{idx}: {type_match.group(1)} must use z.infer from the schema factory"
-                )
-    return issues
-
-
-def frontend_test_async_boundary_issues(root: Path = ROOT) -> list[str]:
-    issues: list[str] = []
-    test_roots = [
-        root / "frontend" / "src" / "test",
-        root / "frontend" / "tests",
-    ]
-    ignored_call = re.compile(r"\bvoid\s+[A-Za-z_$][A-Za-z0-9_$]*(?:[.(])")
-    for test_root in test_roots:
-        if not test_root.exists():
-            continue
-        for path in iter_files(test_root, (".ts", ".tsx")):
-            normalized = rel(path) if root == ROOT else str(path.relative_to(root)).replace("\\", "/")
-            text = path.read_text(encoding="utf-8")
-            for idx, line in enumerate(text.splitlines(), 1):
-                if ignored_call.search(line):
-                    issues.append(
-                        f"{normalized}:{idx}: test code must await/return async work instead of fire-and-forget `void` calls"
-                    )
-    return issues
-
-
-def frontend_public_route_navigation_issues(root: Path = ROOT) -> list[str]:
-    issues: list[str] = []
-    routes_root = root / "frontend" / "src" / "routes"
-    if not routes_root.exists():
-        return issues
-
-    route_factory = re.compile(r"\bcreate(?:Lazy)?FileRoute\(")
-    for path in iter_files(routes_root, (".tsx",)):
-        normalized = rel(path) if root == ROOT else str(path.relative_to(root)).replace("\\", "/")
-        route_path = str(path.relative_to(routes_root)).replace("\\", "/")
-        text = path.read_text(encoding="utf-8")
-
-        if not route_factory.search(text):
-            continue
-        if route_path == "__root.tsx":
-            continue
-        if route_path.startswith("_") and "/" not in route_path:
-            continue
-        if route_path.startswith("_authenticated"):
-            continue
-        redirect_only_route = re.search(r"\bNavigate\b", text) or (
-            "beforeLoad:" in text
-            and "component:" not in text
-            and "pendingComponent:" not in text
-            and "errorComponent:" not in text
-            and "notFoundComponent:" not in text
-        )
-        if redirect_only_route:
-            continue
-
-        if "export const routeNavigation" not in text or "publicRouteNavigation(" not in text:
-            issues.append(
-                f"{normalized}: public route must export `routeNavigation = publicRouteNavigation(...)` "
-                "so escape navigation is declared at the route boundary"
-            )
-        if "from '@/lib/route-navigation'" not in text:
-            issues.append(
-                f"{normalized}: public route navigation metadata must use '@/lib/route-navigation'"
-            )
-
-    return issues
-
-
-def frontend_route_access_group_issues(root: Path = ROOT) -> list[str]:
-    issues: list[str] = []
-    routes_root = root / "frontend" / "src" / "routes"
-    if not routes_root.exists():
-        return issues
-
-    guest_group_path = routes_root / "_guest.tsx"
-    guest_route_paths = {
-        "auth/verify.lazy.tsx",
-        "auth/verify.tsx",
-        "register.lazy.tsx",
-        "register.tsx",
-        "register_.confirmation.lazy.tsx",
-        "register_.confirmation.tsx",
-        "sign-in.lazy.tsx",
-        "sign-in.tsx",
-    }
-
-    guest_leaf_exists = False
-    for path in iter_files(routes_root, (".tsx",)):
-        route_path = str(path.relative_to(routes_root)).replace("\\", "/")
-        normalized = rel(path) if root == ROOT else str(path.relative_to(root)).replace("\\", "/")
-        text = path.read_text(encoding="utf-8")
-
-        if route_path in guest_route_paths:
-            issues.append(
-                f"{normalized}: guest-only auth routes must live under the `_guest` "
-                "pathless route group instead of declaring per-route guards"
-            )
-
-        if route_path.startswith("_guest/"):
-            guest_leaf_exists = True
-            if "redirectAuthenticatedUserFromGuestRoute" in text or "beforeLoad:" in text:
-                issues.append(
-                    f"{normalized}: guest leaf routes inherit the `_guest` guard; "
-                    "do not attach guest guards to individual leaf routes"
-                )
-
-    if guest_leaf_exists:
-        normalized_group = (
-            rel(guest_group_path)
-            if root == ROOT
-            else str(guest_group_path.relative_to(root)).replace("\\", "/")
-        )
-        if not guest_group_path.exists():
-            issues.append(
-                f"{normalized_group}: guest-only routes require a `_guest` pathless route group"
-            )
-        else:
-            group_text = guest_group_path.read_text(encoding="utf-8")
-            if "redirectAuthenticatedUserFromGuestRoute" not in group_text or "beforeLoad:" not in group_text:
-                issues.append(
-                    f"{normalized_group}: `_guest` route group must own the guest-only redirect guard"
-                )
-
-    return issues
-
-
-def frontend_transient_handoff_issues(root: Path = ROOT) -> list[str]:
-    issues: list[str] = []
-    src_root = root / "frontend" / "src"
-    routes_root = src_root / "routes"
-
-    callback_lazy_route = routes_root / "callback.lazy.tsx"
-    if callback_lazy_route.exists():
-        normalized = rel(callback_lazy_route) if root == ROOT else str(callback_lazy_route.relative_to(root)).replace("\\", "/")
-        issues.append(
-            f"{normalized}: callback success handoffs must run before render; use a non-lazy `/callback` route with `beforeLoad`"
-        )
-
-    callback_route = routes_root / "callback.tsx"
-    if callback_route.exists():
-        normalized = rel(callback_route) if root == ROOT else str(callback_route.relative_to(root)).replace("\\", "/")
-        text = callback_route.read_text(encoding="utf-8")
-        if "beforeLoad:" not in text or "redirectFromCallbackRoute" not in text:
-            issues.append(
-                f"{normalized}: `/callback` must perform successful token handoff in `beforeLoad` before rendering recovery UI"
-            )
-
-    callback_page = src_root / "features" / "auth" / "components" / "CallbackPage.tsx"
-    if callback_page.exists():
-        normalized = rel(callback_page) if root == ROOT else str(callback_page.relative_to(root)).replace("\\", "/")
-        text = callback_page.read_text(encoding="utf-8")
-        forbidden = {
-            "exchangeAuthorizationCode": "exchange tokens in the route handoff guard instead of `CallbackPage`",
-            "auth.callback.completing": "remove transient callback success copy; render only recovery UI",
-            "auth.callback.title": "remove transient callback success copy; render only recovery UI",
-            "Completing sign-in": "remove transient callback success copy; render only recovery UI",
-        }
-        for token, message in forbidden.items():
-            if token in text:
-                issues.append(f"{normalized}: {message}")
-
-    translations = src_root / "features" / "preferences" / "translations.ts"
-    if translations.exists():
-        normalized = rel(translations) if root == ROOT else str(translations.relative_to(root)).replace("\\", "/")
-        text = translations.read_text(encoding="utf-8")
-        for token in ("auth.callback.completing", "auth.callback.title"):
-            if token in text:
-                issues.append(
-                    f"{normalized}: stale callback pending translation `{token}` is not valid; callback success handoffs are silent"
-                )
-
-    return issues
-
-
-def frontend_quality_issues(root: Path = ROOT) -> list[str]:
-    return [
-        *frontend_ui_system_issues(root),
-        *frontend_component_file_name_issues(root),
-        *frontend_tailwind_opacity_issues(root),
-        *frontend_form_schema_type_issues(root),
-        *frontend_test_async_boundary_issues(root),
-        *frontend_public_route_navigation_issues(root),
-        *frontend_route_access_group_issues(root),
-        *frontend_transient_handoff_issues(root),
-    ]
-
-
-def check_frontend_quality(_args: argparse.Namespace | None = None) -> int:
-    issues = frontend_quality_issues()
-    if issues:
-        for issue in issues:
-            print(f"check-frontend-quality FAIL: {issue}", file=sys.stderr)
-        print("\nSee docs/playbooks/frontend.md#component-design", file=sys.stderr)
-        return 1
-    print("check-frontend-quality: OK")
-    return 0
 
 
 NAVIGATION_RE = re.compile(r"^> \*\*Navigation\*\*: .*\[[^\]]+\]\([^)]+\)")
@@ -2022,6 +1647,7 @@ ENFORCEMENT_TRUTH_REQUIRED_SNIPPETS = [
             ("python scripts/axis.py dotnet test -- --no-build", "full .NET test suite runs in CI through the Axis wrapper"),
             ("node-version-file: frontend/.nvmrc", "frontend CI setup uses the documented Node source"),
             ("run: python scripts/axis.py frontend install", "frontend dependencies install through the Axis wrapper"),
+            ("run: python scripts/axis.py check frontend-vulnerable-packages", "frontend dependency vulnerability gate runs in CI"),
             ("run: python scripts/axis.py frontend gen-api-types --check", "frontend API type generation runs in CI through the Axis wrapper"),
             ("run: python scripts/axis.py check ui-baseline", "approved frontend UI baseline is checked in CI"),
             ("run: python scripts/axis.py frontend ci", "frontend typecheck/lint runs in CI through the Axis wrapper"),
@@ -2037,6 +1663,7 @@ ENFORCEMENT_TRUTH_REQUIRED_SNIPPETS = [
         [
             ('step(".NET SDK", lambda: check_dotnet_sdk())', "local verify checks the documented .NET SDK before dotnet commands"),
             ('step("frontend toolchain", lambda: check_frontend_toolchain())', "local verify checks the documented Node source before npm commands"),
+            ('step("frontend vulnerable packages", lambda: check_frontend_vulnerable_packages())', "local verify audits changed frontend dependency manifests"),
             ("dotnet_projects_for_changed_paths(paths)", "local verify routes .NET work by changed project paths"),
             ('step("policy gate tests", lambda: check_policy_tests())', "local verify runs policy gate tests when scripts change"),
             ('step("doc navigation", lambda: check_doc_navigation())', "local verify runs docs checks when docs change"),
@@ -2516,6 +2143,16 @@ def _node_toolchain_bin_dirs(expected_major: str) -> list[Path]:
         seen.add(resolved)
         candidates.append(resolved)
 
+    try:
+        add(axis_setup.managed_bin_dir("node"))
+    except axis_setup.SetupError:
+        pass
+
+    path_node = shutil.which("node")
+    path_npm = shutil.which("npm") or shutil.which("npm.cmd")
+    if path_node and path_npm and Path(path_node).parent.resolve() == Path(path_npm).parent.resolve():
+        add(Path(path_node).parent)
+
     for root in _nvm_unix_roots():
         if not root.is_dir():
             continue
@@ -2551,10 +2188,15 @@ def frontend_toolchain_env() -> dict[str, str]:
         return {}
 
     expected = expected_or_error
-    node_ok, node_version, _node_resolved = command_version_line("node", "--version")
-    npm_ok, _npm_version, _npm_resolved = command_version_line("npm", "--version")
-    if node_ok and npm_ok and version_major(node_version) == expected:
-        return {}
+    node_ok, node_version, node_resolved = command_version_line("node", "--version")
+    npm_ok, _npm_version, npm_resolved = command_version_line("npm", "--version")
+    if (
+        node_ok
+        and npm_ok
+        and version_major(node_version) == expected
+        and Path(node_resolved).parent.resolve() == Path(npm_resolved).parent.resolve()
+    ):
+        return {"PATH": _path_with_prefix(Path(node_resolved).parent)}
 
     for bin_dir in _nvm_node_bin_dirs(expected):
         env = {"PATH": _path_with_prefix(bin_dir)}
@@ -2711,7 +2353,8 @@ def check_playwright_browsers(_args: argparse.Namespace | None = None) -> int:
 
 
 def find_lychee() -> str | None:
-    return shutil.which("lychee")
+    resolved = resolve_exe("lychee")
+    return resolved if resolved_file(resolved) else shutil.which("lychee")
 
 
 def lychee_version_status(lychee: str) -> tuple[bool, str]:
@@ -2724,7 +2367,7 @@ def lychee_version_status(lychee: str) -> tuple[bool, str]:
 
     first_line = (result.stdout or result.stderr or "").strip().splitlines()
     version_line = first_line[0] if first_line else ""
-    expected = f"lychee {REQUIRED_LYCHEE_VERSION}"
+    expected = f"lychee {axis_setup.LYCHEE_VERSION}"
     if version_line != expected:
         return (
             False,
@@ -2753,7 +2396,7 @@ def check_markdown_links_for_paths(paths: list[str] | None) -> int:
     lychee = find_lychee()
     if lychee is None:
         print(
-            f"check-markdown-links: Lychee {REQUIRED_LYCHEE_VERSION} is required, "
+            f"check-markdown-links: Lychee {axis_setup.LYCHEE_VERSION} is required, "
             "but `lychee` was not found in PATH. See docs/playbooks/scripts.md#tool-versions.",
             file=sys.stderr,
         )
@@ -2761,7 +2404,7 @@ def check_markdown_links_for_paths(paths: list[str] | None) -> int:
     version_ok, version_detail = lychee_version_status(lychee)
     if not version_ok:
         print(
-            f"check-markdown-links: Lychee {REQUIRED_LYCHEE_VERSION} is required; {version_detail}. "
+            f"check-markdown-links: Lychee {axis_setup.LYCHEE_VERSION} is required; {version_detail}. "
             "Install the documented version or put it earlier in PATH. "
             "See docs/playbooks/scripts.md#tool-versions.",
             file=sys.stderr,
@@ -2982,8 +2625,12 @@ def related_test_project_for_source_project(project: str) -> str | None:
     project_name = Path(project).stem
     if project == "src/Axis.Api/Axis.Api.csproj":
         candidate = ROOT / "tests/Api/Axis.Api.Tests/Axis.Api.Tests.csproj"
-    elif project.startswith("src/Modules/Identity/"):
-        candidate = ROOT / f"tests/Modules/Identity/{project_name}.Tests/{project_name}.Tests.csproj"
+    elif project.startswith("src/Modules/"):
+        parts = Path(project).parts
+        if len(parts) < 4:
+            return None
+        module_name = parts[2]
+        candidate = ROOT / "tests" / "Modules" / module_name / f"{project_name}.Tests" / f"{project_name}.Tests.csproj"
     elif project.startswith("src/Shared/"):
         candidate = ROOT / f"tests/Shared/{project_name}.Tests/{project_name}.Tests.csproj"
     else:
@@ -3068,10 +2715,16 @@ def verify_scope_paths(since: str | None = None) -> tuple[str, list[str]]:
 def verify(args: argparse.Namespace) -> int:
     scope, paths = verify_scope_paths(getattr(args, "since", None))
     failed: list[str] = []
+    planned: list[str] = []
+    plan_only = getattr(args, "plan_only", False)
 
     def step(name: str, fn: callable[[], int]) -> int:
         print()
         print(f"> {name}")
+        planned.append(name)
+        if plan_only:
+            print(f"PLAN {name}")
+            return 0
         try:
             rc = fn()
         except CheckError as exc:
@@ -3095,6 +2748,9 @@ def verify(args: argparse.Namespace) -> int:
     build_projects, test_projects = dotnet_projects_for_changed_paths(paths)
 
     frontend = any(is_frontend_path(path) for path in paths)
+    frontend_package_scan = any(
+        path in {"frontend/package.json", "frontend/package-lock.json"} for path in paths
+    )
     renovate_config = ".github/renovate.json5" in paths
     frontend_api_types = "openapi.json" in paths or "frontend/src/lib/api-types.ts" in paths
     frontend_tests_only = frontend and all(
@@ -3149,6 +2805,8 @@ def verify(args: argparse.Namespace) -> int:
 
     if frontend:
         if step("frontend toolchain", lambda: check_frontend_toolchain()) == 0:
+            if frontend_package_scan:
+                step("frontend vulnerable packages", lambda: check_frontend_vulnerable_packages())
             if frontend_api_types:
                 step("frontend API types", lambda: frontend_command(argparse.Namespace(frontend_command="gen-api-types", check=True)))
             step("frontend ci (tsc + biome)", lambda: frontend_command(argparse.Namespace(frontend_command="ci")))
@@ -3209,6 +2867,9 @@ def verify(args: argparse.Namespace) -> int:
         print("  then commit openapi.json + api-types.ts; CI's OpenApiDocumentTests fails otherwise.")
 
     print()
+    if plan_only:
+        print(f"verify: PLAN - {len(planned)} step(s); no commands run")
+        return 0
     if not failed:
         print("verify: PASS")
         return 0
@@ -3901,7 +3562,193 @@ def _wsl_docker_ok() -> bool:
     return result is not None and result.returncode == 0
 
 
+def setup_tool_ready(tool: str) -> bool:
+    if tool == "dotnet":
+        return dotnet_sdk_status()[0]
+    if tool == "node":
+        env = frontend_toolchain_env()
+        if not env:
+            return False
+        node_ok = node_version_status(env)[0]
+        npm_status, _npm_detail = _command_version("npm", "--version", env=env)
+        return node_ok and npm_status == "OK"
+    if tool == "lychee":
+        resolved = find_lychee()
+        return resolved is not None and lychee_version_status(resolved)[0]
+    if tool == "gh":
+        return gh_cli_status()[0]
+    raise CheckError(f"Unknown setup-managed tool: {tool}")
+
+
+def gh_cli_status() -> tuple[bool, str]:
+    ok, version_line, resolved = command_version_line("gh", "--version")
+    if not ok:
+        return False, version_line
+    match = re.search(r"\bgh version ([0-9]+(?:[.][0-9]+)+)\b", version_line)
+    if match is None:
+        return False, f"found `{version_line or 'unknown'}` at {resolved}; expected >= {axis_setup.GH_VERSION}"
+    version = match.group(1)
+    if _version_sort_key(version) < _version_sort_key(axis_setup.GH_VERSION):
+        return False, f"found `{version_line}` at {resolved}; expected >= {axis_setup.GH_VERSION}"
+    return True, f"{version_line} ({resolved}); expected >= {axis_setup.GH_VERSION}"
+
+
+def setup_external_preflight(profile: str) -> int:
+    normalized = "review" if profile == "all" else profile
+    if doctor(argparse.Namespace(profile="core", strict=True)) != 0:
+        return 1
+    if normalized in {"local-dev", "review"}:
+        if find_openssl() is None:
+            print(
+                "setup: FAIL - OpenSSL is required for local HTTPS certificates; "
+                "Axis will not install an OS package automatically",
+                file=sys.stderr,
+            )
+            return 1
+        if not _docker_info_ok():
+            print(
+                "setup: FAIL - Docker Engine is not reachable in this shell; "
+                "Axis will not install or start an OS service automatically",
+                file=sys.stderr,
+            )
+            return 1
+        if require_docker_compose("setup") != 0:
+            return 1
+    if normalized == "review" and check_coderabbit_cli() != 0:
+        print(
+            "setup: CodeRabbit remains an external prerequisite because its publisher "
+            "does not provide verified cross-platform artifacts",
+            file=sys.stderr,
+        )
+        return 1
+    return 0
+
+
+def setup_preflight(profile: str) -> int:
+    normalized = "review" if profile == "all" else profile
+    rc = doctor(argparse.Namespace(profile=profile, strict=True))
+    if rc != 0:
+        if normalized == "review" and not setup_tool_ready("lychee"):
+            print("setup: rerun with --install-user-tools to install the pinned Lychee artifact", file=sys.stderr)
+        return rc
+    return 0
+
+
+def setup(args: argparse.Namespace) -> int:
+    profile = getattr(args, "profile", "build")
+    browsers = getattr(args, "browsers", False)
+    install_user_tools = getattr(args, "install_user_tools", False)
+    plan_only = getattr(args, "plan_only", False)
+    try:
+        platform_spec = axis_setup.detect_platform()
+        plan = axis_setup.setup_plan(
+            profile=profile,
+            install_user_tools=install_user_tools,
+            browsers=browsers,
+            platform_spec=platform_spec,
+        )
+    except axis_setup.SetupError as exc:
+        print(f"setup: FAIL - {exc}", file=sys.stderr)
+        return 1
+
+    print(f"axis setup (profile={profile}, platform={platform_spec.label})", flush=True)
+    if plan_only:
+        for index, label in enumerate(plan, 1):
+            print(f"{index}. {label}")
+        print("setup plan: no checks, downloads, or repository mutations were performed")
+        return 0
+
+    missing: tuple[str, ...] = ()
+    if install_user_tools:
+        managed_tools = axis_setup.managed_tools_for_profile(profile)
+        missing = tuple(tool for tool in managed_tools if not setup_tool_ready(tool))
+        try:
+            for tool in missing:
+                try:
+                    axis_setup.asset_name(tool, platform_spec)
+                except axis_setup.SetupError as exc:
+                    raise axis_setup.SetupError(
+                        f"no verified portable artifact is available for missing `{tool}`: {exc}"
+                    ) from exc
+        except axis_setup.SetupError as exc:
+            print(f"setup: FAIL - {exc}", file=sys.stderr)
+            return 1
+
+    rc = setup_external_preflight(profile)
+    if rc != 0:
+        return rc
+
+    if install_user_tools:
+        try:
+            axis_setup.confirm_install(
+                missing,
+                assume_yes=getattr(args, "yes", False),
+                stdin=sys.stdin,
+            )
+            for tool in missing:
+                print(f"> install pinned user-local {tool} {axis_setup.tool_version(tool)}", flush=True)
+                installed = axis_setup.install_tool(tool, platform_spec=platform_spec)
+                print(f"  installed: {installed}")
+        except (OSError, axis_setup.SetupError) as exc:
+            print(f"setup: FAIL - {exc}", file=sys.stderr)
+            return 1
+
+    rc = setup_preflight(profile)
+    if rc != 0:
+        return rc
+
+    steps: list[tuple[str, callable[[], int]]] = [
+        (
+            "restore .NET dependencies",
+            lambda: run([exe("dotnet"), "restore", "Axis.sln"], check=False).returncode,
+        ),
+        ("install frontend dependencies", lambda: run_frontend_npm(["ci"]).returncode),
+    ]
+    normalized = "review" if profile == "all" else profile
+    if browsers or normalized in {"local-dev", "review"}:
+        steps.append(
+            (
+                "install Playwright Chromium",
+                lambda: run_frontend_npm(["exec", "--", "playwright", "install", "chromium"]).returncode,
+            )
+        )
+    if normalized in {"local-dev", "review"}:
+        steps.extend(
+            [
+                ("generate local HTTPS certificates", lambda: local_dev_certs(args)),
+                ("install repository pre-push hook", lambda: install_hooks(args)),
+            ]
+        )
+
+    for label, action in steps:
+        print(f"> {label}", flush=True)
+        rc = action()
+        if rc != 0:
+            print(f"setup: FAIL - {label}", file=sys.stderr)
+            return rc
+
+    print("setup: OK")
+    if normalized == "review":
+        followups = ["`coderabbit auth status`"]
+        if setup_tool_ready("gh"):
+            followups.insert(0, "`gh auth status`")
+        print(f"review authentication remains interactive: run {' and '.join(followups)}")
+    return 0
+
+
 def doctor(args: argparse.Namespace) -> int:
+    profile = getattr(args, "profile", "local-dev")
+    profile_groups = {
+        "core": {"core"},
+        "build": {"core", "build"},
+        "local-dev": {"core", "build", "local-dev"},
+        "review": {"core", "build", "local-dev", "review"},
+        "all": {"core", "build", "local-dev", "review"},
+    }
+    if profile not in profile_groups:
+        raise CheckError(f"Unknown doctor profile: {profile}")
+
+    groups = profile_groups[profile]
     rows: list[tuple[str, str, str]] = []
 
     def record(status: str, label: str, detail: str) -> None:
@@ -3915,118 +3762,113 @@ def doctor(args: argparse.Namespace) -> int:
     if python_in_path:
         record("OK", "python launcher", python_in_path)
     else:
-        record("WARN", "python launcher", "not found in PATH; open a shell where Python 3 resolves before running repo scripts")
+        record("WARN", "python launcher", "not found in PATH; use `python3` on WSL/Linux or `py -3` on Windows")
 
+    git_status, git_detail = _command_version("git", "--version")
+    record(git_status, "git", git_detail)
 
-    lychee = find_lychee()
-    if lychee is None:
-        record(
-            "FAIL",
-            "lychee",
-            f"Lychee {REQUIRED_LYCHEE_VERSION} is required for markdown link checks; "
-            "install it on PATH per docs/playbooks/scripts.md#tool-versions",
-        )
-    else:
-        lychee_ok, lychee_detail = lychee_version_status(lychee)
-        record("OK" if lychee_ok else "FAIL", "lychee", lychee_detail)
+    frontend_env: dict[str, str] | None = None
+    node_ok = False
+    if "build" in groups:
+        dotnet_ok, dotnet_detail = dotnet_sdk_status()
+        record("OK" if dotnet_ok else "FAIL", ".NET SDK", dotnet_detail)
 
-    coderabbit_status, coderabbit_detail = coderabbit_doctor_status(strict=args.strict)
-    record(coderabbit_status, "coderabbit", coderabbit_detail)
+        frontend_env = frontend_toolchain_env()
+        node_ok, node_detail = node_version_status(frontend_env)
+        record("OK" if node_ok else "FAIL", "node", node_detail)
+        npm_status, npm_detail = _command_version("npm", "--version", env=frontend_env)
+        record(npm_status, "npm", npm_detail)
 
-    dotnet_ok, dotnet_detail = dotnet_sdk_status()
-    record("OK" if dotnet_ok else "FAIL", ".NET SDK", dotnet_detail)
+        if os.name == "nt":
+            npm_cmd = shutil.which("npm.cmd")
+            npm_ps1 = shutil.which("npm.ps1")
+            if npm_cmd:
+                detail = f"native npm shim available ({npm_cmd})"
+                if npm_ps1:
+                    detail += f"; alternate npm launcher also detected ({npm_ps1})"
+                record("OK", "npm adapter", detail)
 
-    frontend_env = frontend_toolchain_env()
-    node_ok, node_detail = node_version_status(frontend_env)
-    record("OK" if node_ok else "FAIL", "node", node_detail)
+    if "local-dev" in groups:
+        if node_ok:
+            chromium_ok, chromium_detail = playwright_chromium_status(frontend_env)
+            record("OK" if chromium_ok else "WARN", "playwright chromium", chromium_detail)
+        else:
+            record("WARN", "playwright chromium", "Node must resolve before checking Playwright browser artifacts")
 
-    if node_ok:
-        chromium_ok, chromium_detail = playwright_chromium_status(frontend_env)
-        record("OK" if chromium_ok else "WARN", "playwright chromium", chromium_detail)
-    else:
-        record(
-            "WARN",
-            "playwright chromium",
-            "Node must resolve before checking Playwright browser artifacts",
-        )
+        openssl = find_openssl()
+        if openssl:
+            record("OK", "openssl", openssl)
+        else:
+            record("WARN", "openssl", "required for local-dev certs; install OpenSSL on PATH or Git for Windows")
 
-    for name, version_args in (
-        ("git", ("--version",)),
-        ("npm", ("--version",)),
-    ):
-        env = frontend_env if name == "npm" else None
-        status, detail = _command_version(name, *version_args, env=env)
-        record(status, name, detail)
+        docker_status, docker_detail = _command_version("docker", "--version")
+        if docker_status == "FAIL":
+            record(
+                "WARN",
+                "docker cli",
+                f"{docker_detail}; install Docker Engine and Compose in the active environment",
+            )
+        else:
+            record(docker_status, "docker cli", docker_detail)
 
-    openssl = find_openssl()
-    if openssl:
-        record("OK", "openssl", openssl)
-    else:
-        record("WARN", "openssl", "required for local-dev certs; install OpenSSL on PATH or Git for Windows")
+        docker_current = _docker_info_ok()
+        docker_host = os.environ.get("DOCKER_HOST")
+        docker_host_ping = _docker_host_ping_ok(docker_host)
+        tcp_docker = _http_ok("http://127.0.0.1:2375/_ping") or _http_ok("http://localhost:2375/_ping")
+        wsl_docker = _wsl_docker_ok()
 
-    docker_status, docker_detail = _command_version("docker", "--version")
-    if docker_status == "FAIL":
-        record(
-            "WARN",
-            "docker cli",
-            f"{docker_detail}; use an environment adapter if Docker is available from another execution context",
-        )
-    else:
-        record(docker_status, "docker cli", docker_detail)
+        if docker_current:
+            record("OK", "docker endpoint", "docker info works in this shell")
+        elif docker_host and docker_host_ping:
+            record("OK", "docker endpoint", f"DOCKER_HOST={docker_host} responds; Testcontainers can use it")
+        elif docker_host:
+            record("FAIL", "docker endpoint", f"DOCKER_HOST={docker_host} is set, but the daemon did not respond")
+        elif tcp_docker:
+            record(
+                "WARN",
+                "docker endpoint",
+                "an exported Docker endpoint responds; set DOCKER_HOST for the current session",
+            )
+        elif wsl_docker:
+            record(
+                "WARN",
+                "docker endpoint",
+                "Docker works from another detected execution context; run the canonical command there",
+            )
+        else:
+            record("FAIL", "docker endpoint", "docker info failed; no reachable Docker endpoint detected")
 
-    docker_current = _docker_info_ok()
-    docker_host = os.environ.get("DOCKER_HOST")
-    docker_host_ping = _docker_host_ping_ok(docker_host)
-    tcp_docker = _http_ok("http://127.0.0.1:2375/_ping") or _http_ok("http://localhost:2375/_ping")
-    wsl_docker = _wsl_docker_ok()
+        if _docker_compose_ok():
+            record("OK", "docker compose", "docker compose version works")
+        elif wsl_docker:
+            record("WARN", "docker compose", "Docker Compose is available from another execution context")
+        else:
+            record("FAIL", "docker compose", "Docker Compose v2 not available from this execution context")
 
-    if docker_current:
-        record("OK", "docker endpoint", "docker info works in this shell")
-    elif docker_host and docker_host_ping:
-        record("OK", "docker endpoint", f"DOCKER_HOST={docker_host} responds; Testcontainers can use it")
-    elif docker_host:
-        record("FAIL", "docker endpoint", f"DOCKER_HOST={docker_host} is set, but the daemon did not respond")
-    elif tcp_docker:
-        record(
-            "WARN",
-            "docker endpoint",
-            "an exported Docker endpoint responds; set DOCKER_HOST to that endpoint for the current process/session",
-        )
-    elif wsl_docker:
-        record(
-            "WARN",
-            "docker endpoint",
-            "Docker works from another detected execution context; run the canonical repo-root command there or expose a local Docker endpoint",
-        )
-    else:
-        record("FAIL", "docker endpoint", "docker info failed; no reachable Docker endpoint detected")
+    if "review" in groups:
+        lychee = find_lychee()
+        if lychee is None:
+            record(
+                "FAIL",
+                "lychee",
+                f"Lychee {axis_setup.LYCHEE_VERSION} is required; install it per {TOOL_VERSIONS_DOC}",
+            )
+        else:
+            lychee_ok, lychee_detail = lychee_version_status(lychee)
+            record("OK" if lychee_ok else "FAIL", "lychee", lychee_detail)
 
-    if _docker_compose_ok():
-        record("OK", "docker compose", "docker compose version works")
-    elif wsl_docker:
-        record(
-            "WARN",
-            "docker compose",
-            "Docker Compose is available from another detected execution context; run the canonical repo-root command there",
-        )
-    else:
-        record("FAIL", "docker compose", "Docker Compose v2 not available from this execution context")
+        coderabbit_status, coderabbit_detail = coderabbit_doctor_status(strict=getattr(args, "strict", False))
+        record(coderabbit_status, "coderabbit", coderabbit_detail)
 
-    if os.name == "nt":
-        npm_cmd = shutil.which("npm.cmd")
-        npm_ps1 = shutil.which("npm.ps1")
-        if npm_cmd:
-            detail = f"native npm shim available ({npm_cmd})"
-            if npm_ps1:
-                detail += f"; alternate npm launcher also detected ({npm_ps1})"
-            record("OK", "npm adapter", detail)
+        gh_ok, gh_detail = gh_cli_status()
+        record("OK" if gh_ok else "WARN", "github cli (optional)", gh_detail)
 
-    print("axis doctor")
+    print(f"axis doctor (profile={profile})")
     for status, label, detail in rows:
         print(f"[{status:<4}] {label}: {detail}")
 
     failures = [label for status, label, _detail in rows if status == "FAIL"]
-    if failures and args.strict:
+    if failures and getattr(args, "strict", False):
         print(f"doctor: FAIL - {len(failures)} blocking issue(s): {', '.join(failures)}", file=sys.stderr)
         return 1
 
@@ -4079,12 +3921,46 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
 
-    doctor_parser = sub.add_parser("doctor")
-    doctor_parser.add_argument("--strict", action="store_true", help="Exit non-zero when required local-dev tools are unavailable")
+    setup_parser = sub.add_parser("setup", help="Prepare a portable repository development profile")
+    setup_parser.add_argument(
+        "--profile",
+        choices=("build", "local-dev", "review", "all"),
+        default="build",
+        help="Cumulative setup profile (default: build)",
+    )
+    setup_parser.add_argument(
+        "--browsers",
+        action="store_true",
+        help="Compatibility option: add Playwright Chromium to any profile",
+    )
+    setup_parser.add_argument(
+        "--plan-only",
+        action="store_true",
+        help="Print the platform-specific setup plan without checks, downloads, or mutations",
+    )
+    setup_parser.add_argument(
+        "--install-user-tools",
+        action="store_true",
+        help="Install missing pinned tools into the current user's Axis data directory",
+    )
+    setup_parser.add_argument(
+        "--yes",
+        action="store_true",
+        help="Confirm user-local tool downloads without an interactive prompt",
+    )
+    setup_parser.set_defaults(func=setup)
+    doctor_parser = sub.add_parser("doctor", help="Diagnose tools required by a selected workflow profile")
+    doctor_parser.add_argument(
+        "--profile",
+        choices=("core", "build", "local-dev", "review", "all"),
+        default="local-dev",
+        help="Tool group to diagnose (default: local-dev)",
+    )
+    doctor_parser.add_argument("--strict", action="store_true", help="Exit non-zero when required tools in the selected profile are unavailable")
     doctor_parser.set_defaults(func=doctor)
-    sub.add_parser("install-hooks").set_defaults(func=install_hooks)
-    sub.add_parser("pre-push").set_defaults(func=pre_push)
-    ready_review_parser = sub.add_parser("ready-review")
+    sub.add_parser("install-hooks", help="Install the repository-managed pre-push hook").set_defaults(func=install_hooks)
+    sub.add_parser("pre-push", help="Run the pre-push policy profile").set_defaults(func=pre_push)
+    ready_review_parser = sub.add_parser("ready-review", help="Verify a clean checkpoint before review")
     ready_review_parser.add_argument("--since", help="Scope expensive verification after this checkpoint")
     ready_review_parser.add_argument(
         "--policy-only",
@@ -4092,63 +3968,71 @@ def main(argv: list[str] | None = None) -> int:
         help="Run only the deterministic policy profile shared with CI",
     )
     ready_review_parser.set_defaults(func=ready_review)
-    verify_parser = sub.add_parser("verify")
+    verify_parser = sub.add_parser("verify", help="Run checks selected from changed paths")
     verify_parser.add_argument("--since", help="Scope verification to changes after this checkpoint plus the working tree")
+    verify_parser.add_argument(
+        "--plan-only",
+        action="store_true",
+        help="Print the changed-path verification plan without running commands",
+    )
     verify_parser.set_defaults(func=verify)
 
-    dotnet_parser = sub.add_parser("dotnet")
+    dotnet_parser = sub.add_parser("dotnet", help="Run repository-standard .NET commands")
     dotnet_sub = dotnet_parser.add_subparsers(dest="dotnet_command", required=True)
     for dotnet_passthrough in ("restore", "build", "test"):
-        parser_for_dotnet = dotnet_sub.add_parser(dotnet_passthrough)
+        parser_for_dotnet = dotnet_sub.add_parser(
+            dotnet_passthrough,
+            help=f"Run dotnet {dotnet_passthrough} through the repository wrapper",
+        )
         parser_for_dotnet.add_argument("dotnet_args", nargs=argparse.REMAINDER)
         parser_for_dotnet.set_defaults(func=dotnet_command)
-    dotnet_format = dotnet_sub.add_parser("format")
+    dotnet_format = dotnet_sub.add_parser("format", help="Format the solution or verify formatting")
     dotnet_format.add_argument("--check", action="store_true", help="Fail when dotnet format would change files")
     dotnet_format.add_argument("dotnet_args", nargs=argparse.REMAINDER)
     dotnet_format.set_defaults(func=dotnet_command)
-    dotnet_run_api = dotnet_sub.add_parser("run-api")
+    dotnet_run_api = dotnet_sub.add_parser("run-api", help="Run the Axis API project")
     dotnet_run_api.add_argument("dotnet_args", nargs=argparse.REMAINDER)
     dotnet_run_api.set_defaults(func=dotnet_command)
-    dotnet_ef = dotnet_sub.add_parser("ef")
+    dotnet_ef = dotnet_sub.add_parser("ef", help="Run Entity Framework tooling")
     dotnet_ef.add_argument("dotnet_args", nargs=argparse.REMAINDER)
     dotnet_ef.set_defaults(func=dotnet_command)
 
-    frontend_parser = sub.add_parser("frontend")
+    frontend_parser = sub.add_parser("frontend", help="Run repository-standard frontend commands")
     frontend_sub = frontend_parser.add_subparsers(dest="frontend_command", required=True)
-    frontend_sub.add_parser("install").set_defaults(func=frontend_command)
-    frontend_sub.add_parser("install-browsers").set_defaults(func=frontend_command)
-    frontend_sub.add_parser("ci").set_defaults(func=frontend_command)
-    frontend_sub.add_parser("test").set_defaults(func=frontend_command)
-    frontend_gen_api = frontend_sub.add_parser("gen-api-types")
+    frontend_sub.add_parser("install", help="Install locked frontend dependencies with npm ci").set_defaults(func=frontend_command)
+    frontend_sub.add_parser("install-browsers", help="Install Playwright Chromium").set_defaults(func=frontend_command)
+    frontend_sub.add_parser("ci", help="Run frontend type-check and lint gates").set_defaults(func=frontend_command)
+    frontend_sub.add_parser("test", help="Run frontend unit tests").set_defaults(func=frontend_command)
+    frontend_gen_api = frontend_sub.add_parser("gen-api-types", help="Generate TypeScript API types from OpenAPI")
     frontend_gen_api.add_argument("--check", action="store_true", help="Fail if generated frontend API types are stale")
     frontend_gen_api.set_defaults(func=frontend_command)
-    frontend_ui_baseline = frontend_sub.add_parser("ui-baseline")
+    frontend_ui_baseline = frontend_sub.add_parser("ui-baseline", help="Check or write the approved UI baseline")
     frontend_ui_baseline.add_argument("--write", action="store_true", help="Write the reviewed approved UI baseline")
     frontend_ui_baseline.set_defaults(func=frontend_command)
-    frontend_script = frontend_sub.add_parser("script")
+    frontend_script = frontend_sub.add_parser("script", help="Run an allow-listed package script")
     frontend_script.add_argument("script_name")
     frontend_script.add_argument("script_args", nargs=argparse.REMAINDER)
     frontend_script.set_defaults(func=frontend_command)
 
-    local_dev_parser = sub.add_parser("local-dev")
+    local_dev_parser = sub.add_parser("local-dev", help="Manage the Docker Compose local-development stack")
     local_dev_sub = local_dev_parser.add_subparsers(dest="local_dev_command", required=True)
-    local_dev_sub.add_parser("certs").set_defaults(func=local_dev)
-    local_up = local_dev_sub.add_parser("up")
+    local_dev_sub.add_parser("certs", help="Create local HTTPS certificates").set_defaults(func=local_dev)
+    local_up = local_dev_sub.add_parser("up", help="Create and start local services")
     local_up.add_argument("--build", action="store_true")
     local_up.add_argument("services", nargs="*")
     local_up.set_defaults(func=local_dev)
-    local_down = local_dev_sub.add_parser("down")
+    local_down = local_dev_sub.add_parser("down", help="Stop and remove local services")
     local_down.add_argument("--volumes", action="store_true")
     local_down.set_defaults(func=local_dev)
     for local_command in ("start", "stop", "restart"):
-        parser_for_command = local_dev_sub.add_parser(local_command)
+        parser_for_command = local_dev_sub.add_parser(local_command, help=f"{local_command.capitalize()} local services")
         parser_for_command.add_argument("services", nargs="*")
         parser_for_command.set_defaults(func=local_dev)
-    local_recreate = local_dev_sub.add_parser("recreate")
+    local_recreate = local_dev_sub.add_parser("recreate", help="Recreate selected local services")
     local_recreate.add_argument("services", nargs="+")
     local_recreate.set_defaults(func=local_dev)
-    local_dev_sub.add_parser("status").set_defaults(func=local_dev)
-    local_logs = local_dev_sub.add_parser("logs")
+    local_dev_sub.add_parser("status", help="Show local service status").set_defaults(func=local_dev)
+    local_logs = local_dev_sub.add_parser("logs", help="Show local service logs")
     local_logs.add_argument("-f", "--follow", action="store_true")
     local_logs.add_argument("services", nargs="*")
     local_logs.set_defaults(func=local_dev)
@@ -4156,79 +4040,80 @@ def main(argv: list[str] | None = None) -> int:
     local_shell.add_argument("service", nargs="?", default="api")
     local_shell.add_argument("exec_command", nargs=argparse.REMAINDER)
     local_shell.set_defaults(func=local_dev)
-    local_psql = local_dev_sub.add_parser("psql")
+    local_psql = local_dev_sub.add_parser("psql", help="Open psql in the PostgreSQL service")
     local_psql.add_argument("--database", default="axis")
     local_psql.set_defaults(func=local_dev)
-    local_e2e = local_dev_sub.add_parser("e2e")
+    local_e2e = local_dev_sub.add_parser("e2e", help="Run end-to-end tests against the local stack")
     local_e2e.add_argument("e2e_args", nargs=argparse.REMAINDER)
     local_e2e.set_defaults(func=local_dev)
-    local_smoke = local_dev_sub.add_parser("smoke")
+    local_smoke = local_dev_sub.add_parser("smoke", help="Run local stack smoke checks")
     local_smoke.add_argument("smoke_args", nargs=argparse.REMAINDER)
     local_smoke.set_defaults(func=local_dev)
-    local_observability = local_dev_sub.add_parser("observability")
+    local_observability = local_dev_sub.add_parser("observability", help="Manage the optional observability profile")
     local_observability_sub = local_observability.add_subparsers(dest="observability_command", required=True)
-    local_observability_sub.add_parser("up").set_defaults(func=local_dev)
-    local_observability_sub.add_parser("stop").set_defaults(func=local_dev)
-    local_observability_sub.add_parser("status").set_defaults(func=local_dev)
-    local_observability_logs = local_observability_sub.add_parser("logs")
+    local_observability_sub.add_parser("up", help="Start observability services").set_defaults(func=local_dev)
+    local_observability_sub.add_parser("stop", help="Stop observability services").set_defaults(func=local_dev)
+    local_observability_sub.add_parser("status", help="Show observability service status").set_defaults(func=local_dev)
+    local_observability_logs = local_observability_sub.add_parser("logs", help="Show observability logs")
     local_observability_logs.add_argument("-f", "--follow", action="store_true")
     local_observability_logs.set_defaults(func=local_dev)
-    local_dev_sub.add_parser("reset-db").set_defaults(func=local_dev)
-    local_dev_sub.add_parser("reset-all").set_defaults(func=local_dev)
+    local_dev_sub.add_parser("reset-db", help="Recreate the local database volume").set_defaults(func=local_dev)
+    local_dev_sub.add_parser("reset-all", help="Recreate all local volumes and services").set_defaults(func=local_dev)
 
-    check = sub.add_parser("check")
+    check = sub.add_parser("check", help="Run an individual deterministic repository gate")
     check_sub = check.add_subparsers(dest="check_command", required=True)
-    check_sub.add_parser("doc-drift").set_defaults(func=check_doc_drift)
-    check_sub.add_parser("policy-tests").set_defaults(func=check_policy_tests)
-    check_sub.add_parser("text-encoding").set_defaults(func=check_text_encoding)
-    check_sub.add_parser("scripts-standard").set_defaults(func=check_scripts_standard)
-    check_sub.add_parser("repo-skills").set_defaults(func=check_repo_skills)
-    check_sub.add_parser("renovate-config").set_defaults(func=check_renovate_config)
-    check_sub.add_parser("test-naming").set_defaults(func=check_test_naming)
-    check_sub.add_parser("test-project-classification").set_defaults(func=check_test_project_classification)
-    check_sub.add_parser("docker").set_defaults(func=check_docker)
-    check_sub.add_parser("dotnet-sdk").set_defaults(func=check_dotnet_sdk)
-    check_sub.add_parser("frontend-toolchain").set_defaults(func=check_frontend_toolchain)
-    check_sub.add_parser("playwright-browsers").set_defaults(func=check_playwright_browsers)
-    check_sub.add_parser("vulnerable-packages").set_defaults(func=check_vulnerable_packages)
-    check_sub.add_parser("ef-domain-mapping").set_defaults(func=check_ef_domain_mapping)
-    check_sub.add_parser("frontend-api-contracts").set_defaults(func=check_frontend_api_contracts)
-    check_sub.add_parser("ui-baseline").set_defaults(func=check_ui_baseline)
-    check_sub.add_parser("frontend-quality").set_defaults(func=check_frontend_quality)
-    check_sub.add_parser("coderabbit-cli").set_defaults(func=check_coderabbit_cli)
-    check_sub.add_parser("local-dev-docs").set_defaults(
+    check_sub.add_parser("doc-drift", help="Check documented enforcement against repository truth").set_defaults(func=check_doc_drift)
+    check_sub.add_parser("policy-tests", help="Run repository policy regression tests").set_defaults(func=check_policy_tests)
+    check_sub.add_parser("text-encoding", help="Check repository text encoding and line endings").set_defaults(func=check_text_encoding)
+    check_sub.add_parser("scripts-standard", help="Check repository script ownership conventions").set_defaults(func=check_scripts_standard)
+    check_sub.add_parser("repo-skills", help="Validate repository skill contracts").set_defaults(func=check_repo_skills)
+    check_sub.add_parser("renovate-config", help="Validate the Renovate configuration").set_defaults(func=check_renovate_config)
+    check_sub.add_parser("test-naming", help="Validate test naming conventions").set_defaults(func=check_test_naming)
+    check_sub.add_parser("test-project-classification", help="Validate test project classifications").set_defaults(func=check_test_project_classification)
+    check_sub.add_parser("docker", help="Check Docker availability for integration tests").set_defaults(func=check_docker)
+    check_sub.add_parser("dotnet-sdk", help="Check the required .NET SDK version").set_defaults(func=check_dotnet_sdk)
+    check_sub.add_parser("frontend-toolchain", help="Check Node and npm versions").set_defaults(func=check_frontend_toolchain)
+    check_sub.add_parser("playwright-browsers", help="Check Playwright Chromium availability").set_defaults(func=check_playwright_browsers)
+    check_sub.add_parser("vulnerable-packages", help="Audit NuGet dependencies for vulnerabilities").set_defaults(func=check_vulnerable_packages)
+    check_sub.add_parser("frontend-vulnerable-packages", help="Audit npm dependencies at high severity").set_defaults(func=check_frontend_vulnerable_packages)
+    check_sub.add_parser("ef-domain-mapping", help="Check EF Core mappings against domain ownership").set_defaults(func=check_ef_domain_mapping)
+    check_sub.add_parser("frontend-api-contracts", help="Check generated frontend API contracts").set_defaults(func=check_frontend_api_contracts)
+    check_sub.add_parser("ui-baseline", help="Check the approved frontend UI baseline").set_defaults(func=check_ui_baseline)
+    check_sub.add_parser("frontend-quality", help="Run deterministic frontend policy checks").set_defaults(func=check_frontend_quality)
+    check_sub.add_parser("coderabbit-cli", help="Check the CodeRabbit CLI review dependency").set_defaults(func=check_coderabbit_cli)
+    check_sub.add_parser("local-dev-docs", help="Check local-development docs against Compose").set_defaults(
         func=lambda _args: run_module_check("check-local-dev-docs.py", ["--check"])
     )
-    check_sub.add_parser("doc-link-targets").set_defaults(
+    check_sub.add_parser("doc-link-targets", help="Check local documentation link targets").set_defaults(
         func=lambda _args: run_module_check("check-doc-link-targets.py", ["--check"])
     )
-    check_sub.add_parser("markdown-links").set_defaults(func=check_markdown_links)
-    check_sub.add_parser("doc-navigation").set_defaults(func=check_doc_navigation)
-    check_sub.add_parser("doc-size-budgets").set_defaults(func=check_doc_size_budgets)
-    check_sub.add_parser("doc-code-fences").set_defaults(
+    check_sub.add_parser("markdown-links", help="Check Markdown links with Lychee").set_defaults(func=check_markdown_links)
+    check_sub.add_parser("doc-navigation", help="Check documentation navigation blocks").set_defaults(func=check_doc_navigation)
+    check_sub.add_parser("doc-size-budgets", help="Check documentation size budgets").set_defaults(func=check_doc_size_budgets)
+    check_sub.add_parser("doc-code-fences", help="Check canonical commands in documentation fences").set_defaults(
         func=lambda _args: run_module_check("check-doc-code-fences.py", ["--check"])
     )
-    check_sub.add_parser("use-case-docs").set_defaults(
+    check_sub.add_parser("use-case-docs", help="Validate use-case documentation contracts").set_defaults(
         func=lambda _args: run_module_check("check-use-case-docs.py", ["--check"])
     )
-    check_sub.add_parser("foundation-docs").set_defaults(
+    check_sub.add_parser("foundation-docs", help="Validate foundation documentation contracts").set_defaults(
         func=lambda _args: run_module_check("check-foundation-docs.py", ["--check"])
     )
-    pr_parser = check_sub.add_parser("pr")
+    pr_parser = check_sub.add_parser("pr", help="Validate pull-request metadata and branch naming")
     pr_parser.add_argument("--title")
     pr_parser.add_argument("--body-file", type=Path)
     pr_parser.add_argument("--branch")
     pr_parser.set_defaults(func=check_pr)
 
-    test = sub.add_parser("test")
+    test = sub.add_parser("test", help="Run repository test profiles")
     test_sub = test.add_subparsers(dest="test_command", required=True)
-    unit = test_sub.add_parser("unit")
+    unit = test_sub.add_parser("unit", help="Run all convention-classified .NET unit test projects")
     unit.add_argument("dotnet_args", nargs=argparse.REMAINDER)
     unit.set_defaults(func=test_unit)
 
-    generate = sub.add_parser("generate")
+    generate = sub.add_parser("generate", help="Generate committed repository artifacts")
     generate_sub = generate.add_subparsers(dest="generate_command", required=True)
-    generate_sub.add_parser("api-contracts").set_defaults(func=generate_api_contracts)
+    generate_sub.add_parser("api-contracts", help="Generate OpenAPI and frontend API types").set_defaults(func=generate_api_contracts)
 
     args = parser.parse_args(argv)
     try:

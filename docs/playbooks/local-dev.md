@@ -6,13 +6,12 @@ Use `python scripts/axis.py local-dev ...` for local stack work. Do not document
 
 ## Prerequisites
 
-- .NET SDK from [global.json](../../global.json).
-- Node from [frontend/.nvmrc](../../frontend/.nvmrc).
-- Docker reachable from the shell running tests.
-- Optional: Playwright Chromium from `python scripts/axis.py frontend install-browsers` for `local-dev smoke` and host browser E2E.
-- Local certs from `python scripts/axis.py local-dev certs` when HTTPS is needed.
+- Python 3 and Git; use `python3` on WSL/Linux or `py -3` on Windows when `python` is unavailable.
+- Docker Engine with Compose reachable from the shell running tests. Native Docker Engine inside WSL is supported; Docker Desktop is not required.
+- OpenSSL on PATH, or from Git for Windows, for local HTTPS certificates.
+- .NET SDK from [global.json](../../global.json) and Node from [frontend/.nvmrc](../../frontend/.nvmrc), either already available or installed user-locally by Axis.
 
-Run `python scripts/axis.py doctor` when toolchain resolution feels wrong.
+First-time preparation is `python scripts/axis.py setup --profile local-dev --install-user-tools`. This validates the cumulative doctor profile, restores locked dependencies, installs Playwright Chromium, generates local certificates, and installs the pre-push hook. Use `--plan-only` before execution or `--yes` for confirmed non-interactive downloads. Run `python scripts/axis.py doctor --profile local-dev --strict` for diagnosis without setup mutations.
 
 ## HTTPS
 
@@ -26,9 +25,9 @@ Trust the root CA in the OS that runs the browser. On WSL with a Windows browser
 
 ## Environment Adapters
 
-If Docker is reachable only through Docker Desktop/WSL indirection, correct the shell environment instead of changing tests.
+If Docker Engine is native to WSL or reachable through another execution context, correct the active shell environment instead of changing tests.
 
-The package-manager adapter resolves the documented Node/npm binary/shim path from PATH, nvm, nvm-windows, or Volta. OpenSSL for certs resolves PATH or Git for Windows.
+The package-manager adapter resolves the documented Node/npm binary/shim path from Axis's user-local tool directory, PATH, nvm, nvm-windows, or Volta. OpenSSL for certs resolves PATH or Git for Windows. Setup diagnoses Docker and OpenSSL but never invokes an OS package manager, `sudo`, or service configuration.
 
 ## Stack
 
@@ -52,7 +51,7 @@ Local overrides live in ignored root `.env.local`. See [.env.example](../../.env
 | Compose overrides | `.env.local` (copy from [.env.example](../../.env.example)) | Optional; only when a compose default needs changing (e.g. `VITE_USE_POLLING`). |
 | API on host | [src/Axis.Api/appsettings.json](../../src/Axis.Api/appsettings.json) | Host-native dev without the API container (`python scripts/axis.py dotnet run-api`). Override with ASP.NET env vars (`Section__Key`) or ignored `appsettings.Development.json`. |
 | EF migrations | `ConnectionStrings__Identity`, `ConnectionStrings__BusinessObjects`, `IDENTITY_CONNECTION_STRING`, or `BUSINESS_OBJECTS_CONNECTION_STRING` | `python scripts/axis.py dotnet ef ...` only. |
-| Shell adapters | `python scripts/axis.py doctor` | `DOCKER_HOST`, `NVM_DIR`, `PATH` when tools resolve from another context (WSL, Docker Desktop). |
+| Shell adapters | `python scripts/axis.py doctor --profile local-dev` | `DOCKER_HOST`, `NVM_DIR`, `PATH` when tools resolve from another context. |
 | Host browser smoke | [frontend/playwright.config.ts](../../frontend/playwright.config.ts) and a running local stack | `python scripts/axis.py local-dev smoke -- <playwright-args>` reuses host Chromium against `https://localhost:3000`, skips the dev server, and imports the local CA into the ignored repo-local `.dev-browser/` NSS store. |
 | E2E | [docker-compose.yml](../../docker-compose.yml) and [frontend/playwright.config.ts](../../frontend/playwright.config.ts) | `python scripts/axis.py local-dev e2e` builds and runs the compose E2E profile with API, web, Maildev, service URLs, and browser trust configured. Pass Playwright args after `--` to scope a file or title. |
 

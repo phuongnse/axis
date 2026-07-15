@@ -6,6 +6,7 @@ import os
 import re
 import subprocess
 from pathlib import Path
+from typing import Iterable
 
 ROOT = Path(__file__).resolve().parent.parent
 MODULES_DIR = ROOT / "src" / "Modules"
@@ -68,6 +69,27 @@ def git_visible_paths_under(path: Path) -> list[Path] | None:
         return None
 
     return [ROOT / line for line in result.stdout.splitlines() if line]
+
+
+def iter_files(root: Path, suffixes: tuple[str, ...]) -> Iterable[Path]:
+    if not root.exists():
+        return []
+
+    visible_paths = git_visible_paths_under(root)
+    if visible_paths is not None:
+        return (
+            path
+            for path in visible_paths
+            if path.is_file() and path.suffix in suffixes
+        )
+
+    return (
+        path
+        for path in root.rglob("*")
+        if path.is_file()
+        and path.suffix in suffixes
+        and not any(part in FALLBACK_GENERATED_OR_DEPENDENCY_DIRS for part in path.parts)
+    )
 
 
 def fallback_has_module_source(module_dir: Path) -> bool:

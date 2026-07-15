@@ -8,14 +8,27 @@
 
 | Tool | Required source | Used by |
 |---|---|---|
-| .NET SDK | [global.json](../../global.json) / [docs/TECH_STACK.md](../TECH_STACK.md) | build, tests, format, package scan, API contracts |
-| Node.js | [frontend/.nvmrc](../../frontend/.nvmrc) | frontend commands and API types |
+| .NET SDK | [global.json](../../global.json) / [docs/TECH_STACK.md](../TECH_STACK.md); portable setup pin in [scripts/axis_setup.py](../../scripts/axis_setup.py) | build, tests, format, package scan, API contracts |
+| Node.js | [frontend/.nvmrc](../../frontend/.nvmrc); portable setup pin in [scripts/axis_setup.py](../../scripts/axis_setup.py) | frontend commands and API types |
 | Playwright Chromium | [frontend/package.json](../../frontend/package.json) and `python scripts/axis.py frontend install-browsers` | `local-dev smoke`, host browser E2E, and fast layout smoke |
 | Lychee | [scripts/axis.py](../../scripts/axis.py) check and [.github/workflows/build-and-test.yml](../../.github/workflows/build-and-test.yml) pin | Markdown link checks |
+| GitHub CLI | portable setup pin in [scripts/axis_setup.py](../../scripts/axis_setup.py) | optional publication adapter |
 | Renovate validator | [scripts/axis.py](../../scripts/axis.py) check | Dependency automation config |
 | Pre-PR review checkpoint | [scripts/axis.py](../../scripts/axis.py) check | `$axis-pull-request` before GitHub PR actions |
 
-Use `python scripts/axis.py doctor` or the exact `check` subcommand to verify local tool resolution.
+Project commands use `python`; substitute `python3` on WSL/Linux or `py -3` on Windows when that is the available Python 3 launcher.
+
+## Bootstrap and diagnosis
+
+- A current patched Python 3 with the standard-library tar data extraction filter and Git are external prerequisites. Run `python scripts/axis.py setup --profile build`; select `local-dev`, `review`, or `all` for cumulative preparation.
+- Add `--install-user-tools` to install a missing pinned .NET SDK and Node.js. The review profile can also install pinned Lychee and GitHub CLI artifacts. Downloads require interactive confirmation or `--yes`, use HTTPS, verify the publisher's SHA-256/SHA-512 digest, and land under the native user data directory. `AXIS_TOOLS_DIR` overrides that location.
+- Portable executables still rely on publisher-documented host libraries. For example, the Linux .NET SDK requires ICU and other native runtime libraries; strict doctor output identifies these as external OS prerequisites rather than setting globalization fallbacks or installing packages silently.
+- Use `--plan-only` to print the selected OS/architecture plan without checks, network access, downloads, or repository mutations. The legacy `--browsers` option remains an additive compatibility alias; `local-dev` and `review` include Chromium automatically.
+- `local-dev` and `review` also generate local HTTPS certificates and install the repository pre-push hook. They require Docker Engine, Compose, and OpenSSL in the active shell before dependency mutations.
+- Build and local-dev setup support Windows, glibc-based Linux/WSL, and macOS on x64/arm64. Review-tool auto-install follows published artifacts: Lychee is portable on Linux x64/arm64, macOS arm64, and Windows x64; other review hosts must provide the pinned version externally. Setup never invokes an OS package manager, `sudo`, Docker Desktop, or service configuration. Missing system tools get diagnostic guidance.
+- CodeRabbit is not auto-installed because its release service does not publish checksums and its official installer does not support Windows native. Install and authenticate it separately; use WSL for the review profile on Windows when needed. Authentication for GitHub CLI and CodeRabbit always remains interactive and outside setup.
+- Doctor profiles are cumulative: `core`, `build`, `local-dev`, `review`, and `all`. The default is `local-dev`; review-only tools such as Lychee and CodeRabbit are checked by `review`/`all`.
+- Use the exact `check` subcommand for one machine-readable prerequisite or policy gate.
 
 ## Pre-PR review checkpoint
 
@@ -34,6 +47,7 @@ Use `python scripts/axis.py doctor` or the exact `check` subcommand to verify lo
 - Use `python scripts/axis.py local-dev smoke -- <playwright-args>` for fast host-browser smoke against a running local stack; use `python scripts/axis.py local-dev e2e -- <playwright-args>` for Compose-backed browser evidence.
 - Use `python scripts/axis.py ready-review` on a clean checkpoint commit at the review boundary. It runs changed-path verification plus the deterministic policy profile shared with CI.
 - Treat `python scripts/axis.py verify` as the changed-path verification engine behind ready-review, not as complete PR-readiness evidence by itself.
+- Use `python scripts/axis.py verify --plan-only` to inspect changed-path routing without executing tools.
 - Use `python scripts/axis.py pre-push` for ordinary Git push sanity; it is not a substitute for the pre-PR review checkpoint on published PR branches.
 - Use `python scripts/axis.py check pr` to validate the current or CI head branch plus PR title/body before publication.
 - Set `AXIS_PRE_PUSH_FULL=1` only when an explicit workflow wants pre-push to run `ready-review`; ordinary pre-push remains a quick gate.
@@ -42,7 +56,7 @@ Use `python scripts/axis.py doctor` or the exact `check` subcommand to verify lo
 ## Script Rules
 
 - Keep repo maintenance scripts in Python.
-- Put shared repository discovery in [scripts/axis_repo.py](../../scripts/axis_repo.py) or small Python helpers.
+- Put shared repository discovery in [scripts/axis_repo.py](../../scripts/axis_repo.py), portable setup ownership in [scripts/axis_setup.py](../../scripts/axis_setup.py), and coherent policy domains in small modules such as [scripts/axis_frontend_policy.py](../../scripts/axis_frontend_policy.py).
 - Keep top-level `scripts/*.py` files non-executable.
 - Keep [scripts/hooks/pre-push](../../scripts/hooks/pre-push) non-executable in the worktree; installation writes the executable copy under `.git/hooks`.
 - New deterministic guards encode reusable current invariants. Keep incident details in regression fixtures, not guard rules or retired artifact names.

@@ -176,6 +176,9 @@ jobs:
       - name: Install dependencies
         run: python scripts/axis.py frontend install
 
+      - name: Vulnerable packages
+        run: python scripts/axis.py check frontend-vulnerable-packages
+
       - name: API types in sync with openapi.json
         run: python scripts/axis.py frontend gen-api-types --check
 
