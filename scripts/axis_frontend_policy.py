@@ -124,8 +124,6 @@ def frontend_component_file_name_issues(root: Path = ROOT) -> list[str]:
     if route_root.exists():
         for path in iter_files(route_root, (".tsx",)):
             normalized = rel(path) if root == ROOT else str(path.relative_to(root)).replace("\\", "/")
-            if normalized.endswith("routeTree.gen.ts"):
-                continue
             text = path.read_text(encoding="utf-8")
             for idx, line in enumerate(text.splitlines(), 1):
                 if "className=" in line:
