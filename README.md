@@ -10,12 +10,22 @@ Axis is an open-source platform being built for adaptable, workflow-driven busin
 
 ## Quickstart
 
-Install Python 3, the .NET SDK from `global.json`, Node from `frontend/.nvmrc`, and Docker Engine with Compose. On WSL/Linux use `python3`; on Windows use `py -3` if `python` is unavailable.
+Install Python 3, the .NET SDK from `global.json`, Node from `frontend/.nvmrc`, and Docker Engine with Compose.
+
+WSL/Linux:
 
 ```bash
 python3 scripts/axis.py doctor --profile build --strict
 python3 scripts/axis.py setup --browsers
 python3 scripts/axis.py local-dev up
+```
+
+Windows PowerShell:
+
+```powershell
+py -3 scripts/axis.py doctor --profile build --strict
+py -3 scripts/axis.py setup --browsers
+py -3 scripts/axis.py local-dev up
 ```
 
 Open the web app at <https://localhost:3000>. For ports, HTTPS setup, troubleshooting, and observability, see [docs/playbooks/local-dev.md](./docs/playbooks/local-dev.md).
