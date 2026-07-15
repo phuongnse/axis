@@ -124,14 +124,27 @@ def env_path(env: dict[str, str] | None = None) -> str | None:
     return env.get("PATH") if env and "PATH" in env else None
 
 
+def resolved_file(path: str) -> bool:
+    candidate = Path(path)
+    return candidate.is_absolute() and candidate.is_file()
+
+
 def resolve_exe(name: str, *, env: dict[str, str] | None = None) -> str:
+    path = env_path(env)
+    if env is not None:
+        if os.name == "nt" and not name.endswith(".exe"):
+            cmd = shutil.which(f"{name}.cmd", path=path)
+            if cmd:
+                return cmd
+        found = shutil.which(name, path=path)
+        if found:
+            return found
     try:
         managed = axis_setup.managed_executable(name)
     except axis_setup.SetupError:
         managed = None
     if managed is not None and managed.is_file():
         return str(managed)
-    path = env_path(env)
     if os.name == "nt" and not name.endswith(".exe"):
         cmd = shutil.which(f"{name}.cmd", path=path)
         if cmd:
@@ -142,7 +155,7 @@ def resolve_exe(name: str, *, env: dict[str, str] | None = None) -> str:
 
 def command_exists(name: str, *, env: dict[str, str] | None = None) -> bool:
     resolved = resolve_exe(name, env=env)
-    if Path(resolved).is_file():
+    if resolved_file(resolved):
         return True
     path = env_path(env)
     return shutil.which(name, path=path) is not None or shutil.which(f"{name}.cmd", path=path) is not None
@@ -2135,6 +2148,11 @@ def _node_toolchain_bin_dirs(expected_major: str) -> list[Path]:
     except axis_setup.SetupError:
         pass
 
+    path_node = shutil.which("node")
+    path_npm = shutil.which("npm") or shutil.which("npm.cmd")
+    if path_node and path_npm and Path(path_node).parent.resolve() == Path(path_npm).parent.resolve():
+        add(Path(path_node).parent)
+
     for root in _nvm_unix_roots():
         if not root.is_dir():
             continue
@@ -2170,10 +2188,15 @@ def frontend_toolchain_env() -> dict[str, str]:
         return {}
 
     expected = expected_or_error
-    node_ok, node_version, _node_resolved = command_version_line("node", "--version")
-    npm_ok, _npm_version, _npm_resolved = command_version_line("npm", "--version")
-    if node_ok and npm_ok and version_major(node_version) == expected:
-        return {}
+    node_ok, node_version, node_resolved = command_version_line("node", "--version")
+    npm_ok, _npm_version, npm_resolved = command_version_line("npm", "--version")
+    if (
+        node_ok
+        and npm_ok
+        and version_major(node_version) == expected
+        and Path(node_resolved).parent.resolve() == Path(npm_resolved).parent.resolve()
+    ):
+        return {"PATH": _path_with_prefix(Path(node_resolved).parent)}
 
     for bin_dir in _nvm_node_bin_dirs(expected):
         env = {"PATH": _path_with_prefix(bin_dir)}
@@ -2331,7 +2354,7 @@ def check_playwright_browsers(_args: argparse.Namespace | None = None) -> int:
 
 def find_lychee() -> str | None:
     resolved = resolve_exe("lychee")
-    return resolved if Path(resolved).is_file() else shutil.which("lychee")
+    return resolved if resolved_file(resolved) else shutil.which("lychee")
 
 
 def lychee_version_status(lychee: str) -> tuple[bool, str]:
@@ -3543,19 +3566,60 @@ def setup_tool_ready(tool: str) -> bool:
     if tool == "dotnet":
         return dotnet_sdk_status()[0]
     if tool == "node":
-        return node_version_status()[0]
+        env = frontend_toolchain_env()
+        node_ok = node_version_status(env)[0]
+        npm_status, _npm_detail = _command_version("npm", "--version", env=env)
+        return node_ok and npm_status == "OK"
     if tool == "lychee":
         resolved = find_lychee()
         return resolved is not None and lychee_version_status(resolved)[0]
     if tool == "gh":
-        ok, version_line, _resolved = command_version_line("gh", "--version")
-        match = re.search(r"\bgh version ([0-9]+(?:[.][0-9]+)+)\b", version_line)
-        return bool(
-            ok
-            and match is not None
-            and _version_sort_key(match.group(1)) >= _version_sort_key(axis_setup.GH_VERSION)
-        )
+        return gh_cli_status()[0]
     raise CheckError(f"Unknown setup-managed tool: {tool}")
+
+
+def gh_cli_status() -> tuple[bool, str]:
+    ok, version_line, resolved = command_version_line("gh", "--version")
+    if not ok:
+        return False, version_line
+    match = re.search(r"\bgh version ([0-9]+(?:[.][0-9]+)+)\b", version_line)
+    if match is None:
+        return False, f"found `{version_line or 'unknown'}` at {resolved}; expected >= {axis_setup.GH_VERSION}"
+    version = match.group(1)
+    if _version_sort_key(version) < _version_sort_key(axis_setup.GH_VERSION):
+        return False, f"found `{version_line}` at {resolved}; expected >= {axis_setup.GH_VERSION}"
+    return True, f"{version_line} ({resolved}); expected >= {axis_setup.GH_VERSION}"
+
+
+def setup_external_preflight(profile: str) -> int:
+    normalized = "review" if profile == "all" else profile
+    if doctor(argparse.Namespace(profile="core", strict=True)) != 0:
+        return 1
+    if normalized in {"local-dev", "review"}:
+        if find_openssl() is None:
+            print(
+                "setup: FAIL - OpenSSL is required for local HTTPS certificates; "
+                "Axis will not install an OS package automatically",
+                file=sys.stderr,
+            )
+            return 1
+        if not _docker_info_ok():
+            print(
+                "setup: FAIL - Docker Engine is not reachable in this shell; "
+                "Axis will not install or start an OS service automatically",
+                file=sys.stderr,
+            )
+            return 1
+        if require_docker_compose("setup") != 0:
+            return 1
+    if normalized == "review" and check_coderabbit_cli() != 0:
+        print(
+            "setup: CodeRabbit remains an external prerequisite because its publisher "
+            "does not provide verified cross-platform artifacts",
+            file=sys.stderr,
+        )
+        return 1
+    return 0
 
 
 def setup_preflight(profile: str) -> int:
@@ -3565,13 +3629,6 @@ def setup_preflight(profile: str) -> int:
         if normalized == "review" and not setup_tool_ready("lychee"):
             print("setup: rerun with --install-user-tools to install the pinned Lychee artifact", file=sys.stderr)
         return rc
-    if normalized in {"local-dev", "review"} and find_openssl() is None:
-        print(
-            "setup: FAIL - OpenSSL is required for local HTTPS certificates; "
-            "Axis will not install an OS package automatically",
-            file=sys.stderr,
-        )
-        return 1
     return 0
 
 
@@ -3592,13 +3649,14 @@ def setup(args: argparse.Namespace) -> int:
         print(f"setup: FAIL - {exc}", file=sys.stderr)
         return 1
 
-    print(f"axis setup (profile={profile}, platform={platform_spec.label})")
+    print(f"axis setup (profile={profile}, platform={platform_spec.label})", flush=True)
     if plan_only:
         for index, label in enumerate(plan, 1):
             print(f"{index}. {label}")
         print("setup plan: no checks, downloads, or repository mutations were performed")
         return 0
 
+    missing: tuple[str, ...] = ()
     if install_user_tools:
         managed_tools = axis_setup.managed_tools_for_profile(profile)
         missing = tuple(tool for tool in managed_tools if not setup_tool_ready(tool))
@@ -3610,13 +3668,23 @@ def setup(args: argparse.Namespace) -> int:
                     raise axis_setup.SetupError(
                         f"no verified portable artifact is available for missing `{tool}`: {exc}"
                     ) from exc
+        except axis_setup.SetupError as exc:
+            print(f"setup: FAIL - {exc}", file=sys.stderr)
+            return 1
+
+    rc = setup_external_preflight(profile)
+    if rc != 0:
+        return rc
+
+    if install_user_tools:
+        try:
             axis_setup.confirm_install(
                 missing,
                 assume_yes=getattr(args, "yes", False),
                 stdin=sys.stdin,
             )
             for tool in missing:
-                print(f"> install pinned user-local {tool} {axis_setup.tool_version(tool)}")
+                print(f"> install pinned user-local {tool} {axis_setup.tool_version(tool)}", flush=True)
                 installed = axis_setup.install_tool(tool, platform_spec=platform_spec)
                 print(f"  installed: {installed}")
         except (OSError, axis_setup.SetupError) as exc:
@@ -3651,7 +3719,7 @@ def setup(args: argparse.Namespace) -> int:
         )
 
     for label, action in steps:
-        print(f"> {label}")
+        print(f"> {label}", flush=True)
         rc = action()
         if rc != 0:
             print(f"setup: FAIL - {label}", file=sys.stderr)
@@ -3659,7 +3727,10 @@ def setup(args: argparse.Namespace) -> int:
 
     print("setup: OK")
     if normalized == "review":
-        print("review authentication remains interactive: run `gh auth status` and `coderabbit auth status`")
+        followups = ["`coderabbit auth status`"]
+        if setup_tool_ready("gh"):
+            followups.insert(0, "`gh auth status`")
+        print(f"review authentication remains interactive: run {' and '.join(followups)}")
     return 0
 
 
@@ -3786,6 +3857,9 @@ def doctor(args: argparse.Namespace) -> int:
 
         coderabbit_status, coderabbit_detail = coderabbit_doctor_status(strict=getattr(args, "strict", False))
         record(coderabbit_status, "coderabbit", coderabbit_detail)
+
+        gh_ok, gh_detail = gh_cli_status()
+        record("OK" if gh_ok else "WARN", "github cli (optional)", gh_detail)
 
     print(f"axis doctor (profile={profile})")
     for status, label, detail in rows:

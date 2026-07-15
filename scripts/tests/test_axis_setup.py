@@ -40,6 +40,10 @@ class TestSetupPlatform(unittest.TestCase):
         with self.assertRaisesRegex(axis_setup.SetupError, "unsupported architecture.*riscv64"):
             axis_setup.detect_platform(system="Linux", machine="riscv64")
 
+    def test_rejects_musl_linux_instead_of_selecting_glibc_artifacts(self) -> None:
+        with self.assertRaisesRegex(axis_setup.SetupError, "glibc Linux"):
+            axis_setup.detect_platform(system="Linux", machine="x86_64", libc="musl")
+
     def test_selects_portable_asset_names(self) -> None:
         windows = axis_setup.SetupPlatform("windows", "x64")
         linux_arm = axis_setup.SetupPlatform("linux", "arm64")
@@ -163,6 +167,22 @@ class TestVerifiedArtifacts(unittest.TestCase):
                 handle.addfile(fifo)
 
             with self.assertRaisesRegex(axis_setup.SetupError, "unsafe archive member type"):
+                axis_setup.extract_verified_archive(archive, root / "target")
+
+    def test_fails_closed_when_python_has_no_tar_data_filter(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            archive = root / "safe.tar.gz"
+            with tarfile.open(archive, "w:gz") as handle:
+                payload = b"tool"
+                member = tarfile.TarInfo("payload/tool")
+                member.size = len(payload)
+                handle.addfile(member, io.BytesIO(payload))
+
+            with (
+                mock.patch.object(tarfile.TarFile, "extractall", side_effect=TypeError("no filter")),
+                self.assertRaisesRegex(axis_setup.SetupError, "data extraction filter"),
+            ):
                 axis_setup.extract_verified_archive(archive, root / "target")
 
     def test_node_resolution_requires_the_official_shasums_entry(self) -> None:
@@ -295,12 +315,12 @@ class TestVerifiedArtifacts(unittest.TestCase):
 
             def fail_publish(path: Path, target: Path):
                 if path.name == "staged" and target.name == "2.96.0":
-                    raise OSError("publish failed")
+                    raise KeyboardInterrupt("publish interrupted")
                 return original_rename(path, target)
 
             with (
                 mock.patch.object(Path, "rename", new=fail_publish),
-                self.assertRaisesRegex(OSError, "publish failed"),
+                self.assertRaisesRegex(KeyboardInterrupt, "publish interrupted"),
             ):
                 axis_setup.install_artifact(
                     artifact,
@@ -310,6 +330,70 @@ class TestVerifiedArtifacts(unittest.TestCase):
                 )
 
             self.assertEqual(b"previous", existing.read_bytes())
+
+    def test_install_recovers_a_stranded_previous_version_before_downloading(self) -> None:
+        platform_spec = axis_setup.SetupPlatform("windows", "x64")
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / "tools"
+            final_root = root / "gh" / "2.96.0"
+            previous_root = final_root.parent / ".2.96.0.axis-previous"
+            previous = previous_root / "bin" / "gh.exe"
+            previous.parent.mkdir(parents=True)
+            previous.write_bytes(b"previous")
+            artifact = axis_setup.Artifact(
+                "gh",
+                "2.96.0",
+                "gh_2.96.0_windows_amd64.zip",
+                "https://example.invalid/gh.zip",
+                "sha256",
+                "0" * 64,
+            )
+
+            with self.assertRaisesRegex(OSError, "network unavailable"):
+                axis_setup.install_artifact(
+                    artifact,
+                    platform_spec=platform_spec,
+                    root=root,
+                    downloader=lambda _url, _destination: (_ for _ in ()).throw(OSError("network unavailable")),
+                )
+
+            self.assertEqual(b"previous", (final_root / "bin" / "gh.exe").read_bytes())
+            self.assertFalse(previous_root.exists())
+
+    def test_fetch_json_normalizes_invalid_publisher_payloads(self) -> None:
+        with mock.patch.object(axis_setup, "fetch_text", return_value="not-json"):
+            with self.assertRaisesRegex(axis_setup.SetupError, "invalid JSON"):
+                axis_setup.fetch_json("https://example.invalid/release.json")
+
+        with mock.patch.object(axis_setup, "fetch_text", return_value="[]"):
+            with self.assertRaisesRegex(axis_setup.SetupError, "JSON object"):
+                axis_setup.fetch_json("https://example.invalid/release.json")
+
+    def test_extract_normalizes_a_malformed_zip(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            archive = Path(temp) / "bad.zip"
+            archive.write_bytes(b"not-a-zip")
+
+            with self.assertRaisesRegex(axis_setup.SetupError, "invalid archive"):
+                axis_setup.extract_verified_archive(archive, Path(temp) / "target")
+
+    def test_download_rejects_an_https_to_http_redirect(self) -> None:
+        class RedirectedResponse(io.BytesIO):
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_args):
+                self.close()
+
+            def geturl(self) -> str:
+                return "http://mirror.invalid/tool.zip"
+
+        with tempfile.TemporaryDirectory() as temp:
+            with (
+                mock.patch.object(axis_setup.urllib.request, "urlopen", return_value=RedirectedResponse(b"tool")),
+                self.assertRaisesRegex(axis_setup.SetupError, "redirected to non-HTTPS"),
+            ):
+                axis_setup.download_file("https://example.invalid/tool.zip", Path(temp) / "tool.zip")
 
     def test_download_rejects_non_https_urls(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -355,6 +439,10 @@ class TestSetupProfiles(unittest.TestCase):
         self.assertLess(
             plan.index("diagnose Docker Engine, Compose, and OpenSSL without changing OS services"),
             plan.index("restore locked .NET dependencies"),
+        )
+        self.assertLess(
+            plan.index("diagnose Docker Engine, Compose, and OpenSSL without changing OS services"),
+            plan.index("install missing pinned user-local tools: .NET SDK 8.0.423, Node.js 22.23.1"),
         )
 
     def test_plan_reports_review_tools_without_a_portable_artifact(self) -> None:

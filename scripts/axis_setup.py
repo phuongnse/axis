@@ -49,7 +49,12 @@ class Artifact:
     checksum: str
 
 
-def detect_platform(*, system: str | None = None, machine: str | None = None) -> SetupPlatform:
+def detect_platform(
+    *,
+    system: str | None = None,
+    machine: str | None = None,
+    libc: str | None = None,
+) -> SetupPlatform:
     system_name = (system or platform.system()).strip().lower()
     machine_name = (machine or platform.machine()).strip().lower()
     os_names = {"linux": "linux", "darwin": "darwin", "windows": "windows"}
@@ -69,6 +74,13 @@ def detect_platform(*, system: str | None = None, machine: str | None = None) ->
             f"unsupported architecture `{machine or platform.machine()}`; "
             "Axis setup supports x64 and arm64"
         )
+    if system_name == "linux":
+        libc_name = (libc if libc is not None else platform.libc_ver()[0]).strip().lower()
+        if libc_name != "glibc":
+            label = libc_name or "unknown libc"
+            raise SetupError(
+                f"unsupported Linux C library `{label}`; verified portable auto-install currently supports glibc Linux"
+            )
     return SetupPlatform(os_names[system_name], architectures[machine_name])
 
 
@@ -202,6 +214,10 @@ def setup_plan(
 ) -> list[str]:
     normalized = "review" if profile == "all" else profile
     steps = [f"detect supported platform ({platform_spec.label})", "validate Python 3 and Git prerequisites"]
+    if normalized in {"local-dev", "review"}:
+        steps.append("diagnose Docker Engine, Compose, and OpenSSL without changing OS services")
+    if normalized == "review":
+        steps.append("diagnose external CodeRabbit prerequisite without changing authentication")
     if install_user_tools:
         labels: list[str] = []
         external: list[str] = []
@@ -224,10 +240,7 @@ def setup_plan(
             steps.append(f"verified portable artifact unavailable; {', '.join(external)} requires external installation")
     else:
         steps.append("validate required toolchains; do not install executables")
-    if normalized in {"local-dev", "review"}:
-        steps.append("diagnose Docker Engine, Compose, and OpenSSL without changing OS services")
-    if normalized == "review":
-        steps.append("diagnose review tools and report authentication follow-ups")
+    steps.append(f"run strict doctor for the cumulative {normalized} profile")
     steps.extend(["restore locked .NET dependencies", "install locked frontend dependencies"])
     if normalized in {"local-dev", "review"} or browsers:
         steps.append("install Playwright Chromium")
@@ -244,11 +257,23 @@ def setup_plan(
 def fetch_text(url: str) -> str:
     request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
     with urllib.request.urlopen(request, timeout=DOWNLOAD_TIMEOUT_SECONDS) as response:
-        return response.read().decode("utf-8")
+        final_url = response.geturl()
+        if not final_url.lower().startswith("https://"):
+            raise SetupError(f"HTTPS request redirected to non-HTTPS URL: {final_url}")
+        try:
+            return response.read().decode("utf-8")
+        except UnicodeDecodeError as exc:
+            raise SetupError(f"publisher response from {url} is not valid UTF-8") from exc
 
 
 def fetch_json(url: str) -> dict[str, object]:
-    return json.loads(fetch_text(url))
+    try:
+        payload = json.loads(fetch_text(url))
+    except json.JSONDecodeError as exc:
+        raise SetupError(f"publisher response from {url} contains invalid JSON") from exc
+    if not isinstance(payload, dict):
+        raise SetupError(f"publisher response from {url} must be a JSON object")
+    return payload
 
 
 def resolve_node_artifact(
@@ -392,23 +417,31 @@ def _safe_link_target(member: tarfile.TarInfo, target: Path) -> None:
 def extract_verified_archive(archive: Path, target: Path) -> None:
     target.mkdir(parents=True, exist_ok=True)
     if archive.name.endswith(".zip"):
-        with zipfile.ZipFile(archive) as handle:
-            for member in handle.infolist():
-                _safe_member_path(member.filename, target)
-            handle.extractall(target)
+        try:
+            with zipfile.ZipFile(archive) as handle:
+                for member in handle.infolist():
+                    _safe_member_path(member.filename, target)
+                handle.extractall(target)
+        except (zipfile.BadZipFile, zipfile.LargeZipFile, RuntimeError) as exc:
+            raise SetupError(f"invalid archive `{archive.name}`: {exc}") from exc
         return
     if archive.name.endswith((".tar.gz", ".tgz")):
-        with tarfile.open(archive, "r:gz") as handle:
-            for member in handle.getmembers():
-                _safe_member_path(member.name, target)
-                if not (member.isfile() or member.isdir() or member.issym() or member.islnk()):
-                    raise SetupError(f"unsafe archive member type for `{member.name}`")
-                if member.issym() or member.islnk():
-                    _safe_link_target(member, target)
-            try:
+        try:
+            with tarfile.open(archive, "r:gz") as handle:
+                for member in handle.getmembers():
+                    _safe_member_path(member.name, target)
+                    if not (member.isfile() or member.isdir() or member.issym() or member.islnk()):
+                        raise SetupError(f"unsafe archive member type for `{member.name}`")
+                    if member.issym() or member.islnk():
+                        _safe_link_target(member, target)
                 handle.extractall(target, filter="data")
-            except TypeError:
-                handle.extractall(target)
+        except TypeError as exc:
+            raise SetupError(
+                "this Python runtime does not provide the required tar data extraction filter; "
+                "install a current patched Python 3 release"
+            ) from exc
+        except (tarfile.TarError, EOFError) as exc:
+            raise SetupError(f"invalid archive `{archive.name}`: {exc}") from exc
         return
     raise SetupError(f"unsupported archive format `{archive.name}`")
 
@@ -419,8 +452,27 @@ def download_file(url: str, destination: Path) -> None:
     request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
     destination.parent.mkdir(parents=True, exist_ok=True)
     with urllib.request.urlopen(request, timeout=DOWNLOAD_TIMEOUT_SECONDS) as response:
+        final_url = response.geturl()
+        if not final_url.lower().startswith("https://"):
+            raise SetupError(f"HTTPS download redirected to non-HTTPS URL: {final_url}")
         with destination.open("wb") as output:
             shutil.copyfileobj(response, output)
+
+
+def _remove_install_path(path: Path) -> None:
+    if path.is_dir():
+        shutil.rmtree(path)
+    elif path.exists():
+        path.unlink()
+
+
+def _recover_previous_install(final_root: Path, previous_root: Path) -> None:
+    if not previous_root.exists():
+        return
+    if final_root.exists():
+        _remove_install_path(previous_root)
+        return
+    previous_root.rename(final_root)
 
 
 def install_artifact(
@@ -436,6 +488,8 @@ def install_artifact(
 
     parent = final_root.parent
     parent.mkdir(parents=True, exist_ok=True)
+    previous = parent / f".{artifact.version}.axis-previous"
+    _recover_previous_install(final_root, previous)
     with tempfile.TemporaryDirectory(prefix=".axis-setup-", dir=parent) as temp:
         temp_root = Path(temp)
         downloaded = temp_root / artifact.name
@@ -467,15 +521,15 @@ def install_artifact(
         if platform_spec.os != "windows":
             staged_expected.chmod(staged_expected.stat().st_mode | 0o111)
 
-        previous = temp_root / "previous"
         if final_root.exists():
             final_root.rename(previous)
         try:
             staged.rename(final_root)
-        except OSError:
+        except BaseException:
             if previous.exists() and not final_root.exists():
                 previous.rename(final_root)
             raise
+        _remove_install_path(previous)
     return expected
 
 

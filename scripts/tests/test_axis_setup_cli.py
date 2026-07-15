@@ -31,6 +31,13 @@ def setup_args(**overrides: object) -> argparse.Namespace:
 
 
 class TestPortableSetupCli(unittest.TestCase):
+    def test_command_exists_does_not_treat_a_relative_repo_file_as_an_executable(self) -> None:
+        with (
+            mock.patch.object(axis, "resolve_exe", return_value="README.md"),
+            mock.patch.object(axis.shutil, "which", return_value=None),
+        ):
+            self.assertFalse(axis.command_exists("missing-tool"))
+
     def test_preflight_reuses_strict_doctor_for_the_selected_profile(self) -> None:
         with mock.patch.object(axis, "doctor", return_value=0) as doctor:
             self.assertEqual(0, axis.setup_preflight("build"))
@@ -56,6 +63,37 @@ class TestPortableSetupCli(unittest.TestCase):
             return_value=(True, "gh version 2.40.0", "/usr/bin/gh"),
         ):
             self.assertFalse(axis.setup_tool_ready("gh"))
+
+    def test_setup_treats_node_with_an_unresolved_npm_as_missing(self) -> None:
+        with (
+            mock.patch.object(axis, "node_version_status", return_value=(True, "v22.23.1")),
+            mock.patch.object(axis, "_command_version", return_value=("FAIL", "npm not found")),
+        ):
+            self.assertFalse(axis.setup_tool_ready("node"))
+
+    def test_frontend_toolchain_pairs_managed_node_with_its_adjacent_npm(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            managed_bin = Path(temp) / "managed" / "bin"
+            managed_bin.mkdir(parents=True)
+            (managed_bin / "node").write_text("", encoding="utf-8")
+            (managed_bin / "npm").write_text("", encoding="utf-8")
+
+            def fake_version(name: str, *_args: str, env: dict[str, str] | None = None):
+                if env and env["PATH"].split(axis.os.pathsep)[0] == str(managed_bin):
+                    version = "v22.23.1" if name == "node" else "10.9.8"
+                    return True, version, str(managed_bin / name)
+                if name == "node":
+                    return True, "v22.23.1", str(managed_bin / "node")
+                return True, "10.9.8", "/usr/bin/npm"
+
+            with (
+                mock.patch.object(axis, "required_node_major", return_value=(True, "22")),
+                mock.patch.object(axis, "command_version_line", side_effect=fake_version),
+                mock.patch.object(axis, "_nvm_node_bin_dirs", return_value=[managed_bin]),
+            ):
+                env = axis.frontend_toolchain_env()
+
+        self.assertEqual(str(managed_bin), env["PATH"].split(axis.os.pathsep)[0])
 
     def test_plan_only_prints_the_portable_plan_without_checks_or_mutations(self) -> None:
         platform_spec = axis_setup.SetupPlatform("windows", "arm64")
@@ -98,6 +136,7 @@ class TestPortableSetupCli(unittest.TestCase):
 
         with (
             mock.patch.object(axis.axis_setup, "detect_platform", return_value=axis_setup.SetupPlatform("linux", "x64")),
+            mock.patch.object(axis, "setup_external_preflight", return_value=0),
             mock.patch.object(axis, "setup_preflight", return_value=0),
             mock.patch.object(axis, "run", side_effect=fake_run),
             mock.patch.object(axis, "run_frontend_npm", side_effect=fake_npm),
@@ -115,6 +154,7 @@ class TestPortableSetupCli(unittest.TestCase):
         calls: list[str] = []
         with (
             mock.patch.object(axis.axis_setup, "detect_platform", return_value=axis_setup.SetupPlatform("darwin", "arm64")),
+            mock.patch.object(axis, "setup_external_preflight", return_value=0),
             mock.patch.object(axis, "setup_preflight", return_value=0),
             mock.patch.object(
                 axis,
@@ -147,6 +187,7 @@ class TestPortableSetupCli(unittest.TestCase):
         with (
             mock.patch.object(axis.axis_setup, "detect_platform", return_value=axis_setup.SetupPlatform("linux", "x64")),
             mock.patch.object(axis, "setup_tool_ready", side_effect=lambda tool: ready[tool]),
+            mock.patch.object(axis, "setup_external_preflight", return_value=0),
             mock.patch.object(axis.axis_setup, "confirm_install") as confirm,
             mock.patch.object(axis.axis_setup, "install_tool", side_effect=fake_install),
             mock.patch.object(axis, "setup_preflight", return_value=0),
@@ -158,6 +199,38 @@ class TestPortableSetupCli(unittest.TestCase):
 
         confirm.assert_called_once()
         self.assertEqual(["dotnet"], installed)
+
+    def test_external_preflight_runs_before_user_local_tool_installation(self) -> None:
+        events: list[str] = []
+        with (
+            mock.patch.object(axis.axis_setup, "detect_platform", return_value=axis_setup.SetupPlatform("linux", "x64")),
+            mock.patch.object(axis, "setup_tool_ready", return_value=False),
+            mock.patch.object(axis, "setup_external_preflight", side_effect=lambda _profile: events.append("external") or 0),
+            mock.patch.object(axis.axis_setup, "confirm_install"),
+            mock.patch.object(axis.axis_setup, "install_tool", side_effect=lambda tool, **_kwargs: events.append(f"install:{tool}") or Path("/managed") / tool),
+            mock.patch.object(axis, "setup_preflight", side_effect=lambda _profile: events.append("full") or 1),
+            contextlib.redirect_stdout(io.StringIO()),
+            contextlib.redirect_stderr(io.StringIO()),
+        ):
+            self.assertEqual(1, axis.setup(setup_args(install_user_tools=True, yes=True)))
+
+        self.assertEqual("external", events[0])
+        self.assertLess(events.index("external"), events.index("install:dotnet"))
+        self.assertLess(events.index("install:node"), events.index("full"))
+
+    def test_external_preflight_failure_stops_before_confirmation_and_download(self) -> None:
+        with (
+            mock.patch.object(axis.axis_setup, "detect_platform", return_value=axis_setup.SetupPlatform("linux", "x64")),
+            mock.patch.object(axis, "setup_tool_ready", return_value=False),
+            mock.patch.object(axis, "setup_external_preflight", return_value=1),
+            mock.patch.object(axis.axis_setup, "confirm_install") as confirm,
+            mock.patch.object(axis.axis_setup, "install_tool") as install_tool,
+            contextlib.redirect_stdout(io.StringIO()),
+        ):
+            self.assertEqual(1, axis.setup(setup_args(install_user_tools=True, yes=True)))
+
+        confirm.assert_not_called()
+        install_tool.assert_not_called()
 
     def test_install_stops_before_download_when_a_missing_tool_has_no_verified_artifact(self) -> None:
         with (

@@ -3105,6 +3105,7 @@ class TestAxisCommandWrappers(unittest.TestCase):
             return axis.subprocess.CompletedProcess(args, 0)
 
         with (
+            mock.patch.object(axis, "setup_external_preflight", return_value=0),
             mock.patch.object(axis, "setup_preflight", return_value=0),
             mock.patch.object(axis, "run", side_effect=fake_run),
             mock.patch.object(axis, "run_frontend_npm", side_effect=fake_frontend),
@@ -3124,6 +3125,7 @@ class TestAxisCommandWrappers(unittest.TestCase):
 
     def test_setup_fails_before_mutating_when_a_toolchain_is_missing(self) -> None:
         with (
+            mock.patch.object(axis, "setup_external_preflight", return_value=0),
             mock.patch.object(axis, "setup_preflight", return_value=1),
             mock.patch.object(axis, "run") as run,
             mock.patch.object(axis, "run_frontend_npm") as run_npm,
