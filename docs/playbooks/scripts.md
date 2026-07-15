@@ -15,7 +15,14 @@
 | Renovate validator | [scripts/axis.py](../../scripts/axis.py) check | Dependency automation config |
 | Pre-PR review checkpoint | [scripts/axis.py](../../scripts/axis.py) check | `$axis-pull-request` before GitHub PR actions |
 
-Use `python scripts/axis.py doctor` or the exact `check` subcommand to verify local tool resolution.
+Project commands use `python`; substitute `python3` on WSL/Linux or `py -3` on Windows when that is the available Python 3 launcher.
+
+## Bootstrap and diagnosis
+
+- Run `python scripts/axis.py doctor --profile build --strict`, then `python scripts/axis.py setup`; add `--browsers` when Playwright Chromium is needed.
+- `setup` validates both toolchains before restoring `Axis.sln` and installing locked frontend dependencies; it does not install OS packages or Docker.
+- Doctor profiles are cumulative: `core`, `build`, `local-dev`, `review`, and `all`. The default is `local-dev`; review-only tools such as Lychee and CodeRabbit are checked by `review`/`all`.
+- Use the exact `check` subcommand for one machine-readable prerequisite or policy gate.
 
 ## Pre-PR review checkpoint
 
@@ -34,6 +41,7 @@ Use `python scripts/axis.py doctor` or the exact `check` subcommand to verify lo
 - Use `python scripts/axis.py local-dev smoke -- <playwright-args>` for fast host-browser smoke against a running local stack; use `python scripts/axis.py local-dev e2e -- <playwright-args>` for Compose-backed browser evidence.
 - Use `python scripts/axis.py ready-review` on a clean checkpoint commit at the review boundary. It runs changed-path verification plus the deterministic policy profile shared with CI.
 - Treat `python scripts/axis.py verify` as the changed-path verification engine behind ready-review, not as complete PR-readiness evidence by itself.
+- Use `python scripts/axis.py verify --plan-only` to inspect changed-path routing without executing tools.
 - Use `python scripts/axis.py pre-push` for ordinary Git push sanity; it is not a substitute for the pre-PR review checkpoint on published PR branches.
 - Use `python scripts/axis.py check pr` to validate the current or CI head branch plus PR title/body before publication.
 - Set `AXIS_PRE_PUSH_FULL=1` only when an explicit workflow wants pre-push to run `ready-review`; ordinary pre-push remains a quick gate.
@@ -42,7 +50,7 @@ Use `python scripts/axis.py doctor` or the exact `check` subcommand to verify lo
 ## Script Rules
 
 - Keep repo maintenance scripts in Python.
-- Put shared repository discovery in [scripts/axis_repo.py](../../scripts/axis_repo.py) or small Python helpers.
+- Put shared repository discovery in [scripts/axis_repo.py](../../scripts/axis_repo.py); keep coherent policy domains in small modules such as [scripts/axis_frontend_policy.py](../../scripts/axis_frontend_policy.py).
 - Keep top-level `scripts/*.py` files non-executable.
 - Keep [scripts/hooks/pre-push](../../scripts/hooks/pre-push) non-executable in the worktree; installation writes the executable copy under `.git/hooks`.
 - New deterministic guards encode reusable current invariants. Keep incident details in regression fixtures, not guard rules or retired artifact names.

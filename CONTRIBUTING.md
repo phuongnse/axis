@@ -11,6 +11,8 @@ Axis uses docs-first development. Use-case specs under [docs/use-cases/README.md
 
 ## Before a PR
 
+For first-time setup, run `python scripts/axis.py doctor --profile build --strict` and `python scripts/axis.py setup`; see [docs/playbooks/scripts.md](./docs/playbooks/scripts.md) for launcher variants and optional browser setup.
+
 Install the local pre-push hook with `python scripts/axis.py install-hooks`.
 
 Follow [docs/playbooks/agent-checklist.md](./docs/playbooks/agent-checklist.md) before opening or marking a PR ready. Run checks through `python scripts/axis.py ...`; command ownership lives in [docs/playbooks/scripts.md](./docs/playbooks/scripts.md).
