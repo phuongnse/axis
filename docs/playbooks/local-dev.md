@@ -21,7 +21,7 @@ Cert material stays local under ignored `.dev-certs/`; private keys never leave 
 - `.dev-certs/rootCA.cer` is for host OS trust.
 - `.dev-certs/localhost.pem` and `.dev-certs/localhost-key.pem` cover `localhost`, loopback, `api`, and `web`.
 
-`local-dev certs` reuses valid material; use `local-dev certs --renew` only to rotate it. Run `local-dev trust-certs` or `untrust-certs` to update the current-user Windows store (including WSL browsers) or macOS login keychain after confirming the displayed SHA-256 fingerprint. Native Linux remains manual and never invokes `sudo`: import or remove `.dev-certs/rootCA.cer` in the browser or user trust store.
+`local-dev certs` reuses valid material. To rotate a CA trusted through Axis, run `local-dev untrust-certs`, `local-dev certs --renew`, then `local-dev trust-certs`; Axis blocks replacement while its current trust marker remains. The trust commands update the current-user Windows store (including WSL browsers) or macOS login keychain after confirming the displayed SHA-256 fingerprint. Native Linux remains manual and never invokes `sudo`: import or remove `.dev-certs/rootCA.cer` in the browser or user trust store.
 
 ## Environment Adapters
 

@@ -55,6 +55,7 @@ LOCAL_CERT_DIR = ROOT / ".dev-certs"
 LOCAL_ROOT_CA_KEY = LOCAL_CERT_DIR / "rootCA-key.pem"
 LOCAL_ROOT_CA_PEM = LOCAL_CERT_DIR / "rootCA.pem"
 LOCAL_ROOT_CA_CER = LOCAL_CERT_DIR / "rootCA.cer"
+LOCAL_TRUSTED_ROOT_CA_FINGERPRINT = LOCAL_CERT_DIR / "trusted-rootCA.sha1"
 LOCALHOST_KEY = LOCAL_CERT_DIR / "localhost-key.pem"
 LOCALHOST_CSR = LOCAL_CERT_DIR / "localhost.csr"
 LOCALHOST_EXT = LOCAL_CERT_DIR / "localhost.ext"
@@ -3526,6 +3527,10 @@ def local_dev_trust_certs(args: argparse.Namespace) -> int:
             check=False,
         )
     if result.returncode == 0:
+        LOCAL_TRUSTED_ROOT_CA_FINGERPRINT.write_text(
+            f"{local_dev_ca_fingerprint('sha1')}\n",
+            encoding="utf-8",
+        )
         print("local-dev trust-certs: trusted Axis root CA for the current user")
     return result.returncode
 
@@ -3560,6 +3565,7 @@ def local_dev_untrust_certs(args: argparse.Namespace) -> int:
         keychain = Path.home() / "Library" / "Keychains" / "login.keychain-db"
         result = run([security, "delete-certificate", "-Z", fingerprint, str(keychain)], check=False)
     if result.returncode == 0:
+        LOCAL_TRUSTED_ROOT_CA_FINGERPRINT.unlink(missing_ok=True)
         print("local-dev untrust-certs: removed Axis root CA from the current user's trust store")
     return result.returncode
 
@@ -3600,6 +3606,14 @@ def local_dev_certs(args: argparse.Namespace | None = None) -> int:
         restrict_local_cert_permissions()
         print(f"local-dev certs: reusing valid files in {path_label(LOCAL_CERT_DIR)}")
         return 0
+
+    if LOCAL_TRUSTED_ROOT_CA_FINGERPRINT.is_file():
+        print(
+            "local-dev certs: the current root CA was trusted by Axis; run "
+            "`python scripts/axis.py local-dev untrust-certs` before replacing it",
+            file=sys.stderr,
+        )
+        return 1
 
     commands = [
         [openssl, "genrsa", "-out", str(LOCAL_ROOT_CA_KEY), "4096"],

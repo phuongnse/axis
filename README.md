@@ -26,4 +26,4 @@ py -3 scripts/axis.py setup --profile local-dev --install-user-tools
 py -3 scripts/axis.py local-dev up
 ```
 
-Add `--plan-only` to inspect the platform-specific work without changing anything, or `--trust-local-ca` to opt into current-user browser trust (`--yes` skips the Axis prompt; Windows may still warn). Open the web app at <https://localhost:3000>. For supported platforms, Docker-in-WSL, HTTPS setup, troubleshooting, and observability, see [docs/playbooks/local-dev.md](./docs/playbooks/local-dev.md).
+Add `--plan-only` to inspect the platform-specific work without changing anything, or `--trust-local-ca` to opt into the current-user host trust store (`--yes` skips the Axis prompt; Windows may still warn). Open the web app at <https://localhost:3000>. For supported platforms, Docker-in-WSL, HTTPS setup, troubleshooting, and observability, see [docs/playbooks/local-dev.md](./docs/playbooks/local-dev.md).

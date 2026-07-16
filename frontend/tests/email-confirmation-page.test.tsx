@@ -24,14 +24,15 @@ describe('EmailConfirmationPage', () => {
     await renderWithRouter(<EmailConfirmationPage />, { path: '/register/confirmation' });
 
     expect(screen.getByRole('heading', { name: /check your email/i })).toBeInTheDocument();
-    expect(
-      screen.getByText(
-        /If an account exists for this email, you will receive a verification link shortly./,
-      ),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(/If an account exists for this email/).closest('[role="alert"]'),
-    ).toHaveClass('border-info/25', 'bg-info/10', 'text-info');
+    const confirmationCopy = screen.getByText(
+      /If an account exists for this email, you will receive a verification link shortly./,
+    );
+    expect(confirmationCopy).toBeInTheDocument();
+    expect(confirmationCopy.closest('[role="alert"]')).toHaveClass(
+      'border-info/25',
+      'bg-info/10',
+      'text-info',
+    );
     expect(screen.getByText(/Sent to alex@example.com/)).toBeInTheDocument();
     expect(screen.getByText("Didn't receive it?")).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /resend email/i })).toHaveClass('h-8');

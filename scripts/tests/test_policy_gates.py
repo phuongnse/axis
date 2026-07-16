@@ -3332,6 +3332,37 @@ class TestAxisCommandWrappers(unittest.TestCase):
             self.assertFalse(any("genrsa" in command for command in calls))
             self.assertIn("reusing", stdout.getvalue())
 
+    def test_local_dev_certs_refuses_to_replace_an_axis_managed_trusted_ca(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            cert_dir = Path(temp) / ".dev-certs"
+            cert_dir.mkdir()
+            root_ca = cert_dir / "rootCA.cer"
+            root_ca.write_bytes(b"axis-root-ca")
+            trusted_marker = cert_dir / "trusted-rootCA.sha1"
+            trusted_marker.write_text(
+                f"{hashlib.sha1(root_ca.read_bytes()).hexdigest().upper()}\n",
+                encoding="utf-8",
+            )
+
+            with (
+                mock.patch.object(axis, "LOCAL_CERT_DIR", cert_dir),
+                mock.patch.object(axis, "LOCAL_ROOT_CA_CER", root_ca),
+                mock.patch.object(axis, "LOCALHOST_EXT", cert_dir / "localhost.ext"),
+                mock.patch.object(
+                    axis,
+                    "LOCAL_TRUSTED_ROOT_CA_FINGERPRINT",
+                    trusted_marker,
+                    create=True,
+                ),
+                mock.patch.object(axis, "find_openssl", return_value="/usr/bin/openssl"),
+                mock.patch.object(axis, "run_required") as run_required,
+                contextlib.redirect_stderr(io.StringIO()) as stderr,
+            ):
+                self.assertEqual(1, axis.local_dev_certs(axis.argparse.Namespace(renew=True)))
+
+            run_required.assert_not_called()
+            self.assertIn("untrust-certs", stderr.getvalue())
+
     def test_trust_certs_imports_root_ca_into_windows_user_store_from_wsl(self) -> None:
         handler = getattr(axis, "local_dev_trust_certs", None)
         self.assertTrue(callable(handler))
@@ -3339,6 +3370,7 @@ class TestAxisCommandWrappers(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             root_ca = Path(temp) / "rootCA.cer"
             root_ca.write_bytes(b"axis-root-ca")
+            trusted_marker = Path(temp) / "trusted-rootCA.sha1"
             calls: list[list[str]] = []
 
             def fake_run(command: list[str], **_kwargs):
@@ -3348,6 +3380,12 @@ class TestAxisCommandWrappers(unittest.TestCase):
 
             with (
                 mock.patch.object(axis, "LOCAL_ROOT_CA_CER", root_ca),
+                mock.patch.object(
+                    axis,
+                    "LOCAL_TRUSTED_ROOT_CA_FINGERPRINT",
+                    trusted_marker,
+                    create=True,
+                ),
                 mock.patch.object(axis, "local_dev_cert_host", return_value="wsl"),
                 mock.patch.object(axis.shutil, "which", side_effect=lambda name: name),
                 mock.patch.object(axis, "run", side_effect=fake_run),
@@ -3355,11 +3393,16 @@ class TestAxisCommandWrappers(unittest.TestCase):
             ):
                 self.assertEqual(0, handler(axis.argparse.Namespace(yes=True)))
 
-        self.assertEqual(["wslpath", "-w", str(root_ca)], calls[0])
-        self.assertEqual(
-            ["certutil.exe", "-f", "-user", "-addstore", "Root", "C:\\axis\\rootCA.cer"],
-            calls[1],
-        )
+            self.assertEqual(["wslpath", "-w", str(root_ca)], calls[0])
+            self.assertEqual(
+                ["certutil.exe", "-f", "-user", "-addstore", "Root", "C:\\axis\\rootCA.cer"],
+                calls[1],
+            )
+            self.assertTrue(trusted_marker.is_file())
+            self.assertEqual(
+                f"{hashlib.sha1(b'axis-root-ca').hexdigest().upper()}\n",
+                trusted_marker.read_text(encoding="utf-8"),
+            )
 
     def test_untrust_certs_removes_root_ca_from_windows_user_store(self) -> None:
         handler = getattr(axis, "local_dev_untrust_certs", None)
@@ -3368,6 +3411,8 @@ class TestAxisCommandWrappers(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             root_ca = Path(temp) / "rootCA.cer"
             root_ca.write_bytes(b"axis-root-ca")
+            trusted_marker = Path(temp) / "trusted-rootCA.sha1"
+            trusted_marker.write_text("managed\n", encoding="utf-8")
             calls: list[list[str]] = []
 
             def fake_run(command: list[str], **_kwargs):
@@ -3376,6 +3421,12 @@ class TestAxisCommandWrappers(unittest.TestCase):
 
             with (
                 mock.patch.object(axis, "LOCAL_ROOT_CA_CER", root_ca),
+                mock.patch.object(
+                    axis,
+                    "LOCAL_TRUSTED_ROOT_CA_FINGERPRINT",
+                    trusted_marker,
+                    create=True,
+                ),
                 mock.patch.object(axis, "local_dev_cert_host", return_value="wsl"),
                 mock.patch.object(axis.shutil, "which", side_effect=lambda name: name),
                 mock.patch.object(axis, "run", side_effect=fake_run),
@@ -3383,11 +3434,12 @@ class TestAxisCommandWrappers(unittest.TestCase):
             ):
                 self.assertEqual(0, handler(axis.argparse.Namespace(yes=True)))
 
-        fingerprint = hashlib.sha1(b"axis-root-ca").hexdigest().upper()
-        self.assertEqual(
-            ["certutil.exe", "-user", "-delstore", "Root", fingerprint],
-            calls[0],
-        )
+            fingerprint = hashlib.sha1(b"axis-root-ca").hexdigest().upper()
+            self.assertEqual(
+                ["certutil.exe", "-user", "-delstore", "Root", fingerprint],
+                calls[0],
+            )
+            self.assertFalse(trusted_marker.exists())
 
     def test_native_linux_trust_prints_manual_guidance_without_running_a_command(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
