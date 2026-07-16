@@ -2,7 +2,6 @@ import { Link } from '@tanstack/react-router';
 import { Mail } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { StatusNotice } from '@/components/shared/StatusNotice';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { AuthCard } from '@/features/auth/components/AuthCard';
 import { useResendVerification } from '@/features/auth/hooks/useResendVerification';
@@ -32,18 +31,15 @@ export function EmailConfirmationPage() {
       }
     >
       <div className="space-y-4">
-        <Alert>
-          <Mail aria-hidden />
-          <AlertDescription>
-            <div className="space-y-2">
-              <p>{t('auth.confirm.body1')}</p>
-              <p>{t('auth.confirm.body2')}</p>
-              {context?.email ? (
-                <p className="text-xs">{t('auth.confirm.sentTo', { email: context.email })}</p>
-              ) : null}
-            </div>
-          </AlertDescription>
-        </Alert>
+        <StatusNotice tone="info">
+          <div className="space-y-2">
+            <p>{t('auth.confirm.body1')}</p>
+            <p>{t('auth.confirm.body2')}</p>
+            {context?.email ? (
+              <p className="text-xs">{t('auth.confirm.sentTo', { email: context.email })}</p>
+            ) : null}
+          </div>
+        </StatusNotice>
 
         {state === 'sending' ? (
           <StatusNotice title={t('notice.sendingEmailTitle')}>

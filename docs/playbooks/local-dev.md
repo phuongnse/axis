@@ -11,17 +11,17 @@ Use `python scripts/axis.py local-dev ...` for local stack work. Do not document
 - OpenSSL on PATH, or from Git for Windows, for local HTTPS certificates.
 - .NET SDK from [global.json](../../global.json) and Node from [frontend/.nvmrc](../../frontend/.nvmrc), either already available or installed user-locally by Axis.
 
-First-time preparation is `python scripts/axis.py setup --profile local-dev --install-user-tools`. This validates the cumulative doctor profile, restores locked dependencies, installs Playwright Chromium, generates local certificates, and installs the pre-push hook. Use `--plan-only` before execution or `--yes` for confirmed non-interactive downloads. Run `python scripts/axis.py doctor --profile local-dev --strict` for diagnosis without setup mutations.
+First-time preparation is `python scripts/axis.py setup --profile local-dev --install-user-tools`. This validates the cumulative doctor profile, restores locked dependencies, installs Playwright Chromium, generates local certificates, and installs the pre-push hook. Add `--trust-local-ca` to opt into current-user host trust; `--yes` skips the Axis prompt, but Windows may still show its security warning. Use `--plan-only` before execution. Run `python scripts/axis.py doctor --profile local-dev --strict` for diagnosis without setup mutations.
 
 ## HTTPS
 
-Cert material stays local under `.dev-certs/`, which is ignored.
+Cert material stays local under ignored `.dev-certs/`; private keys never leave that directory.
 
 - `.dev-certs/rootCA.pem` is for containers, E2E Node trust, and Playwright browser trust stores.
 - `.dev-certs/rootCA.cer` is for host OS trust.
 - `.dev-certs/localhost.pem` and `.dev-certs/localhost-key.pem` cover `localhost`, loopback, `api`, and `web`.
 
-Trust the root CA in the OS that runs the browser. On WSL with a Windows browser, import `.dev-certs/rootCA.cer` into Windows Current User trusted roots.
+`local-dev certs` reuses valid material; use `local-dev certs --renew` only to rotate it. Run `local-dev trust-certs` or `untrust-certs` to update the current-user Windows store (including WSL browsers) or macOS login keychain after confirming the displayed SHA-256 fingerprint. Native Linux remains manual and never invokes `sudo`: import or remove `.dev-certs/rootCA.cer` in the browser or user trust store.
 
 ## Environment Adapters
 

@@ -211,6 +211,7 @@ def setup_plan(
     install_user_tools: bool,
     browsers: bool,
     platform_spec: SetupPlatform,
+    trust_local_ca: bool = False,
 ) -> list[str]:
     normalized = "review" if profile == "all" else profile
     steps = [f"detect supported platform ({platform_spec.label})", "validate Python 3 and Git prerequisites"]
@@ -245,12 +246,10 @@ def setup_plan(
     if normalized in {"local-dev", "review"} or browsers:
         steps.append("install Playwright Chromium")
     if normalized in {"local-dev", "review"}:
-        steps.extend(
-            [
-                "generate local HTTPS certificates",
-                "install repository pre-push hook",
-            ]
-        )
+        steps.append("generate local HTTPS certificates")
+        if trust_local_ca:
+            steps.append("trust local HTTPS root CA in the current user's host trust store")
+        steps.append("install repository pre-push hook")
     return steps
 
 

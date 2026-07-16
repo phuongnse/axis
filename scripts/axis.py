@@ -1032,6 +1032,18 @@ SKILL_HANDOFF_WORD_RE = re.compile(r"\b(?:requires?|delegat(?:e|es|ed|ing)|retur
 SKILL_TYPED_HANDOFF_RE = re.compile(r"[*][*](?:Requires|Delegates|Returns to)[*][*]")
 SKILL_CATALOG_LINK_RE = re.compile(r"\]\(\./(?P<name>axis-[a-z0-9-]+)/SKILL[.]md(?:#[^)]+)?\)")
 SKILL_DUPLICATE_INSTRUCTION_MIN_LENGTH = 80
+SKILL_VERIFICATION_SCOPE_CONSUMERS = ("axis-frontend-feature", "axis-ui-system")
+SKILL_VERIFICATION_SCOPE_OUTPUT_FIELDS = (
+    "Moment",
+    "Selected checks",
+    "Omitted broad checks",
+    "Results",
+    "Next verification boundary",
+)
+SKILL_VERIFICATION_SCOPE_DELEGATE_RE = re.compile(
+    r"Verification command selection [*][*]Delegates[*][*] to `\$axis-script-scope`[.]?",
+    re.IGNORECASE,
+)
 
 
 def simple_yaml_value(text: str, key: str) -> str:
@@ -1232,6 +1244,37 @@ def repo_skill_required_cycle_issues(records: list[tuple[Path, str]]) -> list[st
     return issues
 
 
+def repo_skill_verification_scope_issues(
+    records: list[tuple[Path, str]], *, root: Path
+) -> list[str]:
+    by_name = {path.parent.name: (path, text) for path, text in records}
+    issues: list[str] = []
+    for consumer in SKILL_VERIFICATION_SCOPE_CONSUMERS:
+        record = by_name.get(consumer)
+        if record is None:
+            continue
+        skill_md, text = record
+        if SKILL_VERIFICATION_SCOPE_DELEGATE_RE.search(text) is None:
+            issues.append(
+                f"{rel_from(skill_md, root)}: `{consumer}` must use **Delegates** for "
+                "verification command selection to `$axis-script-scope`"
+            )
+
+    owner = by_name.get("axis-script-scope")
+    if owner is not None:
+        skill_md, text = owner
+        output_match = re.search(r"(?ms)^## Output\s*$\n(?P<body>.*?)(?=^## |\Z)", text)
+        output = output_match.group("body") if output_match is not None else ""
+        missing = [field for field in SKILL_VERIFICATION_SCOPE_OUTPUT_FIELDS if f"`{field}`" not in output]
+        if missing:
+            formatted = [f"`{field}`" for field in SKILL_VERIFICATION_SCOPE_OUTPUT_FIELDS]
+            fields = f"{', '.join(formatted[:-1])}, and {formatted[-1]}"
+            issues.append(
+                f"{rel_from(skill_md, root)}: `axis-script-scope` output must include {fields}"
+            )
+    return issues
+
+
 def repo_skill_issues(*, root: Path = ROOT) -> list[str]:
     issues: list[str] = []
     skills_root = root / REPO_SKILLS_DIR.replace("/", os.sep)
@@ -1329,6 +1372,7 @@ def repo_skill_issues(*, root: Path = ROOT) -> list[str]:
     issues.extend(repo_skill_catalog_issues(skills_root, skill_names, root=root))
     issues.extend(repo_skill_duplicate_instruction_issues(records, root=root))
     issues.extend(repo_skill_required_cycle_issues(records))
+    issues.extend(repo_skill_verification_scope_issues(records, root=root))
     return issues
 
 
@@ -3356,7 +3400,171 @@ def restrict_local_cert_permissions() -> None:
     LOCALHOST_KEY.chmod(0o600)
 
 
-def local_dev_certs(_args: argparse.Namespace | None = None) -> int:
+def local_dev_certificates_valid(openssl: str) -> bool:
+    required = (
+        LOCAL_ROOT_CA_KEY,
+        LOCAL_ROOT_CA_PEM,
+        LOCAL_ROOT_CA_CER,
+        LOCALHOST_KEY,
+        LOCALHOST_CERT,
+    )
+    if not all(path.is_file() for path in required):
+        return False
+
+    checks = [
+        [openssl, "x509", "-in", str(LOCAL_ROOT_CA_PEM), "-checkend", "2592000", "-noout"],
+        [openssl, "x509", "-inform", "der", "-in", str(LOCAL_ROOT_CA_CER), "-checkend", "2592000", "-noout"],
+        [openssl, "x509", "-in", str(LOCALHOST_CERT), "-checkend", "2592000", "-noout"],
+        [openssl, "verify", "-CAfile", str(LOCAL_ROOT_CA_PEM), str(LOCALHOST_CERT)],
+        [openssl, "x509", "-in", str(LOCALHOST_CERT), "-checkhost", "localhost", "-noout"],
+        [openssl, "x509", "-in", str(LOCALHOST_CERT), "-checkhost", "api", "-noout"],
+        [openssl, "x509", "-in", str(LOCALHOST_CERT), "-checkhost", "web", "-noout"],
+        [openssl, "x509", "-in", str(LOCALHOST_CERT), "-checkip", "127.0.0.1", "-noout"],
+        [openssl, "x509", "-in", str(LOCALHOST_CERT), "-checkip", "::1", "-noout"],
+    ]
+    if any(run(command, check=False, capture=True).returncode != 0 for command in checks):
+        return False
+
+    public_key_commands = (
+        (
+            [openssl, "x509", "-in", str(LOCAL_ROOT_CA_PEM), "-pubkey", "-noout"],
+            [openssl, "pkey", "-in", str(LOCAL_ROOT_CA_KEY), "-pubout"],
+        ),
+        (
+            [openssl, "x509", "-inform", "der", "-in", str(LOCAL_ROOT_CA_CER), "-pubkey", "-noout"],
+            [openssl, "pkey", "-in", str(LOCAL_ROOT_CA_KEY), "-pubout"],
+        ),
+        (
+            [openssl, "x509", "-in", str(LOCALHOST_CERT), "-pubkey", "-noout"],
+            [openssl, "pkey", "-in", str(LOCALHOST_KEY), "-pubout"],
+        ),
+    )
+    for certificate_command, key_command in public_key_commands:
+        certificate_key = run(certificate_command, check=False, capture=True)
+        private_key = run(key_command, check=False, capture=True)
+        if (
+            certificate_key.returncode != 0
+            or private_key.returncode != 0
+            or certificate_key.stdout.strip() != private_key.stdout.strip()
+        ):
+            return False
+    return True
+
+
+def local_dev_cert_host() -> str:
+    system = platform.system().lower()
+    if os.name == "nt" or system == "windows":
+        return "windows"
+    if system == "darwin":
+        return "darwin"
+    release = platform.release().lower()
+    if system == "linux" and (os.environ.get("WSL_DISTRO_NAME") or "microsoft" in release):
+        return "wsl"
+    return "linux"
+
+
+def local_dev_ca_fingerprint(algorithm: str = "sha256") -> str:
+    digest = hashlib.new(algorithm, LOCAL_ROOT_CA_CER.read_bytes()).hexdigest().upper()
+    if algorithm == "sha256":
+        return ":".join(digest[index : index + 2] for index in range(0, len(digest), 2))
+    return digest
+
+
+def confirm_local_ca_store_change(action: str, args: argparse.Namespace) -> bool:
+    print(f"local-dev {action}-certs: root CA {path_label(LOCAL_ROOT_CA_CER)}")
+    print(f"local-dev {action}-certs: SHA-256 {local_dev_ca_fingerprint()}")
+    if getattr(args, "yes", False):
+        return True
+    if not sys.stdin.isatty():
+        print(f"local-dev {action}-certs: confirmation required; rerun with --yes", file=sys.stderr)
+        return False
+    print(f"Modify the current user's host trust store ({action})? [y/N] ", end="", flush=True)
+    return sys.stdin.readline().strip().lower() in {"y", "yes"}
+
+
+def local_dev_trust_certs(args: argparse.Namespace) -> int:
+    if not LOCAL_ROOT_CA_CER.is_file():
+        print("local-dev trust-certs: root CA is missing; run `python scripts/axis.py local-dev certs`", file=sys.stderr)
+        return 1
+    host = local_dev_cert_host()
+    if host == "linux":
+        print(f"local-dev trust-certs: SHA-256 {local_dev_ca_fingerprint()}")
+        print(
+            "local-dev trust-certs: automatic trust is unavailable on native Linux; "
+            f"import {path_label(LOCAL_ROOT_CA_CER)} into your browser or user trust store",
+            file=sys.stderr,
+        )
+        return 1
+    if not confirm_local_ca_store_change("trust", args):
+        print("local-dev trust-certs: cancelled", file=sys.stderr)
+        return 1
+
+    if host in {"windows", "wsl"}:
+        certutil = shutil.which("certutil.exe") or shutil.which("certutil")
+        if certutil is None:
+            print("local-dev trust-certs: Windows certutil was not found", file=sys.stderr)
+            return 1
+        certificate_path = str(LOCAL_ROOT_CA_CER)
+        if host == "wsl":
+            wslpath = shutil.which("wslpath")
+            if wslpath is None:
+                print("local-dev trust-certs: wslpath was not found", file=sys.stderr)
+                return 1
+            converted = run([wslpath, "-w", certificate_path], check=False, capture=True)
+            if converted.returncode != 0 or not converted.stdout.strip():
+                return converted.returncode or 1
+            certificate_path = converted.stdout.strip()
+        result = run([certutil, "-f", "-user", "-addstore", "Root", certificate_path], check=False)
+    else:
+        security = shutil.which("security")
+        if security is None:
+            print("local-dev trust-certs: macOS security tool was not found", file=sys.stderr)
+            return 1
+        keychain = Path.home() / "Library" / "Keychains" / "login.keychain-db"
+        result = run(
+            [security, "add-trusted-cert", "-r", "trustRoot", "-k", str(keychain), str(LOCAL_ROOT_CA_CER)],
+            check=False,
+        )
+    if result.returncode == 0:
+        print("local-dev trust-certs: trusted Axis root CA for the current user")
+    return result.returncode
+
+
+def local_dev_untrust_certs(args: argparse.Namespace) -> int:
+    if not LOCAL_ROOT_CA_CER.is_file():
+        print("local-dev untrust-certs: root CA is missing; cannot identify the certificate", file=sys.stderr)
+        return 1
+    host = local_dev_cert_host()
+    fingerprint = local_dev_ca_fingerprint("sha1")
+    if host == "linux":
+        print(
+            "local-dev untrust-certs: automatic removal is unavailable on native Linux; "
+            f"remove SHA-1 {fingerprint} from your browser or user trust store",
+            file=sys.stderr,
+        )
+        return 1
+    if not confirm_local_ca_store_change("untrust", args):
+        print("local-dev untrust-certs: cancelled", file=sys.stderr)
+        return 1
+    if host in {"windows", "wsl"}:
+        certutil = shutil.which("certutil.exe") or shutil.which("certutil")
+        if certutil is None:
+            print("local-dev untrust-certs: Windows certutil was not found", file=sys.stderr)
+            return 1
+        result = run([certutil, "-user", "-delstore", "Root", fingerprint], check=False)
+    else:
+        security = shutil.which("security")
+        if security is None:
+            print("local-dev untrust-certs: macOS security tool was not found", file=sys.stderr)
+            return 1
+        keychain = Path.home() / "Library" / "Keychains" / "login.keychain-db"
+        result = run([security, "delete-certificate", "-Z", fingerprint, str(keychain)], check=False)
+    if result.returncode == 0:
+        print("local-dev untrust-certs: removed Axis root CA from the current user's trust store")
+    return result.returncode
+
+
+def local_dev_certs(args: argparse.Namespace | None = None) -> int:
     openssl = find_openssl()
     if openssl is None:
         print(
@@ -3387,6 +3595,11 @@ def local_dev_certs(_args: argparse.Namespace | None = None) -> int:
         encoding="utf-8",
         newline="\n",
     )
+
+    if not getattr(args, "renew", False) and local_dev_certificates_valid(openssl):
+        restrict_local_cert_permissions()
+        print(f"local-dev certs: reusing valid files in {path_label(LOCAL_CERT_DIR)}")
+        return 0
 
     commands = [
         [openssl, "genrsa", "-out", str(LOCAL_ROOT_CA_KEY), "4096"],
@@ -3452,6 +3665,10 @@ def local_dev_certs(_args: argparse.Namespace | None = None) -> int:
 def local_dev(args: argparse.Namespace) -> int:
     if args.local_dev_command == "certs":
         return local_dev_certs(args)
+    if args.local_dev_command == "trust-certs":
+        return local_dev_trust_certs(args)
+    if args.local_dev_command == "untrust-certs":
+        return local_dev_untrust_certs(args)
 
     rc = require_docker_compose("local-dev")
     if rc != 0:
@@ -3639,12 +3856,18 @@ def setup(args: argparse.Namespace) -> int:
     browsers = getattr(args, "browsers", False)
     install_user_tools = getattr(args, "install_user_tools", False)
     plan_only = getattr(args, "plan_only", False)
+    trust_local_ca = getattr(args, "trust_local_ca", False)
+    normalized = "review" if profile == "all" else profile
+    if trust_local_ca and normalized not in {"local-dev", "review"}:
+        print("setup: FAIL - --trust-local-ca requires --profile local-dev, review, or all", file=sys.stderr)
+        return 1
     try:
         platform_spec = axis_setup.detect_platform()
         plan = axis_setup.setup_plan(
             profile=profile,
             install_user_tools=install_user_tools,
             browsers=browsers,
+            trust_local_ca=trust_local_ca,
             platform_spec=platform_spec,
         )
     except axis_setup.SetupError as exc:
@@ -3704,7 +3927,6 @@ def setup(args: argparse.Namespace) -> int:
         ),
         ("install frontend dependencies", lambda: run_frontend_npm(["ci"]).returncode),
     ]
-    normalized = "review" if profile == "all" else profile
     if browsers or normalized in {"local-dev", "review"}:
         steps.append(
             (
@@ -3713,12 +3935,10 @@ def setup(args: argparse.Namespace) -> int:
             )
         )
     if normalized in {"local-dev", "review"}:
-        steps.extend(
-            [
-                ("generate local HTTPS certificates", lambda: local_dev_certs(args)),
-                ("install repository pre-push hook", lambda: install_hooks(args)),
-            ]
-        )
+        steps.append(("generate local HTTPS certificates", lambda: local_dev_certs(args)))
+        if trust_local_ca:
+            steps.append(("trust local HTTPS root CA", lambda: local_dev_trust_certs(args)))
+        steps.append(("install repository pre-push hook", lambda: install_hooks(args)))
 
     for label, action in steps:
         print(f"> {label}", flush=True)
@@ -3946,7 +4166,12 @@ def main(argv: list[str] | None = None) -> int:
     setup_parser.add_argument(
         "--yes",
         action="store_true",
-        help="Confirm user-local tool downloads without an interactive prompt",
+        help="Skip Axis confirmation for opted-in user-local downloads and trust-store changes",
+    )
+    setup_parser.add_argument(
+        "--trust-local-ca",
+        action="store_true",
+        help="Trust the generated local root CA in the current user's host trust store",
     )
     setup_parser.set_defaults(func=setup)
     doctor_parser = sub.add_parser("doctor", help="Diagnose tools required by a selected workflow profile")
@@ -4016,7 +4241,15 @@ def main(argv: list[str] | None = None) -> int:
 
     local_dev_parser = sub.add_parser("local-dev", help="Manage the Docker Compose local-development stack")
     local_dev_sub = local_dev_parser.add_subparsers(dest="local_dev_command", required=True)
-    local_dev_sub.add_parser("certs", help="Create local HTTPS certificates").set_defaults(func=local_dev)
+    local_certs = local_dev_sub.add_parser("certs", help="Create or reuse local HTTPS certificates")
+    local_certs.add_argument("--renew", action="store_true", help="Replace existing local HTTPS certificates")
+    local_certs.set_defaults(func=local_dev)
+    local_trust = local_dev_sub.add_parser("trust-certs", help="Trust the local root CA for the current host user")
+    local_trust.add_argument("--yes", action="store_true", help="Skip the Axis confirmation; the host OS may still prompt")
+    local_trust.set_defaults(func=local_dev)
+    local_untrust = local_dev_sub.add_parser("untrust-certs", help="Remove the local root CA from the current host user store")
+    local_untrust.add_argument("--yes", action="store_true", help="Skip the Axis confirmation; the host OS may still prompt")
+    local_untrust.set_defaults(func=local_dev)
     local_up = local_dev_sub.add_parser("up", help="Create and start local services")
     local_up.add_argument("--build", action="store_true")
     local_up.add_argument("services", nargs="*")
