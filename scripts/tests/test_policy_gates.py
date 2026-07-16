@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import contextlib
+import hashlib
 import importlib.util
 import io
 import json
@@ -3290,6 +3291,213 @@ class TestAxisCommandWrappers(unittest.TestCase):
             chmod.assert_any_call(cert_dir / "localhost-key.pem", 0o600)
             self.assertEqual("/usr/bin/openssl", calls[0][0])
 
+    def test_local_dev_certs_reuses_valid_existing_material(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            cert_dir = Path(temp) / ".dev-certs"
+            cert_dir.mkdir()
+            paths = {
+                "LOCAL_CERT_DIR": cert_dir,
+                "LOCAL_ROOT_CA_KEY": cert_dir / "rootCA-key.pem",
+                "LOCAL_ROOT_CA_PEM": cert_dir / "rootCA.pem",
+                "LOCAL_ROOT_CA_CER": cert_dir / "rootCA.cer",
+                "LOCALHOST_KEY": cert_dir / "localhost-key.pem",
+                "LOCALHOST_CSR": cert_dir / "localhost.csr",
+                "LOCALHOST_EXT": cert_dir / "localhost.ext",
+                "LOCALHOST_CERT": cert_dir / "localhost.pem",
+            }
+            for path in paths.values():
+                if path != cert_dir:
+                    path.write_text("existing\n", encoding="utf-8")
+
+            calls: list[list[str]] = []
+
+            def fake_run(command: list[str], **_kwargs):
+                calls.append(command)
+                return axis.subprocess.CompletedProcess(command, 0, stdout="public-key\n", stderr="")
+
+            patches = [mock.patch.object(axis, name, value) for name, value in paths.items()]
+            with contextlib.ExitStack() as stack:
+                for patcher in patches:
+                    stack.enter_context(patcher)
+                stack.enter_context(mock.patch.object(axis, "run", side_effect=fake_run))
+                stack.enter_context(mock.patch.object(axis, "find_openssl", return_value="/usr/bin/openssl"))
+                stack.enter_context(mock.patch.object(axis.os, "name", "posix"))
+                stack.enter_context(mock.patch.object(axis.Path, "chmod", autospec=True))
+                stdout = stack.enter_context(contextlib.redirect_stdout(io.StringIO()))
+                self.assertEqual(0, axis.local_dev_certs(axis.argparse.Namespace(renew=False)))
+
+            self.assertTrue(any("-checkend" in command for command in calls))
+            self.assertTrue(any("-checkhost" in command and "api" in command for command in calls))
+            self.assertTrue(any("-checkip" in command and "::1" in command for command in calls))
+            self.assertFalse(any("genrsa" in command for command in calls))
+            self.assertIn("reusing", stdout.getvalue())
+
+    def test_local_dev_certs_refuses_to_replace_an_axis_managed_trusted_ca(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            cert_dir = Path(temp) / ".dev-certs"
+            cert_dir.mkdir()
+            root_ca = cert_dir / "rootCA.cer"
+            root_ca.write_bytes(b"axis-root-ca")
+            trusted_marker = cert_dir / "trusted-rootCA.sha1"
+            trusted_marker.write_text(
+                f"{hashlib.sha1(root_ca.read_bytes()).hexdigest().upper()}\n",
+                encoding="utf-8",
+            )
+
+            with (
+                mock.patch.object(axis, "LOCAL_CERT_DIR", cert_dir),
+                mock.patch.object(axis, "LOCAL_ROOT_CA_CER", root_ca),
+                mock.patch.object(axis, "LOCALHOST_EXT", cert_dir / "localhost.ext"),
+                mock.patch.object(
+                    axis,
+                    "LOCAL_TRUSTED_ROOT_CA_FINGERPRINT",
+                    trusted_marker,
+                    create=True,
+                ),
+                mock.patch.object(axis, "find_openssl", return_value="/usr/bin/openssl"),
+                mock.patch.object(axis, "run_required") as run_required,
+                contextlib.redirect_stderr(io.StringIO()) as stderr,
+            ):
+                self.assertEqual(1, axis.local_dev_certs(axis.argparse.Namespace(renew=True)))
+
+            run_required.assert_not_called()
+            self.assertIn("untrust-certs", stderr.getvalue())
+
+    def test_trust_certs_imports_root_ca_into_windows_user_store_from_wsl(self) -> None:
+        handler = getattr(axis, "local_dev_trust_certs", None)
+        self.assertTrue(callable(handler))
+
+        with tempfile.TemporaryDirectory() as temp:
+            root_ca = Path(temp) / "rootCA.cer"
+            root_ca.write_bytes(b"axis-root-ca")
+            trusted_marker = Path(temp) / "trusted-rootCA.sha1"
+            calls: list[list[str]] = []
+
+            def fake_run(command: list[str], **_kwargs):
+                calls.append(command)
+                stdout = "C:\\axis\\rootCA.cer\n" if command[0] == "wslpath" else ""
+                return axis.subprocess.CompletedProcess(command, 0, stdout=stdout, stderr="")
+
+            with (
+                mock.patch.object(axis, "LOCAL_ROOT_CA_CER", root_ca),
+                mock.patch.object(
+                    axis,
+                    "LOCAL_TRUSTED_ROOT_CA_FINGERPRINT",
+                    trusted_marker,
+                    create=True,
+                ),
+                mock.patch.object(axis, "local_dev_cert_host", return_value="wsl"),
+                mock.patch.object(axis.shutil, "which", side_effect=lambda name: name),
+                mock.patch.object(axis, "run", side_effect=fake_run),
+                contextlib.redirect_stdout(io.StringIO()),
+            ):
+                self.assertEqual(0, handler(axis.argparse.Namespace(yes=True)))
+
+            self.assertEqual(["wslpath", "-w", str(root_ca)], calls[0])
+            self.assertEqual(
+                ["certutil.exe", "-f", "-user", "-addstore", "Root", "C:\\axis\\rootCA.cer"],
+                calls[1],
+            )
+            self.assertTrue(trusted_marker.is_file())
+            self.assertEqual(
+                f"{hashlib.sha1(b'axis-root-ca').hexdigest().upper()}\n",
+                trusted_marker.read_text(encoding="utf-8"),
+            )
+
+    def test_untrust_certs_removes_root_ca_from_windows_user_store(self) -> None:
+        handler = getattr(axis, "local_dev_untrust_certs", None)
+        self.assertTrue(callable(handler))
+
+        with tempfile.TemporaryDirectory() as temp:
+            root_ca = Path(temp) / "rootCA.cer"
+            root_ca.write_bytes(b"axis-root-ca")
+            trusted_marker = Path(temp) / "trusted-rootCA.sha1"
+            managed_fingerprint = hashlib.sha1(b"previous-axis-root-ca").hexdigest().upper()
+            trusted_marker.write_text(f"{managed_fingerprint}\n", encoding="utf-8")
+            calls: list[list[str]] = []
+
+            def fake_run(command: list[str], **_kwargs):
+                calls.append(command)
+                return axis.subprocess.CompletedProcess(command, 0, stdout="", stderr="")
+
+            with (
+                mock.patch.object(axis, "LOCAL_ROOT_CA_CER", root_ca),
+                mock.patch.object(
+                    axis,
+                    "LOCAL_TRUSTED_ROOT_CA_FINGERPRINT",
+                    trusted_marker,
+                    create=True,
+                ),
+                mock.patch.object(axis, "local_dev_cert_host", return_value="wsl"),
+                mock.patch.object(axis.shutil, "which", side_effect=lambda name: name),
+                mock.patch.object(axis, "run", side_effect=fake_run),
+                contextlib.redirect_stdout(io.StringIO()),
+            ):
+                self.assertEqual(0, handler(axis.argparse.Namespace(yes=True)))
+
+            self.assertEqual(
+                ["certutil.exe", "-user", "-delstore", "Root", managed_fingerprint],
+                calls[0],
+            )
+            self.assertFalse(trusted_marker.exists())
+
+    def test_untrust_certs_uses_managed_fingerprint_when_root_ca_is_missing(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root_ca = Path(temp) / "missing-rootCA.cer"
+            trusted_marker = Path(temp) / "trusted-rootCA.sha1"
+            managed_fingerprint = hashlib.sha1(b"missing-axis-root-ca").hexdigest().upper()
+            trusted_marker.write_text(f"{managed_fingerprint}\n", encoding="utf-8")
+            calls: list[list[str]] = []
+
+            def fake_run(command: list[str], **_kwargs):
+                calls.append(command)
+                return axis.subprocess.CompletedProcess(command, 0, stdout="", stderr="")
+
+            with (
+                mock.patch.object(axis, "LOCAL_ROOT_CA_CER", root_ca),
+                mock.patch.object(axis, "LOCAL_TRUSTED_ROOT_CA_FINGERPRINT", trusted_marker),
+                mock.patch.object(axis, "local_dev_cert_host", return_value="wsl"),
+                mock.patch.object(axis.shutil, "which", side_effect=lambda name: name),
+                mock.patch.object(axis, "run", side_effect=fake_run),
+                contextlib.redirect_stdout(io.StringIO()),
+            ):
+                self.assertEqual(0, axis.local_dev_untrust_certs(axis.argparse.Namespace(yes=True)))
+
+            self.assertEqual(
+                ["certutil.exe", "-user", "-delstore", "Root", managed_fingerprint],
+                calls[0],
+            )
+            self.assertFalse(trusted_marker.exists())
+
+    def test_native_linux_trust_prints_manual_guidance_without_running_a_command(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root_ca = Path(temp) / "rootCA.cer"
+            root_ca.write_bytes(b"axis-root-ca")
+            with (
+                mock.patch.object(axis, "LOCAL_ROOT_CA_CER", root_ca),
+                mock.patch.object(axis, "local_dev_cert_host", return_value="linux"),
+                mock.patch.object(axis, "run") as run,
+                contextlib.redirect_stdout(io.StringIO()) as stdout,
+                contextlib.redirect_stderr(io.StringIO()) as stderr,
+            ):
+                self.assertEqual(1, axis.local_dev_trust_certs(axis.argparse.Namespace(yes=False)))
+
+        run.assert_not_called()
+        self.assertIn("SHA-256", stdout.getvalue())
+        self.assertIn("browser or user trust store", stderr.getvalue())
+
+    def test_local_dev_cli_routes_certificate_lifecycle_flags(self) -> None:
+        with (
+            mock.patch.object(axis, "local_dev_certs", return_value=0) as certs,
+            mock.patch.object(axis, "local_dev_trust_certs", return_value=0) as trust,
+            contextlib.redirect_stdout(io.StringIO()),
+        ):
+            self.assertEqual(0, axis.main(["local-dev", "certs", "--renew"]))
+            self.assertEqual(0, axis.main(["local-dev", "trust-certs", "--yes"]))
+
+        self.assertTrue(certs.call_args.args[0].renew)
+        self.assertTrue(trust.call_args.args[0].yes)
+
 
 class TestInstallHooks(unittest.TestCase):
     def test_cli_exposes_install_hooks(self) -> None:
@@ -3394,8 +3602,56 @@ class TestRepoSkillsGate(unittest.TestCase):
             ),
         }
 
+    def add_skill(self, files: dict[str, str], name: str) -> None:
+        files[f".agents/skills/{name}/SKILL.md"] = files[
+            ".agents/skills/axis-example/SKILL.md"
+        ].replace("axis-example", name).replace("Axis Example", name.replace("-", " ").title())
+        files[".agents/skills/README.md"] += (
+            f"| {name} | [{name}/SKILL.md](./{name}/SKILL.md) |\n"
+        )
+
     def test_accepts_valid_repo_skill(self) -> None:
         self.assertEqual([], self.issues_for_skill(self.valid_skill_files()))
+
+    def test_verification_scope_consumers_must_delegate_command_selection(self) -> None:
+        for consumer in ("axis-frontend-feature", "axis-ui-system"):
+            with self.subTest(consumer=consumer):
+                files = self.valid_skill_files()
+                self.add_skill(files, "axis-script-scope")
+                self.add_skill(files, consumer)
+                files[f".agents/skills/{consumer}/SKILL.md"] += (
+                    "\n- Documentation lookup **Delegates** to `$axis-script-scope`.\n"
+                )
+                files[".agents/skills/axis-script-scope/SKILL.md"] = files[
+                    ".agents/skills/axis-script-scope/SKILL.md"
+                ].replace(
+                    "Report the result.",
+                    "Report `Moment`, `Selected checks`, `Omitted broad checks`, `Results`, and `Next verification boundary`.",
+                )
+
+                issues = self.issues_for_skill(files)
+
+                self.assertIn(
+                    f"`{consumer}` must use **Delegates** for verification command selection to `$axis-script-scope`",
+                    "\n".join(issues),
+                )
+
+    def test_script_scope_requires_the_verification_output_contract(self) -> None:
+        files = self.valid_skill_files()
+        self.add_skill(files, "axis-script-scope")
+        files[".agents/skills/axis-script-scope/SKILL.md"] = files[
+            ".agents/skills/axis-script-scope/SKILL.md"
+        ].replace(
+            "- Example input.",
+            "- Example input with `Moment`, `Selected checks`, `Omitted broad checks`, `Results`, and `Next verification boundary`.",
+        )
+
+        issues = self.issues_for_skill(files)
+
+        self.assertIn(
+            "axis-script-scope` output must include `Moment`, `Selected checks`, `Omitted broad checks`, `Results`, and `Next verification boundary`",
+            "\n".join(issues),
+        )
 
     def test_rejects_legacy_vendor_adapter_directory(self) -> None:
         files = self.valid_skill_files()

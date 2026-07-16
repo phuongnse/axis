@@ -30,6 +30,10 @@ Do not invent IDs, endpoints, tables, or product behavior. If code and docs conf
 - Before non-trivial work, read the matching `SKILL.md` and [`.agents/skills/reference.md`](./.agents/skills/reference.md), then follow numbered steps in order.
 - `$axis-*` aliases in docs map to `.agents/skills/<name>/SKILL.md`. Do not skip workflow gates or defer them into PR follow-ups unless the user explicitly approved that deferral.
 
+## External Skills
+
+Axis repository skills own the development lifecycle. External skills may supplement reasoning and diagnostics, but must not create parallel specs, plans, review gates, verification commands, or Git/PR workflows. When an external skill overlaps a `$axis-*` owner, the Axis owner takes precedence.
+
 ## Verification
 
 During development, run the narrow check that proves the surface changed. Before review, run triggered verification from [docs/playbooks/agent-checklist.md](./docs/playbooks/agent-checklist.md).

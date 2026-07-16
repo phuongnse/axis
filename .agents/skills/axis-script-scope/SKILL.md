@@ -32,4 +32,10 @@ Follow [reference.md](../reference.md).
 
 ## Output
 
-Report selected commands and why, intentionally omitted evidence, results, and the next verification boundary.
+Report these fields:
+
+- `Moment`
+- `Selected checks` with reasons
+- `Omitted broad checks` with reasons
+- `Results`
+- `Next verification boundary`

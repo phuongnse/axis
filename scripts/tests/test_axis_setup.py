@@ -491,6 +491,19 @@ class TestSetupProfiles(unittest.TestCase):
             plan.index("install missing pinned user-local tools: .NET SDK 8.0.423, Node.js 22.23.1"),
         )
 
+    def test_plan_lists_explicit_local_ca_trust_after_certificate_generation(self) -> None:
+        plan = axis_setup.setup_plan(
+            profile="local-dev",
+            install_user_tools=False,
+            browsers=False,
+            trust_local_ca=True,
+            platform_spec=axis_setup.SetupPlatform("windows", "x64"),
+        )
+
+        trust_step = "trust local HTTPS root CA in the current user's host trust store"
+        self.assertIn(trust_step, plan)
+        self.assertLess(plan.index("generate local HTTPS certificates"), plan.index(trust_step))
+
     def test_plan_reports_review_tools_without_a_portable_artifact(self) -> None:
         plan = axis_setup.setup_plan(
             profile="review",

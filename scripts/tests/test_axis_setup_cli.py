@@ -24,6 +24,7 @@ def setup_args(**overrides: object) -> argparse.Namespace:
         "browsers": False,
         "plan_only": False,
         "install_user_tools": False,
+        "trust_local_ca": False,
         "yes": False,
     }
     values.update(overrides)
@@ -31,6 +32,16 @@ def setup_args(**overrides: object) -> argparse.Namespace:
 
 
 class TestPortableSetupCli(unittest.TestCase):
+    def test_build_profile_rejects_local_ca_trust(self) -> None:
+        with (
+            mock.patch.object(axis.axis_setup, "detect_platform") as detect_platform,
+            contextlib.redirect_stderr(io.StringIO()) as stderr,
+        ):
+            self.assertEqual(1, axis.setup(setup_args(trust_local_ca=True)))
+
+        detect_platform.assert_not_called()
+        self.assertIn("requires --profile local-dev", stderr.getvalue())
+
     def test_command_exists_does_not_treat_a_relative_repo_file_as_an_executable(self) -> None:
         with (
             mock.patch.object(axis, "resolve_exe", return_value="README.md"),
@@ -182,6 +193,31 @@ class TestPortableSetupCli(unittest.TestCase):
             self.assertEqual(0, axis.setup(setup_args(profile="local-dev")))
 
         self.assertEqual(["ci", "exec -- playwright install chromium", "certs", "hooks"], calls)
+
+    def test_local_dev_profile_can_explicitly_trust_the_generated_root_ca(self) -> None:
+        calls: list[str] = []
+        with (
+            mock.patch.object(axis.axis_setup, "detect_platform", return_value=axis_setup.SetupPlatform("windows", "x64")),
+            mock.patch.object(axis, "setup_external_preflight", return_value=0),
+            mock.patch.object(axis, "setup_preflight", return_value=0),
+            mock.patch.object(axis, "run", return_value=axis.subprocess.CompletedProcess([], 0)),
+            mock.patch.object(
+                axis,
+                "run_frontend_npm",
+                side_effect=lambda args, **_kwargs: calls.append(" ".join(args))
+                or axis.subprocess.CompletedProcess(args, 0),
+            ),
+            mock.patch.object(axis, "local_dev_certs", side_effect=lambda _args: calls.append("certs") or 0),
+            mock.patch.object(axis, "local_dev_trust_certs", side_effect=lambda _args: calls.append("trust") or 0),
+            mock.patch.object(axis, "install_hooks", side_effect=lambda _args: calls.append("hooks") or 0),
+            contextlib.redirect_stdout(io.StringIO()),
+        ):
+            self.assertEqual(
+                0,
+                axis.setup(setup_args(profile="local-dev", trust_local_ca=True, yes=True)),
+            )
+
+        self.assertEqual(["ci", "exec -- playwright install chromium", "certs", "trust", "hooks"], calls)
 
     def test_install_user_tools_installs_only_missing_profile_tools_before_preflight(self) -> None:
         ready = {"dotnet": False, "node": True}

@@ -15,6 +15,7 @@ Follow [reference.md](../reference.md).
 - Non-trivial entry work **Requires** current `$axis-design-gate` evidence.
 - Apply the sign-off and provenance rules from [docs/playbooks/frontend.md § Component design](../../../docs/playbooks/frontend.md#component-design); do not broaden or weaken them here.
 - Do not refresh the baseline merely to silence unexplained drift or discard existing exception evidence.
+- Verification command selection **Delegates** to `$axis-script-scope`.
 
 ## Inputs
 
@@ -31,7 +32,7 @@ Follow [reference.md](../reference.md).
 4. Choose one owner: upstream registry zone, semantic theme zone, app-owned shared pattern, or one-off feature composition. State visuals outside registry primitives belong only to `frontend/src/components/shared/interactionStates.ts`; reuse its contract and stop when a requested treatment conflicts with the hierarchy.
 5. Implement only after required evidence: sync reviewed upstream source; keep shared props Axis-owned and provider-neutral; keep feature classes layout-only; preserve accessibility.
 6. Refresh `frontend/ui-baseline.json` only after provenance is established. Preserve valid exceptions; add non-empty `reason` and `signOff` only for approved upstream-zone exceptions.
-7. Verify baseline, frontend quality, shared contracts/consumers, focused browser behavior, and the post-sync registry diff. For interaction states, compare computed light/dark results for every matrix role and prove persistent emphasis exceeds transient emphasis on equivalent surfaces.
+7. Name required evidence categories: baseline, frontend quality, affected shared contracts/consumers, and post-sync registry diff when applicable; add focused browser evidence only for layout or interaction risk. Pass the current moment, changed paths, and valid evidence through the verification handoff, then run only its selected checks.
 
 ## Output
 
