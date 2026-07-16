@@ -3471,9 +3471,21 @@ def local_dev_ca_fingerprint(algorithm: str = "sha256") -> str:
     return digest
 
 
-def confirm_local_ca_store_change(action: str, args: argparse.Namespace) -> bool:
+def confirm_local_ca_store_change(
+    action: str,
+    args: argparse.Namespace,
+    *,
+    fingerprint: str | None = None,
+) -> bool:
     print(f"local-dev {action}-certs: root CA {path_label(LOCAL_ROOT_CA_CER)}")
-    print(f"local-dev {action}-certs: SHA-256 {local_dev_ca_fingerprint()}")
+    current_matches = (
+        LOCAL_ROOT_CA_CER.is_file()
+        and (fingerprint is None or local_dev_ca_fingerprint("sha1") == fingerprint)
+    )
+    if current_matches:
+        print(f"local-dev {action}-certs: SHA-256 {local_dev_ca_fingerprint()}")
+    else:
+        print(f"local-dev {action}-certs: managed SHA-1 {fingerprint}")
     if getattr(args, "yes", False):
         return True
     if not sys.stdin.isatty():
@@ -3536,11 +3548,18 @@ def local_dev_trust_certs(args: argparse.Namespace) -> int:
 
 
 def local_dev_untrust_certs(args: argparse.Namespace) -> int:
-    if not LOCAL_ROOT_CA_CER.is_file():
+    fingerprint: str | None = None
+    if LOCAL_TRUSTED_ROOT_CA_FINGERPRINT.is_file():
+        fingerprint = LOCAL_TRUSTED_ROOT_CA_FINGERPRINT.read_text(encoding="utf-8").strip().upper()
+        if re.fullmatch(r"[0-9A-F]{40}", fingerprint) is None:
+            print("local-dev untrust-certs: managed CA fingerprint is invalid", file=sys.stderr)
+            return 1
+    elif LOCAL_ROOT_CA_CER.is_file():
+        fingerprint = local_dev_ca_fingerprint("sha1")
+    else:
         print("local-dev untrust-certs: root CA is missing; cannot identify the certificate", file=sys.stderr)
         return 1
     host = local_dev_cert_host()
-    fingerprint = local_dev_ca_fingerprint("sha1")
     if host == "linux":
         print(
             "local-dev untrust-certs: automatic removal is unavailable on native Linux; "
@@ -3548,7 +3567,7 @@ def local_dev_untrust_certs(args: argparse.Namespace) -> int:
             file=sys.stderr,
         )
         return 1
-    if not confirm_local_ca_store_change("untrust", args):
+    if not confirm_local_ca_store_change("untrust", args, fingerprint=fingerprint):
         print("local-dev untrust-certs: cancelled", file=sys.stderr)
         return 1
     if host in {"windows", "wsl"}:

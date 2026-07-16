@@ -3412,7 +3412,8 @@ class TestAxisCommandWrappers(unittest.TestCase):
             root_ca = Path(temp) / "rootCA.cer"
             root_ca.write_bytes(b"axis-root-ca")
             trusted_marker = Path(temp) / "trusted-rootCA.sha1"
-            trusted_marker.write_text("managed\n", encoding="utf-8")
+            managed_fingerprint = hashlib.sha1(b"previous-axis-root-ca").hexdigest().upper()
+            trusted_marker.write_text(f"{managed_fingerprint}\n", encoding="utf-8")
             calls: list[list[str]] = []
 
             def fake_run(command: list[str], **_kwargs):
@@ -3434,9 +3435,36 @@ class TestAxisCommandWrappers(unittest.TestCase):
             ):
                 self.assertEqual(0, handler(axis.argparse.Namespace(yes=True)))
 
-            fingerprint = hashlib.sha1(b"axis-root-ca").hexdigest().upper()
             self.assertEqual(
-                ["certutil.exe", "-user", "-delstore", "Root", fingerprint],
+                ["certutil.exe", "-user", "-delstore", "Root", managed_fingerprint],
+                calls[0],
+            )
+            self.assertFalse(trusted_marker.exists())
+
+    def test_untrust_certs_uses_managed_fingerprint_when_root_ca_is_missing(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root_ca = Path(temp) / "missing-rootCA.cer"
+            trusted_marker = Path(temp) / "trusted-rootCA.sha1"
+            managed_fingerprint = hashlib.sha1(b"missing-axis-root-ca").hexdigest().upper()
+            trusted_marker.write_text(f"{managed_fingerprint}\n", encoding="utf-8")
+            calls: list[list[str]] = []
+
+            def fake_run(command: list[str], **_kwargs):
+                calls.append(command)
+                return axis.subprocess.CompletedProcess(command, 0, stdout="", stderr="")
+
+            with (
+                mock.patch.object(axis, "LOCAL_ROOT_CA_CER", root_ca),
+                mock.patch.object(axis, "LOCAL_TRUSTED_ROOT_CA_FINGERPRINT", trusted_marker),
+                mock.patch.object(axis, "local_dev_cert_host", return_value="wsl"),
+                mock.patch.object(axis.shutil, "which", side_effect=lambda name: name),
+                mock.patch.object(axis, "run", side_effect=fake_run),
+                contextlib.redirect_stdout(io.StringIO()),
+            ):
+                self.assertEqual(0, axis.local_dev_untrust_certs(axis.argparse.Namespace(yes=True)))
+
+            self.assertEqual(
+                ["certutil.exe", "-user", "-delstore", "Root", managed_fingerprint],
                 calls[0],
             )
             self.assertFalse(trusted_marker.exists())
