@@ -40,6 +40,10 @@ export interface PkceSession {
   state: string;
 }
 
+interface AuthorizeUrlOptions {
+  prompt?: 'none';
+}
+
 export function createPkceSession(): PkceSession {
   const verifier = randomString(64);
   const state = randomString(32);
@@ -60,7 +64,11 @@ export function clearPkceSession(): void {
   sessionStorage.removeItem('pkce_state');
 }
 
-export async function buildAuthorizeUrl(state: string, verifier: string): Promise<string> {
+export async function buildAuthorizeUrl(
+  state: string,
+  verifier: string,
+  options: AuthorizeUrlOptions = {},
+): Promise<string> {
   const challenge = await sha256Base64Url(verifier);
   const params = new URLSearchParams({
     response_type: 'code',
@@ -71,6 +79,9 @@ export async function buildAuthorizeUrl(state: string, verifier: string): Promis
     scope: SCOPES,
     state,
   });
+  if (options.prompt) {
+    params.set('prompt', options.prompt);
+  }
   return `${connectBaseUrl()}/connect/authorize?${params.toString()}`;
 }
 

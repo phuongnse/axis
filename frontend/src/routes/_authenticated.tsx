@@ -8,7 +8,11 @@ export const Route = createFileRoute('/_authenticated')({
   component: AuthenticatedLayout,
 });
 
-export async function ensureAuthenticatedRouteSession() {
+export async function ensureAuthenticatedRouteSession(context: { preload?: boolean } = {}) {
+  if (context.preload) {
+    return;
+  }
+
   if (getAccessToken()) {
     return;
   }

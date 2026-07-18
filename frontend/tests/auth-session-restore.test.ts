@@ -37,6 +37,14 @@ function unauthenticatedResponse(): Response {
   } as unknown as Response;
 }
 
+function loginRequiredResponse(state: string): Response {
+  return {
+    ok: true,
+    status: 200,
+    url: `${window.location.origin}/callback?error=login_required&state=${state}`,
+  } as unknown as Response;
+}
+
 function tokenFailureResponse(): Response {
   return {
     ok: false,
@@ -188,6 +196,83 @@ describe('auth session restore', () => {
     expect(getAccessToken()).toBeNull();
     expect(sessionStorage.getItem('pkce_verifier')).toBeNull();
     expect(sessionStorage.getItem('pkce_state')).toBeNull();
+  });
+
+  it('uses prompt none for silent browser session restoration', async () => {
+    let prompt: string | null = null;
+    vi.mocked(fetch).mockImplementation((input: RequestInfo | URL) => {
+      const url = new URL(String(input), window.location.origin);
+      prompt = url.searchParams.get('prompt');
+      return Promise.resolve(loginRequiredResponse(url.searchParams.get('state') ?? ''));
+    });
+
+    await expect(restoreSessionFromBrowserAuth()).resolves.toBe(false);
+
+    expect(prompt).toBe('none');
+  });
+
+  it('shares one unauthenticated session resolution between app entry and its guest destination', async () => {
+    let authorizeRequests = 0;
+    vi.mocked(fetch).mockImplementation((input: RequestInfo | URL) => {
+      const url = new URL(String(input), window.location.origin);
+      authorizeRequests += 1;
+      return Promise.resolve(loginRequiredResponse(url.searchParams.get('state') ?? ''));
+    });
+
+    await expect(redirectFromAppEntryRoute()).rejects.toMatchObject({
+      options: { to: '/sign-in', replace: true },
+    });
+    await expect(redirectAuthenticatedUserFromGuestRoute()).resolves.toBeUndefined();
+
+    expect(authorizeRequests).toBe(1);
+  });
+
+  it('does not cache a silent authorization error whose state does not match', async () => {
+    let authorizeRequests = 0;
+    vi.mocked(fetch).mockImplementation(() => {
+      authorizeRequests += 1;
+      return Promise.resolve(loginRequiredResponse('wrong-state'));
+    });
+
+    await expect(restoreSessionFromBrowserAuth()).resolves.toBe(false);
+    await expect(restoreSessionFromBrowserAuth()).resolves.toBe(false);
+
+    expect(authorizeRequests).toBe(2);
+  });
+
+  it('keeps auth route preloads free of browser session requests', async () => {
+    const asPreloadGuard = (guard: unknown) =>
+      (guard as (context: { preload: boolean }) => Promise<void>)({ preload: true });
+
+    await expect(asPreloadGuard(redirectAuthenticatedUserFromGuestRoute)).resolves.toBeUndefined();
+    await expect(asPreloadGuard(redirectFromAppEntryRoute)).resolves.toBeUndefined();
+    await expect(asPreloadGuard(ensureAuthenticatedRouteSession)).resolves.toBeUndefined();
+
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('rechecks the browser session after sign-in resolves a previous guest bootstrap', async () => {
+    let signedIn = false;
+    vi.mocked(fetch).mockImplementation((input: RequestInfo | URL) => {
+      const url = new URL(String(input), window.location.origin);
+      if (url.pathname === '/connect/authorize') {
+        return Promise.resolve(
+          signedIn
+            ? authResponse(url.searchParams.get('state') ?? '')
+            : loginRequiredResponse(url.searchParams.get('state') ?? ''),
+        );
+      }
+      if (url.pathname === '/connect/token') {
+        return Promise.resolve(tokenResponse('post-sign-in-token'));
+      }
+      return Promise.reject(new Error(`Unexpected fetch: ${url.toString()}`));
+    });
+
+    await expect(redirectAuthenticatedUserFromGuestRoute()).resolves.toBeUndefined();
+    signedIn = true;
+
+    await expect(completePostSignInPkceFlow()).resolves.toBe(true);
+    expect(getAccessToken()).toBe('post-sign-in-token');
   });
 
   it('routes the app entry directly to the dashboard when an access token already exists in memory', async () => {

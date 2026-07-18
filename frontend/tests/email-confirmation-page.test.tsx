@@ -34,15 +34,26 @@ describe('EmailConfirmationPage', () => {
       'text-info',
     );
     expect(screen.getByText(/Sent to alex@example.com/)).toBeInTheDocument();
-    expect(screen.getByText("Didn't receive it?")).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /resend email/i })).toHaveClass('h-8');
+    const prompt = screen.getByText("Didn't receive it?");
+    const resendAction = screen.getByRole('button', { name: /resend email/i });
+    const backToRegistration = screen.getByRole('link', { name: /back to registration/i });
+    expect(prompt.parentElement).toHaveClass('gap-x-1', 'text-xs');
+    for (const action of [resendAction, backToRegistration]) {
+      expect(action).toHaveClass(
+        'h-auto',
+        'border-0',
+        'p-0',
+        'text-xs',
+        'font-medium',
+        'text-primary',
+        'hover:underline',
+      );
+    }
+    expect(resendAction.querySelector('svg')).not.toBeInTheDocument();
     expect(
       screen.queryByRole('link', { name: /register another account/i }),
     ).not.toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /back to registration/i })).toHaveAttribute(
-      'href',
-      '/register',
-    );
+    expect(backToRegistration).toHaveAttribute('href', '/register');
   });
 
   it('shows success banner after resend succeeds', async () => {

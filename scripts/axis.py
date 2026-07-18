@@ -76,6 +76,7 @@ if str(SCRIPTS) not in sys.path:
 
 import axis_repo  # noqa: E402
 import axis_setup  # noqa: E402
+import axis_theme  # noqa: E402
 import doc_drift_domains  # noqa: E402
 from axis_frontend_policy import (  # noqa: E402
     check_frontend_quality,
@@ -723,8 +724,9 @@ def ui_baseline_payload(root: Path = ROOT) -> dict[str, object]:
     frontend_root = root / "frontend"
     config_path = frontend_root / "components.json"
     theme_path = frontend_root / "src" / "index.css"
+    generated_theme_path = frontend_root / "src" / "theme.generated.css"
     ui_root = frontend_root / "src" / "components" / "ui"
-    required = (config_path, theme_path)
+    required = (config_path, theme_path, generated_theme_path)
     missing = [str(path.relative_to(root)).replace("\\", "/") for path in required if not path.is_file()]
     if missing:
         raise CheckError(f"missing UI baseline source: {', '.join(missing)}")
@@ -743,6 +745,7 @@ def ui_baseline_payload(root: Path = ROOT) -> dict[str, object]:
     paths = [
         config_path,
         theme_path,
+        generated_theme_path,
         *(path for path in support_paths if path.is_file()),
         *sorted(ui_root.rglob("*.tsx")),
     ]
@@ -849,6 +852,32 @@ def check_ui_baseline(_args: argparse.Namespace | None = None) -> int:
         )
         return 1
     print("check-ui-baseline: OK")
+    return 0
+
+
+def check_theme(_args: argparse.Namespace | None = None) -> int:
+    issues = axis_theme.theme_artifact_issues(ROOT)
+    if issues:
+        print("check-theme FAIL:", file=sys.stderr)
+        for issue in issues:
+            print(f"  - {issue}", file=sys.stderr)
+        print(
+            "\nRun `python scripts/axis.py generate theme` and commit the generated artifacts.",
+            file=sys.stderr,
+        )
+        return 1
+    print("check-theme: OK")
+    return 0
+
+
+def generate_theme(_args: argparse.Namespace | None = None) -> int:
+    try:
+        written = axis_theme.write_theme_artifacts(ROOT)
+    except (OSError, axis_theme.ThemeValidationError) as exc:
+        print(f"generate-theme FAIL: {exc}", file=sys.stderr)
+        return 1
+    for path in written:
+        print(f"generate-theme: wrote {path}")
     return 0
 
 
@@ -2035,6 +2064,7 @@ def check_doc_drift(_args: argparse.Namespace | None = None) -> int:
         ("check-ef-domain-mapping", check_ef_domain_mapping),
         ("check-frontend-api-contracts", check_frontend_api_contracts),
         ("check-ui-baseline", check_ui_baseline),
+        ("check-theme", check_theme),
         ("check-frontend-quality", check_frontend_quality),
         ("check-use-case-docs.py", lambda _=None: run_module_check("check-use-case-docs.py", ["--check"])),
         ("check-foundation-docs.py", lambda _=None: run_module_check("check-foundation-docs.py", ["--check"])),
@@ -2812,6 +2842,7 @@ def verify(args: argparse.Namespace) -> int:
     foundation_docs = any(path.startswith("docs/foundations/") for path in paths)
     skills = any(path.startswith(f"{REPO_SKILLS_DIR}/") for path in paths)
     scripts_changed = any(path.startswith("scripts/") for path in paths)
+    theme_changed = any(axis_theme.is_theme_path(path) for path in paths)
     text_paths = [path for path in paths if (ROOT / path).is_file() and should_check_text_encoding(path)]
     api_surface_drift = any_changed(paths, r"^src/Axis[.]Api/Endpoints/") and not any_changed(paths, r"^openapi[.]json$")
 
@@ -2828,6 +2859,9 @@ def verify(args: argparse.Namespace) -> int:
 
     if text_paths:
         step("text encoding (changed files)", lambda: run_text_encoding_check(text_paths, label="check-text-encoding-changed"))
+
+    if theme_changed:
+        step("generated theme artifacts", lambda: check_theme())
 
     if dotnet:
         if step(".NET SDK", lambda: check_dotnet_sdk()) == 0:
@@ -4345,6 +4379,7 @@ def main(argv: list[str] | None = None) -> int:
     check_sub.add_parser("ef-domain-mapping", help="Check EF Core mappings against domain ownership").set_defaults(func=check_ef_domain_mapping)
     check_sub.add_parser("frontend-api-contracts", help="Check generated frontend API contracts").set_defaults(func=check_frontend_api_contracts)
     check_sub.add_parser("ui-baseline", help="Check the approved frontend UI baseline").set_defaults(func=check_ui_baseline)
+    check_sub.add_parser("theme", help="Check canonical theme generated artifacts").set_defaults(func=check_theme)
     check_sub.add_parser("frontend-quality", help="Run deterministic frontend policy checks").set_defaults(func=check_frontend_quality)
     check_sub.add_parser("coderabbit-cli", help="Check the CodeRabbit CLI review dependency").set_defaults(func=check_coderabbit_cli)
     check_sub.add_parser("local-dev-docs", help="Check local-development docs against Compose").set_defaults(
@@ -4380,6 +4415,7 @@ def main(argv: list[str] | None = None) -> int:
     generate = sub.add_parser("generate", help="Generate committed repository artifacts")
     generate_sub = generate.add_subparsers(dest="generate_command", required=True)
     generate_sub.add_parser("api-contracts", help="Generate OpenAPI and frontend API types").set_defaults(func=generate_api_contracts)
+    generate_sub.add_parser("theme", help="Generate web and email theme projections").set_defaults(func=generate_theme)
 
     args = parser.parse_args(argv)
     try:

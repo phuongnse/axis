@@ -143,6 +143,30 @@ function watchThemePreferenceWrites(page: Page): () => number {
   return () => writes;
 }
 
+function watchAuthorizationActivity(page: Page) {
+  const statuses: number[] = [];
+  const consoleErrors: string[] = [];
+
+  page.on('response', (response) => {
+    if (new URL(response.url()).pathname === '/connect/authorize') {
+      statuses.push(response.status());
+    }
+  });
+  page.on('console', (message) => {
+    if (
+      message.type() === 'error' &&
+      (message.location().url.includes('/connect/authorize') || message.text().includes('401'))
+    ) {
+      consoleErrors.push(message.text());
+    }
+  });
+
+  return {
+    consoleErrors: () => consoleErrors,
+    statuses: () => statuses,
+  };
+}
+
 function installVisitedPathRecorder() {
   const target = window as Window & { __axisVisitedPaths?: string[] };
   if (target.__axisVisitedPaths) return;
@@ -215,12 +239,116 @@ test.describe('sign in user', () => {
   test('AT-002 unauthenticated dashboard access routes to sign-in with registration link', async ({
     page,
   }) => {
+    const authorization = watchAuthorizationActivity(page);
     await page.goto('/dashboard');
 
     await expect(page).toHaveURL(/\/sign-in$/);
     await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible();
     await page.getByRole('link', { name: /create account/i }).click();
     await expect(page).toHaveURL(/\/register$/);
+    const authorizeCountBeforeHover = authorization.statuses().length;
+    await page.getByRole('link', { name: 'Sign in' }).hover();
+    await page.waitForTimeout(250);
+
+    expect(authorization.statuses()).toEqual([302]);
+    expect(authorization.statuses()).toHaveLength(authorizeCountBeforeHover);
+    expect(authorization.consoleErrors()).toEqual([]);
+  });
+
+  test('AT-006 unverified sign-in separates warning, resend action, and feedback', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 320, height: 800 });
+    const email = uniqueEmail('sign006');
+    await page.route('**/api/auth/sign-in', async (route) => {
+      await route.fulfill({
+        status: 422,
+        contentType: 'application/problem+json',
+        body: JSON.stringify({ code: 'identity.signIn.verificationRequired' }),
+      });
+    });
+    await page.route('**/api/auth/resend-verification', async (route) => {
+      await route.fulfill({ status: 204, body: '' });
+    });
+
+    await page.goto('/sign-in');
+    await fillSignInForm(page, email);
+    await page.getByRole('button', { name: /sign in/i }).click();
+
+    const verificationNotice = page.getByRole('alert');
+    await expect(verificationNotice).toContainText('Email not verified');
+    await expect(verificationNotice).toContainText(
+      'Email verification is required before sign-in.',
+    );
+    await expect(verificationNotice.getByRole('button')).toHaveCount(0);
+    await expect(page.getByText("Didn't receive it?")).toBeVisible();
+    const resendAction = page.getByRole('button', {
+      name: /resend verification email/i,
+    });
+    await expect(resendAction).toHaveText('Resend email');
+    await expect(resendAction).toHaveCSS('text-decoration-line', 'none');
+    const resendAppearance = await resendAction.evaluate((element) => {
+      const style = getComputedStyle(element);
+      const rowStyle = element.parentElement ? getComputedStyle(element.parentElement) : null;
+      return {
+        fontSize: style.fontSize,
+        fontWeight: style.fontWeight,
+        height: style.height,
+        iconCount: element.querySelectorAll('svg').length,
+        rowColumnGap: rowStyle?.columnGap ?? null,
+        paddingInlineStart: style.paddingInlineStart,
+      };
+    });
+    expect(resendAppearance).toEqual({
+      fontSize: '12px',
+      fontWeight: '500',
+      height: '16px',
+      iconCount: 0,
+      rowColumnGap: '4px',
+      paddingInlineStart: '0px',
+    });
+    const createAccountAppearance = await page
+      .getByRole('link', { name: 'Create account' })
+      .evaluate((element) => {
+        const style = getComputedStyle(element);
+        return {
+          fontSize: style.fontSize,
+          fontWeight: style.fontWeight,
+          height: style.height,
+          paddingInlineStart: style.paddingInlineStart,
+        };
+      });
+    expect(createAccountAppearance).toEqual({
+      fontSize: resendAppearance.fontSize,
+      fontWeight: resendAppearance.fontWeight,
+      height: resendAppearance.height,
+      paddingInlineStart: resendAppearance.paddingInlineStart,
+    });
+    await resendAction.hover();
+    await expect(resendAction).toHaveCSS('text-decoration-line', 'underline');
+
+    await page.getByRole('button', { name: 'Preferences' }).click();
+    await page.getByRole('button', { name: 'Vietnamese' }).click();
+    await page.keyboard.press('Escape');
+
+    await expect(verificationNotice).toContainText('Email chưa xác minh');
+    await expect(page.getByText('Chưa nhận được email?')).toBeVisible();
+    const vietnameseResendAction = page.getByRole('button', {
+      name: 'Gửi lại email xác minh',
+    });
+    await expect(vietnameseResendAction).toHaveText('Gửi lại email');
+
+    await vietnameseResendAction.click();
+    const feedback = page.getByRole('status');
+    await expect(feedback).toHaveText('Đã gửi email xác minh.');
+    expect(
+      await feedback.evaluate((element) => ({
+        fontSize: getComputedStyle(element).fontSize,
+        successTone: element.classList.contains('text-success'),
+      })),
+    ).toEqual({ fontSize: '12px', successTone: true });
+    await expect(verificationNotice).not.toContainText('Đã gửi email xác minh.');
+    await expect(page.getByRole('alert')).toHaveCount(1);
   });
 
   test('AT-004 validation errors relocalize and visibly mark invalid fields', async ({ page }) => {
@@ -301,11 +429,14 @@ test.describe('sign in user', () => {
     test.skip(!maildevURL, 'Set E2E_MAILDEV_URL to run sign-in-user email verification.');
 
     const email = uniqueEmail('sign015');
+    const authorization = watchAuthorizationActivity(page);
     await createVerifiedUser(request, email);
 
     await page.goto('/');
     await expect(page).toHaveURL(/\/sign-in$/);
     await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible();
+    expect(authorization.statuses()).toEqual([302]);
+    expect(authorization.consoleErrors()).toEqual([]);
 
     await fillSignInForm(page, email);
     await page.getByRole('button', { name: /sign in/i }).click();

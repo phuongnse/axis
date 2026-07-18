@@ -26,7 +26,7 @@ export function AppShell({
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const clearSession = useAuthStore((s) => s.clearSession);
+  const markBrowserSessionGuest = useAuthStore((s) => s.markBrowserSessionGuest);
   const signOutPendingRef = useRef(false);
   const [signingOut, setSigningOut] = useState(false);
   const [signOutError, setSignOutError] = useState(false);
@@ -53,7 +53,7 @@ export function AppShell({
     }
 
     clearPkceSession();
-    clearSession();
+    markBrowserSessionGuest();
     queryClient.clear();
     void navigate({ to: '/sign-in', replace: true });
   }

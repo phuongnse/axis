@@ -341,6 +341,7 @@ class TestUiBaseline(unittest.TestCase):
         files = {
             "frontend/components.json": '{"style":"base-nova"}\n',
             "frontend/src/index.css": '@import "tailwindcss";\n',
+            "frontend/src/theme.generated.css": ":root {}\n",
             "frontend/src/components/ui/button.tsx": "export function Button() { return null; }\n",
         }
         for relative_path, content in files.items():
@@ -365,10 +366,12 @@ class TestUiBaseline(unittest.TestCase):
                 root = Path(temp)
                 config = root / "frontend/components.json"
                 theme = root / "frontend/src/index.css"
+                generated_theme = root / "frontend/src/theme.generated.css"
                 config.parent.mkdir(parents=True)
                 theme.parent.mkdir(parents=True)
                 config.write_text(f"{value}\n", encoding="utf-8")
                 theme.write_text('@import "tailwindcss";\n', encoding="utf-8")
+                generated_theme.write_text(":root {}\n", encoding="utf-8")
 
                 with self.assertRaisesRegex(axis.CheckError, "root value must be an object"):
                     axis.ui_baseline_payload(root)

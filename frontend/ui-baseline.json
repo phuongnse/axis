@@ -79,8 +79,9 @@
     "src/components/ui/toggle.tsx": "290d2cd01c768d1e3c894bfebcf9c3d1532191ae7ec1e48da1e405dab0a95c4c",
     "src/components/ui/tooltip.tsx": "a9f7b6823ef80334f2a70ee0e7eb40e01f095d63f7e354be6b7c499e2d2c84aa",
     "src/hooks/use-mobile.ts": "58b2cc5fa259358e9192125abf072c832144193d87f3d66a90b13089a0196cef",
-    "src/index.css": "a0cb3d8437d679cd66f11ec82467756c28c579459a7d14c3042d00523ad6f1a3",
-    "src/lib/utils.ts": "74e8fe9d0d680c442ed6adb13e7d119d6c210c19ae6c114313b2a72552be0883"
+    "src/index.css": "8293d4ecf0cb3f76c2b5e67c90563dcefe86daf214499a15c31b50a5b19c6eb0",
+    "src/lib/utils.ts": "74e8fe9d0d680c442ed6adb13e7d119d6c210c19ae6c114313b2a72552be0883",
+    "src/theme.generated.css": "1eac54086f4edc899cdb4d94519240d7191a4a0813088f343a1f0c643af5089a"
   },
   "registry": "@shadcn",
   "schemaVersion": 2,

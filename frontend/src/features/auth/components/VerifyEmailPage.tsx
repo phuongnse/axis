@@ -194,7 +194,7 @@ export function VerifyEmailPage() {
     };
   }, [continueToDashboard, sessionEstablished]);
 
-  if (!token) {
+  if (!token && !started) {
     return (
       <VerifyEmailOutcome
         kind="invalid"

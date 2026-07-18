@@ -36,7 +36,7 @@ Register a standalone Axis Platform user with email/password so the user can ver
 - **AC-001** User registration can be started without any team/setup context.
 - **AC-002** User can register with full name, email/password, password confirmation, and current user-level legal acceptance.
 - **AC-003** Registration creates the standalone account, personal workspace, and legal acceptance without requiring team/setup context.
-- **AC-004** Registration sends an Axis Platform-branded verification email in the account's initial supported language preference with HTML and plain-text bodies, a prominent verification action, a fallback URL, expiry and security context, recipient context, and footer metadata.
+- **AC-004** Registration sends an Axis Platform-branded verification email in the account's initial supported language preference with the current brand palette, email-safe typography, HTML and plain-text bodies, a prominent verification action, a fallback URL, expiry and security context, recipient context, and footer metadata.
 - **AC-005** After successful email verification, the user is signed in and routed to the dashboard.
 
 *Validation & errors*
@@ -68,7 +68,7 @@ Register a standalone Axis Platform user with email/password so the user can ver
 | AT-007 | UI/API boundaries | Expired, invalid, and already-used verification links show clear states; resend remains available where allowed and rate-limited resend is clear | AC-012 | UI component test + API integration test | Yes |
 | AT-008 | Application boundary | Completed or in-progress idempotency key deduplicates repeated registration attempts | AC-013 | Application test | Yes |
 | AT-009 | UI component | Registration, confirmation, and verification screens expose sign-in or registration escape navigation | AC-016 | UI component test | Yes |
-| AT-010 | Infrastructure boundary | Verification email content includes clear subject, HTML and plain-text bodies, CTA and fallback link, expiry and security context, recipient context, and footer metadata | AC-004 | Infrastructure test | Yes |
+| AT-010 | Infrastructure boundary | Verification email content uses the current brand palette and email-safe typography and includes clear subject, HTML and plain-text bodies, CTA and fallback link, expiry and security context, recipient context, and footer metadata | AC-004 | Infrastructure test | Yes |
 | AT-011 | UI/API boundaries | Registration submits the selected supported site language, persists it as the initial user preference, rejects unsupported language input, and sends the verification email in that language | AC-004, AC-017 | Browser automation + UI component test + API integration test + Infrastructure test | Yes |
 
 ## Out Of Scope

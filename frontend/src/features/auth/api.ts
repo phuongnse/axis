@@ -1,5 +1,5 @@
 import { fetchApi } from '@/lib/api';
-import { getAccessToken, useAuthStore } from './auth-store';
+import { getAccessToken, getBrowserSessionStatus, useAuthStore } from './auth-store';
 import {
   buildAuthorizeUrl,
   CLIENT_ID,
@@ -37,6 +37,10 @@ const verifyEmailSuccessCache = new Map<
 const verifyEmailInFlight = new Map<string, Promise<VerifyEmailResponse>>();
 const verifyEmailSuccessCacheTtlMs = 60_000;
 let browserSessionRestoreInFlight: Promise<boolean> | null = null;
+
+interface BrowserSessionRestoreOptions {
+  force?: boolean;
+}
 
 function pruneVerifyEmailSuccessCache(now: number): void {
   for (const [token, entry] of verifyEmailSuccessCache.entries()) {
@@ -142,7 +146,7 @@ export async function verifyEmail(token: string): Promise<VerifyEmailResponse> {
 }
 
 export async function completePostVerifyPkceFlow(): Promise<boolean> {
-  const restored = await restoreSessionFromBrowserAuth();
+  const restored = await restoreSessionFromBrowserAuth({ force: true });
   if (restored) {
     return true;
   }
@@ -151,9 +155,14 @@ export async function completePostVerifyPkceFlow(): Promise<boolean> {
   return false;
 }
 
-export async function restoreSessionFromBrowserAuth(): Promise<boolean> {
+export async function restoreSessionFromBrowserAuth(
+  options: BrowserSessionRestoreOptions = {},
+): Promise<boolean> {
   if (getAccessToken()) {
     return true;
+  }
+  if (!options.force && getBrowserSessionStatus() === 'guest') {
+    return false;
   }
 
   if (!browserSessionRestoreInFlight) {
@@ -168,7 +177,7 @@ export async function restoreSessionFromBrowserAuth(): Promise<boolean> {
 async function restoreSessionFromBrowserAuthOnce(): Promise<boolean> {
   try {
     const pkce = createPkceSession();
-    const authorizeUrl = await buildAuthorizeUrl(pkce.state, pkce.verifier);
+    const authorizeUrl = await buildAuthorizeUrl(pkce.state, pkce.verifier, { prompt: 'none' });
 
     const response = await fetch(authorizeUrl, {
       credentials: 'include',
@@ -177,6 +186,9 @@ async function restoreSessionFromBrowserAuthOnce(): Promise<boolean> {
     });
 
     if (!response.ok || !response.url) {
+      if (response.status === 401) {
+        useAuthStore.getState().markBrowserSessionGuest();
+      }
       clearPkceSession();
       return false;
     }
@@ -187,9 +199,20 @@ async function restoreSessionFromBrowserAuthOnce(): Promise<boolean> {
       return false;
     }
 
-    const code = finalUrl.searchParams.get('code');
     const state = finalUrl.searchParams.get('state');
-    if (!code || state !== pkce.state) {
+    if (state !== pkce.state) {
+      clearPkceSession();
+      return false;
+    }
+
+    if (finalUrl.searchParams.get('error') === 'login_required') {
+      useAuthStore.getState().markBrowserSessionGuest();
+      clearPkceSession();
+      return false;
+    }
+
+    const code = finalUrl.searchParams.get('code');
+    if (!code) {
       clearPkceSession();
       return false;
     }
@@ -203,7 +226,7 @@ async function restoreSessionFromBrowserAuthOnce(): Promise<boolean> {
 }
 
 export async function completePostSignInPkceFlow(): Promise<boolean> {
-  const restored = await restoreSessionFromBrowserAuth();
+  const restored = await restoreSessionFromBrowserAuth({ force: true });
   if (restored) {
     return true;
   }
