@@ -4,7 +4,15 @@ import { exchangeAuthorizationCode, restoreSessionFromBrowserAuth } from '@/feat
 import { getAccessToken } from '@/features/auth/auth-store';
 import { clearPkceSession, loadPkceSession } from '@/features/auth/pkce';
 
-export async function redirectAuthenticatedUserFromGuestRoute() {
+interface RouteGuardContext {
+  preload?: boolean;
+}
+
+export async function redirectAuthenticatedUserFromGuestRoute(context: RouteGuardContext = {}) {
+  if (context.preload) {
+    return;
+  }
+
   if (getAccessToken()) {
     throw redirect({ to: '/dashboard', replace: true });
   }
@@ -15,7 +23,11 @@ export async function redirectAuthenticatedUserFromGuestRoute() {
   }
 }
 
-export async function redirectFromAppEntryRoute() {
+export async function redirectFromAppEntryRoute(context: RouteGuardContext = {}) {
+  if (context.preload) {
+    return;
+  }
+
   if (getAccessToken()) {
     throw redirect({ to: '/dashboard', replace: true });
   }

@@ -23,6 +23,38 @@ interface MaildevMessage {
   to?: MaildevRecipient[] | MaildevRecipient;
 }
 
+interface DestructiveNoticeRecord {
+  pathname: string;
+  text: string;
+}
+
+type DestructiveNoticeWindow = Window & {
+  __axisDestructiveNotices?: DestructiveNoticeRecord[];
+};
+
+function installDestructiveNoticeRecorder() {
+  const trackedWindow = window as DestructiveNoticeWindow;
+  const records: DestructiveNoticeRecord[] = [];
+  trackedWindow.__axisDestructiveNotices = records;
+
+  const sampleFrame = () => {
+    const notice = document.querySelector('[data-slot="alert"].text-destructive');
+    if (notice && records.length === 0) {
+      records.push({
+        pathname: window.location.pathname,
+        text: notice.textContent?.trim() ?? '',
+      });
+      return;
+    }
+    window.requestAnimationFrame(sampleFrame);
+  };
+  window.requestAnimationFrame(sampleFrame);
+}
+
+async function readDestructiveNoticeRecords(page: Page): Promise<DestructiveNoticeRecord[]> {
+  return page.evaluate(() => (window as DestructiveNoticeWindow).__axisDestructiveNotices ?? []);
+}
+
 interface VerificationEmailLink {
   token: string;
   url: URL;
@@ -201,6 +233,7 @@ test.describe('register user', () => {
     request,
   }) => {
     test.skip(!maildevURL, 'Set E2E_MAILDEV_URL to run register-user email verification.');
+    await page.addInitScript(installDestructiveNoticeRecorder);
 
     const email = uniqueEmail('reg001');
     const languageWrites = watchLanguagePreferenceWrites(page);
@@ -235,6 +268,7 @@ test.describe('register user', () => {
     await expect(page).toHaveURL(/\/dashboard$/, { timeout: 30_000 });
     expect(mainFramePaths).not.toContain('/callback');
     await expectAuthenticatedFrame(page, 'Alex Rivers');
+    expect(await readDestructiveNoticeRecords(page)).toEqual([]);
     expect(languageWrites()).toBe(0);
     expect(themeWrites()).toBe(0);
   });
@@ -269,7 +303,7 @@ test.describe('register user', () => {
     expect(message.html ?? '').toContain('data-template="axis-transactional-email"');
     expect(message.html ?? '').toContain('/axis-logo.svg');
     expect(message.html ?? '').toContain('letter-spacing:0.18em');
-    expect(message.html ?? '').toContain('background:#c75f1e');
+    expect(message.html ?? '').toContain('<meta name="color-scheme" content="light only">');
 
     const verificationLink = verificationLinkFrom(message);
     if (!verificationLink) {

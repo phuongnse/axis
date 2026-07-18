@@ -14,17 +14,6 @@ internal sealed class MailKitEmailSender(IConfiguration configuration) : IEmailS
     private const string BrandLogoPath = "axis-logo.svg";
     private const string DefaultLanguage = "en";
     private const string VietnameseLanguage = "vi";
-    private const string BackgroundColor = "#f7f9fb";
-    private const string CardColor = "#ffffff";
-    private const string ForegroundColor = "#1b1f27";
-    private const string MutedColor = "#5e6673";
-    private const string BorderColor = "#d8e0ea";
-    private const string PrimaryColor = "#c75f1e";
-    private const string SecondaryColor = "#4d8589";
-    private const string AccentColor = "#edf3f7";
-    private const string WarningBackgroundColor = "#fff7ed";
-    private const string WarningBorderColor = "#f0b35c";
-    private const string WarningTextColor = "#7c3f12";
     private static readonly IReadOnlyDictionary<string, VerificationEmailTemplate> VerificationEmailTemplates =
         new Dictionary<string, VerificationEmailTemplate>(StringComparer.OrdinalIgnoreCase)
         {
@@ -166,16 +155,18 @@ internal sealed class MailKitEmailSender(IConfiguration configuration) : IEmailS
             <head>
               <meta charset="utf-8">
               <meta name="viewport" content="width=device-width, initial-scale=1.0">
+              <meta name="color-scheme" content="light only">
+              <meta name="supported-color-schemes" content="light">
               <title>{{escapedSubject}}</title>
             </head>
-            <body style="margin:0; padding:0; background:{{BackgroundColor}}; color:{{ForegroundColor}}; font-family:'Geist',Arial,Helvetica,sans-serif;">
+            <body style="margin:0; padding:0; background:{{TransactionalEmailTheme.BackgroundColor}}; color:{{TransactionalEmailTheme.ForegroundColor}}; color-scheme:light; font-family:{{TransactionalEmailTheme.FontFamily}};">
               <div style="display:none; max-height:0; overflow:hidden; opacity:0;">{{escapedPreheader}}</div>
-              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" data-template="axis-transactional-email" style="background:{{BackgroundColor}}; padding:40px 16px;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" data-template="axis-transactional-email" style="background:{{TransactionalEmailTheme.BackgroundColor}}; padding:40px 16px; font-family:{{TransactionalEmailTheme.FontFamily}};">
                 <tr>
                   <td align="center">
-                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:640px; background:{{CardColor}}; border:1px solid {{BorderColor}}; border-radius:12px; overflow:hidden; box-shadow:0 18px 48px rgba(27,31,39,0.08);">
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:640px; background:{{TransactionalEmailTheme.CardColor}}; border:1px solid {{TransactionalEmailTheme.BorderColor}}; border-radius:12px; overflow:hidden; box-shadow:0 18px 48px rgba(27,31,39,0.08); font-family:{{TransactionalEmailTheme.FontFamily}};">
                       <tr>
-                        <td style="height:6px; background:{{PrimaryColor}}; line-height:6px; font-size:0;">&nbsp;</td>
+                        <td style="height:6px; background:{{TransactionalEmailTheme.PrimaryColor}}; line-height:6px; font-size:0;">&nbsp;</td>
                       </tr>
                       <tr>
                         <td style="padding:26px 32px 18px;">
@@ -184,37 +175,37 @@ internal sealed class MailKitEmailSender(IConfiguration configuration) : IEmailS
                               <td align="left" style="width:44px; vertical-align:middle;">
                                 <img src="{{escapedBrandLogoUrl}}" width="40" height="40" alt="{{escapedBrandName}}" style="display:block; border:0; outline:none; text-decoration:none;">
                               </td>
-                              <td align="left" style="padding-left:12px; color:{{MutedColor}}; font-family:'Geist',Arial,Helvetica,sans-serif; font-size:12px; font-weight:600; letter-spacing:0.18em; text-transform:uppercase; vertical-align:middle;">{{escapedEyebrow}}</td>
+                              <td align="left" style="padding-left:12px; color:{{TransactionalEmailTheme.MutedColor}}; font-family:{{TransactionalEmailTheme.FontFamily}}; font-size:12px; font-weight:600; letter-spacing:0.18em; text-transform:uppercase; vertical-align:middle;">{{escapedEyebrow}}</td>
                             </tr>
                           </table>
                         </td>
                       </tr>
                       <tr>
                         <td style="padding:18px 32px 34px;">
-                          <h1 style="margin:0 0 14px; color:{{ForegroundColor}}; font-size:28px; line-height:1.25; font-weight:700;">{{escapedHeading}}</h1>
-                          <p style="margin:0 0 28px; color:{{MutedColor}}; font-size:16px; line-height:1.65;">{{escapedHtmlIntro}}</p>
+                          <h1 style="margin:0 0 14px; color:{{TransactionalEmailTheme.ForegroundColor}}; font-family:{{TransactionalEmailTheme.FontFamily}}; font-size:28px; line-height:1.25; font-weight:700;">{{escapedHeading}}</h1>
+                          <p style="margin:0 0 28px; color:{{TransactionalEmailTheme.MutedColor}}; font-size:16px; line-height:1.65;">{{escapedHtmlIntro}}</p>
                           <p style="margin:0 0 28px;">
-                            <a href="{{escapedActionUrl}}" style="display:inline-block; border-radius:8px; background:{{PrimaryColor}}; color:#ffffff; font-size:16px; font-weight:700; line-height:1; padding:15px 22px; text-decoration:none;">{{escapedActionLabel}}</a>
+                            <a href="{{escapedActionUrl}}" style="display:inline-block; border-radius:8px; background:{{TransactionalEmailTheme.PrimaryColor}}; color:{{TransactionalEmailTheme.PrimaryForegroundColor}}; font-size:16px; font-weight:700; line-height:1; padding:15px 22px; text-decoration:none;">{{escapedActionLabel}}</a>
                           </p>
-                          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid {{BorderColor}}; border-radius:10px; background:{{AccentColor}};">
+                          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid {{TransactionalEmailTheme.BorderColor}}; border-radius:10px; background:{{TransactionalEmailTheme.AccentColor}};">
                             <tr>
                               <td style="padding:16px 18px;">
-                                <p style="margin:0 0 8px; color:{{MutedColor}}; font-size:14px; line-height:1.6;">{{escapedFallbackIntro}}</p>
-                                <p style="margin:0; color:{{SecondaryColor}}; font-size:14px; line-height:1.6; word-break:break-all;">
-                                  <a href="{{escapedActionUrl}}" style="color:{{SecondaryColor}}; text-decoration:underline;">{{escapedActionUrl}}</a>
+                                <p style="margin:0 0 8px; color:{{TransactionalEmailTheme.MutedColor}}; font-size:14px; line-height:1.6;">{{escapedFallbackIntro}}</p>
+                                <p style="margin:0; color:{{TransactionalEmailTheme.LinkColor}}; font-size:14px; line-height:1.6; word-break:break-all;">
+                                  <a href="{{escapedActionUrl}}" style="color:{{TransactionalEmailTheme.LinkColor}}; text-decoration:underline;">{{escapedActionUrl}}</a>
                                 </p>
                               </td>
                             </tr>
                           </table>
-                          <p style="margin:18px 0 22px; color:{{MutedColor}}; font-size:14px; line-height:1.6;">{{escapedExpiry}}</p>
-                          <div style="border:1px solid {{WarningBorderColor}}; border-radius:10px; background:{{WarningBackgroundColor}}; color:{{WarningTextColor}}; font-size:14px; line-height:1.65; padding:16px 18px;">
+                          <p style="margin:18px 0 22px; color:{{TransactionalEmailTheme.MutedColor}}; font-size:14px; line-height:1.6;">{{escapedExpiry}}</p>
+                          <div style="border:1px solid {{TransactionalEmailTheme.WarningBorderColor}}; border-radius:10px; background:{{TransactionalEmailTheme.WarningBackgroundColor}}; color:{{TransactionalEmailTheme.WarningTextColor}}; font-size:14px; line-height:1.65; padding:16px 18px;">
                             <strong>{{escapedSecurityTitle}}</strong><br>
                             {{escapedSecurityBody}}
                           </div>
                         </td>
                       </tr>
                       <tr>
-                        <td style="padding:22px 32px; background:{{AccentColor}}; border-top:1px solid {{BorderColor}}; color:{{MutedColor}}; font-size:12px; line-height:1.65;">
+                        <td style="padding:22px 32px; background:{{TransactionalEmailTheme.AccentColor}}; border-top:1px solid {{TransactionalEmailTheme.BorderColor}}; color:{{TransactionalEmailTheme.MutedColor}}; font-size:12px; line-height:1.65;">
                           <p style="margin:0 0 8px;">{{escapedFooter}}</p>
                           <p style="margin:0;">{{escapedBrandName}} &copy; {{email.Year}}. {{escapedCopyright}}</p>
                         </td>

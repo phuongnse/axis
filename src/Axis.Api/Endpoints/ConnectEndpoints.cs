@@ -45,6 +45,19 @@ public static class ConnectEndpoints
 
         if (!cookieResult.Succeeded)
         {
+            if (request.HasPrompt(Prompts.None))
+            {
+                return Results.Forbid(
+                    new AuthenticationProperties(new Dictionary<string, string?>
+                    {
+                        [OpenIddictServerAspNetCoreConstants.Properties.Error] =
+                            Errors.LoginRequired,
+                        [OpenIddictServerAspNetCoreConstants.Properties.ErrorDescription] =
+                            "The browser authorization session is not available.",
+                    }),
+                    [OpenIddictServerAspNetCoreDefaults.AuthenticationScheme]);
+            }
+
             return Results.Unauthorized();
         }
 

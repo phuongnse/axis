@@ -73,17 +73,18 @@ Let a verified standalone Axis Platform user sign in with email/password and rea
 - **AC-025** A user with a valid memory access token or browser authorization session who opens `/sign-in`, `/register`, `/register/confirmation`, or `/auth/verify` is routed to `/dashboard` and does not start another public auth, registration, or verification flow.
 - **AC-026** A user who opens `/` is routed by the current session state: valid memory access token or browser authorization session reaches `/dashboard` directly, while no valid session reaches `/sign-in`.
 - **AC-027** Successful sign-in callback handoffs do not render transient standalone callback pages; callback screens are reserved for recoverable failure states that need user action.
+- **AC-028** Browser intent preloads do not start authorization or mutate session state, and an absent browser authorization session resolves once without surfacing a failed authorization resource.
 
 ## Acceptance Test Matrix
 
 | ID | Boundary | Scenario | Covers AC | Verification | Required |
 |---|---|---|---|---|---|
 | AT-001 | Browser journey | Verified standalone user signs in and reaches the dashboard | AC-001, AC-002, AC-003, AC-004, AC-005, AC-006 | Browser automation | Yes |
-| AT-002 | Browser journey | Unauthenticated dashboard access routes to sign-in, and sign-in links to registration | AC-007, AC-024 | Browser automation | Yes |
+| AT-002 | Browser journey | Unauthenticated dashboard access resolves the absent browser session once, routes to sign-in, links to registration, and keeps guest-route preloads free of authorization work | AC-007, AC-024, AC-028 | Browser automation + UI component test | Yes |
 | AT-003 | API boundary | Valid sign-in verifies password hash, active user, verified email, and active personal workspace before establishing a browser authorization session | AC-003, AC-004, AC-005, AC-006 | Application test + API integration test | Yes |
 | AT-004 | UI component | Empty form and invalid email render inline field errors | AC-008, AC-009, AC-010 | UI component test | Yes |
 | AT-005 | API boundary | Unknown email, wrong password, and inactive account return the same generic credential failure without a session | AC-011 | Application test + API integration test | Yes |
-| AT-006 | UI/API boundaries | Unverified account with correct credentials shows verification-required state and resend success, failure, and rate-limited states | AC-012, AC-013 | UI component test + API integration test | Yes |
+| AT-006 | UI/API boundaries | Unverified account with correct credentials shows one verification-required warning followed by a separate inline resend prompt and action, with clear success, failure, and rate-limited feedback directly below the action row | AC-012, AC-013 | Browser automation + UI component test + API integration test | Yes |
 | AT-007 | API boundary | Missing or unavailable personal workspace prevents session establishment with a non-sensitive account-unavailable error | AC-014 | Application test + API integration test | Yes |
 | AT-008 | UI component | 5xx and rate-limited sign-in responses show retry/wait states and restore or disable submit appropriately | AC-015, AC-016 | UI component test | Yes |
 | AT-009 | UI component | Invalid callback, state mismatch, and token exchange failure show retry-sign-in state and clear stale local session data | AC-017 | UI component test | Yes |
@@ -92,7 +93,7 @@ Let a verified standalone Axis Platform user sign in with email/password and rea
 | AT-012 | UI component | Sign-in and callback states expose registration or sign-in escape navigation | AC-022 | UI component test | Yes |
 | AT-013 | Browser journey | Authenticated protected route reload restores from the existing browser authorization session and stays on the authenticated route | AC-006, AC-023 | Browser automation + UI component test | Yes |
 | AT-014 | Browser journey | Authenticated user opens public auth and registration routes and is routed to the dashboard | AC-025 | Browser automation + UI component test | Yes |
-| AT-015 | Browser journey | App root routes by the current session state without showing a guest auth route as an intermediate destination | AC-026 | Browser automation + UI component test | Yes |
+| AT-015 | Browser journey | App root resolves the current session once and routes without a guest auth hop or failed authorization resource | AC-026, AC-028 | Browser automation + UI component test | Yes |
 | AT-016 | Browser journey | Successful sign-in completes the callback handoff without rendering a transient callback page, while callback failures remain recoverable | AC-017, AC-027 | Browser automation + UI component test | Yes |
 
 ## Out Of Scope
@@ -108,13 +109,13 @@ Let a verified standalone Axis Platform user sign in with email/password and rea
 |---|---|
 | `/sign-in` | Render an auth-card form with email, password, link to registration, and one submit action. |
 | `/sign-in` validation | Show required-field, invalid-email, generic credential, unverified-account, workspace-unavailable, rate-limited, and generic 5xx states inline or in the form alert described by the relevant AC. Keep submit busy and disabled from submit through successful dashboard handoff; re-enable after recoverable sign-in errors except rate-limited. |
-| `/sign-in` verification required | Show that email verification is required, allow resend when not limited, and keep resend copy account-enumeration-safe. |
+| `/sign-in` verification required | Show one warning notice that explains email verification is required and remains a warning until verification completes. Immediately below the notice, show the established inline resend prompt and link-action pattern; expose sending on the action, place live success/error/rate-limited feedback directly below that row, use the success semantic for successful delivery, and keep resend copy account-enumeration-safe. |
 | Callback/dashboard handoff | Reuse the existing browser callback path to exchange the authorization code, keep the access token in memory, and route successful handoffs to `/dashboard` before rendering a standalone callback screen. Render sign-in escape navigation only when callback recovery is needed. |
-| Protected route bootstrap | On authenticated routes with no memory access token, try to restore through the existing browser authorization session and callback handoff; continue on success and route to `/sign-in` on failure. |
-| Public auth route bootstrap | On public Identity Access auth and registration routes, keep unauthenticated users on the requested public screen, but route users with a valid memory access token or restorable browser authorization session to `/dashboard` before rendering the public flow. |
-| App entry bootstrap | On `/`, resolve the current session once and route authenticated or restorable sessions to `/dashboard`; route unauthenticated sessions to `/sign-in` without rendering a public auth screen first. |
+| Protected route bootstrap | On authenticated-route navigation with no memory access token, try to restore through the existing browser authorization session and callback handoff; continue on success and route to `/sign-in` on failure. Route preloads do not start this handoff. |
+| Public auth route bootstrap | On public Identity Access auth and registration route navigation, keep unauthenticated users on the requested public screen, but route users with a valid memory access token or restorable browser authorization session to `/dashboard` before rendering the public flow. Route preloads do not start this handoff. |
+| App entry bootstrap | On `/`, resolve the current session once and route authenticated or restorable sessions to `/dashboard`; route unauthenticated sessions to `/sign-in` without rendering a public auth screen first or treating the expected missing browser session as a failed resource. |
 
-Required UI quality: labels must be programmatic, invalid fields must expose invalid state, error/help text must remain associated with the field or form state it describes, recovery actions must be visible and keyboard-reachable, technical success handoffs must not flash standalone intermediate screens or return the primary action to idle before navigation completes, and the screens must use existing auth components and theme tokens.
+Required UI quality: labels must be programmatic, invalid fields must expose invalid state, error/help text must remain associated with the field or form state it describes, recovery actions must be visible and keyboard-reachable, technical success handoffs must not flash standalone intermediate screens or return the primary action to idle before navigation completes, intent preloads must not initiate browser authorization or create failed-resource console noise, and the screens must use existing auth components and theme tokens.
 
 ## Diagrams
 

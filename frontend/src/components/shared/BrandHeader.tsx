@@ -1,5 +1,3 @@
-import { Separator } from '@/components/ui/separator';
-
 type BrandHeaderLabelElement = 'p' | 'h1' | 'h2';
 
 interface BrandHeaderProps {
@@ -11,16 +9,13 @@ function BrandHeader({ label, labelElement = 'p' }: BrandHeaderProps) {
   const LabelElement = labelElement;
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-3">
-        <img src="/axis-logo.svg" alt="" className="size-11 shrink-0" width={44} height={44} />
-        {label ? (
-          <LabelElement className="font-heading text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-            {label}
-          </LabelElement>
-        ) : null}
-      </div>
-      <Separator />
+    <div className="flex items-center gap-3 pb-2">
+      <img src="/axis-logo.svg" alt="" className="size-11 shrink-0" width={44} height={44} />
+      {label ? (
+        <LabelElement className="font-heading text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+          {label}
+        </LabelElement>
+      ) : null}
     </div>
   );
 }

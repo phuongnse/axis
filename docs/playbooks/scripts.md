@@ -42,6 +42,7 @@ Project commands use `python`; substitute `python3` on WSL/Linux or `py -3` on W
 ## Command Boundaries
 
 - Add repo workflows as `python scripts/axis.py ...` subcommands.
+- Use `python scripts/axis.py generate theme` after editing [theme/axis-theme.json](../../theme/axis-theme.json); `python scripts/axis.py check theme` rejects stale web or email projections.
 - Use `python scripts/axis.py dotnet test [path/to/project.csproj] -- <dotnet-test-args>`; omit the project to test `Axis.sln`.
 - Keep raw Docker, dotnet, npm, Lychee, and OpenSSL calls inside wrappers or package scripts.
 - Use `python scripts/axis.py local-dev smoke -- <playwright-args>` for fast host-browser smoke against a running local stack; use `python scripts/axis.py local-dev e2e -- <playwright-args>` for Compose-backed browser evidence.

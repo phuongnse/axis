@@ -36,13 +36,15 @@ public class MailKitEmailSenderTests
         content.Html.Should().Contain("Account security");
         content.Html.Should().Contain("src=\"https://localhost:3000/axis-logo.svg\"");
         content.Html.Should().Contain("alt=\"Axis Platform\"");
-        content.Html.Should().Contain("font-family:'Geist',Arial,Helvetica,sans-serif");
+        content.Html.Should().Contain($"font-family:{TransactionalEmailTheme.FontFamily}");
+        content.Html.Should().Contain("<meta name=\"color-scheme\" content=\"light only\">");
         content.Html.Should().Contain("padding-left:12px");
         content.Html.Should().Contain("letter-spacing:0.18em");
         content.Html.Should().Contain("font-weight:600");
         content.Html.Should().NotContain("align=\"right\"");
-        content.Html.Should().Contain("background:#c75f1e");
-        content.Html.Should().Contain("color:#4d8589");
+        content.Html.Should().Contain($"background:{TransactionalEmailTheme.PrimaryColor}");
+        content.Html.Should().Contain($"color:{TransactionalEmailTheme.PrimaryColor}");
+        content.Html.Should().Contain($"background:{TransactionalEmailTheme.WarningBackgroundColor}");
         content.Html.Should().Contain("max-width:640px");
         content.Html.Should().NotContain("#2563eb");
         content.Html.Should().Contain("href=\"https://localhost:3000/auth/verify?token=abc123\"");

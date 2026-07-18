@@ -1,8 +1,10 @@
-import { Link } from '@tanstack/react-router';
-import { Mail } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import {
+  InlinePromptAction,
+  InlinePromptActionButton,
+  InlinePromptActionLink,
+} from '@/components/shared/InlinePromptAction';
 import { StatusNotice } from '@/components/shared/StatusNotice';
-import { Button } from '@/components/ui/button';
 import { AuthCard } from '@/features/auth/components/AuthCard';
 import { useResendVerification } from '@/features/auth/hooks/useResendVerification';
 import { loadRegistrationContext } from '@/features/auth/registration-context';
@@ -22,12 +24,11 @@ export function EmailConfirmationPage() {
     <AuthCard
       title={t('auth.confirm.title')}
       footer={
-        <>
-          {t('auth.confirm.useAnother')}{' '}
-          <Link to="/register" className="font-medium text-primary hover:underline">
+        <InlinePromptAction prompt={t('auth.confirm.useAnother')}>
+          <InlinePromptActionLink to="/register">
             {t('auth.backToRegistration')}
-          </Link>
-        </>
+          </InlinePromptActionLink>
+        </InlinePromptAction>
       }
     >
       <div className="space-y-4">
@@ -65,24 +66,21 @@ export function EmailConfirmationPage() {
           </StatusNotice>
         ) : null}
 
-        <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm">
-          <span className="text-muted-foreground">{t('auth.confirm.didNotReceive')}</span>
+        <InlinePromptAction prompt={t('auth.confirm.didNotReceive')}>
           {context?.email ? (
-            <Button
+            <InlinePromptActionButton
               type="button"
-              variant="link"
               disabled={state === 'sending' || state === 'rate_limited'}
               onClick={() => void handleResend()}
             >
-              <Mail className="size-3.5" aria-hidden />
               {t('auth.resendEmail')}
-            </Button>
+            </InlinePromptActionButton>
           ) : (
-            <Link to="/register" className="font-medium text-primary hover:underline">
+            <InlinePromptActionLink to="/register">
               {t('auth.backToRegistration')}
-            </Link>
+            </InlinePromptActionLink>
           )}
-        </div>
+        </InlinePromptAction>
       </div>
     </AuthCard>
   );

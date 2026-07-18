@@ -124,6 +124,25 @@ public sealed class SignInUserFlowTests(ApiTestFixture fixture)
     }
 
     [Fact]
+    public async Task Authorize_WhenSilentBrowserSessionIsAbsent_RedirectsWithLoginRequired()
+    {
+        string state = Guid.NewGuid().ToString("N");
+        HttpResponseMessage signOutResponse =
+            await fixture.Client.PostAsync("/api/auth/sign-out", content: null);
+
+        HttpResponseMessage response = await AuthorizeAsync(prompt: "none", state);
+
+        signOutResponse.StatusCode.Should().Be(HttpStatusCode.NoContent);
+        response.StatusCode.Should().Be(HttpStatusCode.Redirect);
+        Uri location = response.Headers.Location!;
+        location.AbsolutePath.Should().Be("/callback");
+        Dictionary<string, Microsoft.Extensions.Primitives.StringValues> query =
+            QueryHelpers.ParseQuery(location.Query);
+        query["error"].ToString().Should().Be("login_required");
+        query["state"].ToString().Should().Be(state);
+    }
+
+    [Fact]
     public async Task SignOutUser_WhenBrowserSessionExistsOrIsAbsent_ClearsBrowserSessionWithoutIdentitySideEffects()
     {
         string email = UniqueEmail();
@@ -172,7 +191,7 @@ public sealed class SignInUserFlowTests(ApiTestFixture fixture)
     private async Task<HttpResponseMessage> SignInAsync(string email, string password) =>
         await fixture.Client.PostAsJsonAsync("/api/auth/sign-in", new { email, password }, Json);
 
-    private async Task<HttpResponseMessage> AuthorizeAsync()
+    private async Task<HttpResponseMessage> AuthorizeAsync(string? prompt = null, string? state = null)
     {
         string verifier = CreateCodeVerifier();
         Dictionary<string, string?> authorizeQuery = new()
@@ -183,7 +202,8 @@ public sealed class SignInUserFlowTests(ApiTestFixture fixture)
             ["code_challenge"] = CreateCodeChallenge(verifier),
             ["code_challenge_method"] = "S256",
             ["scope"] = "openid email profile",
-            ["state"] = Guid.NewGuid().ToString("N"),
+            ["state"] = state ?? Guid.NewGuid().ToString("N"),
+            ["prompt"] = prompt,
         };
 
         string authorizeUrl = QueryHelpers.AddQueryString("/connect/authorize", authorizeQuery);

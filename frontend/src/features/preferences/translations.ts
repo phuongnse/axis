@@ -56,6 +56,7 @@ export const translations = {
     'auth.sending': 'Sending...',
     'auth.signIn': 'Sign in',
     'auth.signInCredentialError': 'Email or password is incorrect.',
+    'auth.signInEmailUnverifiedTitle': 'Email not verified',
     'auth.signInErrorTitle': 'Unable to sign in',
     'auth.signingIn': 'Signing in...',
     'auth.signInEmailHelp': 'Use the email for your account.',
@@ -65,7 +66,6 @@ export const translations = {
     'auth.signInWorkspaceUnavailable': 'Account is not available for sign-in.',
     'auth.termsAgreement':
       'I agree to the <terms>Terms of Service</terms> and <privacy>Privacy Policy</privacy>',
-    'auth.verifyEmail': 'Verify your email',
 
     'dashboard.accountDetails': 'Account details',
     'dashboard.accountReady': 'Account ready',
@@ -622,6 +622,7 @@ export const translations = {
     'auth.sending': 'Đang gửi...',
     'auth.signIn': 'Đăng nhập',
     'auth.signInCredentialError': 'Email hoặc mật khẩu không đúng.',
+    'auth.signInEmailUnverifiedTitle': 'Email chưa xác minh',
     'auth.signInErrorTitle': 'Không thể đăng nhập',
     'auth.signingIn': 'Đang đăng nhập...',
     'auth.signInEmailHelp': 'Dùng email của tài khoản.',
@@ -631,7 +632,6 @@ export const translations = {
     'auth.signInWorkspaceUnavailable': 'Tài khoản chưa thể đăng nhập.',
     'auth.termsAgreement':
       'Tôi đồng ý với <terms>Điều khoản dịch vụ</terms> và <privacy>Chính sách quyền riêng tư</privacy>',
-    'auth.verifyEmail': 'Xác minh email của bạn',
 
     'dashboard.accountDetails': 'Thông tin tài khoản',
     'dashboard.accountReady': 'Tài khoản đã sẵn sàng',

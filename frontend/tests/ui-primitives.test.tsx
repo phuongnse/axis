@@ -326,10 +326,9 @@ describe('Select', () => {
 
     await user.click(screen.getByLabelText('Field type'));
 
-    expect(screen.getByRole('listbox').closest('[data-slot="select-content"]')).toHaveAttribute(
-      'data-align-trigger',
-      'false',
-    );
+    expect(
+      (await screen.findByRole('listbox')).closest('[data-slot="select-content"]'),
+    ).toHaveAttribute('data-align-trigger', 'false');
   });
 
   it('links a select trigger to its label', () => {

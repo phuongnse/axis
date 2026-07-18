@@ -63,7 +63,7 @@ Treat design-system component visuals as owned by the component contract. Featur
 Use these ownership layers:
 
 - **Upstream zone** — `frontend/src/components/ui` plus baseline-tracked shadcn support files contain reviewed registry source. Keep registry-default visuals and APIs; do not add product variants, business logic, feature/shared imports, or internal styling. `frontend/ui-baseline.json` records the approved snapshot and the reason/sign-off reference for each explicit exception.
-- **Theme zone** — `frontend/src/index.css` owns approved semantic tokens. Consumers use semantic utilities; new tokens use background/foreground pairs and require sign-off.
+- **Theme zone** — [theme/axis-theme.json](../../theme/axis-theme.json) owns approved semantic values for web and email projections. `frontend/src/theme.generated.css` is generated and committed; `frontend/src/index.css` owns imports and base styles only. Consumers use semantic utilities; new tokens use background/foreground pairs and require sign-off.
 - **App-pattern zone** — `frontend/src/components/shared` owns reusable Axis composition and adapters. Give them narrow Axis-owned props such as product state, not provider variants, types, selectors, or DOM assumptions.
 - **Feature zone** — feature components compose defaults and app patterns. Consumer `className` is outer layout-only and must not alter primitive visuals.
 
@@ -78,7 +78,7 @@ Every interactive surface follows one state-role hierarchy:
 
 Persistent item emphasis must exceed transient item emphasis in light and dark mode. Compare equivalent state roles across overlays, navigation, collections/tables, and form options; action variants keep their component contract. Outside registry primitives, `frontend/src/components/shared/interactionStates.ts` is the only visual-state class owner; other shared, feature, and route code composes it without local state colors. Stacked single-choice options use `OptionList` for full-width, inline-start content.
 
-Cross-feature informational, success, warning, and destructive feedback uses the app-owned `StatusNotice` pattern so text, icon, and semantic tone stay aligned; lifecycle labels use `StatusBadge` with published as success, draft/unpublished as neutral, and archived as muted.
+Full form- or page-level informational, success, warning, and destructive feedback uses the app-owned `StatusNotice` pattern so text, icon, and semantic tone stay aligned. Feedback directly attached to the compact `InlinePromptAction` pattern uses its shared feedback component at the same type scale; lifecycle labels use `StatusBadge` with published as success, draft/unpublished as neutral, and archived as muted.
 
 Use `$axis-ui-system` for token/customization decisions, registry diffs, baseline refreshes, or provider changes. Never bulk-overwrite unrelated registry components. A reviewed upstream sync and matching baseline refresh need provenance but no additional sign-off when they introduce no customization or exception. Explicit sign-off is required for semantic-token visual changes, cross-feature visual/API conventions, primitive exceptions, style/base/provider or major-library changes, and all customizations.
 

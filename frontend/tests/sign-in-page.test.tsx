@@ -1,4 +1,4 @@
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -228,13 +228,103 @@ describe('SignInPage', () => {
     await fillSignInForm(user);
     await user.click(screen.getByRole('button', { name: /sign in/i }));
 
-    expect(
-      await screen.findByText('Email verification is required before sign-in.'),
-    ).toBeInTheDocument();
+    const verificationNotice = await screen.findByRole('alert');
+    expect(verificationNotice).toHaveTextContent('Email not verified');
+    expect(verificationNotice).toHaveTextContent('Email verification is required before sign-in.');
     expect(screen.queryByText('Do not show this backend fallback.')).not.toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: /resend verification email/i }));
+    expect(within(verificationNotice).queryByRole('button')).not.toBeInTheDocument();
+    expect(screen.getByText("Didn't receive it?")).toBeInTheDocument();
+    const resendAction = screen.getByRole('button', {
+      name: /resend verification email/i,
+    });
+    const createAccount = screen.getByRole('link', { name: /create account/i });
+    expect(verificationNotice).not.toContainElement(resendAction);
+    expect(resendAction).toHaveTextContent(/^Resend email$/);
+    for (const action of [resendAction, createAccount]) {
+      expect(action).toHaveClass(
+        'h-auto',
+        'border-0',
+        'p-0',
+        'text-xs',
+        'font-medium',
+        'text-primary',
+        'hover:underline',
+      );
+      expect(action).not.toHaveClass('underline', 'h-8', 'text-sm');
+    }
+    expect(resendAction.querySelector('svg')).not.toBeInTheDocument();
+    expect(screen.getByText("Didn't receive it?").parentElement).toHaveClass('gap-x-1', 'text-xs');
+    await user.click(resendAction);
 
-    expect(await screen.findByText('Verification email sent.')).toBeInTheDocument();
+    const feedback = await screen.findByRole('status');
+    expect(feedback).toHaveTextContent('Verification email sent.');
+    expect(feedback).toHaveClass('text-xs', 'text-success');
+    expect(feedback).not.toHaveClass('text-sm');
+    expect(verificationNotice).not.toContainElement(feedback);
+    expect(screen.getAllByRole('alert')).toHaveLength(1);
+  });
+
+  it.each([
+    {
+      status: 500,
+      statusText: 'Internal Server Error',
+      expected: 'Something went wrong, please try again',
+      expectedClass: 'text-destructive',
+      disabled: false,
+    },
+    {
+      status: 429,
+      statusText: 'Too Many Requests',
+      expected: 'Too many requests. Try again shortly.',
+      expectedClass: 'text-warning',
+      disabled: true,
+    },
+  ])('shows resend $status feedback below the action row', async ({
+    status,
+    statusText,
+    expected,
+    expectedClass,
+    disabled,
+  }) => {
+    const user = userEvent.setup();
+    vi.mocked(fetch).mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input.toString();
+      if (url.includes('/api/auth/sign-in') && init?.method === 'POST') {
+        return Promise.resolve({
+          ok: false,
+          status: 422,
+          statusText: 'Unprocessable Entity',
+          json: () => Promise.resolve({ code: 'identity.signIn.verificationRequired' }),
+        } as unknown as Response);
+      }
+      if (url.includes('/api/auth/resend-verification') && init?.method === 'POST') {
+        return Promise.resolve({
+          ok: false,
+          status,
+          statusText,
+          json: () => Promise.resolve({ detail: statusText }),
+        } as unknown as Response);
+      }
+      return Promise.reject(new Error(`Unexpected fetch: ${url}`));
+    });
+
+    await renderWithRouter(<SignInPage />, { path: '/sign-in' });
+    await fillSignInForm(user);
+    await user.click(screen.getByRole('button', { name: /sign in/i }));
+
+    const verificationNotice = await screen.findByRole('alert');
+    const resendAction = screen.getByRole('button', {
+      name: /resend verification email/i,
+    });
+    await user.click(resendAction);
+
+    const feedback = await screen.findByRole('status');
+    expect(feedback).toHaveTextContent(expected);
+    expect(feedback).toHaveClass('text-xs', expectedClass);
+    expect(feedback).not.toHaveClass('text-sm');
+    expect(verificationNotice).not.toContainElement(feedback);
+    expect(resendAction).toHaveProperty('disabled', disabled);
+    expect(screen.getAllByRole('alert')).toHaveLength(1);
   });
 
   it('shows workspace-unavailable and generic server errors as form alerts', async () => {

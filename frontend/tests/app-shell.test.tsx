@@ -170,6 +170,7 @@ describe('AppShell', () => {
 
     await waitFor(() => expect(signOutUser).toHaveBeenCalledTimes(1));
     expect(useAuthStore.getState().accessToken).toBeNull();
+    expect(useAuthStore.getState().browserSessionStatus).toBe('guest');
     expect(sessionStorage.getItem('pkce_verifier')).toBeNull();
     expect(sessionStorage.getItem('pkce_state')).toBeNull();
     expect(queryClient.getQueryData(['dashboard', 'current-user'])).toBeUndefined();
