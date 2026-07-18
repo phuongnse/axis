@@ -100,6 +100,13 @@ def _parse_oklch(value: Any, label: str) -> tuple[float, float, float]:
     lightness = float(match.group("lightness"))
     chroma = float(match.group("chroma"))
     hue = float(match.group("hue"))
+    for component_name, component in (
+        ("lightness", lightness),
+        ("chroma", chroma),
+        ("hue", hue),
+    ):
+        if not math.isfinite(component):
+            raise ThemeValidationError(f"{label} {component_name} must be finite")
     if not 0 <= lightness <= 1:
         raise ThemeValidationError(f"{label} lightness must be between 0 and 1")
     if chroma < 0:
@@ -301,7 +308,7 @@ def write_theme_artifacts(root: Path) -> list[Path]:
     for relative_path, content in artifacts.items():
         path = root / relative_path
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(content, encoding="utf-8")
+        path.write_text(content, encoding="utf-8", newline="\n")
         written.append(relative_path)
     return written
 

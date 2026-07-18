@@ -44,6 +44,7 @@ function installDestructiveNoticeRecorder() {
         pathname: window.location.pathname,
         text: notice.textContent?.trim() ?? '',
       });
+      return;
     }
     window.requestAnimationFrame(sampleFrame);
   };

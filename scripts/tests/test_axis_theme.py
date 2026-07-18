@@ -7,6 +7,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[2]
 SCRIPTS = ROOT / "scripts"
@@ -72,6 +73,31 @@ class TestAxisTheme(unittest.TestCase):
             ):
                 axis_theme.load_theme(root)
 
+    def test_load_theme_rejects_non_finite_oklch_components(self) -> None:
+        huge_number = "9" * 400
+        components = {
+            "lightness": f"oklch({huge_number} 0.1 180)",
+            "chroma": f"oklch(0.5 {huge_number} 180)",
+            "hue": f"oklch(0.5 0.1 {huge_number})",
+        }
+
+        for component, color in components.items():
+            with self.subTest(component=component), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp)
+                definition = self.definition()
+                colors = definition["colors"]
+                assert isinstance(colors, dict)
+                light = colors["light"]
+                assert isinstance(light, dict)
+                light["primary"] = color
+                self.write_source(root, definition)
+
+                with self.assertRaisesRegex(
+                    axis_theme.ThemeValidationError,
+                    f"primary {component} must be finite",
+                ):
+                    axis_theme.load_theme(root)
+
     def test_render_theme_artifacts_is_deterministic_and_projects_email_safe_values(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
@@ -108,6 +134,28 @@ class TestAxisTheme(unittest.TestCase):
             self.assertTrue(
                 any("stale generated theme artifact" in issue for issue in axis_theme.theme_artifact_issues(root))
             )
+
+    def test_write_theme_artifacts_uses_lf_newlines_when_platform_defaults_translate(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            self.write_source(root)
+
+            def translating_write_text(
+                path: Path,
+                content: str,
+                encoding: str | None = None,
+                errors: str | None = None,
+                newline: str | None = None,
+            ) -> int:
+                del errors
+                rendered = content.replace("\n", "\r\n") if newline is None else content
+                return path.write_bytes(rendered.encode(encoding or "utf-8"))
+
+            with mock.patch.object(Path, "write_text", autospec=True, side_effect=translating_write_text):
+                written = axis_theme.write_theme_artifacts(root)
+
+            for relative_path in written:
+                self.assertNotIn(b"\r\n", (root / relative_path).read_bytes())
 
 
 if __name__ == "__main__":
