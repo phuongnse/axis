@@ -167,6 +167,46 @@ describe('BusinessObjectsPage', () => {
     );
   });
 
+  it('waits for deep-link detail before opening and consuming the launch intent', async () => {
+    const detail = definitionDetail();
+    let resolveDetail!: (response: Response) => void;
+    const detailResponse = new Promise<Response>((resolve) => {
+      resolveDetail = resolve;
+    });
+    vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL) => {
+      const path = requestPath(input);
+      if (isRulesRequest(input)) return jsonResponse(fieldRuleDefinitions);
+      if (path === `/api/business-object-definitions/${definitionId}`) return detailResponse;
+      if (path === '/api/business-object-definitions') return jsonResponse(emptyPage());
+      throw new Error(`Unexpected fetch: ${path}`);
+    });
+
+    const router = await renderPage(
+      `/business-objects?page=1&dialog=view&recordId=${encodeURIComponent(definitionId)}`,
+    );
+
+    await waitFor(() =>
+      expect(
+        vi
+          .mocked(fetch)
+          .mock.calls.some(
+            ([input]) => requestPath(input) === `/api/business-object-definitions/${definitionId}`,
+          ),
+      ).toBe(true),
+    );
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(router.state.location.search).toEqual({
+      page: 1,
+      dialog: 'view',
+      recordId: definitionId,
+    });
+
+    await act(async () => resolveDetail(jsonResponse(detail)));
+
+    expect(await screen.findByRole('dialog', { name: 'Customer' })).toBeInTheDocument();
+    await waitFor(() => expect(router.state.location.search).toEqual({ page: 1 }));
+  });
+
   it('consumes a create launch intent and transitions the window to the created record', async () => {
     const user = userEvent.setup();
     vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {

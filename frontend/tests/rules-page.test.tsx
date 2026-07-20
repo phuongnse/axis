@@ -490,6 +490,45 @@ describe('RulesPage', () => {
     expect(screen.getByLabelText('Name')).toHaveValue('Updated credit value');
   });
 
+  it('shows an error state when rule contexts cannot load for creation', async () => {
+    const user = userEvent.setup();
+    vi.mocked(fetch).mockImplementation((input) => {
+      const url = input.toString();
+      if (url.includes('/rules/context-schemas')) {
+        return Promise.resolve(jsonResponse({ title: 'Unavailable' }, 500));
+      }
+      return Promise.resolve(jsonResponse(ruleDefinitions));
+    });
+
+    await renderWithRouter(<RulesPage />, { path: '/rules', authenticatedPath: 'rules' });
+    await user.click(await screen.findByRole('button', { name: 'New rule' }));
+
+    const createDialog = await screen.findByRole('dialog', { name: 'New workspace rule' });
+    expect(await within(createDialog).findByRole('alert')).toHaveTextContent(
+      'Unable to load rules',
+    );
+    expect(within(createDialog).queryByLabelText('Name')).not.toBeInTheDocument();
+  });
+
+  it('shows an empty state when no rule context is eligible for creation', async () => {
+    const user = userEvent.setup();
+    vi.mocked(fetch).mockImplementation((input) => {
+      const url = input.toString();
+      if (url.includes('/rules/context-schemas')) return Promise.resolve(jsonResponse([]));
+      return Promise.resolve(jsonResponse(ruleDefinitions));
+    });
+
+    await renderWithRouter(<RulesPage />, { path: '/rules', authenticatedPath: 'rules' });
+    await user.click(await screen.findByRole('button', { name: 'New rule' }));
+
+    const createDialog = await screen.findByRole('dialog', { name: 'New workspace rule' });
+    expect(await within(createDialog).findByText('Context unavailable')).toBeInTheDocument();
+    expect(createDialog).toHaveTextContent(
+      'No consumer has registered a context for this scope yet.',
+    );
+    expect(within(createDialog).queryByLabelText('Name')).not.toBeInTheDocument();
+  });
+
   it('keeps minimized record identity stable while multiple windows overlap', async () => {
     const user = userEvent.setup();
     vi.mocked(fetch).mockImplementation((input) => {

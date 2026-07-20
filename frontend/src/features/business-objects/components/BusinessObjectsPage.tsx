@@ -33,6 +33,10 @@ export function BusinessObjectsPage() {
   const navigate = route.useNavigate();
   const definitionsQuery = useQuery(businessObjectDefinitionsListQueryOptions(search.page));
   const definitions = definitionsQuery.data?.items ?? [];
+  const launchDefinitionQuery = useQuery({
+    ...businessObjectDefinitionDetailQueryOptions(search.recordId ?? ''),
+    enabled: (search.dialog === 'view' || search.dialog === 'edit') && Boolean(search.recordId),
+  });
   const dateFormatter = useMemo(
     () => new Intl.DateTimeFormat(i18n.language, { dateStyle: 'medium', timeStyle: 'short' }),
     [i18n.language],
@@ -57,12 +61,17 @@ export function BusinessObjectsPage() {
     if (search.dialog === 'create') {
       openWindow(businessObjectCreateWindowDescriptor(t('businessObjects.defineTitle')));
     } else if (search.recordId) {
+      if (launchDefinitionQuery.isLoading) return;
       const definition = definitions.find((candidate) => candidate.id === search.recordId);
       openWindow(
         businessObjectDefinitionWindowDescriptor({
           recordId: search.recordId,
           mode: search.dialog,
-          title: definition?.name ?? search.recordId ?? t('businessObjects.definitionTitle'),
+          title:
+            launchDefinitionQuery.data?.name ??
+            definition?.name ??
+            search.recordId ??
+            t('businessObjects.definitionTitle'),
         }),
       );
     } else {
@@ -72,7 +81,16 @@ export function BusinessObjectsPage() {
       replace: true,
       search: (current) => ({ ...current, dialog: undefined, recordId: undefined }),
     });
-  }, [definitions, navigate, openWindow, search.dialog, search.recordId, t]);
+  }, [
+    definitions,
+    launchDefinitionQuery.data?.name,
+    launchDefinitionQuery.isLoading,
+    navigate,
+    openWindow,
+    search.dialog,
+    search.recordId,
+    t,
+  ]);
 
   const prefetchDefinition = useCallback(
     (id: string | undefined) => {

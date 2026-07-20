@@ -19,6 +19,13 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from '@/components/ui/empty';
 import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import {
@@ -150,6 +157,20 @@ export function RuleEditorDialog({
   });
   const schemasQuery = useQuery({ ...ruleContextSchemasQueryOptions(), enabled: open });
   const detail = detailQuery.data;
+  const hasEligibleCreateSchema = useMemo(
+    () =>
+      (schemasQuery.data ?? []).some(
+        (candidate) =>
+          Boolean(candidate.scope) &&
+          Boolean(candidate.contextKey) &&
+          candidate.version !== undefined,
+      ),
+    [schemasQuery.data],
+  );
+  const createSchemaLoadFailed = creating && schemasQuery.isError;
+  const createSchemaUnavailable = creating && schemasQuery.isSuccess && !hasEligibleCreateSchema;
+  const createEditorPending =
+    creating && schemasQuery.isSuccess && hasEligibleCreateSchema && editor === null;
   const schema = useMemo(
     () =>
       (schemasQuery.data ?? []).find(
@@ -166,9 +187,9 @@ export function RuleEditorDialog({
   }, [detail, schemasQuery.data]);
 
   useEffect(() => {
-    if (!creating || !open || editor || schemasQuery.isLoading) return;
+    if (!creating || !open || editor || !schemasQuery.isSuccess) return;
     setEditor(toCreateEditorState(schemasQuery.data ?? []));
-  }, [creating, editor, open, schemasQuery.data, schemasQuery.isLoading]);
+  }, [creating, editor, open, schemasQuery.data, schemasQuery.isSuccess]);
 
   useEffect(() => {
     if (!open) return;
@@ -363,7 +384,9 @@ export function RuleEditorDialog({
       JSON.stringify(editor) !== JSON.stringify(baselineEditor);
   const autoSizeReady =
     !schemasQuery.isLoading &&
-    (creating ? editor !== null : detailQuery.isError || Boolean(detail && editor));
+    (creating
+      ? createSchemaLoadFailed || createSchemaUnavailable || editor !== null
+      : detailQuery.isError || Boolean(detail && editor));
 
   function requestOpenChange(nextOpen: boolean) {
     if (nextOpen) {
@@ -466,15 +489,23 @@ export function RuleEditorDialog({
       }
     >
       <ManagedDialogBody>
-        {detailQuery.isError ? (
+        {detailQuery.isError || createSchemaLoadFailed ? (
           <Alert variant="destructive">
             <AlertCircle className="size-4" aria-hidden />
             <AlertTitle>{t('rules.loadErrorTitle')}</AlertTitle>
             <AlertDescription>{t('rules.loadErrorBody')}</AlertDescription>
           </Alert>
-        ) : null}
-
-        {editor && (creating || detail) ? (
+        ) : createSchemaUnavailable ? (
+          <Empty className="border">
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                <Braces aria-hidden />
+              </EmptyMedia>
+              <EmptyTitle>{t('rules.contextUnavailable')}</EmptyTitle>
+              <EmptyDescription>{t('rules.noContextForScope')}</EmptyDescription>
+            </EmptyHeader>
+          </Empty>
+        ) : editor && (creating || detail) ? (
           <div className="space-y-6">
             {feedback ? <StatusNotice tone={feedback.variant}>{feedback.text}</StatusNotice> : null}
             <RuleIdentitySection
@@ -518,7 +549,7 @@ export function RuleEditorDialog({
               </>
             ) : null}
           </div>
-        ) : detailQuery.isLoading || schemasQuery.isLoading ? (
+        ) : detailQuery.isLoading || schemasQuery.isLoading || createEditorPending ? (
           <p className="text-sm text-muted-foreground">{t('rules.loadingRule')}</p>
         ) : null}
       </ManagedDialogBody>
