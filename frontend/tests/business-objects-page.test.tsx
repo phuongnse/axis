@@ -7,12 +7,15 @@ import {
   Outlet,
   RouterProvider,
 } from '@tanstack/react-router';
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { ManagedWindowHost } from '@/components/shared/ManagedWindowHost';
+import { ManagedWindowProvider } from '@/components/shared/ManagedWindowManager';
 import { businessObjectDefinitionQueryKeys } from '@/features/business-objects/api';
 import { BusinessObjectsPage } from '@/features/business-objects/components/BusinessObjectsPage';
 import { ruleDefinitionQueryKeys } from '@/features/rules';
+import { managedWindowRenderers } from '@/lib/managed-window-registry';
 import type { MyRouterContext } from '@/routes/__root';
 import { loadBusinessObjectDefinitionsRoute } from '@/routes/_authenticated/business-objects';
 
@@ -72,7 +75,7 @@ describe('BusinessObjectsPage', () => {
     ).toEqual(fieldRuleDefinitions);
   });
 
-  it('prefetches a definition and opens its route-backed dialog without another detail request', async () => {
+  it('prefetches a definition and opens its managed window without another detail request', async () => {
     const user = userEvent.setup();
     const detail = definitionDetail();
     let detailRequests = 0;
@@ -93,17 +96,78 @@ describe('BusinessObjectsPage', () => {
     await waitFor(() => expect(detailRequests).toBe(1));
     await user.click(recordButton);
 
-    expect(await screen.findByRole('dialog', { name: 'Customer' })).toBeInTheDocument();
+    const definitionDialog = await screen.findByRole('dialog', { name: 'Customer' });
+    expect(definitionDialog.querySelector('[data-slot="managed-dialog-window"]')).toHaveAttribute(
+      'data-dialog-preset',
+      'large',
+    );
+    expect(screen.getByRole('button', { name: 'Maximize dialog' })).toBeEnabled();
     expect(screen.getByLabelText('Object key')).toHaveValue('customer');
-    expect(router.state.location.search).toMatchObject({
-      dialog: 'edit',
-      page: 1,
-      recordId: definitionId,
-    });
+    const editFooter = definitionDialog.querySelector('[data-slot="managed-dialog-footer"]');
+    expect(editFooter).not.toBeNull();
+    expect(within(editFooter as HTMLElement).getByRole('button', { name: 'Cancel' })).toBeEnabled();
+    expect(
+      within(editFooter as HTMLElement).queryByRole('button', { name: 'Close' }),
+    ).not.toBeInTheDocument();
+    expect(router.state.location.search).toEqual({ page: 1 });
     expect(detailRequests).toBe(1);
+
+    const nameInput = screen.getByLabelText('Name');
+    await user.clear(nameInput);
+    await user.type(nameInput, 'Preferred customer');
+    await user.click(screen.getByRole('button', { name: 'Minimize dialog' }));
+
+    const dock = document.querySelector('[data-slot="managed-window-dock"]');
+    expect(dock).not.toBeNull();
+    expect(within(dock as HTMLElement).getByText('Unsaved changes')).toBeInTheDocument();
+    expect(router.state.location.search).toEqual({ page: 1 });
+    await user.click(within(dock as HTMLElement).getByRole('button', { name: 'Close dialog' }));
+    expect(screen.getByRole('heading', { name: 'Discard unsaved changes?' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Keep editing' }));
+    expect(document.querySelector('[data-slot="managed-window-dock"]')).toBeInTheDocument();
+
+    await user.click(recordButton);
+    expect(await screen.findByLabelText('Name')).toHaveValue('Preferred customer');
+    expect(
+      document.querySelectorAll(
+        '[data-window-id="business-objects:33333333-3333-4333-8333-333333333333"]',
+      ),
+    ).toHaveLength(1);
+    expect(router.state.location.search).toEqual({ page: 1 });
   });
 
-  it('creates a definition in a dialog and transitions the URL to edit mode', async () => {
+  it('uses an explicit Close action for a read-only definition', async () => {
+    const user = userEvent.setup();
+    const detail = definitionDetail();
+    vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL) => {
+      const path = requestPath(input);
+      if (isRulesRequest(input)) return jsonResponse(fieldRuleDefinitions);
+      if (path === `/api/business-object-definitions/${definitionId}`) {
+        return jsonResponse(detail);
+      }
+      if (path === '/api/business-object-definitions') return jsonResponse(pageWith(detail));
+      throw new Error(`Unexpected fetch: ${path}`);
+    });
+
+    await renderPage(
+      `/business-objects?page=1&dialog=view&recordId=${encodeURIComponent(definitionId)}`,
+    );
+
+    const definitionDialog = await screen.findByRole('dialog', { name: 'Customer' });
+    const footer = definitionDialog.querySelector('[data-slot="managed-dialog-footer"]');
+    expect(footer).not.toBeNull();
+    expect(within(footer as HTMLElement).getByRole('button', { name: 'Close' })).toBeEnabled();
+    expect(
+      within(footer as HTMLElement).queryByRole('button', { name: 'Cancel' }),
+    ).not.toBeInTheDocument();
+
+    await user.click(within(footer as HTMLElement).getByRole('button', { name: 'Close' }));
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog', { name: 'Customer' })).not.toBeInTheDocument(),
+    );
+  });
+
+  it('consumes a create launch intent and transitions the window to the created record', async () => {
     const user = userEvent.setup();
     vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
       const path = requestPath(input);
@@ -122,13 +186,7 @@ describe('BusinessObjectsPage', () => {
     await user.type(await screen.findByLabelText('Name'), 'Customer');
     await user.click(screen.getByRole('button', { name: 'Start definition' }));
 
-    await waitFor(() =>
-      expect(router.state.location.search).toMatchObject({
-        dialog: 'edit',
-        page: 1,
-        recordId: definitionId,
-      }),
-    );
+    await waitFor(() => expect(router.state.location.search).toEqual({ page: 1 }));
     expect(await screen.findByRole('dialog', { name: 'Customer' })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'Fields' })).toBeInTheDocument();
   });
@@ -227,7 +285,12 @@ async function renderPage(path = '/business-objects?page=1') {
   await act(() => router.load());
   render(
     <QueryClientProvider client={queryClient}>
-      <RouterProvider router={router} />
+      <ManagedWindowProvider renderers={managedWindowRenderers}>
+        <div className="relative h-dvh w-dvw">
+          <RouterProvider router={router} />
+          <ManagedWindowHost />
+        </div>
+      </ManagedWindowProvider>
     </QueryClientProvider>,
   );
   return router;

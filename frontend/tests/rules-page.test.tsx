@@ -123,6 +123,9 @@ describe('RulesPage', () => {
     const requiredRow = within(catalog).getByText('Required value').closest('tr');
     if (!requiredRow) throw new Error('Required rule row was not rendered');
     expect(catalogViewport).toContainElement(requiredRow);
+    expect(
+      within(requiredRow).getByText('Require records to provide a value for the field.'),
+    ).toHaveClass('text-xs');
     expect(requiredRow.querySelectorAll('[data-slot="rule-table-value"]')).toHaveLength(5);
     expect(within(requiredRow).getByText('Built-in')).toBeInTheDocument();
     expect(within(requiredRow).getByText('Published')).toHaveClass('text-success');
@@ -160,6 +163,233 @@ describe('RulesPage', () => {
     );
   });
 
+  it('opens details from Rule column links for system and workspace records', async () => {
+    const user = userEvent.setup();
+    const workspaceDetail = {
+      ...ruleDefinitions.items[9],
+      condition: null,
+      outcome: null,
+      versions: [],
+      createdAt: '2026-01-01T00:00:00Z',
+      updatedAt: '2026-01-01T00:00:00Z',
+      archivedAt: null,
+    };
+    vi.mocked(fetch).mockImplementation((input) => {
+      const url = input.toString();
+      if (url.includes('/rules/context-schemas')) {
+        return Promise.resolve(jsonResponse(contextSchemas));
+      }
+      if (url.endsWith('/rules/credit_threshold')) {
+        return Promise.resolve(jsonResponse(workspaceDetail));
+      }
+      return Promise.resolve(jsonResponse(ruleDefinitions));
+    });
+
+    await renderWithRouter(<RulesPage />, { path: '/rules', authenticatedPath: 'rules' });
+
+    const catalog = screen.getByRole('region', { name: 'Rules catalog' });
+    const systemRuleLink = await within(catalog).findByRole('button', {
+      name: 'Required value',
+    });
+    const workspaceRuleLink = within(catalog).getByRole('button', {
+      name: 'Credit threshold',
+    });
+    expect(systemRuleLink).toHaveClass('h-auto', 'p-0');
+    expect(workspaceRuleLink).toHaveClass('h-auto', 'p-0');
+
+    await user.click(systemRuleLink);
+    const systemDetails = await screen.findByRole('dialog', { name: 'Required value' });
+    const dialogWindow = systemDetails.querySelector('[data-slot="managed-dialog-window"]');
+    expect(dialogWindow).toHaveAttribute('data-dialog-preset', 'large');
+    expect(within(systemDetails).getByRole('button', { name: 'Reset dialog' })).toBeEnabled();
+    const minimizeButton = within(systemDetails).getByRole('button', {
+      name: 'Minimize dialog',
+    });
+    expect(minimizeButton).toBeEnabled();
+    expect(minimizeButton.querySelector('svg')).toHaveClass('lucide-minus');
+    expect(within(systemDetails).getByRole('button', { name: 'Maximize dialog' })).toBeEnabled();
+    expect(within(systemDetails).getByRole('button', { name: 'Close dialog' })).toBeEnabled();
+    const systemDetailsFooter = systemDetails.querySelector('[data-slot="managed-dialog-footer"]');
+    expect(systemDetailsFooter).not.toBeNull();
+    expect(
+      within(systemDetailsFooter as HTMLElement).getByRole('button', { name: 'Close' }),
+    ).toBeEnabled();
+    expect(
+      within(systemDetailsFooter as HTMLElement).queryByRole('button', { name: 'Cancel' }),
+    ).not.toBeInTheDocument();
+
+    const managedHeader = systemDetails.querySelector('[data-slot="managed-dialog-header"]');
+    expect(managedHeader).not.toBeNull();
+    await user.dblClick(managedHeader as HTMLElement);
+    expect(dialogWindow).toHaveAttribute('data-dialog-preset', 'fullscreen');
+    expect(
+      within(systemDetails).getByRole('button', { name: 'Restore dialog size' }),
+    ).toBeEnabled();
+    await user.dblClick(managedHeader as HTMLElement);
+    expect(dialogWindow).toHaveAttribute('data-dialog-preset', 'large');
+
+    const maximizeButton = within(systemDetails).getByRole('button', {
+      name: 'Maximize dialog',
+    });
+    await user.dblClick(maximizeButton);
+    expect(dialogWindow).toHaveAttribute('data-dialog-preset', 'large');
+
+    await user.click(minimizeButton);
+    const dock = document.querySelector('[data-slot="managed-window-dock"]');
+    expect(dock).not.toBeNull();
+    expect(dock).toHaveAttribute('data-dialog-preset', 'large');
+    expect(screen.queryByRole('dialog', { name: 'Required value' })).not.toBeInTheDocument();
+    const restoreLargeButton = within(dock as HTMLElement).getByRole('button', {
+      name: 'Restore dialog',
+    });
+    expect(dock?.querySelector('[data-action="restore"]')).toHaveFocus();
+
+    await user.keyboard('{Escape}');
+    expect(document.querySelector('[data-slot="managed-window-dock"]')).toBeInTheDocument();
+    await user.click(within(catalog).getByRole('button', { name: 'Filters' }));
+    expect(screen.getByRole('button', { name: 'Add condition' })).toBeInTheDocument();
+
+    await user.click(restoreLargeButton);
+    const restoredLarge = await screen.findByRole('dialog', { name: 'Required value' });
+    const restoredLargeWindow = restoredLarge.querySelector('[data-slot="managed-dialog-window"]');
+    expect(restoredLargeWindow).toHaveAttribute('data-dialog-preset', 'large');
+    expect(minimizeButton).toHaveFocus();
+
+    await user.click(within(restoredLarge).getByRole('button', { name: 'Maximize dialog' }));
+    expect(restoredLargeWindow).toHaveAttribute('data-dialog-preset', 'fullscreen');
+    await user.click(within(restoredLarge).getByRole('button', { name: 'Minimize dialog' }));
+    const fullscreenDock = document.querySelector('[data-slot="managed-window-dock"]');
+    expect(fullscreenDock).toHaveAttribute('data-dialog-preset', 'fullscreen');
+    await user.click(
+      within(fullscreenDock as HTMLElement).getByRole('button', { name: 'Restore dialog' }),
+    );
+    const restoredFullscreen = await screen.findByRole('dialog', { name: 'Required value' });
+    expect(restoredFullscreen.querySelector('[data-slot="managed-dialog-window"]')).toHaveAttribute(
+      'data-dialog-preset',
+      'fullscreen',
+    );
+    const restoreSizeButton = within(restoredFullscreen).getByRole('button', {
+      name: 'Restore dialog size',
+    });
+    expect(restoreSizeButton).toBeEnabled();
+    await user.click(restoreSizeButton);
+    expect(restoredFullscreen.querySelector('[data-slot="managed-dialog-window"]')).toHaveAttribute(
+      'data-dialog-preset',
+      'large',
+    );
+    expect(
+      within(restoredFullscreen).getByRole('button', { name: 'Maximize dialog' }),
+    ).toBeEnabled();
+    expect(
+      within(restoredFullscreen).getByRole('heading', { name: 'Definition' }),
+    ).toBeInTheDocument();
+    const restoredHeader = restoredFullscreen.querySelector('[data-slot="managed-dialog-header"]');
+    expect(restoredHeader).not.toBeNull();
+    expect(
+      Array.from(restoredHeader?.querySelectorAll('[data-slot="badge"]') ?? [], (badge) =>
+        badge.textContent?.trim(),
+      ),
+    ).toEqual(['Built-in', 'Read-only']);
+    expect(
+      within(systemDetails).queryByRole('button', { name: 'Archive' }),
+    ).not.toBeInTheDocument();
+    expect(
+      vi
+        .mocked(fetch)
+        .mock.calls.some(([input]) => input.toString().endsWith('/rules/field.required')),
+    ).toBe(false);
+
+    await user.click(
+      within(systemDetailsFooter as HTMLElement).getByRole('button', { name: 'Close' }),
+    );
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    await user.click(workspaceRuleLink);
+    const workspaceDetails = await screen.findByRole('dialog', { name: 'Credit threshold' });
+    expect(workspaceDetails.querySelector('[data-slot="managed-dialog-window"]')).toHaveAttribute(
+      'data-dialog-preset',
+      'large',
+    );
+    expect(within(workspaceDetails).getByRole('button', { name: 'Maximize dialog' })).toBeEnabled();
+    await waitFor(() =>
+      expect(
+        vi
+          .mocked(fetch)
+          .mock.calls.some(([input]) => input.toString().endsWith('/rules/credit_threshold')),
+      ).toBe(true),
+    );
+    const workspaceFooter = workspaceDetails.querySelector('[data-slot="managed-dialog-footer"]');
+    expect(workspaceFooter).not.toBeNull();
+    expect(
+      within(workspaceFooter as HTMLElement).getByRole('button', { name: 'Cancel' }),
+    ).toBeEnabled();
+    expect(
+      within(workspaceFooter as HTMLElement).queryByRole('button', { name: 'Close' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('renders system rule details as responsive described sections', async () => {
+    const user = userEvent.setup();
+    vi.mocked(fetch).mockResolvedValue(jsonResponse(ruleDefinitions));
+
+    await renderWithRouter(<RulesPage />, { path: '/rules', authenticatedPath: 'rules' });
+
+    const catalog = screen.getByRole('region', { name: 'Rules catalog' });
+    await user.click(await within(catalog).findByRole('button', { name: 'Required value' }));
+    const details = await screen.findByRole('dialog', { name: 'Required value' });
+    const header = details.querySelector('[data-slot="managed-dialog-header"]');
+    expect(header).not.toBeNull();
+    expect(
+      within(header as HTMLElement).queryByText(
+        'Require records to provide a value for the field.',
+      ),
+    ).not.toBeInTheDocument();
+    const headerBadges = header?.querySelectorAll('[data-slot="badge"]') ?? [];
+    expect(Array.from(headerBadges, (badge) => badge.textContent?.trim())).toEqual([
+      'Built-in',
+      'Read-only',
+    ]);
+    expect(headerBadges[0]).toHaveAttribute('data-variant', 'secondary');
+    expect(headerBadges[1]).toHaveAttribute('data-variant', 'outline');
+
+    const definitionSection = within(details).getByRole('region', { name: 'Definition' });
+    const fieldTypesSection = within(details).getByRole('region', {
+      name: 'Supported field types',
+    });
+    const parametersSection = within(details).getByRole('region', { name: 'Parameters' });
+    const sections = [definitionSection, fieldTypesSection, parametersSection];
+
+    expect(details.querySelectorAll('[data-slot="system-rule-details-section"]')).toHaveLength(3);
+    expect(definitionSection).toHaveTextContent(
+      'Scope, ownership, lifecycle, and published version.',
+    );
+    expect(definitionSection).toHaveTextContent(
+      'Require records to provide a value for the field.',
+    );
+    expect(fieldTypesSection).toHaveTextContent('Field types and setup supported by this rule.');
+    expect(parametersSection).toHaveTextContent(
+      'Optional typed inputs supplied when a rule is applied.',
+    );
+
+    for (const section of sections) {
+      expect(section).toHaveClass('grid', 'sm:grid-cols-3');
+      expect(
+        section.querySelector('[data-slot="system-rule-details-section-content"]'),
+      ).toHaveClass('sm:col-span-2');
+    }
+    expect(definitionSection).not.toHaveClass('border-t');
+    expect(fieldTypesSection).toHaveClass('border-t');
+    expect(parametersSection).toHaveClass('border-t');
+
+    expect(
+      Array.from(definitionSection.querySelectorAll('dt'), (item) => item.textContent),
+    ).toEqual(['Description', 'Scope', 'Status', 'Outcome', 'Version history']);
+    expect(
+      Array.from(fieldTypesSection.querySelectorAll('dt'), (item) => item.textContent),
+    ).toEqual(['Field types', 'Setup']);
+    expect(within(fieldTypesSection).getByText('No setup needed')).toBeInTheDocument();
+    expect(within(parametersSection).getByText('No parameters')).toBeInTheDocument();
+  });
+
   it('creates a workspace draft from a registered context', async () => {
     const user = userEvent.setup();
     const created = {
@@ -188,7 +418,27 @@ describe('RulesPage', () => {
 
     await renderWithRouter(<RulesPage />, { path: '/rules', authenticatedPath: 'rules' });
     await user.click(await screen.findByRole('button', { name: 'New rule' }));
-    expect(await screen.findByRole('heading', { name: 'New workspace rule' })).toBeInTheDocument();
+    const createDialog = await screen.findByRole('dialog', { name: 'New workspace rule' });
+    expect(createDialog.querySelector('[data-slot="managed-dialog-window"]')).toHaveAttribute(
+      'data-dialog-preset',
+      'large',
+    );
+    const createFooter = createDialog.querySelector('[data-slot="managed-dialog-footer"]');
+    expect(createFooter).not.toBeNull();
+    expect(
+      within(createFooter as HTMLElement).getByRole('button', { name: 'Cancel' }),
+    ).toBeEnabled();
+    expect(
+      within(createFooter as HTMLElement).queryByRole('button', { name: 'Close' }),
+    ).not.toBeInTheDocument();
+    expect(within(createDialog).getByRole('button', { name: 'Reset dialog' })).toBeEnabled();
+    expect(within(createDialog).getByRole('heading', { name: 'Definition' })).toBeInTheDocument();
+    expect(
+      within(createDialog).queryByRole('heading', { name: 'Parameters' }),
+    ).not.toBeInTheDocument();
+    expect(
+      within(createDialog).queryByRole('heading', { name: 'Conditions' }),
+    ).not.toBeInTheDocument();
 
     await user.type(screen.getByLabelText('Name'), 'High credit value');
     await user.type(screen.getByLabelText('Description'), 'Flags high credit values.');
@@ -210,7 +460,13 @@ describe('RulesPage', () => {
     expect(screen.getByLabelText('Context')).toHaveTextContent('Decimal field value');
     await user.click(screen.getByRole('button', { name: 'Create draft' }));
 
-    expect(await screen.findByRole('heading', { name: 'High credit value' })).toBeInTheDocument();
+    const editorDialog = await screen.findByRole('dialog', { name: 'High credit value' });
+    expect(within(editorDialog).getByRole('heading', { name: 'Definition' })).toBeInTheDocument();
+    expect(within(editorDialog).getByLabelText('Name')).toHaveValue('High credit value');
+    expect(within(editorDialog).getByText('Stable key: high_credit_value')).toBeInTheDocument();
+    expect(within(editorDialog).getByRole('heading', { name: 'Parameters' })).toBeInTheDocument();
+    expect(within(editorDialog).getByRole('heading', { name: 'Conditions' })).toBeInTheDocument();
+    expect(within(editorDialog).getByRole('heading', { name: 'Simulation' })).toBeInTheDocument();
     const post = vi
       .mocked(fetch)
       .mock.calls.find(
@@ -228,10 +484,63 @@ describe('RulesPage', () => {
     const editorName = await screen.findByLabelText('Name');
     await user.clear(editorName);
     await user.type(editorName, 'Updated credit value');
-    await user.click(screen.getByRole('button', { name: 'Close' }));
+    await user.click(screen.getByRole('button', { name: 'Close dialog' }));
     expect(screen.getByRole('heading', { name: 'Discard unsaved changes?' })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Keep editing' }));
     expect(screen.getByLabelText('Name')).toHaveValue('Updated credit value');
+  });
+
+  it('keeps minimized record identity stable while multiple windows overlap', async () => {
+    const user = userEvent.setup();
+    vi.mocked(fetch).mockImplementation((input) => {
+      const url = input.toString();
+      if (url.includes('/rules/context-schemas')) {
+        return Promise.resolve(jsonResponse(contextSchemas));
+      }
+      return Promise.resolve(jsonResponse(ruleDefinitions));
+    });
+
+    await renderWithRouter(<RulesPage />, { path: '/rules', authenticatedPath: 'rules' });
+    const catalog = screen.getByRole('region', { name: 'Rules catalog' });
+    await user.click(await within(catalog).findByRole('button', { name: 'Required value' }));
+    const requiredWindow = await screen.findByRole('dialog', { name: 'Required value' });
+    await user.click(within(requiredWindow).getByRole('button', { name: 'Minimize dialog' }));
+
+    const requiredDock = document.querySelector<HTMLElement>('[data-slot="managed-window-dock"]');
+    expect(requiredDock).toHaveTextContent('Required value');
+    await user.click(within(catalog).getByRole('button', { name: 'Numeric range' }));
+    expect(await screen.findByRole('dialog', { name: 'Numeric range' })).toBeInTheDocument();
+    expect(requiredDock).toHaveTextContent('Required value');
+    expect(requiredDock).not.toHaveTextContent('Numeric range');
+
+    await user.click(
+      within(requiredDock as HTMLElement).getByRole('button', { name: 'Restore dialog' }),
+    );
+    const windowElements = document.querySelectorAll('[data-slot="managed-dialog-window"]');
+    expect(windowElements).toHaveLength(2);
+    expect(document.querySelector('[data-window-id="rules:field.required"]')).toHaveAttribute(
+      'data-active',
+      'true',
+    );
+    const windowsButton = screen.getByRole('button', { name: 'Windows (2)' });
+    await user.click(windowsButton);
+    expect(await screen.findByRole('menuitem', { name: /Required value/ })).toBeInTheDocument();
+    await user.click(screen.getByRole('menuitem', { name: /Numeric range/ }));
+    expect(document.querySelector('[data-window-id="rules:field.numeric_range"]')).toHaveAttribute(
+      'data-active',
+      'true',
+    );
+
+    await user.keyboard('{Escape}');
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog', { name: 'Numeric range' })).not.toBeInTheDocument(),
+    );
+    expect(screen.getByRole('dialog', { name: 'Required value' })).toBeInTheDocument();
+    expect(document.querySelector('[data-window-id="rules:field.required"]')).toHaveAttribute(
+      'data-active',
+      'true',
+    );
+    expect(screen.getByRole('button', { name: 'Windows (1)' })).toBeInTheDocument();
   });
 
   it('shows a retryable error state when the catalog cannot load', async () => {

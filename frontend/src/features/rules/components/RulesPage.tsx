@@ -1,8 +1,8 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { getRouteApi } from '@tanstack/react-router';
 import type { TFunction } from 'i18next';
 import { Plus } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   createDataTableMessages,
@@ -10,36 +10,11 @@ import {
   type DataTableColumnDef,
   type DataTableDefinition,
 } from '@/components/shared/data-table';
+import { useManagedWindowActions } from '@/components/shared/ManagedWindowManager';
 import { StatusBadge, type StatusBadgeTone } from '@/components/shared/StatusBadge';
 import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field';
-import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
-import { ApiError } from '@/lib/api';
-import {
-  createRuleDefinition,
-  type RuleDefinitionDetail,
-  type RuleDefinitionSummary,
-  type RuleScope,
-  ruleContextSchemasQueryOptions,
-  ruleDefinitionQueryKeys,
-  ruleDefinitionsListQueryOptions,
-} from '../api';
+import { type RuleDefinitionSummary, ruleDefinitionsListQueryOptions } from '../api';
+import { ruleCreateWindowDescriptor, ruleDefinitionWindowDescriptor } from '../managed-windows';
 import {
   compareFieldTypes,
   compareRuleDefinitions,
@@ -48,7 +23,6 @@ import {
   ruleNameTranslationKey,
   ruleSetupTranslationKey,
 } from '../metadata';
-import { RuleEditorDialog } from './RuleEditorDialog';
 
 const route = getRouteApi('/_authenticated/rules');
 
@@ -56,8 +30,39 @@ export function RulesPage() {
   const { t } = useTranslation();
   const search = route.useSearch();
   const navigate = route.useNavigate();
+  const { openWindow } = useManagedWindowActions();
   const definitionsQuery = useQuery(ruleDefinitionsListQueryOptions());
   const definitions = definitionsQuery.data?.items ?? [];
+  const selectedDefinition = definitions.find(
+    (definition) => definition.definitionKey === search.definitionKey,
+  );
+
+  useEffect(() => {
+    if (!search.dialog) return;
+    if (search.dialog === 'create') {
+      openWindow(ruleCreateWindowDescriptor(t('rules.createTitle')));
+      void navigate({ replace: true, search: {} });
+      return;
+    }
+    if (!search.definitionKey || definitionsQuery.isLoading) return;
+    const definition =
+      selectedDefinition ??
+      ({ definitionKey: search.definitionKey, origin: 'Workspace' } as RuleDefinitionSummary);
+    const descriptor = ruleDefinitionWindowDescriptor(
+      definition,
+      selectedDefinition ? localizedRuleName(selectedDefinition, t) : search.definitionKey,
+    );
+    if (descriptor) openWindow(descriptor);
+    void navigate({ replace: true, search: {} });
+  }, [
+    definitionsQuery.isLoading,
+    navigate,
+    openWindow,
+    search.definitionKey,
+    search.dialog,
+    selectedDefinition,
+    t,
+  ]);
   const tableDefinition = useMemo<DataTableDefinition<RuleDefinitionSummary>>(() => {
     const appliesTo = new Map<string, string>();
     for (const definition of definitions) {
@@ -103,11 +108,13 @@ export function RulesPage() {
           <RuleIdentityCell
             definition={row.original}
             onOpen={
-              row.original.origin === 'Workspace' && row.original.definitionKey
+              row.original.definitionKey
                 ? () => {
-                    void navigate({
-                      search: { dialog: 'edit', definitionKey: row.original.definitionKey },
-                    });
+                    const descriptor = ruleDefinitionWindowDescriptor(
+                      row.original,
+                      localizedRuleName(row.original, t),
+                    );
+                    if (descriptor) openWindow(descriptor);
                   }
                 : undefined
             }
@@ -227,7 +234,7 @@ export function RulesPage() {
         <Button
           type="button"
           size="sm"
-          onClick={() => void navigate({ search: { dialog: 'create' } })}
+          onClick={() => openWindow(ruleCreateWindowDescriptor(t('rules.createTitle')))}
         >
           <Plus aria-hidden />
           {t('rules.newRule')}
@@ -242,7 +249,7 @@ export function RulesPage() {
     definitionsQuery.isError,
     definitionsQuery.isLoading,
     definitionsQuery.refetch,
-    navigate,
+    openWindow,
     t,
   ]);
 
@@ -262,28 +269,6 @@ export function RulesPage() {
       <div className="min-h-0 flex-1">
         <DataTable definition={tableDefinition} />
       </div>
-
-      <CreateRuleDialog
-        open={search.dialog === 'create'}
-        onOpenChange={(open) => {
-          if (!open) void navigate({ search: {} });
-        }}
-        onCreated={(definition) => {
-          void navigate({
-            replace: true,
-            search: definition.definitionKey
-              ? { dialog: 'edit', definitionKey: definition.definitionKey }
-              : {},
-          });
-        }}
-      />
-      <RuleEditorDialog
-        definitionKey={search.definitionKey ?? null}
-        open={search.dialog === 'edit' && Boolean(search.definitionKey)}
-        onOpenChange={(open) => {
-          if (!open) void navigate({ search: {} });
-        }}
-      />
     </div>
   );
 }
@@ -300,7 +285,13 @@ function RuleIdentityCell({
   return (
     <div className="min-w-0 whitespace-normal">
       {onOpen ? (
-        <Button type="button" variant="link" onClick={onOpen}>
+        <Button
+          data-slot="rule-table-value"
+          type="button"
+          variant="link"
+          className="h-auto p-0"
+          onClick={onOpen}
+        >
           {name}
         </Button>
       ) : (
@@ -308,7 +299,7 @@ function RuleIdentityCell({
           {name}
         </p>
       )}
-      <p className="mt-1 line-clamp-2 text-sm leading-5 text-muted-foreground">
+      <p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">
         {localizedRuleDescription(definition, t)}
       </p>
     </div>
@@ -383,200 +374,6 @@ function RuleStatusCell({ definition }: { definition: RuleDefinitionSummary }) {
   );
 }
 
-function CreateRuleDialog({
-  open,
-  onOpenChange,
-  onCreated,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  onCreated: (definition: RuleDefinitionDetail) => void;
-}) {
-  const { t } = useTranslation();
-  const queryClient = useQueryClient();
-  const schemasQuery = useQuery({ ...ruleContextSchemasQueryOptions(), enabled: open });
-  const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
-  const [scope, setScope] = useState<RuleScope | null>(null);
-  const [contextKey, setContextKey] = useState('');
-  const [outcomeKind, setOutcomeKind] = useState<'Validation' | 'Decision'>('Validation');
-  const [error, setError] = useState('');
-  const schemas = Array.isArray(schemasQuery.data) ? schemasQuery.data : [];
-  const availableScopes = distinctDefined(schemas.map((schema) => schema.scope));
-  const selectedScope =
-    scope && availableScopes.includes(scope) ? scope : (availableScopes[0] ?? null);
-  const availableSchemas = schemas.filter((schema) => schema.scope === selectedScope);
-  const selectedSchema = availableSchemas.find((schema) => schema.contextKey === contextKey);
-
-  const createMutation = useMutation({
-    mutationFn: createRuleDefinition,
-    onSuccess: async (definition) => {
-      await queryClient.invalidateQueries({ queryKey: ruleDefinitionQueryKeys.all });
-      reset();
-      onCreated(definition);
-    },
-    onError: (mutationError) => setError(readApiError(mutationError, t('rules.createError'))),
-  });
-
-  function reset() {
-    setName('');
-    setDescription('');
-    setScope(null);
-    setContextKey('');
-    setOutcomeKind('Validation');
-    setError('');
-  }
-
-  function changeScope(nextScope: RuleScope) {
-    setScope(nextScope);
-    const firstSchema = schemas.find((schema) => schema.scope === nextScope);
-    setContextKey(firstSchema?.contextKey ?? '');
-  }
-
-  return (
-    <Dialog
-      open={open}
-      onOpenChange={(nextOpen) => {
-        if (!nextOpen) reset();
-        onOpenChange(nextOpen);
-      }}
-    >
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>{t('rules.createTitle')}</DialogTitle>
-          <DialogDescription>{t('rules.createDescription')}</DialogDescription>
-        </DialogHeader>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field className="sm:col-span-2">
-            <FieldLabel htmlFor="rule-name">{t('rules.name')}</FieldLabel>
-            <Input
-              id="rule-name"
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              maxLength={200}
-            />
-            <FieldDescription>
-              {t('rules.derivedKey', { key: deriveRuleKey(name) })}
-            </FieldDescription>
-          </Field>
-          <Field className="sm:col-span-2">
-            <FieldLabel htmlFor="rule-description">{t('rules.description')}</FieldLabel>
-            <Textarea
-              id="rule-description"
-              value={description}
-              onChange={(event) => setDescription(event.target.value)}
-              maxLength={1000}
-            />
-          </Field>
-          <Field>
-            <FieldLabel htmlFor="rule-scope">{t('rules.scope')}</FieldLabel>
-            <Select
-              value={selectedScope}
-              onValueChange={(value) => value && changeScope(value as RuleScope)}
-              disabled={schemasQuery.isLoading || availableScopes.length === 0}
-            >
-              <SelectTrigger id="rule-scope">
-                <SelectValue>{(value) => t(`rules.scope${value}`)}</SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                {availableScopes.map((value) => (
-                  <SelectItem key={value} value={value}>
-                    {t(`rules.scope${value}`)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </Field>
-          <Field>
-            <FieldLabel htmlFor="rule-outcome-kind">{t('rules.outcome')}</FieldLabel>
-            <Select
-              value={outcomeKind}
-              onValueChange={(value) => value && setOutcomeKind(value as 'Validation' | 'Decision')}
-            >
-              <SelectTrigger id="rule-outcome-kind">
-                <SelectValue>
-                  {(value) =>
-                    value === 'Decision' ? t('rules.outcomeDecision') : t('rules.outcomeValidation')
-                  }
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Validation">{t('rules.outcomeValidation')}</SelectItem>
-                <SelectItem value="Decision">{t('rules.outcomeDecision')}</SelectItem>
-              </SelectContent>
-            </Select>
-          </Field>
-          <Field className="sm:col-span-2">
-            <FieldLabel htmlFor="rule-context">{t('rules.context')}</FieldLabel>
-            <Select
-              value={contextKey || null}
-              onValueChange={(value) => setContextKey(value ?? '')}
-              disabled={schemasQuery.isLoading || availableSchemas.length === 0}
-            >
-              <SelectTrigger id="rule-context">
-                <SelectValue>
-                  {(value) =>
-                    availableSchemas.find((schema) => schema.contextKey === value)?.displayName ??
-                    t('rules.selectContext')
-                  }
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                {availableSchemas.map((schema) => (
-                  <SelectItem
-                    key={`${schema.contextKey}:${schema.version}`}
-                    value={schema.contextKey}
-                  >
-                    {schema.displayName}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {availableSchemas.length === 0 && !schemasQuery.isLoading ? (
-              <FieldDescription>{t('rules.noContextForScope')}</FieldDescription>
-            ) : null}
-          </Field>
-          <FieldError className="sm:col-span-2">{error}</FieldError>
-        </div>
-        <DialogFooter>
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-            {t('app.cancel')}
-          </Button>
-          <Button
-            type="button"
-            disabled={
-              createMutation.isPending ||
-              !name.trim() ||
-              !description.trim() ||
-              !selectedSchema?.contextKey ||
-              selectedSchema.version === undefined
-            }
-            onClick={() => {
-              if (
-                !selectedScope ||
-                !selectedSchema?.contextKey ||
-                selectedSchema.version === undefined
-              )
-                return;
-              setError('');
-              createMutation.mutate({
-                name: name.trim(),
-                description: description.trim(),
-                scope: selectedScope,
-                contextKey: selectedSchema.contextKey,
-                contextSchemaVersion: selectedSchema.version,
-                outcomeKind,
-              });
-            }}
-          >
-            {t('rules.createAction')}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
 function humanizeContext(contextKey: string | null | undefined, fallback: string): string {
   if (!contextKey) return fallback;
   const label = contextKey.split('.').slice(1).join(' ');
@@ -606,24 +403,4 @@ function ruleTargets(definition: RuleDefinitionSummary): string[] {
 
 function distinctDefined<T>(values: (T | null | undefined)[]): T[] {
   return [...new Set(values.filter((value): value is T => value != null))];
-}
-
-function deriveRuleKey(name: string): string {
-  const normalized = name
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/đ/g, 'd')
-    .toLocaleLowerCase()
-    .replace(/[^a-z0-9]+/g, '_')
-    .replace(/^_+|_+$/g, '');
-  const key = /^[a-z]/.test(normalized) ? normalized : normalized ? `rule_${normalized}` : 'rule';
-  return key.slice(0, 63).replace(/_+$/g, '') || 'rule';
-}
-
-function readApiError(error: unknown, fallback: string): string {
-  if (!(error instanceof ApiError) || typeof error.data !== 'object' || error.data === null) {
-    return fallback;
-  }
-  const detail = (error.data as { detail?: unknown }).detail;
-  return typeof detail === 'string' && detail ? detail : fallback;
 }

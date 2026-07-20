@@ -1,10 +1,11 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowDown, ArrowUp, Plus, Save, Trash2, UploadCloud } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
+import { ManagedDialog, ManagedDialogBody } from '@/components/shared/ManagedDialog';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
   AlertDialog,
@@ -18,14 +19,6 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
 import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import {
@@ -150,7 +143,7 @@ interface BusinessObjectDefinitionDialogProps {
   ruleDefinitions: RuleDefinitionSummary[];
   ruleCatalogLoading: boolean;
   ruleCatalogUnavailable: boolean;
-  onCreated: (recordId: string) => void;
+  onCreated: (recordId: string, title: string) => void;
   onClose: () => void;
 }
 
@@ -166,6 +159,7 @@ export function BusinessObjectDefinitionDialog({
   onClose,
 }: BusinessObjectDefinitionDialogProps) {
   const { t } = useTranslation();
+  const formId = useId();
   const queryClient = useQueryClient();
   const [requestError, setRequestError] = useState<string | null>(null);
   const [discardOpen, setDiscardOpen] = useState(false);
@@ -182,6 +176,8 @@ export function BusinessObjectDefinitionDialog({
   const definition = detailQuery.data;
   const readOnly = mode === 'view' || definition?.status === 'Published';
   const open = Boolean(mode);
+  const exitLabel =
+    readOnly || (mode !== 'create' && !definition) ? t('app.close') : t('app.cancel');
 
   useEffect(() => {
     setRequestError(null);
@@ -198,7 +194,7 @@ export function BusinessObjectDefinitionDialog({
       cacheDefinition(queryClient, created);
       form.reset(toFormValues(created, ruleDefinitions));
       await invalidateLists(queryClient);
-      if (created.id) onCreated(created.id);
+      if (created.id) onCreated(created.id, created.name ?? t('businessObjects.definitionTitle'));
     },
     onError: (error) => setRequestError(readApiError(error, t('businessObjects.requestError'))),
   });
@@ -284,141 +280,140 @@ export function BusinessObjectDefinitionDialog({
 
   return (
     <>
-      <Dialog
+      <ManagedDialog
         open={open}
         onOpenChange={(nextOpen) => {
           if (!nextOpen) requestClose();
         }}
+        title={title}
+        description={
+          mode === 'create'
+            ? t('businessObjects.defineDescription')
+            : t('businessObjects.editorDescription')
+        }
+        closeDisabled={busy}
+        dirty={!readOnly && form.formState.isDirty}
+        autoSizeKey={`${mode ?? 'closed'}:${recordId ?? 'create'}`}
+        autoSizeReady={mode === 'create' || detailQuery.isError || Boolean(definition)}
+        footer={
+          <>
+            <Button type="button" variant="outline" disabled={busy} onClick={requestClose}>
+              {exitLabel}
+            </Button>
+            {mode === 'create' ? (
+              <Button type="submit" form={formId} disabled={busy}>
+                <Plus aria-hidden />
+                {createMutation.isPending
+                  ? t('businessObjects.creating')
+                  : t('businessObjects.create')}
+              </Button>
+            ) : null}
+            {!readOnly && mode !== 'create' ? (
+              <>
+                <Button
+                  type="submit"
+                  form={formId}
+                  variant="secondary"
+                  disabled={busy || !form.formState.isDirty}
+                >
+                  <Save aria-hidden />
+                  {saveMutation.isPending ? t('businessObjects.saving') : t('businessObjects.save')}
+                </Button>
+                <Button
+                  type="button"
+                  disabled={busy || form.formState.isDirty || fields.length === 0}
+                  onClick={() => {
+                    if (definition?.id && definition.revision != null) {
+                      publishMutation.mutate({
+                        id: definition.id,
+                        revision: definition.revision,
+                      });
+                    }
+                  }}
+                >
+                  <UploadCloud aria-hidden />
+                  {publishMutation.isPending
+                    ? t('businessObjects.publishing')
+                    : t('businessObjects.publish')}
+                </Button>
+              </>
+            ) : null}
+          </>
+        }
       >
-        <DialogContent showCloseButton={!busy}>
-          <DialogHeader>
-            <DialogTitle>{title}</DialogTitle>
-            <DialogDescription>
-              {mode === 'create'
-                ? t('businessObjects.defineDescription')
-                : t('businessObjects.editorDescription')}
-            </DialogDescription>
-          </DialogHeader>
+        <form id={formId} className="contents" onSubmit={submit} noValidate>
+          <ManagedDialogBody>
+            {detailQuery.isLoading && mode !== 'create' ? (
+              <p role="status">{t('table.loading')}</p>
+            ) : null}
+            {detailQuery.isError ? (
+              <Alert variant="destructive">
+                <AlertTitle>{t('businessObjects.loadError')}</AlertTitle>
+                <AlertDescription>{t('businessObjects.loadErrorDescription')}</AlertDescription>
+              </Alert>
+            ) : null}
+            {requestError ? (
+              <Alert variant="destructive">
+                <AlertTitle>{t('businessObjects.requestError')}</AlertTitle>
+                <AlertDescription>{requestError}</AlertDescription>
+              </Alert>
+            ) : null}
 
-          <form className="contents" onSubmit={submit} noValidate>
-            <div data-slot="dialog-body" className="max-h-96 min-h-0 overflow-y-auto">
-              {detailQuery.isLoading && mode !== 'create' ? (
-                <p role="status">{t('table.loading')}</p>
-              ) : null}
-              {detailQuery.isError ? (
-                <Alert variant="destructive">
-                  <AlertTitle>{t('businessObjects.loadError')}</AlertTitle>
-                  <AlertDescription>{t('businessObjects.loadErrorDescription')}</AlertDescription>
-                </Alert>
-              ) : null}
-              {requestError ? (
-                <Alert variant="destructive">
-                  <AlertTitle>{t('businessObjects.requestError')}</AlertTitle>
-                  <AlertDescription>{requestError}</AlertDescription>
-                </Alert>
-              ) : null}
+            {!detailQuery.isLoading || mode === 'create' ? (
+              <Tabs defaultValue="details">
+                <TabsList aria-label={t('businessObjects.definitionSections')}>
+                  <TabsTrigger value="details">{t('businessObjects.details')}</TabsTrigger>
+                  {mode !== 'create' ? (
+                    <TabsTrigger value="fields">{t('businessObjects.fields')}</TabsTrigger>
+                  ) : null}
+                  {definition?.latestPublishedVersion ? (
+                    <TabsTrigger value="published">
+                      {t('businessObjects.publishedVersion')}
+                    </TabsTrigger>
+                  ) : null}
+                </TabsList>
 
-              {!detailQuery.isLoading || mode === 'create' ? (
-                <Tabs defaultValue="details">
-                  <TabsList aria-label={t('businessObjects.definitionSections')}>
-                    <TabsTrigger value="details">{t('businessObjects.details')}</TabsTrigger>
-                    {mode !== 'create' ? (
-                      <TabsTrigger value="fields">{t('businessObjects.fields')}</TabsTrigger>
-                    ) : null}
-                    {definition?.latestPublishedVersion ? (
-                      <TabsTrigger value="published">
-                        {t('businessObjects.publishedVersion')}
-                      </TabsTrigger>
-                    ) : null}
-                  </TabsList>
+                <TabsContent value="details">
+                  <DefinitionDetails
+                    name={name}
+                    objectKey={definition?.objectKey ?? deriveKey(name)}
+                    readOnly={readOnly}
+                    nameError={form.formState.errors.name?.message}
+                    onNameChange={(value) =>
+                      form.setValue('name', value, { shouldDirty: true, shouldValidate: true })
+                    }
+                  />
+                </TabsContent>
 
-                  <TabsContent value="details">
-                    <DefinitionDetails
-                      name={name}
-                      objectKey={definition?.objectKey ?? deriveKey(name)}
+                {mode !== 'create' ? (
+                  <TabsContent value="fields">
+                    <FieldsEditor
+                      fields={fields}
+                      errors={form.formState.errors.fields}
                       readOnly={readOnly}
-                      nameError={form.formState.errors.name?.message}
-                      onNameChange={(value) =>
-                        form.setValue('name', value, { shouldDirty: true, shouldValidate: true })
+                      ruleDefinitions={ruleDefinitions}
+                      ruleCatalogLoading={ruleCatalogLoading}
+                      ruleCatalogUnavailable={ruleCatalogUnavailable}
+                      onChange={updateField}
+                      onMove={moveField}
+                      onRemove={(index) =>
+                        updateFields(fields.filter((_, fieldIndex) => fieldIndex !== index))
                       }
+                      onAdd={() => updateFields([...fields, newField()])}
                     />
                   </TabsContent>
+                ) : null}
 
-                  {mode !== 'create' ? (
-                    <TabsContent value="fields">
-                      <FieldsEditor
-                        fields={fields}
-                        errors={form.formState.errors.fields}
-                        readOnly={readOnly}
-                        ruleDefinitions={ruleDefinitions}
-                        ruleCatalogLoading={ruleCatalogLoading}
-                        ruleCatalogUnavailable={ruleCatalogUnavailable}
-                        onChange={updateField}
-                        onMove={moveField}
-                        onRemove={(index) =>
-                          updateFields(fields.filter((_, fieldIndex) => fieldIndex !== index))
-                        }
-                        onAdd={() => updateFields([...fields, newField()])}
-                      />
-                    </TabsContent>
-                  ) : null}
-
-                  {definition?.latestPublishedVersion ? (
-                    <TabsContent value="published">
-                      <PublishedVersion definition={definition} />
-                    </TabsContent>
-                  ) : null}
-                </Tabs>
-              ) : null}
-            </div>
-
-            <DialogFooter>
-              <Button type="button" variant="outline" disabled={busy} onClick={requestClose}>
-                {t('app.cancel')}
-              </Button>
-              {mode === 'create' ? (
-                <Button type="submit" disabled={busy}>
-                  <Plus aria-hidden />
-                  {createMutation.isPending
-                    ? t('businessObjects.creating')
-                    : t('businessObjects.create')}
-                </Button>
-              ) : null}
-              {!readOnly && mode !== 'create' ? (
-                <>
-                  <Button
-                    type="submit"
-                    variant="secondary"
-                    disabled={busy || !form.formState.isDirty}
-                  >
-                    <Save aria-hidden />
-                    {saveMutation.isPending
-                      ? t('businessObjects.saving')
-                      : t('businessObjects.save')}
-                  </Button>
-                  <Button
-                    type="button"
-                    disabled={busy || form.formState.isDirty || fields.length === 0}
-                    onClick={() => {
-                      if (definition?.id && definition.revision != null) {
-                        publishMutation.mutate({
-                          id: definition.id,
-                          revision: definition.revision,
-                        });
-                      }
-                    }}
-                  >
-                    <UploadCloud aria-hidden />
-                    {publishMutation.isPending
-                      ? t('businessObjects.publishing')
-                      : t('businessObjects.publish')}
-                  </Button>
-                </>
-              ) : null}
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+                {definition?.latestPublishedVersion ? (
+                  <TabsContent value="published">
+                    <PublishedVersion definition={definition} />
+                  </TabsContent>
+                ) : null}
+              </Tabs>
+            ) : null}
+          </ManagedDialogBody>
+        </form>
+      </ManagedDialog>
 
       <AlertDialog open={discardOpen} onOpenChange={setDiscardOpen}>
         <AlertDialogContent>

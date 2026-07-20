@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertCircle, Archive, Braces, Play, Plus, Save, Send, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { ManagedDialog, ManagedDialogBody } from '@/components/shared/ManagedDialog';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { StatusNotice } from '@/components/shared/StatusNotice';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -18,14 +19,6 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
 import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import {
@@ -40,6 +33,7 @@ import { ApiError } from '@/lib/api';
 import type { components } from '@/lib/api-types';
 import {
   archiveRuleDefinition,
+  createRuleDefinition,
   getRuleDefinition,
   publishRuleDefinition,
   type RuleConditionNode,
@@ -122,13 +116,16 @@ export function RuleEditorDialog({
   definitionKey,
   open,
   onOpenChange,
+  onCreated,
 }: {
   definitionKey: string | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onCreated?: (definition: RuleDefinitionDetail) => void;
 }) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
+  const creating = definitionKey === null;
   const [editor, setEditor] = useState<EditorState | null>(null);
   const [feedback, setFeedback] = useState<{
     variant: 'success' | 'destructive';
@@ -169,12 +166,52 @@ export function RuleEditorDialog({
   }, [detail, schemasQuery.data]);
 
   useEffect(() => {
-    if (!open || !definitionKey) return;
+    if (!creating || !open || editor || schemasQuery.isLoading) return;
+    setEditor(toCreateEditorState(schemasQuery.data ?? []));
+  }, [creating, editor, open, schemasQuery.data, schemasQuery.isLoading]);
+
+  useEffect(() => {
+    if (!open) return;
     setFeedback(null);
     setSimulation(null);
     setSampleContext({});
     setSampleParameters({});
-  }, [definitionKey, open]);
+  }, [open]);
+
+  const createMutation = useMutation({
+    mutationFn: async (state: EditorState) => {
+      const selectedSchema = (schemasQuery.data ?? []).find(
+        (candidate) =>
+          candidate.scope === state.scope &&
+          candidate.contextKey === state.contextKey &&
+          candidate.version === state.contextSchemaVersion,
+      );
+      if (
+        !state.name.trim() ||
+        !state.description.trim() ||
+        !selectedSchema?.scope ||
+        !selectedSchema.contextKey ||
+        selectedSchema.version === undefined
+      ) {
+        throw new Error(t('rules.createError'));
+      }
+      return createRuleDefinition({
+        name: state.name.trim(),
+        description: state.description.trim(),
+        scope: selectedSchema.scope,
+        contextKey: selectedSchema.contextKey,
+        contextSchemaVersion: selectedSchema.version,
+        outcomeKind: state.outcomeKind,
+      });
+    },
+    onSuccess: async (created) => {
+      setDetailCache(queryClient, created);
+      await queryClient.invalidateQueries({ queryKey: ruleDefinitionQueryKeys.all });
+      onCreated?.(created);
+    },
+    onError: (error) =>
+      setFeedback({ variant: 'destructive', text: readError(error, t('rules.createError')) }),
+  });
 
   const saveMutation = useMutation({
     mutationFn: async (state: EditorState) => {
@@ -246,6 +283,8 @@ export function RuleEditorDialog({
         : archiveRuleDefinition(detail.definitionKey, detail.revision);
     },
     onSuccess: async (saved) => {
+      setArchiveOpen(false);
+      setPublishOpen(false);
       setDetailCache(queryClient, saved);
       await queryClient.invalidateQueries({ queryKey: ruleDefinitionQueryKeys.all });
       setFeedback({ variant: 'success', text: t('rules.lifecycleUpdated') });
@@ -301,19 +340,30 @@ export function RuleEditorDialog({
       setFeedback({ variant: 'destructive', text: readError(error, t('rules.simulationError')) }),
   });
 
-  const busy = saveMutation.isPending || lifecycleMutation.isPending || simulateMutation.isPending;
+  const busy =
+    createMutation.isPending ||
+    saveMutation.isPending ||
+    lifecycleMutation.isPending ||
+    simulateMutation.isPending;
   const baselineEditor = useMemo(
     () => (detail ? toEditorState(detail, schemasQuery.data ?? []) : null),
     [detail, schemasQuery.data],
   );
-  const isDirty =
-    detail?.status === 'Draft' &&
-    editor !== null &&
-    baselineEditor !== null &&
-    JSON.stringify(editor) !== JSON.stringify(baselineEditor);
-  const availableSchemas = (schemasQuery.data ?? []).filter(
-    (candidate) => candidate.scope === editor?.scope,
-  );
+  const isDirty = creating
+    ? Boolean(
+        editor &&
+          (editor.name ||
+            editor.description ||
+            editor.contextKey ||
+            editor.outcomeKind !== 'Validation'),
+      )
+    : detail?.status === 'Draft' &&
+      editor !== null &&
+      baselineEditor !== null &&
+      JSON.stringify(editor) !== JSON.stringify(baselineEditor);
+  const autoSizeReady =
+    !schemasQuery.isLoading &&
+    (creating ? editor !== null : detailQuery.isError || Boolean(detail && editor));
 
   function requestOpenChange(nextOpen: boolean) {
     if (nextOpen) {
@@ -329,194 +379,227 @@ export function RuleEditorDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={requestOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <div className="flex min-w-0 flex-wrap items-center gap-2">
-            <DialogTitle>{detail?.name ?? t('rules.loadingRule')}</DialogTitle>
-            {detail ? <LifecycleBadge detail={detail} /> : null}
-          </div>
-          <DialogDescription>{detail?.description ?? t('rules.loadingRule')}</DialogDescription>
-        </DialogHeader>
-
-        <div data-slot="dialog-body" className="max-h-96 min-h-0 overflow-y-auto">
-          {detailQuery.isError ? (
-            <Alert variant="destructive">
-              <AlertCircle className="size-4" aria-hidden />
-              <AlertTitle>{t('rules.loadErrorTitle')}</AlertTitle>
-              <AlertDescription>{t('rules.loadErrorBody')}</AlertDescription>
-            </Alert>
+    <ManagedDialog
+      open={open}
+      onOpenChange={requestOpenChange}
+      title={creating ? t('rules.createTitle') : (detail?.name ?? t('rules.loadingRule'))}
+      description={
+        creating ? t('rules.createDescription') : (detail?.description ?? t('rules.loadingRule'))
+      }
+      titleAccessory={detail ? <LifecycleBadge detail={detail} /> : null}
+      closeDisabled={busy}
+      dirty={isDirty}
+      autoSizeKey={creating ? 'create' : `editor:${definitionKey ?? 'unknown'}`}
+      autoSizeReady={autoSizeReady}
+      footerClassName={
+        detail && editor && detail.status !== 'Archived' && detail.latestPublishedVersion
+          ? 'sm:justify-between'
+          : undefined
+      }
+      footer={
+        <>
+          {detail && editor && detail.status !== 'Archived' && detail.latestPublishedVersion ? (
+            <Button
+              type="button"
+              variant="outline"
+              disabled={busy}
+              onClick={() => setArchiveOpen(true)}
+            >
+              <Archive className="size-4" aria-hidden />
+              {t('rules.archive')}
+            </Button>
           ) : null}
-
-          {detail && editor && schema ? (
-            <div className="space-y-6">
-              {feedback ? (
-                <StatusNotice tone={feedback.variant}>{feedback.text}</StatusNotice>
-              ) : null}
-              <RuleIdentitySection
-                editor={editor}
-                schemas={availableSchemas}
-                disabled={detail.status !== 'Draft' || busy}
-                onChange={setEditor}
-              />
-              <ParameterSection
-                parameters={editor.parameters}
-                disabled={detail.status !== 'Draft' || busy}
-                onChange={(parameters) => setEditor({ ...editor, parameters })}
-              />
-              <ConditionSection
-                condition={editor.condition}
-                schema={schema}
-                parameters={editor.parameters}
-                disabled={detail.status !== 'Draft' || busy}
-                onChange={(condition) => setEditor({ ...editor, condition })}
-              />
-              <OutcomeSection
-                editor={editor}
-                disabled={detail.status !== 'Draft' || busy}
-                onChange={setEditor}
-              />
-              <SimulationSection
-                schema={schema}
-                parameters={editor.parameters}
-                contextValues={sampleContext}
-                parameterValues={sampleParameters}
-                result={simulation}
-                disabled={detail.status !== 'Draft' || busy}
-                onContextChange={setSampleContext}
-                onParameterChange={setSampleParameters}
-                onSimulate={() => simulateMutation.mutate()}
-              />
-              <VersionHistory detail={detail} />
-            </div>
-          ) : detailQuery.isLoading ? (
-            <p className="text-sm text-muted-foreground">{t('rules.loadingRule')}</p>
-          ) : null}
-        </div>
-
-        {detail && editor ? (
-          <DialogFooter>
-            <div>
-              {detail.status !== 'Archived' && detail.latestPublishedVersion ? (
+          <div className="flex flex-col-reverse gap-2 sm:flex-row">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={busy}
+              onClick={() => requestOpenChange(false)}
+            >
+              {creating || (detail?.status === 'Draft' && editor)
+                ? t('app.cancel')
+                : t('app.close')}
+            </Button>
+            {creating && editor ? (
+              <Button
+                type="button"
+                disabled={
+                  busy ||
+                  !editor.name.trim() ||
+                  !editor.description.trim() ||
+                  !schema?.contextKey ||
+                  schema.version === undefined
+                }
+                onClick={() => createMutation.mutate(editor)}
+              >
+                {t('rules.createAction')}
+              </Button>
+            ) : null}
+            {detail && editor && detail.status === 'Draft' ? (
+              <>
                 <Button
                   type="button"
                   variant="outline"
                   disabled={busy}
-                  onClick={() => setArchiveOpen(true)}
+                  onClick={() => saveMutation.mutate(editor)}
                 >
-                  <Archive className="size-4" aria-hidden />
-                  {t('rules.archive')}
+                  <Save className="size-4" aria-hidden />
+                  {t('rules.saveDraft')}
                 </Button>
-              ) : null}
-            </div>
-            <div className="flex gap-2">
-              {detail.status === 'Draft' ? (
-                <>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    disabled={busy}
-                    onClick={() => saveMutation.mutate(editor)}
-                  >
-                    <Save className="size-4" aria-hidden />
-                    {t('rules.saveDraft')}
-                  </Button>
-                  <Button type="button" disabled={busy} onClick={() => setPublishOpen(true)}>
-                    <Send className="size-4" aria-hidden />
-                    {t('rules.publish')}
-                  </Button>
-                </>
-              ) : detail.status === 'Published' ? (
-                <Button
-                  type="button"
-                  disabled={busy}
-                  onClick={() => lifecycleMutation.mutate('draft')}
-                >
-                  <Braces className="size-4" aria-hidden />
-                  {t('rules.startRevision')}
+                <Button type="button" disabled={busy} onClick={() => setPublishOpen(true)}>
+                  <Send className="size-4" aria-hidden />
+                  {t('rules.publish')}
                 </Button>
-              ) : null}
-            </div>
-          </DialogFooter>
+              </>
+            ) : detail && editor && detail.status === 'Published' ? (
+              <Button
+                type="button"
+                disabled={busy}
+                onClick={() => lifecycleMutation.mutate('draft')}
+              >
+                <Braces className="size-4" aria-hidden />
+                {t('rules.startRevision')}
+              </Button>
+            ) : null}
+          </div>
+        </>
+      }
+    >
+      <ManagedDialogBody>
+        {detailQuery.isError ? (
+          <Alert variant="destructive">
+            <AlertCircle className="size-4" aria-hidden />
+            <AlertTitle>{t('rules.loadErrorTitle')}</AlertTitle>
+            <AlertDescription>{t('rules.loadErrorBody')}</AlertDescription>
+          </Alert>
         ) : null}
 
-        <AlertDialog open={archiveOpen} onOpenChange={setArchiveOpen}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>{t('rules.archiveTitle')}</AlertDialogTitle>
-              <AlertDialogDescription>{t('rules.archiveDescription')}</AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel disabled={busy}>{t('app.cancel')}</AlertDialogCancel>
-              <AlertDialogAction
-                variant="destructive"
-                disabled={busy}
-                onClick={() => lifecycleMutation.mutate('archive')}
-              >
-                {t('rules.archive')}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-        <AlertDialog open={publishOpen} onOpenChange={setPublishOpen}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>{t('rules.publishTitle')}</AlertDialogTitle>
-              <AlertDialogDescription>
-                {t('rules.publishDescription', {
-                  version: (detail?.latestPublishedVersion ?? 0) + 1,
-                })}
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel disabled={busy}>{t('app.cancel')}</AlertDialogCancel>
-              <AlertDialogAction
-                disabled={busy}
-                onClick={() => lifecycleMutation.mutate('publish')}
-              >
-                {t('rules.publish')}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-        <AlertDialog open={discardOpen} onOpenChange={setDiscardOpen}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>{t('rules.discardTitle')}</AlertDialogTitle>
-              <AlertDialogDescription>{t('rules.discardDescription')}</AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>{t('rules.keepEditing')}</AlertDialogCancel>
-              <AlertDialogAction
-                variant="destructive"
-                onClick={() => {
-                  setDiscardOpen(false);
-                  setEditor(baselineEditor);
-                  onOpenChange(false);
-                }}
-              >
-                {t('rules.discard')}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      </DialogContent>
-    </Dialog>
+        {editor && (creating || detail) ? (
+          <div className="space-y-6">
+            {feedback ? <StatusNotice tone={feedback.variant}>{feedback.text}</StatusNotice> : null}
+            <RuleIdentitySection
+              editor={editor}
+              definitionKey={detail?.definitionKey}
+              schemas={schemasQuery.data ?? []}
+              disabled={(!creating && detail?.status !== 'Draft') || busy}
+              onChange={setEditor}
+            />
+            {detail && schema ? (
+              <>
+                <ParameterSection
+                  parameters={editor.parameters}
+                  disabled={detail.status !== 'Draft' || busy}
+                  onChange={(parameters) => setEditor({ ...editor, parameters })}
+                />
+                <ConditionSection
+                  condition={editor.condition}
+                  schema={schema}
+                  parameters={editor.parameters}
+                  disabled={detail.status !== 'Draft' || busy}
+                  onChange={(condition) => setEditor({ ...editor, condition })}
+                />
+                <OutcomeSection
+                  editor={editor}
+                  disabled={detail.status !== 'Draft' || busy}
+                  onChange={setEditor}
+                />
+                <SimulationSection
+                  schema={schema}
+                  parameters={editor.parameters}
+                  contextValues={sampleContext}
+                  parameterValues={sampleParameters}
+                  result={simulation}
+                  disabled={detail.status !== 'Draft' || busy}
+                  onContextChange={setSampleContext}
+                  onParameterChange={setSampleParameters}
+                  onSimulate={() => simulateMutation.mutate()}
+                />
+                <VersionHistory detail={detail} />
+              </>
+            ) : null}
+          </div>
+        ) : detailQuery.isLoading || schemasQuery.isLoading ? (
+          <p className="text-sm text-muted-foreground">{t('rules.loadingRule')}</p>
+        ) : null}
+      </ManagedDialogBody>
+
+      <AlertDialog open={archiveOpen} onOpenChange={setArchiveOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('rules.archiveTitle')}</AlertDialogTitle>
+            <AlertDialogDescription>{t('rules.archiveDescription')}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={busy}>{t('app.cancel')}</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              disabled={busy}
+              onClick={() => lifecycleMutation.mutate('archive')}
+            >
+              {t('rules.archive')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      <AlertDialog open={publishOpen} onOpenChange={setPublishOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('rules.publishTitle')}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t('rules.publishDescription', {
+                version: (detail?.latestPublishedVersion ?? 0) + 1,
+              })}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={busy}>{t('app.cancel')}</AlertDialogCancel>
+            <AlertDialogAction disabled={busy} onClick={() => lifecycleMutation.mutate('publish')}>
+              {t('rules.publish')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      <AlertDialog open={discardOpen} onOpenChange={setDiscardOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('rules.discardTitle')}</AlertDialogTitle>
+            <AlertDialogDescription>{t('rules.discardDescription')}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t('rules.keepEditing')}</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              onClick={() => {
+                setDiscardOpen(false);
+                setEditor(baselineEditor);
+                onOpenChange(false);
+              }}
+            >
+              {t('rules.discard')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </ManagedDialog>
   );
 }
 
 function RuleIdentitySection({
   editor,
+  definitionKey,
   schemas,
   disabled,
   onChange,
 }: {
   editor: EditorState;
+  definitionKey?: string | null;
   schemas: RuleContextSchema[];
   disabled: boolean;
   onChange: (editor: EditorState) => void;
 }) {
   const { t } = useTranslation();
+  const availableScopes = distinctDefined(schemas.map((schema) => schema.scope));
+  const availableSchemas = schemas.filter((schema) => schema.scope === editor.scope);
   return (
     <EditorSection title={t('rules.definitionSection')} description={t('rules.definitionHelp')}>
       <div className="grid gap-3 sm:grid-cols-2">
@@ -528,37 +611,35 @@ function RuleIdentitySection({
             disabled={disabled}
             onChange={(event) => onChange({ ...editor, name: event.target.value })}
           />
+          <FieldDescription>
+            {t('rules.derivedKey', { key: definitionKey ?? deriveRuleKey(editor.name) })}
+          </FieldDescription>
         </Field>
         <Field>
-          <FieldLabel htmlFor="rule-editor-context">{t('rules.context')}</FieldLabel>
+          <FieldLabel htmlFor="rule-editor-scope">{t('rules.scope')}</FieldLabel>
           <Select
-            value={editor.contextKey}
-            disabled={disabled}
+            value={editor.scope}
+            disabled={disabled || availableScopes.length === 0}
             onValueChange={(value) => {
-              const schema = schemas.find((candidate) => candidate.contextKey === value);
-              if (!schema) return;
+              const scope = value as RuleScope;
+              const nextSchema = schemas.find((candidate) => candidate.scope === scope);
+              if (!nextSchema) return;
               onChange({
                 ...editor,
-                contextKey: schema.contextKey ?? '',
-                contextSchemaVersion: schema.version ?? 1,
-                condition: defaultCondition(schema),
+                scope,
+                contextKey: nextSchema.contextKey ?? '',
+                contextSchemaVersion: nextSchema.version ?? 1,
+                condition: defaultCondition(nextSchema),
               });
             }}
           >
-            <SelectTrigger id="rule-editor-context">
-              <SelectValue>
-                {(value) =>
-                  schemas.find((schema) => schema.contextKey === value)?.displayName ?? value
-                }
-              </SelectValue>
+            <SelectTrigger id="rule-editor-scope">
+              <SelectValue>{(value) => t(`rules.scope${value}`)}</SelectValue>
             </SelectTrigger>
             <SelectContent>
-              {schemas.map((schema) => (
-                <SelectItem
-                  key={`${schema.contextKey}:${schema.version}`}
-                  value={schema.contextKey}
-                >
-                  {schema.displayName}
+              {availableScopes.map((scope) => (
+                <SelectItem key={scope} value={scope}>
+                  {t(`rules.scope${scope}`)}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -572,6 +653,67 @@ function RuleIdentitySection({
             disabled={disabled}
             onChange={(event) => onChange({ ...editor, description: event.target.value })}
           />
+        </Field>
+        <Field>
+          <FieldLabel htmlFor="rule-editor-context">{t('rules.context')}</FieldLabel>
+          <Select
+            value={editor.contextKey || null}
+            disabled={disabled || availableSchemas.length === 0}
+            onValueChange={(value) => {
+              const schema = availableSchemas.find((candidate) => candidate.contextKey === value);
+              if (!schema) return;
+              onChange({
+                ...editor,
+                contextKey: schema.contextKey ?? '',
+                contextSchemaVersion: schema.version ?? 1,
+                condition: defaultCondition(schema),
+              });
+            }}
+          >
+            <SelectTrigger id="rule-editor-context">
+              <SelectValue>
+                {(value) =>
+                  availableSchemas.find((schema) => schema.contextKey === value)?.displayName ??
+                  t('rules.selectContext')
+                }
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {availableSchemas.map((schema) => (
+                <SelectItem
+                  key={`${schema.contextKey}:${schema.version}`}
+                  value={schema.contextKey}
+                >
+                  {schema.displayName}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {availableSchemas.length === 0 ? (
+            <FieldDescription>{t('rules.noContextForScope')}</FieldDescription>
+          ) : null}
+        </Field>
+        <Field>
+          <FieldLabel htmlFor="rule-editor-outcome-kind">{t('rules.outcome')}</FieldLabel>
+          <Select
+            value={editor.outcomeKind}
+            disabled={disabled}
+            onValueChange={(value) =>
+              value && onChange({ ...editor, outcomeKind: value as RuleOutcomeKind })
+            }
+          >
+            <SelectTrigger id="rule-editor-outcome-kind">
+              <SelectValue>
+                {(value) =>
+                  value === 'Decision' ? t('rules.outcomeDecision') : t('rules.outcomeValidation')
+                }
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="Validation">{t('rules.outcomeValidation')}</SelectItem>
+              <SelectItem value="Decision">{t('rules.outcomeDecision')}</SelectItem>
+            </SelectContent>
+          </Select>
         </Field>
       </div>
     </EditorSection>
@@ -1425,6 +1567,27 @@ function defaultCondition(schema: RuleContextSchema): EditableGroup {
   };
 }
 
+function toCreateEditorState(schemas: RuleContextSchema[]): EditorState | null {
+  const firstSchema = schemas.find(
+    (schema) => schema.scope && schema.contextKey && schema.version !== undefined,
+  );
+  if (!firstSchema?.scope) return null;
+  return {
+    name: '',
+    description: '',
+    scope: firstSchema.scope,
+    contextKey: '',
+    contextSchemaVersion: firstSchema.version ?? 1,
+    outcomeKind: 'Validation',
+    parameters: [],
+    condition: defaultCondition(firstSchema),
+    violationCode: '',
+    severity: 'Error',
+    message: '',
+    decision: 'Deny',
+  };
+}
+
 function toEditorState(detail: RuleDefinitionDetail, schemas: RuleContextSchema[]): EditorState {
   const schema = schemas.find(
     (candidate) =>
@@ -1459,6 +1622,22 @@ function toEditorState(detail: RuleDefinitionDetail, schemas: RuleContextSchema[
     message: detail.outcome?.message ?? '',
     decision: detail.outcome?.decision ?? 'Deny',
   };
+}
+
+function distinctDefined<T>(values: (T | null | undefined)[]): T[] {
+  return [...new Set(values.filter((value): value is T => value != null))];
+}
+
+function deriveRuleKey(name: string): string {
+  const normalized = name
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
+    .toLocaleLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+  const key = /^[a-z]/.test(normalized) ? normalized : normalized ? `rule_${normalized}` : 'rule';
+  return key.slice(0, 63).replace(/_+$/g, '') || 'rule';
 }
 
 function fromConditionDto(node: RuleConditionNode): EditableNode {

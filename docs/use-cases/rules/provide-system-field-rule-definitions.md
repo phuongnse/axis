@@ -67,7 +67,7 @@ Provide a stable, versioned catalog of enterprise system field-rule definitions 
 | AT-003 | Application boundary | Unknown, unavailable, incompatible, malformed, and nondeterministic applications are rejected | AC-010, AC-011, AC-012 | Application test | Yes |
 | AT-004 | API boundary | Authenticated catalog response exposes versioned system metadata with generated frontend parity and no mutation surface | AC-001, AC-002, AC-003, AC-005, AC-013 | API integration test | Yes |
 | AT-005 | Application boundary | Consumers reference Rules contracts only and Rules remains free of consumer state or side-effect dependencies | AC-006, AC-012, AC-014 | Architecture test | Yes |
-| AT-006 | UI component | Rules catalog presents system rules, applicability, and setup summary without system mutation controls | AC-001, AC-002, AC-003, AC-004, AC-013 | UI component test | Yes |
+| AT-006 | UI component | Rules catalog presents system rules, applicability, setup summary, and readable definition details without system mutation controls | AC-001, AC-002, AC-003, AC-004, AC-013 | UI component test | Yes |
 
 ## Out Of Scope
 
@@ -79,7 +79,8 @@ Provide a stable, versioned catalog of enterprise system field-rule definitions 
 
 | Screen | Required contract |
 |---|---|
-| Rules catalog | Show system rules in the shared catalog with scope, applicability, concise setup summary, and read-only behavior. |
+| Rules catalog | Show system rules in the shared catalog with scope, applicability, concise setup summary, read-only behavior, and an entry point to definition details. |
+| System rule details | Keep the rule name with separate Built-in and Read-only badges in the dialog header, and present the rule description as a labeled value in Definition. Group definition, supported-field, and parameter metadata into independent sections. Give each section a heading and concise description, place its labeled values beside that context on wider layouts and below it on narrow layouts, and use a subtle divider between sections. |
 | Consumer field editor | Show only rules compatible with the selected field type and configuration and snapshot the selected version. |
 
 Required UI quality: catalog rows must remain scannable as definitions grow, avoid exposing internal evaluator keys or raw schema payloads, and preserve keyboard navigation, responsive scrolling, localized labels, and visible loading, empty, and error states.

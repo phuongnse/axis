@@ -1,5 +1,6 @@
 export * from './api';
 export { RulesPage } from './components/RulesPage';
+export * from './managed-windows';
 export {
   compareFieldTypes,
   compareRuleDefinitions,

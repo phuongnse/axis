@@ -9,6 +9,9 @@ import {
 } from '@tanstack/react-router';
 import { act, type RenderOptions, type RenderResult, render } from '@testing-library/react';
 import type { ReactElement } from 'react';
+import { ManagedWindowHost } from '@/components/shared/ManagedWindowHost';
+import { ManagedWindowProvider } from '@/components/shared/ManagedWindowManager';
+import { managedWindowRenderers } from '@/lib/managed-window-registry';
 
 interface RenderWithRouterOptions extends Omit<RenderOptions, 'wrapper'> {
   path?: string;
@@ -60,7 +63,12 @@ export async function renderWithRouter(
 
   const result = render(
     <QueryClientProvider client={queryClient}>
-      <RouterProvider router={router} />
+      <ManagedWindowProvider renderers={managedWindowRenderers}>
+        <div className="relative h-dvh w-dvw">
+          <RouterProvider router={router} />
+          <ManagedWindowHost />
+        </div>
+      </ManagedWindowProvider>
     </QueryClientProvider>,
     renderOptions,
   );
