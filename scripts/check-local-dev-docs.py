@@ -9,8 +9,10 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import ast
 import json
 import re
+import shlex
 import sys
 from pathlib import Path
 
@@ -119,21 +121,47 @@ def service_property(block: str, property_name: str) -> str:
     return ""
 
 
+def compose_command_tokens(command: str) -> list[str]:
+    value = command.strip()
+    if not value:
+        return []
+
+    if value.startswith("["):
+        try:
+            parsed = ast.literal_eval(value)
+        except (SyntaxError, ValueError):
+            return []
+        return [token for token in parsed if isinstance(token, str)] if isinstance(parsed, list) else []
+
+    lines = [line.strip() for line in value.splitlines() if line.strip()]
+    if lines and all(line.startswith("-") for line in lines):
+        tokens: list[str] = []
+        for line in lines:
+            scalar = line.removeprefix("-").strip()
+            if scalar.startswith(("'", '"')):
+                try:
+                    scalar = ast.literal_eval(scalar)
+                except (SyntaxError, ValueError):
+                    return []
+            if not isinstance(scalar, str):
+                return []
+            tokens.append(scalar)
+        return tokens
+
+    try:
+        return shlex.split(value)
+    except ValueError:
+        return []
+
+
 def api_has_source_reload(compose_file: Path) -> bool:
     service_text = services_section(compose_file.read_text(encoding="utf-8"))
     api_block = next(
         (match.group(2) for match in SERVICE_BLOCK.finditer(service_text) if match.group(1) == "api"),
         "",
     )
-    command_tokens = [
-        token
-        for token in re.findall(r"[a-z0-9_.:/-]+", service_property(api_block, "command").lower())
-        if token != "-"
-    ]
-    has_watcher = any(
-        current == "dotnet" and following == "watch"
-        for current, following in zip(command_tokens, command_tokens[1:])
-    )
+    command_tokens = compose_command_tokens(service_property(api_block, "command"))
+    has_watcher = [token.lower() for token in command_tokens[:2]] == ["dotnet", "watch"]
     polling_environment = service_property(api_block, "environment")
     has_bind_mount_polling = re.search(
         r'^DOTNET_USE_POLLING_FILE_WATCHER:\s*["\']?(?:1|true)["\']?$',

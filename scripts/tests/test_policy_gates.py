@@ -812,6 +812,56 @@ Ship user value.
             "\n".join(issues),
         )
 
+    def test_browser_use_case_evidence_rejects_runner_name_in_arguments(self) -> None:
+        issues = self.issues_for_document(
+            self.complete_use_case_document(
+                """| ID | Boundary | Scenario | Covers AC | Verification | Required |
+|---|---|---|---|---|---|
+| AT-001 | Browser journey | User completes flow | AC-001 | Browser automation | Yes |"""
+            ),
+            evidence_doc="""# Sample Evidence
+
+> **Navigation**: [docs/use-cases/example/sample.md](./sample.md)
+
+## Acceptance Evidence
+
+| AT ID | Evidence | Commands |
+|---|---|---|
+| AT-001 | `frontend/e2e/sample.pw.ts` | `python scripts/axis.py frontend script test -- --grep "local-dev e2e"` |
+""",
+            evidence_files=("frontend/e2e/sample.pw.ts",),
+        )
+
+        self.assertIn(
+            "Browser automation Commands must run Playwright through scripts/axis.py",
+            "\n".join(issues),
+        )
+
+    def test_ui_component_evidence_rejects_e2e_script_variant(self) -> None:
+        issues = self.issues_for_document(
+            self.complete_use_case_document(
+                """| ID | Boundary | Scenario | Covers AC | Verification | Required |
+|---|---|---|---|---|---|
+| AT-001 | UI component | User completes flow | AC-001 | UI component test | Yes |"""
+            ),
+            evidence_doc="""# Sample Evidence
+
+> **Navigation**: [docs/use-cases/example/sample.md](./sample.md)
+
+## Acceptance Evidence
+
+| AT ID | Evidence | Commands |
+|---|---|---|
+| AT-001 | `frontend/tests/sample.test.tsx` | `python scripts/axis.py frontend script test:e2e:smoke -- e2e/sample.pw.ts` |
+""",
+            evidence_files=("frontend/tests/sample.test.tsx",),
+        )
+
+        self.assertIn(
+            "UI component test Commands must run frontend tests through scripts/axis.py",
+            "\n".join(issues),
+        )
+
     def test_accepts_infrastructure_test_with_targeted_dotnet_filter(self) -> None:
         issues = self.issues_for_document(
             self.complete_use_case_document(
@@ -1209,6 +1259,24 @@ Provide an app frame.
         )
         issues = self.issues_for_foundation(
             evidence_doc=legacy,
+            evidence_files=(
+                "frontend/src/components/shared/AppShell.test.tsx",
+                "frontend/e2e/app-frame.pw.ts",
+            ),
+        )
+
+        self.assertIn(
+            "Browser automation Commands must run Playwright through scripts/axis.py",
+            "\n".join(issues),
+        )
+
+    def test_browser_foundation_evidence_rejects_runner_name_in_arguments(self) -> None:
+        near_miss = self.valid_evidence_doc().replace(
+            "python scripts/axis.py local-dev e2e -- e2e/app-frame.pw.ts",
+            'python scripts/axis.py frontend script test -- --grep "local-dev e2e"',
+        )
+        issues = self.issues_for_foundation(
+            evidence_doc=near_miss,
             evidence_files=(
                 "frontend/src/components/shared/AppShell.test.tsx",
                 "frontend/e2e/app-frame.pw.ts",
@@ -2772,6 +2840,16 @@ class TestLocalDevCli(unittest.TestCase):
       - \"127.0.0.1:5281:8443\"
 """
 
+        indirect_compose = """services:
+  api:
+    command: [\"sh\", \"-c\", \"dotnet watch --project src/Axis.Api/Axis.Api.csproj run\"]
+    environment:
+      DOTNET_USE_POLLING_FILE_WATCHER: \"true\"
+      App__BaseUrl: \"${APP_BASE_URL:-https://localhost:3000}\"
+    ports:
+      - \"127.0.0.1:5281:8443\"
+"""
+
         def check(compose_text: str) -> list[str]:
             with tempfile.TemporaryDirectory() as temp:
                 compose = Path(temp) / "docker-compose.yml"
@@ -2781,6 +2859,7 @@ class TestLocalDevCli(unittest.TestCase):
 
         expected = "docker-compose.yml api service must automatically reload source changes"
         self.assertIn(expected, check(one_shot_compose))
+        self.assertIn(expected, check(indirect_compose))
         self.assertNotIn(expected, check(watching_compose))
 
     def test_api_appsettings_base_url_reads_app_base_url(self) -> None:

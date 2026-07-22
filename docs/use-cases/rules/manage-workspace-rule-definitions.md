@@ -24,7 +24,7 @@ Let a signed-in workspace user define, validate, publish, revise, and archive re
 5. User selects a pure outcome kind: Validation or Decision.
 6. System exposes the versioned expression capabilities and context fields registered for that scope and context version.
 7. User independently composes a typed expression from allowed context operands, literals, parameters, pure functions, comparison operators, and all/any/not groups.
-8. For Validation, user defines a stable violation code, severity, and user-facing message; for Decision, user defines Allow or Deny when the condition matches.
+8. For Validation, user defines a stable violation code, severity, and user-facing message; for Decision, user defines Allow or Deny when the expression matches.
 9. User validates the draft against the selected context contract and can simulate it with sample context before publication.
 10. User publishes the current draft revision; system creates immutable version 1 and records publisher and publication time.
 11. User can create a new draft revision from the latest published version and publish a later immutable version without changing earlier versions.
@@ -34,9 +34,9 @@ Let a signed-in workspace user define, validate, publish, revise, and archive re
 
 - Duplicate or malformed rule key: reject creation without persistence.
 - Unsupported scope, unavailable context key/schema version, outcome, operand, operator, or context path: reject draft validation and publication.
-- Operand/operator type mismatch: identify the affected condition node and reject publication.
+- Operand/operator type mismatch: identify the affected expression node and reject publication.
 - Missing parameter schema, violation metadata, or decision outcome: reject publication.
-- Condition tree exceeds configured depth, node, literal-size, or parameter limits: reject before persistence or evaluation.
+- Typed expression exceeds configured depth, node, literal-size, or parameter limits: reject before persistence or evaluation.
 - Stale draft revision or concurrent publication: reject without overwriting newer state or published versions.
 - Archive requested for an already archived definition: return the current archived state without creating another version.
 - Missing, unavailable, or cross-workspace scope: reject without mutation or resource disclosure.
@@ -67,7 +67,7 @@ Let a signed-in workspace user define, validate, publish, revise, and archive re
 *Edge cases*
 - **AC-018** Current workspace scope is required for create, update, publish, archive, list, load, validate, and simulate operations.
 - **AC-019** Workspace definitions and simulation inputs are isolated by workspace; cross-workspace access returns a not-found style result.
-- **AC-020** Rules owns definition lifecycle, immutable versions, schemas, structured conditions, and pure outcomes; consumers own applications, business context, enforcement, and side effects outside Rules.
+- **AC-020** Rules owns definition lifecycle, immutable versions, schemas, typed expressions, and pure outcomes; consumers own applications, business context, enforcement, and side effects outside Rules.
 - **AC-021** Create, update, publish, and archive operations are atomic and record actor/time audit metadata for every lifecycle mutation.
 - **AC-022** System definitions appear in the same catalog but remain read-only and cannot be revised, archived, or shadowed by a workspace key.
 
@@ -83,7 +83,7 @@ Let a signed-in workspace user define, validate, publish, revise, and archive re
 | AT-006 | API boundary | Authorized lifecycle endpoints expose stable request/response contracts, problem codes, pagination, and generated frontend parity | AC-001, AC-006, AC-007, AC-008, AC-009, AC-010, AC-011, AC-015 | API integration test | Yes |
 | AT-007 | API/Application boundaries | Anonymous, missing-workspace, unavailable-workspace, and cross-workspace operations fail without mutation or disclosure | AC-018, AC-019, AC-022 | API integration test + Application test | Yes |
 | AT-008 | Application boundary | Rules owns lifecycle/persistence and consumers depend only on context/evaluation contracts without internal-module references | AC-004, AC-017, AC-020 | Architecture test | Yes |
-| AT-009 | UI component | Catalog and authoring surfaces support lifecycle, typed condition building, contextual errors, simulation, and read-only system definitions | AC-001, AC-002, AC-003, AC-005, AC-006, AC-010, AC-012, AC-014, AC-022 | UI component test | Yes |
+| AT-009 | UI component | Catalog and authoring surfaces support lifecycle, typed expression authoring, contextual errors, simulation, and read-only system definitions | AC-001, AC-002, AC-003, AC-005, AC-006, AC-010, AC-012, AC-014, AC-022 | UI component test | Yes |
 | AT-010 | Browser journey | User creates, validates, simulates, publishes, revises, and archives a workspace rule without console errors or layout overflow | AC-001, AC-006, AC-007, AC-008, AC-009, AC-010, AC-018, AC-021 | Browser automation | Yes |
 
 ## Out Of Scope
@@ -102,10 +102,10 @@ Let a signed-in workspace user define, validate, publish, revise, and archive re
 | Expression builder | Let the user independently compose typed nested logic from all context-aware fields, parameters, operators, pure functions, and groups exposed by the selected versioned capability contract without exposing raw serialized AST data. |
 | Outcome editor | Configure Validation or Decision outcome details with contextual validation. |
 | Validate and simulate | Show node-specific errors or deterministic result and outcome for sample context without mutation. |
-| Publish review | Summarize scope, condition, parameters, outcome, and immutable version implications before publication. |
+| Publish review | Summarize scope, typed expression, parameters, outcome, and immutable version implications before publication. |
 | Rule detail | Show lifecycle, latest version, audit metadata, prior immutable versions, revise action, and archive action where allowed. |
 
-Required UI quality: authoring must be keyboard operable, preserve focus while nested conditions change, expose programmatic labels and node-specific errors, keep destructive archive implications visible, and remain usable without document scrolling or horizontal overflow. Raw AST, internal evaluator identifiers, secrets, and unbounded context payloads must not be rendered.
+Required UI quality: authoring must be keyboard operable, preserve focus while nested expression groups change, expose programmatic labels and node-specific errors, keep destructive archive implications visible, and remain usable without document scrolling or horizontal overflow. Raw AST, internal evaluator identifiers, secrets, and unbounded context payloads must not be rendered.
 
 ## Diagrams
 
@@ -132,9 +132,9 @@ sequenceDiagram
   participant Rules as Rules
   participant Store as Rules Store
 
-  User->>Web: Define scope, conditions, and outcome
+  User->>Web: Define scope, typed expression, and outcome
   Web->>API: Validate draft and simulate sample context
-  API->>Rules: Validate typed condition tree
+  API->>Rules: Validate typed expression
   Rules-->>Web: Node errors or deterministic result
   User->>Web: Publish current revision
   Web->>API: Publish draft
