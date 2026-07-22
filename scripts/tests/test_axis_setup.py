@@ -64,6 +64,44 @@ class TestSetupPlatform(unittest.TestCase):
         with self.assertRaisesRegex(axis_setup.SetupError, "Lychee.*macOS x64"):
             axis_setup.asset_name("lychee", axis_setup.SetupPlatform("darwin", "x64"))
 
+    def test_dotnet_icu_failure_names_ubuntu_2604_native_prerequisite(self) -> None:
+        classify = getattr(axis_setup, "dotnet_native_prerequisite_hint", None)
+        self.assertTrue(callable(classify))
+
+        hint = classify(
+            "Couldn't find a valid ICU package installed on the system.",
+            platform_spec=axis_setup.SetupPlatform("linux", "x64"),
+            os_release_text='ID=ubuntu\nVERSION_ID="26.04"\n',
+        )
+
+        self.assertIn("sudo apt install libicu78", hint)
+        self.assertIn("will not run sudo or an OS package manager", hint)
+
+    def test_dotnet_icu_failure_keeps_unknown_linux_distribution_generic(self) -> None:
+        classify = getattr(axis_setup, "dotnet_native_prerequisite_hint", None)
+        self.assertTrue(callable(classify))
+
+        hint = classify(
+            "Couldn't find a valid ICU package installed on the system.",
+            platform_spec=axis_setup.SetupPlatform("linux", "x64"),
+            os_release_text='ID=example\nVERSION_ID="1"\nPRETTY_NAME="Example Linux 1"\n',
+        )
+
+        self.assertIn("ICU runtime package documented for Example Linux 1", hint)
+        self.assertNotIn("apt install", hint)
+
+    def test_dotnet_native_prerequisite_classifier_ignores_unrelated_failures(self) -> None:
+        classify = getattr(axis_setup, "dotnet_native_prerequisite_hint", None)
+        self.assertTrue(callable(classify))
+
+        hint = classify(
+            "A fatal error occurred. The folder [/usr/share/dotnet/host/fxr] does not exist.",
+            platform_spec=axis_setup.SetupPlatform("linux", "x64"),
+            os_release_text='ID=ubuntu\nVERSION_ID="26.04"\n',
+        )
+
+        self.assertIsNone(hint)
+
 
 class TestManagedToolPaths(unittest.TestCase):
     def test_uses_platform_native_user_data_roots(self) -> None:
@@ -114,6 +152,86 @@ class TestManagedToolPaths(unittest.TestCase):
 
         self.assertEqual(root / "node" / "22.23.1" / "bin" / "node", node)
         self.assertEqual(root / "dotnet" / "8.0.423" / "dotnet.exe", dotnet)
+
+    def test_user_command_dir_uses_the_native_user_location(self) -> None:
+        home = Path("/users/alice")
+
+        linux = axis_setup.user_command_dir(
+            platform_spec=axis_setup.SetupPlatform("linux", "x64"),
+            home=home,
+        )
+        windows = axis_setup.user_command_dir(
+            platform_spec=axis_setup.SetupPlatform("windows", "x64"),
+            env={"LOCALAPPDATA": r"C:\Users\alice\AppData\Local"},
+            home=home,
+        )
+
+        self.assertEqual(home / ".local" / "bin", linux)
+        self.assertEqual(Path(r"C:\Users\alice\AppData\Local") / "Axis" / "bin", windows)
+
+    def test_exposes_a_managed_posix_command_with_a_stable_symlink(self) -> None:
+        platform_spec = axis_setup.SetupPlatform("linux", "x64")
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / "tools"
+            command_dir = Path(temp) / "bin"
+            managed = axis_setup.managed_executable("gh", platform_spec=platform_spec, root=root)
+            managed.parent.mkdir(parents=True)
+            managed.write_text("", encoding="utf-8")
+
+            exposed = axis_setup.expose_managed_command(
+                "gh",
+                platform_spec=platform_spec,
+                root=root,
+                command_dir=command_dir,
+            )
+
+            self.assertEqual(command_dir / "gh", exposed)
+            self.assertTrue(exposed.is_symlink())
+            self.assertEqual(managed, exposed.resolve())
+
+    def test_exposes_a_managed_windows_command_with_a_stable_launcher(self) -> None:
+        platform_spec = axis_setup.SetupPlatform("windows", "x64")
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / "tools"
+            command_dir = Path(temp) / "bin"
+            managed = axis_setup.managed_executable("gh", platform_spec=platform_spec, root=root)
+            managed.parent.mkdir(parents=True)
+            managed.write_text("", encoding="utf-8")
+
+            exposed = axis_setup.expose_managed_command(
+                "gh",
+                platform_spec=platform_spec,
+                root=root,
+                command_dir=command_dir,
+            )
+
+            self.assertEqual(command_dir / "gh.cmd", exposed)
+            self.assertEqual(
+                f'@rem Managed by Axis portable setup\r\n@"{managed}" %*\r\n'.encode(),
+                exposed.read_bytes(),
+            )
+
+    def test_refuses_to_replace_an_unmanaged_user_command(self) -> None:
+        platform_spec = axis_setup.SetupPlatform("linux", "x64")
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / "tools"
+            command_dir = Path(temp) / "bin"
+            managed = axis_setup.managed_executable("gh", platform_spec=platform_spec, root=root)
+            managed.parent.mkdir(parents=True)
+            managed.write_text("", encoding="utf-8")
+            command_dir.mkdir()
+            existing = command_dir / "gh"
+            existing.write_text("user-owned", encoding="utf-8")
+
+            with self.assertRaisesRegex(axis_setup.SetupError, "refusing to replace unmanaged command"):
+                axis_setup.expose_managed_command(
+                    "gh",
+                    platform_spec=platform_spec,
+                    root=root,
+                    command_dir=command_dir,
+                )
+
+            self.assertEqual("user-owned", existing.read_text(encoding="utf-8"))
 
 
 class TestVerifiedArtifacts(unittest.TestCase):

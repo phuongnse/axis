@@ -13,6 +13,7 @@ Universal semantics for every repo skill. Intent routing lives in [README.md](./
 7. **Reuse evidence.** A current satisfied prerequisite is idempotent; do not recurse or rerun it.
 8. **Report honestly.** Missing or stale evidence is `not run` or `blocked`, never pass.
 9. **Keep current contracts only.** Remove superseded guidance instead of documenting incident history or retired names.
+10. **Route durable guidance before edit.** Before editing durable guidance, select `$axis-doc-hygiene` as the entry owner or enter it through a typed handoff.
 
 ## Handoff types
 

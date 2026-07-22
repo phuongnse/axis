@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "acceptances": [
+    {
+      "advisory": "GHSA-frvp-7c67-39w9",
+      "severity": "moderate",
+      "dependencyPath": ["shadcn", "@modelcontextprotocol/sdk", "@hono/node-server"],
+      "owner": "frontend-tooling",
+      "acceptedOn": "2026-07-22",
+      "expiresOn": "2026-08-21",
+      "scope": "shadcn CLI tooling only; not imported by the SPA runtime",
+      "reason": "The compatible upstream dependency range has not reached the patched release.",
+      "remediation": "Remove this acceptance when shadcn permits @hono/node-server >=2.0.5."
+    }
+  ]
+}

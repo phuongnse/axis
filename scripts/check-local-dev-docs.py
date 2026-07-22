@@ -173,7 +173,46 @@ def api_has_source_reload(compose_file: Path) -> bool:
         polling_environment,
         re.IGNORECASE | re.MULTILINE,
     ) is not None
-    return has_watcher and has_bind_mount_polling
+    has_artifacts_output = re.search(
+        r'^UseArtifactsOutput:\s*["\']?true["\']?$',
+        polling_environment,
+        re.IGNORECASE | re.MULTILINE,
+    ) is not None
+    has_isolated_artifacts_path = re.search(
+        r'^ArtifactsPath:\s*["\']?/tmp/axis-artifacts["\']?$',
+        polling_environment,
+        re.IGNORECASE | re.MULTILINE,
+    ) is not None
+    avoids_cli_artifacts_path = "--artifacts-path" not in [token.lower() for token in command_tokens]
+    return (
+        has_watcher
+        and has_bind_mount_polling
+        and has_artifacts_output
+        and has_isolated_artifacts_path
+        and avoids_cli_artifacts_path
+    )
+
+
+def web_has_trusted_https_healthcheck(compose_file: Path) -> bool:
+    service_text = services_section(compose_file.read_text(encoding="utf-8"))
+    web_block = next(
+        (match.group(2) for match in SERVICE_BLOCK.finditer(service_text) if match.group(1) == "web"),
+        "",
+    )
+    environment = service_property(web_block, "environment")
+    healthcheck = service_property(web_block, "healthcheck")
+    has_ca = re.search(
+        r'^NODE_EXTRA_CA_CERTS:\s*["\']?/https/rootCA[.]pem["\']?$',
+        environment,
+        re.MULTILINE,
+    ) is not None
+    normalized = healthcheck.lower()
+    has_https_probe = "node" in normalized and "https://localhost:3000" in normalized
+    disables_verification = any(
+        unsafe in normalized
+        for unsafe in ("--no-check-certificate", "node_tls_reject_unauthorized=0")
+    )
+    return has_ca and has_https_probe and not disables_verification
 
 
 def api_appsettings_base_url(appsettings_file: Path) -> str | None:
@@ -224,6 +263,9 @@ def check_local_dev_doc() -> list[str]:
 
     if not api_has_source_reload(MAIN_COMPOSE_FILE):
         errors.append("docker-compose.yml api service must automatically reload source changes")
+
+    if not web_has_trusted_https_healthcheck(MAIN_COMPOSE_FILE):
+        errors.append("docker-compose.yml web service must expose a trusted HTTPS healthcheck")
 
     if api_appsettings_base_url(API_APPSETTINGS_FILE) != LOCAL_BROWSER_APP_BASE_URL:
         errors.append(

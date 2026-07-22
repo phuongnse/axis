@@ -28,7 +28,7 @@ Follow [reference.md](../reference.md).
 
 1. Classify consumption, app pattern, theme, registry sync, exception, or provider/style replacement.
 2. Run `python scripts/axis.py check ui-baseline`; trace primitive imports, consumers, tests, provider leakage, and visual overrides with `rg`. For state changes, record a state-role matrix across every affected interactive surface; distinguish transient, persistent, focus, disabled, and destructive semantics before comparing visuals.
-3. For registry work, preview and diff only the named component family through the Axis shadcn wrapper.
+3. For registry work, run the frontend dependency-risk gate, then preview and diff only the named component family through the Axis shadcn wrapper. A CLI/provider dependency change must either remove its advisory or carry current machine-readable acceptance evidence; it never justifies a forced install or unreviewed major override.
 4. Choose one owner: upstream registry zone, semantic theme zone, app-owned shared pattern, or one-off feature composition. State visuals outside registry primitives belong only to `frontend/src/components/shared/interactionStates.ts`; reuse its contract and stop when a requested treatment conflicts with the hierarchy.
 5. Implement only after required evidence: sync reviewed upstream source; keep shared props Axis-owned and provider-neutral; keep feature classes layout-only; preserve accessibility.
 6. Refresh `frontend/ui-baseline.json` only after provenance is established. Preserve valid exceptions; add non-empty `reason` and `signOff` only for approved upstream-zone exceptions.

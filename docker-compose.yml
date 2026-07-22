@@ -66,8 +66,6 @@ services:
       - --no-hot-reload
       - run
       - --no-launch-profile
-      - --artifacts-path
-      - /tmp/axis-artifacts
     depends_on:
       postgres:
         condition: service_healthy
@@ -79,6 +77,8 @@ services:
       ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_URLS: https://+:8443
       DOTNET_USE_POLLING_FILE_WATCHER: "1"
+      UseArtifactsOutput: "true"
+      ArtifactsPath: "/tmp/axis-artifacts"
       Kestrel__Certificates__Default__Path: "/https/localhost.pem"
       Kestrel__Certificates__Default__KeyPath: "/https/localhost-key.pem"
       ConnectionStrings__Identity: "Host=postgres;Port=5432;Database=axis_identity;Username=axis;Password=axis_dev_pass"
@@ -133,6 +133,16 @@ services:
     command: ["sh", "./scripts/docker-dev-entrypoint.sh"]
     ports:
       - "127.0.0.1:3000:3000"
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('https://localhost:3000').then(response => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))"
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
     volumes:
       - ./frontend:/app
       - ./.dev-certs/rootCA.pem:/https/rootCA.pem:ro

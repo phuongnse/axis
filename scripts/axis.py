@@ -9,6 +9,7 @@ details behind the wrapper.
 from __future__ import annotations
 
 import argparse
+from datetime import date
 import hashlib
 import importlib
 import importlib.util
@@ -36,6 +37,7 @@ MINIMUM_CODERABBIT_CLI_VERSION = "0.6.0"
 VERSION_PROBE_TIMEOUT_SECONDS = 15
 PLAYWRIGHT_BROWSER_PROBE_TIMEOUT_SECONDS = 20
 DOCKER_PROBE_TIMEOUT_SECONDS = 20
+LOCAL_DEV_WAIT_TIMEOUT_SECONDS = 300
 TOOL_VERSIONS_DOC = "docs/playbooks/scripts.md#tool-versions"
 TECH_STACK_DOC = "docs/TECH_STACK.md"
 GLOBAL_JSON_PATH = ROOT / "global.json"
@@ -74,6 +76,7 @@ import axis_repo  # noqa: E402
 import axis_setup  # noqa: E402
 import axis_theme  # noqa: E402
 import doc_drift_domains  # noqa: E402
+from axis_dependency_policy import evaluate_npm_audit  # noqa: E402
 from axis_frontend_policy import (  # noqa: E402
     check_frontend_quality,
     frontend_component_file_name_issues,
@@ -616,15 +619,43 @@ def check_frontend_vulnerable_packages(_args: argparse.Namespace | None = None) 
     if rc != 0:
         return rc
 
-    result = run_frontend_npm(["audit", "--audit-level=high"])
-    if result.returncode != 0:
+    result = run_frontend_npm(["audit", "--json"], capture=True)
+    try:
+        report = json.loads(result.stdout or "")
+    except json.JSONDecodeError:
+        detail = (result.stderr or "").strip()
+        suffix = f": {detail}" if detail else ""
         print(
-            "check-frontend-vulnerable-packages: FAIL - npm reported a high or critical vulnerability",
+            f"check-frontend-vulnerable-packages: FAIL - expected valid npm audit JSON{suffix}",
             file=sys.stderr,
         )
-        return result.returncode
+        return 1
+    if result.returncode not in {0, 1}:
+        detail = (result.stderr or "").strip()
+        suffix = f": {detail}" if detail else ""
+        print(
+            f"check-frontend-vulnerable-packages: FAIL - npm audit exited with {result.returncode}{suffix}",
+            file=sys.stderr,
+        )
+        return 1
+    acceptance_path = ROOT / "frontend" / "dependency-risk-acceptances.json"
+    try:
+        acceptance_document = json.loads(acceptance_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        print(
+            f"check-frontend-vulnerable-packages: FAIL - cannot read {path_label(acceptance_path)}: {exc}",
+            file=sys.stderr,
+        )
+        return 1
 
-    print("check-frontend-vulnerable-packages: OK")
+    policy = evaluate_npm_audit(report, acceptance_document, today=date.today())
+    if policy.issues:
+        for issue in policy.issues:
+            print(f"check-frontend-vulnerable-packages: FAIL - {issue}", file=sys.stderr)
+        return 1
+    accepted = ", ".join(f"{advisory} through {expiry}" for advisory, expiry in policy.accepted)
+    suffix = f" (accepted: {accepted})" if accepted else ""
+    print(f"check-frontend-vulnerable-packages: OK{suffix}")
     return 0
 
 
@@ -1298,6 +1329,46 @@ def repo_skill_verification_scope_issues(
             issues.append(
                 f"{rel_from(skill_md, root)}: `axis-script-scope` output must include {fields}"
             )
+        local_dev_fragments = ("host browser", "--trust-local-ca", "local-dev up", "readiness")
+        if any(fragment not in text for fragment in local_dev_fragments):
+            issues.append(
+                f"{rel_from(skill_md, root)}: `axis-script-scope` must require the local-dev "
+                "host-browser trust decision and readiness proof"
+            )
+        doc_hygiene_fragments = (
+            "Editing durable guidance **Requires** entering `$axis-doc-hygiene` before edit",
+            "reuse an active handoff",
+        )
+        if any(fragment not in text for fragment in doc_hygiene_fragments):
+            issues.append(
+                f"{rel_from(skill_md, root)}: `axis-script-scope` must use **Requires** for "
+                "`$axis-doc-hygiene` before editing durable guidance"
+            )
+        dependency_policy_fragments = (
+            "native prerequisites",
+            "observed failure",
+            "accepted-risk",
+        )
+        if any(fragment not in text for fragment in dependency_policy_fragments):
+            issues.append(
+                f"{rel_from(skill_md, root)}: `axis-script-scope` must classify native "
+                "prerequisites and enforce accepted-risk policy"
+            )
+
+    reference = root / REPO_SKILLS_DIR / "reference.md"
+    if reference.is_file():
+        reference_text = reference.read_text(encoding="utf-8")
+        reference_fragments = (
+            "Route durable guidance before edit",
+            "Before editing durable guidance",
+            "`$axis-doc-hygiene`",
+            "typed handoff",
+        )
+        if any(fragment not in reference_text for fragment in reference_fragments):
+            issues.append(
+                f"{rel_from(reference, root)}: universal contract must route durable guidance "
+                "edits through `$axis-doc-hygiene` before edit"
+            )
     return issues
 
 
@@ -1701,7 +1772,8 @@ ENFORCEMENT_ALLOWED_STATUSES = {
     "Review-only",
 }
 
-ENFORCEMENT_TRUTH_REQUIRED_SNIPPETS = [
+def enforcement_truth_required_snippets() -> list[tuple[Path, list[tuple[str, str]]]]:
+    return [
     (
         Path(".github/workflows/build-and-test.yml"),
         [
@@ -1723,7 +1795,10 @@ ENFORCEMENT_TRUTH_REQUIRED_SNIPPETS = [
             ("run: python scripts/axis.py frontend ci", "frontend typecheck/lint runs in CI through the Axis wrapper"),
             ("run: python scripts/axis.py frontend test", "frontend tests run in CI through the Axis wrapper"),
             ("uses: lycheeverse/lychee-action", "markdown link check runs in CI"),
-            ("lycheeVersion: v0.23.0", "markdown link check pins the documented Lychee version"),
+            (
+                f"lycheeVersion: v{axis_setup.LYCHEE_VERSION}",
+                "markdown link check pins the documented Lychee version",
+            ),
             ("args: --config ./lychee.toml './**/*.md'", "markdown link check uses shared lychee config"),
             ("BASE_BRANCH: main", "doc drift compares against main"),
         ],
@@ -1795,7 +1870,7 @@ ENFORCEMENT_TRUTH_REQUIRED_SNIPPETS = [
             ("tests\\Architecture\\Axis.Architecture.Tests\\Axis.Architecture.Tests.csproj", "architecture fitness tests are included in Axis.sln"),
         ],
     ),
-]
+    ]
 
 
 def governance_owner_boundary_issues(*, root: Path | None = None) -> list[str]:
@@ -1850,7 +1925,7 @@ def enforcement_truth_audit_issues(*, root: Path | None = None) -> list[str]:
     root = root or ROOT
     issues: list[str] = []
 
-    for relative, requirements in ENFORCEMENT_TRUTH_REQUIRED_SNIPPETS:
+    for relative, requirements in enforcement_truth_required_snippets():
         path = root / relative
         normalized = relative.as_posix()
         if not path.is_file():
@@ -2313,10 +2388,12 @@ def dotnet_sdk_status() -> tuple[bool, str]:
 
     ok, version_line, resolved = command_version_line("dotnet", "--version")
     if not ok:
+        prerequisite = axis_setup.dotnet_native_prerequisite_hint(version_line)
+        prerequisite_detail = f"; {prerequisite}" if prerequisite else ""
         return (
             False,
             f"{version_line}; .NET SDK {REQUIRED_DOTNET_SDK_MAJOR}.x is required per "
-            f"{TECH_STACK_DOC} and {path_label(GLOBAL_JSON_PATH)}",
+            f"{TECH_STACK_DOC} and {path_label(GLOBAL_JSON_PATH)}{prerequisite_detail}",
         )
 
     major = version_major(version_line)
@@ -2574,11 +2651,12 @@ def run_frontend_npm(
     *,
     cwd: Path = FRONTEND_DIR,
     env_overrides: dict[str, str] | None = None,
+    capture: bool = False,
 ) -> subprocess.CompletedProcess[str]:
     env = frontend_toolchain_env()
     if env_overrides:
         env.update(env_overrides)
-    return run([resolve_exe("npm", env=env), *npm_args], cwd=cwd, env=env, check=False)
+    return run([resolve_exe("npm", env=env), *npm_args], cwd=cwd, env=env, capture=capture, check=False)
 
 
 def passthrough_args(raw_args: list[str]) -> list[str]:
@@ -2826,7 +2904,13 @@ def verify(args: argparse.Namespace) -> int:
 
     frontend = any(is_frontend_path(path) for path in paths)
     frontend_package_scan = any(
-        path in {"frontend/package.json", "frontend/package-lock.json"} for path in paths
+        path
+        in {
+            "frontend/package.json",
+            "frontend/package-lock.json",
+            "frontend/dependency-risk-acceptances.json",
+        }
+        for path in paths
     )
     renovate_config = ".github/renovate.json5" in paths
     frontend_api_types = "openapi.json" in paths or "frontend/src/lib/api-types.ts" in paths
@@ -3286,6 +3370,26 @@ def local_dev_compose_args(*args: str) -> list[str]:
     )
 
 
+def local_dev_up_args(
+    *services: str,
+    build: bool = False,
+    force_recreate: bool = False,
+) -> list[str]:
+    args = [
+        "up",
+        "-d",
+        "--wait",
+        "--wait-timeout",
+        str(LOCAL_DEV_WAIT_TIMEOUT_SECONDS),
+    ]
+    if build:
+        args.append("--build")
+    if force_recreate:
+        args.append("--force-recreate")
+    args.extend(services)
+    return local_dev_compose_args(*args)
+
+
 def local_dev_shell_argv(service: str, exec_command: list[str]) -> list[str]:
     command = exec_command[1:] if exec_command[:1] == ["--"] else exec_command
     if command:
@@ -3294,7 +3398,7 @@ def local_dev_shell_argv(service: str, exec_command: list[str]) -> list[str]:
 
 
 def run_local_dev_browser(playwright_args: list[str]) -> int:
-    up = run(local_dev_compose_args("up", "-d"), check=False)
+    up = run(local_dev_up_args(), check=False)
     if up.returncode != 0:
         return up.returncode
     build = run(local_dev_compose_args("--profile", "e2e", "build", "e2e"), check=False)
@@ -3402,6 +3506,46 @@ def local_dev_cert_host() -> str:
     if system == "linux" and (os.environ.get("WSL_DISTRO_NAME") or "microsoft" in release):
         return "wsl"
     return "linux"
+
+
+def local_dev_host_trust_status() -> tuple[str, str]:
+    trust_command = "`python scripts/axis.py local-dev trust-certs`"
+    if not LOCAL_ROOT_CA_CER.is_file():
+        return "WARN", "local root CA is missing; run `python scripts/axis.py local-dev certs`"
+
+    host = local_dev_cert_host()
+    fingerprint = local_dev_ca_fingerprint("sha1")
+    if host in {"windows", "wsl"}:
+        certutil = shutil.which("certutil.exe") or shutil.which("certutil")
+        if certutil is None:
+            return "WARN", f"Windows certutil is unavailable; verify host trust or run {trust_command}"
+        result = run_optional(
+            [certutil, "-user", "-store", "Root", fingerprint],
+            timeout=VERSION_PROBE_TIMEOUT_SECONDS,
+        )
+        if result is not None and result.returncode == 0:
+            return "OK", "Axis local root CA is trusted for this Windows user"
+        return "WARN", f"host browser trust is not configured; run {trust_command}"
+
+    if host == "darwin":
+        security = shutil.which("security")
+        if security is None:
+            return "WARN", f"macOS security tool is unavailable; verify host trust or run {trust_command}"
+        keychain = Path.home() / "Library" / "Keychains" / "login.keychain-db"
+        result = run_optional(
+            [security, "find-certificate", "-a", "-Z", str(keychain)],
+            timeout=VERSION_PROBE_TIMEOUT_SECONDS,
+        )
+        output = "" if result is None else f"{result.stdout}\n{result.stderr}".upper()
+        if result is not None and result.returncode == 0 and fingerprint in output:
+            return "OK", "Axis local root CA is trusted in the login keychain"
+        return "WARN", f"host browser trust is not configured; run {trust_command}"
+
+    return (
+        "WARN",
+        "automatic host trust verification is unavailable on native Linux; "
+        f"import {path_label(LOCAL_ROOT_CA_CER)} into the browser or user trust store",
+    )
 
 
 def local_dev_ca_fingerprint(algorithm: str = "sha256") -> str:
@@ -3649,11 +3793,20 @@ def local_dev(args: argparse.Namespace) -> int:
 
     command = args.local_dev_command
     if command == "up":
-        compose = ["up", "-d"]
-        if args.build:
-            compose.append("--build")
-        compose.extend(args.services)
-        return run(local_dev_compose_args(*compose), check=False).returncode
+        result = run(
+            local_dev_up_args(*args.services, build=args.build),
+            check=False,
+        )
+        if result.returncode != 0:
+            return result.returncode
+        print("local-dev up: ready")
+        if not args.services:
+            print("web: https://localhost:3000")
+            print("api health: https://localhost:5281/health")
+            print("maildev: http://localhost:1080")
+            trust_status, trust_detail = local_dev_host_trust_status()
+            print(f"[{trust_status}] host browser trust: {trust_detail}")
+        return 0
 
     if command == "down":
         compose = ["down", "--remove-orphans"]
@@ -3668,7 +3821,10 @@ def local_dev(args: argparse.Namespace) -> int:
         if not args.services:
             print("local-dev recreate: name at least one service", file=sys.stderr)
             return 1
-        return run(local_dev_compose_args("up", "-d", "--force-recreate", *args.services), check=False).returncode
+        return run(
+            local_dev_up_args(*args.services, force_recreate=True),
+            check=False,
+        ).returncode
 
     if command == "status":
         return run(local_dev_compose_args("ps"), check=False).returncode
@@ -3725,13 +3881,13 @@ def local_dev(args: argparse.Namespace) -> int:
             if remove_output:
                 print(remove_output, file=sys.stderr)
             return remove.returncode
-        return run(local_dev_compose_args("up", "-d"), check=False).returncode
+        return run(local_dev_up_args(), check=False).returncode
 
     if command == "reset-all":
         down = run(local_dev_compose_args("down", "--volumes"), check=False)
         if down.returncode != 0:
             return down.returncode
-        return run(local_dev_compose_args("up", "-d"), check=False).returncode
+        return run(local_dev_up_args(), check=False).returncode
 
     raise CheckError(f"Unknown local-dev command: {command}")
 
@@ -3744,6 +3900,38 @@ def _wsl_docker_ok() -> bool:
         timeout=DOCKER_PROBE_TIMEOUT_SECONDS,
     )
     return result is not None and result.returncode == 0
+
+
+def _docker_group_session_hint(
+    *,
+    socket_group_id: int | None = None,
+    configured_group_ids: set[int] | None = None,
+    active_group_ids: set[int] | None = None,
+) -> str | None:
+    if socket_group_id is None or configured_group_ids is None or active_group_ids is None:
+        if os.name == "nt":
+            return None
+        socket_path = Path("/var/run/docker.sock")
+        try:
+            import grp
+            import pwd
+
+            socket_group_id = socket_path.stat().st_gid
+            user = pwd.getpwuid(os.getuid())
+            configured_group_ids = {user.pw_gid}
+            configured_group_ids.update(
+                group.gr_gid for group in grp.getgrall() if user.pw_name in group.gr_mem
+            )
+            active_group_ids = {os.getgid(), *os.getgroups()}
+        except (ImportError, KeyError, OSError):
+            return None
+
+    if socket_group_id in configured_group_ids and socket_group_id not in active_group_ids:
+        return (
+            "Docker group membership is configured but missing from this shell; "
+            "start a new login shell or restart WSL, then rerun the command"
+        )
+    return None
 
 
 def setup_tool_ready(tool: str) -> bool:
@@ -3790,9 +3978,13 @@ def setup_external_preflight(profile: str) -> int:
             )
             return 1
         if not _docker_info_ok():
+            session_hint = _docker_group_session_hint()
+            detail = session_hint or (
+                "Docker Engine is not reachable in this shell; "
+                "Axis will not install or start an OS service automatically"
+            )
             print(
-                "setup: FAIL - Docker Engine is not reachable in this shell; "
-                "Axis will not install or start an OS service automatically",
+                f"setup: FAIL - {detail}",
                 file=sys.stderr,
             )
             return 1
@@ -3846,6 +4038,8 @@ def setup(args: argparse.Namespace) -> int:
         for index, label in enumerate(plan, 1):
             print(f"{index}. {label}")
         print("setup plan: no checks, downloads, or repository mutations were performed")
+        if normalized in {"local-dev", "review"} and not trust_local_ca:
+            print("setup plan: host browser trust is opt-in; add --trust-local-ca when required")
         return 0
 
     missing: tuple[str, ...] = ()
@@ -3879,6 +4073,19 @@ def setup(args: argparse.Namespace) -> int:
                 print(f"> install pinned user-local {tool} {axis_setup.tool_version(tool)}", flush=True)
                 installed = axis_setup.install_tool(tool, platform_spec=platform_spec)
                 print(f"  installed: {installed}")
+            if normalized == "review" and ("gh" in missing or shutil.which("gh") is None):
+                exposed = axis_setup.expose_managed_command("gh", platform_spec=platform_spec)
+                print(f"  exposed: {exposed}")
+                active_dirs = {
+                    os.path.normcase(os.path.abspath(entry))
+                    for entry in os.environ.get("PATH", "").split(os.pathsep)
+                    if entry
+                }
+                if os.path.normcase(os.path.abspath(exposed.parent)) not in active_dirs:
+                    print(
+                        f"setup: user command directory `{exposed.parent}` is not active in this shell; "
+                        "add it to PATH and start a new shell"
+                    )
         except (OSError, axis_setup.SetupError) as exc:
             print(f"setup: FAIL - {exc}", file=sys.stderr)
             return 1
@@ -3915,6 +4122,10 @@ def setup(args: argparse.Namespace) -> int:
             return rc
 
     print("setup: OK")
+    if normalized in {"local-dev", "review"} and not trust_local_ca:
+        trust_status, trust_detail = local_dev_host_trust_status()
+        if trust_status != "OK":
+            print(f"setup: [{trust_status}] host browser trust: {trust_detail}")
     if normalized == "review":
         followups = ["`coderabbit auth status`"]
         if setup_tool_ready("gh"):
@@ -3979,6 +4190,16 @@ def doctor(args: argparse.Namespace) -> int:
         openssl = find_openssl()
         if openssl:
             record("OK", "openssl", openssl)
+            certificates_valid = local_dev_certificates_valid(openssl)
+            record(
+                "OK" if certificates_valid else "WARN",
+                "local HTTPS certificates",
+                "valid local CA and localhost certificate"
+                if certificates_valid
+                else "missing or invalid; run `python scripts/axis.py local-dev certs`",
+            )
+            trust_status, trust_detail = local_dev_host_trust_status()
+            record(trust_status, "host browser trust", trust_detail)
         else:
             record("WARN", "openssl", "required for local-dev certs; install OpenSSL on PATH or Git for Windows")
 
@@ -4017,7 +4238,12 @@ def doctor(args: argparse.Namespace) -> int:
                 "Docker works from another detected execution context; run the canonical command there",
             )
         else:
-            record("FAIL", "docker endpoint", "docker info failed; no reachable Docker endpoint detected")
+            session_hint = _docker_group_session_hint()
+            record(
+                "FAIL",
+                "docker endpoint",
+                session_hint or "docker info failed; no reachable Docker endpoint detected",
+            )
 
         if _docker_compose_ok():
             record("OK", "docker compose", "docker compose version works")
@@ -4269,7 +4495,10 @@ def main(argv: list[str] | None = None) -> int:
     check_sub.add_parser("frontend-toolchain", help="Check Node and npm versions").set_defaults(func=check_frontend_toolchain)
     check_sub.add_parser("playwright-browsers", help="Check Playwright Chromium availability").set_defaults(func=check_playwright_browsers)
     check_sub.add_parser("vulnerable-packages", help="Audit NuGet dependencies for vulnerabilities").set_defaults(func=check_vulnerable_packages)
-    check_sub.add_parser("frontend-vulnerable-packages", help="Audit npm dependencies at high severity").set_defaults(func=check_frontend_vulnerable_packages)
+    check_sub.add_parser(
+        "frontend-vulnerable-packages",
+        help="Audit npm dependencies against the accepted-risk policy",
+    ).set_defaults(func=check_frontend_vulnerable_packages)
     check_sub.add_parser("ef-domain-mapping", help="Check EF Core mappings against domain ownership").set_defaults(func=check_ef_domain_mapping)
     check_sub.add_parser("frontend-api-contracts", help="Check generated frontend API contracts").set_defaults(func=check_frontend_api_contracts)
     check_sub.add_parser("ui-baseline", help="Check the approved frontend UI baseline").set_defaults(func=check_ui_baseline)
