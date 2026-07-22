@@ -2226,7 +2226,7 @@ class TestReviewVerificationGates(unittest.TestCase):
             mock.patch.object(axis, "verify_scope_paths", return_value=("working tree", ["frontend/e2e/register.pw.ts"])),
             mock.patch.object(axis, "check_frontend_toolchain", side_effect=lambda: calls.append("frontend-toolchain") or 0),
             mock.patch.object(axis, "frontend_toolchain_env", return_value={}),
-            mock.patch.object(axis, "run_local_dev_browser", browser_runner, create=True),
+            mock.patch.object(axis, "run_local_dev_browser", browser_runner),
             mock.patch.object(
                 axis,
                 "run_frontend_npm",
@@ -3247,7 +3247,7 @@ class TestAxisCommandWrappers(unittest.TestCase):
         with (
             mock.patch.object(axis, "check_frontend_toolchain", return_value=0),
             mock.patch.object(axis, "require_docker_compose", return_value=0),
-            mock.patch.object(axis, "run_local_dev_browser", browser_runner, create=True),
+            mock.patch.object(axis, "run_local_dev_browser", browser_runner),
             mock.patch.object(axis, "run_frontend_npm") as run_npm,
         ):
             rc = axis.frontend_command(
