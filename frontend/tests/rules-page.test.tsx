@@ -599,14 +599,45 @@ describe('RulesPage', () => {
       contextSchemaVersion: 1,
       outcomeKind: 'Validation',
     });
+  });
 
-    const editorName = await screen.findByLabelText('Name');
+  it('keeps workspace draft edits when dialog close is cancelled', async () => {
+    const user = userEvent.setup();
+    const workspaceDetail = {
+      ...ruleDefinitions.items[9],
+      expressionLanguageVersion: 1,
+      condition: null,
+      outcome: null,
+      versions: [],
+      createdAt: '2026-01-01T00:00:00Z',
+      updatedAt: '2026-01-01T00:00:00Z',
+      archivedAt: null,
+    };
+    vi.mocked(fetch).mockImplementation((input) => {
+      const url = input.toString();
+      if (url.includes('/rules/context-schemas')) {
+        return Promise.resolve(jsonResponse(contextSchemas));
+      }
+      if (url.endsWith('/rules/expression-language')) {
+        return Promise.resolve(jsonResponse(expressionLanguage));
+      }
+      if (url.endsWith('/rules/credit_threshold')) {
+        return Promise.resolve(jsonResponse(workspaceDetail));
+      }
+      return Promise.resolve(jsonResponse(ruleDefinitions));
+    });
+
+    await renderWithRouter(<RulesPage />, { path: '/rules', authenticatedPath: 'rules' });
+    await user.click(await screen.findByRole('button', { name: 'Credit threshold' }));
+    const editorDialog = await screen.findByRole('dialog', { name: 'Credit threshold' });
+    const editorName = within(editorDialog).getByLabelText('Name');
     await user.clear(editorName);
     await user.type(editorName, 'Updated credit value');
-    await user.click(screen.getByRole('button', { name: 'Close dialog' }));
+    await user.click(within(editorDialog).getByRole('button', { name: 'Close dialog' }));
+
     expect(screen.getByRole('heading', { name: 'Discard unsaved changes?' })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Keep editing' }));
-    expect(screen.getByLabelText('Name')).toHaveValue('Updated credit value');
+    expect(within(editorDialog).getByLabelText('Name')).toHaveValue('Updated credit value');
   });
 
   it('authors function operands from the server capability contract', async () => {
