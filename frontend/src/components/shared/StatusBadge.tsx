@@ -2,9 +2,17 @@ import type { ComponentProps } from 'react';
 
 import { Badge } from '@/components/ui/badge';
 
-type StatusBadgeTone = 'success' | 'neutral' | 'muted';
+type StatusBadgeTone = 'brand' | 'info' | 'success' | 'neutral' | 'muted';
 
 const toneStyles = {
+  brand: {
+    variant: 'outline',
+    className: 'border-primary/25 bg-primary/10 text-primary',
+  },
+  info: {
+    variant: 'outline',
+    className: 'border-info/25 bg-info/10 text-info',
+  },
   success: {
     variant: 'outline',
     className: 'border-success/25 bg-success/10 text-success',

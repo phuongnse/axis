@@ -169,7 +169,7 @@ class TestPortableSetupCli(unittest.TestCase):
             calls,
         )
 
-    def test_local_dev_profile_owns_browser_certificates_and_hooks(self) -> None:
+    def test_local_dev_profile_owns_certificates_and_hooks_without_host_browser(self) -> None:
         calls: list[str] = []
         with (
             mock.patch.object(axis.axis_setup, "detect_platform", return_value=axis_setup.SetupPlatform("darwin", "arm64")),
@@ -192,7 +192,7 @@ class TestPortableSetupCli(unittest.TestCase):
         ):
             self.assertEqual(0, axis.setup(setup_args(profile="local-dev")))
 
-        self.assertEqual(["ci", "exec -- playwright install chromium", "certs", "hooks"], calls)
+        self.assertEqual(["ci", "certs", "hooks"], calls)
 
     def test_local_dev_profile_can_explicitly_trust_the_generated_root_ca(self) -> None:
         calls: list[str] = []
@@ -217,7 +217,7 @@ class TestPortableSetupCli(unittest.TestCase):
                 axis.setup(setup_args(profile="local-dev", trust_local_ca=True, yes=True)),
             )
 
-        self.assertEqual(["ci", "exec -- playwright install chromium", "certs", "trust", "hooks"], calls)
+        self.assertEqual(["ci", "certs", "trust", "hooks"], calls)
 
     def test_install_user_tools_installs_only_missing_profile_tools_before_preflight(self) -> None:
         ready = {"dotnet": False, "node": True}

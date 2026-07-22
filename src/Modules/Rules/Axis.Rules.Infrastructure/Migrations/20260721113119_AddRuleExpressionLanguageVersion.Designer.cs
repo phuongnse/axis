@@ -3,6 +3,7 @@ using System;
 using Axis.Rules.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Axis.Rules.Infrastructure.Migrations
 {
     [DbContext(typeof(RulesDbContext))]
-    partial class RulesDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260721113119_AddRuleExpressionLanguageVersion")]
+    partial class AddRuleExpressionLanguageVersion
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

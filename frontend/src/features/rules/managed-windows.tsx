@@ -6,7 +6,7 @@ import type {
 } from '@/components/shared/ManagedWindowManager';
 import { useCurrentManagedWindow } from '@/components/shared/ManagedWindowManager';
 import type { RuleDefinitionSummary } from './api';
-import { ruleDefinitionsListQueryOptions } from './api';
+import { ruleDefinitionDetailQueryOptions } from './api';
 import { RuleEditorDialog } from './components/RuleEditorDialog';
 import { SystemRuleDetailsDialog } from './components/SystemRuleDetailsDialog';
 
@@ -70,16 +70,13 @@ function RuleEditorWindowRenderer({ descriptor }: ManagedWindowRendererProps) {
 function SystemRuleWindowRenderer({ descriptor }: ManagedWindowRendererProps) {
   const { windowId, closeWindow } = useCurrentManagedWindow();
   const definitionKey = readDefinitionKey(descriptor);
-  const definitionsQuery = useQuery(ruleDefinitionsListQueryOptions());
-  const definition = definitionsQuery.data?.items?.find(
-    (candidate) => candidate.definitionKey === definitionKey,
-  );
+  const definitionQuery = useQuery(ruleDefinitionDetailQueryOptions(definitionKey));
   return (
     <SystemRuleDetailsDialog
-      definition={definition ?? null}
+      definition={definitionQuery.data ?? null}
       fallbackTitle={descriptor.title}
-      loading={definitionsQuery.isLoading}
-      unavailable={definitionsQuery.isError || (!definitionsQuery.isLoading && !definition)}
+      loading={definitionQuery.isLoading}
+      unavailable={definitionQuery.isError || (!definitionQuery.isLoading && !definitionQuery.data)}
       open
       onOpenChange={(open) => {
         if (!open) closeWindow(windowId);

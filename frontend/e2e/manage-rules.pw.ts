@@ -4,6 +4,7 @@ import type { components } from '../src/lib/api-types';
 
 type CreateRuleRequest = components['schemas']['CreateRuleDefinitionRequest'];
 type RuleDetail = components['schemas']['RuleDefinitionDetailDto'];
+type RuleExpressionLanguage = components['schemas']['RuleExpressionLanguageDto'];
 type RuleVersion = components['schemas']['RuleDefinitionVersionDto'];
 type SaveRuleRequest = components['schemas']['SaveRuleDefinitionDraftRequest'];
 
@@ -34,6 +35,7 @@ const systemRule = (definitionKey: string, name: string, targetTypeKeys: string[
   scope: 'Field',
   outcomeKind: 'Validation',
   status: 'Published',
+  expressionLanguageVersion: 1,
   latestPublishedVersion: 1,
   applicability: { targetTypeKeys, configurationConstraints: {} },
   parameters: [],
@@ -70,6 +72,86 @@ const contextSchemas = [
     configuration: {},
   },
 ];
+const comparableTypes = ['Integer', 'Decimal', 'Date', 'DateTime'] as const;
+const expressionLanguage: RuleExpressionLanguage = {
+  version: 1,
+  operators: [
+    {
+      operator: 'Equal',
+      leftShapes: ['Text', 'Integer', 'Decimal', 'Date', 'DateTime', 'Boolean'].map((type) => ({
+        type,
+        cardinality: 'Any',
+      })),
+      rightShapes: ['Text', 'Integer', 'Decimal', 'Date', 'DateTime', 'Boolean'].map((type) => ({
+        type,
+        cardinality: 'Any',
+      })),
+      requiresMatchingTypes: true,
+    },
+    {
+      operator: 'GreaterThan',
+      leftShapes: comparableTypes.map((type) => ({ type, cardinality: 'Scalar' })),
+      rightShapes: comparableTypes.map((type) => ({ type, cardinality: 'Scalar' })),
+      requiresMatchingTypes: true,
+    },
+  ],
+  functions: [
+    {
+      function: 'IsBlank',
+      parameters: [
+        {
+          acceptedTypes: ['Text', 'Integer', 'Decimal', 'Date', 'DateTime', 'Boolean'],
+          cardinality: 'Any',
+        },
+      ],
+      returnType: 'Boolean',
+      returnCardinality: 'Scalar',
+    },
+  ],
+  limits: {
+    maxDepth: 12,
+    maxNodes: 200,
+    maxFunctionCalls: 50,
+    maxParameters: 100,
+    maxExecutionSteps: 1000,
+  },
+};
+
+function systemDetail(definitionKey: string): RuleDetail | null {
+  const definition = systemRules.find((candidate) => candidate.definitionKey === definitionKey);
+  if (!definition) return null;
+  return {
+    ...definition,
+    revision: null,
+    contextKey: null,
+    contextSchemaVersion: null,
+    condition: {
+      nodeId: 'required_check',
+      predicateOperator: 'Equal',
+      left: {
+        kind: 'Function',
+        function: 'IsBlank',
+        arguments: [{ kind: 'Context', reference: 'field.value', arguments: [] }],
+      },
+      right: {
+        kind: 'Literal',
+        literal: { type: 'Boolean', values: ['true'] },
+        arguments: [],
+      },
+      children: [],
+    },
+    outcome: {
+      kind: 'Validation',
+      violationCode: `${definitionKey}.failed`,
+      severity: 'Error',
+      message: `${definition.name} validation failed.`,
+    },
+    versions: [],
+    createdAt: null,
+    updatedAt: null,
+    archivedAt: null,
+  };
+}
 
 interface CapturedRequest {
   method: string;
@@ -165,12 +247,31 @@ async function mockRulesApi(page: Page): Promise<CapturedRequest[]> {
       return;
     }
 
+    if (method === 'GET' && path === '/api/rules/expression-language') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(expressionLanguage),
+      });
+      return;
+    }
+
     if (method === 'GET' && path === '/api/rules') {
       const items = detail ? [...systemRules, summary(detail)] : systemRules;
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ items, totalCount: items.length, page: 1, pageSize: 100 }),
+      });
+      return;
+    }
+
+    if (method === 'GET' && path.startsWith('/api/rules/field.')) {
+      const definition = systemDetail(path.slice('/api/rules/'.length));
+      await route.fulfill({
+        status: definition ? 200 : 404,
+        contentType: 'application/json',
+        body: JSON.stringify(definition ?? {}),
       });
       return;
     }
@@ -186,6 +287,7 @@ async function mockRulesApi(page: Page): Promise<CapturedRequest[]> {
         scope: body.scope,
         outcomeKind: body.outcomeKind,
         status: 'Draft',
+        expressionLanguageVersion: 1,
         revision: 1,
         latestPublishedVersion: null,
         contextKey: body.contextKey,
@@ -243,6 +345,7 @@ async function mockRulesApi(page: Page): Promise<CapturedRequest[]> {
           description: detail.description,
           scope: detail.scope,
           outcomeKind: detail.outcomeKind,
+          expressionLanguageVersion: detail.expressionLanguageVersion,
           contextKey: detail.contextKey,
           contextSchemaVersion: detail.contextSchemaVersion,
           parameters: detail.parameters,
@@ -419,33 +522,11 @@ test('workspace rule authoring supports simulation, immutable revisions, and arc
   const systemDetails = page.getByRole('dialog', { name: 'Required value' });
   const systemWindow = systemDetails.locator('[data-slot="managed-dialog-window"]');
   await expect(systemDetails).toBeVisible();
-  await expect(systemWindow).toHaveAttribute('data-dialog-preset', 'large');
+  await expect(systemWindow).toHaveAttribute('data-dialog-preset', 'fullscreen');
   const expandedLayerBox = await page
     .locator('[data-slot="managed-window-expanded-layer"]')
     .boundingBox();
   if (!expandedLayerBox) throw new Error('Managed window work area did not render');
-  const expectedLargeRect = {
-    width: Math.round(expandedLayerBox.width * 0.5),
-    height: Math.round(expandedLayerBox.height * 0.75),
-    x: Math.round(expandedLayerBox.x + expandedLayerBox.width * 0.25),
-    y: Math.round(expandedLayerBox.y + expandedLayerBox.height * 0.125),
-  };
-  await expect
-    .poll(async () => {
-      const box = await systemWindow.boundingBox();
-      return box
-        ? {
-            width: Math.round(box.width),
-            height: Math.round(box.height),
-            x: Math.round(box.x),
-            y: Math.round(box.y),
-          }
-        : null;
-    })
-    .toEqual(expectedLargeRect);
-
-  await systemDetails.getByRole('button', { name: 'Maximize dialog' }).click();
-  await expect(systemWindow).toHaveAttribute('data-dialog-preset', 'fullscreen');
   await expect
     .poll(async () => {
       const box = await systemWindow.boundingBox();
@@ -467,6 +548,25 @@ test('workspace rule authoring supports simulation, immutable revisions, and arc
 
   await systemDetails.getByRole('button', { name: 'Restore dialog size' }).click();
   await expect(systemWindow).toHaveAttribute('data-dialog-preset', 'large');
+  const expectedLargeRect = {
+    width: Math.round(expandedLayerBox.width * 0.5),
+    height: Math.round(expandedLayerBox.height * 0.75),
+    x: Math.round(expandedLayerBox.x + expandedLayerBox.width * 0.25),
+    y: Math.round(expandedLayerBox.y + expandedLayerBox.height * 0.125),
+  };
+  await expect
+    .poll(async () => {
+      const box = await systemWindow.boundingBox();
+      return box
+        ? {
+            width: Math.round(box.width),
+            height: Math.round(box.height),
+            x: Math.round(box.x),
+            y: Math.round(box.y),
+          }
+        : null;
+    })
+    .toEqual(expectedLargeRect);
 
   const backgroundNewRuleButton = catalog.getByRole('button', { name: 'New rule', exact: true });
   await expect(backgroundNewRuleButton).toBeVisible();
@@ -491,6 +591,8 @@ test('workspace rule authoring supports simulation, immutable revisions, and arc
   expect(draggedDialogBox?.y ?? 0).toBeGreaterThan(initialDialogBox.y + 20);
 
   await systemDetails.getByRole('button', { name: 'Reset dialog' }).click();
+  await expect(systemWindow).toHaveAttribute('data-dialog-preset', 'fullscreen');
+  await systemDetails.getByRole('button', { name: 'Restore dialog size' }).click();
   await expect(systemWindow).toHaveAttribute('data-dialog-preset', 'large');
   const resetDialogBox = await systemWindow.boundingBox();
   expect(resetDialogBox?.x).toBeCloseTo(expandedLayerBox.x + expandedLayerBox.width * 0.25, 1);
@@ -636,7 +738,10 @@ test('workspace rule authoring supports simulation, immutable revisions, and arc
   );
   await expect(systemBadges).toHaveCount(2);
   await expect(systemBadges.nth(0)).toHaveText('Built-in');
-  await expect(systemBadges.nth(1)).toHaveText('Read-only');
+  await expect(systemBadges.nth(1)).toHaveText('Published');
+  await expect(systemDetails.getByRole('heading', { name: 'Rule logic' })).toBeVisible();
+  await expect(systemDetails).toContainText('Is blank');
+  await expect(systemDetails).toContainText('Field value');
   await expect(systemDetails.getByRole('button', { name: 'Archive', exact: true })).toHaveCount(0);
   await page.keyboard.press('Escape');
   await expect(systemDetails).toBeHidden();
@@ -777,7 +882,7 @@ test('workspace rule authoring supports simulation, immutable revisions, and arc
   await expect(greaterThanOption).toBeVisible();
   await greaterThanOption.click();
   await expect(editorDialog.getByLabel('Operator')).toContainText('Greater than');
-  await editorDialog.getByLabel('Compare with').click();
+  await editorDialog.getByLabel('Right operand').click();
   await page.getByRole('option', { name: 'Parameter' }).click();
   await editorDialog.getByLabel('Parameter', { exact: true }).click();
   await page.getByRole('option', { name: 'threshold' }).click();

@@ -1,4 +1,7 @@
 using System.Globalization;
+using System.Net.Mail;
+using System.Text;
+using System.Text.RegularExpressions;
 using Axis.Shared.Domain.Primitives;
 
 namespace Axis.Rules.Domain;
@@ -6,6 +9,8 @@ namespace Axis.Rules.Domain;
 public sealed record RuleEvaluationLimits(
     int MaxDepth = 12,
     int MaxNodes = 200,
+    int MaxFunctionCalls = 50,
+    int MaxParameters = 100,
     int MaxExecutionSteps = 1000)
 {
     public static RuleEvaluationLimits Default { get; } = new();
@@ -20,6 +25,8 @@ public sealed record RuleConditionEvaluation(
 
 public static class RuleConditionEvaluator
 {
+    private static readonly TimeSpan PatternTimeout = TimeSpan.FromMilliseconds(250);
+
     public static Result<RuleConditionEvaluation> Evaluate(
         RuleConditionNode condition,
         RuleContextSchema schema,
@@ -28,8 +35,13 @@ public static class RuleConditionEvaluator
         RuleEvaluationLimits? limits = null)
     {
         RuleEvaluationLimits effectiveLimits = limits ?? RuleEvaluationLimits.Default;
-        if (effectiveLimits.MaxDepth <= 0 || effectiveLimits.MaxNodes <= 0 || effectiveLimits.MaxExecutionSteps <= 0)
+        if (effectiveLimits.MaxDepth <= 0 || effectiveLimits.MaxNodes <= 0 ||
+            effectiveLimits.MaxFunctionCalls <= 0 || effectiveLimits.MaxParameters <= 0 ||
+            effectiveLimits.MaxExecutionSteps <= 0)
             return Result.Failure<RuleConditionEvaluation>("Rule evaluation limits must be positive.");
+
+        if ((parameters?.Count ?? 0) > effectiveLimits.MaxParameters)
+            return Result.Failure<RuleConditionEvaluation>("Rule evaluation exceeds the maximum parameter count.");
 
         EvaluationState state = new(
             schema,
@@ -138,6 +150,9 @@ public static class RuleConditionEvaluator
         if (operand.Kind == RuleOperandKind.Literal)
             return new ResolvedOperand(operand.Literal);
 
+        if (operand.Kind == RuleOperandKind.Function)
+            return ResolveFunction(operand, state);
+
         if (operand.Kind == RuleOperandKind.Parameter)
             return state.Parameters.TryGetValue(operand.Reference!, out RuleValue? parameter)
                 ? new ResolvedOperand(parameter)
@@ -154,6 +169,176 @@ public static class RuleConditionEvaluator
             return Result.Failure<ResolvedOperand>($"Rule context value '{field.Path}' does not match its schema.");
 
         return new ResolvedOperand(contextValue);
+    }
+
+    private static Result<ResolvedOperand> ResolveFunction(
+        RuleOperand operand,
+        EvaluationState state)
+    {
+        state.FunctionCallCount += 1;
+        if (state.FunctionCallCount > state.Limits.MaxFunctionCalls)
+            return Result.Failure<ResolvedOperand>("Rule expression exceeds the maximum function-call count.");
+
+        state.ExecutionSteps += 1;
+        if (state.ExecutionSteps > state.Limits.MaxExecutionSteps)
+            return Result.Failure<ResolvedOperand>("Rule evaluation exceeded the execution-step limit.");
+
+        if (operand.FunctionKind is null)
+            return Result.Failure<ResolvedOperand>("Rule expression function is not supported.");
+
+        List<RuleValue?> arguments = [];
+        foreach (RuleOperand argumentOperand in operand.Arguments)
+        {
+            Result<ResolvedOperand> argument = Resolve(argumentOperand, state);
+            if (argument.IsFailure)
+                return argument;
+            arguments.Add(argument.Value.Value);
+        }
+
+        return operand.FunctionKind.Value switch
+        {
+            RuleExpressionFunction.IsBlank => IsBlank(arguments),
+            RuleExpressionFunction.Length => Length(arguments),
+            RuleExpressionFunction.Precision => Precision(arguments),
+            RuleExpressionFunction.Scale => Scale(arguments),
+            RuleExpressionFunction.Count => Count(arguments),
+            RuleExpressionFunction.MatchesPattern => MatchesPattern(arguments),
+            RuleExpressionFunction.HasFormat => HasFormat(arguments),
+            RuleExpressionFunction.ToDecimal => ToDecimal(arguments),
+            _ => Result.Failure<ResolvedOperand>("Rule expression function is not supported."),
+        };
+    }
+
+    private static Result<ResolvedOperand> IsBlank(IReadOnlyList<RuleValue?> arguments)
+    {
+        if (arguments.Count != 1)
+            return Result.Failure<ResolvedOperand>("IsBlank requires one argument.");
+
+        RuleValue? value = arguments[0];
+        bool isBlank = value is null ||
+            value.Type == RuleValueType.Text && value.Values.All(string.IsNullOrWhiteSpace);
+        return Scalar(RuleValueType.Boolean, isBlank.ToString());
+    }
+
+    private static Result<ResolvedOperand> Length(IReadOnlyList<RuleValue?> arguments)
+    {
+        RuleValue? value = SingleArgument(arguments, RuleValueType.Text);
+        return value is null
+            ? new ResolvedOperand(null)
+            : Scalar(
+                RuleValueType.Integer,
+                value.Values[0].EnumerateRunes().Count().ToString(CultureInfo.InvariantCulture));
+    }
+
+    private static Result<ResolvedOperand> Precision(IReadOnlyList<RuleValue?> arguments)
+    {
+        RuleValue? value = SingleArgument(arguments, RuleValueType.Decimal);
+        if (value is null)
+            return new ResolvedOperand(null);
+
+        (int precision, _) = DecimalShape(value.Values[0]);
+        return Scalar(RuleValueType.Integer, precision.ToString(CultureInfo.InvariantCulture));
+    }
+
+    private static Result<ResolvedOperand> Scale(IReadOnlyList<RuleValue?> arguments)
+    {
+        RuleValue? value = SingleArgument(arguments, RuleValueType.Decimal);
+        if (value is null)
+            return new ResolvedOperand(null);
+
+        (_, int scale) = DecimalShape(value.Values[0]);
+        return Scalar(RuleValueType.Integer, scale.ToString(CultureInfo.InvariantCulture));
+    }
+
+    private static Result<ResolvedOperand> Count(IReadOnlyList<RuleValue?> arguments)
+    {
+        if (arguments.Count != 1)
+            return Result.Failure<ResolvedOperand>("Count requires one argument.");
+
+        return arguments[0] is RuleValue value
+            ? Scalar(RuleValueType.Integer, value.Values.Count.ToString(CultureInfo.InvariantCulture))
+            : new ResolvedOperand(null);
+    }
+
+    private static Result<ResolvedOperand> MatchesPattern(IReadOnlyList<RuleValue?> arguments)
+    {
+        if (arguments.Count != 2 || arguments[0] is not RuleValue value ||
+            arguments[1] is not RuleValue pattern)
+            return new ResolvedOperand(null);
+
+        try
+        {
+            bool matches = Regex.IsMatch(
+                value.Values[0],
+                pattern.Values[0],
+                RegexOptions.CultureInvariant,
+                PatternTimeout);
+            return Scalar(RuleValueType.Boolean, matches.ToString());
+        }
+        catch (RegexMatchTimeoutException)
+        {
+            return Result.Failure<ResolvedOperand>("Rule text pattern exceeded its execution limit.");
+        }
+        catch (ArgumentException)
+        {
+            return Result.Failure<ResolvedOperand>("Rule text pattern is invalid.");
+        }
+    }
+
+    private static Result<ResolvedOperand> HasFormat(IReadOnlyList<RuleValue?> arguments)
+    {
+        if (arguments.Count != 2 || arguments[0] is not RuleValue value ||
+            arguments[1] is not RuleValue format)
+            return new ResolvedOperand(null);
+
+        bool matches = format.Values[0] switch
+        {
+            "Email" => MailAddress.TryCreate(value.Values[0], out _),
+            "Url" => Uri.TryCreate(value.Values[0], UriKind.Absolute, out Uri? uri) &&
+                uri.Scheme is "http" or "https",
+            "Uuid" => Guid.TryParse(value.Values[0], out _),
+            _ => false,
+        };
+        return Scalar(RuleValueType.Boolean, matches.ToString());
+    }
+
+    private static Result<ResolvedOperand> ToDecimal(IReadOnlyList<RuleValue?> arguments)
+    {
+        if (arguments.Count != 1 || arguments[0] is not RuleValue value)
+            return new ResolvedOperand(null);
+
+        return value.Type is RuleValueType.Integer or RuleValueType.Decimal
+            ? Scalar(RuleValueType.Decimal, value.Values[0])
+            : Result.Failure<ResolvedOperand>("ToDecimal requires a scalar integer or decimal.");
+    }
+
+    private static RuleValue? SingleArgument(
+        IReadOnlyList<RuleValue?> arguments,
+        RuleValueType expectedType) =>
+        arguments.Count == 1 &&
+        arguments[0] is RuleValue value &&
+        value.Type == expectedType &&
+        value.Values.Count == 1
+            ? value
+            : null;
+
+    private static (int Precision, int Scale) DecimalShape(string value)
+    {
+        string canonical = decimal.Parse(value, CultureInfo.InvariantCulture)
+            .ToString("G29", CultureInfo.InvariantCulture)
+            .TrimStart('-');
+        string[] parts = canonical.Split('.', 2);
+        int scale = parts.Length == 2 ? parts[1].Length : 0;
+        int precision = Math.Max(1, string.Concat(parts).TrimStart('0').Length);
+        return (precision, scale);
+    }
+
+    private static Result<ResolvedOperand> Scalar(RuleValueType type, string value)
+    {
+        Result<RuleValue> result = RuleValue.Create(type, [value]);
+        return result.IsSuccess
+            ? new ResolvedOperand(result.Value)
+            : Result.Failure<ResolvedOperand>(result.Error);
     }
 
     private static bool Equal(RuleValue left, RuleValue right) =>
@@ -216,6 +401,7 @@ public static class RuleConditionEvaluator
         public RuleEvaluationLimits Limits { get; } = limits;
         public List<RuleNodeDiagnostic> Diagnostics { get; } = [];
         public int NodeCount { get; set; }
+        public int FunctionCallCount { get; set; }
         public int ExecutionSteps { get; set; }
     }
 }

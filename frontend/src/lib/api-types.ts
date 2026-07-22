@@ -261,6 +261,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/rules/expression-language": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get the versioned typed-expression capabilities available for rule authoring */
+        get: operations["GetRuleExpressionLanguage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/rules/{definitionKey}": {
         parameters: {
             query?: never;
@@ -268,7 +285,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get a workspace rule definition and its versions */
+        /** Get a system or workspace rule definition */
         get: operations["GetRuleDefinition"];
         put?: never;
         post?: never;
@@ -621,20 +638,23 @@ export interface components {
             outcomeKind?: components["schemas"]["RuleOutcomeKind"];
             status?: components["schemas"]["RuleLifecycleStatus"];
             /** Format: int32 */
-            revision?: number;
+            expressionLanguageVersion?: number;
+            /** Format: int32 */
+            revision?: number | null;
             /** Format: int32 */
             latestPublishedVersion?: number | null;
-            contextKey?: string;
+            contextKey?: string | null;
             /** Format: int32 */
-            contextSchemaVersion?: number;
+            contextSchemaVersion?: number | null;
+            applicability?: components["schemas"]["RuleApplicabilityDto"];
             parameters?: components["schemas"]["RuleParameterDefinitionDto"][];
             condition?: components["schemas"]["RuleConditionNodeDto"];
             outcome?: components["schemas"]["RuleOutcomeDto"];
             versions?: components["schemas"]["RuleDefinitionVersionDto"][];
             /** Format: date-time */
-            createdAt?: string;
+            createdAt?: string | null;
             /** Format: date-time */
-            updatedAt?: string;
+            updatedAt?: string | null;
             /** Format: date-time */
             archivedAt?: string | null;
         };
@@ -646,6 +666,8 @@ export interface components {
             scope?: components["schemas"]["RuleScope"];
             outcomeKind?: components["schemas"]["RuleOutcomeKind"];
             status?: components["schemas"]["RuleLifecycleStatus"];
+            /** Format: int32 */
+            expressionLanguageVersion?: number;
             /** Format: int32 */
             revision?: number | null;
             /** Format: int32 */
@@ -674,6 +696,8 @@ export interface components {
             description?: string;
             scope?: components["schemas"]["RuleScope"];
             outcomeKind?: components["schemas"]["RuleOutcomeKind"];
+            /** Format: int32 */
+            expressionLanguageVersion?: number;
             contextKey?: string;
             /** Format: int32 */
             contextSchemaVersion?: number;
@@ -684,6 +708,43 @@ export interface components {
             publishedByUserId?: string;
             /** Format: date-time */
             publishedAt?: string;
+        };
+        /** @enum {string} */
+        RuleExpressionCardinality: "Scalar" | "Multiple" | "Any";
+        /** @enum {string} */
+        RuleExpressionFunction: "IsBlank" | "Length" | "Precision" | "Scale" | "Count" | "MatchesPattern" | "HasFormat" | "ToDecimal";
+        RuleExpressionFunctionDefinitionDto: {
+            function?: components["schemas"]["RuleExpressionFunction"];
+            parameters?: components["schemas"]["RuleExpressionFunctionParameterDto"][];
+            returnType?: components["schemas"]["RuleValueType"];
+            returnCardinality?: components["schemas"]["RuleExpressionCardinality"];
+        };
+        RuleExpressionFunctionParameterDto: {
+            acceptedTypes?: components["schemas"]["RuleValueType"][];
+            cardinality?: components["schemas"]["RuleExpressionCardinality"];
+        };
+        RuleExpressionLanguageDto: {
+            /** Format: int32 */
+            version?: number;
+            operators?: components["schemas"]["RulePredicateOperatorDefinitionDto"][];
+            functions?: components["schemas"]["RuleExpressionFunctionDefinitionDto"][];
+            limits?: components["schemas"]["RuleExpressionLimitsDto"];
+        };
+        RuleExpressionLimitsDto: {
+            /** Format: int32 */
+            maxDepth?: number;
+            /** Format: int32 */
+            maxNodes?: number;
+            /** Format: int32 */
+            maxFunctionCalls?: number;
+            /** Format: int32 */
+            maxParameters?: number;
+            /** Format: int32 */
+            maxExecutionSteps?: number;
+        };
+        RuleExpressionValueShapeDto: {
+            type?: components["schemas"]["RuleValueType"];
+            cardinality?: components["schemas"]["RuleExpressionCardinality"];
         };
         /** @enum {string} */
         RuleLifecycleStatus: "Draft" | "Published" | "Archived";
@@ -697,9 +758,11 @@ export interface components {
             kind?: components["schemas"]["RuleOperandKind"];
             reference?: string | null;
             literal?: components["schemas"]["RuleValueDto"];
+            function?: components["schemas"]["RuleExpressionFunction"];
+            arguments?: components["schemas"]["RuleOperandDto"][] | null;
         };
         /** @enum {string} */
-        RuleOperandKind: "Context" | "Parameter" | "Literal";
+        RuleOperandKind: "Context" | "Parameter" | "Literal" | "Function";
         /** @enum {string} */
         RuleOrigin: "System" | "Workspace";
         RuleOutcomeDto: {
@@ -720,6 +783,12 @@ export interface components {
         };
         /** @enum {string} */
         RulePredicateOperator: "Equal" | "NotEqual" | "GreaterThan" | "GreaterThanOrEqual" | "LessThan" | "LessThanOrEqual" | "Contains" | "StartsWith" | "EndsWith" | "IsNull" | "IsNotNull";
+        RulePredicateOperatorDefinitionDto: {
+            operator?: components["schemas"]["RulePredicateOperator"];
+            leftShapes?: components["schemas"]["RuleExpressionValueShapeDto"][];
+            rightShapes?: components["schemas"]["RuleExpressionValueShapeDto"][];
+            requiresMatchingTypes?: boolean;
+        };
         RuleRevisionRequest: {
             /** Format: int32 */
             expectedRevision?: number;
@@ -1584,6 +1653,44 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RuleContextSchemaDto"][];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetRuleExpressionLanguage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RuleExpressionLanguageDto"];
                 };
             };
             /** @description Unauthorized */

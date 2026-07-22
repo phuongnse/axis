@@ -85,6 +85,80 @@ const contextSchemas = [
   },
 ];
 
+const expressionLanguage = {
+  version: 1,
+  operators: [
+    {
+      operator: 'Equal',
+      leftShapes: ['Text', 'Integer', 'Decimal', 'Date', 'DateTime', 'Boolean'].map((type) => ({
+        type,
+        cardinality: 'Any',
+      })),
+      rightShapes: ['Text', 'Integer', 'Decimal', 'Date', 'DateTime', 'Boolean'].map((type) => ({
+        type,
+        cardinality: 'Any',
+      })),
+      requiresMatchingTypes: true,
+    },
+    {
+      operator: 'IsNull',
+      leftShapes: [{ type: 'Text', cardinality: 'Any' }],
+      rightShapes: [],
+      requiresMatchingTypes: false,
+    },
+  ],
+  functions: [
+    {
+      function: 'IsBlank',
+      parameters: [{ acceptedTypes: ['Text'], cardinality: 'Any' }],
+      returnType: 'Boolean',
+      returnCardinality: 'Scalar',
+    },
+    {
+      function: 'Length',
+      parameters: [{ acceptedTypes: ['Text'], cardinality: 'Scalar' }],
+      returnType: 'Integer',
+      returnCardinality: 'Scalar',
+    },
+  ],
+  limits: { maxDepth: 12, maxNodes: 200, maxExecutionSteps: 1000 },
+};
+
+function systemDetail(definitionKey: string) {
+  const summary = ruleDefinitions.items.find(
+    (definition) => definition.definitionKey === definitionKey,
+  );
+  if (!summary) throw new Error(`Missing test rule ${definitionKey}`);
+  return {
+    ...summary,
+    expressionLanguageVersion: 1,
+    revision: null,
+    contextKey: null,
+    contextSchemaVersion: null,
+    condition: {
+      nodeId: 'required_check',
+      predicateOperator: 'Equal',
+      left: {
+        kind: 'Function',
+        function: 'IsBlank',
+        arguments: [{ kind: 'Context', reference: 'field.value', arguments: [] }],
+      },
+      right: { kind: 'Literal', literal: { type: 'Boolean', values: ['true'] }, arguments: [] },
+      children: [],
+    },
+    outcome: {
+      kind: 'Validation',
+      violationCode: 'field.value.required',
+      severity: 'Error',
+      message: 'A value is required.',
+    },
+    versions: [],
+    createdAt: null,
+    updatedAt: null,
+    archivedAt: null,
+  };
+}
+
 describe('RulesPage', () => {
   beforeEach(() => {
     vi.stubGlobal('fetch', vi.fn());
@@ -127,7 +201,7 @@ describe('RulesPage', () => {
       within(requiredRow).getByText('Require records to provide a value for the field.'),
     ).toHaveClass('text-xs');
     expect(requiredRow.querySelectorAll('[data-slot="rule-table-value"]')).toHaveLength(5);
-    expect(within(requiredRow).getByText('Built-in')).toBeInTheDocument();
+    expect(within(requiredRow).getByText('Built-in')).toHaveClass('bg-info/10', 'text-info');
     expect(within(requiredRow).getByText('Published')).toHaveClass('text-success');
     expect(within(requiredRow).getByText(/Date and time/)).toBeInTheDocument();
     expect(within(requiredRow).getByText('Field')).toBeInTheDocument();
@@ -138,6 +212,12 @@ describe('RulesPage', () => {
     expect(within(catalog).getByText('Text format')).toBeInTheDocument();
     expect(within(catalog).getByText('Choice selection count')).toBeInTheDocument();
     expect(within(catalog).getByText('Credit threshold')).toBeInTheDocument();
+    const workspaceRow = within(catalog).getByText('Credit threshold').closest('tr');
+    if (!workspaceRow) throw new Error('Workspace rule row was not rendered');
+    expect(within(workspaceRow).getByText('Workspace')).toHaveClass(
+      'bg-primary/10',
+      'text-primary',
+    );
     expect(within(catalog).getByText('Draft')).toHaveAttribute('data-variant', 'secondary');
     expect(within(catalog).queryByText('Validation')).not.toBeInTheDocument();
     expect(within(catalog).queryByText('field.required')).not.toBeInTheDocument();
@@ -181,6 +261,12 @@ describe('RulesPage', () => {
       }
       if (url.endsWith('/rules/credit_threshold')) {
         return Promise.resolve(jsonResponse(workspaceDetail));
+      }
+      if (url.endsWith('/rules/field.required')) {
+        return Promise.resolve(jsonResponse(systemDetail('field.required')));
+      }
+      if (url.endsWith('/rules/expression-language')) {
+        return Promise.resolve(jsonResponse(expressionLanguage));
       }
       return Promise.resolve(jsonResponse(ruleDefinitions));
     });
@@ -289,7 +375,7 @@ describe('RulesPage', () => {
       Array.from(restoredHeader?.querySelectorAll('[data-slot="badge"]') ?? [], (badge) =>
         badge.textContent?.trim(),
       ),
-    ).toEqual(['Built-in', 'Read-only']);
+    ).toEqual(['Built-in', 'Published']);
     expect(
       within(systemDetails).queryByRole('button', { name: 'Archive' }),
     ).not.toBeInTheDocument();
@@ -297,7 +383,7 @@ describe('RulesPage', () => {
       vi
         .mocked(fetch)
         .mock.calls.some(([input]) => input.toString().endsWith('/rules/field.required')),
-    ).toBe(false);
+    ).toBe(true);
 
     await user.click(
       within(systemDetailsFooter as HTMLElement).getByRole('button', { name: 'Close' }),
@@ -329,7 +415,13 @@ describe('RulesPage', () => {
 
   it('renders system rule details as responsive described sections', async () => {
     const user = userEvent.setup();
-    vi.mocked(fetch).mockResolvedValue(jsonResponse(ruleDefinitions));
+    vi.mocked(fetch).mockImplementation((input) => {
+      const url = input.toString();
+      if (url.endsWith('/rules/field.required')) {
+        return Promise.resolve(jsonResponse(systemDetail('field.required')));
+      }
+      return Promise.resolve(jsonResponse(ruleDefinitions));
+    });
 
     await renderWithRouter(<RulesPage />, { path: '/rules', authenticatedPath: 'rules' });
 
@@ -346,19 +438,28 @@ describe('RulesPage', () => {
     const headerBadges = header?.querySelectorAll('[data-slot="badge"]') ?? [];
     expect(Array.from(headerBadges, (badge) => badge.textContent?.trim())).toEqual([
       'Built-in',
-      'Read-only',
+      'Published',
     ]);
-    expect(headerBadges[0]).toHaveAttribute('data-variant', 'secondary');
-    expect(headerBadges[1]).toHaveAttribute('data-variant', 'outline');
+    expect(headerBadges[0]).toHaveAttribute('data-variant', 'outline');
+    expect(headerBadges[0]).toHaveClass('bg-info/10', 'text-info');
+    expect(within(details).queryByText('Read-only')).not.toBeInTheDocument();
 
     const definitionSection = within(details).getByRole('region', { name: 'Definition' });
     const fieldTypesSection = within(details).getByRole('region', {
       name: 'Supported field types',
     });
     const parametersSection = within(details).getByRole('region', { name: 'Parameters' });
-    const sections = [definitionSection, fieldTypesSection, parametersSection];
+    const logicSection = within(details).getByRole('region', { name: 'Rule logic' });
+    const outcomeSection = within(details).getByRole('region', { name: 'Outcome' });
+    const sections = [
+      definitionSection,
+      fieldTypesSection,
+      logicSection,
+      parametersSection,
+      outcomeSection,
+    ];
 
-    expect(details.querySelectorAll('[data-slot="system-rule-details-section"]')).toHaveLength(3);
+    expect(details.querySelectorAll('[data-slot="system-rule-details-section"]')).toHaveLength(5);
     expect(definitionSection).toHaveTextContent(
       'Scope, ownership, lifecycle, and published version.',
     );
@@ -369,25 +470,40 @@ describe('RulesPage', () => {
     expect(parametersSection).toHaveTextContent(
       'Optional typed inputs supplied when a rule is applied.',
     );
+    expect(logicSection).toHaveTextContent('Is blank');
+    expect(logicSection).toHaveTextContent('Field value');
+    expect(logicSection).toHaveTextContent('Equals');
+    expect(logicSection).toHaveTextContent('true');
+    expect(outcomeSection).toHaveTextContent('A value is required.');
+    expect(definitionSection).toHaveTextContent('Applies to a single field value.');
 
     for (const section of sections) {
-      expect(section).toHaveClass('grid', 'sm:grid-cols-3');
+      expect(section).toHaveClass('grid', 'gap-4', 'py-6', 'sm:grid-cols-3', 'sm:gap-8');
       expect(
         section.querySelector('[data-slot="system-rule-details-section-content"]'),
       ).toHaveClass('sm:col-span-2');
     }
     expect(definitionSection).not.toHaveClass('border-t');
     expect(fieldTypesSection).toHaveClass('border-t');
+    expect(logicSection).toHaveClass('border-t');
     expect(parametersSection).toHaveClass('border-t');
+    expect(outcomeSection).toHaveClass('border-t');
 
     expect(
       Array.from(definitionSection.querySelectorAll('dt'), (item) => item.textContent),
-    ).toEqual(['Description', 'Scope', 'Status', 'Outcome', 'Version history']);
+    ).toEqual(['Description', 'Scope', 'Version history']);
     expect(
       Array.from(fieldTypesSection.querySelectorAll('dt'), (item) => item.textContent),
     ).toEqual(['Field types', 'Setup']);
+    for (const list of details.querySelectorAll('dl')) {
+      expect(list).toHaveClass('gap-y-5');
+    }
+    for (const item of details.querySelectorAll('dt')) {
+      expect(item.parentElement).toHaveClass('space-y-2');
+      expect(item.nextElementSibling).toHaveClass('leading-relaxed');
+    }
     expect(within(fieldTypesSection).getByText('No setup needed')).toBeInTheDocument();
-    expect(within(parametersSection).getByText('No parameters')).toBeInTheDocument();
+    expect(within(parametersSection).getByText('No parameters')).toHaveClass('leading-relaxed');
   });
 
   it('creates a workspace draft from a registered context', async () => {
@@ -410,6 +526,8 @@ describe('RulesPage', () => {
       const url = input.toString();
       if (url.includes('/rules/context-schemas'))
         return Promise.resolve(jsonResponse(contextSchemas));
+      if (url.endsWith('/rules/expression-language'))
+        return Promise.resolve(jsonResponse(expressionLanguage));
       if (url.endsWith('/rules') && init?.method === 'POST')
         return Promise.resolve(jsonResponse(created, 201));
       if (url.endsWith('/rules/high_credit_value')) return Promise.resolve(jsonResponse(created));
@@ -451,6 +569,7 @@ describe('RulesPage', () => {
     );
     await waitFor(() => expect(screen.getByLabelText('Context')).toBeEnabled());
     expect(screen.getByLabelText('Scope')).toHaveTextContent('Field');
+    expect(screen.getByText('Applies to a single field value.')).toBeInTheDocument();
     await user.click(screen.getByLabelText('Scope'));
     await user.click(await screen.findByRole('option', { name: 'Field' }));
     expect(screen.getByLabelText('Scope')).toHaveTextContent('Field');
@@ -488,6 +607,100 @@ describe('RulesPage', () => {
     expect(screen.getByRole('heading', { name: 'Discard unsaved changes?' })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Keep editing' }));
     expect(screen.getByLabelText('Name')).toHaveValue('Updated credit value');
+  });
+
+  it('authors function operands from the server capability contract', async () => {
+    const user = userEvent.setup();
+    const textSchema = {
+      contextKey: 'business_objects.field.text',
+      version: 1,
+      scope: 'Field',
+      displayName: 'Text field value',
+      fields: [
+        { path: 'field.value', displayName: 'Field value', type: 'Text', allowMultiple: false },
+      ],
+    };
+    const workspaceDetail = {
+      ...ruleDefinitions.items[9],
+      expressionLanguageVersion: 1,
+      contextKey: textSchema.contextKey,
+      contextSchemaVersion: 1,
+      condition: {
+        nodeId: 'root',
+        logicalOperator: 'All',
+        children: [
+          {
+            nodeId: 'predicate',
+            predicateOperator: 'Equal',
+            left: { kind: 'Context', reference: 'field.value', arguments: [] },
+            right: {
+              kind: 'Literal',
+              literal: { type: 'Text', values: ['example'] },
+              arguments: [],
+            },
+            children: [],
+          },
+        ],
+      },
+      outcome: {
+        kind: 'Validation',
+        violationCode: 'credit.threshold.exceeded',
+        severity: 'Error',
+        message: 'Value is invalid.',
+      },
+      versions: [],
+      createdAt: '2026-01-01T00:00:00Z',
+      updatedAt: '2026-01-01T00:00:00Z',
+      archivedAt: null,
+    };
+    vi.mocked(fetch).mockImplementation((input, init) => {
+      const url = input.toString();
+      if (url.endsWith('/rules/context-schemas'))
+        return Promise.resolve(jsonResponse([textSchema]));
+      if (url.endsWith('/rules/expression-language')) {
+        return Promise.resolve(jsonResponse(expressionLanguage));
+      }
+      if (url.endsWith('/rules/credit_threshold/draft') && init?.method === 'PUT') {
+        return Promise.resolve(jsonResponse(workspaceDetail));
+      }
+      if (url.endsWith('/rules/credit_threshold')) {
+        return Promise.resolve(jsonResponse(workspaceDetail));
+      }
+      return Promise.resolve(jsonResponse(ruleDefinitions));
+    });
+
+    await renderWithRouter(<RulesPage />, { path: '/rules', authenticatedPath: 'rules' });
+    const catalog = screen.getByRole('region', { name: 'Rules catalog' });
+    await user.click(await within(catalog).findByRole('button', { name: 'Credit threshold' }));
+    const editor = await screen.findByRole('dialog', { name: 'Credit threshold' });
+    const conditions = within(editor).getByRole('heading', { name: 'Conditions' }).parentElement
+      ?.parentElement;
+    if (!conditions) throw new Error('Conditions section was not rendered');
+
+    await user.click(within(conditions).getByLabelText('Left operand'));
+    await user.click(await screen.findByRole('option', { name: 'Function' }));
+    await user.click(within(conditions).getByLabelText('Function'));
+    await user.click(await screen.findByRole('option', { name: 'Length' }));
+
+    expect(within(conditions).getByText('Argument 1')).toBeInTheDocument();
+    expect(within(conditions).getByText('Field value')).toBeInTheDocument();
+    await user.type(within(conditions).getByLabelText('Value'), '5');
+    await user.click(within(editor).getByRole('button', { name: 'Save draft' }));
+
+    await waitFor(() => {
+      const save = vi
+        .mocked(fetch)
+        .mock.calls.find(
+          ([input, init]) =>
+            input.toString().endsWith('/rules/credit_threshold/draft') && init?.method === 'PUT',
+        );
+      expect(save).toBeDefined();
+      expect(JSON.parse(save?.[1]?.body as string).condition.children[0].left).toMatchObject({
+        kind: 'Function',
+        function: 'Length',
+        arguments: [{ kind: 'Context', reference: 'field.value' }],
+      });
+    });
   });
 
   it('shows an error state when rule contexts cannot load for creation', async () => {
@@ -535,6 +748,12 @@ describe('RulesPage', () => {
       const url = input.toString();
       if (url.includes('/rules/context-schemas')) {
         return Promise.resolve(jsonResponse(contextSchemas));
+      }
+      if (url.endsWith('/rules/field.required')) {
+        return Promise.resolve(jsonResponse(systemDetail('field.required')));
+      }
+      if (url.endsWith('/rules/field.numeric_range')) {
+        return Promise.resolve(jsonResponse(systemDetail('field.numeric_range')));
       }
       return Promise.resolve(jsonResponse(ruleDefinitions));
     });

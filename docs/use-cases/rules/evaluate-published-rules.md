@@ -21,7 +21,7 @@ Evaluate exact published system or workspace rule versions against typed context
 1. Caller supplies workspace scope, evaluation purpose, scope context schema version, ordered rule references, canonical application parameters, and typed context.
 2. Rules resolves every exact definition version and verifies availability for historical resolution, scope, outcome kind, and context-schema compatibility.
 3. Rules validates parameter and context values against declared types and configured complexity limits.
-4. Rules evaluates conditions in deterministic rule order with short-circuit behavior defined by each condition group.
+4. Rules evaluates system and workspace expressions through one deterministic engine in rule order with short-circuit behavior defined by each logical group.
 5. Validation evaluation returns all matched violations in deterministic order.
 6. Decision evaluation returns Deny when any applicable matched rule denies, otherwise Allow; evaluation errors never become Allow.
 7. Rules returns evaluated definition key/version, context schema version, match result, pure outcomes, and safe diagnostics without mutating consumer state.
@@ -41,16 +41,16 @@ Evaluate exact published system or workspace rule versions against typed context
 
 *Happy path*
 - **AC-001** Evaluator accepts exact rule key/version references, application parameters, scope, context schema version, typed context, and evaluation purpose.
-- **AC-002** System and workspace published versions use the same deterministic evaluation contract while preserving origin and workspace isolation.
-- **AC-003** Conditions support typed equality, ordering, containment, text, null/presence, all, any, and not behavior only where the operand types allow it.
+- **AC-002** System and workspace published versions carry versioned typed expressions and use the same deterministic expression evaluator while preserving origin and workspace isolation.
+- **AC-003** The registered expression language supports typed equality, ordering, containment, text, null/presence, pure function calls, all, any, and not behavior only where declared type signatures allow it.
 - **AC-004** Validation returns every matched violation with rule key/version, stable code, severity, and message in deterministic order.
 - **AC-005** Decision evaluation returns Deny when any applicable matched rule denies and Allow only when evaluation completes successfully without a matched deny.
 - **AC-006** Batch evaluation follows caller-supplied rule order with a stable secondary key/version order and produces the same output for equivalent canonical input.
-- **AC-007** Simulation uses the same evaluator as runtime, returns safe per-node diagnostics, and never mutates rule or consumer business state.
+- **AC-007** Simulation and readable rule details use the same canonical expression evaluated at runtime, simulation returns safe per-node diagnostics, and neither surface mutates rule or consumer business state.
 - **AC-008** Archived published versions remain evaluable for existing immutable snapshots but cannot be newly applied.
 
 *Validation & errors*
-- **AC-009** Unknown versions, schema mismatches, invalid context paths, invalid types, missing parameters, and unsupported operators fail with stable machine-readable errors.
+- **AC-009** Unknown language or capability versions, schema mismatches, invalid context paths, invalid types, missing parameters, and unsupported operators or functions fail with stable machine-readable errors.
 - **AC-010** Evaluator enforces condition depth, node count, collection size, string size, numeric precision, and execution-step limits.
 - **AC-011** Evaluation is pure and cannot access current time, randomness, environment variables, files, network services, arbitrary databases, reflection-based code execution, or side-effect services.
 - **AC-012** Evaluation errors and unexpected faults never produce a successful validation pass or Allow decision.
@@ -67,9 +67,9 @@ Evaluate exact published system or workspace rule versions against typed context
 
 | ID | Boundary | Scenario | Covers AC | Verification | Required |
 |---|---|---|---|---|---|
-| AT-001 | Domain boundary | Typed condition evaluator returns deterministic matches for supported operators and temporal semantics | AC-003, AC-006, AC-013 | Domain test | Yes |
+| AT-001 | Domain boundary | The shared typed-expression evaluator returns deterministic system and workspace matches for registered operators, pure functions, logical groups, and temporal semantics | AC-002, AC-003, AC-006, AC-013 | Domain test | Yes |
 | AT-002 | Domain boundary | Limits, unsupported operations, type mismatches, and nondeterministic capabilities are rejected safely | AC-009, AC-010, AC-011, AC-012 | Domain test | Yes |
-| AT-003 | Application boundary | Exact system/workspace versions resolve and validation outcomes include every deterministic violation | AC-001, AC-002, AC-004, AC-006, AC-008, AC-017 | Application test | Yes |
+| AT-003 | Application boundary | Exact system/workspace expressions resolve through one evaluator and validation outcomes include every deterministic violation | AC-001, AC-002, AC-004, AC-006, AC-008, AC-017 | Application test | Yes |
 | AT-004 | Application boundary | Decision aggregation denies safely, evaluation failures never allow, and cancellation returns no partial success | AC-005, AC-009, AC-012, AC-018 | Application test | Yes |
 | AT-005 | API/Application boundaries | Simulation uses the runtime evaluator, returns redacted diagnostics, and performs no mutation | AC-007, AC-014, AC-016, AC-017 | Application test + API integration test | Yes |
 | AT-006 | API boundary | Evaluation and simulation contracts expose stable problem codes, authorization behavior, and generated frontend parity | AC-001, AC-004, AC-005, AC-009, AC-014, AC-015 | API integration test | Yes |
@@ -130,4 +130,4 @@ sequenceDiagram
 >
 > **Verification:** Acceptance proof is tracked in the sibling evidence sidecar.
 >
-> **Decisions:** Evaluation is deterministic, pure, bounded, side-effect free, and version exact. Structured conditions are evaluated directly; no free-form parser or runtime code compilation is introduced. Validation collects all violations; Decision fails closed on matched deny or evaluator failure. Consumers own context, authorization, transactions, persistence, and enforcement. Archived versions remain resolvable only for existing snapshots. Execution-history storage, integration events, inbox/outbox, event sourcing, and distributed evaluation are rejected for this slice.
+> **Decisions:** Evaluation is deterministic, pure, bounded, side-effect free, and version exact. Rules owns one versioned typed-expression language, capability registry, and evaluator for system and workspace definitions. The system controls safe capabilities and type signatures while users control how capabilities available to their selected context are composed. Expressions are evaluated directly; no arbitrary parser, runtime code compilation, I/O, time, randomness, or side-effect capability is introduced. Validation collects all violations; Decision fails closed on matched deny or evaluator failure. Consumers own context, authorization, transactions, persistence, and enforcement. Archived versions remain resolvable only for existing snapshots. Execution-history storage, integration events, inbox/outbox, event sourcing, and distributed evaluation are rejected for this slice.

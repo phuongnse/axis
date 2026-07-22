@@ -99,6 +99,50 @@ def compose_has_local_app_base_url(compose_file: Path) -> bool:
     return LOCAL_APP_BASE_URL_LINE.search(compose_file.read_text(encoding="utf-8")) is not None
 
 
+def service_property(block: str, property_name: str) -> str:
+    lines = block.splitlines()
+    marker = re.compile(rf"^    {re.escape(property_name)}:\s*(.*)$")
+
+    for index, line in enumerate(lines):
+        match = marker.match(line)
+        if match is None:
+            continue
+
+        value = [match.group(1)] if match.group(1) else []
+        for nested_line in lines[index + 1 :]:
+            if nested_line.startswith("      ") or not nested_line.strip():
+                value.append(nested_line.strip())
+                continue
+            break
+        return "\n".join(value)
+
+    return ""
+
+
+def api_has_source_reload(compose_file: Path) -> bool:
+    service_text = services_section(compose_file.read_text(encoding="utf-8"))
+    api_block = next(
+        (match.group(2) for match in SERVICE_BLOCK.finditer(service_text) if match.group(1) == "api"),
+        "",
+    )
+    command_tokens = [
+        token
+        for token in re.findall(r"[a-z0-9_.:/-]+", service_property(api_block, "command").lower())
+        if token != "-"
+    ]
+    has_watcher = any(
+        current == "dotnet" and following == "watch"
+        for current, following in zip(command_tokens, command_tokens[1:])
+    )
+    polling_environment = service_property(api_block, "environment")
+    has_bind_mount_polling = re.search(
+        r'^DOTNET_USE_POLLING_FILE_WATCHER:\s*["\']?(?:1|true)["\']?$',
+        polling_environment,
+        re.IGNORECASE | re.MULTILINE,
+    ) is not None
+    return has_watcher and has_bind_mount_polling
+
+
 def api_appsettings_base_url(appsettings_file: Path) -> str | None:
     try:
         data = json.loads(appsettings_file.read_text(encoding="utf-8"))
@@ -144,6 +188,9 @@ def check_local_dev_doc() -> list[str]:
             "docker-compose.yml api service must set App__BaseUrl to "
             f"{LOCAL_BROWSER_APP_BASE_URL} for human local-dev verification links"
         )
+
+    if not api_has_source_reload(MAIN_COMPOSE_FILE):
+        errors.append("docker-compose.yml api service must automatically reload source changes")
 
     if api_appsettings_base_url(API_APPSETTINGS_FILE) != LOCAL_BROWSER_APP_BASE_URL:
         errors.append(

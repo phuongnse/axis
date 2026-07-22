@@ -77,4 +77,24 @@ public enum RuleOperandKind
     Context = 0,
     Parameter = 1,
     Literal = 2,
+    Function = 3,
+}
+
+public enum RuleExpressionFunction
+{
+    IsBlank = 0,
+    Length = 1,
+    Precision = 2,
+    Scale = 3,
+    Count = 4,
+    MatchesPattern = 5,
+    HasFormat = 6,
+    ToDecimal = 7,
+}
+
+public enum RuleExpressionCardinality
+{
+    Scalar = 0,
+    Multiple = 1,
+    Any = 2,
 }

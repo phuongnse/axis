@@ -45,10 +45,6 @@ RENOVATE_CONFIG_PATH = ROOT / ".github" / "renovate.json5"
 LOCAL_DEV_ENV_FILE = ROOT / ".env.local"
 LOCAL_DEV_PROJECT_NAME = "axis"
 LOCAL_DEV_POSTGRES_VOLUME = f"{LOCAL_DEV_PROJECT_NAME}_postgres_data"
-LOCAL_DEV_BROWSER_BASE_URL = "https://localhost:3000"
-LOCAL_DEV_API_BASE_URL = "https://localhost:5281"
-LOCAL_DEV_SMOKE_SERVICES = ("api", "web")
-LOCAL_DEV_BROWSER_HOME = ROOT / ".dev-browser"
 API_PROJECT = ROOT / "src" / "Axis.Api" / "Axis.Api.csproj"
 FRONTEND_DIR = ROOT / "frontend"
 LOCAL_CERT_DIR = ROOT / ".dev-certs"
@@ -2600,6 +2596,12 @@ def frontend_command(args: argparse.Namespace) -> int:
             return 0
         return check_ui_baseline()
 
+    if command == "script" and args.script_name == "test:e2e":
+        rc = require_docker_compose("frontend script test:e2e")
+        if rc != 0:
+            return rc
+        return run_local_dev_browser(passthrough_args(args.script_args))
+
     rc = check_frontend_toolchain()
     if rc != 0:
         return rc
@@ -2908,7 +2910,7 @@ def verify(args: argparse.Namespace) -> int:
                 if changed_e2e_tests:
                     step(
                         "frontend e2e (changed test files)",
-                        lambda: run_frontend_npm(["run", "test:e2e", "--", *changed_e2e_tests]).returncode,
+                        lambda: run_local_dev_browser(changed_e2e_tests),
                     )
             else:
                 step("frontend test", lambda: frontend_command(argparse.Namespace(frontend_command="test")))
@@ -3291,128 +3293,32 @@ def local_dev_shell_argv(service: str, exec_command: list[str]) -> list[str]:
     return [LOCAL_DEV_SERVICE_SHELL.get(service, LOCAL_DEV_DEFAULT_SHELL)]
 
 
-def local_dev_smoke_env() -> dict[str, str]:
-    env = {
-        "E2E_API_URL": LOCAL_DEV_API_BASE_URL,
-        "E2E_BASE_URL": LOCAL_DEV_BROWSER_BASE_URL,
-        "E2E_BROWSER_HOME": str(LOCAL_DEV_BROWSER_HOME),
-        "E2E_SKIP_WEB_SERVER": "1",
-        "E2E_VERIFY_ORIGIN": LOCAL_DEV_BROWSER_BASE_URL,
-    }
-    if LOCAL_ROOT_CA_PEM.is_file():
-        env["NODE_EXTRA_CA_CERTS"] = str(LOCAL_ROOT_CA_PEM)
-    return env
-
-
-def ensure_local_dev_smoke_browser_trust() -> int:
-    if not LOCAL_ROOT_CA_PEM.is_file():
-        print(
-            "local-dev smoke: local root CA is missing. "
-            "Run `python scripts/axis.py local-dev certs` first.",
-            file=sys.stderr,
-        )
-        return 1
-
-    fingerprint = hashlib.sha256(LOCAL_ROOT_CA_PEM.read_bytes()).hexdigest()
-    marker = LOCAL_DEV_BROWSER_HOME / ".axis-root-ca.sha256"
-    nss_database = LOCAL_DEV_BROWSER_HOME / ".pki" / "nssdb"
-
-    if (
-        (nss_database / "cert9.db").is_file()
-        and marker.is_file()
-        and marker.read_text(encoding="utf-8").strip() == fingerprint
-    ):
-        return 0
-
-    LOCAL_DEV_BROWSER_HOME.mkdir(parents=True, exist_ok=True)
-    LOCAL_DEV_BROWSER_HOME.chmod(0o700)
-
+def run_local_dev_browser(playwright_args: list[str]) -> int:
+    up = run(local_dev_compose_args("up", "-d"), check=False)
+    if up.returncode != 0:
+        return up.returncode
     build = run(local_dev_compose_args("--profile", "e2e", "build", "e2e"), check=False)
     if build.returncode != 0:
         return build.returncode
-
-    user_args: list[str] = []
-    getuid = getattr(os, "getuid", None)
-    getgid = getattr(os, "getgid", None)
-    if callable(getuid) and callable(getgid):
-        user_args = ["--user", f"{getuid()}:{getgid()}"]
-
-    trust = run(
+    return run(
         local_dev_compose_args(
             "--profile",
             "e2e",
             "run",
             "--rm",
             "--no-deps",
-            *user_args,
-            "--entrypoint",
-            "sh",
-            "-v",
-            f"{LOCAL_DEV_BROWSER_HOME}:/browser-home",
             "e2e",
-            "./scripts/import-browser-ca.sh",
-            "/browser-home/.pki/nssdb",
-            "/https/rootCA.pem",
+            *playwright_args,
         ),
         check=False,
-    )
-    if trust.returncode != 0:
-        return trust.returncode
-    if not (nss_database / "cert9.db").is_file():
-        print("local-dev smoke: Chromium trust store was not created", file=sys.stderr)
-        return 1
-
-    marker.write_text(f"{fingerprint}\n", encoding="utf-8")
-    return 0
-
-
-def require_local_dev_smoke_services() -> int:
-    result = run(
-        local_dev_compose_args("ps", "--services", "--status", "running"),
-        capture=True,
-        check=False,
-    )
-    if result.returncode != 0:
-        emit_captured_process(result)
-        return result.returncode
-
-    running = {line.strip() for line in (result.stdout or "").splitlines() if line.strip()}
-    missing = [service for service in LOCAL_DEV_SMOKE_SERVICES if service not in running]
-    if missing:
-        print(
-            "local-dev smoke: required services are not running: "
-            f"{', '.join(missing)}. Run `python scripts/axis.py local-dev up` first.",
-            file=sys.stderr,
-        )
-        return 1
-    return 0
+    ).returncode
 
 
 def local_dev_smoke(args: argparse.Namespace) -> int:
-    rc = check_frontend_toolchain()
-    if rc != 0:
-        return rc
-
-    ok, detail = playwright_chromium_status()
-    if not ok:
-        print(f"local-dev smoke: Playwright Chromium unavailable - {detail}", file=sys.stderr)
-        return 1
-
-    rc = require_local_dev_smoke_services()
-    if rc != 0:
-        return rc
-
-    rc = ensure_local_dev_smoke_browser_trust()
-    if rc != 0:
-        return rc
-
     smoke_args = passthrough_args(getattr(args, "smoke_args", []))
     if not smoke_args:
         smoke_args = ["e2e/local-dev-smoke.pw.ts"]
-    return run_frontend_npm(
-        ["run", "test:e2e", "--", *smoke_args],
-        env_overrides=local_dev_smoke_env(),
-    ).returncode
+    return run_local_dev_browser(smoke_args)
 
 
 def require_docker_compose(label: str) -> int:
@@ -3788,14 +3694,8 @@ def local_dev(args: argparse.Namespace) -> int:
         ).returncode
 
     if command == "e2e":
-        build = run(local_dev_compose_args("--profile", "e2e", "build", "e2e"), check=False)
-        if build.returncode != 0:
-            return build.returncode
         e2e_args = passthrough_args(getattr(args, "e2e_args", []))
-        return run(
-            local_dev_compose_args("--profile", "e2e", "run", "--rm", "--no-deps", "e2e", *e2e_args),
-            check=False,
-        ).returncode
+        return run_local_dev_browser(e2e_args)
 
     if command == "smoke":
         return local_dev_smoke(args)
@@ -3994,7 +3894,7 @@ def setup(args: argparse.Namespace) -> int:
         ),
         ("install frontend dependencies", lambda: run_frontend_npm(["ci"]).returncode),
     ]
-    if browsers or normalized in {"local-dev", "review"}:
+    if browsers:
         steps.append(
             (
                 "install Playwright Chromium",
@@ -4076,12 +3976,6 @@ def doctor(args: argparse.Namespace) -> int:
                 record("OK", "npm adapter", detail)
 
     if "local-dev" in groups:
-        if node_ok:
-            chromium_ok, chromium_detail = playwright_chromium_status(frontend_env)
-            record("OK" if chromium_ok else "WARN", "playwright chromium", chromium_detail)
-        else:
-            record("WARN", "playwright chromium", "Node must resolve before checking Playwright browser artifacts")
-
         openssl = find_openssl()
         if openssl:
             record("OK", "openssl", openssl)
@@ -4218,7 +4112,7 @@ def main(argv: list[str] | None = None) -> int:
     setup_parser.add_argument(
         "--browsers",
         action="store_true",
-        help="Compatibility option: add Playwright Chromium to any profile",
+        help="Install host Playwright Chromium for explicit host-browser debugging",
     )
     setup_parser.add_argument(
         "--plan-only",

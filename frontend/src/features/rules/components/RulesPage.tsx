@@ -23,6 +23,7 @@ import {
   ruleNameTranslationKey,
   ruleSetupTranslationKey,
 } from '../metadata';
+import { RuleOriginBadge } from './RuleOriginBadge';
 
 const route = getRouteApi('/_authenticated/rules');
 
@@ -344,17 +345,10 @@ function RuleScopeCell({ definition }: { definition: RuleDefinitionSummary }) {
 }
 
 function RuleOriginCell({ definition }: { definition: RuleDefinitionSummary }) {
-  const { t } = useTranslation();
-  const label =
-    definition.origin === 'System'
-      ? t('rules.builtIn')
-      : definition.origin === 'Workspace'
-        ? t('rules.originWorkspace')
-        : '—';
-  return (
-    <span data-slot="rule-table-value" className="text-sm font-medium text-foreground">
-      {label}
-    </span>
+  return definition.origin ? (
+    <RuleOriginBadge data-slot="rule-table-value" origin={definition.origin} />
+  ) : (
+    <span data-slot="rule-table-value">—</span>
   );
 }
 

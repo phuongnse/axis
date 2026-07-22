@@ -11,7 +11,7 @@ Use `python scripts/axis.py local-dev ...` for local stack work. Do not document
 - OpenSSL on PATH, or from Git for Windows, for local HTTPS certificates.
 - .NET SDK from [global.json](../../global.json) and Node from [frontend/.nvmrc](../../frontend/.nvmrc), either already available or installed user-locally by Axis.
 
-First-time preparation is `python scripts/axis.py setup --profile local-dev --install-user-tools`. This validates the cumulative doctor profile, restores locked dependencies, installs Playwright Chromium, generates local certificates, and installs the pre-push hook. Add `--trust-local-ca` to opt into current-user host trust; `--yes` skips the Axis prompt, but Windows may still show its security warning. Use `--plan-only` before execution. Run `python scripts/axis.py doctor --profile local-dev --strict` for diagnosis without setup mutations.
+First-time preparation is `python scripts/axis.py setup --profile local-dev --install-user-tools`. This validates the cumulative doctor profile, restores locked dependencies, generates local certificates, and installs the pre-push hook. Add `--trust-local-ca` to opt into current-user host trust; `--yes` skips the Axis prompt, but Windows may still show its security warning. Use `--plan-only` before execution. Run `python scripts/axis.py doctor --profile local-dev --strict` for diagnosis without setup mutations.
 
 ## HTTPS
 
@@ -41,6 +41,8 @@ Host ports published by compose: `1025`, `1080`, `3000`, `4318`, `5281`, `5432`,
 
 After frontend manifest or toolchain changes, reconcile running local-dev services with the current manifests before trusting browser smoke or E2E results. Use the Axis local-dev wrapper to recreate affected services when dependency volumes or runtime caches may be stale.
 
+The `web` service uses Vite hot module replacement. The `api` service rebuilds and restarts its process when mounted source, project, or migration files change; it intentionally uses restart-on-change so startup composition and development migrations run against the new code. A brief unhealthy period while the API restarts is expected. Compose command or environment changes still require `local-dev recreate api` because they change the container definition rather than mounted source.
+
 Local overrides live in ignored root `.env.local`. See [.env.example](../../.env.example) for optional Compose variables; stack defaults stay in [docker-compose.yml](../../docker-compose.yml).
 
 ## Environment
@@ -52,8 +54,7 @@ Local overrides live in ignored root `.env.local`. See [.env.example](../../.env
 | API on host | [src/Axis.Api/appsettings.json](../../src/Axis.Api/appsettings.json) | Host-native dev without the API container (`python scripts/axis.py dotnet run-api`). Override with ASP.NET env vars (`Section__Key`) or ignored `appsettings.Development.json`. |
 | EF migrations | `ConnectionStrings__Identity`, `ConnectionStrings__BusinessObjects`, `IDENTITY_CONNECTION_STRING`, or `BUSINESS_OBJECTS_CONNECTION_STRING` | `python scripts/axis.py dotnet ef ...` only. |
 | Shell adapters | `python scripts/axis.py doctor --profile local-dev` | `DOCKER_HOST`, `NVM_DIR`, `PATH` when tools resolve from another context. |
-| Host browser smoke | [frontend/playwright.config.ts](../../frontend/playwright.config.ts) and a running local stack | `python scripts/axis.py local-dev smoke -- <playwright-args>` reuses host Chromium against `https://localhost:3000`, skips the dev server, and imports the local CA into the ignored repo-local `.dev-browser/` NSS store. |
-| E2E | [docker-compose.yml](../../docker-compose.yml) and [frontend/playwright.config.ts](../../frontend/playwright.config.ts) | `python scripts/axis.py local-dev e2e` builds and runs the compose E2E profile with API, web, Maildev, service URLs, and browser trust configured. Pass Playwright args after `--` to scope a file or title. |
+| Browser verification | [docker-compose.yml](../../docker-compose.yml), [frontend/Dockerfile.e2e](../../frontend/Dockerfile.e2e), and [frontend/playwright.config.ts](../../frontend/playwright.config.ts) | `local-dev smoke` and `local-dev e2e` both start or reconcile the local stack, build the pinned browser image, and run with API, web, Maildev, service URLs, and browser trust configured. Pass Playwright args after `--` to scope a file or title. |
 
 Common API settings (compose uses service hostnames; host run uses `localhost`):
 
@@ -81,7 +82,7 @@ Frontend dev (compose `web` service sets these; host Vite uses [frontend/vite.co
 
 ## Daily Operations
 
-Prefer scoped CLI commands: `status`, `up`, `down`, `smoke`, `e2e`, and focused checks. Use `python scripts/axis.py local-dev smoke -- <playwright-args>` for fast host-browser layout or UI smoke against an already-running local stack; the wrapper sets the browser-facing base URL, skips the Playwright dev server, and prepares an isolated Chromium NSS trust store from the local CA. The store is rebuilt only when the CA fingerprint changes, and HTTPS verification stays enabled. Compose E2E imports the same CA into its container-local Chromium trust store. Use `python scripts/axis.py local-dev e2e -- e2e/sign-in-user.pw.ts` for Compose-backed evidence; add Playwright filters such as `-g "AT-001"` when one acceptance row is in scope. Running `python scripts/axis.py local-dev e2e` with no args remains the full Axis browser E2E workflow. Package Playwright scripts stay behind repo wrappers. `local-dev shell [service]` runs inside the container; host shell (PowerShell, bash, WSL) does not matter.
+Prefer scoped CLI commands: `status`, `up`, `down`, `smoke`, `e2e`, and focused checks. Browser verification has one execution environment: both browser commands reconcile the mandatory stack, build the Compose E2E image, import the local CA into its container-local Chromium trust store, and keep HTTPS verification enabled. `python scripts/axis.py local-dev smoke` defaults to `e2e/local-dev-smoke.pw.ts`; pass another file or filter after `--` when the same narrow command is convenient. Use `python scripts/axis.py local-dev e2e -- e2e/sign-in-user.pw.ts` for acceptance evidence; add filters such as `-g "AT-001"` when one row is in scope. Running `python scripts/axis.py local-dev e2e` with no args runs the full browser suite. The reconciled stack remains running after either command. Package Playwright scripts stay behind repo wrappers. `local-dev shell [service]` runs inside the container; host shell (PowerShell, bash, WSL) does not matter.
 
 Use runtime-specific dev servers only through the documented Axis wrapper or owning package script.
 

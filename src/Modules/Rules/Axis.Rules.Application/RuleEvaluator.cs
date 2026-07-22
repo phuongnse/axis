@@ -1,7 +1,3 @@
-using System.Globalization;
-using System.Net.Mail;
-using System.Text;
-using System.Text.RegularExpressions;
 using Axis.Rules.Application.Repositories;
 using Axis.Rules.Contracts;
 using Axis.Rules.Domain;
@@ -18,8 +14,6 @@ public sealed class RuleEvaluator(
     RuleContextSchemaRegistry contextSchemas,
     IRuleDefinitionRepository repository) : IRuleEvaluator
 {
-    private static readonly TimeSpan PatternTimeout = TimeSpan.FromMilliseconds(250);
-
     public async Task<RuleEvaluationResult> EvaluateAsync(
         RuleEvaluationRequest request,
         CancellationToken cancellationToken = default)
@@ -164,7 +158,10 @@ public sealed class RuleEvaluator(
             if (parameters.IsFailure)
                 return Result.Failure<ResolvedRule>("parameter_invalid", parameters.Error);
 
-            return ResolvedRule.System(system, parameters.Value);
+            return new ResolvedRule(
+                system.Condition,
+                RuleContractMapper.ToDto(system.Outcome),
+                parameters.Value);
         }
 
         if (SystemRuleCatalog.Definitions.Any(definition =>
@@ -212,7 +209,7 @@ public sealed class RuleEvaluator(
         if (valid.IsFailure)
             return Result.Failure<ResolvedRule>("definition_invalid", valid.Error);
 
-        return ResolvedRule.Workspace(
+        return new ResolvedRule(
             version.Condition,
             RuleContractMapper.ToDto(version.Outcome),
             mappedParameters.Value);
@@ -223,11 +220,8 @@ public sealed class RuleEvaluator(
         RuleContextSchema schema,
         IReadOnlyDictionary<string, RuleValue> context)
     {
-        if (rule.SystemDefinition is not null)
-            return EvaluateSystem(rule.SystemDefinition, context, rule.Parameters);
-
         Result<RuleConditionEvaluation> evaluation = RuleConditionEvaluator.Evaluate(
-            rule.Condition!,
+            rule.Condition,
             schema,
             context,
             rule.Parameters);
@@ -235,137 +229,6 @@ public sealed class RuleEvaluator(
             ? evaluation.Value.IsMatch
             : Result.Failure<bool>(evaluation.Error);
     }
-
-    private static Result<bool> EvaluateSystem(
-        SystemRuleDefinition definition,
-        IReadOnlyDictionary<string, RuleValue> context,
-        IReadOnlyDictionary<string, RuleValue> parameters)
-    {
-        context.TryGetValue("field.value", out RuleValue? value);
-        if (definition.Key.Value == RuleDefinitionKeys.Required)
-        {
-            return value is null || value.Values.Count == 0 ||
-                value.Type == Domain.RuleValueType.Text && value.Values.All(string.IsNullOrWhiteSpace);
-        }
-
-        if (value is null)
-            return false;
-
-        return definition.Key.Value switch
-        {
-            RuleDefinitionKeys.NumericRange => OutsideDecimalRange(value, parameters),
-            RuleDefinitionKeys.DecimalPrecision => ExceedsDecimalPrecision(value, parameters),
-            RuleDefinitionKeys.DateRange => OutsideDateRange(value, parameters),
-            RuleDefinitionKeys.DateTimeRange => OutsideDateTimeRange(value, parameters),
-            RuleDefinitionKeys.TextLength => OutsideTextLength(value, parameters),
-            RuleDefinitionKeys.TextPattern => DoesNotMatchPattern(value, parameters),
-            RuleDefinitionKeys.TextFormat => DoesNotMatchFormat(value, parameters),
-            RuleDefinitionKeys.ChoiceSelectionCount => OutsideSelectionCount(value, parameters),
-            _ => Result.Failure<bool>("System rule definition is not supported."),
-        };
-    }
-
-    private static bool OutsideDecimalRange(
-        RuleValue value,
-        IReadOnlyDictionary<string, RuleValue> parameters)
-    {
-        decimal number = decimal.Parse(value.Values[0], CultureInfo.InvariantCulture);
-        return parameters.TryGetValue("min", out RuleValue? min) &&
-                number < decimal.Parse(min.Values[0], CultureInfo.InvariantCulture) ||
-            parameters.TryGetValue("max", out RuleValue? max) &&
-                number > decimal.Parse(max.Values[0], CultureInfo.InvariantCulture);
-    }
-
-    private static bool ExceedsDecimalPrecision(
-        RuleValue value,
-        IReadOnlyDictionary<string, RuleValue> parameters)
-    {
-        string canonical = decimal.Parse(value.Values[0], CultureInfo.InvariantCulture)
-            .ToString("G29", CultureInfo.InvariantCulture)
-            .TrimStart('-');
-        string[] parts = canonical.Split('.', 2);
-        int scale = parts.Length == 2 ? parts[1].Length : 0;
-        int precision = Math.Max(1, string.Concat(parts).TrimStart('0').Length);
-        return precision > int.Parse(parameters["precision"].Values[0], CultureInfo.InvariantCulture) ||
-            scale > int.Parse(parameters["scale"].Values[0], CultureInfo.InvariantCulture);
-    }
-
-    private static bool OutsideDateRange(
-        RuleValue value,
-        IReadOnlyDictionary<string, RuleValue> parameters)
-    {
-        DateOnly date = DateOnly.ParseExact(value.Values[0], "yyyy-MM-dd", CultureInfo.InvariantCulture);
-        return parameters.TryGetValue("min", out RuleValue? min) &&
-                date < DateOnly.ParseExact(min.Values[0], "yyyy-MM-dd", CultureInfo.InvariantCulture) ||
-            parameters.TryGetValue("max", out RuleValue? max) &&
-                date > DateOnly.ParseExact(max.Values[0], "yyyy-MM-dd", CultureInfo.InvariantCulture);
-    }
-
-    private static bool OutsideDateTimeRange(
-        RuleValue value,
-        IReadOnlyDictionary<string, RuleValue> parameters)
-    {
-        DateTimeOffset instant = DateTimeOffset.Parse(value.Values[0], CultureInfo.InvariantCulture);
-        return parameters.TryGetValue("min", out RuleValue? min) &&
-                instant < DateTimeOffset.Parse(min.Values[0], CultureInfo.InvariantCulture) ||
-            parameters.TryGetValue("max", out RuleValue? max) &&
-                instant > DateTimeOffset.Parse(max.Values[0], CultureInfo.InvariantCulture);
-    }
-
-    private static bool OutsideTextLength(
-        RuleValue value,
-        IReadOnlyDictionary<string, RuleValue> parameters)
-    {
-        int length = value.Values[0].EnumerateRunes().Count();
-        return OutsideIntegerRange(length, parameters);
-    }
-
-    private static Result<bool> DoesNotMatchPattern(
-        RuleValue value,
-        IReadOnlyDictionary<string, RuleValue> parameters)
-    {
-        try
-        {
-            return !Regex.IsMatch(
-                value.Values[0],
-                parameters["pattern"].Values[0],
-                RegexOptions.CultureInvariant,
-                PatternTimeout);
-        }
-        catch (RegexMatchTimeoutException)
-        {
-            return Result.Failure<bool>("System text pattern exceeded its execution limit.");
-        }
-        catch (ArgumentException)
-        {
-            return Result.Failure<bool>("System text pattern is invalid.");
-        }
-    }
-
-    private static bool DoesNotMatchFormat(
-        RuleValue value,
-        IReadOnlyDictionary<string, RuleValue> parameters) =>
-        parameters["format"].Values[0] switch
-        {
-            "Email" => !MailAddress.TryCreate(value.Values[0], out _),
-            "Url" => !Uri.TryCreate(value.Values[0], UriKind.Absolute, out Uri? uri) ||
-                uri.Scheme is not ("http" or "https"),
-            "Uuid" => !Guid.TryParse(value.Values[0], out _),
-            _ => true,
-        };
-
-    private static bool OutsideSelectionCount(
-        RuleValue value,
-        IReadOnlyDictionary<string, RuleValue> parameters) =>
-        OutsideIntegerRange(value.Values.Count, parameters);
-
-    private static bool OutsideIntegerRange(
-        int value,
-        IReadOnlyDictionary<string, RuleValue> parameters) =>
-        parameters.TryGetValue("min", out RuleValue? min) &&
-            value < int.Parse(min.Values[0], CultureInfo.InvariantCulture) ||
-        parameters.TryGetValue("max", out RuleValue? max) &&
-            value > int.Parse(max.Values[0], CultureInfo.InvariantCulture);
 
     private static Result<IReadOnlyDictionary<string, RuleValue>> MapParameters(
         IReadOnlyList<RuleParameterDefinition> definitions,
@@ -418,14 +281,6 @@ public sealed class RuleEvaluator(
         return mapped;
     }
 
-    private static RuleOutcomeDto SystemOutcome(SystemRuleDefinition definition) =>
-        new(
-            ContractOutcomeKind.Validation,
-            $"{definition.Key.Value}.failed",
-            ContractRuleSeverity.Error,
-            $"{definition.DisplayName} validation failed.",
-            Decision: null);
-
     private static RuleEvaluationResult Failed(
         RuleEvaluationRequest request,
         string correlationId,
@@ -450,20 +305,7 @@ public sealed class RuleEvaluator(
     }
 
     private sealed record ResolvedRule(
-        SystemRuleDefinition? SystemDefinition,
-        RuleConditionNode? Condition,
+        RuleConditionNode Condition,
         RuleOutcomeDto Outcome,
-        IReadOnlyDictionary<string, RuleValue> Parameters)
-    {
-        public static ResolvedRule System(
-            SystemRuleDefinition definition,
-            IReadOnlyDictionary<string, RuleValue> parameters) =>
-            new(definition, null, SystemOutcome(definition), parameters);
-
-        public static ResolvedRule Workspace(
-            RuleConditionNode condition,
-            RuleOutcomeDto outcome,
-            IReadOnlyDictionary<string, RuleValue> parameters) =>
-            new(null, condition, outcome, parameters);
-    }
+        IReadOnlyDictionary<string, RuleValue> Parameters);
 }

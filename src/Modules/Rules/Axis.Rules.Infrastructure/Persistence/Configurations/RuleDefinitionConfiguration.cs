@@ -87,6 +87,9 @@ internal sealed class RuleDefinitionConfiguration : IEntityTypeConfiguration<Rul
         builder.Property(definition => definition.ContextSchemaVersion)
             .HasColumnName("context_schema_version")
             .IsRequired();
+        builder.Property(definition => definition.ExpressionLanguageVersion)
+            .HasColumnName("expression_language_version")
+            .IsRequired();
         builder.Property(definition => definition.OutcomeKind)
             .HasColumnName("outcome_kind")
             .HasConversion<string>()

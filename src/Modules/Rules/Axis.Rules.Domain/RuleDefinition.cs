@@ -14,6 +14,7 @@ public sealed class RuleDefinition : AggregateRoot<RuleDefinitionId>
     public RuleScope Scope { get; private set; }
     public RuleContextKey ContextKey { get; private set; }
     public int ContextSchemaVersion { get; private set; }
+    public int ExpressionLanguageVersion { get; private set; }
     public RuleOutcomeKind OutcomeKind { get; private set; }
     public RuleLifecycleStatus Status { get; private set; }
     public int Revision { get; private set; }
@@ -59,6 +60,7 @@ public sealed class RuleDefinition : AggregateRoot<RuleDefinitionId>
         Scope = scope;
         ContextKey = contextKey;
         ContextSchemaVersion = contextSchemaVersion;
+        ExpressionLanguageVersion = RuleExpressionLanguage.Version;
         OutcomeKind = outcomeKind;
         Status = RuleLifecycleStatus.Draft;
         Revision = 1;

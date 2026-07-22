@@ -81,7 +81,7 @@ Provide one app-scoped managed-window workspace for product details and forms th
 |---|---|
 | Route beneath windows | Remain visible and pointer-interactive outside expanded window rectangles so route actions can launch or focus additional windows. |
 | Expanded-window layer | Render every expanded window inside the authenticated work area with one active z-order and one active focus owner. |
-| Window header | Provide title, optional status, reset, minimize, maximize-or-restore-size, close, desktop drag, and non-control double-click maximize-or-restore-size. |
+| Window header | Provide title, optional status, reset, minimize, maximize-or-restore-size, close, desktop drag, and non-control double-click maximize-or-restore-size. Vertically center every title/accessory/description block with the window controls. |
 | Window body and footer | Keep consumer content in the only managed scroll region with a mandatory stable action footer below it. Use `Close` for read-only, loading, error, and unavailable states; use `Cancel` plus product actions for editable forms; never show equivalent `Close` and `Cancel` actions together. Expose readiness and a logical sizing key so adaptive measurement occurs after the current mode is stable; preserve an internal fullscreen safe area around visible tray controls. |
 | Dock tray | Align compact title bars right-to-left immediately above the footer and expose overflow through `+N`. |
 | Window switcher | List all stable identities with localized title plus active and dirty state, then focus or restore the selected item. |

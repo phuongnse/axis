@@ -6,6 +6,7 @@ using Axis.Rules.Application.Commands.PublishRuleDefinition;
 using Axis.Rules.Application.Commands.SaveRuleDefinitionDraft;
 using Axis.Rules.Application.Commands.StartRuleDefinitionDraft;
 using Axis.Rules.Application.Queries.GetRuleDefinition;
+using Axis.Rules.Application.Queries.GetRuleExpressionLanguage;
 using Axis.Rules.Application.Queries.ListRuleContextSchemas;
 using Axis.Rules.Application.Queries.ListRuleDefinitions;
 using Axis.Rules.Application.Queries.SimulateRuleDefinition;
@@ -49,9 +50,16 @@ public static class RuleDefinitionEndpoints
             .ProducesProblem(401)
             .ProducesProblem(403);
 
+        group.MapGet("/expression-language", GetExpressionLanguage)
+            .WithName("GetRuleExpressionLanguage")
+            .WithSummary("Get the versioned typed-expression capabilities available for rule authoring")
+            .Produces<RuleExpressionLanguageDto>()
+            .ProducesProblem(401)
+            .ProducesProblem(403);
+
         group.MapGet("/{definitionKey}", Get)
             .WithName("GetRuleDefinition")
-            .WithSummary("Get a workspace rule definition and its versions")
+            .WithSummary("Get a system or workspace rule definition")
             .Produces<RuleDefinitionDetailDto>()
             .ProducesProblem(401)
             .ProducesProblem(403)
@@ -149,6 +157,16 @@ public static class RuleDefinitionEndpoints
     {
         Result<IReadOnlyList<RuleContextSchemaDto>> result = await mediator.Send(
             new ListRuleContextSchemasQuery(),
+            cancellationToken);
+        return result.IsFailure ? result.ToProblemDetails() : Results.Ok(result.Value);
+    }
+
+    private static async Task<IResult> GetExpressionLanguage(
+        ISender mediator,
+        CancellationToken cancellationToken)
+    {
+        Result<RuleExpressionLanguageDto> result = await mediator.Send(
+            new GetRuleExpressionLanguageQuery(),
             cancellationToken);
         return result.IsFailure ? result.ToProblemDetails() : Results.Ok(result.Value);
     }

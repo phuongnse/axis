@@ -19,6 +19,14 @@ public static class RuleDefinitionValidator
             return Result.Failure("Rule parameter keys must be unique.");
 
         RuleEvaluationLimits effectiveLimits = limits ?? RuleEvaluationLimits.Default;
+        if (effectiveLimits.MaxDepth <= 0 || effectiveLimits.MaxNodes <= 0 ||
+            effectiveLimits.MaxFunctionCalls <= 0 || effectiveLimits.MaxParameters <= 0 ||
+            effectiveLimits.MaxExecutionSteps <= 0)
+            return Result.Failure("Rule validation limits must be positive.");
+
+        if (parameters.Count > effectiveLimits.MaxParameters)
+            return Result.Failure("Rule definition exceeds the maximum parameter count.");
+
         ValidationState state = new(schema, parameters, effectiveLimits);
         return ValidateNode(condition, depth: 1, state);
     }
@@ -53,35 +61,33 @@ public static class RuleDefinitionValidator
         if (left.IsFailure)
             return Result.Failure(left.Error);
 
-        if (predicate.Operator is RulePredicateOperator.IsNull or RulePredicateOperator.IsNotNull)
+        RulePredicateOperatorDefinition? definition = RuleExpressionLanguage.Find(predicate.Operator);
+        if (definition is null || !MatchesAnyShape(definition.LeftShapes, left.Value))
+            return Result.Failure("Rule predicate left operand is not type compatible.");
+
+        if (definition.RightShapes.Count == 0)
             return Result.Success();
 
         Result<OperandShape> right = ResolveShape(predicate.Right!, state);
         if (right.IsFailure)
             return Result.Failure(right.Error);
 
-        if (left.Value.Type != right.Value.Type)
+        if (!MatchesAnyShape(definition.RightShapes, right.Value))
+            return Result.Failure("Rule predicate right operand is not type compatible.");
+
+        if (definition.RequiresMatchingTypes && left.Value.Type != right.Value.Type)
             return Result.Failure("Rule predicate operands must use the same value type.");
 
-        return predicate.Operator switch
-        {
-            RulePredicateOperator.Equal or RulePredicateOperator.NotEqual => Result.Success(),
-            RulePredicateOperator.GreaterThan or
-            RulePredicateOperator.GreaterThanOrEqual or
-            RulePredicateOperator.LessThan or
-            RulePredicateOperator.LessThanOrEqual =>
-                ValidateOrdered(left.Value, right.Value),
-            RulePredicateOperator.Contains => ValidateContains(left.Value, right.Value),
-            RulePredicateOperator.StartsWith or RulePredicateOperator.EndsWith =>
-                ValidateText(left.Value, right.Value),
-            _ => Result.Failure("Rule predicate operator is not supported."),
-        };
+        return Result.Success();
     }
 
     private static Result<OperandShape> ResolveShape(RuleOperand operand, ValidationState state)
     {
         if (operand.Kind == RuleOperandKind.Literal)
             return new OperandShape(operand.Literal!.Type, operand.Literal.IsMultiple);
+
+        if (operand.Kind == RuleOperandKind.Function)
+            return ResolveFunctionShape(operand, state);
 
         if (operand.Kind == RuleOperandKind.Context)
         {
@@ -98,31 +104,53 @@ public static class RuleDefinitionValidator
             : new OperandShape(parameter.Type, parameter.AllowMultiple);
     }
 
-    private static Result ValidateOrdered(OperandShape left, OperandShape right)
+    private static Result<OperandShape> ResolveFunctionShape(
+        RuleOperand operand,
+        ValidationState state)
     {
-        if (left.IsMultiple || right.IsMultiple)
-            return Result.Failure("Ordered comparison requires scalar operands.");
+        state.FunctionCallCount += 1;
+        if (state.FunctionCallCount > state.Limits.MaxFunctionCalls)
+            return Result.Failure<OperandShape>("Rule expression exceeds the maximum function-call count.");
 
-        return left.Type is RuleValueType.Text or RuleValueType.Integer or RuleValueType.Decimal or
-            RuleValueType.Date or RuleValueType.DateTime
-            ? Result.Success()
-            : Result.Failure("Rule value type does not support ordered comparison.");
+        RuleExpressionFunctionDefinition? definition = operand.FunctionKind is null
+            ? null
+            : RuleExpressionLanguage.Find(operand.FunctionKind.Value);
+        if (definition is null || definition.Parameters.Count != operand.Arguments.Count)
+            return Result.Failure<OperandShape>("Rule expression function signature is invalid.");
+
+        for (int index = 0; index < definition.Parameters.Count; index += 1)
+        {
+            Result<OperandShape> argument = ResolveShape(operand.Arguments[index], state);
+            if (argument.IsFailure)
+                return argument;
+
+            RuleExpressionFunctionParameter parameter = definition.Parameters[index];
+            if (!parameter.AcceptedTypes.Contains(argument.Value.Type) ||
+                !MatchesCardinality(parameter.Cardinality, argument.Value.IsMultiple))
+            {
+                return Result.Failure<OperandShape>(
+                    $"Rule expression function '{definition.Function}' arguments are not type compatible.");
+            }
+        }
+
+        return new OperandShape(
+            definition.ReturnType,
+            definition.ReturnCardinality == RuleExpressionCardinality.Multiple);
     }
 
-    private static Result ValidateContains(OperandShape left, OperandShape right)
-    {
-        if (right.IsMultiple)
-            return Result.Failure("Contains requires a scalar right operand.");
+    private static bool MatchesCardinality(
+        RuleExpressionCardinality cardinality,
+        bool isMultiple) =>
+        cardinality == RuleExpressionCardinality.Any ||
+        cardinality == RuleExpressionCardinality.Multiple && isMultiple ||
+        cardinality == RuleExpressionCardinality.Scalar && !isMultiple;
 
-        return left.IsMultiple || left.Type == RuleValueType.Text
-            ? Result.Success()
-            : Result.Failure("Contains requires text or a multiple-value left operand.");
-    }
-
-    private static Result ValidateText(OperandShape left, OperandShape right) =>
-        left.Type == RuleValueType.Text && !left.IsMultiple && !right.IsMultiple
-            ? Result.Success()
-            : Result.Failure("Text comparison requires scalar text operands.");
+    private static bool MatchesAnyShape(
+        IReadOnlyList<RuleExpressionValueShape> shapes,
+        OperandShape operand) =>
+        shapes.Any(shape =>
+            shape.Type == operand.Type &&
+            MatchesCardinality(shape.Cardinality, operand.IsMultiple));
 
     private sealed record OperandShape(RuleValueType Type, bool IsMultiple);
 
@@ -136,5 +164,6 @@ public static class RuleDefinitionValidator
         public RuleEvaluationLimits Limits { get; } = limits;
         public HashSet<string> NodeIds { get; } = new(StringComparer.Ordinal);
         public int NodeCount { get; set; }
+        public int FunctionCallCount { get; set; }
     }
 }

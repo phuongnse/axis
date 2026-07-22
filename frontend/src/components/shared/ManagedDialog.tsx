@@ -368,7 +368,7 @@ export function ManagedDialog({
           >
             <div
               data-slot="managed-dialog-header"
-              className="managed-dialog-drag-handle flex shrink-0 cursor-move items-start justify-between gap-4 border-b p-4"
+              className="managed-dialog-drag-handle flex shrink-0 cursor-move items-center justify-between gap-4 border-b p-4"
             >
               <div className="min-w-0 space-y-2">
                 <div className="flex min-w-0 flex-wrap items-center gap-2">

@@ -59,9 +59,15 @@ services:
     container_name: axis_api
     working_dir: /src
     command:
-      - bash
-      - -lc
-      - "dotnet restore src/Axis.Api/Axis.Api.csproj --artifacts-path /tmp/axis-artifacts && dotnet build src/Axis.Api/Axis.Api.csproj --no-restore --artifacts-path /tmp/axis-artifacts && cd /tmp/axis-artifacts/bin/Axis.Api/debug && dotnet Axis.Api.dll"
+      - dotnet
+      - watch
+      - --project
+      - src/Axis.Api/Axis.Api.csproj
+      - --no-hot-reload
+      - run
+      - --no-launch-profile
+      - --artifacts-path
+      - /tmp/axis-artifacts
     depends_on:
       postgres:
         condition: service_healthy
@@ -72,6 +78,7 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_URLS: https://+:8443
+      DOTNET_USE_POLLING_FILE_WATCHER: "1"
       Kestrel__Certificates__Default__Path: "/https/localhost.pem"
       Kestrel__Certificates__Default__KeyPath: "/https/localhost-key.pem"
       ConnectionStrings__Identity: "Host=postgres;Port=5432;Database=axis_identity;Username=axis;Password=axis_dev_pass"

@@ -478,7 +478,7 @@ class TestSetupProfiles(unittest.TestCase):
         )
 
         self.assertIn("install missing pinned user-local tools: .NET SDK 8.0.423, Node.js 22.23.1", plan)
-        self.assertIn("install Playwright Chromium", plan)
+        self.assertNotIn("install Playwright Chromium", plan)
         self.assertIn("generate local HTTPS certificates", plan)
         self.assertIn("install repository pre-push hook", plan)
         self.assertIn("diagnose Docker Engine, Compose, and OpenSSL without changing OS services", plan)
@@ -490,6 +490,16 @@ class TestSetupProfiles(unittest.TestCase):
             plan.index("diagnose Docker Engine, Compose, and OpenSSL without changing OS services"),
             plan.index("install missing pinned user-local tools: .NET SDK 8.0.423, Node.js 22.23.1"),
         )
+
+    def test_plan_installs_host_playwright_only_when_explicitly_requested(self) -> None:
+        plan = axis_setup.setup_plan(
+            profile="local-dev",
+            install_user_tools=False,
+            browsers=True,
+            platform_spec=axis_setup.SetupPlatform("linux", "x64"),
+        )
+
+        self.assertIn("install Playwright Chromium", plan)
 
     def test_plan_lists_explicit_local_ca_trust_after_certificate_generation(self) -> None:
         plan = axis_setup.setup_plan(

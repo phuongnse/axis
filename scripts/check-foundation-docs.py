@@ -329,7 +329,7 @@ def verification_evidence_issues(
     commands: list[str],
 ) -> list[str]:
     issues: list[str] = []
-    has_e2e_command = any(" frontend script test:e2e" in command or " local-dev e2e" in command for command in commands)
+    has_e2e_command = any(" local-dev e2e" in command for command in commands)
     has_frontend_test_command = any(
         (" frontend script test" in command and ":e2e" not in command) or command.endswith(" frontend test")
         for command in commands

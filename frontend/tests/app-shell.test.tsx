@@ -210,6 +210,7 @@ describe('AppShell', () => {
     await user.click(screen.getByRole('button', { name: 'Open test window' }));
     const dialog = await screen.findByRole('dialog', { name: 'Persistent test window' });
     expect(dialog.querySelector('[data-slot="managed-dialog-window"]')).toHaveClass('shadow-lg');
+    expect(dialog.querySelector('[data-slot="managed-dialog-header"]')).toHaveClass('items-center');
   });
 
   it('keeps the Windows trigger fully opaque in dark mode', async () => {
@@ -296,6 +297,9 @@ describe('AppShell', () => {
 
       await user.click(screen.getByRole('button', { name: 'Open fitting window' }));
       const fittingDialog = await screen.findByRole('dialog', { name: 'Fitting window' });
+      expect(fittingDialog.querySelector('[data-slot="managed-dialog-header"]')).toHaveClass(
+        'items-center',
+      );
       const fittingWindow = fittingDialog.querySelector('[data-slot="managed-dialog-window"]');
       await waitFor(() => expect(fittingWindow).toHaveAttribute('data-dialog-preset', 'large'));
       const workAreaWidth = window.visualViewport?.width ?? window.innerWidth;
@@ -540,6 +544,7 @@ function AdaptiveTestWindowRenderer({ descriptor }: ManagedWindowRendererProps) 
     <ManagedDialog
       open
       title={descriptor.title}
+      description="Adaptive window description"
       autoSizeKey={descriptor.resourceKey}
       autoSizeReady={ready}
       onOpenChange={(open) => {

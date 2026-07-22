@@ -780,12 +780,37 @@ Ship user value.
 
 | AT ID | Evidence | Commands |
 |---|---|---|
-| AT-001 | `frontend/tests/sample.test.tsx` | `python scripts/axis.py frontend script test:e2e -- e2e/sample.pw.ts` |
+| AT-001 | `frontend/tests/sample.test.tsx` | `python scripts/axis.py local-dev e2e -- e2e/sample.pw.ts` |
 """,
             evidence_files=("frontend/tests/sample.test.tsx",),
         )
 
         self.assertIn("Browser automation must reference a committed `frontend/e2e/*.pw.ts` test", "\n".join(issues))
+
+    def test_browser_use_case_evidence_requires_canonical_local_dev_runner(self) -> None:
+        issues = self.issues_for_document(
+            self.complete_use_case_document(
+                """| ID | Boundary | Scenario | Covers AC | Verification | Required |
+|---|---|---|---|---|---|
+| AT-001 | Browser journey | User completes flow | AC-001 | Browser automation | Yes |"""
+            ),
+            evidence_doc="""# Sample Evidence
+
+> **Navigation**: [docs/use-cases/example/sample.md](./sample.md)
+
+## Acceptance Evidence
+
+| AT ID | Evidence | Commands |
+|---|---|---|
+| AT-001 | `frontend/e2e/sample.pw.ts` | `python scripts/axis.py frontend script test:e2e -- e2e/sample.pw.ts` |
+""",
+            evidence_files=("frontend/e2e/sample.pw.ts",),
+        )
+
+        self.assertIn(
+            "Browser automation Commands must run Playwright through scripts/axis.py",
+            "\n".join(issues),
+        )
 
     def test_accepts_infrastructure_test_with_targeted_dotnet_filter(self) -> None:
         issues = self.issues_for_document(
@@ -1134,7 +1159,7 @@ Provide an app frame.
 | AT ID | Evidence | Commands |
 |---|---|---|
 | AT-001 | `frontend/src/components/shared/AppShell.test.tsx` | `python scripts/axis.py frontend script test src/components/shared/AppShell.test.tsx` |
-| AT-002 | `frontend/e2e/app-frame.pw.ts` | `python scripts/axis.py frontend script test:e2e -- e2e/app-frame.pw.ts` |
+| AT-002 | `frontend/e2e/app-frame.pw.ts` | `python scripts/axis.py local-dev e2e -- e2e/app-frame.pw.ts` |
 """
 
     def test_complete_foundation_requires_acceptance_evidence(self) -> None:
@@ -1170,12 +1195,30 @@ Provide an app frame.
 | AT ID | Evidence | Commands |
 |---|---|---|
 | AT-001 | `frontend/src/components/shared/AppShell.test.tsx` | `python scripts/axis.py frontend script test src/components/shared/AppShell.test.tsx` |
-| AT-002 | `frontend/src/components/shared/AppShell.test.tsx` | `python scripts/axis.py frontend script test:e2e -- e2e/app-frame.pw.ts` |
+| AT-002 | `frontend/src/components/shared/AppShell.test.tsx` | `python scripts/axis.py local-dev e2e -- e2e/app-frame.pw.ts` |
 """,
             evidence_files=("frontend/src/components/shared/AppShell.test.tsx",),
         )
 
         self.assertIn("Browser automation must reference a committed `frontend/e2e/*.pw.ts` test", "\n".join(issues))
+
+    def test_browser_foundation_evidence_requires_canonical_local_dev_runner(self) -> None:
+        legacy = self.valid_evidence_doc().replace(
+            "python scripts/axis.py local-dev e2e -- e2e/app-frame.pw.ts",
+            "python scripts/axis.py frontend script test:e2e -- e2e/app-frame.pw.ts",
+        )
+        issues = self.issues_for_foundation(
+            evidence_doc=legacy,
+            evidence_files=(
+                "frontend/src/components/shared/AppShell.test.tsx",
+                "frontend/e2e/app-frame.pw.ts",
+            ),
+        )
+
+        self.assertIn(
+            "Browser automation Commands must run Playwright through scripts/axis.py",
+            "\n".join(issues),
+        )
 
     def test_accepts_complete_foundation_with_required_evidence(self) -> None:
         issues = self.issues_for_foundation(
@@ -1743,7 +1786,8 @@ class TestToolVersionGates(unittest.TestCase):
         self.assertIn("/missing/chromium", detail)
         self.assertIn("python scripts/axis.py frontend install-browsers", detail)
 
-    def test_doctor_warns_when_playwright_chromium_is_missing(self) -> None:
+    def test_local_dev_doctor_does_not_require_host_playwright(self) -> None:
+        playwright_status = mock.Mock(return_value=(False, "missing host browser"))
         with (
             mock.patch.object(axis, "find_lychee", return_value="/usr/bin/lychee"),
             mock.patch.object(axis, "lychee_version_status", return_value=(True, "lychee 0.23.0")),
@@ -1751,11 +1795,7 @@ class TestToolVersionGates(unittest.TestCase):
             mock.patch.object(axis, "dotnet_sdk_status", return_value=(True, "8.0.100")),
             mock.patch.object(axis, "frontend_toolchain_env", return_value={}),
             mock.patch.object(axis, "node_version_status", return_value=(True, "v22.23.0")),
-            mock.patch.object(
-                axis,
-                "playwright_chromium_status",
-                return_value=(False, "missing; run `python scripts/axis.py frontend install-browsers`"),
-            ),
+            mock.patch.object(axis, "playwright_chromium_status", playwright_status),
             mock.patch.object(axis, "_command_version", return_value=("OK", "/usr/bin/tool")),
             mock.patch.object(axis, "find_openssl", return_value="/usr/bin/openssl"),
             mock.patch.object(axis, "_docker_info_ok", return_value=True),
@@ -1768,7 +1808,8 @@ class TestToolVersionGates(unittest.TestCase):
         ):
             self.assertEqual(0, axis.doctor(axis.argparse.Namespace(strict=True)))
 
-        self.assertIn("[WARN] playwright chromium", stdout.getvalue())
+        playwright_status.assert_not_called()
+        self.assertNotIn("playwright chromium", stdout.getvalue())
         self.assertEqual("", stderr.getvalue())
 
     def test_core_doctor_profile_skips_build_local_dev_and_review_tools(self) -> None:
@@ -2179,11 +2220,13 @@ class TestReviewVerificationGates(unittest.TestCase):
 
     def test_runs_changed_frontend_e2e_file_for_e2e_only_change(self) -> None:
         calls: list[str] = []
+        browser_runner = mock.Mock(return_value=0)
 
         with (
             mock.patch.object(axis, "verify_scope_paths", return_value=("working tree", ["frontend/e2e/register.pw.ts"])),
             mock.patch.object(axis, "check_frontend_toolchain", side_effect=lambda: calls.append("frontend-toolchain") or 0),
             mock.patch.object(axis, "frontend_toolchain_env", return_value={}),
+            mock.patch.object(axis, "run_local_dev_browser", browser_runner, create=True),
             mock.patch.object(
                 axis,
                 "run_frontend_npm",
@@ -2198,10 +2241,10 @@ class TestReviewVerificationGates(unittest.TestCase):
                 "frontend-toolchain",
                 "frontend-toolchain",
                 "run ci",
-                "run test:e2e -- e2e/register.pw.ts",
             ],
             calls,
         )
+        browser_runner.assert_called_once_with(["e2e/register.pw.ts"])
 
     def test_runs_related_dotnet_projects_for_source_change(self) -> None:
         calls: list[str] = []
@@ -2704,6 +2747,42 @@ class TestLocalDevCli(unittest.TestCase):
 
             self.assertFalse(check_local_dev_docs.compose_has_local_app_base_url(compose))
 
+    def test_local_dev_doc_check_requires_api_source_reload_capability(self) -> None:
+        one_shot_compose = """services:
+  api:
+    command: [\"dotnet\", \"Axis.Api.dll\"]
+    environment:
+      App__BaseUrl: \"${APP_BASE_URL:-https://localhost:3000}\"
+    ports:
+      - \"127.0.0.1:5281:8443\"
+"""
+        watching_compose = """services:
+  api:
+    command:
+      - dotnet
+      - watch
+      - --project
+      - src/Axis.Api/Axis.Api.csproj
+      - --no-hot-reload
+      - run
+    environment:
+      DOTNET_USE_POLLING_FILE_WATCHER: \"true\"
+      App__BaseUrl: \"${APP_BASE_URL:-https://localhost:3000}\"
+    ports:
+      - \"127.0.0.1:5281:8443\"
+"""
+
+        def check(compose_text: str) -> list[str]:
+            with tempfile.TemporaryDirectory() as temp:
+                compose = Path(temp) / "docker-compose.yml"
+                compose.write_text(compose_text, encoding="utf-8")
+                with mock.patch.object(check_local_dev_docs, "MAIN_COMPOSE_FILE", compose):
+                    return check_local_dev_docs.check_local_dev_doc()
+
+        expected = "docker-compose.yml api service must automatically reload source changes"
+        self.assertIn(expected, check(one_shot_compose))
+        self.assertNotIn(expected, check(watching_compose))
+
     def test_api_appsettings_base_url_reads_app_base_url(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             appsettings = Path(temp) / "appsettings.json"
@@ -2783,8 +2862,12 @@ class TestLocalDevCli(unittest.TestCase):
         calls = self.run_local_dev(axis.argparse.Namespace(local_dev_command="e2e", e2e_args=[]))
 
         self.assertEqual(
-            ["compose", "-p", "axis", "-f", str(axis.LOCAL_DEV_COMPOSE_FILE), "--profile", "e2e", "build", "e2e"],
+            ["compose", "-p", "axis", "-f", str(axis.LOCAL_DEV_COMPOSE_FILE), "up", "-d"],
             calls[0][1:],
+        )
+        self.assertEqual(
+            ["compose", "-p", "axis", "-f", str(axis.LOCAL_DEV_COMPOSE_FILE), "--profile", "e2e", "build", "e2e"],
+            calls[1][1:],
         )
         self.assertEqual(
             [
@@ -2800,7 +2883,7 @@ class TestLocalDevCli(unittest.TestCase):
                 "--no-deps",
                 "e2e",
             ],
-            calls[1][1:],
+            calls[2][1:],
         )
 
     def test_e2e_forwards_playwright_args(self) -> None:
@@ -2828,127 +2911,30 @@ class TestLocalDevCli(unittest.TestCase):
                 "-g",
                 "AT-001",
             ],
-            calls[1][1:],
+            calls[2][1:],
         )
 
-    def test_smoke_runs_host_playwright_against_running_local_stack(self) -> None:
-        calls: list[list[str]] = []
-        envs: list[dict[str, str] | None] = []
-
-        def fake_run(command: list[str], **kwargs):
-            calls.append(command)
-            envs.append(kwargs.get("env"))
-            if command[1:] == [
-                "compose",
-                "-p",
-                "axis",
-                "-f",
-                str(axis.LOCAL_DEV_COMPOSE_FILE),
-                "ps",
-                "--services",
-                "--status",
-                "running",
-            ]:
-                return axis.subprocess.CompletedProcess(command, 0, stdout="api\nweb\n", stderr="")
-            return axis.subprocess.CompletedProcess(command, 0, stdout="", stderr="")
-
-        with tempfile.TemporaryDirectory() as temp:
-            root_ca = Path(temp) / "rootCA.pem"
-            root_ca.write_text("test root ca", encoding="utf-8")
-            browser_home = Path(temp) / "browser-home"
-
-            with (
-                mock.patch.object(axis, "LOCAL_ROOT_CA_PEM", root_ca),
-                mock.patch.object(axis, "LOCAL_DEV_BROWSER_HOME", browser_home),
-                mock.patch.object(axis, "_docker_compose_ok", return_value=True),
-                mock.patch.object(axis, "check_frontend_toolchain", return_value=0),
-                mock.patch.object(axis, "playwright_chromium_status", return_value=(True, "chromium")),
-                mock.patch.object(axis, "ensure_local_dev_smoke_browser_trust", return_value=0),
-                mock.patch.object(axis, "frontend_toolchain_env", return_value={"PATH": "node-bin"}),
-                mock.patch.object(axis, "run", side_effect=fake_run),
-            ):
-                result = axis.local_dev(
-                    axis.argparse.Namespace(
-                        local_dev_command="smoke",
-                        smoke_args=["--", "e2e/app-frame.pw.ts", "-g", "AT-002"],
-                    )
-                )
-
-        self.assertEqual(0, result)
-        self.assertEqual(
-            [
-                "compose",
-                "-p",
-                "axis",
-                "-f",
-                str(axis.LOCAL_DEV_COMPOSE_FILE),
-                "ps",
-                "--services",
-                "--status",
-                "running",
-            ],
-            calls[0][1:],
-        )
-        self.assertEqual(["run", "test:e2e", "--", "e2e/app-frame.pw.ts", "-g", "AT-002"], calls[1][1:])
-        self.assertEqual("https://localhost:5281", envs[1]["E2E_API_URL"])
-        self.assertEqual("https://localhost:3000", envs[1]["E2E_BASE_URL"])
-        self.assertEqual(str(browser_home), envs[1]["E2E_BROWSER_HOME"])
-        self.assertEqual("1", envs[1]["E2E_SKIP_WEB_SERVER"])
-        self.assertEqual("https://localhost:3000", envs[1]["E2E_VERIFY_ORIGIN"])
-        self.assertEqual(str(root_ca), envs[1]["NODE_EXTRA_CA_CERTS"])
-
-    def test_smoke_browser_trust_imports_root_ca_into_isolated_nss_db(self) -> None:
-        calls: list[list[str]] = []
-
-        with tempfile.TemporaryDirectory() as temp:
-            root_ca = Path(temp) / "rootCA.pem"
-            root_ca.write_text("test root ca", encoding="utf-8")
-            browser_home = Path(temp) / "browser-home"
-
-            def fake_run(command: list[str], **_kwargs):
-                calls.append(command)
-                if "run" in command:
-                    nss_db = browser_home / ".pki" / "nssdb"
-                    nss_db.mkdir(parents=True, exist_ok=True)
-                    (nss_db / "cert9.db").write_text("trusted", encoding="utf-8")
-                return axis.subprocess.CompletedProcess(command, 0, stdout="", stderr="")
-
-            with (
-                mock.patch.object(axis, "LOCAL_ROOT_CA_PEM", root_ca),
-                mock.patch.object(axis, "LOCAL_DEV_BROWSER_HOME", browser_home),
-                mock.patch.object(axis, "run", side_effect=fake_run),
-            ):
-                result = axis.ensure_local_dev_smoke_browser_trust()
-
-            self.assertEqual(0, result)
-            self.assertEqual(2, len(calls))
-            self.assertEqual(
-                ["--profile", "e2e", "build", "e2e"],
-                calls[0][-4:],
+    def test_smoke_uses_the_canonical_compose_browser_runner(self) -> None:
+        calls = self.run_local_dev(
+            axis.argparse.Namespace(
+                local_dev_command="smoke",
+                smoke_args=["--", "e2e/app-frame.pw.ts", "-g", "AT-002"],
             )
-            self.assertIn(f"{browser_home}:/browser-home", calls[1])
-            self.assertTrue((browser_home / ".axis-root-ca.sha256").is_file())
+        )
 
-    def test_smoke_fails_when_required_local_services_are_not_running(self) -> None:
-        calls: list[list[str]] = []
+        self.assertEqual(["up", "-d"], calls[0][-2:])
+        self.assertEqual(["--profile", "e2e", "build", "e2e"], calls[1][-4:])
+        self.assertEqual(
+            ["e2e", "e2e/app-frame.pw.ts", "-g", "AT-002"],
+            calls[2][-4:],
+        )
 
-        def fake_run(command: list[str], **_kwargs):
-            calls.append(command)
-            return axis.subprocess.CompletedProcess(command, 0, stdout="api\n", stderr="")
+    def test_smoke_defaults_to_the_local_dev_smoke_journey(self) -> None:
+        calls = self.run_local_dev(
+            axis.argparse.Namespace(local_dev_command="smoke", smoke_args=[])
+        )
 
-        stderr = io.StringIO()
-        with (
-            mock.patch.object(axis, "_docker_compose_ok", return_value=True),
-            mock.patch.object(axis, "check_frontend_toolchain", return_value=0),
-            mock.patch.object(axis, "playwright_chromium_status", return_value=(True, "chromium")),
-            mock.patch.object(axis, "run", side_effect=fake_run),
-            mock.patch.object(axis.sys, "stderr", stderr),
-        ):
-            result = axis.local_dev(axis.argparse.Namespace(local_dev_command="smoke", smoke_args=[]))
-
-        self.assertEqual(1, result)
-        self.assertEqual(1, len(calls))
-        self.assertIn("required services are not running: web", stderr.getvalue())
+        self.assertEqual(["e2e", "e2e/local-dev-smoke.pw.ts"], calls[2][-2:])
 
     def test_shell_uses_service_default_inside_container(self) -> None:
         calls = self.run_local_dev(
@@ -3255,6 +3241,26 @@ class TestAxisCommandWrappers(unittest.TestCase):
         )
 
         self.assertEqual(["npm", "exec", "--", "playwright", "install", "chromium"], calls[0])
+
+    def test_frontend_test_e2e_compatibility_command_uses_canonical_browser_runner(self) -> None:
+        browser_runner = mock.Mock(return_value=0)
+        with (
+            mock.patch.object(axis, "check_frontend_toolchain", return_value=0),
+            mock.patch.object(axis, "require_docker_compose", return_value=0),
+            mock.patch.object(axis, "run_local_dev_browser", browser_runner, create=True),
+            mock.patch.object(axis, "run_frontend_npm") as run_npm,
+        ):
+            rc = axis.frontend_command(
+                axis.argparse.Namespace(
+                    frontend_command="script",
+                    script_name="test:e2e",
+                    script_args=["--", "e2e/app-frame.pw.ts", "-g", "AT-002"],
+                )
+            )
+
+        self.assertEqual(0, rc)
+        browser_runner.assert_called_once_with(["e2e/app-frame.pw.ts", "-g", "AT-002"])
+        run_npm.assert_not_called()
 
     def test_local_dev_certs_writes_extension_and_runs_openssl(self) -> None:
         with tempfile.TemporaryDirectory() as temp:

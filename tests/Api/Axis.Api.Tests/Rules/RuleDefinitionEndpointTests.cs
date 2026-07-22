@@ -50,6 +50,45 @@ public sealed class RuleDefinitionEndpointTests(ApiTestFixture fixture)
     }
 
     [Fact]
+    public async Task RuleAuthoringContracts_WhenAuthenticated_ReturnCapabilitiesAndExecutableSystemDetail()
+    {
+        string accessToken = await CreateVerifiedSessionTokenAsync(UniqueEmail());
+
+        HttpResponseMessage languageResponse = await SendWithBearerAsync(
+            HttpMethod.Get,
+            "/api/rules/expression-language",
+            accessToken);
+
+        languageResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        JsonElement language = await languageResponse.Content.ReadFromJsonAsync<JsonElement>(Json);
+        language.GetProperty("version").GetInt32().Should().Be(1);
+        language.GetProperty("operators").EnumerateArray()
+            .Select(definition => definition.GetProperty("operator").GetString())
+            .Should().Contain("GreaterThan");
+        JsonElement length = language.GetProperty("functions").EnumerateArray().Single(
+            definition => definition.GetProperty("function").GetString() == "Length");
+        length.GetProperty("parameters")[0].GetProperty("acceptedTypes")[0].GetString()
+            .Should().Be("Text");
+        length.GetProperty("returnType").GetString().Should().Be("Integer");
+
+        HttpResponseMessage detailResponse = await SendWithBearerAsync(
+            HttpMethod.Get,
+            $"/api/rules/{RuleDefinitionKeys.Required}",
+            accessToken);
+
+        detailResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        JsonElement detail = await detailResponse.Content.ReadFromJsonAsync<JsonElement>(Json);
+        detail.GetProperty("origin").GetString().Should().Be("System");
+        detail.GetProperty("status").GetString().Should().Be("Published");
+        detail.GetProperty("expressionLanguageVersion").GetInt32().Should().Be(1);
+        detail.GetProperty("condition").GetProperty("left").GetProperty("function").GetString()
+            .Should().Be("IsBlank");
+        detail.GetProperty("outcome").GetProperty("kind").GetString().Should().Be("Validation");
+        detail.GetProperty("applicability").GetProperty("targetTypeKeys").GetArrayLength()
+            .Should().BeGreaterThan(0);
+    }
+
+    [Fact]
     public async Task ManageWorkspaceRule_WhenAuthenticated_SavesSimulatesAndPublishesExactVersion()
     {
         string accessToken = await CreateVerifiedSessionTokenAsync(UniqueEmail());
@@ -87,6 +126,7 @@ public sealed class RuleDefinitionEndpointTests(ApiTestFixture fixture)
         JsonElement created = await createResponse.Content.ReadFromJsonAsync<JsonElement>(Json);
         string definitionKey = created.GetProperty("definitionKey").GetString()!;
         created.GetProperty("status").GetString().Should().Be("Draft");
+        created.GetProperty("expressionLanguageVersion").GetInt32().Should().Be(1);
         created.GetProperty("revision").GetInt32().Should().Be(1);
 
         object parameters = new[]

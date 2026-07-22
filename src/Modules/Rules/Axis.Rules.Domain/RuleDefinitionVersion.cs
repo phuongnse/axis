@@ -13,6 +13,7 @@ public sealed class RuleDefinitionVersion : Entity<RuleDefinitionVersionId>
     public RuleScope Scope { get; private set; }
     public RuleContextKey ContextKey { get; private set; }
     public int ContextSchemaVersion { get; private set; }
+    public int ExpressionLanguageVersion { get; private set; }
     public RuleOutcomeKind OutcomeKind { get; private set; }
     public RuleConditionNode Condition { get; private set; }
     public RuleOutcome Outcome { get; private set; }
@@ -39,6 +40,7 @@ public sealed class RuleDefinitionVersion : Entity<RuleDefinitionVersionId>
         RuleScope scope,
         RuleContextKey contextKey,
         int contextSchemaVersion,
+        int expressionLanguageVersion,
         RuleOutcomeKind outcomeKind,
         IReadOnlyList<RuleParameterDefinition> parameters,
         RuleConditionNode condition,
@@ -54,6 +56,7 @@ public sealed class RuleDefinitionVersion : Entity<RuleDefinitionVersionId>
         Scope = scope;
         ContextKey = contextKey;
         ContextSchemaVersion = contextSchemaVersion;
+        ExpressionLanguageVersion = expressionLanguageVersion;
         OutcomeKind = outcomeKind;
         _parameters.AddRange(parameters);
         Condition = condition;
@@ -76,6 +79,7 @@ public sealed class RuleDefinitionVersion : Entity<RuleDefinitionVersionId>
             definition.Scope,
             definition.ContextKey,
             definition.ContextSchemaVersion,
+            definition.ExpressionLanguageVersion,
             definition.OutcomeKind,
             definition.Parameters.ToArray(),
             definition.Condition!,

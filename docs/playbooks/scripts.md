@@ -10,7 +10,7 @@
 |---|---|---|
 | .NET SDK | [global.json](../../global.json) / [docs/TECH_STACK.md](../TECH_STACK.md); portable setup pin in [scripts/axis_setup.py](../../scripts/axis_setup.py) | build, tests, format, package scan, API contracts |
 | Node.js | [frontend/.nvmrc](../../frontend/.nvmrc); portable setup pin in [scripts/axis_setup.py](../../scripts/axis_setup.py) | frontend commands and API types |
-| Playwright Chromium | [frontend/package.json](../../frontend/package.json) and `python scripts/axis.py frontend install-browsers` | `local-dev smoke`, host browser E2E, and fast layout smoke |
+| Playwright browser runtime | [frontend/Dockerfile.e2e](../../frontend/Dockerfile.e2e) and [frontend/package.json](../../frontend/package.json) | Containerized `local-dev smoke` and `local-dev e2e` workflows |
 | Lychee | [scripts/axis.py](../../scripts/axis.py) check and [.github/workflows/build-and-test.yml](../../.github/workflows/build-and-test.yml) pin | Markdown link checks |
 | GitHub CLI | portable setup pin in [scripts/axis_setup.py](../../scripts/axis_setup.py) | optional publication adapter |
 | Renovate validator | [scripts/axis.py](../../scripts/axis.py) check | Dependency automation config |
@@ -23,7 +23,7 @@ Project commands use `python`; substitute `python3` on WSL/Linux or `py -3` on W
 - A current patched Python 3 with the standard-library tar data extraction filter and Git are external prerequisites. Run `python scripts/axis.py setup --profile build`; select `local-dev`, `review`, or `all` for cumulative preparation.
 - Add `--install-user-tools` to install a missing pinned .NET SDK and Node.js. The review profile can also install pinned Lychee and GitHub CLI artifacts. Downloads require interactive confirmation or `--yes`, use HTTPS, verify the publisher's SHA-256/SHA-512 digest, and land under the native user data directory. `AXIS_TOOLS_DIR` overrides that location.
 - Portable executables still rely on publisher-documented host libraries. For example, the Linux .NET SDK requires ICU and other native runtime libraries; strict doctor output identifies these as external OS prerequisites rather than setting globalization fallbacks or installing packages silently.
-- Use `--plan-only` to print the selected OS/architecture plan without checks, network access, downloads, or repository mutations. The legacy `--browsers` option remains an additive compatibility alias; `local-dev` and `review` include Chromium automatically.
+- Use `--plan-only` to print the selected OS/architecture plan without checks, network access, downloads, or repository mutations. Add `--browsers` only when explicit host-browser debugging needs a user-local Chromium binary; standard Axis browser workflows use the containerized runtime.
 - `local-dev` and `review` also create or reuse local HTTPS certificates and install the repository pre-push hook. `--trust-local-ca` explicitly opts into a confirmed current-user host trust-store change; setup never changes system-wide trust or invokes `sudo`. These profiles require Docker Engine, Compose, and OpenSSL in the active shell before dependency mutations.
 - Build and local-dev setup support Windows, glibc-based Linux/WSL, and macOS on x64/arm64. Review-tool auto-install follows published artifacts: Lychee is portable on Linux x64/arm64, macOS arm64, and Windows x64; other review hosts must provide the pinned version externally. Setup never invokes an OS package manager, `sudo`, Docker Desktop, or service configuration. Missing system tools get diagnostic guidance.
 - CodeRabbit is not auto-installed because its release service does not publish checksums and its official installer does not support Windows native. Install and authenticate it separately; use WSL for the review profile on Windows when needed. Authentication for GitHub CLI and CodeRabbit always remains interactive and outside setup.
@@ -45,7 +45,7 @@ Project commands use `python`; substitute `python3` on WSL/Linux or `py -3` on W
 - Use `python scripts/axis.py generate theme` after editing [theme/axis-theme.json](../../theme/axis-theme.json); `python scripts/axis.py check theme` rejects stale web or email projections.
 - Use `python scripts/axis.py dotnet test [path/to/project.csproj] -- <dotnet-test-args>`; omit the project to test `Axis.sln`.
 - Keep raw Docker, dotnet, npm, Lychee, and OpenSSL calls inside wrappers or package scripts.
-- Use `python scripts/axis.py local-dev smoke -- <playwright-args>` for fast host-browser smoke against a running local stack; use `python scripts/axis.py local-dev e2e -- <playwright-args>` for Compose-backed browser evidence.
+- Use `python scripts/axis.py local-dev smoke -- <playwright-args>` for the narrow smoke journey and `python scripts/axis.py local-dev e2e -- <playwright-args>` for focused or full browser evidence. Both commands reconcile the local stack and run Playwright in the same Compose-managed browser environment.
 - Use `python scripts/axis.py ready-review` on a clean checkpoint commit at the review boundary. It runs changed-path verification plus the deterministic policy profile shared with CI.
 - Treat `python scripts/axis.py verify` as the changed-path verification engine behind ready-review, not as complete PR-readiness evidence by itself.
 - Use `python scripts/axis.py verify --plan-only` to inspect changed-path routing without executing tools.

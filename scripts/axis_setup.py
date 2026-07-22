@@ -243,7 +243,7 @@ def setup_plan(
         steps.append("validate required toolchains; do not install executables")
     steps.append(f"run strict doctor for the cumulative {normalized} profile")
     steps.extend(["restore locked .NET dependencies", "install locked frontend dependencies"])
-    if normalized in {"local-dev", "review"} or browsers:
+    if browsers:
         steps.append("install Playwright Chromium")
     if normalized in {"local-dev", "review"}:
         steps.append("generate local HTTPS certificates")
