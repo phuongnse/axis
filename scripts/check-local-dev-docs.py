@@ -127,11 +127,16 @@ def compose_command_tokens(command: str) -> list[str]:
         return []
 
     if value.startswith("["):
-        try:
-            parsed = ast.literal_eval(value)
-        except (SyntaxError, ValueError):
+        if not value.endswith("]"):
             return []
-        return [token for token in parsed if isinstance(token, str)] if isinstance(parsed, list) else []
+        lexer = shlex.shlex(value[1:-1], posix=True)
+        lexer.whitespace += ","
+        lexer.whitespace_split = True
+        lexer.commenters = ""
+        try:
+            return list(lexer)
+        except ValueError:
+            return []
 
     lines = [line.strip() for line in value.splitlines() if line.strip()]
     if lines and all(line.startswith("-") for line in lines):

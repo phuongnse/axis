@@ -2849,6 +2849,15 @@ class TestLocalDevCli(unittest.TestCase):
     ports:
       - \"127.0.0.1:5281:8443\"
 """
+        unquoted_flow_compose = """services:
+  api:
+    command: [dotnet, watch, --project, src/Axis.Api/Axis.Api.csproj, run]
+    environment:
+      DOTNET_USE_POLLING_FILE_WATCHER: \"true\"
+      App__BaseUrl: \"${APP_BASE_URL:-https://localhost:3000}\"
+    ports:
+      - \"127.0.0.1:5281:8443\"
+"""
 
         def check(compose_text: str) -> list[str]:
             with tempfile.TemporaryDirectory() as temp:
@@ -2861,6 +2870,7 @@ class TestLocalDevCli(unittest.TestCase):
         self.assertIn(expected, check(one_shot_compose))
         self.assertIn(expected, check(indirect_compose))
         self.assertNotIn(expected, check(watching_compose))
+        self.assertNotIn(expected, check(unquoted_flow_compose))
 
     def test_api_appsettings_base_url_reads_app_base_url(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
