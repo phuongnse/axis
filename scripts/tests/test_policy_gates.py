@@ -4328,6 +4328,7 @@ class TestRepoSkillsGate(unittest.TestCase):
             with self.subTest(consumer=consumer):
                 files = self.valid_skill_files()
                 self.add_skill(files, "axis-script-scope")
+                self.add_skill(files, "axis-doc-hygiene")
                 self.add_skill(files, consumer)
                 files[f".agents/skills/{consumer}/SKILL.md"] += (
                     "\n- Unresolved verification command selection **Delegates** to "
@@ -4339,28 +4340,40 @@ class TestRepoSkillsGate(unittest.TestCase):
                     "Report the result.",
                     "Report `Moment`, `Selected checks`, `Omitted broad checks`, `Results`, and `Next verification boundary`.",
                 )
+                files[".agents/skills/axis-script-scope/SKILL.md"] += (
+                    "\nhost browser --trust-local-ca local-dev up readiness.\n"
+                    "Editing durable guidance **Requires** entering `$axis-doc-hygiene` before edit; "
+                    "reuse an active handoff.\n"
+                    "Classify native prerequisites from an observed failure and enforce accepted-risk policy.\n"
+                )
 
                 issues = self.issues_for_skill(files)
 
-                self.assertNotIn(
-                    "unresolved verification command selection",
-                    "\n".join(issues),
-                )
+                self.assertEqual([], issues)
 
     def test_verification_scope_consumers_reject_unconditional_command_selection_handoff(self) -> None:
         for consumer in ("axis-frontend-feature", "axis-ui-system"):
             with self.subTest(consumer=consumer):
                 files = self.valid_skill_files()
                 self.add_skill(files, "axis-script-scope")
+                self.add_skill(files, "axis-doc-hygiene")
                 self.add_skill(files, consumer)
                 files[f".agents/skills/{consumer}/SKILL.md"] += (
-                    "\n- Verification command selection **Delegates** to `$axis-script-scope`.\n"
+                    "\n- Unresolved verification command selection **Delegates** to "
+                    "`$axis-script-scope`.\n"
+                    "- Documentation lookup **Delegates** to `$axis-script-scope`.\n"
                 )
                 files[".agents/skills/axis-script-scope/SKILL.md"] = files[
                     ".agents/skills/axis-script-scope/SKILL.md"
                 ].replace(
                     "Report the result.",
                     "Report `Moment`, `Selected checks`, `Omitted broad checks`, `Results`, and `Next verification boundary`.",
+                )
+                files[".agents/skills/axis-script-scope/SKILL.md"] += (
+                    "\nhost browser --trust-local-ca local-dev up readiness.\n"
+                    "Editing durable guidance **Requires** entering `$axis-doc-hygiene` before edit; "
+                    "reuse an active handoff.\n"
+                    "Classify native prerequisites from an observed failure and enforce accepted-risk policy.\n"
                 )
 
                 issues = self.issues_for_skill(files)

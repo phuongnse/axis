@@ -1101,6 +1101,9 @@ SKILL_VERIFICATION_SCOPE_DELEGATE_RE = re.compile(
     r"Unresolved verification command selection [*][*]Delegates[*][*] to `\$axis-script-scope`[.]?",
     re.IGNORECASE,
 )
+SKILL_SCRIPT_SCOPE_DELEGATE_LINE_RE = re.compile(
+    r"(?im)^[^\n]*[*][*]Delegates[*][*] to `\$axis-script-scope`[^\n]*$",
+)
 
 
 def simple_yaml_value(text: str, key: str) -> str:
@@ -1311,7 +1314,11 @@ def repo_skill_verification_scope_issues(
         if record is None:
             continue
         skill_md, text = record
-        if SKILL_VERIFICATION_SCOPE_DELEGATE_RE.search(text) is None:
+        script_scope_handoffs = SKILL_SCRIPT_SCOPE_DELEGATE_LINE_RE.findall(text)
+        if not script_scope_handoffs or any(
+            SKILL_VERIFICATION_SCOPE_DELEGATE_RE.search(handoff) is None
+            for handoff in script_scope_handoffs
+        ):
             issues.append(
                 f"{rel_from(skill_md, root)}: `{consumer}` must use **Delegates** only for "
                 "unresolved verification command selection to `$axis-script-scope`"

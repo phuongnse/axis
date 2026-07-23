@@ -31,7 +31,7 @@ Follow [reference.md](../reference.md).
 4. Implement narrowly using the frontend playbook: stable server-state ownership, RHF/Zod forms, explicit mutation cache behavior, shareable URL state, localized copy, and required loading/empty/error/validation/disabled/success states.
 5. Use existing UI contracts. This workflow **Delegates** unresolved visual deviations to `$axis-ui-system` and wire-shape deviations to `$axis-api-contract`; keep consumer classes layout-only and do not create feature-local primitives.
 6. Trace every in-scope AC/AT row to observable behavior and API/cache proof with Vitest/Testing Library; use focused Playwright evidence for layout, navigation, or interaction risk.
-7. Run documented focused checks directly. Use the verification handoff only when changed paths lack an owned command or alter workflow selection; report every omitted broad check.
+7. Run documented focused checks directly through their `python scripts/axis.py ...` wrappers, never raw npm, Playwright, or .NET commands. Use the verification handoff only when changed paths lack an owned command or alter workflow selection; report every omitted broad check.
 
 ## Output
 
