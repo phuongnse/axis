@@ -2294,6 +2294,7 @@ class TestMarkdownLinkGate(unittest.TestCase):
             coderabbit = home / ".local" / "bin" / "coderabbit"
             coderabbit.parent.mkdir(parents=True)
             coderabbit.write_text("", encoding="utf-8")
+            coderabbit.chmod(0o755)
             with (
                 mock.patch.object(axis.os, "name", "posix"),
                 mock.patch.object(axis.Path, "home", return_value=home),

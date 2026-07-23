@@ -2567,7 +2567,7 @@ def inactive_coderabbit_path() -> Path | None:
     if os.name == "nt":
         return None
     candidate = Path.home() / ".local" / "bin" / "coderabbit"
-    return candidate if candidate.is_file() else None
+    return candidate if candidate.is_file() and os.access(candidate, os.X_OK) else None
 
 
 def coderabbit_missing_detail(version_line: str) -> str:
