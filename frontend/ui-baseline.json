@@ -1,5 +1,9 @@
 {
   "exceptions": {
+    "src/components/ui/dialog.tsx": {
+      "reason": "Expose the unstyled Base UI popup so app-owned managed dialogs can preserve modal semantics without importing headless primitives outside the UI zone.",
+      "signOff": "Approved by project owner."
+    },
     "src/components/ui/navigation-menu.tsx": {
       "reason": "Restore Base UI's bracketed data-attribute selectors so directional transitions compile and run correctly.",
       "signOff": "Approved by project owner."
@@ -39,7 +43,7 @@
     "src/components/ui/combobox.tsx": "f85f566d4d53d69d2b87a625a12bbfc36585d48fe8797fd7ce555808307ce0ac",
     "src/components/ui/command.tsx": "e85607682ae67fd7d4d95ca2dfde6d3a0fc43b69d3f312687ae06cfb3b3a77e2",
     "src/components/ui/context-menu.tsx": "cbef7e0a095e9311dde6485595663b7d29de52f4f040499448165b9dbfe4be8b",
-    "src/components/ui/dialog.tsx": "dd373d38c46f0e2227238fb517a7e58351cba91cd8b4a663641b7cfab7fbd697",
+    "src/components/ui/dialog.tsx": "928852ef7514dc7abb3f27b8db97f33b8002b53916bb068f400eba92056e8501",
     "src/components/ui/direction.tsx": "661ff5b9c0dc26edde1226bfedc0ab50976d84f8bae42ca83a38dc3b478fd4d4",
     "src/components/ui/drawer.tsx": "6735b69dcbf7b75780ed1e155a12a1ac678a18daa63c2b4cedecc8491e3c4758",
     "src/components/ui/dropdown-menu.tsx": "c143e8692f7b899d55c889d2978e3f1d0aef1bf5a83dffe1590a0640aba60044",

@@ -6,6 +6,120 @@ namespace Axis.Rules.Domain.Tests;
 public sealed class RuleConditionEvaluatorTests
 {
     [Fact]
+    public void ExpressionLanguage_WhenRead_ExposesVersionedTypedCapabilities()
+    {
+        RuleExpressionLanguage.Version.Should().Be(1);
+        RuleExpressionLanguage.Functions.Select(function => function.Function)
+            .Should().BeEquivalentTo(
+                Enum.GetValues<RuleExpressionFunction>(),
+                options => options.WithStrictOrdering());
+        RuleExpressionLanguage.Operators.Select(definition => definition.Operator)
+            .Should().BeEquivalentTo(
+                Enum.GetValues<RulePredicateOperator>(),
+                options => options.WithStrictOrdering());
+        RulePredicateOperatorDefinition ordered = RuleExpressionLanguage.Operators.Single(
+            definition => definition.Operator == RulePredicateOperator.GreaterThan);
+        ordered.LeftShapes.Should().OnlyContain(shape =>
+            shape.Cardinality == RuleExpressionCardinality.Scalar &&
+            shape.Type != RuleValueType.Boolean);
+        ordered.RequiresMatchingTypes.Should().BeTrue();
+        RuleExpressionFunctionDefinition length = RuleExpressionLanguage.Functions.Single(
+            function => function.Function == RuleExpressionFunction.Length);
+        RuleExpressionFunctionParameter parameter = length.Parameters.Should().ContainSingle().Subject;
+        parameter.AcceptedTypes.Should().Equal(RuleValueType.Text);
+        parameter.Cardinality.Should().Be(RuleExpressionCardinality.Scalar);
+        length.ReturnType.Should().Be(RuleValueType.Integer);
+        length.ReturnCardinality.Should().Be(RuleExpressionCardinality.Scalar);
+    }
+
+    [Fact]
+    public void Evaluate_WhenExpressionUsesRegisteredFunctions_ReturnsMatch()
+    {
+        RuleOperand length = RuleOperand.Function(
+            RuleExpressionFunction.Length,
+            [RuleOperand.Context("record.status").Value]).Value;
+        RulePredicateCondition condition = Predicate(
+            "length-check",
+            RulePredicateOperator.GreaterThan,
+            length,
+            RuleOperand.LiteralValue(Value(RuleValueType.Integer, "3")).Value);
+
+        RuleConditionEvaluator.Evaluate(
+                condition,
+                Schema(),
+                new Dictionary<string, RuleValue>(StringComparer.Ordinal)
+                {
+                    ["record.status"] = Value(RuleValueType.Text, "Active"),
+                })
+            .Value.IsMatch.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Validate_WhenFunctionArgumentsDoNotMatchCapabilitySignature_ReturnsFailure()
+    {
+        RuleOperand invalidLength = RuleOperand.Function(
+            RuleExpressionFunction.Length,
+            [RuleOperand.Context("record.amount").Value]).Value;
+        RulePredicateCondition condition = Predicate(
+            "length-check",
+            RulePredicateOperator.GreaterThan,
+            invalidLength,
+            RuleOperand.LiteralValue(Value(RuleValueType.Integer, "3")).Value);
+        RuleValidationOutcome outcome = RuleValidationOutcome.Create(
+            "invalid_length",
+            RuleSeverity.Error,
+            "Length is invalid.").Value;
+
+        RuleDefinitionValidator.Validate(
+                Schema(),
+                [],
+                condition,
+                outcome,
+                RuleOutcomeKind.Validation)
+            .IsFailure.Should().BeTrue();
+    }
+
+    [Fact]
+    public void ValidateAndEvaluate_WhenFunctionCallsExceedLimit_ReturnFailure()
+    {
+        RuleOperand operand = RuleOperand.Context("record.status").Value;
+        for (int index = 0; index < 3; index += 1)
+        {
+            operand = RuleOperand.Function(
+                RuleExpressionFunction.IsBlank,
+                [operand]).Value;
+        }
+        RulePredicateCondition condition = Predicate(
+            "bounded-functions",
+            RulePredicateOperator.Equal,
+            operand,
+            RuleOperand.LiteralValue(Value(RuleValueType.Boolean, "true")).Value);
+        RuleValidationOutcome outcome = RuleValidationOutcome.Create(
+            "bounded_functions",
+            RuleSeverity.Error,
+            "Function calls are bounded.").Value;
+        RuleEvaluationLimits limits = new(MaxFunctionCalls: 2);
+
+        RuleDefinitionValidator.Validate(
+                Schema(),
+                [],
+                condition,
+                outcome,
+                RuleOutcomeKind.Validation,
+                limits)
+            .IsFailure.Should().BeTrue();
+        RuleConditionEvaluator.Evaluate(
+                condition,
+                Schema(),
+                new Dictionary<string, RuleValue>(StringComparer.Ordinal)
+                {
+                    ["record.status"] = Value(RuleValueType.Text, "Active"),
+                },
+                limits: limits)
+            .IsFailure.Should().BeTrue();
+    }
+
+    [Fact]
     public void CreateGroup_WhenChildrenCollectionIsMutated_PreservesCondition()
     {
         RulePredicateCondition leaf = RulePredicateCondition.Create(

@@ -1036,12 +1036,58 @@
         ]
       }
     },
+    "/api/rules/expression-language": {
+      "get": {
+        "tags": [
+          "Rules"
+        ],
+        "summary": "Get the versioned typed-expression capabilities available for rule authoring",
+        "operationId": "GetRuleExpressionLanguage",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuleExpressionLanguageDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
+    },
     "/api/rules/{definitionKey}": {
       "get": {
         "tags": [
           "Rules"
         ],
-        "summary": "Get a workspace rule definition and its versions",
+        "summary": "Get a system or workspace rule definition",
         "operationId": "GetRuleDefinition",
         "parameters": [
           {
@@ -2352,9 +2398,14 @@
           "status": {
             "$ref": "#/components/schemas/RuleLifecycleStatus"
           },
-          "revision": {
+          "expressionLanguageVersion": {
             "type": "integer",
             "format": "int32"
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
           },
           "latestPublishedVersion": {
             "type": "integer",
@@ -2362,11 +2413,16 @@
             "nullable": true
           },
           "contextKey": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "contextSchemaVersion": {
             "type": "integer",
-            "format": "int32"
+            "format": "int32",
+            "nullable": true
+          },
+          "applicability": {
+            "$ref": "#/components/schemas/RuleApplicabilityDto"
           },
           "parameters": {
             "type": "array",
@@ -2388,11 +2444,13 @@
           },
           "createdAt": {
             "type": "string",
-            "format": "date-time"
+            "format": "date-time",
+            "nullable": true
           },
           "updatedAt": {
             "type": "string",
-            "format": "date-time"
+            "format": "date-time",
+            "nullable": true
           },
           "archivedAt": {
             "type": "string",
@@ -2425,6 +2483,10 @@
           },
           "status": {
             "$ref": "#/components/schemas/RuleLifecycleStatus"
+          },
+          "expressionLanguageVersion": {
+            "type": "integer",
+            "format": "int32"
           },
           "revision": {
             "type": "integer",
@@ -2505,6 +2567,10 @@
           "outcomeKind": {
             "$ref": "#/components/schemas/RuleOutcomeKind"
           },
+          "expressionLanguageVersion": {
+            "type": "integer",
+            "format": "int32"
+          },
           "contextKey": {
             "type": "string"
           },
@@ -2531,6 +2597,126 @@
           "publishedAt": {
             "type": "string",
             "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "RuleExpressionCardinality": {
+        "enum": [
+          "Scalar",
+          "Multiple",
+          "Any"
+        ],
+        "type": "string"
+      },
+      "RuleExpressionFunction": {
+        "enum": [
+          "IsBlank",
+          "Length",
+          "Precision",
+          "Scale",
+          "Count",
+          "MatchesPattern",
+          "HasFormat",
+          "ToDecimal"
+        ],
+        "type": "string"
+      },
+      "RuleExpressionFunctionDefinitionDto": {
+        "type": "object",
+        "properties": {
+          "function": {
+            "$ref": "#/components/schemas/RuleExpressionFunction"
+          },
+          "parameters": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RuleExpressionFunctionParameterDto"
+            }
+          },
+          "returnType": {
+            "$ref": "#/components/schemas/RuleValueType"
+          },
+          "returnCardinality": {
+            "$ref": "#/components/schemas/RuleExpressionCardinality"
+          }
+        },
+        "additionalProperties": false
+      },
+      "RuleExpressionFunctionParameterDto": {
+        "type": "object",
+        "properties": {
+          "acceptedTypes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RuleValueType"
+            }
+          },
+          "cardinality": {
+            "$ref": "#/components/schemas/RuleExpressionCardinality"
+          }
+        },
+        "additionalProperties": false
+      },
+      "RuleExpressionLanguageDto": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "operators": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RulePredicateOperatorDefinitionDto"
+            }
+          },
+          "functions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RuleExpressionFunctionDefinitionDto"
+            }
+          },
+          "limits": {
+            "$ref": "#/components/schemas/RuleExpressionLimitsDto"
+          }
+        },
+        "additionalProperties": false
+      },
+      "RuleExpressionLimitsDto": {
+        "type": "object",
+        "properties": {
+          "maxDepth": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "maxNodes": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "maxFunctionCalls": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "maxParameters": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "maxExecutionSteps": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "RuleExpressionValueShapeDto": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "$ref": "#/components/schemas/RuleValueType"
+          },
+          "cardinality": {
+            "$ref": "#/components/schemas/RuleExpressionCardinality"
           }
         },
         "additionalProperties": false
@@ -2575,6 +2761,16 @@
           },
           "literal": {
             "$ref": "#/components/schemas/RuleValueDto"
+          },
+          "function": {
+            "$ref": "#/components/schemas/RuleExpressionFunction"
+          },
+          "arguments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RuleOperandDto"
+            },
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -2583,7 +2779,8 @@
         "enum": [
           "Context",
           "Parameter",
-          "Literal"
+          "Literal",
+          "Function"
         ],
         "type": "string"
       },
@@ -2663,6 +2860,30 @@
           "IsNotNull"
         ],
         "type": "string"
+      },
+      "RulePredicateOperatorDefinitionDto": {
+        "type": "object",
+        "properties": {
+          "operator": {
+            "$ref": "#/components/schemas/RulePredicateOperator"
+          },
+          "leftShapes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RuleExpressionValueShapeDto"
+            }
+          },
+          "rightShapes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RuleExpressionValueShapeDto"
+            }
+          },
+          "requiresMatchingTypes": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
       },
       "RuleRevisionRequest": {
         "type": "object",

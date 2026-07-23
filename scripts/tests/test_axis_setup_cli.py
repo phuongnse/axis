@@ -137,10 +137,28 @@ class TestPortableSetupCli(unittest.TestCase):
 
         self.assertIn("platform=windows-arm64", stdout.getvalue())
         self.assertIn("GitHub CLI 2.96.0", stdout.getvalue())
+        self.assertIn("stable user command", stdout.getvalue())
         tool_ready.assert_not_called()
         install_tool.assert_not_called()
         run.assert_not_called()
         run_npm.assert_not_called()
+
+    def test_local_dev_plan_explains_that_host_browser_trust_is_opt_in(self) -> None:
+        with (
+            mock.patch.object(
+                axis.axis_setup,
+                "detect_platform",
+                return_value=axis_setup.SetupPlatform("linux", "x64"),
+            ),
+            contextlib.redirect_stdout(io.StringIO()) as stdout,
+        ):
+            self.assertEqual(
+                0,
+                axis.setup(setup_args(profile="local-dev", plan_only=True)),
+            )
+
+        self.assertIn("host browser trust is opt-in", stdout.getvalue())
+        self.assertIn("--trust-local-ca", stdout.getvalue())
 
     def test_build_profile_preserves_locked_dependency_restore(self) -> None:
         calls: list[list[str]] = []
@@ -169,7 +187,7 @@ class TestPortableSetupCli(unittest.TestCase):
             calls,
         )
 
-    def test_local_dev_profile_owns_browser_certificates_and_hooks(self) -> None:
+    def test_local_dev_profile_owns_certificates_and_hooks_without_host_browser(self) -> None:
         calls: list[str] = []
         with (
             mock.patch.object(axis.axis_setup, "detect_platform", return_value=axis_setup.SetupPlatform("darwin", "arm64")),
@@ -187,12 +205,61 @@ class TestPortableSetupCli(unittest.TestCase):
                 or axis.subprocess.CompletedProcess(args, 0),
             ),
             mock.patch.object(axis, "local_dev_certs", side_effect=lambda _args: calls.append("certs") or 0),
+            mock.patch.object(
+                axis,
+                "local_dev_host_trust_status",
+                return_value=(
+                    "WARN",
+                    "host browser trust is not configured; run "
+                    "`python scripts/axis.py local-dev trust-certs`",
+                ),
+                create=True,
+            ),
             mock.patch.object(axis, "install_hooks", side_effect=lambda _args: calls.append("hooks") or 0),
-            contextlib.redirect_stdout(io.StringIO()),
+            contextlib.redirect_stdout(io.StringIO()) as stdout,
         ):
             self.assertEqual(0, axis.setup(setup_args(profile="local-dev")))
 
-        self.assertEqual(["ci", "exec -- playwright install chromium", "certs", "hooks"], calls)
+        self.assertEqual(["ci", "certs", "hooks"], calls)
+        self.assertIn("host browser trust is not configured", stdout.getvalue())
+        self.assertIn("local-dev trust-certs", stdout.getvalue())
+
+    def test_external_preflight_explains_stale_docker_group_session(self) -> None:
+        with (
+            mock.patch.object(axis, "doctor", return_value=0),
+            mock.patch.object(axis, "find_openssl", return_value="/usr/bin/openssl"),
+            mock.patch.object(axis, "_docker_info_ok", return_value=False),
+            mock.patch.object(
+                axis,
+                "_docker_group_session_hint",
+                return_value="Docker group membership is configured but missing from this shell; start a new login shell",
+                create=True,
+            ),
+            mock.patch.object(axis, "require_docker_compose") as compose,
+            contextlib.redirect_stderr(io.StringIO()) as stderr,
+        ):
+            self.assertEqual(1, axis.setup_external_preflight("local-dev"))
+
+        compose.assert_not_called()
+        self.assertIn("new login shell", stderr.getvalue())
+
+    def test_docker_group_hint_distinguishes_configured_from_active_membership(self) -> None:
+        handler = getattr(axis, "_docker_group_session_hint", None)
+        self.assertTrue(callable(handler))
+
+        stale = handler(
+            socket_group_id=998,
+            configured_group_ids={1000, 998},
+            active_group_ids={1000},
+        )
+        active = handler(
+            socket_group_id=998,
+            configured_group_ids={1000, 998},
+            active_group_ids={1000, 998},
+        )
+
+        self.assertIn("new login shell", stale)
+        self.assertIsNone(active)
 
     def test_local_dev_profile_can_explicitly_trust_the_generated_root_ca(self) -> None:
         calls: list[str] = []
@@ -217,7 +284,7 @@ class TestPortableSetupCli(unittest.TestCase):
                 axis.setup(setup_args(profile="local-dev", trust_local_ca=True, yes=True)),
             )
 
-        self.assertEqual(["ci", "exec -- playwright install chromium", "certs", "trust", "hooks"], calls)
+        self.assertEqual(["ci", "certs", "trust", "hooks"], calls)
 
     def test_install_user_tools_installs_only_missing_profile_tools_before_preflight(self) -> None:
         ready = {"dotnet": False, "node": True}
@@ -243,6 +310,32 @@ class TestPortableSetupCli(unittest.TestCase):
 
         confirm.assert_called_once()
         self.assertEqual(["dotnet"], installed)
+
+    def test_review_setup_exposes_an_existing_managed_gh_command(self) -> None:
+        managed = Path("/managed/gh")
+        exposed = Path("/users/alice/.local/bin/gh")
+        with (
+            mock.patch.object(axis.axis_setup, "detect_platform", return_value=axis_setup.SetupPlatform("linux", "x64")),
+            mock.patch.object(axis, "setup_tool_ready", return_value=True),
+            mock.patch.object(axis, "setup_external_preflight", return_value=0),
+            mock.patch.object(axis.axis_setup, "managed_executable", return_value=managed),
+            mock.patch.object(axis.shutil, "which", return_value=None),
+            mock.patch.object(axis.axis_setup, "expose_managed_command", return_value=exposed) as expose,
+            mock.patch.object(axis, "setup_preflight", return_value=0),
+            mock.patch.object(axis, "run", return_value=axis.subprocess.CompletedProcess([], 0)),
+            mock.patch.object(axis, "run_frontend_npm", return_value=axis.subprocess.CompletedProcess([], 0)),
+            mock.patch.object(axis, "local_dev_certs", return_value=0),
+            mock.patch.object(axis, "install_hooks", return_value=0),
+            mock.patch.object(axis, "local_dev_host_trust_status", return_value=("OK", "trusted")),
+            contextlib.redirect_stdout(io.StringIO()) as stdout,
+        ):
+            self.assertEqual(
+                0,
+                axis.setup(setup_args(profile="review", install_user_tools=True, yes=True)),
+            )
+
+        expose.assert_called_once_with("gh", platform_spec=axis_setup.SetupPlatform("linux", "x64"))
+        self.assertIn("exposed: /users/alice/.local/bin/gh", stdout.getvalue())
 
     def test_external_preflight_runs_before_user_local_tool_installation(self) -> None:
         events: list[str] = []

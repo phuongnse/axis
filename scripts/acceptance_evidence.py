@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import shlex
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
@@ -9,6 +10,33 @@ ACCEPTANCE_EVIDENCE_COLUMNS = ["AT ID", "Evidence", "Commands"]
 AT_ID_RE = re.compile(r"^AT-\d{3}$")
 H2_RE = re.compile(r"^##\s+(.+?)\s*$", re.MULTILINE)
 INLINE_CODE_RE = re.compile(r"`([^`]+)`")
+
+
+def axis_command_args(command: str) -> list[str] | None:
+    try:
+        tokens = shlex.split(command)
+    except ValueError:
+        return None
+    if tokens[:2] != ["python", "scripts/axis.py"]:
+        return None
+    return tokens[2:]
+
+
+def is_browser_e2e_command(command: str) -> bool:
+    args = axis_command_args(command)
+    return args is not None and args[:2] == ["local-dev", "e2e"]
+
+
+def is_frontend_component_test_command(command: str) -> bool:
+    args = axis_command_args(command)
+    if args is None:
+        return False
+    if args[:2] == ["frontend", "test"]:
+        return True
+    if args[:2] != ["frontend", "script"] or len(args) < 3:
+        return False
+    script_parts = args[2].split(":")
+    return script_parts[0] == "test" and "e2e" not in script_parts[1:]
 
 
 @dataclass(frozen=True)

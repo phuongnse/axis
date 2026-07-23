@@ -9,8 +9,10 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import ast
 import json
 import re
+import shlex
 import sys
 from pathlib import Path
 
@@ -99,6 +101,123 @@ def compose_has_local_app_base_url(compose_file: Path) -> bool:
     return LOCAL_APP_BASE_URL_LINE.search(compose_file.read_text(encoding="utf-8")) is not None
 
 
+def service_property(block: str, property_name: str) -> str:
+    lines = block.splitlines()
+    marker = re.compile(rf"^    {re.escape(property_name)}:\s*(.*)$")
+
+    for index, line in enumerate(lines):
+        match = marker.match(line)
+        if match is None:
+            continue
+
+        value = [match.group(1)] if match.group(1) else []
+        for nested_line in lines[index + 1 :]:
+            if nested_line.startswith("      ") or not nested_line.strip():
+                value.append(nested_line.strip())
+                continue
+            break
+        return "\n".join(value)
+
+    return ""
+
+
+def compose_command_tokens(command: str) -> list[str]:
+    value = command.strip()
+    if not value:
+        return []
+
+    if value.startswith("["):
+        if not value.endswith("]"):
+            return []
+        lexer = shlex.shlex(value[1:-1], posix=True)
+        lexer.whitespace += ","
+        lexer.whitespace_split = True
+        lexer.commenters = ""
+        try:
+            return list(lexer)
+        except ValueError:
+            return []
+
+    lines = [line.strip() for line in value.splitlines() if line.strip()]
+    if lines and all(line.startswith("-") for line in lines):
+        tokens: list[str] = []
+        for line in lines:
+            scalar = line.removeprefix("-").strip()
+            if scalar.startswith(("'", '"')):
+                try:
+                    scalar = ast.literal_eval(scalar)
+                except (SyntaxError, ValueError):
+                    return []
+            if not isinstance(scalar, str):
+                return []
+            tokens.append(scalar)
+        return tokens
+
+    try:
+        return shlex.split(value)
+    except ValueError:
+        return []
+
+
+def api_has_source_reload(compose_file: Path) -> bool:
+    service_text = services_section(compose_file.read_text(encoding="utf-8"))
+    api_block = next(
+        (match.group(2) for match in SERVICE_BLOCK.finditer(service_text) if match.group(1) == "api"),
+        "",
+    )
+    command_tokens = compose_command_tokens(service_property(api_block, "command"))
+    has_watcher = [token.lower() for token in command_tokens[:2]] == ["dotnet", "watch"]
+    polling_environment = service_property(api_block, "environment")
+    has_bind_mount_polling = re.search(
+        r'^DOTNET_USE_POLLING_FILE_WATCHER:\s*["\']?(?:1|true)["\']?$',
+        polling_environment,
+        re.IGNORECASE | re.MULTILINE,
+    ) is not None
+    has_artifacts_output = re.search(
+        r'^UseArtifactsOutput:\s*["\']?true["\']?$',
+        polling_environment,
+        re.IGNORECASE | re.MULTILINE,
+    ) is not None
+    has_isolated_artifacts_path = re.search(
+        r'^ArtifactsPath:\s*["\']?/tmp/axis-artifacts["\']?$',
+        polling_environment,
+        re.IGNORECASE | re.MULTILINE,
+    ) is not None
+    avoids_cli_artifacts_path = not any(
+        token.lower() == "--artifacts-path" or token.lower().startswith("--artifacts-path=")
+        for token in command_tokens
+    )
+    return (
+        has_watcher
+        and has_bind_mount_polling
+        and has_artifacts_output
+        and has_isolated_artifacts_path
+        and avoids_cli_artifacts_path
+    )
+
+
+def web_has_trusted_https_healthcheck(compose_file: Path) -> bool:
+    service_text = services_section(compose_file.read_text(encoding="utf-8"))
+    web_block = next(
+        (match.group(2) for match in SERVICE_BLOCK.finditer(service_text) if match.group(1) == "web"),
+        "",
+    )
+    environment = service_property(web_block, "environment")
+    healthcheck = service_property(web_block, "healthcheck")
+    has_ca = re.search(
+        r'^NODE_EXTRA_CA_CERTS:\s*["\']?/https/rootCA[.]pem["\']?$',
+        environment,
+        re.MULTILINE,
+    ) is not None
+    normalized = healthcheck.lower()
+    has_https_probe = "node" in normalized and "https://localhost:3000" in normalized
+    disables_verification = any(
+        unsafe in normalized
+        for unsafe in ("--no-check-certificate", "node_tls_reject_unauthorized=0")
+    )
+    return has_ca and has_https_probe and not disables_verification
+
+
 def api_appsettings_base_url(appsettings_file: Path) -> str | None:
     try:
         data = json.loads(appsettings_file.read_text(encoding="utf-8"))
@@ -144,6 +263,12 @@ def check_local_dev_doc() -> list[str]:
             "docker-compose.yml api service must set App__BaseUrl to "
             f"{LOCAL_BROWSER_APP_BASE_URL} for human local-dev verification links"
         )
+
+    if not api_has_source_reload(MAIN_COMPOSE_FILE):
+        errors.append("docker-compose.yml api service must automatically reload source changes")
+
+    if not web_has_trusted_https_healthcheck(MAIN_COMPOSE_FILE):
+        errors.append("docker-compose.yml web service must expose a trusted HTTPS healthcheck")
 
     if api_appsettings_base_url(API_APPSETTINGS_FILE) != LOCAL_BROWSER_APP_BASE_URL:
         errors.append(

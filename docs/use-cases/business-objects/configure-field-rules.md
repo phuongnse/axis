@@ -92,14 +92,14 @@ Let a signed-in workspace user configure enterprise field types, type-specific f
 
 | Screen | Required contract |
 |---|---|
-| Business object collection | Keep one primary table and open unpublished definition editing through the owning route-backed dialog contract. |
+| Business object collection | Keep one primary table and open or focus unpublished definition editing through [docs/foundations/data-display/collection-page.md](../../foundations/data-display/collection-page.md). |
 | Field definition editor | Show stable identity, selected type, type configuration, applied rules, and configuration state for each unpublished field. |
 | Type configuration | Show calendar-date controls for Date, offset-aware controls for DateTime, and selection mode plus ordered option management for Choice. |
 | Rule configuration | Show only compatible published rules, identify their owner and version when needed, and associate parameter errors with the affected rule control. |
 | Publish review | Block publication while invalid configuration remains and identify every affected field or rule. |
 | Published definition detail | Show immutable field type configuration and exact applied rule versions as the record contract. |
 
-Required UI quality: controls must have programmatic labels, keyboard reachability, visible focus and invalid states, stable layout as type-specific controls change, recoverable stale-save state, and responsive behavior inside the record dialog without document scrolling or horizontal overflow. Choice options must use structured row controls; ordering must remain keyboard-operable and labels must not silently change stable option IDs or keys.
+Required UI quality: controls must have programmatic labels, keyboard reachability, visible focus and invalid states, stable layout as type-specific controls change, recoverable stale-save state, and responsive behavior inside the managed record window without document scrolling or horizontal overflow. Choice options must use structured row controls; ordering must remain keyboard-operable and labels must not silently change stable option IDs or keys.
 
 ## Diagrams
 

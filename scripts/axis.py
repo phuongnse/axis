@@ -9,6 +9,7 @@ details behind the wrapper.
 from __future__ import annotations
 
 import argparse
+from datetime import date
 import hashlib
 import importlib
 import importlib.util
@@ -36,6 +37,7 @@ MINIMUM_CODERABBIT_CLI_VERSION = "0.6.0"
 VERSION_PROBE_TIMEOUT_SECONDS = 15
 PLAYWRIGHT_BROWSER_PROBE_TIMEOUT_SECONDS = 20
 DOCKER_PROBE_TIMEOUT_SECONDS = 20
+LOCAL_DEV_WAIT_TIMEOUT_SECONDS = 300
 TOOL_VERSIONS_DOC = "docs/playbooks/scripts.md#tool-versions"
 TECH_STACK_DOC = "docs/TECH_STACK.md"
 GLOBAL_JSON_PATH = ROOT / "global.json"
@@ -45,10 +47,6 @@ RENOVATE_CONFIG_PATH = ROOT / ".github" / "renovate.json5"
 LOCAL_DEV_ENV_FILE = ROOT / ".env.local"
 LOCAL_DEV_PROJECT_NAME = "axis"
 LOCAL_DEV_POSTGRES_VOLUME = f"{LOCAL_DEV_PROJECT_NAME}_postgres_data"
-LOCAL_DEV_BROWSER_BASE_URL = "https://localhost:3000"
-LOCAL_DEV_API_BASE_URL = "https://localhost:5281"
-LOCAL_DEV_SMOKE_SERVICES = ("api", "web")
-LOCAL_DEV_BROWSER_HOME = ROOT / ".dev-browser"
 API_PROJECT = ROOT / "src" / "Axis.Api" / "Axis.Api.csproj"
 FRONTEND_DIR = ROOT / "frontend"
 LOCAL_CERT_DIR = ROOT / ".dev-certs"
@@ -78,6 +76,7 @@ import axis_repo  # noqa: E402
 import axis_setup  # noqa: E402
 import axis_theme  # noqa: E402
 import doc_drift_domains  # noqa: E402
+from axis_dependency_policy import evaluate_npm_audit  # noqa: E402
 from axis_frontend_policy import (  # noqa: E402
     check_frontend_quality,
     frontend_component_file_name_issues,
@@ -620,15 +619,43 @@ def check_frontend_vulnerable_packages(_args: argparse.Namespace | None = None) 
     if rc != 0:
         return rc
 
-    result = run_frontend_npm(["audit", "--audit-level=high"])
-    if result.returncode != 0:
+    result = run_frontend_npm(["audit", "--json"], capture=True)
+    try:
+        report = json.loads(result.stdout or "")
+    except json.JSONDecodeError:
+        detail = (result.stderr or "").strip()
+        suffix = f": {detail}" if detail else ""
         print(
-            "check-frontend-vulnerable-packages: FAIL - npm reported a high or critical vulnerability",
+            f"check-frontend-vulnerable-packages: FAIL - expected valid npm audit JSON{suffix}",
             file=sys.stderr,
         )
-        return result.returncode
+        return 1
+    if result.returncode not in {0, 1}:
+        detail = (result.stderr or "").strip()
+        suffix = f": {detail}" if detail else ""
+        print(
+            f"check-frontend-vulnerable-packages: FAIL - npm audit exited with {result.returncode}{suffix}",
+            file=sys.stderr,
+        )
+        return 1
+    acceptance_path = ROOT / "frontend" / "dependency-risk-acceptances.json"
+    try:
+        acceptance_document = json.loads(acceptance_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        print(
+            f"check-frontend-vulnerable-packages: FAIL - cannot read {path_label(acceptance_path)}: {exc}",
+            file=sys.stderr,
+        )
+        return 1
 
-    print("check-frontend-vulnerable-packages: OK")
+    policy = evaluate_npm_audit(report, acceptance_document, today=date.today())
+    if policy.issues:
+        for issue in policy.issues:
+            print(f"check-frontend-vulnerable-packages: FAIL - {issue}", file=sys.stderr)
+        return 1
+    accepted = ", ".join(f"{advisory} through {expiry}" for advisory, expiry in policy.accepted)
+    suffix = f" (accepted: {accepted})" if accepted else ""
+    print(f"check-frontend-vulnerable-packages: OK{suffix}")
     return 0
 
 
@@ -1071,8 +1098,11 @@ SKILL_VERIFICATION_SCOPE_OUTPUT_FIELDS = (
     "Next verification boundary",
 )
 SKILL_VERIFICATION_SCOPE_DELEGATE_RE = re.compile(
-    r"Verification command selection [*][*]Delegates[*][*] to `\$axis-script-scope`[.]?",
+    r"Unresolved verification command selection [*][*]Delegates[*][*] to `\$axis-script-scope`[.]?",
     re.IGNORECASE,
+)
+SKILL_SCRIPT_SCOPE_DELEGATE_LINE_RE = re.compile(
+    r"(?im)^[^\n]*[*][*]Delegates[*][*] to `\$axis-script-scope`[^\n]*$",
 )
 
 
@@ -1284,10 +1314,14 @@ def repo_skill_verification_scope_issues(
         if record is None:
             continue
         skill_md, text = record
-        if SKILL_VERIFICATION_SCOPE_DELEGATE_RE.search(text) is None:
+        script_scope_handoffs = SKILL_SCRIPT_SCOPE_DELEGATE_LINE_RE.findall(text)
+        if not script_scope_handoffs or any(
+            SKILL_VERIFICATION_SCOPE_DELEGATE_RE.search(handoff) is None
+            for handoff in script_scope_handoffs
+        ):
             issues.append(
-                f"{rel_from(skill_md, root)}: `{consumer}` must use **Delegates** for "
-                "verification command selection to `$axis-script-scope`"
+                f"{rel_from(skill_md, root)}: `{consumer}` must use **Delegates** only for "
+                "unresolved verification command selection to `$axis-script-scope`"
             )
 
     owner = by_name.get("axis-script-scope")
@@ -1301,6 +1335,84 @@ def repo_skill_verification_scope_issues(
             fields = f"{', '.join(formatted[:-1])}, and {formatted[-1]}"
             issues.append(
                 f"{rel_from(skill_md, root)}: `axis-script-scope` output must include {fields}"
+            )
+        local_dev_fragments = ("host browser", "--trust-local-ca", "local-dev up", "readiness")
+        if any(fragment not in text for fragment in local_dev_fragments):
+            issues.append(
+                f"{rel_from(skill_md, root)}: `axis-script-scope` must require the local-dev "
+                "host-browser trust decision and readiness proof"
+            )
+        doc_hygiene_fragments = (
+            "Editing durable guidance **Requires** entering `$axis-doc-hygiene` before edit",
+            "reuse an active handoff",
+        )
+        if any(fragment not in text for fragment in doc_hygiene_fragments):
+            issues.append(
+                f"{rel_from(skill_md, root)}: `axis-script-scope` must use **Requires** for "
+                "`$axis-doc-hygiene` before editing durable guidance"
+            )
+        dependency_policy_fragments = (
+            "native prerequisites",
+            "observed failure",
+            "accepted-risk",
+        )
+        if any(fragment not in text for fragment in dependency_policy_fragments):
+            issues.append(
+                f"{rel_from(skill_md, root)}: `axis-script-scope` must classify native "
+                "prerequisites and enforce accepted-risk policy"
+            )
+
+    ready_review = by_name.get("axis-ready-review")
+    if ready_review is not None:
+        skill_md, text = ready_review
+        minimality_fragments = (
+            "minimality",
+            "existing code",
+            "standard library",
+            "native platform",
+            "installed dependencies",
+            "speculative abstractions",
+            "accessibility",
+        )
+        if any(fragment not in text for fragment in minimality_fragments):
+            issues.append(
+                f"{rel_from(skill_md, root)}: `axis-ready-review` must audit minimality "
+                "after correctness without weakening required safety"
+            )
+
+    reference = root / REPO_SKILLS_DIR / "reference.md"
+    if reference.is_file():
+        reference_text = reference.read_text(encoding="utf-8")
+        reference_fragments = (
+            "Route durable guidance before edit",
+            "Other durable guidance **Requires**",
+            "`$axis-doc-hygiene`",
+            "typed handoff",
+        )
+        if any(fragment not in reference_text for fragment in reference_fragments):
+            issues.append(
+                f"{rel_from(reference, root)}: universal contract must route durable guidance "
+                "edits through `$axis-doc-hygiene` before edit"
+            )
+        if "The entry domain owner keeps spec, status, and evidence decisions" not in reference_text:
+            issues.append(
+                f"{rel_from(reference, root)}: universal contract must keep spec, status, "
+                "and evidence decisions with the entry domain owner"
+            )
+        engineering_method_fragments = (
+            "## Engineering method",
+            "Minimal solution ladder",
+            "Root-cause loop",
+            "Fail-before/pass-after",
+            "Safety floor",
+            "Communication clarity",
+            "Skill proof",
+        )
+        if any(fragment not in reference_text for fragment in engineering_method_fragments):
+            issues.append(
+                f"{rel_from(reference, root)}: universal contract must own the engineering method "
+                "for minimal solutions, root-cause fixes, behavior proof, safety, communication, "
+                "and skill validation"
             )
     return issues
 
@@ -1705,7 +1817,8 @@ ENFORCEMENT_ALLOWED_STATUSES = {
     "Review-only",
 }
 
-ENFORCEMENT_TRUTH_REQUIRED_SNIPPETS = [
+def enforcement_truth_required_snippets() -> list[tuple[Path, list[tuple[str, str]]]]:
+    return [
     (
         Path(".github/workflows/build-and-test.yml"),
         [
@@ -1727,7 +1840,10 @@ ENFORCEMENT_TRUTH_REQUIRED_SNIPPETS = [
             ("run: python scripts/axis.py frontend ci", "frontend typecheck/lint runs in CI through the Axis wrapper"),
             ("run: python scripts/axis.py frontend test", "frontend tests run in CI through the Axis wrapper"),
             ("uses: lycheeverse/lychee-action", "markdown link check runs in CI"),
-            ("lycheeVersion: v0.23.0", "markdown link check pins the documented Lychee version"),
+            (
+                f"lycheeVersion: v{axis_setup.LYCHEE_VERSION}",
+                "markdown link check pins the documented Lychee version",
+            ),
             ("args: --config ./lychee.toml './**/*.md'", "markdown link check uses shared lychee config"),
             ("BASE_BRANCH: main", "doc drift compares against main"),
         ],
@@ -1799,7 +1915,7 @@ ENFORCEMENT_TRUTH_REQUIRED_SNIPPETS = [
             ("tests\\Architecture\\Axis.Architecture.Tests\\Axis.Architecture.Tests.csproj", "architecture fitness tests are included in Axis.sln"),
         ],
     ),
-]
+    ]
 
 
 def governance_owner_boundary_issues(*, root: Path | None = None) -> list[str]:
@@ -1854,7 +1970,7 @@ def enforcement_truth_audit_issues(*, root: Path | None = None) -> list[str]:
     root = root or ROOT
     issues: list[str] = []
 
-    for relative, requirements in ENFORCEMENT_TRUTH_REQUIRED_SNIPPETS:
+    for relative, requirements in enforcement_truth_required_snippets():
         path = root / relative
         normalized = relative.as_posix()
         if not path.is_file():
@@ -2317,10 +2433,12 @@ def dotnet_sdk_status() -> tuple[bool, str]:
 
     ok, version_line, resolved = command_version_line("dotnet", "--version")
     if not ok:
+        prerequisite = axis_setup.dotnet_native_prerequisite_hint(version_line)
+        prerequisite_detail = f"; {prerequisite}" if prerequisite else ""
         return (
             False,
             f"{version_line}; .NET SDK {REQUIRED_DOTNET_SDK_MAJOR}.x is required per "
-            f"{TECH_STACK_DOC} and {path_label(GLOBAL_JSON_PATH)}",
+            f"{TECH_STACK_DOC} and {path_label(GLOBAL_JSON_PATH)}{prerequisite_detail}",
         )
 
     major = version_major(version_line)
@@ -2490,10 +2608,27 @@ def check_markdown_links_for_paths(paths: list[str] | None) -> int:
     return result.returncode
 
 
+def inactive_coderabbit_path() -> Path | None:
+    if os.name == "nt":
+        return None
+    candidate = Path.home() / ".local" / "bin" / "coderabbit"
+    return candidate if candidate.is_file() and os.access(candidate, os.X_OK) else None
+
+
+def coderabbit_missing_detail(version_line: str) -> str:
+    inactive = inactive_coderabbit_path()
+    if inactive is not None:
+        return (
+            f"coderabbit is installed at {inactive}, but {inactive.parent} is not active in PATH; "
+            f"add that directory to PATH and start a new login shell, then rerun. See {TOOL_VERSIONS_DOC}."
+        )
+    return f"{version_line}; CodeRabbit CLI is required for the local pre-PR review checkpoint. See {TOOL_VERSIONS_DOC}."
+
+
 def coderabbit_cli_status() -> tuple[bool, str]:
     ok, version_line, resolved = command_version_line("coderabbit", "--version")
     if not ok:
-        return False, f"{version_line}; CodeRabbit CLI is required for the local pre-PR review checkpoint. See {TOOL_VERSIONS_DOC}."
+        return False, coderabbit_missing_detail(version_line)
 
     version_match = re.search(r"\b([0-9]+(?:[.][0-9]+)+)\b", version_line)
     if version_match is None:
@@ -2515,10 +2650,7 @@ def coderabbit_doctor_status(*, strict: bool) -> tuple[str, str]:
 
     resolved = shutil.which(resolve_exe("coderabbit")) or shutil.which("coderabbit")
     if resolved is None:
-        return (
-            "FAIL",
-            f"coderabbit not found in PATH; CodeRabbit CLI is required for the local pre-PR review checkpoint. See {TOOL_VERSIONS_DOC}.",
-        )
+        return "FAIL", coderabbit_missing_detail("coderabbit not found in PATH")
 
     suffix = Path(resolved).suffix.lower()
     if os.name == "nt" and suffix in {".cmd", ".bat"}:
@@ -2578,11 +2710,12 @@ def run_frontend_npm(
     *,
     cwd: Path = FRONTEND_DIR,
     env_overrides: dict[str, str] | None = None,
+    capture: bool = False,
 ) -> subprocess.CompletedProcess[str]:
     env = frontend_toolchain_env()
     if env_overrides:
         env.update(env_overrides)
-    return run([resolve_exe("npm", env=env), *npm_args], cwd=cwd, env=env, check=False)
+    return run([resolve_exe("npm", env=env), *npm_args], cwd=cwd, env=env, capture=capture, check=False)
 
 
 def passthrough_args(raw_args: list[str]) -> list[str]:
@@ -2599,6 +2732,12 @@ def frontend_command(args: argparse.Namespace) -> int:
             write_ui_baseline()
             return 0
         return check_ui_baseline()
+
+    if command == "script" and args.script_name == "test:e2e":
+        rc = require_docker_compose("frontend script test:e2e")
+        if rc != 0:
+            return rc
+        return run_local_dev_browser(passthrough_args(args.script_args))
 
     rc = check_frontend_toolchain()
     if rc != 0:
@@ -2824,7 +2963,13 @@ def verify(args: argparse.Namespace) -> int:
 
     frontend = any(is_frontend_path(path) for path in paths)
     frontend_package_scan = any(
-        path in {"frontend/package.json", "frontend/package-lock.json"} for path in paths
+        path
+        in {
+            "frontend/package.json",
+            "frontend/package-lock.json",
+            "frontend/dependency-risk-acceptances.json",
+        }
+        for path in paths
     )
     renovate_config = ".github/renovate.json5" in paths
     frontend_api_types = "openapi.json" in paths or "frontend/src/lib/api-types.ts" in paths
@@ -2908,7 +3053,7 @@ def verify(args: argparse.Namespace) -> int:
                 if changed_e2e_tests:
                     step(
                         "frontend e2e (changed test files)",
-                        lambda: run_frontend_npm(["run", "test:e2e", "--", *changed_e2e_tests]).returncode,
+                        lambda: run_local_dev_browser(changed_e2e_tests),
                     )
             else:
                 step("frontend test", lambda: frontend_command(argparse.Namespace(frontend_command="test")))
@@ -3284,6 +3429,26 @@ def local_dev_compose_args(*args: str) -> list[str]:
     )
 
 
+def local_dev_up_args(
+    *services: str,
+    build: bool = False,
+    force_recreate: bool = False,
+) -> list[str]:
+    args = [
+        "up",
+        "-d",
+        "--wait",
+        "--wait-timeout",
+        str(LOCAL_DEV_WAIT_TIMEOUT_SECONDS),
+    ]
+    if build:
+        args.append("--build")
+    if force_recreate:
+        args.append("--force-recreate")
+    args.extend(services)
+    return local_dev_compose_args(*args)
+
+
 def local_dev_shell_argv(service: str, exec_command: list[str]) -> list[str]:
     command = exec_command[1:] if exec_command[:1] == ["--"] else exec_command
     if command:
@@ -3291,128 +3456,32 @@ def local_dev_shell_argv(service: str, exec_command: list[str]) -> list[str]:
     return [LOCAL_DEV_SERVICE_SHELL.get(service, LOCAL_DEV_DEFAULT_SHELL)]
 
 
-def local_dev_smoke_env() -> dict[str, str]:
-    env = {
-        "E2E_API_URL": LOCAL_DEV_API_BASE_URL,
-        "E2E_BASE_URL": LOCAL_DEV_BROWSER_BASE_URL,
-        "E2E_BROWSER_HOME": str(LOCAL_DEV_BROWSER_HOME),
-        "E2E_SKIP_WEB_SERVER": "1",
-        "E2E_VERIFY_ORIGIN": LOCAL_DEV_BROWSER_BASE_URL,
-    }
-    if LOCAL_ROOT_CA_PEM.is_file():
-        env["NODE_EXTRA_CA_CERTS"] = str(LOCAL_ROOT_CA_PEM)
-    return env
-
-
-def ensure_local_dev_smoke_browser_trust() -> int:
-    if not LOCAL_ROOT_CA_PEM.is_file():
-        print(
-            "local-dev smoke: local root CA is missing. "
-            "Run `python scripts/axis.py local-dev certs` first.",
-            file=sys.stderr,
-        )
-        return 1
-
-    fingerprint = hashlib.sha256(LOCAL_ROOT_CA_PEM.read_bytes()).hexdigest()
-    marker = LOCAL_DEV_BROWSER_HOME / ".axis-root-ca.sha256"
-    nss_database = LOCAL_DEV_BROWSER_HOME / ".pki" / "nssdb"
-
-    if (
-        (nss_database / "cert9.db").is_file()
-        and marker.is_file()
-        and marker.read_text(encoding="utf-8").strip() == fingerprint
-    ):
-        return 0
-
-    LOCAL_DEV_BROWSER_HOME.mkdir(parents=True, exist_ok=True)
-    LOCAL_DEV_BROWSER_HOME.chmod(0o700)
-
+def run_local_dev_browser(playwright_args: list[str]) -> int:
+    up = run(local_dev_up_args(), check=False)
+    if up.returncode != 0:
+        return up.returncode
     build = run(local_dev_compose_args("--profile", "e2e", "build", "e2e"), check=False)
     if build.returncode != 0:
         return build.returncode
-
-    user_args: list[str] = []
-    getuid = getattr(os, "getuid", None)
-    getgid = getattr(os, "getgid", None)
-    if callable(getuid) and callable(getgid):
-        user_args = ["--user", f"{getuid()}:{getgid()}"]
-
-    trust = run(
+    return run(
         local_dev_compose_args(
             "--profile",
             "e2e",
             "run",
             "--rm",
             "--no-deps",
-            *user_args,
-            "--entrypoint",
-            "sh",
-            "-v",
-            f"{LOCAL_DEV_BROWSER_HOME}:/browser-home",
             "e2e",
-            "./scripts/import-browser-ca.sh",
-            "/browser-home/.pki/nssdb",
-            "/https/rootCA.pem",
+            *playwright_args,
         ),
         check=False,
-    )
-    if trust.returncode != 0:
-        return trust.returncode
-    if not (nss_database / "cert9.db").is_file():
-        print("local-dev smoke: Chromium trust store was not created", file=sys.stderr)
-        return 1
-
-    marker.write_text(f"{fingerprint}\n", encoding="utf-8")
-    return 0
-
-
-def require_local_dev_smoke_services() -> int:
-    result = run(
-        local_dev_compose_args("ps", "--services", "--status", "running"),
-        capture=True,
-        check=False,
-    )
-    if result.returncode != 0:
-        emit_captured_process(result)
-        return result.returncode
-
-    running = {line.strip() for line in (result.stdout or "").splitlines() if line.strip()}
-    missing = [service for service in LOCAL_DEV_SMOKE_SERVICES if service not in running]
-    if missing:
-        print(
-            "local-dev smoke: required services are not running: "
-            f"{', '.join(missing)}. Run `python scripts/axis.py local-dev up` first.",
-            file=sys.stderr,
-        )
-        return 1
-    return 0
+    ).returncode
 
 
 def local_dev_smoke(args: argparse.Namespace) -> int:
-    rc = check_frontend_toolchain()
-    if rc != 0:
-        return rc
-
-    ok, detail = playwright_chromium_status()
-    if not ok:
-        print(f"local-dev smoke: Playwright Chromium unavailable - {detail}", file=sys.stderr)
-        return 1
-
-    rc = require_local_dev_smoke_services()
-    if rc != 0:
-        return rc
-
-    rc = ensure_local_dev_smoke_browser_trust()
-    if rc != 0:
-        return rc
-
     smoke_args = passthrough_args(getattr(args, "smoke_args", []))
     if not smoke_args:
         smoke_args = ["e2e/local-dev-smoke.pw.ts"]
-    return run_frontend_npm(
-        ["run", "test:e2e", "--", *smoke_args],
-        env_overrides=local_dev_smoke_env(),
-    ).returncode
+    return run_local_dev_browser(smoke_args)
 
 
 def require_docker_compose(label: str) -> int:
@@ -3496,6 +3565,46 @@ def local_dev_cert_host() -> str:
     if system == "linux" and (os.environ.get("WSL_DISTRO_NAME") or "microsoft" in release):
         return "wsl"
     return "linux"
+
+
+def local_dev_host_trust_status() -> tuple[str, str]:
+    trust_command = "`python scripts/axis.py local-dev trust-certs`"
+    if not LOCAL_ROOT_CA_CER.is_file():
+        return "WARN", "local root CA is missing; run `python scripts/axis.py local-dev certs`"
+
+    host = local_dev_cert_host()
+    fingerprint = local_dev_ca_fingerprint("sha1")
+    if host in {"windows", "wsl"}:
+        certutil = shutil.which("certutil.exe") or shutil.which("certutil")
+        if certutil is None:
+            return "WARN", f"Windows certutil is unavailable; verify host trust or run {trust_command}"
+        result = run_optional(
+            [certutil, "-user", "-store", "Root", fingerprint],
+            timeout=VERSION_PROBE_TIMEOUT_SECONDS,
+        )
+        if result is not None and result.returncode == 0:
+            return "OK", "Axis local root CA is trusted for this Windows user"
+        return "WARN", f"host browser trust is not configured; run {trust_command}"
+
+    if host == "darwin":
+        security = shutil.which("security")
+        if security is None:
+            return "WARN", f"macOS security tool is unavailable; verify host trust or run {trust_command}"
+        keychain = Path.home() / "Library" / "Keychains" / "login.keychain-db"
+        result = run_optional(
+            [security, "find-certificate", "-a", "-Z", str(keychain)],
+            timeout=VERSION_PROBE_TIMEOUT_SECONDS,
+        )
+        output = "" if result is None else f"{result.stdout}\n{result.stderr}".upper()
+        if result is not None and result.returncode == 0 and fingerprint in output:
+            return "OK", "Axis local root CA is trusted in the login keychain"
+        return "WARN", f"host browser trust is not configured; run {trust_command}"
+
+    return (
+        "WARN",
+        "automatic host trust verification is unavailable on native Linux; "
+        f"import {path_label(LOCAL_ROOT_CA_CER)} into the browser or user trust store",
+    )
 
 
 def local_dev_ca_fingerprint(algorithm: str = "sha256") -> str:
@@ -3743,11 +3852,20 @@ def local_dev(args: argparse.Namespace) -> int:
 
     command = args.local_dev_command
     if command == "up":
-        compose = ["up", "-d"]
-        if args.build:
-            compose.append("--build")
-        compose.extend(args.services)
-        return run(local_dev_compose_args(*compose), check=False).returncode
+        result = run(
+            local_dev_up_args(*args.services, build=args.build),
+            check=False,
+        )
+        if result.returncode != 0:
+            return result.returncode
+        print("local-dev up: ready")
+        if not args.services:
+            print("web: https://localhost:3000")
+            print("api health: https://localhost:5281/health")
+            print("maildev: http://localhost:1080")
+            trust_status, trust_detail = local_dev_host_trust_status()
+            print(f"[{trust_status}] host browser trust: {trust_detail}")
+        return 0
 
     if command == "down":
         compose = ["down", "--remove-orphans"]
@@ -3762,7 +3880,10 @@ def local_dev(args: argparse.Namespace) -> int:
         if not args.services:
             print("local-dev recreate: name at least one service", file=sys.stderr)
             return 1
-        return run(local_dev_compose_args("up", "-d", "--force-recreate", *args.services), check=False).returncode
+        return run(
+            local_dev_up_args(*args.services, force_recreate=True),
+            check=False,
+        ).returncode
 
     if command == "status":
         return run(local_dev_compose_args("ps"), check=False).returncode
@@ -3788,14 +3909,8 @@ def local_dev(args: argparse.Namespace) -> int:
         ).returncode
 
     if command == "e2e":
-        build = run(local_dev_compose_args("--profile", "e2e", "build", "e2e"), check=False)
-        if build.returncode != 0:
-            return build.returncode
         e2e_args = passthrough_args(getattr(args, "e2e_args", []))
-        return run(
-            local_dev_compose_args("--profile", "e2e", "run", "--rm", "--no-deps", "e2e", *e2e_args),
-            check=False,
-        ).returncode
+        return run_local_dev_browser(e2e_args)
 
     if command == "smoke":
         return local_dev_smoke(args)
@@ -3825,13 +3940,13 @@ def local_dev(args: argparse.Namespace) -> int:
             if remove_output:
                 print(remove_output, file=sys.stderr)
             return remove.returncode
-        return run(local_dev_compose_args("up", "-d"), check=False).returncode
+        return run(local_dev_up_args(), check=False).returncode
 
     if command == "reset-all":
         down = run(local_dev_compose_args("down", "--volumes"), check=False)
         if down.returncode != 0:
             return down.returncode
-        return run(local_dev_compose_args("up", "-d"), check=False).returncode
+        return run(local_dev_up_args(), check=False).returncode
 
     raise CheckError(f"Unknown local-dev command: {command}")
 
@@ -3844,6 +3959,38 @@ def _wsl_docker_ok() -> bool:
         timeout=DOCKER_PROBE_TIMEOUT_SECONDS,
     )
     return result is not None and result.returncode == 0
+
+
+def _docker_group_session_hint(
+    *,
+    socket_group_id: int | None = None,
+    configured_group_ids: set[int] | None = None,
+    active_group_ids: set[int] | None = None,
+) -> str | None:
+    if socket_group_id is None or configured_group_ids is None or active_group_ids is None:
+        if os.name == "nt":
+            return None
+        socket_path = Path("/var/run/docker.sock")
+        try:
+            import grp
+            import pwd
+
+            socket_group_id = socket_path.stat().st_gid
+            user = pwd.getpwuid(os.getuid())
+            configured_group_ids = {user.pw_gid}
+            configured_group_ids.update(
+                group.gr_gid for group in grp.getgrall() if user.pw_name in group.gr_mem
+            )
+            active_group_ids = {os.getgid(), *os.getgroups()}
+        except (ImportError, KeyError, OSError):
+            return None
+
+    if socket_group_id in configured_group_ids and socket_group_id not in active_group_ids:
+        return (
+            "Docker group membership is configured but missing from this shell; "
+            "start a new login shell or restart WSL, then rerun the command"
+        )
+    return None
 
 
 def setup_tool_ready(tool: str) -> bool:
@@ -3890,9 +4037,13 @@ def setup_external_preflight(profile: str) -> int:
             )
             return 1
         if not _docker_info_ok():
+            session_hint = _docker_group_session_hint()
+            detail = session_hint or (
+                "Docker Engine is not reachable in this shell; "
+                "Axis will not install or start an OS service automatically"
+            )
             print(
-                "setup: FAIL - Docker Engine is not reachable in this shell; "
-                "Axis will not install or start an OS service automatically",
+                f"setup: FAIL - {detail}",
                 file=sys.stderr,
             )
             return 1
@@ -3946,6 +4097,8 @@ def setup(args: argparse.Namespace) -> int:
         for index, label in enumerate(plan, 1):
             print(f"{index}. {label}")
         print("setup plan: no checks, downloads, or repository mutations were performed")
+        if normalized in {"local-dev", "review"} and not trust_local_ca:
+            print("setup plan: host browser trust is opt-in; add --trust-local-ca when required")
         return 0
 
     missing: tuple[str, ...] = ()
@@ -3979,6 +4132,19 @@ def setup(args: argparse.Namespace) -> int:
                 print(f"> install pinned user-local {tool} {axis_setup.tool_version(tool)}", flush=True)
                 installed = axis_setup.install_tool(tool, platform_spec=platform_spec)
                 print(f"  installed: {installed}")
+            if normalized == "review" and ("gh" in missing or shutil.which("gh") is None):
+                exposed = axis_setup.expose_managed_command("gh", platform_spec=platform_spec)
+                print(f"  exposed: {exposed}")
+                active_dirs = {
+                    os.path.normcase(os.path.abspath(entry))
+                    for entry in os.environ.get("PATH", "").split(os.pathsep)
+                    if entry
+                }
+                if os.path.normcase(os.path.abspath(exposed.parent)) not in active_dirs:
+                    print(
+                        f"setup: user command directory `{exposed.parent}` is not active in this shell; "
+                        "add it to PATH and start a new shell"
+                    )
         except (OSError, axis_setup.SetupError) as exc:
             print(f"setup: FAIL - {exc}", file=sys.stderr)
             return 1
@@ -3994,7 +4160,7 @@ def setup(args: argparse.Namespace) -> int:
         ),
         ("install frontend dependencies", lambda: run_frontend_npm(["ci"]).returncode),
     ]
-    if browsers or normalized in {"local-dev", "review"}:
+    if browsers:
         steps.append(
             (
                 "install Playwright Chromium",
@@ -4015,6 +4181,10 @@ def setup(args: argparse.Namespace) -> int:
             return rc
 
     print("setup: OK")
+    if normalized in {"local-dev", "review"} and not trust_local_ca:
+        trust_status, trust_detail = local_dev_host_trust_status()
+        if trust_status != "OK":
+            print(f"setup: [{trust_status}] host browser trust: {trust_detail}")
     if normalized == "review":
         followups = ["`coderabbit auth status`"]
         if setup_tool_ready("gh"):
@@ -4076,15 +4246,19 @@ def doctor(args: argparse.Namespace) -> int:
                 record("OK", "npm adapter", detail)
 
     if "local-dev" in groups:
-        if node_ok:
-            chromium_ok, chromium_detail = playwright_chromium_status(frontend_env)
-            record("OK" if chromium_ok else "WARN", "playwright chromium", chromium_detail)
-        else:
-            record("WARN", "playwright chromium", "Node must resolve before checking Playwright browser artifacts")
-
         openssl = find_openssl()
         if openssl:
             record("OK", "openssl", openssl)
+            certificates_valid = local_dev_certificates_valid(openssl)
+            record(
+                "OK" if certificates_valid else "WARN",
+                "local HTTPS certificates",
+                "valid local CA and localhost certificate"
+                if certificates_valid
+                else "missing or invalid; run `python scripts/axis.py local-dev certs`",
+            )
+            trust_status, trust_detail = local_dev_host_trust_status()
+            record(trust_status, "host browser trust", trust_detail)
         else:
             record("WARN", "openssl", "required for local-dev certs; install OpenSSL on PATH or Git for Windows")
 
@@ -4123,7 +4297,12 @@ def doctor(args: argparse.Namespace) -> int:
                 "Docker works from another detected execution context; run the canonical command there",
             )
         else:
-            record("FAIL", "docker endpoint", "docker info failed; no reachable Docker endpoint detected")
+            session_hint = _docker_group_session_hint()
+            record(
+                "FAIL",
+                "docker endpoint",
+                session_hint or "docker info failed; no reachable Docker endpoint detected",
+            )
 
         if _docker_compose_ok():
             record("OK", "docker compose", "docker compose version works")
@@ -4218,7 +4397,7 @@ def main(argv: list[str] | None = None) -> int:
     setup_parser.add_argument(
         "--browsers",
         action="store_true",
-        help="Compatibility option: add Playwright Chromium to any profile",
+        help="Install host Playwright Chromium for explicit host-browser debugging",
     )
     setup_parser.add_argument(
         "--plan-only",
@@ -4375,7 +4554,10 @@ def main(argv: list[str] | None = None) -> int:
     check_sub.add_parser("frontend-toolchain", help="Check Node and npm versions").set_defaults(func=check_frontend_toolchain)
     check_sub.add_parser("playwright-browsers", help="Check Playwright Chromium availability").set_defaults(func=check_playwright_browsers)
     check_sub.add_parser("vulnerable-packages", help="Audit NuGet dependencies for vulnerabilities").set_defaults(func=check_vulnerable_packages)
-    check_sub.add_parser("frontend-vulnerable-packages", help="Audit npm dependencies at high severity").set_defaults(func=check_frontend_vulnerable_packages)
+    check_sub.add_parser(
+        "frontend-vulnerable-packages",
+        help="Audit npm dependencies against the accepted-risk policy",
+    ).set_defaults(func=check_frontend_vulnerable_packages)
     check_sub.add_parser("ef-domain-mapping", help="Check EF Core mappings against domain ownership").set_defaults(func=check_ef_domain_mapping)
     check_sub.add_parser("frontend-api-contracts", help="Check generated frontend API contracts").set_defaults(func=check_frontend_api_contracts)
     check_sub.add_parser("ui-baseline", help="Check the approved frontend UI baseline").set_defaults(func=check_ui_baseline)

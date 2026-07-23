@@ -43,10 +43,12 @@ public sealed class RuleDefinitionRepositoryTests(RulesDatabaseFixture db) : IAs
             workspaceId))!;
 
         loaded.Status.Should().Be(RuleLifecycleStatus.Published);
+        loaded.ExpressionLanguageVersion.Should().Be(RuleExpressionLanguage.Version);
         loaded.Parameters.Should().ContainSingle(parameter =>
             parameter.Key == "threshold" && parameter.Type == RuleValueType.Decimal);
         RuleDefinitionVersion version = loaded.Versions.Should().ContainSingle().Subject;
         version.Version.Should().Be(1);
+        version.ExpressionLanguageVersion.Should().Be(RuleExpressionLanguage.Version);
         version.Condition.Should().BeOfType<RulePredicateCondition>();
         version.Outcome.Should().BeOfType<RuleValidationOutcome>();
         version.PublishedByUserId.Should().NotBeEmpty();

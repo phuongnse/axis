@@ -49,6 +49,52 @@ class Artifact:
     checksum: str
 
 
+def _os_release_values(text: str) -> dict[str, str]:
+    values: dict[str, str] = {}
+    for line in text.splitlines():
+        if not line or line.lstrip().startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        value = value.strip()
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in {'"', "'"}:
+            value = value[1:-1]
+        values[key.strip()] = value
+    return values
+
+
+def dotnet_native_prerequisite_hint(
+    detail: str,
+    *,
+    platform_spec: SetupPlatform | None = None,
+    os_release_text: str | None = None,
+) -> str | None:
+    normalized = detail.lower()
+    if "couldn't find a valid icu package" not in normalized and "no usable version of libicu" not in normalized:
+        return None
+    try:
+        current_platform = platform_spec or detect_platform()
+    except SetupError:
+        return None
+    if current_platform.os != "linux":
+        return None
+
+    if os_release_text is None:
+        try:
+            os_release_text = Path("/etc/os-release").read_text(encoding="utf-8")
+        except OSError:
+            os_release_text = ""
+    release = _os_release_values(os_release_text)
+    if release.get("ID") == "ubuntu" and release.get("VERSION_ID") == "26.04":
+        action = "on Ubuntu 26.04 install it with `sudo apt install libicu78`"
+    else:
+        distribution = release.get("PRETTY_NAME") or "this Linux distribution"
+        action = f"install the ICU runtime package documented for {distribution}"
+    return (
+        f"the .NET host is missing ICU; {action}, then rerun setup; "
+        "Axis will not run sudo or an OS package manager"
+    )
+
+
 def detect_platform(
     *,
     system: str | None = None,
@@ -184,6 +230,90 @@ def managed_bin_dir(tool: str, *, platform_spec: SetupPlatform | None = None) ->
     return managed_executable(tool, platform_spec=platform_spec).parent
 
 
+def user_command_dir(
+    *,
+    platform_spec: SetupPlatform | None = None,
+    env: Mapping[str, str] | None = None,
+    home: Path | None = None,
+) -> Path:
+    platform_spec = platform_spec or detect_platform()
+    values = os.environ if env is None else env
+    home = Path.home() if home is None else home
+    if platform_spec.os == "windows":
+        local_app_data = values.get("LOCALAPPDATA")
+        base = Path(local_app_data) if local_app_data else home / "AppData" / "Local"
+        return base / "Axis" / "bin"
+    return home / ".local" / "bin"
+
+
+def _managed_command_owned(destination: Path, *, tool: str, root: Path, windows: bool) -> bool:
+    if windows:
+        if not destination.is_file():
+            return False
+        try:
+            first_line = destination.read_text(encoding="utf-8").splitlines()[0]
+        except (IndexError, OSError, UnicodeError):
+            return False
+        return first_line == "@rem Managed by Axis portable setup"
+    if not destination.is_symlink():
+        return False
+    try:
+        destination.resolve(strict=False).relative_to((root / tool).resolve(strict=False))
+    except (OSError, ValueError):
+        return False
+    return True
+
+
+def expose_managed_command(
+    tool: str,
+    *,
+    platform_spec: SetupPlatform | None = None,
+    root: Path | None = None,
+    command_dir: Path | None = None,
+) -> Path:
+    platform_spec = platform_spec or detect_platform()
+    root = managed_tools_root(platform_spec=platform_spec) if root is None else root
+    managed = managed_executable(tool, platform_spec=platform_spec, root=root)
+    if not managed.is_file():
+        raise SetupError(f"managed `{tool}` executable does not exist at `{managed}`")
+
+    command_dir = user_command_dir(platform_spec=platform_spec) if command_dir is None else command_dir
+    command_dir.mkdir(parents=True, exist_ok=True)
+    windows = platform_spec.os == "windows"
+    destination = command_dir / (f"{tool}.cmd" if windows else tool)
+    destination_exists = os.path.lexists(destination)
+    if destination_exists and not _managed_command_owned(destination, tool=tool, root=root, windows=windows):
+        raise SetupError(f"refusing to replace unmanaged command `{destination}`")
+
+    if windows:
+        escaped = str(managed).replace("%", "%%")
+        content = f'@rem Managed by Axis portable setup\r\n@"{escaped}" %*\r\n'.encode()
+        if destination_exists and destination.read_bytes() == content:
+            return destination
+        with tempfile.NamedTemporaryFile(
+            prefix=f".{tool}.axis-",
+            suffix=".cmd",
+            dir=command_dir,
+            delete=False,
+        ) as handle:
+            handle.write(content)
+            staged = Path(handle.name)
+    else:
+        if destination_exists and destination.resolve(strict=False) == managed.resolve(strict=False):
+            return destination
+        with tempfile.NamedTemporaryFile(prefix=f".{tool}.axis-", dir=command_dir, delete=False) as handle:
+            staged = Path(handle.name)
+        staged.unlink()
+        staged.symlink_to(managed)
+
+    try:
+        os.replace(staged, destination)
+    finally:
+        if os.path.lexists(staged):
+            staged.unlink()
+    return destination
+
+
 def managed_tools_for_profile(profile: str) -> tuple[str, ...]:
     normalized = "review" if profile == "all" else profile
     if normalized in {"build", "local-dev"}:
@@ -237,13 +367,15 @@ def setup_plan(
                 labels.append(label)
         if labels:
             steps.append(f"install missing pinned user-local tools: {', '.join(labels)}")
+            if normalized == "review":
+                steps.append("expose the managed GitHub CLI through a stable user command")
         if external:
             steps.append(f"verified portable artifact unavailable; {', '.join(external)} requires external installation")
     else:
         steps.append("validate required toolchains; do not install executables")
     steps.append(f"run strict doctor for the cumulative {normalized} profile")
     steps.extend(["restore locked .NET dependencies", "install locked frontend dependencies"])
-    if normalized in {"local-dev", "review"} or browsers:
+    if browsers:
         steps.append("install Playwright Chromium")
     if normalized in {"local-dev", "review"}:
         steps.append("generate local HTTPS certificates")

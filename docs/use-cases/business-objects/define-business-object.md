@@ -17,7 +17,7 @@ Define and publish a workspace-scoped business object definition so published ve
 ## Main flow
 
 1. User opens the business object collection for the current workspace.
-2. User starts a new unpublished business object definition in a route-backed record dialog.
+2. User starts a new unpublished business object definition through the app-scoped record-window contract owned by [docs/foundations/data-display/collection-page.md](../../foundations/data-display/collection-page.md).
 3. User enters a definition name; system derives a stable object key, displays it read-only, and preserves it after the definition is created.
 4. User adds, orders, edits, or removes unpublished text field definitions with stable field keys and labels.
 5. System validates definition identity, field identity, workspace scope, and the user's last-seen revision.
@@ -93,12 +93,12 @@ Define and publish a workspace-scoped business object definition so published ve
 |---|---|
 | Authenticated navigation | Expose a visible Business Objects navigation contribution when the current workspace can use the module; global navigation rendering remains owned by the module-navigation foundation. |
 | Business object collection | Render one primary table with name, key, unpublished/published availability, latest version context, paging, and consumer-defined actions without an action column. |
-| Definition dialog | Restore create/view/edit state from route search, capture the definition name, display a read-only derived stable business object key, and keep revision state in sync after saves. |
+| Definition window | Open or focus stable create/view/edit identities through [docs/foundations/data-display/collection-page.md](../../foundations/data-display/collection-page.md), capture the definition name, display a read-only derived stable business object key, and keep revision state in sync after saves. |
 | Field definition editor | Let the user add, order, remove, and rename text fields while keeping stable field keys visible, validated, and saved against the current revision. |
 | Publish review | Show validation state and block publication until required definition and field identity rules pass. |
 | Published definition detail | Show the published version context and make clear that later record creation will use a published definition version. |
 
-Required UI quality: the page must retain one primary table while create/view/edit workflows use the route-backed responsive record dialog; labels and errors must be programmatic, field rows must stay keyboard-reachable while reordered or edited, dialog content must scroll internally with stable actions, validation must identify the affected definition or field control, stale-save and stale-publish conflicts must keep unsaved input recoverable, publish implications must be visible before confirmation, and the layout must fit supported mobile and desktop widths without document scrolling or horizontal overflow.
+Required UI quality: the page must retain one primary table while create/view/edit workflows use the responsive managed-window contract; labels and errors must be programmatic, field rows must stay keyboard-reachable while reordered or edited, window content must scroll internally with stable actions, validation must identify the affected definition or field control, stale-save and stale-publish conflicts must keep unsaved input recoverable, publish implications must be visible before confirmation, and the layout must fit supported mobile and desktop widths without document scrolling or horizontal overflow.
 
 ## Diagrams
 

@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { getRouteApi } from '@tanstack/react-router';
 import { Plus } from 'lucide-react';
-import { useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   createDataTableMessages,
@@ -9,29 +9,34 @@ import {
   type DataTableColumnDef,
   type DataTableDefinition,
 } from '@/components/shared/data-table';
+import { useManagedWindowActions } from '@/components/shared/ManagedWindowManager';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { Button } from '@/components/ui/button';
-import { ruleDefinitionsListQueryOptions } from '@/features/rules';
 import {
   type BusinessObjectDefinitionListItem,
   businessObjectDefinitionDetailQueryOptions,
   businessObjectDefinitionsDefaultPageSize,
   businessObjectDefinitionsListQueryOptions,
 } from '../api';
-import { BusinessObjectDefinitionDialog } from './BusinessObjectDefinitionDialog';
+import {
+  businessObjectCreateWindowDescriptor,
+  businessObjectDefinitionWindowDescriptor,
+} from '../managed-windows';
 
 const route = getRouteApi('/_authenticated/business-objects');
 
 export function BusinessObjectsPage() {
   const { t, i18n } = useTranslation();
   const queryClient = useQueryClient();
+  const { openWindow } = useManagedWindowActions();
   const search = route.useSearch();
   const navigate = route.useNavigate();
   const definitionsQuery = useQuery(businessObjectDefinitionsListQueryOptions(search.page));
-  const rulesQuery = useQuery(
-    ruleDefinitionsListQueryOptions({ page: 1, pageSize: 100, scope: 'Field' }),
-  );
   const definitions = definitionsQuery.data?.items ?? [];
+  const launchDefinitionQuery = useQuery({
+    ...businessObjectDefinitionDetailQueryOptions(search.recordId ?? ''),
+    enabled: (search.dialog === 'view' || search.dialog === 'edit') && Boolean(search.recordId),
+  });
   const dateFormatter = useMemo(
     () => new Intl.DateTimeFormat(i18n.language, { dateStyle: 'medium', timeStyle: 'short' }),
     [i18n.language],
@@ -40,16 +45,52 @@ export function BusinessObjectsPage() {
   const openDefinition = useCallback(
     (definition: BusinessObjectDefinitionListItem) => {
       if (!definition.id) return;
-      void navigate({
-        search: (current) => ({
-          ...current,
-          dialog: definition.status === 'Published' ? 'view' : 'edit',
+      openWindow(
+        businessObjectDefinitionWindowDescriptor({
           recordId: definition.id,
+          mode: definition.status === 'Published' ? 'view' : 'edit',
+          title: definition.name ?? t('businessObjects.definitionTitle'),
         }),
-      });
+      );
     },
-    [navigate],
+    [openWindow, t],
   );
+
+  useEffect(() => {
+    if (!search.dialog) return;
+    if (search.dialog === 'create') {
+      openWindow(businessObjectCreateWindowDescriptor(t('businessObjects.defineTitle')));
+    } else if (search.recordId) {
+      if (launchDefinitionQuery.isLoading) return;
+      const definition = definitions.find((candidate) => candidate.id === search.recordId);
+      openWindow(
+        businessObjectDefinitionWindowDescriptor({
+          recordId: search.recordId,
+          mode: search.dialog,
+          title:
+            launchDefinitionQuery.data?.name ??
+            definition?.name ??
+            search.recordId ??
+            t('businessObjects.definitionTitle'),
+        }),
+      );
+    } else {
+      return;
+    }
+    void navigate({
+      replace: true,
+      search: (current) => ({ ...current, dialog: undefined, recordId: undefined }),
+    });
+  }, [
+    definitions,
+    launchDefinitionQuery.data?.name,
+    launchDefinitionQuery.isLoading,
+    navigate,
+    openWindow,
+    search.dialog,
+    search.recordId,
+    t,
+  ]);
 
   const prefetchDefinition = useCallback(
     (id: string | undefined) => {
@@ -161,13 +202,7 @@ export function BusinessObjectsPage() {
           type="button"
           size="sm"
           onClick={() => {
-            void navigate({
-              search: (current) => ({
-                ...current,
-                dialog: 'create',
-                recordId: undefined,
-              }),
-            });
+            openWindow(businessObjectCreateWindowDescriptor(t('businessObjects.defineTitle')));
           }}
         >
           <Plus aria-hidden />
@@ -188,6 +223,7 @@ export function BusinessObjectsPage() {
     definitionsQuery.refetch,
     navigate,
     openDefinition,
+    openWindow,
     prefetchDefinition,
     search.page,
     t,
@@ -207,23 +243,6 @@ export function BusinessObjectsPage() {
       <div className="min-h-0 flex-1">
         <DataTable definition={tableDefinition} />
       </div>
-
-      <BusinessObjectDefinitionDialog
-        mode={search.dialog}
-        recordId={search.recordId}
-        ruleDefinitions={rulesQuery.data?.items ?? []}
-        ruleCatalogLoading={rulesQuery.isLoading}
-        ruleCatalogUnavailable={rulesQuery.isError}
-        onCreated={(recordId) => {
-          void navigate({
-            replace: true,
-            search: (current) => ({ ...current, dialog: 'edit', recordId }),
-          });
-        }}
-        onClose={() => {
-          void navigate({ search: (current) => ({ page: current.page }) });
-        }}
-      />
     </div>
   );
 }

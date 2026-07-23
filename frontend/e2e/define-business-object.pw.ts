@@ -244,6 +244,10 @@ async function mockAuthenticatedSession(
       body: JSON.stringify(sessionProfile),
     });
   });
+
+  await page.route('**/api/auth/sign-out', async (route) => {
+    await route.fulfill({ status: 204 });
+  });
 }
 
 async function mockBusinessObjectDefinitionApi(
@@ -406,6 +410,29 @@ async function expectNoDesktopDocumentScroll(page: Page): Promise<void> {
     .toBe(true);
 }
 
+async function expectMobileDockAboveFooter(page: Page): Promise<Locator> {
+  const dock = page.locator('[data-slot="managed-window-dock"]');
+  const host = page.locator('[data-slot="managed-window-host"]');
+  const footer = page.getByRole('contentinfo');
+  await expect(dock).toBeVisible();
+  const [dockBox, hostBox, footerBox] = await Promise.all([
+    dock.boundingBox(),
+    host.boundingBox(),
+    footer.boundingBox(),
+  ]);
+  if (!dockBox || !hostBox || !footerBox) {
+    throw new Error('Managed dialog dock geometry was not available');
+  }
+
+  expect(dockBox.width).toBeGreaterThanOrEqual(200);
+  expect(dockBox.width).toBeLessThanOrEqual(256);
+  expect(hostBox.x + hostBox.width - (dockBox.x + dockBox.width)).toBeCloseTo(12, 0);
+  const footerGap = footerBox.y - (dockBox.y + dockBox.height);
+  expect(footerGap).toBeGreaterThanOrEqual(8);
+  expect(footerGap).toBeLessThanOrEqual(12);
+  return dock;
+}
+
 async function expectDarkReadableContrast(locator: Locator): Promise<void> {
   await expect
     .poll(async () =>
@@ -562,6 +589,56 @@ async function expectDarkReadableContrast(locator: Locator): Promise<void> {
 }
 
 test.describe('define business object', () => {
+  test('managed draft survives navigation and sign-out clears the window workspace', async ({
+    page,
+  }) => {
+    const pageErrors: string[] = [];
+    page.on('console', (message) => {
+      if (message.type() === 'error') pageErrors.push(message.text());
+    });
+    page.on('pageerror', (error) => pageErrors.push(error.message));
+
+    await mockAuthenticatedSession(page);
+    await mockBusinessObjectDefinitionApi(page);
+
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.goto('/business-objects');
+    await page.getByRole('button', { name: 'New definition' }).click();
+    let dialog = page.getByRole('dialog', { name: 'Define business object' });
+    await dialog.getByLabel('Name', { exact: true }).fill('Customer');
+    await dialog.getByRole('button', { name: 'Start definition' }).click();
+
+    dialog = page.getByRole('dialog', { name: 'Customer' });
+    await expect(dialog).toBeVisible();
+    await dialog.getByLabel('Name', { exact: true }).fill('Customer draft');
+    await dialog.getByRole('button', { name: 'Minimize dialog' }).click();
+    await expect(dialog).toBeHidden();
+
+    await page.getByRole('link', { name: 'Rules' }).click();
+    await expect(page).toHaveURL(/\/rules$/);
+    await expect(page.getByRole('heading', { name: 'Rules', exact: true })).toBeVisible();
+
+    await page.getByRole('button', { name: 'Windows (1)' }).click();
+    await page.getByRole('menuitem', { name: /Customer/ }).click();
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByLabel('Name', { exact: true })).toHaveValue('Customer draft');
+
+    await dialog.getByRole('button', { name: 'Close dialog' }).click();
+    const discardDialog = page.getByRole('alertdialog', { name: 'Discard unsaved changes?' });
+    await expect(discardDialog).toBeVisible();
+    await discardDialog.getByRole('button', { name: 'Keep editing' }).click();
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByLabel('Name', { exact: true })).toHaveValue('Customer draft');
+
+    await page.getByRole('button', { name: 'Account menu' }).click();
+    await page.getByRole('button', { name: 'Sign out' }).click();
+    await expect(page).toHaveURL(/\/sign-in$/);
+    await expect(page.getByRole('button', { name: 'Windows (1)' })).toHaveCount(0);
+    await expect(page.locator('[data-slot="managed-dialog-window"]')).toHaveCount(0);
+    await expectNoPageOverflow(page);
+    expect(pageErrors).toEqual([]);
+  });
+
   test('AT-013 browser journey creates, saves, and publishes a definition', async ({ page }) => {
     const pageErrors: string[] = [];
     page.on('console', (message) => {
@@ -592,14 +669,16 @@ test.describe('define business object', () => {
     await page.getByRole('button', { name: 'New definition' }).click();
     const dialog = page.locator('[data-slot="dialog-content"]');
     await expect(dialog.getByRole('heading', { name: 'Define business object' })).toBeVisible();
+    await expect(dialog.locator('[data-slot="managed-dialog-window"]')).toHaveAttribute(
+      'data-dialog-preset',
+      'large',
+    );
     await dialog.getByLabel('Name', { exact: true }).fill('Customer');
     await expect(dialog.getByLabel('Object key')).toHaveValue('customer');
     await expect(dialog.getByLabel('Object key')).toHaveJSProperty('readOnly', true);
     await dialog.getByRole('button', { name: 'Start definition' }).click();
 
-    await expect(page).toHaveURL(
-      new RegExp(`/business-objects\\?page=1&dialog=edit&recordId=${definitionId}$`),
-    );
+    await expect(page).toHaveURL(/\/business-objects\?page=1$/);
     await expect(dialog.getByRole('heading', { name: 'Customer' })).toBeVisible();
     await dialog.getByRole('tab', { name: 'Fields' }).click();
     await expect(dialog.getByRole('button', { name: 'Publish', exact: true })).toBeDisabled();
@@ -621,7 +700,19 @@ test.describe('define business object', () => {
     await expect(dialog).toBeVisible();
     await expectNoPageOverflow(page);
 
-    await dialog.locator('[data-slot="dialog-close"]').click();
+    await dialog.getByRole('button', { name: 'Minimize dialog' }).click();
+    const mobileDock = await expectMobileDockAboveFooter(page);
+    await expect(dialog).toBeHidden();
+    await page.keyboard.press('Escape');
+    await expect(mobileDock).toBeVisible();
+    await mobileDock.getByRole('button', { name: 'Restore dialog' }).click();
+    await expect(dialog).toBeVisible();
+    await expect(dialog.locator('[data-slot="managed-dialog-window"]')).toHaveAttribute(
+      'data-dialog-preset',
+      'fullscreen',
+    );
+
+    await dialog.getByRole('button', { name: 'Close dialog' }).click();
     await expect(dialog).toBeHidden();
     await expect(page.getByText('Published', { exact: true })).toBeVisible();
 
@@ -767,6 +858,10 @@ test.describe('define business object', () => {
       await dialog.getByRole('button', { name: 'Add field' }).click();
     }
 
+    await expect(dialog.locator('[data-slot="managed-dialog-window"]')).toHaveAttribute(
+      'data-dialog-preset',
+      'large',
+    );
     const dialogBody = dialog.locator('[data-slot="dialog-body"]');
     await expect
       .poll(() => dialogBody.evaluate((element) => element.scrollHeight > element.clientHeight))

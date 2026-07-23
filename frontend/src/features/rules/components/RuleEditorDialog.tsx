@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertCircle, Archive, Braces, Play, Plus, Save, Send, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { ManagedDialog, ManagedDialogBody } from '@/components/shared/ManagedDialog';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { StatusNotice } from '@/components/shared/StatusNotice';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -19,13 +20,12 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from '@/components/ui/empty';
 import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import {
@@ -40,19 +40,25 @@ import { ApiError } from '@/lib/api';
 import type { components } from '@/lib/api-types';
 import {
   archiveRuleDefinition,
+  createRuleDefinition,
   getRuleDefinition,
   publishRuleDefinition,
   type RuleConditionNode,
   type RuleContextSchema,
   type RuleDecision,
   type RuleDefinitionDetail,
+  type RuleExpressionCardinality,
+  type RuleExpressionFunction,
+  type RuleExpressionLanguage,
   type RuleLogicalOperator,
+  type RuleOperand,
   type RulePredicateOperator,
   type RuleScope,
   type RuleSeverity,
   type RuleValueType,
   ruleContextSchemasQueryOptions,
   ruleDefinitionQueryKeys,
+  ruleExpressionLanguageQueryOptions,
   saveRuleDefinitionDraft,
   simulateRuleDefinition,
   startRuleDefinitionDraft,
@@ -82,11 +88,24 @@ interface EditableGroup {
 interface EditablePredicate {
   id: string;
   kind: 'predicate';
-  contextPath: string;
+  left: EditableOperand;
   operator: RulePredicateOperator;
-  rightKind: Exclude<RuleOperandKind, 'Context'> | 'Context';
-  rightReference: string;
-  rightValue: string;
+  right: EditableOperand | null;
+}
+
+interface EditableOperand {
+  id: string;
+  kind: RuleOperandKind;
+  reference: string;
+  literalType: RuleValueType;
+  literalValue: string;
+  function: RuleExpressionFunction | null;
+  arguments: EditableOperand[];
+}
+
+interface OperandShape {
+  type: RuleValueType;
+  cardinality: Exclude<RuleExpressionCardinality, 'Any'>;
 }
 
 type EditableNode = EditableGroup | EditablePredicate;
@@ -106,29 +125,22 @@ interface EditorState {
   decision: RuleDecision;
 }
 
-const orderedOperators: RulePredicateOperator[] = [
-  'Equal',
-  'NotEqual',
-  'GreaterThan',
-  'GreaterThanOrEqual',
-  'LessThan',
-  'LessThanOrEqual',
-  'IsNull',
-  'IsNotNull',
-];
 const unsetSelectValue = '__unset__';
 
 export function RuleEditorDialog({
   definitionKey,
   open,
   onOpenChange,
+  onCreated,
 }: {
   definitionKey: string | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onCreated?: (definition: RuleDefinitionDetail) => void;
 }) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
+  const creating = definitionKey === null;
   const [editor, setEditor] = useState<EditorState | null>(null);
   const [feedback, setFeedback] = useState<{
     variant: 'success' | 'destructive';
@@ -152,7 +164,25 @@ export function RuleEditorDialog({
     enabled: open && Boolean(definitionKey),
   });
   const schemasQuery = useQuery({ ...ruleContextSchemasQueryOptions(), enabled: open });
+  const expressionLanguageQuery = useQuery({
+    ...ruleExpressionLanguageQueryOptions(),
+    enabled: open && Boolean(definitionKey),
+  });
   const detail = detailQuery.data;
+  const hasEligibleCreateSchema = useMemo(
+    () =>
+      (schemasQuery.data ?? []).some(
+        (candidate) =>
+          Boolean(candidate.scope) &&
+          Boolean(candidate.contextKey) &&
+          candidate.version !== undefined,
+      ),
+    [schemasQuery.data],
+  );
+  const createSchemaLoadFailed = creating && schemasQuery.isError;
+  const createSchemaUnavailable = creating && schemasQuery.isSuccess && !hasEligibleCreateSchema;
+  const createEditorPending =
+    creating && schemasQuery.isSuccess && hasEligibleCreateSchema && editor === null;
   const schema = useMemo(
     () =>
       (schemasQuery.data ?? []).find(
@@ -169,19 +199,60 @@ export function RuleEditorDialog({
   }, [detail, schemasQuery.data]);
 
   useEffect(() => {
-    if (!open || !definitionKey) return;
+    if (!creating || !open || editor || !schemasQuery.isSuccess) return;
+    setEditor(toCreateEditorState(schemasQuery.data ?? []));
+  }, [creating, editor, open, schemasQuery.data, schemasQuery.isSuccess]);
+
+  useEffect(() => {
+    if (!open) return;
     setFeedback(null);
     setSimulation(null);
     setSampleContext({});
     setSampleParameters({});
-  }, [definitionKey, open]);
+  }, [open]);
+
+  const createMutation = useMutation({
+    mutationFn: async (state: EditorState) => {
+      const selectedSchema = (schemasQuery.data ?? []).find(
+        (candidate) =>
+          candidate.scope === state.scope &&
+          candidate.contextKey === state.contextKey &&
+          candidate.version === state.contextSchemaVersion,
+      );
+      if (
+        !state.name.trim() ||
+        !state.description.trim() ||
+        !selectedSchema?.scope ||
+        !selectedSchema.contextKey ||
+        selectedSchema.version === undefined
+      ) {
+        throw new Error(t('rules.createError'));
+      }
+      return createRuleDefinition({
+        name: state.name.trim(),
+        description: state.description.trim(),
+        scope: selectedSchema.scope,
+        contextKey: selectedSchema.contextKey,
+        contextSchemaVersion: selectedSchema.version,
+        outcomeKind: state.outcomeKind,
+      });
+    },
+    onSuccess: async (created) => {
+      setDetailCache(queryClient, created);
+      await queryClient.invalidateQueries({ queryKey: ruleDefinitionQueryKeys.all });
+      onCreated?.(created);
+    },
+    onError: (error) =>
+      setFeedback({ variant: 'destructive', text: readError(error, t('rules.createError')) }),
+  });
 
   const saveMutation = useMutation({
     mutationFn: async (state: EditorState) => {
-      if (!detail?.definitionKey || detail.revision === undefined || !schema) {
+      if (!detail?.definitionKey || detail.revision == null || !schema) {
         throw new Error(t('rules.editorUnavailable'));
       }
-      const validationError = validateEditor(state, schema);
+      if (!expressionLanguageQuery.data) throw new Error(t('rules.editorUnavailable'));
+      const validationError = validateEditor(state, schema, expressionLanguageQuery.data);
       if (validationError) throw new Error(validationError);
       return saveRuleDefinitionDraft(detail.definitionKey, {
         expectedRevision: detail.revision,
@@ -198,7 +269,7 @@ export function RuleEditorDialog({
           allowMultiple: parameter.allowMultiple,
           allowedValues: splitValues(parameter.allowedValues),
         })),
-        condition: toConditionDto(state.condition, schema, state.parameters),
+        condition: toConditionDto(state.condition),
         outcome:
           state.outcomeKind === 'Validation'
             ? {
@@ -231,12 +302,12 @@ export function RuleEditorDialog({
 
   const lifecycleMutation = useMutation({
     mutationFn: async (action: 'publish' | 'draft' | 'archive') => {
-      if (!detail?.definitionKey || detail.revision === undefined) {
+      if (!detail?.definitionKey || detail.revision == null) {
         throw new Error(t('rules.editorUnavailable'));
       }
       if (action === 'publish') {
         const saved = editor ? await saveMutation.mutateAsync(editor) : detail;
-        if (!saved.definitionKey || saved.revision === undefined) {
+        if (!saved.definitionKey || saved.revision == null) {
           throw new Error(t('rules.editorUnavailable'));
         }
         return publishRuleDefinition(saved.definitionKey, saved.revision);
@@ -246,6 +317,8 @@ export function RuleEditorDialog({
         : archiveRuleDefinition(detail.definitionKey, detail.revision);
     },
     onSuccess: async (saved) => {
+      setArchiveOpen(false);
+      setPublishOpen(false);
       setDetailCache(queryClient, saved);
       await queryClient.invalidateQueries({ queryKey: ruleDefinitionQueryKeys.all });
       setFeedback({ variant: 'success', text: t('rules.lifecycleUpdated') });
@@ -301,19 +374,34 @@ export function RuleEditorDialog({
       setFeedback({ variant: 'destructive', text: readError(error, t('rules.simulationError')) }),
   });
 
-  const busy = saveMutation.isPending || lifecycleMutation.isPending || simulateMutation.isPending;
+  const busy =
+    createMutation.isPending ||
+    saveMutation.isPending ||
+    lifecycleMutation.isPending ||
+    simulateMutation.isPending;
   const baselineEditor = useMemo(
     () => (detail ? toEditorState(detail, schemasQuery.data ?? []) : null),
     [detail, schemasQuery.data],
   );
-  const isDirty =
-    detail?.status === 'Draft' &&
-    editor !== null &&
-    baselineEditor !== null &&
-    JSON.stringify(editor) !== JSON.stringify(baselineEditor);
-  const availableSchemas = (schemasQuery.data ?? []).filter(
-    (candidate) => candidate.scope === editor?.scope,
-  );
+  const isDirty = creating
+    ? Boolean(
+        editor &&
+          (editor.name ||
+            editor.description ||
+            editor.contextKey ||
+            editor.outcomeKind !== 'Validation'),
+      )
+    : detail?.status === 'Draft' &&
+      editor !== null &&
+      baselineEditor !== null &&
+      JSON.stringify(editor) !== JSON.stringify(baselineEditor);
+  const autoSizeReady =
+    !schemasQuery.isLoading &&
+    (creating
+      ? createSchemaLoadFailed || createSchemaUnavailable || editor !== null
+      : detailQuery.isError ||
+        expressionLanguageQuery.isError ||
+        Boolean(detail && editor && expressionLanguageQuery.data));
 
   function requestOpenChange(nextOpen: boolean) {
     if (nextOpen) {
@@ -329,194 +417,239 @@ export function RuleEditorDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={requestOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <div className="flex min-w-0 flex-wrap items-center gap-2">
-            <DialogTitle>{detail?.name ?? t('rules.loadingRule')}</DialogTitle>
-            {detail ? <LifecycleBadge detail={detail} /> : null}
-          </div>
-          <DialogDescription>{detail?.description ?? t('rules.loadingRule')}</DialogDescription>
-        </DialogHeader>
-
-        <div data-slot="dialog-body" className="max-h-96 min-h-0 overflow-y-auto">
-          {detailQuery.isError ? (
-            <Alert variant="destructive">
-              <AlertCircle className="size-4" aria-hidden />
-              <AlertTitle>{t('rules.loadErrorTitle')}</AlertTitle>
-              <AlertDescription>{t('rules.loadErrorBody')}</AlertDescription>
-            </Alert>
+    <ManagedDialog
+      open={open}
+      onOpenChange={requestOpenChange}
+      title={creating ? t('rules.createTitle') : (detail?.name ?? t('rules.loadingRule'))}
+      description={
+        creating ? t('rules.createDescription') : (detail?.description ?? t('rules.loadingRule'))
+      }
+      titleAccessory={detail ? <LifecycleBadge detail={detail} /> : null}
+      closeDisabled={busy}
+      dirty={isDirty}
+      autoSizeKey={creating ? 'create' : `editor:${definitionKey ?? 'unknown'}`}
+      autoSizeReady={autoSizeReady}
+      footerClassName={
+        detail && editor && detail.status !== 'Archived' && detail.latestPublishedVersion
+          ? 'sm:justify-between'
+          : undefined
+      }
+      footer={
+        <>
+          {detail && editor && detail.status !== 'Archived' && detail.latestPublishedVersion ? (
+            <Button
+              type="button"
+              variant="outline"
+              disabled={busy}
+              onClick={() => setArchiveOpen(true)}
+            >
+              <Archive className="size-4" aria-hidden />
+              {t('rules.archive')}
+            </Button>
           ) : null}
-
-          {detail && editor && schema ? (
-            <div className="space-y-6">
-              {feedback ? (
-                <StatusNotice tone={feedback.variant}>{feedback.text}</StatusNotice>
-              ) : null}
-              <RuleIdentitySection
-                editor={editor}
-                schemas={availableSchemas}
-                disabled={detail.status !== 'Draft' || busy}
-                onChange={setEditor}
-              />
-              <ParameterSection
-                parameters={editor.parameters}
-                disabled={detail.status !== 'Draft' || busy}
-                onChange={(parameters) => setEditor({ ...editor, parameters })}
-              />
-              <ConditionSection
-                condition={editor.condition}
-                schema={schema}
-                parameters={editor.parameters}
-                disabled={detail.status !== 'Draft' || busy}
-                onChange={(condition) => setEditor({ ...editor, condition })}
-              />
-              <OutcomeSection
-                editor={editor}
-                disabled={detail.status !== 'Draft' || busy}
-                onChange={setEditor}
-              />
-              <SimulationSection
-                schema={schema}
-                parameters={editor.parameters}
-                contextValues={sampleContext}
-                parameterValues={sampleParameters}
-                result={simulation}
-                disabled={detail.status !== 'Draft' || busy}
-                onContextChange={setSampleContext}
-                onParameterChange={setSampleParameters}
-                onSimulate={() => simulateMutation.mutate()}
-              />
-              <VersionHistory detail={detail} />
-            </div>
-          ) : detailQuery.isLoading ? (
-            <p className="text-sm text-muted-foreground">{t('rules.loadingRule')}</p>
-          ) : null}
-        </div>
-
-        {detail && editor ? (
-          <DialogFooter>
-            <div>
-              {detail.status !== 'Archived' && detail.latestPublishedVersion ? (
+          <div className="flex flex-col-reverse gap-2 sm:flex-row">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={busy}
+              onClick={() => requestOpenChange(false)}
+            >
+              {creating || (detail?.status === 'Draft' && editor)
+                ? t('app.cancel')
+                : t('app.close')}
+            </Button>
+            {creating && editor ? (
+              <Button
+                type="button"
+                disabled={
+                  busy ||
+                  !editor.name.trim() ||
+                  !editor.description.trim() ||
+                  !schema?.contextKey ||
+                  schema.version === undefined
+                }
+                onClick={() => createMutation.mutate(editor)}
+              >
+                {t('rules.createAction')}
+              </Button>
+            ) : null}
+            {detail && editor && detail.status === 'Draft' ? (
+              <>
                 <Button
                   type="button"
                   variant="outline"
                   disabled={busy}
-                  onClick={() => setArchiveOpen(true)}
+                  onClick={() => saveMutation.mutate(editor)}
                 >
-                  <Archive className="size-4" aria-hidden />
-                  {t('rules.archive')}
+                  <Save className="size-4" aria-hidden />
+                  {t('rules.saveDraft')}
                 </Button>
-              ) : null}
-            </div>
-            <div className="flex gap-2">
-              {detail.status === 'Draft' ? (
-                <>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    disabled={busy}
-                    onClick={() => saveMutation.mutate(editor)}
-                  >
-                    <Save className="size-4" aria-hidden />
-                    {t('rules.saveDraft')}
-                  </Button>
-                  <Button type="button" disabled={busy} onClick={() => setPublishOpen(true)}>
-                    <Send className="size-4" aria-hidden />
-                    {t('rules.publish')}
-                  </Button>
-                </>
-              ) : detail.status === 'Published' ? (
-                <Button
-                  type="button"
-                  disabled={busy}
-                  onClick={() => lifecycleMutation.mutate('draft')}
-                >
-                  <Braces className="size-4" aria-hidden />
-                  {t('rules.startRevision')}
+                <Button type="button" disabled={busy} onClick={() => setPublishOpen(true)}>
+                  <Send className="size-4" aria-hidden />
+                  {t('rules.publish')}
                 </Button>
-              ) : null}
-            </div>
-          </DialogFooter>
+              </>
+            ) : detail && editor && detail.status === 'Published' ? (
+              <Button
+                type="button"
+                disabled={busy}
+                onClick={() => lifecycleMutation.mutate('draft')}
+              >
+                <Braces className="size-4" aria-hidden />
+                {t('rules.startRevision')}
+              </Button>
+            ) : null}
+          </div>
+        </>
+      }
+    >
+      <ManagedDialogBody>
+        {detailQuery.isError || expressionLanguageQuery.isError || createSchemaLoadFailed ? (
+          <Alert variant="destructive">
+            <AlertCircle className="size-4" aria-hidden />
+            <AlertTitle>{t('rules.loadErrorTitle')}</AlertTitle>
+            <AlertDescription>{t('rules.loadErrorBody')}</AlertDescription>
+          </Alert>
+        ) : createSchemaUnavailable ? (
+          <Empty className="border">
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                <Braces aria-hidden />
+              </EmptyMedia>
+              <EmptyTitle>{t('rules.contextUnavailable')}</EmptyTitle>
+              <EmptyDescription>{t('rules.noContextForScope')}</EmptyDescription>
+            </EmptyHeader>
+          </Empty>
+        ) : editor && (creating || detail) ? (
+          <div className="space-y-6">
+            {feedback ? <StatusNotice tone={feedback.variant}>{feedback.text}</StatusNotice> : null}
+            <RuleIdentitySection
+              editor={editor}
+              definitionKey={detail?.definitionKey}
+              schemas={schemasQuery.data ?? []}
+              disabled={(!creating && detail?.status !== 'Draft') || busy}
+              onChange={setEditor}
+            />
+            {detail && schema && expressionLanguageQuery.data ? (
+              <>
+                <ParameterSection
+                  parameters={editor.parameters}
+                  disabled={detail.status !== 'Draft' || busy}
+                  onChange={(parameters) => setEditor({ ...editor, parameters })}
+                />
+                <ConditionSection
+                  condition={editor.condition}
+                  schema={schema}
+                  parameters={editor.parameters}
+                  expressionLanguage={expressionLanguageQuery.data}
+                  disabled={detail.status !== 'Draft' || busy}
+                  onChange={(condition) => setEditor({ ...editor, condition })}
+                />
+                <OutcomeSection
+                  editor={editor}
+                  disabled={detail.status !== 'Draft' || busy}
+                  onChange={setEditor}
+                />
+                <SimulationSection
+                  schema={schema}
+                  parameters={editor.parameters}
+                  contextValues={sampleContext}
+                  parameterValues={sampleParameters}
+                  result={simulation}
+                  disabled={detail.status !== 'Draft' || busy}
+                  onContextChange={setSampleContext}
+                  onParameterChange={setSampleParameters}
+                  onSimulate={() => simulateMutation.mutate()}
+                />
+                <VersionHistory detail={detail} />
+              </>
+            ) : null}
+          </div>
+        ) : detailQuery.isLoading ||
+          schemasQuery.isLoading ||
+          expressionLanguageQuery.isLoading ||
+          createEditorPending ? (
+          <p className="text-sm text-muted-foreground">{t('rules.loadingRule')}</p>
         ) : null}
+      </ManagedDialogBody>
 
-        <AlertDialog open={archiveOpen} onOpenChange={setArchiveOpen}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>{t('rules.archiveTitle')}</AlertDialogTitle>
-              <AlertDialogDescription>{t('rules.archiveDescription')}</AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel disabled={busy}>{t('app.cancel')}</AlertDialogCancel>
-              <AlertDialogAction
-                variant="destructive"
-                disabled={busy}
-                onClick={() => lifecycleMutation.mutate('archive')}
-              >
-                {t('rules.archive')}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-        <AlertDialog open={publishOpen} onOpenChange={setPublishOpen}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>{t('rules.publishTitle')}</AlertDialogTitle>
-              <AlertDialogDescription>
-                {t('rules.publishDescription', {
-                  version: (detail?.latestPublishedVersion ?? 0) + 1,
-                })}
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel disabled={busy}>{t('app.cancel')}</AlertDialogCancel>
-              <AlertDialogAction
-                disabled={busy}
-                onClick={() => lifecycleMutation.mutate('publish')}
-              >
-                {t('rules.publish')}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-        <AlertDialog open={discardOpen} onOpenChange={setDiscardOpen}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>{t('rules.discardTitle')}</AlertDialogTitle>
-              <AlertDialogDescription>{t('rules.discardDescription')}</AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>{t('rules.keepEditing')}</AlertDialogCancel>
-              <AlertDialogAction
-                variant="destructive"
-                onClick={() => {
-                  setDiscardOpen(false);
-                  setEditor(baselineEditor);
-                  onOpenChange(false);
-                }}
-              >
-                {t('rules.discard')}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      </DialogContent>
-    </Dialog>
+      <AlertDialog open={archiveOpen} onOpenChange={setArchiveOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('rules.archiveTitle')}</AlertDialogTitle>
+            <AlertDialogDescription>{t('rules.archiveDescription')}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={busy}>{t('app.cancel')}</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              disabled={busy}
+              onClick={() => lifecycleMutation.mutate('archive')}
+            >
+              {t('rules.archive')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      <AlertDialog open={publishOpen} onOpenChange={setPublishOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('rules.publishTitle')}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t('rules.publishDescription', {
+                version: (detail?.latestPublishedVersion ?? 0) + 1,
+              })}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={busy}>{t('app.cancel')}</AlertDialogCancel>
+            <AlertDialogAction disabled={busy} onClick={() => lifecycleMutation.mutate('publish')}>
+              {t('rules.publish')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      <AlertDialog open={discardOpen} onOpenChange={setDiscardOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('rules.discardTitle')}</AlertDialogTitle>
+            <AlertDialogDescription>{t('rules.discardDescription')}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t('rules.keepEditing')}</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              onClick={() => {
+                setDiscardOpen(false);
+                setEditor(baselineEditor);
+                onOpenChange(false);
+              }}
+            >
+              {t('rules.discard')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </ManagedDialog>
   );
 }
 
 function RuleIdentitySection({
   editor,
+  definitionKey,
   schemas,
   disabled,
   onChange,
 }: {
   editor: EditorState;
+  definitionKey?: string | null;
   schemas: RuleContextSchema[];
   disabled: boolean;
   onChange: (editor: EditorState) => void;
 }) {
   const { t } = useTranslation();
+  const availableScopes = distinctDefined(schemas.map((schema) => schema.scope));
+  const availableSchemas = schemas.filter((schema) => schema.scope === editor.scope);
   return (
     <EditorSection title={t('rules.definitionSection')} description={t('rules.definitionHelp')}>
       <div className="grid gap-3 sm:grid-cols-2">
@@ -528,14 +661,57 @@ function RuleIdentitySection({
             disabled={disabled}
             onChange={(event) => onChange({ ...editor, name: event.target.value })}
           />
+          <FieldDescription>
+            {t('rules.derivedKey', { key: definitionKey ?? deriveRuleKey(editor.name) })}
+          </FieldDescription>
+        </Field>
+        <Field>
+          <FieldLabel htmlFor="rule-editor-scope">{t('rules.scope')}</FieldLabel>
+          <Select
+            value={editor.scope}
+            disabled={disabled || availableScopes.length === 0}
+            onValueChange={(value) => {
+              const scope = value as RuleScope;
+              const nextSchema = schemas.find((candidate) => candidate.scope === scope);
+              if (!nextSchema) return;
+              onChange({
+                ...editor,
+                scope,
+                contextKey: nextSchema.contextKey ?? '',
+                contextSchemaVersion: nextSchema.version ?? 1,
+                condition: defaultCondition(nextSchema),
+              });
+            }}
+          >
+            <SelectTrigger id="rule-editor-scope">
+              <SelectValue>{(value) => t(`rules.scope${value}`)}</SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {availableScopes.map((scope) => (
+                <SelectItem key={scope} value={scope}>
+                  {t(`rules.scope${scope}`)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <FieldDescription>{t(`rules.scope${editor.scope}Description`)}</FieldDescription>
+        </Field>
+        <Field className="sm:col-span-2">
+          <FieldLabel htmlFor="rule-editor-description">{t('rules.description')}</FieldLabel>
+          <Textarea
+            id="rule-editor-description"
+            value={editor.description}
+            disabled={disabled}
+            onChange={(event) => onChange({ ...editor, description: event.target.value })}
+          />
         </Field>
         <Field>
           <FieldLabel htmlFor="rule-editor-context">{t('rules.context')}</FieldLabel>
           <Select
-            value={editor.contextKey}
-            disabled={disabled}
+            value={editor.contextKey || null}
+            disabled={disabled || availableSchemas.length === 0}
             onValueChange={(value) => {
-              const schema = schemas.find((candidate) => candidate.contextKey === value);
+              const schema = availableSchemas.find((candidate) => candidate.contextKey === value);
               if (!schema) return;
               onChange({
                 ...editor,
@@ -548,12 +724,13 @@ function RuleIdentitySection({
             <SelectTrigger id="rule-editor-context">
               <SelectValue>
                 {(value) =>
-                  schemas.find((schema) => schema.contextKey === value)?.displayName ?? value
+                  availableSchemas.find((schema) => schema.contextKey === value)?.displayName ??
+                  t('rules.selectContext')
                 }
               </SelectValue>
             </SelectTrigger>
             <SelectContent>
-              {schemas.map((schema) => (
+              {availableSchemas.map((schema) => (
                 <SelectItem
                   key={`${schema.contextKey}:${schema.version}`}
                   value={schema.contextKey}
@@ -563,15 +740,31 @@ function RuleIdentitySection({
               ))}
             </SelectContent>
           </Select>
+          {availableSchemas.length === 0 ? (
+            <FieldDescription>{t('rules.noContextForScope')}</FieldDescription>
+          ) : null}
         </Field>
-        <Field className="sm:col-span-2">
-          <FieldLabel htmlFor="rule-editor-description">{t('rules.description')}</FieldLabel>
-          <Textarea
-            id="rule-editor-description"
-            value={editor.description}
+        <Field>
+          <FieldLabel htmlFor="rule-editor-outcome-kind">{t('rules.outcome')}</FieldLabel>
+          <Select
+            value={editor.outcomeKind}
             disabled={disabled}
-            onChange={(event) => onChange({ ...editor, description: event.target.value })}
-          />
+            onValueChange={(value) =>
+              value && onChange({ ...editor, outcomeKind: value as RuleOutcomeKind })
+            }
+          >
+            <SelectTrigger id="rule-editor-outcome-kind">
+              <SelectValue>
+                {(value) =>
+                  value === 'Decision' ? t('rules.outcomeDecision') : t('rules.outcomeValidation')
+                }
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="Validation">{t('rules.outcomeValidation')}</SelectItem>
+              <SelectItem value="Decision">{t('rules.outcomeDecision')}</SelectItem>
+            </SelectContent>
+          </Select>
         </Field>
       </div>
     </EditorSection>
@@ -728,12 +921,14 @@ function ConditionSection({
   condition,
   schema,
   parameters,
+  expressionLanguage,
   disabled,
   onChange,
 }: {
   condition: EditableGroup;
   schema: RuleContextSchema;
   parameters: EditableParameter[];
+  expressionLanguage: RuleExpressionLanguage;
   disabled: boolean;
   onChange: (condition: EditableGroup) => void;
 }) {
@@ -745,6 +940,7 @@ function ConditionSection({
         root
         schema={schema}
         parameters={parameters}
+        expressionLanguage={expressionLanguage}
         disabled={disabled}
         onChange={(node) => onChange(node as EditableGroup)}
         onRemove={() => undefined}
@@ -758,6 +954,7 @@ function ConditionNodeEditor({
   root = false,
   schema,
   parameters,
+  expressionLanguage,
   disabled,
   onChange,
   onRemove,
@@ -766,111 +963,114 @@ function ConditionNodeEditor({
   root?: boolean;
   schema: RuleContextSchema;
   parameters: EditableParameter[];
+  expressionLanguage: RuleExpressionLanguage;
   disabled: boolean;
   onChange: (node: EditableNode) => void;
   onRemove: () => void;
 }) {
   const { t } = useTranslation();
   if (node.kind === 'predicate') {
-    const contextField = schema.fields?.find((field) => field.path === node.contextPath);
-    const unary = node.operator === 'IsNull' || node.operator === 'IsNotNull';
+    const leftShape = resolveOperandShape(node.left, schema, parameters, expressionLanguage);
+    const operatorDefinitions = compatibleOperators(expressionLanguage, leftShape);
+    const operatorDefinition = operatorDefinitions.find(
+      (definition) => definition.operator === node.operator,
+    );
+    const unary = (operatorDefinition?.rightShapes ?? []).length === 0;
+    const matchingRightShapes = (operatorDefinition?.rightShapes ?? []).filter(
+      (shape) => !operatorDefinition?.requiresMatchingTypes || shape.type === leftShape?.type,
+    );
     return (
-      <div className="grid gap-2 border-l-2 border-border pl-3 sm:grid-cols-2 lg:grid-cols-3 lg:items-end">
-        <Field>
-          <FieldLabel htmlFor={`condition-${node.id}-field`}>{t('rules.contextField')}</FieldLabel>
-          <Select
-            value={node.contextPath}
-            disabled={disabled}
-            onValueChange={(value) =>
-              value && onChange({ ...node, contextPath: value, operator: 'Equal' })
-            }
-          >
-            <SelectTrigger id={`condition-${node.id}-field`}>
-              <SelectValue>
-                {(value) =>
-                  (schema.fields ?? []).find((field) => field.path === value)?.displayName ?? value
-                }
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              {(schema.fields ?? []).map((field) => (
-                <SelectItem key={field.path} value={field.path}>
-                  {field.displayName}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </Field>
-        <Field>
-          <FieldLabel htmlFor={`condition-${node.id}-operator`}>{t('rules.operator')}</FieldLabel>
-          <Select
-            value={node.operator}
-            disabled={disabled}
-            onValueChange={(value) =>
-              value && onChange({ ...node, operator: value as RulePredicateOperator })
-            }
-          >
-            <SelectTrigger id={`condition-${node.id}-operator`}>
-              <SelectValue>{(value) => t(`rules.operator${value}`)}</SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              {operatorsFor(contextField).map((operator) => (
-                <SelectItem key={operator} value={operator}>
-                  {t(`rules.operator${operator}`)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </Field>
-        {!unary ? (
-          <Field>
-            <FieldLabel htmlFor={`condition-${node.id}-right-kind`}>
-              {t('rules.compareWith')}
-            </FieldLabel>
-            <Select
-              value={node.rightKind}
+      <div className="space-y-3 border-l-2 border-border pl-3">
+        <div className="grid gap-3 lg:grid-cols-3 lg:items-start">
+          <div className="lg:col-span-2">
+            <OperandEditor
+              label={t('rules.leftOperand')}
+              operand={node.left}
+              schema={schema}
+              parameters={parameters}
+              expressionLanguage={expressionLanguage}
               disabled={disabled}
-              onValueChange={(value) =>
-                value &&
+              onChange={(left) => {
+                const nextShape = resolveOperandShape(left, schema, parameters, expressionLanguage);
+                const nextOperators = compatibleOperators(expressionLanguage, nextShape);
+                const nextOperator = nextOperators.some(
+                  (definition) => definition.operator === node.operator,
+                )
+                  ? node.operator
+                  : (nextOperators[0]?.operator ?? node.operator);
+                const nextDefinition = nextOperators.find(
+                  (definition) => definition.operator === nextOperator,
+                );
                 onChange({
                   ...node,
-                  rightKind: value as EditablePredicate['rightKind'],
-                })
-              }
+                  left,
+                  operator: nextOperator,
+                  right:
+                    (nextDefinition?.rightShapes ?? []).length === 0
+                      ? null
+                      : ensureCompatibleOperand(
+                          node.right,
+                          rightShapesFor(nextDefinition, nextShape),
+                          schema,
+                          parameters,
+                          expressionLanguage,
+                        ),
+                });
+              }}
+            />
+          </div>
+          <Field>
+            <FieldLabel htmlFor={`condition-${node.id}-operator`}>{t('rules.operator')}</FieldLabel>
+            <Select
+              value={node.operator}
+              disabled={disabled}
+              onValueChange={(value) => {
+                if (!value) return;
+                const operator = value as RulePredicateOperator;
+                const definition = operatorDefinitions.find(
+                  (candidate) => candidate.operator === operator,
+                );
+                onChange({
+                  ...node,
+                  operator,
+                  right:
+                    (definition?.rightShapes ?? []).length === 0
+                      ? null
+                      : ensureCompatibleOperand(
+                          node.right,
+                          rightShapesFor(definition, leftShape),
+                          schema,
+                          parameters,
+                          expressionLanguage,
+                        ),
+                });
+              }}
             >
-              <SelectTrigger id={`condition-${node.id}-right-kind`}>
-                <SelectValue>
-                  {(value) =>
-                    value === 'Parameter'
-                      ? t('rules.parameter')
-                      : value === 'Context'
-                        ? t('rules.contextField')
-                        : t('rules.literal')
-                  }
-                </SelectValue>
+              <SelectTrigger id={`condition-${node.id}-operator`}>
+                <SelectValue>{(value) => t(`rules.operator${value}`)}</SelectValue>
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="Literal">{t('rules.literal')}</SelectItem>
-                <SelectItem value="Parameter">{t('rules.parameter')}</SelectItem>
-                <SelectItem value="Context">{t('rules.contextField')}</SelectItem>
+                {operatorDefinitions.map((definition) => (
+                  <SelectItem key={definition.operator} value={definition.operator}>
+                    {t(`rules.operator${definition.operator}`)}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </Field>
-        ) : (
-          <span />
-        )}
-        {!unary ? (
-          <RightOperandInput
-            node={node}
-            contextField={contextField}
+        </div>
+        {!unary && node.right ? (
+          <OperandEditor
+            label={t('rules.rightOperand')}
+            operand={node.right}
             schema={schema}
             parameters={parameters}
+            expressionLanguage={expressionLanguage}
+            acceptedShapes={matchingRightShapes}
             disabled={disabled}
-            onChange={onChange}
+            onChange={(right) => onChange({ ...node, right })}
           />
-        ) : (
-          <span />
-        )}
+        ) : null}
         <Button
           type="button"
           variant="ghost"
@@ -969,6 +1169,7 @@ function ConditionNodeEditor({
             node={child}
             schema={schema}
             parameters={parameters}
+            expressionLanguage={expressionLanguage}
             disabled={disabled}
             onChange={(nextChild) =>
               onChange({
@@ -991,93 +1192,264 @@ function ConditionNodeEditor({
   );
 }
 
-function RightOperandInput({
-  node,
-  contextField,
+function OperandEditor({
+  label,
+  operand,
   schema,
   parameters,
+  expressionLanguage,
+  acceptedShapes,
   disabled,
   onChange,
 }: {
-  node: EditablePredicate;
-  contextField: NonNullable<RuleContextSchema['fields']>[number] | undefined;
+  label: string;
+  operand: EditableOperand;
   schema: RuleContextSchema;
   parameters: EditableParameter[];
+  expressionLanguage: RuleExpressionLanguage;
+  acceptedShapes?: NonNullable<
+    NonNullable<RuleExpressionLanguage['operators']>[number]['leftShapes']
+  >;
   disabled: boolean;
-  onChange: (node: EditableNode) => void;
+  onChange: (operand: EditableOperand) => void;
 }) {
   const { t } = useTranslation();
-  if (node.rightKind === 'Parameter') {
-    return (
-      <Field>
-        <FieldLabel htmlFor={`condition-${node.id}-parameter`}>{t('rules.parameter')}</FieldLabel>
-        <Select
-          value={node.rightReference || null}
-          disabled={disabled}
-          onValueChange={(value) => onChange({ ...node, rightReference: value ?? '' })}
-        >
-          <SelectTrigger id={`condition-${node.id}-parameter`}>
-            <SelectValue>
-              {(value) =>
-                parameters.find((parameter) => parameter.key === value)?.key ??
-                t('rules.selectParameter')
-              }
-            </SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            {parameters
-              .filter((parameter) => parameter.type === contextField?.type)
-              .map((parameter) => (
-                <SelectItem key={parameter.id} value={parameter.key}>
-                  {parameter.key || t('rules.unnamedParameter')}
-                </SelectItem>
-              ))}
-          </SelectContent>
-        </Select>
-      </Field>
-    );
-  }
-
-  if (node.rightKind === 'Context') {
-    return (
-      <Field>
-        <FieldLabel htmlFor={`condition-${node.id}-context`}>{t('rules.contextField')}</FieldLabel>
-        <Select
-          value={node.rightReference || null}
-          disabled={disabled}
-          onValueChange={(value) => onChange({ ...node, rightReference: value ?? '' })}
-        >
-          <SelectTrigger id={`condition-${node.id}-context`}>
-            <SelectValue>
-              {(value) =>
-                (schema.fields ?? []).find((field) => field.path === value)?.displayName ??
-                t('rules.selectContextField')
-              }
-            </SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            {(schema.fields ?? [])
-              .filter((field) => field.type === contextField?.type)
-              .map((field) => (
-                <SelectItem key={field.path} value={field.path}>
-                  {field.displayName}
-                </SelectItem>
-              ))}
-          </SelectContent>
-        </Select>
-      </Field>
-    );
-  }
+  const eligibleFields = (schema.fields ?? []).filter(
+    (field) => field.type && acceptsShape(acceptedShapes, field.type, field.allowMultiple),
+  );
+  const eligibleParameters = parameters.filter((parameter) =>
+    acceptsShape(acceptedShapes, parameter.type, parameter.allowMultiple),
+  );
+  const literalTypes = distinctDefined(
+    acceptedShapes
+      ?.filter((shape) => shape.cardinality !== 'Multiple')
+      .map((shape) => shape.type) ?? valueTypes,
+  );
+  const eligibleFunctions = (expressionLanguage.functions ?? []).filter(
+    (definition) =>
+      definition.function &&
+      definition.returnType &&
+      acceptsShape(
+        acceptedShapes,
+        definition.returnType,
+        definition.returnCardinality === 'Multiple',
+      ),
+  );
+  const functionDefinition = (expressionLanguage.functions ?? []).find(
+    (definition) => definition.function === operand.function,
+  );
 
   return (
-    <TypedValueField
-      id={`condition-${node.id}-literal`}
-      label={t('rules.value')}
-      type={contextField?.type ?? 'Text'}
-      value={node.rightValue}
-      disabled={disabled}
-      onChange={(rightValue) => onChange({ ...node, rightValue })}
-    />
+    <div className="space-y-3 rounded-md border bg-muted/20 p-3">
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Field>
+          <FieldLabel htmlFor={`operand-${operand.id}-kind`}>{label}</FieldLabel>
+          <Select
+            value={operand.kind}
+            disabled={disabled}
+            onValueChange={(value) => {
+              if (!value) return;
+              onChange(
+                createOperand(
+                  value as RuleOperandKind,
+                  schema,
+                  parameters,
+                  expressionLanguage,
+                  acceptedShapes,
+                ),
+              );
+            }}
+          >
+            <SelectTrigger id={`operand-${operand.id}-kind`}>
+              <SelectValue>{(value) => t(`rules.operand${value}`)}</SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {eligibleFields.length > 0 ? (
+                <SelectItem value="Context">{t('rules.operandContext')}</SelectItem>
+              ) : null}
+              {eligibleParameters.length > 0 ? (
+                <SelectItem value="Parameter">{t('rules.operandParameter')}</SelectItem>
+              ) : null}
+              {literalTypes.length > 0 ? (
+                <SelectItem value="Literal">{t('rules.operandLiteral')}</SelectItem>
+              ) : null}
+              {eligibleFunctions.length > 0 ? (
+                <SelectItem value="Function">{t('rules.operandFunction')}</SelectItem>
+              ) : null}
+            </SelectContent>
+          </Select>
+        </Field>
+        {operand.kind === 'Context' ? (
+          <Field>
+            <FieldLabel htmlFor={`operand-${operand.id}-context`}>
+              {t('rules.contextField')}
+            </FieldLabel>
+            <Select
+              value={operand.reference || null}
+              disabled={disabled}
+              onValueChange={(value) => onChange({ ...operand, reference: value ?? '' })}
+            >
+              <SelectTrigger id={`operand-${operand.id}-context`}>
+                <SelectValue>
+                  {(value) =>
+                    eligibleFields.find((field) => field.path === value)?.displayName ??
+                    t('rules.selectContextField')
+                  }
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {eligibleFields.map((field) => (
+                  <SelectItem key={field.path} value={field.path}>
+                    {field.displayName}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
+        ) : null}
+        {operand.kind === 'Parameter' ? (
+          <Field>
+            <FieldLabel htmlFor={`operand-${operand.id}-parameter`}>
+              {t('rules.parameter')}
+            </FieldLabel>
+            <Select
+              value={operand.reference || null}
+              disabled={disabled}
+              onValueChange={(value) => onChange({ ...operand, reference: value ?? '' })}
+            >
+              <SelectTrigger id={`operand-${operand.id}-parameter`}>
+                <SelectValue>
+                  {(value) =>
+                    eligibleParameters.find((parameter) => parameter.key === value)?.key ??
+                    t('rules.selectParameter')
+                  }
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {eligibleParameters.map((parameter) => (
+                  <SelectItem key={parameter.id} value={parameter.key}>
+                    {parameter.key || t('rules.unnamedParameter')}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
+        ) : null}
+        {operand.kind === 'Function' ? (
+          <Field>
+            <FieldLabel htmlFor={`operand-${operand.id}-function`}>
+              {t('rules.function')}
+            </FieldLabel>
+            <Select
+              value={operand.function}
+              disabled={disabled}
+              onValueChange={(value) => {
+                if (!value) return;
+                const definition = eligibleFunctions.find(
+                  (candidate) => candidate.function === value,
+                );
+                onChange({
+                  ...operand,
+                  function: value as RuleExpressionFunction,
+                  arguments: createFunctionArguments(
+                    definition,
+                    schema,
+                    parameters,
+                    expressionLanguage,
+                  ),
+                });
+              }}
+            >
+              <SelectTrigger id={`operand-${operand.id}-function`}>
+                <SelectValue>
+                  {(value) => t(`rules.function${value}`, { defaultValue: value })}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {eligibleFunctions.map((definition) => (
+                  <SelectItem key={definition.function} value={definition.function}>
+                    {t(`rules.function${definition.function}`, {
+                      defaultValue: definition.function,
+                    })}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
+        ) : null}
+      </div>
+      {operand.kind === 'Literal' ? (
+        <div className="grid gap-3 sm:grid-cols-2">
+          {literalTypes.length > 1 ? (
+            <Field>
+              <FieldLabel htmlFor={`operand-${operand.id}-literal-type`}>
+                {t('rules.type')}
+              </FieldLabel>
+              <Select
+                value={operand.literalType}
+                disabled={disabled}
+                onValueChange={(value) =>
+                  value && onChange({ ...operand, literalType: value as RuleValueType })
+                }
+              >
+                <SelectTrigger id={`operand-${operand.id}-literal-type`}>
+                  <SelectValue>
+                    {(value) => t(fieldTypeTranslationKey(value as RuleValueType))}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {literalTypes.map((type) => (
+                    <SelectItem key={type} value={type}>
+                      {t(fieldTypeTranslationKey(type))}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+          ) : null}
+          <TypedValueField
+            id={`operand-${operand.id}-literal`}
+            label={t('rules.value')}
+            type={operand.literalType}
+            value={operand.literalValue}
+            disabled={disabled}
+            onChange={(literalValue) => onChange({ ...operand, literalValue })}
+          />
+        </div>
+      ) : null}
+      {operand.kind === 'Function' && functionDefinition ? (
+        <div className="space-y-3 border-l-2 border-border pl-3">
+          {(functionDefinition.parameters ?? []).map((parameter, index) => {
+            const argument = operand.arguments[index];
+            if (!argument) return null;
+            const shapes = (parameter.acceptedTypes ?? []).map((type) => ({
+              type,
+              cardinality: parameter.cardinality,
+            }));
+            return (
+              <OperandEditor
+                key={argument.id}
+                label={t('rules.functionArgument', { index: index + 1 })}
+                operand={argument}
+                schema={schema}
+                parameters={parameters}
+                expressionLanguage={expressionLanguage}
+                acceptedShapes={shapes}
+                disabled={disabled}
+                onChange={(nextArgument) =>
+                  onChange({
+                    ...operand,
+                    arguments: operand.arguments.map((item, itemIndex) =>
+                      itemIndex === index ? nextArgument : item,
+                    ),
+                  })
+                }
+              />
+            );
+          })}
+        </div>
+      ) : null}
+    </div>
   );
 }
 
@@ -1405,14 +1777,13 @@ function LifecycleBadge({ detail }: { detail: RuleDefinitionDetail }) {
 const valueTypes: RuleValueType[] = ['Text', 'Integer', 'Decimal', 'Date', 'DateTime', 'Boolean'];
 
 function defaultPredicate(schema: RuleContextSchema): EditablePredicate {
+  const field = schema.fields?.[0];
   return {
     id: crypto.randomUUID(),
     kind: 'predicate',
-    contextPath: schema.fields?.[0]?.path ?? '',
+    left: editableOperand({ kind: 'Context', reference: field?.path ?? '' }),
     operator: 'Equal',
-    rightKind: 'Literal',
-    rightReference: '',
-    rightValue: '',
+    right: editableOperand({ kind: 'Literal', literalType: field?.type ?? 'Text' }),
   };
 }
 
@@ -1425,14 +1796,35 @@ function defaultCondition(schema: RuleContextSchema): EditableGroup {
   };
 }
 
+function toCreateEditorState(schemas: RuleContextSchema[]): EditorState | null {
+  const firstSchema = schemas.find(
+    (schema) => schema.scope && schema.contextKey && schema.version !== undefined,
+  );
+  if (!firstSchema?.scope) return null;
+  return {
+    name: '',
+    description: '',
+    scope: firstSchema.scope,
+    contextKey: '',
+    contextSchemaVersion: firstSchema.version ?? 1,
+    outcomeKind: 'Validation',
+    parameters: [],
+    condition: defaultCondition(firstSchema),
+    violationCode: '',
+    severity: 'Error',
+    message: '',
+    decision: 'Deny',
+  };
+}
+
 function toEditorState(detail: RuleDefinitionDetail, schemas: RuleContextSchema[]): EditorState {
   const schema = schemas.find(
     (candidate) =>
       candidate.contextKey === detail.contextKey &&
       candidate.version === detail.contextSchemaVersion,
   ) ?? {
-    contextKey: detail.contextKey,
-    version: detail.contextSchemaVersion,
+    contextKey: detail.contextKey ?? undefined,
+    version: detail.contextSchemaVersion ?? undefined,
     scope: detail.scope,
     fields: [],
   };
@@ -1461,6 +1853,22 @@ function toEditorState(detail: RuleDefinitionDetail, schemas: RuleContextSchema[
   };
 }
 
+function distinctDefined<T>(values: (T | null | undefined)[]): T[] {
+  return [...new Set(values.filter((value): value is T => value != null))];
+}
+
+function deriveRuleKey(name: string): string {
+  const normalized = name
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
+    .toLocaleLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+  const key = /^[a-z]/.test(normalized) ? normalized : normalized ? `rule_${normalized}` : 'rule';
+  return key.slice(0, 63).replace(/_+$/g, '') || 'rule';
+}
+
 function fromConditionDto(node: RuleConditionNode): EditableNode {
   if (node.logicalOperator) {
     return {
@@ -1473,12 +1881,21 @@ function fromConditionDto(node: RuleConditionNode): EditableNode {
   return {
     id: crypto.randomUUID(),
     kind: 'predicate',
-    contextPath: node.left?.reference ?? '',
+    left: node.left ? fromOperandDto(node.left) : editableOperand({ kind: 'Context' }),
     operator: node.predicateOperator ?? 'Equal',
-    rightKind: node.right?.kind ?? 'Literal',
-    rightReference: node.right?.reference ?? '',
-    rightValue: (node.right?.literal?.values ?? []).join(', '),
+    right: node.right ? fromOperandDto(node.right) : null,
   };
+}
+
+function fromOperandDto(operand: RuleOperand): EditableOperand {
+  return editableOperand({
+    kind: operand.kind ?? 'Literal',
+    reference: operand.reference ?? '',
+    literalType: operand.literal?.type ?? 'Text',
+    literalValue: (operand.literal?.values ?? []).join(', '),
+    function: operand.function ?? null,
+    arguments: (operand.arguments ?? []).map(fromOperandDto),
+  });
 }
 
 function ensureRootGroup(node: EditableNode): EditableGroup {
@@ -1487,11 +1904,7 @@ function ensureRootGroup(node: EditableNode): EditableGroup {
     : { id: crypto.randomUUID(), kind: 'group', operator: 'All', children: [node] };
 }
 
-function toConditionDto(
-  node: EditableNode,
-  schema: RuleContextSchema,
-  parameters: EditableParameter[],
-): RuleConditionNode {
+function toConditionDto(node: EditableNode): RuleConditionNode {
   if (node.kind === 'group') {
     return {
       nodeId: nodeId(node.id),
@@ -1499,30 +1912,39 @@ function toConditionDto(
       predicateOperator: undefined,
       left: undefined,
       right: undefined,
-      children: node.children.map((child) => toConditionDto(child, schema, parameters)),
+      children: node.children.map(toConditionDto),
     };
   }
-  const field = schema.fields?.find((candidate) => candidate.path === node.contextPath);
-  const unary = node.operator === 'IsNull' || node.operator === 'IsNotNull';
   return {
     nodeId: nodeId(node.id),
     logicalOperator: undefined,
     predicateOperator: node.operator,
-    left: { kind: 'Context', reference: node.contextPath, literal: undefined },
-    right: unary
-      ? undefined
-      : node.rightKind === 'Literal'
-        ? {
-            kind: 'Literal',
-            reference: null,
-            literal: typedRuleValue(field?.type ?? 'Text', node.rightValue, false),
-          }
-        : {
-            kind: node.rightKind,
-            reference: node.rightReference,
-            literal: undefined,
-          },
+    left: toOperandDto(node.left),
+    right: node.right ? toOperandDto(node.right) : undefined,
     children: [],
+  };
+}
+
+function toOperandDto(operand: EditableOperand): RuleOperand {
+  if (operand.kind === 'Function') {
+    return {
+      kind: 'Function',
+      function: operand.function ?? undefined,
+      arguments: operand.arguments.map(toOperandDto),
+    };
+  }
+  if (operand.kind === 'Literal') {
+    return {
+      kind: 'Literal',
+      reference: null,
+      literal: typedRuleValue(operand.literalType, operand.literalValue, false),
+      arguments: [],
+    };
+  }
+  return {
+    kind: operand.kind,
+    reference: operand.reference,
+    arguments: [],
   };
 }
 
@@ -1544,31 +1966,251 @@ function splitValues(source: string): string[] {
     .filter(Boolean);
 }
 
-function operatorsFor(
-  field: NonNullable<RuleContextSchema['fields']>[number] | undefined,
-): RulePredicateOperator[] {
-  if (!field) return ['Equal', 'NotEqual', 'IsNull', 'IsNotNull'];
-  if (field.allowMultiple) return ['Equal', 'NotEqual', 'Contains', 'IsNull', 'IsNotNull'];
-  if (field.type === 'Text') {
-    return [
-      'Equal',
-      'NotEqual',
-      'Contains',
-      'StartsWith',
-      'EndsWith',
-      'GreaterThan',
-      'GreaterThanOrEqual',
-      'LessThan',
-      'LessThanOrEqual',
-      'IsNull',
-      'IsNotNull',
-    ];
-  }
-  if (field.type === 'Boolean') return ['Equal', 'NotEqual', 'IsNull', 'IsNotNull'];
-  return orderedOperators;
+function editableOperand(
+  value: Partial<Omit<EditableOperand, 'id'>> & Pick<EditableOperand, 'kind'>,
+): EditableOperand {
+  return {
+    id: crypto.randomUUID(),
+    kind: value.kind,
+    reference: value.reference ?? '',
+    literalType: value.literalType ?? 'Text',
+    literalValue: value.literalValue ?? '',
+    function: value.function ?? null,
+    arguments: value.arguments ?? [],
+  };
 }
 
-function validateEditor(editor: EditorState, schema: RuleContextSchema): string | null {
+function createOperand(
+  kind: RuleOperandKind,
+  schema: RuleContextSchema,
+  parameters: EditableParameter[],
+  expressionLanguage: RuleExpressionLanguage,
+  acceptedShapes?: NonNullable<
+    NonNullable<RuleExpressionLanguage['operators']>[number]['leftShapes']
+  >,
+): EditableOperand {
+  if (kind === 'Context') {
+    const field = (schema.fields ?? []).find(
+      (candidate) =>
+        candidate.type && acceptsShape(acceptedShapes, candidate.type, candidate.allowMultiple),
+    );
+    return editableOperand({
+      kind,
+      reference: field?.path ?? '',
+      literalType: field?.type ?? firstAcceptedType(acceptedShapes),
+    });
+  }
+  if (kind === 'Parameter') {
+    const parameter = parameters.find((candidate) =>
+      acceptsShape(acceptedShapes, candidate.type, candidate.allowMultiple),
+    );
+    return editableOperand({
+      kind,
+      reference: parameter?.key ?? '',
+      literalType: parameter?.type ?? firstAcceptedType(acceptedShapes),
+    });
+  }
+  if (kind === 'Function') {
+    const definition = (expressionLanguage.functions ?? []).find(
+      (candidate) =>
+        candidate.function &&
+        candidate.returnType &&
+        acceptsShape(
+          acceptedShapes,
+          candidate.returnType,
+          candidate.returnCardinality === 'Multiple',
+        ),
+    );
+    return editableOperand({
+      kind,
+      function: definition?.function ?? null,
+      literalType: definition?.returnType ?? firstAcceptedType(acceptedShapes),
+      arguments: createFunctionArguments(definition, schema, parameters, expressionLanguage),
+    });
+  }
+  return editableOperand({ kind: 'Literal', literalType: firstAcceptedType(acceptedShapes) });
+}
+
+function createFunctionArguments(
+  definition: NonNullable<RuleExpressionLanguage['functions']>[number] | undefined,
+  schema: RuleContextSchema,
+  parameters: EditableParameter[],
+  expressionLanguage: RuleExpressionLanguage,
+): EditableOperand[] {
+  return (definition?.parameters ?? []).map((parameter) => {
+    const acceptedShapes = (parameter.acceptedTypes ?? []).map((type) => ({
+      type,
+      cardinality: parameter.cardinality,
+    }));
+    const fieldAvailable = (schema.fields ?? []).some(
+      (field) => field.type && acceptsShape(acceptedShapes, field.type, field.allowMultiple),
+    );
+    const parameterAvailable = parameters.some((candidate) =>
+      acceptsShape(acceptedShapes, candidate.type, candidate.allowMultiple),
+    );
+    const acceptsLiteral = acceptedShapes.some((shape) => shape.cardinality !== 'Multiple');
+    const kind: RuleOperandKind = fieldAvailable
+      ? 'Context'
+      : parameterAvailable
+        ? 'Parameter'
+        : acceptsLiteral
+          ? 'Literal'
+          : 'Context';
+    return createOperand(kind, schema, parameters, expressionLanguage, acceptedShapes);
+  });
+}
+
+function ensureCompatibleOperand(
+  operand: EditableOperand | null,
+  acceptedShapes: NonNullable<
+    NonNullable<RuleExpressionLanguage['operators']>[number]['rightShapes']
+  >,
+  schema: RuleContextSchema,
+  parameters: EditableParameter[],
+  expressionLanguage: RuleExpressionLanguage,
+): EditableOperand {
+  const shape = operand
+    ? resolveOperandShape(operand, schema, parameters, expressionLanguage)
+    : null;
+  if (
+    operand &&
+    shape &&
+    acceptsShape(acceptedShapes, shape.type, shape.cardinality === 'Multiple')
+  ) {
+    return operand;
+  }
+  return createOperand('Literal', schema, parameters, expressionLanguage, acceptedShapes);
+}
+
+function resolveOperandShape(
+  operand: EditableOperand,
+  schema: RuleContextSchema,
+  parameters: EditableParameter[],
+  expressionLanguage: RuleExpressionLanguage,
+): OperandShape | null {
+  if (operand.kind === 'Literal') {
+    return { type: operand.literalType, cardinality: 'Scalar' };
+  }
+  if (operand.kind === 'Context') {
+    const field = (schema.fields ?? []).find((candidate) => candidate.path === operand.reference);
+    return field?.type
+      ? { type: field.type, cardinality: field.allowMultiple ? 'Multiple' : 'Scalar' }
+      : null;
+  }
+  if (operand.kind === 'Parameter') {
+    const parameter = parameters.find((candidate) => candidate.key === operand.reference);
+    return parameter
+      ? {
+          type: parameter.type,
+          cardinality: parameter.allowMultiple ? 'Multiple' : 'Scalar',
+        }
+      : null;
+  }
+  const definition = (expressionLanguage.functions ?? []).find(
+    (candidate) => candidate.function === operand.function,
+  );
+  return definition?.returnType
+    ? {
+        type: definition.returnType,
+        cardinality: definition.returnCardinality === 'Multiple' ? 'Multiple' : 'Scalar',
+      }
+    : null;
+}
+
+function compatibleOperators(
+  expressionLanguage: RuleExpressionLanguage,
+  shape: OperandShape | null,
+) {
+  if (!shape) return [];
+  return (expressionLanguage.operators ?? []).filter(
+    (definition) =>
+      definition.operator &&
+      acceptsShape(definition.leftShapes, shape.type, shape.cardinality === 'Multiple'),
+  );
+}
+
+function rightShapesFor(
+  definition: NonNullable<RuleExpressionLanguage['operators']>[number] | undefined,
+  leftShape: OperandShape | null,
+) {
+  return (definition?.rightShapes ?? []).filter(
+    (shape) => !definition?.requiresMatchingTypes || shape.type === leftShape?.type,
+  );
+}
+
+function acceptsShape(
+  acceptedShapes:
+    | ReadonlyArray<{
+        type?: RuleValueType;
+        cardinality?: RuleExpressionCardinality;
+      }>
+    | null
+    | undefined,
+  type: RuleValueType,
+  isMultiple: boolean | undefined,
+): boolean {
+  if (!acceptedShapes || acceptedShapes.length === 0) return true;
+  return acceptedShapes.some(
+    (shape) =>
+      shape.type === type &&
+      (shape.cardinality === 'Any' ||
+        shape.cardinality === undefined ||
+        (shape.cardinality === 'Multiple') === Boolean(isMultiple)),
+  );
+}
+
+function firstAcceptedType(
+  acceptedShapes?: ReadonlyArray<{ type?: RuleValueType }>,
+): RuleValueType {
+  return acceptedShapes?.find((shape) => shape.type)?.type ?? 'Text';
+}
+
+function validateOperand(
+  operand: EditableOperand,
+  schema: RuleContextSchema,
+  parameters: EditableParameter[],
+  expressionLanguage: RuleExpressionLanguage,
+): string | null {
+  if (operand.kind === 'Context') {
+    return (schema.fields ?? []).some((field) => field.path === operand.reference)
+      ? null
+      : 'Select a valid context field.';
+  }
+  if (operand.kind === 'Parameter') {
+    return parameters.some((parameter) => parameter.key === operand.reference)
+      ? null
+      : 'Select a valid parameter.';
+  }
+  if (operand.kind === 'Literal') {
+    return operand.literalValue.trim() ? null : 'Condition values are required.';
+  }
+  const definition = (expressionLanguage.functions ?? []).find(
+    (candidate) => candidate.function === operand.function,
+  );
+  if (!definition || (definition.parameters ?? []).length !== operand.arguments.length)
+    return 'Select a valid function.';
+  for (let index = 0; index < operand.arguments.length; index += 1) {
+    const argument = operand.arguments[index];
+    const parameter = definition.parameters?.[index];
+    if (!argument || !parameter) return 'Complete every function argument.';
+    const error = validateOperand(argument, schema, parameters, expressionLanguage);
+    if (error) return error;
+    const shape = resolveOperandShape(argument, schema, parameters, expressionLanguage);
+    const acceptedShapes = (parameter.acceptedTypes ?? []).map((type) => ({
+      type,
+      cardinality: parameter.cardinality,
+    }));
+    if (!shape || !acceptsShape(acceptedShapes, shape.type, shape.cardinality === 'Multiple'))
+      return 'Select a compatible function argument.';
+  }
+  return null;
+}
+
+function validateEditor(
+  editor: EditorState,
+  schema: RuleContextSchema,
+  expressionLanguage: RuleExpressionLanguage,
+): string | null {
   if (!editor.name.trim() || !editor.description.trim())
     return 'Name and description are required.';
   const keys = editor.parameters.map((parameter) => parameter.key.trim());
@@ -1576,7 +2218,12 @@ function validateEditor(editor: EditorState, schema: RuleContextSchema): string 
     return 'Parameter keys must be unique lowercase identifiers.';
   }
   if (!editor.condition.children.length) return 'Add at least one condition.';
-  const conditionError = validateNode(editor.condition, schema, editor.parameters);
+  const conditionError = validateNode(
+    editor.condition,
+    schema,
+    editor.parameters,
+    expressionLanguage,
+  );
   if (conditionError) return conditionError;
   if (
     editor.outcomeKind === 'Validation' &&
@@ -1591,30 +2238,42 @@ function validateNode(
   node: EditableNode,
   schema: RuleContextSchema,
   parameters: EditableParameter[],
+  expressionLanguage: RuleExpressionLanguage,
 ): string | null {
   if (node.kind === 'group') {
     if (!node.children.length || (node.operator === 'Not' && node.children.length !== 1)) {
       return 'Condition groups must contain valid children.';
     }
     for (const child of node.children) {
-      const error = validateNode(child, schema, parameters);
+      const error = validateNode(child, schema, parameters, expressionLanguage);
       if (error) return error;
     }
     return null;
   }
-  const field = schema.fields?.find((candidate) => candidate.path === node.contextPath);
-  if (!field) return 'Select a valid context field for every condition.';
-  if (node.operator === 'IsNull' || node.operator === 'IsNotNull') return null;
-  if (node.rightKind === 'Literal' && !node.rightValue.trim())
-    return 'Condition values are required.';
-  if (node.rightKind === 'Parameter') {
-    const parameter = parameters.find((candidate) => candidate.key === node.rightReference);
-    if (!parameter || parameter.type !== field.type) return 'Select a compatible parameter.';
-  }
-  if (node.rightKind === 'Context') {
-    const right = schema.fields?.find((candidate) => candidate.path === node.rightReference);
-    if (!right || right.type !== field.type) return 'Select a compatible context field.';
-  }
+  const leftError = validateOperand(node.left, schema, parameters, expressionLanguage);
+  if (leftError) return leftError;
+  const leftShape = resolveOperandShape(node.left, schema, parameters, expressionLanguage);
+  const definition = (expressionLanguage.operators ?? []).find(
+    (candidate) => candidate.operator === node.operator,
+  );
+  if (
+    !definition ||
+    !leftShape ||
+    !acceptsShape(definition.leftShapes, leftShape.type, leftShape.cardinality === 'Multiple')
+  )
+    return 'Select a compatible operator.';
+  if ((definition.rightShapes ?? []).length === 0)
+    return node.right ? 'Unary conditions cannot have a right operand.' : null;
+  if (!node.right) return 'Select a right operand.';
+  const rightError = validateOperand(node.right, schema, parameters, expressionLanguage);
+  if (rightError) return rightError;
+  const rightShape = resolveOperandShape(node.right, schema, parameters, expressionLanguage);
+  if (
+    !rightShape ||
+    !acceptsShape(definition.rightShapes, rightShape.type, rightShape.cardinality === 'Multiple') ||
+    (definition.requiresMatchingTypes && rightShape.type !== leftShape.type)
+  )
+    return 'Select a compatible right operand.';
   return null;
 }
 

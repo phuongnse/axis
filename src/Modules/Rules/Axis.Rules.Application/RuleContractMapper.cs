@@ -2,6 +2,8 @@ using Axis.Rules.Contracts;
 using Axis.Rules.Domain;
 using Axis.Shared.Domain.Primitives;
 using ContractDecision = Axis.Rules.Contracts.RuleDecision;
+using ContractExpressionCardinality = Axis.Rules.Contracts.RuleExpressionCardinality;
+using ContractExpressionFunction = Axis.Rules.Contracts.RuleExpressionFunction;
 using ContractLifecycleStatus = Axis.Rules.Contracts.RuleLifecycleStatus;
 using ContractLogicalOperator = Axis.Rules.Contracts.RuleLogicalOperator;
 using ContractOperandKind = Axis.Rules.Contracts.RuleOperandKind;
@@ -12,6 +14,8 @@ using ContractScope = Axis.Rules.Contracts.RuleScope;
 using ContractSeverity = Axis.Rules.Contracts.RuleSeverity;
 using ContractValueType = Axis.Rules.Contracts.RuleValueType;
 using DomainDecision = Axis.Rules.Domain.RuleDecision;
+using DomainExpressionCardinality = Axis.Rules.Domain.RuleExpressionCardinality;
+using DomainExpressionFunction = Axis.Rules.Domain.RuleExpressionFunction;
 using DomainLogicalOperator = Axis.Rules.Domain.RuleLogicalOperator;
 using DomainOperandKind = Axis.Rules.Domain.RuleOperandKind;
 using DomainOutcomeKind = Axis.Rules.Domain.RuleOutcomeKind;
@@ -33,6 +37,7 @@ internal static class RuleContractMapper
             (ContractScope)definition.Scope,
             (ContractOutcomeKind)definition.OutcomeKind,
             ContractLifecycleStatus.Published,
+            definition.ExpressionLanguageVersion,
             Revision: null,
             definition.Version,
             ContextKey: null,
@@ -50,6 +55,7 @@ internal static class RuleContractMapper
             (ContractScope)definition.Scope,
             (ContractOutcomeKind)definition.OutcomeKind,
             (ContractLifecycleStatus)definition.Status,
+            definition.ExpressionLanguageVersion,
             definition.Revision,
             definition.LatestPublishedVersion,
             definition.ContextKey.Value,
@@ -67,10 +73,12 @@ internal static class RuleContractMapper
             (ContractScope)definition.Scope,
             (ContractOutcomeKind)definition.OutcomeKind,
             (ContractLifecycleStatus)definition.Status,
+            definition.ExpressionLanguageVersion,
             definition.Revision,
             definition.LatestPublishedVersion,
             definition.ContextKey.Value,
             definition.ContextSchemaVersion,
+            Applicability: null,
             definition.Parameters.Select(ToDto).ToArray(),
             definition.Condition is null ? null : ToDto(definition.Condition),
             definition.Outcome is null ? null : ToDto(definition.Outcome),
@@ -79,6 +87,29 @@ internal static class RuleContractMapper
             definition.UpdatedAt,
             definition.ArchivedAt);
 
+    public static RuleDefinitionDetailDto ToDetailDto(SystemRuleDefinition definition) =>
+        new(
+            definition.Key.Value,
+            definition.DisplayName,
+            definition.Description,
+            ContractOrigin.System,
+            (ContractScope)definition.Scope,
+            (ContractOutcomeKind)definition.OutcomeKind,
+            ContractLifecycleStatus.Published,
+            definition.ExpressionLanguageVersion,
+            Revision: null,
+            LatestPublishedVersion: definition.Version,
+            ContextKey: null,
+            ContextSchemaVersion: null,
+            ToDto(definition.Applicability),
+            definition.Parameters.Select(ToDto).ToArray(),
+            ToDto(definition.Condition),
+            ToDto(definition.Outcome),
+            Versions: [],
+            CreatedAt: null,
+            UpdatedAt: null,
+            ArchivedAt: null);
+
     public static RuleDefinitionVersionDto ToDto(RuleDefinitionVersion version) =>
         new(
             version.Version,
@@ -86,6 +117,7 @@ internal static class RuleContractMapper
             version.Description,
             (ContractScope)version.Scope,
             (ContractOutcomeKind)version.OutcomeKind,
+            version.ExpressionLanguageVersion,
             version.ContextKey.Value,
             version.ContextSchemaVersion,
             version.Parameters.Select(ToDto).ToArray(),
@@ -93,6 +125,18 @@ internal static class RuleContractMapper
             ToDto(version.Outcome),
             version.PublishedByUserId,
             version.PublishedAt);
+
+    public static RuleExpressionLanguageDto ToExpressionLanguageDto() =>
+        new(
+            RuleExpressionLanguage.Version,
+            RuleExpressionLanguage.Operators.Select(ToDto).ToArray(),
+            RuleExpressionLanguage.Functions.Select(ToDto).ToArray(),
+            new RuleExpressionLimitsDto(
+                RuleEvaluationLimits.Default.MaxDepth,
+                RuleEvaluationLimits.Default.MaxNodes,
+                RuleEvaluationLimits.Default.MaxFunctionCalls,
+                RuleEvaluationLimits.Default.MaxParameters,
+                RuleEvaluationLimits.Default.MaxExecutionSteps));
 
     public static RuleConditionNodeDto ToDto(RuleConditionNode node) => node switch
     {
@@ -117,7 +161,11 @@ internal static class RuleContractMapper
         new(
             (ContractOperandKind)operand.Kind,
             operand.Reference,
-            operand.Literal is null ? null : ToDto(operand.Literal));
+            operand.Literal is null ? null : ToDto(operand.Literal),
+            operand.FunctionKind is null
+                ? null
+                : (ContractExpressionFunction)operand.FunctionKind.Value,
+            operand.Arguments.Select(ToDto).ToArray());
 
     public static RuleOutcomeDto ToDto(RuleOutcome outcome) => outcome switch
     {
@@ -251,6 +299,7 @@ internal static class RuleContractMapper
         ContractOperandKind.Context => RuleOperand.Context(operand.Reference ?? string.Empty),
         ContractOperandKind.Parameter => RuleOperand.Parameter(operand.Reference ?? string.Empty),
         ContractOperandKind.Literal => ToDomainLiteral(operand.Literal),
+        ContractOperandKind.Function => ToDomainFunction(operand),
         _ => Result.Failure<RuleOperand>("Rule operand kind is not supported."),
     };
 
@@ -284,6 +333,33 @@ internal static class RuleContractMapper
     private static RuleApplicabilityDto ToDto(RuleApplicability applicability) =>
         new(applicability.TargetTypeKeys, applicability.ConfigurationConstraints);
 
+    private static RulePredicateOperatorDefinitionDto ToDto(
+        RulePredicateOperatorDefinition definition) =>
+        new(
+            (ContractPredicateOperator)definition.Operator,
+            definition.LeftShapes.Select(ToDto).ToArray(),
+            definition.RightShapes.Select(ToDto).ToArray(),
+            definition.RequiresMatchingTypes);
+
+    private static RuleExpressionValueShapeDto ToDto(RuleExpressionValueShape shape) =>
+        new(
+            (ContractValueType)shape.Type,
+            (ContractExpressionCardinality)shape.Cardinality);
+
+    private static RuleExpressionFunctionDefinitionDto ToDto(
+        RuleExpressionFunctionDefinition definition) =>
+        new(
+            (ContractExpressionFunction)definition.Function,
+            definition.Parameters.Select(ToDto).ToArray(),
+            (ContractValueType)definition.ReturnType,
+            (ContractExpressionCardinality)definition.ReturnCardinality);
+
+    private static RuleExpressionFunctionParameterDto ToDto(
+        RuleExpressionFunctionParameter parameter) =>
+        new(
+            parameter.AcceptedTypes.Select(type => (ContractValueType)type).ToArray(),
+            (ContractExpressionCardinality)parameter.Cardinality);
+
     private static Result<RuleOperand> ToDomainLiteral(RuleValueDto? literal)
     {
         if (literal is null)
@@ -293,5 +369,22 @@ internal static class RuleContractMapper
         return value.IsSuccess
             ? RuleOperand.LiteralValue(value.Value)
             : Result.Failure<RuleOperand>(value.Error);
+    }
+
+    private static Result<RuleOperand> ToDomainFunction(RuleOperandDto operand)
+    {
+        if (operand.Function is null || operand.Arguments is null)
+            return Result.Failure<RuleOperand>("Rule expression function shape is invalid.");
+
+        List<RuleOperand> arguments = [];
+        foreach (RuleOperandDto argumentDto in operand.Arguments)
+        {
+            Result<RuleOperand> argument = ToDomain(argumentDto);
+            if (argument.IsFailure)
+                return argument;
+            arguments.Add(argument.Value);
+        }
+
+        return RuleOperand.Function((DomainExpressionFunction)operand.Function.Value, arguments);
     }
 }

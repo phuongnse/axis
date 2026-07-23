@@ -92,7 +92,8 @@ public sealed record RulePredicateCondition : RuleConditionNode
         if (left is null)
             return Result.Failure<RulePredicateCondition>("Rule predicate left operand is required.");
 
-        bool unary = @operator is RulePredicateOperator.IsNull or RulePredicateOperator.IsNotNull;
+        RulePredicateOperatorDefinition? definition = RuleExpressionLanguage.Find(@operator);
+        bool unary = definition?.RightShapes.Count == 0;
         if (unary && right is not null)
             return Result.Failure<RulePredicateCondition>("Unary rule predicates cannot define a right operand.");
 
@@ -105,16 +106,25 @@ public sealed record RulePredicateCondition : RuleConditionNode
 
 public sealed record RuleOperand
 {
-    private RuleOperand(RuleOperandKind kind, string? reference, RuleValue? literal)
+    private RuleOperand(
+        RuleOperandKind kind,
+        string? reference,
+        RuleValue? literal,
+        RuleExpressionFunction? function,
+        IReadOnlyList<RuleOperand> arguments)
     {
         Kind = kind;
         Reference = reference;
         Literal = literal;
+        FunctionKind = function;
+        Arguments = arguments;
     }
 
     public RuleOperandKind Kind { get; }
     public string? Reference { get; }
     public RuleValue? Literal { get; }
+    public RuleExpressionFunction? FunctionKind { get; }
+    public IReadOnlyList<RuleOperand> Arguments { get; }
 
     public static Result<RuleOperand> Context(string path) => ReferenceOperand(RuleOperandKind.Context, path);
     public static Result<RuleOperand> Parameter(string key) => ReferenceOperand(RuleOperandKind.Parameter, key);
@@ -122,7 +132,25 @@ public sealed record RuleOperand
     public static Result<RuleOperand> LiteralValue(RuleValue value) =>
         value is null
             ? Result.Failure<RuleOperand>("Rule literal value is required.")
-            : new RuleOperand(RuleOperandKind.Literal, null, value);
+            : new RuleOperand(RuleOperandKind.Literal, null, value, null, []);
+
+    public static Result<RuleOperand> Function(
+        RuleExpressionFunction function,
+        IReadOnlyList<RuleOperand> arguments)
+    {
+        if (!Enum.IsDefined(function))
+            return Result.Failure<RuleOperand>("Rule expression function is not supported.");
+
+        if (arguments is null || arguments.Any(argument => argument is null))
+            return Result.Failure<RuleOperand>("Rule expression function arguments are invalid.");
+
+        return new RuleOperand(
+            RuleOperandKind.Function,
+            null,
+            null,
+            function,
+            Array.AsReadOnly(arguments.ToArray()));
+    }
 
     private static Result<RuleOperand> ReferenceOperand(RuleOperandKind kind, string reference)
     {
@@ -130,6 +158,6 @@ public sealed record RuleOperand
         if (normalized.Length == 0 || normalized.Length > 120)
             return Result.Failure<RuleOperand>("Rule operand reference is required and cannot exceed 120 characters.");
 
-        return new RuleOperand(kind, normalized, null);
+        return new RuleOperand(kind, normalized, null, null, []);
     }
 }

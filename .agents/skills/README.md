@@ -25,7 +25,7 @@ Repo skills are executable workflows. [reference.md](./reference.md) owns univer
 | Implement SPA feature behavior | [axis-frontend-feature/SKILL.md](./axis-frontend-feature/SKILL.md) | Owns route, state, form, and feature behavior |
 | Define shared SPA foundation contracts | [axis-frontend-foundation/SKILL.md](./axis-frontend-foundation/SKILL.md) | Owns product-neutral foundation specs, not product journeys |
 | Change UI tokens, primitives, shared visual APIs, or providers | [axis-ui-system/SKILL.md](./axis-ui-system/SKILL.md) | Owns UI source boundaries and safe replacement |
-| Change durable docs, guidance, diagrams, or ownership | [axis-doc-hygiene/SKILL.md](./axis-doc-hygiene/SKILL.md) | Owns clarity and single-source hygiene, not domain decisions |
+| Change standalone guidance, diagrams, navigation, or documentation ownership | [axis-doc-hygiene/SKILL.md](./axis-doc-hygiene/SKILL.md) | Owns clarity and single-source hygiene; domain owners retain spec, status, and evidence decisions |
 | Select or change repository bootstrap, commands, and checks | [axis-script-scope/SKILL.md](./axis-script-scope/SKILL.md) | Chooses environment profiles, the smallest proof, and wrapper boundaries |
 | Decide local review readiness | [axis-ready-review/SKILL.md](./axis-ready-review/SKILL.md) | Audits immutable evidence; does not commit or publish |
 | Resolve review findings | [axis-review-feedback/SKILL.md](./axis-review-feedback/SKILL.md) | Classifies and fixes findings, then returns evidence |

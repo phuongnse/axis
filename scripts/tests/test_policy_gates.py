@@ -780,12 +780,87 @@ Ship user value.
 
 | AT ID | Evidence | Commands |
 |---|---|---|
-| AT-001 | `frontend/tests/sample.test.tsx` | `python scripts/axis.py frontend script test:e2e -- e2e/sample.pw.ts` |
+| AT-001 | `frontend/tests/sample.test.tsx` | `python scripts/axis.py local-dev e2e -- e2e/sample.pw.ts` |
 """,
             evidence_files=("frontend/tests/sample.test.tsx",),
         )
 
         self.assertIn("Browser automation must reference a committed `frontend/e2e/*.pw.ts` test", "\n".join(issues))
+
+    def test_browser_use_case_evidence_requires_canonical_local_dev_runner(self) -> None:
+        issues = self.issues_for_document(
+            self.complete_use_case_document(
+                """| ID | Boundary | Scenario | Covers AC | Verification | Required |
+|---|---|---|---|---|---|
+| AT-001 | Browser journey | User completes flow | AC-001 | Browser automation | Yes |"""
+            ),
+            evidence_doc="""# Sample Evidence
+
+> **Navigation**: [docs/use-cases/example/sample.md](./sample.md)
+
+## Acceptance Evidence
+
+| AT ID | Evidence | Commands |
+|---|---|---|
+| AT-001 | `frontend/e2e/sample.pw.ts` | `python scripts/axis.py frontend script test:e2e -- e2e/sample.pw.ts` |
+""",
+            evidence_files=("frontend/e2e/sample.pw.ts",),
+        )
+
+        self.assertIn(
+            "Browser automation Commands must run Playwright through scripts/axis.py",
+            "\n".join(issues),
+        )
+
+    def test_browser_use_case_evidence_rejects_runner_name_in_arguments(self) -> None:
+        issues = self.issues_for_document(
+            self.complete_use_case_document(
+                """| ID | Boundary | Scenario | Covers AC | Verification | Required |
+|---|---|---|---|---|---|
+| AT-001 | Browser journey | User completes flow | AC-001 | Browser automation | Yes |"""
+            ),
+            evidence_doc="""# Sample Evidence
+
+> **Navigation**: [docs/use-cases/example/sample.md](./sample.md)
+
+## Acceptance Evidence
+
+| AT ID | Evidence | Commands |
+|---|---|---|
+| AT-001 | `frontend/e2e/sample.pw.ts` | `python scripts/axis.py frontend script test -- --grep "local-dev e2e"` |
+""",
+            evidence_files=("frontend/e2e/sample.pw.ts",),
+        )
+
+        self.assertIn(
+            "Browser automation Commands must run Playwright through scripts/axis.py",
+            "\n".join(issues),
+        )
+
+    def test_ui_component_evidence_rejects_e2e_script_variant(self) -> None:
+        issues = self.issues_for_document(
+            self.complete_use_case_document(
+                """| ID | Boundary | Scenario | Covers AC | Verification | Required |
+|---|---|---|---|---|---|
+| AT-001 | UI component | User completes flow | AC-001 | UI component test | Yes |"""
+            ),
+            evidence_doc="""# Sample Evidence
+
+> **Navigation**: [docs/use-cases/example/sample.md](./sample.md)
+
+## Acceptance Evidence
+
+| AT ID | Evidence | Commands |
+|---|---|---|
+| AT-001 | `frontend/tests/sample.test.tsx` | `python scripts/axis.py frontend script test:e2e:smoke -- e2e/sample.pw.ts` |
+""",
+            evidence_files=("frontend/tests/sample.test.tsx",),
+        )
+
+        self.assertIn(
+            "UI component test Commands must run frontend tests through scripts/axis.py",
+            "\n".join(issues),
+        )
 
     def test_accepts_infrastructure_test_with_targeted_dotnet_filter(self) -> None:
         issues = self.issues_for_document(
@@ -1134,7 +1209,7 @@ Provide an app frame.
 | AT ID | Evidence | Commands |
 |---|---|---|
 | AT-001 | `frontend/src/components/shared/AppShell.test.tsx` | `python scripts/axis.py frontend script test src/components/shared/AppShell.test.tsx` |
-| AT-002 | `frontend/e2e/app-frame.pw.ts` | `python scripts/axis.py frontend script test:e2e -- e2e/app-frame.pw.ts` |
+| AT-002 | `frontend/e2e/app-frame.pw.ts` | `python scripts/axis.py local-dev e2e -- e2e/app-frame.pw.ts` |
 """
 
     def test_complete_foundation_requires_acceptance_evidence(self) -> None:
@@ -1170,12 +1245,48 @@ Provide an app frame.
 | AT ID | Evidence | Commands |
 |---|---|---|
 | AT-001 | `frontend/src/components/shared/AppShell.test.tsx` | `python scripts/axis.py frontend script test src/components/shared/AppShell.test.tsx` |
-| AT-002 | `frontend/src/components/shared/AppShell.test.tsx` | `python scripts/axis.py frontend script test:e2e -- e2e/app-frame.pw.ts` |
+| AT-002 | `frontend/src/components/shared/AppShell.test.tsx` | `python scripts/axis.py local-dev e2e -- e2e/app-frame.pw.ts` |
 """,
             evidence_files=("frontend/src/components/shared/AppShell.test.tsx",),
         )
 
         self.assertIn("Browser automation must reference a committed `frontend/e2e/*.pw.ts` test", "\n".join(issues))
+
+    def test_browser_foundation_evidence_requires_canonical_local_dev_runner(self) -> None:
+        legacy = self.valid_evidence_doc().replace(
+            "python scripts/axis.py local-dev e2e -- e2e/app-frame.pw.ts",
+            "python scripts/axis.py frontend script test:e2e -- e2e/app-frame.pw.ts",
+        )
+        issues = self.issues_for_foundation(
+            evidence_doc=legacy,
+            evidence_files=(
+                "frontend/src/components/shared/AppShell.test.tsx",
+                "frontend/e2e/app-frame.pw.ts",
+            ),
+        )
+
+        self.assertIn(
+            "Browser automation Commands must run Playwright through scripts/axis.py",
+            "\n".join(issues),
+        )
+
+    def test_browser_foundation_evidence_rejects_runner_name_in_arguments(self) -> None:
+        near_miss = self.valid_evidence_doc().replace(
+            "python scripts/axis.py local-dev e2e -- e2e/app-frame.pw.ts",
+            'python scripts/axis.py frontend script test -- --grep "local-dev e2e"',
+        )
+        issues = self.issues_for_foundation(
+            evidence_doc=near_miss,
+            evidence_files=(
+                "frontend/src/components/shared/AppShell.test.tsx",
+                "frontend/e2e/app-frame.pw.ts",
+            ),
+        )
+
+        self.assertIn(
+            "Browser automation Commands must run Playwright through scripts/axis.py",
+            "\n".join(issues),
+        )
 
     def test_accepts_complete_foundation_with_required_evidence(self) -> None:
         issues = self.issues_for_foundation(
@@ -1546,6 +1657,97 @@ def main() -> int:
 
 
 class TestVulnerablePackageGate(unittest.TestCase):
+    @staticmethod
+    def frontend_audit_report(*, severity: str = "moderate") -> dict[str, object]:
+        return {
+            "auditReportVersion": 2,
+            "vulnerabilities": {
+                "@hono/node-server": {
+                    "name": "@hono/node-server",
+                    "severity": severity,
+                    "isDirect": False,
+                    "via": [
+                        {
+                            "source": 1124006,
+                            "name": "@hono/node-server",
+                            "dependency": "@hono/node-server",
+                            "title": "Path traversal",
+                            "url": "https://github.com/advisories/GHSA-frvp-7c67-39w9",
+                            "severity": severity,
+                            "range": "<2.0.5",
+                        }
+                    ],
+                    "effects": ["@modelcontextprotocol/sdk"],
+                    "range": "<2.0.5",
+                    "nodes": ["node_modules/@hono/node-server"],
+                },
+                "@modelcontextprotocol/sdk": {
+                    "name": "@modelcontextprotocol/sdk",
+                    "severity": severity,
+                    "isDirect": False,
+                    "via": ["@hono/node-server"],
+                    "effects": ["shadcn"],
+                    "range": ">=1.25.0",
+                    "nodes": ["node_modules/@modelcontextprotocol/sdk"],
+                },
+                "shadcn": {
+                    "name": "shadcn",
+                    "severity": severity,
+                    "isDirect": True,
+                    "via": ["@modelcontextprotocol/sdk"],
+                    "effects": [],
+                    "range": ">=3.8.4",
+                    "nodes": ["node_modules/shadcn"],
+                },
+            },
+            "metadata": {
+                "vulnerabilities": {
+                    "info": 0,
+                    "low": 0,
+                    "moderate": 3 if severity == "moderate" else 0,
+                    "high": 3 if severity == "high" else 0,
+                    "critical": 0,
+                    "total": 3,
+                }
+            },
+        }
+
+    @staticmethod
+    def write_frontend_risk_acceptance(
+        root: Path,
+        *,
+        accepted_on: str = "2026-07-22",
+        expires_on: str = "2026-08-21",
+    ) -> None:
+        path = root / "frontend" / "dependency-risk-acceptances.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            json.dumps(
+                {
+                    "schemaVersion": 1,
+                    "acceptances": [
+                        {
+                            "advisory": "GHSA-frvp-7c67-39w9",
+                            "severity": "moderate",
+                            "dependencyPath": [
+                                "shadcn",
+                                "@modelcontextprotocol/sdk",
+                                "@hono/node-server",
+                            ],
+                            "owner": "frontend-tooling",
+                            "acceptedOn": accepted_on,
+                            "expiresOn": expires_on,
+                            "scope": "shadcn CLI tooling only; not imported by the SPA runtime",
+                            "reason": "The compatible upstream dependency range has not reached the patched release.",
+                            "remediation": "Remove this acceptance when shadcn permits @hono/node-server >=2.0.5.",
+                        }
+                    ],
+                }
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+
     def test_uses_absolute_solution_path_for_dotnet_list(self) -> None:
         calls: list[list[str]] = []
 
@@ -1565,31 +1767,209 @@ class TestVulnerablePackageGate(unittest.TestCase):
         self.assertEqual(str(axis.ROOT / "Axis.sln"), calls[0][2])
         self.assertTrue(Path(calls[0][2]).is_absolute())
 
-    def test_frontend_gate_uses_high_severity_audit_threshold(self) -> None:
+    def test_shadcn_cli_is_owned_as_a_development_dependency(self) -> None:
+        package = json.loads((axis.ROOT / "frontend" / "package.json").read_text(encoding="utf-8"))
+
+        self.assertNotIn("shadcn", package["dependencies"])
+        self.assertIn("shadcn", package["devDependencies"])
+
+    def test_frontend_gate_accepts_only_the_current_time_bounded_moderate_advisory(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            self.write_frontend_risk_acceptance(root)
+            report = self.frontend_audit_report()
+            with (
+                mock.patch.object(axis, "ROOT", root),
+                mock.patch.object(axis, "check_frontend_toolchain", return_value=0),
+                mock.patch.object(
+                    axis,
+                    "run_frontend_npm",
+                    return_value=axis.subprocess.CompletedProcess([], 1, stdout=json.dumps(report), stderr=""),
+                ) as run_npm,
+                contextlib.redirect_stdout(io.StringIO()) as stdout,
+            ):
+                self.assertEqual(0, axis.check_frontend_vulnerable_packages())
+
+        run_npm.assert_called_once_with(["audit", "--json"], capture=True)
+        self.assertIn("GHSA-frvp-7c67-39w9", stdout.getvalue())
+
+    def test_frontend_gate_rejects_high_advisory_even_when_moderate_acceptance_exists(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            self.write_frontend_risk_acceptance(root)
+            report = self.frontend_audit_report(severity="high")
+            with (
+                mock.patch.object(axis, "ROOT", root),
+                mock.patch.object(axis, "check_frontend_toolchain", return_value=0),
+                mock.patch.object(
+                    axis,
+                    "run_frontend_npm",
+                    return_value=axis.subprocess.CompletedProcess([], 1, stdout=json.dumps(report), stderr=""),
+                ),
+                contextlib.redirect_stderr(io.StringIO()) as stderr,
+            ):
+                self.assertEqual(1, axis.check_frontend_vulnerable_packages())
+
+        self.assertIn("high vulnerabilities cannot be accepted", stderr.getvalue())
+
+    def test_frontend_gate_rejects_new_unaccepted_moderate_advisory(self) -> None:
+        report = self.frontend_audit_report()
+        root_advisory = report["vulnerabilities"]["@hono/node-server"]["via"][0]
+        root_advisory["url"] = "https://github.com/advisories/GHSA-new1-new2-new3"
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            self.write_frontend_risk_acceptance(root)
+            with (
+                mock.patch.object(axis, "ROOT", root),
+                mock.patch.object(axis, "check_frontend_toolchain", return_value=0),
+                mock.patch.object(
+                    axis,
+                    "run_frontend_npm",
+                    return_value=axis.subprocess.CompletedProcess([], 1, stdout=json.dumps(report), stderr=""),
+                ),
+                contextlib.redirect_stderr(io.StringIO()) as stderr,
+            ):
+                self.assertEqual(1, axis.check_frontend_vulnerable_packages())
+
+        self.assertIn("GHSA-new1-new2-new3 is not accepted", stderr.getvalue())
+        self.assertIn("GHSA-frvp-7c67-39w9 is stale", stderr.getvalue())
+
+    def test_frontend_gate_rejects_vulnerability_without_a_resolvable_advisory(self) -> None:
+        report = {
+            "auditReportVersion": 2,
+            "vulnerabilities": {
+                "opaque-package": {
+                    "name": "opaque-package",
+                    "severity": "low",
+                    "isDirect": True,
+                    "via": [],
+                    "effects": [],
+                    "range": "*",
+                    "nodes": ["node_modules/opaque-package"],
+                }
+            },
+            "metadata": {},
+        }
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root / "frontend").mkdir()
+            (root / "frontend" / "dependency-risk-acceptances.json").write_text(
+                '{"schemaVersion":1,"acceptances":[]}\n',
+                encoding="utf-8",
+            )
+            with (
+                mock.patch.object(axis, "ROOT", root),
+                mock.patch.object(axis, "check_frontend_toolchain", return_value=0),
+                mock.patch.object(
+                    axis,
+                    "run_frontend_npm",
+                    return_value=axis.subprocess.CompletedProcess([], 1, stdout=json.dumps(report), stderr=""),
+                ),
+                contextlib.redirect_stderr(io.StringIO()) as stderr,
+            ):
+                self.assertEqual(1, axis.check_frontend_vulnerable_packages())
+
+        self.assertIn("opaque-package does not resolve to a GitHub advisory", stderr.getvalue())
+
+    def test_frontend_gate_rejects_expired_acceptance(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            self.write_frontend_risk_acceptance(
+                root,
+                accepted_on="1999-12-03",
+                expires_on="2000-01-01",
+            )
+            with (
+                mock.patch.object(axis, "ROOT", root),
+                mock.patch.object(axis, "check_frontend_toolchain", return_value=0),
+                mock.patch.object(
+                    axis,
+                    "run_frontend_npm",
+                    return_value=axis.subprocess.CompletedProcess(
+                        [], 1, stdout=json.dumps(self.frontend_audit_report()), stderr=""
+                    ),
+                ),
+                contextlib.redirect_stderr(io.StringIO()) as stderr,
+            ):
+                self.assertEqual(1, axis.check_frontend_vulnerable_packages())
+
+        self.assertIn("expired on 2000-01-01", stderr.getvalue())
+
+    def test_frontend_gate_rejects_acceptance_longer_than_thirty_days(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            self.write_frontend_risk_acceptance(root, expires_on="2026-08-22")
+            with (
+                mock.patch.object(axis, "ROOT", root),
+                mock.patch.object(axis, "check_frontend_toolchain", return_value=0),
+                mock.patch.object(
+                    axis,
+                    "run_frontend_npm",
+                    return_value=axis.subprocess.CompletedProcess(
+                        [], 1, stdout=json.dumps(self.frontend_audit_report()), stderr=""
+                    ),
+                ),
+                contextlib.redirect_stderr(io.StringIO()) as stderr,
+            ):
+                self.assertEqual(1, axis.check_frontend_vulnerable_packages())
+
+        self.assertIn("exceeds the 30-day maximum", stderr.getvalue())
+
+    def test_frontend_gate_rejects_stale_acceptance_after_advisory_disappears(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            self.write_frontend_risk_acceptance(root)
+            report = {"auditReportVersion": 2, "vulnerabilities": {}, "metadata": {}}
+            with (
+                mock.patch.object(axis, "ROOT", root),
+                mock.patch.object(axis, "check_frontend_toolchain", return_value=0),
+                mock.patch.object(
+                    axis,
+                    "run_frontend_npm",
+                    return_value=axis.subprocess.CompletedProcess([], 0, stdout=json.dumps(report), stderr=""),
+                ),
+                contextlib.redirect_stderr(io.StringIO()) as stderr,
+            ):
+                self.assertEqual(1, axis.check_frontend_vulnerable_packages())
+
+        self.assertIn("GHSA-frvp-7c67-39w9 is stale", stderr.getvalue())
+
+    def test_frontend_gate_rejects_invalid_audit_output(self) -> None:
         with (
             mock.patch.object(axis, "check_frontend_toolchain", return_value=0),
             mock.patch.object(
                 axis,
                 "run_frontend_npm",
-                return_value=axis.subprocess.CompletedProcess([], 0),
-            ) as run_npm,
-            contextlib.redirect_stdout(io.StringIO()),
-        ):
-            self.assertEqual(0, axis.check_frontend_vulnerable_packages())
-
-        run_npm.assert_called_once_with(["audit", "--audit-level=high"])
-
-    def test_frontend_gate_propagates_failed_audit(self) -> None:
-        with (
-            mock.patch.object(axis, "check_frontend_toolchain", return_value=0),
-            mock.patch.object(
-                axis,
-                "run_frontend_npm",
-                return_value=axis.subprocess.CompletedProcess([], 1),
+                return_value=axis.subprocess.CompletedProcess([], 1, stdout="not-json", stderr="network failed"),
             ),
-            contextlib.redirect_stderr(io.StringIO()),
+            contextlib.redirect_stderr(io.StringIO()) as stderr,
         ):
             self.assertEqual(1, axis.check_frontend_vulnerable_packages())
+
+        self.assertIn("valid npm audit JSON", stderr.getvalue())
+
+    def test_frontend_gate_rejects_unexpected_npm_audit_exit_code(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root / "frontend").mkdir()
+            (root / "frontend" / "dependency-risk-acceptances.json").write_text(
+                '{"schemaVersion":1,"acceptances":[]}\n',
+                encoding="utf-8",
+            )
+            report = {"auditReportVersion": 2, "vulnerabilities": {}, "metadata": {}}
+            with (
+                mock.patch.object(axis, "ROOT", root),
+                mock.patch.object(axis, "check_frontend_toolchain", return_value=0),
+                mock.patch.object(
+                    axis,
+                    "run_frontend_npm",
+                    return_value=axis.subprocess.CompletedProcess([], 2, stdout=json.dumps(report), stderr="failed"),
+                ),
+                contextlib.redirect_stderr(io.StringIO()) as stderr,
+            ):
+                self.assertEqual(1, axis.check_frontend_vulnerable_packages())
+
+        self.assertIn("npm audit exited with 2", stderr.getvalue())
 
 
 class TestToolVersionGates(unittest.TestCase):
@@ -1630,6 +2010,29 @@ class TestToolVersionGates(unittest.TestCase):
         self.assertFalse(ok)
         self.assertIn("expected .NET SDK 8.x", detail)
         self.assertIn("docs/TECH_STACK.md", detail)
+
+    def test_dotnet_sdk_surfaces_classified_native_prerequisite(self) -> None:
+        with (
+            mock.patch.object(
+                axis,
+                "command_version_line",
+                return_value=(False, "Couldn't find a valid ICU package installed on the system.", "/tools/dotnet"),
+            ),
+            mock.patch.object(
+                axis.axis_setup,
+                "dotnet_native_prerequisite_hint",
+                return_value=(
+                    "the .NET host is missing ICU; on Ubuntu 26.04 install it with "
+                    "`sudo apt install libicu78`; Axis will not run sudo or an OS package manager"
+                ),
+                create=True,
+            ) as classify,
+        ):
+            ok, detail = axis.dotnet_sdk_status()
+
+        self.assertFalse(ok)
+        classify.assert_called_once()
+        self.assertIn("sudo apt install libicu78", detail)
 
     def test_frontend_toolchain_rejects_wrong_node_major(self) -> None:
         with (
@@ -1743,7 +2146,8 @@ class TestToolVersionGates(unittest.TestCase):
         self.assertIn("/missing/chromium", detail)
         self.assertIn("python scripts/axis.py frontend install-browsers", detail)
 
-    def test_doctor_warns_when_playwright_chromium_is_missing(self) -> None:
+    def test_local_dev_doctor_does_not_require_host_playwright(self) -> None:
+        playwright_status = mock.Mock(return_value=(False, "missing host browser"))
         with (
             mock.patch.object(axis, "find_lychee", return_value="/usr/bin/lychee"),
             mock.patch.object(axis, "lychee_version_status", return_value=(True, "lychee 0.23.0")),
@@ -1751,11 +2155,7 @@ class TestToolVersionGates(unittest.TestCase):
             mock.patch.object(axis, "dotnet_sdk_status", return_value=(True, "8.0.100")),
             mock.patch.object(axis, "frontend_toolchain_env", return_value={}),
             mock.patch.object(axis, "node_version_status", return_value=(True, "v22.23.0")),
-            mock.patch.object(
-                axis,
-                "playwright_chromium_status",
-                return_value=(False, "missing; run `python scripts/axis.py frontend install-browsers`"),
-            ),
+            mock.patch.object(axis, "playwright_chromium_status", playwright_status),
             mock.patch.object(axis, "_command_version", return_value=("OK", "/usr/bin/tool")),
             mock.patch.object(axis, "find_openssl", return_value="/usr/bin/openssl"),
             mock.patch.object(axis, "_docker_info_ok", return_value=True),
@@ -1763,12 +2163,23 @@ class TestToolVersionGates(unittest.TestCase):
             mock.patch.object(axis, "_http_ok", return_value=False),
             mock.patch.object(axis, "_wsl_docker_ok", return_value=False),
             mock.patch.object(axis, "_docker_compose_ok", return_value=True),
+            mock.patch.object(axis, "local_dev_certificates_valid", return_value=True),
+            mock.patch.object(
+                axis,
+                "local_dev_host_trust_status",
+                return_value=("WARN", "host browser trust is not configured"),
+                create=True,
+            ) as trust_status,
             contextlib.redirect_stdout(io.StringIO()) as stdout,
             contextlib.redirect_stderr(io.StringIO()) as stderr,
         ):
             self.assertEqual(0, axis.doctor(axis.argparse.Namespace(strict=True)))
 
-        self.assertIn("[WARN] playwright chromium", stdout.getvalue())
+        playwright_status.assert_not_called()
+        trust_status.assert_called_once_with()
+        self.assertNotIn("playwright chromium", stdout.getvalue())
+        self.assertIn("local HTTPS certificates", stdout.getvalue())
+        self.assertIn("host browser trust", stdout.getvalue())
         self.assertEqual("", stderr.getvalue())
 
     def test_core_doctor_profile_skips_build_local_dev_and_review_tools(self) -> None:
@@ -1863,6 +2274,7 @@ class TestMarkdownLinkGate(unittest.TestCase):
 
     def test_coderabbit_cli_rejects_missing_cli(self) -> None:
         with (
+            mock.patch.object(axis, "inactive_coderabbit_path", return_value=None),
             mock.patch.object(
                 axis,
                 "command_version_line",
@@ -1875,6 +2287,29 @@ class TestMarkdownLinkGate(unittest.TestCase):
         output = stderr.getvalue()
         self.assertIn("CodeRabbit CLI is required", output)
         self.assertIn("docs/playbooks/scripts.md#tool-versions", output)
+
+    def test_coderabbit_cli_reports_installed_command_directory_missing_from_path(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            home = Path(temp)
+            coderabbit = home / ".local" / "bin" / "coderabbit"
+            coderabbit.parent.mkdir(parents=True)
+            coderabbit.write_text("", encoding="utf-8")
+            coderabbit.chmod(0o755)
+            with (
+                mock.patch.object(axis.os, "name", "posix"),
+                mock.patch.object(axis.Path, "home", return_value=home),
+                mock.patch.object(
+                    axis,
+                    "command_version_line",
+                    return_value=(False, "coderabbit not found in PATH", "coderabbit"),
+                ),
+            ):
+                ok, detail = axis.coderabbit_cli_status()
+
+        self.assertFalse(ok)
+        self.assertIn(str(coderabbit), detail)
+        self.assertIn("not active in PATH", detail)
+        self.assertIn("new login shell", detail)
 
     def test_coderabbit_cli_rejects_old_version(self) -> None:
         with (
@@ -1938,6 +2373,32 @@ class TestVerifyGate(unittest.TestCase):
                 axis,
                 "verify_scope_paths",
                 return_value=("working tree", ["frontend/package-lock.json"]),
+            ),
+            mock.patch.object(axis, "run_text_encoding_check", return_value=0),
+            mock.patch.object(axis, "check_frontend_toolchain", side_effect=lambda: calls.append("toolchain") or 0),
+            mock.patch.object(
+                axis,
+                "check_frontend_vulnerable_packages",
+                side_effect=lambda: calls.append("audit") or 0,
+            ),
+            mock.patch.object(
+                axis,
+                "frontend_command",
+                side_effect=lambda args: calls.append(args.frontend_command) or 0,
+            ),
+            contextlib.redirect_stdout(io.StringIO()),
+        ):
+            self.assertEqual(0, axis.verify(object()))
+
+        self.assertEqual(["toolchain", "audit", "ci", "test"], calls)
+
+    def test_risk_acceptance_manifest_change_runs_frontend_vulnerability_gate(self) -> None:
+        calls: list[str] = []
+        with (
+            mock.patch.object(
+                axis,
+                "verify_scope_paths",
+                return_value=("working tree", ["frontend/dependency-risk-acceptances.json"]),
             ),
             mock.patch.object(axis, "run_text_encoding_check", return_value=0),
             mock.patch.object(axis, "check_frontend_toolchain", side_effect=lambda: calls.append("toolchain") or 0),
@@ -2179,11 +2640,13 @@ class TestReviewVerificationGates(unittest.TestCase):
 
     def test_runs_changed_frontend_e2e_file_for_e2e_only_change(self) -> None:
         calls: list[str] = []
+        browser_runner = mock.Mock(return_value=0)
 
         with (
             mock.patch.object(axis, "verify_scope_paths", return_value=("working tree", ["frontend/e2e/register.pw.ts"])),
             mock.patch.object(axis, "check_frontend_toolchain", side_effect=lambda: calls.append("frontend-toolchain") or 0),
             mock.patch.object(axis, "frontend_toolchain_env", return_value={}),
+            mock.patch.object(axis, "run_local_dev_browser", browser_runner),
             mock.patch.object(
                 axis,
                 "run_frontend_npm",
@@ -2198,10 +2661,10 @@ class TestReviewVerificationGates(unittest.TestCase):
                 "frontend-toolchain",
                 "frontend-toolchain",
                 "run ci",
-                "run test:e2e -- e2e/register.pw.ts",
             ],
             calls,
         )
+        browser_runner.assert_called_once_with(["e2e/register.pw.ts"])
 
     def test_runs_related_dotnet_projects_for_source_change(self) -> None:
         calls: list[str] = []
@@ -2358,7 +2821,7 @@ class TestEnforcementLedger(unittest.TestCase):
 class TestEnforcementTruthAudit(unittest.TestCase):
     def write_truth_repo(self, root: Path, mutate=None) -> None:
         files: dict[Path, str] = {}
-        for relative, requirements in axis.ENFORCEMENT_TRUTH_REQUIRED_SNIPPETS:
+        for relative, requirements in axis.enforcement_truth_required_snippets():
             files[relative] = "\n".join(snippet for snippet, _description in requirements) + "\n"
 
         workflow = Path(".github/workflows/build-and-test.yml")
@@ -2386,6 +2849,14 @@ class TestEnforcementTruthAudit(unittest.TestCase):
             issues = axis.enforcement_truth_audit_issues(root=root)
 
         self.assertIn("shared ready-review policy profile runs in CI", "\n".join(issues))
+
+    def test_lychee_ci_pin_requirement_comes_from_the_managed_tool_owner(self) -> None:
+        with mock.patch.object(axis.axis_setup, "LYCHEE_VERSION", "9.9.9"):
+            requirements = axis.enforcement_truth_required_snippets()
+
+        workflow_requirements = dict(requirements)[Path(".github/workflows/build-and-test.yml")]
+        snippets = [snippet for snippet, _description in workflow_requirements]
+        self.assertIn("lycheeVersion: v9.9.9", snippets)
 
     def test_rejects_ci_without_frontend_vulnerability_gate(self) -> None:
         def mutate(files: dict[Path, str]) -> None:
@@ -2704,6 +3175,128 @@ class TestLocalDevCli(unittest.TestCase):
 
             self.assertFalse(check_local_dev_docs.compose_has_local_app_base_url(compose))
 
+    def test_local_dev_doc_check_requires_api_source_reload_capability(self) -> None:
+        one_shot_compose = """services:
+  api:
+    command: [\"dotnet\", \"Axis.Api.dll\"]
+    environment:
+      App__BaseUrl: \"${APP_BASE_URL:-https://localhost:3000}\"
+    ports:
+      - \"127.0.0.1:5281:8443\"
+"""
+        watching_compose = """services:
+  api:
+    command:
+      - dotnet
+      - watch
+      - --project
+      - src/Axis.Api/Axis.Api.csproj
+      - --no-hot-reload
+      - run
+    environment:
+      DOTNET_USE_POLLING_FILE_WATCHER: \"true\"
+      UseArtifactsOutput: \"true\"
+      ArtifactsPath: \"/tmp/axis-artifacts\"
+      App__BaseUrl: \"${APP_BASE_URL:-https://localhost:3000}\"
+    ports:
+      - \"127.0.0.1:5281:8443\"
+"""
+
+        cli_artifacts_compose = """services:
+  api:
+    command:
+      - dotnet
+      - watch
+      - --project
+      - src/Axis.Api/Axis.Api.csproj
+      - --no-hot-reload
+      - run
+      - --artifacts-path
+      - /tmp/axis-artifacts
+    environment:
+      DOTNET_USE_POLLING_FILE_WATCHER: \"true\"
+      UseArtifactsOutput: \"true\"
+      ArtifactsPath: \"/tmp/axis-artifacts\"
+      App__BaseUrl: \"${APP_BASE_URL:-https://localhost:3000}\"
+    ports:
+      - \"127.0.0.1:5281:8443\"
+"""
+
+        cli_artifacts_equals_compose = watching_compose.replace(
+            "      - run\n",
+            "      - run\n      - --ARTIFACTS-PATH=/tmp/axis-artifacts\n",
+        )
+
+        indirect_compose = """services:
+  api:
+    command: [\"sh\", \"-c\", \"dotnet watch --project src/Axis.Api/Axis.Api.csproj run\"]
+    environment:
+      DOTNET_USE_POLLING_FILE_WATCHER: \"true\"
+      App__BaseUrl: \"${APP_BASE_URL:-https://localhost:3000}\"
+    ports:
+      - \"127.0.0.1:5281:8443\"
+"""
+        unquoted_flow_compose = """services:
+  api:
+    command: [dotnet, watch, --project, src/Axis.Api/Axis.Api.csproj, run]
+    environment:
+      DOTNET_USE_POLLING_FILE_WATCHER: \"true\"
+      UseArtifactsOutput: \"true\"
+      ArtifactsPath: \"/tmp/axis-artifacts\"
+      App__BaseUrl: \"${APP_BASE_URL:-https://localhost:3000}\"
+    ports:
+      - \"127.0.0.1:5281:8443\"
+"""
+
+        def check(compose_text: str) -> list[str]:
+            with tempfile.TemporaryDirectory() as temp:
+                compose = Path(temp) / "docker-compose.yml"
+                compose.write_text(compose_text, encoding="utf-8")
+                with mock.patch.object(check_local_dev_docs, "MAIN_COMPOSE_FILE", compose):
+                    return check_local_dev_docs.check_local_dev_doc()
+
+        expected = "docker-compose.yml api service must automatically reload source changes"
+        self.assertIn(expected, check(one_shot_compose))
+        self.assertIn(expected, check(indirect_compose))
+        self.assertIn(expected, check(cli_artifacts_compose))
+        self.assertIn(expected, check(cli_artifacts_equals_compose))
+        self.assertIn(
+            expected,
+            check(watching_compose.replace('      UseArtifactsOutput: "true"\n', "")),
+        )
+        self.assertIn(
+            expected,
+            check(watching_compose.replace("/tmp/axis-artifacts", "/src/artifacts")),
+        )
+        self.assertNotIn(expected, check(watching_compose))
+        self.assertNotIn(expected, check(unquoted_flow_compose))
+
+    def test_local_dev_doc_check_requires_trusted_web_https_healthcheck(self) -> None:
+        canonical = """services:
+  web:
+    environment:
+      NODE_EXTRA_CA_CERTS: "/https/rootCA.pem"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('https://localhost:3000').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+    ports:
+      - "127.0.0.1:3000:3000"
+"""
+        insecure = canonical.replace(
+            "[\"CMD\", \"node\", \"-e\", \"fetch('https://localhost:3000').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))\"]",
+            "[\"CMD-SHELL\", \"wget --no-check-certificate https://localhost:3000\"]",
+        )
+
+        def check(compose_text: str) -> list[str]:
+            with tempfile.TemporaryDirectory() as temp:
+                compose = Path(temp) / "docker-compose.yml"
+                compose.write_text(compose_text, encoding="utf-8")
+                with mock.patch.object(check_local_dev_docs, "MAIN_COMPOSE_FILE", compose):
+                    return check_local_dev_docs.check_local_dev_doc()
+
+        expected = "docker-compose.yml web service must expose a trusted HTTPS healthcheck"
+        self.assertNotIn(expected, check(canonical))
+        self.assertIn(expected, check(insecure))
+
     def test_api_appsettings_base_url_reads_app_base_url(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             appsettings = Path(temp) / "appsettings.json"
@@ -2738,7 +3331,14 @@ class TestLocalDevCli(unittest.TestCase):
             temp_dir if temp_dir is not None else contextlib.nullcontext(),
             mock.patch.object(axis, "LOCAL_DEV_ENV_FILE", env_file),
             mock.patch.object(axis, "_docker_compose_ok", return_value=True),
+            mock.patch.object(
+                axis,
+                "local_dev_host_trust_status",
+                return_value=("OK", "Axis local root CA is trusted for this host user"),
+                create=True,
+            ),
             mock.patch.object(axis, "run", side_effect=fake_run),
+            contextlib.redirect_stdout(io.StringIO()),
         ):
             self.assertEqual(0, axis.local_dev(args))
 
@@ -2750,9 +3350,55 @@ class TestLocalDevCli(unittest.TestCase):
         )
 
         self.assertEqual(
-            ["compose", "-p", "axis", "-f", str(axis.LOCAL_DEV_COMPOSE_FILE), "up", "-d"],
+            [
+                "compose",
+                "-p",
+                "axis",
+                "-f",
+                str(axis.LOCAL_DEV_COMPOSE_FILE),
+                "up",
+                "-d",
+                "--wait",
+                "--wait-timeout",
+                "300",
+            ],
             calls[0][1:],
         )
+
+    def test_up_reports_ready_urls_and_host_trust_followup(self) -> None:
+        with (
+            tempfile.TemporaryDirectory() as temp,
+            mock.patch.object(axis, "LOCAL_DEV_ENV_FILE", Path(temp) / ".env.local"),
+            mock.patch.object(axis, "_docker_compose_ok", return_value=True),
+            mock.patch.object(
+                axis,
+                "local_dev_host_trust_status",
+                return_value=(
+                    "WARN",
+                    "host browser trust is not configured; run "
+                    "`python scripts/axis.py local-dev trust-certs`",
+                ),
+                create=True,
+            ),
+            mock.patch.object(
+                axis,
+                "run",
+                return_value=axis.subprocess.CompletedProcess([], 0, stdout="", stderr=""),
+            ),
+            contextlib.redirect_stdout(io.StringIO()) as stdout,
+        ):
+            self.assertEqual(
+                0,
+                axis.local_dev(
+                    axis.argparse.Namespace(local_dev_command="up", build=False, services=[])
+                ),
+            )
+
+        output = stdout.getvalue()
+        self.assertIn("local-dev up: ready", output)
+        self.assertIn("https://localhost:3000", output)
+        self.assertIn("https://localhost:5281/health", output)
+        self.assertIn("local-dev trust-certs", output)
 
     def test_up_uses_local_env_file_when_present(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -2775,6 +3421,9 @@ class TestLocalDevCli(unittest.TestCase):
                 str(env_file),
                 "up",
                 "-d",
+                "--wait",
+                "--wait-timeout",
+                "300",
             ],
             calls[0][1:],
         )
@@ -2783,8 +3432,23 @@ class TestLocalDevCli(unittest.TestCase):
         calls = self.run_local_dev(axis.argparse.Namespace(local_dev_command="e2e", e2e_args=[]))
 
         self.assertEqual(
-            ["compose", "-p", "axis", "-f", str(axis.LOCAL_DEV_COMPOSE_FILE), "--profile", "e2e", "build", "e2e"],
+            [
+                "compose",
+                "-p",
+                "axis",
+                "-f",
+                str(axis.LOCAL_DEV_COMPOSE_FILE),
+                "up",
+                "-d",
+                "--wait",
+                "--wait-timeout",
+                "300",
+            ],
             calls[0][1:],
+        )
+        self.assertEqual(
+            ["compose", "-p", "axis", "-f", str(axis.LOCAL_DEV_COMPOSE_FILE), "--profile", "e2e", "build", "e2e"],
+            calls[1][1:],
         )
         self.assertEqual(
             [
@@ -2800,7 +3464,7 @@ class TestLocalDevCli(unittest.TestCase):
                 "--no-deps",
                 "e2e",
             ],
-            calls[1][1:],
+            calls[2][1:],
         )
 
     def test_e2e_forwards_playwright_args(self) -> None:
@@ -2828,127 +3492,33 @@ class TestLocalDevCli(unittest.TestCase):
                 "-g",
                 "AT-001",
             ],
-            calls[1][1:],
+            calls[2][1:],
         )
 
-    def test_smoke_runs_host_playwright_against_running_local_stack(self) -> None:
-        calls: list[list[str]] = []
-        envs: list[dict[str, str] | None] = []
-
-        def fake_run(command: list[str], **kwargs):
-            calls.append(command)
-            envs.append(kwargs.get("env"))
-            if command[1:] == [
-                "compose",
-                "-p",
-                "axis",
-                "-f",
-                str(axis.LOCAL_DEV_COMPOSE_FILE),
-                "ps",
-                "--services",
-                "--status",
-                "running",
-            ]:
-                return axis.subprocess.CompletedProcess(command, 0, stdout="api\nweb\n", stderr="")
-            return axis.subprocess.CompletedProcess(command, 0, stdout="", stderr="")
-
-        with tempfile.TemporaryDirectory() as temp:
-            root_ca = Path(temp) / "rootCA.pem"
-            root_ca.write_text("test root ca", encoding="utf-8")
-            browser_home = Path(temp) / "browser-home"
-
-            with (
-                mock.patch.object(axis, "LOCAL_ROOT_CA_PEM", root_ca),
-                mock.patch.object(axis, "LOCAL_DEV_BROWSER_HOME", browser_home),
-                mock.patch.object(axis, "_docker_compose_ok", return_value=True),
-                mock.patch.object(axis, "check_frontend_toolchain", return_value=0),
-                mock.patch.object(axis, "playwright_chromium_status", return_value=(True, "chromium")),
-                mock.patch.object(axis, "ensure_local_dev_smoke_browser_trust", return_value=0),
-                mock.patch.object(axis, "frontend_toolchain_env", return_value={"PATH": "node-bin"}),
-                mock.patch.object(axis, "run", side_effect=fake_run),
-            ):
-                result = axis.local_dev(
-                    axis.argparse.Namespace(
-                        local_dev_command="smoke",
-                        smoke_args=["--", "e2e/app-frame.pw.ts", "-g", "AT-002"],
-                    )
-                )
-
-        self.assertEqual(0, result)
-        self.assertEqual(
-            [
-                "compose",
-                "-p",
-                "axis",
-                "-f",
-                str(axis.LOCAL_DEV_COMPOSE_FILE),
-                "ps",
-                "--services",
-                "--status",
-                "running",
-            ],
-            calls[0][1:],
-        )
-        self.assertEqual(["run", "test:e2e", "--", "e2e/app-frame.pw.ts", "-g", "AT-002"], calls[1][1:])
-        self.assertEqual("https://localhost:5281", envs[1]["E2E_API_URL"])
-        self.assertEqual("https://localhost:3000", envs[1]["E2E_BASE_URL"])
-        self.assertEqual(str(browser_home), envs[1]["E2E_BROWSER_HOME"])
-        self.assertEqual("1", envs[1]["E2E_SKIP_WEB_SERVER"])
-        self.assertEqual("https://localhost:3000", envs[1]["E2E_VERIFY_ORIGIN"])
-        self.assertEqual(str(root_ca), envs[1]["NODE_EXTRA_CA_CERTS"])
-
-    def test_smoke_browser_trust_imports_root_ca_into_isolated_nss_db(self) -> None:
-        calls: list[list[str]] = []
-
-        with tempfile.TemporaryDirectory() as temp:
-            root_ca = Path(temp) / "rootCA.pem"
-            root_ca.write_text("test root ca", encoding="utf-8")
-            browser_home = Path(temp) / "browser-home"
-
-            def fake_run(command: list[str], **_kwargs):
-                calls.append(command)
-                if "run" in command:
-                    nss_db = browser_home / ".pki" / "nssdb"
-                    nss_db.mkdir(parents=True, exist_ok=True)
-                    (nss_db / "cert9.db").write_text("trusted", encoding="utf-8")
-                return axis.subprocess.CompletedProcess(command, 0, stdout="", stderr="")
-
-            with (
-                mock.patch.object(axis, "LOCAL_ROOT_CA_PEM", root_ca),
-                mock.patch.object(axis, "LOCAL_DEV_BROWSER_HOME", browser_home),
-                mock.patch.object(axis, "run", side_effect=fake_run),
-            ):
-                result = axis.ensure_local_dev_smoke_browser_trust()
-
-            self.assertEqual(0, result)
-            self.assertEqual(2, len(calls))
-            self.assertEqual(
-                ["--profile", "e2e", "build", "e2e"],
-                calls[0][-4:],
+    def test_smoke_uses_the_canonical_compose_browser_runner(self) -> None:
+        calls = self.run_local_dev(
+            axis.argparse.Namespace(
+                local_dev_command="smoke",
+                smoke_args=["--", "e2e/app-frame.pw.ts", "-g", "AT-002"],
             )
-            self.assertIn(f"{browser_home}:/browser-home", calls[1])
-            self.assertTrue((browser_home / ".axis-root-ca.sha256").is_file())
+        )
 
-    def test_smoke_fails_when_required_local_services_are_not_running(self) -> None:
-        calls: list[list[str]] = []
+        self.assertEqual(
+            ["up", "-d", "--wait", "--wait-timeout", "300"],
+            calls[0][-5:],
+        )
+        self.assertEqual(["--profile", "e2e", "build", "e2e"], calls[1][-4:])
+        self.assertEqual(
+            ["e2e", "e2e/app-frame.pw.ts", "-g", "AT-002"],
+            calls[2][-4:],
+        )
 
-        def fake_run(command: list[str], **_kwargs):
-            calls.append(command)
-            return axis.subprocess.CompletedProcess(command, 0, stdout="api\n", stderr="")
+    def test_smoke_defaults_to_the_local_dev_smoke_journey(self) -> None:
+        calls = self.run_local_dev(
+            axis.argparse.Namespace(local_dev_command="smoke", smoke_args=[])
+        )
 
-        stderr = io.StringIO()
-        with (
-            mock.patch.object(axis, "_docker_compose_ok", return_value=True),
-            mock.patch.object(axis, "check_frontend_toolchain", return_value=0),
-            mock.patch.object(axis, "playwright_chromium_status", return_value=(True, "chromium")),
-            mock.patch.object(axis, "run", side_effect=fake_run),
-            mock.patch.object(axis.sys, "stderr", stderr),
-        ):
-            result = axis.local_dev(axis.argparse.Namespace(local_dev_command="smoke", smoke_args=[]))
-
-        self.assertEqual(1, result)
-        self.assertEqual(1, len(calls))
-        self.assertIn("required services are not running: web", stderr.getvalue())
+        self.assertEqual(["e2e", "e2e/local-dev-smoke.pw.ts"], calls[2][-2:])
 
     def test_shell_uses_service_default_inside_container(self) -> None:
         calls = self.run_local_dev(
@@ -3012,7 +3582,21 @@ class TestLocalDevCli(unittest.TestCase):
 
         self.assertEqual(["compose", "-p", "axis", "-f", str(axis.LOCAL_DEV_COMPOSE_FILE), "down"], calls[0][1:])
         self.assertEqual(["volume", "rm", "axis_postgres_data"], calls[1][1:])
-        self.assertEqual(["compose", "-p", "axis", "-f", str(axis.LOCAL_DEV_COMPOSE_FILE), "up", "-d"], calls[2][1:])
+        self.assertEqual(
+            [
+                "compose",
+                "-p",
+                "axis",
+                "-f",
+                str(axis.LOCAL_DEV_COMPOSE_FILE),
+                "up",
+                "-d",
+                "--wait",
+                "--wait-timeout",
+                "300",
+            ],
+            calls[2][1:],
+        )
 
     def test_reset_db_fails_when_postgres_volume_removal_fails(self) -> None:
         calls: list[list[str]] = []
@@ -3051,7 +3635,21 @@ class TestLocalDevCli(unittest.TestCase):
         ):
             self.assertEqual(0, axis.local_dev(axis.argparse.Namespace(local_dev_command="reset-db")))
 
-        self.assertEqual(["compose", "-p", "axis", "-f", str(axis.LOCAL_DEV_COMPOSE_FILE), "up", "-d"], calls[2][1:])
+        self.assertEqual(
+            [
+                "compose",
+                "-p",
+                "axis",
+                "-f",
+                str(axis.LOCAL_DEV_COMPOSE_FILE),
+                "up",
+                "-d",
+                "--wait",
+                "--wait-timeout",
+                "300",
+            ],
+            calls[2][1:],
+        )
 
 
 class TestLocalDevShellArgv(unittest.TestCase):
@@ -3256,6 +3854,26 @@ class TestAxisCommandWrappers(unittest.TestCase):
 
         self.assertEqual(["npm", "exec", "--", "playwright", "install", "chromium"], calls[0])
 
+    def test_frontend_test_e2e_compatibility_command_uses_canonical_browser_runner(self) -> None:
+        browser_runner = mock.Mock(return_value=0)
+        with (
+            mock.patch.object(axis, "check_frontend_toolchain", return_value=0),
+            mock.patch.object(axis, "require_docker_compose", return_value=0),
+            mock.patch.object(axis, "run_local_dev_browser", browser_runner),
+            mock.patch.object(axis, "run_frontend_npm") as run_npm,
+        ):
+            rc = axis.frontend_command(
+                axis.argparse.Namespace(
+                    frontend_command="script",
+                    script_name="test:e2e",
+                    script_args=["--", "e2e/app-frame.pw.ts", "-g", "AT-002"],
+                )
+            )
+
+        self.assertEqual(0, rc)
+        browser_runner.assert_called_once_with(["e2e/app-frame.pw.ts", "-g", "AT-002"])
+        run_npm.assert_not_called()
+
     def test_local_dev_certs_writes_extension_and_runs_openssl(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             cert_dir = Path(temp) / ".dev-certs"
@@ -3276,6 +3894,11 @@ class TestAxisCommandWrappers(unittest.TestCase):
                 mock.patch.object(axis, "LOCALHOST_CSR", cert_dir / "localhost.csr"),
                 mock.patch.object(axis, "LOCALHOST_EXT", cert_dir / "localhost.ext"),
                 mock.patch.object(axis, "LOCALHOST_CERT", cert_dir / "localhost.pem"),
+                mock.patch.object(
+                    axis,
+                    "LOCAL_TRUSTED_ROOT_CA_FINGERPRINT",
+                    cert_dir / "trusted-rootCA.sha1",
+                ),
                 mock.patch.object(axis, "run", side_effect=fake_run),
                 mock.patch.object(axis, "find_openssl", return_value="/usr/bin/openssl"),
                 mock.patch.object(axis.os, "name", "posix"),
@@ -3403,6 +4026,62 @@ class TestAxisCommandWrappers(unittest.TestCase):
                 f"{hashlib.sha1(b'axis-root-ca').hexdigest().upper()}\n",
                 trusted_marker.read_text(encoding="utf-8"),
             )
+
+    def test_host_trust_status_checks_the_windows_current_user_root_store(self) -> None:
+        handler = getattr(axis, "local_dev_host_trust_status", None)
+        self.assertTrue(callable(handler))
+
+        with tempfile.TemporaryDirectory() as temp:
+            root_ca = Path(temp) / "rootCA.cer"
+            root_ca.write_bytes(b"axis-root-ca")
+            calls: list[list[str]] = []
+
+            def fake_run_optional(command: list[str], **_kwargs):
+                calls.append(command)
+                return axis.subprocess.CompletedProcess(command, 0, stdout="certificate", stderr="")
+
+            with (
+                mock.patch.object(axis, "LOCAL_ROOT_CA_CER", root_ca),
+                mock.patch.object(axis, "local_dev_cert_host", return_value="wsl"),
+                mock.patch.object(axis.shutil, "which", return_value="certutil.exe"),
+                mock.patch.object(axis, "run_optional", side_effect=fake_run_optional),
+            ):
+                status, detail = handler()
+
+        self.assertEqual("OK", status)
+        self.assertIn("trusted", detail)
+        self.assertEqual(
+            [
+                "certutil.exe",
+                "-user",
+                "-store",
+                "Root",
+                hashlib.sha1(b"axis-root-ca").hexdigest().upper(),
+            ],
+            calls[0],
+        )
+
+    def test_host_trust_status_warns_when_windows_store_lacks_the_ca(self) -> None:
+        handler = getattr(axis, "local_dev_host_trust_status", None)
+        self.assertTrue(callable(handler))
+
+        with tempfile.TemporaryDirectory() as temp:
+            root_ca = Path(temp) / "rootCA.cer"
+            root_ca.write_bytes(b"axis-root-ca")
+            with (
+                mock.patch.object(axis, "LOCAL_ROOT_CA_CER", root_ca),
+                mock.patch.object(axis, "local_dev_cert_host", return_value="wsl"),
+                mock.patch.object(axis.shutil, "which", return_value="certutil.exe"),
+                mock.patch.object(
+                    axis,
+                    "run_optional",
+                    return_value=axis.subprocess.CompletedProcess([], 1, stdout="", stderr="not found"),
+                ),
+            ):
+                status, detail = handler()
+
+        self.assertEqual("WARN", status)
+        self.assertIn("local-dev trust-certs", detail)
 
     def test_untrust_certs_removes_root_ca_from_windows_user_store(self) -> None:
         handler = getattr(axis, "local_dev_untrust_certs", None)
@@ -3585,7 +4264,15 @@ class TestRepoSkillsGate(unittest.TestCase):
                 "|---|---|\n"
                 "| Example | [axis-example/SKILL.md](./axis-example/SKILL.md) |\n"
             ),
-            ".agents/skills/reference.md": "# Contract\n",
+            ".agents/skills/reference.md": (
+                "# Contract\n\nRoute durable guidance before edit.\n\n"
+                "The entry domain owner keeps spec, status, and evidence decisions. Other durable "
+                "guidance **Requires** selecting `$axis-doc-hygiene` or entering it through a typed "
+                "handoff before edit.\n\n"
+                "## Engineering method\n\n"
+                "Minimal solution ladder. Root-cause loop. Fail-before/pass-after. "
+                "Safety floor. Communication clarity. Skill proof.\n"
+            ),
             ".agents/skills/axis-example/SKILL.md": (
                 "---\n"
                 "name: axis-example\n"
@@ -3613,7 +4300,7 @@ class TestRepoSkillsGate(unittest.TestCase):
     def test_accepts_valid_repo_skill(self) -> None:
         self.assertEqual([], self.issues_for_skill(self.valid_skill_files()))
 
-    def test_verification_scope_consumers_must_delegate_command_selection(self) -> None:
+    def test_verification_scope_consumers_must_delegate_unresolved_command_selection(self) -> None:
         for consumer in ("axis-frontend-feature", "axis-ui-system"):
             with self.subTest(consumer=consumer):
                 files = self.valid_skill_files()
@@ -3632,7 +4319,67 @@ class TestRepoSkillsGate(unittest.TestCase):
                 issues = self.issues_for_skill(files)
 
                 self.assertIn(
-                    f"`{consumer}` must use **Delegates** for verification command selection to `$axis-script-scope`",
+                    f"`{consumer}` must use **Delegates** only for unresolved verification command selection to `$axis-script-scope`",
+                    "\n".join(issues),
+                )
+
+    def test_verification_scope_consumers_accept_conditional_command_selection_handoff(self) -> None:
+        for consumer in ("axis-frontend-feature", "axis-ui-system"):
+            with self.subTest(consumer=consumer):
+                files = self.valid_skill_files()
+                self.add_skill(files, "axis-script-scope")
+                self.add_skill(files, "axis-doc-hygiene")
+                self.add_skill(files, consumer)
+                files[f".agents/skills/{consumer}/SKILL.md"] += (
+                    "\n- Unresolved verification command selection **Delegates** to "
+                    "`$axis-script-scope`.\n"
+                )
+                files[".agents/skills/axis-script-scope/SKILL.md"] = files[
+                    ".agents/skills/axis-script-scope/SKILL.md"
+                ].replace(
+                    "Report the result.",
+                    "Report `Moment`, `Selected checks`, `Omitted broad checks`, `Results`, and `Next verification boundary`.",
+                )
+                files[".agents/skills/axis-script-scope/SKILL.md"] += (
+                    "\nhost browser --trust-local-ca local-dev up readiness.\n"
+                    "Editing durable guidance **Requires** entering `$axis-doc-hygiene` before edit; "
+                    "reuse an active handoff.\n"
+                    "Classify native prerequisites from an observed failure and enforce accepted-risk policy.\n"
+                )
+
+                issues = self.issues_for_skill(files)
+
+                self.assertEqual([], issues)
+
+    def test_verification_scope_consumers_reject_unconditional_command_selection_handoff(self) -> None:
+        for consumer in ("axis-frontend-feature", "axis-ui-system"):
+            with self.subTest(consumer=consumer):
+                files = self.valid_skill_files()
+                self.add_skill(files, "axis-script-scope")
+                self.add_skill(files, "axis-doc-hygiene")
+                self.add_skill(files, consumer)
+                files[f".agents/skills/{consumer}/SKILL.md"] += (
+                    "\n- Unresolved verification command selection **Delegates** to "
+                    "`$axis-script-scope`.\n"
+                    "- Documentation lookup **Delegates** to `$axis-script-scope`.\n"
+                )
+                files[".agents/skills/axis-script-scope/SKILL.md"] = files[
+                    ".agents/skills/axis-script-scope/SKILL.md"
+                ].replace(
+                    "Report the result.",
+                    "Report `Moment`, `Selected checks`, `Omitted broad checks`, `Results`, and `Next verification boundary`.",
+                )
+                files[".agents/skills/axis-script-scope/SKILL.md"] += (
+                    "\nhost browser --trust-local-ca local-dev up readiness.\n"
+                    "Editing durable guidance **Requires** entering `$axis-doc-hygiene` before edit; "
+                    "reuse an active handoff.\n"
+                    "Classify native prerequisites from an observed failure and enforce accepted-risk policy.\n"
+                )
+
+                issues = self.issues_for_skill(files)
+
+                self.assertIn(
+                    "must use **Delegates** only for unresolved verification command selection",
                     "\n".join(issues),
                 )
 
@@ -3650,6 +4397,141 @@ class TestRepoSkillsGate(unittest.TestCase):
 
         self.assertIn(
             "axis-script-scope` output must include `Moment`, `Selected checks`, `Omitted broad checks`, `Results`, and `Next verification boundary`",
+            "\n".join(issues),
+        )
+
+    def test_script_scope_requires_local_dev_browser_and_readiness_decisions(self) -> None:
+        files = self.valid_skill_files()
+        self.add_skill(files, "axis-script-scope")
+        files[".agents/skills/axis-script-scope/SKILL.md"] = files[
+            ".agents/skills/axis-script-scope/SKILL.md"
+        ].replace(
+            "Report the result.",
+            "Report `Moment`, `Selected checks`, `Omitted broad checks`, `Results`, and `Next verification boundary`.",
+        )
+
+        issues = self.issues_for_skill(files)
+
+        self.assertIn(
+            "axis-script-scope` must require the local-dev host-browser trust decision and readiness proof",
+            "\n".join(issues),
+        )
+
+    def test_script_scope_requires_native_prerequisite_and_accepted_risk_policy(self) -> None:
+        files = self.valid_skill_files()
+        self.add_skill(files, "axis-script-scope")
+        files[".agents/skills/axis-script-scope/SKILL.md"] = files[
+            ".agents/skills/axis-script-scope/SKILL.md"
+        ].replace(
+            "Report the result.",
+            "Report `Moment`, `Selected checks`, `Omitted broad checks`, `Results`, and `Next verification boundary`.",
+        )
+        files[".agents/skills/axis-script-scope/SKILL.md"] += (
+            "\nHost browser --trust-local-ca local-dev up readiness.\n"
+            "Editing durable guidance **Requires** entering `$axis-doc-hygiene` before edit; reuse an active handoff.\n"
+        )
+
+        issues = self.issues_for_skill(files)
+
+        self.assertIn(
+            "axis-script-scope` must classify native prerequisites and enforce accepted-risk policy",
+            "\n".join(issues),
+        )
+
+    def test_universal_contract_routes_durable_guidance_through_doc_hygiene(self) -> None:
+        files = self.valid_skill_files()
+        files[".agents/skills/reference.md"] = "# Contract\n"
+
+        issues = self.issues_for_skill(files)
+
+        self.assertIn(
+            "universal contract must route durable guidance edits through `$axis-doc-hygiene` before edit",
+            "\n".join(issues),
+        )
+
+    def test_universal_contract_keeps_domain_decisions_with_the_entry_owner(self) -> None:
+        files = self.valid_skill_files()
+        files[".agents/skills/reference.md"] = files[
+            ".agents/skills/reference.md"
+        ].replace(
+            "The entry domain owner keeps spec, status, and evidence decisions. ",
+            "",
+        )
+
+        issues = self.issues_for_skill(files)
+
+        self.assertIn(
+            "universal contract must keep spec, status, and evidence decisions with the entry domain owner",
+            "\n".join(issues),
+        )
+
+    def test_universal_contract_requires_the_engineering_method(self) -> None:
+        files = self.valid_skill_files()
+        files[".agents/skills/reference.md"] = files[
+            ".agents/skills/reference.md"
+        ].replace(
+            "## Engineering method\n\n"
+            "Minimal solution ladder. Root-cause loop. Fail-before/pass-after. "
+            "Safety floor. Communication clarity. Skill proof.\n",
+            "",
+        )
+
+        issues = self.issues_for_skill(files)
+
+        self.assertIn(
+            "universal contract must own the engineering method",
+            "\n".join(issues),
+        )
+
+    def test_ready_review_requires_a_minimality_audit(self) -> None:
+        files = self.valid_skill_files()
+        self.add_skill(files, "axis-ready-review")
+
+        issues = self.issues_for_skill(files)
+
+        self.assertIn(
+            "axis-ready-review` must audit minimality after correctness",
+            "\n".join(issues),
+        )
+
+    def test_script_scope_requires_doc_hygiene_before_durable_guidance_edits(self) -> None:
+        files = self.valid_skill_files()
+        self.add_skill(files, "axis-script-scope")
+        self.add_skill(files, "axis-doc-hygiene")
+        files[".agents/skills/axis-script-scope/SKILL.md"] = files[
+            ".agents/skills/axis-script-scope/SKILL.md"
+        ].replace(
+            "Report the result.",
+            "Report `Moment`, `Selected checks`, `Omitted broad checks`, `Results`, and `Next verification boundary`.",
+        )
+        files[".agents/skills/axis-script-scope/SKILL.md"] += (
+            "\nHost browser --trust-local-ca local-dev up readiness.\n"
+        )
+
+        issues = self.issues_for_skill(files)
+
+        self.assertIn(
+            "axis-script-scope` must use **Requires** for `$axis-doc-hygiene` before editing durable guidance",
+            "\n".join(issues),
+        )
+
+    def test_script_scope_rejects_ambiguous_pre_edit_doc_hygiene_evidence(self) -> None:
+        files = self.valid_skill_files()
+        self.add_skill(files, "axis-script-scope")
+        self.add_skill(files, "axis-doc-hygiene")
+        script_scope = files[".agents/skills/axis-script-scope/SKILL.md"].replace(
+            "Report the result.",
+            "Report `Moment`, `Selected checks`, `Omitted broad checks`, `Results`, and `Next verification boundary`.",
+        )
+        files[".agents/skills/axis-script-scope/SKILL.md"] = script_scope + (
+            "\nHost browser --trust-local-ca local-dev up readiness.\n"
+            "Editing durable guidance **Requires** current `$axis-doc-hygiene` evidence before edit.\n"
+        )
+
+        issues = self.issues_for_skill(files)
+
+        self.assertIn(
+            "axis-script-scope` must use **Requires** for `$axis-doc-hygiene` before editing durable guidance",
             "\n".join(issues),
         )
 

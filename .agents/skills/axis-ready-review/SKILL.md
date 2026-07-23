@@ -27,9 +27,10 @@ Follow [reference.md](../reference.md).
 1. Inspect `git status --short` and the committed diff from its merge base; classify changed path owners and stack manifests.
 2. Reconcile the diff with the Design Gate, sign-off, retirement, and contract decisions.
 3. Audit product evidence only when behavior/status is touched: AC coverage, implementation status, evidence sidecar, and exact deferrals.
-4. Run `python scripts/axis.py ready-review` once, or `--since <checkpoint>` for an immutable follow-up delta. Debug failures with narrow checks only.
-5. Apply [reference.md § Improvement loop](../reference.md#improvement-loop) and [docs/playbooks/agent-checklist.md](../../../docs/playbooks/agent-checklist.md); update one owner only when evidence justifies promotion or retirement.
-6. Return the verdict and evidence to the caller. Publication is a separate user-authorized workflow.
+4. Audit minimality after correctness: prefer existing code, the standard library, native platform capabilities, and installed dependencies before custom code; reject speculative abstractions, dependencies, flags, or files without weakening required safety, accessibility, or ACs.
+5. Run `python scripts/axis.py ready-review` once, or `--since <checkpoint>` for an immutable follow-up delta. Debug failures with narrow checks only.
+6. Apply [reference.md § Improvement loop](../reference.md#improvement-loop) and [docs/playbooks/agent-checklist.md](../../../docs/playbooks/agent-checklist.md); update one owner only when evidence justifies promotion or retirement.
+7. Return the verdict and evidence to the caller. Publication is a separate user-authorized workflow.
 
 ## Output
 

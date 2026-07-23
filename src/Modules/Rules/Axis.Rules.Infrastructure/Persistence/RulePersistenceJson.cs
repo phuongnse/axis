@@ -3,6 +3,7 @@ using Axis.Rules.Contracts;
 using Axis.Rules.Domain;
 using Contracts = Axis.Rules.Contracts;
 using DomainDecision = Axis.Rules.Domain.RuleDecision;
+using DomainExpressionFunction = Axis.Rules.Domain.RuleExpressionFunction;
 using DomainLogicalOperator = Axis.Rules.Domain.RuleLogicalOperator;
 using DomainOperandKind = Axis.Rules.Domain.RuleOperandKind;
 using DomainOutcomeKind = Axis.Rules.Domain.RuleOutcomeKind;
@@ -126,7 +127,11 @@ internal static class RulePersistenceJson
                 ? null
                 : new RuleValueDto(
                     (Contracts.RuleValueType)operand.Literal.Type,
-                    operand.Literal.Values));
+                    operand.Literal.Values),
+            operand.FunctionKind is null
+                ? null
+                : (Contracts.RuleExpressionFunction)operand.FunctionKind.Value,
+            operand.Arguments.Select(ToDto).ToArray());
 
     private static RuleOperand ToDomain(RuleOperandDto operand)
     {
@@ -135,6 +140,7 @@ internal static class RulePersistenceJson
             DomainOperandKind.Context => RuleOperand.Context(operand.Reference ?? string.Empty),
             DomainOperandKind.Parameter => RuleOperand.Parameter(operand.Reference ?? string.Empty),
             DomainOperandKind.Literal => Literal(operand.Literal),
+            DomainOperandKind.Function => Function(operand),
             _ => throw new InvalidOperationException("Persisted rule operand kind is invalid."),
         };
         return result.IsSuccess ? result.Value : throw new InvalidOperationException(result.Error);
@@ -149,6 +155,19 @@ internal static class RulePersistenceJson
         return value.IsSuccess
             ? RuleOperand.LiteralValue(value.Value)
             : Axis.Shared.Domain.Primitives.Result.Failure<RuleOperand>(value.Error);
+    }
+
+    private static Axis.Shared.Domain.Primitives.Result<RuleOperand> Function(RuleOperandDto operand)
+    {
+        if (operand.Function is null || operand.Arguments is null)
+            return Axis.Shared.Domain.Primitives.Result.Failure<RuleOperand>(
+                "Persisted rule function is invalid.");
+
+        List<RuleOperand> arguments = [];
+        foreach (RuleOperandDto argumentDto in operand.Arguments)
+            arguments.Add(ToDomain(argumentDto));
+
+        return RuleOperand.Function((DomainExpressionFunction)operand.Function.Value, arguments);
     }
 
     private static RuleOutcomeDto ToDto(RuleOutcome outcome) => outcome switch

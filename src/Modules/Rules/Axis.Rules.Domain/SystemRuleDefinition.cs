@@ -69,7 +69,10 @@ public sealed record SystemRuleDefinition
         RuleScope scope,
         RuleOutcomeKind outcomeKind,
         RuleApplicability applicability,
-        IReadOnlyList<RuleParameterDefinition> parameters)
+        IReadOnlyList<RuleParameterDefinition> parameters,
+        int expressionLanguageVersion,
+        RuleConditionNode condition,
+        RuleOutcome outcome)
     {
         Key = key;
         Version = version;
@@ -79,6 +82,9 @@ public sealed record SystemRuleDefinition
         OutcomeKind = outcomeKind;
         Applicability = applicability;
         Parameters = parameters;
+        ExpressionLanguageVersion = expressionLanguageVersion;
+        Condition = condition;
+        Outcome = outcome;
     }
 
     public RuleDefinitionKey Key { get; }
@@ -91,6 +97,9 @@ public sealed record SystemRuleDefinition
     public RuleLifecycleStatus Status => RuleLifecycleStatus.Published;
     public RuleApplicability Applicability { get; }
     public IReadOnlyList<RuleParameterDefinition> Parameters { get; }
+    public int ExpressionLanguageVersion { get; }
+    public RuleConditionNode Condition { get; }
+    public RuleOutcome Outcome { get; }
 
     public static Result<SystemRuleDefinition> Create(
         string key,
@@ -100,7 +109,10 @@ public sealed record SystemRuleDefinition
         RuleScope scope,
         RuleOutcomeKind outcomeKind,
         RuleApplicability applicability,
-        IReadOnlyList<RuleParameterDefinition> parameters)
+        IReadOnlyList<RuleParameterDefinition> parameters,
+        int expressionLanguageVersion,
+        RuleConditionNode condition,
+        RuleOutcome outcome)
     {
         Result<RuleDefinitionKey> definitionKey = RuleDefinitionKey.Create(key);
         if (definitionKey.IsFailure)
@@ -127,6 +139,12 @@ public sealed record SystemRuleDefinition
         if (parameters.Select(parameter => parameter.Key).Distinct(StringComparer.Ordinal).Count() != parameters.Count)
             return Result.Failure<SystemRuleDefinition>("System rule parameter keys must be unique.");
 
+        if (expressionLanguageVersion != RuleExpressionLanguage.Version)
+            return Result.Failure<SystemRuleDefinition>("System rule expression language version is not supported.");
+
+        if (condition is null || outcome is null || outcome.Kind != outcomeKind)
+            return Result.Failure<SystemRuleDefinition>("System rule expression or outcome is invalid.");
+
         return new SystemRuleDefinition(
             definitionKey.Value,
             version,
@@ -135,6 +153,9 @@ public sealed record SystemRuleDefinition
             scope,
             outcomeKind,
             applicability,
-            Array.AsReadOnly(parameters.ToArray()));
+            Array.AsReadOnly(parameters.ToArray()),
+            expressionLanguageVersion,
+            condition,
+            outcome);
     }
 }

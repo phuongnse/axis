@@ -4,6 +4,7 @@ import type { components } from '../src/lib/api-types';
 
 type CreateRuleRequest = components['schemas']['CreateRuleDefinitionRequest'];
 type RuleDetail = components['schemas']['RuleDefinitionDetailDto'];
+type RuleExpressionLanguage = components['schemas']['RuleExpressionLanguageDto'];
 type RuleVersion = components['schemas']['RuleDefinitionVersionDto'];
 type SaveRuleRequest = components['schemas']['SaveRuleDefinitionDraftRequest'];
 
@@ -34,6 +35,7 @@ const systemRule = (definitionKey: string, name: string, targetTypeKeys: string[
   scope: 'Field',
   outcomeKind: 'Validation',
   status: 'Published',
+  expressionLanguageVersion: 1,
   latestPublishedVersion: 1,
   applicability: { targetTypeKeys, configurationConstraints: {} },
   parameters: [],
@@ -70,6 +72,86 @@ const contextSchemas = [
     configuration: {},
   },
 ];
+const comparableTypes = ['Integer', 'Decimal', 'Date', 'DateTime'] as const;
+const expressionLanguage: RuleExpressionLanguage = {
+  version: 1,
+  operators: [
+    {
+      operator: 'Equal',
+      leftShapes: ['Text', 'Integer', 'Decimal', 'Date', 'DateTime', 'Boolean'].map((type) => ({
+        type,
+        cardinality: 'Any',
+      })),
+      rightShapes: ['Text', 'Integer', 'Decimal', 'Date', 'DateTime', 'Boolean'].map((type) => ({
+        type,
+        cardinality: 'Any',
+      })),
+      requiresMatchingTypes: true,
+    },
+    {
+      operator: 'GreaterThan',
+      leftShapes: comparableTypes.map((type) => ({ type, cardinality: 'Scalar' })),
+      rightShapes: comparableTypes.map((type) => ({ type, cardinality: 'Scalar' })),
+      requiresMatchingTypes: true,
+    },
+  ],
+  functions: [
+    {
+      function: 'IsBlank',
+      parameters: [
+        {
+          acceptedTypes: ['Text', 'Integer', 'Decimal', 'Date', 'DateTime', 'Boolean'],
+          cardinality: 'Any',
+        },
+      ],
+      returnType: 'Boolean',
+      returnCardinality: 'Scalar',
+    },
+  ],
+  limits: {
+    maxDepth: 12,
+    maxNodes: 200,
+    maxFunctionCalls: 50,
+    maxParameters: 100,
+    maxExecutionSteps: 1000,
+  },
+};
+
+function systemDetail(definitionKey: string): RuleDetail | null {
+  const definition = systemRules.find((candidate) => candidate.definitionKey === definitionKey);
+  if (!definition) return null;
+  return {
+    ...definition,
+    revision: null,
+    contextKey: null,
+    contextSchemaVersion: null,
+    condition: {
+      nodeId: 'required_check',
+      predicateOperator: 'Equal',
+      left: {
+        kind: 'Function',
+        function: 'IsBlank',
+        arguments: [{ kind: 'Context', reference: 'field.value', arguments: [] }],
+      },
+      right: {
+        kind: 'Literal',
+        literal: { type: 'Boolean', values: ['true'] },
+        arguments: [],
+      },
+      children: [],
+    },
+    outcome: {
+      kind: 'Validation',
+      violationCode: `${definitionKey}.failed`,
+      severity: 'Error',
+      message: `${definition.name} validation failed.`,
+    },
+    versions: [],
+    createdAt: null,
+    updatedAt: null,
+    archivedAt: null,
+  };
+}
 
 interface CapturedRequest {
   method: string;
@@ -165,12 +247,31 @@ async function mockRulesApi(page: Page): Promise<CapturedRequest[]> {
       return;
     }
 
+    if (method === 'GET' && path === '/api/rules/expression-language') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(expressionLanguage),
+      });
+      return;
+    }
+
     if (method === 'GET' && path === '/api/rules') {
       const items = detail ? [...systemRules, summary(detail)] : systemRules;
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ items, totalCount: items.length, page: 1, pageSize: 100 }),
+      });
+      return;
+    }
+
+    if (method === 'GET' && path.startsWith('/api/rules/field.')) {
+      const definition = systemDetail(path.slice('/api/rules/'.length));
+      await route.fulfill({
+        status: definition ? 200 : 404,
+        contentType: 'application/json',
+        body: JSON.stringify(definition ?? {}),
       });
       return;
     }
@@ -186,6 +287,7 @@ async function mockRulesApi(page: Page): Promise<CapturedRequest[]> {
         scope: body.scope,
         outcomeKind: body.outcomeKind,
         status: 'Draft',
+        expressionLanguageVersion: 1,
         revision: 1,
         latestPublishedVersion: null,
         contextKey: body.contextKey,
@@ -243,6 +345,7 @@ async function mockRulesApi(page: Page): Promise<CapturedRequest[]> {
           description: detail.description,
           scope: detail.scope,
           outcomeKind: detail.outcomeKind,
+          expressionLanguageVersion: detail.expressionLanguageVersion,
           contextKey: detail.contextKey,
           contextSchemaVersion: detail.contextSchemaVersion,
           parameters: detail.parameters,
@@ -303,6 +406,33 @@ async function expectNoDocumentOverflow(page: Page): Promise<void> {
       })),
     )
     .toEqual({ horizontal: true, vertical: true });
+}
+
+async function expectDockAboveFooter(page: Page, expectedWidth?: number): Promise<Locator> {
+  const dock = page.locator('[data-slot="managed-window-dock"]');
+  const host = page.locator('[data-slot="managed-window-host"]');
+  const footer = page.getByRole('contentinfo');
+  await expect(dock).toBeVisible();
+  const [dockBox, hostBox, footerBox] = await Promise.all([
+    dock.boundingBox(),
+    host.boundingBox(),
+    footer.boundingBox(),
+  ]);
+  if (!dockBox || !hostBox || !footerBox) {
+    throw new Error('Managed dialog dock geometry was not available');
+  }
+
+  if (expectedWidth === undefined) {
+    expect(dockBox.width).toBeGreaterThanOrEqual(160);
+    expect(dockBox.width).toBeLessThanOrEqual(256);
+  } else {
+    expect(dockBox.width).toBeCloseTo(expectedWidth, 0);
+  }
+  expect(hostBox.x + hostBox.width - (dockBox.x + dockBox.width)).toBeCloseTo(12, 0);
+  const footerGap = footerBox.y - (dockBox.y + dockBox.height);
+  expect(footerGap).toBeGreaterThanOrEqual(8);
+  expect(footerGap).toBeLessThanOrEqual(12);
+  return dock;
 }
 
 async function expectTableColumnsAligned(table: Locator): Promise<void> {
@@ -372,6 +502,250 @@ test('workspace rule authoring supports simulation, immutable revisions, and arc
   await expect(requiredRow.getByText('Published', { exact: true })).toBeVisible();
   await expectTableColumnsAligned(catalog);
 
+  const requiredRuleLink = requiredRow.getByRole('button', {
+    name: 'Required value',
+    exact: true,
+  });
+  const linkSpacing = await requiredRuleLink.evaluate((element) => {
+    const style = window.getComputedStyle(element);
+    return {
+      height: element.getBoundingClientRect().height,
+      paddingInlineStart: style.paddingInlineStart,
+      paddingInlineEnd: style.paddingInlineEnd,
+    };
+  });
+  expect(linkSpacing.paddingInlineStart).toBe('0px');
+  expect(linkSpacing.paddingInlineEnd).toBe('0px');
+  expect(linkSpacing.height).toBeLessThanOrEqual(24);
+
+  await requiredRuleLink.click();
+  const systemDetails = page.getByRole('dialog', { name: 'Required value' });
+  const systemWindow = systemDetails.locator('[data-slot="managed-dialog-window"]');
+  await expect(systemDetails).toBeVisible();
+  await expect(systemWindow).toHaveAttribute('data-dialog-preset', 'fullscreen');
+  const expandedLayerBox = await page
+    .locator('[data-slot="managed-window-expanded-layer"]')
+    .boundingBox();
+  if (!expandedLayerBox) throw new Error('Managed window work area did not render');
+  await expect
+    .poll(async () => {
+      const box = await systemWindow.boundingBox();
+      return box
+        ? {
+            width: Math.round(box.width),
+            height: Math.round(box.height),
+            x: Math.round(box.x),
+            y: Math.round(box.y),
+          }
+        : null;
+    })
+    .toEqual({
+      width: Math.round(expandedLayerBox.width),
+      height: Math.round(expandedLayerBox.height),
+      x: Math.round(expandedLayerBox.x),
+      y: Math.round(expandedLayerBox.y),
+    });
+
+  await systemDetails.getByRole('button', { name: 'Restore dialog size' }).click();
+  await expect(systemWindow).toHaveAttribute('data-dialog-preset', 'large');
+  const expectedLargeRect = {
+    width: Math.round(expandedLayerBox.width * 0.5),
+    height: Math.round(expandedLayerBox.height * 0.75),
+    x: Math.round(expandedLayerBox.x + expandedLayerBox.width * 0.25),
+    y: Math.round(expandedLayerBox.y + expandedLayerBox.height * 0.125),
+  };
+  await expect
+    .poll(async () => {
+      const box = await systemWindow.boundingBox();
+      return box
+        ? {
+            width: Math.round(box.width),
+            height: Math.round(box.height),
+            x: Math.round(box.x),
+            y: Math.round(box.y),
+          }
+        : null;
+    })
+    .toEqual(expectedLargeRect);
+
+  const backgroundNewRuleButton = catalog.getByRole('button', { name: 'New rule', exact: true });
+  await expect(backgroundNewRuleButton).toBeVisible();
+  await backgroundNewRuleButton.click({ timeout: 10_000 });
+  const backgroundCreateDialog = page.getByRole('dialog', { name: 'New workspace rule' });
+  await expect(backgroundCreateDialog).toBeVisible();
+  await backgroundCreateDialog.getByRole('button', { name: 'Close dialog' }).click();
+  await expect(backgroundCreateDialog).toBeHidden();
+
+  const initialDialogBox = await systemWindow.boundingBox();
+  if (!initialDialogBox) throw new Error('Managed dialog did not render a bounding box');
+
+  const managedHeader = systemWindow.locator('[data-slot="managed-dialog-header"]');
+  const headerBox = await managedHeader.boundingBox();
+  if (!headerBox) throw new Error('Managed dialog header did not render a bounding box');
+  await page.mouse.move(headerBox.x + 24, headerBox.y + 24);
+  await page.mouse.down();
+  await page.mouse.move(headerBox.x + 104, headerBox.y + 64, { steps: 5 });
+  await page.mouse.up();
+  const draggedDialogBox = await systemWindow.boundingBox();
+  expect(draggedDialogBox?.x ?? 0).toBeGreaterThan(initialDialogBox.x + 40);
+  expect(draggedDialogBox?.y ?? 0).toBeGreaterThan(initialDialogBox.y + 20);
+
+  await systemDetails.getByRole('button', { name: 'Reset dialog' }).click();
+  await expect(systemWindow).toHaveAttribute('data-dialog-preset', 'fullscreen');
+  await systemDetails.getByRole('button', { name: 'Restore dialog size' }).click();
+  await expect(systemWindow).toHaveAttribute('data-dialog-preset', 'large');
+  const resetDialogBox = await systemWindow.boundingBox();
+  expect(resetDialogBox?.x).toBeCloseTo(expandedLayerBox.x + expandedLayerBox.width * 0.25, 1);
+  expect(resetDialogBox?.y).toBeCloseTo(expandedLayerBox.y + expandedLayerBox.height * 0.125, 1);
+
+  if (!resetDialogBox) throw new Error('Managed dialog disappeared before resizing');
+  await page.mouse.move(
+    resetDialogBox.x + resetDialogBox.width - 2,
+    resetDialogBox.y + resetDialogBox.height - 2,
+  );
+  await page.mouse.down();
+  await page.mouse.move(resetDialogBox.x + 360, resetDialogBox.y + 240, { steps: 5 });
+  await page.mouse.up();
+  const minimumDialogBox = await systemWindow.boundingBox();
+  expect(minimumDialogBox?.width).toBeGreaterThanOrEqual(expandedLayerBox.width / 2 - 1);
+  expect(minimumDialogBox?.height).toBeGreaterThanOrEqual(expandedLayerBox.height / 2 - 1);
+
+  if (!minimumDialogBox) throw new Error('Managed dialog disappeared at its minimum size');
+  await page.mouse.move(
+    minimumDialogBox.x + minimumDialogBox.width - 2,
+    minimumDialogBox.y + minimumDialogBox.height - 2,
+  );
+  await page.mouse.down();
+  await page.mouse.move(
+    minimumDialogBox.x + minimumDialogBox.width + 120,
+    minimumDialogBox.y + minimumDialogBox.height + 80,
+    { steps: 5 },
+  );
+  await page.mouse.up();
+  await expect(systemWindow).toHaveAttribute('data-dialog-preset', 'custom');
+  const resizedDialogBox = await systemWindow.boundingBox();
+  expect(resizedDialogBox?.width ?? 0).toBeGreaterThan(minimumDialogBox.width + 100);
+  expect(resizedDialogBox?.height ?? 0).toBeGreaterThan(minimumDialogBox.height + 60);
+  if (!resizedDialogBox) throw new Error('Managed dialog disappeared before docking');
+
+  await systemDetails.getByRole('button', { name: 'Minimize dialog' }).click();
+  let dock = await expectDockAboveFooter(page, 256);
+  await expect(dock).toHaveAttribute('data-dialog-preset', 'custom');
+  await expect(dock).toContainText('Required value');
+  await expect(systemDetails).toBeHidden();
+  await expect
+    .poll(async () => {
+      const box = await page.locator('[data-slot="managed-window-expanded-layer"]').boundingBox();
+      return box
+        ? {
+            width: Math.round(box.width),
+            height: Math.round(box.height),
+            x: Math.round(box.x),
+            y: Math.round(box.y),
+          }
+        : null;
+    })
+    .toEqual({
+      width: Math.round(expandedLayerBox.width),
+      height: Math.round(expandedLayerBox.height),
+      x: Math.round(expandedLayerBox.x),
+      y: Math.round(expandedLayerBox.y),
+    });
+  await page.keyboard.press('Escape');
+  await expect(dock).toBeVisible();
+  await catalog.getByRole('button', { name: 'Filters', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Add condition' })).toBeVisible();
+  await page.keyboard.press('Escape');
+
+  await catalog.getByRole('button', { name: 'Numeric range', exact: true }).click();
+  const numericDetails = page.getByRole('dialog', { name: 'Numeric range' });
+  await expect(numericDetails).toBeVisible();
+  await expect(dock).toContainText('Required value');
+  await expect(dock).not.toContainText('Numeric range');
+  await dock.getByRole('button', { name: 'Restore dialog' }).click();
+  await expect(systemDetails).toBeVisible();
+  await expect(numericDetails).toBeVisible();
+  const windowsMenu = page.getByRole('button', { name: 'Windows (2)' });
+  await windowsMenu.click();
+  await expect(page.getByRole('menuitem', { name: /Required value/ })).toBeVisible();
+  const numericWindowItem = page.getByRole('menuitem', { name: /Numeric range/ });
+  await expect(numericWindowItem).toBeVisible();
+  await numericWindowItem.click();
+  await numericDetails.getByRole('button', { name: 'Close dialog' }).click();
+  await expect(numericDetails).toBeHidden();
+  await expect
+    .poll(async () => {
+      const box = await systemWindow.boundingBox();
+      return box
+        ? {
+            width: Math.round(box.width),
+            height: Math.round(box.height),
+            x: Math.round(box.x),
+            y: Math.round(box.y),
+          }
+        : null;
+    })
+    .toEqual({
+      width: Math.round(resizedDialogBox.width),
+      height: Math.round(resizedDialogBox.height),
+      x: Math.round(resizedDialogBox.x),
+      y: Math.round(resizedDialogBox.y),
+    });
+
+  await managedHeader.dblclick({ position: { x: 24, y: 24 } });
+  await expect(systemWindow).toHaveAttribute('data-dialog-preset', 'fullscreen');
+  const maximizedDialogBox = await systemWindow.boundingBox();
+  expect(maximizedDialogBox?.x).toBeCloseTo(expandedLayerBox.x, 0);
+  expect(maximizedDialogBox?.y).toBeCloseTo(expandedLayerBox.y, 0);
+  expect(maximizedDialogBox?.width).toBeCloseTo(expandedLayerBox.width, 0);
+  expect(maximizedDialogBox?.height).toBeCloseTo(expandedLayerBox.height, 0);
+  const managedHostBox = await page.locator('[data-slot="managed-window-host"]').boundingBox();
+  if (!managedHostBox) throw new Error('Managed window host did not render a bounding box');
+  expect((maximizedDialogBox?.y ?? 0) + (maximizedDialogBox?.height ?? 0)).toBeCloseTo(
+    managedHostBox.y + managedHostBox.height,
+    0,
+  );
+  await systemDetails.getByRole('button', { name: 'Minimize dialog' }).click();
+  dock = await expectDockAboveFooter(page, 256);
+  await expect(dock).toHaveAttribute('data-dialog-preset', 'fullscreen');
+  await dock.getByRole('button', { name: 'Restore dialog' }).click();
+  await expect(systemDetails).toBeVisible();
+  await expect(systemWindow).toHaveAttribute('data-dialog-preset', 'fullscreen');
+  const restoredMaximizedBox = await systemWindow.boundingBox();
+  expect(restoredMaximizedBox).toEqual(maximizedDialogBox);
+  await managedHeader.dblclick({ position: { x: 24, y: 24 } });
+  await expect(systemWindow).toHaveAttribute('data-dialog-preset', 'custom');
+  await expect
+    .poll(async () => {
+      const box = await systemWindow.boundingBox();
+      return box
+        ? {
+            width: Math.round(box.width),
+            height: Math.round(box.height),
+            x: Math.round(box.x),
+            y: Math.round(box.y),
+          }
+        : null;
+    })
+    .toEqual({
+      width: Math.round(resizedDialogBox.width),
+      height: Math.round(resizedDialogBox.height),
+      x: Math.round(resizedDialogBox.x),
+      y: Math.round(resizedDialogBox.y),
+    });
+  const systemBadges = systemDetails.locator(
+    '[data-slot="managed-dialog-header"] [data-slot="badge"]',
+  );
+  await expect(systemBadges).toHaveCount(2);
+  await expect(systemBadges.nth(0)).toHaveText('Built-in');
+  await expect(systemBadges.nth(1)).toHaveText('Published');
+  await expect(systemDetails.getByRole('heading', { name: 'Rule logic' })).toBeVisible();
+  await expect(systemDetails).toContainText('Is blank');
+  await expect(systemDetails).toContainText('Field value');
+  await expect(systemDetails.getByRole('button', { name: 'Archive', exact: true })).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  await expect(systemDetails).toBeHidden();
+
   await catalog.getByRole('button', { name: 'Filters', exact: true }).click();
   await expectNoDocumentOverflow(page);
   await page.getByRole('button', { name: 'Add condition' }).click();
@@ -395,13 +769,19 @@ test('workspace rule authoring supports simulation, immutable revisions, and arc
   await filterField.click();
   const selectContent = page.locator('[data-slot="select-content"][data-open]');
   await expect(selectContent).toBeVisible();
-  const [triggerBox, contentBox] = await Promise.all([
-    filterField.boundingBox(),
-    selectContent.boundingBox(),
-  ]);
-  if (!triggerBox || !contentBox) throw new Error('Select trigger or popup did not render');
-  expect(contentBox.y).toBeGreaterThanOrEqual(triggerBox.y + triggerBox.height);
-  expect(Math.abs(contentBox.x - triggerBox.x)).toBeLessThanOrEqual(1);
+  await expect
+    .poll(async () => {
+      const [triggerBox, contentBox] = await Promise.all([
+        filterField.boundingBox(),
+        selectContent.boundingBox(),
+      ]);
+      if (!triggerBox || !contentBox) return false;
+      return (
+        contentBox.y >= triggerBox.y + triggerBox.height &&
+        Math.abs(contentBox.x - triggerBox.x) <= 1
+      );
+    })
+    .toBe(true);
   await page.getByRole('option', { name: 'Origin', exact: true }).click();
   await page.getByTestId('value-editor').click();
   await page.getByRole('option', { name: 'Built-in', exact: true }).click();
@@ -468,15 +848,20 @@ test('workspace rule authoring supports simulation, immutable revisions, and arc
   expect(headerBoxAfterScroll.y).toBeCloseTo(headerBoxBeforeScroll.y, 0);
 
   await page.getByRole('button', { name: 'New rule' }).click();
-  const createDialog = page.locator('[data-slot="dialog-content"]');
+  const createDialog = page.getByRole('dialog', { name: 'New workspace rule' });
+  await expect(createDialog.getByRole('heading', { name: 'Definition' })).toBeVisible();
+  await expect(createDialog.getByRole('heading', { name: 'Parameters' })).toBeHidden();
   await createDialog.getByLabel('Name').fill('Credit threshold');
   await createDialog.getByLabel('Description').fill('Flags credit values above a threshold.');
   await createDialog.getByLabel('Context').click();
   await page.getByRole('option', { name: 'Decimal field value' }).click();
   await createDialog.getByRole('button', { name: 'Create draft' }).click();
 
-  const editorDialog = page.locator('[data-slot="dialog-content"]');
+  const editorDialog = page.getByRole('dialog', { name: 'Credit threshold' });
   await expect(editorDialog.getByRole('heading', { name: 'Credit threshold' })).toBeVisible();
+  await expect(editorDialog.getByRole('heading', { name: 'Definition' })).toBeVisible();
+  await expect(editorDialog.getByText('Stable key: credit_threshold')).toBeVisible();
+  await expect(editorDialog.getByRole('heading', { name: 'Parameters' })).toBeVisible();
   const editorViewport = editorDialog.locator('[data-slot="dialog-body"]');
   await expect
     .poll(() => editorViewport.evaluate((element) => element.scrollHeight > element.clientHeight))
@@ -497,7 +882,7 @@ test('workspace rule authoring supports simulation, immutable revisions, and arc
   await expect(greaterThanOption).toBeVisible();
   await greaterThanOption.click();
   await expect(editorDialog.getByLabel('Operator')).toContainText('Greater than');
-  await editorDialog.getByLabel('Compare with').click();
+  await editorDialog.getByLabel('Right operand').click();
   await page.getByRole('option', { name: 'Parameter' }).click();
   await editorDialog.getByLabel('Parameter', { exact: true }).click();
   await page.getByRole('option', { name: 'threshold' }).click();
@@ -564,11 +949,38 @@ test('workspace rule authoring supports simulation, immutable revisions, and arc
 
   await page.setViewportSize({ width: 390, height: 844 });
   await expectNoDocumentOverflow(page);
-  const dialogBox = await editorDialog.boundingBox();
+  const editorWindow = editorDialog.locator('[data-slot="managed-dialog-window"]');
+  await expect(editorWindow).toHaveAttribute('data-dialog-preset', 'fullscreen');
+  const dialogBox = await editorWindow.boundingBox();
   expect(dialogBox?.x ?? -1).toBeGreaterThanOrEqual(-1);
   expect((dialogBox?.x ?? 0) + (dialogBox?.width ?? 0)).toBeLessThanOrEqual(391);
-  await editorDialog.locator('[data-slot="dialog-close"]').click();
+  await editorWindow
+    .locator('[data-slot="managed-dialog-header"]')
+    .dblclick({ position: { x: 24, y: 24 } });
+  await expect(editorWindow).toHaveAttribute('data-dialog-preset', 'fullscreen');
+  await expect(editorDialog.getByRole('button', { name: 'Restore dialog size' })).toBeDisabled();
+  await editorDialog.getByRole('button', { name: 'Minimize dialog' }).click();
+  const editorDock = await expectDockAboveFooter(page);
+  await expect(editorDock).toHaveAttribute('data-dialog-preset', 'fullscreen');
+  await expect(editorDock).toContainText('Credit threshold');
   await expect(editorDialog).toBeHidden();
+  await page.keyboard.press('Escape');
+
+  await catalog.getByRole('button', { name: 'Required value', exact: true }).click();
+  await expect(systemDetails).toBeVisible();
+  await systemDetails.getByRole('button', { name: 'Minimize dialog' }).click();
+  const mobileDock = await expectDockAboveFooter(page);
+  await expect(mobileDock).toContainText('Required value');
+  const overflowMenu = page.getByRole('button', { name: '1 more windows' });
+  await expect(overflowMenu).toBeVisible();
+  await overflowMenu.click();
+  await page.getByRole('menuitem', { name: /Credit threshold/ }).click();
+  await expect(editorDialog).toBeVisible();
+  await expect(editorWindow).toHaveAttribute('data-dialog-preset', 'fullscreen');
+  await editorDialog.getByRole('button', { name: 'Close dialog' }).click();
+  await expect(editorDialog).toBeHidden();
+  await mobileDock.getByRole('button', { name: 'Close dialog' }).click();
+  await expect(mobileDock).toBeHidden();
   await expect(catalog).toBeVisible();
   await expectNoDocumentOverflow(page);
   await catalog.getByRole('button', { name: 'Filters', exact: true }).click();

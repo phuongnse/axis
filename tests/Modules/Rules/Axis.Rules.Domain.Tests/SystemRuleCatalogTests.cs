@@ -56,6 +56,98 @@ public sealed class SystemRuleCatalogTests
     }
 
     [Fact]
+    public void Definitions_WhenRead_OwnValidSharedExpressionsAndOutcomes()
+    {
+        foreach (SystemRuleDefinition definition in SystemRuleCatalog.Definitions)
+        {
+            definition.ExpressionLanguageVersion.Should().Be(RuleExpressionLanguage.Version);
+            definition.Condition.Should().NotBeNull();
+            definition.Outcome.Kind.Should().Be(definition.OutcomeKind);
+
+            foreach (string targetType in definition.Applicability.TargetTypeKeys)
+            {
+                RuleContextSchema schema = SystemSchema(
+                    targetType,
+                    allowMultiple: definition.Key.Value == "field.choice_selection_count");
+
+                RuleDefinitionValidator.Validate(
+                        schema,
+                        definition.Parameters,
+                        definition.Condition,
+                        definition.Outcome,
+                        definition.OutcomeKind)
+                    .IsSuccess.Should().BeTrue(
+                        $"{definition.Key.Value} must be valid for {targetType}");
+            }
+        }
+    }
+
+    [Fact]
+    public void Definitions_WhenEvaluated_UseRegisteredFunctionsForSystemSemantics()
+    {
+        SystemRuleDefinition required = SystemRuleCatalog.Find("field.required", 1)!;
+        RuleContextSchema textSchema = SystemSchema("Text");
+        RuleConditionEvaluator.Evaluate(
+                required.Condition,
+                textSchema,
+                new Dictionary<string, RuleValue>(StringComparer.Ordinal)
+                {
+                    ["field.value"] = Value(RuleValueType.Text, "   "),
+                })
+            .Value.IsMatch.Should().BeTrue();
+
+        SystemRuleDefinition precision = SystemRuleCatalog.Find("field.decimal_precision", 1)!;
+        RuleConditionEvaluator.Evaluate(
+                precision.Condition,
+                SystemSchema("Decimal"),
+                new Dictionary<string, RuleValue>(StringComparer.Ordinal)
+                {
+                    ["field.value"] = Value(RuleValueType.Decimal, "123.456"),
+                },
+                new Dictionary<string, RuleValue>(StringComparer.Ordinal)
+                {
+                    ["precision"] = Value(RuleValueType.Integer, "5"),
+                    ["scale"] = Value(RuleValueType.Integer, "2"),
+                })
+            .Value.IsMatch.Should().BeTrue();
+
+        SystemRuleDefinition format = SystemRuleCatalog.Find("field.text_format", 1)!;
+        RuleConditionEvaluator.Evaluate(
+                format.Condition,
+                textSchema,
+                new Dictionary<string, RuleValue>(StringComparer.Ordinal)
+                {
+                    ["field.value"] = Value(RuleValueType.Text, "not-an-email"),
+                },
+                new Dictionary<string, RuleValue>(StringComparer.Ordinal)
+                {
+                    ["format"] = Value(RuleValueType.Text, "Email"),
+                })
+            .Value.IsMatch.Should().BeTrue();
+    }
+
+    [Fact]
+    public void DecimalPrecision_WhenValueRetainsFractionalZeros_CountsRetainedDigits()
+    {
+        SystemRuleDefinition precision = SystemRuleCatalog.Find("field.decimal_precision", 1)!;
+
+        RuleConditionEvaluation result = RuleConditionEvaluator.Evaluate(
+            precision.Condition,
+            SystemSchema("Decimal"),
+            new Dictionary<string, RuleValue>(StringComparer.Ordinal)
+            {
+                ["field.value"] = Value(RuleValueType.Decimal, "1.50"),
+            },
+            new Dictionary<string, RuleValue>(StringComparer.Ordinal)
+            {
+                ["precision"] = Value(RuleValueType.Integer, "2"),
+                ["scale"] = Value(RuleValueType.Integer, "2"),
+            }).Value;
+
+        result.IsMatch.Should().BeTrue();
+    }
+
+    [Fact]
     public void Find_WhenVersionIsUnknown_ReturnsNull()
     {
         SystemRuleCatalog.Find("field.required", version: 2).Should().BeNull();
@@ -88,4 +180,29 @@ public sealed class SystemRuleCatalogTests
 
         result.IsFailure.Should().BeTrue();
     }
+
+    private static RuleContextSchema SystemSchema(string targetType, bool allowMultiple = false) =>
+        RuleContextSchema.Create(
+            $"system.field.{targetType.ToLowerInvariant()}",
+            1,
+            RuleScope.Field,
+            $"{targetType} field",
+            [
+                RuleContextField.Create(
+                    "field.value",
+                    "Value",
+                    targetType switch
+                    {
+                        "Integer" => RuleValueType.Integer,
+                        "Decimal" => RuleValueType.Decimal,
+                        "Date" => RuleValueType.Date,
+                        "DateTime" => RuleValueType.DateTime,
+                        "Boolean" => RuleValueType.Boolean,
+                        _ => RuleValueType.Text,
+                    },
+                    allowMultiple).Value,
+            ]).Value;
+
+    private static RuleValue Value(RuleValueType type, string value) =>
+        RuleValue.Create(type, [value]).Value;
 }

@@ -21,6 +21,10 @@ export type RuleLogicalOperator = components['schemas']['RuleLogicalOperator'];
 export type RuleSeverity = components['schemas']['RuleSeverity'];
 export type RuleDecision = components['schemas']['RuleDecision'];
 export type RuleConditionNode = components['schemas']['RuleConditionNodeDto'];
+export type RuleOperand = components['schemas']['RuleOperandDto'];
+export type RuleExpressionLanguage = components['schemas']['RuleExpressionLanguageDto'];
+export type RuleExpressionFunction = components['schemas']['RuleExpressionFunction'];
+export type RuleExpressionCardinality = components['schemas']['RuleExpressionCardinality'];
 
 export interface RuleDefinitionFilters {
   page?: number;
@@ -41,6 +45,7 @@ export const ruleDefinitionQueryKeys = {
   detail: (definitionKey: string) =>
     [...ruleDefinitionQueryKeys.all, 'detail', definitionKey] as const,
   contextSchemas: () => [...ruleDefinitionQueryKeys.all, 'context-schemas'] as const,
+  expressionLanguage: () => [...ruleDefinitionQueryKeys.all, 'expression-language'] as const,
 };
 
 export function ruleDefinitionsListQueryOptions(filters: RuleDefinitionFilters = defaultFilters) {
@@ -59,6 +64,22 @@ export function ruleContextSchemasQueryOptions() {
   });
 }
 
+export function ruleDefinitionDetailQueryOptions(definitionKey: string) {
+  return queryOptions({
+    queryKey: ruleDefinitionQueryKeys.detail(definitionKey),
+    queryFn: () => getRuleDefinition(definitionKey),
+    staleTime: ruleDefinitionStaleTimeMs,
+  });
+}
+
+export function ruleExpressionLanguageQueryOptions() {
+  return queryOptions({
+    queryKey: ruleDefinitionQueryKeys.expressionLanguage(),
+    queryFn: getRuleExpressionLanguage,
+    staleTime: Number.POSITIVE_INFINITY,
+  });
+}
+
 export async function listRuleDefinitions(
   filters: RuleDefinitionFilters = defaultFilters,
 ): Promise<RuleDefinitionsPage> {
@@ -74,6 +95,10 @@ export async function listRuleDefinitions(
 
 export async function listRuleContextSchemas(): Promise<RuleContextSchema[]> {
   return fetchApi<RuleContextSchema[]>('/rules/context-schemas');
+}
+
+export async function getRuleExpressionLanguage(): Promise<RuleExpressionLanguage> {
+  return fetchApi<RuleExpressionLanguage>('/rules/expression-language');
 }
 
 export async function getRuleDefinition(definitionKey: string): Promise<RuleDefinitionDetail> {

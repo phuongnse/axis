@@ -64,6 +64,10 @@ namespace Axis.Rules.Infrastructure.Migrations
                         .HasColumnType("character varying(1000)")
                         .HasColumnName("description");
 
+                    b.Property<int>("ExpressionLanguageVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("expression_language_version");
+
                     b.Property<string>("Key")
                         .IsRequired()
                         .HasMaxLength(63)
@@ -169,6 +173,10 @@ namespace Axis.Rules.Infrastructure.Migrations
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)")
                         .HasColumnName("description");
+
+                    b.Property<int>("ExpressionLanguageVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("expression_language_version");
 
                     b.Property<string>("Name")
                         .IsRequired()

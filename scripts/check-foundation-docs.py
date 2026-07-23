@@ -15,6 +15,8 @@ from pathlib import Path
 
 from acceptance_evidence import EvidenceValidationContext
 from acceptance_evidence import evidence_file_for
+from acceptance_evidence import is_browser_e2e_command
+from acceptance_evidence import is_frontend_component_test_command
 from acceptance_evidence import validate_acceptance_evidence_sidecar
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -329,11 +331,8 @@ def verification_evidence_issues(
     commands: list[str],
 ) -> list[str]:
     issues: list[str] = []
-    has_e2e_command = any(" frontend script test:e2e" in command or " local-dev e2e" in command for command in commands)
-    has_frontend_test_command = any(
-        (" frontend script test" in command and ":e2e" not in command) or command.endswith(" frontend test")
-        for command in commands
-    )
+    has_e2e_command = any(is_browser_e2e_command(command) for command in commands)
+    has_frontend_test_command = any(is_frontend_component_test_command(command) for command in commands)
 
     if verification == "Browser automation":
         if not any(path.startswith("frontend/e2e/") and path.endswith(".pw.ts") for path in paths):

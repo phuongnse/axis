@@ -28,6 +28,9 @@ public sealed class RuleDefinitionTests
             Now.AddMinutes(3)).Value;
 
         versionOne.Version.Should().Be(1);
+        definition.ExpressionLanguageVersion.Should().Be(RuleExpressionLanguage.Version);
+        versionOne.ExpressionLanguageVersion.Should().Be(RuleExpressionLanguage.Version);
+        versionTwo.ExpressionLanguageVersion.Should().Be(RuleExpressionLanguage.Version);
         versionOne.Outcome.Should().BeOfType<RuleValidationOutcome>()
             .Which.Message.Should().Be("Amount exceeds approval threshold");
         versionTwo.Version.Should().Be(2);

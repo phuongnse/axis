@@ -85,6 +85,80 @@ const contextSchemas = [
   },
 ];
 
+const expressionLanguage = {
+  version: 1,
+  operators: [
+    {
+      operator: 'Equal',
+      leftShapes: ['Text', 'Integer', 'Decimal', 'Date', 'DateTime', 'Boolean'].map((type) => ({
+        type,
+        cardinality: 'Any',
+      })),
+      rightShapes: ['Text', 'Integer', 'Decimal', 'Date', 'DateTime', 'Boolean'].map((type) => ({
+        type,
+        cardinality: 'Any',
+      })),
+      requiresMatchingTypes: true,
+    },
+    {
+      operator: 'IsNull',
+      leftShapes: [{ type: 'Text', cardinality: 'Any' }],
+      rightShapes: [],
+      requiresMatchingTypes: false,
+    },
+  ],
+  functions: [
+    {
+      function: 'IsBlank',
+      parameters: [{ acceptedTypes: ['Text'], cardinality: 'Any' }],
+      returnType: 'Boolean',
+      returnCardinality: 'Scalar',
+    },
+    {
+      function: 'Length',
+      parameters: [{ acceptedTypes: ['Text'], cardinality: 'Scalar' }],
+      returnType: 'Integer',
+      returnCardinality: 'Scalar',
+    },
+  ],
+  limits: { maxDepth: 12, maxNodes: 200, maxExecutionSteps: 1000 },
+};
+
+function systemDetail(definitionKey: string) {
+  const summary = ruleDefinitions.items.find(
+    (definition) => definition.definitionKey === definitionKey,
+  );
+  if (!summary) throw new Error(`Missing test rule ${definitionKey}`);
+  return {
+    ...summary,
+    expressionLanguageVersion: 1,
+    revision: null,
+    contextKey: null,
+    contextSchemaVersion: null,
+    condition: {
+      nodeId: 'required_check',
+      predicateOperator: 'Equal',
+      left: {
+        kind: 'Function',
+        function: 'IsBlank',
+        arguments: [{ kind: 'Context', reference: 'field.value', arguments: [] }],
+      },
+      right: { kind: 'Literal', literal: { type: 'Boolean', values: ['true'] }, arguments: [] },
+      children: [],
+    },
+    outcome: {
+      kind: 'Validation',
+      violationCode: 'field.value.required',
+      severity: 'Error',
+      message: 'A value is required.',
+    },
+    versions: [],
+    createdAt: null,
+    updatedAt: null,
+    archivedAt: null,
+  };
+}
+
 describe('RulesPage', () => {
   beforeEach(() => {
     vi.stubGlobal('fetch', vi.fn());
@@ -123,8 +197,11 @@ describe('RulesPage', () => {
     const requiredRow = within(catalog).getByText('Required value').closest('tr');
     if (!requiredRow) throw new Error('Required rule row was not rendered');
     expect(catalogViewport).toContainElement(requiredRow);
+    expect(
+      within(requiredRow).getByText('Require records to provide a value for the field.'),
+    ).toHaveClass('text-xs');
     expect(requiredRow.querySelectorAll('[data-slot="rule-table-value"]')).toHaveLength(5);
-    expect(within(requiredRow).getByText('Built-in')).toBeInTheDocument();
+    expect(within(requiredRow).getByText('Built-in')).toHaveClass('bg-info/10', 'text-info');
     expect(within(requiredRow).getByText('Published')).toHaveClass('text-success');
     expect(within(requiredRow).getByText(/Date and time/)).toBeInTheDocument();
     expect(within(requiredRow).getByText('Field')).toBeInTheDocument();
@@ -135,6 +212,12 @@ describe('RulesPage', () => {
     expect(within(catalog).getByText('Text format')).toBeInTheDocument();
     expect(within(catalog).getByText('Choice selection count')).toBeInTheDocument();
     expect(within(catalog).getByText('Credit threshold')).toBeInTheDocument();
+    const workspaceRow = within(catalog).getByText('Credit threshold').closest('tr');
+    if (!workspaceRow) throw new Error('Workspace rule row was not rendered');
+    expect(within(workspaceRow).getByText('Workspace')).toHaveClass(
+      'bg-primary/10',
+      'text-primary',
+    );
     expect(within(catalog).getByText('Draft')).toHaveAttribute('data-variant', 'secondary');
     expect(within(catalog).queryByText('Validation')).not.toBeInTheDocument();
     expect(within(catalog).queryByText('field.required')).not.toBeInTheDocument();
@@ -160,6 +243,269 @@ describe('RulesPage', () => {
     );
   });
 
+  it('opens details from Rule column links for system and workspace records', async () => {
+    const user = userEvent.setup();
+    const workspaceDetail = {
+      ...ruleDefinitions.items[9],
+      condition: null,
+      outcome: null,
+      versions: [],
+      createdAt: '2026-01-01T00:00:00Z',
+      updatedAt: '2026-01-01T00:00:00Z',
+      archivedAt: null,
+    };
+    vi.mocked(fetch).mockImplementation((input) => {
+      const url = input.toString();
+      if (url.includes('/rules/context-schemas')) {
+        return Promise.resolve(jsonResponse(contextSchemas));
+      }
+      if (url.endsWith('/rules/credit_threshold')) {
+        return Promise.resolve(jsonResponse(workspaceDetail));
+      }
+      if (url.endsWith('/rules/field.required')) {
+        return Promise.resolve(jsonResponse(systemDetail('field.required')));
+      }
+      if (url.endsWith('/rules/expression-language')) {
+        return Promise.resolve(jsonResponse(expressionLanguage));
+      }
+      return Promise.resolve(jsonResponse(ruleDefinitions));
+    });
+
+    await renderWithRouter(<RulesPage />, { path: '/rules', authenticatedPath: 'rules' });
+
+    const catalog = screen.getByRole('region', { name: 'Rules catalog' });
+    const systemRuleLink = await within(catalog).findByRole('button', {
+      name: 'Required value',
+    });
+    const workspaceRuleLink = within(catalog).getByRole('button', {
+      name: 'Credit threshold',
+    });
+    expect(systemRuleLink).toHaveClass('h-auto', 'p-0');
+    expect(workspaceRuleLink).toHaveClass('h-auto', 'p-0');
+
+    await user.click(systemRuleLink);
+    const systemDetails = await screen.findByRole('dialog', { name: 'Required value' });
+    const dialogWindow = systemDetails.querySelector('[data-slot="managed-dialog-window"]');
+    expect(dialogWindow).toHaveAttribute('data-dialog-preset', 'large');
+    expect(within(systemDetails).getByRole('button', { name: 'Reset dialog' })).toBeEnabled();
+    const minimizeButton = within(systemDetails).getByRole('button', {
+      name: 'Minimize dialog',
+    });
+    expect(minimizeButton).toBeEnabled();
+    expect(minimizeButton.querySelector('svg')).toHaveClass('lucide-minus');
+    expect(within(systemDetails).getByRole('button', { name: 'Maximize dialog' })).toBeEnabled();
+    expect(within(systemDetails).getByRole('button', { name: 'Close dialog' })).toBeEnabled();
+    const systemDetailsFooter = systemDetails.querySelector('[data-slot="managed-dialog-footer"]');
+    expect(systemDetailsFooter).not.toBeNull();
+    expect(
+      within(systemDetailsFooter as HTMLElement).getByRole('button', { name: 'Close' }),
+    ).toBeEnabled();
+    expect(
+      within(systemDetailsFooter as HTMLElement).queryByRole('button', { name: 'Cancel' }),
+    ).not.toBeInTheDocument();
+
+    const managedHeader = systemDetails.querySelector('[data-slot="managed-dialog-header"]');
+    expect(managedHeader).not.toBeNull();
+    await user.dblClick(managedHeader as HTMLElement);
+    expect(dialogWindow).toHaveAttribute('data-dialog-preset', 'fullscreen');
+    expect(
+      within(systemDetails).getByRole('button', { name: 'Restore dialog size' }),
+    ).toBeEnabled();
+    await user.dblClick(managedHeader as HTMLElement);
+    expect(dialogWindow).toHaveAttribute('data-dialog-preset', 'large');
+
+    const maximizeButton = within(systemDetails).getByRole('button', {
+      name: 'Maximize dialog',
+    });
+    await user.dblClick(maximizeButton);
+    expect(dialogWindow).toHaveAttribute('data-dialog-preset', 'large');
+
+    await user.click(minimizeButton);
+    const dock = document.querySelector('[data-slot="managed-window-dock"]');
+    expect(dock).not.toBeNull();
+    expect(dock).toHaveAttribute('data-dialog-preset', 'large');
+    expect(screen.queryByRole('dialog', { name: 'Required value' })).not.toBeInTheDocument();
+    const restoreLargeButton = within(dock as HTMLElement).getByRole('button', {
+      name: 'Restore dialog',
+    });
+    expect(dock?.querySelector('[data-action="restore"]')).toHaveFocus();
+
+    await user.keyboard('{Escape}');
+    expect(document.querySelector('[data-slot="managed-window-dock"]')).toBeInTheDocument();
+    await user.click(within(catalog).getByRole('button', { name: 'Filters' }));
+    expect(screen.getByRole('button', { name: 'Add condition' })).toBeInTheDocument();
+
+    await user.click(restoreLargeButton);
+    const restoredLarge = await screen.findByRole('dialog', { name: 'Required value' });
+    const restoredLargeWindow = restoredLarge.querySelector('[data-slot="managed-dialog-window"]');
+    expect(restoredLargeWindow).toHaveAttribute('data-dialog-preset', 'large');
+    expect(minimizeButton).toHaveFocus();
+
+    await user.click(within(restoredLarge).getByRole('button', { name: 'Maximize dialog' }));
+    expect(restoredLargeWindow).toHaveAttribute('data-dialog-preset', 'fullscreen');
+    await user.click(within(restoredLarge).getByRole('button', { name: 'Minimize dialog' }));
+    const fullscreenDock = document.querySelector('[data-slot="managed-window-dock"]');
+    expect(fullscreenDock).toHaveAttribute('data-dialog-preset', 'fullscreen');
+    await user.click(
+      within(fullscreenDock as HTMLElement).getByRole('button', { name: 'Restore dialog' }),
+    );
+    const restoredFullscreen = await screen.findByRole('dialog', { name: 'Required value' });
+    expect(restoredFullscreen.querySelector('[data-slot="managed-dialog-window"]')).toHaveAttribute(
+      'data-dialog-preset',
+      'fullscreen',
+    );
+    const restoreSizeButton = within(restoredFullscreen).getByRole('button', {
+      name: 'Restore dialog size',
+    });
+    expect(restoreSizeButton).toBeEnabled();
+    await user.click(restoreSizeButton);
+    expect(restoredFullscreen.querySelector('[data-slot="managed-dialog-window"]')).toHaveAttribute(
+      'data-dialog-preset',
+      'large',
+    );
+    expect(
+      within(restoredFullscreen).getByRole('button', { name: 'Maximize dialog' }),
+    ).toBeEnabled();
+    expect(
+      within(restoredFullscreen).getByRole('heading', { name: 'Definition' }),
+    ).toBeInTheDocument();
+    const restoredHeader = restoredFullscreen.querySelector('[data-slot="managed-dialog-header"]');
+    expect(restoredHeader).not.toBeNull();
+    expect(
+      Array.from(restoredHeader?.querySelectorAll('[data-slot="badge"]') ?? [], (badge) =>
+        badge.textContent?.trim(),
+      ),
+    ).toEqual(['Built-in', 'Published']);
+    expect(
+      within(systemDetails).queryByRole('button', { name: 'Archive' }),
+    ).not.toBeInTheDocument();
+    expect(
+      vi
+        .mocked(fetch)
+        .mock.calls.some(([input]) => input.toString().endsWith('/rules/field.required')),
+    ).toBe(true);
+
+    await user.click(
+      within(systemDetailsFooter as HTMLElement).getByRole('button', { name: 'Close' }),
+    );
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    await user.click(workspaceRuleLink);
+    const workspaceDetails = await screen.findByRole('dialog', { name: 'Credit threshold' });
+    expect(workspaceDetails.querySelector('[data-slot="managed-dialog-window"]')).toHaveAttribute(
+      'data-dialog-preset',
+      'large',
+    );
+    expect(within(workspaceDetails).getByRole('button', { name: 'Maximize dialog' })).toBeEnabled();
+    await waitFor(() =>
+      expect(
+        vi
+          .mocked(fetch)
+          .mock.calls.some(([input]) => input.toString().endsWith('/rules/credit_threshold')),
+      ).toBe(true),
+    );
+    const workspaceFooter = workspaceDetails.querySelector('[data-slot="managed-dialog-footer"]');
+    expect(workspaceFooter).not.toBeNull();
+    expect(
+      within(workspaceFooter as HTMLElement).getByRole('button', { name: 'Cancel' }),
+    ).toBeEnabled();
+    expect(
+      within(workspaceFooter as HTMLElement).queryByRole('button', { name: 'Close' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('renders system rule details as responsive described sections', async () => {
+    const user = userEvent.setup();
+    vi.mocked(fetch).mockImplementation((input) => {
+      const url = input.toString();
+      if (url.endsWith('/rules/field.required')) {
+        return Promise.resolve(jsonResponse(systemDetail('field.required')));
+      }
+      return Promise.resolve(jsonResponse(ruleDefinitions));
+    });
+
+    await renderWithRouter(<RulesPage />, { path: '/rules', authenticatedPath: 'rules' });
+
+    const catalog = screen.getByRole('region', { name: 'Rules catalog' });
+    await user.click(await within(catalog).findByRole('button', { name: 'Required value' }));
+    const details = await screen.findByRole('dialog', { name: 'Required value' });
+    const header = details.querySelector('[data-slot="managed-dialog-header"]');
+    expect(header).not.toBeNull();
+    expect(
+      within(header as HTMLElement).queryByText(
+        'Require records to provide a value for the field.',
+      ),
+    ).not.toBeInTheDocument();
+    const headerBadges = header?.querySelectorAll('[data-slot="badge"]') ?? [];
+    expect(Array.from(headerBadges, (badge) => badge.textContent?.trim())).toEqual([
+      'Built-in',
+      'Published',
+    ]);
+    expect(headerBadges[0]).toHaveAttribute('data-variant', 'outline');
+    expect(headerBadges[0]).toHaveClass('bg-info/10', 'text-info');
+    expect(within(details).queryByText('Read-only')).not.toBeInTheDocument();
+
+    const definitionSection = within(details).getByRole('region', { name: 'Definition' });
+    const fieldTypesSection = within(details).getByRole('region', {
+      name: 'Supported field types',
+    });
+    const parametersSection = within(details).getByRole('region', { name: 'Parameters' });
+    const logicSection = within(details).getByRole('region', { name: 'Rule logic' });
+    const outcomeSection = within(details).getByRole('region', { name: 'Outcome' });
+    const sections = [
+      definitionSection,
+      fieldTypesSection,
+      logicSection,
+      parametersSection,
+      outcomeSection,
+    ];
+
+    expect(details.querySelectorAll('[data-slot="system-rule-details-section"]')).toHaveLength(5);
+    expect(definitionSection).toHaveTextContent(
+      'Scope, ownership, lifecycle, and published version.',
+    );
+    expect(definitionSection).toHaveTextContent(
+      'Require records to provide a value for the field.',
+    );
+    expect(fieldTypesSection).toHaveTextContent('Field types and setup supported by this rule.');
+    expect(parametersSection).toHaveTextContent(
+      'Optional typed inputs supplied when a rule is applied.',
+    );
+    expect(logicSection).toHaveTextContent('Is blank');
+    expect(logicSection).toHaveTextContent('Field value');
+    expect(logicSection).toHaveTextContent('Equals');
+    expect(logicSection).toHaveTextContent('true');
+    expect(outcomeSection).toHaveTextContent('A value is required.');
+    expect(definitionSection).toHaveTextContent('Applies to a single field value.');
+
+    for (const section of sections) {
+      expect(section).toHaveClass('grid', 'gap-4', 'py-6', 'sm:grid-cols-3', 'sm:gap-8');
+      expect(
+        section.querySelector('[data-slot="system-rule-details-section-content"]'),
+      ).toHaveClass('sm:col-span-2');
+    }
+    expect(definitionSection).not.toHaveClass('border-t');
+    expect(fieldTypesSection).toHaveClass('border-t');
+    expect(logicSection).toHaveClass('border-t');
+    expect(parametersSection).toHaveClass('border-t');
+    expect(outcomeSection).toHaveClass('border-t');
+
+    expect(
+      Array.from(definitionSection.querySelectorAll('dt'), (item) => item.textContent),
+    ).toEqual(['Description', 'Scope', 'Version history']);
+    expect(
+      Array.from(fieldTypesSection.querySelectorAll('dt'), (item) => item.textContent),
+    ).toEqual(['Field types', 'Setup']);
+    for (const list of details.querySelectorAll('dl')) {
+      expect(list).toHaveClass('gap-y-5');
+    }
+    for (const item of details.querySelectorAll('dt')) {
+      expect(item.parentElement).toHaveClass('space-y-2');
+      expect(item.nextElementSibling).toHaveClass('leading-relaxed');
+    }
+    expect(within(fieldTypesSection).getByText('No setup needed')).toBeInTheDocument();
+    expect(within(parametersSection).getByText('No parameters')).toHaveClass('leading-relaxed');
+  });
+
   it('creates a workspace draft from a registered context', async () => {
     const user = userEvent.setup();
     const created = {
@@ -180,6 +526,8 @@ describe('RulesPage', () => {
       const url = input.toString();
       if (url.includes('/rules/context-schemas'))
         return Promise.resolve(jsonResponse(contextSchemas));
+      if (url.endsWith('/rules/expression-language'))
+        return Promise.resolve(jsonResponse(expressionLanguage));
       if (url.endsWith('/rules') && init?.method === 'POST')
         return Promise.resolve(jsonResponse(created, 201));
       if (url.endsWith('/rules/high_credit_value')) return Promise.resolve(jsonResponse(created));
@@ -188,7 +536,27 @@ describe('RulesPage', () => {
 
     await renderWithRouter(<RulesPage />, { path: '/rules', authenticatedPath: 'rules' });
     await user.click(await screen.findByRole('button', { name: 'New rule' }));
-    expect(await screen.findByRole('heading', { name: 'New workspace rule' })).toBeInTheDocument();
+    const createDialog = await screen.findByRole('dialog', { name: 'New workspace rule' });
+    expect(createDialog.querySelector('[data-slot="managed-dialog-window"]')).toHaveAttribute(
+      'data-dialog-preset',
+      'large',
+    );
+    const createFooter = createDialog.querySelector('[data-slot="managed-dialog-footer"]');
+    expect(createFooter).not.toBeNull();
+    expect(
+      within(createFooter as HTMLElement).getByRole('button', { name: 'Cancel' }),
+    ).toBeEnabled();
+    expect(
+      within(createFooter as HTMLElement).queryByRole('button', { name: 'Close' }),
+    ).not.toBeInTheDocument();
+    expect(within(createDialog).getByRole('button', { name: 'Reset dialog' })).toBeEnabled();
+    expect(within(createDialog).getByRole('heading', { name: 'Definition' })).toBeInTheDocument();
+    expect(
+      within(createDialog).queryByRole('heading', { name: 'Parameters' }),
+    ).not.toBeInTheDocument();
+    expect(
+      within(createDialog).queryByRole('heading', { name: 'Conditions' }),
+    ).not.toBeInTheDocument();
 
     await user.type(screen.getByLabelText('Name'), 'High credit value');
     await user.type(screen.getByLabelText('Description'), 'Flags high credit values.');
@@ -201,6 +569,7 @@ describe('RulesPage', () => {
     );
     await waitFor(() => expect(screen.getByLabelText('Context')).toBeEnabled());
     expect(screen.getByLabelText('Scope')).toHaveTextContent('Field');
+    expect(screen.getByText('Applies to a single field value.')).toBeInTheDocument();
     await user.click(screen.getByLabelText('Scope'));
     await user.click(await screen.findByRole('option', { name: 'Field' }));
     expect(screen.getByLabelText('Scope')).toHaveTextContent('Field');
@@ -210,7 +579,13 @@ describe('RulesPage', () => {
     expect(screen.getByLabelText('Context')).toHaveTextContent('Decimal field value');
     await user.click(screen.getByRole('button', { name: 'Create draft' }));
 
-    expect(await screen.findByRole('heading', { name: 'High credit value' })).toBeInTheDocument();
+    const editorDialog = await screen.findByRole('dialog', { name: 'High credit value' });
+    expect(within(editorDialog).getByRole('heading', { name: 'Definition' })).toBeInTheDocument();
+    expect(within(editorDialog).getByLabelText('Name')).toHaveValue('High credit value');
+    expect(within(editorDialog).getByText('Stable key: high_credit_value')).toBeInTheDocument();
+    expect(within(editorDialog).getByRole('heading', { name: 'Parameters' })).toBeInTheDocument();
+    expect(within(editorDialog).getByRole('heading', { name: 'Conditions' })).toBeInTheDocument();
+    expect(within(editorDialog).getByRole('heading', { name: 'Simulation' })).toBeInTheDocument();
     const post = vi
       .mocked(fetch)
       .mock.calls.find(
@@ -224,14 +599,237 @@ describe('RulesPage', () => {
       contextSchemaVersion: 1,
       outcomeKind: 'Validation',
     });
+  });
 
-    const editorName = await screen.findByLabelText('Name');
+  it('keeps workspace draft edits when dialog close is cancelled', async () => {
+    const user = userEvent.setup();
+    const workspaceDetail = {
+      ...ruleDefinitions.items[9],
+      expressionLanguageVersion: 1,
+      condition: null,
+      outcome: null,
+      versions: [],
+      createdAt: '2026-01-01T00:00:00Z',
+      updatedAt: '2026-01-01T00:00:00Z',
+      archivedAt: null,
+    };
+    vi.mocked(fetch).mockImplementation((input) => {
+      const url = input.toString();
+      if (url.includes('/rules/context-schemas')) {
+        return Promise.resolve(jsonResponse(contextSchemas));
+      }
+      if (url.endsWith('/rules/expression-language')) {
+        return Promise.resolve(jsonResponse(expressionLanguage));
+      }
+      if (url.endsWith('/rules/credit_threshold')) {
+        return Promise.resolve(jsonResponse(workspaceDetail));
+      }
+      return Promise.resolve(jsonResponse(ruleDefinitions));
+    });
+
+    await renderWithRouter(<RulesPage />, { path: '/rules', authenticatedPath: 'rules' });
+    await user.click(await screen.findByRole('button', { name: 'Credit threshold' }));
+    const editorDialog = await screen.findByRole('dialog', { name: 'Credit threshold' });
+    const editorName = within(editorDialog).getByLabelText('Name');
     await user.clear(editorName);
     await user.type(editorName, 'Updated credit value');
-    await user.click(screen.getByRole('button', { name: 'Close' }));
+    await user.click(within(editorDialog).getByRole('button', { name: 'Close dialog' }));
+
     expect(screen.getByRole('heading', { name: 'Discard unsaved changes?' })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Keep editing' }));
-    expect(screen.getByLabelText('Name')).toHaveValue('Updated credit value');
+    expect(within(editorDialog).getByLabelText('Name')).toHaveValue('Updated credit value');
+  });
+
+  it('authors function operands from the server capability contract', async () => {
+    const user = userEvent.setup();
+    const textSchema = {
+      contextKey: 'business_objects.field.text',
+      version: 1,
+      scope: 'Field',
+      displayName: 'Text field value',
+      fields: [
+        { path: 'field.value', displayName: 'Field value', type: 'Text', allowMultiple: false },
+      ],
+    };
+    const workspaceDetail = {
+      ...ruleDefinitions.items[9],
+      expressionLanguageVersion: 1,
+      contextKey: textSchema.contextKey,
+      contextSchemaVersion: 1,
+      condition: {
+        nodeId: 'root',
+        logicalOperator: 'All',
+        children: [
+          {
+            nodeId: 'predicate',
+            predicateOperator: 'Equal',
+            left: { kind: 'Context', reference: 'field.value', arguments: [] },
+            right: {
+              kind: 'Literal',
+              literal: { type: 'Text', values: ['example'] },
+              arguments: [],
+            },
+            children: [],
+          },
+        ],
+      },
+      outcome: {
+        kind: 'Validation',
+        violationCode: 'credit.threshold.exceeded',
+        severity: 'Error',
+        message: 'Value is invalid.',
+      },
+      versions: [],
+      createdAt: '2026-01-01T00:00:00Z',
+      updatedAt: '2026-01-01T00:00:00Z',
+      archivedAt: null,
+    };
+    vi.mocked(fetch).mockImplementation((input, init) => {
+      const url = input.toString();
+      if (url.endsWith('/rules/context-schemas'))
+        return Promise.resolve(jsonResponse([textSchema]));
+      if (url.endsWith('/rules/expression-language')) {
+        return Promise.resolve(jsonResponse(expressionLanguage));
+      }
+      if (url.endsWith('/rules/credit_threshold/draft') && init?.method === 'PUT') {
+        return Promise.resolve(jsonResponse(workspaceDetail));
+      }
+      if (url.endsWith('/rules/credit_threshold')) {
+        return Promise.resolve(jsonResponse(workspaceDetail));
+      }
+      return Promise.resolve(jsonResponse(ruleDefinitions));
+    });
+
+    await renderWithRouter(<RulesPage />, { path: '/rules', authenticatedPath: 'rules' });
+    const catalog = screen.getByRole('region', { name: 'Rules catalog' });
+    await user.click(await within(catalog).findByRole('button', { name: 'Credit threshold' }));
+    const editor = await screen.findByRole('dialog', { name: 'Credit threshold' });
+    const conditions = within(editor).getByRole('heading', { name: 'Conditions' }).parentElement
+      ?.parentElement;
+    if (!conditions) throw new Error('Conditions section was not rendered');
+
+    await user.click(within(conditions).getByLabelText('Left operand'));
+    await user.click(await screen.findByRole('option', { name: 'Function' }));
+    await user.click(within(conditions).getByLabelText('Function'));
+    await user.click(await screen.findByRole('option', { name: 'Length' }));
+
+    expect(within(conditions).getByText('Argument 1')).toBeInTheDocument();
+    expect(within(conditions).getByText('Field value')).toBeInTheDocument();
+    await user.type(within(conditions).getByLabelText('Value'), '5');
+    await user.click(within(editor).getByRole('button', { name: 'Save draft' }));
+
+    await waitFor(() => {
+      const save = vi
+        .mocked(fetch)
+        .mock.calls.find(
+          ([input, init]) =>
+            input.toString().endsWith('/rules/credit_threshold/draft') && init?.method === 'PUT',
+        );
+      expect(save).toBeDefined();
+      expect(JSON.parse(save?.[1]?.body as string).condition.children[0].left).toMatchObject({
+        kind: 'Function',
+        function: 'Length',
+        arguments: [{ kind: 'Context', reference: 'field.value' }],
+      });
+    });
+  });
+
+  it('shows an error state when rule contexts cannot load for creation', async () => {
+    const user = userEvent.setup();
+    vi.mocked(fetch).mockImplementation((input) => {
+      const url = input.toString();
+      if (url.includes('/rules/context-schemas')) {
+        return Promise.resolve(jsonResponse({ title: 'Unavailable' }, 500));
+      }
+      return Promise.resolve(jsonResponse(ruleDefinitions));
+    });
+
+    await renderWithRouter(<RulesPage />, { path: '/rules', authenticatedPath: 'rules' });
+    await user.click(await screen.findByRole('button', { name: 'New rule' }));
+
+    const createDialog = await screen.findByRole('dialog', { name: 'New workspace rule' });
+    expect(await within(createDialog).findByRole('alert')).toHaveTextContent(
+      'Unable to load rules',
+    );
+    expect(within(createDialog).queryByLabelText('Name')).not.toBeInTheDocument();
+  });
+
+  it('shows an empty state when no rule context is eligible for creation', async () => {
+    const user = userEvent.setup();
+    vi.mocked(fetch).mockImplementation((input) => {
+      const url = input.toString();
+      if (url.includes('/rules/context-schemas')) return Promise.resolve(jsonResponse([]));
+      return Promise.resolve(jsonResponse(ruleDefinitions));
+    });
+
+    await renderWithRouter(<RulesPage />, { path: '/rules', authenticatedPath: 'rules' });
+    await user.click(await screen.findByRole('button', { name: 'New rule' }));
+
+    const createDialog = await screen.findByRole('dialog', { name: 'New workspace rule' });
+    expect(await within(createDialog).findByText('Context unavailable')).toBeInTheDocument();
+    expect(createDialog).toHaveTextContent(
+      'No consumer has registered a context for this scope yet.',
+    );
+    expect(within(createDialog).queryByLabelText('Name')).not.toBeInTheDocument();
+  });
+
+  it('keeps minimized record identity stable while multiple windows overlap', async () => {
+    const user = userEvent.setup();
+    vi.mocked(fetch).mockImplementation((input) => {
+      const url = input.toString();
+      if (url.includes('/rules/context-schemas')) {
+        return Promise.resolve(jsonResponse(contextSchemas));
+      }
+      if (url.endsWith('/rules/field.required')) {
+        return Promise.resolve(jsonResponse(systemDetail('field.required')));
+      }
+      if (url.endsWith('/rules/field.numeric_range')) {
+        return Promise.resolve(jsonResponse(systemDetail('field.numeric_range')));
+      }
+      return Promise.resolve(jsonResponse(ruleDefinitions));
+    });
+
+    await renderWithRouter(<RulesPage />, { path: '/rules', authenticatedPath: 'rules' });
+    const catalog = screen.getByRole('region', { name: 'Rules catalog' });
+    await user.click(await within(catalog).findByRole('button', { name: 'Required value' }));
+    const requiredWindow = await screen.findByRole('dialog', { name: 'Required value' });
+    await user.click(within(requiredWindow).getByRole('button', { name: 'Minimize dialog' }));
+
+    const requiredDock = document.querySelector<HTMLElement>('[data-slot="managed-window-dock"]');
+    expect(requiredDock).toHaveTextContent('Required value');
+    await user.click(within(catalog).getByRole('button', { name: 'Numeric range' }));
+    expect(await screen.findByRole('dialog', { name: 'Numeric range' })).toBeInTheDocument();
+    expect(requiredDock).toHaveTextContent('Required value');
+    expect(requiredDock).not.toHaveTextContent('Numeric range');
+
+    await user.click(
+      within(requiredDock as HTMLElement).getByRole('button', { name: 'Restore dialog' }),
+    );
+    const windowElements = document.querySelectorAll('[data-slot="managed-dialog-window"]');
+    expect(windowElements).toHaveLength(2);
+    expect(document.querySelector('[data-window-id="rules:field.required"]')).toHaveAttribute(
+      'data-active',
+      'true',
+    );
+    const windowsButton = screen.getByRole('button', { name: 'Windows (2)' });
+    await user.click(windowsButton);
+    expect(await screen.findByRole('menuitem', { name: /Required value/ })).toBeInTheDocument();
+    await user.click(screen.getByRole('menuitem', { name: /Numeric range/ }));
+    expect(document.querySelector('[data-window-id="rules:field.numeric_range"]')).toHaveAttribute(
+      'data-active',
+      'true',
+    );
+
+    await user.keyboard('{Escape}');
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog', { name: 'Numeric range' })).not.toBeInTheDocument(),
+    );
+    expect(screen.getByRole('dialog', { name: 'Required value' })).toBeInTheDocument();
+    expect(document.querySelector('[data-window-id="rules:field.required"]')).toHaveAttribute(
+      'data-active',
+      'true',
+    );
+    expect(screen.getByRole('button', { name: 'Windows (1)' })).toBeInTheDocument();
   });
 
   it('shows a retryable error state when the catalog cannot load', async () => {
