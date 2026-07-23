@@ -4266,8 +4266,12 @@ class TestRepoSkillsGate(unittest.TestCase):
             ),
             ".agents/skills/reference.md": (
                 "# Contract\n\nRoute durable guidance before edit.\n\n"
-                "Before editing durable guidance, select `$axis-doc-hygiene` as the entry owner "
-                "or enter it through a typed handoff.\n"
+                "The entry domain owner keeps spec, status, and evidence decisions. Other durable "
+                "guidance **Requires** selecting `$axis-doc-hygiene` or entering it through a typed "
+                "handoff before edit.\n\n"
+                "## Engineering method\n\n"
+                "Minimal solution ladder. Root-cause loop. Fail-before/pass-after. "
+                "Safety floor. Communication clarity. Skill proof.\n"
             ),
             ".agents/skills/axis-example/SKILL.md": (
                 "---\n"
@@ -4296,7 +4300,7 @@ class TestRepoSkillsGate(unittest.TestCase):
     def test_accepts_valid_repo_skill(self) -> None:
         self.assertEqual([], self.issues_for_skill(self.valid_skill_files()))
 
-    def test_verification_scope_consumers_must_delegate_command_selection(self) -> None:
+    def test_verification_scope_consumers_must_delegate_unresolved_command_selection(self) -> None:
         for consumer in ("axis-frontend-feature", "axis-ui-system"):
             with self.subTest(consumer=consumer):
                 files = self.valid_skill_files()
@@ -4315,7 +4319,54 @@ class TestRepoSkillsGate(unittest.TestCase):
                 issues = self.issues_for_skill(files)
 
                 self.assertIn(
-                    f"`{consumer}` must use **Delegates** for verification command selection to `$axis-script-scope`",
+                    f"`{consumer}` must use **Delegates** only for unresolved verification command selection to `$axis-script-scope`",
+                    "\n".join(issues),
+                )
+
+    def test_verification_scope_consumers_accept_conditional_command_selection_handoff(self) -> None:
+        for consumer in ("axis-frontend-feature", "axis-ui-system"):
+            with self.subTest(consumer=consumer):
+                files = self.valid_skill_files()
+                self.add_skill(files, "axis-script-scope")
+                self.add_skill(files, consumer)
+                files[f".agents/skills/{consumer}/SKILL.md"] += (
+                    "\n- Unresolved verification command selection **Delegates** to "
+                    "`$axis-script-scope`.\n"
+                )
+                files[".agents/skills/axis-script-scope/SKILL.md"] = files[
+                    ".agents/skills/axis-script-scope/SKILL.md"
+                ].replace(
+                    "Report the result.",
+                    "Report `Moment`, `Selected checks`, `Omitted broad checks`, `Results`, and `Next verification boundary`.",
+                )
+
+                issues = self.issues_for_skill(files)
+
+                self.assertNotIn(
+                    "unresolved verification command selection",
+                    "\n".join(issues),
+                )
+
+    def test_verification_scope_consumers_reject_unconditional_command_selection_handoff(self) -> None:
+        for consumer in ("axis-frontend-feature", "axis-ui-system"):
+            with self.subTest(consumer=consumer):
+                files = self.valid_skill_files()
+                self.add_skill(files, "axis-script-scope")
+                self.add_skill(files, consumer)
+                files[f".agents/skills/{consumer}/SKILL.md"] += (
+                    "\n- Verification command selection **Delegates** to `$axis-script-scope`.\n"
+                )
+                files[".agents/skills/axis-script-scope/SKILL.md"] = files[
+                    ".agents/skills/axis-script-scope/SKILL.md"
+                ].replace(
+                    "Report the result.",
+                    "Report `Moment`, `Selected checks`, `Omitted broad checks`, `Results`, and `Next verification boundary`.",
+                )
+
+                issues = self.issues_for_skill(files)
+
+                self.assertIn(
+                    "must use **Delegates** only for unresolved verification command selection",
                     "\n".join(issues),
                 )
 
@@ -4382,6 +4433,51 @@ class TestRepoSkillsGate(unittest.TestCase):
 
         self.assertIn(
             "universal contract must route durable guidance edits through `$axis-doc-hygiene` before edit",
+            "\n".join(issues),
+        )
+
+    def test_universal_contract_keeps_domain_decisions_with_the_entry_owner(self) -> None:
+        files = self.valid_skill_files()
+        files[".agents/skills/reference.md"] = files[
+            ".agents/skills/reference.md"
+        ].replace(
+            "The entry domain owner keeps spec, status, and evidence decisions. ",
+            "",
+        )
+
+        issues = self.issues_for_skill(files)
+
+        self.assertIn(
+            "universal contract must keep spec, status, and evidence decisions with the entry domain owner",
+            "\n".join(issues),
+        )
+
+    def test_universal_contract_requires_the_engineering_method(self) -> None:
+        files = self.valid_skill_files()
+        files[".agents/skills/reference.md"] = files[
+            ".agents/skills/reference.md"
+        ].replace(
+            "## Engineering method\n\n"
+            "Minimal solution ladder. Root-cause loop. Fail-before/pass-after. "
+            "Safety floor. Communication clarity. Skill proof.\n",
+            "",
+        )
+
+        issues = self.issues_for_skill(files)
+
+        self.assertIn(
+            "universal contract must own the engineering method",
+            "\n".join(issues),
+        )
+
+    def test_ready_review_requires_a_minimality_audit(self) -> None:
+        files = self.valid_skill_files()
+        self.add_skill(files, "axis-ready-review")
+
+        issues = self.issues_for_skill(files)
+
+        self.assertIn(
+            "axis-ready-review` must audit minimality after correctness",
             "\n".join(issues),
         )
 

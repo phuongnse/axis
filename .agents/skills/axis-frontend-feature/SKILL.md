@@ -14,7 +14,7 @@ Implement a frontend slice from supplied product/foundation evidence with genera
 Follow [reference.md](../reference.md).
 - Non-trivial entry work **Requires** current `$axis-design-gate` evidence; reuse evidence supplied by an orchestrating use-case or foundation workflow.
 - UI token, primitive, baseline, shared visual API, or provider work **Delegates** to `$axis-ui-system` and returns here with its decision.
-- Verification command selection **Delegates** to `$axis-script-scope`.
+- Unresolved verification command selection **Delegates** to `$axis-script-scope`; known owner commands stay local.
 - Generated request types own wire shape; do not hand-write duplicate DTOs or submit fields absent from the generated request.
 
 ## Inputs
@@ -31,7 +31,7 @@ Follow [reference.md](../reference.md).
 4. Implement narrowly using the frontend playbook: stable server-state ownership, RHF/Zod forms, explicit mutation cache behavior, shareable URL state, localized copy, and required loading/empty/error/validation/disabled/success states.
 5. Use existing UI contracts. This workflow **Delegates** unresolved visual deviations to `$axis-ui-system` and wire-shape deviations to `$axis-api-contract`; keep consumer classes layout-only and do not create feature-local primitives.
 6. Trace every in-scope AC/AT row to observable behavior and API/cache proof with Vitest/Testing Library; use focused Playwright evidence for layout, navigation, or interaction risk.
-7. Pass the current moment, changed paths, and valid evidence through the verification handoff; run only the returned selected checks and report omissions.
+7. Run documented focused checks directly. Use the verification handoff only when changed paths lack an owned command or alter workflow selection; report every omitted broad check.
 
 ## Output
 

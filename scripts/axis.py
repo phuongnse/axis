@@ -1098,7 +1098,7 @@ SKILL_VERIFICATION_SCOPE_OUTPUT_FIELDS = (
     "Next verification boundary",
 )
 SKILL_VERIFICATION_SCOPE_DELEGATE_RE = re.compile(
-    r"Verification command selection [*][*]Delegates[*][*] to `\$axis-script-scope`[.]?",
+    r"Unresolved verification command selection [*][*]Delegates[*][*] to `\$axis-script-scope`[.]?",
     re.IGNORECASE,
 )
 
@@ -1313,8 +1313,8 @@ def repo_skill_verification_scope_issues(
         skill_md, text = record
         if SKILL_VERIFICATION_SCOPE_DELEGATE_RE.search(text) is None:
             issues.append(
-                f"{rel_from(skill_md, root)}: `{consumer}` must use **Delegates** for "
-                "verification command selection to `$axis-script-scope`"
+                f"{rel_from(skill_md, root)}: `{consumer}` must use **Delegates** only for "
+                "unresolved verification command selection to `$axis-script-scope`"
             )
 
     owner = by_name.get("axis-script-scope")
@@ -1355,12 +1355,30 @@ def repo_skill_verification_scope_issues(
                 "prerequisites and enforce accepted-risk policy"
             )
 
+    ready_review = by_name.get("axis-ready-review")
+    if ready_review is not None:
+        skill_md, text = ready_review
+        minimality_fragments = (
+            "minimality",
+            "existing code",
+            "standard library",
+            "native platform",
+            "installed dependencies",
+            "speculative abstractions",
+            "accessibility",
+        )
+        if any(fragment not in text for fragment in minimality_fragments):
+            issues.append(
+                f"{rel_from(skill_md, root)}: `axis-ready-review` must audit minimality "
+                "after correctness without weakening required safety"
+            )
+
     reference = root / REPO_SKILLS_DIR / "reference.md"
     if reference.is_file():
         reference_text = reference.read_text(encoding="utf-8")
         reference_fragments = (
             "Route durable guidance before edit",
-            "Before editing durable guidance",
+            "Other durable guidance **Requires**",
             "`$axis-doc-hygiene`",
             "typed handoff",
         )
@@ -1368,6 +1386,26 @@ def repo_skill_verification_scope_issues(
             issues.append(
                 f"{rel_from(reference, root)}: universal contract must route durable guidance "
                 "edits through `$axis-doc-hygiene` before edit"
+            )
+        if "The entry domain owner keeps spec, status, and evidence decisions" not in reference_text:
+            issues.append(
+                f"{rel_from(reference, root)}: universal contract must keep spec, status, "
+                "and evidence decisions with the entry domain owner"
+            )
+        engineering_method_fragments = (
+            "## Engineering method",
+            "Minimal solution ladder",
+            "Root-cause loop",
+            "Fail-before/pass-after",
+            "Safety floor",
+            "Communication clarity",
+            "Skill proof",
+        )
+        if any(fragment not in reference_text for fragment in engineering_method_fragments):
+            issues.append(
+                f"{rel_from(reference, root)}: universal contract must own the engineering method "
+                "for minimal solutions, root-cause fixes, behavior proof, safety, communication, "
+                "and skill validation"
             )
     return issues
 
