@@ -324,9 +324,7 @@ public static class RuleConditionEvaluator
 
     private static (int Precision, int Scale) DecimalShape(string value)
     {
-        string canonical = decimal.Parse(value, CultureInfo.InvariantCulture)
-            .ToString("G29", CultureInfo.InvariantCulture)
-            .TrimStart('-');
+        string canonical = value.TrimStart('-');
         string[] parts = canonical.Split('.', 2);
         int scale = parts.Length == 2 ? parts[1].Length : 0;
         int precision = Math.Max(1, string.Concat(parts).TrimStart('0').Length);

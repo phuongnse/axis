@@ -183,7 +183,10 @@ def api_has_source_reload(compose_file: Path) -> bool:
         polling_environment,
         re.IGNORECASE | re.MULTILINE,
     ) is not None
-    avoids_cli_artifacts_path = "--artifacts-path" not in [token.lower() for token in command_tokens]
+    avoids_cli_artifacts_path = not any(
+        token.lower() == "--artifacts-path" or token.lower().startswith("--artifacts-path=")
+        for token in command_tokens
+    )
     return (
         has_watcher
         and has_bind_mount_polling

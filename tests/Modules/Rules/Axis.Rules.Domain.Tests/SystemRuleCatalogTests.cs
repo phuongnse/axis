@@ -127,6 +127,27 @@ public sealed class SystemRuleCatalogTests
     }
 
     [Fact]
+    public void DecimalPrecision_WhenValueRetainsFractionalZeros_CountsRetainedDigits()
+    {
+        SystemRuleDefinition precision = SystemRuleCatalog.Find("field.decimal_precision", 1)!;
+
+        RuleConditionEvaluation result = RuleConditionEvaluator.Evaluate(
+            precision.Condition,
+            SystemSchema("Decimal"),
+            new Dictionary<string, RuleValue>(StringComparer.Ordinal)
+            {
+                ["field.value"] = Value(RuleValueType.Decimal, "1.50"),
+            },
+            new Dictionary<string, RuleValue>(StringComparer.Ordinal)
+            {
+                ["precision"] = Value(RuleValueType.Integer, "2"),
+                ["scale"] = Value(RuleValueType.Integer, "2"),
+            }).Value;
+
+        result.IsMatch.Should().BeTrue();
+    }
+
+    [Fact]
     public void Find_WhenVersionIsUnknown_ReturnsNull()
     {
         SystemRuleCatalog.Find("field.required", version: 2).Should().BeNull();

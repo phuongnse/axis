@@ -4,6 +4,8 @@
 
 ## Acceptance Evidence
 
+AT-009 proves the catalog and authoring UI behavior only. Complexity-limit enforcement under AC-014 is owned by the domain and application evidence in AT-002 and AT-003, not inferred from the component test.
+
 | AT ID | Evidence | Commands |
 |---|---|---|
 | AT-001, AT-002 | `src/Modules/Rules/Axis.Rules.Domain/RuleExpressionLanguage.cs`, `tests/Modules/Rules/Axis.Rules.Domain.Tests/RuleDefinitionTests.cs`, `tests/Modules/Rules/Axis.Rules.Domain.Tests/RuleConditionEvaluatorTests.cs` | `python scripts/axis.py dotnet test tests/Modules/Rules/Axis.Rules.Domain.Tests/Axis.Rules.Domain.Tests.csproj` |

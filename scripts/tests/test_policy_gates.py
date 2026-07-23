@@ -2274,6 +2274,7 @@ class TestMarkdownLinkGate(unittest.TestCase):
 
     def test_coderabbit_cli_rejects_missing_cli(self) -> None:
         with (
+            mock.patch.object(axis, "inactive_coderabbit_path", return_value=None),
             mock.patch.object(
                 axis,
                 "command_version_line",
@@ -2286,6 +2287,28 @@ class TestMarkdownLinkGate(unittest.TestCase):
         output = stderr.getvalue()
         self.assertIn("CodeRabbit CLI is required", output)
         self.assertIn("docs/playbooks/scripts.md#tool-versions", output)
+
+    def test_coderabbit_cli_reports_installed_command_directory_missing_from_path(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            home = Path(temp)
+            coderabbit = home / ".local" / "bin" / "coderabbit"
+            coderabbit.parent.mkdir(parents=True)
+            coderabbit.write_text("", encoding="utf-8")
+            with (
+                mock.patch.object(axis.os, "name", "posix"),
+                mock.patch.object(axis.Path, "home", return_value=home),
+                mock.patch.object(
+                    axis,
+                    "command_version_line",
+                    return_value=(False, "coderabbit not found in PATH", "coderabbit"),
+                ),
+            ):
+                ok, detail = axis.coderabbit_cli_status()
+
+        self.assertFalse(ok)
+        self.assertIn(str(coderabbit), detail)
+        self.assertIn("not active in PATH", detail)
+        self.assertIn("new login shell", detail)
 
     def test_coderabbit_cli_rejects_old_version(self) -> None:
         with (
@@ -3198,6 +3221,11 @@ class TestLocalDevCli(unittest.TestCase):
       - \"127.0.0.1:5281:8443\"
 """
 
+        cli_artifacts_equals_compose = watching_compose.replace(
+            "      - run\n",
+            "      - run\n      - --ARTIFACTS-PATH=/tmp/axis-artifacts\n",
+        )
+
         indirect_compose = """services:
   api:
     command: [\"sh\", \"-c\", \"dotnet watch --project src/Axis.Api/Axis.Api.csproj run\"]
@@ -3230,6 +3258,7 @@ class TestLocalDevCli(unittest.TestCase):
         self.assertIn(expected, check(one_shot_compose))
         self.assertIn(expected, check(indirect_compose))
         self.assertIn(expected, check(cli_artifacts_compose))
+        self.assertIn(expected, check(cli_artifacts_equals_compose))
         self.assertIn(
             expected,
             check(watching_compose.replace('      UseArtifactsOutput: "true"\n', "")),

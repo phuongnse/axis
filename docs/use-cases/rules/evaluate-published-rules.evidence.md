@@ -4,6 +4,8 @@
 
 ## Acceptance Evidence
 
+AT-009 proves the UI projection of simulation results and errors. Runtime evaluator identity, diagnostic safety, and non-mutation are owned by the application/API evidence in AT-005 and AT-006, not inferred from the component test.
+
 | AT ID | Evidence | Commands |
 |---|---|---|
 | AT-001, AT-002 | `src/Modules/Rules/Axis.Rules.Domain/RuleExpressionLanguage.cs`, `tests/Modules/Rules/Axis.Rules.Domain.Tests/RuleConditionEvaluatorTests.cs`, `tests/Modules/Rules/Axis.Rules.Domain.Tests/SystemRuleCatalogTests.cs`, `tests/Modules/Rules/Axis.Rules.Domain.Tests/RuleValueTests.cs` | `python scripts/axis.py dotnet test tests/Modules/Rules/Axis.Rules.Domain.Tests/Axis.Rules.Domain.Tests.csproj` |

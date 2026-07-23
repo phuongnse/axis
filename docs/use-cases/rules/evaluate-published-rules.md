@@ -75,7 +75,7 @@ Evaluate exact published system or workspace rule versions against typed context
 | AT-006 | API boundary | Evaluation and simulation contracts expose stable problem codes, authorization behavior, and generated frontend parity | AC-001, AC-004, AC-005, AC-009, AC-014, AC-015 | API integration test | Yes |
 | AT-007 | API/Application boundaries | Missing workspace, cross-workspace rule references, and unavailable definitions fail without disclosure | AC-002, AC-008, AC-015 | API integration test + Application test | Yes |
 | AT-008 | Application boundary | Evaluator has no side-effect dependencies and consumers own authorization, persistence, and transaction enforcement | AC-011, AC-016 | Architecture test | Yes |
-| AT-009 | UI component | Authoring simulation shows deterministic result and safe diagnostics for valid and invalid sample context | AC-007, AC-009, AC-014 | UI component test | Yes |
+| AT-009 | UI component | Authoring simulation renders the returned match, non-match, diagnostic, and error states for valid and invalid sample context | AC-007 | UI component test | Yes |
 | AT-010 | Browser journey | User simulates a workspace rule through the authoring flow without mutation, console errors, or layout overflow | AC-007, AC-014, AC-015 | Browser automation | Yes |
 
 ## Out Of Scope

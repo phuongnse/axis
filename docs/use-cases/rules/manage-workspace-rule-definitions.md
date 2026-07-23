@@ -22,7 +22,7 @@ Let a signed-in workspace user define, validate, publish, revise, and archive re
 3. System offers the scopes exposed by context schemas currently registered by consumers.
 4. User selects an available scope, context key, and schema version owned by the target business context.
 5. User selects a pure outcome kind: Validation or Decision.
-6. System exposes the versioned expression capabilities and context fields registered for that scope and context version.
+6. System combines the selected versioned expression-language capabilities with the fields supplied by the consumer-owned context schema registered for that scope and context version.
 7. User independently composes a typed expression from allowed context operands, literals, parameters, pure functions, comparison operators, and all/any/not groups.
 8. For Validation, user defines a stable violation code, severity, and user-facing message; for Decision, user defines Allow or Deny when the expression matches.
 9. User validates the draft against the selected context contract and can simulate it with sample context before publication.
@@ -83,7 +83,7 @@ Let a signed-in workspace user define, validate, publish, revise, and archive re
 | AT-006 | API boundary | Authorized lifecycle endpoints expose stable request/response contracts, problem codes, pagination, and generated frontend parity | AC-001, AC-006, AC-007, AC-008, AC-009, AC-010, AC-011, AC-015 | API integration test | Yes |
 | AT-007 | API/Application boundaries | Anonymous, missing-workspace, unavailable-workspace, and cross-workspace operations fail without mutation or disclosure | AC-018, AC-019, AC-022 | API integration test + Application test | Yes |
 | AT-008 | Application boundary | Rules owns lifecycle/persistence and consumers depend only on context/evaluation contracts without internal-module references | AC-004, AC-017, AC-020 | Architecture test | Yes |
-| AT-009 | UI component | Catalog and authoring surfaces support lifecycle, typed expression authoring, contextual errors, simulation, and read-only system definitions | AC-001, AC-002, AC-003, AC-005, AC-006, AC-010, AC-012, AC-014, AC-022 | UI component test | Yes |
+| AT-009 | UI component | Catalog and authoring surfaces support lifecycle, typed expression authoring, contextual errors, simulation, and read-only system definitions | AC-001, AC-002, AC-003, AC-005, AC-006, AC-010, AC-012, AC-022 | UI component test | Yes |
 | AT-010 | Browser journey | User creates, validates, simulates, publishes, revises, and archives a workspace rule without console errors or layout overflow | AC-001, AC-006, AC-007, AC-008, AC-009, AC-010, AC-018, AC-021 | Browser automation | Yes |
 
 ## Out Of Scope
@@ -99,7 +99,7 @@ Let a signed-in workspace user define, validate, publish, revise, and archive re
 |---|---|
 | Rules catalog | List system and workspace rules with useful scope, status, origin, and version context; render each origin with a distinct, stable semantic badge treatment and provide creation only for workspace rules. |
 | New rule identity | Capture name and description, display the derived stable key, and select a scope exposed by a registered context schema plus an outcome kind. |
-| Expression builder | Let the user independently compose typed nested logic from all context-aware fields, parameters, operators, pure functions, and groups exposed by the selected versioned capability contract without exposing raw serialized AST data. |
+| Expression builder | Let the user independently compose typed nested logic from fields supplied by the selected consumer-owned context schema and parameters, operators, pure functions, and groups supplied by the selected versioned expression-language contract without exposing raw serialized AST data. |
 | Outcome editor | Configure Validation or Decision outcome details with contextual validation. |
 | Validate and simulate | Show node-specific errors or deterministic result and outcome for sample context without mutation. |
 | Publish review | Summarize scope, typed expression, parameters, outcome, and immutable version implications before publication. |
@@ -159,4 +159,4 @@ sequenceDiagram
 >
 > **Verification:** Acceptance proof is tracked in the sibling evidence sidecar.
 >
-> **Decisions:** Rules owns one versioned typed-expression language and one evaluator for system and workspace definitions. The system controls the safe capability registry, type signatures, context fields, and complexity limits; users control how every capability available to their selected context is composed. Workspace rules do not accept arbitrary executable code. Definitions have draft/published/archived lifecycle with immutable published versions and optimistic concurrency. Workspace rules use only scopes exposed by registered context schemas and produce pure Validation or Decision outcomes. System rules share the same expression model but remain code-owned and read-only. Consumers register versioned context schemas and own applications, enforcement transactions, and all side effects. Published versions are never edited or deleted. Event sourcing, integration events, inbox/outbox, runtime scripting, plugins, and automation actions are rejected for this slice.
+> **Decisions:** Rules owns one versioned typed-expression language and one evaluator for system and workspace definitions. The system controls the safe language capability registry, type signatures, and complexity limits; consumers register versioned context schemas and control the fields available to each context, while users control how the resulting allowed capabilities are composed. Workspace rules do not accept arbitrary executable code. Definitions have draft/published/archived lifecycle with immutable published versions and optimistic concurrency. Workspace rules use only scopes exposed by registered context schemas and produce pure Validation or Decision outcomes. System rules share the same expression model but remain code-owned and read-only. Consumers own applications, enforcement transactions, and all side effects. Published versions are never edited or deleted. Event sourcing, integration events, inbox/outbox, runtime scripting, plugins, and automation actions are rejected for this slice.

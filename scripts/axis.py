@@ -2563,10 +2563,27 @@ def check_markdown_links_for_paths(paths: list[str] | None) -> int:
     return result.returncode
 
 
+def inactive_coderabbit_path() -> Path | None:
+    if os.name == "nt":
+        return None
+    candidate = Path.home() / ".local" / "bin" / "coderabbit"
+    return candidate if candidate.is_file() else None
+
+
+def coderabbit_missing_detail(version_line: str) -> str:
+    inactive = inactive_coderabbit_path()
+    if inactive is not None:
+        return (
+            f"coderabbit is installed at {inactive}, but {inactive.parent} is not active in PATH; "
+            f"add that directory to PATH and start a new login shell, then rerun. See {TOOL_VERSIONS_DOC}."
+        )
+    return f"{version_line}; CodeRabbit CLI is required for the local pre-PR review checkpoint. See {TOOL_VERSIONS_DOC}."
+
+
 def coderabbit_cli_status() -> tuple[bool, str]:
     ok, version_line, resolved = command_version_line("coderabbit", "--version")
     if not ok:
-        return False, f"{version_line}; CodeRabbit CLI is required for the local pre-PR review checkpoint. See {TOOL_VERSIONS_DOC}."
+        return False, coderabbit_missing_detail(version_line)
 
     version_match = re.search(r"\b([0-9]+(?:[.][0-9]+)+)\b", version_line)
     if version_match is None:
@@ -2588,10 +2605,7 @@ def coderabbit_doctor_status(*, strict: bool) -> tuple[str, str]:
 
     resolved = shutil.which(resolve_exe("coderabbit")) or shutil.which("coderabbit")
     if resolved is None:
-        return (
-            "FAIL",
-            f"coderabbit not found in PATH; CodeRabbit CLI is required for the local pre-PR review checkpoint. See {TOOL_VERSIONS_DOC}.",
-        )
+        return "FAIL", coderabbit_missing_detail("coderabbit not found in PATH")
 
     suffix = Path(resolved).suffix.lower()
     if os.name == "nt" and suffix in {".cmd", ".bat"}:

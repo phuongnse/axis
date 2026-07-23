@@ -2,7 +2,7 @@
 
 > **Navigation**: [docs/use-cases/README.md](../README.md) · [docs/README.md](../../README.md) · [AGENTS.md](../../../AGENTS.md)
 
-Rules owns reusable system and workspace rule definitions, immutable versions, parameter and context schemas, a versioned typed-expression language with registered capabilities, and pure deterministic evaluation. The system defines the safe language and each user controls how available fields, parameters, operators, functions, and logical groups are composed. Consumer modules own applied snapshots, authorization, enforcement transactions, side effects, and runtime business state.
+Rules owns reusable system and workspace rule definitions, immutable versions, parameter and context schemas, a versioned typed-expression language with registered capabilities, and pure deterministic evaluation. The system defines the safe language; for workspace-authored rules, each user controls how available fields, parameters, operators, functions, and logical groups are composed. System definitions remain code-owned and read-only. Consumer modules own applied snapshots, authorization, enforcement transactions, side effects, and runtime business state.
 
 ## Current Use Cases
 
