@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { type AnchorHTMLAttributes, type ReactNode, useState } from 'react';
+import type { AnchorHTMLAttributes, ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { signOutUser } from '@/features/auth/api';
 import { useAuthStore } from '@/features/auth/auth-store';
@@ -19,7 +19,7 @@ const routerState = { location: { pathname: '/dashboard' } };
 const navigateMock = vi.fn();
 const testWindowRenderers: ManagedWindowRendererRegistry = {
   test: TestWindowRenderer,
-  'adaptive-test': AdaptiveTestWindowRenderer,
+  'sizing-test': SizingTestWindowRenderer,
 };
 
 vi.mock('@tanstack/react-router', () => ({
@@ -262,7 +262,7 @@ describe('AppShell', () => {
     );
   });
 
-  it('AT-001 resolves adaptive initial sizing once content is ready and re-evaluates on reset', async () => {
+  it('AT-001 keeps runtime overflow windowed and uses fullscreen only for an explicit workflow policy', async () => {
     const user = userEvent.setup();
     const queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false } },
@@ -290,60 +290,44 @@ describe('AppShell', () => {
       render(
         <QueryClientProvider client={queryClient}>
           <AppShell navigationContributions={[]} windowRenderers={testWindowRenderers}>
-            <AdaptiveTestWindowLauncher />
+            <SizingTestWindowLauncher />
           </AppShell>
         </QueryClientProvider>,
       );
 
-      await user.click(screen.getByRole('button', { name: 'Open fitting window' }));
-      const fittingDialog = await screen.findByRole('dialog', { name: 'Fitting window' });
-      expect(fittingDialog.querySelector('[data-slot="managed-dialog-header"]')).toHaveClass(
+      await user.click(screen.getByRole('button', { name: 'Open overflowing window' }));
+      const overflowingDialog = await screen.findByRole('dialog', { name: 'Overflowing window' });
+      expect(overflowingDialog.querySelector('[data-slot="managed-dialog-header"]')).toHaveClass(
         'items-center',
       );
-      const fittingWindow = fittingDialog.querySelector('[data-slot="managed-dialog-window"]');
-      await waitFor(() => expect(fittingWindow).toHaveAttribute('data-dialog-preset', 'large'));
+      const overflowingWindow = overflowingDialog.querySelector(
+        '[data-slot="managed-dialog-window"]',
+      );
+      await waitFor(() =>
+        expect(overflowingWindow).toHaveAttribute('data-dialog-preset', 'windowed'),
+      );
       const workAreaWidth = window.visualViewport?.width ?? window.innerWidth;
       const workAreaHeight = window.visualViewport?.height ?? window.innerHeight;
-      expect(fittingWindow).toHaveStyle({
+      expect(overflowingWindow).toHaveStyle({
         width: `${workAreaWidth * 0.5}px`,
         height: `${workAreaHeight * 0.75}px`,
       });
+      await user.click(screen.getByRole('button', { name: 'Reset dialog' }));
+      expect(overflowingWindow).toHaveAttribute('data-dialog-preset', 'windowed');
       await user.click(screen.getByRole('button', { name: 'Close dialog' }));
 
-      await user.click(screen.getByRole('button', { name: 'Open pending overflow window' }));
-      const overflowDialog = await screen.findByRole('dialog', { name: 'Overflow window' });
-      expect(overflowDialog.querySelector('[data-slot="managed-dialog-window"]')).toHaveAttribute(
-        'data-dialog-preset',
-        'large',
+      await user.click(screen.getByRole('button', { name: 'Open fullscreen workflow' }));
+      const fullscreenDialog = await screen.findByRole('dialog', { name: 'Fullscreen workflow' });
+      const fullscreenWindow = fullscreenDialog.querySelector(
+        '[data-slot="managed-dialog-window"]',
       );
-
-      await user.click(screen.getByRole('button', { name: 'Finish loading' }));
       await waitFor(() =>
-        expect(overflowDialog.querySelector('[data-slot="managed-dialog-window"]')).toHaveAttribute(
-          'data-dialog-preset',
-          'fullscreen',
-        ),
+        expect(fullscreenWindow).toHaveAttribute('data-dialog-preset', 'fullscreen'),
       );
-
       await user.click(screen.getByRole('button', { name: 'Restore dialog size' }));
-      expect(overflowDialog.querySelector('[data-slot="managed-dialog-window"]')).toHaveAttribute(
-        'data-dialog-preset',
-        'large',
-      );
-      await waitFor(() =>
-        expect(overflowDialog.querySelector('[data-slot="managed-dialog-window"]')).toHaveAttribute(
-          'data-dialog-preset',
-          'large',
-        ),
-      );
-
+      expect(fullscreenWindow).toHaveAttribute('data-dialog-preset', 'windowed');
       await user.click(screen.getByRole('button', { name: 'Reset dialog' }));
-      await waitFor(() =>
-        expect(overflowDialog.querySelector('[data-slot="managed-dialog-window"]')).toHaveAttribute(
-          'data-dialog-preset',
-          'fullscreen',
-        ),
-      );
+      expect(fullscreenWindow).toHaveAttribute('data-dialog-preset', 'fullscreen');
     } finally {
       clientHeight.mockRestore();
       scrollHeight.mockRestore();
@@ -494,21 +478,21 @@ function TestWindowRenderer() {
   );
 }
 
-type AdaptiveTestPayload = {
+type SizingTestPayload = {
   overflow: boolean;
-  ready: boolean;
+  initialSize?: 'fullscreen';
 };
 
-function AdaptiveTestWindowLauncher() {
+function SizingTestWindowLauncher() {
   const { openWindow } = useManagedWindowActions();
-  const openAdaptiveWindow = (id: string, title: string, payload: AdaptiveTestPayload) =>
+  const openSizingTestWindow = (id: string, title: string, payload: SizingTestPayload) =>
     openWindow({
       id,
-      kind: 'adaptive-test',
+      kind: 'sizing-test',
       resourceKey: id,
       title,
       payload,
-      initialSize: 'auto',
+      initialSize: payload.initialSize,
     });
 
   return (
@@ -516,37 +500,34 @@ function AdaptiveTestWindowLauncher() {
       <button
         type="button"
         onClick={() =>
-          openAdaptiveWindow('test:fitting', 'Fitting window', { overflow: false, ready: true })
+          openSizingTestWindow('test:overflowing', 'Overflowing window', { overflow: true })
         }
       >
-        Open fitting window
+        Open overflowing window
       </button>
       <button
         type="button"
         onClick={() =>
-          openAdaptiveWindow('test:overflow', 'Overflow window', {
-            overflow: true,
-            ready: false,
+          openSizingTestWindow('test:fullscreen', 'Fullscreen workflow', {
+            overflow: false,
+            initialSize: 'fullscreen',
           })
         }
       >
-        Open pending overflow window
+        Open fullscreen workflow
       </button>
     </>
   );
 }
 
-function AdaptiveTestWindowRenderer({ descriptor }: ManagedWindowRendererProps) {
+function SizingTestWindowRenderer({ descriptor }: ManagedWindowRendererProps) {
   const { windowId, closeWindow } = useCurrentManagedWindow();
-  const payload = descriptor.payload as AdaptiveTestPayload;
-  const [ready, setReady] = useState(payload.ready);
+  const payload = descriptor.payload as SizingTestPayload;
   return (
     <ManagedDialog
       open
       title={descriptor.title}
-      description="Adaptive window description"
-      autoSizeKey={descriptor.resourceKey}
-      autoSizeReady={ready}
+      description="Sizing test window description"
       onOpenChange={(open) => {
         if (!open) closeWindow(windowId);
       }}
@@ -557,12 +538,7 @@ function AdaptiveTestWindowRenderer({ descriptor }: ManagedWindowRendererProps) 
       }
     >
       <ManagedDialogBody data-content-overflow={payload.overflow}>
-        Adaptive content
-        {!ready ? (
-          <button type="button" onClick={() => setReady(true)}>
-            Finish loading
-          </button>
-        ) : null}
+        Sizing test content
       </ManagedDialogBody>
     </ManagedDialog>
   );

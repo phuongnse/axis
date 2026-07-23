@@ -522,33 +522,12 @@ test('workspace rule authoring supports simulation, immutable revisions, and arc
   const systemDetails = page.getByRole('dialog', { name: 'Required value' });
   const systemWindow = systemDetails.locator('[data-slot="managed-dialog-window"]');
   await expect(systemDetails).toBeVisible();
-  await expect(systemWindow).toHaveAttribute('data-dialog-preset', 'fullscreen');
+  await expect(systemWindow).toHaveAttribute('data-dialog-preset', 'windowed');
   const expandedLayerBox = await page
     .locator('[data-slot="managed-window-expanded-layer"]')
     .boundingBox();
   if (!expandedLayerBox) throw new Error('Managed window work area did not render');
-  await expect
-    .poll(async () => {
-      const box = await systemWindow.boundingBox();
-      return box
-        ? {
-            width: Math.round(box.width),
-            height: Math.round(box.height),
-            x: Math.round(box.x),
-            y: Math.round(box.y),
-          }
-        : null;
-    })
-    .toEqual({
-      width: Math.round(expandedLayerBox.width),
-      height: Math.round(expandedLayerBox.height),
-      x: Math.round(expandedLayerBox.x),
-      y: Math.round(expandedLayerBox.y),
-    });
-
-  await systemDetails.getByRole('button', { name: 'Restore dialog size' }).click();
-  await expect(systemWindow).toHaveAttribute('data-dialog-preset', 'large');
-  const expectedLargeRect = {
+  const expectedWindowedRect = {
     width: Math.round(expandedLayerBox.width * 0.5),
     height: Math.round(expandedLayerBox.height * 0.75),
     x: Math.round(expandedLayerBox.x + expandedLayerBox.width * 0.25),
@@ -566,7 +545,7 @@ test('workspace rule authoring supports simulation, immutable revisions, and arc
           }
         : null;
     })
-    .toEqual(expectedLargeRect);
+    .toEqual(expectedWindowedRect);
 
   const backgroundNewRuleButton = catalog.getByRole('button', { name: 'New rule', exact: true });
   await expect(backgroundNewRuleButton).toBeVisible();
@@ -591,9 +570,7 @@ test('workspace rule authoring supports simulation, immutable revisions, and arc
   expect(draggedDialogBox?.y ?? 0).toBeGreaterThan(initialDialogBox.y + 20);
 
   await systemDetails.getByRole('button', { name: 'Reset dialog' }).click();
-  await expect(systemWindow).toHaveAttribute('data-dialog-preset', 'fullscreen');
-  await systemDetails.getByRole('button', { name: 'Restore dialog size' }).click();
-  await expect(systemWindow).toHaveAttribute('data-dialog-preset', 'large');
+  await expect(systemWindow).toHaveAttribute('data-dialog-preset', 'windowed');
   const resetDialogBox = await systemWindow.boundingBox();
   expect(resetDialogBox?.x).toBeCloseTo(expandedLayerBox.x + expandedLayerBox.width * 0.25, 1);
   expect(resetDialogBox?.y).toBeCloseTo(expandedLayerBox.y + expandedLayerBox.height * 0.125, 1);
@@ -607,7 +584,8 @@ test('workspace rule authoring supports simulation, immutable revisions, and arc
   await page.mouse.move(resetDialogBox.x + 360, resetDialogBox.y + 240, { steps: 5 });
   await page.mouse.up();
   const minimumDialogBox = await systemWindow.boundingBox();
-  expect(minimumDialogBox?.width).toBeGreaterThanOrEqual(expandedLayerBox.width / 2 - 1);
+  expect(minimumDialogBox?.width).toBeGreaterThanOrEqual(expandedLayerBox.width * 0.35 - 1);
+  expect(minimumDialogBox?.width).toBeLessThan(resetDialogBox.width - 1);
   expect(minimumDialogBox?.height).toBeGreaterThanOrEqual(expandedLayerBox.height / 2 - 1);
 
   if (!minimumDialogBox) throw new Error('Managed dialog disappeared at its minimum size');
@@ -739,9 +717,16 @@ test('workspace rule authoring supports simulation, immutable revisions, and arc
   await expect(systemBadges).toHaveCount(2);
   await expect(systemBadges.nth(0)).toHaveText('Built-in');
   await expect(systemBadges.nth(1)).toHaveText('Published');
-  await expect(systemDetails.getByRole('heading', { name: 'Rule logic' })).toBeVisible();
-  await expect(systemDetails).toContainText('Is blank');
-  await expect(systemDetails).toContainText('Field value');
+  await expect(systemDetails.getByRole('heading', { name: 'What this rule does' })).toBeVisible();
+  await expect(
+    systemDetails.getByRole('heading', { name: 'Where this rule applies' }),
+  ).toBeVisible();
+  await expect(systemDetails).toContainText('Field value is blank');
+  await expect(systemDetails).not.toContainText('Equals true');
+  await expect(systemDetails.getByRole('button', { name: /Technical details/ })).toHaveAttribute(
+    'aria-expanded',
+    'false',
+  );
   await expect(systemDetails.getByRole('button', { name: 'Archive', exact: true })).toHaveCount(0);
   await page.keyboard.press('Escape');
   await expect(systemDetails).toBeHidden();
@@ -961,7 +946,7 @@ test('workspace rule authoring supports simulation, immutable revisions, and arc
   await expect(editorDialog.getByRole('button', { name: 'Restore dialog size' })).toBeDisabled();
   await editorDialog.getByRole('button', { name: 'Minimize dialog' }).click();
   const editorDock = await expectDockAboveFooter(page);
-  await expect(editorDock).toHaveAttribute('data-dialog-preset', 'fullscreen');
+  await expect(editorDock).toHaveAttribute('data-dialog-preset', 'windowed');
   await expect(editorDock).toContainText('Credit threshold');
   await expect(editorDialog).toBeHidden();
   await page.keyboard.press('Escape');

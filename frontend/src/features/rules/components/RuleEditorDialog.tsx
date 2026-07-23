@@ -395,14 +395,6 @@ export function RuleEditorDialog({
       editor !== null &&
       baselineEditor !== null &&
       JSON.stringify(editor) !== JSON.stringify(baselineEditor);
-  const autoSizeReady =
-    !schemasQuery.isLoading &&
-    (creating
-      ? createSchemaLoadFailed || createSchemaUnavailable || editor !== null
-      : detailQuery.isError ||
-        expressionLanguageQuery.isError ||
-        Boolean(detail && editor && expressionLanguageQuery.data));
-
   function requestOpenChange(nextOpen: boolean) {
     if (nextOpen) {
       onOpenChange(true);
@@ -427,8 +419,6 @@ export function RuleEditorDialog({
       titleAccessory={detail ? <LifecycleBadge detail={detail} /> : null}
       closeDisabled={busy}
       dirty={isDirty}
-      autoSizeKey={creating ? 'create' : `editor:${definitionKey ?? 'unknown'}`}
-      autoSizeReady={autoSizeReady}
       footerClassName={
         detail && editor && detail.status !== 'Archived' && detail.latestPublishedVersion
           ? 'sm:justify-between'

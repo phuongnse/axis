@@ -286,7 +286,7 @@ describe('RulesPage', () => {
     await user.click(systemRuleLink);
     const systemDetails = await screen.findByRole('dialog', { name: 'Required value' });
     const dialogWindow = systemDetails.querySelector('[data-slot="managed-dialog-window"]');
-    expect(dialogWindow).toHaveAttribute('data-dialog-preset', 'large');
+    expect(dialogWindow).toHaveAttribute('data-dialog-preset', 'windowed');
     expect(within(systemDetails).getByRole('button', { name: 'Reset dialog' })).toBeEnabled();
     const minimizeButton = within(systemDetails).getByRole('button', {
       name: 'Minimize dialog',
@@ -312,20 +312,20 @@ describe('RulesPage', () => {
       within(systemDetails).getByRole('button', { name: 'Restore dialog size' }),
     ).toBeEnabled();
     await user.dblClick(managedHeader as HTMLElement);
-    expect(dialogWindow).toHaveAttribute('data-dialog-preset', 'large');
+    expect(dialogWindow).toHaveAttribute('data-dialog-preset', 'windowed');
 
     const maximizeButton = within(systemDetails).getByRole('button', {
       name: 'Maximize dialog',
     });
     await user.dblClick(maximizeButton);
-    expect(dialogWindow).toHaveAttribute('data-dialog-preset', 'large');
+    expect(dialogWindow).toHaveAttribute('data-dialog-preset', 'windowed');
 
     await user.click(minimizeButton);
     const dock = document.querySelector('[data-slot="managed-window-dock"]');
     expect(dock).not.toBeNull();
-    expect(dock).toHaveAttribute('data-dialog-preset', 'large');
+    expect(dock).toHaveAttribute('data-dialog-preset', 'windowed');
     expect(screen.queryByRole('dialog', { name: 'Required value' })).not.toBeInTheDocument();
-    const restoreLargeButton = within(dock as HTMLElement).getByRole('button', {
+    const restoreWindowedButton = within(dock as HTMLElement).getByRole('button', {
       name: 'Restore dialog',
     });
     expect(dock?.querySelector('[data-action="restore"]')).toHaveFocus();
@@ -335,15 +335,17 @@ describe('RulesPage', () => {
     await user.click(within(catalog).getByRole('button', { name: 'Filters' }));
     expect(screen.getByRole('button', { name: 'Add condition' })).toBeInTheDocument();
 
-    await user.click(restoreLargeButton);
-    const restoredLarge = await screen.findByRole('dialog', { name: 'Required value' });
-    const restoredLargeWindow = restoredLarge.querySelector('[data-slot="managed-dialog-window"]');
-    expect(restoredLargeWindow).toHaveAttribute('data-dialog-preset', 'large');
+    await user.click(restoreWindowedButton);
+    const restoredWindowed = await screen.findByRole('dialog', { name: 'Required value' });
+    const restoredWindowedWindow = restoredWindowed.querySelector(
+      '[data-slot="managed-dialog-window"]',
+    );
+    expect(restoredWindowedWindow).toHaveAttribute('data-dialog-preset', 'windowed');
     expect(minimizeButton).toHaveFocus();
 
-    await user.click(within(restoredLarge).getByRole('button', { name: 'Maximize dialog' }));
-    expect(restoredLargeWindow).toHaveAttribute('data-dialog-preset', 'fullscreen');
-    await user.click(within(restoredLarge).getByRole('button', { name: 'Minimize dialog' }));
+    await user.click(within(restoredWindowed).getByRole('button', { name: 'Maximize dialog' }));
+    expect(restoredWindowedWindow).toHaveAttribute('data-dialog-preset', 'fullscreen');
+    await user.click(within(restoredWindowed).getByRole('button', { name: 'Minimize dialog' }));
     const fullscreenDock = document.querySelector('[data-slot="managed-window-dock"]');
     expect(fullscreenDock).toHaveAttribute('data-dialog-preset', 'fullscreen');
     await user.click(
@@ -361,13 +363,20 @@ describe('RulesPage', () => {
     await user.click(restoreSizeButton);
     expect(restoredFullscreen.querySelector('[data-slot="managed-dialog-window"]')).toHaveAttribute(
       'data-dialog-preset',
-      'large',
+      'windowed',
     );
     expect(
       within(restoredFullscreen).getByRole('button', { name: 'Maximize dialog' }),
     ).toBeEnabled();
     expect(
-      within(restoredFullscreen).getByRole('heading', { name: 'Definition' }),
+      within(restoredFullscreen).getByRole('heading', {
+        name: 'What this rule does',
+      }),
+    ).toBeInTheDocument();
+    expect(
+      within(restoredFullscreen).getByRole('heading', {
+        name: 'Where this rule applies',
+      }),
     ).toBeInTheDocument();
     const restoredHeader = restoredFullscreen.querySelector('[data-slot="managed-dialog-header"]');
     expect(restoredHeader).not.toBeNull();
@@ -393,7 +402,7 @@ describe('RulesPage', () => {
     const workspaceDetails = await screen.findByRole('dialog', { name: 'Credit threshold' });
     expect(workspaceDetails.querySelector('[data-slot="managed-dialog-window"]')).toHaveAttribute(
       'data-dialog-preset',
-      'large',
+      'windowed',
     );
     expect(within(workspaceDetails).getByRole('button', { name: 'Maximize dialog' })).toBeEnabled();
     await waitFor(() =>
@@ -413,7 +422,7 @@ describe('RulesPage', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('renders system rule details as responsive described sections', async () => {
+  it('renders system rule details with a scannable business-first hierarchy', async () => {
     const user = userEvent.setup();
     vi.mocked(fetch).mockImplementation((input) => {
       const url = input.toString();
@@ -444,66 +453,49 @@ describe('RulesPage', () => {
     expect(headerBadges[0]).toHaveClass('bg-info/10', 'text-info');
     expect(within(details).queryByText('Read-only')).not.toBeInTheDocument();
 
-    const definitionSection = within(details).getByRole('region', { name: 'Definition' });
-    const fieldTypesSection = within(details).getByRole('region', {
-      name: 'Supported field types',
+    const summary = within(details).getByText('Require records to provide a value for the field.');
+    expect(summary).toHaveAttribute('data-slot', 'system-rule-summary');
+
+    const behaviorSection = within(details).getByRole('region', {
+      name: 'What this rule does',
     });
-    const parametersSection = within(details).getByRole('region', { name: 'Parameters' });
-    const logicSection = within(details).getByRole('region', { name: 'Rule logic' });
-    const outcomeSection = within(details).getByRole('region', { name: 'Outcome' });
-    const sections = [
-      definitionSection,
-      fieldTypesSection,
-      logicSection,
-      parametersSection,
-      outcomeSection,
-    ];
+    const applicabilitySection = within(details).getByRole('region', {
+      name: 'Where this rule applies',
+    });
+    expect(within(details).queryByRole('region', { name: 'Parameters' })).not.toBeInTheDocument();
 
-    expect(details.querySelectorAll('[data-slot="system-rule-details-section"]')).toHaveLength(5);
-    expect(definitionSection).toHaveTextContent(
-      'Scope, ownership, lifecycle, and published version.',
-    );
-    expect(definitionSection).toHaveTextContent(
-      'Require records to provide a value for the field.',
-    );
-    expect(fieldTypesSection).toHaveTextContent('Field types and setup supported by this rule.');
-    expect(parametersSection).toHaveTextContent(
-      'Optional typed inputs supplied when a rule is applied.',
-    );
-    expect(logicSection).toHaveTextContent('Is blank');
-    expect(logicSection).toHaveTextContent('Field value');
-    expect(logicSection).toHaveTextContent('Equals');
-    expect(logicSection).toHaveTextContent('true');
-    expect(outcomeSection).toHaveTextContent('A value is required.');
-    expect(definitionSection).toHaveTextContent('Applies to a single field value.');
+    expect(behaviorSection).toHaveTextContent('When');
+    expect(behaviorSection).toHaveTextContent('Field value is blank');
+    expect(behaviorSection).not.toHaveTextContent('Equals');
+    expect(behaviorSection).not.toHaveTextContent('true');
+    expect(behaviorSection).toHaveTextContent('Then');
+    expect(behaviorSection).toHaveTextContent('Validation');
+    expect(behaviorSection).toHaveTextContent('Error');
+    expect(behaviorSection).toHaveTextContent('A value is required.');
 
-    for (const section of sections) {
-      expect(section).toHaveClass('grid', 'gap-4', 'py-6', 'sm:grid-cols-3', 'sm:gap-8');
-      expect(
-        section.querySelector('[data-slot="system-rule-details-section-content"]'),
-      ).toHaveClass('sm:col-span-2');
-    }
-    expect(definitionSection).not.toHaveClass('border-t');
-    expect(fieldTypesSection).toHaveClass('border-t');
-    expect(logicSection).toHaveClass('border-t');
-    expect(parametersSection).toHaveClass('border-t');
-    expect(outcomeSection).toHaveClass('border-t');
+    expect(applicabilitySection).toHaveTextContent('Applies to a single field value.');
+    expect(within(applicabilitySection).getByText('Text')).toHaveAttribute('data-slot', 'badge');
+    expect(within(applicabilitySection).getByText('Choice')).toHaveAttribute('data-slot', 'badge');
+    expect(applicabilitySection).toHaveTextContent('Ready to use—no setup required.');
 
+    const detailsRoot = details.querySelector('[data-slot="system-rule-details"]');
+    expect(detailsRoot).toHaveClass('@container/system-rule-details');
+    expect(behaviorSection.querySelector('[data-slot="system-rule-behavior-grid"]')).toHaveClass(
+      'grid',
+      '@md/system-rule-details:grid-cols-2',
+    );
     expect(
-      Array.from(definitionSection.querySelectorAll('dt'), (item) => item.textContent),
-    ).toEqual(['Description', 'Scope', 'Version history']);
-    expect(
-      Array.from(fieldTypesSection.querySelectorAll('dt'), (item) => item.textContent),
-    ).toEqual(['Field types', 'Setup']);
-    for (const list of details.querySelectorAll('dl')) {
-      expect(list).toHaveClass('gap-y-5');
-    }
-    for (const item of details.querySelectorAll('dt')) {
-      expect(item.parentElement).toHaveClass('space-y-2');
-      expect(item.nextElementSibling).toHaveClass('leading-relaxed');
-    }
-    expect(within(fieldTypesSection).getByText('No setup needed')).toBeInTheDocument();
-    expect(within(parametersSection).getByText('No parameters')).toHaveClass('leading-relaxed');
+      applicabilitySection.querySelector('[data-slot="system-rule-applicability-grid"]'),
+    ).toHaveClass('grid', '@md/system-rule-details:grid-cols-2');
+    expect(detailsRoot?.querySelector('.sm\\:grid-cols-3')).not.toBeInTheDocument();
+    expect(detailsRoot?.querySelector('.xl\\:grid-cols-3')).not.toBeInTheDocument();
+
+    expect(within(details).queryByText('Violation code')).not.toBeInTheDocument();
+    await user.click(within(details).getByRole('button', { name: /Technical details/ }));
+    expect(within(details).getByText('Published version')).toBeVisible();
+    expect(within(details).getByText('Expression language')).toBeVisible();
+    expect(within(details).getByText('Violation code')).toBeVisible();
+    expect(within(details).getByText('field.value.required')).toBeVisible();
   });
 
   it('creates a workspace draft from a registered context', async () => {
@@ -539,7 +531,7 @@ describe('RulesPage', () => {
     const createDialog = await screen.findByRole('dialog', { name: 'New workspace rule' });
     expect(createDialog.querySelector('[data-slot="managed-dialog-window"]')).toHaveAttribute(
       'data-dialog-preset',
-      'large',
+      'windowed',
     );
     const createFooter = createDialog.querySelector('[data-slot="managed-dialog-footer"]');
     expect(createFooter).not.toBeNull();

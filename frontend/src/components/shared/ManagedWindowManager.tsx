@@ -11,9 +11,8 @@ import {
 import { useStore } from 'zustand';
 import { createStore, type StoreApi } from 'zustand/vanilla';
 
-export type ManagedWindowPreset = 'large' | 'custom' | 'fullscreen';
-export type ManagedWindowInitialSize = 'auto' | Exclude<ManagedWindowPreset, 'custom'>;
-export type ManagedWindowAutoSizeStatus = 'pending' | 'resolved' | 'manual';
+export type ManagedWindowPreset = 'windowed' | 'custom' | 'fullscreen';
+export type ManagedWindowInitialSize = Exclude<ManagedWindowPreset, 'custom'>;
 
 export interface ManagedWindowRect {
   x: number;
@@ -47,10 +46,6 @@ export interface ManagedWindowEntry {
   maximizeSnapshot: {
     preset: ManagedWindowPreset;
     rect: ManagedWindowRect;
-  } | null;
-  autoSize: {
-    key: string | null;
-    status: ManagedWindowAutoSizeStatus;
   } | null;
   zIndex: number;
   dockOrder: number;
@@ -267,10 +262,6 @@ function createManagedWindowStore(): StoreApi<ManagedWindowStoreState> {
               preset: initialPreset(descriptor.initialSize),
               rect: null,
               maximizeSnapshot: null,
-              autoSize:
-                (descriptor.initialSize ?? 'auto') === 'auto'
-                  ? { key: null, status: 'pending' }
-                  : null,
               zIndex: zCounter,
               dockOrder: 0,
               title: descriptor.title,
@@ -454,5 +445,5 @@ function highestExpandedWindowId(windows: Record<string, ManagedWindowEntry>, ex
 }
 
 function initialPreset(initialSize: ManagedWindowInitialSize | undefined): ManagedWindowPreset {
-  return initialSize === 'fullscreen' ? 'fullscreen' : 'large';
+  return initialSize === 'fullscreen' ? 'fullscreen' : 'windowed';
 }

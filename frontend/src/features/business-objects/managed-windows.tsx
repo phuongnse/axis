@@ -18,7 +18,6 @@ export function businessObjectCreateWindowDescriptor(title: string): ManagedWind
     resourceKey: 'create',
     title,
     payload: { mode: 'create' satisfies BusinessObjectWindowMode },
-    initialSize: 'auto',
   };
 }
 
@@ -37,7 +36,6 @@ export function businessObjectDefinitionWindowDescriptor({
     resourceKey: recordId,
     title,
     payload: { mode, recordId },
-    initialSize: 'auto',
   };
 }
 

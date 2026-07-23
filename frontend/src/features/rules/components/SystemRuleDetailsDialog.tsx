@@ -2,7 +2,15 @@ import { type ReactNode, useId } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ManagedDialog, ManagedDialogBody } from '@/components/shared/ManagedDialog';
 import { StatusBadge } from '@/components/shared/StatusBadge';
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '@/components/ui/accordion';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import type { RuleDefinitionDetail } from '../api';
 import {
@@ -41,6 +49,12 @@ export function SystemRuleDetailsDialog({
     : (definition?.description ?? t('rules.unknownRuleDescription'));
   const targetTypes = definition?.applicability?.targetTypeKeys ?? [];
   const parameters = definition?.parameters ?? [];
+  const setup =
+    setupKey === 'rules.setup.required'
+      ? t('rules.readyToUse')
+      : setupKey
+        ? t(setupKey)
+        : t('rules.setup.configured');
 
   return (
     <ManagedDialog
@@ -53,8 +67,6 @@ export function SystemRuleDetailsDialog({
           <StatusBadge tone="success">{t('rules.statusPublished')}</StatusBadge>
         </>
       }
-      autoSizeKey={`system:${definition?.definitionKey ?? fallbackTitle ?? 'unknown'}`}
-      autoSizeReady={!loading}
       footer={
         <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
           {t('app.close')}
@@ -69,18 +81,81 @@ export function SystemRuleDetailsDialog({
           </p>
         ) : null}
         {definition ? (
-          <div>
-            <DetailsSection
-              headingId={`${detailsId}-definition`}
-              title={t('rules.definitionSection')}
-              description={t('rules.definitionDetailsDescription')}
+          <div data-slot="system-rule-details" className="@container/system-rule-details space-y-6">
+            <p
+              data-slot="system-rule-summary"
+              className="text-sm leading-relaxed text-muted-foreground"
             >
-              <dl className="grid gap-x-6 gap-y-5 sm:grid-cols-2 xl:grid-cols-3">
-                <DetailItem
-                  className="sm:col-span-2"
-                  label={t('rules.description')}
-                  value={description}
-                />
+              {description}
+            </p>
+
+            <section
+              aria-labelledby={`${detailsId}-behavior`}
+              data-slot="system-rule-behavior"
+              className="space-y-4"
+            >
+              <SectionHeading
+                headingId={`${detailsId}-behavior`}
+                title={t('rules.whatThisRuleDoes')}
+                description={t('rules.ruleBehaviorDescription')}
+              />
+              <Card size="sm">
+                <CardContent
+                  data-slot="system-rule-behavior-grid"
+                  className="grid gap-5 @md/system-rule-details:grid-cols-2"
+                >
+                  <div className="space-y-2">
+                    <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+                      {t('rules.when')}
+                    </p>
+                    {definition.condition ? (
+                      <RuleExpressionView condition={definition.condition} />
+                    ) : (
+                      <p className="text-sm text-muted-foreground">{t('rules.notSet')}</p>
+                    )}
+                  </div>
+                  <div className="space-y-3">
+                    <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+                      {t('rules.then')}
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      <Badge variant="outline">
+                        {t(
+                          definition.outcomeKind === 'Decision'
+                            ? 'rules.outcomeDecision'
+                            : 'rules.outcomeValidation',
+                        )}
+                      </Badge>
+                      {definition.outcome?.severity ? (
+                        <Badge variant="destructive">
+                          {t(`rules.severity${definition.outcome.severity}`)}
+                        </Badge>
+                      ) : null}
+                    </div>
+                    <p className="text-sm leading-relaxed font-medium text-foreground">
+                      {definition.outcome?.message ??
+                        definition.outcome?.decision ??
+                        t('rules.notSet')}
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            </section>
+
+            <section
+              aria-labelledby={`${detailsId}-applicability`}
+              data-slot="system-rule-applicability"
+              className="space-y-4 border-t pt-6"
+            >
+              <SectionHeading
+                headingId={`${detailsId}-applicability`}
+                title={t('rules.whereThisRuleApplies')}
+                description={t('rules.applicabilityDescription')}
+              />
+              <dl
+                data-slot="system-rule-applicability-grid"
+                className="grid gap-5 @md/system-rule-details:grid-cols-2"
+              >
                 <DetailItem
                   label={t('rules.scope')}
                   value={
@@ -95,72 +170,37 @@ export function SystemRuleDetailsDialog({
                   }
                 />
                 <DetailItem
-                  label={t('rules.versionHistory')}
-                  value={t('rules.version', {
-                    version: definition.latestPublishedVersion ?? 1,
-                  })}
-                />
-              </dl>
-            </DetailsSection>
-
-            <DetailsSection
-              divided
-              headingId={`${detailsId}-field-types`}
-              title={t('rules.supportedFieldTypes')}
-              description={t('rules.supportedFieldTypesDescription')}
-            >
-              <dl className="grid gap-y-5">
-                <DetailItem
                   label={t('rules.fieldTypes')}
                   value={
-                    targetTypes.length > 0
-                      ? targetTypes
-                          .map((fieldType) => t(fieldTypeTranslationKey(fieldType)))
-                          .join(', ')
-                      : t('rules.contextUnavailable')
-                  }
-                />
-                <DetailItem
-                  label={t('rules.setupColumn')}
-                  value={setupKey ? t(setupKey) : t('rules.setup.configured')}
-                />
-              </dl>
-            </DetailsSection>
-
-            <DetailsSection
-              divided
-              headingId={`${detailsId}-logic`}
-              title={t('rules.ruleLogic')}
-              description={t('rules.ruleLogicDescription')}
-            >
-              <dl className="grid gap-y-5">
-                <DetailItem
-                  label={t('rules.expressionLanguage')}
-                  value={t('rules.expressionLanguageVersion', {
-                    version: definition.expressionLanguageVersion ?? 1,
-                  })}
-                />
-                <DetailItem
-                  label={t('rules.expression')}
-                  value={
-                    definition.condition ? (
-                      <RuleExpressionView condition={definition.condition} />
+                    targetTypes.length > 0 ? (
+                      <span className="flex flex-wrap gap-2">
+                        {targetTypes.map((fieldType) => (
+                          <Badge key={fieldType} variant="secondary">
+                            {t(fieldTypeTranslationKey(fieldType))}
+                          </Badge>
+                        ))}
+                      </span>
                     ) : (
-                      t('rules.notSet')
+                      t('rules.contextUnavailable')
                     )
                   }
                 />
+                <DetailItem label={t('rules.setupColumn')} value={setup} />
               </dl>
-            </DetailsSection>
+            </section>
 
-            <DetailsSection
-              divided
-              headingId={`${detailsId}-parameters`}
-              title={t('rules.parameters')}
-              description={t('rules.parametersHelp')}
-            >
-              {parameters.length > 0 ? (
-                <dl className="grid gap-x-6 gap-y-5 sm:grid-cols-2">
+            {parameters.length > 0 ? (
+              <section
+                aria-labelledby={`${detailsId}-parameters`}
+                data-slot="system-rule-parameters"
+                className="space-y-4 border-t pt-6"
+              >
+                <SectionHeading
+                  headingId={`${detailsId}-parameters`}
+                  title={t('rules.parameters')}
+                  description={t('rules.parametersHelp')}
+                />
+                <dl className="grid gap-x-6 gap-y-5 @md/system-rule-details:grid-cols-2">
                   {parameters.map((parameter) => (
                     <DetailItem
                       key={parameter.key}
@@ -177,49 +217,45 @@ export function SystemRuleDetailsDialog({
                     />
                   ))}
                 </dl>
-              ) : (
-                <p className="text-sm leading-relaxed text-muted-foreground">
-                  {t('rules.noParameters')}
-                </p>
-              )}
-            </DetailsSection>
+              </section>
+            ) : null}
 
-            <DetailsSection
-              divided
-              headingId={`${detailsId}-outcome`}
-              title={t('rules.outcome')}
-              description={t('rules.outcomeDetailsDescription')}
-            >
-              <dl className="grid gap-x-6 gap-y-5 sm:grid-cols-2">
-                <DetailItem
-                  label={t('rules.type')}
-                  value={t(
-                    definition.outcomeKind === 'Decision'
-                      ? 'rules.outcomeDecision'
-                      : 'rules.outcomeValidation',
-                  )}
-                />
-                {definition.outcome?.severity ? (
-                  <DetailItem
-                    label={t('rules.severity')}
-                    value={t(`rules.severity${definition.outcome.severity}`)}
-                  />
-                ) : null}
-                {definition.outcome?.violationCode ? (
-                  <DetailItem
-                    label={t('rules.violationCode')}
-                    value={definition.outcome.violationCode}
-                  />
-                ) : null}
-                <DetailItem
-                  className="sm:col-span-2"
-                  label={t('rules.message')}
-                  value={
-                    definition.outcome?.message ?? definition.outcome?.decision ?? t('rules.notSet')
-                  }
-                />
-              </dl>
-            </DetailsSection>
+            <div className="border-t pt-3">
+              <Accordion>
+                <AccordionItem value="technical-details">
+                  <AccordionTrigger>
+                    <span>
+                      <span className="block">{t('rules.technicalDetails')}</span>
+                      <span className="mt-1 block text-xs font-normal text-muted-foreground">
+                        {t('rules.technicalDetailsDescription')}
+                      </span>
+                    </span>
+                  </AccordionTrigger>
+                  <AccordionContent>
+                    <dl className="grid gap-5 @md/system-rule-details:grid-cols-2">
+                      <DetailItem
+                        label={t('rules.publishedVersion')}
+                        value={t('rules.version', {
+                          version: definition.latestPublishedVersion ?? 1,
+                        })}
+                      />
+                      <DetailItem
+                        label={t('rules.expressionLanguage')}
+                        value={t('rules.expressionLanguageVersion', {
+                          version: definition.expressionLanguageVersion ?? 1,
+                        })}
+                      />
+                      {definition.outcome?.violationCode ? (
+                        <DetailItem
+                          label={t('rules.violationCode')}
+                          value={definition.outcome.violationCode}
+                        />
+                      ) : null}
+                    </dl>
+                  </AccordionContent>
+                </AccordionItem>
+              </Accordion>
+            </div>
           </div>
         ) : null}
       </ManagedDialogBody>
@@ -227,38 +263,22 @@ export function SystemRuleDetailsDialog({
   );
 }
 
-function DetailsSection({
+function SectionHeading({
   headingId,
   title,
   description,
-  divided = false,
-  children,
 }: {
   headingId: string;
   title: string;
   description: string;
-  divided?: boolean;
-  children: ReactNode;
 }) {
   return (
-    <section
-      aria-labelledby={headingId}
-      data-slot="system-rule-details-section"
-      className={cn(
-        'grid gap-4 py-6 first:pt-0 last:pb-0 sm:grid-cols-3 sm:gap-8',
-        divided && 'border-t',
-      )}
-    >
-      <div>
-        <h3 id={headingId} className="text-sm font-semibold text-foreground">
-          {title}
-        </h3>
-        <p className="mt-2 text-xs/relaxed text-muted-foreground">{description}</p>
-      </div>
-      <div data-slot="system-rule-details-section-content" className="sm:col-span-2">
-        {children}
-      </div>
-    </section>
+    <div>
+      <h3 id={headingId} className="text-sm font-semibold text-foreground">
+        {title}
+      </h3>
+      <p className="mt-1 text-xs/relaxed text-muted-foreground">{description}</p>
+    </div>
   );
 }
 

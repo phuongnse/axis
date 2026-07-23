@@ -99,7 +99,7 @@ describe('BusinessObjectsPage', () => {
     const definitionDialog = await screen.findByRole('dialog', { name: 'Customer' });
     expect(definitionDialog.querySelector('[data-slot="managed-dialog-window"]')).toHaveAttribute(
       'data-dialog-preset',
-      'large',
+      'windowed',
     );
     expect(screen.getByRole('button', { name: 'Maximize dialog' })).toBeEnabled();
     expect(screen.getByLabelText('Object key')).toHaveValue('customer');

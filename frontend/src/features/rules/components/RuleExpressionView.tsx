@@ -4,7 +4,7 @@ import type { RuleConditionNode, RuleOperand } from '../api';
 
 export function RuleExpressionView({ condition }: { condition: RuleConditionNode }) {
   return (
-    <div data-slot="rule-expression" className="rounded-md border bg-muted/25 p-3">
+    <div data-slot="rule-expression">
       <ConditionNodeView node={condition} />
     </div>
   );
@@ -28,6 +28,15 @@ function ConditionNodeView({ node }: { node: RuleConditionNode }) {
     );
   }
 
+  const affirmedFunction = getAffirmedBooleanFunction(node);
+  if (affirmedFunction) {
+    return (
+      <div className="text-sm leading-6 text-foreground">
+        <OperandView operand={affirmedFunction} />
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-sm leading-6 text-foreground">
       {node.left ? <OperandView operand={node.left} /> : <span>—</span>}
@@ -44,6 +53,15 @@ function ConditionNodeView({ node }: { node: RuleConditionNode }) {
 function OperandView({ operand }: { operand: RuleOperand }) {
   const { t } = useTranslation();
   if (operand.kind === 'Function') {
+    if (operand.function === 'IsBlank' && operand.arguments?.[0]) {
+      return (
+        <span className="font-medium">
+          <OperandView operand={operand.arguments[0]} />{' '}
+          <span className="font-normal text-muted-foreground">{t('rules.predicateIsBlank')}</span>
+        </span>
+      );
+    }
+
     const label = operand.function
       ? t(`rules.function${operand.function}`, { defaultValue: humanize(operand.function) })
       : t('rules.unknownFunction');
@@ -96,4 +114,18 @@ function humanize(value: string): string {
     .replace(/([a-z])([A-Z])/g, '$1 $2')
     .replace(/[._]/g, ' ')
     .replace(/^./, (character) => character.toUpperCase());
+}
+
+function getAffirmedBooleanFunction(node: RuleConditionNode): RuleOperand | undefined {
+  if (
+    node.predicateOperator !== 'Equal' ||
+    node.left?.kind !== 'Function' ||
+    node.right?.kind !== 'Literal' ||
+    node.right.literal?.type !== 'Boolean'
+  ) {
+    return undefined;
+  }
+
+  const values = node.right.literal.values ?? [];
+  return values.length === 1 && values[0]?.toLowerCase() === 'true' ? node.left : undefined;
 }
