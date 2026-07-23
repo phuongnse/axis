@@ -7,7 +7,6 @@ import {
   useCallback,
   useContext,
   useEffect,
-  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -30,9 +29,10 @@ import {
 import { cn } from '@/lib/utils';
 
 const COMPACT_VIEWPORT_WIDTH = 640;
-const LARGE_DIALOG_WIDTH_SCALE = 0.5;
-const LARGE_DIALOG_HEIGHT_SCALE = 0.75;
-const MINIMUM_DIALOG_SCALE = 0.5;
+const WINDOWED_DIALOG_WIDTH_SCALE = 0.5;
+const WINDOWED_DIALOG_HEIGHT_SCALE = 0.75;
+const MINIMUM_DIALOG_WIDTH_SCALE = 0.35;
+const MINIMUM_DIALOG_HEIGHT_SCALE = 0.5;
 const MANAGED_DIALOG_HEADER_SELECTOR = '[data-slot="managed-dialog-header"]';
 const MANAGED_DIALOG_INTERACTIVE_SELECTOR =
   "button, a, input, textarea, select, [role='button'], [role='combobox']";
@@ -55,8 +55,6 @@ export function ManagedDialog({
   footerClassName,
   closeDisabled = false,
   dirty = false,
-  autoSizeKey,
-  autoSizeReady = true,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -68,8 +66,6 @@ export function ManagedDialog({
   footerClassName?: string;
   closeDisabled?: boolean;
   dirty?: boolean;
-  autoSizeKey?: string;
-  autoSizeReady?: boolean;
 }) {
   const { t } = useTranslation();
   const {
@@ -112,9 +108,7 @@ export function ManagedDialog({
   }, [portalContainer]);
 
   const isCompact = workArea.width < COMPACT_VIEWPORT_WIDTH;
-  const initialSize = entry?.descriptor.initialSize ?? 'auto';
-  const logicalAutoSizeKey = autoSizeKey ?? entry?.descriptor.resourceKey ?? windowId;
-  const configuredPreset = initialSize === 'fullscreen' ? 'fullscreen' : 'large';
+  const configuredPreset = entry?.descriptor.initialSize ?? 'windowed';
   const effectivePreset = isCompact ? 'fullscreen' : (entry?.preset ?? configuredPreset);
   const effectiveRect = useMemo(
     () =>
@@ -122,71 +116,15 @@ export function ManagedDialog({
         ? fullscreenRect(workArea)
         : clampRect(
             entry?.rect ??
-              rectForPreset(workArea, effectivePreset === 'custom' ? 'large' : effectivePreset),
+              rectForPreset(workArea, effectivePreset === 'custom' ? 'windowed' : effectivePreset),
             workArea,
           ),
     [effectivePreset, entry?.rect, isCompact, workArea],
   );
   const minimumRectSize = minimumSize(workArea);
 
-  useLayoutEffect(() => {
-    if (
-      !entry ||
-      !portalContainer ||
-      initialSize !== 'auto' ||
-      isCompact ||
-      workArea.width <= 0 ||
-      workArea.height <= 0
-    )
-      return;
-
-    const largeRect = centeredLargeRect(workArea);
-    if (!entry.autoSize || entry.autoSize.key !== logicalAutoSizeKey) {
-      updateWindow(windowId, {
-        preset: 'large',
-        rect: largeRect,
-        maximizeSnapshot: null,
-        autoSize: { key: logicalAutoSizeKey, status: 'pending' },
-      });
-      return;
-    }
-    if (entry.autoSize.status !== 'pending' || !autoSizeReady || entry.mode !== 'expanded') return;
-    if (entry.preset !== 'large') {
-      updateWindow(windowId, {
-        preset: 'large',
-        rect: largeRect,
-        maximizeSnapshot: null,
-      });
-      return;
-    }
-
-    const body = findWindowElement('managed-dialog-window', windowId)?.querySelector<HTMLElement>(
-      '[data-slot="dialog-body"]',
-    );
-    if (!body || body.clientHeight <= 0 || body.clientWidth <= 0) return;
-
-    const overflows =
-      body.scrollHeight > body.clientHeight + 1 || body.scrollWidth > body.clientWidth + 1;
-    updateWindow(windowId, {
-      preset: overflows ? 'fullscreen' : 'large',
-      rect: overflows ? fullscreenRect(workArea) : largeRect,
-      maximizeSnapshot: overflows ? { preset: 'large', rect: largeRect } : null,
-      autoSize: { key: logicalAutoSizeKey, status: 'resolved' },
-    });
-  }, [
-    autoSizeReady,
-    entry,
-    initialSize,
-    isCompact,
-    logicalAutoSizeKey,
-    portalContainer,
-    updateWindow,
-    windowId,
-    workArea,
-  ]);
-
   useEffect(() => {
-    if (!entry || workArea.width <= 0 || workArea.height <= 0) return;
+    if (!entry || isCompact || workArea.width <= 0 || workArea.height <= 0) return;
     if (
       entry.rect?.x === effectiveRect.x &&
       entry.rect.y === effectiveRect.y &&
@@ -200,6 +138,7 @@ export function ManagedDialog({
     effectivePreset,
     effectiveRect,
     entry,
+    isCompact,
     updateWindow,
     windowId,
     workArea.height,
@@ -238,8 +177,14 @@ export function ManagedDialog({
 
   if (!entry || !portalContainer) return null;
 
-  const canRestoreSize = entry.preset === 'fullscreen' && entry.maximizeSnapshot !== null;
-  const sizeActionLabel = canRestoreSize ? t('dialog.restoreSize') : t('dialog.maximize');
+  const configuredFullscreenSnapshot =
+    entry.preset === 'fullscreen' && configuredPreset === 'fullscreen'
+      ? { preset: 'windowed' as const, rect: centeredWindowedRect(workArea) }
+      : null;
+  const restoreSnapshot = entry.maximizeSnapshot ?? configuredFullscreenSnapshot;
+  const canRestoreSize = !isCompact && entry.preset === 'fullscreen' && restoreSnapshot !== null;
+  const showingFullscreen = effectivePreset === 'fullscreen';
+  const sizeActionLabel = showingFullscreen ? t('dialog.restoreSize') : t('dialog.maximize');
 
   function minimize() {
     expandedFocusRef.current =
@@ -249,12 +194,11 @@ export function ManagedDialog({
 
   function toggleMaximize() {
     if (!entry) return;
-    if (entry.preset === 'fullscreen' && entry.maximizeSnapshot) {
+    if (entry.preset === 'fullscreen' && restoreSnapshot) {
       updateWindow(windowId, {
-        preset: entry.maximizeSnapshot.preset,
-        rect: clampRect(entry.maximizeSnapshot.rect, workArea),
+        preset: restoreSnapshot.preset,
+        rect: clampRect(restoreSnapshot.rect, workArea),
         maximizeSnapshot: null,
-        autoSize: manualAutoSize(),
       });
       return;
     }
@@ -262,24 +206,22 @@ export function ManagedDialog({
       preset: 'fullscreen',
       rect: fullscreenRect(workArea),
       maximizeSnapshot: { preset: entry.preset, rect: effectiveRect },
-      autoSize: manualAutoSize(),
     });
   }
 
   function reset() {
-    const preset = isCompact ? 'fullscreen' : configuredPreset;
+    const restoreRect = centeredWindowedRect(workArea);
     updateWindow(windowId, {
-      preset,
-      rect: rectForPreset(workArea, preset),
-      maximizeSnapshot: null,
-      autoSize: initialSize === 'auto' ? { key: logicalAutoSizeKey, status: 'pending' } : null,
+      preset: configuredPreset,
+      rect: rectForPreset(workArea, configuredPreset),
+      maximizeSnapshot:
+        configuredPreset === 'fullscreen' ? { preset: 'windowed', rect: restoreRect } : null,
     });
   }
 
   function handleDragStop(_event: unknown, data: DraggableData) {
     updateWindow(windowId, {
       rect: clampPosition({ ...effectiveRect, x: data.x, y: data.y }, workArea),
-      autoSize: manualAutoSize(),
     });
   }
 
@@ -296,16 +238,11 @@ export function ManagedDialog({
       rect: nextRect,
       preset: isFullscreen(nextRect, workArea)
         ? 'fullscreen'
-        : isLargeSize(nextRect, workArea)
-          ? 'large'
+        : isWindowedSize(nextRect, workArea)
+          ? 'windowed'
           : 'custom',
       maximizeSnapshot: null,
-      autoSize: manualAutoSize(),
     });
-  }
-
-  function manualAutoSize() {
-    return initialSize === 'auto' ? ({ key: logicalAutoSizeKey, status: 'manual' } as const) : null;
   }
 
   const expanded = entry.mode === 'expanded';
@@ -408,7 +345,7 @@ export function ManagedDialog({
                   disabled={isCompact || (entry.preset === 'fullscreen' && !canRestoreSize)}
                   onClick={toggleMaximize}
                 >
-                  {canRestoreSize ? <Minimize2Icon /> : <Maximize2Icon />}
+                  {showingFullscreen ? <Minimize2Icon /> : <Maximize2Icon />}
                 </Button>
                 <Button
                   type="button"
@@ -479,25 +416,25 @@ function rectForPreset(
   workArea: WorkArea,
   preset: Exclude<ManagedWindowPreset, 'custom'>,
 ): ManagedWindowRect {
-  return preset === 'fullscreen' ? fullscreenRect(workArea) : centeredLargeRect(workArea);
+  return preset === 'fullscreen' ? fullscreenRect(workArea) : centeredWindowedRect(workArea);
 }
 
 function minimumSize(workArea: WorkArea) {
   return {
-    width: workArea.width * MINIMUM_DIALOG_SCALE,
-    height: workArea.height * MINIMUM_DIALOG_SCALE,
+    width: workArea.width * MINIMUM_DIALOG_WIDTH_SCALE,
+    height: workArea.height * MINIMUM_DIALOG_HEIGHT_SCALE,
   };
 }
 
-function largeSize(workArea: WorkArea) {
+function windowedSize(workArea: WorkArea) {
   return {
-    width: workArea.width * LARGE_DIALOG_WIDTH_SCALE,
-    height: workArea.height * LARGE_DIALOG_HEIGHT_SCALE,
+    width: workArea.width * WINDOWED_DIALOG_WIDTH_SCALE,
+    height: workArea.height * WINDOWED_DIALOG_HEIGHT_SCALE,
   };
 }
 
-function centeredLargeRect(workArea: WorkArea): ManagedWindowRect {
-  const size = largeSize(workArea);
+function centeredWindowedRect(workArea: WorkArea): ManagedWindowRect {
+  const size = windowedSize(workArea);
   return {
     ...size,
     x: (workArea.width - size.width) / 2,
@@ -529,9 +466,9 @@ function clampPosition(rect: ManagedWindowRect, workArea: WorkArea): ManagedWind
   };
 }
 
-function isLargeSize(rect: ManagedWindowRect, workArea: WorkArea) {
-  const large = largeSize(workArea);
-  return rect.width === large.width && rect.height === large.height;
+function isWindowedSize(rect: ManagedWindowRect, workArea: WorkArea) {
+  const windowed = windowedSize(workArea);
+  return rect.width === windowed.width && rect.height === windowed.height;
 }
 
 function isFullscreen(rect: ManagedWindowRect, workArea: WorkArea) {

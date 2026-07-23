@@ -20,7 +20,6 @@ export function ruleCreateWindowDescriptor(title: string): ManagedWindowDescript
     kind: RULE_CREATE_KIND,
     resourceKey: 'create',
     title,
-    initialSize: 'auto',
   };
 }
 
@@ -35,7 +34,6 @@ export function ruleDefinitionWindowDescriptor(
     resourceKey: definition.definitionKey,
     title,
     payload: { definitionKey: definition.definitionKey },
-    initialSize: 'auto',
   };
 }
 

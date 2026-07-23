@@ -293,8 +293,6 @@ export function BusinessObjectDefinitionDialog({
         }
         closeDisabled={busy}
         dirty={!readOnly && form.formState.isDirty}
-        autoSizeKey={`${mode ?? 'closed'}:${recordId ?? 'create'}`}
-        autoSizeReady={mode === 'create' || detailQuery.isError || Boolean(definition)}
         footer={
           <>
             <Button type="button" variant="outline" disabled={busy} onClick={requestClose}>

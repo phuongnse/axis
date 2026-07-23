@@ -67,7 +67,7 @@ Provide a stable, versioned catalog of enterprise system field-rule definitions 
 | AT-003 | Application boundary | System expressions run through the shared evaluator and unknown, unavailable, incompatible, malformed, and nondeterministic applications are rejected | AC-010, AC-011, AC-012 | Application test | Yes |
 | AT-004 | API boundary | Authenticated catalog and detail responses expose versioned system metadata, expressions, outcomes, and capability references with generated frontend parity and no mutation surface | AC-001, AC-002, AC-003, AC-005, AC-013 | API integration test | Yes |
 | AT-005 | Application boundary | Consumers reference Rules contracts only and Rules remains free of consumer state or side-effect dependencies | AC-006, AC-012, AC-014 | Architecture test | Yes |
-| AT-006 | UI component | Rules catalog presents system rules, applicability, setup summary, lifecycle, and the same readable expression that runtime evaluates without system mutation controls | AC-001, AC-002, AC-003, AC-004, AC-013 | UI component test | Yes |
+| AT-006 | UI component | Rules catalog presents system rules and read-only details prioritize a natural-language condition/result summary, applicability and setup, conditional inputs, and expandable technical metadata while rendering the same expression that runtime evaluates without mutation controls | AC-001, AC-002, AC-003, AC-004, AC-013 | UI component test | Yes |
 
 ## Out Of Scope
 
@@ -80,10 +80,10 @@ Provide a stable, versioned catalog of enterprise system field-rule definitions 
 | Screen | Required contract |
 |---|---|
 | Rules catalog | Show system rules in the shared catalog with scope, applicability, concise setup summary, read-only behavior, and an entry point to definition details. |
-| System rule details | Keep the rule name with separate Built-in origin and Published lifecycle badges in the dialog header, using the same stable semantic treatments as the catalog. Present overview, supported-field, readable rule-logic, parameter, and outcome information as clear sections; the rule-logic section renders the same typed expression that runtime evaluates rather than a frontend-authored description. Give each section a heading, place labeled values in a consistent label/content structure, and use a subtle divider between sections. |
+| System rule details | Keep the rule name with separate Built-in origin and Published lifecycle badges in one compact dialog-header row. Begin the body with the business description, then lead with one `When`/`Then` summary that joins the readable runtime expression to its outcome. Follow with scope, supported field types, and setup; show inputs only when parameters exist; keep version, expression-language, and violation-code metadata available under expandable technical details. |
 | Consumer field editor | Show only rules compatible with the selected field type and configuration and snapshot the selected version. |
 
-Required UI quality: catalog rows must remain scannable as definitions grow, avoid exposing internal evaluator keys or raw schema payloads, and preserve keyboard navigation, responsive scrolling, localized labels, and visible loading, empty, and error states.
+Required UI quality: catalog rows and details must remain scannable as definitions grow, avoid exposing internal evaluator keys or raw schema payloads, and preserve keyboard navigation, responsive scrolling, localized labels, and visible loading, empty, and error states. Detail hierarchy prioritizes business meaning over metadata, renders simple expressions as natural language without changing their semantics, and adapts to the available dialog width so resized windows never retain a cramped multi-column layout.
 
 ## Diagrams
 

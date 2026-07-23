@@ -671,7 +671,7 @@ test.describe('define business object', () => {
     await expect(dialog.getByRole('heading', { name: 'Define business object' })).toBeVisible();
     await expect(dialog.locator('[data-slot="managed-dialog-window"]')).toHaveAttribute(
       'data-dialog-preset',
-      'large',
+      'windowed',
     );
     await dialog.getByLabel('Name', { exact: true }).fill('Customer');
     await expect(dialog.getByLabel('Object key')).toHaveValue('customer');
@@ -860,7 +860,7 @@ test.describe('define business object', () => {
 
     await expect(dialog.locator('[data-slot="managed-dialog-window"]')).toHaveAttribute(
       'data-dialog-preset',
-      'large',
+      'windowed',
     );
     const dialogBody = dialog.locator('[data-slot="dialog-body"]');
     await expect
