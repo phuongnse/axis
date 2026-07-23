@@ -471,6 +471,10 @@ describe('RulesPage', () => {
     expect(behaviorSection).toHaveTextContent('Then');
     expect(behaviorSection).toHaveTextContent('Validation');
     expect(behaviorSection).toHaveTextContent('Error');
+    expect(within(behaviorSection).getByText('Error')).toHaveAttribute(
+      'data-variant',
+      'destructive',
+    );
     expect(behaviorSection).toHaveTextContent('A value is required.');
 
     expect(applicabilitySection).toHaveTextContent('Applies to a single field value.');
@@ -496,6 +500,32 @@ describe('RulesPage', () => {
     expect(within(details).getByText('Expression language')).toBeVisible();
     expect(within(details).getByText('Violation code')).toBeVisible();
     expect(within(details).getByText('field.value.required')).toBeVisible();
+  });
+
+  it.each([
+    ['Info', 'Information', 'outline'],
+    ['Warning', 'Warning', 'secondary'],
+  ])('uses the %s severity treatment without implying an error', async (severity, label, variant) => {
+    const user = userEvent.setup();
+    const detail = systemDetail('field.required');
+    detail.applicability = { ...detail.applicability, targetTypeKeys: [] };
+    detail.outcome = { ...detail.outcome, severity };
+    vi.mocked(fetch).mockImplementation((input) => {
+      const url = input.toString();
+      if (url.endsWith('/rules/field.required')) {
+        return Promise.resolve(jsonResponse(detail));
+      }
+      return Promise.resolve(jsonResponse(ruleDefinitions));
+    });
+
+    await renderWithRouter(<RulesPage />, { path: '/rules', authenticatedPath: 'rules' });
+
+    const catalog = screen.getByRole('region', { name: 'Rules catalog' });
+    await user.click(await within(catalog).findByRole('button', { name: 'Required value' }));
+    const details = await screen.findByRole('dialog', { name: 'Required value' });
+    expect(within(details).getByText(label)).toHaveAttribute('data-variant', variant);
+    expect(within(details).getByText('Field type applicability unavailable')).toBeVisible();
+    expect(within(details).queryByText('Context unavailable')).not.toBeInTheDocument();
   });
 
   it('creates a workspace draft from a registered context', async () => {

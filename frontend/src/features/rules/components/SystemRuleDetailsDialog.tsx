@@ -12,7 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
-import type { RuleDefinitionDetail } from '../api';
+import type { RuleDefinitionDetail, RuleSeverity } from '../api';
 import {
   fieldTypeTranslationKey,
   ruleDescriptionTranslationKey,
@@ -127,7 +127,7 @@ export function SystemRuleDetailsDialog({
                         )}
                       </Badge>
                       {definition.outcome?.severity ? (
-                        <Badge variant="destructive">
+                        <Badge variant={severityBadgeVariants[definition.outcome.severity]}>
                           {t(`rules.severity${definition.outcome.severity}`)}
                         </Badge>
                       ) : null}
@@ -181,7 +181,7 @@ export function SystemRuleDetailsDialog({
                         ))}
                       </span>
                     ) : (
-                      t('rules.contextUnavailable')
+                      t('rules.fieldTypesUnavailable')
                     )
                   }
                 />
@@ -262,6 +262,12 @@ export function SystemRuleDetailsDialog({
     </ManagedDialog>
   );
 }
+
+const severityBadgeVariants = {
+  Info: 'outline',
+  Warning: 'secondary',
+  Error: 'destructive',
+} as const satisfies Record<RuleSeverity, 'outline' | 'secondary' | 'destructive'>;
 
 function SectionHeading({
   headingId,
