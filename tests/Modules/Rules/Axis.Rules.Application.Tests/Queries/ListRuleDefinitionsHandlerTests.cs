@@ -2,6 +2,7 @@ using Axis.Rules.Application.Queries.ListRuleDefinitions;
 using Axis.Rules.Application.Search;
 using Axis.Rules.Contracts;
 using Axis.Shared.Application;
+using Axis.Shared.Application.Identity;
 using Axis.Shared.Domain.Primitives;
 using FluentAssertions;
 using NSubstitute;
@@ -13,6 +14,23 @@ namespace Axis.Rules.Application.Tests.Queries;
 public sealed class ListRuleDefinitionsHandlerTests
 {
     private readonly RuleDefinitionHandlerTestContext _context = new();
+
+    [Fact]
+    public async Task List_WhenWorkspaceIsMissing_ReturnsFailure()
+    {
+        ICurrentUser currentUser = Substitute.For<ICurrentUser>();
+        currentUser.workspaceId.Returns((Guid?)null);
+        ListRuleDefinitionsHandler sut = new(
+            currentUser,
+            _context.Repository,
+            _context.CatalogSearch);
+
+        Result<PagedResult<RuleDefinitionSummaryDto>> result = await sut.Handle(
+            new ListRuleDefinitionsQuery(Page: 1, PageSize: 20),
+            CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue();
+    }
 
     [Fact]
     public async Task List_WhenOriginIsSystem_ReturnsOnlySystemDefinitions()

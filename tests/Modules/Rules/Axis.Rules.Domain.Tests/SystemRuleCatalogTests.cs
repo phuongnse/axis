@@ -38,6 +38,9 @@ public sealed class SystemRuleCatalogTests
         definitions.Should().OnlyContain(definition =>
             definition.Parameters.Select(parameter => parameter.Key).Distinct(StringComparer.Ordinal).Count()
             == definition.Parameters.Count);
+        definitions.Should().OnlyContain(definition =>
+            definition.Documentation.Locales.Values.All(content =>
+                content.Examples.All(example => example != definition.Key.Value)));
 
         SystemRuleDefinition textFormat = definitions.Single(
             definition => definition.Key.Value == "field.text_format");

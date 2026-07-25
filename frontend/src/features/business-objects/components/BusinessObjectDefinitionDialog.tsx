@@ -459,10 +459,11 @@ export function BusinessObjectDefinitionDialog({
           {definition ? (
             <BusinessObjectPublishReview definition={definition} fields={fields} />
           ) : null}
+          {requestError ? <StatusNotice tone="destructive">{requestError}</StatusNotice> : null}
           <AlertDialogFooter>
             <AlertDialogCancel disabled={busy}>{t('app.cancel')}</AlertDialogCancel>
             <AlertDialogAction
-              disabled={busy}
+              disabled={busy || !definition?.id || definition.revision == null}
               onClick={() => {
                 if (definition?.id && definition.revision != null) {
                   publishMutation.mutate({

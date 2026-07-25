@@ -140,15 +140,19 @@ sequenceDiagram
   User->>Web: Author versioned syntax
   Web->>API: Parse, complete, and explain
   API->>Rules: Resolve language and context contracts
-  Rules-->>Web: Canonical expression, prose, or range errors
+  Rules-->>API: Canonical expression, prose, or range errors
+  API-->>Web: Canonical expression, prose, or range errors
   Web->>API: Validate draft and simulate sample context
   API->>Rules: Validate canonical typed expression
-  Rules-->>Web: Validation errors or deterministic result
+  Rules-->>API: Validation errors or deterministic result
+  API-->>Web: Validation errors or deterministic result
   User->>Web: Publish current revision
   Web->>API: Publish draft
   API->>Rules: Enforce lifecycle and concurrency
   Rules->>Store: Persist immutable version atomically
-  Rules-->>Web: Published rule version
+  Store-->>Rules: Persisted immutable version
+  Rules-->>API: Published rule version
+  API-->>Web: Published rule version
 ```
 
 > **Implementation status**

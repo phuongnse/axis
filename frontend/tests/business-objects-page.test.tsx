@@ -244,6 +244,40 @@ describe('BusinessObjectsPage', () => {
     );
   });
 
+  it('shows publish failures inside the confirmation dialog', async () => {
+    const user = userEvent.setup();
+    const detail = definitionDetail();
+    vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const path = requestPath(input);
+      const method = init?.method ?? 'GET';
+      if (isRulesRequest(input)) return jsonResponse(fieldRuleDefinitions);
+      if (path === '/api/business-object-definitions' && method === 'GET') {
+        return jsonResponse(pageWith(detail));
+      }
+      if (path === `/api/business-object-definitions/${definitionId}` && method === 'GET') {
+        return jsonResponse(detail);
+      }
+      if (
+        path === `/api/business-object-definitions/${definitionId}/publish` &&
+        method === 'POST'
+      ) {
+        return jsonResponse({ title: 'Publish failed' }, 409);
+      }
+      throw new Error(`Unexpected fetch: ${method} ${path}`);
+    });
+
+    await renderPage(
+      `/business-objects?page=1&dialog=edit&recordId=${encodeURIComponent(definitionId)}`,
+    );
+    const definitionDialog = await screen.findByRole('dialog', { name: 'Customer' });
+    await user.click(within(definitionDialog).getByRole('button', { name: 'Publish' }));
+    const review = await screen.findByRole('alertdialog', { name: 'Publish this definition?' });
+    await user.click(within(review).getByRole('button', { name: 'Publish' }));
+
+    expect(await within(review).findByText('Unable to update business object')).toBeVisible();
+    expect(review).toBeVisible();
+  });
+
   it('waits for deep-link detail before opening and consuming the launch intent', async () => {
     const detail = definitionDetail();
     let resolveDetail!: (response: Response) => void;

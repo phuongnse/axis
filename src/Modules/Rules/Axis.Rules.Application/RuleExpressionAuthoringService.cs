@@ -915,6 +915,7 @@ public sealed class RuleExpressionAuthoringService(RuleContextSchemaRegistry con
                 int start = index;
                 index += 1;
                 bool escaped = false;
+                bool terminated = false;
                 while (index < source.Length)
                 {
                     char character = source[index++];
@@ -929,9 +930,12 @@ public sealed class RuleExpressionAuthoringService(RuleContextSchemaRegistry con
                         continue;
                     }
                     if (character == '"')
+                    {
+                        terminated = true;
                         break;
+                    }
                 }
-                if (source[index - 1] != '"')
+                if (!terminated)
                 {
                     throw new ParseException(
                         "rules.expression.string_unterminated",

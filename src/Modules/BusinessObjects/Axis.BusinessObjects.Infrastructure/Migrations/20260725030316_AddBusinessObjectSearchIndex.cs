@@ -98,12 +98,6 @@ namespace Axis.BusinessObjects.Infrastructure.Migrations
                 name: "search_vector",
                 table: "business_object_definitions");
 
-            migrationBuilder.Sql(
-                """
-                DROP FUNCTION IF EXISTS axis_unaccent(text);
-                DROP EXTENSION IF EXISTS pg_trgm;
-                DROP EXTENSION IF EXISTS unaccent;
-                """);
         }
     }
 }

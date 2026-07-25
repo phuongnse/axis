@@ -118,7 +118,12 @@ public sealed class ListRuleDefinitionsHandler(
         return definitions
             .Select(definition =>
             {
-                RuleReferenceContent content = definition.Documentation.Locales[locale];
+                RuleReferenceContent content =
+                    definition.Documentation.Locales.TryGetValue(
+                        locale,
+                        out RuleReferenceContent? localized)
+                        ? localized
+                        : definition.Documentation.Locales["en"];
                 return new RuleTextSearchDocument(
                     definition.Key.Value,
                     content.DisplayName,

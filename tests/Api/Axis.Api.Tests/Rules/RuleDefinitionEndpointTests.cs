@@ -56,7 +56,9 @@ public sealed class RuleDefinitionEndpointTests(ApiTestFixture fixture)
         JsonElement search = await searchResponse.Content.ReadFromJsonAsync<JsonElement>(Json);
         search.GetProperty("items").EnumerateArray()
             .Select(definition => definition.GetProperty("definitionKey").GetString())
-            .Should().Contain(RuleDefinitionKeys.Required);
+            .Should().Contain(RuleDefinitionKeys.Required)
+            .And.NotContain(RuleDefinitionKeys.DateTimeRange);
+        search.GetProperty("totalCount").GetInt32().Should().BeLessThan(9);
     }
 
     [Fact]

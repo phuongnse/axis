@@ -98,12 +98,6 @@ namespace Axis.Rules.Infrastructure.Migrations
                 name: "search_vector",
                 table: "rule_definitions");
 
-            migrationBuilder.Sql(
-                """
-                DROP FUNCTION IF EXISTS axis_unaccent(text);
-                DROP EXTENSION IF EXISTS pg_trgm;
-                DROP EXTENSION IF EXISTS unaccent;
-                """);
         }
     }
 }

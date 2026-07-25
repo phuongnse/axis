@@ -38,7 +38,9 @@ export function SystemRuleDetailsDialog({
     compareFieldTypes,
   );
   const parameters = definition?.parameters ?? [];
-  const setup = documentation?.usage ?? t('rules.setup.configured');
+  const setup =
+    documentation?.usage ??
+    t(parameters.length > 0 ? 'rules.setup.configured' : 'rules.setup.none');
 
   return (
     <ManagedDialog

@@ -1173,14 +1173,21 @@ describe('RulesPage', () => {
     expect(within(details).getByText('field.value.required')).toBeVisible();
   });
 
-  it('does not reconstruct natural language when the server projection is missing', async () => {
+  it('shows an error when the server projection is malformed', async () => {
     const user = userEvent.setup();
     vi.mocked(fetch).mockImplementation(async (input, init) => {
       const url = input.toString();
       if (url.endsWith('/rules/expression-language/assist')) {
         const response = expressionAssistResponse(init);
         const payload = await response.json();
-        return jsonResponse({ ...payload, display: null });
+        return jsonResponse({
+          ...payload,
+          display: {
+            nodeId: 'invalid-group',
+            tokens: [],
+            children: [payload.display],
+          },
+        });
       }
       if (url.endsWith('/rules/field.required')) {
         return jsonResponse(systemDetail('field.required'));
@@ -1415,7 +1422,9 @@ describe('RulesPage', () => {
     const catalog = screen.getByRole('region', { name: 'Rules catalog' });
     await user.click(await within(catalog).findByRole('button', { name: 'Credit threshold' }));
     const editor = await screen.findByRole('dialog', { name: 'Credit threshold' });
-    await user.click(await within(editor).findByRole('button', { name: 'Publish version' }));
+    const publishButton = await within(editor).findByRole('button', { name: 'Publish version' });
+    await waitFor(() => expect(publishButton).toBeEnabled());
+    await user.click(publishButton);
 
     const review = await screen.findByRole('alertdialog', { name: 'Publish this rule?' });
     expect(review).toHaveTextContent('Version 1 will be immutable.');
@@ -1725,7 +1734,9 @@ describe('RulesPage', () => {
     await user.clear(syntax);
     await user.type(syntax, 'Length(@context.field.value) Equal Integer("5")');
     await waitFor(() => expect(within(expression).getByText('What this means')).toBeVisible());
-    await user.click(within(editor).getByRole('button', { name: 'Save draft' }));
+    const saveButton = within(editor).getByRole('button', { name: 'Save draft' });
+    await waitFor(() => expect(saveButton).toBeEnabled());
+    await user.click(saveButton);
 
     await waitFor(() => {
       const save = vi

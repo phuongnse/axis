@@ -125,6 +125,32 @@ public sealed class AssistRuleExpressionHandlerTests
     }
 
     [Fact]
+    public async Task Assist_WhenStringEndsWithEscapedQuote_ReturnsUnterminatedDiagnostic()
+    {
+        RuleExpressionAuthoringService service = new(_context.ContextRegistry);
+        AssistRuleExpressionHandler sut = new(_context.CurrentUser, service);
+        const string syntax = """@context.field.value Equal Text("abc\")""";
+
+        Result<RuleExpressionAuthoringDto> result = await sut.Handle(
+            new AssistRuleExpressionQuery(
+                new AssistRuleExpressionRequest(
+                    1,
+                    RuleDefinitionHandlerTestContext.Schema.ContextKey,
+                    RuleDefinitionHandlerTestContext.Schema.Version,
+                    Parameters: [],
+                    syntax,
+                    Condition: null,
+                    CursorOffset: syntax.Length,
+                    Language: "en")),
+            CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Condition.Should().BeNull();
+        result.Value.Diagnostics.Should().ContainSingle()
+            .Which.Code.Should().Be("rules.expression.string_unterminated");
+    }
+
+    [Fact]
     public async Task Assist_WhenConditionIsCanonical_FormatsSyntaxAndLocalizedDisplay()
     {
         RuleExpressionAuthoringService service = new(_context.ContextRegistry);

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import type {
   RuleContextSchema,
@@ -24,7 +25,16 @@ export function RuleExpressionView({
   parameters?: RuleParameterDefinition[];
   references?: boolean;
 }) {
+  const { t } = useTranslation();
   const [target, setTarget] = useState<RuleExpressionGuideTarget | null>(null);
+
+  if (!isValidRuleExpressionDisplay(display)) {
+    return (
+      <p role="alert" className="text-sm text-destructive">
+        {t('rules.loadErrorTitle')}
+      </p>
+    );
+  }
 
   return (
     <>
@@ -129,6 +139,18 @@ function DisplayNodeView({
 
 function logicalOperatorFrom(value: string | null | undefined): RuleLogicalOperator | null {
   return value === 'All' || value === 'Any' || value === 'Not' ? value : null;
+}
+
+function isValidRuleExpressionDisplay(node: RuleExpressionDisplayNode): boolean {
+  const children = node.children ?? [];
+  if (children.length === 0) return true;
+  const logicalToken = (node.tokens ?? []).find(
+    (token) => token.referenceKind === 'LogicalOperator',
+  );
+  return (
+    logicalOperatorFrom(logicalToken?.referenceKey) !== null &&
+    children.every(isValidRuleExpressionDisplay)
+  );
 }
 
 function displayTokenTarget(

@@ -184,6 +184,7 @@ export function RulesPage() {
       queryState: tableQuery,
       onQueryStateChange: (next) => {
         void navigate({
+          replace: true,
           search: (current) => ({
             ...current,
             page: 1,

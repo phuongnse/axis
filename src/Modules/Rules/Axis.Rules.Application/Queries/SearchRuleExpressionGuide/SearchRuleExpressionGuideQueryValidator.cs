@@ -32,6 +32,7 @@ public sealed class SearchRuleExpressionGuideQueryValidator
                 .WithErrorCode(RulesProblemCodes.DefinitionInvalid);
 
             RuleFor(query => query.Request.Parameters)
+                .Cascade(CascadeMode.Stop)
                 .NotNull()
                 .Must(parameters => parameters.Count <= Domain.RuleEvaluationLimits.Default.MaxParameters)
                 .WithErrorCode(RulesProblemCodes.DefinitionInvalid);

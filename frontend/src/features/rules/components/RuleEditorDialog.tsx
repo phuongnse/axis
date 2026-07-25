@@ -36,6 +36,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { ApiError } from '@/lib/api';
 import type { components } from '@/lib/api-types';
 import {
@@ -182,7 +183,7 @@ export function RuleEditorDialog({
     enabled: open && Boolean(detail?.condition),
     staleTime: Number.POSITIVE_INFINITY,
   });
-  const authoringRequest = useMemo(
+  const liveAuthoringRequest = useMemo(
     () => ({
       expressionLanguageVersion: detail?.expressionLanguageVersion,
       contextKey: schema?.contextKey ?? null,
@@ -190,7 +191,7 @@ export function RuleEditorDialog({
       parameters: toParameterDtos(editor?.parameters ?? []),
       syntax: editor?.expressionSyntax ?? '',
       condition: undefined,
-      cursorOffset: editor?.expressionSyntax.length ?? 0,
+      cursorOffset: cursor,
       language: i18n.language,
     }),
     [
@@ -198,16 +199,20 @@ export function RuleEditorDialog({
       editor?.expressionSyntax,
       editor?.parameters,
       i18n.language,
+      cursor,
       schema?.contextKey,
       schema?.version,
     ],
   );
+  const authoringRequest = useDebouncedValue(liveAuthoringRequest);
+  const authoringIsCurrent = authoringRequest === liveAuthoringRequest;
   const authoringQuery = useQuery({
     queryKey: ruleDefinitionQueryKeys.expressionAssist(authoringRequest),
     queryFn: () => assistRuleExpression(authoringRequest),
     enabled: open && detail?.status === 'Draft' && Boolean(editor && schema),
     staleTime: Number.POSITIVE_INFINITY,
   });
+  const authoring = authoringIsCurrent ? authoringQuery.data : undefined;
 
   useEffect(() => {
     if (!open) {
@@ -265,7 +270,7 @@ export function RuleEditorDialog({
     mutationFn: async (state: EditorState) => {
       if (!detail?.definitionKey || detail.revision == null || !schema)
         throw new Error(t('rules.editorUnavailable'));
-      const error = validateEditor(state, authoringQuery.data);
+      const error = validateEditor(state, authoring);
       if (error) throw new Error(error);
       return saveRuleDefinitionDraft(detail.definitionKey, {
         expectedRevision: detail.revision,
@@ -365,8 +370,8 @@ export function RuleEditorDialog({
     lifecycleMutation.isPending ||
     simulateMutation.isPending;
   const expressionReady =
-    Boolean(authoringQuery.data?.condition) &&
-    (authoringQuery.data?.diagnostics ?? []).length === 0 &&
+    Boolean(authoring?.condition) &&
+    (authoring?.diagnostics ?? []).length === 0 &&
     !authoringQuery.isFetching;
   const baseline = detail
     ? detailToEditor(detail, initialExpressionQuery.data?.syntax ?? '')
@@ -525,8 +530,8 @@ export function RuleEditorDialog({
                   schema={schema}
                   parameters={toParameterDtos(editor.parameters)}
                   language={languageQuery.data}
-                  authoring={authoringQuery.data}
-                  loading={authoringQuery.isFetching}
+                  authoring={authoring}
+                  loading={!authoringIsCurrent || authoringQuery.isFetching}
                   disabled={busy}
                   onCursorChange={setCursor}
                   onChange={(expressionSyntax) => setEditor({ ...editor, expressionSyntax })}
@@ -563,13 +568,8 @@ export function RuleEditorDialog({
               })}
             </AlertDialogDescription>
           </AlertDialogHeader>
-          {detail && editor && authoringQuery.data ? (
-            <PublishReview
-              detail={detail}
-              editor={editor}
-              schema={schema}
-              authoring={authoringQuery.data}
-            />
+          {detail && editor && authoring ? (
+            <PublishReview detail={detail} editor={editor} schema={schema} authoring={authoring} />
           ) : null}
           <AlertDialogFooter>
             <AlertDialogCancel disabled={busy}>{t('app.cancel')}</AlertDialogCancel>
@@ -1632,7 +1632,9 @@ function splitValues(source: string) {
 function typedRuleValue(type: RuleValueType, source: string, multiple = false): RuleValue {
   return {
     type,
-    values: multiple ? splitValues(source) : [normalizeValue(type, source)],
+    values: multiple
+      ? splitValues(source).map((value) => normalizeValue(type, value))
+      : [normalizeValue(type, source)],
   };
 }
 

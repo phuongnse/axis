@@ -312,9 +312,12 @@ public sealed class BusinessObjectDefinitionRepositoryTests(BusinessObjectsDatab
         IReadOnlyList<BusinessObjectDefinition> typoMatch =
             await _repository.ListForWorkspaceAsync(workspaceId, 1, 10, "inovice");
 
-        ranked.Select(definition => definition.Id).Take(2).Should().Equal(exact.Id, prefix.Id);
-        accentAndOrder.Should().ContainSingle(definition => definition.Id == accented.Id);
-        typoMatch.Should().ContainSingle(definition => definition.Id == typo.Id);
+        ranked.Select(definition => definition.Id).Should().Equal(exact.Id, prefix.Id);
+        accentAndOrder.Should().ContainSingle().Which.Id.Should().Be(accented.Id);
+        typoMatch.Should().ContainSingle().Which.Id.Should().Be(typo.Id);
+        (await _repository.CountForWorkspaceAsync(workspaceId, "customer")).Should().Be(2);
+        (await _repository.CountForWorkspaceAsync(workspaceId, "uu tien hoa don")).Should().Be(1);
+        (await _repository.CountForWorkspaceAsync(workspaceId, "inovice")).Should().Be(1);
     }
 
     [Fact]

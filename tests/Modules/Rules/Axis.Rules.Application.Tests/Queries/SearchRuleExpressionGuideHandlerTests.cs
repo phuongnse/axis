@@ -12,6 +12,24 @@ public sealed class SearchRuleExpressionGuideHandlerTests
     private readonly RuleDefinitionHandlerTestContext _context = new();
 
     [Fact]
+    public void Validate_WhenParametersAreNull_ReturnsFailure()
+    {
+        SearchRuleExpressionGuideQueryValidator validator = new();
+        SearchRuleExpressionGuideQuery query = new(new(
+            ExpressionLanguageVersion: 1,
+            DefinitionKey: null,
+            ContextKey: null,
+            ContextSchemaVersion: null,
+            Parameters: null!,
+            Query: null,
+            Language: "en"));
+
+        FluentValidation.Results.ValidationResult result = validator.Validate(query);
+
+        result.IsValid.Should().BeFalse();
+    }
+
+    [Fact]
     public async Task Search_WhenContextAndParametersAreProvided_BuildsLocalizedGuideFromMetadata()
     {
         RuleExpressionGuideService service = new(_context.ContextRegistry, _context.TextSearch);

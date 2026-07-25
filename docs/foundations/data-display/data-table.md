@@ -98,12 +98,12 @@ Required UI quality: controls must be keyboard-reachable, visible copy must come
 > | Layer | Status |
 > |-------|--------|
 > | Contract | Done |
-> | Frontend | Partial |
-> | Tests | Partial |
+> | Frontend | Done |
+> | Tests | Done |
 >
 > **Implemented:** A typed TanStack Table and TanStack Virtual based foundation owns client, manual page, and infinite data modes; a nested typed filter builder; sorting; numbered paging; grouping; expansion; selection; virtualization; stable table scrolling; consumer-defined toolbar actions; and shadcn-owned controls.
 >
-> **Gaps vs spec:** Local full-text matching still requires clean replacement by the controlled server-search contract.
+> **Gaps vs spec:** None. Generic client mode still supports structured filtering over a complete in-memory dataset, but free-text matching is always emitted as controlled server intent.
 >
 > **Deferred follow-ups:** Backend-owned grouping, aggregate, cursor, export, and persisted preference contracts remain with future consuming use cases.
 >
