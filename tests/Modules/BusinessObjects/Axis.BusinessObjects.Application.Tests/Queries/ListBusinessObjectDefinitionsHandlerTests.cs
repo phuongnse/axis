@@ -19,12 +19,14 @@ public sealed class ListBusinessObjectDefinitionsHandlerTests
         BusinessObjectDefinition second = BusinessObjectDefinitionHandlerTestContext.CreateUnpublished("Invoice", "invoice");
         _context.Repository.CountForWorkspaceAsync(
                 BusinessObjectDefinitionHandlerTestContext.WorkspaceId,
+                null,
                 Arg.Any<CancellationToken>())
             .Returns(2);
         _context.Repository.ListForWorkspaceAsync(
                 BusinessObjectDefinitionHandlerTestContext.WorkspaceId,
                 1,
                 20,
+                null,
                 Arg.Any<CancellationToken>())
             .Returns([first, second]);
         ListBusinessObjectDefinitionsHandler sut = new(_context.CurrentUser, _context.Repository);

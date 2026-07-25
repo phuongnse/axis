@@ -76,7 +76,14 @@ public sealed class BusinessObjectRuleContextSchemaProvider : IRuleContextSchema
             Version: 1,
             ContractRuleScope.Field,
             displayName,
-            [new RuleContextFieldDto("field.value", "Field value", valueType, allowMultiple)],
+            [
+                new RuleContextFieldDto(
+                    "field.value",
+                    "Field value",
+                    valueType,
+                    allowMultiple,
+                    FieldDocumentation(displayName, valueType, allowMultiple)),
+            ],
             TargetTypeKey: key.Contains(".choice.", StringComparison.Ordinal)
                 ? BusinessObjectFieldType.Choice.ToString()
                 : key.Split('.')[^1] switch
@@ -95,4 +102,23 @@ public sealed class BusinessObjectRuleContextSchemaProvider : IRuleContextSchema
                         ["selection_mode"] = [BusinessObjectChoiceSelectionMode.Multiple.ToString()],
                     }
                     : new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal));
+
+    private static RuleReferenceDocumentationDto FieldDocumentation(
+        string contextDisplayName,
+        ContractRuleValueType valueType,
+        bool allowMultiple) =>
+        new(
+            new Dictionary<string, RuleReferenceContentDto>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["en"] = new(
+                    "Field value",
+                    $"The {contextDisplayName.ToLowerInvariant()} supplied when the rule runs.",
+                    $"Use this {(allowMultiple ? "collection" : "value")} as a {valueType} operand in compatible conditions.",
+                    ["Field value"]),
+                ["vi"] = new(
+                    "Giá trị trường",
+                    $"Giá trị {contextDisplayName.ToLowerInvariant()} được cung cấp khi rule chạy.",
+                    $"Dùng {(allowMultiple ? "tập giá trị" : "giá trị")} này như operand kiểu {valueType} trong điều kiện tương thích.",
+                    ["Giá trị trường"]),
+            });
 }

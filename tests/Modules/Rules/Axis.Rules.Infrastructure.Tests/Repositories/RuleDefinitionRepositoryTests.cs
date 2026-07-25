@@ -134,6 +134,35 @@ public sealed class RuleDefinitionRepositoryTests(RulesDatabaseFixture db) : IAs
         rows.Should().ContainSingle(definition => definition.Name == "Draft rule");
     }
 
+    [Fact]
+    public async Task ListForWorkspaceAsync_WhenSearchIsSmart_MatchesAccentTermOrderAndTypo()
+    {
+        Guid workspaceId = Guid.NewGuid();
+        RuleDefinition exact = DraftRule(workspaceId, UniqueKey("customer"), "Customer");
+        RuleDefinition prefix = DraftRule(workspaceId, UniqueKey("customer_archive"), "Customer archive");
+        RuleDefinition accented = DraftRule(
+            workspaceId,
+            UniqueKey("priority_check"),
+            "Kiểm tra ưu tiên");
+        RuleDefinition typo = DraftRule(workspaceId, UniqueKey("invoice"), "Invoice");
+        await _repository.AddAsync(exact);
+        await _repository.AddAsync(prefix);
+        await _repository.AddAsync(accented);
+        await _repository.AddAsync(typo);
+        await _unitOfWork.SaveChangesAsync();
+
+        IReadOnlyList<RuleDefinition> ranked = await _repository.ListForWorkspaceAsync(
+            workspaceId, 0, 10, searchQuery: "customer");
+        IReadOnlyList<RuleDefinition> accentAndOrder = await _repository.ListForWorkspaceAsync(
+            workspaceId, 0, 10, searchQuery: "uu tien kiem tra");
+        IReadOnlyList<RuleDefinition> typoMatch = await _repository.ListForWorkspaceAsync(
+            workspaceId, 0, 10, searchQuery: "inovice");
+
+        ranked.Select(definition => definition.Key).Take(2).Should().Equal(exact.Key, prefix.Key);
+        accentAndOrder.Should().ContainSingle(definition => definition.Key == accented.Key);
+        typoMatch.Should().ContainSingle(definition => definition.Key == typo.Key);
+    }
+
     private static RuleDefinition PublishedRule(Guid workspaceId, string key)
     {
         Guid userId = Guid.NewGuid();
@@ -182,6 +211,19 @@ public sealed class RuleDefinitionRepositoryTests(RulesDatabaseFixture db) : IAs
             DateTime.UtcNow).IsSuccess.Should().BeTrue();
         return created.Value;
     }
+
+    private static RuleDefinition DraftRule(Guid workspaceId, string key, string name) =>
+        RuleDefinition.CreateDraft(
+            workspaceId,
+            RuleDefinitionKey.Create(key).Value,
+            name,
+            $"Search document for {name}.",
+            RuleScope.Field,
+            RuleContextKey.Create("business_objects.field.text").Value,
+            1,
+            RuleOutcomeKind.Validation,
+            Guid.NewGuid(),
+            DateTime.UtcNow).Value;
 
     private static string UniqueKey(string prefix) =>
         $"{prefix}_{Guid.NewGuid():N}"[..Math.Min(63, prefix.Length + 9)];

@@ -278,6 +278,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/rules/expression-language/assist": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Parse, complete, and explain rule expression syntax */
+        post: operations["AssistRuleExpression"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/rules/expression-language/guide": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Browse and search the contextual rule expression guide */
+        post: operations["SearchRuleExpressionGuide"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/rules/{definitionKey}": {
         parameters: {
             query?: never;
@@ -368,6 +402,19 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        AssistRuleExpressionRequest: {
+            /** Format: int32 */
+            expressionLanguageVersion?: number;
+            contextKey?: string | null;
+            /** Format: int32 */
+            contextSchemaVersion?: number | null;
+            parameters?: components["schemas"]["RuleParameterDefinitionDto"][];
+            syntax?: string | null;
+            condition?: components["schemas"]["RuleConditionNodeDto"];
+            /** Format: int32 */
+            cursorOffset?: number;
+            language?: string;
+        };
         BusinessObjectChoiceFieldConfigurationDto: {
             selectionMode?: components["schemas"]["BusinessObjectChoiceSelectionMode"];
             options?: components["schemas"]["BusinessObjectChoiceOptionDto"][];
@@ -614,6 +661,7 @@ export interface components {
             displayName?: string;
             type?: components["schemas"]["RuleValueType"];
             allowMultiple?: boolean;
+            documentation?: components["schemas"]["RuleReferenceDocumentationDto"];
         };
         RuleContextSchemaDto: {
             contextKey?: string;
@@ -657,6 +705,7 @@ export interface components {
             updatedAt?: string | null;
             /** Format: date-time */
             archivedAt?: string | null;
+            documentation?: components["schemas"]["RuleReferenceDocumentationDto"];
         };
         RuleDefinitionSummaryDto: {
             definitionKey?: string;
@@ -679,6 +728,7 @@ export interface components {
             parameters?: components["schemas"]["RuleParameterDefinitionDto"][];
             /** Format: date-time */
             updatedAt?: string | null;
+            documentation?: components["schemas"]["RuleReferenceDocumentationDto"];
         };
         RuleDefinitionSummaryDtoPagedResult: {
             items?: components["schemas"]["RuleDefinitionSummaryDto"][];
@@ -709,8 +759,51 @@ export interface components {
             /** Format: date-time */
             publishedAt?: string;
         };
+        RuleExpressionAuthoringDto: {
+            syntax?: string;
+            condition?: components["schemas"]["RuleConditionNodeDto"];
+            display?: components["schemas"]["RuleExpressionDisplayNodeDto"];
+            diagnostics?: components["schemas"]["RuleExpressionDiagnosticDto"][];
+            completions?: components["schemas"]["RuleExpressionCompletionDto"][];
+        };
         /** @enum {string} */
         RuleExpressionCardinality: "Scalar" | "Multiple" | "Any";
+        RuleExpressionCardinalityDefinitionDto: {
+            cardinality?: components["schemas"]["RuleExpressionCardinality"];
+            documentation?: components["schemas"]["RuleReferenceDocumentationDto"];
+        };
+        RuleExpressionCompletionDto: {
+            label?: string;
+            insertText?: string;
+            /** Format: int32 */
+            cursorOffset?: number;
+            /** Format: int32 */
+            replacementStart?: number;
+            /** Format: int32 */
+            replacementLength?: number;
+            referenceKind?: components["schemas"]["RuleExpressionReferenceKind"];
+            referenceKey?: string;
+            summary?: string;
+        };
+        RuleExpressionDiagnosticDto: {
+            code?: string;
+            message?: string;
+            /** Format: int32 */
+            start?: number;
+            /** Format: int32 */
+            length?: number;
+        };
+        RuleExpressionDisplayNodeDto: {
+            nodeId?: string;
+            tokens?: components["schemas"]["RuleExpressionDisplayTokenDto"][];
+            children?: components["schemas"]["RuleExpressionDisplayNodeDto"][];
+        };
+        RuleExpressionDisplayTokenDto: {
+            text?: string;
+            referenceKind?: components["schemas"]["RuleExpressionReferenceKind"];
+            referenceKey?: string | null;
+            isCode?: boolean;
+        };
         /** @enum {string} */
         RuleExpressionFunction: "IsBlank" | "Length" | "Precision" | "Scale" | "Count" | "MatchesPattern" | "HasFormat" | "ToDecimal";
         RuleExpressionFunctionDefinitionDto: {
@@ -718,17 +811,51 @@ export interface components {
             parameters?: components["schemas"]["RuleExpressionFunctionParameterDto"][];
             returnType?: components["schemas"]["RuleValueType"];
             returnCardinality?: components["schemas"]["RuleExpressionCardinality"];
+            documentation?: components["schemas"]["RuleReferenceDocumentationDto"];
         };
         RuleExpressionFunctionParameterDto: {
             acceptedTypes?: components["schemas"]["RuleValueType"][];
             cardinality?: components["schemas"]["RuleExpressionCardinality"];
+        };
+        RuleExpressionGuideDto: {
+            /** Format: int32 */
+            expressionLanguageVersion?: number;
+            /** Format: int32 */
+            totalResults?: number;
+            sections?: components["schemas"]["RuleExpressionGuideSectionDto"][];
+        };
+        RuleExpressionGuideItemDto: {
+            referenceKind?: components["schemas"]["RuleExpressionReferenceKind"];
+            referenceKey?: string;
+            displayName?: components["schemas"]["SearchTextDto"];
+            summary?: components["schemas"]["SearchTextDto"];
+            usage?: components["schemas"]["SearchTextDto"];
+            examples?: components["schemas"]["SearchTextDto"][];
+            detail?: components["schemas"]["SearchTextDto"];
+        };
+        RuleExpressionGuideSectionDto: {
+            key?: string;
+            title?: string;
+            description?: string;
+            items?: components["schemas"]["RuleExpressionGuideItemDto"][];
         };
         RuleExpressionLanguageDto: {
             /** Format: int32 */
             version?: number;
             operators?: components["schemas"]["RulePredicateOperatorDefinitionDto"][];
             functions?: components["schemas"]["RuleExpressionFunctionDefinitionDto"][];
+            logicalOperators?: components["schemas"]["RuleLogicalOperatorDefinitionDto"][];
+            operandKinds?: components["schemas"]["RuleOperandKindDefinitionDto"][];
+            valueTypes?: components["schemas"]["RuleValueTypeDefinitionDto"][];
+            cardinalities?: components["schemas"]["RuleExpressionCardinalityDefinitionDto"][];
+            limitDefinitions?: components["schemas"]["RuleExpressionLimitDefinitionDto"][];
             limits?: components["schemas"]["RuleExpressionLimitsDto"];
+        };
+        RuleExpressionLimitDefinitionDto: {
+            key?: string;
+            /** Format: int32 */
+            value?: number;
+            documentation?: components["schemas"]["RuleReferenceDocumentationDto"];
         };
         RuleExpressionLimitsDto: {
             /** Format: int32 */
@@ -742,6 +869,8 @@ export interface components {
             /** Format: int32 */
             maxExecutionSteps?: number;
         };
+        /** @enum {string} */
+        RuleExpressionReferenceKind: "LogicalOperator" | "PredicateOperator" | "Function" | "Context" | "Parameter" | "Literal" | "ValueType" | "OperandKind" | "Limit";
         RuleExpressionValueShapeDto: {
             type?: components["schemas"]["RuleValueType"];
             cardinality?: components["schemas"]["RuleExpressionCardinality"];
@@ -750,6 +879,14 @@ export interface components {
         RuleLifecycleStatus: "Draft" | "Published" | "Archived";
         /** @enum {string} */
         RuleLogicalOperator: "All" | "Any" | "Not";
+        RuleLogicalOperatorDefinitionDto: {
+            operator?: components["schemas"]["RuleLogicalOperator"];
+            /** Format: int32 */
+            minimumChildren?: number;
+            /** Format: int32 */
+            maximumChildren?: number | null;
+            documentation?: components["schemas"]["RuleReferenceDocumentationDto"];
+        };
         RuleNodeDiagnosticDto: {
             nodeId?: string;
             isMatch?: boolean;
@@ -763,6 +900,10 @@ export interface components {
         };
         /** @enum {string} */
         RuleOperandKind: "Context" | "Parameter" | "Literal" | "Function";
+        RuleOperandKindDefinitionDto: {
+            kind?: components["schemas"]["RuleOperandKind"];
+            documentation?: components["schemas"]["RuleReferenceDocumentationDto"];
+        };
         /** @enum {string} */
         RuleOrigin: "System" | "Workspace";
         RuleOutcomeDto: {
@@ -788,6 +929,18 @@ export interface components {
             leftShapes?: components["schemas"]["RuleExpressionValueShapeDto"][];
             rightShapes?: components["schemas"]["RuleExpressionValueShapeDto"][];
             requiresMatchingTypes?: boolean;
+            documentation?: components["schemas"]["RuleReferenceDocumentationDto"];
+        };
+        RuleReferenceContentDto: {
+            displayName?: string;
+            summary?: string;
+            usage?: string;
+            examples?: string[];
+        };
+        RuleReferenceDocumentationDto: {
+            locales?: {
+                [key: string]: components["schemas"]["RuleReferenceContentDto"];
+            };
         };
         RuleRevisionRequest: {
             /** Format: int32 */
@@ -812,6 +965,10 @@ export interface components {
         };
         /** @enum {string} */
         RuleValueType: "Text" | "Integer" | "Decimal" | "Date" | "DateTime" | "Boolean";
+        RuleValueTypeDefinitionDto: {
+            type?: components["schemas"]["RuleValueType"];
+            documentation?: components["schemas"]["RuleReferenceDocumentationDto"];
+        };
         SaveRuleDefinitionDraftRequest: {
             /** Format: int32 */
             expectedRevision?: number;
@@ -823,7 +980,7 @@ export interface components {
             contextSchemaVersion?: number;
             outcomeKind?: components["schemas"]["RuleOutcomeKind"];
             parameters?: components["schemas"]["RuleParameterDefinitionDto"][];
-            condition?: components["schemas"]["RuleConditionNodeDto"];
+            expressionSyntax?: string;
             outcome?: components["schemas"]["RuleOutcomeDto"];
         };
         SaveUnpublishedBusinessObjectDefinitionRequest: {
@@ -831,6 +988,25 @@ export interface components {
             expectedRevision?: number;
             name?: string;
             fields?: components["schemas"]["BusinessObjectFieldDefinitionInput"][];
+        };
+        SearchRuleExpressionGuideRequest: {
+            /** Format: int32 */
+            expressionLanguageVersion?: number;
+            definitionKey?: string | null;
+            contextKey?: string | null;
+            /** Format: int32 */
+            contextSchemaVersion?: number | null;
+            parameters?: components["schemas"]["RuleParameterDefinitionDto"][];
+            query?: string | null;
+            language?: string;
+        };
+        SearchTextDto: {
+            text?: string;
+            segments?: components["schemas"]["SearchTextSegmentDto"][];
+        };
+        SearchTextSegmentDto: {
+            text?: string;
+            isMatch?: boolean;
         };
         /** @enum {string} */
         SignInNextStep: "Dashboard";
@@ -893,6 +1069,8 @@ export interface operations {
             query?: {
                 page?: number;
                 pageSize?: number;
+                query?: string;
+                language?: string;
             };
             header?: never;
             path?: never;
@@ -1532,6 +1710,8 @@ export interface operations {
                 scope?: components["schemas"]["RuleScope"];
                 origin?: components["schemas"]["RuleOrigin"];
                 status?: components["schemas"]["RuleLifecycleStatus"];
+                query?: string;
+                language?: string;
             };
             header?: never;
             path?: never;
@@ -1691,6 +1871,108 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RuleExpressionLanguageDto"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    AssistRuleExpression: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AssistRuleExpressionRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RuleExpressionAuthoringDto"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SearchRuleExpressionGuide: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SearchRuleExpressionGuideRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RuleExpressionGuideDto"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
                 };
             };
             /** @description Unauthorized */

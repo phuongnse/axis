@@ -284,14 +284,28 @@ public sealed class RuleEvaluatorTests
                 Version: 1,
                 RuleScope.Field,
                 "Text field value",
-                [new RuleContextFieldDto("field.value", "Field value", RuleValueType.Text, AllowMultiple: false)],
+                [
+                    new RuleContextFieldDto(
+                        "field.value",
+                        "Field value",
+                        RuleValueType.Text,
+                        AllowMultiple: false,
+                        Documentation: RuleDefinitionHandlerTestContext.ReferenceDocumentation("Field value")),
+                ],
                 TargetTypeKey: "Text"),
             new(
                 "business_objects.field.decimal",
                 Version: 1,
                 RuleScope.Field,
                 "Decimal field value",
-                [new RuleContextFieldDto("field.value", "Field value", RuleValueType.Decimal, AllowMultiple: false)],
+                [
+                    new RuleContextFieldDto(
+                        "field.value",
+                        "Field value",
+                        RuleValueType.Decimal,
+                        AllowMultiple: false,
+                        Documentation: RuleDefinitionHandlerTestContext.ReferenceDocumentation("Field value")),
+                ],
                 TargetTypeKey: "Decimal"),
         ];
 

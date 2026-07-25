@@ -200,8 +200,20 @@ public sealed class SystemRuleCatalogTests
                         "Boolean" => RuleValueType.Boolean,
                         _ => RuleValueType.Text,
                     },
+                    Documentation("Value"),
                     allowMultiple).Value,
             ]).Value;
+
+    private static RuleReferenceDocumentation Documentation(string displayName) =>
+        RuleReferenceDocumentation.Bilingual(
+            displayName,
+            $"Reference for {displayName}.",
+            $"Use {displayName} in a compatible condition.",
+            displayName,
+            displayName,
+            $"Tham chiếu cho {displayName}.",
+            $"Dùng {displayName} trong điều kiện tương thích.",
+            displayName);
 
     private static RuleValue Value(RuleValueType type, string value) =>
         RuleValue.Create(type, [value]).Value;

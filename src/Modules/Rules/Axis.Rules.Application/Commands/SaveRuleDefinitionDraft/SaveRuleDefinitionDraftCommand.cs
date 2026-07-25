@@ -13,6 +13,6 @@ public sealed record SaveRuleDefinitionDraftCommand(
     int ContextSchemaVersion,
     RuleOutcomeKind OutcomeKind,
     IReadOnlyList<RuleParameterDefinitionDto> Parameters,
-    RuleConditionNodeDto Condition,
+    string ExpressionSyntax,
     RuleOutcomeDto Outcome)
     : ICommand<RuleDefinitionDetailDto>;

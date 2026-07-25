@@ -5,10 +5,12 @@ using Axis.Rules.Application.Commands.CreateRuleDefinition;
 using Axis.Rules.Application.Commands.PublishRuleDefinition;
 using Axis.Rules.Application.Commands.SaveRuleDefinitionDraft;
 using Axis.Rules.Application.Commands.StartRuleDefinitionDraft;
+using Axis.Rules.Application.Queries.AssistRuleExpression;
 using Axis.Rules.Application.Queries.GetRuleDefinition;
 using Axis.Rules.Application.Queries.GetRuleExpressionLanguage;
 using Axis.Rules.Application.Queries.ListRuleContextSchemas;
 using Axis.Rules.Application.Queries.ListRuleDefinitions;
+using Axis.Rules.Application.Queries.SearchRuleExpressionGuide;
 using Axis.Rules.Application.Queries.SimulateRuleDefinition;
 using Axis.Rules.Contracts;
 using Axis.Shared.Application;
@@ -54,6 +56,22 @@ public static class RuleDefinitionEndpoints
             .WithName("GetRuleExpressionLanguage")
             .WithSummary("Get the versioned typed-expression capabilities available for rule authoring")
             .Produces<RuleExpressionLanguageDto>()
+            .ProducesProblem(401)
+            .ProducesProblem(403);
+
+        group.MapPost("/expression-language/assist", AssistExpression)
+            .WithName("AssistRuleExpression")
+            .WithSummary("Parse, complete, and explain rule expression syntax")
+            .Produces<RuleExpressionAuthoringDto>()
+            .ProducesProblem(400)
+            .ProducesProblem(401)
+            .ProducesProblem(403);
+
+        group.MapPost("/expression-language/guide", SearchExpressionGuide)
+            .WithName("SearchRuleExpressionGuide")
+            .WithSummary("Browse and search the contextual rule expression guide")
+            .Produces<RuleExpressionGuideDto>()
+            .ProducesProblem(400)
             .ProducesProblem(401)
             .ProducesProblem(403);
 
@@ -124,10 +142,12 @@ public static class RuleDefinitionEndpoints
         [FromQuery] int pageSize = 20,
         [FromQuery] RuleScope? scope = null,
         [FromQuery] RuleOrigin? origin = null,
-        [FromQuery] RuleLifecycleStatus? status = null)
+        [FromQuery] RuleLifecycleStatus? status = null,
+        [FromQuery] string? query = null,
+        [FromQuery] string? language = null)
     {
         Result<PagedResult<RuleDefinitionSummaryDto>> result = await mediator.Send(
-            new ListRuleDefinitionsQuery(page, pageSize, scope, origin, status),
+            new ListRuleDefinitionsQuery(page, pageSize, scope, origin, status, query, language),
             cancellationToken);
         return result.IsFailure ? result.ToProblemDetails() : Results.Ok(result.Value);
     }
@@ -171,6 +191,28 @@ public static class RuleDefinitionEndpoints
         return result.IsFailure ? result.ToProblemDetails() : Results.Ok(result.Value);
     }
 
+    private static async Task<IResult> AssistExpression(
+        [FromBody] AssistRuleExpressionRequest request,
+        ISender mediator,
+        CancellationToken cancellationToken)
+    {
+        Result<RuleExpressionAuthoringDto> result = await mediator.Send(
+            new AssistRuleExpressionQuery(request),
+            cancellationToken);
+        return result.IsFailure ? result.ToProblemDetails() : Results.Ok(result.Value);
+    }
+
+    private static async Task<IResult> SearchExpressionGuide(
+        [FromBody] SearchRuleExpressionGuideRequest request,
+        ISender mediator,
+        CancellationToken cancellationToken)
+    {
+        Result<RuleExpressionGuideDto> result = await mediator.Send(
+            new SearchRuleExpressionGuideQuery(request),
+            cancellationToken);
+        return result.IsFailure ? result.ToProblemDetails() : Results.Ok(result.Value);
+    }
+
     private static async Task<IResult> Get(
         string definitionKey,
         ISender mediator,
@@ -199,7 +241,7 @@ public static class RuleDefinitionEndpoints
                 request.ContextSchemaVersion,
                 request.OutcomeKind,
                 request.Parameters,
-                request.Condition,
+                request.ExpressionSyntax,
                 request.Outcome),
             cancellationToken);
         return result.IsFailure ? result.ToProblemDetails() : Results.Ok(result.Value);

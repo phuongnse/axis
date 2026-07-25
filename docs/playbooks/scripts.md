@@ -45,7 +45,7 @@ Project commands use `python`; substitute `python3` on WSL/Linux or `py -3` on W
 - Use `python scripts/axis.py generate theme` after editing [theme/axis-theme.json](../../theme/axis-theme.json); `python scripts/axis.py check theme` rejects stale web or email projections.
 - Use `python scripts/axis.py dotnet test [path/to/project.csproj] -- <dotnet-test-args>`; omit the project to test `Axis.sln`.
 - Keep raw Docker, dotnet, npm, Lychee, and OpenSSL calls inside wrappers or package scripts.
-- Use `python scripts/axis.py local-dev smoke -- <playwright-args>` for the narrow smoke journey and `python scripts/axis.py local-dev e2e -- <playwright-args>` for focused or full browser evidence. Both commands reconcile the local stack and run Playwright in the same Compose-managed browser environment.
+- Use `python scripts/axis.py local-dev smoke -- <playwright-args>` for the narrow smoke journey and `python scripts/axis.py local-dev e2e -- <playwright-args>` for diff-triggered browser evidence. Omit Playwright arguments only for CI or a cross-cutting diff that invalidates every browser surface. Both commands reconcile the local stack and run Playwright in the same Compose-managed browser environment.
 - Use `python scripts/axis.py ready-review` on a clean checkpoint commit at the review boundary. It runs changed-path verification plus the deterministic policy profile shared with CI.
 - Treat `python scripts/axis.py verify` as the changed-path verification engine behind ready-review, not as complete PR-readiness evidence by itself.
 - Use `python scripts/axis.py verify --plan-only` to inspect changed-path routing without executing tools.

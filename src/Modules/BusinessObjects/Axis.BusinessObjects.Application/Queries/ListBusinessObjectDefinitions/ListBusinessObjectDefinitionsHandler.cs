@@ -19,12 +19,16 @@ public sealed class ListBusinessObjectDefinitionsHandler(
         if (currentUser.workspaceId is not Guid workspaceId)
             return BusinessObjectDefinitionFailures.MissingWorkspace<PagedResult<BusinessObjectDefinitionListItemDto>>();
 
-        int totalCount = await repository.CountForWorkspaceAsync(workspaceId, cancellationToken);
+        int totalCount = await repository.CountForWorkspaceAsync(
+            workspaceId,
+            query.SearchQuery,
+            cancellationToken);
         IReadOnlyList<BusinessObjectDefinition> definitions =
             await repository.ListForWorkspaceAsync(
                 workspaceId,
                 query.Page,
                 query.PageSize,
+                query.SearchQuery,
                 cancellationToken);
 
         return new PagedResult<BusinessObjectDefinitionListItemDto>(

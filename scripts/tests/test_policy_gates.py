@@ -4908,5 +4908,19 @@ class TestDocDomainDiscovery(unittest.TestCase):
         )
 
 
+class TestClientExperienceWorkflow(unittest.TestCase):
+    def test_frontend_lifecycle_skills_reference_single_client_experience_owner(self) -> None:
+        owner = ROOT / "docs" / "playbooks" / "client-experience.md"
+        self.assertTrue(owner.is_file())
+        self.assertFalse((ROOT / "docs" / "playbooks" / "ui-composition.md").exists())
+
+        for skill in ("axis-use-case-spec", "axis-frontend-feature", "axis-ui-system"):
+            with self.subTest(skill=skill):
+                text = (
+                    ROOT / ".agents" / "skills" / skill / "SKILL.md"
+                ).read_text(encoding="utf-8")
+                self.assertIn("docs/playbooks/client-experience.md", text)
+
+
 if __name__ == "__main__":
     unittest.main()

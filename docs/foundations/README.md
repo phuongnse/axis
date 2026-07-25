@@ -13,6 +13,7 @@ Foundation contracts are the source of truth for enabling surfaces that are not 
 | [docs/foundations/data-display/README.md](./data-display/README.md) | [docs/foundations/data-display/collection-page.md](./data-display/collection-page.md) | Done |
 | [docs/foundations/data-display/README.md](./data-display/README.md) | [docs/foundations/data-display/data-table.md](./data-display/data-table.md) | Partial |
 | [docs/foundations/overlays/README.md](./overlays/README.md) | [docs/foundations/overlays/managed-dialog.md](./overlays/managed-dialog.md) | Done |
+| [docs/foundations/search/README.md](./search/README.md) | [docs/foundations/search/search-experience.md](./search/search-experience.md) | Done |
 
 ## Rule
 

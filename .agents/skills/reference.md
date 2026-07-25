@@ -14,6 +14,7 @@ Universal semantics for every repo skill. Intent routing lives in [README.md](./
 8. **Report honestly.** Missing or stale evidence is `not run` or `blocked`, never pass.
 9. **Keep current contracts only.** Remove superseded guidance instead of documenting incident history or retired names.
 10. **Route durable guidance before edit.** The entry domain owner keeps spec, status, and evidence decisions. Other durable guidance **Requires** selecting `$axis-doc-hygiene` or entering it through a typed handoff before edit.
+11. **Compatibility is explicit.** Derive compatibility from the owning contract, real consumers/data, and current product phase. An approved pre-production clean cutover removes the old path completely; it does not preserve shims, dual contracts, feature flags, fallback parsing, or duplicate tests.
 
 ## Handoff types
 
@@ -33,8 +34,9 @@ Delegated skills do not auto-route back, commit, publish, or invoke another work
 3. **Root-cause loop.** For a failure, reproduce it, read exact diagnostics and recent changes, trace the source, state one hypothesis, and test one variable. Do not stack unproven fixes; after three failed fix attempts, stop and reassess the architecture with the user.
 4. **Fail-before/pass-after.** For a bug or logic change, first prove the smallest reliable check fails for the intended reason, then make it pass. If no automated boundary exists, record why and use the smallest reproducible check.
 5. **Safety floor.** Minimality never removes required acceptance behavior, trust-boundary validation, security, data-loss protection, error behavior, or accessibility.
-6. **Communication clarity.** Lead with outcome and decisive evidence; preserve exact paths, commands, identifiers, and errors; remove filler and repeated summaries. Expand when compression could obscure sequence, risk, ambiguity, or an irreversible action.
-7. **Skill proof.** Pair deterministic skill checks with a realistic forward test when a fresh agent is available; pass task artifacts, not the intended answer. Compare with the current Axis baseline, not a deliberately weak workflow, and measure task fidelity plus workflow cost rather than brevity alone. Otherwise report semantic compliance as review-only.
+6. **Clean replacement.** When compatibility is not required, update spec, implementation, callers, generated artifacts, tests, and guidance as one cutover, then prove the retired identifiers are gone. Keeping both paths is additional product behavior, not a safety default.
+7. **Communication clarity.** Lead with outcome and decisive evidence; preserve exact paths, commands, identifiers, and errors; remove filler and repeated summaries. Expand when compression could obscure sequence, risk, ambiguity, or an irreversible action.
+8. **Skill proof.** Pair deterministic skill checks with a realistic forward test when a fresh agent is available; pass task artifacts, not the intended answer. Compare with the current Axis baseline, not a deliberately weak workflow, and measure task fidelity plus workflow cost rather than brevity alone. Otherwise report semantic compliance as review-only.
 
 ## Improvement loop
 

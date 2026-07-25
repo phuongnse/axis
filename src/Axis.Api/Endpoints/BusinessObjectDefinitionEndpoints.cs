@@ -72,10 +72,12 @@ public static class BusinessObjectDefinitionEndpoints
         ISender mediator,
         CancellationToken ct,
         [FromQuery] int page = 1,
-        [FromQuery] int pageSize = 20)
+        [FromQuery] int pageSize = 20,
+        [FromQuery] string? query = null,
+        [FromQuery] string? language = null)
     {
         Result<PagedResult<BusinessObjectDefinitionListItemDto>> result = await mediator.Send(
-            new ListBusinessObjectDefinitionsQuery(page, pageSize),
+            new ListBusinessObjectDefinitionsQuery(page, pageSize, query, language),
             ct);
 
         return result.IsFailure

@@ -9,6 +9,10 @@ public interface IRuleDefinitionRepository
         RuleDefinitionKey key,
         Guid workspaceId,
         CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<RuleDefinition>> ListByKeysForWorkspaceAsync(
+        IReadOnlyList<RuleDefinitionKey> keys,
+        Guid workspaceId,
+        CancellationToken cancellationToken = default);
     Task<bool> KeyExistsAsync(
         RuleDefinitionKey key,
         Guid workspaceId,
@@ -17,6 +21,7 @@ public interface IRuleDefinitionRepository
         Guid workspaceId,
         RuleScope? scope = null,
         RuleLifecycleStatus? status = null,
+        string? searchQuery = null,
         CancellationToken cancellationToken = default);
     Task<IReadOnlyList<RuleDefinition>> ListForWorkspaceAsync(
         Guid workspaceId,
@@ -24,5 +29,6 @@ public interface IRuleDefinitionRepository
         int take,
         RuleScope? scope = null,
         RuleLifecycleStatus? status = null,
+        string? searchQuery = null,
         CancellationToken cancellationToken = default);
 }

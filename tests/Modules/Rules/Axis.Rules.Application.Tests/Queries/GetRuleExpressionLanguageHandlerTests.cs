@@ -24,6 +24,17 @@ public sealed class GetRuleExpressionLanguageHandlerTests
             .Should().BeEquivalentTo(Enum.GetValues<RulePredicateOperator>());
         result.Value.Functions.Select(definition => definition.Function)
             .Should().BeEquivalentTo(Enum.GetValues<RuleExpressionFunction>());
+        result.Value.LogicalOperators.Select(definition => definition.Operator)
+            .Should().BeEquivalentTo(Enum.GetValues<RuleLogicalOperator>());
+        result.Value.OperandKinds.Select(definition => definition.Kind)
+            .Should().BeEquivalentTo(Enum.GetValues<RuleOperandKind>());
+        result.Value.ValueTypes.Select(definition => definition.Type)
+            .Should().BeEquivalentTo(Enum.GetValues<RuleValueType>());
+        result.Value.Cardinalities.Select(definition => definition.Cardinality)
+            .Should().BeEquivalentTo(Enum.GetValues<RuleExpressionCardinality>());
+        result.Value.LimitDefinitions.Should().OnlyContain(definition =>
+            definition.Value > 0 &&
+            definition.Documentation.Locales.Keys.Order().SequenceEqual(new[] { "en", "vi" }));
 
         RuleExpressionFunctionDefinitionDto length = result.Value.Functions.Single(
             definition => definition.Function == RuleExpressionFunction.Length);
@@ -31,6 +42,10 @@ public sealed class GetRuleExpressionLanguageHandlerTests
         length.Parameters[0].AcceptedTypes.Should().Equal(RuleValueType.Text);
         length.Parameters[0].Cardinality.Should().Be(RuleExpressionCardinality.Scalar);
         length.ReturnType.Should().Be(RuleValueType.Integer);
+        length.Documentation.Locales["en"].DisplayName.Should().Be("Length");
+        length.Documentation.Locales["vi"].Usage.Should().NotBeNullOrWhiteSpace();
+        result.Value.Operators.Should().OnlyContain(definition =>
+            definition.Documentation.Locales.Keys.Order().SequenceEqual(new[] { "en", "vi" }));
         result.Value.Limits.MaxDepth.Should().Be(DomainEvaluationLimits.Default.MaxDepth);
         result.Value.Limits.MaxNodes.Should().Be(DomainEvaluationLimits.Default.MaxNodes);
         result.Value.Limits.MaxFunctionCalls.Should().Be(DomainEvaluationLimits.Default.MaxFunctionCalls);

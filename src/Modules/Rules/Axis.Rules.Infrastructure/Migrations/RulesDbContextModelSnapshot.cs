@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
+using NpgsqlTypes;
 
 #nullable disable
 
@@ -104,6 +105,24 @@ namespace Axis.Rules.Infrastructure.Migrations
                         .HasColumnType("character varying(32)")
                         .HasColumnName("scope");
 
+                    b.Property<string>("SearchText")
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("text")
+                        .HasColumnName("search_text")
+                        .HasComputedColumnSql("axis_unaccent(lower(coalesce(name, '') || ' ' || coalesce(description, '') || ' ' || coalesce(definition_key, '') || ' ' || coalesce(context_key, '')))", true);
+
+                    b.Property<string>("SearchTitle")
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("text")
+                        .HasColumnName("search_title")
+                        .HasComputedColumnSql("axis_unaccent(lower(coalesce(name, '')))", true);
+
+                    b.Property<NpgsqlTsVector>("SearchVector")
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("tsvector")
+                        .HasColumnName("search_vector")
+                        .HasComputedColumnSql("to_tsvector('simple', axis_unaccent(lower(coalesce(name, '') || ' ' || coalesce(description, '') || ' ' || coalesce(definition_key, '') || ' ' || coalesce(context_key, ''))))", true);
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(32)
@@ -134,6 +153,23 @@ namespace Axis.Rules.Infrastructure.Migrations
                         .HasColumnName("xmin");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("SearchText")
+                        .HasDatabaseName("ix_rule_definitions_search_text");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("SearchText"), "gin");
+                    NpgsqlIndexBuilderExtensions.HasOperators(b.HasIndex("SearchText"), new[] { "gin_trgm_ops" });
+
+                    b.HasIndex("SearchTitle")
+                        .HasDatabaseName("ix_rule_definitions_search_title");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("SearchTitle"), "gin");
+                    NpgsqlIndexBuilderExtensions.HasOperators(b.HasIndex("SearchTitle"), new[] { "gin_trgm_ops" });
+
+                    b.HasIndex("SearchVector")
+                        .HasDatabaseName("ix_rule_definitions_search_vector");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("SearchVector"), "gin");
 
                     b.HasIndex("WorkspaceId", "Key")
                         .IsUnique();

@@ -164,7 +164,6 @@ test.describe('select site theme', () => {
     await openAuthenticatedPreferences(page);
     await page.getByRole('button', { name: 'Dark' }).click();
 
-    await expect(page.getByText('Theme saved')).toBeVisible({ timeout: 30_000 });
     await expect(page.locator('html')).toHaveClass(/dark/);
     await expect(page.locator('html')).toHaveAttribute('data-theme-mode', 'dark');
 

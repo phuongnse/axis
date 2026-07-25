@@ -80,6 +80,7 @@ from axis_dependency_policy import evaluate_npm_audit  # noqa: E402
 from axis_frontend_policy import (  # noqa: E402
     check_frontend_quality,
     frontend_component_file_name_issues,
+    frontend_e2e_structure_issues,
     frontend_form_schema_type_issues,
     frontend_public_route_navigation_issues,
     frontend_quality_issues,
@@ -723,7 +724,15 @@ def check_frontend_api_contracts(_args: argparse.Namespace | None = None) -> int
             continue
         text = path.read_text(encoding="utf-8")
         lines = text.splitlines()
+        in_import = False
         for idx, line in enumerate(lines, 1):
+            stripped = line.lstrip()
+            if stripped.startswith("import "):
+                in_import = ";" not in line
+                continue
+            if in_import:
+                in_import = ";" not in line
+                continue
             if not pattern.search(line):
                 continue
             statement = line

@@ -14,6 +14,7 @@ Tech-stack changes need explicit user approval before implementation. Update thi
 |---|---|
 | Backend | .NET 8, ASP.NET Core Minimal API, MediatR, FluentValidation. |
 | Persistence | EF Core migrations, Npgsql/PostgreSQL, Redis. |
+| Search | Server-owned CQRS read providers; PostgreSQL full-text search with `unaccent` and `pg_trgm` is the first adapter. |
 | Auth | OpenIddict Authorization Code + PKCE, BCrypt password hashing, MailKit SMTP. |
 | Observability | Serilog, OpenTelemetry, optional local OTEL/LGTM stack. |
 | API contract | OpenAPI via Swashbuckle/Scalar; SPA types generated with `openapi-typescript`. |

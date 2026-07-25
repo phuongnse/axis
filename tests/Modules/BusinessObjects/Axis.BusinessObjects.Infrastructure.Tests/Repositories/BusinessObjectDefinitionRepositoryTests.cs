@@ -280,6 +280,44 @@ public sealed class BusinessObjectDefinitionRepositoryTests(BusinessObjectsDatab
     }
 
     [Fact]
+    public async Task ListForWorkspaceAsync_WhenSearchIsSmart_MatchesAccentTermOrderAndTypo()
+    {
+        Guid workspaceId = Guid.NewGuid();
+        BusinessObjectDefinition exact = CreateUnpublished(
+            workspaceId,
+            "Customer",
+            UniqueKey("customer"));
+        BusinessObjectDefinition prefix = CreateUnpublished(
+            workspaceId,
+            "Customer archive",
+            UniqueKey("customer_archive"));
+        BusinessObjectDefinition accented = CreateUnpublished(
+            workspaceId,
+            "Hóa đơn ưu tiên",
+            UniqueKey("priority_invoice"));
+        BusinessObjectDefinition typo = CreateUnpublished(
+            workspaceId,
+            "Invoice",
+            UniqueKey("invoice"));
+        await _repository.AddAsync(exact);
+        await _repository.AddAsync(prefix);
+        await _repository.AddAsync(accented);
+        await _repository.AddAsync(typo);
+        await _unitOfWork.SaveChangesAsync();
+
+        IReadOnlyList<BusinessObjectDefinition> ranked =
+            await _repository.ListForWorkspaceAsync(workspaceId, 1, 10, "customer");
+        IReadOnlyList<BusinessObjectDefinition> accentAndOrder =
+            await _repository.ListForWorkspaceAsync(workspaceId, 1, 10, "uu tien hoa don");
+        IReadOnlyList<BusinessObjectDefinition> typoMatch =
+            await _repository.ListForWorkspaceAsync(workspaceId, 1, 10, "inovice");
+
+        ranked.Select(definition => definition.Id).Take(2).Should().Equal(exact.Id, prefix.Id);
+        accentAndOrder.Should().ContainSingle(definition => definition.Id == accented.Id);
+        typoMatch.Should().ContainSingle(definition => definition.Id == typo.Id);
+    }
+
+    [Fact]
     public async Task SaveChangesAsync_WhenConcurrentUnpublishedUpdateWins_ThrowsConcurrencyException()
     {
         Guid workspaceId = Guid.NewGuid();

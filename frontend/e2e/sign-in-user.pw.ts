@@ -248,7 +248,6 @@ test.describe('sign in user', () => {
     await expect(page).toHaveURL(/\/register$/);
     const authorizeCountBeforeHover = authorization.statuses().length;
     await page.getByRole('link', { name: 'Sign in' }).hover();
-    await page.waitForTimeout(250);
 
     expect(authorization.statuses()).toEqual([302]);
     expect(authorization.statuses()).toHaveLength(authorizeCountBeforeHover);

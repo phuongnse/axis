@@ -30,7 +30,8 @@ public sealed record RuleDefinitionSummaryDto(
     int? ContextSchemaVersion,
     RuleApplicabilityDto? Applicability,
     IReadOnlyList<RuleParameterDefinitionDto> Parameters,
-    DateTime? UpdatedAt);
+    DateTime? UpdatedAt,
+    RuleReferenceDocumentationDto? Documentation = null);
 
 public sealed record RuleDefinitionDetailDto(
     string DefinitionKey,
@@ -52,7 +53,8 @@ public sealed record RuleDefinitionDetailDto(
     IReadOnlyList<RuleDefinitionVersionDto> Versions,
     DateTime? CreatedAt,
     DateTime? UpdatedAt,
-    DateTime? ArchivedAt);
+    DateTime? ArchivedAt,
+    RuleReferenceDocumentationDto? Documentation = null);
 
 public sealed record RuleDefinitionVersionDto(
     int Version,
@@ -95,7 +97,8 @@ public sealed record RuleContextFieldDto(
     string Path,
     string DisplayName,
     RuleValueType Type,
-    bool AllowMultiple);
+    bool AllowMultiple,
+    RuleReferenceDocumentationDto Documentation);
 
 public sealed record RuleContextSchemaDto(
     string ContextKey,

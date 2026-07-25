@@ -1,13 +1,13 @@
 ---
 name: axis-frontend-feature
-description: Implement Axis SPA feature behavior. Use for routes, feature components, forms, server-state loading, generated API consumers, mutations, URL state, and user-visible loading, empty, error, or success behavior.
+description: Self-direct and implement Axis client experiences from ready product contracts. Use for user journeys, routes, screen hierarchy, read/edit modes, feature components, forms, server-state loading, generated API consumers, mutations, URL state, recovery, and user-visible loading, empty, error, or success behavior.
 ---
 
 # Axis Frontend Feature
 
 ## Goal
 
-Implement a frontend slice from supplied product/foundation evidence with generated contracts, observable states, accessible interaction, and focused tests.
+Turn a ready product/foundation contract into a coherent, easy-to-use client journey with generated contracts, observable and recoverable states, accessible interaction, and focused evidence.
 
 ## Hard gates
 
@@ -16,23 +16,26 @@ Follow [reference.md](../reference.md).
 - UI token, primitive, baseline, shared visual API, or provider work **Delegates** to `$axis-ui-system` and returns here with its decision.
 - Unresolved verification command selection **Delegates** to `$axis-script-scope`; known owner commands stay local.
 - Generated request types own wire shape; do not hand-write duplicate DTOs or submit fields absent from the generated request.
+- Follow the Design Gate compatibility decision. A clean cutover removes the retired journey/components/state/tests instead of hiding or preserving them beside the replacement.
 
 ## Inputs
 
 - Caller, owning use-case/foundation, and in-scope AC/AT rows or foundation behavior.
+- User outcome, journey, mode, state, hierarchy, content, and quality decisions from the client experience contract.
 - Generated API contract and Design Gate/UI decisions when triggered.
 - Existing route, feature, query, component, and test paths.
 
 ## Workflow
 
 1. Confirm the caller owns product/foundation decisions; carry current prerequisite evidence and every in-scope AC/AT row through implementation and return evidence.
-2. Read [docs/playbooks/frontend.md](../../../docs/playbooks/frontend.md), [docs/playbooks/testing.md](../../../docs/playbooks/testing.md), and the owning contract.
-3. Trace routes, access group, query factories/keys, API wrapper, generated types, cache updates, URL state, translations, UI call sites, and tests with `rg`.
-4. Implement narrowly using the frontend playbook: stable server-state ownership, RHF/Zod forms, explicit mutation cache behavior, shareable URL state, localized copy, and required loading/empty/error/validation/disabled/success states.
-5. Use existing UI contracts. This workflow **Delegates** unresolved visual deviations to `$axis-ui-system` and wire-shape deviations to `$axis-api-contract`; keep consumer classes layout-only and do not create feature-local primitives.
-6. Trace every in-scope AC/AT row to observable behavior and API/cache proof with Vitest/Testing Library; use focused Playwright evidence for layout, navigation, or interaction risk.
-7. Run documented focused checks directly through their `python scripts/axis.py ...` wrappers, never raw npm, Playwright, or .NET commands. Use the verification handoff only when changed paths lack an owned command or alter workflow selection; report every omitted broad check.
+2. Read [docs/playbooks/client-experience.md](../../../docs/playbooks/client-experience.md), [docs/playbooks/frontend.md](../../../docs/playbooks/frontend.md), [docs/playbooks/testing.md](../../../docs/playbooks/testing.md), and the owning contract.
+3. Trace the complete existing journey: routes, neighboring screens, access group, entry/exit, query factories/keys, API wrapper, generated types, cache and URL state, translations, UI call sites, and tests with `rg`. Classify visible vocabulary as server-owned product meaning or client-owned interface copy; flag every frontend mapping or static guide that duplicates server-owned values.
+4. Before JSX, reconcile the experience contract: user outcome; primary and recovery paths; read/edit transitions; applicable state model; information hierarchy; relationships; semantic component mapping; content/help; responsive and accessibility behavior. Decide ordinary UX details autonomously from the owner and existing patterns; stop only for missing product behavior.
+5. Implement the complete in-scope journey narrowly: stable server state, RHF/Zod forms, explicit mutation cache behavior, shareable URL state, localized copy, visible progress, actionable errors, recovery, and distinct loading/empty/validation/disabled/success states. Render backend-owned labels, explanations, examples, constraints, and compatibility from generated reference metadata; never create a parallel feature-local knowledge map.
+6. Use existing UI contracts. This workflow **Delegates** unresolved visual deviations to `$axis-ui-system` and wire-shape deviations to `$axis-api-contract`; keep consumer classes layout-only and do not create feature-local primitives. When replacing a surface, remove obsolete controls, mappings, translations, and tests in the same slice unless the owning contract explicitly requires overlap.
+7. Trace every in-scope AC/AT row to its lowest reliable boundary. Use Vitest/Testing Library for state and component matrices. Give each Playwright test one independently runnable user outcome; keep one thin cross-layer happy path and separate only browser-required lifecycle, recovery, read-only discovery, keyboard, layout/overflow, or console-health journeys. Never solve a broad or stale journey with fixed sleeps, serial state, or a local timeout override.
+8. Run documented focused checks directly through their `python scripts/axis.py ...` wrappers, never raw npm, Playwright, or .NET commands. Use the verification handoff only when changed paths lack an owned command or alter workflow selection; report every omitted broad check.
 
 ## Output
 
-Report feature paths, AC/AT evidence, route/state decisions, UI/API handoffs, tests/visual evidence, and gaps.
+Report feature paths, experience contract and autonomous decisions, open product decisions, AC/AT evidence, route/state decisions, UI/API handoffs, tests/browser evidence, and gaps.

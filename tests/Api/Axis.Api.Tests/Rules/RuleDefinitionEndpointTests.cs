@@ -47,6 +47,16 @@ public sealed class RuleDefinitionEndpointTests(ApiTestFixture fixture)
                 RuleDefinitionKeys.ChoiceSelectionCount,
             ]);
         body.GetProperty("totalCount").GetInt32().Should().Be(9);
+
+        HttpResponseMessage searchResponse = await SendWithBearerAsync(
+            HttpMethod.Get,
+            "/api/rules?page=1&pageSize=20&query=required&language=en",
+            accessToken);
+        searchResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        JsonElement search = await searchResponse.Content.ReadFromJsonAsync<JsonElement>(Json);
+        search.GetProperty("items").EnumerateArray()
+            .Select(definition => definition.GetProperty("definitionKey").GetString())
+            .Should().Contain(RuleDefinitionKeys.Required);
     }
 
     [Fact]
@@ -70,6 +80,51 @@ public sealed class RuleDefinitionEndpointTests(ApiTestFixture fixture)
         length.GetProperty("parameters")[0].GetProperty("acceptedTypes")[0].GetString()
             .Should().Be("Text");
         length.GetProperty("returnType").GetString().Should().Be("Integer");
+        length.GetProperty("documentation").GetProperty("locales")
+            .GetProperty("en").GetProperty("summary").GetString()
+            .Should().NotBeNullOrWhiteSpace();
+        language.GetProperty("logicalOperators").GetArrayLength().Should().BeGreaterThan(0);
+        language.GetProperty("operandKinds").GetArrayLength().Should().BeGreaterThan(0);
+        language.GetProperty("valueTypes").GetArrayLength().Should().BeGreaterThan(0);
+        language.GetProperty("cardinalities").GetArrayLength().Should().BeGreaterThan(0);
+        language.GetProperty("limitDefinitions").EnumerateArray()
+            .All(definition =>
+                definition.GetProperty("documentation").GetProperty("locales")
+                    .TryGetProperty("vi", out _))
+            .Should().BeTrue();
+
+        HttpResponseMessage guideResponse = await SendWithBearerAsync(
+            HttpMethod.Post,
+            "/api/rules/expression-language/guide",
+            accessToken,
+            new
+            {
+                expressionLanguageVersion = 1,
+                definitionKey = RuleDefinitionKeys.NumericRange,
+                contextKey = "business_objects.field.decimal",
+                contextSchemaVersion = 1,
+                parameters = new[]
+                {
+                    new
+                    {
+                        key = "threshold",
+                        type = "Decimal",
+                        isRequired = true,
+                        allowMultiple = false,
+                        allowedValues = Array.Empty<string>(),
+                    },
+                },
+                query = "thresold",
+                language = "en",
+            });
+        guideResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        JsonElement guide = await guideResponse.Content.ReadFromJsonAsync<JsonElement>(Json);
+        JsonElement threshold = guide.GetProperty("sections").EnumerateArray()
+            .SelectMany(section => section.GetProperty("items").EnumerateArray())
+            .Single(item => item.GetProperty("referenceKey").GetString() == "threshold");
+        threshold.GetProperty("referenceKind").GetString().Should().Be("Parameter");
+        threshold.GetProperty("displayName").GetProperty("segments").EnumerateArray()
+            .Should().Contain(segment => segment.GetProperty("isMatch").GetBoolean());
 
         HttpResponseMessage detailResponse = await SendWithBearerAsync(
             HttpMethod.Get,
@@ -108,6 +163,51 @@ public sealed class RuleDefinitionEndpointTests(ApiTestFixture fixture)
                 "business_objects.field.choice.single",
                 "business_objects.field.choice.multiple",
             ]);
+        schemas[0].GetProperty("fields")[0].GetProperty("documentation")
+            .GetProperty("locales").GetProperty("en").GetProperty("usage").GetString()
+            .Should().NotBeNullOrWhiteSpace();
+
+        HttpResponseMessage assistResponse = await SendWithBearerAsync(
+            HttpMethod.Post,
+            "/api/rules/expression-language/assist",
+            accessToken,
+            new
+            {
+                expressionLanguageVersion = 1,
+                contextKey = "business_objects.field.decimal",
+                contextSchemaVersion = 1,
+                parameters = new[]
+                {
+                    new
+                    {
+                        key = "threshold",
+                        type = "Decimal",
+                        isRequired = true,
+                        allowMultiple = false,
+                        allowedValues = Array.Empty<string>(),
+                    },
+                },
+                syntax = "@context.field.value GreaterThan @parameters.threshold",
+                condition = (object?)null,
+                cursorOffset = 5,
+                language = "vi",
+            });
+        assistResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        JsonElement assisted = await assistResponse.Content.ReadFromJsonAsync<JsonElement>(Json);
+        assisted.GetProperty("condition").GetProperty("predicateOperator").GetString()
+            .Should().Be("GreaterThan");
+        JsonElement[] displayTokens = assisted.GetProperty("display").GetProperty("tokens")
+            .EnumerateArray()
+            .ToArray();
+        displayTokens
+            .Select(token => token.GetProperty("text").GetString())
+            .Should().Contain("lớn hơn");
+        displayTokens.Single(token => token.GetProperty("text").GetString() == "lớn hơn")
+            .GetProperty("referenceKey").GetString()
+            .Should().Be("GreaterThan");
+        assisted.GetProperty("completions").EnumerateArray()
+            .Should().Contain(completion =>
+                completion.GetProperty("insertText").GetString() == "@context.field.value");
 
         HttpResponseMessage createResponse = await SendWithBearerAsync(
             HttpMethod.Post,
@@ -140,25 +240,6 @@ public sealed class RuleDefinitionEndpointTests(ApiTestFixture fixture)
                 allowedValues = Array.Empty<string>(),
             },
         };
-        object condition = new
-        {
-            nodeId = "credit-threshold",
-            logicalOperator = (string?)null,
-            predicateOperator = "GreaterThan",
-            left = new
-            {
-                kind = "Context",
-                reference = "field.value",
-                literal = (object?)null,
-            },
-            right = new
-            {
-                kind = "Parameter",
-                reference = "threshold",
-                literal = (object?)null,
-            },
-            children = Array.Empty<object>(),
-        };
         object outcome = new
         {
             kind = "Validation",
@@ -182,7 +263,7 @@ public sealed class RuleDefinitionEndpointTests(ApiTestFixture fixture)
                 contextSchemaVersion = 1,
                 outcomeKind = "Validation",
                 parameters,
-                condition,
+                expressionSyntax = "@context.field.value GreaterThan @parameters.threshold",
                 outcome,
             });
         saveResponse.StatusCode.Should().Be(HttpStatusCode.OK);

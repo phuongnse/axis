@@ -46,6 +46,14 @@ def frontend_ui_system_issues(root: Path = ROOT) -> list[str]:
         src_root / "components" / "shared",
         src_root / "routes",
     )
+    raw_badge_owners = {
+        src_root / "components" / "shared" / "MetadataTag.tsx",
+        src_root / "components" / "shared" / "StatusBadge.tsx",
+        src_root / "components" / "shared" / "data-table" / "DataTableToolbar.tsx",
+    }
+    raw_alert_owners = {
+        src_root / "components" / "shared" / "StatusNotice.tsx",
+    }
 
     for path in iter_files(src_root, (".ts", ".tsx")):
         normalized = rel(path) if root == ROOT else str(path.relative_to(root)).replace("\\", "/")
@@ -68,6 +76,28 @@ def frontend_ui_system_issues(root: Path = ROOT) -> list[str]:
                         f"{normalized}:{idx}: registry primitives cannot depend on feature, shared, or route code"
                     )
             continue
+
+        for match in import_target.finditer(text):
+            target = match.group("target").replace("\\", "/")
+            imports_raw_badge = target == "@/components/ui/badge" or target.endswith(
+                "/components/ui/badge"
+            ) or target.endswith("/ui/badge")
+            if imports_raw_badge and path not in raw_badge_owners:
+                idx = text.count("\n", 0, match.start()) + 1
+                issues.append(
+                    f"{normalized}:{idx}: raw Badge is restricted to semantic badge owners; "
+                    "use StatusBadge for state/origin, MetadataTag for compact taxonomy or syntax, "
+                    "and typography or a structural pattern for headings, steps, outcomes, and prose"
+                )
+            imports_raw_alert = target == "@/components/ui/alert" or target.endswith(
+                "/components/ui/alert"
+            ) or target.endswith("/ui/alert")
+            if imports_raw_alert and path not in raw_alert_owners:
+                idx = text.count("\n", 0, match.start()) + 1
+                issues.append(
+                    f"{normalized}:{idx}: raw Alert is restricted to the StatusNotice owner; "
+                    "use StatusNotice for page, form, dialog, and menu feedback"
+                )
 
         for idx, line in enumerate(text.splitlines(), 1):
             for match in palette_utility.finditer(line):
@@ -222,6 +252,35 @@ def frontend_form_schema_type_issues(root: Path = ROOT) -> list[str]:
     return issues
 
 
+def frontend_server_owned_vocabulary_issues(root: Path = ROOT) -> list[str]:
+    issues: list[str] = []
+    translations_path = root / "frontend" / "src" / "features" / "preferences" / "translations.ts"
+    if not translations_path.exists():
+        return issues
+
+    text = translations_path.read_text(encoding="utf-8")
+    normalized = (
+        rel(translations_path)
+        if root == ROOT
+        else str(translations_path.relative_to(root)).replace("\\", "/")
+    )
+    server_owned_rule_keys = re.compile(
+        r"['\"]rules\.(?:operator[A-Z]|function(?:HasFormat|IsBlank|Length|MatchesPattern|Count|"
+        r"Precision|Scale|ToDecimal)|operand(?:Context|Function|Literal|Parameter)|"
+        r"group(?:All|Any|Not)|contextFieldValue|predicateIsBlank|"
+        r"expressionGuide(?:Group(?:All|Any|Not)|Operand(?:Context|Function|Literal|Parameter)|"
+        r"Limit(?:Depth|Functions|Nodes|Parameters|Steps)|Step(?:Compatibility|Condition|Group)|"
+        r"Type(?:Any|Multiple)))"
+    )
+    for match in server_owned_rule_keys.finditer(text):
+        line_number = text.count("\n", 0, match.start()) + 1
+        issues.append(
+            f"{normalized}:{line_number}: backend-owned rule vocabulary and guidance "
+            "must come from generated server reference metadata, not client translations"
+        )
+    return issues
+
+
 def frontend_test_async_boundary_issues(root: Path = ROOT) -> list[str]:
     issues: list[str] = []
     test_roots = [
@@ -240,6 +299,36 @@ def frontend_test_async_boundary_issues(root: Path = ROOT) -> list[str]:
                     issues.append(
                         f"{normalized}:{idx}: test code must await/return async work instead of fire-and-forget `void` calls"
                     )
+    return issues
+
+
+def frontend_e2e_structure_issues(root: Path = ROOT) -> list[str]:
+    issues: list[str] = []
+    e2e_root = root / "frontend" / "e2e"
+    if not e2e_root.exists():
+        return issues
+
+    forbidden = {
+        "waitForTimeout(": (
+            "fixed browser sleeps are forbidden; wait for an observable URL, response, state, or locator"
+        ),
+        ".setTimeout(": (
+            "journeys use the centrally owned Playwright timeout; split or fix the journey instead of overriding it"
+        ),
+        "mode: 'serial'": (
+            "browser journeys must be independently runnable; do not couple them with serial shared state"
+        ),
+        'mode: "serial"': (
+            "browser journeys must be independently runnable; do not couple them with serial shared state"
+        ),
+    }
+    for path in iter_files(e2e_root, (".ts",)):
+        normalized = rel(path) if root == ROOT else str(path.relative_to(root)).replace("\\", "/")
+        text = path.read_text(encoding="utf-8")
+        for token, message in forbidden.items():
+            for match in re.finditer(re.escape(token), text):
+                line_number = text.count("\n", 0, match.start()) + 1
+                issues.append(f"{normalized}:{line_number}: {message}")
     return issues
 
 
@@ -398,7 +487,9 @@ def frontend_quality_issues(root: Path = ROOT) -> list[str]:
         *frontend_component_file_name_issues(root),
         *frontend_tailwind_opacity_issues(root),
         *frontend_form_schema_type_issues(root),
+        *frontend_server_owned_vocabulary_issues(root),
         *frontend_test_async_boundary_issues(root),
+        *frontend_e2e_structure_issues(root),
         *frontend_public_route_navigation_issues(root),
         *frontend_route_access_group_issues(root),
         *frontend_transient_handoff_issues(root),

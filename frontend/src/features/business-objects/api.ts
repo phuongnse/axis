@@ -30,8 +30,8 @@ export const businessObjectDefinitionStaleTimeMs = 1000 * 60 * 5;
 export const businessObjectDefinitionQueryKeys = {
   all: ['business-object-definitions'] as const,
   lists: () => [...businessObjectDefinitionQueryKeys.all, 'list'] as const,
-  list: (page: number, pageSize: number) =>
-    [...businessObjectDefinitionQueryKeys.lists(), page, pageSize] as const,
+  list: (page: number, pageSize: number, query: string, language: string) =>
+    [...businessObjectDefinitionQueryKeys.lists(), page, pageSize, query, language] as const,
   details: () => [...businessObjectDefinitionQueryKeys.all, 'detail'] as const,
   detail: (id: string) => [...businessObjectDefinitionQueryKeys.all, 'detail', id] as const,
 };
@@ -39,10 +39,12 @@ export const businessObjectDefinitionQueryKeys = {
 export function businessObjectDefinitionsListQueryOptions(
   page = 1,
   pageSize = businessObjectDefinitionsDefaultPageSize,
+  query = '',
+  language = 'en',
 ) {
   return queryOptions({
-    queryKey: businessObjectDefinitionQueryKeys.list(page, pageSize),
-    queryFn: () => listBusinessObjectDefinitions(page, pageSize),
+    queryKey: businessObjectDefinitionQueryKeys.list(page, pageSize, query, language),
+    queryFn: ({ signal }) => listBusinessObjectDefinitions(page, pageSize, query, language, signal),
     staleTime: businessObjectDefinitionStaleTimeMs,
   });
 }
@@ -55,10 +57,19 @@ export function businessObjectDefinitionDetailQueryOptions(id: string) {
   });
 }
 
-export async function listBusinessObjectDefinitions(page: number, pageSize: number) {
+export async function listBusinessObjectDefinitions(
+  page: number,
+  pageSize: number,
+  query = '',
+  language = 'en',
+  signal?: AbortSignal,
+) {
   const search = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
+  if (query.trim()) search.set('query', query.trim());
+  search.set('language', language);
   return fetchApi<BusinessObjectDefinitionPage>(
     `/business-object-definitions?${search.toString()}`,
+    { signal },
   );
 }
 

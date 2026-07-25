@@ -145,8 +145,7 @@ public static class SystemRuleCatalog
         Result<SystemRuleDefinition> definition = SystemRuleDefinition.Create(
             key,
             version: 1,
-            displayName,
-            description,
+            Documentation(key, displayName, description),
             RuleScope.Field,
             RuleOutcomeKind.Validation,
             applicability.Value,
@@ -157,6 +156,73 @@ public static class SystemRuleCatalog
         return definition.IsSuccess
             ? definition.Value
             : throw new InvalidOperationException(definition.Error);
+    }
+
+    private static RuleReferenceDocumentation Documentation(
+        string key,
+        string englishName,
+        string englishSummary)
+    {
+        (string vietnameseName, string vietnameseSummary, string englishUsage, string vietnameseUsage) =
+            key switch
+            {
+                "field.required" => (
+                    "Giá trị bắt buộc",
+                    "Bắt buộc bản ghi cung cấp giá trị cho trường.",
+                    "No setup needed.",
+                    "Không cần cấu hình."),
+                "field.numeric_range" => (
+                    "Khoảng số",
+                    "Giới hạn số nguyên hoặc số thập phân bằng khoảng tùy chọn.",
+                    "Configure optional minimum and maximum values.",
+                    "Cấu hình giá trị nhỏ nhất và lớn nhất tùy chọn."),
+                "field.decimal_precision" => (
+                    "Độ chính xác thập phân",
+                    "Giới hạn precision và scale của số thập phân.",
+                    "Configure precision and scale.",
+                    "Cấu hình precision và scale."),
+                "field.date_range" => (
+                    "Khoảng ngày",
+                    "Giới hạn ngày bằng giá trị sớm nhất và muộn nhất tùy chọn.",
+                    "Configure optional earliest and latest dates.",
+                    "Cấu hình ngày sớm nhất và muộn nhất tùy chọn."),
+                "field.datetime_range" => (
+                    "Khoảng ngày giờ",
+                    "Giới hạn thời điểm ngày giờ bằng offset rõ ràng.",
+                    "Configure optional earliest and latest instants.",
+                    "Cấu hình thời điểm sớm nhất và muộn nhất tùy chọn."),
+                "field.text_length" => (
+                    "Độ dài văn bản",
+                    "Giới hạn văn bản bằng độ dài tối thiểu và tối đa tùy chọn.",
+                    "Configure optional minimum and maximum length.",
+                    "Cấu hình độ dài tối thiểu và tối đa tùy chọn."),
+                "field.text_pattern" => (
+                    "Mẫu văn bản",
+                    "Bắt buộc văn bản khớp pattern đã cấu hình.",
+                    "Configure the required regular-expression pattern.",
+                    "Cấu hình pattern biểu thức chính quy bắt buộc."),
+                "field.text_format" => (
+                    "Định dạng văn bản",
+                    "Bắt buộc văn bản dùng định dạng email, URL hoặc UUID được hỗ trợ.",
+                    "Choose a supported text format.",
+                    "Chọn một định dạng văn bản được hỗ trợ."),
+                "field.choice_selection_count" => (
+                    "Số lượng lựa chọn",
+                    "Giới hạn số lựa chọn của trường chọn nhiều.",
+                    "Configure optional minimum and maximum selections.",
+                    "Cấu hình số lựa chọn tối thiểu và tối đa tùy chọn."),
+                _ => throw new InvalidOperationException($"System rule documentation is missing for '{key}'."),
+            };
+
+        return RuleReferenceDocumentation.Bilingual(
+            englishName,
+            englishSummary,
+            englishUsage,
+            key,
+            vietnameseName,
+            vietnameseSummary,
+            vietnameseUsage,
+            key);
     }
 
     private static RuleParameterDefinition Parameter(

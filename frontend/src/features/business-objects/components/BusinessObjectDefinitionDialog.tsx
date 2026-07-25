@@ -1,12 +1,14 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowDown, ArrowUp, Plus, Save, Trash2, UploadCloud } from 'lucide-react';
-import { useEffect, useId, useState } from 'react';
+import { type ReactNode, useEffect, useId, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 import { ManagedDialog, ManagedDialogBody } from '@/components/shared/ManagedDialog';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { MetadataTag } from '@/components/shared/MetadataTag';
+import { StatusBadge } from '@/components/shared/StatusBadge';
+import { StatusNotice } from '@/components/shared/StatusNotice';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -17,7 +19,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
@@ -37,8 +38,9 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { type RuleDefinitionSummary, ruleNameTranslationKey } from '@/features/rules';
+import type { RuleDefinitionSummary } from '@/features/rules';
 import { ApiError } from '@/lib/api';
+import { referenceContent } from '@/lib/reference-metadata';
 import {
   type BusinessObjectChoiceSelectionMode,
   type BusinessObjectDefinitionDetail,
@@ -163,6 +165,7 @@ export function BusinessObjectDefinitionDialog({
   const queryClient = useQueryClient();
   const [requestError, setRequestError] = useState<string | null>(null);
   const [discardOpen, setDiscardOpen] = useState(false);
+  const [publishOpen, setPublishOpen] = useState(false);
   const form = useForm<DefinitionFormValues>({
     resolver: zodResolver(definitionSchema),
     defaultValues: emptyDefinition,
@@ -230,6 +233,7 @@ export function BusinessObjectDefinitionDialog({
       cacheDefinition(queryClient, published);
       form.reset(toFormValues(published, ruleDefinitions));
       setRequestError(null);
+      setPublishOpen(false);
       await invalidateLists(queryClient);
     },
     onError: (error) => setRequestError(readApiError(error, t('businessObjects.requestError'))),
@@ -291,6 +295,17 @@ export function BusinessObjectDefinitionDialog({
             ? t('businessObjects.defineDescription')
             : t('businessObjects.editorDescription')
         }
+        titleAccessory={
+          definition ? (
+            <StatusBadge tone={definition.status === 'Published' ? 'success' : 'neutral'}>
+              {t(
+                definition.status === 'Published'
+                  ? 'businessObjects.published'
+                  : 'businessObjects.unpublished',
+              )}
+            </StatusBadge>
+          ) : null
+        }
         closeDisabled={busy}
         dirty={!readOnly && form.formState.isDirty}
         footer={
@@ -320,14 +335,7 @@ export function BusinessObjectDefinitionDialog({
                 <Button
                   type="button"
                   disabled={busy || form.formState.isDirty || fields.length === 0}
-                  onClick={() => {
-                    if (definition?.id && definition.revision != null) {
-                      publishMutation.mutate({
-                        id: definition.id,
-                        revision: definition.revision,
-                      });
-                    }
-                  }}
+                  onClick={() => setPublishOpen(true)}
                 >
                   <UploadCloud aria-hidden />
                   {publishMutation.isPending
@@ -345,19 +353,22 @@ export function BusinessObjectDefinitionDialog({
               <p role="status">{t('table.loading')}</p>
             ) : null}
             {detailQuery.isError ? (
-              <Alert variant="destructive">
-                <AlertTitle>{t('businessObjects.loadError')}</AlertTitle>
-                <AlertDescription>{t('businessObjects.loadErrorDescription')}</AlertDescription>
-              </Alert>
+              <StatusNotice tone="destructive" title={t('businessObjects.loadError')}>
+                {t('businessObjects.loadErrorDescription')}
+              </StatusNotice>
             ) : null}
             {requestError ? (
-              <Alert variant="destructive">
-                <AlertTitle>{t('businessObjects.requestError')}</AlertTitle>
-                <AlertDescription>{requestError}</AlertDescription>
-              </Alert>
+              <StatusNotice tone="destructive" title={t('businessObjects.requestError')}>
+                {requestError}
+              </StatusNotice>
             ) : null}
 
-            {!detailQuery.isLoading || mode === 'create' ? (
+            {readOnly && definition ? (
+              <BusinessObjectReadOnlyDetails
+                definition={definition}
+                ruleDefinitions={ruleDefinitions}
+              />
+            ) : !detailQuery.isLoading || mode === 'create' ? (
               <Tabs defaultValue="details">
                 <TabsList aria-label={t('businessObjects.definitionSections')}>
                   <TabsTrigger value="details">{t('businessObjects.details')}</TabsTrigger>
@@ -436,8 +447,277 @@ export function BusinessObjectDefinitionDialog({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <AlertDialog open={publishOpen} onOpenChange={setPublishOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('businessObjects.publishTitle')}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t('businessObjects.publishDescription')}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {definition ? (
+            <BusinessObjectPublishReview definition={definition} fields={fields} />
+          ) : null}
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={busy}>{t('app.cancel')}</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={busy}
+              onClick={() => {
+                if (definition?.id && definition.revision != null) {
+                  publishMutation.mutate({
+                    id: definition.id,
+                    revision: definition.revision,
+                  });
+                }
+              }}
+            >
+              {t('businessObjects.publish')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
+}
+
+function BusinessObjectReadOnlyDetails({
+  definition,
+  ruleDefinitions,
+}: {
+  definition: BusinessObjectDefinitionDetail;
+  ruleDefinitions: RuleDefinitionSummary[];
+}) {
+  const { t, i18n } = useTranslation();
+  const detailsId = useId();
+  const published = definition.status === 'Published' && definition.latestPublishedVersion;
+  const fields = published
+    ? (definition.latestPublishedVersion?.fields ?? [])
+    : (definition.fields ?? []);
+  const publishedAt = definition.latestPublishedVersion?.publishedAt;
+  const dateFormatter = new Intl.DateTimeFormat(i18n.language, {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  });
+
+  return (
+    <div
+      data-slot="business-object-read-only-details"
+      className="@container/business-object-details space-y-6"
+    >
+      <p className="text-sm leading-relaxed text-muted-foreground">
+        {t(
+          published
+            ? 'businessObjects.readOnlyPublishedSummary'
+            : 'businessObjects.readOnlyUnpublishedSummary',
+        )}
+      </p>
+
+      <section aria-labelledby={`${detailsId}-identity`} className="space-y-4">
+        <ReadOnlyHeading
+          id={`${detailsId}-identity`}
+          title={t('businessObjects.details')}
+          description={t('businessObjects.definitionDetailsDescription')}
+        />
+        <dl className="grid gap-5 @md/business-object-details:grid-cols-2">
+          <ReadOnlyFact
+            label={t('businessObjects.objectKey')}
+            value={definition.objectKey ?? t('businessObjects.notAvailable')}
+          />
+          <ReadOnlyFact
+            label={t('businessObjects.version')}
+            value={
+              definition.latestPublishedVersionNumber
+                ? t('businessObjects.latestVersion', {
+                    version: definition.latestPublishedVersionNumber,
+                  })
+                : t('businessObjects.notAvailable')
+            }
+          />
+          <ReadOnlyFact
+            label={t('businessObjects.fields')}
+            value={t('businessObjects.fieldCount', { count: fields.length })}
+          />
+          <ReadOnlyFact
+            label={publishedAt ? t('businessObjects.publishedAt') : t('businessObjects.updated')}
+            value={formatBusinessObjectDate(
+              publishedAt ?? definition.updatedAt,
+              dateFormatter,
+              t('businessObjects.notAvailable'),
+            )}
+          />
+        </dl>
+      </section>
+
+      <section aria-labelledby={`${detailsId}-fields`} className="space-y-4 border-t pt-6">
+        <ReadOnlyHeading
+          id={`${detailsId}-fields`}
+          title={t('businessObjects.fields')}
+          description={t('businessObjects.fieldsDescription')}
+        />
+        {fields.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            {t('businessObjects.noFieldsDescription')}
+          </p>
+        ) : (
+          <ol className="divide-y divide-border">
+            {fields.map((field, index) => (
+              <li
+                key={field.id ?? field.fieldKey ?? index}
+                className="space-y-4 py-5 first:pt-0 last:pb-0"
+              >
+                <div>
+                  <h4 className="text-sm font-semibold text-foreground">
+                    {field.label ?? t('businessObjects.newField')}
+                  </h4>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <MetadataTag>{field.fieldKey ?? '—'}</MetadataTag>
+                    <MetadataTag>
+                      {t(`businessObjects.fieldType${field.fieldType ?? 'Text'}`)}
+                    </MetadataTag>
+                  </div>
+                </div>
+
+                {field.choiceConfiguration ? (
+                  <dl className="grid gap-4 @md/business-object-details:grid-cols-2">
+                    <ReadOnlyFact
+                      label={t('businessObjects.selectionMode')}
+                      value={t(
+                        field.choiceConfiguration.selectionMode === 'Multiple'
+                          ? 'businessObjects.selectionMultiple'
+                          : 'businessObjects.selectionSingle',
+                      )}
+                    />
+                    <ReadOnlyFact
+                      label={t('businessObjects.options')}
+                      value={
+                        (field.choiceConfiguration.options ?? []).length > 0 ? (
+                          <ul className="space-y-1 font-normal">
+                            {(field.choiceConfiguration.options ?? []).map((option) => (
+                              <li key={option.id ?? option.optionKey}>
+                                {option.label ?? option.optionKey ?? '—'}
+                                {option.optionKey ? (
+                                  <span className="text-muted-foreground">
+                                    {' '}
+                                    ({option.optionKey})
+                                  </span>
+                                ) : null}
+                              </li>
+                            ))}
+                          </ul>
+                        ) : (
+                          t('businessObjects.notAvailable')
+                        )
+                      }
+                    />
+                  </dl>
+                ) : null}
+
+                {(field.rules ?? []).length > 0 ? (
+                  <div>
+                    <p className="text-xs font-medium text-muted-foreground">
+                      {t('businessObjects.fieldRulesTitle')}
+                    </p>
+                    <ul className="mt-2 space-y-2">
+                      {(field.rules ?? []).map((rule) => {
+                        const definitionMetadata = ruleDefinitions.find(
+                          (candidate) => candidate.definitionKey === rule.definitionKey,
+                        );
+                        return (
+                          <li
+                            key={rule.id ?? `${rule.definitionKey}:${rule.definitionVersion}`}
+                            className="text-sm text-foreground"
+                          >
+                            <span className="font-medium">
+                              {definitionMetadata
+                                ? ruleDisplayName(definitionMetadata, i18n.language, t)
+                                : rule.definitionKey}
+                            </span>{' '}
+                            <span className="text-muted-foreground">
+                              {t('businessObjects.ruleVersion', {
+                                version: rule.definitionVersion,
+                              })}
+                            </span>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
+                ) : null}
+              </li>
+            ))}
+          </ol>
+        )}
+      </section>
+    </div>
+  );
+}
+
+function BusinessObjectPublishReview({
+  definition,
+  fields,
+}: {
+  definition: BusinessObjectDefinitionDetail;
+  fields: EditableField[];
+}) {
+  const { t } = useTranslation();
+  const configuredRules = fields.reduce((count, field) => count + field.rules.length, 0);
+  return (
+    <dl className="grid grid-cols-2 gap-x-4 gap-y-3">
+      <ReadOnlyFact
+        label={t('businessObjects.name')}
+        value={definition.name ?? t('businessObjects.notAvailable')}
+      />
+      <ReadOnlyFact
+        label={t('businessObjects.objectKey')}
+        value={definition.objectKey ?? t('businessObjects.notAvailable')}
+      />
+      <ReadOnlyFact
+        label={t('businessObjects.fields')}
+        value={t('businessObjects.fieldCount', { count: fields.length })}
+      />
+      <ReadOnlyFact
+        label={t('businessObjects.fieldRulesTitle')}
+        value={t('businessObjects.configuredRulesCount', { count: configuredRules })}
+      />
+    </dl>
+  );
+}
+
+function ReadOnlyHeading({
+  id,
+  title,
+  description,
+}: {
+  id: string;
+  title: string;
+  description: string;
+}) {
+  return (
+    <div>
+      <h3 id={id} className="text-sm font-semibold text-foreground">
+        {title}
+      </h3>
+      <p className="mt-1 text-xs/relaxed text-muted-foreground">{description}</p>
+    </div>
+  );
+}
+
+function ReadOnlyFact({ label, value }: { label: string; value: ReactNode }) {
+  return (
+    <div className="space-y-2">
+      <dt className="text-xs font-medium text-muted-foreground">{label}</dt>
+      <dd className="text-sm leading-relaxed font-medium text-foreground">{value}</dd>
+    </div>
+  );
+}
+
+function formatBusinessObjectDate(
+  value: string | null | undefined,
+  formatter: Intl.DateTimeFormat,
+  fallback: string,
+) {
+  return value ? formatter.format(new Date(value)) : fallback;
 }
 
 function DefinitionDetails({
@@ -796,7 +1076,7 @@ function RulesEditor({
   readOnly: boolean;
   onChange: (index: number, patch: Partial<EditableField>) => void;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const compatible = definitions.filter(
     (definition) =>
       isCompatibleRule(definition, field) &&
@@ -841,7 +1121,7 @@ function RulesEditor({
             <SelectContent>
               {compatible.map((definition) => (
                 <SelectItem key={definition.definitionKey} value={definition.definitionKey ?? ''}>
-                  {ruleDisplayName(definition, t)}
+                  {ruleDisplayName(definition, i18n.language, t)}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -854,12 +1134,14 @@ function RulesEditor({
         </p>
       ) : null}
       {unavailable ? (
-        <Alert variant="destructive" className="mt-3">
-          <AlertTitle>{t('businessObjects.rulesCatalogUnavailableTitle')}</AlertTitle>
-          <AlertDescription>
+        <div className="mt-3">
+          <StatusNotice
+            tone="destructive"
+            title={t('businessObjects.rulesCatalogUnavailableTitle')}
+          >
             {t('businessObjects.rulesCatalogUnavailableDescription')}
-          </AlertDescription>
-        </Alert>
+          </StatusNotice>
+        </div>
       ) : null}
       <ItemGroup className="mt-3">
         {field.rules.map((rule, ruleIndex) => {
@@ -870,12 +1152,12 @@ function RulesEditor({
             <Item key={rule.clientId} variant="muted" size="sm">
               <ItemHeader>
                 <ItemTitle>
-                  {definition ? ruleDisplayName(definition, t) : rule.definitionKey}
+                  {definition ? ruleDisplayName(definition, i18n.language, t) : rule.definitionKey}
                 </ItemTitle>
                 <ItemActions>
-                  <Badge variant="outline">
+                  <span className="text-xs text-muted-foreground">
                     {t('businessObjects.ruleVersion', { version: rule.definitionVersion })}
-                  </Badge>
+                  </span>
                   {!readOnly ? (
                     <Button
                       type="button"
@@ -1073,10 +1355,10 @@ function PublishedVersion({ definition }: { definition: BusinessObjectDefinition
             <ItemContent>
               <ItemTitle>{field.label}</ItemTitle>
               <div className="flex flex-wrap gap-2">
-                <Badge variant="outline">{field.fieldKey}</Badge>
-                <Badge variant="secondary">
+                <MetadataTag>{field.fieldKey}</MetadataTag>
+                <MetadataTag>
                   {t(`businessObjects.fieldType${field.fieldType ?? 'Text'}`)}
-                </Badge>
+                </MetadataTag>
               </div>
             </ItemContent>
           </Item>
@@ -1217,11 +1499,11 @@ function isCompatibleRule(definition: RuleDefinitionSummary, field: EditableFiel
 
 function ruleDisplayName(
   definition: RuleDefinitionSummary,
+  locale: string,
   t: ReturnType<typeof useTranslation>['t'],
 ): string {
-  const translationKey = ruleNameTranslationKey(definition.definitionKey ?? '');
   const fallback = definition.name || definition.definitionKey || t('businessObjects.unknownRule');
-  return translationKey ? t(translationKey, { defaultValue: fallback }) : fallback;
+  return referenceContent(definition.documentation, locale)?.displayName ?? fallback;
 }
 
 function parameterInputType(

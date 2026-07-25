@@ -44,7 +44,7 @@ Define and publish a workspace-scoped business object definition so published ve
 - **AC-005** Publishing a valid unpublished definition creates immutable published object definition version 1 that future records can reference.
 - **AC-006** Published business object definition versions use distinct immutable snapshot identities and preserve the source definition and field identities, keys, labels, and ordering as they existed at publication time.
 - **AC-007** Unpublished object definitions are not available for record creation; only published versions can become record contracts.
-- **AC-008** The current workspace can list its object definitions with deterministic ordering and pagination metadata while distinguishing unpublished and published availability.
+- **AC-008** The current workspace can search and list its object definitions by name or stable key with deterministic relevance/default ordering, typo- and diacritic-tolerant server matching, pagination metadata, and distinct unpublished/published availability; workspace scope is applied before matching and paging.
 
 *Validation & errors*
 - **AC-009** Definition names are required, and system-derived object keys are required, read-only to the user, unique within a workspace, 1-63 characters, start with a lowercase letter, and contain only lowercase letters, digits, and underscores.
@@ -67,14 +67,14 @@ Define and publish a workspace-scoped business object definition so published ve
 | AT-001 | Domain boundary | Valid unpublished object definition captures stable object identity and ordered text field definitions with stable keys and labels | AC-001, AC-002, AC-003 | Domain test | Yes |
 | AT-002 | Application boundary | Saving unpublished definition changes returns a current revision that later save and publish attempts must use | AC-004 | Application test | Yes |
 | AT-003 | Application boundary | Publishing a valid unpublished definition creates immutable version 1 with distinct snapshot IDs and explicit source definition and field identities | AC-005, AC-006, AC-017 | Domain test + Application test | Yes |
-| AT-004 | Application boundary | Unpublished definitions are not exposed as record contracts, and workspace listing is paginated, deterministic, and scoped to unpublished/published availability | AC-007, AC-008 | Application test | Yes |
+| AT-004 | Application/Infrastructure boundaries | Unpublished definitions are not exposed as record contracts, and workspace listing uses indexed server search with deterministic relevance/default ordering, typo and diacritic tolerance, pagination, and workspace isolation | AC-007, AC-008 | Application test + Infrastructure integration test | Yes |
 | AT-005 | Application boundary | Duplicate or malformed object and field keys fail with validation errors before persistence | AC-009, AC-010 | Application test | Yes |
 | AT-006 | Application boundary | Duplicate identities and unpublished definitions without fields cannot publish | AC-011 | Application test | Yes |
 | AT-007 | Application/Infrastructure boundaries | Stale unpublished saves, concurrent publish attempts, and persistence failures fail without overwriting newer definition state | AC-012, AC-018 | Application test + Infrastructure integration test | Yes |
 | AT-008 | API/Application boundaries | Missing workspace scope, unavailable workspace scope, and cross-workspace definition access are rejected without mutation or resource disclosure | AC-013, AC-014 | API integration test + Application test | Yes |
 | AT-009 | Domain boundary | Business Objects boundaries keep workspace lifecycle outside the module and prevent Identity internals from becoming business-object dependencies | AC-015 | Architecture test | Yes |
 | AT-010 | API boundary | Object definition endpoints expose the approved request and response contract without advanced field, record, or workflow artifacts | AC-003, AC-016 | API integration test | Yes |
-| AT-011 | UI component | Business object definition screens expose unpublished definition creation, text field editing, validation errors, publish action, pagination, and definition availability states | AC-001, AC-002, AC-003, AC-007, AC-008, AC-009, AC-010, AC-011 | UI component test | Yes |
+| AT-011 | UI component | Business object definition screens expose server-owned search, unpublished definition creation, text field editing, validation errors, publish action, pagination, and definition availability states | AC-001, AC-002, AC-003, AC-007, AC-008, AC-009, AC-010, AC-011 | UI component test | Yes |
 | AT-012 | Browser journey | User defines and publishes a business object from an authenticated workspace route while the field editor can focus inside the shell without console errors, document scrolling, or horizontal overflow | AC-001, AC-002, AC-005, AC-008, AC-013, AC-014 | Browser automation | Yes |
 
 ## Out Of Scope
@@ -95,8 +95,8 @@ Define and publish a workspace-scoped business object definition so published ve
 | Business object collection | Render one primary table with name, key, unpublished/published availability, latest version context, paging, and consumer-defined actions without an action column. |
 | Definition window | Open or focus stable create/view/edit identities through [docs/foundations/data-display/collection-page.md](../../foundations/data-display/collection-page.md), capture the definition name, display a read-only derived stable business object key, and keep revision state in sync after saves. |
 | Field definition editor | Let the user add, order, remove, and rename text fields while keeping stable field keys visible, validated, and saved against the current revision. |
-| Publish review | Show validation state and block publication until required definition and field identity rules pass. |
-| Published definition detail | Show the published version context and make clear that later record creation will use a published definition version. |
+| Publish review | Before mutation, summarize the stable object key, field count, configured-rule count, and immutable-version consequence; keep publication blocked until required definition and field identity rules pass. |
+| Definition detail | Render identity, availability, version/date facts, fields, type configuration, and applied rule versions as semantic read-only content rather than disabled authoring controls. Make clear that unpublished definitions are unavailable for record creation and that future records use the immutable published version. |
 
 Required UI quality: the page must retain one primary table while create/view/edit workflows use the responsive managed-window contract; labels and errors must be programmatic, field rows must stay keyboard-reachable while reordered or edited, window content must scroll internally with stable actions, validation must identify the affected definition or field control, stale-save and stale-publish conflicts must keep unsaved input recoverable, publish implications must be visible before confirmation, and the layout must fit supported mobile and desktop widths without document scrolling or horizontal overflow.
 
@@ -130,12 +130,12 @@ sequenceDiagram
 > | Layer | Status |
 > |-------|--------|
 > | Domain | Done |
-> | Application | Done |
-> | Infrastructure | Done |
-> | API | Done |
-> | Frontend | Done |
+> | Application | Partial |
+> | Infrastructure | Partial |
+> | API | Partial |
+> | Frontend | Partial |
 >
-> **Gaps vs spec:** None.
+> **Gaps vs spec:** No known gap in the implemented AC-008 search slice; remaining partial layers retain their existing non-search scope.
 >
 > **Deferred follow-ups:** N/A for this use case; excluded surfaces are listed in Out Of Scope.
 >

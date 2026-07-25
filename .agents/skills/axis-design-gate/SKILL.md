@@ -20,7 +20,7 @@ Follow [reference.md](../reference.md).
 
 - User intent, affected surfaces, and intended files.
 - Owner rules and blast-radius search terms.
-- Retired identifiers and compatibility requirements, when applicable.
+- Retired identifiers, product phase, known consumers/data, and compatibility requirements, when applicable.
 
 ## Workflow
 
@@ -28,7 +28,7 @@ Follow [reference.md](../reference.md).
 2. Read [AGENTS.md](../../../AGENTS.md), the Design Gate policy, [docs/playbooks/agent-checklist.md](../../../docs/playbooks/agent-checklist.md), and only the touched owner docs.
 3. Quote the minimum governing rules with `path:section` references; distinguish enforced, partial, and review-only expectations through [docs/ENFORCEMENT.md](../../../docs/ENFORCEMENT.md).
 4. Run the smallest `rg` search that covers callers, consumers, tests, docs, generated artifacts, and manifests in scope.
-5. For a retirement, apply [docs/playbooks/design-gate.md § Dossier](../../../docs/playbooks/design-gate.md#dossier): name the retired surface, compatibility decision, and pre/post-edit sweep.
+5. For a retirement, apply [docs/playbooks/design-gate.md § Dossier](../../../docs/playbooks/design-gate.md#dossier): choose clean cutover or evidence-backed compatibility, name the retired surface, and define pre/post-edit sweeps. An approved pre-production clean cutover forbids shims, dual paths, flags, fallbacks, and preserved obsolete tests.
 6. Record the wire/schema contract decision or `N/A because no wire shape changes`.
 7. Name focused development checks and review-boundary verification, then delegate implementation through [README.md § Responsibility catalog](../README.md#responsibility-catalog) with the dossier attached.
 

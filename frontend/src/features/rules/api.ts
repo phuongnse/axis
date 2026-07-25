@@ -25,6 +25,13 @@ export type RuleOperand = components['schemas']['RuleOperandDto'];
 export type RuleExpressionLanguage = components['schemas']['RuleExpressionLanguageDto'];
 export type RuleExpressionFunction = components['schemas']['RuleExpressionFunction'];
 export type RuleExpressionCardinality = components['schemas']['RuleExpressionCardinality'];
+export type AssistRuleExpressionRequest = components['schemas']['AssistRuleExpressionRequest'];
+export type RuleExpressionAuthoring = components['schemas']['RuleExpressionAuthoringDto'];
+export type RuleExpressionCompletion = components['schemas']['RuleExpressionCompletionDto'];
+export type RuleExpressionDisplayNode = components['schemas']['RuleExpressionDisplayNodeDto'];
+export type RuleExpressionGuide = components['schemas']['RuleExpressionGuideDto'];
+export type SearchRuleExpressionGuideRequest =
+  components['schemas']['SearchRuleExpressionGuideRequest'];
 
 export interface RuleDefinitionFilters {
   page?: number;
@@ -32,9 +39,11 @@ export interface RuleDefinitionFilters {
   scope?: RuleScope;
   origin?: RuleOrigin;
   status?: RuleLifecycleStatus;
+  query?: string;
+  language?: string;
 }
 
-const defaultFilters = { page: 1, pageSize: 100 } as const;
+const defaultFilters = { page: 1, pageSize: 20 } as const;
 
 export const ruleDefinitionStaleTimeMs = 1000 * 60 * 5;
 
@@ -46,12 +55,16 @@ export const ruleDefinitionQueryKeys = {
     [...ruleDefinitionQueryKeys.all, 'detail', definitionKey] as const,
   contextSchemas: () => [...ruleDefinitionQueryKeys.all, 'context-schemas'] as const,
   expressionLanguage: () => [...ruleDefinitionQueryKeys.all, 'expression-language'] as const,
+  expressionAssist: (request: AssistRuleExpressionRequest) =>
+    [...ruleDefinitionQueryKeys.all, 'expression-assist', request] as const,
+  expressionGuide: (request: SearchRuleExpressionGuideRequest) =>
+    [...ruleDefinitionQueryKeys.all, 'expression-guide', request] as const,
 };
 
 export function ruleDefinitionsListQueryOptions(filters: RuleDefinitionFilters = defaultFilters) {
   return queryOptions({
     queryKey: ruleDefinitionQueryKeys.list(filters),
-    queryFn: () => listRuleDefinitions(filters),
+    queryFn: ({ signal }) => listRuleDefinitions(filters, signal),
     staleTime: ruleDefinitionStaleTimeMs,
   });
 }
@@ -82,6 +95,7 @@ export function ruleExpressionLanguageQueryOptions() {
 
 export async function listRuleDefinitions(
   filters: RuleDefinitionFilters = defaultFilters,
+  signal?: AbortSignal,
 ): Promise<RuleDefinitionsPage> {
   const search = new URLSearchParams({
     page: String(filters.page ?? defaultFilters.page),
@@ -90,7 +104,9 @@ export async function listRuleDefinitions(
   if (filters.scope) search.set('scope', filters.scope);
   if (filters.origin) search.set('origin', filters.origin);
   if (filters.status) search.set('status', filters.status);
-  return fetchApi<RuleDefinitionsPage>(`/rules?${search.toString()}`);
+  if (filters.query?.trim()) search.set('query', filters.query.trim());
+  if (filters.language) search.set('language', filters.language);
+  return fetchApi<RuleDefinitionsPage>(`/rules?${search.toString()}`, { signal });
 }
 
 export async function listRuleContextSchemas(): Promise<RuleContextSchema[]> {
@@ -99,6 +115,26 @@ export async function listRuleContextSchemas(): Promise<RuleContextSchema[]> {
 
 export async function getRuleExpressionLanguage(): Promise<RuleExpressionLanguage> {
   return fetchApi<RuleExpressionLanguage>('/rules/expression-language');
+}
+
+export async function assistRuleExpression(
+  request: AssistRuleExpressionRequest,
+): Promise<RuleExpressionAuthoring> {
+  return fetchApi<RuleExpressionAuthoring>('/rules/expression-language/assist', {
+    method: 'POST',
+    body: JSON.stringify(request),
+  });
+}
+
+export async function searchRuleExpressionGuide(
+  request: SearchRuleExpressionGuideRequest,
+  signal?: AbortSignal,
+): Promise<RuleExpressionGuide> {
+  return fetchApi<RuleExpressionGuide>('/rules/expression-language/guide', {
+    method: 'POST',
+    body: JSON.stringify(request),
+    signal,
+  });
 }
 
 export async function getRuleDefinition(definitionKey: string): Promise<RuleDefinitionDetail> {
