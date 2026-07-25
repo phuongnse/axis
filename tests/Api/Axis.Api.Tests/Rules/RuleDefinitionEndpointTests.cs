@@ -62,6 +62,51 @@ public sealed class RuleDefinitionEndpointTests(ApiTestFixture fixture)
     }
 
     [Fact]
+    public async Task WorkspaceRule_WhenAccessedFromAnotherWorkspace_ReturnsNotFoundWithoutMutation()
+    {
+        string ownerToken = await CreateVerifiedSessionTokenAsync(UniqueEmail());
+        HttpResponseMessage createResponse = await SendWithBearerAsync(
+            HttpMethod.Post,
+            "/api/rules",
+            ownerToken,
+            new
+            {
+                name = "Isolated credit threshold",
+                description = "Proves workspace isolation.",
+                scope = "Field",
+                contextKey = "business_objects.field.decimal",
+                contextSchemaVersion = 1,
+                outcomeKind = "Validation",
+            });
+        createResponse.StatusCode.Should().Be(HttpStatusCode.Created);
+        JsonElement created = await createResponse.Content.ReadFromJsonAsync<JsonElement>(Json);
+        string definitionKey = created.GetProperty("definitionKey").GetString()!;
+
+        string otherWorkspaceToken = await CreateVerifiedSessionTokenAsync(UniqueEmail());
+        HttpResponseMessage disclosureResponse = await SendWithBearerAsync(
+            HttpMethod.Get,
+            $"/api/rules/{definitionKey}",
+            otherWorkspaceToken);
+        HttpResponseMessage mutationResponse = await SendWithBearerAsync(
+            HttpMethod.Post,
+            $"/api/rules/{definitionKey}/archive",
+            otherWorkspaceToken,
+            new { expectedRevision = 1 });
+
+        disclosureResponse.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        mutationResponse.StatusCode.Should().Be(HttpStatusCode.NotFound);
+
+        HttpResponseMessage ownerResponse = await SendWithBearerAsync(
+            HttpMethod.Get,
+            $"/api/rules/{definitionKey}",
+            ownerToken);
+        ownerResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        JsonElement ownerDefinition = await ownerResponse.Content.ReadFromJsonAsync<JsonElement>(Json);
+        ownerDefinition.GetProperty("status").GetString().Should().Be("Draft");
+        ownerDefinition.GetProperty("revision").GetInt32().Should().Be(1);
+    }
+
+    [Fact]
     public async Task RuleAuthoringContracts_WhenAuthenticated_ReturnCapabilitiesAndExecutableSystemDetail()
     {
         string accessToken = await CreateVerifiedSessionTokenAsync(UniqueEmail());
