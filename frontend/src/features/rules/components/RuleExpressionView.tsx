@@ -99,13 +99,17 @@ function DisplayNodeView({
     </span>
   );
 
-  if (children.length > 0 && !logicalOperator) {
+  if (children.length === 0) {
+    return <div className="min-h-6">{content}</div>;
+  }
+
+  if (!logicalOperator) {
     throw new Error('Rule logical group projection is invalid.');
   }
 
-  return children.length > 0 ? (
+  return (
     <RuleConditionTree
-      operator={logicalOperator!}
+      operator={logicalOperator}
       operatorLabel={logicalToken?.text ?? ''}
       onOperatorClick={
         references && logicalSelection ? () => onReference(logicalSelection) : undefined
@@ -120,8 +124,6 @@ function DisplayNodeView({
         />
       ))}
     </RuleConditionTree>
-  ) : (
-    <div className="min-h-6">{content}</div>
   );
 }
 

@@ -19,12 +19,11 @@ export function RuleConditionTree({
   const inverted = operator === 'Not';
 
   return (
-    <div
-      role="group"
+    <fieldset
       aria-label={operatorLabel}
       data-slot="rule-condition-group"
       data-operator={operator}
-      className="relative w-fit max-w-full"
+      className="relative m-0 min-w-0 w-fit max-w-full border-0 p-0"
     >
       {parallel ? (
         <>
@@ -113,6 +112,6 @@ export function RuleConditionTree({
           </li>
         ))}
       </ul>
-    </div>
+    </fieldset>
   );
 }

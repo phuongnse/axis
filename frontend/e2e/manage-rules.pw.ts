@@ -1274,9 +1274,8 @@ test('read-only rule details open the canonical server guide', async ({ page }) 
       ) ?? [],
     ).map((branch) => branch.getBoundingClientRect());
     const rails = Array.from(
-      root?.querySelectorAll<HTMLElement>(
-        ':scope > [data-slot="rule-condition-parallel-rail"]',
-      ) ?? [],
+      root?.querySelectorAll<HTMLElement>(':scope > [data-slot="rule-condition-parallel-rail"]') ??
+        [],
     ).map((rail) => rail.getBoundingClientRect());
     return {
       branchCenters: branches.map((branch) => ({
@@ -1296,11 +1295,11 @@ test('read-only rule details open the canonical server guide', async ({ page }) 
   expect(
     Math.abs(conditionConnector.branchCenters[0].y - conditionConnector.railCenters[0].start),
   ).toBeLessThanOrEqual(1);
-  expect(
-    Math.abs(
-      conditionConnector.branchCenters.at(-1)!.y - conditionConnector.railCenters[0].end,
-    ),
-  ).toBeLessThanOrEqual(1);
+  const lastBranchCenter = conditionConnector.branchCenters.at(-1);
+  if (!lastBranchCenter) throw new Error('Expected a final connector branch.');
+  expect(Math.abs(lastBranchCenter.y - conditionConnector.railCenters[0].end)).toBeLessThanOrEqual(
+    1,
+  );
   await expect(behaviorFlow.getByText(/^(and|or|not)$/i)).toHaveCount(0);
   await expect(behaviorFlow).not.toContainText('Any');
   await expect(behaviorFlow).not.toContainText('All');

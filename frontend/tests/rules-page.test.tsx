@@ -283,12 +283,7 @@ function expressionGuideResponse(init?: RequestInit) {
     'Same value',
     'Checks whether both values are the same.',
   );
-  const any = item(
-    'LogicalOperator',
-    'Any',
-    'Or',
-    'Matches when one connected branch matches.',
-  );
+  const any = item('LogicalOperator', 'Any', 'Or', 'Matches when one connected branch matches.');
   const isNotNull = item(
     'PredicateOperator',
     'IsNotNull',
@@ -1026,9 +1021,9 @@ describe('RulesPage', () => {
     expect(
       behaviorSection.querySelector('[data-slot="rule-condition-group"][data-operator="Not"]'),
     ).toBeInTheDocument();
-    expect(behaviorSection.querySelectorAll('[data-slot="rule-condition-serial-rail"]')).toHaveLength(
-      2,
-    );
+    expect(
+      behaviorSection.querySelectorAll('[data-slot="rule-condition-serial-rail"]'),
+    ).toHaveLength(2);
     expect(
       behaviorSection.querySelectorAll('[data-slot="rule-condition-parallel-rail"]'),
     ).toHaveLength(2);
@@ -1077,15 +1072,21 @@ describe('RulesPage', () => {
     expect(
       within(selectedReference as HTMLElement).getByRole('heading', { name: 'is blank' }),
     ).toBeVisible();
-    expect(within(selectedReference as HTMLElement).queryByText('Used here')).not.toBeInTheDocument();
+    expect(
+      within(selectedReference as HTMLElement).queryByText('Used here'),
+    ).not.toBeInTheDocument();
     expect(
       within(selectedReference as HTMLElement).queryByText(
         'IsBlank(@context.field.value) Equal Boolean("true")',
       ),
     ).not.toBeInTheDocument();
     expect(within(selectedReference as HTMLElement).getByText('How to use')).toBeVisible();
-    expect(within(selectedReference as HTMLElement).queryByText('Reference')).not.toBeInTheDocument();
-    expect(within(selectedReference as HTMLElement).queryByText('Examples')).not.toBeInTheDocument();
+    expect(
+      within(selectedReference as HTMLElement).queryByText('Reference'),
+    ).not.toBeInTheDocument();
+    expect(
+      within(selectedReference as HTMLElement).queryByText('Examples'),
+    ).not.toBeInTheDocument();
     expect(within(reference).queryByRole('button', { name: 'Insert' })).not.toBeInTheDocument();
     const search = within(reference).getByRole('searchbox', { name: 'Search expression guide' });
     await user.type(search, 'blnk');
@@ -1363,7 +1364,9 @@ describe('RulesPage', () => {
       'rule-expression-guide-item-PredicateOperator-IsNotNull',
     );
     expect(selected).toBeVisible();
-    expect(within(selected as HTMLElement).getByRole('heading', { name: 'is provided' })).toBeVisible();
+    expect(
+      within(selected as HTMLElement).getByRole('heading', { name: 'is provided' }),
+    ).toBeVisible();
     expect(within(selected as HTMLElement).queryByText('Used here')).not.toBeInTheDocument();
     expect(
       within(selected as HTMLElement).queryByText('@parameters.max IsNotNull'),
@@ -1706,9 +1709,7 @@ describe('RulesPage', () => {
     expect(
       within(expressionGuide).getByText('Checks whether both values are the same.'),
     ).toBeVisible();
-    const lengthGuideItem = document.getElementById(
-      'rule-expression-guide-item-Function-Length',
-    );
+    const lengthGuideItem = document.getElementById('rule-expression-guide-item-Function-Length');
     expect(lengthGuideItem).not.toBeNull();
     expect(within(lengthGuideItem as HTMLElement).getByText('Examples')).toBeVisible();
     await user.click(within(expressionGuide).getByRole('button', { name: 'Close' }));
