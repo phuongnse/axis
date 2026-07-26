@@ -329,7 +329,6 @@ def expose_managed_command(
         ) as handle:
             handle.write(content)
             staged = Path(handle.name)
-        staged.chmod(0o755)
     else:
         if destination_exists and destination.resolve(strict=False) == managed.resolve(strict=False):
             return destination
@@ -339,6 +338,8 @@ def expose_managed_command(
         staged.symlink_to(managed)
 
     try:
+        if not windows and tool == "dotnet":
+            staged.chmod(0o755)
         os.replace(staged, destination)
     finally:
         if os.path.lexists(staged):

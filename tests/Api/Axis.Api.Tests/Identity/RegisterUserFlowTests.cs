@@ -223,14 +223,22 @@ public sealed class RegisterUserFlowTests(ApiTestFixture fixture)
         };
         request.Headers.Add("Idempotency-Key", Guid.NewGuid().ToString("N"));
 
-        return await fixture.Client.SendAsync(request);
+        return await fixture.Client.SendAsync(request, TestContext.Current.CancellationToken);
     }
 
     private async Task<HttpResponseMessage> VerifyEmailAsync(string token) =>
-        await fixture.Client.PostAsJsonAsync("/api/auth/verify-email", new { token }, Json);
+        await fixture.Client.PostAsJsonAsync(
+            "/api/auth/verify-email",
+            new { token },
+            Json,
+            TestContext.Current.CancellationToken);
 
     private async Task<HttpResponseMessage> ResendVerificationAsync(string email) =>
-        await fixture.Client.PostAsJsonAsync("/api/auth/resend-verification", new { email }, Json);
+        await fixture.Client.PostAsJsonAsync(
+            "/api/auth/resend-verification",
+            new { email },
+            Json,
+            TestContext.Current.CancellationToken);
 
     private async Task ExpireTokenAsync(string rawToken)
     {
@@ -238,9 +246,11 @@ public sealed class RegisterUserFlowTests(ApiTestFixture fixture)
         using IServiceScope scope = fixture.CreateScope();
         IdentityDbContext db = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
         EmailVerificationToken token =
-            await db.EmailVerificationTokens.SingleAsync(t => t.TokenHash == tokenHash);
+            await db.EmailVerificationTokens.SingleAsync(
+                t => t.TokenHash == tokenHash,
+                TestContext.Current.CancellationToken);
         token.ExpiresAt = DateTime.UtcNow.AddMinutes(-1);
-        await db.SaveChangesAsync();
+        await db.SaveChangesAsync(TestContext.Current.CancellationToken);
     }
 
     private string CapturedToken(string email) =>

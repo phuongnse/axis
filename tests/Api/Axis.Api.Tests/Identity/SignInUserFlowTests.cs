@@ -182,14 +182,22 @@ public sealed class SignInUserFlowTests(ApiTestFixture fixture)
         };
         request.Headers.Add("Idempotency-Key", Guid.NewGuid().ToString("N"));
 
-        return await fixture.Client.SendAsync(request);
+        return await fixture.Client.SendAsync(request, TestContext.Current.CancellationToken);
     }
 
     private async Task<HttpResponseMessage> VerifyEmailAsync(string token) =>
-        await fixture.Client.PostAsJsonAsync("/api/auth/verify-email", new { token }, Json);
+        await fixture.Client.PostAsJsonAsync(
+            "/api/auth/verify-email",
+            new { token },
+            Json,
+            TestContext.Current.CancellationToken);
 
     private async Task<HttpResponseMessage> SignInAsync(string email, string password) =>
-        await fixture.Client.PostAsJsonAsync("/api/auth/sign-in", new { email, password }, Json);
+        await fixture.Client.PostAsJsonAsync(
+            "/api/auth/sign-in",
+            new { email, password },
+            Json,
+            TestContext.Current.CancellationToken);
 
     private async Task<HttpResponseMessage> AuthorizeAsync(string? prompt = null, string? state = null)
     {
@@ -207,7 +215,9 @@ public sealed class SignInUserFlowTests(ApiTestFixture fixture)
         };
 
         string authorizeUrl = QueryHelpers.AddQueryString("/connect/authorize", authorizeQuery);
-        return await fixture.Client.GetAsync(authorizeUrl);
+        return await fixture.Client.GetAsync(
+            authorizeUrl,
+            TestContext.Current.CancellationToken);
     }
 
     private async Task<(int UserCount, int WorkspaceCount, int TokenCount)> CountRegistrationArtifactsAsync()
@@ -215,9 +225,9 @@ public sealed class SignInUserFlowTests(ApiTestFixture fixture)
         using IServiceScope scope = fixture.CreateScope();
         IdentityDbContext db = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
         return (
-            await db.Users.CountAsync(),
-            await db.Workspaces.CountAsync(),
-            await db.EmailVerificationTokens.CountAsync());
+            await db.Users.CountAsync(TestContext.Current.CancellationToken),
+            await db.Workspaces.CountAsync(TestContext.Current.CancellationToken),
+            await db.EmailVerificationTokens.CountAsync(TestContext.Current.CancellationToken));
     }
 
     private async Task SetUserStatusAsync(string email, UserStatus status)
@@ -225,9 +235,11 @@ public sealed class SignInUserFlowTests(ApiTestFixture fixture)
         using IServiceScope scope = fixture.CreateScope();
         IdentityDbContext db = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
         Email normalizedEmail = Email.Create(email).Value;
-        User user = await db.Users.SingleAsync(u => u.Email == normalizedEmail);
+        User user = await db.Users.SingleAsync(
+            u => u.Email == normalizedEmail,
+            TestContext.Current.CancellationToken);
         db.Entry(user).Property(nameof(User.Status)).CurrentValue = status;
-        await db.SaveChangesAsync();
+        await db.SaveChangesAsync(TestContext.Current.CancellationToken);
     }
 
     private async Task MarkUserEmailVerifiedWithoutActivatingWorkspaceAsync(string email)
@@ -235,9 +247,11 @@ public sealed class SignInUserFlowTests(ApiTestFixture fixture)
         using IServiceScope scope = fixture.CreateScope();
         IdentityDbContext db = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
         Email normalizedEmail = Email.Create(email).Value;
-        User user = await db.Users.SingleAsync(u => u.Email == normalizedEmail);
+        User user = await db.Users.SingleAsync(
+            u => u.Email == normalizedEmail,
+            TestContext.Current.CancellationToken);
         user.VerifyEmail();
-        await db.SaveChangesAsync();
+        await db.SaveChangesAsync(TestContext.Current.CancellationToken);
     }
 
     private string CapturedToken(string email) =>

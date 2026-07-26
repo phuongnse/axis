@@ -192,7 +192,7 @@ class TestManagedToolPaths(unittest.TestCase):
     def test_exposes_dotnet_with_its_portable_runtime_root(self) -> None:
         platform_spec = axis_setup.SetupPlatform("linux", "x64")
         with tempfile.TemporaryDirectory() as temp:
-            root = Path(temp) / "tools"
+            root = Path(temp) / "tools with spaces"
             command_dir = Path(temp) / "bin"
             managed = axis_setup.managed_executable("dotnet", platform_spec=platform_spec, root=root)
             managed.parent.mkdir(parents=True)
@@ -209,8 +209,8 @@ class TestManagedToolPaths(unittest.TestCase):
                 (
                     "#!/bin/sh\n"
                     "# Managed by Axis portable setup\n"
-                    f"export DOTNET_ROOT={managed.parent}\n"
-                    f'exec {managed} "$@"\n'
+                    f"export DOTNET_ROOT='{managed.parent}'\n"
+                    f"exec '{managed}' \"$@\"\n"
                 ),
                 exposed.read_text(encoding="utf-8"),
             )
