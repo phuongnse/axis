@@ -51,7 +51,7 @@ public sealed class ApiTestFixture : IAsyncLifetime
         PropertyNameCaseInsensitive = true,
     };
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         await _postgres.StartAsync();
         await _redis.StartAsync();
@@ -162,7 +162,7 @@ public sealed class ApiTestFixture : IAsyncLifetime
         });
     }
 
-    public async Task DisposeAsync()
+    public async ValueTask DisposeAsync()
     {
         if (_factory is not null)
             await _factory.DisposeAsync();

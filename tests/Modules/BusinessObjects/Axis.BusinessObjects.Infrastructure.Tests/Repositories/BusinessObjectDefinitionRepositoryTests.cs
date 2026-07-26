@@ -20,15 +20,15 @@ public sealed class BusinessObjectDefinitionRepositoryTests(BusinessObjectsDatab
     private IBusinessObjectDefinitionRepository _repository = null!;
     private IUnitOfWork _unitOfWork = null!;
 
-    public Task InitializeAsync()
+    public ValueTask InitializeAsync()
     {
         _ctx = db.CreateContext();
         _repository = new BusinessObjectDefinitionRepository(_ctx);
         _unitOfWork = new BusinessObjectsUnitOfWork(_ctx);
-        return Task.CompletedTask;
+        return ValueTask.CompletedTask;
     }
 
-    public async Task DisposeAsync() => await _ctx.DisposeAsync();
+    public async ValueTask DisposeAsync() => await _ctx.DisposeAsync();
 
     [Fact]
     public async Task AddAsync_WhenDefinitionGraphIsPublished_PersistsUnpublishedAndVersionSnapshot()
@@ -43,14 +43,15 @@ public sealed class BusinessObjectDefinitionRepositoryTests(BusinessObjectsDatab
             DateTime.UtcNow).IsSuccess.Should().BeTrue();
         definition.Publish(2, Guid.NewGuid(), DateTime.UtcNow).IsSuccess.Should().BeTrue();
 
-        await _repository.AddAsync(definition);
-        await _unitOfWork.SaveChangesAsync();
+        await _repository.AddAsync(definition, TestContext.Current.CancellationToken);
+        await _unitOfWork.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         await using BusinessObjectsDbContext reloadContext = db.CreateContext();
         IBusinessObjectDefinitionRepository reloadRepository = new BusinessObjectDefinitionRepository(reloadContext);
         BusinessObjectDefinition? loaded = await reloadRepository.GetByIdForWorkspaceAsync(
             definition.Id,
-            workspaceId);
+            workspaceId,
+            TestContext.Current.CancellationToken);
 
         loaded.Should().NotBeNull();
         loaded!.Status.Should().Be(BusinessObjectDefinitionStatus.Published);
@@ -95,14 +96,15 @@ public sealed class BusinessObjectDefinitionRepositoryTests(BusinessObjectsDatab
             DateTime.UtcNow).IsSuccess.Should().BeTrue();
         definition.Publish(2, Guid.NewGuid(), DateTime.UtcNow).IsSuccess.Should().BeTrue();
 
-        await _repository.AddAsync(definition);
-        await _unitOfWork.SaveChangesAsync();
+        await _repository.AddAsync(definition, TestContext.Current.CancellationToken);
+        await _unitOfWork.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         await using BusinessObjectsDbContext reloadContext = db.CreateContext();
         IBusinessObjectDefinitionRepository reloadRepository = new BusinessObjectDefinitionRepository(reloadContext);
         BusinessObjectDefinition loaded = (await reloadRepository.GetByIdForWorkspaceAsync(
             definition.Id,
-            workspaceId))!;
+            workspaceId,
+            TestContext.Current.CancellationToken))!;
 
         BusinessObjectFieldDefinition amount = loaded.Fields.Single(field => field.Key.Value == "amount");
         amount.FieldType.Should().Be(BusinessObjectFieldType.Decimal);
@@ -136,10 +138,13 @@ public sealed class BusinessObjectDefinitionRepositoryTests(BusinessObjectsDatab
             DateTime.UtcNow).IsSuccess.Should().BeTrue();
         BusinessObjectFieldDefinitionId originalFieldId = definition.Fields.Single().Id;
 
-        await _repository.AddAsync(definition);
-        await _unitOfWork.SaveChangesAsync();
+        await _repository.AddAsync(definition, TestContext.Current.CancellationToken);
+        await _unitOfWork.SaveChangesAsync(TestContext.Current.CancellationToken);
 
-        BusinessObjectDefinition loaded = (await _repository.GetByIdForWorkspaceAsync(definition.Id, workspaceId))!;
+        BusinessObjectDefinition loaded = (await _repository.GetByIdForWorkspaceAsync(
+            definition.Id,
+            workspaceId,
+            TestContext.Current.CancellationToken))!;
         loaded.SaveUnpublished(
             "Account",
             [
@@ -147,11 +152,14 @@ public sealed class BusinessObjectDefinitionRepositoryTests(BusinessObjectsDatab
             ],
             expectedRevision: 2,
             DateTime.UtcNow).IsSuccess.Should().BeTrue();
-        await _unitOfWork.SaveChangesAsync();
+        await _unitOfWork.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         await using BusinessObjectsDbContext reloadContext = db.CreateContext();
         IBusinessObjectDefinitionRepository reloadRepository = new BusinessObjectDefinitionRepository(reloadContext);
-        BusinessObjectDefinition reloaded = (await reloadRepository.GetByIdForWorkspaceAsync(definition.Id, workspaceId))!;
+        BusinessObjectDefinition reloaded = (await reloadRepository.GetByIdForWorkspaceAsync(
+            definition.Id,
+            workspaceId,
+            TestContext.Current.CancellationToken))!;
         BusinessObjectFieldDefinition field = reloaded.Fields.Single();
 
         field.Id.Should().Be(originalFieldId);
@@ -176,10 +184,13 @@ public sealed class BusinessObjectDefinitionRepositoryTests(BusinessObjectsDatab
             ],
             expectedRevision: 1,
             DateTime.UtcNow).IsSuccess.Should().BeTrue();
-        await _repository.AddAsync(definition);
-        await _unitOfWork.SaveChangesAsync();
+        await _repository.AddAsync(definition, TestContext.Current.CancellationToken);
+        await _unitOfWork.SaveChangesAsync(TestContext.Current.CancellationToken);
 
-        BusinessObjectDefinition loaded = (await _repository.GetByIdForWorkspaceAsync(definition.Id, workspaceId))!;
+        BusinessObjectDefinition loaded = (await _repository.GetByIdForWorkspaceAsync(
+            definition.Id,
+            workspaceId,
+            TestContext.Current.CancellationToken))!;
         loaded.SaveUnpublished(
             "Application",
             [
@@ -195,11 +206,14 @@ public sealed class BusinessObjectDefinitionRepositoryTests(BusinessObjectsDatab
             ],
             expectedRevision: 2,
             DateTime.UtcNow).IsSuccess.Should().BeTrue();
-        await _unitOfWork.SaveChangesAsync();
+        await _unitOfWork.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         await using BusinessObjectsDbContext reloadContext = db.CreateContext();
         IBusinessObjectDefinitionRepository reloadRepository = new BusinessObjectDefinitionRepository(reloadContext);
-        BusinessObjectDefinition reloaded = (await reloadRepository.GetByIdForWorkspaceAsync(definition.Id, workspaceId))!;
+        BusinessObjectDefinition reloaded = (await reloadRepository.GetByIdForWorkspaceAsync(
+            definition.Id,
+            workspaceId,
+            TestContext.Current.CancellationToken))!;
         BusinessObjectFieldDefinition field = reloaded.Fields.Single();
 
         field.Rules.Should().ContainSingle();
@@ -213,10 +227,14 @@ public sealed class BusinessObjectDefinitionRepositoryTests(BusinessObjectsDatab
         Guid workspaceId = Guid.NewGuid();
         string objectKey = UniqueKey("invoice");
 
-        await _repository.AddAsync(CreateUnpublished(workspaceId, "Invoice", objectKey));
-        await _repository.AddAsync(CreateUnpublished(workspaceId, "Duplicate invoice", objectKey));
+        await _repository.AddAsync(
+            CreateUnpublished(workspaceId, "Invoice", objectKey),
+            TestContext.Current.CancellationToken);
+        await _repository.AddAsync(
+            CreateUnpublished(workspaceId, "Duplicate invoice", objectKey),
+            TestContext.Current.CancellationToken);
 
-        Func<Task> act = () => _unitOfWork.SaveChangesAsync();
+        Func<Task> act = () => _unitOfWork.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         ExceptionAssertions<UniqueConstraintException> exception =
             await act.Should().ThrowAsync<UniqueConstraintException>();
@@ -230,16 +248,18 @@ public sealed class BusinessObjectDefinitionRepositoryTests(BusinessObjectsDatab
         Guid workspaceId = Guid.NewGuid();
         string objectKey = UniqueKey("order");
         BusinessObjectDefinition definition = CreateUnpublished(workspaceId, "Order", objectKey);
-        await _repository.AddAsync(definition);
-        await _unitOfWork.SaveChangesAsync();
+        await _repository.AddAsync(definition, TestContext.Current.CancellationToken);
+        await _unitOfWork.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         bool existsWithoutExcept = await _repository.ObjectKeyExistsAsync(
             workspaceId,
-            BusinessObjectDefinitionKey.Create(objectKey).Value);
+            BusinessObjectDefinitionKey.Create(objectKey).Value,
+            ct: TestContext.Current.CancellationToken);
         bool existsWithExcept = await _repository.ObjectKeyExistsAsync(
             workspaceId,
             BusinessObjectDefinitionKey.Create(objectKey).Value,
-            definition.Id);
+            definition.Id,
+            TestContext.Current.CancellationToken);
 
         existsWithoutExcept.Should().BeTrue();
         existsWithExcept.Should().BeFalse();
@@ -263,16 +283,21 @@ public sealed class BusinessObjectDefinitionRepositoryTests(BusinessObjectsDatab
             expectedRevision: 1,
             DateTime.UtcNow).IsSuccess.Should().BeTrue();
 
-        await _repository.AddAsync(first);
-        await _repository.AddAsync(second);
-        await _repository.AddAsync(CreateUnpublished(otherWorkspaceId, "Other", UniqueKey("other")));
-        await _unitOfWork.SaveChangesAsync();
+        await _repository.AddAsync(first, TestContext.Current.CancellationToken);
+        await _repository.AddAsync(second, TestContext.Current.CancellationToken);
+        await _repository.AddAsync(
+            CreateUnpublished(otherWorkspaceId, "Other", UniqueKey("other")),
+            TestContext.Current.CancellationToken);
+        await _unitOfWork.SaveChangesAsync(TestContext.Current.CancellationToken);
 
-        int total = await _repository.CountForWorkspaceAsync(workspaceId);
+        int total = await _repository.CountForWorkspaceAsync(
+            workspaceId,
+            ct: TestContext.Current.CancellationToken);
         IReadOnlyList<BusinessObjectDefinition> page = await _repository.ListForWorkspaceAsync(
             workspaceId,
             page: 1,
-            pageSize: 1);
+            pageSize: 1,
+            ct: TestContext.Current.CancellationToken);
 
         total.Should().Be(2);
         page.Should().ContainSingle();
@@ -299,25 +324,49 @@ public sealed class BusinessObjectDefinitionRepositoryTests(BusinessObjectsDatab
             workspaceId,
             "Invoice",
             UniqueKey("invoice"));
-        await _repository.AddAsync(exact);
-        await _repository.AddAsync(prefix);
-        await _repository.AddAsync(accented);
-        await _repository.AddAsync(typo);
-        await _unitOfWork.SaveChangesAsync();
+        await _repository.AddAsync(exact, TestContext.Current.CancellationToken);
+        await _repository.AddAsync(prefix, TestContext.Current.CancellationToken);
+        await _repository.AddAsync(accented, TestContext.Current.CancellationToken);
+        await _repository.AddAsync(typo, TestContext.Current.CancellationToken);
+        await _unitOfWork.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         IReadOnlyList<BusinessObjectDefinition> ranked =
-            await _repository.ListForWorkspaceAsync(workspaceId, 1, 10, "customer");
+            await _repository.ListForWorkspaceAsync(
+                workspaceId,
+                1,
+                10,
+                "customer",
+                TestContext.Current.CancellationToken);
         IReadOnlyList<BusinessObjectDefinition> accentAndOrder =
-            await _repository.ListForWorkspaceAsync(workspaceId, 1, 10, "uu tien hoa don");
+            await _repository.ListForWorkspaceAsync(
+                workspaceId,
+                1,
+                10,
+                "uu tien hoa don",
+                TestContext.Current.CancellationToken);
         IReadOnlyList<BusinessObjectDefinition> typoMatch =
-            await _repository.ListForWorkspaceAsync(workspaceId, 1, 10, "inovice");
+            await _repository.ListForWorkspaceAsync(
+                workspaceId,
+                1,
+                10,
+                "inovice",
+                TestContext.Current.CancellationToken);
 
         ranked.Select(definition => definition.Id).Should().Equal(exact.Id, prefix.Id);
         accentAndOrder.Should().ContainSingle().Which.Id.Should().Be(accented.Id);
         typoMatch.Should().ContainSingle().Which.Id.Should().Be(typo.Id);
-        (await _repository.CountForWorkspaceAsync(workspaceId, "customer")).Should().Be(2);
-        (await _repository.CountForWorkspaceAsync(workspaceId, "uu tien hoa don")).Should().Be(1);
-        (await _repository.CountForWorkspaceAsync(workspaceId, "inovice")).Should().Be(1);
+        (await _repository.CountForWorkspaceAsync(
+            workspaceId,
+            "customer",
+            TestContext.Current.CancellationToken)).Should().Be(2);
+        (await _repository.CountForWorkspaceAsync(
+            workspaceId,
+            "uu tien hoa don",
+            TestContext.Current.CancellationToken)).Should().Be(1);
+        (await _repository.CountForWorkspaceAsync(
+            workspaceId,
+            "inovice",
+            TestContext.Current.CancellationToken)).Should().Be(1);
     }
 
     [Fact]
@@ -326,8 +375,8 @@ public sealed class BusinessObjectDefinitionRepositoryTests(BusinessObjectsDatab
         Guid workspaceId = Guid.NewGuid();
         string objectKey = UniqueKey("lead");
         BusinessObjectDefinition definition = CreateUnpublished(workspaceId, "Lead", objectKey);
-        await _repository.AddAsync(definition);
-        await _unitOfWork.SaveChangesAsync();
+        await _repository.AddAsync(definition, TestContext.Current.CancellationToken);
+        await _unitOfWork.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         await using BusinessObjectsDbContext firstContext = db.CreateContext();
         await using BusinessObjectsDbContext secondContext = db.CreateContext();
@@ -336,8 +385,14 @@ public sealed class BusinessObjectDefinitionRepositoryTests(BusinessObjectsDatab
         IUnitOfWork firstUnitOfWork = new BusinessObjectsUnitOfWork(firstContext);
         IUnitOfWork secondUnitOfWork = new BusinessObjectsUnitOfWork(secondContext);
 
-        BusinessObjectDefinition first = (await firstRepository.GetByIdForWorkspaceAsync(definition.Id, workspaceId))!;
-        BusinessObjectDefinition second = (await secondRepository.GetByIdForWorkspaceAsync(definition.Id, workspaceId))!;
+        BusinessObjectDefinition first = (await firstRepository.GetByIdForWorkspaceAsync(
+            definition.Id,
+            workspaceId,
+            TestContext.Current.CancellationToken))!;
+        BusinessObjectDefinition second = (await secondRepository.GetByIdForWorkspaceAsync(
+            definition.Id,
+            workspaceId,
+            TestContext.Current.CancellationToken))!;
         first.SaveUnpublished(
             "Lead",
             [Field("name", "Name", 0)],
@@ -349,8 +404,8 @@ public sealed class BusinessObjectDefinitionRepositoryTests(BusinessObjectsDatab
             expectedRevision: 1,
             DateTime.UtcNow).IsSuccess.Should().BeTrue();
 
-        await firstUnitOfWork.SaveChangesAsync();
-        Func<Task> act = () => secondUnitOfWork.SaveChangesAsync();
+        await firstUnitOfWork.SaveChangesAsync(TestContext.Current.CancellationToken);
+        Func<Task> act = () => secondUnitOfWork.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         await act.Should().ThrowAsync<ConcurrencyException>();
     }

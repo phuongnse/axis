@@ -17,7 +17,8 @@ public sealed class RuleApplicationValidatorTests
             Request(
                 RuleDefinitionKeys.NumericRange,
                 "Decimal",
-                Params(("min", ["0.0"]), ("max", ["100000.00"]))));
+                Params(("min", ["0.0"]), ("max", ["100000.00"]))),
+            TestContext.Current.CancellationToken);
 
         result.IsValid.Should().BeTrue();
         result.CanonicalParameters!["min"].Should().Equal("0.0");
@@ -30,7 +31,8 @@ public sealed class RuleApplicationValidatorTests
             Request(
                 RuleDefinitionKeys.TextLength,
                 "Boolean",
-                Params(("min", ["1"]))));
+                Params(("min", ["1"]))),
+            TestContext.Current.CancellationToken);
 
         result.IsValid.Should().BeFalse();
         result.ErrorCode.Should().Be("rule_incompatible");
@@ -43,7 +45,8 @@ public sealed class RuleApplicationValidatorTests
             Request(
                 RuleDefinitionKeys.TextLength,
                 "Text",
-                Params(("min", ["10"]), ("max", ["2"]))));
+                Params(("min", ["10"]), ("max", ["2"]))),
+            TestContext.Current.CancellationToken);
 
         result.IsValid.Should().BeFalse();
         result.Error.Should().Be("Text length minimum cannot exceed maximum.");
@@ -60,7 +63,8 @@ public sealed class RuleApplicationValidatorTests
                 new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal)
                 {
                     ["selection_mode"] = ["Single"],
-                }));
+                }),
+            TestContext.Current.CancellationToken);
 
         result.IsValid.Should().BeFalse();
         result.ErrorCode.Should().Be("rule_incompatible");
@@ -77,7 +81,7 @@ public sealed class RuleApplicationValidatorTests
         RuleApplicationValidationResult result = await _sut.ValidateAsync(request with
         {
             DefinitionVersion = 2,
-        });
+        }, TestContext.Current.CancellationToken);
 
         result.IsValid.Should().BeFalse();
         result.ErrorCode.Should().Be("definition_not_found");
@@ -90,7 +94,8 @@ public sealed class RuleApplicationValidatorTests
             Request(
                 RuleDefinitionKeys.NumericRange,
                 "Decimal",
-                Params(("min", ["0"]), (" min ", ["1"]))));
+                Params(("min", ["0"]), (" min ", ["1"]))),
+            TestContext.Current.CancellationToken);
 
         result.IsValid.Should().BeFalse();
         result.ErrorCode.Should().Be("parameter_invalid");

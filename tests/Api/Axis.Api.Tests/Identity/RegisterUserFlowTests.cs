@@ -34,7 +34,9 @@ public sealed class RegisterUserFlowTests(ApiTestFixture fixture)
         IdentityDbContext db = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
         Email normalizedEmail = Email.Create(email).Value;
 
-        User user = await db.Users.SingleAsync(u => u.Email == normalizedEmail);
+        User user = await db.Users.SingleAsync(
+            u => u.Email == normalizedEmail,
+            TestContext.Current.CancellationToken);
         user.FullName.Should().Be("Alice Smith");
         user.PasswordHash.Should().NotBeNullOrWhiteSpace();
         user.IsEmailVerified.Should().BeFalse();
@@ -43,8 +45,9 @@ public sealed class RegisterUserFlowTests(ApiTestFixture fixture)
         user.AcceptedPrivacyVersion.Should().Be(WellKnownLegalDocuments.PrivacyVersion);
         user.LegalAcceptedAt.Should().NotBeNull();
 
-        Workspace personalWorkspace = await db.Workspaces.SingleAsync(w =>
-            w.OwnerUserId == user.Id && w.Type == WorkspaceType.Personal);
+        Workspace personalWorkspace = await db.Workspaces.SingleAsync(
+            w => w.OwnerUserId == user.Id && w.Type == WorkspaceType.Personal,
+            TestContext.Current.CancellationToken);
         personalWorkspace.Name.Should().Be("Alice Smith");
         personalWorkspace.OwnerEmail.Should().Be(normalizedEmail);
         personalWorkspace.Status.Should().Be(WorkspaceStatus.PendingVerification);
@@ -52,8 +55,9 @@ public sealed class RegisterUserFlowTests(ApiTestFixture fixture)
         personalWorkspace.AcceptedPrivacyVersion.Should().Be(WellKnownLegalDocuments.PrivacyVersion);
         personalWorkspace.LegalAcceptedAt.Should().NotBeNull();
 
-        int activeTokenCount = await db.EmailVerificationTokens.CountAsync(t =>
-            t.UserId == user.Id && t.UsedAt == null && t.ExpiresAt > DateTime.UtcNow);
+        int activeTokenCount = await db.EmailVerificationTokens.CountAsync(
+            t => t.UserId == user.Id && t.UsedAt == null && t.ExpiresAt > DateTime.UtcNow,
+            TestContext.Current.CancellationToken);
         activeTokenCount.Should().Be(1);
         fixture.EmailCapture.GetVerificationLanguage(email).Should().Be(UserLanguage.DefaultValue);
     }
@@ -71,7 +75,9 @@ public sealed class RegisterUserFlowTests(ApiTestFixture fixture)
         using IServiceScope scope = fixture.CreateScope();
         IdentityDbContext db = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
         Email normalizedEmail = Email.Create(email).Value;
-        User user = await db.Users.SingleAsync(u => u.Email == normalizedEmail);
+        User user = await db.Users.SingleAsync(
+            u => u.Email == normalizedEmail,
+            TestContext.Current.CancellationToken);
         user.LanguagePreference!.Value.Should().Be("vi");
     }
 
@@ -88,7 +94,9 @@ public sealed class RegisterUserFlowTests(ApiTestFixture fixture)
         using IServiceScope scope = fixture.CreateScope();
         IdentityDbContext db = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
         Email normalizedEmail = Email.Create(email).Value;
-        User user = await db.Users.SingleAsync(u => u.Email == normalizedEmail);
+        User user = await db.Users.SingleAsync(
+            u => u.Email == normalizedEmail,
+            TestContext.Current.CancellationToken);
         user.LanguagePreference!.Value.Should().Be(UserLanguage.DefaultValue);
     }
 
@@ -98,7 +106,7 @@ public sealed class RegisterUserFlowTests(ApiTestFixture fixture)
         HttpResponseMessage response = await RegisterAsync(UniqueEmail(), preferredLanguage: "fr");
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
-        JsonElement body = await response.Content.ReadFromJsonAsync<JsonElement>(Json);
+        JsonElement body = await response.Content.ReadFromJsonAsync<JsonElement>(Json, TestContext.Current.CancellationToken);
         JsonElement errors = body.GetProperty("errors");
         errors.EnumerateObject().Select(property => property.Name)
             .Should().Contain("preferredLanguage");
@@ -113,7 +121,7 @@ public sealed class RegisterUserFlowTests(ApiTestFixture fixture)
         HttpResponseMessage response = await RegisterAsync(UniqueEmail(), fullName: "");
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
-        JsonElement body = await response.Content.ReadFromJsonAsync<JsonElement>(Json);
+        JsonElement body = await response.Content.ReadFromJsonAsync<JsonElement>(Json, TestContext.Current.CancellationToken);
         JsonElement errors = body.GetProperty("errors");
         errors.EnumerateObject().Select(property => property.Name)
             .Should().ContainSingle().Which.Should().Be("fullName");
@@ -168,7 +176,7 @@ public sealed class RegisterUserFlowTests(ApiTestFixture fixture)
         HttpResponseMessage firstUseResponse = await VerifyEmailAsync(reusedToken);
 
         firstUseResponse.StatusCode.Should().Be(HttpStatusCode.OK);
-        JsonElement body = await firstUseResponse.Content.ReadFromJsonAsync<JsonElement>(Json);
+        JsonElement body = await firstUseResponse.Content.ReadFromJsonAsync<JsonElement>(Json, TestContext.Current.CancellationToken);
         body.GetProperty("sessionEstablished").GetBoolean().Should().BeTrue();
         body.GetProperty("nextStep").GetString().Should().Be(nameof(VerifyEmailNextStep.Dashboard));
 
@@ -241,7 +249,7 @@ public sealed class RegisterUserFlowTests(ApiTestFixture fixture)
 
     private static async Task<ApiProblem> ReadProblemAsync(HttpResponseMessage response)
     {
-        JsonElement body = await response.Content.ReadFromJsonAsync<JsonElement>(Json);
+        JsonElement body = await response.Content.ReadFromJsonAsync<JsonElement>(Json, TestContext.Current.CancellationToken);
         return new ApiProblem(
             body.GetProperty("detail").GetString(),
             body.GetProperty("code").GetString(),

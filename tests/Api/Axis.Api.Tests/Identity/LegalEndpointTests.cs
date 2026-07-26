@@ -15,10 +15,10 @@ public class LegalEndpointTests(ApiTestFixture fixture)
     [Fact]
     public async Task GetLegalVersions_WhenRequested_ReturnsCurrentDocumentVersions()
     {
-        HttpResponseMessage resp = await fixture.Client.GetAsync("/api/legal/versions");
+        HttpResponseMessage resp = await fixture.Client.GetAsync("/api/legal/versions", TestContext.Current.CancellationToken);
 
         resp.StatusCode.Should().Be(HttpStatusCode.OK);
-        JsonElement body = await resp.Content.ReadFromJsonAsync<JsonElement>(Json);
+        JsonElement body = await resp.Content.ReadFromJsonAsync<JsonElement>(Json, TestContext.Current.CancellationToken);
         body.GetProperty("termsVersion").GetString().Should().Be(WellKnownLegalDocuments.TermsVersion);
         body.GetProperty("privacyVersion").GetString().Should().Be(WellKnownLegalDocuments.PrivacyVersion);
     }

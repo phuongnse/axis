@@ -14,23 +14,26 @@ public class RegistrationIdempotencyRepositoryTests(IdentityDatabaseFixture db) 
     private IdentityDbContext _ctx = null!;
     private RegistrationIdempotencyRepository _sut = null!;
 
-    public Task InitializeAsync()
+    public ValueTask InitializeAsync()
     {
         _ctx = db.CreateContext();
         _sut = new RegistrationIdempotencyRepository(_ctx);
-        return Task.CompletedTask;
+        return ValueTask.CompletedTask;
     }
 
-    public async Task DisposeAsync() => await _ctx.DisposeAsync();
+    public async ValueTask DisposeAsync() => await _ctx.DisposeAsync();
 
     [Fact]
     public async Task AcquireAsync_WhenNoRowExists_InsertsPendingAndReturnsAcquired()
     {
-        RegistrationIdempotencyAcquireResult result = await _sut.AcquireAsync("new-key");
+        RegistrationIdempotencyAcquireResult result =
+            await _sut.AcquireAsync("new-key", TestContext.Current.CancellationToken);
 
         result.Should().Be(RegistrationIdempotencyAcquireResult.Acquired);
         RegistrationIdempotencyRecord? row = await _ctx.Set<RegistrationIdempotencyRecord>()
-            .FirstOrDefaultAsync(r => r.IdempotencyKey == "new-key");
+            .FirstOrDefaultAsync(
+                r => r.IdempotencyKey == "new-key",
+                TestContext.Current.CancellationToken);
         row.Should().NotBeNull();
         row!.Status.Should().Be(RegistrationIdempotencyStatus.Pending);
     }
@@ -46,10 +49,11 @@ public class RegistrationIdempotencyRepositoryTests(IdentityDatabaseFixture db) 
             CreatedAt = now,
             UpdatedAt = now,
         });
-        await _ctx.SaveChangesAsync();
+        await _ctx.SaveChangesAsync(TestContext.Current.CancellationToken);
         _ctx.ChangeTracker.Clear();
 
-        RegistrationIdempotencyAcquireResult result = await _sut.AcquireAsync("in-flight");
+        RegistrationIdempotencyAcquireResult result =
+            await _sut.AcquireAsync("in-flight", TestContext.Current.CancellationToken);
 
         result.Should().Be(RegistrationIdempotencyAcquireResult.InProgress);
     }
@@ -65,14 +69,17 @@ public class RegistrationIdempotencyRepositoryTests(IdentityDatabaseFixture db) 
             CreatedAt = stale,
             UpdatedAt = stale,
         });
-        await _ctx.SaveChangesAsync();
+        await _ctx.SaveChangesAsync(TestContext.Current.CancellationToken);
         _ctx.ChangeTracker.Clear();
 
-        RegistrationIdempotencyAcquireResult result = await _sut.AcquireAsync("stale-pending");
+        RegistrationIdempotencyAcquireResult result =
+            await _sut.AcquireAsync("stale-pending", TestContext.Current.CancellationToken);
 
         result.Should().Be(RegistrationIdempotencyAcquireResult.Acquired);
         RegistrationIdempotencyRecord row = await _ctx.Set<RegistrationIdempotencyRecord>()
-            .SingleAsync(r => r.IdempotencyKey == "stale-pending");
+            .SingleAsync(
+                r => r.IdempotencyKey == "stale-pending",
+                TestContext.Current.CancellationToken);
         row.Status.Should().Be(RegistrationIdempotencyStatus.Pending);
         row.UpdatedAt.Should().BeCloseTo(DateTimeOffset.UtcNow, TimeSpan.FromSeconds(5));
     }
@@ -88,10 +95,11 @@ public class RegistrationIdempotencyRepositoryTests(IdentityDatabaseFixture db) 
             CreatedAt = now,
             UpdatedAt = now,
         });
-        await _ctx.SaveChangesAsync();
+        await _ctx.SaveChangesAsync(TestContext.Current.CancellationToken);
         _ctx.ChangeTracker.Clear();
 
-        RegistrationIdempotencyAcquireResult result = await _sut.AcquireAsync("done");
+        RegistrationIdempotencyAcquireResult result =
+            await _sut.AcquireAsync("done", TestContext.Current.CancellationToken);
 
         result.Should().Be(RegistrationIdempotencyAcquireResult.AlreadyCompleted);
     }
@@ -107,14 +115,17 @@ public class RegistrationIdempotencyRepositoryTests(IdentityDatabaseFixture db) 
             CreatedAt = now,
             UpdatedAt = now,
         });
-        await _ctx.SaveChangesAsync();
+        await _ctx.SaveChangesAsync(TestContext.Current.CancellationToken);
         _ctx.ChangeTracker.Clear();
 
-        RegistrationIdempotencyAcquireResult result = await _sut.AcquireAsync("retry");
+        RegistrationIdempotencyAcquireResult result =
+            await _sut.AcquireAsync("retry", TestContext.Current.CancellationToken);
 
         result.Should().Be(RegistrationIdempotencyAcquireResult.Acquired);
         RegistrationIdempotencyRecord row = await _ctx.Set<RegistrationIdempotencyRecord>()
-            .SingleAsync(r => r.IdempotencyKey == "retry");
+            .SingleAsync(
+                r => r.IdempotencyKey == "retry",
+                TestContext.Current.CancellationToken);
         row.Status.Should().Be(RegistrationIdempotencyStatus.Pending);
     }
 
@@ -129,20 +140,26 @@ public class RegistrationIdempotencyRepositoryTests(IdentityDatabaseFixture db) 
             CreatedAt = now,
             UpdatedAt = now,
         });
-        await _ctx.SaveChangesAsync();
+        await _ctx.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         User unrelated = User.Create(
             "Pending User",
             Email.Create("pending-user@example.com").Value!);
         _ctx.Users.Add(unrelated);
 
-        await _sut.MarkFailedAsync("failed-with-tracked-user");
+        await _sut.MarkFailedAsync(
+            "failed-with-tracked-user",
+            TestContext.Current.CancellationToken);
 
         _ctx.ChangeTracker.Clear();
         RegistrationIdempotencyRecord row = await _ctx.Set<RegistrationIdempotencyRecord>()
-            .SingleAsync(r => r.IdempotencyKey == "failed-with-tracked-user");
+            .SingleAsync(
+                r => r.IdempotencyKey == "failed-with-tracked-user",
+                TestContext.Current.CancellationToken);
         row.Status.Should().Be(RegistrationIdempotencyStatus.Failed);
-        bool userPersisted = await _ctx.Users.AnyAsync(u => u.Email == Email.Create("pending-user@example.com").Value);
+        bool userPersisted = await _ctx.Users.AnyAsync(
+            u => u.Email == Email.Create("pending-user@example.com").Value,
+            TestContext.Current.CancellationToken);
         userPersisted.Should().BeFalse();
     }
 }

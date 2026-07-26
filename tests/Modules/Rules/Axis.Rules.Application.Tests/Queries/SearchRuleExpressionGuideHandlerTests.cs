@@ -59,7 +59,7 @@ public sealed class SearchRuleExpressionGuideHandlerTests
                 item.Detail!.Text.Contains("Số thập phân", StringComparison.Ordinal)));
         result.Value.Sections.Should().OnlyContain(section => section.Items.Count > 0);
         await _context.TextSearch.DidNotReceiveWithAnyArgs()
-            .SearchAsync(default!, default!, default);
+            .SearchAsync(default!, default!, TestContext.Current.CancellationToken);
     }
 
     [Fact]

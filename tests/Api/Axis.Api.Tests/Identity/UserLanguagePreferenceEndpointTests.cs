@@ -34,7 +34,7 @@ public sealed class UserLanguagePreferenceEndpointTests(ApiTestFixture fixture)
             new { language = "vi" });
 
         updateResponse.StatusCode.Should().Be(HttpStatusCode.OK);
-        JsonElement updateBody = await updateResponse.Content.ReadFromJsonAsync<JsonElement>(Json);
+        JsonElement updateBody = await updateResponse.Content.ReadFromJsonAsync<JsonElement>(Json, TestContext.Current.CancellationToken);
         updateBody.GetProperty("language").GetString().Should().Be("vi");
 
         HttpResponseMessage profileResponse = await SendWithBearerAsync(
@@ -43,13 +43,15 @@ public sealed class UserLanguagePreferenceEndpointTests(ApiTestFixture fixture)
             accessToken);
 
         profileResponse.StatusCode.Should().Be(HttpStatusCode.OK);
-        JsonElement profileBody = await profileResponse.Content.ReadFromJsonAsync<JsonElement>(Json);
+        JsonElement profileBody = await profileResponse.Content.ReadFromJsonAsync<JsonElement>(Json, TestContext.Current.CancellationToken);
         profileBody.GetProperty("language").GetString().Should().Be("vi");
 
         using IServiceScope scope = fixture.CreateScope();
         IdentityDbContext db = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
         Email normalizedEmail = Email.Create(email).Value;
-        User user = await db.Users.SingleAsync(user => user.Email == normalizedEmail);
+        User user = await db.Users.SingleAsync(
+            user => user.Email == normalizedEmail,
+            TestContext.Current.CancellationToken);
         user.LanguagePreference!.Value.Should().Be("vi");
     }
 
@@ -66,7 +68,7 @@ public sealed class UserLanguagePreferenceEndpointTests(ApiTestFixture fixture)
             new { theme = "dark" });
 
         updateResponse.StatusCode.Should().Be(HttpStatusCode.OK);
-        JsonElement updateBody = await updateResponse.Content.ReadFromJsonAsync<JsonElement>(Json);
+        JsonElement updateBody = await updateResponse.Content.ReadFromJsonAsync<JsonElement>(Json, TestContext.Current.CancellationToken);
         updateBody.GetProperty("theme").GetString().Should().Be("dark");
 
         HttpResponseMessage profileResponse = await SendWithBearerAsync(
@@ -75,13 +77,15 @@ public sealed class UserLanguagePreferenceEndpointTests(ApiTestFixture fixture)
             accessToken);
 
         profileResponse.StatusCode.Should().Be(HttpStatusCode.OK);
-        JsonElement profileBody = await profileResponse.Content.ReadFromJsonAsync<JsonElement>(Json);
+        JsonElement profileBody = await profileResponse.Content.ReadFromJsonAsync<JsonElement>(Json, TestContext.Current.CancellationToken);
         profileBody.GetProperty("theme").GetString().Should().Be("dark");
 
         using IServiceScope scope = fixture.CreateScope();
         IdentityDbContext db = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
         Email normalizedEmail = Email.Create(email).Value;
-        User user = await db.Users.SingleAsync(user => user.Email == normalizedEmail);
+        User user = await db.Users.SingleAsync(
+            user => user.Email == normalizedEmail,
+            TestContext.Current.CancellationToken);
         user.ThemePreference!.Value.Should().Be("dark");
     }
 
@@ -97,7 +101,7 @@ public sealed class UserLanguagePreferenceEndpointTests(ApiTestFixture fixture)
             new { language = "fr" });
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
-        JsonElement body = await response.Content.ReadFromJsonAsync<JsonElement>(Json);
+        JsonElement body = await response.Content.ReadFromJsonAsync<JsonElement>(Json, TestContext.Current.CancellationToken);
         body.GetProperty("errors").EnumerateObject()
             .Select(error => error.Name)
             .Should().Contain("language");
@@ -115,7 +119,7 @@ public sealed class UserLanguagePreferenceEndpointTests(ApiTestFixture fixture)
             new { theme = "contrast" });
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
-        JsonElement body = await response.Content.ReadFromJsonAsync<JsonElement>(Json);
+        JsonElement body = await response.Content.ReadFromJsonAsync<JsonElement>(Json, TestContext.Current.CancellationToken);
         body.GetProperty("errors").EnumerateObject()
             .Select(error => error.Name)
             .Should().Contain("theme");
@@ -130,7 +134,9 @@ public sealed class UserLanguagePreferenceEndpointTests(ApiTestFixture fixture)
         {
             IdentityDbContext beforeDb = beforeScope.ServiceProvider.GetRequiredService<IdentityDbContext>();
             Email beforeNormalizedEmail = Email.Create(email).Value;
-            User beforeUser = await beforeDb.Users.SingleAsync(user => user.Email == beforeNormalizedEmail);
+            User beforeUser = await beforeDb.Users.SingleAsync(
+                user => user.Email == beforeNormalizedEmail,
+                TestContext.Current.CancellationToken);
             beforeUser.LanguagePreference!.Value.Should().Be(UserLanguage.DefaultValue);
         }
 
@@ -140,7 +146,9 @@ public sealed class UserLanguagePreferenceEndpointTests(ApiTestFixture fixture)
         using IServiceScope scope = fixture.CreateScope();
         IdentityDbContext afterDb = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
         Email afterNormalizedEmail = Email.Create(email).Value;
-        User afterUser = await afterDb.Users.SingleAsync(user => user.Email == afterNormalizedEmail);
+        User afterUser = await afterDb.Users.SingleAsync(
+            user => user.Email == afterNormalizedEmail,
+            TestContext.Current.CancellationToken);
         afterUser.LanguagePreference!.Value.Should().Be(UserLanguage.DefaultValue);
         afterUser.ThemePreference.Should().BeNull();
     }
@@ -187,7 +195,7 @@ public sealed class UserLanguagePreferenceEndpointTests(ApiTestFixture fixture)
 
         HttpResponseMessage tokenResponse = await fixture.Client.PostAsync("/connect/token", tokenRequest);
         tokenResponse.StatusCode.Should().Be(HttpStatusCode.OK);
-        JsonElement tokenBody = await tokenResponse.Content.ReadFromJsonAsync<JsonElement>(Json);
+        JsonElement tokenBody = await tokenResponse.Content.ReadFromJsonAsync<JsonElement>(Json, TestContext.Current.CancellationToken);
         return tokenBody.GetProperty("access_token").GetString()
             ?? throw new InvalidOperationException("Token response did not include an access token.");
     }

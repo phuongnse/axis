@@ -59,8 +59,10 @@ public sealed class CreateBusinessObjectDefinitionHandlerTests
         result.IsFailure.Should().BeTrue();
         result.ErrorCode.Should().Be(ErrorCodes.Forbidden);
         result.ProblemCode.Should().Be(BusinessObjectsProblemCodes.WorkspaceScopeRequired);
-        await _context.Repository.DidNotReceiveWithAnyArgs().AddAsync(default!, default);
-        await _context.UnitOfWork.DidNotReceiveWithAnyArgs().SaveChangesAsync(default);
+        await _context.Repository.DidNotReceiveWithAnyArgs()
+            .AddAsync(default!, TestContext.Current.CancellationToken);
+        await _context.UnitOfWork.DidNotReceiveWithAnyArgs()
+            .SaveChangesAsync(TestContext.Current.CancellationToken);
     }
 
     [Fact]

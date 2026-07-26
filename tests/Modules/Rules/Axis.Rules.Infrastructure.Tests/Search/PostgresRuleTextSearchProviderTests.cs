@@ -23,11 +23,20 @@ public sealed class PostgresRuleTextSearchProviderTests(RulesDatabaseFixture db)
         ];
 
         IReadOnlyList<RuleTextSearchMatch> ranked =
-            await sut.SearchAsync(documents, "customer");
+            await sut.SearchAsync(
+                documents,
+                "customer",
+                TestContext.Current.CancellationToken);
         IReadOnlyList<RuleTextSearchMatch> accentAndOrder =
-            await sut.SearchAsync(documents, "uu tien kiem tra");
+            await sut.SearchAsync(
+                documents,
+                "uu tien kiem tra",
+                TestContext.Current.CancellationToken);
         IReadOnlyList<RuleTextSearchMatch> typo =
-            await sut.SearchAsync(documents, "inovice");
+            await sut.SearchAsync(
+                documents,
+                "inovice",
+                TestContext.Current.CancellationToken);
 
         ranked.Select(match => match.Key).Take(2).Should().Equal("exact", "prefix");
         accentAndOrder.Should().ContainSingle(match => match.Key == "accent");

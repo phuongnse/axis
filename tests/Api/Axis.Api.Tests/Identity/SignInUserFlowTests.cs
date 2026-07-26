@@ -38,7 +38,7 @@ public sealed class SignInUserFlowTests(ApiTestFixture fixture)
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         response.Headers.TryGetValues("Set-Cookie", out IEnumerable<string>? cookies).Should().BeTrue();
         cookies!.Should().Contain(cookie => cookie.Contains(".AspNetCore.Cookies", StringComparison.Ordinal));
-        JsonElement body = await response.Content.ReadFromJsonAsync<JsonElement>(Json);
+        JsonElement body = await response.Content.ReadFromJsonAsync<JsonElement>(Json, TestContext.Current.CancellationToken);
         body.GetProperty("sessionEstablished").GetBoolean().Should().BeTrue();
         body.GetProperty("nextStep").GetString().Should().Be(nameof(SignInNextStep.Dashboard));
 
@@ -54,7 +54,7 @@ public sealed class SignInUserFlowTests(ApiTestFixture fixture)
         HttpResponseMessage response = await SignInAsync("", "");
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
-        JsonElement body = await response.Content.ReadFromJsonAsync<JsonElement>(Json);
+        JsonElement body = await response.Content.ReadFromJsonAsync<JsonElement>(Json, TestContext.Current.CancellationToken);
         JsonElement errors = body.GetProperty("errors");
         errors.EnumerateObject().Select(property => property.Name)
             .Should().BeEquivalentTo(["email", "password"]);
@@ -128,7 +128,7 @@ public sealed class SignInUserFlowTests(ApiTestFixture fixture)
     {
         string state = Guid.NewGuid().ToString("N");
         HttpResponseMessage signOutResponse =
-            await fixture.Client.PostAsync("/api/auth/sign-out", content: null);
+            await fixture.Client.PostAsync("/api/auth/sign-out", content: null, cancellationToken: TestContext.Current.CancellationToken);
 
         HttpResponseMessage response = await AuthorizeAsync(prompt: "none", state);
 
@@ -155,7 +155,7 @@ public sealed class SignInUserFlowTests(ApiTestFixture fixture)
         HttpResponseMessage authorizeBeforeSignOut = await AuthorizeAsync();
         authorizeBeforeSignOut.StatusCode.Should().Be(HttpStatusCode.Redirect);
 
-        HttpResponseMessage signOutResponse = await fixture.Client.PostAsync("/api/auth/sign-out", content: null);
+        HttpResponseMessage signOutResponse = await fixture.Client.PostAsync("/api/auth/sign-out", content: null, cancellationToken: TestContext.Current.CancellationToken);
 
         signOutResponse.StatusCode.Should().Be(HttpStatusCode.NoContent);
         signOutResponse.Headers.TryGetValues("Set-Cookie", out IEnumerable<string>? cookies).Should().BeTrue();
@@ -165,7 +165,7 @@ public sealed class SignInUserFlowTests(ApiTestFixture fixture)
         HttpResponseMessage authorizeAfterSignOut = await AuthorizeAsync();
         authorizeAfterSignOut.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
 
-        HttpResponseMessage absentSessionResponse = await fixture.Client.PostAsync("/api/auth/sign-out", content: null);
+        HttpResponseMessage absentSessionResponse = await fixture.Client.PostAsync("/api/auth/sign-out", content: null, cancellationToken: TestContext.Current.CancellationToken);
         absentSessionResponse.StatusCode.Should().Be(HttpStatusCode.NoContent);
 
         (int userCountAfter, int workspaceCountAfter, int tokenCountAfter) = await CountRegistrationArtifactsAsync();
@@ -246,7 +246,7 @@ public sealed class SignInUserFlowTests(ApiTestFixture fixture)
 
     private static async Task<ApiProblem> ReadProblemAsync(HttpResponseMessage response)
     {
-        JsonElement body = await response.Content.ReadFromJsonAsync<JsonElement>(Json);
+        JsonElement body = await response.Content.ReadFromJsonAsync<JsonElement>(Json, TestContext.Current.CancellationToken);
         return new ApiProblem(
             body.GetProperty("detail").GetString(),
             body.GetProperty("code").GetString(),

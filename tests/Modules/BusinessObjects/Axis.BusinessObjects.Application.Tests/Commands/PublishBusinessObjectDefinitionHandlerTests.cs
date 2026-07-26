@@ -58,6 +58,7 @@ public sealed class PublishBusinessObjectDefinitionHandlerTests
         result.IsFailure.Should().BeTrue();
         result.ErrorCode.Should().Be(ErrorCodes.Forbidden);
         result.ProblemCode.Should().Be(BusinessObjectsProblemCodes.UserScopeRequired);
-        await _context.UnitOfWork.DidNotReceiveWithAnyArgs().SaveChangesAsync(default);
+        await _context.UnitOfWork.DidNotReceiveWithAnyArgs()
+            .SaveChangesAsync(TestContext.Current.CancellationToken);
     }
 }

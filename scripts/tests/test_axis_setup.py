@@ -189,6 +189,33 @@ class TestManagedToolPaths(unittest.TestCase):
             self.assertTrue(exposed.is_symlink())
             self.assertEqual(managed, exposed.resolve())
 
+    def test_exposes_dotnet_with_its_portable_runtime_root(self) -> None:
+        platform_spec = axis_setup.SetupPlatform("linux", "x64")
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / "tools"
+            command_dir = Path(temp) / "bin"
+            managed = axis_setup.managed_executable("dotnet", platform_spec=platform_spec, root=root)
+            managed.parent.mkdir(parents=True)
+            managed.write_text("", encoding="utf-8")
+
+            exposed = axis_setup.expose_managed_command(
+                "dotnet",
+                platform_spec=platform_spec,
+                root=root,
+                command_dir=command_dir,
+            )
+
+            self.assertEqual(
+                (
+                    "#!/bin/sh\n"
+                    "# Managed by Axis portable setup\n"
+                    f"export DOTNET_ROOT={managed.parent}\n"
+                    f'exec {managed} "$@"\n'
+                ),
+                exposed.read_text(encoding="utf-8"),
+            )
+            self.assertTrue(exposed.stat().st_mode & 0o100)
+
     def test_exposes_a_managed_windows_command_with_a_stable_launcher(self) -> None:
         platform_spec = axis_setup.SetupPlatform("windows", "x64")
         with tempfile.TemporaryDirectory() as temp:
@@ -208,6 +235,31 @@ class TestManagedToolPaths(unittest.TestCase):
             self.assertEqual(command_dir / "gh.cmd", exposed)
             self.assertEqual(
                 f'@rem Managed by Axis portable setup\r\n@"{managed}" %*\r\n'.encode(),
+                exposed.read_bytes(),
+            )
+
+    def test_exposes_dotnet_windows_command_with_its_portable_runtime_root(self) -> None:
+        platform_spec = axis_setup.SetupPlatform("windows", "x64")
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / "tools"
+            command_dir = Path(temp) / "bin"
+            managed = axis_setup.managed_executable("dotnet", platform_spec=platform_spec, root=root)
+            managed.parent.mkdir(parents=True)
+            managed.write_text("", encoding="utf-8")
+
+            exposed = axis_setup.expose_managed_command(
+                "dotnet",
+                platform_spec=platform_spec,
+                root=root,
+                command_dir=command_dir,
+            )
+
+            self.assertEqual(
+                (
+                    "@rem Managed by Axis portable setup\r\n"
+                    f'@set "DOTNET_ROOT={managed.parent}"\r\n'
+                    f'@"{managed}" %*\r\n'
+                ).encode(),
                 exposed.read_bytes(),
             )
 

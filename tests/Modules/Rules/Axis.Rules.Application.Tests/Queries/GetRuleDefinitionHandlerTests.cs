@@ -49,7 +49,7 @@ public sealed class GetRuleDefinitionHandlerTests
         result.Value.Condition.Left.Function.Should().Be(RuleExpressionFunction.IsBlank);
         result.Value.Outcome.Should().NotBeNull();
         await _context.Repository.DidNotReceiveWithAnyArgs()
-            .GetByKeyForWorkspaceAsync(default, default, default);
+            .GetByKeyForWorkspaceAsync(default, default, TestContext.Current.CancellationToken);
     }
 
     [Fact]

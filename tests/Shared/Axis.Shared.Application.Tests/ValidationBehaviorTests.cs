@@ -29,11 +29,11 @@ public class ValidationBehaviorTests
     {
         TestCommandValidator[] validators = new[] { new TestCommandValidator() };
         ValidationBehavior<TestCommand, string> behavior = new ValidationBehavior<TestCommand, string>(validators);
-        _next.Invoke().Returns("ok");
+        _next.Invoke(Arg.Any<CancellationToken>()).Returns("ok");
 
         await behavior.Handle(new TestCommand("Alice"), _next, CancellationToken.None);
 
-        await _next.Received(1).Invoke();
+        await _next.Received(1).Invoke(Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -66,7 +66,7 @@ public class ValidationBehaviorTests
     public async Task ValidationBehavior_WhenNoValidators_PassesThroughToNext()
     {
         ValidationBehavior<TestCommand, string> behavior = new ValidationBehavior<TestCommand, string>([]);
-        _next.Invoke().Returns("ok");
+        _next.Invoke(Arg.Any<CancellationToken>()).Returns("ok");
         string result = await behavior.Handle(new TestCommand("Alice"), _next, CancellationToken.None);
 
         result.Should().Be("ok");

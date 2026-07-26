@@ -28,7 +28,8 @@ public sealed class RuleEvaluatorTests
             {
                 ["field.value"] = new(RuleValueType.Text, ["abcd"]),
             },
-            CorrelationId: "test-correlation"));
+            CorrelationId: "test-correlation"),
+            TestContext.Current.CancellationToken);
 
         result.IsSuccess.Should().BeTrue();
         result.IsAllowed.Should().BeFalse();
@@ -56,7 +57,8 @@ public sealed class RuleEvaluatorTests
                 DefinitionVersion: 99,
                 Params())],
             new Dictionary<string, RuleValueDto>(StringComparer.Ordinal),
-            CorrelationId: "test-correlation"));
+            CorrelationId: "test-correlation"),
+            TestContext.Current.CancellationToken);
 
         result.IsSuccess.Should().BeFalse();
         result.IsAllowed.Should().BeFalse();
@@ -84,7 +86,8 @@ public sealed class RuleEvaluatorTests
             {
                 ["field.value"] = new(RuleValueType.Text, ["10"]),
             },
-            CorrelationId: "test-correlation"));
+            CorrelationId: "test-correlation"),
+            TestContext.Current.CancellationToken);
 
         result.IsSuccess.Should().BeFalse();
         result.ErrorCode.Should().Be("rule_incompatible");
@@ -110,7 +113,8 @@ public sealed class RuleEvaluatorTests
             {
                 ["field.value"] = new(RuleValueType.Decimal, ["5"]),
             },
-            CorrelationId: "test-correlation"));
+            CorrelationId: "test-correlation"),
+            TestContext.Current.CancellationToken);
 
         result.IsSuccess.Should().BeFalse();
         result.IsAllowed.Should().BeFalse();
@@ -142,7 +146,8 @@ public sealed class RuleEvaluatorTests
             {
                 ["field.value"] = new(RuleValueType.Text, ["abcd"]),
             },
-            CorrelationId: "validation-order"));
+            CorrelationId: "validation-order"),
+            TestContext.Current.CancellationToken);
 
         result.IsSuccess.Should().BeTrue();
         result.IsAllowed.Should().BeFalse();
@@ -186,7 +191,8 @@ public sealed class RuleEvaluatorTests
             {
                 ["field.value"] = new(RuleValueType.Text, ["blocked"]),
             },
-            CorrelationId: "decision-order"));
+            CorrelationId: "decision-order"),
+            TestContext.Current.CancellationToken);
 
         result.IsSuccess.Should().BeTrue();
         result.IsAllowed.Should().BeFalse();

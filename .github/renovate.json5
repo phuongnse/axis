@@ -126,11 +126,12 @@
       "commitMessageTopic": "container images"
     },
     {
-      "description": "Keep major updates separate for deliberate review.",
+      "description": "Require dashboard approval before proposing separate major updates.",
       "matchUpdateTypes": [
         "major"
       ],
       "groupName": null,
+      "dependencyDashboardApproval": true,
       "automerge": false
     }
   ]
