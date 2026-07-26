@@ -8,7 +8,7 @@
   "configMigration": true,
   "timezone": "Asia/Ho_Chi_Minh",
   "schedule": [
-    "* 0-8 1 * *"
+    "before 5am on monday"
   ],
   "labels": [
     "dependencies"
@@ -27,20 +27,43 @@
     "npm",
     "nuget"
   ],
-  "rangeStrategy": "bump",
+  "rangeStrategy": "pin",
+  "lockFileMaintenance": {
+    "enabled": true,
+    "schedule": [
+      "before 5am on monday"
+    ]
+  },
+  "vulnerabilityAlerts": {
+    "enabled": true,
+    "labels": [
+      "security"
+    ],
+    "vulnerabilityFixStrategy": "lowest"
+  },
   "prBodyTemplate": "## Summary\n\nRenovate proposes a dependency update for Axis version owners.\n\n{{{table}}}\n\n## Linked spec\n\nN/A - dependency automation update; version ownership lives in docs/TECH_STACK.md.\n\n## Requirements & rules followed\n\n- [ ] **Spec/code** - N/A - automated dependency update follows repository version owners; no product behavior is intended.\n- [ ] **Ready review** - N/A - automated dependency PR awaits human review before merge.\n- [ ] **Verification** - N/A - CI runs after the PR opens and must pass before merge.\n- [ ] **Docs/status** - N/A - per-update docs change only when stack policy changes.\n- [ ] **No placeholders** - N/A - generated Renovate body uses fixed Axis text plus the Renovate dependency table.\n",
   "packageRules": [
-    {
-      "description": "Require deliberate PRs for major updates.",
-      "matchUpdateTypes": [
-        "major"
-      ],
-      "enabled": false
-    },
     {
       "description": "Do not automate .NET SDK baseline changes.",
       "matchFileNames": [
         "global.json"
+      ],
+      "enabled": false
+    },
+    {
+      "description": "Keep the Node image aligned with the explicitly approved Node and bundled npm baseline.",
+      "matchFileNames": [
+        "frontend/Dockerfile.dev"
+      ],
+      "enabled": false
+    },
+    {
+      "description": "Do not update bundled npm independently from the Node baseline.",
+      "matchManagers": [
+        "npm"
+      ],
+      "matchDepTypes": [
+        "packageManager"
       ],
       "enabled": false
     },
@@ -101,6 +124,14 @@
       "groupName": "container images",
       "groupSlug": "container-images",
       "commitMessageTopic": "container images"
+    },
+    {
+      "description": "Keep major updates separate for deliberate review.",
+      "matchUpdateTypes": [
+        "major"
+      ],
+      "groupName": null,
+      "automerge": false
     }
   ]
 }

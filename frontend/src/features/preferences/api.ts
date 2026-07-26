@@ -1,12 +1,10 @@
 import { fetchApi } from '@/lib/api';
-import type { components } from '@/lib/api-types';
+import type * as ApiTypes from '@/lib/api-generated';
 
-export type LanguagePreference = components['schemas']['LanguagePreferenceDto'];
-export type UpdateLanguagePreferenceRequest =
-  components['schemas']['UpdateUserLanguagePreferenceRequest'];
-export type ThemePreference = components['schemas']['ThemePreferenceDto'];
-export type UpdateThemePreferenceRequest =
-  components['schemas']['UpdateUserThemePreferenceRequest'];
+export type LanguagePreference = ApiTypes.LanguagePreferenceDto;
+export type UpdateLanguagePreferenceRequest = ApiTypes.UpdateUserLanguagePreferenceRequest;
+export type ThemePreference = ApiTypes.ThemePreferenceDto;
+export type UpdateThemePreferenceRequest = ApiTypes.UpdateUserThemePreferenceRequest;
 
 export async function updateLanguagePreference(
   request: UpdateLanguagePreferenceRequest,

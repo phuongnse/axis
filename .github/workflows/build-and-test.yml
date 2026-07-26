@@ -176,6 +176,9 @@ jobs:
       - name: Install dependencies
         run: python scripts/axis.py frontend install
 
+      - name: Exact dependency versions
+        run: python scripts/axis.py check frontend-dependency-versions
+
       - name: Vulnerable packages
         run: python scripts/axis.py check frontend-vulnerable-packages
 

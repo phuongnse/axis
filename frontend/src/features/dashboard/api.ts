@@ -1,7 +1,7 @@
 import { fetchApi } from '@/lib/api';
-import type { components } from '@/lib/api-types';
+import type * as ApiTypes from '@/lib/api-generated';
 
-export type CurrentUserProfile = components['schemas']['CurrentUserProfileDto'];
+export type CurrentUserProfile = ApiTypes.CurrentUserProfileDto;
 
 export const dashboardQueryKeys = {
   all: ['dashboard'] as const,

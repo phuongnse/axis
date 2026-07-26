@@ -1773,6 +1773,64 @@ class TestVulnerablePackageGate(unittest.TestCase):
         self.assertNotIn("shadcn", package["dependencies"])
         self.assertIn("shadcn", package["devDependencies"])
 
+    def test_frontend_dependency_versions_accept_exact_versions(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            frontend = root / "frontend"
+            frontend.mkdir()
+            (frontend / ".nvmrc").write_text(f"{axis.axis_setup.NODE_VERSION}\n", encoding="utf-8")
+            (frontend / "Dockerfile.dev").write_text(
+                f"FROM node:{axis.axis_setup.NODE_VERSION}-alpine\n",
+                encoding="utf-8",
+            )
+            (frontend / "package.json").write_text(
+                json.dumps(
+                    {
+                        "packageManager": "npm@11.16.0",
+                        "dependencies": {"stable": "1.2.3"},
+                        "devDependencies": {"preview": "2.0.0-beta.1"},
+                        "overrides": {"transitive": "3.4.5"},
+                    }
+                ),
+                encoding="utf-8",
+            )
+            with (
+                mock.patch.object(axis, "ROOT", root),
+                contextlib.redirect_stdout(io.StringIO()),
+            ):
+                self.assertEqual(0, axis.check_frontend_dependency_versions())
+
+    def test_frontend_dependency_versions_reject_ranges_and_tags(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            frontend = root / "frontend"
+            frontend.mkdir()
+            (frontend / ".nvmrc").write_text(f"{axis.axis_setup.NODE_VERSION}\n", encoding="utf-8")
+            (frontend / "Dockerfile.dev").write_text(
+                f"FROM node:{axis.axis_setup.NODE_VERSION}-alpine\n",
+                encoding="utf-8",
+            )
+            (frontend / "package.json").write_text(
+                json.dumps(
+                    {
+                        "packageManager": "npm@11.16.0",
+                        "dependencies": {"ranged": "^1.2.3"},
+                        "devDependencies": {"floating": "latest"},
+                        "overrides": {},
+                    }
+                ),
+                encoding="utf-8",
+            )
+            with (
+                mock.patch.object(axis, "ROOT", root),
+                contextlib.redirect_stderr(io.StringIO()) as stderr,
+            ):
+                self.assertEqual(1, axis.check_frontend_dependency_versions())
+
+        output = stderr.getvalue()
+        self.assertIn("dependencies.ranged", output)
+        self.assertIn("devDependencies.floating", output)
+
     def test_frontend_gate_accepts_only_the_current_time_bounded_moderate_advisory(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
@@ -2034,9 +2092,10 @@ class TestToolVersionGates(unittest.TestCase):
         classify.assert_called_once()
         self.assertIn("sudo apt install libicu78", detail)
 
-    def test_frontend_toolchain_rejects_wrong_node_major(self) -> None:
+    def test_frontend_toolchain_rejects_wrong_node_patch(self) -> None:
         with (
-            mock.patch.object(axis, "required_node_major", return_value=(True, "22")),
+            mock.patch.object(axis, "required_node_version", return_value=(True, "24.18.0")),
+            mock.patch.object(axis, "frontend_toolchain_env", return_value={}),
             mock.patch.object(
                 axis,
                 "command_version_line",
@@ -2046,15 +2105,15 @@ class TestToolVersionGates(unittest.TestCase):
         ):
             self.assertEqual(1, axis.check_frontend_toolchain())
 
-        self.assertIn("expected Node 22.x", stderr.getvalue())
+        self.assertIn("expected Node 24.18.0", stderr.getvalue())
         self.assertIn("frontend/.nvmrc", stderr.getvalue())
 
     def test_frontend_toolchain_env_resolves_nvm_when_path_lacks_node(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             nvm_root = root / ".nvm"
-            older_bin = nvm_root / "versions" / "node" / "v22.1.0" / "bin"
-            expected_bin = nvm_root / "versions" / "node" / "v22.23.0" / "bin"
+            older_bin = nvm_root / "versions" / "node" / "v24.17.0" / "bin"
+            expected_bin = nvm_root / "versions" / "node" / "v24.18.0" / "bin"
             path_dir = root / "plain-path"
             for bin_dir in (older_bin, expected_bin):
                 bin_dir.mkdir(parents=True)
@@ -2065,13 +2124,13 @@ class TestToolVersionGates(unittest.TestCase):
             def fake_command_version_line(name: str, *_args: str, env: dict[str, str] | None = None):
                 path = env.get("PATH", "") if env else ""
                 if path.split(axis.os.pathsep)[0] == str(expected_bin):
-                    version = "v22.23.0" if name == "node" else "10.9.8"
+                    version = "v24.18.0" if name == "node" else "11.16.0"
                     return True, version, str(expected_bin / name)
                 return False, f"{name} not found in PATH", name
 
             with (
                 mock.patch.dict(axis.os.environ, {"NVM_DIR": str(nvm_root), "PATH": str(path_dir)}, clear=True),
-                mock.patch.object(axis, "required_node_major", return_value=(True, "22")),
+                mock.patch.object(axis, "required_node_version", return_value=(True, "24.18.0")),
                 mock.patch.object(axis, "command_version_line", side_effect=fake_command_version_line),
             ):
                 env = axis.frontend_toolchain_env()
@@ -2082,7 +2141,7 @@ class TestToolVersionGates(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             nvm_home = root / "nvm"
-            expected_dir = nvm_home / "v22.23.0"
+            expected_dir = nvm_home / "v24.18.0"
             path_dir = root / "plain-path"
             expected_dir.mkdir(parents=True)
             path_dir.mkdir()
@@ -2095,7 +2154,7 @@ class TestToolVersionGates(unittest.TestCase):
                 path = env.get("PATH", "")
                 if path.split(axis.os.pathsep)[0] != str(expected_dir):
                     return False, f"{name} not found in PATH", name
-                version = "v22.23.0" if name == "node" else "10.9.8"
+                version = "v24.18.0" if name == "node" else "11.16.0"
                 suffix = "node.exe" if name == "node" else "npm.cmd"
                 return True, version, str(expected_dir / suffix)
 
@@ -2104,7 +2163,7 @@ class TestToolVersionGates(unittest.TestCase):
                 mock.patch.object(axis, "_nvm_windows_roots", return_value=[nvm_home]),
                 mock.patch.object(axis.Path, "home", return_value=root),
                 mock.patch.dict(axis.os.environ, {"PATH": str(path_dir)}, clear=True),
-                mock.patch.object(axis, "required_node_major", return_value=(True, "22")),
+                mock.patch.object(axis, "required_node_version", return_value=(True, "24.18.0")),
                 mock.patch.object(axis, "command_version_line", side_effect=fake_command_version_line),
             ):
                 env = axis.frontend_toolchain_env()
@@ -2154,7 +2213,7 @@ class TestToolVersionGates(unittest.TestCase):
             mock.patch.object(axis, "coderabbit_cli_status", return_value=(True, "coderabbit 0.6.0")),
             mock.patch.object(axis, "dotnet_sdk_status", return_value=(True, "8.0.100")),
             mock.patch.object(axis, "frontend_toolchain_env", return_value={}),
-            mock.patch.object(axis, "node_version_status", return_value=(True, "v22.23.0")),
+            mock.patch.object(axis, "node_version_status", return_value=(True, "v24.18.0")),
             mock.patch.object(axis, "playwright_chromium_status", playwright_status),
             mock.patch.object(axis, "_command_version", return_value=("OK", "/usr/bin/tool")),
             mock.patch.object(axis, "find_openssl", return_value="/usr/bin/openssl"),
@@ -2348,6 +2407,7 @@ class TestVerifyGate(unittest.TestCase):
             ),
             mock.patch.object(axis, "run_text_encoding_check") as text_encoding,
             mock.patch.object(axis, "check_frontend_toolchain") as toolchain,
+            mock.patch.object(axis, "check_frontend_dependency_versions") as versions,
             mock.patch.object(axis, "check_frontend_vulnerable_packages") as audit,
             mock.patch.object(axis, "frontend_command") as frontend,
             mock.patch.object(axis, "check_scripts_standard") as scripts_standard,
@@ -2363,7 +2423,7 @@ class TestVerifyGate(unittest.TestCase):
         self.assertIn("PLAN frontend vulnerable packages", output)
         self.assertIn("PLAN policy gate tests", output)
         self.assertIn("no commands run", output)
-        for patched in (text_encoding, toolchain, audit, frontend, scripts_standard, policy_tests):
+        for patched in (text_encoding, toolchain, versions, audit, frontend, scripts_standard, policy_tests):
             patched.assert_not_called()
 
     def test_package_manifest_change_runs_frontend_vulnerability_gate(self) -> None:
@@ -2378,6 +2438,11 @@ class TestVerifyGate(unittest.TestCase):
             mock.patch.object(axis, "check_frontend_toolchain", side_effect=lambda: calls.append("toolchain") or 0),
             mock.patch.object(
                 axis,
+                "check_frontend_dependency_versions",
+                side_effect=lambda: calls.append("versions") or 0,
+            ),
+            mock.patch.object(
+                axis,
                 "check_frontend_vulnerable_packages",
                 side_effect=lambda: calls.append("audit") or 0,
             ),
@@ -2390,7 +2455,7 @@ class TestVerifyGate(unittest.TestCase):
         ):
             self.assertEqual(0, axis.verify(object()))
 
-        self.assertEqual(["toolchain", "audit", "ci", "test"], calls)
+        self.assertEqual(["toolchain", "versions", "audit", "ci", "test"], calls)
 
     def test_risk_acceptance_manifest_change_runs_frontend_vulnerability_gate(self) -> None:
         calls: list[str] = []
@@ -2404,6 +2469,11 @@ class TestVerifyGate(unittest.TestCase):
             mock.patch.object(axis, "check_frontend_toolchain", side_effect=lambda: calls.append("toolchain") or 0),
             mock.patch.object(
                 axis,
+                "check_frontend_dependency_versions",
+                side_effect=lambda: calls.append("versions") or 0,
+            ),
+            mock.patch.object(
+                axis,
                 "check_frontend_vulnerable_packages",
                 side_effect=lambda: calls.append("audit") or 0,
             ),
@@ -2416,7 +2486,38 @@ class TestVerifyGate(unittest.TestCase):
         ):
             self.assertEqual(0, axis.verify(object()))
 
-        self.assertEqual(["toolchain", "audit", "ci", "test"], calls)
+        self.assertEqual(["toolchain", "versions", "audit", "ci", "test"], calls)
+
+    def test_frontend_source_change_runs_version_and_vulnerability_gates(self) -> None:
+        calls: list[str] = []
+        with (
+            mock.patch.object(
+                axis,
+                "verify_scope_paths",
+                return_value=("working tree", ["frontend/src/app.tsx"]),
+            ),
+            mock.patch.object(axis, "run_text_encoding_check", return_value=0),
+            mock.patch.object(axis, "check_frontend_toolchain", side_effect=lambda: calls.append("toolchain") or 0),
+            mock.patch.object(
+                axis,
+                "check_frontend_dependency_versions",
+                side_effect=lambda: calls.append("versions") or 0,
+            ),
+            mock.patch.object(
+                axis,
+                "check_frontend_vulnerable_packages",
+                side_effect=lambda: calls.append("audit") or 0,
+            ),
+            mock.patch.object(
+                axis,
+                "frontend_command",
+                side_effect=lambda args: calls.append(args.frontend_command) or 0,
+            ),
+            contextlib.redirect_stdout(io.StringIO()),
+        ):
+            self.assertEqual(0, axis.verify(object()))
+
+        self.assertEqual(["toolchain", "versions", "audit", "ci", "test"], calls)
 
     def test_runs_markdown_links_for_markdown_changes(self) -> None:
         calls: list[str] = []
@@ -2595,6 +2696,16 @@ class TestReviewVerificationGates(unittest.TestCase):
         with (
             mock.patch.object(axis, "verify_scope_paths", return_value=("working tree", ["frontend/src/App.tsx"])),
             mock.patch.object(axis, "check_frontend_toolchain", side_effect=lambda: calls.append("frontend-toolchain") or 0),
+            mock.patch.object(
+                axis,
+                "check_frontend_dependency_versions",
+                side_effect=lambda: calls.append("versions") or 0,
+            ),
+            mock.patch.object(
+                axis,
+                "check_frontend_vulnerable_packages",
+                side_effect=lambda: calls.append("audit") or 0,
+            ),
             mock.patch.object(axis, "frontend_toolchain_env", return_value={}),
             mock.patch.object(axis, "run", side_effect=fake_run),
             contextlib.redirect_stdout(io.StringIO()),
@@ -2604,6 +2715,8 @@ class TestReviewVerificationGates(unittest.TestCase):
         self.assertEqual(
             [
                 "frontend-toolchain",
+                "versions",
+                "audit",
                 "frontend-toolchain",
                 "npm run ci",
                 "frontend-toolchain",
@@ -2618,6 +2731,16 @@ class TestReviewVerificationGates(unittest.TestCase):
         with (
             mock.patch.object(axis, "verify_scope_paths", return_value=("working tree", ["frontend/tests/button.test.tsx"])),
             mock.patch.object(axis, "check_frontend_toolchain", side_effect=lambda: calls.append("frontend-toolchain") or 0),
+            mock.patch.object(
+                axis,
+                "check_frontend_dependency_versions",
+                side_effect=lambda: calls.append("versions") or 0,
+            ),
+            mock.patch.object(
+                axis,
+                "check_frontend_vulnerable_packages",
+                side_effect=lambda: calls.append("audit") or 0,
+            ),
             mock.patch.object(axis, "frontend_toolchain_env", return_value={}),
             mock.patch.object(
                 axis,
@@ -2631,6 +2754,8 @@ class TestReviewVerificationGates(unittest.TestCase):
         self.assertEqual(
             [
                 "frontend-toolchain",
+                "versions",
+                "audit",
                 "frontend-toolchain",
                 "run ci",
                 "exec vitest run tests/button.test.tsx",
@@ -2645,6 +2770,16 @@ class TestReviewVerificationGates(unittest.TestCase):
         with (
             mock.patch.object(axis, "verify_scope_paths", return_value=("working tree", ["frontend/e2e/register.pw.ts"])),
             mock.patch.object(axis, "check_frontend_toolchain", side_effect=lambda: calls.append("frontend-toolchain") or 0),
+            mock.patch.object(
+                axis,
+                "check_frontend_dependency_versions",
+                side_effect=lambda: calls.append("versions") or 0,
+            ),
+            mock.patch.object(
+                axis,
+                "check_frontend_vulnerable_packages",
+                side_effect=lambda: calls.append("audit") or 0,
+            ),
             mock.patch.object(axis, "frontend_toolchain_env", return_value={}),
             mock.patch.object(axis, "run_local_dev_browser", browser_runner),
             mock.patch.object(
@@ -2659,6 +2794,8 @@ class TestReviewVerificationGates(unittest.TestCase):
         self.assertEqual(
             [
                 "frontend-toolchain",
+                "versions",
+                "audit",
                 "frontend-toolchain",
                 "run ci",
             ],
@@ -3794,7 +3931,7 @@ class TestAxisCommandWrappers(unittest.TestCase):
     def test_frontend_gen_api_types_check_restores_stale_working_file(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             frontend = Path(temp)
-            generated = frontend / "src" / "lib" / "api-types.ts"
+            generated = frontend / "src" / "lib" / "api-generated" / "types.gen.ts"
             generated.parent.mkdir(parents=True)
             generated.write_text("current", encoding="utf-8")
 
@@ -4344,7 +4481,8 @@ class TestRepoSkillsGate(unittest.TestCase):
                     "\nhost browser --trust-local-ca local-dev up readiness.\n"
                     "Editing durable guidance **Requires** entering `$axis-doc-hygiene` before edit; "
                     "reuse an active handoff.\n"
-                    "Classify native prerequisites from an observed failure and enforce accepted-risk policy.\n"
+                    "Classify native prerequisites from an observed failure and enforce accepted-risk policy. "
+                    "Require exact direct versions and keep the scheduled workflow.\n"
                 )
 
                 issues = self.issues_for_skill(files)
@@ -4373,7 +4511,8 @@ class TestRepoSkillsGate(unittest.TestCase):
                     "\nhost browser --trust-local-ca local-dev up readiness.\n"
                     "Editing durable guidance **Requires** entering `$axis-doc-hygiene` before edit; "
                     "reuse an active handoff.\n"
-                    "Classify native prerequisites from an observed failure and enforce accepted-risk policy.\n"
+                    "Classify native prerequisites from an observed failure and enforce accepted-risk policy. "
+                    "Require exact direct versions and keep the scheduled workflow.\n"
                 )
 
                 issues = self.issues_for_skill(files)

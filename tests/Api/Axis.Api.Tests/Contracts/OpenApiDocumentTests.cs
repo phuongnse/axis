@@ -33,7 +33,7 @@ public class OpenApiDocumentTests(ApiTestFixture fixture)
             committed.Should().Be(
                 fresh,
                 "openapi.json drifted from the API. Run `python scripts/axis.py frontend gen-api-types` "
-                    + "to regenerate openapi.json and frontend/src/lib/api-types.ts, then commit both");
+                    + "to regenerate openapi.json and frontend/src/lib/api-generated, then commit both");
         }
     }
 

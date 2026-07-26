@@ -1,18 +1,18 @@
 import { Buffer } from 'node:buffer';
 import { expect, type Locator, type Page, test } from '@playwright/test';
-import type { components } from '../src/lib/api-types';
+import type * as ApiTypes from '../src/lib/api-generated';
 
-type CreateRuleRequest = components['schemas']['CreateRuleDefinitionRequest'];
-type RuleDetail = components['schemas']['RuleDefinitionDetailDto'];
-type RuleExpressionLanguage = components['schemas']['RuleExpressionLanguageDto'];
-type AssistRuleRequest = components['schemas']['AssistRuleExpressionRequest'];
-type RuleExpressionAuthoring = components['schemas']['RuleExpressionAuthoringDto'];
-type RuleExpressionCompletion = components['schemas']['RuleExpressionCompletionDto'];
-type RuleExpressionDisplay = components['schemas']['RuleExpressionDisplayNodeDto'];
-type RuleExpressionDisplayToken = components['schemas']['RuleExpressionDisplayTokenDto'];
-type RuleExpressionReferenceKind = components['schemas']['RuleExpressionReferenceKind'];
-type RuleVersion = components['schemas']['RuleDefinitionVersionDto'];
-type SaveRuleRequest = components['schemas']['SaveRuleDefinitionDraftRequest'];
+type CreateRuleRequest = ApiTypes.CreateRuleDefinitionRequest;
+type RuleDetail = ApiTypes.RuleDefinitionDetailDto;
+type RuleExpressionLanguage = ApiTypes.RuleExpressionLanguageDto;
+type AssistRuleRequest = ApiTypes.AssistRuleExpressionRequest;
+type RuleExpressionAuthoring = ApiTypes.RuleExpressionAuthoringDto;
+type RuleExpressionCompletion = ApiTypes.RuleExpressionCompletionDto;
+type RuleExpressionDisplay = ApiTypes.RuleExpressionDisplayNodeDto;
+type RuleExpressionDisplayToken = ApiTypes.RuleExpressionDisplayTokenDto;
+type RuleExpressionReferenceKind = ApiTypes.RuleExpressionReferenceKind;
+type RuleVersion = ApiTypes.RuleDefinitionVersionDto;
+type SaveRuleRequest = ApiTypes.SaveRuleDefinitionDraftRequest;
 
 const profile = {
   id: '11111111-1111-4111-8111-111111111111',

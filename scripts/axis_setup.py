@@ -18,7 +18,7 @@ from pathlib import Path, PurePosixPath
 from typing import Callable, Mapping, TextIO
 
 DOTNET_SDK_VERSION = "8.0.423"
-NODE_VERSION = "22.23.1"
+NODE_VERSION = "24.18.0"
 LYCHEE_VERSION = "0.23.0"
 GH_VERSION = "2.96.0"
 DOWNLOAD_TIMEOUT_SECONDS = 60

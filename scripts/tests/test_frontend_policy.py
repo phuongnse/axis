@@ -587,9 +587,9 @@ class TestFrontendApiContracts(unittest.TestCase):
         rc, stderr = self.run_frontend_api_contracts(
             {
                 "frontend/src/features/preferences/api.ts": (
-                    "import type { components } from '@/lib/api-types';\n"
+                    "import type * as ApiTypes from '@/lib/api-generated';\n"
                     "export type UpdateLanguagePreferenceRequest =\n"
-                    "  components['schemas']['UpdateUserLanguagePreferenceRequest'];\n"
+                    "  ApiTypes.UpdateUserLanguagePreferenceRequest;\n"
                 )
             }
         )

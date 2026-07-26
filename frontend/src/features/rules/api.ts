@@ -1,37 +1,35 @@
 import { queryOptions } from '@tanstack/react-query';
 import { fetchApi } from '@/lib/api';
-import type { components } from '@/lib/api-types';
+import type * as ApiTypes from '@/lib/api-generated';
 
-export type RuleDefinitionSummary = components['schemas']['RuleDefinitionSummaryDto'];
-export type RuleDefinitionsPage = components['schemas']['RuleDefinitionSummaryDtoPagedResult'];
-export type RuleDefinitionDetail = components['schemas']['RuleDefinitionDetailDto'];
-export type RuleContextSchema = components['schemas']['RuleContextSchemaDto'];
-export type RuleParameterDefinition = components['schemas']['RuleParameterDefinitionDto'];
-export type RuleSimulationResult = components['schemas']['RuleSimulationResultDto'];
-export type CreateRuleDefinitionRequest = components['schemas']['CreateRuleDefinitionRequest'];
-export type SaveRuleDefinitionDraftRequest =
-  components['schemas']['SaveRuleDefinitionDraftRequest'];
-export type SimulateRuleRequest = components['schemas']['SimulateRuleRequest'];
-export type RuleScope = components['schemas']['RuleScope'];
-export type RuleOrigin = components['schemas']['RuleOrigin'];
-export type RuleLifecycleStatus = components['schemas']['RuleLifecycleStatus'];
-export type RuleValueType = components['schemas']['RuleValueType'];
-export type RulePredicateOperator = components['schemas']['RulePredicateOperator'];
-export type RuleLogicalOperator = components['schemas']['RuleLogicalOperator'];
-export type RuleSeverity = components['schemas']['RuleSeverity'];
-export type RuleDecision = components['schemas']['RuleDecision'];
-export type RuleConditionNode = components['schemas']['RuleConditionNodeDto'];
-export type RuleOperand = components['schemas']['RuleOperandDto'];
-export type RuleExpressionLanguage = components['schemas']['RuleExpressionLanguageDto'];
-export type RuleExpressionFunction = components['schemas']['RuleExpressionFunction'];
-export type RuleExpressionCardinality = components['schemas']['RuleExpressionCardinality'];
-export type AssistRuleExpressionRequest = components['schemas']['AssistRuleExpressionRequest'];
-export type RuleExpressionAuthoring = components['schemas']['RuleExpressionAuthoringDto'];
-export type RuleExpressionCompletion = components['schemas']['RuleExpressionCompletionDto'];
-export type RuleExpressionDisplayNode = components['schemas']['RuleExpressionDisplayNodeDto'];
-export type RuleExpressionGuide = components['schemas']['RuleExpressionGuideDto'];
-export type SearchRuleExpressionGuideRequest =
-  components['schemas']['SearchRuleExpressionGuideRequest'];
+export type RuleDefinitionSummary = ApiTypes.RuleDefinitionSummaryDto;
+export type RuleDefinitionsPage = ApiTypes.RuleDefinitionSummaryDtoPagedResult;
+export type RuleDefinitionDetail = ApiTypes.RuleDefinitionDetailDto;
+export type RuleContextSchema = ApiTypes.RuleContextSchemaDto;
+export type RuleParameterDefinition = ApiTypes.RuleParameterDefinitionDto;
+export type RuleSimulationResult = ApiTypes.RuleSimulationResultDto;
+export type CreateRuleDefinitionRequest = ApiTypes.CreateRuleDefinitionRequest;
+export type SaveRuleDefinitionDraftRequest = ApiTypes.SaveRuleDefinitionDraftRequest;
+export type SimulateRuleRequest = ApiTypes.SimulateRuleRequest;
+export type RuleScope = ApiTypes.RuleScope;
+export type RuleOrigin = ApiTypes.RuleOrigin;
+export type RuleLifecycleStatus = ApiTypes.RuleLifecycleStatus;
+export type RuleValueType = ApiTypes.RuleValueType;
+export type RulePredicateOperator = ApiTypes.RulePredicateOperator;
+export type RuleLogicalOperator = ApiTypes.RuleLogicalOperator;
+export type RuleSeverity = ApiTypes.RuleSeverity;
+export type RuleDecision = ApiTypes.RuleDecision;
+export type RuleConditionNode = ApiTypes.RuleConditionNodeDto;
+export type RuleOperand = ApiTypes.RuleOperandDto;
+export type RuleExpressionLanguage = ApiTypes.RuleExpressionLanguageDto;
+export type RuleExpressionFunction = ApiTypes.RuleExpressionFunction;
+export type RuleExpressionCardinality = ApiTypes.RuleExpressionCardinality;
+export type AssistRuleExpressionRequest = ApiTypes.AssistRuleExpressionRequest;
+export type RuleExpressionAuthoring = ApiTypes.RuleExpressionAuthoringDto;
+export type RuleExpressionCompletion = ApiTypes.RuleExpressionCompletionDto;
+export type RuleExpressionDisplayNode = ApiTypes.RuleExpressionDisplayNodeDto;
+export type RuleExpressionGuide = ApiTypes.RuleExpressionGuideDto;
+export type SearchRuleExpressionGuideRequest = ApiTypes.SearchRuleExpressionGuideRequest;
 
 export interface RuleDefinitionFilters {
   page?: number;

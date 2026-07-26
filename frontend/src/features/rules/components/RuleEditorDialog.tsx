@@ -38,7 +38,7 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { ApiError } from '@/lib/api';
-import type { components } from '@/lib/api-types';
+import type * as ApiTypes from '@/lib/api-generated';
 import {
   archiveRuleDefinition,
   assistRuleExpression,
@@ -68,8 +68,8 @@ import { RuleExpressionGuide } from './RuleExpressionGuide';
 import { RuleExpressionView } from './RuleExpressionView';
 import { RuleOriginBadge } from './RuleOriginBadge';
 
-type RuleOutcomeKind = components['schemas']['RuleOutcomeKind'];
-type RuleValue = components['schemas']['RuleValueDto'];
+type RuleOutcomeKind = ApiTypes.RuleOutcomeKind;
+type RuleValue = ApiTypes.RuleValueDto;
 
 interface EditableParameter {
   id: string;
