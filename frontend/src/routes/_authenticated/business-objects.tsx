@@ -7,6 +7,7 @@ export type BusinessObjectsDialogMode = 'create' | 'edit' | 'view';
 
 export interface BusinessObjectsRouteSearch {
   page: number;
+  query?: string;
   dialog?: BusinessObjectsDialogMode;
   recordId?: string;
 }
@@ -38,8 +39,11 @@ function validateBusinessObjectsSearch(
   const recordId =
     typeof search.recordId === 'string' && search.recordId ? search.recordId : undefined;
 
+  const query = typeof search.query === 'string' && search.query.trim() ? search.query : undefined;
+
   return {
     page,
+    ...(query ? { query } : {}),
     ...(dialog ? { dialog } : {}),
     ...(recordId ? { recordId } : {}),
   };

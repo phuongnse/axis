@@ -40,3 +40,12 @@ API fixtures must create and isolate the module databases/schemas required by th
 - Use Playwright for browser-level journeys and layout-sensitive flows.
 - Prefer `userEvent` over implementation-level event calls.
 - Mock network edges, not product behavior.
+
+### Browser journeys
+
+- Give each Playwright test one independently runnable user outcome. Do not share mutable state or require test order.
+- Keep one thin cross-layer happy path per use case. Put lifecycle branches, recovery, read-only discovery, and responsive behavior in separate focused journeys only when a browser boundary is required.
+- Prove component variants, detailed control behavior, semantic markup, and exact visual composition with component tests. Browser tests cover routing, real browser interaction, cross-layer integration, keyboard behavior, layout/overflow, and console health without repeating the component matrix.
+- Use web-first assertions against observable URL, response, busy, content, focus, or visibility changes. Fixed sleeps and local test-timeout overrides are forbidden; a timeout means fix the wait or split the journey. A bounded assertion or external-system poll may use an explicit timeout when the behavior itself requires that budget.
+- Keep network mocks at the API boundary and make them honor server-owned query, paging, and metadata semantics. A browser mock must not restore retired client behavior.
+- During development, run the affected test title or file. At review, run the browser journeys triggered by the diff and its owning acceptance evidence. Run the full browser suite only in CI or when a cross-cutting change invalidates every browser surface.

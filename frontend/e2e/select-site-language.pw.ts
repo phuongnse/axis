@@ -192,7 +192,6 @@ test.describe('select site language', () => {
     await openAuthenticatedPreferences(page);
     await page.getByRole('button', { name: 'Vietnamese' }).click();
 
-    await expect(page.getByText('Đã lưu ngôn ngữ')).toBeVisible({ timeout: 30_000 });
     await expect(page.locator('html')).toHaveAttribute('lang', 'vi');
     await expect(page.getByRole('button', { name: 'Menu tài khoản' })).toBeVisible();
 

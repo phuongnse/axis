@@ -12,6 +12,8 @@ This file owns durable source and runtime boundaries. Current behavior lives in 
 - Modules may expose optional `Axis.{Module}.Contracts` projects for stable cross-module contracts; consumers may reference another module's Contracts project only, not its Domain, Application, or Infrastructure projects.
 - Module Domain models follow DDD tactical boundaries; aggregate roots own invariants and domain events.
 - Module Application exposes CQRS commands and side-effect-free queries through handlers.
+- Server-owned search is a CQRS read-side pattern: module Application owns searchable intent and provider ports, Infrastructure owns read-store translation and indexes, and shared code may contain storage-neutral primitives only.
+- Cross-module global search, when required by an owning contract, uses one materialized read model built from published module contracts rather than querying module internals or merging provider-native scores.
 - Domain projects have zero external dependencies.
 - `Axis.Shared.*` is for shared primitives and cross-cutting helpers only, not product behavior.
 - Module-owned data changes use EF Core migrations.

@@ -14,6 +14,7 @@ namespace Axis.Rules.Application.Commands.SaveRuleDefinitionDraft;
 public sealed class SaveRuleDefinitionDraftHandler(
     ICurrentUser currentUser,
     RuleContextSchemaRegistry contextSchemas,
+    RuleExpressionAuthoringService expressionAuthoring,
     IRuleDefinitionRepository repository,
     IUnitOfWork unitOfWork)
     : ICommandHandler<SaveRuleDefinitionDraftCommand, RuleDefinitionDetailDto>
@@ -46,9 +47,30 @@ public sealed class SaveRuleDefinitionDraftHandler(
         if (contextSchema is null || contextSchema.Scope != (DomainScope)command.Scope)
             return RuleDefinitionFailures.Invalid<RuleDefinitionDetailDto>("Rule context schema is unavailable or incompatible.");
 
+        Result<RuleExpressionAuthoringDto> authored = await expressionAuthoring.AssistAsync(
+            workspaceId,
+            new AssistRuleExpressionRequest(
+                RuleExpressionLanguage.Version,
+                command.ContextKey,
+                command.ContextSchemaVersion,
+                command.Parameters,
+                command.ExpressionSyntax,
+                Condition: null,
+                command.ExpressionSyntax.Length,
+                Language: "en"),
+            cancellationToken);
+        if (authored.IsFailure)
+            return RuleDefinitionFailures.Invalid<RuleDefinitionDetailDto>(authored.Error);
+        if (authored.Value.Condition is null)
+        {
+            string detail = authored.Value.Diagnostics.FirstOrDefault()?.Message ??
+                "Rule expression syntax is invalid.";
+            return RuleDefinitionFailures.Invalid<RuleDefinitionDetailDto>(detail);
+        }
+
         Result<RuleDraftInput> input = RuleDraftInputMapper.Map(
             command.Parameters,
-            command.Condition,
+            authored.Value.Condition,
             command.Outcome);
         if (input.IsFailure)
             return RuleDefinitionFailures.Invalid<RuleDefinitionDetailDto>(input.Error);

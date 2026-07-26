@@ -13,5 +13,13 @@ public sealed class ListBusinessObjectDefinitionsQueryValidator : AbstractValida
         RuleFor(query => query.PageSize)
             .InclusiveBetween(1, 100)
             .WithErrorCode(BusinessObjectsProblemCodes.BusinessObjectDefinitionInvalid);
+
+        RuleFor(query => query.SearchQuery)
+            .MaximumLength(200)
+            .WithErrorCode(BusinessObjectsProblemCodes.BusinessObjectDefinitionInvalid);
+
+        RuleFor(query => query.Language)
+            .MaximumLength(16)
+            .WithErrorCode(BusinessObjectsProblemCodes.BusinessObjectDefinitionInvalid);
     }
 }

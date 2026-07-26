@@ -5,7 +5,6 @@ import {
   functionalUpdate,
   getCoreRowModel,
   getExpandedRowModel,
-  getFilteredRowModel,
   getGroupedRowModel,
   getPaginationRowModel,
   getSortedRowModel,
@@ -77,7 +76,6 @@ import {
   countFilterConditions,
   createEmptyFilterExpression,
   filterData,
-  normalizeSearchValue,
   pruneFilterExpression,
 } from './filtering';
 import type { DataTableDefinition, DataTableMessages, DataTableQueryState } from './types';
@@ -194,12 +192,11 @@ export function DataTable<TData>({ definition }: { definition: DataTableDefiniti
     getSubRows: definition.getSubRows,
     getRowCanExpand: definition.renderDetail ? () => true : undefined,
     getCoreRowModel: getCoreRowModel(),
-    getFilteredRowModel: clientMode ? getFilteredRowModel() : undefined,
     getSortedRowModel: clientMode ? getSortedRowModel() : undefined,
     getGroupedRowModel: clientMode ? getGroupedRowModel() : undefined,
     getExpandedRowModel: getExpandedRowModel(),
     getPaginationRowModel: clientNumberedPagination ? getPaginationRowModel() : undefined,
-    manualFiltering: !clientMode,
+    manualFiltering: true,
     manualSorting: !clientMode,
     manualGrouping: !clientMode,
     manualPagination: source.mode === 'page',
@@ -209,16 +206,6 @@ export function DataTable<TData>({ definition }: { definition: DataTableDefiniti
     enableColumnResizing: definition.enableColumnResizing ?? false,
     columnResizeMode: 'onChange',
     enableRowSelection: definition.enableRowSelection,
-    getColumnCanGlobalFilter: (column) =>
-      column.columnDef.meta?.searchable !== false && Boolean(column.columnDef.meta?.label),
-    globalFilterFn: (row, columnId, filterValue) => {
-      if (columnVisibility[columnId] === false) return false;
-      const cell = row.getAllCells().find((candidate) => candidate.column.id === columnId);
-      const value = cell?.column.columnDef.meta?.searchValue
-        ? cell.column.columnDef.meta.searchValue(row.original)
-        : row.getValue(columnId);
-      return normalizeSearchValue(value).includes(normalizeSearchValue(filterValue));
-    },
     state: {
       globalFilter: query.globalFilter,
       sorting: query.sorting,
@@ -299,7 +286,7 @@ export function DataTable<TData>({ definition }: { definition: DataTableDefiniti
       <DataTableToolbar
         table={table}
         messages={messages}
-        globalSearch={definition.globalSearch ?? true}
+        globalSearch={definition.globalSearch ?? false}
         columnControls={definition.columnControls ?? true}
         grouping={definition.grouping ?? false}
         filterExpression={query.filterExpression}
@@ -746,7 +733,7 @@ function DataTableFooter<TData>({
       ? source.rowCount
       : source.mode === 'infinite'
         ? (source.totalRowCount ?? source.data.length)
-        : table.getFilteredRowModel().rows.length;
+        : table.getCoreRowModel().rows.length;
   const pageCount = Math.max(table.getPageCount(), 1);
   const page = Math.min(table.getState().pagination.pageIndex + 1, pageCount);
   const pageSizeOptions =

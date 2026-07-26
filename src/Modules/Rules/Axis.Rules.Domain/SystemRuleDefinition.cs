@@ -64,8 +64,7 @@ public sealed record SystemRuleDefinition
     private SystemRuleDefinition(
         RuleDefinitionKey key,
         int version,
-        string displayName,
-        string description,
+        RuleReferenceDocumentation documentation,
         RuleScope scope,
         RuleOutcomeKind outcomeKind,
         RuleApplicability applicability,
@@ -76,8 +75,7 @@ public sealed record SystemRuleDefinition
     {
         Key = key;
         Version = version;
-        DisplayName = displayName;
-        Description = description;
+        Documentation = documentation;
         Scope = scope;
         OutcomeKind = outcomeKind;
         Applicability = applicability;
@@ -89,8 +87,9 @@ public sealed record SystemRuleDefinition
 
     public RuleDefinitionKey Key { get; }
     public int Version { get; }
-    public string DisplayName { get; }
-    public string Description { get; }
+    public RuleReferenceDocumentation Documentation { get; }
+    public string DisplayName => Documentation.Locales["en"].DisplayName;
+    public string Description => Documentation.Locales["en"].Summary;
     public RuleOrigin Origin => RuleOrigin.System;
     public RuleScope Scope { get; }
     public RuleOutcomeKind OutcomeKind { get; }
@@ -104,8 +103,7 @@ public sealed record SystemRuleDefinition
     public static Result<SystemRuleDefinition> Create(
         string key,
         int version,
-        string displayName,
-        string description,
+        RuleReferenceDocumentation documentation,
         RuleScope scope,
         RuleOutcomeKind outcomeKind,
         RuleApplicability applicability,
@@ -121,11 +119,11 @@ public sealed record SystemRuleDefinition
         if (version <= 0)
             return Result.Failure<SystemRuleDefinition>("System rule version must be positive.");
 
-        if (string.IsNullOrWhiteSpace(displayName))
-            return Result.Failure<SystemRuleDefinition>("System rule display name is required.");
-
-        if (string.IsNullOrWhiteSpace(description))
-            return Result.Failure<SystemRuleDefinition>("System rule description is required.");
+        if (documentation is null || !documentation.IsComplete("en", "vi"))
+        {
+            return Result.Failure<SystemRuleDefinition>(
+                "System rule documentation must define complete en and vi references.");
+        }
 
         if (!Enum.IsDefined(scope) || !Enum.IsDefined(outcomeKind))
             return Result.Failure<SystemRuleDefinition>("System rule scope or outcome is not supported.");
@@ -148,8 +146,7 @@ public sealed record SystemRuleDefinition
         return new SystemRuleDefinition(
             definitionKey.Value,
             version,
-            displayName.Trim(),
-            description.Trim(),
+            documentation,
             scope,
             outcomeKind,
             applicability,

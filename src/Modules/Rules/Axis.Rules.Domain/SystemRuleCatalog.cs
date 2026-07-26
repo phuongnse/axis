@@ -145,8 +145,7 @@ public static class SystemRuleCatalog
         Result<SystemRuleDefinition> definition = SystemRuleDefinition.Create(
             key,
             version: 1,
-            displayName,
-            description,
+            Documentation(key, displayName, description),
             RuleScope.Field,
             RuleOutcomeKind.Validation,
             applicability.Value,
@@ -157,6 +156,97 @@ public static class SystemRuleCatalog
         return definition.IsSuccess
             ? definition.Value
             : throw new InvalidOperationException(definition.Error);
+    }
+
+    private static RuleReferenceDocumentation Documentation(
+        string key,
+        string englishName,
+        string englishSummary)
+    {
+        (
+            string vietnameseName,
+            string vietnameseSummary,
+            string englishUsage,
+            string vietnameseUsage,
+            string englishExample,
+            string vietnameseExample) =
+            key switch
+            {
+                "field.required" => (
+                    "Giá trị bắt buộc",
+                    "Bắt buộc bản ghi cung cấp giá trị cho trường.",
+                    "No setup needed.",
+                    "Không cần cấu hình.",
+                    "A customer name cannot be left blank.",
+                    "Tên khách hàng không được để trống."),
+                "field.numeric_range" => (
+                    "Khoảng số",
+                    "Giới hạn số nguyên hoặc số thập phân bằng khoảng tùy chọn.",
+                    "Configure optional minimum and maximum values.",
+                    "Cấu hình giá trị nhỏ nhất và lớn nhất tùy chọn.",
+                    "A discount must stay between 0 and 100.",
+                    "Mức giảm giá phải nằm trong khoảng từ 0 đến 100."),
+                "field.decimal_precision" => (
+                    "Độ chính xác thập phân",
+                    "Giới hạn precision và scale của số thập phân.",
+                    "Configure precision and scale.",
+                    "Cấu hình precision và scale.",
+                    "A price allows up to 12 digits with 2 decimal places.",
+                    "Giá cho phép tối đa 12 chữ số với 2 chữ số thập phân."),
+                "field.date_range" => (
+                    "Khoảng ngày",
+                    "Giới hạn ngày bằng giá trị sớm nhất và muộn nhất tùy chọn.",
+                    "Configure optional earliest and latest dates.",
+                    "Cấu hình ngày sớm nhất và muộn nhất tùy chọn.",
+                    "A booking date must fall within the current year.",
+                    "Ngày đặt chỗ phải nằm trong năm hiện tại."),
+                "field.datetime_range" => (
+                    "Khoảng ngày giờ",
+                    "Giới hạn thời điểm ngày giờ bằng offset rõ ràng.",
+                    "Configure optional earliest and latest instants.",
+                    "Cấu hình thời điểm sớm nhất và muộn nhất tùy chọn.",
+                    "A submission must occur before the closing instant.",
+                    "Bài gửi phải được thực hiện trước thời điểm đóng."),
+                "field.text_length" => (
+                    "Độ dài văn bản",
+                    "Giới hạn văn bản bằng độ dài tối thiểu và tối đa tùy chọn.",
+                    "Configure optional minimum and maximum length.",
+                    "Cấu hình độ dài tối thiểu và tối đa tùy chọn.",
+                    "A summary must contain between 20 and 200 characters.",
+                    "Phần tóm tắt phải có từ 20 đến 200 ký tự."),
+                "field.text_pattern" => (
+                    "Mẫu văn bản",
+                    "Bắt buộc văn bản khớp pattern đã cấu hình.",
+                    "Configure the required regular-expression pattern.",
+                    "Cấu hình pattern biểu thức chính quy bắt buộc.",
+                    "An order code must match the configured code pattern.",
+                    "Mã đơn hàng phải khớp mẫu mã đã cấu hình."),
+                "field.text_format" => (
+                    "Định dạng văn bản",
+                    "Bắt buộc văn bản dùng định dạng email, URL hoặc UUID được hỗ trợ.",
+                    "Choose a supported text format.",
+                    "Chọn một định dạng văn bản được hỗ trợ.",
+                    "A contact address must use a valid email format.",
+                    "Địa chỉ liên hệ phải dùng định dạng email hợp lệ."),
+                "field.choice_selection_count" => (
+                    "Số lượng lựa chọn",
+                    "Giới hạn số lựa chọn của trường chọn nhiều.",
+                    "Configure optional minimum and maximum selections.",
+                    "Cấu hình số lựa chọn tối thiểu và tối đa tùy chọn.",
+                    "A preference field requires one to three selections.",
+                    "Trường sở thích yêu cầu từ một đến ba lựa chọn."),
+                _ => throw new InvalidOperationException($"System rule documentation is missing for '{key}'."),
+            };
+
+        return RuleReferenceDocumentation.Bilingual(
+            englishName,
+            englishSummary,
+            englishUsage,
+            englishExample,
+            vietnameseName,
+            vietnameseSummary,
+            vietnameseUsage,
+            vietnameseExample);
     }
 
     private static RuleParameterDefinition Parameter(

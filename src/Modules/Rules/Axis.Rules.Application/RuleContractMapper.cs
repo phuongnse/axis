@@ -44,7 +44,8 @@ internal static class RuleContractMapper
             ContextSchemaVersion: null,
             ToDto(definition.Applicability),
             definition.Parameters.Select(ToDto).ToArray(),
-            UpdatedAt: null);
+            UpdatedAt: null,
+            ToDto(definition.Documentation));
 
     public static RuleDefinitionSummaryDto ToSummaryDto(RuleDefinition definition) =>
         new(
@@ -62,7 +63,8 @@ internal static class RuleContractMapper
             definition.ContextSchemaVersion,
             Applicability: null,
             definition.Parameters.Select(ToDto).ToArray(),
-            definition.UpdatedAt);
+            definition.UpdatedAt,
+            Documentation: null);
 
     public static RuleDefinitionDetailDto ToDetailDto(RuleDefinition definition) =>
         new(
@@ -85,7 +87,8 @@ internal static class RuleContractMapper
             definition.Versions.OrderBy(version => version.Version).Select(ToDto).ToArray(),
             definition.CreatedAt,
             definition.UpdatedAt,
-            definition.ArchivedAt);
+            definition.ArchivedAt,
+            Documentation: null);
 
     public static RuleDefinitionDetailDto ToDetailDto(SystemRuleDefinition definition) =>
         new(
@@ -108,7 +111,8 @@ internal static class RuleContractMapper
             Versions: [],
             CreatedAt: null,
             UpdatedAt: null,
-            ArchivedAt: null);
+            ArchivedAt: null,
+            ToDto(definition.Documentation));
 
     public static RuleDefinitionVersionDto ToDto(RuleDefinitionVersion version) =>
         new(
@@ -131,6 +135,11 @@ internal static class RuleContractMapper
             RuleExpressionLanguage.Version,
             RuleExpressionLanguage.Operators.Select(ToDto).ToArray(),
             RuleExpressionLanguage.Functions.Select(ToDto).ToArray(),
+            RuleExpressionLanguage.LogicalOperators.Select(ToDto).ToArray(),
+            RuleExpressionLanguage.OperandKinds.Select(ToDto).ToArray(),
+            RuleExpressionLanguage.ValueTypes.Select(ToDto).ToArray(),
+            RuleExpressionLanguage.Cardinalities.Select(ToDto).ToArray(),
+            RuleExpressionLanguage.Limits.Select(ToDto).ToArray(),
             new RuleExpressionLimitsDto(
                 RuleEvaluationLimits.Default.MaxDepth,
                 RuleEvaluationLimits.Default.MaxNodes,
@@ -205,7 +214,8 @@ internal static class RuleContractMapper
                 field.Path,
                 field.DisplayName,
                 (ContractValueType)field.Type,
-                field.AllowMultiple)).ToArray(),
+                field.AllowMultiple,
+                ToDto(field.Documentation))).ToArray(),
             schema.TargetTypeKey,
             schema.Configuration);
 
@@ -218,6 +228,7 @@ internal static class RuleContractMapper
                 fieldDto.Path,
                 fieldDto.DisplayName,
                 (DomainValueType)fieldDto.Type,
+                ToDomain(fieldDto.Documentation),
                 fieldDto.AllowMultiple);
             if (field.IsFailure)
                 return Result.Failure<RuleContextSchema>(field.Error);
@@ -339,7 +350,8 @@ internal static class RuleContractMapper
             (ContractPredicateOperator)definition.Operator,
             definition.LeftShapes.Select(ToDto).ToArray(),
             definition.RightShapes.Select(ToDto).ToArray(),
-            definition.RequiresMatchingTypes);
+            definition.RequiresMatchingTypes,
+            ToDto(definition.Documentation));
 
     private static RuleExpressionValueShapeDto ToDto(RuleExpressionValueShape shape) =>
         new(
@@ -352,13 +364,71 @@ internal static class RuleContractMapper
             (ContractExpressionFunction)definition.Function,
             definition.Parameters.Select(ToDto).ToArray(),
             (ContractValueType)definition.ReturnType,
-            (ContractExpressionCardinality)definition.ReturnCardinality);
+            (ContractExpressionCardinality)definition.ReturnCardinality,
+            ToDto(definition.Documentation));
 
     private static RuleExpressionFunctionParameterDto ToDto(
         RuleExpressionFunctionParameter parameter) =>
         new(
             parameter.AcceptedTypes.Select(type => (ContractValueType)type).ToArray(),
             (ContractExpressionCardinality)parameter.Cardinality);
+
+    private static RuleLogicalOperatorDefinitionDto ToDto(
+        RuleLogicalOperatorDefinition definition) =>
+        new(
+            (ContractLogicalOperator)definition.Operator,
+            definition.MinimumChildren,
+            definition.MaximumChildren,
+            ToDto(definition.Documentation));
+
+    private static RuleOperandKindDefinitionDto ToDto(
+        RuleOperandKindDefinition definition) =>
+        new(
+            (ContractOperandKind)definition.Kind,
+            ToDto(definition.Documentation));
+
+    private static RuleValueTypeDefinitionDto ToDto(
+        RuleValueTypeDefinition definition) =>
+        new(
+            (ContractValueType)definition.Type,
+            ToDto(definition.Documentation));
+
+    private static RuleExpressionCardinalityDefinitionDto ToDto(
+        RuleExpressionCardinalityDefinition definition) =>
+        new(
+            (ContractExpressionCardinality)definition.Cardinality,
+            ToDto(definition.Documentation));
+
+    private static RuleExpressionLimitDefinitionDto ToDto(
+        RuleExpressionLimitDefinition definition) =>
+        new(
+            definition.Key,
+            definition.Value,
+            ToDto(definition.Documentation));
+
+    private static RuleReferenceDocumentationDto ToDto(
+        RuleReferenceDocumentation documentation) =>
+        new(
+            documentation.Locales.ToDictionary(
+                entry => entry.Key,
+                entry => new RuleReferenceContentDto(
+                    entry.Value.DisplayName,
+                    entry.Value.Summary,
+                    entry.Value.Usage,
+                    entry.Value.Examples),
+                StringComparer.OrdinalIgnoreCase));
+
+    private static RuleReferenceDocumentation ToDomain(
+        RuleReferenceDocumentationDto documentation) =>
+        new(
+            documentation.Locales.ToDictionary(
+                entry => entry.Key,
+                entry => new RuleReferenceContent(
+                    entry.Value.DisplayName,
+                    entry.Value.Summary,
+                    entry.Value.Usage,
+                    entry.Value.Examples),
+                StringComparer.OrdinalIgnoreCase));
 
     private static Result<RuleOperand> ToDomainLiteral(RuleValueDto? literal)
     {

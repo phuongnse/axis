@@ -32,7 +32,7 @@ sys.dont_write_bytecode = True
 ROOT = Path(__file__).resolve().parent.parent
 SCRIPTS = ROOT / "scripts"
 REQUIRED_DOTNET_SDK_MAJOR = "8"
-REQUIRED_RENOVATE_VALIDATOR_VERSION = "42.99.0"
+REQUIRED_RENOVATE_VALIDATOR_VERSION = "43.280.5"
 MINIMUM_CODERABBIT_CLI_VERSION = "0.6.0"
 VERSION_PROBE_TIMEOUT_SECONDS = 15
 PLAYWRIGHT_BROWSER_PROBE_TIMEOUT_SECONDS = 20
@@ -80,6 +80,7 @@ from axis_dependency_policy import evaluate_npm_audit  # noqa: E402
 from axis_frontend_policy import (  # noqa: E402
     check_frontend_quality,
     frontend_component_file_name_issues,
+    frontend_e2e_structure_issues,
     frontend_form_schema_type_issues,
     frontend_public_route_navigation_issues,
     frontend_quality_issues,
@@ -614,6 +615,69 @@ def check_vulnerable_packages(_args: argparse.Namespace | None = None) -> int:
     return 0
 
 
+EXACT_NPM_VERSION_RE = re.compile(
+    r"^(?:0|[1-9]\d*)[.](?:0|[1-9]\d*)[.](?:0|[1-9]\d*)"
+    r"(?:-[0-9A-Za-z.-]+)?(?:[+][0-9A-Za-z.-]+)?$"
+)
+
+
+def check_frontend_dependency_versions(_args: argparse.Namespace | None = None) -> int:
+    package_path = ROOT / "frontend" / "package.json"
+    try:
+        package = json.loads(package_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        print(
+            f"check-frontend-dependency-versions: FAIL - cannot read {path_label(package_path)}: {exc}",
+            file=sys.stderr,
+        )
+        return 1
+
+    issues: list[str] = []
+    package_manager = package.get("packageManager")
+    if not isinstance(package_manager, str) or re.fullmatch(
+        r"npm@(?:0|[1-9]\d*)[.](?:0|[1-9]\d*)[.](?:0|[1-9]\d*)",
+        package_manager,
+    ) is None:
+        issues.append(f"packageManager must pin one exact npm version, found {package_manager!r}")
+
+    try:
+        node_version = NVMRC_PATH.read_text(encoding="utf-8").strip().removeprefix("v")
+    except OSError as exc:
+        issues.append(f"cannot read {path_label(NVMRC_PATH)}: {exc}")
+        node_version = ""
+    if EXACT_NPM_VERSION_RE.fullmatch(node_version) is None:
+        issues.append(f"{path_label(NVMRC_PATH)} must pin one exact Node version")
+    elif node_version != axis_setup.NODE_VERSION:
+        issues.append(
+            f"{path_label(NVMRC_PATH)} pins {node_version}, but portable setup pins {axis_setup.NODE_VERSION}"
+        )
+
+    dockerfile_path = ROOT / "frontend" / "Dockerfile.dev"
+    try:
+        dockerfile = dockerfile_path.read_text(encoding="utf-8")
+    except OSError as exc:
+        issues.append(f"cannot read {path_label(dockerfile_path)}: {exc}")
+    else:
+        if f"FROM node:{node_version}-alpine" not in dockerfile:
+            issues.append(f"{path_label(dockerfile_path)} must use node:{node_version}-alpine")
+
+    for section in ("dependencies", "devDependencies", "overrides"):
+        entries = package.get(section, {})
+        if not isinstance(entries, dict):
+            issues.append(f"{section} must be an object")
+            continue
+        for name, version in sorted(entries.items()):
+            if not isinstance(version, str) or EXACT_NPM_VERSION_RE.fullmatch(version) is None:
+                issues.append(f"{section}.{name} must use one exact npm version, found {version!r}")
+
+    if issues:
+        for issue in issues:
+            print(f"check-frontend-dependency-versions: FAIL - {issue}", file=sys.stderr)
+        return 1
+    print("check-frontend-dependency-versions: OK")
+    return 0
+
+
 def check_frontend_vulnerable_packages(_args: argparse.Namespace | None = None) -> int:
     rc = check_frontend_toolchain()
     if rc != 0:
@@ -714,16 +778,24 @@ def check_ef_domain_mapping(_args: argparse.Namespace | None = None) -> int:
 
 def check_frontend_api_contracts(_args: argparse.Namespace | None = None) -> int:
     pattern = re.compile(r"(^|\s)(export\s+)?(interface|type)\s+[A-Za-z0-9_]*(Request|Response|Dto)\b")
-    generated_contract_pattern = re.compile(r"(components|operations)\[['\"]")
+    generated_contract_pattern = re.compile(r"(components|operations)\[['\"]|ApiTypes[.]")
     issues: list[str] = []
     root = ROOT / "frontend" / "src"
     for path in iter_files(root, (".ts", ".tsx")):
         normalized = rel(path)
-        if normalized.endswith("frontend/src/lib/api-types.ts") or normalized.endswith("frontend/src/routeTree.gen.ts"):
+        if normalized.startswith("frontend/src/lib/api-generated/") or normalized.endswith("frontend/src/routeTree.gen.ts"):
             continue
         text = path.read_text(encoding="utf-8")
         lines = text.splitlines()
+        in_import = False
         for idx, line in enumerate(lines, 1):
+            stripped = line.lstrip()
+            if stripped.startswith("import "):
+                in_import = ";" not in line
+                continue
+            if in_import:
+                in_import = ";" not in line
+                continue
             if not pattern.search(line):
                 continue
             statement = line
@@ -738,7 +810,7 @@ def check_frontend_api_contracts(_args: argparse.Namespace | None = None) -> int
         for hit in issues:
             print(
                 "check-frontend-api-contracts FAIL: Hand-authored frontend API model. "
-                f"Import/alias from generated api-types.ts instead: {hit}",
+                f"Import/alias from frontend/src/lib/api-generated instead: {hit}",
                 file=sys.stderr,
             )
         print("\nRun python scripts/axis.py generate api-contracts after API contract changes.", file=sys.stderr)
@@ -1355,6 +1427,8 @@ def repo_skill_verification_scope_issues(
             "native prerequisites",
             "observed failure",
             "accepted-risk",
+            "exact direct versions",
+            "scheduled workflow",
         )
         if any(fragment not in text for fragment in dependency_policy_fragments):
             issues.append(
@@ -1834,6 +1908,7 @@ def enforcement_truth_required_snippets() -> list[tuple[Path, list[tuple[str, st
             ("python scripts/axis.py dotnet test -- --no-build", "full .NET test suite runs in CI through the Axis wrapper"),
             ("node-version-file: frontend/.nvmrc", "frontend CI setup uses the documented Node source"),
             ("run: python scripts/axis.py frontend install", "frontend dependencies install through the Axis wrapper"),
+            ("run: python scripts/axis.py check frontend-dependency-versions", "frontend direct dependencies are exactly pinned"),
             ("run: python scripts/axis.py check frontend-vulnerable-packages", "frontend dependency vulnerability gate runs in CI"),
             ("run: python scripts/axis.py frontend gen-api-types --check", "frontend API type generation runs in CI through the Axis wrapper"),
             ("run: python scripts/axis.py check ui-baseline", "approved frontend UI baseline is checked in CI"),
@@ -1849,11 +1924,24 @@ def enforcement_truth_required_snippets() -> list[tuple[Path, list[tuple[str, st
         ],
     ),
     (
+        Path(".github/workflows/dependency-security.yml"),
+        [
+            ("schedule:", "dependency security audit runs on a schedule"),
+            ("workflow_dispatch:", "dependency security audit can be started manually"),
+            ("run: python scripts/axis.py dotnet restore", "scheduled audit restores the locked .NET graph"),
+            ("run: python scripts/axis.py check vulnerable-packages", "scheduled audit checks NuGet advisories"),
+            ("run: python scripts/axis.py frontend install", "scheduled audit installs the locked frontend graph"),
+            ("run: python scripts/axis.py check frontend-dependency-versions", "scheduled audit checks exact frontend versions"),
+            ("run: python scripts/axis.py check frontend-vulnerable-packages", "scheduled audit checks npm advisories"),
+        ],
+    ),
+    (
         Path("scripts/axis.py"),
         [
             ('step(".NET SDK", lambda: check_dotnet_sdk())', "local verify checks the documented .NET SDK before dotnet commands"),
             ('step("frontend toolchain", lambda: check_frontend_toolchain())', "local verify checks the documented Node source before npm commands"),
-            ('step("frontend vulnerable packages", lambda: check_frontend_vulnerable_packages())', "local verify audits changed frontend dependency manifests"),
+            ('step("frontend dependency versions", lambda: check_frontend_dependency_versions())', "local verify checks exact frontend dependency versions"),
+            ('step("frontend vulnerable packages", lambda: check_frontend_vulnerable_packages())', "local verify audits every changed frontend surface"),
             ("dotnet_projects_for_changed_paths(paths)", "local verify routes .NET work by changed project paths"),
             ('step("policy gate tests", lambda: check_policy_tests())', "local verify runs policy gate tests when scripts change"),
             ('step("doc navigation", lambda: check_doc_navigation())', "local verify runs docs checks when docs change"),
@@ -1906,7 +1994,10 @@ def enforcement_truth_required_snippets() -> list[tuple[Path, list[tuple[str, st
     (
         Path("frontend/package.json"),
         [
-            ('"gen:api-types": "openapi-typescript ../openapi.json -o src/lib/api-types.ts"', "frontend API types generate from committed openapi.json"),
+            (
+                '"gen:api-types": "openapi-ts -i ../openapi.json -o src/lib/api-generated -p @hey-api/typescript"',
+                "frontend API types generate from committed openapi.json",
+            ),
         ],
     ),
     (
@@ -2229,12 +2320,22 @@ def version_major(version_line: str) -> str | None:
 
 
 def required_node_major() -> tuple[bool, str]:
+    ok, version_or_error = required_node_version()
+    if not ok:
+        return False, version_or_error
+    major = version_major(version_or_error)
+    if major is None:
+        return False, f"{rel(NVMRC_PATH)} must contain an exact Node semver version"
+    return True, major
+
+
+def required_node_version() -> tuple[bool, str]:
     if not NVMRC_PATH.is_file():
         return False, f"missing {rel(NVMRC_PATH)}"
     text = NVMRC_PATH.read_text(encoding="utf-8").strip()
-    match = re.fullmatch(r"v?([0-9]+)(?:[.][0-9]+)*", text)
+    match = re.fullmatch(r"v?((?:0|[1-9]\d*)[.](?:0|[1-9]\d*)[.](?:0|[1-9]\d*))", text)
     if match is None:
-        return False, f"{rel(NVMRC_PATH)} must contain a Node major or semver version"
+        return False, f"{rel(NVMRC_PATH)} must contain an exact Node semver version"
     return True, match.group(1)
 
 
@@ -2374,26 +2475,29 @@ def _nvm_node_bin_dirs(expected_major: str) -> list[Path]:
 
 
 def frontend_toolchain_env() -> dict[str, str]:
-    expected_ok, expected_or_error = required_node_major()
+    expected_ok, expected_or_error = required_node_version()
     if not expected_ok:
         return {}
 
     expected = expected_or_error
+    expected_major = version_major(expected)
+    if expected_major is None:
+        return {}
     node_ok, node_version, node_resolved = command_version_line("node", "--version")
     npm_ok, _npm_version, npm_resolved = command_version_line("npm", "--version")
     if (
         node_ok
         and npm_ok
-        and version_major(node_version) == expected
+        and node_version.removeprefix("v") == expected
         and Path(node_resolved).parent.resolve() == Path(npm_resolved).parent.resolve()
     ):
         return {"PATH": _path_with_prefix(Path(node_resolved).parent)}
 
-    for bin_dir in _nvm_node_bin_dirs(expected):
+    for bin_dir in _nvm_node_bin_dirs(expected_major):
         env = {"PATH": _path_with_prefix(bin_dir)}
         node_ok, node_version, _node_resolved = command_version_line("node", "--version", env=env)
         npm_ok, _npm_version, _npm_resolved = command_version_line("npm", "--version", env=env)
-        if node_ok and npm_ok and version_major(node_version) == expected:
+        if node_ok and npm_ok and node_version.removeprefix("v") == expected:
             return env
 
     return {}
@@ -2462,7 +2566,7 @@ def check_dotnet_sdk(_args: argparse.Namespace | None = None) -> int:
 
 
 def node_version_status(env: dict[str, str] | None = None) -> tuple[bool, str]:
-    expected_ok, expected_or_error = required_node_major()
+    expected_ok, expected_or_error = required_node_version()
     if not expected_ok:
         return False, f"{expected_or_error}; fix the documented Node source before running frontend commands"
     expected = expected_or_error
@@ -2470,16 +2574,35 @@ def node_version_status(env: dict[str, str] | None = None) -> tuple[bool, str]:
 
     ok, version_line, resolved = command_version_line("node", "--version", env=env)
     if not ok:
-        return False, f"{version_line}; Node {expected}.x is required per {rel(NVMRC_PATH)}"
+        return False, f"{version_line}; Node {expected} is required per {rel(NVMRC_PATH)}"
 
-    major = version_major(version_line)
-    if major != expected:
+    actual = version_line.removeprefix("v")
+    if actual != expected:
         return (
             False,
             f"found `{version_line or 'unknown'}` at {resolved}; "
-            f"expected Node {expected}.x from {rel(NVMRC_PATH)}",
+            f"expected Node {expected} from {rel(NVMRC_PATH)}",
         )
-    return True, f"{version_line} ({resolved}); expected major {expected} from {rel(NVMRC_PATH)}"
+    return True, f"{version_line} ({resolved}); expected exact {expected} from {rel(NVMRC_PATH)}"
+
+
+def npm_version_status(env: dict[str, str] | None = None) -> tuple[bool, str]:
+    package_path = FRONTEND_DIR / "package.json"
+    try:
+        package = json.loads(package_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        return False, f"cannot read {path_label(package_path)}: {exc}"
+    owner = package.get("packageManager")
+    match = re.fullmatch(r"npm@((?:0|[1-9]\d*)[.](?:0|[1-9]\d*)[.](?:0|[1-9]\d*))", owner or "")
+    if match is None:
+        return False, f"{path_label(package_path)} packageManager must pin one exact npm version"
+    expected = match.group(1)
+    ok, version_line, resolved = command_version_line("npm", "--version", env=env)
+    if not ok:
+        return False, f"{version_line}; npm {expected} is required per {path_label(package_path)}"
+    if version_line != expected:
+        return False, f"found npm `{version_line}` at {resolved}; expected {expected} per {path_label(package_path)}"
+    return True, f"{version_line} ({resolved}); expected exact {expected} from {path_label(package_path)}"
 
 
 def check_frontend_toolchain(_args: argparse.Namespace | None = None) -> int:
@@ -2489,9 +2612,9 @@ def check_frontend_toolchain(_args: argparse.Namespace | None = None) -> int:
         print(f"frontend-toolchain: FAIL - {node_detail}", file=sys.stderr)
         return 1
 
-    npm_status, npm_detail = _command_version("npm", "--version", env=env)
-    if npm_status != "OK":
-        print(f"frontend-toolchain: FAIL - {npm_detail}; npm must resolve beside Node", file=sys.stderr)
+    npm_ok, npm_detail = npm_version_status(env)
+    if not npm_ok:
+        print(f"frontend-toolchain: FAIL - {npm_detail}", file=sys.stderr)
         return 1
 
     print(f"frontend-toolchain: OK ({node_detail}; npm {npm_detail})")
@@ -2752,19 +2875,31 @@ def frontend_command(args: argparse.Namespace) -> int:
     if command == "test":
         return run_frontend_npm(["run", "test"]).returncode
     if command == "gen-api-types":
-        generated_path = FRONTEND_DIR / "src" / "lib" / "api-types.ts"
-        original = generated_path.read_bytes() if generated_path.exists() else None
+        generated_path = FRONTEND_DIR / "src" / "lib" / "api-generated"
+
+        def snapshot() -> dict[str, bytes]:
+            if not generated_path.is_dir():
+                return {}
+            return {
+                str(path.relative_to(generated_path)): path.read_bytes()
+                for path in sorted(generated_path.rglob("*"))
+                if path.is_file()
+            }
+
+        original = snapshot()
         result = run_frontend_npm(["run", "gen:api-types"])
         if result.returncode != 0 or not args.check:
             return result.returncode
-        generated = generated_path.read_bytes() if generated_path.exists() else None
+        generated = snapshot()
         if generated != original:
-            if original is None:
-                generated_path.unlink(missing_ok=True)
-            else:
-                generated_path.write_bytes(original)
+            if generated_path.exists():
+                shutil.rmtree(generated_path)
+            for relative, content in original.items():
+                target = generated_path / relative
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_bytes(content)
             print(
-                "frontend gen-api-types: frontend/src/lib/api-types.ts is stale - "
+                "frontend gen-api-types: frontend/src/lib/api-generated is stale - "
                 "run `python scripts/axis.py frontend gen-api-types` and commit the result",
                 file=sys.stderr,
             )
@@ -2962,17 +3097,10 @@ def verify(args: argparse.Namespace) -> int:
     build_projects, test_projects = dotnet_projects_for_changed_paths(paths)
 
     frontend = any(is_frontend_path(path) for path in paths)
-    frontend_package_scan = any(
-        path
-        in {
-            "frontend/package.json",
-            "frontend/package-lock.json",
-            "frontend/dependency-risk-acceptances.json",
-        }
-        for path in paths
-    )
     renovate_config = ".github/renovate.json5" in paths
-    frontend_api_types = "openapi.json" in paths or "frontend/src/lib/api-types.ts" in paths
+    frontend_api_types = "openapi.json" in paths or any(
+        path.startswith("frontend/src/lib/api-generated/") for path in paths
+    )
     frontend_tests_only = frontend and all(
         path.startswith("frontend/tests/") or path.startswith("frontend/e2e/")
         for path in paths
@@ -3029,8 +3157,8 @@ def verify(args: argparse.Namespace) -> int:
 
     if frontend:
         if step("frontend toolchain", lambda: check_frontend_toolchain()) == 0:
-            if frontend_package_scan:
-                step("frontend vulnerable packages", lambda: check_frontend_vulnerable_packages())
+            step("frontend dependency versions", lambda: check_frontend_dependency_versions())
+            step("frontend vulnerable packages", lambda: check_frontend_vulnerable_packages())
             if frontend_api_types:
                 step("frontend API types", lambda: frontend_command(argparse.Namespace(frontend_command="gen-api-types", check=True)))
             step("frontend ci (tsc + biome)", lambda: frontend_command(argparse.Namespace(frontend_command="ci")))
@@ -3088,7 +3216,7 @@ def verify(args: argparse.Namespace) -> int:
         print("WARN API surface changed (src/Axis.Api/Endpoints/) but openapi.json is unchanged.")
         print("  If you added or changed a route / request / response shape, regenerate the contract:")
         print("    python scripts/axis.py generate api-contracts")
-        print("  then commit openapi.json + api-types.ts; CI's OpenApiDocumentTests fails otherwise.")
+        print("  then commit openapi.json + frontend/src/lib/api-generated; CI's OpenApiDocumentTests fails otherwise.")
 
     print()
     if plan_only:
@@ -4001,8 +4129,8 @@ def setup_tool_ready(tool: str) -> bool:
         if not env:
             return False
         node_ok = node_version_status(env)[0]
-        npm_status, _npm_detail = _command_version("npm", "--version", env=env)
-        return node_ok and npm_status == "OK"
+        npm_ok = npm_version_status(env)[0]
+        return node_ok and npm_ok
     if tool == "lychee":
         resolved = find_lychee()
         return resolved is not None and lychee_version_status(resolved)[0]
@@ -4552,6 +4680,10 @@ def main(argv: list[str] | None = None) -> int:
     check_sub.add_parser("docker", help="Check Docker availability for integration tests").set_defaults(func=check_docker)
     check_sub.add_parser("dotnet-sdk", help="Check the required .NET SDK version").set_defaults(func=check_dotnet_sdk)
     check_sub.add_parser("frontend-toolchain", help="Check Node and npm versions").set_defaults(func=check_frontend_toolchain)
+    check_sub.add_parser(
+        "frontend-dependency-versions",
+        help="Require exact versions for direct npm dependencies",
+    ).set_defaults(func=check_frontend_dependency_versions)
     check_sub.add_parser("playwright-browsers", help="Check Playwright Chromium availability").set_defaults(func=check_playwright_browsers)
     check_sub.add_parser("vulnerable-packages", help="Audit NuGet dependencies for vulnerabilities").set_defaults(func=check_vulnerable_packages)
     check_sub.add_parser(

@@ -1,12 +1,18 @@
 import { Buffer } from 'node:buffer';
 import { expect, type Locator, type Page, test } from '@playwright/test';
-import type { components } from '../src/lib/api-types';
+import type * as ApiTypes from '../src/lib/api-generated';
 
-type CreateRuleRequest = components['schemas']['CreateRuleDefinitionRequest'];
-type RuleDetail = components['schemas']['RuleDefinitionDetailDto'];
-type RuleExpressionLanguage = components['schemas']['RuleExpressionLanguageDto'];
-type RuleVersion = components['schemas']['RuleDefinitionVersionDto'];
-type SaveRuleRequest = components['schemas']['SaveRuleDefinitionDraftRequest'];
+type CreateRuleRequest = ApiTypes.CreateRuleDefinitionRequest;
+type RuleDetail = ApiTypes.RuleDefinitionDetailDto;
+type RuleExpressionLanguage = ApiTypes.RuleExpressionLanguageDto;
+type AssistRuleRequest = ApiTypes.AssistRuleExpressionRequest;
+type RuleExpressionAuthoring = ApiTypes.RuleExpressionAuthoringDto;
+type RuleExpressionCompletion = ApiTypes.RuleExpressionCompletionDto;
+type RuleExpressionDisplay = ApiTypes.RuleExpressionDisplayNodeDto;
+type RuleExpressionDisplayToken = ApiTypes.RuleExpressionDisplayTokenDto;
+type RuleExpressionReferenceKind = ApiTypes.RuleExpressionReferenceKind;
+type RuleVersion = ApiTypes.RuleDefinitionVersionDto;
+type SaveRuleRequest = ApiTypes.SaveRuleDefinitionDraftRequest;
 
 const profile = {
   id: '11111111-1111-4111-8111-111111111111',
@@ -27,6 +33,22 @@ const profile = {
   ],
 };
 const now = '2026-07-10T00:00:00Z';
+const documentation = (displayName: string, summary = `${displayName} reference.`) => ({
+  locales: {
+    en: {
+      displayName,
+      summary,
+      usage: `Use ${displayName} in a compatible expression.`,
+      examples: [displayName],
+    },
+    vi: {
+      displayName,
+      summary: `Tham chiếu ${displayName}.`,
+      usage: `Dùng ${displayName} trong biểu thức tương thích.`,
+      examples: [displayName],
+    },
+  },
+});
 const systemRule = (definitionKey: string, name: string, targetTypeKeys: string[]) => ({
   definitionKey,
   name,
@@ -66,7 +88,13 @@ const contextSchemas = [
     scope: 'Field',
     displayName: 'Decimal field value',
     fields: [
-      { path: 'field.value', displayName: 'Field value', type: 'Decimal', allowMultiple: false },
+      {
+        path: 'field.value',
+        displayName: 'Field value',
+        type: 'Decimal',
+        allowMultiple: false,
+        documentation: documentation('Field value', 'The decimal field value supplied at runtime.'),
+      },
     ],
     targetTypeKey: 'Decimal',
     configuration: {},
@@ -87,12 +115,14 @@ const expressionLanguage: RuleExpressionLanguage = {
         cardinality: 'Any',
       })),
       requiresMatchingTypes: true,
+      documentation: documentation('Equals', 'Checks whether both values are the same.'),
     },
     {
       operator: 'GreaterThan',
       leftShapes: comparableTypes.map((type) => ({ type, cardinality: 'Scalar' })),
       rightShapes: comparableTypes.map((type) => ({ type, cardinality: 'Scalar' })),
       requiresMatchingTypes: true,
+      documentation: documentation('Greater than'),
     },
   ],
   functions: [
@@ -106,6 +136,57 @@ const expressionLanguage: RuleExpressionLanguage = {
       ],
       returnType: 'Boolean',
       returnCardinality: 'Scalar',
+      documentation: documentation('Is blank'),
+    },
+  ],
+  logicalOperators: [
+    {
+      operator: 'All',
+      minimumChildren: 1,
+      maximumChildren: null,
+      documentation: documentation('All'),
+    },
+    {
+      operator: 'Any',
+      minimumChildren: 1,
+      maximumChildren: null,
+      documentation: documentation('Any'),
+    },
+    {
+      operator: 'Not',
+      minimumChildren: 1,
+      maximumChildren: 1,
+      documentation: documentation('Not'),
+    },
+  ],
+  operandKinds: [
+    { kind: 'Context', documentation: documentation('Context value') },
+    { kind: 'Parameter', documentation: documentation('Parameter') },
+    { kind: 'Literal', documentation: documentation('Literal value') },
+    { kind: 'Function', documentation: documentation('Function result') },
+  ],
+  valueTypes: ['Text', 'Integer', 'Decimal', 'Date', 'DateTime', 'Boolean'].map((type) => ({
+    type,
+    documentation: documentation(type),
+  })),
+  cardinalities: [
+    { cardinality: 'Scalar', documentation: documentation('Single value') },
+    { cardinality: 'Multiple', documentation: documentation('Multiple values') },
+    { cardinality: 'Any', documentation: documentation('Single or multiple') },
+  ],
+  limitDefinitions: [
+    { key: 'maxDepth', value: 12, documentation: documentation('Maximum nesting depth') },
+    { key: 'maxNodes', value: 200, documentation: documentation('Maximum condition nodes') },
+    {
+      key: 'maxFunctionCalls',
+      value: 50,
+      documentation: documentation('Maximum function calls'),
+    },
+    { key: 'maxParameters', value: 100, documentation: documentation('Maximum parameters') },
+    {
+      key: 'maxExecutionSteps',
+      value: 1000,
+      documentation: documentation('Maximum evaluation steps'),
     },
   ],
   limits: {
@@ -120,26 +201,53 @@ const expressionLanguage: RuleExpressionLanguage = {
 function systemDetail(definitionKey: string): RuleDetail | null {
   const definition = systemRules.find((candidate) => candidate.definitionKey === definitionKey);
   if (!definition) return null;
+  const requiredCheck = {
+    nodeId: 'required_check',
+    predicateOperator: 'Equal',
+    left: {
+      kind: 'Function',
+      function: 'IsBlank',
+      arguments: [{ kind: 'Context', reference: 'field.value', arguments: [] }],
+    },
+    right: {
+      kind: 'Literal',
+      literal: { type: 'Boolean', values: ['true'] },
+      arguments: [],
+    },
+    children: [],
+  } satisfies NonNullable<RuleDetail['condition']>;
   return {
     ...definition,
     revision: null,
     contextKey: null,
     contextSchemaVersion: null,
-    condition: {
-      nodeId: 'required_check',
-      predicateOperator: 'Equal',
-      left: {
-        kind: 'Function',
-        function: 'IsBlank',
-        arguments: [{ kind: 'Context', reference: 'field.value', arguments: [] }],
-      },
-      right: {
-        kind: 'Literal',
-        literal: { type: 'Boolean', values: ['true'] },
-        arguments: [],
-      },
-      children: [],
-    },
+    condition:
+      definitionKey === 'field.required'
+        ? {
+            nodeId: 'root',
+            logicalOperator: 'Any',
+            children: [
+              { nodeId: 'required_group', logicalOperator: 'All', children: [requiredCheck] },
+              {
+                nodeId: 'fallback_group',
+                logicalOperator: 'All',
+                children: [
+                  {
+                    nodeId: 'fallback_check',
+                    predicateOperator: 'Equal',
+                    left: { kind: 'Context', reference: 'field.value', arguments: [] },
+                    right: {
+                      kind: 'Literal',
+                      literal: { type: 'Text', values: ['example'] },
+                      arguments: [],
+                    },
+                    children: [],
+                  },
+                ],
+              },
+            ],
+          }
+        : requiredCheck,
     outcome: {
       kind: 'Validation',
       violationCode: `${definitionKey}.failed`,
@@ -157,6 +265,90 @@ interface CapturedRequest {
   method: string;
   path: string;
   body?: unknown;
+}
+
+function expressionGuide(request: { query?: string | null }) {
+  const query = request.query?.trim().toLocaleLowerCase() ?? '';
+  const text = (value: string, highlight?: string) => {
+    const start = highlight ? value.toLocaleLowerCase().indexOf(highlight) : -1;
+    const highlightLength = highlight?.length ?? 0;
+    return {
+      text: value,
+      segments:
+        start < 0
+          ? [{ text: value, isMatch: false }]
+          : [
+              ...(start > 0 ? [{ text: value.slice(0, start), isMatch: false }] : []),
+              { text: value.slice(start, start + highlightLength), isMatch: true },
+              ...(start + highlightLength < value.length
+                ? [{ text: value.slice(start + highlightLength), isMatch: false }]
+                : []),
+            ],
+    };
+  };
+  const item = (
+    referenceKind: string,
+    referenceKey: string,
+    displayName: string,
+    summary: string,
+    highlight?: string,
+  ) => ({
+    referenceKind,
+    referenceKey,
+    displayName: text(displayName, highlight),
+    summary: text(summary),
+    usage: text(`Use ${displayName} in a compatible expression.`),
+    examples: [text(referenceKey)],
+  });
+  const isBlank = item(
+    'Function',
+    'IsBlank',
+    'Is blank',
+    'Returns true when a value is absent or empty.',
+    query === 'blnk' ? 'blank' : undefined,
+  );
+  const sections =
+    query === 'blnk'
+      ? [{ key: 'functions', title: 'Functions', description: 'Functions.', items: [isBlank] }]
+      : [
+          {
+            key: 'context',
+            title: 'Available fields',
+            description: 'Context values.',
+            items: [
+              item(
+                'Context',
+                'field.value',
+                '@context.field.value',
+                'The field value supplied when the rule runs.',
+              ),
+            ],
+          },
+          {
+            key: 'operators',
+            title: 'Operators',
+            description: 'Comparison operators.',
+            items: [
+              item(
+                'PredicateOperator',
+                'GreaterThan',
+                'Greater than',
+                'The first value is larger than or later than the second.',
+              ),
+            ],
+          },
+          {
+            key: 'functions',
+            title: 'Functions',
+            description: 'Expression functions.',
+            items: [isBlank],
+          },
+        ];
+  return {
+    expressionLanguageVersion: 1,
+    totalResults: sections.reduce((total, section) => total + section.items.length, 0),
+    sections,
+  };
 }
 
 function base64UrlJson(value: unknown): string {
@@ -198,6 +390,248 @@ function summary(detail: RuleDetail) {
   };
 }
 
+function assistExpression(body: AssistRuleRequest): RuleExpressionAuthoring {
+  const syntax = body.syntax;
+  const condition = body.condition ?? parseExpressionSyntax(syntax ?? '');
+  const cursor = Math.min(body.cursorOffset ?? syntax?.length ?? 0, syntax?.length ?? 0);
+  const prefix = syntax?.slice(0, cursor).match(/@?[A-Za-z][A-Za-z0-9.]*$/)?.[0] ?? '';
+  const parameters = body.parameters ?? [];
+  const completions = [
+    completion('@context.field.value', '@context.field.value', 'Context', 'field.value'),
+    completion('Equal', 'Equal', 'PredicateOperator', 'Equal'),
+    completion('GreaterThan', 'GreaterThan', 'PredicateOperator', 'GreaterThan'),
+    ...parameters.map((parameter: { key?: string }) =>
+      completion(
+        `@parameters.${parameter.key ?? ''}`,
+        `@parameters.${parameter.key ?? ''}`,
+        'Parameter',
+        parameter.key ?? '',
+      ),
+    ),
+  ].map((item) => ({
+    ...item,
+    replacementStart: cursor - prefix.length,
+    replacementLength: prefix.length,
+  }));
+  return {
+    syntax: syntax ?? (condition ? formatCondition(condition) : ''),
+    condition,
+    display: condition ? displayCondition(condition) : null,
+    diagnostics: condition
+      ? []
+      : [
+          {
+            code: 'rules.expression.required',
+            message: 'Expression is required.',
+            start: 0,
+            length: Math.max(1, syntax?.length ?? 0),
+          },
+        ],
+    completions: syntax === null ? [] : completions,
+  };
+}
+
+function completion(
+  label: string,
+  insertText: string,
+  referenceKind: RuleExpressionReferenceKind,
+  referenceKey: string,
+): RuleExpressionCompletion {
+  return {
+    label,
+    insertText,
+    cursorOffset: insertText.length,
+    replacementStart: 0,
+    replacementLength: 0,
+    referenceKind,
+    referenceKey,
+    summary: `${label} reference.`,
+  };
+}
+
+function parseExpressionSyntax(syntax: string): NonNullable<RuleDetail['condition']> | null {
+  const match = syntax
+    .trim()
+    .match(
+      /^@context\.field\.value\s+(Equal|GreaterThan)\s+@parameters\.([A-Za-z][A-Za-z0-9_.]*)$/,
+    );
+  if (!match) return null;
+  return {
+    nodeId: 'syntax-1',
+    predicateOperator: match[1] as 'Equal' | 'GreaterThan',
+    left: { kind: 'Context', reference: 'field.value', arguments: [] },
+    right:
+      match[2] === 'threshold'
+        ? { kind: 'Parameter', reference: 'threshold', arguments: [] }
+        : { kind: 'Context', reference: match[2], arguments: [] },
+    children: [],
+  };
+}
+
+function formatCondition(condition: NonNullable<RuleDetail['condition']>): string {
+  if (condition.logicalOperator) {
+    return `${condition.logicalOperator}(${(condition.children ?? []).map(formatCondition).join(', ')})`;
+  }
+  return `${formatOperand(condition.left)} ${condition.predicateOperator} ${formatOperand(
+    condition.right,
+  )}`.trim();
+}
+
+function formatOperand(operand: NonNullable<RuleDetail['condition']>['left']): string {
+  if (!operand) return '';
+  if (operand.kind === 'Function') {
+    return `${operand.function}(${(operand.arguments ?? []).map(formatOperand).join(', ')})`;
+  }
+  if (operand.kind === 'Literal') {
+    return `${operand.literal?.type}("${operand.literal?.values?.[0] ?? ''}")`;
+  }
+  if (!operand.reference) return '';
+  return operand.kind === 'Context'
+    ? `@context.${operand.reference}`
+    : `@parameters.${operand.reference}`;
+}
+
+function displayCondition(condition: NonNullable<RuleDetail['condition']>): RuleExpressionDisplay {
+  const children = condition.children ?? [];
+  if (condition.logicalOperator) {
+    const headings = {
+      All: 'and',
+      Any: 'or',
+      Not: 'not',
+    };
+    return {
+      nodeId: condition.nodeId,
+      tokens: [
+        {
+          text: headings[condition.logicalOperator],
+          referenceKind: 'LogicalOperator',
+          referenceKey: condition.logicalOperator,
+        },
+      ],
+      children: children.map(displayCondition),
+    };
+  }
+  return {
+    nodeId: condition.nodeId,
+    tokens: displayConditionTokens(condition),
+    children: [],
+  };
+}
+
+function displayConditionTokens(
+  condition: NonNullable<RuleDetail['condition']>,
+): RuleExpressionDisplayToken[] {
+  if (condition.logicalOperator) {
+    if (condition.logicalOperator === 'Not') {
+      return [
+        {
+          text: 'not',
+          referenceKind: 'LogicalOperator',
+          referenceKey: 'Not',
+        },
+        ...(condition.children?.[0] ? displayConditionTokens(condition.children[0]) : []),
+      ];
+    }
+    return (condition.children ?? []).flatMap((child, index) => [
+      ...(index > 0 && condition.logicalOperator === 'Any' ? [{ text: ',' }] : []),
+      ...(index > 0
+        ? [
+            {
+              text: condition.logicalOperator === 'All' ? 'and' : 'or',
+              referenceKind: 'LogicalOperator' as const,
+              referenceKey: condition.logicalOperator,
+            },
+          ]
+        : []),
+      ...displayConditionTokens(child),
+    ]);
+  }
+  if (
+    condition.predicateOperator === 'Equal' &&
+    condition.left?.kind === 'Function' &&
+    condition.left.function === 'IsBlank' &&
+    condition.right?.literal?.type === 'Boolean' &&
+    condition.right.literal.values?.[0]?.toLowerCase() === 'true'
+  ) {
+    return [
+      ...displayOperand(condition.left.arguments?.[0]),
+      {
+        text: 'is blank',
+        referenceKind: 'Function',
+        referenceKey: 'IsBlank',
+      },
+    ];
+  }
+  if (condition.predicateOperator === 'IsNull' || condition.predicateOperator === 'IsNotNull') {
+    const parameter = condition.left?.kind === 'Parameter';
+    return [
+      ...displayOperand(condition.left),
+      {
+        text:
+          condition.predicateOperator === 'IsNull'
+            ? parameter
+              ? 'is not provided'
+              : 'has no value'
+            : parameter
+              ? 'is provided'
+              : 'has a value',
+        referenceKind: 'PredicateOperator',
+        referenceKey: condition.predicateOperator,
+      },
+    ];
+  }
+  return [
+    ...displayOperand(condition.left),
+    {
+      text:
+        condition.predicateOperator === 'Equal'
+          ? 'equals'
+          : condition.predicateOperator === 'LessThan'
+            ? 'is less than'
+            : 'is greater than',
+      referenceKind: 'PredicateOperator',
+      referenceKey: condition.predicateOperator,
+    },
+    ...displayOperand(condition.right),
+  ];
+}
+
+function displayOperand(
+  operand: NonNullable<RuleDetail['condition']>['left'],
+): RuleExpressionDisplayToken[] {
+  if (!operand) return [];
+  if (operand.kind === 'Function') {
+    if (operand.function === 'ToDecimal') return displayOperand(operand.arguments?.[0]);
+    return [
+      {
+        text: operand.function === 'IsBlank' ? 'Is blank' : operand.function,
+        referenceKind: 'Function',
+        referenceKey: operand.function,
+      },
+      { text: '(' },
+      ...(operand.arguments ?? []).flatMap(displayOperand),
+      { text: ')' },
+    ];
+  }
+  if (operand.kind === 'Literal') {
+    return [
+      {
+        text: operand.literal?.values?.join(', ') ?? '',
+        referenceKind: 'Literal',
+        referenceKey: operand.literal?.type,
+        isCode: true,
+      },
+    ];
+  }
+  return [
+    {
+      text: operand.kind === 'Context' ? 'Field value' : operand.reference,
+      referenceKind: operand.kind,
+      referenceKey: operand.reference,
+    },
+  ];
+}
+
 async function mockAuthenticatedSession(page: Page): Promise<void> {
   await page.addInitScript(() => {
     window.__AXIS_DISABLE_DEVTOOLS__ = true;
@@ -234,7 +668,8 @@ async function mockRulesApi(page: Page): Promise<CapturedRequest[]> {
   await page.route('**/api/rules**', async (route) => {
     const request = route.request();
     const method = request.method();
-    const path = new URL(request.url()).pathname;
+    const requestUrl = new URL(request.url());
+    const path = requestUrl.pathname;
     const captured: CapturedRequest = { method, path };
     requests.push(captured);
 
@@ -256,8 +691,40 @@ async function mockRulesApi(page: Page): Promise<CapturedRequest[]> {
       return;
     }
 
+    if (method === 'POST' && path === '/api/rules/expression-language/assist') {
+      const body = request.postDataJSON() as AssistRuleRequest;
+      captured.body = body;
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(assistExpression(body)),
+      });
+      return;
+    }
+
+    if (method === 'POST' && path === '/api/rules/expression-language/guide') {
+      const body = request.postDataJSON() as { query?: string | null };
+      captured.body = body;
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(expressionGuide(body)),
+      });
+      return;
+    }
+
     if (method === 'GET' && path === '/api/rules') {
-      const items = detail ? [...systemRules, summary(detail)] : systemRules;
+      const candidates = detail ? [...systemRules, summary(detail)] : systemRules;
+      const query = requestUrl.searchParams.get('query')?.trim().toLocaleLowerCase();
+      const items = query
+        ? candidates.filter((definition) =>
+            [definition.name, definition.description, definition.definitionKey]
+              .filter(Boolean)
+              .join(' ')
+              .toLocaleLowerCase()
+              .includes(query),
+          )
+        : candidates;
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -316,9 +783,18 @@ async function mockRulesApi(page: Page): Promise<CapturedRequest[]> {
       captured.body = request.postDataJSON();
       if (method === 'PUT' && action === 'draft') {
         const body = captured.body as SaveRuleRequest;
+        const condition = parseExpressionSyntax(body.expressionSyntax ?? '');
         detail = {
           ...detail,
-          ...body,
+          name: body.name,
+          description: body.description,
+          scope: body.scope,
+          contextKey: body.contextKey,
+          contextSchemaVersion: body.contextSchemaVersion,
+          outcomeKind: body.outcomeKind,
+          parameters: body.parameters,
+          condition,
+          outcome: body.outcome,
           status: 'Draft',
           revision: (detail.revision ?? 0) + 1,
           updatedAt: now,
@@ -468,10 +944,7 @@ async function expectTableColumnsAligned(table: Locator): Promise<void> {
   }
 }
 
-test('workspace rule authoring supports simulation, immutable revisions, and archive', async ({
-  page,
-}, testInfo) => {
-  testInfo.setTimeout(60_000);
+test('rules catalog search and managed system windows remain usable', async ({ page }) => {
   const pageErrors: string[] = [];
   page.on('console', (message) => {
     if (message.type() === 'error') pageErrors.push(message.text());
@@ -479,7 +952,7 @@ test('workspace rule authoring supports simulation, immutable revisions, and arc
   page.on('pageerror', (error) => pageErrors.push(error.message));
 
   await mockAuthenticatedSession(page);
-  const requests = await mockRulesApi(page);
+  await mockRulesApi(page);
   await page.setViewportSize({ width: 1280, height: 720 });
   await page.goto('/rules');
 
@@ -489,6 +962,9 @@ test('workspace rule authoring supports simulation, immutable revisions, and arc
   await expect(catalog.getByRole('columnheader', { name: /Actions/ })).toHaveCount(0);
   const search = catalog.getByLabel('Search rules');
   await search.fill('date and time range');
+  await expect
+    .poll(() => new URL(page.url()).searchParams.get('query'))
+    .toBe('date and time range');
   await expect(catalog.getByText('Date and time range', { exact: true })).toBeVisible();
   await expect(catalog.getByText('Required value', { exact: true })).toHaveCount(0);
   await search.clear();
@@ -631,9 +1107,7 @@ test('workspace rule authoring supports simulation, immutable revisions, and arc
     });
   await page.keyboard.press('Escape');
   await expect(dock).toBeVisible();
-  await catalog.getByRole('button', { name: 'Filters', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Add condition' })).toBeVisible();
-  await page.keyboard.press('Escape');
+  await expect(catalog.getByRole('button', { name: 'Filters', exact: true })).toHaveCount(0);
 
   await catalog.getByRole('button', { name: 'Numeric range', exact: true }).click();
   const numericDetails = page.getByRole('dialog', { name: 'Numeric range' });
@@ -711,6 +1185,25 @@ test('workspace rule authoring supports simulation, immutable revisions, and arc
       x: Math.round(resizedDialogBox.x),
       y: Math.round(resizedDialogBox.y),
     });
+  expect(pageErrors).toEqual([]);
+});
+
+test('read-only rule details open the canonical server guide', async ({ page }) => {
+  const pageErrors: string[] = [];
+  page.on('console', (message) => {
+    if (message.type() === 'error') pageErrors.push(message.text());
+  });
+  page.on('pageerror', (error) => pageErrors.push(error.message));
+
+  await mockAuthenticatedSession(page);
+  const requests = await mockRulesApi(page);
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.goto('/rules');
+
+  const catalog = page.getByRole('region', { name: 'Rules catalog' });
+  await catalog.getByRole('button', { name: 'Required value', exact: true }).click();
+  const systemDetails = page.getByRole('dialog', { name: 'Required value' });
+  await expect(systemDetails).toBeVisible();
   const systemBadges = systemDetails.locator(
     '[data-slot="managed-dialog-header"] [data-slot="badge"]',
   );
@@ -722,61 +1215,121 @@ test('workspace rule authoring supports simulation, immutable revisions, and arc
     systemDetails.getByRole('heading', { name: 'Where this rule applies' }),
   ).toBeVisible();
   await expect(systemDetails).toContainText('Field value is blank');
-  await expect(systemDetails).not.toContainText('Equals true');
-  await expect(systemDetails.getByRole('button', { name: /Technical details/ })).toHaveAttribute(
-    'aria-expanded',
-    'false',
+  await expect(systemDetails).not.toContainText('Expression syntax');
+  await expect(systemDetails.getByRole('button', { name: 'Expression guide' })).toHaveCount(0);
+  expect(
+    requests.filter((request) => request.path === '/api/rules/expression-language'),
+  ).toHaveLength(0);
+  const blankKeyword = systemDetails.getByRole('button', { name: 'is blank' });
+  await expect(blankKeyword).toHaveClass(/underline/);
+  await expect(blankKeyword.locator('svg')).toHaveCount(0);
+  await blankKeyword.click();
+  const keywordReference = page.getByRole('dialog', { name: 'Rule expression guide' });
+  await expect(keywordReference.getByRole('heading', { name: 'Functions' })).toBeVisible();
+  const selectedKeywordReference = keywordReference.locator(
+    '#rule-expression-guide-item-Function-IsBlank',
   );
+  await expect(selectedKeywordReference).toBeFocused();
+  await expect(selectedKeywordReference).toHaveAttribute('aria-current', 'true');
+  await expect(selectedKeywordReference.getByRole('heading', { name: 'is blank' })).toBeVisible();
+  await expect(
+    keywordReference.getByText('IsBlank(@context.field.value) Equal Boolean("true")'),
+  ).toHaveCount(0);
+  await expect(selectedKeywordReference.getByText('How to use')).toBeVisible();
+  await expect(selectedKeywordReference.getByText('Reference', { exact: true })).toHaveCount(0);
+  await expect(selectedKeywordReference.getByText('Examples')).toHaveCount(0);
+  await expect(keywordReference.getByRole('button', { name: 'Insert' })).toHaveCount(0);
+  expect(
+    requests.filter((request) => request.path === '/api/rules/expression-language'),
+  ).toHaveLength(0);
+  await keywordReference.getByRole('button', { name: 'Close' }).click();
+  const behaviorFlow = systemDetails.locator('[data-slot="system-rule-behavior-flow"]');
+  await expect(behaviorFlow.locator('[data-slot="badge"]')).toHaveCount(0);
+  await expect(behaviorFlow.locator('[data-slot="rule-timeline-item"]')).toHaveCount(2);
+  await expect(behaviorFlow.locator('[data-slot="rule-timeline-marker"]')).toHaveCount(2);
+  await expect(behaviorFlow.locator('[data-slot="rule-timeline-line"]')).toBeVisible();
+  await expect(behaviorFlow.locator('[data-slot="rule-timeline-tail"]')).toBeVisible();
+  await expect(behaviorFlow.locator('[data-slot="rule-condition-group"]')).toHaveCount(3);
+  await expect(
+    behaviorFlow.locator('[data-slot="rule-condition-group"][data-operator="Any"]'),
+  ).toHaveCount(1);
+  await expect(
+    behaviorFlow.locator('[data-slot="rule-condition-group"][data-operator="All"]'),
+  ).toHaveCount(2);
+  await expect(behaviorFlow.locator('[data-slot="rule-condition-parallel-rail"]')).toHaveCount(2);
+  await expect(behaviorFlow.locator('[data-slot="rule-condition-serial-rail"]')).toHaveCount(2);
+  const orConnector = behaviorFlow.getByRole('button', { name: 'or' });
+  await expect(orConnector).toBeVisible();
+  await expect(behaviorFlow.getByRole('button', { name: 'and' })).toHaveCount(2);
+  await expect(orConnector).toHaveAttribute('title', 'or');
+  await orConnector.focus();
+  await expect(orConnector).toBeFocused();
+  const conditionConnector = await behaviorFlow.evaluate((flow) => {
+    const root = flow.querySelector<HTMLElement>(
+      '[data-slot="rule-condition-group"][data-operator="Any"]',
+    );
+    const branches = Array.from(
+      root?.querySelectorAll<HTMLElement>(
+        ':scope > ul > [data-slot="rule-condition-item"] > [data-slot="rule-condition-parallel-branch"][data-edge="inline-start"]',
+      ) ?? [],
+    ).map((branch) => branch.getBoundingClientRect());
+    const rails = Array.from(
+      root?.querySelectorAll<HTMLElement>(':scope > [data-slot="rule-condition-parallel-rail"]') ??
+        [],
+    ).map((rail) => rail.getBoundingClientRect());
+    return {
+      branchCenters: branches.map((branch) => ({
+        start: branch.x,
+        y: branch.y + branch.height / 2,
+      })),
+      railCenters: rails.map((rail) => ({
+        x: rail.x + rail.width / 2,
+        start: rail.y,
+        end: rail.y + rail.height,
+      })),
+    };
+  });
+  expect(
+    Math.abs(conditionConnector.branchCenters[0].start - conditionConnector.railCenters[0].x),
+  ).toBeLessThanOrEqual(1);
+  expect(
+    Math.abs(conditionConnector.branchCenters[0].y - conditionConnector.railCenters[0].start),
+  ).toBeLessThanOrEqual(1);
+  const lastBranchCenter = conditionConnector.branchCenters.at(-1);
+  if (!lastBranchCenter) throw new Error('Expected a final connector branch.');
+  expect(Math.abs(lastBranchCenter.y - conditionConnector.railCenters[0].end)).toBeLessThanOrEqual(
+    1,
+  );
+  await expect(behaviorFlow.getByText(/^(and|or|not)$/i)).toHaveCount(0);
+  await expect(behaviorFlow).not.toContainText('Any');
+  await expect(behaviorFlow).not.toContainText('All');
+  await expect(behaviorFlow.locator('[data-slot="system-rule-effect"]')).toContainText(
+    'Effect: Blocks the action',
+  );
+  await expect(
+    systemDetails.getByRole('heading', { name: 'Version and references' }),
+  ).toBeVisible();
+  await expect(systemDetails.getByRole('button', { name: /Technical details/ })).toHaveCount(0);
   await expect(systemDetails.getByRole('button', { name: 'Archive', exact: true })).toHaveCount(0);
   await page.keyboard.press('Escape');
   await expect(systemDetails).toBeHidden();
+  expect(pageErrors).toEqual([]);
+});
 
-  await catalog.getByRole('button', { name: 'Filters', exact: true }).click();
-  await expectNoDocumentOverflow(page);
-  await page.getByRole('button', { name: 'Add condition' }).click();
-  const filterField = page.getByTestId('fields');
-  const filterOperator = page.getByTestId('operators');
-  const filterValue = page.getByTestId('value-editor');
-  const removeCondition = page.getByRole('button', { name: 'Remove condition', exact: true });
-  const [fieldBox, operatorBox, valueBox, removeBox] = await Promise.all([
-    filterField.boundingBox(),
-    filterOperator.boundingBox(),
-    filterValue.boundingBox(),
-    removeCondition.boundingBox(),
-  ]);
-  if (!fieldBox || !operatorBox || !valueBox || !removeBox) {
-    throw new Error('Filter condition controls did not render bounding boxes');
-  }
-  expect(operatorBox.x - (fieldBox.x + fieldBox.width)).toBeLessThanOrEqual(12);
-  expect(valueBox.x - (operatorBox.x + operatorBox.width)).toBeLessThanOrEqual(12);
-  expect(removeBox.x - (valueBox.x + valueBox.width)).toBeLessThanOrEqual(12);
+test('rules catalog table remains aligned and configurable', async ({ page }, testInfo) => {
+  const pageErrors: string[] = [];
+  page.on('console', (message) => {
+    if (message.type() === 'error') pageErrors.push(message.text());
+  });
+  page.on('pageerror', (error) => pageErrors.push(error.message));
 
-  await filterField.click();
-  const selectContent = page.locator('[data-slot="select-content"][data-open]');
-  await expect(selectContent).toBeVisible();
-  await expect
-    .poll(async () => {
-      const [triggerBox, contentBox] = await Promise.all([
-        filterField.boundingBox(),
-        selectContent.boundingBox(),
-      ]);
-      if (!triggerBox || !contentBox) return false;
-      return (
-        contentBox.y >= triggerBox.y + triggerBox.height &&
-        Math.abs(contentBox.x - triggerBox.x) <= 1
-      );
-    })
-    .toBe(true);
-  await page.getByRole('option', { name: 'Origin', exact: true }).click();
-  await page.getByTestId('value-editor').click();
-  await page.getByRole('option', { name: 'Built-in', exact: true }).click();
-  await expect(page.getByTestId('value-editor')).toContainText('Built-in');
-  await page.keyboard.press('Escape');
-  await page.keyboard.press('Escape');
-  await expect(catalog.getByRole('button', { name: 'Filters', exact: true })).toHaveAttribute(
-    'aria-expanded',
-    'false',
-  );
+  await mockAuthenticatedSession(page);
+  await mockRulesApi(page);
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.goto('/rules');
+
+  const catalog = page.getByRole('region', { name: 'Rules catalog' });
+  await expect(catalog.getByRole('button', { name: 'Filters', exact: true })).toHaveCount(0);
 
   await catalog.getByRole('button', { name: 'Columns', exact: true }).click();
   const originColumn = page.getByRole('menuitemcheckbox', { name: 'Origin', exact: true });
@@ -785,17 +1338,6 @@ test('workspace rule authoring supports simulation, immutable revisions, and arc
   await expect(catalog.getByRole('button', { name: 'Clear filters' })).toHaveCount(0);
   await page.keyboard.press('Escape');
   await expect(catalog.getByRole('button', { name: 'Columns', exact: true })).toHaveAttribute(
-    'aria-expanded',
-    'false',
-  );
-
-  await catalog.getByRole('button', { name: 'Filters', exact: true }).click();
-  await page.getByRole('button', { name: 'Add condition' }).click();
-  await page.getByTestId('fields').click();
-  await expect(page.getByRole('option', { name: 'Origin', exact: true })).toHaveCount(0);
-  await page.keyboard.press('Escape');
-  await page.keyboard.press('Escape');
-  await expect(catalog.getByRole('button', { name: 'Filters', exact: true })).toHaveAttribute(
     'aria-expanded',
     'false',
   );
@@ -831,6 +1373,22 @@ test('workspace rule authoring supports simulation, immutable revisions, and arc
   const headerBoxAfterScroll = await catalogHeader.boundingBox();
   if (!headerBoxAfterScroll) throw new Error('Rules catalog header disappeared after scrolling');
   expect(headerBoxAfterScroll.y).toBeCloseTo(headerBoxBeforeScroll.y, 0);
+  expect(pageErrors).toEqual([]);
+});
+
+test('workspace rule authoring supports simulation and immutable lifecycle', async ({
+  page,
+}, testInfo) => {
+  const pageErrors: string[] = [];
+  page.on('console', (message) => {
+    if (message.type() === 'error') pageErrors.push(message.text());
+  });
+  page.on('pageerror', (error) => pageErrors.push(error.message));
+
+  await mockAuthenticatedSession(page);
+  const requests = await mockRulesApi(page);
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.goto('/rules');
 
   await page.getByRole('button', { name: 'New rule' }).click();
   const createDialog = page.getByRole('dialog', { name: 'New workspace rule' });
@@ -847,6 +1405,24 @@ test('workspace rule authoring supports simulation, immutable revisions, and arc
   await expect(editorDialog.getByRole('heading', { name: 'Definition' })).toBeVisible();
   await expect(editorDialog.getByText('Stable key: credit_threshold')).toBeVisible();
   await expect(editorDialog.getByRole('heading', { name: 'Parameters' })).toBeVisible();
+  await editorDialog.getByRole('button', { name: 'Expression guide' }).click();
+  const expressionGuide = page.getByRole('dialog', { name: 'Rule expression guide' });
+  await expect(expressionGuide.getByRole('heading', { name: 'Operators' })).toBeVisible();
+  await expect(expressionGuide.getByRole('heading', { name: 'Functions' })).toBeVisible();
+  const guideSearch = expressionGuide.getByRole('searchbox', { name: 'Search expression guide' });
+  await guideSearch.fill('blnk');
+  const highlightedMatch = expressionGuide.locator('mark').filter({ hasText: 'blank' }).first();
+  await expect(highlightedMatch).toBeVisible();
+  await expect(highlightedMatch).toHaveClass(/bg-primary/);
+  await expect(expressionGuide.getByText('Matches: 1 · “blnk”')).toBeVisible();
+  await guideSearch.fill('');
+  const availableFields = expressionGuide
+    .getByRole('heading', { name: 'Available fields' })
+    .locator('..')
+    .locator('..');
+  await availableFields.getByRole('button', { name: 'Insert' }).click();
+  await expressionGuide.getByRole('button', { name: 'Close' }).click();
+  await expect(editorDialog.getByLabel('Expression syntax')).toHaveValue('@context.field.value');
   const editorViewport = editorDialog.locator('[data-slot="dialog-body"]');
   await expect
     .poll(() => editorViewport.evaluate((element) => element.scrollHeight > element.clientHeight))
@@ -862,15 +1438,15 @@ test('workspace rule authoring supports simulation, immutable revisions, and arc
   await page.getByRole('option', { name: 'Decimal' }).click();
   await expect(editorDialog.getByLabel('Type')).toContainText('Decimal');
   await editorDialog.getByLabel('Allowed values').fill('100, 200');
-  await editorDialog.getByLabel('Operator').click();
-  const greaterThanOption = page.getByRole('option', { name: 'Greater than', exact: true });
-  await expect(greaterThanOption).toBeVisible();
-  await greaterThanOption.click();
-  await expect(editorDialog.getByLabel('Operator')).toContainText('Greater than');
-  await editorDialog.getByLabel('Right operand').click();
-  await page.getByRole('option', { name: 'Parameter' }).click();
-  await editorDialog.getByLabel('Parameter', { exact: true }).click();
-  await page.getByRole('option', { name: 'threshold' }).click();
+  const expressionSyntax = editorDialog.getByLabel('Expression syntax');
+  await expressionSyntax.fill('@context.field.value Gre');
+  const suggestions = page.getByRole('listbox', { name: 'Expression suggestions' });
+  await expect(suggestions.getByRole('option', { name: /GreaterThan/ })).toBeVisible();
+  await expressionSyntax.press('Enter');
+  await expect(expressionSyntax).toHaveValue('@context.field.value GreaterThan');
+  await expressionSyntax.pressSequentially(' @parameters.threshold');
+  await expect(editorDialog.getByRole('heading', { name: 'What this means' })).toBeVisible();
+  await expect(editorDialog).toContainText('Field value is greater than threshold');
   await editorDialog.getByLabel('Violation code').fill('credit.threshold.exceeded');
   await editorDialog.getByLabel('Message').fill('Credit value exceeds the configured threshold.');
   await editorDialog.getByLabel('Field value').fill('150');
@@ -897,24 +1473,28 @@ test('workspace rule authoring supports simulation, immutable revisions, and arc
         allowedValues: ['100', '200'],
       },
     ],
-    condition: {
-      children: [
-        {
-          predicateOperator: 'GreaterThan',
-          left: { kind: 'Context', reference: 'field.value' },
-          right: { kind: 'Parameter', reference: 'threshold' },
-        },
-      ],
-    },
+    expressionSyntax: '@context.field.value GreaterThan @parameters.threshold',
   });
+  expect(firstSave?.body).not.toHaveProperty('condition');
 
   await editorDialog.getByRole('button', { name: 'Publish version' }).click();
   let publishDialog = page.locator('[data-slot="alert-dialog-content"]');
   await expect(publishDialog.getByRole('heading', { name: 'Publish this rule?' })).toBeVisible();
   await expect(publishDialog).toContainText('Version 1 will be immutable.');
+  await expect(publishDialog).toContainText('Decimal field value');
+  await expect(publishDialog).toContainText('When');
+  await expect(publishDialog).toContainText('Then');
+  await expect(publishDialog).toContainText('Blocks the action');
   await publishDialog.getByRole('button', { name: 'Publish version' }).click();
   await expect(editorDialog.getByText('Published', { exact: true })).toBeVisible();
-  await expect(editorDialog.getByText('Version 1')).toBeVisible();
+  const publishedDetails = editorDialog.locator('[data-slot="workspace-rule-details"]');
+  await expect(publishedDetails).toBeVisible();
+  await expect(publishedDetails.getByText('When', { exact: true })).toBeVisible();
+  await expect(publishedDetails.getByText('Then', { exact: true })).toBeVisible();
+  await expect(publishedDetails).toContainText('Blocks the action');
+  await expect(publishedDetails.getByText('Version 1').first()).toBeVisible();
+  await expect(editorDialog.getByRole('button', { name: 'Expression guide' })).toHaveCount(0);
+  await expect(editorDialog.getByLabel('Message')).toHaveCount(0);
 
   await editorDialog.getByRole('button', { name: 'Start revision' }).click();
   await expect(editorDialog.getByText('Draft', { exact: true })).toBeVisible();
@@ -923,54 +1503,60 @@ test('workspace rule authoring supports simulation, immutable revisions, and arc
   publishDialog = page.locator('[data-slot="alert-dialog-content"]');
   await expect(publishDialog).toContainText('Version 2 will be immutable.');
   await publishDialog.getByRole('button', { name: 'Publish version' }).click();
-  await expect(editorDialog.getByText('Version 2')).toBeVisible();
+  await expect(editorDialog.getByText('Version 2').first()).toBeVisible();
 
   await editorDialog.getByRole('button', { name: 'Archive', exact: true }).click();
   const archiveDialog = page.locator('[data-slot="alert-dialog-content"]');
   await expect(archiveDialog.getByRole('heading', { name: 'Archive this rule?' })).toBeVisible();
   await expect(archiveDialog).toContainText('Published versions already in use remain resolvable.');
   await archiveDialog.getByRole('button', { name: 'Archive', exact: true }).click();
-  await expect(editorDialog.getByText('Archived', { exact: true })).toBeVisible();
+  await expect(
+    editorDialog
+      .locator('[data-slot="managed-dialog-header"] [data-slot="badge"]')
+      .filter({ hasText: 'Archived' }),
+  ).toBeVisible();
 
+  expect(requests.map((request) => `${request.method} ${request.path}`)).toEqual(
+    expect.arrayContaining([
+      'POST /api/rules',
+      'POST /api/rules/credit_threshold/simulate',
+      'POST /api/rules/credit_threshold/publish',
+      'POST /api/rules/credit_threshold/draft',
+      'POST /api/rules/credit_threshold/archive',
+    ]),
+  );
+  expect(pageErrors).toEqual([]);
+});
+
+test('rules catalog and details stay contained on mobile', async ({ page }, testInfo) => {
+  const pageErrors: string[] = [];
+  page.on('console', (message) => {
+    if (message.type() === 'error') pageErrors.push(message.text());
+  });
+  page.on('pageerror', (error) => pageErrors.push(error.message));
+
+  await mockAuthenticatedSession(page);
+  await mockRulesApi(page);
   await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/rules');
+
+  const catalog = page.getByRole('region', { name: 'Rules catalog' });
   await expectNoDocumentOverflow(page);
-  const editorWindow = editorDialog.locator('[data-slot="managed-dialog-window"]');
-  await expect(editorWindow).toHaveAttribute('data-dialog-preset', 'fullscreen');
-  const dialogBox = await editorWindow.boundingBox();
+  await catalog.getByRole('button', { name: 'Required value', exact: true }).click();
+  const systemDetails = page.getByRole('dialog', { name: 'Required value' });
+  const systemWindow = systemDetails.locator('[data-slot="managed-dialog-window"]');
+  await expect(systemWindow).toHaveAttribute('data-dialog-preset', 'fullscreen');
+  const dialogBox = await systemWindow.boundingBox();
   expect(dialogBox?.x ?? -1).toBeGreaterThanOrEqual(-1);
   expect((dialogBox?.x ?? 0) + (dialogBox?.width ?? 0)).toBeLessThanOrEqual(391);
-  await editorWindow
-    .locator('[data-slot="managed-dialog-header"]')
-    .dblclick({ position: { x: 24, y: 24 } });
-  await expect(editorWindow).toHaveAttribute('data-dialog-preset', 'fullscreen');
-  await expect(editorDialog.getByRole('button', { name: 'Restore dialog size' })).toBeDisabled();
-  await editorDialog.getByRole('button', { name: 'Minimize dialog' }).click();
-  const editorDock = await expectDockAboveFooter(page);
-  await expect(editorDock).toHaveAttribute('data-dialog-preset', 'windowed');
-  await expect(editorDock).toContainText('Credit threshold');
-  await expect(editorDialog).toBeHidden();
-  await page.keyboard.press('Escape');
-
-  await catalog.getByRole('button', { name: 'Required value', exact: true }).click();
-  await expect(systemDetails).toBeVisible();
   await systemDetails.getByRole('button', { name: 'Minimize dialog' }).click();
   const mobileDock = await expectDockAboveFooter(page);
   await expect(mobileDock).toContainText('Required value');
-  const overflowMenu = page.getByRole('button', { name: '1 more windows' });
-  await expect(overflowMenu).toBeVisible();
-  await overflowMenu.click();
-  await page.getByRole('menuitem', { name: /Credit threshold/ }).click();
-  await expect(editorDialog).toBeVisible();
-  await expect(editorWindow).toHaveAttribute('data-dialog-preset', 'fullscreen');
-  await editorDialog.getByRole('button', { name: 'Close dialog' }).click();
-  await expect(editorDialog).toBeHidden();
   await mobileDock.getByRole('button', { name: 'Close dialog' }).click();
   await expect(mobileDock).toBeHidden();
   await expect(catalog).toBeVisible();
   await expectNoDocumentOverflow(page);
-  await catalog.getByRole('button', { name: 'Filters', exact: true }).click();
-  await expectNoDocumentOverflow(page);
-  await page.keyboard.press('Escape');
+  await expect(catalog.getByRole('button', { name: 'Filters', exact: true })).toHaveCount(0);
   const catalogHorizontalViewport = catalog.locator('[data-slot="data-table-viewport"]');
   await expect(catalog.locator('[data-slot="table"]')).toHaveCount(1);
   await expect
@@ -986,20 +1572,11 @@ test('workspace rule authoring supports simulation, immutable revisions, and arc
     .poll(() => catalogHorizontalViewport.evaluate((element) => element.scrollLeft))
     .toBeGreaterThan(0);
   await expectTableColumnsAligned(catalog);
-  await catalogViewport.evaluate((element) => element.scrollTo({ top: 0 }));
+  await catalogHorizontalViewport.evaluate((element) => element.scrollTo({ top: 0 }));
   await catalogHorizontalViewport.evaluate((element) => element.scrollTo({ left: 0 }));
   await testInfo.attach('rules-table-mobile', {
     body: await page.screenshot(),
     contentType: 'image/png',
   });
-  expect(requests.map((request) => `${request.method} ${request.path}`)).toEqual(
-    expect.arrayContaining([
-      'POST /api/rules',
-      'POST /api/rules/credit_threshold/simulate',
-      'POST /api/rules/credit_threshold/publish',
-      'POST /api/rules/credit_threshold/draft',
-      'POST /api/rules/credit_threshold/archive',
-    ]),
-  );
   expect(pageErrors).toEqual([]);
 });

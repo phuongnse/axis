@@ -13,7 +13,7 @@
 | Playwright browser runtime | [frontend/Dockerfile.e2e](../../frontend/Dockerfile.e2e) and [frontend/package.json](../../frontend/package.json) | Containerized `local-dev smoke` and `local-dev e2e` workflows |
 | Lychee | [scripts/axis.py](../../scripts/axis.py) check and [.github/workflows/build-and-test.yml](../../.github/workflows/build-and-test.yml) pin | Markdown link checks |
 | GitHub CLI | portable setup pin in [scripts/axis_setup.py](../../scripts/axis_setup.py) | optional publication adapter |
-| Renovate validator | [scripts/axis.py](../../scripts/axis.py) check | Dependency automation config |
+| Renovate validator | Exact version in [scripts/axis.py](../../scripts/axis.py) | Dependency automation config |
 | Pre-PR review checkpoint | [scripts/axis.py](../../scripts/axis.py) check | `$axis-pull-request` before GitHub PR actions |
 
 Project commands use `python`; substitute `python3` on WSL/Linux or `py -3` on Windows when that is the available Python 3 launcher.
@@ -45,7 +45,7 @@ Project commands use `python`; substitute `python3` on WSL/Linux or `py -3` on W
 - Use `python scripts/axis.py generate theme` after editing [theme/axis-theme.json](../../theme/axis-theme.json); `python scripts/axis.py check theme` rejects stale web or email projections.
 - Use `python scripts/axis.py dotnet test [path/to/project.csproj] -- <dotnet-test-args>`; omit the project to test `Axis.sln`.
 - Keep raw Docker, dotnet, npm, Lychee, and OpenSSL calls inside wrappers or package scripts.
-- Use `python scripts/axis.py local-dev smoke -- <playwright-args>` for the narrow smoke journey and `python scripts/axis.py local-dev e2e -- <playwright-args>` for focused or full browser evidence. Both commands reconcile the local stack and run Playwright in the same Compose-managed browser environment.
+- Use `python scripts/axis.py local-dev smoke -- <playwright-args>` for the narrow smoke journey and `python scripts/axis.py local-dev e2e -- <playwright-args>` for diff-triggered browser evidence. Omit Playwright arguments only for CI or a cross-cutting diff that invalidates every browser surface. Both commands reconcile the local stack and run Playwright in the same Compose-managed browser environment.
 - Use `python scripts/axis.py ready-review` on a clean checkpoint commit at the review boundary. It runs changed-path verification plus the deterministic policy profile shared with CI.
 - Treat `python scripts/axis.py verify` as the changed-path verification engine behind ready-review, not as complete PR-readiness evidence by itself.
 - Use `python scripts/axis.py verify --plan-only` to inspect changed-path routing without executing tools.
@@ -64,4 +64,6 @@ Project commands use `python`; substitute `python3` on WSL/Linux or `py -3` on W
 - Command tests prove supported subcommands and current behavior.
 - Removed or renamed commands, markers, headings, and artifacts get a one-time `rg` sweep plus current owner links, not permanent denylist checks.
 - Diff-aware checks include PR range plus staged, unstaged, and untracked files.
+- `python scripts/axis.py check frontend-dependency-versions` requires exact direct npm versions and overrides, and keeps the Node/npm source, portable setup, and dev image on one exact baseline. `package-lock.json` owns the resolved graph; install it through `python scripts/axis.py frontend install`.
 - The frontend vulnerability gate evaluates the full npm audit JSON. High and critical findings always fail; every lower-severity advisory needs a current exact acceptance of at most 30 days in [frontend/dependency-risk-acceptances.json](../../frontend/dependency-risk-acceptances.json). New, changed, expired, overlong, and stale acceptances fail the same gate.
+- Changed-path verification runs both frontend dependency gates for every frontend diff, matching pull-request CI. [.github/workflows/dependency-security.yml](../../.github/workflows/dependency-security.yml) audits the locked npm and NuGet graphs daily on the default branch.

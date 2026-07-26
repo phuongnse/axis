@@ -17,6 +17,28 @@ public sealed class RuleConditionEvaluatorTests
             .Should().BeEquivalentTo(
                 Enum.GetValues<RulePredicateOperator>(),
                 options => options.WithStrictOrdering());
+        RuleExpressionLanguage.LogicalOperators.Select(definition => definition.Operator)
+            .Should().BeEquivalentTo(
+                Enum.GetValues<RuleLogicalOperator>(),
+                options => options.WithStrictOrdering());
+        RuleExpressionLanguage.OperandKinds.Select(definition => definition.Kind)
+            .Should().BeEquivalentTo(
+                Enum.GetValues<RuleOperandKind>(),
+                options => options.WithStrictOrdering());
+        RuleExpressionLanguage.Operators.Select(definition => definition.Documentation)
+            .Concat(RuleExpressionLanguage.Functions.Select(definition => definition.Documentation))
+            .Concat(RuleExpressionLanguage.LogicalOperators.Select(definition => definition.Documentation))
+            .Concat(RuleExpressionLanguage.OperandKinds.Select(definition => definition.Documentation))
+            .Concat(RuleExpressionLanguage.ValueTypes.Select(definition => definition.Documentation))
+            .Concat(RuleExpressionLanguage.Cardinalities.Select(definition => definition.Documentation))
+            .Concat(RuleExpressionLanguage.Limits.Select(definition => definition.Documentation))
+            .Should().OnlyContain(documentation =>
+                documentation.Locales.Keys.Order().SequenceEqual(new[] { "en", "vi" }) &&
+                documentation.Locales.Values.All(content =>
+                    !string.IsNullOrWhiteSpace(content.DisplayName) &&
+                    !string.IsNullOrWhiteSpace(content.Summary) &&
+                    !string.IsNullOrWhiteSpace(content.Usage) &&
+                    content.Examples.Count > 0));
         RulePredicateOperatorDefinition ordered = RuleExpressionLanguage.Operators.Single(
             definition => definition.Operator == RulePredicateOperator.GreaterThan);
         ordered.LeftShapes.Should().OnlyContain(shape =>
@@ -231,10 +253,33 @@ public sealed class RuleConditionEvaluatorTests
         RuleScope.Record,
         "Business object record",
         [
-            RuleContextField.Create("record.amount", "Amount", RuleValueType.Decimal).Value,
-            RuleContextField.Create("record.status", "Status", RuleValueType.Text).Value,
-            RuleContextField.Create("record.occurred_at", "Occurred at", RuleValueType.DateTime).Value,
+            RuleContextField.Create(
+                "record.amount",
+                "Amount",
+                RuleValueType.Decimal,
+                Documentation("Amount")).Value,
+            RuleContextField.Create(
+                "record.status",
+                "Status",
+                RuleValueType.Text,
+                Documentation("Status")).Value,
+            RuleContextField.Create(
+                "record.occurred_at",
+                "Occurred at",
+                RuleValueType.DateTime,
+                Documentation("Occurred at")).Value,
         ]).Value;
+
+    private static RuleReferenceDocumentation Documentation(string displayName) =>
+        RuleReferenceDocumentation.Bilingual(
+            displayName,
+            $"Reference for {displayName}.",
+            $"Use {displayName} in a compatible condition.",
+            displayName,
+            displayName,
+            $"Tham chiếu cho {displayName}.",
+            $"Dùng {displayName} trong điều kiện tương thích.",
+            displayName);
 
     private static RulePredicateCondition Predicate(
         string nodeId,

@@ -42,13 +42,11 @@ Mutation success handlers should write returned entities into exact detail cache
 
 Put shareable pagination, filters, and selected record identifiers in route search params. Keep local state for draft-only UI state that should reset on navigation or reload.
 
-## TypeScript discipline
+## TypeScript and server-owned values
 
-Strict TS, no `any`, generated API types for backend contracts.
+Use strict TS with no `any` and generated API types for backend contracts. Frontend forms submit user-authored decisions and required protocol tokens only. If a value is derived by the system, the UI may show an advisory read-only preview, but the generated API request type must exclude that value and the response remains the source of truth.
 
-## Server-owned values
-
-Frontend forms submit user-authored decisions and required protocol tokens only. If a value is derived by the system, the UI may show an advisory read-only preview, but the generated API request type must exclude that value and the response remains the source of truth.
+Backend-owned business vocabulary follows the system-wide source-ownership contract in [client-experience.md](./client-experience.md#server-owned-product-vocabulary). Consume generated reference metadata directly for labels, selected values, guidance, examples, and compatibility. Do not reproduce backend enum or capability meaning with frontend switches, interpolated translation keys, or static documentation arrays. Generic UI copy remains client-owned and localized.
 
 ## Routing
 
@@ -67,6 +65,8 @@ Use these ownership layers:
 - **App-pattern zone** — `frontend/src/components/shared` owns reusable Axis composition and adapters. Give them narrow Axis-owned props such as product state, not provider variants, types, selectors, or DOM assumptions.
 - **Feature zone** — feature components compose defaults and app patterns. Consumer `className` is outer layout-only and must not alter primitive visuals.
 
+[docs/playbooks/client-experience.md](./client-experience.md) owns the self-directed experience contract, view hierarchy, relationship selection, semantic component choice, and pre-JSX audit. Feature code must not import raw `Badge`.
+
 Every interactive surface follows one state-role hierarchy:
 
 | State role | Examples | Visual contract | Relative emphasis |
@@ -78,7 +78,7 @@ Every interactive surface follows one state-role hierarchy:
 
 Persistent item emphasis must exceed transient item emphasis in light and dark mode. Compare equivalent state roles across overlays, navigation, collections/tables, and form options; action variants keep their component contract. Outside registry primitives, `frontend/src/components/shared/interactionStates.ts` is the only visual-state class owner; other shared, feature, and route code composes it without local state colors. Stacked single-choice options use `OptionList` for full-width, inline-start content.
 
-Full form- or page-level informational, success, warning, and destructive feedback uses the app-owned `StatusNotice` pattern so text, icon, and semantic tone stay aligned. Feedback directly attached to the compact `InlinePromptAction` pattern uses its shared feedback component at the same type scale; lifecycle labels use `StatusBadge` with published as success, draft/unpublished as neutral, and archived as muted.
+Full page, form, dialog, and menu informational, success, warning, and destructive feedback uses the app-owned `StatusNotice` pattern so text, icon, and semantic tone stay aligned; feature and shared consumers do not import raw `Alert`. Feedback directly attached to the compact `InlinePromptAction` pattern uses its shared feedback component at the same type scale; lifecycle labels use `StatusBadge` with published as success, draft/unpublished as neutral, and archived as muted.
 
 Use `$axis-ui-system` for token/customization decisions, registry diffs, baseline refreshes, or provider changes. Never bulk-overwrite unrelated registry components. A reviewed upstream sync and matching baseline refresh need provenance but no additional sign-off when they introduce no customization or exception. Explicit sign-off is required for semantic-token visual changes, cross-feature visual/API conventions, primitive exceptions, style/base/provider or major-library changes, and all customizations.
 

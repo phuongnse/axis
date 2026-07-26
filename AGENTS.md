@@ -20,6 +20,7 @@ Do not invent IDs, endpoints, tables, or product behavior. If code and docs conf
 - Non-trivial changes need a [docs/playbooks/design-gate.md](./docs/playbooks/design-gate.md) dossier; high-risk surfaces need user sign-off before code.
 - Keep database schema changes migration-backed and reviewable.
 - Tech-stack changes need explicit approval and a [docs/TECH_STACK.md](./docs/TECH_STACK.md) update.
+- Compatibility is a product constraint, not an automatic implementation goal. When the owning contract and current product phase require no compatibility, replace the old surface cleanly; do not add shims, dual paths, flags, or fallback behavior.
 
 ## Operating Rules
 

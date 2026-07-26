@@ -26,6 +26,7 @@ public sealed class SaveRuleDefinitionDraftHandlerTests
         SaveRuleDefinitionDraftHandler sut = new(
             _context.CurrentUser,
             _context.ContextRegistry,
+            new RuleExpressionAuthoringService(_context.ContextRegistry),
             _context.Repository,
             _context.UnitOfWork);
 
@@ -40,7 +41,7 @@ public sealed class SaveRuleDefinitionDraftHandlerTests
                 definition.ContextSchemaVersion,
                 RuleOutcomeKind.Validation,
                 [new RuleParameterDefinitionDto("threshold", RuleValueType.Decimal, true, false, [])],
-                RuleDefinitionHandlerTestContext.ConditionDto(),
+                "@context.field.value GreaterThan @parameters.threshold",
                 RuleDefinitionHandlerTestContext.OutcomeDto()),
             CancellationToken.None);
 

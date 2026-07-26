@@ -26,10 +26,10 @@ Follow [reference.md](../reference.md).
 
 1. Locate the owning spec and confirm each required expected result is supported by its AC, flow, or decision; this workflow **Delegates** gaps to `$axis-use-case-spec` and resumes only with **Ready** evidence.
 2. Carry or obtain Design Gate evidence. This workflow **Delegates** foundational module decisions to `$axis-module-architecture`, adopted tactical work to `$axis-module-patterns`, wire changes to `$axis-api-contract`, and SPA slices to `$axis-frontend-feature`; each delegate returns evidence here.
-3. Map every in-scope AC to required AT rows and a lowest reliable automated boundary before implementation.
-4. Work in dependency order: Domain, Application, Infrastructure, API, Frontend. Do not start a higher layer while a required lower-layer gap is unresolved.
+3. Map every in-scope AC to required AT rows and its lowest reliable automated boundary before implementation. Keep browser ATs independently runnable and outcome-focused; do not use one end-to-end test as a substitute for component, API, or persistence evidence.
+4. Work in dependency order: Domain, Application, Infrastructure, API, Frontend. Do not start a higher layer while a required lower-layer gap is unresolved. For an approved clean cutover, replace every layer and caller in the same slice; do not leave a compatibility branch.
 5. Add or update proving tests first when practical; implement narrowly using same-module patterns and preserve business-safe failures, thin endpoints, and generated contracts.
-6. Reconcile implementation status and the evidence sidecar with changed paths and required ATs. Record exact deferred ACs. Mark an AT `N/A` only when the owning contract proves it out of scope or non-applicable; every other required AT needs passing evidence.
+6. Reconcile implementation status and the evidence sidecar with changed paths and required ATs. Record exact deferred ACs. For an approved clean cutover, run the dossier's identifier sweep and remove obsolete compatibility tests and guidance; preserve compatibility evidence when the dossier requires compatibility. Mark an AT `N/A` only when the owning contract proves it out of scope or non-applicable; every other required AT needs passing evidence.
 7. Run every required AT command plus focused static checks, then return acceptance evidence, status, and gaps to the caller. Publication is separate.
 
 ## Output

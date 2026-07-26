@@ -307,7 +307,7 @@ test.describe('app frame', () => {
       .getByRole('navigation', { name: 'Modules' })
       .getByRole('link', { name: 'Rules' })
       .click();
-    await expect(page).toHaveURL(/\/rules$/);
+    await expect(page).toHaveURL(/\/rules(?:\?.*)?$/);
     await expect(page.getByRole('heading', { name: 'Rules', exact: true })).toBeVisible();
 
     for (const mode of ['light', 'dark'] as const) {
@@ -460,7 +460,7 @@ test.describe('app frame', () => {
     await page.keyboard.press('Escape');
 
     await page.getByRole('link', { name: 'Rules' }).click();
-    await expect(page).toHaveURL(/\/rules$/);
+    await expect(page).toHaveURL(/\/rules(?:\?.*)?$/);
     await expect(page.getByRole('heading', { name: 'Rules', exact: true })).toBeVisible();
     await expectRouteViewportTouchesMain(page, '32px');
     await expectNoPageOverflow(page);
@@ -488,7 +488,7 @@ test.describe('app frame', () => {
 
     await page.keyboard.press('Escape');
     await page.getByRole('link', { name: 'Rules' }).click();
-    await expect(page).toHaveURL(/\/rules$/);
+    await expect(page).toHaveURL(/\/rules(?:\?.*)?$/);
     await expect(page.getByRole('heading', { name: 'Rules', exact: true })).toBeVisible();
     await expectRouteViewportTouchesMain(page, '16px');
     await expectNoPageOverflow(page);

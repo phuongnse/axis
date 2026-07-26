@@ -67,7 +67,9 @@ describe('BusinessObjectsPage', () => {
     await loadBusinessObjectDefinitionsRoute({ queryClient });
 
     expect(fetch).toHaveBeenCalledTimes(2);
-    expect(queryClient.getQueryData(businessObjectDefinitionQueryKeys.list(1, 20))).toEqual(page);
+    expect(
+      queryClient.getQueryData(businessObjectDefinitionQueryKeys.list(1, 20, '', 'en')),
+    ).toEqual(page);
     expect(
       queryClient.getQueryData(
         ruleDefinitionQueryKeys.list({ page: 1, pageSize: 100, scope: 'Field' }),
@@ -154,6 +156,21 @@ describe('BusinessObjectsPage', () => {
     );
 
     const definitionDialog = await screen.findByRole('dialog', { name: 'Customer' });
+    const readOnlyDetails = definitionDialog.querySelector(
+      '[data-slot="business-object-read-only-details"]',
+    );
+    expect(readOnlyDetails).not.toBeNull();
+    expect(within(definitionDialog).getByText('Not published')).toBeVisible();
+    expect(within(readOnlyDetails as HTMLElement).getByText('customer')).toBeVisible();
+    expect(within(readOnlyDetails as HTMLElement).getByText('1')).toBeVisible();
+    expect(
+      within(readOnlyDetails as HTMLElement).getByRole('heading', { name: 'Status' }),
+    ).toBeVisible();
+    expect(within(readOnlyDetails as HTMLElement).getByText('Single')).toBeVisible();
+    expect(within(readOnlyDetails as HTMLElement).getByText('field.required')).toBeVisible();
+    expect(within(definitionDialog).queryByRole('textbox')).not.toBeInTheDocument();
+    expect(within(definitionDialog).queryByRole('combobox')).not.toBeInTheDocument();
+    expect(within(definitionDialog).queryByRole('tablist')).not.toBeInTheDocument();
     const footer = definitionDialog.querySelector('[data-slot="managed-dialog-footer"]');
     expect(footer).not.toBeNull();
     expect(within(footer as HTMLElement).getByRole('button', { name: 'Close' })).toBeEnabled();
@@ -165,6 +182,100 @@ describe('BusinessObjectsPage', () => {
     await waitFor(() =>
       expect(screen.queryByRole('dialog', { name: 'Customer' })).not.toBeInTheDocument(),
     );
+  });
+
+  it('reviews the immutable contract before publishing a definition', async () => {
+    const user = userEvent.setup();
+    const detail = definitionDetail();
+    vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const path = requestPath(input);
+      const method = init?.method ?? 'GET';
+      if (isRulesRequest(input)) return jsonResponse(fieldRuleDefinitions);
+      if (path === '/api/business-object-definitions' && method === 'GET') {
+        return jsonResponse(pageWith(detail));
+      }
+      if (path === `/api/business-object-definitions/${definitionId}` && method === 'GET') {
+        return jsonResponse(detail);
+      }
+      if (
+        path === `/api/business-object-definitions/${definitionId}/publish` &&
+        method === 'POST'
+      ) {
+        return jsonResponse(detail);
+      }
+      throw new Error(`Unexpected fetch: ${method} ${path}`);
+    });
+
+    await renderPage(
+      `/business-objects?page=1&dialog=edit&recordId=${encodeURIComponent(definitionId)}`,
+    );
+    const definitionDialog = await screen.findByRole('dialog', { name: 'Customer' });
+    await user.click(within(definitionDialog).getByRole('button', { name: 'Publish' }));
+
+    const review = await screen.findByRole('alertdialog', { name: 'Publish this definition?' });
+    expect(review).toHaveTextContent(
+      'Publishing creates an immutable version that future records will use.',
+    );
+    expect(review).toHaveTextContent('Customer');
+    expect(review).toHaveTextContent('customer');
+    expect(review).toHaveTextContent('Fields1');
+    expect(review).toHaveTextContent('Field rules1');
+    expect(
+      vi
+        .mocked(fetch)
+        .mock.calls.some(
+          ([input, init]) =>
+            requestPath(input) === `/api/business-object-definitions/${definitionId}/publish` &&
+            init?.method === 'POST',
+        ),
+    ).toBe(false);
+
+    await user.click(within(review).getByRole('button', { name: 'Publish' }));
+    await waitFor(() =>
+      expect(
+        vi
+          .mocked(fetch)
+          .mock.calls.some(
+            ([input, init]) =>
+              requestPath(input) === `/api/business-object-definitions/${definitionId}/publish` &&
+              init?.method === 'POST',
+          ),
+      ).toBe(true),
+    );
+  });
+
+  it('shows publish failures inside the confirmation dialog', async () => {
+    const user = userEvent.setup();
+    const detail = definitionDetail();
+    vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const path = requestPath(input);
+      const method = init?.method ?? 'GET';
+      if (isRulesRequest(input)) return jsonResponse(fieldRuleDefinitions);
+      if (path === '/api/business-object-definitions' && method === 'GET') {
+        return jsonResponse(pageWith(detail));
+      }
+      if (path === `/api/business-object-definitions/${definitionId}` && method === 'GET') {
+        return jsonResponse(detail);
+      }
+      if (
+        path === `/api/business-object-definitions/${definitionId}/publish` &&
+        method === 'POST'
+      ) {
+        return jsonResponse({ title: 'Publish failed' }, 409);
+      }
+      throw new Error(`Unexpected fetch: ${method} ${path}`);
+    });
+
+    await renderPage(
+      `/business-objects?page=1&dialog=edit&recordId=${encodeURIComponent(definitionId)}`,
+    );
+    const definitionDialog = await screen.findByRole('dialog', { name: 'Customer' });
+    await user.click(within(definitionDialog).getByRole('button', { name: 'Publish' }));
+    const review = await screen.findByRole('alertdialog', { name: 'Publish this definition?' });
+    await user.click(within(review).getByRole('button', { name: 'Publish' }));
+
+    expect(await within(review).findByText('Unable to update business object')).toBeVisible();
+    expect(review).toBeVisible();
   });
 
   it('waits for deep-link detail before opening and consuming the launch intent', async () => {

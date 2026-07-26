@@ -3,6 +3,7 @@ using Axis.BusinessObjects.Domain.Aggregates;
 using Axis.BusinessObjects.Domain.ValueObjects;
 using Axis.BusinessObjects.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using NpgsqlTypes;
 
 namespace Axis.BusinessObjects.Infrastructure.Repositories;
 
@@ -35,25 +36,80 @@ internal sealed class BusinessObjectDefinitionRepository(BusinessObjectsDbContex
         return await query.AnyAsync(ct);
     }
 
-    public async Task<int> CountForWorkspaceAsync(Guid workspaceId, CancellationToken ct = default) =>
-        await context.BusinessObjectDefinitions
-            .AsNoTracking()
-            .CountAsync(definition => definition.WorkspaceId == workspaceId, ct);
+    public async Task<int> CountForWorkspaceAsync(
+        Guid workspaceId,
+        string? searchQuery = null,
+        CancellationToken ct = default) =>
+        await Search(
+                context.BusinessObjectDefinitions.AsNoTracking()
+                    .Where(definition => definition.WorkspaceId == workspaceId),
+                searchQuery)
+            .CountAsync(ct);
 
     public async Task<IReadOnlyList<BusinessObjectDefinition>> ListForWorkspaceAsync(
         Guid workspaceId,
         int page,
         int pageSize,
+        string? searchQuery = null,
         CancellationToken ct = default) =>
-        await context.BusinessObjectDefinitions
-            .AsNoTracking()
-            .Where(definition => definition.WorkspaceId == workspaceId)
-            .OrderByDescending(definition => definition.UpdatedAt)
-            .ThenBy(definition => definition.Name)
-            .ThenBy(definition => definition.Key)
+        await Order(
+                Search(
+                    context.BusinessObjectDefinitions.AsNoTracking()
+                        .Where(definition => definition.WorkspaceId == workspaceId),
+                    searchQuery),
+                searchQuery)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .ToListAsync(ct);
+
+    private static IQueryable<BusinessObjectDefinition> Search(
+        IQueryable<BusinessObjectDefinition> definitions,
+        string? searchQuery)
+    {
+        if (string.IsNullOrWhiteSpace(searchQuery))
+            return definitions;
+
+        string query = searchQuery.Trim().ToLowerInvariant();
+        return definitions.Where(definition =>
+            EF.Property<NpgsqlTsVector>(definition, "SearchVector")
+                .Matches(EF.Functions.WebSearchToTsQuery("simple", EF.Functions.Unaccent(query))) ||
+            EF.Functions.TrigramsAreSimilar(
+                EF.Property<string>(definition, "SearchTitle"),
+                EF.Functions.Unaccent(query)) ||
+            EF.Functions.ILike(
+                EF.Property<string>(definition, "SearchText"),
+                "%" + EF.Functions.Unaccent(query) + "%"));
+    }
+
+    private static IOrderedQueryable<BusinessObjectDefinition> Order(
+        IQueryable<BusinessObjectDefinition> definitions,
+        string? searchQuery)
+    {
+        if (string.IsNullOrWhiteSpace(searchQuery))
+        {
+            return definitions
+                .OrderByDescending(definition => definition.UpdatedAt)
+                .ThenBy(definition => definition.Name)
+                .ThenBy(definition => definition.Key);
+        }
+
+        string query = searchQuery.Trim().ToLowerInvariant();
+        return definitions
+            .OrderByDescending(definition =>
+                EF.Property<string>(definition, "SearchTitle") == EF.Functions.Unaccent(query))
+            .ThenByDescending(definition =>
+                EF.Property<string>(definition, "SearchTitle").StartsWith(EF.Functions.Unaccent(query)))
+            .ThenByDescending(definition =>
+                EF.Property<NpgsqlTsVector>(definition, "SearchVector")
+                    .RankCoverDensity(
+                        EF.Functions.WebSearchToTsQuery("simple", EF.Functions.Unaccent(query))))
+            .ThenByDescending(definition =>
+                EF.Functions.TrigramsStrictWordSimilarity(
+                    EF.Functions.Unaccent(query),
+                    EF.Property<string>(definition, "SearchText")))
+            .ThenBy(definition => definition.Name)
+            .ThenBy(definition => definition.Key);
+    }
 
     private IQueryable<BusinessObjectDefinition> DefinitionsWithGraph() =>
         context.BusinessObjectDefinitions

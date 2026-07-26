@@ -1,28 +1,22 @@
 import { queryOptions } from '@tanstack/react-query';
 import { fetchApi } from '@/lib/api';
-import type { components } from '@/lib/api-types';
+import type * as ApiTypes from '@/lib/api-generated';
 
-export type BusinessObjectDefinitionDetail =
-  components['schemas']['BusinessObjectDefinitionDetailDto'];
-export type BusinessObjectDefinitionListItem =
-  components['schemas']['BusinessObjectDefinitionListItemDto'];
-export type BusinessObjectDefinitionPage =
-  components['schemas']['BusinessObjectDefinitionListItemDtoPagedResult'];
-export type CreateBusinessObjectDefinitionRequest =
-  components['schemas']['CreateBusinessObjectDefinitionRequest'];
+export type BusinessObjectDefinitionDetail = ApiTypes.BusinessObjectDefinitionDetailDto;
+export type BusinessObjectDefinitionListItem = ApiTypes.BusinessObjectDefinitionListItemDto;
+export type BusinessObjectDefinitionPage = ApiTypes.BusinessObjectDefinitionListItemDtoPagedResult;
+export type CreateBusinessObjectDefinitionRequest = ApiTypes.CreateBusinessObjectDefinitionRequest;
 export type SaveUnpublishedBusinessObjectDefinitionRequest =
-  components['schemas']['SaveUnpublishedBusinessObjectDefinitionRequest'];
+  ApiTypes.SaveUnpublishedBusinessObjectDefinitionRequest;
 export type PublishBusinessObjectDefinitionRequest =
-  components['schemas']['PublishBusinessObjectDefinitionRequest'];
-export type BusinessObjectFieldDefinitionInput =
-  components['schemas']['BusinessObjectFieldDefinitionInput'];
-export type BusinessObjectFieldType = components['schemas']['BusinessObjectFieldType'];
-export type BusinessObjectChoiceSelectionMode =
-  components['schemas']['BusinessObjectChoiceSelectionMode'];
+  ApiTypes.PublishBusinessObjectDefinitionRequest;
+export type BusinessObjectFieldDefinitionInput = ApiTypes.BusinessObjectFieldDefinitionInput;
+export type BusinessObjectFieldType = ApiTypes.BusinessObjectFieldType;
+export type BusinessObjectChoiceSelectionMode = ApiTypes.BusinessObjectChoiceSelectionMode;
 export type BusinessObjectChoiceFieldConfigurationInput =
-  components['schemas']['BusinessObjectChoiceFieldConfigurationInput'];
-export type BusinessObjectFieldRuleDto = components['schemas']['BusinessObjectFieldRuleDto'];
-export type BusinessObjectFieldRuleInput = components['schemas']['BusinessObjectFieldRuleInput'];
+  ApiTypes.BusinessObjectChoiceFieldConfigurationInput;
+export type BusinessObjectFieldRuleDto = ApiTypes.BusinessObjectFieldRuleDto;
+export type BusinessObjectFieldRuleInput = ApiTypes.BusinessObjectFieldRuleInput;
 
 export const businessObjectDefinitionsDefaultPageSize = 20;
 export const businessObjectDefinitionStaleTimeMs = 1000 * 60 * 5;
@@ -30,8 +24,8 @@ export const businessObjectDefinitionStaleTimeMs = 1000 * 60 * 5;
 export const businessObjectDefinitionQueryKeys = {
   all: ['business-object-definitions'] as const,
   lists: () => [...businessObjectDefinitionQueryKeys.all, 'list'] as const,
-  list: (page: number, pageSize: number) =>
-    [...businessObjectDefinitionQueryKeys.lists(), page, pageSize] as const,
+  list: (page: number, pageSize: number, query: string, language: string) =>
+    [...businessObjectDefinitionQueryKeys.lists(), page, pageSize, query, language] as const,
   details: () => [...businessObjectDefinitionQueryKeys.all, 'detail'] as const,
   detail: (id: string) => [...businessObjectDefinitionQueryKeys.all, 'detail', id] as const,
 };
@@ -39,10 +33,12 @@ export const businessObjectDefinitionQueryKeys = {
 export function businessObjectDefinitionsListQueryOptions(
   page = 1,
   pageSize = businessObjectDefinitionsDefaultPageSize,
+  query = '',
+  language = 'en',
 ) {
   return queryOptions({
-    queryKey: businessObjectDefinitionQueryKeys.list(page, pageSize),
-    queryFn: () => listBusinessObjectDefinitions(page, pageSize),
+    queryKey: businessObjectDefinitionQueryKeys.list(page, pageSize, query, language),
+    queryFn: ({ signal }) => listBusinessObjectDefinitions(page, pageSize, query, language, signal),
     staleTime: businessObjectDefinitionStaleTimeMs,
   });
 }
@@ -55,10 +51,19 @@ export function businessObjectDefinitionDetailQueryOptions(id: string) {
   });
 }
 
-export async function listBusinessObjectDefinitions(page: number, pageSize: number) {
+export async function listBusinessObjectDefinitions(
+  page: number,
+  pageSize: number,
+  query = '',
+  language = 'en',
+  signal?: AbortSignal,
+) {
   const search = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
+  if (query.trim()) search.set('query', query.trim());
+  search.set('language', language);
   return fetchApi<BusinessObjectDefinitionPage>(
     `/business-object-definitions?${search.toString()}`,
+    { signal },
   );
 }
 

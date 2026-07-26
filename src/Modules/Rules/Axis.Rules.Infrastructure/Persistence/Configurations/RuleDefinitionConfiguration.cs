@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
+using NpgsqlTypes;
 
 namespace Axis.Rules.Infrastructure.Persistence.Configurations;
 
@@ -139,9 +140,36 @@ internal sealed class RuleDefinitionConfiguration : IEntityTypeConfiguration<Rul
         builder.Property(definition => definition.ArchivedAt)
             .HasColumnName("archived_at");
 
+        builder.Property<string>("SearchTitle")
+            .HasColumnName("search_title")
+            .HasComputedColumnSql(
+                "axis_unaccent(lower(coalesce(name, '')))",
+                stored: true);
+        builder.Property<string>("SearchText")
+            .HasColumnName("search_text")
+            .HasComputedColumnSql(
+                "axis_unaccent(lower(coalesce(name, '') || ' ' || coalesce(description, '') || ' ' || coalesce(definition_key, '') || ' ' || coalesce(context_key, '')))",
+                stored: true);
+        builder.Property<NpgsqlTsVector>("SearchVector")
+            .HasColumnName("search_vector")
+            .HasComputedColumnSql(
+                "to_tsvector('simple', axis_unaccent(lower(coalesce(name, '') || ' ' || coalesce(description, '') || ' ' || coalesce(definition_key, '') || ' ' || coalesce(context_key, ''))))",
+                stored: true);
+
         builder.HasIndex(definition => new { definition.WorkspaceId, definition.Key })
             .IsUnique();
         builder.HasIndex(definition => new { definition.WorkspaceId, definition.Status, definition.Name });
+        builder.HasIndex("SearchTitle")
+            .HasDatabaseName("ix_rule_definitions_search_title")
+            .HasMethod("gin")
+            .HasOperators("gin_trgm_ops");
+        builder.HasIndex("SearchText")
+            .HasDatabaseName("ix_rule_definitions_search_text")
+            .HasMethod("gin")
+            .HasOperators("gin_trgm_ops");
+        builder.HasIndex("SearchVector")
+            .HasDatabaseName("ix_rule_definitions_search_vector")
+            .HasMethod("gin");
 
         builder.HasMany(definition => definition.Versions)
             .WithOne()

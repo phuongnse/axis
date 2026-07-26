@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { ChevronDown, LogOut, Settings2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { AccountAvatar } from '@/components/shared/AccountAvatar';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { StatusNotice } from '@/components/shared/StatusNotice';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Separator } from '@/components/ui/separator';
@@ -87,9 +87,7 @@ export function AppActionsMenu({
           {signingOut ? t('nav.signingOut') : t('nav.signOut')}
         </Button>
         {signOutError ? (
-          <Alert variant="destructive">
-            <AlertDescription>{t('nav.signOutFailed')}</AlertDescription>
-          </Alert>
+          <StatusNotice tone="destructive">{t('nav.signOutFailed')}</StatusNotice>
         ) : null}
       </PopoverContent>
     </Popover>

@@ -51,4 +51,25 @@ public sealed class GetRuleDefinitionHandlerTests
         await _context.Repository.DidNotReceiveWithAnyArgs()
             .GetByKeyForWorkspaceAsync(default, default, default);
     }
+
+    [Fact]
+    public async Task Get_WhenDefinitionIsUnavailableInCurrentWorkspace_ReturnsNotFound()
+    {
+        Axis.Rules.Domain.RuleDefinition definition = RuleDefinitionHandlerTestContext.DraftDefinition();
+        GetRuleDefinitionHandler sut = new(
+            _context.CurrentUser,
+            _context.Repository);
+
+        Result<RuleDefinitionDetailDto> result = await sut.Handle(
+            new GetRuleDefinitionQuery(definition.Key.Value),
+            CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue();
+        result.ErrorCode.Should().Be(ErrorCodes.NotFound);
+        result.ProblemCode.Should().Be(RulesProblemCodes.DefinitionNotFound);
+        await _context.Repository.Received(1).GetByKeyForWorkspaceAsync(
+            definition.Key,
+            RuleDefinitionHandlerTestContext.WorkspaceId,
+            Arg.Any<CancellationToken>());
+    }
 }

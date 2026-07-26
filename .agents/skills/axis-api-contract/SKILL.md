@@ -15,6 +15,7 @@ Follow [reference.md](../reference.md).
 - Contract entry work **Requires** `$axis-design-gate`; public contract changes stop for its high-risk sign-off.
 - Regenerate every affected contract artifact; do not hand-maintain generated parity.
 - Request fields represent user-authored decisions or required protocol tokens; server-owned derived values stay out of the request.
+- Follow the Design Gate compatibility decision. A clean cutover replaces the request/response shape and every generated caller together; do not accept both old and new fields or add fallback binding.
 
 ## Inputs
 
@@ -27,7 +28,7 @@ Follow [reference.md](../reference.md).
 1. Carry current Design Gate evidence; do not rerun it when delegated by a use-case orchestrator.
 2. Read [docs/playbooks/api-patterns.md](../../../docs/playbooks/api-patterns.md), the owning use case, and frontend contract rules when the SPA consumes the surface.
 3. Trace route, DTO, handler, field names, tests, OpenAPI, generated frontend types, and callers with `rg`.
-4. Implement narrowly: thin endpoint, explicit authorization/public decision, stable DTOs, generated casing parity, and business-safe result mapping.
+4. Implement narrowly: thin endpoint, explicit authorization/public decision, stable DTOs, generated casing parity, and business-safe result mapping. Remove the retired shape and callers immediately when the dossier selected clean cutover.
 5. Run `python scripts/axis.py generate api-contracts` when wire shape changes; otherwise record generation as not triggered.
 6. Test route shape, auth, validation, status/body, generation parity, and affected callers at the lowest reliable boundary.
 7. Return the changed contract, generated artifacts, tests, and unresolved decisions to the caller.

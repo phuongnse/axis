@@ -1,9 +1,11 @@
 using Axis.Rules.Application;
 using Axis.Rules.Application.Repositories;
+using Axis.Rules.Application.Search;
 using Axis.Rules.Application.Services;
 using Axis.Rules.Contracts;
 using Axis.Rules.Infrastructure.Persistence;
 using Axis.Rules.Infrastructure.Repositories;
+using Axis.Rules.Infrastructure.Search;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -19,8 +21,12 @@ public static class RulesInfrastructureExtensions
         services.AddDbContext<RulesDbContext>(options =>
             options.UseNpgsql(configuration.GetConnectionString("Rules")));
         services.AddScoped<IRuleDefinitionRepository, RuleDefinitionRepository>();
+        services.AddScoped<IRuleCatalogSearchProvider, PostgresRuleCatalogSearchProvider>();
+        services.AddScoped<IRuleTextSearchProvider, PostgresRuleTextSearchProvider>();
         services.AddScoped<IUnitOfWork, RulesUnitOfWork>();
         services.AddScoped<RuleContextSchemaRegistry>();
+        services.AddScoped<RuleExpressionAuthoringService>();
+        services.AddScoped<RuleExpressionGuideService>();
         services.AddScoped<IRuleApplicationValidator, RuleApplicationValidator>();
         services.AddScoped<IRuleEvaluator, RuleEvaluator>();
         return services;

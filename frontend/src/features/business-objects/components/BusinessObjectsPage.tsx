@@ -5,13 +5,16 @@ import { useCallback, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   createDataTableMessages,
+  createEmptyFilterExpression,
   DataTable,
   type DataTableColumnDef,
   type DataTableDefinition,
+  type DataTableQueryState,
 } from '@/components/shared/data-table';
 import { useManagedWindowActions } from '@/components/shared/ManagedWindowManager';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { Button } from '@/components/ui/button';
+import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import {
   type BusinessObjectDefinitionListItem,
   businessObjectDefinitionDetailQueryOptions,
@@ -31,8 +34,25 @@ export function BusinessObjectsPage() {
   const { openWindow } = useManagedWindowActions();
   const search = route.useSearch();
   const navigate = route.useNavigate();
-  const definitionsQuery = useQuery(businessObjectDefinitionsListQueryOptions(search.page));
+  const debouncedSearch = useDebouncedValue(search.query ?? '');
+  const definitionsQuery = useQuery(
+    businessObjectDefinitionsListQueryOptions(
+      search.page,
+      businessObjectDefinitionsDefaultPageSize,
+      debouncedSearch,
+      i18n.language,
+    ),
+  );
   const definitions = definitionsQuery.data?.items ?? [];
+  const tableQuery = useMemo<DataTableQueryState>(
+    () => ({
+      globalFilter: search.query ?? '',
+      filterExpression: createEmptyFilterExpression(),
+      sorting: [],
+      grouping: [],
+    }),
+    [search.query],
+  );
   const launchDefinitionQuery = useQuery({
     ...businessObjectDefinitionDetailQueryOptions(search.recordId ?? ''),
     enabled: (search.dialog === 'view' || search.dialog === 'edit') && Boolean(search.recordId),
@@ -108,7 +128,7 @@ export function BusinessObjectsPage() {
         size: 320,
         minSize: 220,
         enableSorting: false,
-        meta: { label: t('businessObjects.name'), searchable: false },
+        meta: { label: t('businessObjects.name') },
         cell: ({ row }) => (
           <Button
             type="button"
@@ -127,7 +147,7 @@ export function BusinessObjectsPage() {
         size: 240,
         minSize: 180,
         enableSorting: false,
-        meta: { label: t('businessObjects.objectKey'), searchable: false },
+        meta: { label: t('businessObjects.objectKey') },
       },
       {
         id: 'status',
@@ -193,7 +213,17 @@ export function BusinessObjectsPage() {
       }),
       getRowId: (definition) =>
         definition.id ?? definition.objectKey ?? definition.name ?? 'definition',
-      globalSearch: false,
+      queryState: tableQuery,
+      onQueryStateChange: (next) => {
+        void navigate({
+          search: (current) => ({
+            ...current,
+            page: 1,
+            query: next.globalFilter.trim() || undefined,
+          }),
+        });
+      },
+      globalSearch: true,
       grouping: false,
       columnControls: true,
       enableColumnResizing: true,
@@ -209,7 +239,7 @@ export function BusinessObjectsPage() {
           {t('businessObjects.new')}
         </Button>
       ),
-      loading: definitionsQuery.isLoading,
+      loading: definitionsQuery.isFetching,
       error: definitionsQuery.isError,
       onRetry: () => void definitionsQuery.refetch(),
     };
@@ -219,13 +249,14 @@ export function BusinessObjectsPage() {
     definitionsQuery.data?.pageSize,
     definitionsQuery.data?.totalCount,
     definitionsQuery.isError,
-    definitionsQuery.isLoading,
+    definitionsQuery.isFetching,
     definitionsQuery.refetch,
     navigate,
     openDefinition,
     openWindow,
     prefetchDefinition,
     search.page,
+    tableQuery,
     t,
   ]);
 

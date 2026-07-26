@@ -30,6 +30,20 @@
               "format": "int32",
               "default": 20
             }
+          },
+          {
+            "name": "query",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "language",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -862,6 +876,20 @@
             "schema": {
               "$ref": "#/components/schemas/RuleLifecycleStatus"
             }
+          },
+          {
+            "name": "query",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "language",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -1050,6 +1078,138 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/RuleExpressionLanguageDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/api/rules/expression-language/assist": {
+      "post": {
+        "tags": [
+          "Rules"
+        ],
+        "summary": "Parse, complete, and explain rule expression syntax",
+        "operationId": "AssistRuleExpression",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssistRuleExpressionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuleExpressionAuthoringDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/api/rules/expression-language/guide": {
+      "post": {
+        "tags": [
+          "Rules"
+        ],
+        "summary": "Browse and search the contextual rule expression guide",
+        "operationId": "SearchRuleExpressionGuide",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SearchRuleExpressionGuideRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuleExpressionGuideDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
                 }
               }
             }
@@ -1619,6 +1779,45 @@
   },
   "components": {
     "schemas": {
+      "AssistRuleExpressionRequest": {
+        "type": "object",
+        "properties": {
+          "expressionLanguageVersion": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "contextKey": {
+            "type": "string",
+            "nullable": true
+          },
+          "contextSchemaVersion": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "parameters": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RuleParameterDefinitionDto"
+            }
+          },
+          "syntax": {
+            "type": "string",
+            "nullable": true
+          },
+          "condition": {
+            "$ref": "#/components/schemas/RuleConditionNodeDto"
+          },
+          "cursorOffset": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "language": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
       "BusinessObjectChoiceFieldConfigurationDto": {
         "type": "object",
         "properties": {
@@ -2324,6 +2523,9 @@
           },
           "allowMultiple": {
             "type": "boolean"
+          },
+          "documentation": {
+            "$ref": "#/components/schemas/RuleReferenceDocumentationDto"
           }
         },
         "additionalProperties": false
@@ -2456,6 +2658,9 @@
             "type": "string",
             "format": "date-time",
             "nullable": true
+          },
+          "documentation": {
+            "$ref": "#/components/schemas/RuleReferenceDocumentationDto"
           }
         },
         "additionalProperties": false
@@ -2520,6 +2725,9 @@
             "type": "string",
             "format": "date-time",
             "nullable": true
+          },
+          "documentation": {
+            "$ref": "#/components/schemas/RuleReferenceDocumentationDto"
           }
         },
         "additionalProperties": false
@@ -2601,6 +2809,33 @@
         },
         "additionalProperties": false
       },
+      "RuleExpressionAuthoringDto": {
+        "type": "object",
+        "properties": {
+          "syntax": {
+            "type": "string"
+          },
+          "condition": {
+            "$ref": "#/components/schemas/RuleConditionNodeDto"
+          },
+          "display": {
+            "$ref": "#/components/schemas/RuleExpressionDisplayNodeDto"
+          },
+          "diagnostics": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RuleExpressionDiagnosticDto"
+            }
+          },
+          "completions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RuleExpressionCompletionDto"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
       "RuleExpressionCardinality": {
         "enum": [
           "Scalar",
@@ -2608,6 +2843,111 @@
           "Any"
         ],
         "type": "string"
+      },
+      "RuleExpressionCardinalityDefinitionDto": {
+        "type": "object",
+        "properties": {
+          "cardinality": {
+            "$ref": "#/components/schemas/RuleExpressionCardinality"
+          },
+          "documentation": {
+            "$ref": "#/components/schemas/RuleReferenceDocumentationDto"
+          }
+        },
+        "additionalProperties": false
+      },
+      "RuleExpressionCompletionDto": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string"
+          },
+          "insertText": {
+            "type": "string"
+          },
+          "cursorOffset": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "replacementStart": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "replacementLength": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "referenceKind": {
+            "$ref": "#/components/schemas/RuleExpressionReferenceKind"
+          },
+          "referenceKey": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "RuleExpressionDiagnosticDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "start": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "length": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "RuleExpressionDisplayNodeDto": {
+        "type": "object",
+        "properties": {
+          "nodeId": {
+            "type": "string"
+          },
+          "tokens": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RuleExpressionDisplayTokenDto"
+            }
+          },
+          "children": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RuleExpressionDisplayNodeDto"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "RuleExpressionDisplayTokenDto": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string"
+          },
+          "referenceKind": {
+            "$ref": "#/components/schemas/RuleExpressionReferenceKind"
+          },
+          "referenceKey": {
+            "type": "string",
+            "nullable": true
+          },
+          "isCode": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
       },
       "RuleExpressionFunction": {
         "enum": [
@@ -2639,6 +2979,9 @@
           },
           "returnCardinality": {
             "$ref": "#/components/schemas/RuleExpressionCardinality"
+          },
+          "documentation": {
+            "$ref": "#/components/schemas/RuleReferenceDocumentationDto"
           }
         },
         "additionalProperties": false
@@ -2654,6 +2997,77 @@
           },
           "cardinality": {
             "$ref": "#/components/schemas/RuleExpressionCardinality"
+          }
+        },
+        "additionalProperties": false
+      },
+      "RuleExpressionGuideDto": {
+        "type": "object",
+        "properties": {
+          "expressionLanguageVersion": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "totalResults": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "sections": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RuleExpressionGuideSectionDto"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "RuleExpressionGuideItemDto": {
+        "type": "object",
+        "properties": {
+          "referenceKind": {
+            "$ref": "#/components/schemas/RuleExpressionReferenceKind"
+          },
+          "referenceKey": {
+            "type": "string"
+          },
+          "displayName": {
+            "$ref": "#/components/schemas/SearchTextDto"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/SearchTextDto"
+          },
+          "usage": {
+            "$ref": "#/components/schemas/SearchTextDto"
+          },
+          "examples": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SearchTextDto"
+            }
+          },
+          "detail": {
+            "$ref": "#/components/schemas/SearchTextDto"
+          }
+        },
+        "additionalProperties": false
+      },
+      "RuleExpressionGuideSectionDto": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RuleExpressionGuideItemDto"
+            }
           }
         },
         "additionalProperties": false
@@ -2677,8 +3091,54 @@
               "$ref": "#/components/schemas/RuleExpressionFunctionDefinitionDto"
             }
           },
+          "logicalOperators": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RuleLogicalOperatorDefinitionDto"
+            }
+          },
+          "operandKinds": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RuleOperandKindDefinitionDto"
+            }
+          },
+          "valueTypes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RuleValueTypeDefinitionDto"
+            }
+          },
+          "cardinalities": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RuleExpressionCardinalityDefinitionDto"
+            }
+          },
+          "limitDefinitions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RuleExpressionLimitDefinitionDto"
+            }
+          },
           "limits": {
             "$ref": "#/components/schemas/RuleExpressionLimitsDto"
+          }
+        },
+        "additionalProperties": false
+      },
+      "RuleExpressionLimitDefinitionDto": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "value": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "documentation": {
+            "$ref": "#/components/schemas/RuleReferenceDocumentationDto"
           }
         },
         "additionalProperties": false
@@ -2709,6 +3169,20 @@
         },
         "additionalProperties": false
       },
+      "RuleExpressionReferenceKind": {
+        "enum": [
+          "LogicalOperator",
+          "PredicateOperator",
+          "Function",
+          "Context",
+          "Parameter",
+          "Literal",
+          "ValueType",
+          "OperandKind",
+          "Limit"
+        ],
+        "type": "string"
+      },
       "RuleExpressionValueShapeDto": {
         "type": "object",
         "properties": {
@@ -2736,6 +3210,27 @@
           "Not"
         ],
         "type": "string"
+      },
+      "RuleLogicalOperatorDefinitionDto": {
+        "type": "object",
+        "properties": {
+          "operator": {
+            "$ref": "#/components/schemas/RuleLogicalOperator"
+          },
+          "minimumChildren": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "maximumChildren": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "documentation": {
+            "$ref": "#/components/schemas/RuleReferenceDocumentationDto"
+          }
+        },
+        "additionalProperties": false
       },
       "RuleNodeDiagnosticDto": {
         "type": "object",
@@ -2783,6 +3278,18 @@
           "Function"
         ],
         "type": "string"
+      },
+      "RuleOperandKindDefinitionDto": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/RuleOperandKind"
+          },
+          "documentation": {
+            "$ref": "#/components/schemas/RuleReferenceDocumentationDto"
+          }
+        },
+        "additionalProperties": false
       },
       "RuleOrigin": {
         "enum": [
@@ -2881,6 +3388,42 @@
           },
           "requiresMatchingTypes": {
             "type": "boolean"
+          },
+          "documentation": {
+            "$ref": "#/components/schemas/RuleReferenceDocumentationDto"
+          }
+        },
+        "additionalProperties": false
+      },
+      "RuleReferenceContentDto": {
+        "type": "object",
+        "properties": {
+          "displayName": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "usage": {
+            "type": "string"
+          },
+          "examples": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "RuleReferenceDocumentationDto": {
+        "type": "object",
+        "properties": {
+          "locales": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/RuleReferenceContentDto"
+            }
           }
         },
         "additionalProperties": false
@@ -2967,6 +3510,18 @@
         ],
         "type": "string"
       },
+      "RuleValueTypeDefinitionDto": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "$ref": "#/components/schemas/RuleValueType"
+          },
+          "documentation": {
+            "$ref": "#/components/schemas/RuleReferenceDocumentationDto"
+          }
+        },
+        "additionalProperties": false
+      },
       "SaveRuleDefinitionDraftRequest": {
         "type": "object",
         "properties": {
@@ -2999,8 +3554,8 @@
               "$ref": "#/components/schemas/RuleParameterDefinitionDto"
             }
           },
-          "condition": {
-            "$ref": "#/components/schemas/RuleConditionNodeDto"
+          "expressionSyntax": {
+            "type": "string"
           },
           "outcome": {
             "$ref": "#/components/schemas/RuleOutcomeDto"
@@ -3023,6 +3578,69 @@
             "items": {
               "$ref": "#/components/schemas/BusinessObjectFieldDefinitionInput"
             }
+          }
+        },
+        "additionalProperties": false
+      },
+      "SearchRuleExpressionGuideRequest": {
+        "type": "object",
+        "properties": {
+          "expressionLanguageVersion": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "definitionKey": {
+            "type": "string",
+            "nullable": true
+          },
+          "contextKey": {
+            "type": "string",
+            "nullable": true
+          },
+          "contextSchemaVersion": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "parameters": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RuleParameterDefinitionDto"
+            }
+          },
+          "query": {
+            "type": "string",
+            "nullable": true
+          },
+          "language": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "SearchTextDto": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string"
+          },
+          "segments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SearchTextSegmentDto"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "SearchTextSegmentDto": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string"
+          },
+          "isMatch": {
+            "type": "boolean"
           }
         },
         "additionalProperties": false

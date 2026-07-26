@@ -77,16 +77,16 @@ class TestPortableSetupCli(unittest.TestCase):
 
     def test_setup_treats_node_with_an_unresolved_npm_as_missing(self) -> None:
         with (
-            mock.patch.object(axis, "node_version_status", return_value=(True, "v22.23.1")),
-            mock.patch.object(axis, "_command_version", return_value=("FAIL", "npm not found")),
+            mock.patch.object(axis, "node_version_status", return_value=(True, "v24.18.0")),
+            mock.patch.object(axis, "npm_version_status", return_value=(False, "npm not found")),
         ):
             self.assertFalse(axis.setup_tool_ready("node"))
 
     def test_setup_rejects_node_when_no_paired_toolchain_environment_resolves(self) -> None:
         with (
             mock.patch.object(axis, "frontend_toolchain_env", return_value={}),
-            mock.patch.object(axis, "node_version_status", return_value=(True, "v22.23.1")),
-            mock.patch.object(axis, "_command_version", return_value=("OK", "10.9.8")),
+            mock.patch.object(axis, "node_version_status", return_value=(True, "v24.18.0")),
+            mock.patch.object(axis, "npm_version_status", return_value=(True, "11.16.0")),
         ):
             self.assertFalse(axis.setup_tool_ready("node"))
 
@@ -99,14 +99,14 @@ class TestPortableSetupCli(unittest.TestCase):
 
             def fake_version(name: str, *_args: str, env: dict[str, str] | None = None):
                 if env and env["PATH"].split(axis.os.pathsep)[0] == str(managed_bin):
-                    version = "v22.23.1" if name == "node" else "10.9.8"
+                    version = "v24.18.0" if name == "node" else "11.16.0"
                     return True, version, str(managed_bin / name)
                 if name == "node":
-                    return True, "v22.23.1", str(managed_bin / "node")
-                return True, "10.9.8", "/usr/bin/npm"
+                    return True, "v24.18.0", str(managed_bin / "node")
+                return True, "11.16.0", "/usr/bin/npm"
 
             with (
-                mock.patch.object(axis, "required_node_major", return_value=(True, "22")),
+                mock.patch.object(axis, "required_node_version", return_value=(True, "24.18.0")),
                 mock.patch.object(axis, "command_version_line", side_effect=fake_version),
                 mock.patch.object(axis, "_nvm_node_bin_dirs", return_value=[managed_bin]),
             ):

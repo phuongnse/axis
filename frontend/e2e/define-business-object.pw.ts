@@ -278,7 +278,7 @@ async function mockBusinessObjectDefinitionApi(
     requests.push(requestEntry);
 
     if (method === 'GET' && url.pathname === '/api/business-object-definitions') {
-      const items = hasDefinition
+      const candidates = hasDefinition
         ? [
             {
               id: currentDefinition.id,
@@ -291,6 +291,14 @@ async function mockBusinessObjectDefinitionApi(
             },
           ]
         : [];
+      const query = url.searchParams.get('query')?.trim().toLocaleLowerCase();
+      const items = query
+        ? candidates.filter((definition) =>
+            [definition.name, definition.objectKey].some((value) =>
+              value.toLocaleLowerCase().includes(query),
+            ),
+          )
+        : candidates;
 
       await route.fulfill({
         status: 200,
@@ -615,7 +623,7 @@ test.describe('define business object', () => {
     await expect(dialog).toBeHidden();
 
     await page.getByRole('link', { name: 'Rules' }).click();
-    await expect(page).toHaveURL(/\/rules$/);
+    await expect(page).toHaveURL(/\/rules\?page=1$/);
     await expect(page.getByRole('heading', { name: 'Rules', exact: true })).toBeVisible();
 
     await page.getByRole('button', { name: 'Windows (1)' }).click();
@@ -637,6 +645,28 @@ test.describe('define business object', () => {
     await expect(page.locator('[data-slot="managed-dialog-window"]')).toHaveCount(0);
     await expectNoPageOverflow(page);
     expect(pageErrors).toEqual([]);
+  });
+
+  test('business object catalog search is server-driven and shareable', async ({ page }) => {
+    await mockAuthenticatedSession(page);
+    await mockBusinessObjectDefinitionApi(page);
+    await page.goto('/business-objects');
+
+    await page.getByRole('button', { name: 'New definition' }).click();
+    let dialog = page.getByRole('dialog', { name: 'Define business object' });
+    await dialog.getByLabel('Name', { exact: true }).fill('Customer');
+    await dialog.getByRole('button', { name: 'Start definition' }).click();
+    dialog = page.getByRole('dialog', { name: 'Customer' });
+    await dialog.getByRole('button', { name: 'Close dialog' }).click();
+
+    const catalog = page.getByRole('region', { name: 'Definitions' });
+    const search = catalog.getByLabel('Search business objects');
+    await search.fill('customer');
+    await expect.poll(() => new URL(page.url()).searchParams.get('query')).toBe('customer');
+    await expect(catalog.getByRole('button', { name: 'Customer', exact: true })).toBeVisible();
+
+    await search.fill('missing');
+    await expect(catalog.getByText('No matching rows')).toBeVisible();
   });
 
   test('AT-013 browser journey creates, saves, and publishes a definition', async ({ page }) => {
@@ -691,8 +721,23 @@ test.describe('define business object', () => {
     await expect(dialog.getByRole('button', { name: 'Publish', exact: true })).toBeEnabled();
 
     await dialog.getByRole('button', { name: 'Publish', exact: true }).click();
+    const publishReview = page.locator('[data-slot="alert-dialog-content"]');
+    await expect(
+      publishReview.getByRole('heading', { name: 'Publish this definition?' }),
+    ).toBeVisible();
+    await expect(publishReview).toContainText(
+      'Publishing creates an immutable version that future records will use.',
+    );
+    await expect(publishReview).toContainText('Object keycustomer');
+    await expect(publishReview).toContainText('Fields1');
+    await publishReview.getByRole('button', { name: 'Publish', exact: true }).click();
 
-    await expect(dialog.getByRole('tab', { name: 'Published version' })).toBeVisible();
+    const publishedDetails = dialog.locator('[data-slot="business-object-read-only-details"]');
+    await expect(publishedDetails).toBeVisible();
+    await expect(publishedDetails.getByText('customer', { exact: true })).toBeVisible();
+    await expect(publishedDetails.getByRole('heading', { name: 'Name' })).toBeVisible();
+    await expect(publishedDetails.getByText('Text', { exact: true })).toBeVisible();
+    await expect(dialog.getByRole('tablist')).toHaveCount(0);
     await expect(dialog.getByRole('button', { name: 'Publish', exact: true })).toHaveCount(0);
     await expectNoPageOverflow(page);
 
@@ -728,8 +773,7 @@ test.describe('define business object', () => {
 
   test('AT-008 browser journey configures field rules and publishes the typed contract', async ({
     page,
-  }, testInfo) => {
-    testInfo.setTimeout(60_000);
+  }) => {
     const pageErrors: string[] = [];
     page.on('console', (message) => {
       if (message.type() === 'error') {
@@ -807,11 +851,22 @@ test.describe('define business object', () => {
     await expect(dialog.getByRole('button', { name: 'Publish', exact: true })).toBeEnabled();
 
     await dialog.getByRole('button', { name: 'Publish', exact: true }).click();
+    const publishReview = page.locator('[data-slot="alert-dialog-content"]');
+    await expect(
+      publishReview.getByRole('heading', { name: 'Publish this definition?' }),
+    ).toBeVisible();
+    await expect(publishReview).toContainText('Fields1');
+    await expect(publishReview).toContainText('Field rules1');
+    await publishReview.getByRole('button', { name: 'Publish', exact: true }).click();
 
-    await expect(dialog.getByRole('tab', { name: 'Published version' })).toBeVisible();
-    await expect(dialog.getByLabel('Type')).toContainText('Choice');
-    await expect(options.getByLabel('Option key').nth(0)).toHaveValue('draft');
-    await expect(options.getByLabel('Label', { exact: true }).nth(2)).toHaveValue('Approved');
+    const publishedDetails = dialog.locator('[data-slot="business-object-read-only-details"]');
+    await expect(publishedDetails).toBeVisible();
+    await expect(publishedDetails.getByRole('heading', { name: 'Status' })).toBeVisible();
+    await expect(publishedDetails.getByText('Choice', { exact: true })).toBeVisible();
+    await expect(publishedDetails.getByText('Single', { exact: true })).toBeVisible();
+    await expect(publishedDetails.getByText('Approved', { exact: false })).toBeVisible();
+    await expect(publishedDetails.getByText('Required value', { exact: true })).toBeVisible();
+    await expect(dialog.getByRole('tablist')).toHaveCount(0);
     await expectNoDesktopDocumentScroll(page);
     await expectNoPageOverflow(page);
 

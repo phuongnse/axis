@@ -1,25 +1,14 @@
 import { type ReactNode, useId } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ManagedDialog, ManagedDialogBody } from '@/components/shared/ManagedDialog';
+import { MetadataTag } from '@/components/shared/MetadataTag';
 import { StatusBadge } from '@/components/shared/StatusBadge';
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from '@/components/ui/accordion';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { referenceContent } from '@/lib/reference-metadata';
 import { cn } from '@/lib/utils';
-import type { RuleDefinitionDetail, RuleSeverity } from '../api';
-import {
-  fieldTypeTranslationKey,
-  ruleDescriptionTranslationKey,
-  ruleNameTranslationKey,
-  ruleSetupTranslationKey,
-} from '../metadata';
-import { RuleExpressionView } from './RuleExpressionView';
+import type { RuleDefinitionDetail } from '../api';
+import { compareFieldTypes, fieldTypeTranslationKey } from '../metadata';
+import { RuleBehaviorSummary } from './RuleBehaviorSummary';
 import { RuleOriginBadge } from './RuleOriginBadge';
 
 export function SystemRuleDetailsDialog({
@@ -37,24 +26,21 @@ export function SystemRuleDetailsDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const detailsId = useId();
 
-  const nameKey = ruleNameTranslationKey(definition?.definitionKey);
-  const descriptionKey = ruleDescriptionTranslationKey(definition?.definitionKey);
-  const setupKey = ruleSetupTranslationKey(definition?.definitionKey);
-  const name = nameKey ? t(nameKey) : (definition?.name ?? fallbackTitle ?? t('rules.unknownRule'));
-  const description = descriptionKey
-    ? t(descriptionKey)
-    : (definition?.description ?? t('rules.unknownRuleDescription'));
-  const targetTypes = definition?.applicability?.targetTypeKeys ?? [];
+  const documentation = referenceContent(definition?.documentation, i18n.language);
+  const name =
+    documentation?.displayName ?? definition?.name ?? fallbackTitle ?? t('rules.unknownRule');
+  const description =
+    documentation?.summary ?? definition?.description ?? t('rules.unknownRuleDescription');
+  const targetTypes = [...(definition?.applicability?.targetTypeKeys ?? [])].sort(
+    compareFieldTypes,
+  );
   const parameters = definition?.parameters ?? [];
   const setup =
-    setupKey === 'rules.setup.required'
-      ? t('rules.readyToUse')
-      : setupKey
-        ? t(setupKey)
-        : t('rules.setup.configured');
+    documentation?.usage ??
+    t(parameters.length > 0 ? 'rules.setup.configured' : 'rules.setup.none');
 
   return (
     <ManagedDialog
@@ -99,47 +85,17 @@ export function SystemRuleDetailsDialog({
                 title={t('rules.whatThisRuleDoes')}
                 description={t('rules.ruleBehaviorDescription')}
               />
-              <Card size="sm">
-                <CardContent
-                  data-slot="system-rule-behavior-grid"
-                  className="grid gap-5 @md/system-rule-details:grid-cols-2"
-                >
-                  <div className="space-y-2">
-                    <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-                      {t('rules.when')}
-                    </p>
-                    {definition.condition ? (
-                      <RuleExpressionView condition={definition.condition} />
-                    ) : (
-                      <p className="text-sm text-muted-foreground">{t('rules.notSet')}</p>
-                    )}
-                  </div>
-                  <div className="space-y-3">
-                    <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-                      {t('rules.then')}
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                      <Badge variant="outline">
-                        {t(
-                          definition.outcomeKind === 'Decision'
-                            ? 'rules.outcomeDecision'
-                            : 'rules.outcomeValidation',
-                        )}
-                      </Badge>
-                      {definition.outcome?.severity ? (
-                        <Badge variant={severityBadgeVariants[definition.outcome.severity]}>
-                          {t(`rules.severity${definition.outcome.severity}`)}
-                        </Badge>
-                      ) : null}
-                    </div>
-                    <p className="text-sm leading-relaxed font-medium text-foreground">
-                      {definition.outcome?.message ??
-                        definition.outcome?.decision ??
-                        t('rules.notSet')}
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
+              <RuleBehaviorSummary
+                definitionKey={definition.definitionKey}
+                condition={definition.condition}
+                outcome={definition.outcome}
+                expressionLanguageVersion={definition.expressionLanguageVersion}
+                flowSlot="system-rule-behavior-flow"
+                outcomeSlot="system-rule-outcome"
+                effectSlot="system-rule-effect"
+                parameters={definition.parameters}
+                references
+              />
             </section>
 
             <section
@@ -170,14 +126,14 @@ export function SystemRuleDetailsDialog({
                   }
                 />
                 <DetailItem
-                  label={t('rules.fieldTypes')}
+                  label={t('rules.supportedFieldTypes')}
                   value={
                     targetTypes.length > 0 ? (
                       <span className="flex flex-wrap gap-2">
                         {targetTypes.map((fieldType) => (
-                          <Badge key={fieldType} variant="secondary">
+                          <MetadataTag key={fieldType}>
                             {t(fieldTypeTranslationKey(fieldType))}
-                          </Badge>
+                          </MetadataTag>
                         ))}
                       </span>
                     ) : (
@@ -205,69 +161,64 @@ export function SystemRuleDetailsDialog({
                     <DetailItem
                       key={parameter.key}
                       label={parameter.key || t('rules.unnamedParameter')}
-                      value={`${
-                        parameter.type
-                          ? t(`rules.parameterType${parameter.type}`)
-                          : t('rules.unknownParameterType')
-                      } · ${t(
-                        parameter.isRequired
-                          ? 'rules.parameterRequired'
-                          : 'rules.parameterOptional',
-                      )}`}
+                      value={
+                        <span className="flex flex-wrap gap-2">
+                          <MetadataTag>
+                            {parameter.type
+                              ? t(`rules.parameterType${parameter.type}`)
+                              : t('rules.unknownParameterType')}
+                          </MetadataTag>
+                          <MetadataTag>
+                            {t(
+                              parameter.isRequired
+                                ? 'rules.parameterRequired'
+                                : 'rules.parameterOptional',
+                            )}
+                          </MetadataTag>
+                        </span>
+                      }
                     />
                   ))}
                 </dl>
               </section>
             ) : null}
 
-            <div className="border-t pt-3">
-              <Accordion>
-                <AccordionItem value="technical-details">
-                  <AccordionTrigger>
-                    <span>
-                      <span className="block">{t('rules.technicalDetails')}</span>
-                      <span className="mt-1 block text-xs font-normal text-muted-foreground">
-                        {t('rules.technicalDetailsDescription')}
-                      </span>
-                    </span>
-                  </AccordionTrigger>
-                  <AccordionContent>
-                    <dl className="grid gap-5 @md/system-rule-details:grid-cols-2">
-                      <DetailItem
-                        label={t('rules.publishedVersion')}
-                        value={t('rules.version', {
-                          version: definition.latestPublishedVersion ?? 1,
-                        })}
-                      />
-                      <DetailItem
-                        label={t('rules.expressionLanguage')}
-                        value={t('rules.expressionLanguageVersion', {
-                          version: definition.expressionLanguageVersion ?? 1,
-                        })}
-                      />
-                      {definition.outcome?.violationCode ? (
-                        <DetailItem
-                          label={t('rules.violationCode')}
-                          value={definition.outcome.violationCode}
-                        />
-                      ) : null}
-                    </dl>
-                  </AccordionContent>
-                </AccordionItem>
-              </Accordion>
-            </div>
+            <section
+              aria-labelledby={`${detailsId}-version-references`}
+              className="space-y-4 border-t pt-6"
+            >
+              <SectionHeading
+                headingId={`${detailsId}-version-references`}
+                title={t('rules.versionAndReferences')}
+                description={t('rules.versionAndReferencesDescription')}
+              />
+              <dl className="grid gap-5 @md/system-rule-details:grid-cols-2">
+                <DetailItem
+                  label={t('rules.publishedVersion')}
+                  value={t('rules.version', {
+                    version: definition.latestPublishedVersion ?? 1,
+                  })}
+                />
+                <DetailItem
+                  label={t('rules.expressionLanguage')}
+                  value={t('rules.expressionLanguageVersion', {
+                    version: definition.expressionLanguageVersion ?? 1,
+                  })}
+                />
+                {definition.outcome?.violationCode ? (
+                  <DetailItem
+                    label={t('rules.violationCode')}
+                    value={definition.outcome.violationCode}
+                  />
+                ) : null}
+              </dl>
+            </section>
           </div>
         ) : null}
       </ManagedDialogBody>
     </ManagedDialog>
   );
 }
-
-const severityBadgeVariants = {
-  Info: 'outline',
-  Warning: 'secondary',
-  Error: 'destructive',
-} as const satisfies Record<RuleSeverity, 'outline' | 'secondary' | 'destructive'>;
 
 function SectionHeading({
   headingId,

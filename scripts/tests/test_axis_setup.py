@@ -56,7 +56,7 @@ class TestSetupPlatform(unittest.TestCase):
         mac_arm = axis_setup.SetupPlatform("darwin", "arm64")
 
         self.assertEqual("dotnet-sdk-8.0.423-win-x64.zip", axis_setup.asset_name("dotnet", windows))
-        self.assertEqual("node-v22.23.1-win-x64.zip", axis_setup.asset_name("node", windows))
+        self.assertEqual("node-v24.18.0-win-x64.zip", axis_setup.asset_name("node", windows))
         self.assertEqual("gh_2.96.0_linux_arm64.tar.gz", axis_setup.asset_name("gh", linux_arm))
         self.assertEqual("lychee-arm64-macos.tar.gz", axis_setup.asset_name("lychee", mac_arm))
 
@@ -150,7 +150,7 @@ class TestManagedToolPaths(unittest.TestCase):
             root=root,
         )
 
-        self.assertEqual(root / "node" / "22.23.1" / "bin" / "node", node)
+        self.assertEqual(root / "node" / "24.18.0" / "bin" / "node", node)
         self.assertEqual(root / "dotnet" / "8.0.423" / "dotnet.exe", dotnet)
 
     def test_user_command_dir_uses_the_native_user_location(self) -> None:
@@ -595,7 +595,7 @@ class TestSetupProfiles(unittest.TestCase):
             platform_spec=axis_setup.SetupPlatform("windows", "x64"),
         )
 
-        self.assertIn("install missing pinned user-local tools: .NET SDK 8.0.423, Node.js 22.23.1", plan)
+        self.assertIn("install missing pinned user-local tools: .NET SDK 8.0.423, Node.js 24.18.0", plan)
         self.assertNotIn("install Playwright Chromium", plan)
         self.assertIn("generate local HTTPS certificates", plan)
         self.assertIn("install repository pre-push hook", plan)
@@ -606,7 +606,7 @@ class TestSetupProfiles(unittest.TestCase):
         )
         self.assertLess(
             plan.index("diagnose Docker Engine, Compose, and OpenSSL without changing OS services"),
-            plan.index("install missing pinned user-local tools: .NET SDK 8.0.423, Node.js 22.23.1"),
+            plan.index("install missing pinned user-local tools: .NET SDK 8.0.423, Node.js 24.18.0"),
         )
 
     def test_plan_installs_host_playwright_only_when_explicitly_requested(self) -> None:

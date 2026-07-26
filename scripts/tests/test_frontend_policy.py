@@ -19,6 +19,49 @@ if str(SCRIPTS) not in sys.path:
 import axis  # noqa: E402
 
 
+class TestFrontendE2eStructure(unittest.TestCase):
+    def issues_for_frontend(self, files: dict[str, str]) -> list[str]:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            for relative_path, content in files.items():
+                path = root / relative_path
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(content, encoding="utf-8")
+            return axis.frontend_e2e_structure_issues(root=root)
+
+    def test_rejects_fixed_sleep_timeout_override_and_serial_state(self) -> None:
+        issues = self.issues_for_frontend(
+            {
+                "frontend/e2e/example.pw.ts": (
+                    "test.describe.configure({ mode: 'serial' });\n"
+                    "test('example', async ({ page }, testInfo) => {\n"
+                    "  testInfo.setTimeout(120_000);\n"
+                    "  await page.waitForTimeout(250);\n"
+                    "});\n"
+                )
+            }
+        )
+
+        joined = "\n".join(issues)
+        self.assertIn("independently runnable", joined)
+        self.assertIn("centrally owned Playwright timeout", joined)
+        self.assertIn("fixed browser sleeps", joined)
+
+    def test_accepts_observable_independent_journey(self) -> None:
+        issues = self.issues_for_frontend(
+            {
+                "frontend/e2e/example.pw.ts": (
+                    "test('example', async ({ page }) => {\n"
+                    "  await page.goto('/rules');\n"
+                    "  await expect(page).toHaveURL(/rules/);\n"
+                    "});\n"
+                )
+            }
+        )
+
+        self.assertEqual([], issues)
+
+
 class TestFrontendComponentFileNames(unittest.TestCase):
     def issues_for_frontend(self, files: dict[str, str]) -> list[str]:
         with tempfile.TemporaryDirectory() as temp:
@@ -264,6 +307,53 @@ class TestFrontendUiSystemPolicy(unittest.TestCase):
         self.assertIn("arbitrary Tailwind value `size-[1.625rem]`", joined)
         self.assertIn("component-local hard-coded color", joined)
 
+    def test_rejects_raw_badge_import_outside_semantic_owners(self) -> None:
+        issues = self.issues_for_frontend(
+            {
+                "frontend/src/features/rules/components/RuleStep.tsx": (
+                    "import { Badge } from '@/components/ui/badge';\n"
+                    "export function RuleStep() { return <Badge>When</Badge>; }\n"
+                )
+            }
+        )
+
+        self.assertIn(
+            "raw Badge is restricted to semantic badge owners",
+            "\n".join(issues),
+        )
+
+    def test_rejects_raw_alert_import_outside_status_notice_owner(self) -> None:
+        issues = self.issues_for_frontend(
+            {
+                "frontend/src/features/rules/components/RuleFeedback.tsx": (
+                    "import { Alert } from '@/components/ui/alert';\n"
+                    "export function RuleFeedback() { return <Alert>Failed</Alert>; }\n"
+                )
+            }
+        )
+
+        self.assertIn(
+            "raw Alert is restricted to the StatusNotice owner",
+            "\n".join(issues),
+        )
+
+    def test_accepts_raw_badge_import_in_semantic_owners(self) -> None:
+        issues = self.issues_for_frontend(
+            {
+                "frontend/src/components/shared/StatusBadge.tsx": (
+                    "import { Badge } from '@/components/ui/badge';\n"
+                ),
+                "frontend/src/components/shared/MetadataTag.tsx": (
+                    "import { Badge } from '@/components/ui/badge';\n"
+                ),
+                "frontend/src/components/shared/data-table/DataTableToolbar.tsx": (
+                    "import { Badge } from '@/components/ui/badge';\n"
+                ),
+            }
+        )
+
+        self.assertEqual([], issues)
+
     def test_accepts_semantic_tokens_and_standard_tailwind_scale(self) -> None:
         issues = self.issues_for_frontend(
             {
@@ -497,9 +587,23 @@ class TestFrontendApiContracts(unittest.TestCase):
         rc, stderr = self.run_frontend_api_contracts(
             {
                 "frontend/src/features/preferences/api.ts": (
-                    "import type { components } from '@/lib/api-types';\n"
+                    "import type * as ApiTypes from '@/lib/api-generated';\n"
                     "export type UpdateLanguagePreferenceRequest =\n"
-                    "  components['schemas']['UpdateUserLanguagePreferenceRequest'];\n"
+                    "  ApiTypes.UpdateUserLanguagePreferenceRequest;\n"
+                )
+            }
+        )
+
+        self.assertEqual(0, rc, stderr)
+
+    def test_accepts_type_only_request_import_split_across_lines(self) -> None:
+        rc, stderr = self.run_frontend_api_contracts(
+            {
+                "frontend/src/features/rules/guide.tsx": (
+                    "import {\n"
+                    "  type SearchRuleExpressionGuideRequest,\n"
+                    "  searchRuleExpressionGuide,\n"
+                    "} from '../api';\n"
                 )
             }
         )
@@ -592,6 +696,34 @@ class TestFrontendQuality(unittest.TestCase):
                     "import { z } from 'zod';\n"
                     "export type RegisterFormValues = z.infer<ReturnType<typeof createRegisterSchema>>;\n"
                     "export function createRegisterSchema() { return z.object({}); }\n"
+                )
+            }
+        )
+
+        self.assertEqual([], issues)
+
+    def test_rejects_client_copy_for_server_owned_rule_vocabulary(self) -> None:
+        issues = self.issues_for_frontend(
+            {
+                "frontend/src/features/preferences/translations.ts": (
+                    "export const resources = {\n"
+                    "  'rules.operatorEqual': 'Equals',\n"
+                    "  'rules.expressionGuideOperandContext': 'Context value',\n"
+                    "};\n"
+                )
+            }
+        )
+
+        self.assertIn("must come from generated server reference metadata", "\n".join(issues))
+
+    def test_accepts_generic_client_interface_copy(self) -> None:
+        issues = self.issues_for_frontend(
+            {
+                "frontend/src/features/preferences/translations.ts": (
+                    "export const resources = {\n"
+                    "  'rules.expressionGuideTitle': 'Rule expression guide',\n"
+                    "  'rules.referenceLoading': 'Loading reference',\n"
+                    "};\n"
                 )
             }
         )

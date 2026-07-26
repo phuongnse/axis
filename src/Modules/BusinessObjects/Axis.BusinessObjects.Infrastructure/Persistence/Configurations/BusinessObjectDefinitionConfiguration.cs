@@ -2,6 +2,7 @@ using Axis.BusinessObjects.Domain.Aggregates;
 using Axis.BusinessObjects.Domain.ValueObjects;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using NpgsqlTypes;
 
 namespace Axis.BusinessObjects.Infrastructure.Persistence.Configurations;
 
@@ -56,8 +57,40 @@ internal sealed class BusinessObjectDefinitionConfiguration : IEntityTypeConfigu
             .HasColumnName("updated_at")
             .IsRequired();
 
+        builder.Property<string>("SearchTitle")
+            .HasColumnName("search_title")
+            .HasComputedColumnSql(
+                "axis_unaccent(lower(coalesce(name, '')))",
+                stored: true);
+
+        builder.Property<string>("SearchText")
+            .HasColumnName("search_text")
+            .HasComputedColumnSql(
+                "axis_unaccent(lower(coalesce(name, '') || ' ' || coalesce(object_key, '')))",
+                stored: true);
+
+        builder.Property<NpgsqlTsVector>("SearchVector")
+            .HasColumnName("search_vector")
+            .HasComputedColumnSql(
+                "to_tsvector('simple', axis_unaccent(lower(coalesce(name, '') || ' ' || coalesce(object_key, ''))))",
+                stored: true);
+
         builder.HasIndex(definition => new { definition.WorkspaceId, definition.Key })
             .IsUnique();
+
+        builder.HasIndex("SearchTitle")
+            .HasDatabaseName("ix_business_object_definitions_search_title")
+            .HasMethod("gin")
+            .HasOperators("gin_trgm_ops");
+
+        builder.HasIndex("SearchText")
+            .HasDatabaseName("ix_business_object_definitions_search_text")
+            .HasMethod("gin")
+            .HasOperators("gin_trgm_ops");
+
+        builder.HasIndex("SearchVector")
+            .HasDatabaseName("ix_business_object_definitions_search_vector")
+            .HasMethod("gin");
 
         builder.HasMany(definition => definition.Fields)
             .WithOne()

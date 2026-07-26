@@ -1,13 +1,13 @@
-import type { components } from '@/lib/api-types';
+import type * as ApiTypes from '@/lib/api-generated';
 
 // Derived from the backend OpenAPI schema so request/response
 // shapes can never drift from the API. Regenerate with `npm run gen:api-types`.
-export type RegisterUserRequest = components['schemas']['RegisterUserRequest'];
-export type MessageResponse = components['schemas']['MessageResponse'];
-export type SignInUserRequest = components['schemas']['SignInUserRequest'];
-export type SignInResponse = components['schemas']['SignInSessionEstablishedDto'];
+export type RegisterUserRequest = ApiTypes.RegisterUserRequest;
+export type MessageResponse = ApiTypes.MessageResponse;
+export type SignInUserRequest = ApiTypes.SignInUserRequest;
+export type SignInResponse = ApiTypes.SignInSessionEstablishedDto;
 
-export type LegalVersionsResponse = components['schemas']['LegalVersionsDto'];
+export type LegalVersionsResponse = ApiTypes.LegalVersionsDto;
 
 export interface RegisterValidationErrorData {
   errors?: Record<string, string[]>;
@@ -23,7 +23,7 @@ export interface SignInValidationErrorData {
   title?: string;
 }
 
-export type VerifyEmailResponse = components['schemas']['VerifyEmailSessionEstablishedDto'];
+export type VerifyEmailResponse = ApiTypes.VerifyEmailSessionEstablishedDto;
 
 export type VerifyEmailErrorKind = 'expired' | 'already_used' | 'invalid' | 'rate_limited';
 

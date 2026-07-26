@@ -203,7 +203,7 @@ function clientDefinition(
 }
 
 describe('DataTable', () => {
-  it('renders, searches, sorts, and uses numbered client pagination', async () => {
+  it('renders, sorts, and uses numbered client pagination without implicit search', async () => {
     const user = userEvent.setup();
     render(
       <DataTable
@@ -253,11 +253,7 @@ describe('DataTable', () => {
     expect(within(table).getByRole('button', { name: 'Page 2 of 2' })).toHaveClass('bg-primary');
     expect(within(table).getByRole('button', { name: 'Page 1 of 2' })).toHaveClass('border-border');
 
-    await user.type(within(table).getByLabelText('Search records'), 'beta');
-    expect(within(table).getByText('Beta')).toBeInTheDocument();
-    expect(within(table).queryByText('Alpha')).not.toBeInTheDocument();
-
-    await user.clear(within(table).getByLabelText('Search records'));
+    expect(within(table).queryByLabelText('Search records')).not.toBeInTheDocument();
     await user.click(nameSort);
     expect(
       within(table).getByRole('button', { name: 'Name: Sort descending' }),
@@ -344,6 +340,7 @@ describe('DataTable', () => {
             columns,
             messages,
             getRowId: (row) => row.id,
+            globalSearch: true,
             queryState,
             onQueryStateChange: (next) => {
               setQueryState(next);

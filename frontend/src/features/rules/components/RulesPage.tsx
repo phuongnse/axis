@@ -6,34 +6,49 @@ import { useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   createDataTableMessages,
+  createEmptyFilterExpression,
   DataTable,
   type DataTableColumnDef,
   type DataTableDefinition,
+  type DataTableQueryState,
 } from '@/components/shared/data-table';
 import { useManagedWindowActions } from '@/components/shared/ManagedWindowManager';
 import { StatusBadge, type StatusBadgeTone } from '@/components/shared/StatusBadge';
 import { Button } from '@/components/ui/button';
+import { useDebouncedValue } from '@/hooks/use-debounced-value';
+import { referenceContent } from '@/lib/reference-metadata';
 import { type RuleDefinitionSummary, ruleDefinitionsListQueryOptions } from '../api';
 import { ruleCreateWindowDescriptor, ruleDefinitionWindowDescriptor } from '../managed-windows';
-import {
-  compareFieldTypes,
-  compareRuleDefinitions,
-  fieldTypeTranslationKey,
-  ruleDescriptionTranslationKey,
-  ruleNameTranslationKey,
-  ruleSetupTranslationKey,
-} from '../metadata';
+import { compareFieldTypes, fieldTypeTranslationKey } from '../metadata';
 import { RuleOriginBadge } from './RuleOriginBadge';
 
 const route = getRouteApi('/_authenticated/rules');
 
 export function RulesPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const search = route.useSearch();
+  const page = search.page ?? 1;
   const navigate = route.useNavigate();
   const { openWindow } = useManagedWindowActions();
-  const definitionsQuery = useQuery(ruleDefinitionsListQueryOptions());
+  const debouncedSearch = useDebouncedValue(search.query ?? '');
+  const definitionsQuery = useQuery(
+    ruleDefinitionsListQueryOptions({
+      page,
+      pageSize: 20,
+      query: debouncedSearch,
+      language: i18n.language,
+    }),
+  );
   const definitions = definitionsQuery.data?.items ?? [];
+  const tableQuery = useMemo<DataTableQueryState>(
+    () => ({
+      globalFilter: search.query ?? '',
+      filterExpression: createEmptyFilterExpression(),
+      sorting: [],
+      grouping: [],
+    }),
+    [search.query],
+  );
   const selectedDefinition = definitions.find(
     (definition) => definition.definitionKey === search.definitionKey,
   );
@@ -51,7 +66,9 @@ export function RulesPage() {
       ({ definitionKey: search.definitionKey, origin: 'Workspace' } as RuleDefinitionSummary);
     const descriptor = ruleDefinitionWindowDescriptor(
       definition,
-      selectedDefinition ? localizedRuleName(selectedDefinition, t) : search.definitionKey,
+      selectedDefinition
+        ? localizedRuleName(selectedDefinition, i18n.language, t)
+        : search.definitionKey,
     );
     if (descriptor) openWindow(descriptor);
     void navigate({ replace: true, search: {} });
@@ -62,48 +79,20 @@ export function RulesPage() {
     search.definitionKey,
     search.dialog,
     selectedDefinition,
+    i18n.language,
     t,
   ]);
   const tableDefinition = useMemo<DataTableDefinition<RuleDefinitionSummary>>(() => {
-    const appliesTo = new Map<string, string>();
-    for (const definition of definitions) {
-      const targetTypes = definition.applicability?.targetTypeKeys ?? [];
-      for (const fieldType of targetTypes) {
-        appliesTo.set(fieldType, t(fieldTypeTranslationKey(fieldType)));
-      }
-      if (targetTypes.length === 0 && definition.contextKey) {
-        appliesTo.set(
-          definition.contextKey,
-          humanizeContext(definition.contextKey, t('rules.contextUnavailable')),
-        );
-      }
-    }
-    const catalogScopes = distinctDefined(definitions.map((definition) => definition.scope));
-    const origins = distinctDefined(definitions.map((definition) => definition.origin));
-    const statuses = distinctDefined(definitions.map((definition) => definition.status));
-
     const columns: DataTableColumnDef<RuleDefinitionSummary>[] = [
       {
         id: 'rule',
-        accessorFn: (definition) => localizedRuleName(definition, t),
-        sortingFn: (left, right) => compareRuleDefinitions(left.original, right.original),
+        accessorFn: (definition) => localizedRuleName(definition, i18n.language, t),
         size: 330,
         minSize: 280,
+        enableSorting: false,
         enableGrouping: false,
         meta: {
           label: t('rules.ruleColumn'),
-          searchable: true,
-          searchValue: (definition) => [
-            localizedRuleName(definition, t),
-            localizedRuleDescription(definition, t),
-          ],
-          filter: {
-            kind: 'text',
-            getValue: (definition) => [
-              localizedRuleName(definition, t),
-              localizedRuleDescription(definition, t),
-            ],
-          },
         },
         cell: ({ row }) => (
           <RuleIdentityCell
@@ -113,7 +102,7 @@ export function RulesPage() {
                 ? () => {
                     const descriptor = ruleDefinitionWindowDescriptor(
                       row.original,
-                      localizedRuleName(row.original, t),
+                      localizedRuleName(row.original, i18n.language, t),
                     );
                     if (descriptor) openWindow(descriptor);
                   }
@@ -127,18 +116,9 @@ export function RulesPage() {
         accessorFn: ruleTargets,
         size: 220,
         minSize: 200,
+        enableSorting: false,
         enableGrouping: false,
-        meta: {
-          label: t('rules.appliesToColumn'),
-          searchable: true,
-          searchValue: (definition) =>
-            ruleTargets(definition).map((value) => appliesTo.get(value) ?? value),
-          filter: {
-            kind: 'multiChoice',
-            options: [...appliesTo].map(([value, label]) => ({ value, label })),
-            getValue: ruleTargets,
-          },
-        },
+        meta: { label: t('rules.appliesToColumn') },
         cell: ({ row }) => <RuleTargetsCell definition={row.original} />,
       },
       {
@@ -146,20 +126,9 @@ export function RulesPage() {
         accessorFn: (definition) => definition.scope,
         size: 160,
         minSize: 150,
-        enableGrouping: true,
-        meta: {
-          label: t('rules.scope'),
-          searchable: true,
-          searchValue: (definition) =>
-            definition.scope ? t(`rules.scope${definition.scope}`) : [],
-          filter: {
-            kind: 'singleChoice',
-            options: catalogScopes.map((scope) => ({
-              value: scope,
-              label: t(`rules.scope${scope}`),
-            })),
-          },
-        },
+        enableSorting: false,
+        enableGrouping: false,
+        meta: { label: t('rules.scope') },
         cell: ({ row }) => <RuleScopeCell definition={row.original} />,
       },
       {
@@ -167,24 +136,9 @@ export function RulesPage() {
         accessorFn: (definition) => definition.origin,
         size: 130,
         minSize: 120,
-        enableGrouping: true,
-        meta: {
-          label: t('rules.origin'),
-          searchable: true,
-          searchValue: (definition) =>
-            definition.origin
-              ? definition.origin === 'System'
-                ? t('rules.builtIn')
-                : t('rules.originWorkspace')
-              : [],
-          filter: {
-            kind: 'singleChoice',
-            options: origins.map((origin) => ({
-              value: origin,
-              label: origin === 'System' ? t('rules.builtIn') : t('rules.originWorkspace'),
-            })),
-          },
-        },
+        enableSorting: false,
+        enableGrouping: false,
+        meta: { label: t('rules.origin') },
         cell: ({ row }) => <RuleOriginCell definition={row.original} />,
       },
       {
@@ -192,27 +146,29 @@ export function RulesPage() {
         accessorFn: (definition) => definition.status,
         size: 130,
         minSize: 120,
-        enableGrouping: true,
-        meta: {
-          label: t('rules.status'),
-          searchable: true,
-          searchValue: (definition) =>
-            definition.status ? t(`rules.status${definition.status}`) : [],
-          filter: {
-            kind: 'singleChoice',
-            options: statuses.map((status) => ({
-              value: status,
-              label: t(`rules.status${status}`),
-            })),
-          },
-        },
+        enableSorting: false,
+        enableGrouping: false,
+        meta: { label: t('rules.status') },
         cell: ({ row }) => <RuleStatusCell definition={row.original} />,
       },
     ];
 
     return {
       ariaLabel: t('rules.catalogTitle'),
-      source: { mode: 'client', data: definitions, pagination: { pageSize: 20 } },
+      source: {
+        mode: 'page',
+        data: definitions,
+        pagination: {
+          pageIndex: page - 1,
+          pageSize: definitionsQuery.data?.pageSize ?? 20,
+        },
+        rowCount: definitionsQuery.data?.totalCount ?? 0,
+        onPaginationChange: (pagination) => {
+          void navigate({
+            search: (current) => ({ ...current, page: pagination.pageIndex + 1 }),
+          });
+        },
+      },
       columns,
       messages: createDataTableMessages(t, {
         searchLabel: t('rules.searchLabel'),
@@ -225,12 +181,21 @@ export function RulesPage() {
       getRowId: (definition) =>
         definition.definitionKey ??
         `${definition.origin ?? 'Unknown'}:${definition.name ?? definition.contextKey ?? 'rule'}`,
-      initialState: {
-        sorting: [{ id: 'rule', desc: false }],
+      queryState: tableQuery,
+      onQueryStateChange: (next) => {
+        void navigate({
+          replace: true,
+          search: (current) => ({
+            ...current,
+            page: 1,
+            query: next.globalFilter.trim() || undefined,
+          }),
+        });
       },
       enableColumnResizing: true,
       globalSearch: true,
       columnControls: true,
+      grouping: false,
       renderToolbarActions: () => (
         <Button
           type="button"
@@ -241,16 +206,22 @@ export function RulesPage() {
           {t('rules.newRule')}
         </Button>
       ),
-      loading: definitionsQuery.isLoading,
+      loading: definitionsQuery.isFetching,
       error: definitionsQuery.isError,
       onRetry: () => void definitionsQuery.refetch(),
     };
   }, [
     definitions,
     definitionsQuery.isError,
-    definitionsQuery.isLoading,
+    definitionsQuery.isFetching,
     definitionsQuery.refetch,
+    definitionsQuery.data?.pageSize,
+    definitionsQuery.data?.totalCount,
+    i18n.language,
+    navigate,
     openWindow,
+    page,
+    tableQuery,
     t,
   ]);
 
@@ -281,8 +252,8 @@ function RuleIdentityCell({
   definition: RuleDefinitionSummary;
   onOpen?: () => void;
 }) {
-  const { t } = useTranslation();
-  const name = localizedRuleName(definition, t);
+  const { t, i18n } = useTranslation();
+  const name = localizedRuleName(definition, i18n.language, t);
   return (
     <div className="min-w-0 whitespace-normal">
       {onOpen ? (
@@ -301,7 +272,7 @@ function RuleIdentityCell({
         </p>
       )}
       <p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">
-        {localizedRuleDescription(definition, t)}
+        {localizedRuleDescription(definition, i18n.language, t)}
       </p>
     </div>
   );
@@ -322,8 +293,8 @@ function RuleTargetsCell({ definition }: { definition: RuleDefinitionSummary }) 
 }
 
 function RuleScopeCell({ definition }: { definition: RuleDefinitionSummary }) {
-  const { t } = useTranslation();
-  const setupKey = ruleSetupTranslationKey(definition.definitionKey);
+  const { t, i18n } = useTranslation();
+  const setup = referenceContent(definition.documentation, i18n.language)?.usage;
   return (
     <div className="whitespace-normal">
       <div className="flex flex-wrap gap-x-1.5 text-sm font-medium text-foreground">
@@ -337,9 +308,7 @@ function RuleScopeCell({ definition }: { definition: RuleDefinitionSummary }) {
           </>
         ) : null}
       </div>
-      <p className="mt-1.5 text-xs text-muted-foreground">
-        {setupKey ? t(setupKey) : t('rules.setup.configured')}
-      </p>
+      <p className="mt-1.5 text-xs text-muted-foreground">{setup ?? t('rules.setup.configured')}</p>
     </div>
   );
 }
@@ -374,16 +343,28 @@ function humanizeContext(contextKey: string | null | undefined, fallback: string
   return label.charAt(0).toUpperCase() + label.slice(1);
 }
 
-function localizedRuleName(definition: RuleDefinitionSummary, t: TFunction): string {
-  const nameKey = ruleNameTranslationKey(definition.definitionKey);
-  return nameKey ? t(nameKey) : (definition.name ?? t('rules.unknownRule'));
+function localizedRuleName(
+  definition: RuleDefinitionSummary,
+  locale: string,
+  t: TFunction,
+): string {
+  return (
+    referenceContent(definition.documentation, locale)?.displayName ??
+    definition.name ??
+    t('rules.unknownRule')
+  );
 }
 
-function localizedRuleDescription(definition: RuleDefinitionSummary, t: TFunction): string {
-  const descriptionKey = ruleDescriptionTranslationKey(definition.definitionKey);
-  return descriptionKey
-    ? t(descriptionKey)
-    : (definition.description ?? t('rules.unknownRuleDescription'));
+function localizedRuleDescription(
+  definition: RuleDefinitionSummary,
+  locale: string,
+  t: TFunction,
+): string {
+  return (
+    referenceContent(definition.documentation, locale)?.summary ??
+    definition.description ??
+    t('rules.unknownRuleDescription')
+  );
 }
 
 function ruleTargets(definition: RuleDefinitionSummary): string[] {
@@ -393,8 +374,4 @@ function ruleTargets(definition: RuleDefinitionSummary): string[] {
     : definition.contextKey
       ? [definition.contextKey]
       : [];
-}
-
-function distinctDefined<T>(values: (T | null | undefined)[]): T[] {
-  return [...new Set(values.filter((value): value is T => value != null))];
 }

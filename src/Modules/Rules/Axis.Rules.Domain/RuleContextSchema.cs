@@ -6,23 +6,31 @@ namespace Axis.Rules.Domain;
 
 public sealed partial record RuleContextField
 {
-    private RuleContextField(string path, string displayName, RuleValueType type, bool allowMultiple)
+    private RuleContextField(
+        string path,
+        string displayName,
+        RuleValueType type,
+        bool allowMultiple,
+        RuleReferenceDocumentation documentation)
     {
         Path = path;
         DisplayName = displayName;
         Type = type;
         AllowMultiple = allowMultiple;
+        Documentation = documentation;
     }
 
     public string Path { get; }
     public string DisplayName { get; }
     public RuleValueType Type { get; }
     public bool AllowMultiple { get; }
+    public RuleReferenceDocumentation Documentation { get; }
 
     public static Result<RuleContextField> Create(
         string path,
         string displayName,
         RuleValueType type,
+        RuleReferenceDocumentation documentation,
         bool allowMultiple = false)
     {
         string normalizedPath = path?.Trim() ?? string.Empty;
@@ -35,7 +43,16 @@ public sealed partial record RuleContextField
         if (!Enum.IsDefined(type))
             return Result.Failure<RuleContextField>("Rule context field type is not supported.");
 
-        return new RuleContextField(normalizedPath, displayName.Trim(), type, allowMultiple);
+        if (documentation is null || !documentation.IsComplete("en", "vi"))
+            return Result.Failure<RuleContextField>(
+                "Rule context field documentation must define complete en and vi references.");
+
+        return new RuleContextField(
+            normalizedPath,
+            displayName.Trim(),
+            type,
+            allowMultiple,
+            documentation);
     }
 
     [GeneratedRegex("^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$", RegexOptions.CultureInvariant)]

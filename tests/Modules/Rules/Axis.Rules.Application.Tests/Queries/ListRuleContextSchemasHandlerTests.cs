@@ -21,5 +21,8 @@ public sealed class ListRuleContextSchemasHandlerTests
         result.IsSuccess.Should().BeTrue();
         result.Value.Should().ContainSingle(schema =>
             schema.ContextKey == RuleDefinitionHandlerTestContext.Schema.ContextKey);
+        RuleContextFieldDto field = result.Value.Single().Fields.Should().ContainSingle().Subject;
+        field.Documentation.Locales["en"].DisplayName.Should().Be("Field value");
+        field.Documentation.Locales["vi"].Summary.Should().NotBeNullOrWhiteSpace();
     }
 }

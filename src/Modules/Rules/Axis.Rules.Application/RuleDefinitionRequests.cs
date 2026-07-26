@@ -19,7 +19,7 @@ public sealed record SaveRuleDefinitionDraftRequest(
     int ContextSchemaVersion,
     RuleOutcomeKind OutcomeKind,
     IReadOnlyList<RuleParameterDefinitionDto> Parameters,
-    RuleConditionNodeDto Condition,
+    string ExpressionSyntax,
     RuleOutcomeDto Outcome);
 
 public sealed record RuleRevisionRequest(int ExpectedRevision);
@@ -39,3 +39,13 @@ public sealed record RuleSimulationResultDto(
     string CorrelationId);
 
 public sealed record RuleNodeDiagnosticDto(string NodeId, bool IsMatch);
+
+public sealed record AssistRuleExpressionRequest(
+    int ExpressionLanguageVersion,
+    string? ContextKey,
+    int? ContextSchemaVersion,
+    IReadOnlyList<RuleParameterDefinitionDto> Parameters,
+    string? Syntax,
+    RuleConditionNodeDto? Condition,
+    int CursorOffset,
+    string Language);

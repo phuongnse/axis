@@ -10,5 +10,7 @@ public sealed record ListRuleDefinitionsQuery(
     int PageSize,
     RuleScope? Scope = null,
     RuleOrigin? Origin = null,
-    RuleLifecycleStatus? Status = null)
+    RuleLifecycleStatus? Status = null,
+    string? SearchQuery = null,
+    string? Language = null)
     : IQuery<Result<PagedResult<RuleDefinitionSummaryDto>>>;

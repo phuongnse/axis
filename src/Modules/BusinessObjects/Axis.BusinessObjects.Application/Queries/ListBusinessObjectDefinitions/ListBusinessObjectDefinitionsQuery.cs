@@ -6,5 +6,7 @@ namespace Axis.BusinessObjects.Application.Queries.ListBusinessObjectDefinitions
 
 public sealed record ListBusinessObjectDefinitionsQuery(
     int Page,
-    int PageSize)
+    int PageSize,
+    string? SearchQuery = null,
+    string? Language = null)
     : IQuery<Result<PagedResult<BusinessObjectDefinitionListItemDto>>>;

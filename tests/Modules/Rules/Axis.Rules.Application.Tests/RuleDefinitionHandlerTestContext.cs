@@ -1,4 +1,5 @@
 using Axis.Rules.Application.Repositories;
+using Axis.Rules.Application.Search;
 using Axis.Rules.Application.Services;
 using Axis.Rules.Contracts;
 using Axis.Rules.Domain;
@@ -34,6 +35,8 @@ internal sealed class RuleDefinitionHandlerTestContext
 
     public ICurrentUser CurrentUser { get; } = Substitute.For<ICurrentUser>();
     public IRuleDefinitionRepository Repository { get; } = Substitute.For<IRuleDefinitionRepository>();
+    public IRuleCatalogSearchProvider CatalogSearch { get; } = Substitute.For<IRuleCatalogSearchProvider>();
+    public IRuleTextSearchProvider TextSearch { get; } = Substitute.For<IRuleTextSearchProvider>();
     public IUnitOfWork UnitOfWork { get; } = Substitute.For<IUnitOfWork>();
     public IRuleContextSchemaProvider SchemaProvider { get; } = Substitute.For<IRuleContextSchemaProvider>();
     public RuleContextSchemaRegistry ContextRegistry => new([SchemaProvider]);
@@ -43,8 +46,31 @@ internal sealed class RuleDefinitionHandlerTestContext
         Version: 1,
         ContractScope.Field,
         "Decimal field value",
-        [new RuleContextFieldDto("field.value", "Field value", Axis.Rules.Contracts.RuleValueType.Decimal, false)],
+        [
+            new RuleContextFieldDto(
+                "field.value",
+                "Field value",
+                Axis.Rules.Contracts.RuleValueType.Decimal,
+                false,
+                ReferenceDocumentation("Field value")),
+        ],
         TargetTypeKey: "Decimal");
+
+    public static RuleReferenceDocumentationDto ReferenceDocumentation(string displayName) =>
+        new(
+            new Dictionary<string, RuleReferenceContentDto>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["en"] = new(
+                    displayName,
+                    $"Reference for {displayName}.",
+                    $"Use {displayName} in a compatible condition.",
+                    [displayName]),
+                ["vi"] = new(
+                    displayName,
+                    $"Tham chiếu cho {displayName}.",
+                    $"Dùng {displayName} trong điều kiện tương thích.",
+                    [displayName]),
+            });
 
     public static RuleDefinition DraftDefinition(bool configured = false)
     {

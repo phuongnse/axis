@@ -11,6 +11,7 @@ Review checklist only. Workflow lives in repo skills ([`.agents/skills/README.md
 - Read the owning use-case, foundation, or domain docs and same-module code.
 - Map in-scope ACs before behavior work.
 - Resolve or explicitly defer lower-layer gaps before API work.
+- For a retirement, confirm the Design Gate chose clean cutover or named a real compatibility constraint; do not infer compatibility.
 
 ## Acceptance Coverage
 
@@ -25,6 +26,10 @@ No blank in-scope rows; required AT rows name verification categories; incomplet
 During development, run the smallest check that proves the edit. Before review, use `$axis-ready-review`.
 
 Only claim a full local suite when full `python scripts/axis.py dotnet test` ran, including integration/API tests. CI remains authoritative before merge.
+
+Browser evidence must name focused, independently runnable journeys triggered by the diff and owning acceptance evidence. Reject fixed sleeps, local test-timeout overrides, serial state, and monolithic journeys that duplicate component/API assertions.
+
+For a clean cutover, review the post-edit `rg` sweep for retired routes, fields, components, flags, fallbacks, generated types, tests, and guidance. A passing new path does not compensate for an old path left behind.
 
 ## Docs Review
 
