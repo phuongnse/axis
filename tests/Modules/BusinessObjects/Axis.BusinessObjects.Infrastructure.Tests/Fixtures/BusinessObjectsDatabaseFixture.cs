@@ -24,7 +24,7 @@ public sealed class BusinessObjectsDatabaseFixture : IAsyncLifetime
     public Task<string> CreateDatabaseAsync(string databaseName) =>
         PostgresModuleTestDatabase.CreateAsync(_postgres.GetConnectionString(), databaseName);
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         await _postgres.StartAsync();
         _connectionString = await PostgresModuleTestDatabase.CreateAsync(
@@ -35,5 +35,5 @@ public sealed class BusinessObjectsDatabaseFixture : IAsyncLifetime
             opts => new BusinessObjectsDbContext(opts));
     }
 
-    public Task DisposeAsync() => _postgres.DisposeAsync().AsTask();
+    public ValueTask DisposeAsync() => _postgres.DisposeAsync();
 }

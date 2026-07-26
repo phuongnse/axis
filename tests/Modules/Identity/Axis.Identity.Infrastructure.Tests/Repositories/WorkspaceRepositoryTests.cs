@@ -12,14 +12,14 @@ public class WorkspaceRepositoryTests(IdentityDatabaseFixture db) : IAsyncLifeti
     private IdentityDbContext _ctx = null!;
     private WorkspaceRepository _sut = null!;
 
-    public Task InitializeAsync()
+    public ValueTask InitializeAsync()
     {
         _ctx = db.CreateContext();
         _sut = new WorkspaceRepository(_ctx);
-        return Task.CompletedTask;
+        return ValueTask.CompletedTask;
     }
 
-    public async Task DisposeAsync() => await _ctx.DisposeAsync();
+    public async ValueTask DisposeAsync() => await _ctx.DisposeAsync();
 
     private static Workspace MakeWorkspace(string slug = "test-workspace") =>
         Workspace.Create(
@@ -31,9 +31,11 @@ public class WorkspaceRepositoryTests(IdentityDatabaseFixture db) : IAsyncLifeti
     public async Task AddAsync_WhenEntityIsValid_PersistsAndCanBeRetrievedById()
     {
         Workspace workspace = MakeWorkspace("workspace-add-get");
-        await _sut.AddAsync(workspace);
-        await _ctx.SaveChangesAsync();
-        Workspace? loaded = await _sut.GetByIdAsync(workspace.Id);
+        await _sut.AddAsync(workspace, TestContext.Current.CancellationToken);
+        await _ctx.SaveChangesAsync(TestContext.Current.CancellationToken);
+        Workspace? loaded = await _sut.GetByIdAsync(
+            workspace.Id,
+            TestContext.Current.CancellationToken);
 
         loaded.Should().NotBeNull();
         loaded!.Name.Should().Be(workspace.Name);
@@ -46,10 +48,12 @@ public class WorkspaceRepositoryTests(IdentityDatabaseFixture db) : IAsyncLifeti
     public async Task GetBySlugAsync_WhenSlugExists_ReturnsMatchingWorkspace()
     {
         Workspace workspace = MakeWorkspace("workspace-by-slug");
-        await _sut.AddAsync(workspace);
-        await _ctx.SaveChangesAsync();
+        await _sut.AddAsync(workspace, TestContext.Current.CancellationToken);
+        await _ctx.SaveChangesAsync(TestContext.Current.CancellationToken);
         WorkspaceSlug slug = WorkspaceSlug.Create("workspace-by-slug").Value;
-        Workspace? loaded = await _sut.GetBySlugAsync(slug);
+        Workspace? loaded = await _sut.GetBySlugAsync(
+            slug,
+            TestContext.Current.CancellationToken);
 
         loaded.Should().NotBeNull();
         loaded!.Id.Should().Be(workspace.Id);
@@ -64,10 +68,12 @@ public class WorkspaceRepositoryTests(IdentityDatabaseFixture db) : IAsyncLifeti
             WorkspaceSlug.Create("jane-doe").Value,
             Email.Create("jane@example.com").Value,
             ownerUserId);
-        await _sut.AddAsync(workspace);
-        await _ctx.SaveChangesAsync();
+        await _sut.AddAsync(workspace, TestContext.Current.CancellationToken);
+        await _ctx.SaveChangesAsync(TestContext.Current.CancellationToken);
 
-        Workspace? loaded = await _sut.GetPersonalByOwnerUserIdAsync(ownerUserId);
+        Workspace? loaded = await _sut.GetPersonalByOwnerUserIdAsync(
+            ownerUserId,
+            TestContext.Current.CancellationToken);
 
         loaded.Should().NotBeNull();
         loaded!.Id.Should().Be(workspace.Id);
@@ -77,7 +83,9 @@ public class WorkspaceRepositoryTests(IdentityDatabaseFixture db) : IAsyncLifeti
     public async Task GetBySlugAsync_WhenSlugDoesNotExist_ReturnsNull()
     {
         WorkspaceSlug slug = WorkspaceSlug.Create("does-not-exist").Value;
-        Workspace? result = await _sut.GetBySlugAsync(slug);
+        Workspace? result = await _sut.GetBySlugAsync(
+            slug,
+            TestContext.Current.CancellationToken);
         result.Should().BeNull();
     }
 
@@ -85,23 +93,29 @@ public class WorkspaceRepositoryTests(IdentityDatabaseFixture db) : IAsyncLifeti
     public async Task SlugExistsAsync_WhenSlugIsTaken_ReturnsTrue()
     {
         Workspace workspace = MakeWorkspace("slug-exists-check");
-        await _sut.AddAsync(workspace);
-        await _ctx.SaveChangesAsync();
-        bool exists = await _sut.SlugExistsAsync(WorkspaceSlug.Create("slug-exists-check").Value);
+        await _sut.AddAsync(workspace, TestContext.Current.CancellationToken);
+        await _ctx.SaveChangesAsync(TestContext.Current.CancellationToken);
+        bool exists = await _sut.SlugExistsAsync(
+            WorkspaceSlug.Create("slug-exists-check").Value,
+            TestContext.Current.CancellationToken);
         exists.Should().BeTrue();
     }
 
     [Fact]
     public async Task SlugExistsAsync_WhenSlugIsUnused_ReturnsFalse()
     {
-        bool exists = await _sut.SlugExistsAsync(WorkspaceSlug.Create("never-used-slug").Value);
+        bool exists = await _sut.SlugExistsAsync(
+            WorkspaceSlug.Create("never-used-slug").Value,
+            TestContext.Current.CancellationToken);
         exists.Should().BeFalse();
     }
 
     [Fact]
     public async Task GetByIdAsync_WhenIdDoesNotExist_ReturnsNull()
     {
-        Workspace? result = await _sut.GetByIdAsync(Guid.NewGuid());
+        Workspace? result = await _sut.GetByIdAsync(
+            Guid.NewGuid(),
+            TestContext.Current.CancellationToken);
         result.Should().BeNull();
     }
 }

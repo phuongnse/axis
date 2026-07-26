@@ -1,6 +1,7 @@
 using System.Reflection;
 using FluentAssertions;
 using NetArchTest.Rules;
+using TestResult = NetArchTest.Rules.TestResult;
 
 namespace Axis.Architecture.Tests;
 

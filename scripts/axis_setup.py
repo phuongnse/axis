@@ -7,6 +7,7 @@ import json
 import os
 import platform
 import posixpath
+import shlex
 import shutil
 import tarfile
 import tempfile
@@ -255,6 +256,12 @@ def _managed_command_owned(destination: Path, *, tool: str, root: Path, windows:
         except (IndexError, OSError, UnicodeError):
             return False
         return first_line == "@rem Managed by Axis portable setup"
+    if tool == "dotnet" and destination.is_file() and not destination.is_symlink():
+        try:
+            lines = destination.read_text(encoding="utf-8").splitlines()
+        except (OSError, UnicodeError):
+            return False
+        return len(lines) > 1 and lines[1] == "# Managed by Axis portable setup"
     if not destination.is_symlink():
         return False
     try:
@@ -287,12 +294,36 @@ def expose_managed_command(
 
     if windows:
         escaped = str(managed).replace("%", "%%")
-        content = f'@rem Managed by Axis portable setup\r\n@"{escaped}" %*\r\n'.encode()
+        dotnet_root = ""
+        if tool == "dotnet":
+            escaped_root = str(managed.parent).replace("%", "%%")
+            dotnet_root = f'@set "DOTNET_ROOT={escaped_root}"\r\n'
+        content = (
+            f"@rem Managed by Axis portable setup\r\n"
+            f"{dotnet_root}"
+            f'@"{escaped}" %*\r\n'
+        ).encode()
         if destination_exists and destination.read_bytes() == content:
             return destination
         with tempfile.NamedTemporaryFile(
             prefix=f".{tool}.axis-",
             suffix=".cmd",
+            dir=command_dir,
+            delete=False,
+        ) as handle:
+            handle.write(content)
+            staged = Path(handle.name)
+    elif tool == "dotnet":
+        content = (
+            "#!/bin/sh\n"
+            "# Managed by Axis portable setup\n"
+            f"export DOTNET_ROOT={shlex.quote(str(managed.parent))}\n"
+            f"exec {shlex.quote(str(managed))} \"$@\"\n"
+        ).encode()
+        if destination_exists and destination.is_file() and destination.read_bytes() == content:
+            return destination
+        with tempfile.NamedTemporaryFile(
+            prefix=f".{tool}.axis-",
             dir=command_dir,
             delete=False,
         ) as handle:
@@ -307,6 +338,8 @@ def expose_managed_command(
         staged.symlink_to(managed)
 
     try:
+        if not windows and tool == "dotnet":
+            staged.chmod(0o755)
         os.replace(staged, destination)
     finally:
         if os.path.lexists(staged):

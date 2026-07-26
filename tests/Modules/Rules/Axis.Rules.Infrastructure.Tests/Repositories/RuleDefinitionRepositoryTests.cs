@@ -17,15 +17,15 @@ public sealed class RuleDefinitionRepositoryTests(RulesDatabaseFixture db) : IAs
     private IRuleDefinitionRepository _repository = null!;
     private IUnitOfWork _unitOfWork = null!;
 
-    public Task InitializeAsync()
+    public ValueTask InitializeAsync()
     {
         _context = db.CreateContext();
         _repository = new RuleDefinitionRepository(_context);
         _unitOfWork = new RulesUnitOfWork(_context);
-        return Task.CompletedTask;
+        return ValueTask.CompletedTask;
     }
 
-    public async Task DisposeAsync() => await _context.DisposeAsync();
+    public async ValueTask DisposeAsync() => await _context.DisposeAsync();
 
     [Fact]
     public async Task AddAsync_WhenRuleIsPublished_PersistsCanonicalDraftAndImmutableVersion()
@@ -33,14 +33,15 @@ public sealed class RuleDefinitionRepositoryTests(RulesDatabaseFixture db) : IAs
         Guid workspaceId = Guid.NewGuid();
         RuleDefinition definition = PublishedRule(workspaceId, UniqueKey("credit_threshold"));
 
-        await _repository.AddAsync(definition);
-        await _unitOfWork.SaveChangesAsync();
+        await _repository.AddAsync(definition, TestContext.Current.CancellationToken);
+        await _unitOfWork.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         await using RulesDbContext reloadContext = db.CreateContext();
         IRuleDefinitionRepository reloadRepository = new RuleDefinitionRepository(reloadContext);
         RuleDefinition loaded = (await reloadRepository.GetByKeyForWorkspaceAsync(
             definition.Key,
-            workspaceId))!;
+            workspaceId,
+            TestContext.Current.CancellationToken))!;
 
         loaded.Status.Should().Be(RuleLifecycleStatus.Published);
         loaded.ExpressionLanguageVersion.Should().Be(RuleExpressionLanguage.Version);
@@ -58,12 +59,13 @@ public sealed class RuleDefinitionRepositoryTests(RulesDatabaseFixture db) : IAs
     public async Task GetByKeyForWorkspaceAsync_WhenWorkspaceDiffers_DoesNotDiscloseDefinition()
     {
         RuleDefinition definition = PublishedRule(Guid.NewGuid(), UniqueKey("private_rule"));
-        await _repository.AddAsync(definition);
-        await _unitOfWork.SaveChangesAsync();
+        await _repository.AddAsync(definition, TestContext.Current.CancellationToken);
+        await _unitOfWork.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         RuleDefinition? loaded = await _repository.GetByKeyForWorkspaceAsync(
             definition.Key,
-            Guid.NewGuid());
+            Guid.NewGuid(),
+            TestContext.Current.CancellationToken);
 
         loaded.Should().BeNull();
     }
@@ -73,8 +75,8 @@ public sealed class RuleDefinitionRepositoryTests(RulesDatabaseFixture db) : IAs
     {
         Guid workspaceId = Guid.NewGuid();
         RuleDefinition definition = PublishedRule(workspaceId, UniqueKey("concurrent_rule"));
-        await _repository.AddAsync(definition);
-        await _unitOfWork.SaveChangesAsync();
+        await _repository.AddAsync(definition, TestContext.Current.CancellationToken);
+        await _unitOfWork.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         await using RulesDbContext firstContext = db.CreateContext();
         await using RulesDbContext secondContext = db.CreateContext();
@@ -84,16 +86,18 @@ public sealed class RuleDefinitionRepositoryTests(RulesDatabaseFixture db) : IAs
         IUnitOfWork secondUnitOfWork = new RulesUnitOfWork(secondContext);
         RuleDefinition first = (await firstRepository.GetByKeyForWorkspaceAsync(
             definition.Key,
-            workspaceId))!;
+            workspaceId,
+            TestContext.Current.CancellationToken))!;
         RuleDefinition second = (await secondRepository.GetByKeyForWorkspaceAsync(
             definition.Key,
-            workspaceId))!;
+            workspaceId,
+            TestContext.Current.CancellationToken))!;
         Guid userId = Guid.NewGuid();
         first.StartNextDraft(first.Revision, userId, DateTime.UtcNow).IsSuccess.Should().BeTrue();
         second.StartNextDraft(second.Revision, userId, DateTime.UtcNow).IsSuccess.Should().BeTrue();
 
-        await firstUnitOfWork.SaveChangesAsync();
-        Func<Task> act = () => secondUnitOfWork.SaveChangesAsync();
+        await firstUnitOfWork.SaveChangesAsync(TestContext.Current.CancellationToken);
+        Func<Task> act = () => secondUnitOfWork.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         await act.Should().ThrowAsync<ConcurrencyException>();
     }
@@ -115,20 +119,22 @@ public sealed class RuleDefinitionRepositoryTests(RulesDatabaseFixture db) : IAs
             Guid.NewGuid(),
             DateTime.UtcNow);
         draftResult.IsSuccess.Should().BeTrue();
-        await _repository.AddAsync(published);
-        await _repository.AddAsync(draftResult.Value);
-        await _unitOfWork.SaveChangesAsync();
+        await _repository.AddAsync(published, TestContext.Current.CancellationToken);
+        await _repository.AddAsync(draftResult.Value, TestContext.Current.CancellationToken);
+        await _unitOfWork.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         int count = await _repository.CountForWorkspaceAsync(
             workspaceId,
             RuleScope.Record,
-            RuleLifecycleStatus.Draft);
+            RuleLifecycleStatus.Draft,
+            cancellationToken: TestContext.Current.CancellationToken);
         IReadOnlyList<RuleDefinition> rows = await _repository.ListForWorkspaceAsync(
             workspaceId,
             skip: 0,
             take: 10,
             RuleScope.Record,
-            RuleLifecycleStatus.Draft);
+            RuleLifecycleStatus.Draft,
+            cancellationToken: TestContext.Current.CancellationToken);
 
         count.Should().Be(1);
         rows.Should().ContainSingle(definition => definition.Name == "Draft rule");
@@ -145,18 +151,30 @@ public sealed class RuleDefinitionRepositoryTests(RulesDatabaseFixture db) : IAs
             UniqueKey("priority_check"),
             "Kiểm tra ưu tiên");
         RuleDefinition typo = DraftRule(workspaceId, UniqueKey("invoice"), "Invoice");
-        await _repository.AddAsync(exact);
-        await _repository.AddAsync(prefix);
-        await _repository.AddAsync(accented);
-        await _repository.AddAsync(typo);
-        await _unitOfWork.SaveChangesAsync();
+        await _repository.AddAsync(exact, TestContext.Current.CancellationToken);
+        await _repository.AddAsync(prefix, TestContext.Current.CancellationToken);
+        await _repository.AddAsync(accented, TestContext.Current.CancellationToken);
+        await _repository.AddAsync(typo, TestContext.Current.CancellationToken);
+        await _unitOfWork.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         IReadOnlyList<RuleDefinition> ranked = await _repository.ListForWorkspaceAsync(
-            workspaceId, 0, 10, searchQuery: "customer");
+            workspaceId,
+            0,
+            10,
+            searchQuery: "customer",
+            cancellationToken: TestContext.Current.CancellationToken);
         IReadOnlyList<RuleDefinition> accentAndOrder = await _repository.ListForWorkspaceAsync(
-            workspaceId, 0, 10, searchQuery: "uu tien kiem tra");
+            workspaceId,
+            0,
+            10,
+            searchQuery: "uu tien kiem tra",
+            cancellationToken: TestContext.Current.CancellationToken);
         IReadOnlyList<RuleDefinition> typoMatch = await _repository.ListForWorkspaceAsync(
-            workspaceId, 0, 10, searchQuery: "inovice");
+            workspaceId,
+            0,
+            10,
+            searchQuery: "inovice",
+            cancellationToken: TestContext.Current.CancellationToken);
 
         ranked.Select(definition => definition.Key).Take(2).Should().Equal(exact.Key, prefix.Key);
         accentAndOrder.Should().ContainSingle(definition => definition.Key == accented.Key);

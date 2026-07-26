@@ -132,7 +132,8 @@ public sealed class SaveUnpublishedBusinessObjectDefinitionHandlerTests
         result.IsFailure.Should().BeTrue();
         result.ErrorCode.Should().Be(ErrorCodes.InvalidInput);
         result.ProblemCode.Should().Be(BusinessObjectsProblemCodes.BusinessObjectDefinitionInvalid);
-        await _context.UnitOfWork.DidNotReceiveWithAnyArgs().SaveChangesAsync(default);
+        await _context.UnitOfWork.DidNotReceiveWithAnyArgs()
+            .SaveChangesAsync(TestContext.Current.CancellationToken);
     }
 
     [Fact]
@@ -161,7 +162,8 @@ public sealed class SaveUnpublishedBusinessObjectDefinitionHandlerTests
         result.IsFailure.Should().BeTrue();
         result.ErrorCode.Should().Be(ErrorCodes.Conflict);
         result.ProblemCode.Should().Be(BusinessObjectsProblemCodes.BusinessObjectDefinitionConflict);
-        await _context.UnitOfWork.DidNotReceiveWithAnyArgs().SaveChangesAsync(default);
+        await _context.UnitOfWork.DidNotReceiveWithAnyArgs()
+            .SaveChangesAsync(TestContext.Current.CancellationToken);
     }
 
     private static IReadOnlyDictionary<string, IReadOnlyList<string>> Params(

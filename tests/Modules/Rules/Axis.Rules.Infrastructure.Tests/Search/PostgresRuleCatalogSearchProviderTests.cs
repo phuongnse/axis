@@ -27,7 +27,7 @@ public sealed class PostgresRuleCatalogSearchProviderTests(RulesDatabaseFixture 
             Guid.NewGuid(),
             DateTime.UtcNow).Value;
         context.RuleDefinitions.Add(workspaceDefinition);
-        await context.SaveChangesAsync();
+        await context.SaveChangesAsync(TestContext.Current.CancellationToken);
         IRuleCatalogSearchProvider sut = new PostgresRuleCatalogSearchProvider(context);
 
         RuleCatalogSearchPage result = await sut.SearchAsync(
@@ -38,7 +38,8 @@ public sealed class PostgresRuleCatalogSearchProviderTests(RulesDatabaseFixture 
             workspaceStatus: null,
             skip: 0,
             take: 1,
-            query: "customer");
+            query: "customer",
+            cancellationToken: TestContext.Current.CancellationToken);
 
         result.TotalCount.Should().Be(2);
         result.Items.Should().ContainSingle()

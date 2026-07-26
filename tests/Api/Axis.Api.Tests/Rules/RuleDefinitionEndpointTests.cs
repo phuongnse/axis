@@ -21,7 +21,7 @@ public sealed class RuleDefinitionEndpointTests(ApiTestFixture fixture)
     [Fact]
     public async Task RuleDefinitionEndpoints_WhenAnonymous_ReturnUnauthorized()
     {
-        HttpResponseMessage response = await fixture.Client.GetAsync("/api/rules");
+        HttpResponseMessage response = await fixture.Client.GetAsync("/api/rules", TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
@@ -37,7 +37,7 @@ public sealed class RuleDefinitionEndpointTests(ApiTestFixture fixture)
             accessToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        JsonElement body = await response.Content.ReadFromJsonAsync<JsonElement>(Json);
+        JsonElement body = await response.Content.ReadFromJsonAsync<JsonElement>(Json, TestContext.Current.CancellationToken);
         body.GetProperty("items").EnumerateArray()
             .Select(definition => definition.GetProperty("definitionKey").GetString())
             .Should().Contain([
@@ -53,7 +53,7 @@ public sealed class RuleDefinitionEndpointTests(ApiTestFixture fixture)
             "/api/rules?page=1&pageSize=20&query=required&language=en",
             accessToken);
         searchResponse.StatusCode.Should().Be(HttpStatusCode.OK);
-        JsonElement search = await searchResponse.Content.ReadFromJsonAsync<JsonElement>(Json);
+        JsonElement search = await searchResponse.Content.ReadFromJsonAsync<JsonElement>(Json, TestContext.Current.CancellationToken);
         search.GetProperty("items").EnumerateArray()
             .Select(definition => definition.GetProperty("definitionKey").GetString())
             .Should().Contain(RuleDefinitionKeys.Required)
@@ -79,7 +79,7 @@ public sealed class RuleDefinitionEndpointTests(ApiTestFixture fixture)
                 outcomeKind = "Validation",
             });
         createResponse.StatusCode.Should().Be(HttpStatusCode.Created);
-        JsonElement created = await createResponse.Content.ReadFromJsonAsync<JsonElement>(Json);
+        JsonElement created = await createResponse.Content.ReadFromJsonAsync<JsonElement>(Json, TestContext.Current.CancellationToken);
         string definitionKey = created.GetProperty("definitionKey").GetString()!;
 
         string otherWorkspaceToken = await CreateVerifiedSessionTokenAsync(UniqueEmail());
@@ -101,7 +101,7 @@ public sealed class RuleDefinitionEndpointTests(ApiTestFixture fixture)
             $"/api/rules/{definitionKey}",
             ownerToken);
         ownerResponse.StatusCode.Should().Be(HttpStatusCode.OK);
-        JsonElement ownerDefinition = await ownerResponse.Content.ReadFromJsonAsync<JsonElement>(Json);
+        JsonElement ownerDefinition = await ownerResponse.Content.ReadFromJsonAsync<JsonElement>(Json, TestContext.Current.CancellationToken);
         ownerDefinition.GetProperty("status").GetString().Should().Be("Draft");
         ownerDefinition.GetProperty("revision").GetInt32().Should().Be(1);
     }
@@ -117,7 +117,7 @@ public sealed class RuleDefinitionEndpointTests(ApiTestFixture fixture)
             accessToken);
 
         languageResponse.StatusCode.Should().Be(HttpStatusCode.OK);
-        JsonElement language = await languageResponse.Content.ReadFromJsonAsync<JsonElement>(Json);
+        JsonElement language = await languageResponse.Content.ReadFromJsonAsync<JsonElement>(Json, TestContext.Current.CancellationToken);
         language.GetProperty("version").GetInt32().Should().Be(1);
         language.GetProperty("operators").EnumerateArray()
             .Select(definition => definition.GetProperty("operator").GetString())
@@ -165,7 +165,7 @@ public sealed class RuleDefinitionEndpointTests(ApiTestFixture fixture)
                 language = "en",
             });
         guideResponse.StatusCode.Should().Be(HttpStatusCode.OK);
-        JsonElement guide = await guideResponse.Content.ReadFromJsonAsync<JsonElement>(Json);
+        JsonElement guide = await guideResponse.Content.ReadFromJsonAsync<JsonElement>(Json, TestContext.Current.CancellationToken);
         JsonElement threshold = guide.GetProperty("sections").EnumerateArray()
             .SelectMany(section => section.GetProperty("items").EnumerateArray())
             .Single(item => item.GetProperty("referenceKey").GetString() == "threshold");
@@ -179,7 +179,7 @@ public sealed class RuleDefinitionEndpointTests(ApiTestFixture fixture)
             accessToken);
 
         detailResponse.StatusCode.Should().Be(HttpStatusCode.OK);
-        JsonElement detail = await detailResponse.Content.ReadFromJsonAsync<JsonElement>(Json);
+        JsonElement detail = await detailResponse.Content.ReadFromJsonAsync<JsonElement>(Json, TestContext.Current.CancellationToken);
         detail.GetProperty("origin").GetString().Should().Be("System");
         detail.GetProperty("status").GetString().Should().Be("Published");
         detail.GetProperty("expressionLanguageVersion").GetInt32().Should().Be(1);
@@ -201,7 +201,7 @@ public sealed class RuleDefinitionEndpointTests(ApiTestFixture fixture)
             "/api/rules/context-schemas",
             accessToken);
         schemasResponse.StatusCode.Should().Be(HttpStatusCode.OK);
-        JsonElement schemas = await schemasResponse.Content.ReadFromJsonAsync<JsonElement>(Json);
+        JsonElement schemas = await schemasResponse.Content.ReadFromJsonAsync<JsonElement>(Json, TestContext.Current.CancellationToken);
         schemas.EnumerateArray()
             .Select(schema => schema.GetProperty("contextKey").GetString())
             .Should().Contain([
@@ -240,7 +240,7 @@ public sealed class RuleDefinitionEndpointTests(ApiTestFixture fixture)
                 language = "vi",
             });
         assistResponse.StatusCode.Should().Be(HttpStatusCode.OK);
-        JsonElement assisted = await assistResponse.Content.ReadFromJsonAsync<JsonElement>(Json);
+        JsonElement assisted = await assistResponse.Content.ReadFromJsonAsync<JsonElement>(Json, TestContext.Current.CancellationToken);
         assisted.GetProperty("condition").GetProperty("predicateOperator").GetString()
             .Should().Be("GreaterThan");
         JsonElement[] displayTokens = assisted.GetProperty("display").GetProperty("tokens")
@@ -270,7 +270,7 @@ public sealed class RuleDefinitionEndpointTests(ApiTestFixture fixture)
                 outcomeKind = "Validation",
             });
         createResponse.StatusCode.Should().Be(HttpStatusCode.Created);
-        JsonElement created = await createResponse.Content.ReadFromJsonAsync<JsonElement>(Json);
+        JsonElement created = await createResponse.Content.ReadFromJsonAsync<JsonElement>(Json, TestContext.Current.CancellationToken);
         string definitionKey = created.GetProperty("definitionKey").GetString()!;
         created.GetProperty("status").GetString().Should().Be("Draft");
         created.GetProperty("expressionLanguageVersion").GetInt32().Should().Be(1);
@@ -314,7 +314,7 @@ public sealed class RuleDefinitionEndpointTests(ApiTestFixture fixture)
                 outcome,
             });
         saveResponse.StatusCode.Should().Be(HttpStatusCode.OK);
-        JsonElement saved = await saveResponse.Content.ReadFromJsonAsync<JsonElement>(Json);
+        JsonElement saved = await saveResponse.Content.ReadFromJsonAsync<JsonElement>(Json, TestContext.Current.CancellationToken);
         saved.GetProperty("revision").GetInt32().Should().Be(2);
 
         Dictionary<string, object?> simulationBody = new()
@@ -337,7 +337,7 @@ public sealed class RuleDefinitionEndpointTests(ApiTestFixture fixture)
             accessToken,
             simulationBody);
         draftSimulationResponse.StatusCode.Should().Be(HttpStatusCode.OK);
-        JsonElement draftSimulation = await draftSimulationResponse.Content.ReadFromJsonAsync<JsonElement>(Json);
+        JsonElement draftSimulation = await draftSimulationResponse.Content.ReadFromJsonAsync<JsonElement>(Json, TestContext.Current.CancellationToken);
         draftSimulation.GetProperty("isMatch").GetBoolean().Should().BeTrue();
 
         HttpResponseMessage publishResponse = await SendWithBearerAsync(
@@ -346,7 +346,7 @@ public sealed class RuleDefinitionEndpointTests(ApiTestFixture fixture)
             accessToken,
             new { expectedRevision = 2 });
         publishResponse.StatusCode.Should().Be(HttpStatusCode.OK);
-        JsonElement published = await publishResponse.Content.ReadFromJsonAsync<JsonElement>(Json);
+        JsonElement published = await publishResponse.Content.ReadFromJsonAsync<JsonElement>(Json, TestContext.Current.CancellationToken);
         published.GetProperty("status").GetString().Should().Be("Published");
         published.GetProperty("latestPublishedVersion").GetInt32().Should().Be(1);
 
@@ -357,7 +357,7 @@ public sealed class RuleDefinitionEndpointTests(ApiTestFixture fixture)
             accessToken,
             simulationBody);
         versionSimulationResponse.StatusCode.Should().Be(HttpStatusCode.OK);
-        JsonElement versionSimulation = await versionSimulationResponse.Content.ReadFromJsonAsync<JsonElement>(Json);
+        JsonElement versionSimulation = await versionSimulationResponse.Content.ReadFromJsonAsync<JsonElement>(Json, TestContext.Current.CancellationToken);
         versionSimulation.GetProperty("definitionVersion").GetInt32().Should().Be(1);
         versionSimulation.GetProperty("isMatch").GetBoolean().Should().BeTrue();
 
@@ -367,7 +367,7 @@ public sealed class RuleDefinitionEndpointTests(ApiTestFixture fixture)
             accessToken,
             new { expectedRevision = 3 });
         startRevisionResponse.StatusCode.Should().Be(HttpStatusCode.OK);
-        JsonElement revision = await startRevisionResponse.Content.ReadFromJsonAsync<JsonElement>(Json);
+        JsonElement revision = await startRevisionResponse.Content.ReadFromJsonAsync<JsonElement>(Json, TestContext.Current.CancellationToken);
         revision.GetProperty("status").GetString().Should().Be("Draft");
         revision.GetProperty("revision").GetInt32().Should().Be(4);
 
@@ -377,7 +377,7 @@ public sealed class RuleDefinitionEndpointTests(ApiTestFixture fixture)
             accessToken,
             new { expectedRevision = 4 });
         archiveResponse.StatusCode.Should().Be(HttpStatusCode.OK);
-        JsonElement archived = await archiveResponse.Content.ReadFromJsonAsync<JsonElement>(Json);
+        JsonElement archived = await archiveResponse.Content.ReadFromJsonAsync<JsonElement>(Json, TestContext.Current.CancellationToken);
         archived.GetProperty("status").GetString().Should().Be("Archived");
         archived.GetProperty("versions").GetArrayLength().Should().Be(1);
 
@@ -415,7 +415,9 @@ public sealed class RuleDefinitionEndpointTests(ApiTestFixture fixture)
             ["state"] = state,
         });
 
-        HttpResponseMessage authorizeResponse = await fixture.Client.GetAsync(authorizeUrl);
+        HttpResponseMessage authorizeResponse = await fixture.Client.GetAsync(
+            authorizeUrl,
+            TestContext.Current.CancellationToken);
         authorizeResponse.StatusCode.Should().Be(HttpStatusCode.Redirect);
 
         Uri redirect = authorizeResponse.Headers.Location
@@ -435,9 +437,12 @@ public sealed class RuleDefinitionEndpointTests(ApiTestFixture fixture)
             ["code_verifier"] = verifier,
         });
 
-        HttpResponseMessage tokenResponse = await fixture.Client.PostAsync("/connect/token", tokenRequest);
+        HttpResponseMessage tokenResponse = await fixture.Client.PostAsync(
+            "/connect/token",
+            tokenRequest,
+            TestContext.Current.CancellationToken);
         tokenResponse.StatusCode.Should().Be(HttpStatusCode.OK);
-        JsonElement tokenBody = await tokenResponse.Content.ReadFromJsonAsync<JsonElement>(Json);
+        JsonElement tokenBody = await tokenResponse.Content.ReadFromJsonAsync<JsonElement>(Json, TestContext.Current.CancellationToken);
         return tokenBody.GetProperty("access_token").GetString()
             ?? throw new InvalidOperationException("Token response did not include an access token.");
     }
@@ -453,7 +458,7 @@ public sealed class RuleDefinitionEndpointTests(ApiTestFixture fixture)
             Content = body is null ? null : JsonContent.Create(body, options: Json),
         };
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
-        return await fixture.Client.SendAsync(request);
+        return await fixture.Client.SendAsync(request, TestContext.Current.CancellationToken);
     }
 
     private async Task<HttpResponseMessage> RegisterAsync(string email)
@@ -464,11 +469,15 @@ public sealed class RuleDefinitionEndpointTests(ApiTestFixture fixture)
         };
         request.Headers.Add("Idempotency-Key", Guid.NewGuid().ToString("N"));
 
-        return await fixture.Client.SendAsync(request);
+        return await fixture.Client.SendAsync(request, TestContext.Current.CancellationToken);
     }
 
     private async Task<HttpResponseMessage> VerifyEmailAsync(string token) =>
-        await fixture.Client.PostAsJsonAsync("/api/auth/verify-email", new { token }, Json);
+        await fixture.Client.PostAsJsonAsync(
+            "/api/auth/verify-email",
+            new { token },
+            Json,
+            TestContext.Current.CancellationToken);
 
     private string CapturedToken(string email) =>
         fixture.EmailCapture.GetVerificationToken(email)

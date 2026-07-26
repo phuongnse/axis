@@ -22,7 +22,7 @@ public sealed class IdentityDatabaseFixture : IAsyncLifetime
         return new IdentityDbContext(options);
     }
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         await _postgres.StartAsync();
         _connectionString = await PostgresModuleTestDatabase.CreateAsync(
@@ -37,5 +37,5 @@ public sealed class IdentityDatabaseFixture : IAsyncLifetime
                     .Options));
     }
 
-    public Task DisposeAsync() => _postgres.DisposeAsync().AsTask();
+    public ValueTask DisposeAsync() => _postgres.DisposeAsync();
 }

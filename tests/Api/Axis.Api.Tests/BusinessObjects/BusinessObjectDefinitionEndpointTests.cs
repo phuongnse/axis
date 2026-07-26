@@ -23,7 +23,7 @@ public sealed class BusinessObjectDefinitionEndpointTests(ApiTestFixture fixture
     [Fact]
     public async Task BusinessObjectDefinitionEndpoints_WhenAnonymous_ReturnUnauthorized()
     {
-        HttpResponseMessage response = await fixture.Client.GetAsync("/api/business-object-definitions");
+        HttpResponseMessage response = await fixture.Client.GetAsync("/api/business-object-definitions", TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
@@ -43,7 +43,7 @@ public sealed class BusinessObjectDefinitionEndpointTests(ApiTestFixture fixture
 
         createResponse.StatusCode.Should().Be(HttpStatusCode.Created);
         createResponse.Headers.Location!.ToString().Should().StartWith($"/api/business-object-definitions/");
-        JsonElement created = await createResponse.Content.ReadFromJsonAsync<JsonElement>(Json);
+        JsonElement created = await createResponse.Content.ReadFromJsonAsync<JsonElement>(Json, TestContext.Current.CancellationToken);
         Guid definitionId = created.GetProperty("id").GetGuid();
         created.GetProperty("status").GetString().Should().Be(nameof(BusinessObjectDefinitionStatus.Unpublished));
         created.GetProperty("objectKey").GetString().Should().Be(objectKey);
@@ -105,7 +105,7 @@ public sealed class BusinessObjectDefinitionEndpointTests(ApiTestFixture fixture
             });
 
         saveResponse.StatusCode.Should().Be(HttpStatusCode.OK);
-        JsonElement saved = await saveResponse.Content.ReadFromJsonAsync<JsonElement>(Json);
+        JsonElement saved = await saveResponse.Content.ReadFromJsonAsync<JsonElement>(Json, TestContext.Current.CancellationToken);
         saved.GetProperty("objectKey").GetString().Should().Be(objectKey);
         saved.GetProperty("revision").GetInt32().Should().Be(2);
         saved.GetProperty("fields").GetArrayLength().Should().Be(2);
@@ -138,7 +138,7 @@ public sealed class BusinessObjectDefinitionEndpointTests(ApiTestFixture fixture
             new { expectedRevision = 2 });
 
         publishResponse.StatusCode.Should().Be(HttpStatusCode.OK);
-        JsonElement published = await publishResponse.Content.ReadFromJsonAsync<JsonElement>(Json);
+        JsonElement published = await publishResponse.Content.ReadFromJsonAsync<JsonElement>(Json, TestContext.Current.CancellationToken);
         published.GetProperty("status").GetString().Should().Be(nameof(BusinessObjectDefinitionStatus.Published));
         published.GetProperty("latestPublishedVersionNumber").GetInt32().Should().Be(1);
         published.GetProperty("latestPublishedVersion")
@@ -161,7 +161,7 @@ public sealed class BusinessObjectDefinitionEndpointTests(ApiTestFixture fixture
             $"/api/business-object-definitions/{definitionId}",
             accessToken);
         getResponse.StatusCode.Should().Be(HttpStatusCode.OK);
-        JsonElement detail = await getResponse.Content.ReadFromJsonAsync<JsonElement>(Json);
+        JsonElement detail = await getResponse.Content.ReadFromJsonAsync<JsonElement>(Json, TestContext.Current.CancellationToken);
         detail.GetProperty("objectKey").GetString().Should().Be(objectKey);
 
         HttpResponseMessage listResponse = await SendWithBearerAsync(
@@ -169,7 +169,7 @@ public sealed class BusinessObjectDefinitionEndpointTests(ApiTestFixture fixture
             "/api/business-object-definitions?page=1&pageSize=20",
             accessToken);
         listResponse.StatusCode.Should().Be(HttpStatusCode.OK);
-        JsonElement list = await listResponse.Content.ReadFromJsonAsync<JsonElement>(Json);
+        JsonElement list = await listResponse.Content.ReadFromJsonAsync<JsonElement>(Json, TestContext.Current.CancellationToken);
         list.GetProperty("totalCount").GetInt32().Should().BeGreaterThanOrEqualTo(1);
         list.GetProperty("items").EnumerateArray()
             .Select(item => item.GetProperty("id").GetGuid())
@@ -254,7 +254,7 @@ public sealed class BusinessObjectDefinitionEndpointTests(ApiTestFixture fixture
             new { name = ObjectNameFromKey(objectKey), objectKey = "client_value" });
 
         response.StatusCode.Should().Be(HttpStatusCode.Created);
-        JsonElement body = await response.Content.ReadFromJsonAsync<JsonElement>(Json);
+        JsonElement body = await response.Content.ReadFromJsonAsync<JsonElement>(Json, TestContext.Current.CancellationToken);
         body.GetProperty("objectKey").GetString().Should().Be(objectKey);
     }
 
@@ -267,7 +267,7 @@ public sealed class BusinessObjectDefinitionEndpointTests(ApiTestFixture fixture
             new { name = objectName });
         response.StatusCode.Should().Be(HttpStatusCode.Created);
 
-        JsonElement body = await response.Content.ReadFromJsonAsync<JsonElement>(Json);
+        JsonElement body = await response.Content.ReadFromJsonAsync<JsonElement>(Json, TestContext.Current.CancellationToken);
         return body.GetProperty("id").GetGuid();
     }
 
@@ -314,7 +314,9 @@ public sealed class BusinessObjectDefinitionEndpointTests(ApiTestFixture fixture
         };
 
         string authorizeUrl = QueryHelpers.AddQueryString("/connect/authorize", authorizeQuery);
-        HttpResponseMessage authorizeResponse = await fixture.Client.GetAsync(authorizeUrl);
+        HttpResponseMessage authorizeResponse = await fixture.Client.GetAsync(
+            authorizeUrl,
+            TestContext.Current.CancellationToken);
         authorizeResponse.StatusCode.Should().Be(HttpStatusCode.Redirect);
 
         Uri redirect = authorizeResponse.Headers.Location
@@ -334,9 +336,12 @@ public sealed class BusinessObjectDefinitionEndpointTests(ApiTestFixture fixture
             ["code_verifier"] = verifier,
         });
 
-        HttpResponseMessage tokenResponse = await fixture.Client.PostAsync("/connect/token", tokenRequest);
+        HttpResponseMessage tokenResponse = await fixture.Client.PostAsync(
+            "/connect/token",
+            tokenRequest,
+            TestContext.Current.CancellationToken);
         tokenResponse.StatusCode.Should().Be(HttpStatusCode.OK);
-        JsonElement tokenBody = await tokenResponse.Content.ReadFromJsonAsync<JsonElement>(Json);
+        JsonElement tokenBody = await tokenResponse.Content.ReadFromJsonAsync<JsonElement>(Json, TestContext.Current.CancellationToken);
         return tokenBody.GetProperty("access_token").GetString()
             ?? throw new InvalidOperationException("Token response did not include an access token.");
     }
@@ -352,7 +357,7 @@ public sealed class BusinessObjectDefinitionEndpointTests(ApiTestFixture fixture
         if (body is not null)
             request.Content = JsonContent.Create(body, options: Json);
 
-        return await fixture.Client.SendAsync(request);
+        return await fixture.Client.SendAsync(request, TestContext.Current.CancellationToken);
     }
 
     private async Task<HttpResponseMessage> RegisterAsync(string email)
@@ -363,11 +368,15 @@ public sealed class BusinessObjectDefinitionEndpointTests(ApiTestFixture fixture
         };
         request.Headers.Add("Idempotency-Key", Guid.NewGuid().ToString("N"));
 
-        return await fixture.Client.SendAsync(request);
+        return await fixture.Client.SendAsync(request, TestContext.Current.CancellationToken);
     }
 
     private async Task<HttpResponseMessage> VerifyEmailAsync(string token) =>
-        await fixture.Client.PostAsJsonAsync("/api/auth/verify-email", new { token }, Json);
+        await fixture.Client.PostAsJsonAsync(
+            "/api/auth/verify-email",
+            new { token },
+            Json,
+            TestContext.Current.CancellationToken);
 
     private string CapturedToken(string email) =>
         fixture.EmailCapture.GetVerificationToken(email)
@@ -385,7 +394,7 @@ public sealed class BusinessObjectDefinitionEndpointTests(ApiTestFixture fixture
 
     private static async Task<ApiProblem> ReadProblemAsync(HttpResponseMessage response)
     {
-        JsonElement body = await response.Content.ReadFromJsonAsync<JsonElement>(Json);
+        JsonElement body = await response.Content.ReadFromJsonAsync<JsonElement>(Json, TestContext.Current.CancellationToken);
         string? code = body.TryGetProperty("code", out JsonElement codeElement)
             ? codeElement.GetString()
             : null;

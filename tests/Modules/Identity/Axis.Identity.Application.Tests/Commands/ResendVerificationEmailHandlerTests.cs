@@ -33,7 +33,7 @@ public class ResendVerificationEmailHandlerTests
     {
         User user = MakeUnverifiedUser();
         user.SetLanguagePreference(UserLanguage.Create("vi").Value);
-        _userRepo.FindByEmailGloballyAsync(Arg.Any<Email>()).Returns(user);
+        _userRepo.FindByEmailGloballyAsync(Arg.Any<Email>(), Arg.Any<CancellationToken>()).Returns(user);
         _rateLimiter.TryRecordResendAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(Result.Success());
 
@@ -53,7 +53,7 @@ public class ResendVerificationEmailHandlerTests
     {
         _rateLimiter.TryRecordResendAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(Result.Success());
-        _userRepo.FindByEmailGloballyAsync(Arg.Any<Email>()).ReturnsNull();
+        _userRepo.FindByEmailGloballyAsync(Arg.Any<Email>(), Arg.Any<CancellationToken>()).ReturnsNull();
 
         Func<Task> act = async () => await CreateHandler().Handle(
             new ResendVerificationEmailCommand("unknown@acme.com"),
@@ -73,7 +73,7 @@ public class ResendVerificationEmailHandlerTests
         user.VerifyEmail();
         _rateLimiter.TryRecordResendAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(Result.Success());
-        _userRepo.FindByEmailGloballyAsync(Arg.Any<Email>()).Returns(user);
+        _userRepo.FindByEmailGloballyAsync(Arg.Any<Email>(), Arg.Any<CancellationToken>()).Returns(user);
 
         await CreateHandler().Handle(
             new ResendVerificationEmailCommand("alice@acme.com"),

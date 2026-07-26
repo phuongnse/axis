@@ -38,7 +38,7 @@ public sealed class SignInUserFlowTests(ApiTestFixture fixture)
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         response.Headers.TryGetValues("Set-Cookie", out IEnumerable<string>? cookies).Should().BeTrue();
         cookies!.Should().Contain(cookie => cookie.Contains(".AspNetCore.Cookies", StringComparison.Ordinal));
-        JsonElement body = await response.Content.ReadFromJsonAsync<JsonElement>(Json);
+        JsonElement body = await response.Content.ReadFromJsonAsync<JsonElement>(Json, TestContext.Current.CancellationToken);
         body.GetProperty("sessionEstablished").GetBoolean().Should().BeTrue();
         body.GetProperty("nextStep").GetString().Should().Be(nameof(SignInNextStep.Dashboard));
 
@@ -54,7 +54,7 @@ public sealed class SignInUserFlowTests(ApiTestFixture fixture)
         HttpResponseMessage response = await SignInAsync("", "");
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
-        JsonElement body = await response.Content.ReadFromJsonAsync<JsonElement>(Json);
+        JsonElement body = await response.Content.ReadFromJsonAsync<JsonElement>(Json, TestContext.Current.CancellationToken);
         JsonElement errors = body.GetProperty("errors");
         errors.EnumerateObject().Select(property => property.Name)
             .Should().BeEquivalentTo(["email", "password"]);
@@ -128,7 +128,7 @@ public sealed class SignInUserFlowTests(ApiTestFixture fixture)
     {
         string state = Guid.NewGuid().ToString("N");
         HttpResponseMessage signOutResponse =
-            await fixture.Client.PostAsync("/api/auth/sign-out", content: null);
+            await fixture.Client.PostAsync("/api/auth/sign-out", content: null, cancellationToken: TestContext.Current.CancellationToken);
 
         HttpResponseMessage response = await AuthorizeAsync(prompt: "none", state);
 
@@ -155,7 +155,7 @@ public sealed class SignInUserFlowTests(ApiTestFixture fixture)
         HttpResponseMessage authorizeBeforeSignOut = await AuthorizeAsync();
         authorizeBeforeSignOut.StatusCode.Should().Be(HttpStatusCode.Redirect);
 
-        HttpResponseMessage signOutResponse = await fixture.Client.PostAsync("/api/auth/sign-out", content: null);
+        HttpResponseMessage signOutResponse = await fixture.Client.PostAsync("/api/auth/sign-out", content: null, cancellationToken: TestContext.Current.CancellationToken);
 
         signOutResponse.StatusCode.Should().Be(HttpStatusCode.NoContent);
         signOutResponse.Headers.TryGetValues("Set-Cookie", out IEnumerable<string>? cookies).Should().BeTrue();
@@ -165,7 +165,7 @@ public sealed class SignInUserFlowTests(ApiTestFixture fixture)
         HttpResponseMessage authorizeAfterSignOut = await AuthorizeAsync();
         authorizeAfterSignOut.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
 
-        HttpResponseMessage absentSessionResponse = await fixture.Client.PostAsync("/api/auth/sign-out", content: null);
+        HttpResponseMessage absentSessionResponse = await fixture.Client.PostAsync("/api/auth/sign-out", content: null, cancellationToken: TestContext.Current.CancellationToken);
         absentSessionResponse.StatusCode.Should().Be(HttpStatusCode.NoContent);
 
         (int userCountAfter, int workspaceCountAfter, int tokenCountAfter) = await CountRegistrationArtifactsAsync();
@@ -182,14 +182,22 @@ public sealed class SignInUserFlowTests(ApiTestFixture fixture)
         };
         request.Headers.Add("Idempotency-Key", Guid.NewGuid().ToString("N"));
 
-        return await fixture.Client.SendAsync(request);
+        return await fixture.Client.SendAsync(request, TestContext.Current.CancellationToken);
     }
 
     private async Task<HttpResponseMessage> VerifyEmailAsync(string token) =>
-        await fixture.Client.PostAsJsonAsync("/api/auth/verify-email", new { token }, Json);
+        await fixture.Client.PostAsJsonAsync(
+            "/api/auth/verify-email",
+            new { token },
+            Json,
+            TestContext.Current.CancellationToken);
 
     private async Task<HttpResponseMessage> SignInAsync(string email, string password) =>
-        await fixture.Client.PostAsJsonAsync("/api/auth/sign-in", new { email, password }, Json);
+        await fixture.Client.PostAsJsonAsync(
+            "/api/auth/sign-in",
+            new { email, password },
+            Json,
+            TestContext.Current.CancellationToken);
 
     private async Task<HttpResponseMessage> AuthorizeAsync(string? prompt = null, string? state = null)
     {
@@ -207,7 +215,9 @@ public sealed class SignInUserFlowTests(ApiTestFixture fixture)
         };
 
         string authorizeUrl = QueryHelpers.AddQueryString("/connect/authorize", authorizeQuery);
-        return await fixture.Client.GetAsync(authorizeUrl);
+        return await fixture.Client.GetAsync(
+            authorizeUrl,
+            TestContext.Current.CancellationToken);
     }
 
     private async Task<(int UserCount, int WorkspaceCount, int TokenCount)> CountRegistrationArtifactsAsync()
@@ -215,9 +225,9 @@ public sealed class SignInUserFlowTests(ApiTestFixture fixture)
         using IServiceScope scope = fixture.CreateScope();
         IdentityDbContext db = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
         return (
-            await db.Users.CountAsync(),
-            await db.Workspaces.CountAsync(),
-            await db.EmailVerificationTokens.CountAsync());
+            await db.Users.CountAsync(TestContext.Current.CancellationToken),
+            await db.Workspaces.CountAsync(TestContext.Current.CancellationToken),
+            await db.EmailVerificationTokens.CountAsync(TestContext.Current.CancellationToken));
     }
 
     private async Task SetUserStatusAsync(string email, UserStatus status)
@@ -225,9 +235,11 @@ public sealed class SignInUserFlowTests(ApiTestFixture fixture)
         using IServiceScope scope = fixture.CreateScope();
         IdentityDbContext db = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
         Email normalizedEmail = Email.Create(email).Value;
-        User user = await db.Users.SingleAsync(u => u.Email == normalizedEmail);
+        User user = await db.Users.SingleAsync(
+            u => u.Email == normalizedEmail,
+            TestContext.Current.CancellationToken);
         db.Entry(user).Property(nameof(User.Status)).CurrentValue = status;
-        await db.SaveChangesAsync();
+        await db.SaveChangesAsync(TestContext.Current.CancellationToken);
     }
 
     private async Task MarkUserEmailVerifiedWithoutActivatingWorkspaceAsync(string email)
@@ -235,9 +247,11 @@ public sealed class SignInUserFlowTests(ApiTestFixture fixture)
         using IServiceScope scope = fixture.CreateScope();
         IdentityDbContext db = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
         Email normalizedEmail = Email.Create(email).Value;
-        User user = await db.Users.SingleAsync(u => u.Email == normalizedEmail);
+        User user = await db.Users.SingleAsync(
+            u => u.Email == normalizedEmail,
+            TestContext.Current.CancellationToken);
         user.VerifyEmail();
-        await db.SaveChangesAsync();
+        await db.SaveChangesAsync(TestContext.Current.CancellationToken);
     }
 
     private string CapturedToken(string email) =>
@@ -246,7 +260,7 @@ public sealed class SignInUserFlowTests(ApiTestFixture fixture)
 
     private static async Task<ApiProblem> ReadProblemAsync(HttpResponseMessage response)
     {
-        JsonElement body = await response.Content.ReadFromJsonAsync<JsonElement>(Json);
+        JsonElement body = await response.Content.ReadFromJsonAsync<JsonElement>(Json, TestContext.Current.CancellationToken);
         return new ApiProblem(
             body.GetProperty("detail").GetString(),
             body.GetProperty("code").GetString(),

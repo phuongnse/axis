@@ -21,7 +21,7 @@ public sealed class RulesDatabaseFixture : IAsyncLifetime
         return new RulesDbContext(options);
     }
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         await _postgres.StartAsync();
         _connectionString = await PostgresModuleTestDatabase.CreateAsync(
@@ -32,7 +32,7 @@ public sealed class RulesDatabaseFixture : IAsyncLifetime
             options => new RulesDbContext(options));
     }
 
-    public Task DisposeAsync() => _postgres.DisposeAsync().AsTask();
+    public ValueTask DisposeAsync() => _postgres.DisposeAsync();
 }
 
 [CollectionDefinition("RulesDb")]
