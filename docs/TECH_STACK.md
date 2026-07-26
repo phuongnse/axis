@@ -31,7 +31,7 @@ Tech-stack changes need explicit user approval before implementation. Update thi
 - .NET package versions remain centralized and exact in `Directory.Packages.props`. GitHub Actions remain digest-pinned.
 - Renovate is the only automated version proposer. It opens weekly dependency and lockfile updates, keeps major updates separate for deliberate review, and raises vulnerability fixes without waiting for the normal schedule. It never bypasses CI or human merge review.
 - Pull-request CI audits every changed frontend surface. The scheduled dependency-security workflow audits the locked npm and NuGet graphs daily on the default branch so newly published advisories do not wait for an unrelated code change.
-- Version changes update the owning manifest and generated lock or contract artifacts together. Do not add floating ranges, manual transitive edits, compatibility shims, or vulnerability exceptions to preserve an obsolete version.
+- Version changes update the owning manifest and generated lock or contract artifacts together. Do not add floating ranges, manual transitive edits, compatibility shims, or unapproved or persistent vulnerability exceptions to preserve an obsolete version. Lower-severity findings may use only the documented exact, time-bounded acceptance process.
 
 ## Version Owners
 
