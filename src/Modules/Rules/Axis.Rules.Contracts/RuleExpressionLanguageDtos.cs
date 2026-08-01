@@ -58,7 +58,7 @@ public sealed record RuleExpressionLimitsDto(
     int MaxDepth,
     int MaxNodes,
     int MaxFunctionCalls,
-    int MaxParameters,
+    int MaxInputs,
     int MaxExecutionSteps);
 
 public sealed record RuleExpressionLanguageDto(

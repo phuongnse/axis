@@ -358,7 +358,7 @@ test.describe('sign in user', () => {
     await expect(page.getByText('Email address is required')).toBeVisible();
     await expect(page.getByText('Password is required')).toBeVisible();
     await expect(emailInput).toHaveAttribute('aria-invalid', 'true');
-    await expect(emailInput).toHaveCSS('border-color', 'rgb(239, 68, 68)');
+    await expect(emailInput).toHaveClass(/border-destructive/);
 
     await page.getByRole('button', { name: 'Preferences' }).click();
     await page.getByRole('button', { name: 'Vietnamese' }).click();
@@ -368,7 +368,7 @@ test.describe('sign in user', () => {
     await expect(page.getByText('Mật khẩu là bắt buộc')).toBeVisible();
     await expect(page.getByText('Email address is required')).toHaveCount(0);
     await expect(localizedEmailInput).toHaveAttribute('aria-invalid', 'true');
-    await expect(localizedEmailInput).toHaveCSS('border-color', 'rgb(239, 68, 68)');
+    await expect(localizedEmailInput).toHaveClass(/border-destructive/);
   });
 
   test('AT-013 protected route reload restores from the browser authorization session', async ({

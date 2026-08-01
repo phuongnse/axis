@@ -19,6 +19,7 @@ Do not add reference-owner sections or bottom reference lists for repo docs.
 - Classify by responsibility, not current file inventory.
 - Delete sentences that do not carry a rule, fact, or decision.
 - Use examples only when they generalize.
+- Record the current contract and durable rationale, never who approved, requested, or confirmed it, when the conversation occurred, or other session provenance.
 
 ## Avoid
 
@@ -31,6 +32,7 @@ Do not add reference-owner sections or bottom reference lists for repo docs.
 | Display labels like `[Tech Stack]` | Path labels like `[docs/TECH_STACK.md]` |
 | Old-name warning lists | One-time sweep plus current owner links |
 | Review-only guidance called a gate | [docs/ENFORCEMENT.md](../ENFORCEMENT.md) status terms |
+| Approval or conversation history | Current decision and durable rationale |
 
 ## Size
 

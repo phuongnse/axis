@@ -41,11 +41,18 @@ Project commands use `python`; substitute `python3` on WSL/Linux or `py -3` on W
 
 ## Command Boundaries
 
+- Native read-only inspection needs no wrapper. Repeatable repository workflows, repo-owned tools, and verification evidence use finite Axis subcommands. A rare one-off mutation may use an exact native command only after its command and targets are explicitly approved; recurrence requires a route. Pass-through shell access never counts as a finite route or evidence.
 - Add repo workflows as `python scripts/axis.py ...` subcommands.
+- Use `python scripts/axis.py git sync --branch <branch>` to fetch only that project or Renovate branch from `origin`, switch to its existing clean local branch or create a tracking branch, fast-forward without stash, rebase, reset, or deletion, and refuse dirty, detached, or diverged state.
+- `python scripts/axis.py git checkpoint --branch <branch> --subject <subject>` commits staged paths only. Add `--all` only when every tracked, deleted, and untracked path is intentionally in scope.
+- Use `python scripts/axis.py frontend test [test-paths] [-t <name>]` for all new or focused Vitest evidence; do not add arbitrary Vitest flags. The older `frontend script test` route remains only for existing acceptance evidence until those records are migrated.
+- Use `python scripts/axis.py migration add <identity|business-objects|rules> <PascalCaseName>` to scaffold a migration with the repository-owned project, context, output, and design-time environment.
 - Use `python scripts/axis.py generate theme` after editing [theme/axis-theme.json](../../theme/axis-theme.json); `python scripts/axis.py check theme` rejects stale web or email projections.
 - Use `python scripts/axis.py dotnet test [path/to/project.csproj] -- <dotnet-test-args>`; omit the project to test `Axis.sln`.
 - Keep raw Docker, dotnet, npm, Lychee, and OpenSSL calls inside wrappers or package scripts.
+- The shared runner normalizes `TMPDIR`, `TEMP`, and `TMP` to one existing writable directory before every governed subprocess; inherited cross-OS paths are never passed through.
 - Use `python scripts/axis.py local-dev smoke -- <playwright-args>` for the narrow smoke journey and `python scripts/axis.py local-dev e2e -- <playwright-args>` for diff-triggered browser evidence. Omit Playwright arguments only for CI or a cross-cutting diff that invalidates every browser surface. Both commands reconcile the local stack and run Playwright in the same Compose-managed browser environment.
+- `local-dev shell` is an unrestricted diagnostic escape hatch, not a finite workflow or evidence route. Volume-destructive local-dev commands require explicit `--yes`.
 - Use `python scripts/axis.py ready-review` on a clean checkpoint commit at the review boundary. It runs changed-path verification plus the deterministic policy profile shared with CI.
 - Treat `python scripts/axis.py verify` as the changed-path verification engine behind ready-review, not as complete PR-readiness evidence by itself.
 - Use `python scripts/axis.py verify --plan-only` to inspect changed-path routing without executing tools.
@@ -64,6 +71,6 @@ Project commands use `python`; substitute `python3` on WSL/Linux or `py -3` on W
 - Command tests prove supported subcommands and current behavior.
 - Removed or renamed commands, markers, headings, and artifacts get a one-time `rg` sweep plus current owner links, not permanent denylist checks.
 - Diff-aware checks include PR range plus staged, unstaged, and untracked files.
-- `python scripts/axis.py check frontend-dependency-versions` requires exact direct npm versions and overrides, and keeps the Node/npm source, portable setup, and dev image on one exact baseline. `package-lock.json` owns the resolved graph; install it through `python scripts/axis.py frontend install`.
+- `python scripts/axis.py check frontend-dependency-versions` requires exact direct npm versions and overrides, and keeps the Node/npm source, portable setup, and dev image on one exact baseline. Regenerate `package-lock.json` from that manifest through `python scripts/axis.py frontend sync-lock`; install the locked graph through `python scripts/axis.py frontend install`.
 - The frontend vulnerability gate evaluates the full npm audit JSON. High and critical findings always fail; every lower-severity advisory needs a current exact acceptance of at most 30 days in [frontend/dependency-risk-acceptances.json](../../frontend/dependency-risk-acceptances.json). New, changed, expired, overlong, and stale acceptances fail the same gate.
 - Changed-path verification runs both frontend dependency gates for every frontend diff, matching pull-request CI. [.github/workflows/dependency-security.yml](../../.github/workflows/dependency-security.yml) audits the locked npm and NuGet graphs daily on the default branch.

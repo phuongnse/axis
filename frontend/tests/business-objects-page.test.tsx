@@ -23,6 +23,7 @@ const definitionId = '33333333-3333-4333-8333-333333333333';
 const fieldId = '55555555-5555-4555-8555-555555555555';
 const optionId = '66666666-6666-4666-8666-666666666666';
 const ruleId = '77777777-7777-4777-8777-777777777777';
+const bindingId = '88888888-8888-4888-8888-888888888888';
 const now = '2026-07-07T00:00:00Z';
 
 const fieldRuleDefinitions = {
@@ -32,15 +33,10 @@ const fieldRuleDefinitions = {
       name: 'Required',
       description: 'Future records must provide a value.',
       origin: 'System',
-      scope: 'Field',
       status: 'Published',
       latestPublishedVersion: 1,
-      outcomeKind: 'Validation',
-      applicability: {
-        targetTypeKeys: ['Text', 'Integer', 'Decimal', 'Date', 'DateTime', 'Boolean', 'Choice'],
-        configurationConstraints: {},
-      },
-      parameters: [],
+      output: { type: 'Boolean', cardinality: 'Scalar' },
+      inputs: [{ key: 'value', types: ['Text'], isRequired: true, allowMultiple: false }],
     },
   ],
   totalCount: 1,
@@ -71,9 +67,7 @@ describe('BusinessObjectsPage', () => {
       queryClient.getQueryData(businessObjectDefinitionQueryKeys.list(1, 20, '', 'en')),
     ).toEqual(page);
     expect(
-      queryClient.getQueryData(
-        ruleDefinitionQueryKeys.list({ page: 1, pageSize: 100, scope: 'Field' }),
-      ),
+      queryClient.getQueryData(ruleDefinitionQueryKeys.list({ page: 1, pageSize: 100 })),
     ).toEqual(fieldRuleDefinitions);
   });
 
@@ -160,17 +154,25 @@ describe('BusinessObjectsPage', () => {
       '[data-slot="business-object-read-only-details"]',
     );
     expect(readOnlyDetails).not.toBeNull();
+    const generalPanel = within(definitionDialog).getByRole('tabpanel');
     expect(within(definitionDialog).getByText('Not published')).toBeVisible();
-    expect(within(readOnlyDetails as HTMLElement).getByText('customer')).toBeVisible();
-    expect(within(readOnlyDetails as HTMLElement).getByText('1')).toBeVisible();
+    expect(within(generalPanel).getByText('customer')).toBeVisible();
+    expect(within(generalPanel).getByText('1')).toBeVisible();
+    expect(
+      within(definitionDialog)
+        .getAllByRole('tab')
+        .map((tab) => tab.textContent),
+    ).toEqual(['General', 'Fields']);
+    await user.click(within(definitionDialog).getByRole('tab', { name: 'Fields' }));
     expect(
       within(readOnlyDetails as HTMLElement).getByRole('heading', { name: 'Status' }),
     ).toBeVisible();
     expect(within(readOnlyDetails as HTMLElement).getByText('Single')).toBeVisible();
-    expect(within(readOnlyDetails as HTMLElement).getByText('field.required')).toBeVisible();
+    expect(within(readOnlyDetails as HTMLElement).getByText('Field rules')).toBeVisible();
+    expect(within(readOnlyDetails as HTMLElement).queryByText(bindingId)).not.toBeInTheDocument();
     expect(within(definitionDialog).queryByRole('textbox')).not.toBeInTheDocument();
     expect(within(definitionDialog).queryByRole('combobox')).not.toBeInTheDocument();
-    expect(within(definitionDialog).queryByRole('tablist')).not.toBeInTheDocument();
+    expect(within(definitionDialog).getByRole('tablist')).toBeInTheDocument();
     const footer = definitionDialog.querySelector('[data-slot="managed-dialog-footer"]');
     expect(footer).not.toBeNull();
     expect(within(footer as HTMLElement).getByRole('button', { name: 'Close' })).toBeEnabled();
@@ -394,9 +396,7 @@ describe('BusinessObjectsPage', () => {
           rules: [
             {
               id: ruleId,
-              definitionKey: 'field.required',
-              definitionVersion: 1,
-              parameters: {},
+              bindingId,
             },
           ],
         },
@@ -525,9 +525,7 @@ function definitionDetail({
         rules: [
           {
             id: ruleId,
-            definitionKey: 'field.required',
-            definitionVersion: 1,
-            parameters: {},
+            bindingId,
           },
         ],
       },

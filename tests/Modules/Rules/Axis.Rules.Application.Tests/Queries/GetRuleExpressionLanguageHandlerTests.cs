@@ -49,7 +49,7 @@ public sealed class GetRuleExpressionLanguageHandlerTests
         result.Value.Limits.MaxDepth.Should().Be(DomainEvaluationLimits.Default.MaxDepth);
         result.Value.Limits.MaxNodes.Should().Be(DomainEvaluationLimits.Default.MaxNodes);
         result.Value.Limits.MaxFunctionCalls.Should().Be(DomainEvaluationLimits.Default.MaxFunctionCalls);
-        result.Value.Limits.MaxParameters.Should().Be(DomainEvaluationLimits.Default.MaxParameters);
+        result.Value.Limits.MaxInputs.Should().Be(DomainEvaluationLimits.Default.MaxInputs);
         result.Value.Limits.MaxExecutionSteps.Should().Be(DomainEvaluationLimits.Default.MaxExecutionSteps);
     }
 }

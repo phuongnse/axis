@@ -27,6 +27,101 @@ public sealed class RuleDefinitionEndpointTests(ApiTestFixture fixture)
     }
 
     [Fact]
+    public async Task RuleBindings_WhenCreatedUpdatedAndDeleted_PreserveIndependentRuleDefinition()
+    {
+        string accessToken = await CreateVerifiedSessionTokenAsync(UniqueEmail());
+        object mappings = new
+        {
+            value = new
+            {
+                kind = "Literal",
+                contextKey = (string?)null,
+                literalValues = new[] { "Approved" },
+            },
+        };
+
+        HttpResponseMessage firstCreateResponse = await SendWithBearerAsync(
+            HttpMethod.Post,
+            "/api/rule-bindings",
+            accessToken,
+            new
+            {
+                definitionKey = RuleDefinitionKeys.Required,
+                definitionVersion = 1,
+                targetType = "neutral-consumer",
+                targetId = "consumer-1",
+                useCaseOrTrigger = "validate",
+                inputMappings = mappings,
+            });
+        firstCreateResponse.StatusCode.Should().Be(HttpStatusCode.Created);
+        JsonElement firstBinding = await firstCreateResponse.Content.ReadFromJsonAsync<JsonElement>(Json, TestContext.Current.CancellationToken);
+        string firstBindingId = firstBinding.GetProperty("id").GetString()!;
+        int firstRevision = firstBinding.GetProperty("revision").GetInt32();
+
+        HttpResponseMessage secondCreateResponse = await SendWithBearerAsync(
+            HttpMethod.Post,
+            "/api/rule-bindings",
+            accessToken,
+            new
+            {
+                definitionKey = RuleDefinitionKeys.Required,
+                definitionVersion = 1,
+                targetType = "neutral-consumer",
+                targetId = "consumer-2",
+                useCaseOrTrigger = "validate",
+                inputMappings = mappings,
+            });
+        secondCreateResponse.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        HttpResponseMessage updateResponse = await SendWithBearerAsync(
+            HttpMethod.Put,
+            $"/api/rule-bindings/{firstBindingId}",
+            accessToken,
+            new
+            {
+                expectedRevision = firstRevision,
+                definitionKey = RuleDefinitionKeys.Required,
+                definitionVersion = 1,
+                targetType = "neutral-consumer",
+                targetId = "consumer-1-updated",
+                useCaseOrTrigger = "validate",
+                inputMappings = mappings,
+                enabled = false,
+            });
+        updateResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        JsonElement updatedBinding = await updateResponse.Content.ReadFromJsonAsync<JsonElement>(Json, TestContext.Current.CancellationToken);
+        updatedBinding.GetProperty("enabled").GetBoolean().Should().BeFalse();
+
+        HttpResponseMessage usageResponse = await SendWithBearerAsync(
+            HttpMethod.Get,
+            "/api/rules/field.required/bindings?version=1",
+            accessToken);
+        usageResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        JsonElement[] usages = (await usageResponse.Content.ReadFromJsonAsync<JsonElement[]>(Json, TestContext.Current.CancellationToken))!;
+        usages.Should().HaveCount(2);
+        usages.Select(usage => usage.GetProperty("bindingId").GetString()).Should().Contain(firstBindingId);
+        usages.Select(usage => usage.GetProperty("targetId").GetString()).Should().Contain("consumer-1-updated");
+
+        HttpResponseMessage deleteResponse = await SendWithBearerAsync(
+            HttpMethod.Delete,
+            $"/api/rule-bindings/{firstBindingId}",
+            accessToken);
+        deleteResponse.StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        HttpResponseMessage ruleResponse = await SendWithBearerAsync(
+            HttpMethod.Get,
+            "/api/rules/field.required",
+            accessToken);
+        ruleResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        HttpResponseMessage remainingUsageResponse = await SendWithBearerAsync(
+            HttpMethod.Get,
+            "/api/rules/field.required/bindings?version=1",
+            accessToken);
+        JsonElement[] remainingUsages = (await remainingUsageResponse.Content.ReadFromJsonAsync<JsonElement[]>(Json, TestContext.Current.CancellationToken))!;
+        remainingUsages.Should().HaveCount(1);
+    }
+
+    [Fact]
     public async Task ListRuleDefinitions_WhenAuthenticated_ReturnsGeneralSystemCatalog()
     {
         string accessToken = await CreateVerifiedSessionTokenAsync(UniqueEmail());
@@ -73,10 +168,6 @@ public sealed class RuleDefinitionEndpointTests(ApiTestFixture fixture)
             {
                 name = "Isolated credit threshold",
                 description = "Proves workspace isolation.",
-                scope = "Field",
-                contextKey = "business_objects.field.decimal",
-                contextSchemaVersion = 1,
-                outcomeKind = "Validation",
             });
         createResponse.StatusCode.Should().Be(HttpStatusCode.Created);
         JsonElement created = await createResponse.Content.ReadFromJsonAsync<JsonElement>(Json, TestContext.Current.CancellationToken);
@@ -148,14 +239,22 @@ public sealed class RuleDefinitionEndpointTests(ApiTestFixture fixture)
             {
                 expressionLanguageVersion = 1,
                 definitionKey = RuleDefinitionKeys.NumericRange,
-                contextKey = "business_objects.field.decimal",
-                contextSchemaVersion = 1,
-                parameters = new[]
+                inputs = new[]
                 {
                     new
                     {
+                        key = "value",
+                        label = "Value",
+                        types = new[] { "Decimal" },
+                        isRequired = true,
+                        allowMultiple = false,
+                        allowedValues = Array.Empty<string>(),
+                    },
+                    new
+                    {
                         key = "threshold",
-                        type = "Decimal",
+                        label = "Threshold",
+                        types = new[] { "Decimal" },
                         isRequired = true,
                         allowMultiple = false,
                         allowedValues = Array.Empty<string>(),
@@ -169,7 +268,7 @@ public sealed class RuleDefinitionEndpointTests(ApiTestFixture fixture)
         JsonElement threshold = guide.GetProperty("sections").EnumerateArray()
             .SelectMany(section => section.GetProperty("items").EnumerateArray())
             .Single(item => item.GetProperty("referenceKey").GetString() == "threshold");
-        threshold.GetProperty("referenceKind").GetString().Should().Be("Parameter");
+        threshold.GetProperty("referenceKind").GetString().Should().Be("Input");
         threshold.GetProperty("displayName").GetProperty("segments").EnumerateArray()
             .Should().Contain(segment => segment.GetProperty("isMatch").GetBoolean());
 
@@ -183,11 +282,17 @@ public sealed class RuleDefinitionEndpointTests(ApiTestFixture fixture)
         detail.GetProperty("origin").GetString().Should().Be("System");
         detail.GetProperty("status").GetString().Should().Be("Published");
         detail.GetProperty("expressionLanguageVersion").GetInt32().Should().Be(1);
+        detail.GetProperty("output").GetProperty("type").GetString().Should().Be("Boolean");
+        detail.GetProperty("output").GetProperty("cardinality").GetString().Should().Be("Scalar");
+        JsonElement valueInput = detail.GetProperty("inputs").EnumerateArray()
+            .Single(input => input.GetProperty("key").GetString() == "value");
+        valueInput.GetProperty("isRequired").GetBoolean().Should().BeFalse();
         detail.GetProperty("condition").GetProperty("left").GetProperty("function").GetString()
             .Should().Be("IsBlank");
-        detail.GetProperty("outcome").GetProperty("kind").GetString().Should().Be("Validation");
-        detail.GetProperty("applicability").GetProperty("targetTypeKeys").GetArrayLength()
-            .Should().BeGreaterThan(0);
+        detail.GetProperty("condition").GetProperty("right").GetProperty("literal")
+            .GetProperty("values").EnumerateArray().Single().GetString().Should().Be("false");
+        detail.TryGetProperty("outcome", out _).Should().BeFalse();
+        detail.TryGetProperty("contextKey", out _).Should().BeFalse();
     }
 
     [Fact]
@@ -196,54 +301,48 @@ public sealed class RuleDefinitionEndpointTests(ApiTestFixture fixture)
         string accessToken = await CreateVerifiedSessionTokenAsync(UniqueEmail());
         string name = $"Credit threshold {Guid.NewGuid():N}"[..32];
 
-        HttpResponseMessage schemasResponse = await SendWithBearerAsync(
-            HttpMethod.Get,
-            "/api/rules/context-schemas",
-            accessToken);
-        schemasResponse.StatusCode.Should().Be(HttpStatusCode.OK);
-        JsonElement schemas = await schemasResponse.Content.ReadFromJsonAsync<JsonElement>(Json, TestContext.Current.CancellationToken);
-        schemas.EnumerateArray()
-            .Select(schema => schema.GetProperty("contextKey").GetString())
-            .Should().Contain([
-                "business_objects.field.date",
-                "business_objects.field.datetime",
-                "business_objects.field.choice.single",
-                "business_objects.field.choice.multiple",
-            ]);
-        schemas[0].GetProperty("fields")[0].GetProperty("documentation")
-            .GetProperty("locales").GetProperty("en").GetProperty("usage").GetString()
-            .Should().NotBeNullOrWhiteSpace();
-
-        HttpResponseMessage assistResponse = await SendWithBearerAsync(
+        HttpResponseMessage projectionResponse = await SendWithBearerAsync(
             HttpMethod.Post,
-            "/api/rules/expression-language/assist",
+            "/api/rules/condition/project",
             accessToken,
             new
             {
                 expressionLanguageVersion = 1,
-                contextKey = "business_objects.field.decimal",
-                contextSchemaVersion = 1,
-                parameters = new[]
+                inputs = new[]
                 {
                     new
                     {
-                        key = "threshold",
-                        type = "Decimal",
+                        label = "Value",
+                        types = new[] { "Decimal" },
+                        isRequired = true,
+                        allowMultiple = false,
+                        allowedValues = Array.Empty<string>(),
+                    },
+                    new
+                    {
+                        label = "Threshold",
+                        types = new[] { "Decimal" },
                         isRequired = true,
                         allowMultiple = false,
                         allowedValues = Array.Empty<string>(),
                     },
                 },
-                syntax = "@context.field.value GreaterThan @parameters.threshold",
-                condition = (object?)null,
-                cursorOffset = 5,
+                condition = new
+                {
+                    nodeId = "threshold_check",
+                    logicalOperator = (string?)null,
+                    predicateOperator = "GreaterThan",
+                    left = new { kind = "Input", reference = "Value", literal = (object?)null },
+                    right = new { kind = "Input", reference = "Threshold", literal = (object?)null },
+                    children = Array.Empty<object>(),
+                },
                 language = "vi",
             });
-        assistResponse.StatusCode.Should().Be(HttpStatusCode.OK);
-        JsonElement assisted = await assistResponse.Content.ReadFromJsonAsync<JsonElement>(Json, TestContext.Current.CancellationToken);
-        assisted.GetProperty("condition").GetProperty("predicateOperator").GetString()
+        projectionResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        JsonElement projected = await projectionResponse.Content.ReadFromJsonAsync<JsonElement>(Json, TestContext.Current.CancellationToken);
+        projected.GetProperty("condition").GetProperty("predicateOperator").GetString()
             .Should().Be("GreaterThan");
-        JsonElement[] displayTokens = assisted.GetProperty("display").GetProperty("tokens")
+        JsonElement[] displayTokens = projected.GetProperty("display").GetProperty("tokens")
             .EnumerateArray()
             .ToArray();
         displayTokens
@@ -252,9 +351,8 @@ public sealed class RuleDefinitionEndpointTests(ApiTestFixture fixture)
         displayTokens.Single(token => token.GetProperty("text").GetString() == "lớn hơn")
             .GetProperty("referenceKey").GetString()
             .Should().Be("GreaterThan");
-        assisted.GetProperty("completions").EnumerateArray()
-            .Should().Contain(completion =>
-                completion.GetProperty("insertText").GetString() == "@context.field.value");
+        projected.GetProperty("condition").GetProperty("left").GetProperty("reference").GetString()
+            .Should().NotBe("Value");
 
         HttpResponseMessage createResponse = await SendWithBearerAsync(
             HttpMethod.Post,
@@ -264,10 +362,6 @@ public sealed class RuleDefinitionEndpointTests(ApiTestFixture fixture)
             {
                 name,
                 description = "Flags credit values above a workspace threshold.",
-                scope = "Field",
-                contextKey = "business_objects.field.decimal",
-                contextSchemaVersion = 1,
-                outcomeKind = "Validation",
             });
         createResponse.StatusCode.Should().Be(HttpStatusCode.Created);
         JsonElement created = await createResponse.Content.ReadFromJsonAsync<JsonElement>(Json, TestContext.Current.CancellationToken);
@@ -275,25 +369,27 @@ public sealed class RuleDefinitionEndpointTests(ApiTestFixture fixture)
         created.GetProperty("status").GetString().Should().Be("Draft");
         created.GetProperty("expressionLanguageVersion").GetInt32().Should().Be(1);
         created.GetProperty("revision").GetInt32().Should().Be(1);
+        created.GetProperty("output").GetProperty("type").GetString().Should().Be("Boolean");
+        created.GetProperty("output").GetProperty("cardinality").GetString().Should().Be("Scalar");
 
-        object parameters = new[]
+        object inputs = new[]
         {
             new
             {
-                key = "threshold",
-                type = "Decimal",
+                label = "Value",
+                types = new[] { "Decimal" },
                 isRequired = true,
                 allowMultiple = false,
                 allowedValues = Array.Empty<string>(),
             },
-        };
-        object outcome = new
-        {
-            kind = "Validation",
-            violationCode = "credit.threshold.exceeded",
-            severity = "Error",
-            message = "Credit value exceeds the workspace threshold.",
-            decision = (string?)null,
+            new
+            {
+                label = "Threshold",
+                types = new[] { "Decimal" },
+                isRequired = true,
+                allowMultiple = false,
+                allowedValues = Array.Empty<string>(),
+            },
         };
 
         HttpResponseMessage saveResponse = await SendWithBearerAsync(
@@ -305,28 +401,34 @@ public sealed class RuleDefinitionEndpointTests(ApiTestFixture fixture)
                 expectedRevision = 1,
                 name,
                 description = "Flags credit values above a workspace threshold.",
-                scope = "Field",
-                contextKey = "business_objects.field.decimal",
-                contextSchemaVersion = 1,
-                outcomeKind = "Validation",
-                parameters,
-                expressionSyntax = "@context.field.value GreaterThan @parameters.threshold",
-                outcome,
+                inputs,
+                condition = new
+                {
+                    nodeId = "threshold_check",
+                    logicalOperator = (string?)null,
+                    predicateOperator = "GreaterThan",
+                    left = new { kind = "Input", reference = "Value", literal = (object?)null },
+                    right = new { kind = "Input", reference = "Threshold", literal = (object?)null },
+                    children = Array.Empty<object>(),
+                },
             });
         saveResponse.StatusCode.Should().Be(HttpStatusCode.OK);
         JsonElement saved = await saveResponse.Content.ReadFromJsonAsync<JsonElement>(Json, TestContext.Current.CancellationToken);
         saved.GetProperty("revision").GetInt32().Should().Be(2);
+        saved.GetProperty("output").GetProperty("type").GetString().Should().Be("Boolean");
+        saved.GetProperty("output").GetProperty("cardinality").GetString().Should().Be("Scalar");
 
+        Dictionary<string, string> inputKeys = saved.GetProperty("inputs").EnumerateArray()
+            .ToDictionary(
+                input => input.GetProperty("label").GetString()!,
+                input => input.GetProperty("key").GetString()!);
         Dictionary<string, object?> simulationBody = new()
         {
             ["definitionVersion"] = null,
-            ["parameters"] = new Dictionary<string, object?>
+            ["inputs"] = new Dictionary<string, object?>
             {
-                ["threshold"] = new { type = "Decimal", values = new[] { "100" } },
-            },
-            ["context"] = new Dictionary<string, object?>
-            {
-                ["field.value"] = new { type = "Decimal", values = new[] { "150" } },
+                [inputKeys["Value"]] = new { type = "Decimal", values = new[] { "150" } },
+                [inputKeys["Threshold"]] = new { type = "Decimal", values = new[] { "100" } },
             },
             ["correlationId"] = "rules-api-test",
         };

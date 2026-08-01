@@ -39,6 +39,21 @@ Module.Application
 Axis.Shared.* supports layers without owning product behavior.
 ```
 
+## Rules boundary
+
+Rules owns reusable definitions, bindings, and pure evaluation:
+
+- A Rule is a versioned, deterministic, side-effect-free unit of logic that transforms declared typed inputs into declared typed outputs. `Inputs -> Logic -> Outputs` is the stable platform contract; validation, calculation, classification, eligibility, routing, and transformation are consumer meanings rather than separate Rule models.
+- `RuleDefinition` owns metadata, stable typed input and output contracts, canonical bounded logic, validation, immutable versions, and activation. Built-in and workspace definitions use one semantic model; source and language capabilities are metadata.
+- `RuleBinding` connects one exact rule version to a generic target type/id and use case/trigger. It owns typed input mappings, priority, enabled state, failure behavior, concurrency, audit data, and usage discovery.
+- `RuleEvaluationResult` is deterministic, typed, explainable, bounded, and side-effect-free. Consumers interpret outputs and own every business mutation.
+
+Rules persists definitions, immutable definition versions, and bindings in the Rules store. A binding keeps opaque consumer target identifiers rather than foreign keys or consumer entities; deleting or changing a binding never changes or deletes its definition. Canonical logic is the only persisted rule behavior. Syntax, visual composition, decision tables, and localized explanations are projections over that contract and never separate stored truths.
+
+`Axis.Rules.Contracts` exposes only consumer-neutral definition, binding, typed context-provider, and evaluation contracts. A consumer implements its adapter and explicitly maps runtime context, target data, or fixed values into declared rule inputs. Execution-envelope data used only for isolation, authorization, audit, or tracing is not an ambient logic input. Rules projects may not reference Object, Workflow, another consumer module, or consumer domain types; consumers may reference Rules Contracts only.
+
+`Axis.Api` composes consumer adapters and exposes REST/OpenAPI surfaces. Cross-database Object and Rules mutations remain explicit operations; no hidden dual write or distributed transaction is introduced.
+
 ## Ownership
 
 - Use-case docs own behavior, flows, acceptance criteria, and implementation status.

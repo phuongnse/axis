@@ -19,10 +19,7 @@ public sealed class SimulateRuleDefinitionHandlerTests
                 RuleDefinitionHandlerTestContext.WorkspaceId,
                 Arg.Any<CancellationToken>())
             .Returns(definition);
-        SimulateRuleDefinitionHandler sut = new(
-            _context.CurrentUser,
-            _context.ContextRegistry,
-            _context.Repository);
+        SimulateRuleDefinitionHandler sut = new(_context.CurrentUser, _context.Repository);
 
         Result<RuleSimulationResultDto> result = await sut.Handle(
             new SimulateRuleDefinitionQuery(
@@ -30,17 +27,13 @@ public sealed class SimulateRuleDefinitionHandlerTests
                 DefinitionVersion: null,
                 new Dictionary<string, RuleValueDto>(StringComparer.Ordinal)
                 {
+                    ["value"] = new(RuleValueType.Decimal, ["15"]),
                     ["threshold"] = new(RuleValueType.Decimal, ["10"]),
-                },
-                new Dictionary<string, RuleValueDto>(StringComparer.Ordinal)
-                {
-                    ["field.value"] = new(RuleValueType.Decimal, ["15"]),
                 },
                 "simulation-test"),
             CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
         result.Value.IsMatch.Should().BeTrue();
-        result.Value.Outcome.Should().NotBeNull();
     }
 }

@@ -49,6 +49,47 @@ public sealed class BusinessObjectDefinitionEndpointTests(ApiTestFixture fixture
         created.GetProperty("objectKey").GetString().Should().Be(objectKey);
         created.GetProperty("revision").GetInt32().Should().Be(1);
 
+        Guid requiredBindingId = await CreateRuleBindingAsync(
+            accessToken,
+            objectKey,
+            "name",
+            RuleDefinitionKeys.Required,
+            new
+            {
+                value = new
+                {
+                    kind = "Context",
+                    contextKey = "record.value",
+                    literalValues = Array.Empty<string>(),
+                },
+            });
+        Guid textLengthBindingId = await CreateRuleBindingAsync(
+            accessToken,
+            objectKey,
+            "name",
+            RuleDefinitionKeys.TextLength,
+            new
+            {
+                value = new
+                {
+                    kind = "Context",
+                    contextKey = "record.value",
+                    literalValues = Array.Empty<string>(),
+                },
+                min = new
+                {
+                    kind = "Literal",
+                    contextKey = (string?)null,
+                    literalValues = new[] { "1" },
+                },
+                max = new
+                {
+                    kind = "Literal",
+                    contextKey = (string?)null,
+                    literalValues = new[] { "120" },
+                },
+            });
+
         HttpResponseMessage saveResponse = await SendWithBearerAsync(
             HttpMethod.Put,
             $"/api/business-object-definitions/{definitionId}/unpublished",
@@ -66,22 +107,8 @@ public sealed class BusinessObjectDefinitionEndpointTests(ApiTestFixture fixture
                         fieldType = "Text",
                         rules = new object[]
                         {
-                            new
-                            {
-                                definitionKey = RuleDefinitionKeys.Required,
-                                definitionVersion = 1,
-                                parameters = new { },
-                            },
-                            new
-                            {
-                                definitionKey = RuleDefinitionKeys.TextLength,
-                                definitionVersion = 1,
-                                parameters = new
-                                {
-                                    min = new[] { "1" },
-                                    max = new[] { "120" },
-                                },
-                            },
+                            new { bindingId = requiredBindingId },
+                            new { bindingId = textLengthBindingId },
                         },
                     },
                     new
@@ -112,15 +139,10 @@ public sealed class BusinessObjectDefinitionEndpointTests(ApiTestFixture fixture
         JsonElement savedNameField = saved.GetProperty("fields")[0];
         savedNameField.GetProperty("fieldType").GetString().Should().Be("Text");
         savedNameField.GetProperty("rules").GetArrayLength().Should().Be(2);
-        savedNameField.GetProperty("rules")[1].GetProperty("definitionKey").GetString()
-            .Should().Be(RuleDefinitionKeys.TextLength);
-        savedNameField.GetProperty("rules")[1].GetProperty("definitionVersion").GetInt32()
-            .Should().Be(1);
-        savedNameField.GetProperty("rules")[1]
-            .GetProperty("parameters")
-            .GetProperty("max")[0]
-            .GetString()
-            .Should().Be("120");
+        savedNameField.GetProperty("rules")[0].GetProperty("bindingId").GetGuid()
+            .Should().Be(requiredBindingId);
+        savedNameField.GetProperty("rules")[1].GetProperty("bindingId").GetGuid()
+            .Should().Be(textLengthBindingId);
         JsonElement savedStatusField = saved.GetProperty("fields")[1];
         savedStatusField.GetProperty("fieldType").GetString().Should().Be("Choice");
         savedStatusField.GetProperty("choiceConfiguration").GetProperty("selectionMode").GetString()
@@ -267,6 +289,31 @@ public sealed class BusinessObjectDefinitionEndpointTests(ApiTestFixture fixture
             new { name = objectName });
         response.StatusCode.Should().Be(HttpStatusCode.Created);
 
+        JsonElement body = await response.Content.ReadFromJsonAsync<JsonElement>(Json, TestContext.Current.CancellationToken);
+        return body.GetProperty("id").GetGuid();
+    }
+
+    private async Task<Guid> CreateRuleBindingAsync(
+        string accessToken,
+        string objectKey,
+        string fieldKey,
+        string definitionKey,
+        object inputMappings)
+    {
+        HttpResponseMessage response = await SendWithBearerAsync(
+            HttpMethod.Post,
+            "/api/rule-bindings",
+            accessToken,
+            new
+            {
+                definitionKey,
+                definitionVersion = 1,
+                targetType = "business-object-field",
+                targetId = $"{objectKey}.{fieldKey}",
+                useCaseOrTrigger = "field-validation",
+                inputMappings,
+            });
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
         JsonElement body = await response.Content.ReadFromJsonAsync<JsonElement>(Json, TestContext.Current.CancellationToken);
         return body.GetProperty("id").GetGuid();
     }

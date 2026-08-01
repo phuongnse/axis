@@ -4,17 +4,6 @@ export type ClientOptions = {
     baseUrl: `${string}://${string}` | (string & {});
 };
 
-export type AssistRuleExpressionRequest = {
-    expressionLanguageVersion?: number;
-    contextKey?: string | null;
-    contextSchemaVersion?: number | null;
-    parameters?: Array<RuleParameterDefinitionDto>;
-    syntax?: string | null;
-    condition?: RuleConditionNodeDto;
-    cursorOffset?: number;
-    language?: string;
-};
-
 export type BusinessObjectChoiceFieldConfigurationDto = {
     selectionMode?: BusinessObjectChoiceSelectionMode;
     options?: Array<BusinessObjectChoiceOptionDto>;
@@ -109,11 +98,8 @@ export type BusinessObjectDefinitionVersionFieldDto = {
 export type BusinessObjectDefinitionVersionFieldRuleDto = {
     id?: string;
     sourceFieldRuleId?: string;
-    definitionKey?: string;
-    definitionVersion?: number;
-    parameters?: {
-        [key: string]: Array<string>;
-    };
+    bindingId?: string;
+    order?: number;
 };
 
 export type BusinessObjectFieldDefinitionDto = {
@@ -137,19 +123,12 @@ export type BusinessObjectFieldDefinitionInput = {
 
 export type BusinessObjectFieldRuleDto = {
     id?: string;
-    definitionKey?: string;
-    definitionVersion?: number;
-    parameters?: {
-        [key: string]: Array<string>;
-    };
+    bindingId?: string;
+    order?: number;
 };
 
 export type BusinessObjectFieldRuleInput = {
-    definitionKey?: string;
-    definitionVersion?: number;
-    parameters?: {
-        [key: string]: Array<string>;
-    } | null;
+    bindingId?: string;
     id?: string | null;
 };
 
@@ -159,13 +138,23 @@ export type CreateBusinessObjectDefinitionRequest = {
     name?: string;
 };
 
+export type CreateRuleBindingRequest = {
+    definitionKey?: string;
+    definitionVersion?: number;
+    targetType?: string;
+    targetId?: string;
+    useCaseOrTrigger?: string;
+    inputMappings?: {
+        [key: string]: RuleInputMappingDto;
+    };
+    priority?: number;
+    enabled?: boolean;
+    failureBehavior?: RuleBindingFailureBehavior;
+};
+
 export type CreateRuleDefinitionRequest = {
     name?: string;
     description?: string;
-    scope?: RuleScope;
-    contextKey?: string;
-    contextSchemaVersion?: number;
-    outcomeKind?: RuleOutcomeKind;
 };
 
 export type CurrentUserProfileDto = {
@@ -211,6 +200,13 @@ export type ProblemDetails = {
     [key: string]: unknown;
 };
 
+export type ProjectRuleConditionRequest = {
+    expressionLanguageVersion?: number;
+    inputs?: Array<RuleDraftInputDefinitionDto>;
+    condition?: RuleConditionNodeDto;
+    language?: string;
+};
+
 export type PublishBusinessObjectDefinitionRequest = {
     expectedRevision?: number;
 };
@@ -229,11 +225,37 @@ export type ResendVerificationRequest = {
     email?: string;
 };
 
-export type RuleApplicabilityDto = {
-    targetTypeKeys?: Array<string>;
-    configurationConstraints?: {
-        [key: string]: Array<string>;
+export type RuleBindingDto = {
+    id?: string;
+    workspaceId?: string;
+    definitionKey?: string;
+    definitionVersion?: number;
+    targetType?: string;
+    targetId?: string;
+    useCaseOrTrigger?: string;
+    inputMappings?: {
+        [key: string]: RuleInputMappingDto;
     };
+    priority?: number;
+    enabled?: boolean;
+    failureBehavior?: RuleBindingFailureBehavior;
+    revision?: number;
+    createdAt?: string;
+    updatedAt?: string;
+};
+
+export type RuleBindingFailureBehavior = 'FailClosed' | 'FailOpen';
+
+export type RuleBindingUsageDto = {
+    bindingId?: string;
+    definitionKey?: string;
+    definitionVersion?: number;
+    targetType?: string;
+    targetId?: string;
+    useCaseOrTrigger?: string;
+    priority?: number;
+    enabled?: boolean;
+    failureBehavior?: RuleBindingFailureBehavior;
 };
 
 export type RuleConditionNodeDto = {
@@ -245,45 +267,23 @@ export type RuleConditionNodeDto = {
     children?: Array<RuleConditionNodeDto>;
 };
 
-export type RuleContextFieldDto = {
-    path?: string;
-    displayName?: string;
-    type?: RuleValueType;
-    allowMultiple?: boolean;
-    documentation?: RuleReferenceDocumentationDto;
+export type RuleConditionProjectionDto = {
+    condition?: RuleConditionNodeDto;
+    display?: RuleExpressionDisplayNodeDto;
 };
-
-export type RuleContextSchemaDto = {
-    contextKey?: string;
-    version?: number;
-    scope?: RuleScope;
-    displayName?: string;
-    fields?: Array<RuleContextFieldDto>;
-    targetTypeKey?: string | null;
-    configuration?: {
-        [key: string]: Array<string>;
-    } | null;
-};
-
-export type RuleDecision = 'Allow' | 'Deny';
 
 export type RuleDefinitionDetailDto = {
     definitionKey?: string;
     name?: string;
     description?: string;
     origin?: RuleOrigin;
-    scope?: RuleScope;
-    outcomeKind?: RuleOutcomeKind;
     status?: RuleLifecycleStatus;
     expressionLanguageVersion?: number;
     revision?: number | null;
     latestPublishedVersion?: number | null;
-    contextKey?: string | null;
-    contextSchemaVersion?: number | null;
-    applicability?: RuleApplicabilityDto;
-    parameters?: Array<RuleParameterDefinitionDto>;
+    inputs?: Array<RuleInputDefinitionDto>;
+    output?: RuleOutputContractDto;
     condition?: RuleConditionNodeDto;
-    outcome?: RuleOutcomeDto;
     versions?: Array<RuleDefinitionVersionDto>;
     createdAt?: string | null;
     updatedAt?: string | null;
@@ -296,16 +296,12 @@ export type RuleDefinitionSummaryDto = {
     name?: string;
     description?: string;
     origin?: RuleOrigin;
-    scope?: RuleScope;
-    outcomeKind?: RuleOutcomeKind;
     status?: RuleLifecycleStatus;
     expressionLanguageVersion?: number;
     revision?: number | null;
     latestPublishedVersion?: number | null;
-    contextKey?: string | null;
-    contextSchemaVersion?: number | null;
-    applicability?: RuleApplicabilityDto;
-    parameters?: Array<RuleParameterDefinitionDto>;
+    inputs?: Array<RuleInputDefinitionDto>;
+    output?: RuleOutputContractDto;
     updatedAt?: string | null;
     documentation?: RuleReferenceDocumentationDto;
 };
@@ -321,24 +317,20 @@ export type RuleDefinitionVersionDto = {
     version?: number;
     name?: string;
     description?: string;
-    scope?: RuleScope;
-    outcomeKind?: RuleOutcomeKind;
     expressionLanguageVersion?: number;
-    contextKey?: string;
-    contextSchemaVersion?: number;
-    parameters?: Array<RuleParameterDefinitionDto>;
+    inputs?: Array<RuleInputDefinitionDto>;
+    output?: RuleOutputContractDto;
     condition?: RuleConditionNodeDto;
-    outcome?: RuleOutcomeDto;
     publishedByUserId?: string;
     publishedAt?: string;
 };
 
-export type RuleExpressionAuthoringDto = {
-    syntax?: string;
-    condition?: RuleConditionNodeDto;
-    display?: RuleExpressionDisplayNodeDto;
-    diagnostics?: Array<RuleExpressionDiagnosticDto>;
-    completions?: Array<RuleExpressionCompletionDto>;
+export type RuleDraftInputDefinitionDto = {
+    label?: string;
+    types?: Array<RuleValueType>;
+    isRequired?: boolean;
+    allowMultiple?: boolean;
+    allowedValues?: Array<string>;
 };
 
 export type RuleExpressionCardinality = 'Scalar' | 'Multiple' | 'Any';
@@ -346,24 +338,6 @@ export type RuleExpressionCardinality = 'Scalar' | 'Multiple' | 'Any';
 export type RuleExpressionCardinalityDefinitionDto = {
     cardinality?: RuleExpressionCardinality;
     documentation?: RuleReferenceDocumentationDto;
-};
-
-export type RuleExpressionCompletionDto = {
-    label?: string;
-    insertText?: string;
-    cursorOffset?: number;
-    replacementStart?: number;
-    replacementLength?: number;
-    referenceKind?: RuleExpressionReferenceKind;
-    referenceKey?: string;
-    summary?: string;
-};
-
-export type RuleExpressionDiagnosticDto = {
-    code?: string;
-    message?: string;
-    start?: number;
-    length?: number;
 };
 
 export type RuleExpressionDisplayNodeDto = {
@@ -439,16 +413,33 @@ export type RuleExpressionLimitsDto = {
     maxDepth?: number;
     maxNodes?: number;
     maxFunctionCalls?: number;
-    maxParameters?: number;
+    maxInputs?: number;
     maxExecutionSteps?: number;
 };
 
-export type RuleExpressionReferenceKind = 'LogicalOperator' | 'PredicateOperator' | 'Function' | 'Context' | 'Parameter' | 'Literal' | 'ValueType' | 'OperandKind' | 'Limit';
+export type RuleExpressionReferenceKind = 'LogicalOperator' | 'PredicateOperator' | 'Function' | 'Input' | 'Literal' | 'ValueType' | 'OperandKind' | 'Limit';
 
 export type RuleExpressionValueShapeDto = {
     type?: RuleValueType;
     cardinality?: RuleExpressionCardinality;
 };
+
+export type RuleInputDefinitionDto = {
+    key?: string;
+    label?: string;
+    types?: Array<RuleValueType>;
+    isRequired?: boolean;
+    allowMultiple?: boolean;
+    allowedValues?: Array<string>;
+};
+
+export type RuleInputMappingDto = {
+    kind?: RuleInputMappingKind;
+    contextKey?: string | null;
+    literalValues?: Array<string>;
+};
+
+export type RuleInputMappingKind = 'Context' | 'Literal';
 
 export type RuleLifecycleStatus = 'Draft' | 'Published' | 'Archived';
 
@@ -474,7 +465,7 @@ export type RuleOperandDto = {
     arguments?: Array<RuleOperandDto> | null;
 };
 
-export type RuleOperandKind = 'Context' | 'Parameter' | 'Literal' | 'Function';
+export type RuleOperandKind = 'Input' | 'Literal' | 'Function';
 
 export type RuleOperandKindDefinitionDto = {
     kind?: RuleOperandKind;
@@ -483,22 +474,9 @@ export type RuleOperandKindDefinitionDto = {
 
 export type RuleOrigin = 'System' | 'Workspace';
 
-export type RuleOutcomeDto = {
-    kind?: RuleOutcomeKind;
-    violationCode?: string | null;
-    severity?: RuleSeverity;
-    message?: string | null;
-    decision?: RuleDecision;
-};
-
-export type RuleOutcomeKind = 'Validation' | 'Decision';
-
-export type RuleParameterDefinitionDto = {
-    key?: string;
+export type RuleOutputContractDto = {
     type?: RuleValueType;
-    isRequired?: boolean;
-    allowMultiple?: boolean;
-    allowedValues?: Array<string>;
+    cardinality?: RuleExpressionCardinality;
 };
 
 export type RulePredicateOperator = 'Equal' | 'NotEqual' | 'GreaterThan' | 'GreaterThanOrEqual' | 'LessThan' | 'LessThanOrEqual' | 'Contains' | 'StartsWith' | 'EndsWith' | 'IsNull' | 'IsNotNull';
@@ -528,15 +506,10 @@ export type RuleRevisionRequest = {
     expectedRevision?: number;
 };
 
-export type RuleScope = 'Field' | 'Object' | 'Record' | 'Lifecycle';
-
-export type RuleSeverity = 'Info' | 'Warning' | 'Error';
-
 export type RuleSimulationResultDto = {
     definitionKey?: string;
     definitionVersion?: number | null;
     isMatch?: boolean;
-    outcome?: RuleOutcomeDto;
     diagnostics?: Array<RuleNodeDiagnosticDto>;
     correlationId?: string;
 };
@@ -557,13 +530,8 @@ export type SaveRuleDefinitionDraftRequest = {
     expectedRevision?: number;
     name?: string;
     description?: string;
-    scope?: RuleScope;
-    contextKey?: string;
-    contextSchemaVersion?: number;
-    outcomeKind?: RuleOutcomeKind;
-    parameters?: Array<RuleParameterDefinitionDto>;
-    expressionSyntax?: string;
-    outcome?: RuleOutcomeDto;
+    inputs?: Array<RuleDraftInputDefinitionDto>;
+    condition?: RuleConditionNodeDto;
 };
 
 export type SaveUnpublishedBusinessObjectDefinitionRequest = {
@@ -575,9 +543,7 @@ export type SaveUnpublishedBusinessObjectDefinitionRequest = {
 export type SearchRuleExpressionGuideRequest = {
     expressionLanguageVersion?: number;
     definitionKey?: string | null;
-    contextKey?: string | null;
-    contextSchemaVersion?: number | null;
-    parameters?: Array<RuleParameterDefinitionDto>;
+    inputs?: Array<RuleInputDefinitionDto>;
     query?: string | null;
     language?: string;
 };
@@ -606,10 +572,7 @@ export type SignInUserRequest = {
 
 export type SimulateRuleRequest = {
     definitionVersion?: number | null;
-    parameters?: {
-        [key: string]: RuleValueDto;
-    };
-    context?: {
+    inputs?: {
         [key: string]: RuleValueDto;
     };
     correlationId?: string;
@@ -617,6 +580,21 @@ export type SimulateRuleRequest = {
 
 export type ThemePreferenceDto = {
     theme?: string;
+};
+
+export type UpdateRuleBindingRequest = {
+    expectedRevision?: number;
+    definitionKey?: string;
+    definitionVersion?: number;
+    targetType?: string;
+    targetId?: string;
+    useCaseOrTrigger?: string;
+    inputMappings?: {
+        [key: string]: RuleInputMappingDto;
+    };
+    priority?: number;
+    enabled?: boolean;
+    failureBehavior?: RuleBindingFailureBehavior;
 };
 
 export type UpdateUserLanguagePreferenceRequest = {
@@ -1081,13 +1059,49 @@ export type UpdateThemePreferenceResponses = {
 
 export type UpdateThemePreferenceResponse = UpdateThemePreferenceResponses[keyof UpdateThemePreferenceResponses];
 
+export type ListRuleBindingUsageData = {
+    body?: never;
+    path: {
+        definitionKey: string;
+    };
+    query: {
+        version: number;
+    };
+    url: '/api/rules/{definitionKey}/bindings';
+};
+
+export type ListRuleBindingUsageErrors = {
+    /**
+     * Bad Request
+     */
+    400: ProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+};
+
+export type ListRuleBindingUsageError = ListRuleBindingUsageErrors[keyof ListRuleBindingUsageErrors];
+
+export type ListRuleBindingUsageResponses = {
+    /**
+     * OK
+     */
+    200: Array<RuleBindingUsageDto>;
+};
+
+export type ListRuleBindingUsageResponse = ListRuleBindingUsageResponses[keyof ListRuleBindingUsageResponses];
+
 export type ListRuleDefinitionsData = {
     body?: never;
     path?: never;
     query?: {
         page?: number;
         pageSize?: number;
-        scope?: RuleScope;
         origin?: RuleOrigin;
         status?: RuleLifecycleStatus;
         query?: string;
@@ -1159,35 +1173,6 @@ export type CreateRuleDefinitionResponses = {
 
 export type CreateRuleDefinitionResponse = CreateRuleDefinitionResponses[keyof CreateRuleDefinitionResponses];
 
-export type ListRuleContextSchemasData = {
-    body?: never;
-    path?: never;
-    query?: never;
-    url: '/api/rules/context-schemas';
-};
-
-export type ListRuleContextSchemasErrors = {
-    /**
-     * Unauthorized
-     */
-    401: ProblemDetails;
-    /**
-     * Forbidden
-     */
-    403: ProblemDetails;
-};
-
-export type ListRuleContextSchemasError = ListRuleContextSchemasErrors[keyof ListRuleContextSchemasErrors];
-
-export type ListRuleContextSchemasResponses = {
-    /**
-     * OK
-     */
-    200: Array<RuleContextSchemaDto>;
-};
-
-export type ListRuleContextSchemasResponse = ListRuleContextSchemasResponses[keyof ListRuleContextSchemasResponses];
-
 export type GetRuleExpressionLanguageData = {
     body?: never;
     path?: never;
@@ -1217,14 +1202,14 @@ export type GetRuleExpressionLanguageResponses = {
 
 export type GetRuleExpressionLanguageResponse = GetRuleExpressionLanguageResponses[keyof GetRuleExpressionLanguageResponses];
 
-export type AssistRuleExpressionData = {
-    body: AssistRuleExpressionRequest;
+export type ProjectRuleConditionData = {
+    body: ProjectRuleConditionRequest;
     path?: never;
     query?: never;
-    url: '/api/rules/expression-language/assist';
+    url: '/api/rules/condition/project';
 };
 
-export type AssistRuleExpressionErrors = {
+export type ProjectRuleConditionErrors = {
     /**
      * Bad Request
      */
@@ -1239,16 +1224,16 @@ export type AssistRuleExpressionErrors = {
     403: ProblemDetails;
 };
 
-export type AssistRuleExpressionError = AssistRuleExpressionErrors[keyof AssistRuleExpressionErrors];
+export type ProjectRuleConditionError = ProjectRuleConditionErrors[keyof ProjectRuleConditionErrors];
 
-export type AssistRuleExpressionResponses = {
+export type ProjectRuleConditionResponses = {
     /**
      * OK
      */
-    200: RuleExpressionAuthoringDto;
+    200: RuleConditionProjectionDto;
 };
 
-export type AssistRuleExpressionResponse = AssistRuleExpressionResponses[keyof AssistRuleExpressionResponses];
+export type ProjectRuleConditionResponse = ProjectRuleConditionResponses[keyof ProjectRuleConditionResponses];
 
 export type SearchRuleExpressionGuideData = {
     body: SearchRuleExpressionGuideRequest;
@@ -1528,3 +1513,122 @@ export type SimulateRuleDefinitionResponses = {
 };
 
 export type SimulateRuleDefinitionResponse = SimulateRuleDefinitionResponses[keyof SimulateRuleDefinitionResponses];
+
+export type CreateRuleBindingData = {
+    body: CreateRuleBindingRequest;
+    path?: never;
+    query?: never;
+    url: '/api/rule-bindings';
+};
+
+export type CreateRuleBindingErrors = {
+    /**
+     * Bad Request
+     */
+    400: ProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type CreateRuleBindingError = CreateRuleBindingErrors[keyof CreateRuleBindingErrors];
+
+export type CreateRuleBindingResponses = {
+    /**
+     * Created
+     */
+    201: RuleBindingDto;
+};
+
+export type CreateRuleBindingResponse = CreateRuleBindingResponses[keyof CreateRuleBindingResponses];
+
+export type DeleteRuleBindingData = {
+    body?: never;
+    path: {
+        bindingId: string;
+    };
+    query?: never;
+    url: '/api/rule-bindings/{bindingId}';
+};
+
+export type DeleteRuleBindingErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type DeleteRuleBindingError = DeleteRuleBindingErrors[keyof DeleteRuleBindingErrors];
+
+export type DeleteRuleBindingResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type DeleteRuleBindingResponse = DeleteRuleBindingResponses[keyof DeleteRuleBindingResponses];
+
+export type UpdateRuleBindingData = {
+    body: UpdateRuleBindingRequest;
+    path: {
+        bindingId: string;
+    };
+    query?: never;
+    url: '/api/rule-bindings/{bindingId}';
+};
+
+export type UpdateRuleBindingErrors = {
+    /**
+     * Bad Request
+     */
+    400: ProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type UpdateRuleBindingError = UpdateRuleBindingErrors[keyof UpdateRuleBindingErrors];
+
+export type UpdateRuleBindingResponses = {
+    /**
+     * OK
+     */
+    200: RuleBindingDto;
+};
+
+export type UpdateRuleBindingResponse = UpdateRuleBindingResponses[keyof UpdateRuleBindingResponses];

@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from datetime import date
-from typing import Mapping
+from typing import AbstractSet, Mapping
 
 
 @dataclass(frozen=True)
@@ -76,6 +76,8 @@ def _acceptance_issues(
     advisory_severities: Mapping[str, str],
     *,
     today: date,
+    direct_dependencies: AbstractSet[str],
+    dependency_edges: Mapping[str, AbstractSet[str]],
 ) -> tuple[dict[str, Mapping[str, object]], list[str]]:
     issues: list[str] = []
     if not isinstance(document, Mapping) or document.get("schemaVersion") != 1:
@@ -143,10 +145,16 @@ def _acceptance_issues(
         if advisory not in advisory_severities:
             continue
         first = vulnerabilities.get(path[0])
-        if not isinstance(first, Mapping) or first.get("isDirect") is not True:
+        if (
+            (not isinstance(first, Mapping) or first.get("isDirect") is not True)
+            and path[0] not in direct_dependencies
+        ):
             issues.append(f"{advisory}.dependencyPath must start with a current direct dependency")
         for parent, child in zip(path, path[1:]):
-            if child not in _via_entries(vulnerabilities.get(parent)):
+            if (
+                child not in _via_entries(vulnerabilities.get(parent))
+                and child not in dependency_edges.get(parent, frozenset())
+            ):
                 issues.append(f"{advisory}.dependencyPath edge {parent} -> {child} is stale")
         if advisory not in {
             value
@@ -165,6 +173,8 @@ def evaluate_npm_audit(
     acceptance_document: object,
     *,
     today: date | None = None,
+    direct_dependencies: AbstractSet[str] = frozenset(),
+    dependency_edges: Mapping[str, AbstractSet[str]] | None = None,
 ) -> NpmAuditPolicyResult:
     if not isinstance(report, Mapping) or report.get("auditReportVersion") != 2:
         return NpmAuditPolicyResult(("npm audit output must use auditReportVersion 2",), ())
@@ -199,6 +209,8 @@ def evaluate_npm_audit(
         vulnerabilities,
         advisory_severities,
         today=today or date.today(),
+        direct_dependencies=direct_dependencies,
+        dependency_edges=dependency_edges or {},
     )
     issues.extend(acceptance_issues)
 

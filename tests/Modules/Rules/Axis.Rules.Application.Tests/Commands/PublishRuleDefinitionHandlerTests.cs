@@ -20,11 +20,7 @@ public sealed class PublishRuleDefinitionHandlerTests
                 RuleDefinitionHandlerTestContext.WorkspaceId,
                 Arg.Any<CancellationToken>())
             .Returns(definition);
-        PublishRuleDefinitionHandler sut = new(
-            _context.CurrentUser,
-            _context.ContextRegistry,
-            _context.Repository,
-            _context.UnitOfWork);
+        PublishRuleDefinitionHandler sut = new(_context.CurrentUser, _context.Repository, _context.UnitOfWork);
 
         Result<RuleDefinitionDetailDto> result = await sut.Handle(
             new PublishRuleDefinitionCommand(definition.Key.Value, definition.Revision),
@@ -46,11 +42,7 @@ public sealed class PublishRuleDefinitionHandlerTests
             .Returns(definition);
         _context.UnitOfWork.SaveChangesAsync(Arg.Any<CancellationToken>())
             .Returns<Task<int>>(_ => throw new ConcurrencyException());
-        PublishRuleDefinitionHandler sut = new(
-            _context.CurrentUser,
-            _context.ContextRegistry,
-            _context.Repository,
-            _context.UnitOfWork);
+        PublishRuleDefinitionHandler sut = new(_context.CurrentUser, _context.Repository, _context.UnitOfWork);
 
         Result<RuleDefinitionDetailDto> result = await sut.Handle(
             new PublishRuleDefinitionCommand(definition.Key.Value, definition.Revision),

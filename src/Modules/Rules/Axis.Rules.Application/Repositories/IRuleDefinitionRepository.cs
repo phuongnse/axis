@@ -19,7 +19,6 @@ public interface IRuleDefinitionRepository
         CancellationToken cancellationToken = default);
     Task<int> CountForWorkspaceAsync(
         Guid workspaceId,
-        RuleScope? scope = null,
         RuleLifecycleStatus? status = null,
         string? searchQuery = null,
         CancellationToken cancellationToken = default);
@@ -27,7 +26,6 @@ public interface IRuleDefinitionRepository
         Guid workspaceId,
         int skip,
         int take,
-        RuleScope? scope = null,
         RuleLifecycleStatus? status = null,
         string? searchQuery = null,
         CancellationToken cancellationToken = default);

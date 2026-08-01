@@ -830,6 +830,84 @@
         ]
       }
     },
+    "/api/rules/{definitionKey}/bindings": {
+      "get": {
+        "tags": [
+          "Rules"
+        ],
+        "summary": "Show where an exact rule version is currently used",
+        "operationId": "ListRuleBindingUsage",
+        "parameters": [
+          {
+            "name": "definitionKey",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "version",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RuleBindingUsageDto"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
+    },
     "/api/rules": {
       "get": {
         "tags": [
@@ -854,13 +932,6 @@
               "type": "integer",
               "format": "int32",
               "default": 20
-            }
-          },
-          {
-            "name": "scope",
-            "in": "query",
-            "schema": {
-              "$ref": "#/components/schemas/RuleScope"
             }
           },
           {
@@ -1015,55 +1086,6 @@
         ]
       }
     },
-    "/api/rules/context-schemas": {
-      "get": {
-        "tags": [
-          "Rules"
-        ],
-        "summary": "List rule context schemas available to the workspace",
-        "operationId": "ListRuleContextSchemas",
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/RuleContextSchemaDto"
-                  }
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "Bearer": [ ]
-          }
-        ]
-      }
-    },
     "/api/rules/expression-language": {
       "get": {
         "tags": [
@@ -1110,18 +1132,18 @@
         ]
       }
     },
-    "/api/rules/expression-language/assist": {
+    "/api/rules/condition/project": {
       "post": {
         "tags": [
           "Rules"
         ],
-        "summary": "Parse, complete, and explain rule expression syntax",
-        "operationId": "AssistRuleExpression",
+        "summary": "Validate and present a visual rule condition",
+        "operationId": "ProjectRuleCondition",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/AssistRuleExpressionRequest"
+                "$ref": "#/components/schemas/ProjectRuleConditionRequest"
               }
             }
           },
@@ -1133,7 +1155,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/RuleExpressionAuthoringDto"
+                  "$ref": "#/components/schemas/RuleConditionProjectionDto"
                 }
               }
             }
@@ -1775,49 +1797,251 @@
           }
         ]
       }
+    },
+    "/api/rule-bindings": {
+      "post": {
+        "tags": [
+          "Rules"
+        ],
+        "summary": "Bind an exact rule version to a consumer target",
+        "operationId": "CreateRuleBinding",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateRuleBindingRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuleBindingDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/api/rule-bindings/{bindingId}": {
+      "put": {
+        "tags": [
+          "Rules"
+        ],
+        "summary": "Update a rule binding without changing the rule definition",
+        "operationId": "UpdateRuleBinding",
+        "parameters": [
+          {
+            "name": "bindingId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateRuleBindingRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuleBindingDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "Rules"
+        ],
+        "summary": "Remove a rule binding without removing its rule definition",
+        "operationId": "DeleteRuleBinding",
+        "parameters": [
+          {
+            "name": "bindingId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
     }
   },
   "components": {
     "schemas": {
-      "AssistRuleExpressionRequest": {
-        "type": "object",
-        "properties": {
-          "expressionLanguageVersion": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "contextKey": {
-            "type": "string",
-            "nullable": true
-          },
-          "contextSchemaVersion": {
-            "type": "integer",
-            "format": "int32",
-            "nullable": true
-          },
-          "parameters": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/RuleParameterDefinitionDto"
-            }
-          },
-          "syntax": {
-            "type": "string",
-            "nullable": true
-          },
-          "condition": {
-            "$ref": "#/components/schemas/RuleConditionNodeDto"
-          },
-          "cursorOffset": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "language": {
-            "type": "string"
-          }
-        },
-        "additionalProperties": false
-      },
       "BusinessObjectChoiceFieldConfigurationDto": {
         "type": "object",
         "properties": {
@@ -2122,21 +2346,13 @@
             "type": "string",
             "format": "uuid"
           },
-          "definitionKey": {
-            "type": "string"
+          "bindingId": {
+            "type": "string",
+            "format": "uuid"
           },
-          "definitionVersion": {
+          "order": {
             "type": "integer",
             "format": "int32"
-          },
-          "parameters": {
-            "type": "object",
-            "additionalProperties": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            }
           }
         },
         "additionalProperties": false
@@ -2210,21 +2426,13 @@
             "type": "string",
             "format": "uuid"
           },
-          "definitionKey": {
-            "type": "string"
+          "bindingId": {
+            "type": "string",
+            "format": "uuid"
           },
-          "definitionVersion": {
+          "order": {
             "type": "integer",
             "format": "int32"
-          },
-          "parameters": {
-            "type": "object",
-            "additionalProperties": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            }
           }
         },
         "additionalProperties": false
@@ -2232,22 +2440,9 @@
       "BusinessObjectFieldRuleInput": {
         "type": "object",
         "properties": {
-          "definitionKey": {
-            "type": "string"
-          },
-          "definitionVersion": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "parameters": {
-            "type": "object",
-            "additionalProperties": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            },
-            "nullable": true
+          "bindingId": {
+            "type": "string",
+            "format": "uuid"
           },
           "id": {
             "type": "string",
@@ -2278,6 +2473,44 @@
         },
         "additionalProperties": false
       },
+      "CreateRuleBindingRequest": {
+        "type": "object",
+        "properties": {
+          "definitionKey": {
+            "type": "string"
+          },
+          "definitionVersion": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "targetType": {
+            "type": "string"
+          },
+          "targetId": {
+            "type": "string"
+          },
+          "useCaseOrTrigger": {
+            "type": "string"
+          },
+          "inputMappings": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/RuleInputMappingDto"
+            }
+          },
+          "priority": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "failureBehavior": {
+            "$ref": "#/components/schemas/RuleBindingFailureBehavior"
+          }
+        },
+        "additionalProperties": false
+      },
       "CreateRuleDefinitionRequest": {
         "type": "object",
         "properties": {
@@ -2286,19 +2519,6 @@
           },
           "description": {
             "type": "string"
-          },
-          "scope": {
-            "$ref": "#/components/schemas/RuleScope"
-          },
-          "contextKey": {
-            "type": "string"
-          },
-          "contextSchemaVersion": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "outcomeKind": {
-            "$ref": "#/components/schemas/RuleOutcomeKind"
           }
         },
         "additionalProperties": false
@@ -2414,6 +2634,28 @@
         },
         "additionalProperties": { }
       },
+      "ProjectRuleConditionRequest": {
+        "type": "object",
+        "properties": {
+          "expressionLanguageVersion": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "inputs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RuleDraftInputDefinitionDto"
+            }
+          },
+          "condition": {
+            "$ref": "#/components/schemas/RuleConditionNodeDto"
+          },
+          "language": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
       "PublishBusinessObjectDefinitionRequest": {
         "type": "object",
         "properties": {
@@ -2461,23 +2703,103 @@
         },
         "additionalProperties": false
       },
-      "RuleApplicabilityDto": {
+      "RuleBindingDto": {
         "type": "object",
         "properties": {
-          "targetTypeKeys": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
+          "id": {
+            "type": "string",
+            "format": "uuid"
           },
-          "configurationConstraints": {
+          "workspaceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "definitionKey": {
+            "type": "string"
+          },
+          "definitionVersion": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "targetType": {
+            "type": "string"
+          },
+          "targetId": {
+            "type": "string"
+          },
+          "useCaseOrTrigger": {
+            "type": "string"
+          },
+          "inputMappings": {
             "type": "object",
             "additionalProperties": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
+              "$ref": "#/components/schemas/RuleInputMappingDto"
             }
+          },
+          "priority": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "failureBehavior": {
+            "$ref": "#/components/schemas/RuleBindingFailureBehavior"
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "RuleBindingFailureBehavior": {
+        "enum": [
+          "FailClosed",
+          "FailOpen"
+        ],
+        "type": "string"
+      },
+      "RuleBindingUsageDto": {
+        "type": "object",
+        "properties": {
+          "bindingId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "definitionKey": {
+            "type": "string"
+          },
+          "definitionVersion": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "targetType": {
+            "type": "string"
+          },
+          "targetId": {
+            "type": "string"
+          },
+          "useCaseOrTrigger": {
+            "type": "string"
+          },
+          "priority": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "failureBehavior": {
+            "$ref": "#/components/schemas/RuleBindingFailureBehavior"
           }
         },
         "additionalProperties": false
@@ -2509,72 +2831,17 @@
         },
         "additionalProperties": false
       },
-      "RuleContextFieldDto": {
+      "RuleConditionProjectionDto": {
         "type": "object",
         "properties": {
-          "path": {
-            "type": "string"
+          "condition": {
+            "$ref": "#/components/schemas/RuleConditionNodeDto"
           },
-          "displayName": {
-            "type": "string"
-          },
-          "type": {
-            "$ref": "#/components/schemas/RuleValueType"
-          },
-          "allowMultiple": {
-            "type": "boolean"
-          },
-          "documentation": {
-            "$ref": "#/components/schemas/RuleReferenceDocumentationDto"
+          "display": {
+            "$ref": "#/components/schemas/RuleExpressionDisplayNodeDto"
           }
         },
         "additionalProperties": false
-      },
-      "RuleContextSchemaDto": {
-        "type": "object",
-        "properties": {
-          "contextKey": {
-            "type": "string"
-          },
-          "version": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "scope": {
-            "$ref": "#/components/schemas/RuleScope"
-          },
-          "displayName": {
-            "type": "string"
-          },
-          "fields": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/RuleContextFieldDto"
-            }
-          },
-          "targetTypeKey": {
-            "type": "string",
-            "nullable": true
-          },
-          "configuration": {
-            "type": "object",
-            "additionalProperties": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            },
-            "nullable": true
-          }
-        },
-        "additionalProperties": false
-      },
-      "RuleDecision": {
-        "enum": [
-          "Allow",
-          "Deny"
-        ],
-        "type": "string"
       },
       "RuleDefinitionDetailDto": {
         "type": "object",
@@ -2590,12 +2857,6 @@
           },
           "origin": {
             "$ref": "#/components/schemas/RuleOrigin"
-          },
-          "scope": {
-            "$ref": "#/components/schemas/RuleScope"
-          },
-          "outcomeKind": {
-            "$ref": "#/components/schemas/RuleOutcomeKind"
           },
           "status": {
             "$ref": "#/components/schemas/RuleLifecycleStatus"
@@ -2614,29 +2875,17 @@
             "format": "int32",
             "nullable": true
           },
-          "contextKey": {
-            "type": "string",
-            "nullable": true
-          },
-          "contextSchemaVersion": {
-            "type": "integer",
-            "format": "int32",
-            "nullable": true
-          },
-          "applicability": {
-            "$ref": "#/components/schemas/RuleApplicabilityDto"
-          },
-          "parameters": {
+          "inputs": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/RuleParameterDefinitionDto"
+              "$ref": "#/components/schemas/RuleInputDefinitionDto"
             }
+          },
+          "output": {
+            "$ref": "#/components/schemas/RuleOutputContractDto"
           },
           "condition": {
             "$ref": "#/components/schemas/RuleConditionNodeDto"
-          },
-          "outcome": {
-            "$ref": "#/components/schemas/RuleOutcomeDto"
           },
           "versions": {
             "type": "array",
@@ -2680,12 +2929,6 @@
           "origin": {
             "$ref": "#/components/schemas/RuleOrigin"
           },
-          "scope": {
-            "$ref": "#/components/schemas/RuleScope"
-          },
-          "outcomeKind": {
-            "$ref": "#/components/schemas/RuleOutcomeKind"
-          },
           "status": {
             "$ref": "#/components/schemas/RuleLifecycleStatus"
           },
@@ -2703,23 +2946,14 @@
             "format": "int32",
             "nullable": true
           },
-          "contextKey": {
-            "type": "string",
-            "nullable": true
-          },
-          "contextSchemaVersion": {
-            "type": "integer",
-            "format": "int32",
-            "nullable": true
-          },
-          "applicability": {
-            "$ref": "#/components/schemas/RuleApplicabilityDto"
-          },
-          "parameters": {
+          "inputs": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/RuleParameterDefinitionDto"
+              "$ref": "#/components/schemas/RuleInputDefinitionDto"
             }
+          },
+          "output": {
+            "$ref": "#/components/schemas/RuleOutputContractDto"
           },
           "updatedAt": {
             "type": "string",
@@ -2769,34 +3003,21 @@
           "description": {
             "type": "string"
           },
-          "scope": {
-            "$ref": "#/components/schemas/RuleScope"
-          },
-          "outcomeKind": {
-            "$ref": "#/components/schemas/RuleOutcomeKind"
-          },
           "expressionLanguageVersion": {
             "type": "integer",
             "format": "int32"
           },
-          "contextKey": {
-            "type": "string"
-          },
-          "contextSchemaVersion": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "parameters": {
+          "inputs": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/RuleParameterDefinitionDto"
+              "$ref": "#/components/schemas/RuleInputDefinitionDto"
             }
+          },
+          "output": {
+            "$ref": "#/components/schemas/RuleOutputContractDto"
           },
           "condition": {
             "$ref": "#/components/schemas/RuleConditionNodeDto"
-          },
-          "outcome": {
-            "$ref": "#/components/schemas/RuleOutcomeDto"
           },
           "publishedByUserId": {
             "type": "string",
@@ -2809,28 +3030,28 @@
         },
         "additionalProperties": false
       },
-      "RuleExpressionAuthoringDto": {
+      "RuleDraftInputDefinitionDto": {
         "type": "object",
         "properties": {
-          "syntax": {
+          "label": {
             "type": "string"
           },
-          "condition": {
-            "$ref": "#/components/schemas/RuleConditionNodeDto"
-          },
-          "display": {
-            "$ref": "#/components/schemas/RuleExpressionDisplayNodeDto"
-          },
-          "diagnostics": {
+          "types": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/RuleExpressionDiagnosticDto"
+              "$ref": "#/components/schemas/RuleValueType"
             }
           },
-          "completions": {
+          "isRequired": {
+            "type": "boolean"
+          },
+          "allowMultiple": {
+            "type": "boolean"
+          },
+          "allowedValues": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/RuleExpressionCompletionDto"
+              "type": "string"
             }
           }
         },
@@ -2852,59 +3073,6 @@
           },
           "documentation": {
             "$ref": "#/components/schemas/RuleReferenceDocumentationDto"
-          }
-        },
-        "additionalProperties": false
-      },
-      "RuleExpressionCompletionDto": {
-        "type": "object",
-        "properties": {
-          "label": {
-            "type": "string"
-          },
-          "insertText": {
-            "type": "string"
-          },
-          "cursorOffset": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "replacementStart": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "replacementLength": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "referenceKind": {
-            "$ref": "#/components/schemas/RuleExpressionReferenceKind"
-          },
-          "referenceKey": {
-            "type": "string"
-          },
-          "summary": {
-            "type": "string"
-          }
-        },
-        "additionalProperties": false
-      },
-      "RuleExpressionDiagnosticDto": {
-        "type": "object",
-        "properties": {
-          "code": {
-            "type": "string"
-          },
-          "message": {
-            "type": "string"
-          },
-          "start": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "length": {
-            "type": "integer",
-            "format": "int32"
           }
         },
         "additionalProperties": false
@@ -3158,7 +3326,7 @@
             "type": "integer",
             "format": "int32"
           },
-          "maxParameters": {
+          "maxInputs": {
             "type": "integer",
             "format": "int32"
           },
@@ -3174,8 +3342,7 @@
           "LogicalOperator",
           "PredicateOperator",
           "Function",
-          "Context",
-          "Parameter",
+          "Input",
           "Literal",
           "ValueType",
           "OperandKind",
@@ -3194,6 +3361,62 @@
           }
         },
         "additionalProperties": false
+      },
+      "RuleInputDefinitionDto": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "types": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RuleValueType"
+            }
+          },
+          "isRequired": {
+            "type": "boolean"
+          },
+          "allowMultiple": {
+            "type": "boolean"
+          },
+          "allowedValues": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "RuleInputMappingDto": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/RuleInputMappingKind"
+          },
+          "contextKey": {
+            "type": "string",
+            "nullable": true
+          },
+          "literalValues": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "RuleInputMappingKind": {
+        "enum": [
+          "Context",
+          "Literal"
+        ],
+        "type": "string"
       },
       "RuleLifecycleStatus": {
         "enum": [
@@ -3272,8 +3495,7 @@
       },
       "RuleOperandKind": {
         "enum": [
-          "Context",
-          "Parameter",
+          "Input",
           "Literal",
           "Function"
         ],
@@ -3298,56 +3520,14 @@
         ],
         "type": "string"
       },
-      "RuleOutcomeDto": {
+      "RuleOutputContractDto": {
         "type": "object",
         "properties": {
-          "kind": {
-            "$ref": "#/components/schemas/RuleOutcomeKind"
-          },
-          "violationCode": {
-            "type": "string",
-            "nullable": true
-          },
-          "severity": {
-            "$ref": "#/components/schemas/RuleSeverity"
-          },
-          "message": {
-            "type": "string",
-            "nullable": true
-          },
-          "decision": {
-            "$ref": "#/components/schemas/RuleDecision"
-          }
-        },
-        "additionalProperties": false
-      },
-      "RuleOutcomeKind": {
-        "enum": [
-          "Validation",
-          "Decision"
-        ],
-        "type": "string"
-      },
-      "RuleParameterDefinitionDto": {
-        "type": "object",
-        "properties": {
-          "key": {
-            "type": "string"
-          },
           "type": {
             "$ref": "#/components/schemas/RuleValueType"
           },
-          "isRequired": {
-            "type": "boolean"
-          },
-          "allowMultiple": {
-            "type": "boolean"
-          },
-          "allowedValues": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
+          "cardinality": {
+            "$ref": "#/components/schemas/RuleExpressionCardinality"
           }
         },
         "additionalProperties": false
@@ -3438,23 +3618,6 @@
         },
         "additionalProperties": false
       },
-      "RuleScope": {
-        "enum": [
-          "Field",
-          "Object",
-          "Record",
-          "Lifecycle"
-        ],
-        "type": "string"
-      },
-      "RuleSeverity": {
-        "enum": [
-          "Info",
-          "Warning",
-          "Error"
-        ],
-        "type": "string"
-      },
       "RuleSimulationResultDto": {
         "type": "object",
         "properties": {
@@ -3468,9 +3631,6 @@
           },
           "isMatch": {
             "type": "boolean"
-          },
-          "outcome": {
-            "$ref": "#/components/schemas/RuleOutcomeDto"
           },
           "diagnostics": {
             "type": "array",
@@ -3535,30 +3695,14 @@
           "description": {
             "type": "string"
           },
-          "scope": {
-            "$ref": "#/components/schemas/RuleScope"
-          },
-          "contextKey": {
-            "type": "string"
-          },
-          "contextSchemaVersion": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "outcomeKind": {
-            "$ref": "#/components/schemas/RuleOutcomeKind"
-          },
-          "parameters": {
+          "inputs": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/RuleParameterDefinitionDto"
+              "$ref": "#/components/schemas/RuleDraftInputDefinitionDto"
             }
           },
-          "expressionSyntax": {
-            "type": "string"
-          },
-          "outcome": {
-            "$ref": "#/components/schemas/RuleOutcomeDto"
+          "condition": {
+            "$ref": "#/components/schemas/RuleConditionNodeDto"
           }
         },
         "additionalProperties": false
@@ -3593,19 +3737,10 @@
             "type": "string",
             "nullable": true
           },
-          "contextKey": {
-            "type": "string",
-            "nullable": true
-          },
-          "contextSchemaVersion": {
-            "type": "integer",
-            "format": "int32",
-            "nullable": true
-          },
-          "parameters": {
+          "inputs": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/RuleParameterDefinitionDto"
+              "$ref": "#/components/schemas/RuleInputDefinitionDto"
             }
           },
           "query": {
@@ -3683,13 +3818,7 @@
             "format": "int32",
             "nullable": true
           },
-          "parameters": {
-            "type": "object",
-            "additionalProperties": {
-              "$ref": "#/components/schemas/RuleValueDto"
-            }
-          },
-          "context": {
+          "inputs": {
             "type": "object",
             "additionalProperties": {
               "$ref": "#/components/schemas/RuleValueDto"
@@ -3706,6 +3835,48 @@
         "properties": {
           "theme": {
             "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "UpdateRuleBindingRequest": {
+        "type": "object",
+        "properties": {
+          "expectedRevision": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "definitionKey": {
+            "type": "string"
+          },
+          "definitionVersion": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "targetType": {
+            "type": "string"
+          },
+          "targetId": {
+            "type": "string"
+          },
+          "useCaseOrTrigger": {
+            "type": "string"
+          },
+          "inputMappings": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/RuleInputMappingDto"
+            }
+          },
+          "priority": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "failureBehavior": {
+            "$ref": "#/components/schemas/RuleBindingFailureBehavior"
           }
         },
         "additionalProperties": false

@@ -8,7 +8,6 @@ namespace Axis.Rules.Application.Queries.ListRuleDefinitions;
 public sealed record ListRuleDefinitionsQuery(
     int Page,
     int PageSize,
-    RuleScope? Scope = null,
     RuleOrigin? Origin = null,
     RuleLifecycleStatus? Status = null,
     string? SearchQuery = null,

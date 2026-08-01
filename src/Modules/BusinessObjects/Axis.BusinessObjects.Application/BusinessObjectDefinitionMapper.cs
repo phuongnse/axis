@@ -99,23 +99,14 @@ internal static class BusinessObjectDefinitionMapper
     private static BusinessObjectFieldRuleDto ToRuleDto(BusinessObjectFieldRule rule) =>
         new(
             rule.Id.Value,
-            rule.DefinitionKey,
-            rule.DefinitionVersion,
-            ToParameterDto(rule.Parameters));
+            rule.BindingId,
+            rule.Order);
 
     private static BusinessObjectDefinitionVersionFieldRuleDto ToRuleDto(
         BusinessObjectDefinitionVersionFieldRule rule) =>
         new(
             rule.Id.Value,
             rule.SourceFieldRuleId.Value,
-            rule.DefinitionKey,
-            rule.DefinitionVersion,
-            ToParameterDto(rule.Parameters));
-
-    private static IReadOnlyDictionary<string, IReadOnlyList<string>> ToParameterDto(
-        IReadOnlyDictionary<string, string[]> parameters) =>
-        parameters.ToDictionary(
-            pair => pair.Key,
-            pair => (IReadOnlyList<string>)pair.Value.ToArray(),
-            StringComparer.Ordinal);
+            rule.BindingId,
+            rule.Order);
 }

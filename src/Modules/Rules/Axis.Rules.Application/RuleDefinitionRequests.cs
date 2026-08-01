@@ -4,48 +4,31 @@ namespace Axis.Rules.Application;
 
 public sealed record CreateRuleDefinitionRequest(
     string Name,
-    string Description,
-    RuleScope Scope,
-    string ContextKey,
-    int ContextSchemaVersion,
-    RuleOutcomeKind OutcomeKind);
+    string Description);
 
 public sealed record SaveRuleDefinitionDraftRequest(
     int ExpectedRevision,
     string Name,
     string Description,
-    RuleScope Scope,
-    string ContextKey,
-    int ContextSchemaVersion,
-    RuleOutcomeKind OutcomeKind,
-    IReadOnlyList<RuleParameterDefinitionDto> Parameters,
-    string ExpressionSyntax,
-    RuleOutcomeDto Outcome);
+    IReadOnlyList<RuleDraftInputDefinitionDto> Inputs,
+    RuleConditionNodeDto Condition);
 
 public sealed record RuleRevisionRequest(int ExpectedRevision);
 
 public sealed record SimulateRuleRequest(
     int? DefinitionVersion,
-    IReadOnlyDictionary<string, RuleValueDto> Parameters,
-    IReadOnlyDictionary<string, RuleValueDto> Context,
+    IReadOnlyDictionary<string, RuleValueDto> Inputs,
     string CorrelationId);
 
 public sealed record RuleSimulationResultDto(
     string DefinitionKey,
     int? DefinitionVersion,
     bool IsMatch,
-    RuleOutcomeDto? Outcome,
     IReadOnlyList<RuleNodeDiagnosticDto> Diagnostics,
     string CorrelationId);
 
-public sealed record RuleNodeDiagnosticDto(string NodeId, bool IsMatch);
-
-public sealed record AssistRuleExpressionRequest(
+public sealed record ProjectRuleConditionRequest(
     int ExpressionLanguageVersion,
-    string? ContextKey,
-    int? ContextSchemaVersion,
-    IReadOnlyList<RuleParameterDefinitionDto> Parameters,
-    string? Syntax,
-    RuleConditionNodeDto? Condition,
-    int CursorOffset,
+    IReadOnlyList<RuleDraftInputDefinitionDto> Inputs,
+    RuleConditionNodeDto Condition,
     string Language);

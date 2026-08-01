@@ -8,7 +8,7 @@ Repo skills are executable workflows. [reference.md](./reference.md) owns univer
 2. Read [reference.md](./reference.md) and the full owner skill before editing.
 3. Follow only handoffs explicitly typed as **Requires**, **Delegates**, or **Returns to**.
 4. Reuse current evidence; do not recurse into an already-satisfied prerequisite.
-5. Run repository commands through `python scripts/axis.py ...`.
+5. Run repeatable repository workflows and verification through finite `python scripts/axis.py ...` routes; `$axis-script-scope` owns rare mutation exceptions.
 
 `$axis-*` aliases map to `.agents/skills/<name>/SKILL.md`.
 

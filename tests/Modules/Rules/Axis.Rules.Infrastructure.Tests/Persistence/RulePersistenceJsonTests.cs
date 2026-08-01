@@ -7,6 +7,32 @@ namespace Axis.Rules.Infrastructure.Tests.Persistence;
 public sealed class RulePersistenceJsonTests
 {
     [Fact]
+    public void OutputContract_WhenRoundTripped_PreservesTypeAndCardinality()
+    {
+        string json = RulePersistenceJson.SerializeOutput(RuleOutputContract.BooleanMatch);
+        RuleOutputContract restored = RulePersistenceJson.DeserializeOutput(json);
+
+        restored.Should().Be(RuleOutputContract.BooleanMatch);
+        json.Should().Contain("\"type\":5").And.Contain("\"cardinality\":0");
+    }
+
+    [Fact]
+    public void InputMappings_WhenRoundTripped_PreservesContextAndLiteralMappings()
+    {
+        IReadOnlyDictionary<string, RuleInputMapping> mappings = new Dictionary<string, RuleInputMapping>
+        {
+            ["value"] = RuleInputMapping.FromContext("record.value").Value,
+            ["threshold"] = RuleInputMapping.FromLiteral(["10", "20"]).Value,
+        };
+
+        Dictionary<string, RuleInputMapping> restored = RulePersistenceJson.DeserializeInputMappings(
+            RulePersistenceJson.SerializeInputMappings(mappings));
+
+        restored["value"].ContextKey.Should().Be("record.value");
+        restored["threshold"].LiteralValues.Should().Equal("10", "20");
+    }
+
+    [Fact]
     public void Condition_WhenFunctionOperandIsRoundTripped_PreservesCapabilityAndArguments()
     {
         RulePredicateCondition condition = RulePredicateCondition.Create(
@@ -14,7 +40,7 @@ public sealed class RulePersistenceJsonTests
             RulePredicateOperator.GreaterThan,
             RuleOperand.Function(
                 RuleExpressionFunction.Length,
-                [RuleOperand.Context("field.value").Value]).Value,
+                [RuleOperand.Input("field.value").Value]).Value,
             RuleOperand.LiteralValue(
                 RuleValue.Create(RuleValueType.Integer, ["5"]).Value).Value).Value;
 
@@ -25,7 +51,7 @@ public sealed class RulePersistenceJsonTests
         json.Should().Contain("\"function\":1").And.Contain("\"arguments\"");
         restored.Left.FunctionKind.Should().Be(RuleExpressionFunction.Length);
         restored.Left.Arguments.Should().ContainSingle(argument =>
-            argument.Kind == RuleOperandKind.Context && argument.Reference == "field.value");
+            argument.Kind == RuleOperandKind.Input && argument.Reference == "field.value");
     }
 
     [Theory]

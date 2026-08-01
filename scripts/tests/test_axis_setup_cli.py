@@ -67,6 +67,43 @@ class TestPortableSetupCli(unittest.TestCase):
             ):
                 self.assertEqual(str(managed), axis.resolve_exe("dotnet"))
 
+    def test_managed_dotnet_processes_receive_the_portable_runtime_root(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            managed = Path(temp) / "dotnet" / "dotnet"
+            managed.parent.mkdir()
+            managed.write_text("", encoding="utf-8")
+            with (
+                mock.patch.object(axis.axis_setup, "managed_executable", return_value=managed),
+                mock.patch.object(
+                    axis.subprocess,
+                    "run",
+                    return_value=axis.subprocess.CompletedProcess([], 0),
+                ) as subprocess_run,
+            ):
+                axis.run([str(managed), "test"])
+
+        child_env = subprocess_run.call_args.kwargs["env"]
+        self.assertEqual(str(managed.parent), child_env["DOTNET_ROOT"])
+
+    def test_explicit_dotnet_root_overrides_the_managed_runtime_root(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            managed = Path(temp) / "managed" / "dotnet"
+            managed.parent.mkdir()
+            managed.write_text("", encoding="utf-8")
+            explicit_root = str(Path(temp) / "explicit")
+            with (
+                mock.patch.object(axis.axis_setup, "managed_executable", return_value=managed),
+                mock.patch.object(
+                    axis.subprocess,
+                    "run",
+                    return_value=axis.subprocess.CompletedProcess([], 0),
+                ) as subprocess_run,
+            ):
+                axis.run([str(managed), "test"], env={"DOTNET_ROOT": explicit_root})
+
+        child_env = subprocess_run.call_args.kwargs["env"]
+        self.assertEqual(explicit_root, child_env["DOTNET_ROOT"])
+
     def test_setup_treats_an_old_github_cli_as_missing(self) -> None:
         with mock.patch.object(
             axis,

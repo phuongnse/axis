@@ -7,7 +7,6 @@ namespace Axis.Rules.Application.Queries.SimulateRuleDefinition;
 public sealed record SimulateRuleDefinitionQuery(
     string DefinitionKey,
     int? DefinitionVersion,
-    IReadOnlyDictionary<string, RuleValueDto> Parameters,
-    IReadOnlyDictionary<string, RuleValueDto> Context,
+    IReadOnlyDictionary<string, RuleValueDto> Inputs,
     string CorrelationId)
     : IQuery<Result<RuleSimulationResultDto>>;

@@ -15,7 +15,6 @@ internal sealed class PostgresRuleCatalogSearchProvider(RulesDbContext context)
         Guid workspaceId,
         IReadOnlyList<RuleTextSearchDocument> systemDocuments,
         bool includeWorkspace,
-        RuleScope? workspaceScope,
         RuleLifecycleStatus? workspaceStatus,
         int skip,
         int take,
@@ -51,7 +50,6 @@ internal sealed class PostgresRuleCatalogSearchProvider(RulesDbContext context)
                     WHERE
                         @include_workspace
                         AND workspace_id = @workspace_id
-                        AND (@scope IS NULL OR scope = @scope)
                         AND (@status IS NULL OR status = @status)
                 ),
                 documents AS (
@@ -119,11 +117,6 @@ internal sealed class PostgresRuleCatalogSearchProvider(RulesDbContext context)
                 });
             command.Parameters.AddWithValue("include_workspace", NpgsqlDbType.Boolean, includeWorkspace);
             command.Parameters.AddWithValue("workspace_id", NpgsqlDbType.Uuid, workspaceId);
-            command.Parameters.Add(
-                new NpgsqlParameter<string?>("scope", NpgsqlDbType.Text)
-                {
-                    TypedValue = workspaceScope?.ToString(),
-                });
             command.Parameters.Add(
                 new NpgsqlParameter<string?>("status", NpgsqlDbType.Text)
                 {

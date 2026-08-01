@@ -21,9 +21,7 @@ export const Route = createFileRoute('/_authenticated/business-objects')({
 export function loadBusinessObjectDefinitionsRoute({ queryClient }: MyRouterContext, page = 1) {
   return Promise.all([
     queryClient.ensureQueryData(businessObjectDefinitionsListQueryOptions(page)),
-    queryClient.ensureQueryData(
-      ruleDefinitionsListQueryOptions({ page: 1, pageSize: 100, scope: 'Field' }),
-    ),
+    queryClient.ensureQueryData(ruleDefinitionsListQueryOptions({ page: 1, pageSize: 100 })),
   ]);
 }
 

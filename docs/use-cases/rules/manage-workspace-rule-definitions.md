@@ -1,10 +1,10 @@
-# Manage Workspace Rule Definitions
+# Manage Rule Definitions
 
 > **Navigation**: [docs/use-cases/rules/README.md](./README.md) · [docs/use-cases/README.md](../README.md) · [docs/README.md](../../README.md) · [AGENTS.md](../../../AGENTS.md)
 
 ## Purpose
 
-Let a signed-in workspace user define, validate, publish, revise, and archive reusable workspace rules across supported system scopes without allowing arbitrary code or side-effect execution.
+Let a signed-in workspace user create, validate, test, version, activate, deactivate, and inspect reusable rules without first creating a consumer target.
 
 ## Primary actor
 
@@ -12,163 +12,109 @@ Let a signed-in workspace user define, validate, publish, revise, and archive re
 
 ## Trigger
 
-- User needs reusable business validation or decision behavior not supplied by the system catalog.
-- User opens the Rules catalog and starts or revises a workspace-owned rule.
+- User needs reusable deterministic logic that is not supplied by the built-in catalog.
+- User needs to revise, test, version, activate, deactivate, or inspect an existing definition.
 
 ## Main flow
 
-1. User opens the workspace Rules catalog containing system and workspace definitions.
-2. User starts a workspace-owned draft with a name; system derives a stable workspace-unique rule key and displays it read-only after creation.
-3. System offers the scopes exposed by context schemas currently registered by consumers.
-4. User selects an available scope, context key, and schema version owned by the target business context.
-5. User selects a pure outcome kind: Validation or Decision.
-6. System combines the selected versioned expression-language capabilities with the fields supplied by the consumer-owned context schema registered for that scope and context version.
-7. User independently composes a typed expression through a versioned, non-executable syntax editor. Autocomplete and the localized guide offer only context operands, literals, parameters, pure functions, comparison operators, and all/any/not groups allowed by the selected contracts.
-8. As syntax changes, Rules parses it into the canonical typed expression and returns a synchronized localized natural-language preview. The user-authored syntax is never replaced by that preview.
-9. For Validation, user defines a stable violation code, severity, and user-facing message; for Decision, user defines Allow or Deny when the expression matches.
-10. User validates the draft against the selected context contract and can simulate it with sample context before publication.
-11. User publishes the current draft revision; system creates immutable version 1 and records publisher and publication time.
-12. User can create a new draft revision from the latest published version and publish a later immutable version without changing earlier versions.
-13. User can archive a workspace definition to prevent new application while preserving existing applied snapshots and historical version resolution.
+1. User opens the Rules module's single collection route and keeps the current grid filters, sorting, page, and selection.
+2. User opens a create dialog and enters definition metadata; Rules creates an inactive workspace draft independent of any target or binding.
+3. User declares inputs with stable identities, labels, accepted value types, cardinality, requiredness, and optional allowed values, plus the typed outputs returned to consumers.
+4. User authors logic through a safe textual DSL, visual composer, or another supported projection. Every authoring mode uses one versioned language contract and produces the same canonical logic that transforms declared inputs into declared outputs.
+5. Rules parses and validates the projection, persists only the canonical AST and its language version, and regenerates syntax and natural-language explanations from that AST.
+6. User opens a test dialog, supplies typed samples, and receives deterministic typed outputs plus a safe explanation without mutating rule or consumer state.
+7. User versions a valid draft; Rules creates an immutable, server-numbered snapshot of metadata, input definitions, canonical logic, output definitions, and language version.
+8. User activates an exact immutable version for discovery and new bindings, or deactivates the definition. Neither action rewrites a version or retargets an existing binding.
+9. User views definition details, version history, activation state, and current binding usage in dialogs from the same grid.
+10. A successful mutation refreshes only the affected row or dialog data; closing returns focus and the unchanged grid state.
 
 ## Alternate / error flows
 
-- Duplicate or malformed rule key: reject creation without persistence.
-- Unsupported scope, unavailable context key/schema version, outcome, operand, operator, or context path: reject draft validation and publication.
-- Operand/operator type mismatch: identify the affected expression node and reject publication.
-- Missing parameter schema, violation metadata, or decision outcome: reject publication.
-- Typed expression exceeds configured depth, node, literal-size, or parameter limits: reject before persistence or evaluation.
-- Incomplete or invalid authoring syntax: keep the user's text, identify the affected source range, offer only valid completion candidates for the current contracts, and block save, simulation, and publication until parsing succeeds.
-- Stale draft revision or concurrent publication: reject without overwriting newer state or published versions.
-- Archive requested for an already archived definition: return the current archived state without creating another version.
-- Missing, unavailable, or cross-workspace scope: reject without mutation or resource disclosure.
+- Duplicate definition identity, duplicate input identity, malformed metadata, or unsupported input contract: reject without persistence.
+- Invalid DSL or visual projection: show source-specific diagnostics and keep the last valid canonical AST unchanged.
+- Unknown input, incompatible operation, malformed literal, unsupported language version, or complexity overflow: block testing, version creation, and activation.
+- Stale draft revision or concurrent lifecycle change: reject without overwriting the current draft, immutable versions, activation, or bindings.
+- Deactivation: prevent discovery for new bindings while preserving definition history and existing exact-version bindings for explicit binding lifecycle management.
+- Workspace isolation or authorization failure: return a not-found or permission-denied result without disclosing another workspace's definition.
+- Destructive dismissal or a supported destructive lifecycle action: require explicit confirmation and preserve recoverable input on cancel or failure.
 
 ## Acceptance Criteria
 
 *Happy path*
-- **AC-001** User can create a workspace-scoped draft rule with required name, server-derived stable key, description, scope, registered context key/schema version, and outcome kind.
-- **AC-002** A workspace rule can be authored only for a currently registered context schema, and its scope must match that schema; supported outcomes are pure Validation and Decision outcomes.
-- **AC-003** Users can independently compose a typed expression through a versioned, non-executable syntax that covers every field, parameter, literal, operator, pure function, and logical group allowed by the selected context and expression-language version. Dynamic references use explicit namespaces: `@context.<path>` resolves only against the current server-provided context schema, and `@parameters.<key>` resolves only against the current rule parameter definitions. Unqualified, unknown, or mismatched references are rejected. Predefined templates and direct AST editing are not required, and arbitrary executable code is not accepted.
-- **AC-004** Rules exposes one server-owned, versioned language contract for parsing, formatting, autocomplete, guide insertion, validation, and localized natural-language rendering. It includes stable typed signatures, syntax forms, localized reference metadata, and limits while consumer-owned context schemas expose available fields and their localized reference metadata independently from workspace business state.
-- **AC-005** Validation outcomes carry stable violation code, severity, and message; Decision outcomes carry explicit Allow or Deny semantics.
-- **AC-006** Authoring syntax validation preserves invalid input and returns stable machine-readable diagnostics with source ranges; successful parsing returns the canonical typed expression, canonical syntax, and localized natural-language projection, while successful simulation returns the evaluated rule version, match result, and outcome without mutating business state.
-- **AC-007** Publishing creates immutable version 1 with the canonical expression and its language version, parameter schema, outcome, publisher, and publication time.
-- **AC-008** Revising a published definition creates a new draft and later immutable version while all prior versions remain unchanged and resolvable.
-- **AC-009** Archiving prevents new applications but preserves exact-version resolution for existing applied snapshots.
-- **AC-010** Rules catalog searches and lists system and current-workspace definitions with distinct origin, scope, lifecycle status, and latest version using server-owned case-, diacritic-, order-, and typo-tolerant matching, deterministic relevance/default ordering, workspace isolation before ranking, and pagination.
+
+- **AC-001** A user can create and test an inactive workspace definition without an Object, another consumer target, or a binding.
+- **AC-002** A definition owns metadata plus stable typed input and output contracts; input requiredness and optionality never change the meaning of the Inputs section.
+- **AC-003** Canonical logic and its language version are the only persisted rule behavior and source of truth; authoring projections do not create alternate semantics.
+- **AC-004** Safe textual DSL, visual composition, formatting, syntax diagnostics, and autocomplete are authoring projections generated from the same server-owned language and typed-input contract.
+- **AC-005** Testing accepts typed sample inputs and returns deterministic match state plus a safe structured explanation without persistence or side effects.
+- **AC-006** Version creation snapshots metadata, input definitions, canonical logic, output definitions, and language version into an immutable server-numbered version.
+- **AC-007** Creating or revising a version does not activate it, and activating or deactivating does not mutate any version or exact-version binding.
+- **AC-008** Activation makes an exact immutable version discoverable for new bindings; deactivation prevents new bindings while existing bindings remain unchanged and separately enabled or disabled.
+- **AC-009** Localized natural-language explanations are generated from the canonical AST or evaluation trace for the requested locale and are never stored as rule logic or localized copies.
+- **AC-010** Built-in and workspace definitions use one semantic model and one read-only detail projection; origin and capabilities only change available actions.
+- **AC-011** The Rules route remains grid-first, and create, view, edit, author, test, version, activate, deactivate, and usage operations complete in dialogs without CRUD page navigation or drawers.
 
 *Validation & errors*
-- **AC-011** Rule keys are required, workspace unique, server derived, stable after creation, 1-63 characters, start with a lowercase letter, and contain lowercase letters, digits, and underscores.
-- **AC-012** Names, descriptions, parameter keys, context paths, operators, function calls, expression groups, outcomes, and messages are validated before publication.
-- **AC-013** Expression operands, operators, and pure functions must be registered and type compatible with the selected context schema and language version; unknown, unavailable, or stale versions block publication.
-- **AC-014** Configured limits for expression depth, nodes, function calls, literals, parameters, and simulation input are enforced before evaluation.
-- **AC-015** Draft updates and publish operations require the caller's last-seen revision and reject stale writes without overwrite.
-- **AC-016** Published versions are immutable; archive does not delete definition history or mutate applied consumer snapshots.
-- **AC-017** Workspace rules cannot execute code, access files or network services, read secrets, query arbitrary databases, use nondeterministic time or randomness, or produce side effects.
+
+- **AC-012** Metadata, stable input identities, types, cardinality, allowed values, AST nodes, operations, functions, literals, output contract, and language version are validated before testing, versioning, or activation.
+- **AC-013** DSL parsing cannot execute the authored text; parse failure never replaces the last valid canonical AST or becomes runtime behavior.
+- **AC-014** Depth, node, input, collection, literal-size, precision, function, and evaluation-work limits are enforced at the earliest reliable boundary.
+- **AC-015** Draft and lifecycle mutations require the caller's last-seen revision and reject stale writes without overwrite.
+- **AC-016** Immutable versions cannot be edited in place, and lifecycle changes never rewrite historical content.
+- **AC-017** Rules cannot execute arbitrary code or JavaScript, access files, network services, secrets, arbitrary databases, nondeterministic time, or randomness, or produce side effects.
+- **AC-018** Workspace definitions, drafts, samples, versions, activation, and usage are isolated and authorized without resource disclosure.
 
 *Edge cases*
-- **AC-018** Current workspace scope is required for create, update, publish, archive, list, load, validate, and simulate operations.
-- **AC-019** Workspace definitions and simulation inputs are isolated by workspace; cross-workspace access returns a not-found style result.
-- **AC-020** Rules owns definition lifecycle, immutable versions, schemas, typed expressions, and pure outcomes; consumers own applications, business context, enforcement, and side effects outside Rules.
-- **AC-021** Create, update, publish, and archive operations are atomic and record actor/time audit metadata for every lifecycle mutation.
-- **AC-022** System definitions appear in the same catalog but remain read-only and cannot be revised, archived, or shadowed by a workspace key.
-- **AC-023** Editable rule surfaces keep canonical syntax visible with context-aware autocomplete, keyboard acceptance, guide-to-editor insertion, and a synchronized natural-language preview. Completion and guide insertion emit the complete `@context.*` or `@parameters.*` reference; Enter accepts an active suggestion or creates a new line and never replaces syntax with prose.
-- **AC-024** Read-only rule surfaces render every leaf as a localized sentence and every logical group as a semantic connector structure. A single serial path means every connected branch is required, split-and-rejoin parallel paths mean any connected branch may match, and an inversion node marks the exact branch or nested group whose result is negated. Logical operator words remain absent from the persistent presentation; each connector instead exposes its server-localized operator through a native hover title, keyboard-focusable accessible name, and exact-entry reference navigation. Indentation and connector scope retain every nested level. Natural presentation uses localized names rather than canonical namespace syntax, while reference typography distinguishes dynamic values from keywords. Canonical syntax, evaluator-only normalization details, and authoring controls remain omitted; changing locale changes natural presentation without changing canonical expression semantics or persisted versions.
-- **AC-025** Every semantic expression term opens the same canonical server-generated expression document at that exact entry in both read and edit modes. The selected entry uses the exact localized phrase clicked as its heading, then presents concise server-owned meaning and usage guidance; examples, sibling context, enclosing groups, and raw occurrence syntax are excluded. Editable guide browsing may show examples after an item is found and exposes insertion actions. Technical reference content appears only when it explains the current search match. The server groups current context, parameters, groups, operators, functions, value types, and limits into localized sections. Server search uses names, stable syntax/reference keys, meaning, usage guidance, and technical reference content, but never examples; it ranks case-, diacritic-, and order-insensitive matches, tolerates minor spelling errors, returns structured original-text highlights, and reports no-result state without requiring exact substrings.
+
+- **AC-019** Rules owns definitions, versions, activation, authoring language, validation, testing, persistence, and evaluation without importing Object, Workflow, or another consumer's domain types.
+- **AC-020** Rules exposes binding usage without copying target-specific fields into a definition; binding lifecycle is owned by [docs/use-cases/rules/manage-rule-bindings.md](./manage-rule-bindings.md).
+- **AC-021** Definition, version, and activation mutations are atomic and record workspace, revision, actor, and audit timestamps without introducing evaluator nondeterminism.
 
 ## Acceptance Test Matrix
 
 | ID | Boundary | Scenario | Covers AC | Verification | Required |
 |---|---|---|---|---|---|
-| AT-001 | Domain boundary | Valid workspace rule lifecycle creates a stable draft, publishes immutable versions, revises, and archives without history mutation | AC-001, AC-007, AC-008, AC-009, AC-011, AC-016, AC-021 | Domain test | Yes |
-| AT-002 | Domain boundary | Typed expressions and outcomes enforce registered operators and pure functions, type signatures, supported scope values, metadata, and complexity limits | AC-003, AC-005, AC-012, AC-013, AC-014, AC-017 | Domain test | Yes |
-| AT-003 | Application boundary | One versioned language service parses and formats namespaced syntax, returns context-aware completions, canonical typed expressions, source-range diagnostics, and localized natural-language projections while enforcing context/language compatibility without business-state mutation | AC-002, AC-003, AC-004, AC-006, AC-013, AC-014, AC-017, AC-020, AC-024 | Application test | Yes |
-| AT-004 | Application boundary | Stale update, concurrent publish, invalid archive, and system-definition mutation attempts fail safely | AC-015, AC-016, AC-021, AC-022 | Application test | Yes |
-| AT-005 | Infrastructure boundary | Repository persists workspace isolation, immutable versions, audit metadata, concurrency, indexed search, and atomic lifecycle changes | AC-007, AC-008, AC-009, AC-010, AC-011, AC-015, AC-018, AC-019, AC-021 | Infrastructure integration test | Yes |
-| AT-006 | API boundary | Authorized lifecycle, catalog-search, and language-service endpoints expose stable request/response contracts, server-generated reference documents, structured highlights, diagnostics, projections, problem codes, pagination, and generated frontend parity | AC-001, AC-004, AC-006, AC-007, AC-008, AC-009, AC-010, AC-011, AC-015, AC-024, AC-025 | API integration test | Yes |
-| AT-007 | API/Application boundaries | Anonymous, missing-workspace, unavailable-workspace, and cross-workspace operations fail without mutation or disclosure | AC-018, AC-019, AC-022 | API integration test + Application test | Yes |
-| AT-008 | Application boundary | Rules owns lifecycle/persistence and consumers depend only on context/evaluation contracts without internal-module references | AC-004, AC-017, AC-020 | Architecture test | Yes |
-| AT-009 | UI component | Authoring keeps namespaced syntax and localized prose synchronized, supports keyboard autocomplete and document insertion, preserves invalid text with range diagnostics, and every read/edit semantic reference opens the same grouped document at its exact entry with the clicked phrase, concise meaning, usage guidance, ranked fuzzy search, and highlighted matches without examples, raw occurrence syntax, or unrelated context; editable guide browsing retains examples after discovery | AC-001, AC-002, AC-003, AC-004, AC-005, AC-006, AC-010, AC-012, AC-022, AC-023, AC-024, AC-025 | UI component test | Yes |
-| AT-010 | Browser journey | User searches and navigates the canonical expression document, inserts namespaced syntax, sees synchronized prose, validates, simulates, publishes, revises, and archives a workspace rule without console errors or layout overflow | AC-001, AC-003, AC-006, AC-007, AC-008, AC-009, AC-010, AC-018, AC-021, AC-023, AC-025 | Browser automation | Yes |
+| AT-001 | Domain boundary | Stable typed inputs, canonical AST, immutable versions, separate activation, limits, and deterministic Boolean semantics preserve all definition invariants | AC-002, AC-003, AC-006, AC-007, AC-008, AC-012, AC-014, AC-016, AC-017, AC-021 | Domain test | Yes |
+| AT-002 | Application boundary | Independent definition lifecycle creates, tests, versions, activates, deactivates, audits, and rejects stale or cross-workspace mutations without a consumer target | AC-001, AC-005, AC-007, AC-008, AC-015, AC-018, AC-021 | Application test | Yes |
+| AT-003 | Application boundary | One language service parses, validates, formats, autocompletes, and explains DSL and visual projections while persisting only the canonical AST | AC-003, AC-004, AC-009, AC-012, AC-013, AC-014 | Application test | Yes |
+| AT-004 | API boundary | Definition lifecycle, language, testing, activation, version history, and usage contracts expose generated frontend parity without consumer fields or localized stored logic | AC-001, AC-004, AC-005, AC-006, AC-008, AC-009, AC-018, AC-020 | API integration test | Yes |
+| AT-005 | Application boundary | Rules has no dependency on consumer modules and built-in/workspace definitions use the same public semantic contract | AC-010, AC-019, AC-020 | Architecture test | Yes |
+| AT-006 | UI component | One Rules grid opens create, read-only, edit, authoring, testing, version, activation, and usage dialogs and preserves collection state with targeted refresh | AC-004, AC-005, AC-009, AC-010, AC-011, AC-015 | UI component test | Yes |
+| AT-007 | Browser journey | User creates, tests, versions, activates, revises, deactivates, and inspects a rule without leaving the grid, losing state, overflowing, or producing console errors | AC-001, AC-005, AC-006, AC-007, AC-008, AC-011, AC-018 | Browser automation | Yes |
 
 ## Out Of Scope
 
-- Side-effect actions, automation orchestration, notifications, webhooks, scripts, plugins, or arbitrary external data access.
-- Editing or deleting immutable published versions.
-- Using Rules as the owner of consumer records, object definitions, workflow state, permissions, or lifecycle transactions.
-- Importing an unrestricted third-party expression language or accepting free-form executable expressions.
+- Consumer target schemas, authorization, lifecycle, runtime context construction, result reactions, transactions, and side effects.
+- Arbitrary executable expressions, scripts, plugins, webhooks, notifications, workflow orchestration, remote data access, and persisted localized explanations.
+- Editing an immutable version or silently retargeting existing bindings when another version is activated.
 
 ## Screen flow
 
-| Screen | Required contract |
+| Surface | Required contract |
 |---|---|
-| Rules catalog | List system and workspace rules with useful scope, status, origin, and version context; render each origin with a distinct, stable semantic badge treatment and provide creation only for workspace rules. |
-| New rule identity | Capture name and description, display the derived stable key, and select a scope exposed by a registered context schema plus an outcome kind. |
-| Expression editor | Keep canonical syntax as the editable source while a synchronized localized natural-language preview explains the same server-parsed expression below it. Use `@context.<path>` for runtime context and `@parameters.<key>` for rule configuration, resolving each from the selected server-provided contracts with no client-owned reference list. Offer context-aware autocomplete and the canonical grouped expression document generated from those contracts; entries insert their complete namespaced syntax at the current cursor. Preserve invalid text, mark exact error ranges, and block expression-dependent mutations until parsing succeeds. Enter accepts the active suggestion or creates a new line; it never converts syntax into prose. Do not expose raw serialized AST data or maintain frontend capability, syntax, or documentation maps. |
-| Outcome editor | Configure Validation or Decision outcome details with contextual validation. |
-| Validate and simulate | Show node-specific errors or deterministic result and outcome for sample context without mutation. |
-| Publish review | Before mutation, summarize scope, context, parameters, the complete When → Then behavior and effect, and immutable version implications. |
-| Rule detail | Present published or archived definitions as semantic read-only content: a vertical When → Then behavior whose leaves are server-rendered localized sentences and whose logical groups use semantic connector structures, followed by visible effect, applicability, parameters, references, audit metadata, and prior immutable versions, with revise and archive actions where allowed. Keep every leaf on its own row. Use one serial path for `and`, split-and-rejoin parallel paths for `or`, and an inversion node before the exact branch or nested group for `not`; preserve every nested level through indentation and connector scope without persistently rendering operator words. Make each connector keyboard-focusable, expose its server-localized operator through native hover title and accessible name, and open the canonical expression document at that exact operator entry. Use localized natural names and reference typography rather than canonical namespace syntax. Omit evaluator-only normalization details, canonical syntax, and authoring controls. Make semantic terms visibly keyboard-actionable and open the canonical expression document at the exact server-derived context, parameter, capability, type, or limit entry without insertion actions. |
+| Rules collection | Render one primary `DataTable` with definition identity, origin, active version, activation state, usage count, and contextual actions. |
+| Create, view, and edit | Consume the managed-dialog record-tab contract with General first, Behavior as the primary business section, Usage for published-version relationships, and optional user-relevant system information last. Behavior presents one compact semantic `Inputs -> Logic -> Outputs` sequence with consistent markers, connectors, and alignment. View expressions are static read-only content; explicit authoring help opens the canonical guide where functions and logical operators use one reference interaction. Create and edit use form controls without changing the sequence. |
+| Authoring | Keep every supported authoring projection synchronized through canonical logic; syntax text and visual composition are never separate stored truths. |
+| Test | Open a dialog with typed sample inputs and distinct match, non-match, invalid-input, and evaluation-failure states. |
+| Versions and activation | Open dialogs for history, version creation, activation, and deactivation; use `AlertDialog` when confirmation is destructive. |
+| Usage | Render exact-version bindings in the managed dialog's Usage tab; actionable binding lifecycle remains owned by [docs/use-cases/rules/manage-rule-bindings.md](./manage-rule-bindings.md). |
 
-Required UI quality: authoring and expression guidance must be keyboard operable, preserve cursor and focus while suggestions or the expression document opens, expose programmatic labels and source-range errors, keep syntax and prose visually distinct, align every connector with the center of its condition row, keep nested split/rejoin scope visually closed, keep destructive archive implications visible, and remain usable without document scrolling or horizontal overflow. Connector controls must preserve focus indication and expose the same localized meaning through native hover title and accessible name without adding persistent operator labels. One capability-derived document serves read and edit modes, scrolls and focuses the selected entry, uses the clicked server-provided phrase as its heading, and leads with concise meaning and usage. Direct reference navigation omits examples; editable guide browsing may show them after discovery and exposes insertion actions. Technical reference content appears only when it contains a highlighted search match. Search must exclude examples, rank approximate multi-term matches across owned searchable fields, ignore case and diacritics, highlight matching text, and expose a clear no-result state. Raw occurrence syntax, raw AST, sibling condition details, internal evaluator identifiers, secrets, and unbounded context payloads must not be rendered.
-
-## Diagrams
-
-### workspace-rule-lifecycle
-
-```mermaid
-stateDiagram-v2
-  [*] --> Draft: Create
-  Draft --> Published: Validate and publish v1
-  Draft --> Draft: Save with revision
-  Published --> Draft: Start next version
-  Draft --> Published: Publish next version
-  Published --> Archived: Archive definition
-  Archived --> [*]
-```
-
-### workspace-rule-publication
-
-```mermaid
-sequenceDiagram
-  actor User
-  participant Web as Web App
-  participant API as API
-  participant Rules as Rules
-  participant Store as Rules Store
-
-  User->>Web: Author versioned syntax
-  Web->>API: Parse, complete, and explain
-  API->>Rules: Resolve language and context contracts
-  Rules-->>API: Canonical expression, prose, or range errors
-  API-->>Web: Canonical expression, prose, or range errors
-  Web->>API: Validate draft and simulate sample context
-  API->>Rules: Validate canonical typed expression
-  Rules-->>API: Validation errors or deterministic result
-  API-->>Web: Validation errors or deterministic result
-  User->>Web: Publish current revision
-  Web->>API: Publish draft
-  API->>Rules: Enforce lifecycle and concurrency
-  Rules->>Store: Persist immutable version atomically
-  Store-->>Rules: Persisted immutable version
-  Rules-->>API: Published rule version
-  API-->>Web: Published rule version
-```
+Required UI quality: use the existing shadcn and Tailwind system only; keep labels, focus, keyboard operation, errors, loading, empty, pending, and success states explicit; return focus to the invoking grid control; preserve URL-backed filter, sort, page, and selected-row state; use `Toast` after successful mutations; refresh only affected definition or usage queries; and do not add create, edit, or detail routes, sheets, drawers, or side panels.
 
 > **Implementation status**
 >
 > | Layer | Status |
-> |-------|--------|
-> | Domain | Done |
+> |---|---|
+> | Domain | Partial |
 > | Application | Partial |
 > | Infrastructure | Partial |
 > | API | Partial |
 > | Frontend | Partial |
 >
-> **Gaps vs spec:** No known gap in the implemented AC-010 and AC-025 search and expression-document slice; remaining partial layers retain their existing non-search scope.
+> **Gaps vs spec:** Current definition, immutable-version, canonical-condition, evaluator, persistence, and catalog primitives are reusable. Stable input identity across label edits, separate activation, safe DSL parsing/autocomplete, generated explanation ownership, complete lifecycle dialogs, usage discovery, and targeted refresh remain incomplete.
 >
-> **Deferred follow-ups:** N/A. Alternative read-store adapters and global search remain outside this use case.
+> **Deferred follow-ups:** N/A. Binding lifecycle and runtime consumption are separate in-scope Rules use cases, not deferred definition behavior.
 >
-> **Verification:** Acceptance proof is tracked in the sibling evidence sidecar.
+> **Verification:** Existing evidence is recorded in the sibling sidecar; refreshed acceptance evidence is required after the clean refactor.
 >
-> **Decisions:** Rules owns one versioned typed-expression language and one evaluator for system and workspace definitions. The canonical AST remains the persisted and evaluated source of truth. The approved authoring syntax is a stable, locale-independent, non-executable projection parsed by Rules; localized natural language is a server-rendered explanation and is never persisted as semantics. `@context.*` and `@parameters.*` are the only dynamic-reference namespaces; Rules resolves each namespace from its matching current server contract and rejects unqualified, unknown, or mismatched names. One server registry owns parsing, formatting, completion, document composition, insertion metadata, diagnostics, localized rendering, matching, ranking, and structured highlights so client maps cannot drift. Read-only references deep-link into that canonical server document, while edit mode adds insertion actions. Consumers register versioned context schemas and control available field references; users control composition. Search follows [docs/playbooks/search.md](../../playbooks/search.md), with PostgreSQL as the first provider behind a storage-neutral Application port. The high-risk public-contract, schema, and search replacement was explicitly approved on 2026-07-25. The structured-builder save shape, unqualified `@` syntax, focused reference dialog, and client search matcher are retired without compatibility shims. Definitions retain draft/published/archived lifecycle, immutable published versions, and optimistic concurrency. Runtime scripting, plugins, arbitrary executable code, and side effects remain rejected.
+> **Decisions:** The product is pre-production and uses a clean cutover. `Inputs -> Logic -> Outputs` is the durable Rule contract; the current language capability remains a bounded positive-assertion Boolean predicate until a use case approves additional typed-output authoring. `true` means the stated assertion is satisfied. Canonical logic is authoritative and every editor or explanation is a projection. Version creation and activation are separate. Activation controls eligibility for new bindings and never retargets existing exact-version bindings. Retired consumer-specific rule models, alternate semantic views, syntax persistence, and compatibility aliases are not retained.

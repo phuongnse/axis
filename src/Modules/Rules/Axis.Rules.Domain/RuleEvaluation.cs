@@ -10,7 +10,7 @@ public sealed record RuleEvaluationLimits(
     int MaxDepth = 12,
     int MaxNodes = 200,
     int MaxFunctionCalls = 50,
-    int MaxParameters = 100,
+    int MaxInputs = 100,
     int MaxExecutionSteps = 1000)
 {
     public static RuleEvaluationLimits Default { get; } = new();
@@ -29,24 +29,20 @@ public static class RuleConditionEvaluator
 
     public static Result<RuleConditionEvaluation> Evaluate(
         RuleConditionNode condition,
-        RuleContextSchema schema,
-        IReadOnlyDictionary<string, RuleValue> context,
-        IReadOnlyDictionary<string, RuleValue>? parameters = null,
+        IReadOnlyDictionary<string, RuleValue> inputs,
         RuleEvaluationLimits? limits = null)
     {
         RuleEvaluationLimits effectiveLimits = limits ?? RuleEvaluationLimits.Default;
         if (effectiveLimits.MaxDepth <= 0 || effectiveLimits.MaxNodes <= 0 ||
-            effectiveLimits.MaxFunctionCalls <= 0 || effectiveLimits.MaxParameters <= 0 ||
+            effectiveLimits.MaxFunctionCalls <= 0 || effectiveLimits.MaxInputs <= 0 ||
             effectiveLimits.MaxExecutionSteps <= 0)
             return Result.Failure<RuleConditionEvaluation>("Rule evaluation limits must be positive.");
 
-        if ((parameters?.Count ?? 0) > effectiveLimits.MaxParameters)
-            return Result.Failure<RuleConditionEvaluation>("Rule evaluation exceeds the maximum parameter count.");
+        if ((inputs?.Count ?? 0) > effectiveLimits.MaxInputs)
+            return Result.Failure<RuleConditionEvaluation>("Rule evaluation exceeds the maximum input count.");
 
         EvaluationState state = new(
-            schema,
-            context,
-            parameters ?? new Dictionary<string, RuleValue>(StringComparer.Ordinal),
+            inputs ?? new Dictionary<string, RuleValue>(StringComparer.Ordinal),
             effectiveLimits);
 
         Result<bool> match = EvaluateNode(condition, depth: 1, state);
@@ -153,22 +149,12 @@ public static class RuleConditionEvaluator
         if (operand.Kind == RuleOperandKind.Function)
             return ResolveFunction(operand, state);
 
-        if (operand.Kind == RuleOperandKind.Parameter)
-            return state.Parameters.TryGetValue(operand.Reference!, out RuleValue? parameter)
-                ? new ResolvedOperand(parameter)
+        if (operand.Kind == RuleOperandKind.Input)
+            return state.Inputs.TryGetValue(operand.Reference!, out RuleValue? input)
+                ? new ResolvedOperand(input)
                 : new ResolvedOperand(null);
 
-        RuleContextField? field = state.Schema.FindField(operand.Reference!);
-        if (field is null)
-            return Result.Failure<ResolvedOperand>($"Rule context path '{operand.Reference}' is not defined.");
-
-        if (!state.Context.TryGetValue(field.Path, out RuleValue? contextValue))
-            return new ResolvedOperand(null);
-
-        if (contextValue.Type != field.Type || contextValue.IsMultiple && !field.AllowMultiple)
-            return Result.Failure<ResolvedOperand>($"Rule context value '{field.Path}' does not match its schema.");
-
-        return new ResolvedOperand(contextValue);
+        return Result.Failure<ResolvedOperand>("Rule operand kind is not supported.");
     }
 
     private static Result<ResolvedOperand> ResolveFunction(
@@ -388,14 +374,10 @@ public static class RuleConditionEvaluator
     private sealed record ResolvedOperand(RuleValue? Value);
 
     private sealed class EvaluationState(
-        RuleContextSchema schema,
-        IReadOnlyDictionary<string, RuleValue> context,
-        IReadOnlyDictionary<string, RuleValue> parameters,
+        IReadOnlyDictionary<string, RuleValue> inputs,
         RuleEvaluationLimits limits)
     {
-        public RuleContextSchema Schema { get; } = schema;
-        public IReadOnlyDictionary<string, RuleValue> Context { get; } = context;
-        public IReadOnlyDictionary<string, RuleValue> Parameters { get; } = parameters;
+        public IReadOnlyDictionary<string, RuleValue> Inputs { get; } = inputs;
         public RuleEvaluationLimits Limits { get; } = limits;
         public List<RuleNodeDiagnostic> Diagnostics { get; } = [];
         public int NodeCount { get; set; }

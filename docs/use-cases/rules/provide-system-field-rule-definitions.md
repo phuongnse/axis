@@ -1,122 +1,85 @@
-# Provide System Field Rule Definitions
+# Provide Built-in Rule Definitions
 
 > **Navigation**: [docs/use-cases/rules/README.md](./README.md) · [docs/use-cases/README.md](../README.md) · [docs/README.md](../../README.md) · [AGENTS.md](../../../AGENTS.md)
 
 ## Purpose
 
-Provide a stable, versioned catalog of enterprise system field-rule definitions so product modules can discover compatible validation behavior without hard-coding rule-specific enums, DTO fields, or persistence columns.
+Provide a code-owned catalog of reusable built-in rules using the same semantic definition model as workspace rules. Built-in origin and immutability are catalog capabilities, not a second Rule type.
 
 ## Primary actor
 
-- Signed-in workspace user through a product surface that configures field rules
-- Signed-in workspace user reviewing the Rules catalog
+- Rules module and consumer modules reading the public catalog
 
 ## Trigger
 
-- A product surface needs compatible system field-rule definitions and parameter schemas.
-- A consumer validates or snapshots an applied system rule version.
-- User reviews the system-managed Rules catalog.
+- The application starts and needs the built-in rule catalog.
+- A consumer discovers a built-in rule version to bind to its own inputs.
 
 ## Main flow
 
-1. Consumer requests the system field-rule catalog.
-2. Rules returns deterministic published definitions with stable keys, immutable versions, origin, scope, descriptions, applicability metadata, typed parameter schemas, canonical expressions, stable syntax references, and localized natural-language projections built from the same versioned language service available to workspace rules.
-3. Consumer filters definitions against its target field type and type configuration.
-4. User configures an applicable rule through the consumer-owned product surface.
-5. Rules validates the requested definition version, applicability, and canonical parameter values.
-6. Consumer stores the applied rule version and parameters in its owning business state.
-7. User can review the system definitions in the Rules catalog without receiving mutation controls.
+1. Rules loads the code-owned built-in catalog at composition-root startup.
+2. Each catalog entry exposes the same key, description, inputs, canonical positive assertion, outputs, language version, and current Boolean-match capability used by workspace definitions.
+3. The catalog marks the source as built-in and the available actions as read-only.
+4. Consumers discover a built-in definition, bind its inputs to their own values, and store their own exact version/reference snapshot.
+5. Rules resolves and evaluates the exact built-in version through the shared evaluator.
 
 ## Alternate / error flows
 
-- Unknown definition key or version: reject the applied rule without persistence.
-- Unpublished or archived version: reject new application while preserving existing immutable snapshots.
-- Definition incompatible with field type or type configuration: reject without persistence.
-- Missing, malformed, unsupported, or non-canonical parameter: reject with a parameter-specific error.
-- Invalid system catalog metadata: fail deterministic catalog tests before runtime.
+- Invalid built-in definition or documentation: fail catalog construction before runtime use.
+- Unknown built-in key or version: return not found without substituting another version.
+- Consumer cannot bind required inputs: reject the binding in the consumer module without mutating the rule.
+- Attempt to edit, archive, or shadow a built-in key: reject without mutation.
 
 ## Acceptance Criteria
 
-*Happy path*
-- **AC-001** Rules exposes a deterministic, server-searchable read-only catalog of published system field-rule definitions with localized metadata, typo- and diacritic-tolerant relevance ordering, and pagination.
-- **AC-002** Each definition exposes a stable key, immutable positive version, display metadata, `System` origin, `Field` scope, applicability metadata, parameter schema, outcome, and a canonical typed expression with an explicit language version. The same server-owned language service exposes `@context.*` and `@parameters.*` syntax references, localized natural-language projection, and localized capability, parameter, and context documentation without client-owned product vocabulary.
-- **AC-003** The baseline catalog includes required value, numeric range, decimal precision, calendar-date range, date-and-time range, text length, text pattern, text format, and choice selection count.
-- **AC-004** Applicability distinguishes Text, Integer, Decimal, Date, DateTime, Boolean, and Choice and can constrain compatible Choice selection mode.
-- **AC-005** Parameter schemas support canonical text, integer, decimal, date, date-and-time, boolean, and multi-value values plus declared allowed values where required.
-- **AC-006** Consumers can resolve and validate an exact published rule version, including its executable typed expression, through the Rules public contract without depending on Rules internals.
-- **AC-007** Existing applied snapshots remain resolvable by key and version after newer system versions are published or a version is retired from new application.
-
-*Validation & errors*
-- **AC-008** Definition keys, versions, parameter keys, applicability metadata, and allowed values are normalized, unique, and stable.
-- **AC-009** Catalog construction rejects missing metadata, invalid applicability, duplicate definitions or versions, and invalid parameter schemas before runtime.
-- **AC-010** Unknown, unpublished, archived, or incompatible rule versions are never treated as valid for new application.
-- **AC-011** Date parameters use calendar-date semantics and DateTime parameters require an explicit offset before canonical UTC normalization.
-- **AC-012** System field rules use the shared expression evaluator, are deterministic, and cannot execute arbitrary code, external I/O, side effects, current time, or randomness.
-
-*Edge cases*
-- **AC-013** The system catalog is global read-only metadata; workspace-authored definitions are workspace isolated and owned by the workspace-rule use case.
-- **AC-014** Rules owns definition metadata, version resolution, schemas, applicability, and configuration validation; consumers own applied snapshots and runtime business state.
-- **AC-015** Removing a rule from new application does not mutate immutable published consumer snapshots that reference an older resolvable version.
+- **AC-001** Every built-in definition has a stable key, immutable positive version, description, typed inputs, canonical logic, typed outputs, and supported language version; the current catalog uses one scalar Boolean output.
+- **AC-002** Built-in definitions use the same `RuleDefinition` semantic model, evaluator, API detail shape, and read-only renderer as workspace definitions.
+- **AC-003** Built-in definitions declare no consumer context key, target scope, applicability profile, validation/decision outcome, or side effect.
+- **AC-004** Built-in inputs, operators, functions, conditions, and documentation are normalized and validated at startup.
+- **AC-005** Unknown or invalid built-in definitions fail startup/catalog construction rather than reaching runtime evaluation.
+- **AC-006** Built-in definitions are immutable and cannot be edited, archived, or shadowed by a workspace key.
+- **AC-007** Consumers bind inputs and own applied snapshots; Rules only exposes the public definition and evaluator contracts.
+- **AC-008** Every built-in uses positive assertion polarity: Required matches a present non-blank value; range, precision, length, pattern, format, and selection-count rules match values that satisfy their declared constraints.
+- **AC-009** Required accepts an absent value as evaluable input and returns non-match; absence is not an evaluator failure. Other required runtime inputs remain validation failures when absent.
 
 ## Acceptance Test Matrix
 
 | ID | Boundary | Scenario | Covers AC | Verification | Required |
 |---|---|---|---|---|---|
-| AT-001 | Domain boundary | Catalog returns the complete normalized baseline with stable keys, versions, applicability, schemas, outcomes, and valid versioned expressions | AC-001, AC-002, AC-003, AC-004, AC-005, AC-008, AC-009 | Domain test | Yes |
-| AT-002 | Application boundary | Exact versions resolve deterministically and valid parameters canonicalize without mutation | AC-006, AC-007, AC-011, AC-014, AC-015 | Application test | Yes |
-| AT-003 | Application boundary | System expressions run through the shared evaluator and unknown, unavailable, incompatible, malformed, and nondeterministic applications are rejected | AC-010, AC-011, AC-012 | Application test | Yes |
-| AT-004 | API boundary | Authenticated catalog search and detail responses expose versioned system metadata, canonical expressions, stable syntax references, localized natural-language projections, outcomes, semantic references, and canonical server-generated document search with generated frontend parity and no mutation surface | AC-001, AC-002, AC-003, AC-005, AC-013 | API integration test | Yes |
-| AT-005 | Application boundary | Consumers reference Rules contracts only and Rules remains free of consumer state or side-effect dependencies | AC-006, AC-012, AC-014 | Architecture test | Yes |
-| AT-006 | UI component | Rules catalog presents system rules and read-only details that lead with the server-rendered localized condition/result flow and its effect, omit canonical syntax and authoring controls, show applicability and setup, label conditional inputs distinctly, keep version information visible, and let each semantic term open the shared searchable expression document at its exact server-derived entry with the clicked phrase, concise meaning, and usage guidance without examples, raw occurrence syntax, or unrelated context | AC-001, AC-002, AC-003, AC-004, AC-013 | UI component test | Yes |
+| AT-001 | Domain boundary | Catalog returns one normalized built-in definition model and a valid/invalid behavior matrix proves positive assertion polarity for every built-in | AC-001, AC-004, AC-005, AC-008 | Domain test | Yes |
+| AT-002 | Application boundary | Exact built-in versions resolve through the shared evaluator; Required returns match for present non-blank, non-match for blank or absent, while malformed input remains an error | AC-002, AC-007, AC-009 | Application test | Yes |
+| AT-003 | API boundary | Catalog/detail responses expose built-in metadata plus the same semantic fields as workspace definitions, with generated parity | AC-001, AC-002, AC-006 | API integration test | Yes |
+| AT-004 | Application boundary | No consumer module depends on a built-in-specific Rules type or internal implementation | AC-002, AC-007 | Architecture test | Yes |
+| AT-005 | UI component | Catalog and detail use the same renderer; built-in origin only removes mutation actions | AC-002, AC-003, AC-006 | UI component test | Yes |
 
 ## Out Of Scope
 
-- Workspace-authored rule lifecycle, owned by [docs/use-cases/rules/manage-workspace-rule-definitions.md](./manage-workspace-rule-definitions.md).
-- Runtime and simulation evaluation, owned by [docs/use-cases/rules/evaluate-published-rules.md](./evaluate-published-rules.md).
-- Record persistence, uniqueness queries, external option providers, side-effect actions, webhooks, and automation execution.
+- Workspace-authored lifecycle, owned by [manage-workspace-rule-definitions.md](./manage-workspace-rule-definitions.md).
+- Consumer input binding and field applicability, owned by the consumer use case.
+- Runtime transaction enforcement and execution history.
 
 ## Screen flow
 
 | Screen | Required contract |
 |---|---|
-| Rules catalog | Show system rules in the shared catalog with scope, applicability, concise setup summary, read-only behavior, and an entry point to definition details. |
-| System rule details | Keep the rule name with separate Built-in origin and Published lifecycle badges in one compact dialog-header row. Begin the body with the business description, then lead with one connected vertical `When` → `Then` flow whose leaves are server-rendered localized sentences and whose logical groups use semantic connector structures. Keep every leaf on its own row. Use one serial path for `and`, split-and-rejoin parallel paths for `or`, and an inversion node before the exact branch or nested group for `not`; preserve every nested level through indentation and connector scope without persistently rendering operator words. Make each connector keyboard-focusable, expose its server-localized operator through native hover title and accessible name, and open the shared expression document at that exact operator entry. State the effect beside the outcome, use localized natural names and reference typography rather than canonical namespace syntax, and omit evaluator-only normalization details, canonical syntax, and authoring controls. Make semantic terms visibly keyboard-actionable and open the shared grouped, searchable expression document at the exact server-derived entry without insertion actions. Follow with scope, supported field types, and setup; show inputs only when parameters exist, with type and requirement as separate labels; keep version, expression-language, and violation-code information always visible under `Version and references`. |
-| Consumer field editor | Show only rules compatible with the selected field type and configuration and snapshot the selected version. |
-
-Required UI quality: catalog rows and details must remain scannable as definitions grow, avoid exposing internal evaluator keys or raw schema payloads, and preserve keyboard navigation, responsive scrolling, localized labels, and visible loading, empty, and error states. Detail hierarchy keeps the condition and outcome in one connected top-to-bottom reading flow, keeps the outcome effect in the primary behavior flow, renders every supported expression through server-owned localized natural language without changing semantics, aligns connectors with condition-row centers, keeps nested split/rejoin scope visually closed, and adapts to the available dialog width. Connector controls preserve focus indication and expose the same localized meaning through native hover title and accessible name without persistent operator labels. Read-only semantic references open the same canonical expression document used by authoring at the exact item, use the clicked server-provided phrase as the selected heading, lead with concise meaning and usage guidance, omit examples, raw occurrence syntax, unrelated context, and authoring actions, and keep ranked fuzzy search available.
-
-## Diagrams
-
-### versioned-system-rule-resolution
-
-```mermaid
-sequenceDiagram
-  participant Consumer as Consumer Module
-  participant Contract as Rules Contract
-  participant Rules as Rules Module
-
-  Consumer->>Contract: Resolve rule key and version
-  Contract->>Rules: Validate availability and applicability
-  Rules->>Rules: Canonicalize typed parameters
-  Rules-->>Contract: Resolved immutable definition version
-  Contract-->>Consumer: Validated version and parameters
-  Consumer->>Consumer: Store applied snapshot it owns
-```
+| Rules catalog | Show built-in and workspace definitions in one collection and one semantic row shape. |
+| Rule detail | Use the same managed-dialog record-tab structure and one compact semantic `Inputs -> Logic -> Outputs` sequence for both sources. Sequence markers, connectors, labels, and alignment use one visual grammar. Read-only expressions are static semantic content; explicit authoring help opens the canonical expression guide, and operators expose the same reference behavior there. |
+| Consumer binding | Consumer selects a built-in version and maps its inputs to consumer-owned values. |
 
 > **Implementation status**
 >
 > | Layer | Status |
-> |-------|--------|
-> | Domain | Done |
+> |---|---|
+> | Domain | Partial |
 > | Application | Partial |
-> | Infrastructure | Partial |
+> | Infrastructure | N/A |
 > | API | Partial |
 > | Frontend | Partial |
 >
-> **Gaps vs spec:** No known gap in the implemented system catalog and expression-document search slice; remaining partial layers retain their existing non-search scope.
+> **Gaps vs spec:** `SystemRuleDefinition` is retired and the system detail surface now renders the shared semantic contract. Remaining partial status reflects browser and architecture evidence, not a second Rule model.
 >
-> **Deferred follow-ups:** N/A. Workspace authoring and runtime evaluation are owned by linked use cases rather than deferred from this one.
+> **Deferred follow-ups:** None. Consumer input binding remains owned by each consumer use case.
 >
-> **Verification:** Acceptance proof is tracked in the sibling evidence sidecar.
+> **Verification:** The sibling evidence sidecar defines the required checks; final evidence is pending implementation.
 >
-> **Decisions:** System definitions are immutable, versioned, code-owned definitions that declare parameters, applicability, outcome, and executable logic through the same typed-expression language and evaluator used by workspace definitions. Canonical AST remains authoritative; stable syntax and localized natural language are server-derived projections. There is no definition-key evaluator branch, hidden frontend logic description, or client vocabulary map. The high-risk public-contract expansion was explicitly approved on 2026-07-24 and requires no persistence migration. The initial enterprise baseline remains pure and deterministic. Static Choice options are not a rule definition. Existing key-only snapshots must migrate to explicit version 1. System versions may be unavailable for new application while remaining resolvable for immutable historical snapshots. Event sourcing and persistence are not needed for the code-owned system catalog.
+> **Decisions:** `SystemRuleDefinition` is retired. Built-in and workspace definitions use one semantic type and one public positive-assertion contract; origin and capabilities remain metadata. The product is pre-production, so corrected built-in polarity replaces violation-predicate behavior through a clean cutover with no compatibility alias or dual view.

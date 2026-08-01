@@ -124,15 +124,14 @@ public sealed class BusinessObjectFieldDefinition : Entity<BusinessObjectFieldDe
 
         Dictionary<BusinessObjectFieldRuleId, BusinessObjectFieldRule> rulesById = _rules
             .ToDictionary(rule => rule.Id);
-        Dictionary<string, BusinessObjectFieldRule> rulesByKey = _rules
-            .ToDictionary(rule => rule.DefinitionKey, StringComparer.Ordinal);
+        Dictionary<Guid, BusinessObjectFieldRule> rulesByBindingId = _rules
+            .ToDictionary(rule => rule.BindingId);
         HashSet<BusinessObjectFieldRuleId> seenRuleIds = [];
         foreach (BusinessObjectFieldRuleSpec rule in spec.Rules ?? [])
         {
-            string definitionKey = rule.DefinitionKey?.Trim() ?? string.Empty;
             if (rule.Id is not BusinessObjectFieldRuleId ruleId)
             {
-                if (rulesByKey.ContainsKey(definitionKey))
+                if (rulesByBindingId.ContainsKey(rule.BindingId))
                     return Result.Failure("Existing field rule identity is required when saving a field.");
                 continue;
             }
@@ -141,8 +140,8 @@ public sealed class BusinessObjectFieldDefinition : Entity<BusinessObjectFieldDe
                 return Result.Failure("Field rule identities must be unique.");
             if (!rulesById.TryGetValue(ruleId, out BusinessObjectFieldRule? existingRule))
                 return Result.Failure("Field rule identity does not belong to this field.");
-            if (!StringComparer.Ordinal.Equals(existingRule.DefinitionKey, definitionKey))
-                return Result.Failure("Persisted field rule definition keys cannot be changed.");
+            if (existingRule.BindingId != rule.BindingId)
+                return Result.Failure("Persisted field rule bindings cannot be changed.");
         }
 
         return Result.Success();

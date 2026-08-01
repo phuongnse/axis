@@ -9,19 +9,16 @@ namespace Axis.Rules.Infrastructure.Persistence.Configurations;
 
 internal sealed class RuleDefinitionConfiguration : IEntityTypeConfiguration<RuleDefinition>
 {
-    private static readonly ValueConverter<List<RuleParameterDefinition>, string> ParametersConverter =
+    private static readonly ValueConverter<List<RuleInputDefinition>, string> InputsConverter =
         new(
-            value => RulePersistenceJson.SerializeParameters(value),
-            value => RulePersistenceJson.DeserializeParameters(value));
+            value => RulePersistenceJson.SerializeInputs(value),
+            value => RulePersistenceJson.DeserializeInputs(value));
 
-    private static readonly ValueComparer<List<RuleParameterDefinition>> ParametersComparer =
+    private static readonly ValueComparer<List<RuleInputDefinition>> InputsComparer =
         new(
-            (left, right) => RulePersistenceJson.SerializeParameters(left ?? new List<RuleParameterDefinition>())
-                == RulePersistenceJson.SerializeParameters(right ?? new List<RuleParameterDefinition>()),
-            value => RulePersistenceJson.SerializeParameters(value ?? new List<RuleParameterDefinition>())
-                .GetHashCode(StringComparison.Ordinal),
-            value => RulePersistenceJson.DeserializeParameters(
-                RulePersistenceJson.SerializeParameters(value ?? new List<RuleParameterDefinition>())));
+            (left, right) => RulePersistenceJson.SerializeInputs(left ?? new List<RuleInputDefinition>()) == RulePersistenceJson.SerializeInputs(right ?? new List<RuleInputDefinition>()),
+            value => RulePersistenceJson.SerializeInputs(value ?? new List<RuleInputDefinition>()).GetHashCode(StringComparison.Ordinal),
+            value => RulePersistenceJson.DeserializeInputs(RulePersistenceJson.SerializeInputs(value ?? new List<RuleInputDefinition>())));
 
     private static readonly ValueConverter<RuleConditionNode?, string> ConditionConverter =
         new(
@@ -30,22 +27,20 @@ internal sealed class RuleDefinitionConfiguration : IEntityTypeConfiguration<Rul
 
     private static readonly ValueComparer<RuleConditionNode?> ConditionComparer =
         new(
-            (left, right) => RulePersistenceJson.SerializeCondition(left)
-                == RulePersistenceJson.SerializeCondition(right),
+            (left, right) => RulePersistenceJson.SerializeCondition(left) == RulePersistenceJson.SerializeCondition(right),
             value => RulePersistenceJson.SerializeCondition(value).GetHashCode(StringComparison.Ordinal),
             value => RulePersistenceJson.DeserializeCondition(RulePersistenceJson.SerializeCondition(value)));
 
-    private static readonly ValueConverter<RuleOutcome?, string> OutcomeConverter =
+    private static readonly ValueConverter<RuleOutputContract, string> OutputConverter =
         new(
-            value => RulePersistenceJson.SerializeOutcome(value),
-            value => RulePersistenceJson.DeserializeOutcome(value));
+            value => RulePersistenceJson.SerializeOutput(value),
+            value => RulePersistenceJson.DeserializeOutput(value));
 
-    private static readonly ValueComparer<RuleOutcome?> OutcomeComparer =
+    private static readonly ValueComparer<RuleOutputContract> OutputComparer =
         new(
-            (left, right) => RulePersistenceJson.SerializeOutcome(left)
-                == RulePersistenceJson.SerializeOutcome(right),
-            value => RulePersistenceJson.SerializeOutcome(value).GetHashCode(StringComparison.Ordinal),
-            value => RulePersistenceJson.DeserializeOutcome(RulePersistenceJson.SerializeOutcome(value)));
+            (left, right) => RulePersistenceJson.SerializeOutput(left!) == RulePersistenceJson.SerializeOutput(right!),
+            value => RulePersistenceJson.SerializeOutput(value!).GetHashCode(StringComparison.Ordinal),
+            value => RulePersistenceJson.DeserializeOutput(RulePersistenceJson.SerializeOutput(value!)));
 
     public void Configure(EntityTypeBuilder<RuleDefinition> builder)
     {
@@ -56,128 +51,67 @@ internal sealed class RuleDefinitionConfiguration : IEntityTypeConfiguration<Rul
             .HasColumnName("id")
             .HasConversion(RuleValueConverters.DefinitionId)
             .ValueGeneratedNever();
-
         builder.Property<uint>("xmin").IsRowVersion();
-
-        builder.Property(definition => definition.WorkspaceId)
-            .HasColumnName("workspace_id")
-            .IsRequired();
+        builder.Property(definition => definition.WorkspaceId).HasColumnName("workspace_id").IsRequired();
         builder.Property(definition => definition.Key)
             .HasColumnName("definition_key")
             .HasMaxLength(63)
             .HasConversion(RuleValueConverters.DefinitionKey)
             .IsRequired();
-        builder.Property(definition => definition.Name)
-            .HasColumnName("name")
-            .HasMaxLength(200)
-            .IsRequired();
-        builder.Property(definition => definition.Description)
-            .HasColumnName("description")
-            .HasMaxLength(1000)
-            .IsRequired();
-        builder.Property(definition => definition.Scope)
-            .HasColumnName("scope")
-            .HasConversion<string>()
-            .HasMaxLength(32)
-            .IsRequired();
-        builder.Property(definition => definition.ContextKey)
-            .HasColumnName("context_key")
-            .HasMaxLength(120)
-            .HasConversion(RuleValueConverters.ContextKey)
-            .IsRequired();
-        builder.Property(definition => definition.ContextSchemaVersion)
-            .HasColumnName("context_schema_version")
-            .IsRequired();
-        builder.Property(definition => definition.ExpressionLanguageVersion)
-            .HasColumnName("expression_language_version")
-            .IsRequired();
-        builder.Property(definition => definition.OutcomeKind)
-            .HasColumnName("outcome_kind")
-            .HasConversion<string>()
-            .HasMaxLength(32)
-            .IsRequired();
-        builder.Property(definition => definition.Status)
-            .HasColumnName("status")
-            .HasConversion<string>()
-            .HasMaxLength(32)
-            .IsRequired();
-        builder.Property(definition => definition.Revision)
-            .HasColumnName("revision")
-            .IsRequired();
-        builder.Property(definition => definition.LatestPublishedVersion)
-            .HasColumnName("latest_published_version");
-        builder.Ignore(definition => definition.Parameters);
-        builder.Property<List<RuleParameterDefinition>>("_parameters")
-            .HasColumnName("parameters")
+        builder.Property(definition => definition.Name).HasColumnName("name").HasMaxLength(200).IsRequired();
+        builder.Property(definition => definition.Description).HasColumnName("description").HasMaxLength(1000).IsRequired();
+        builder.Property(definition => definition.Origin).HasColumnName("origin").HasConversion<string>().HasMaxLength(32).IsRequired();
+        builder.Property(definition => definition.ExpressionLanguageVersion).HasColumnName("expression_language_version").IsRequired();
+        builder.Property(definition => definition.Status).HasColumnName("status").HasConversion<string>().HasMaxLength(32).IsRequired();
+        builder.Property(definition => definition.Revision).HasColumnName("revision").IsRequired();
+        builder.Property(definition => definition.LatestPublishedVersion).HasColumnName("latest_published_version");
+        builder.Ignore(definition => definition.Inputs);
+        builder.Ignore(definition => definition.Documentation);
+        builder.Property<List<RuleInputDefinition>>("_inputs")
+            .HasColumnName("inputs")
             .HasColumnType("jsonb")
-            .HasConversion(ParametersConverter)
+            .HasConversion(InputsConverter)
             .IsRequired()
-            .Metadata.SetValueComparer(ParametersComparer);
+            .Metadata.SetValueComparer(InputsComparer);
         builder.Property(definition => definition.Condition)
             .HasColumnName("condition")
             .HasColumnType("jsonb")
             .HasConversion(ConditionConverter)
             .Metadata.SetValueComparer(ConditionComparer);
-        builder.Property(definition => definition.Outcome)
-            .HasColumnName("outcome")
+        builder.Property(definition => definition.Output)
+            .HasColumnName("output")
             .HasColumnType("jsonb")
-            .HasConversion(OutcomeConverter)
-            .Metadata.SetValueComparer(OutcomeComparer);
-        builder.Property(definition => definition.CreatedByUserId)
-            .HasColumnName("created_by_user_id")
-            .IsRequired();
-        builder.Property(definition => definition.UpdatedByUserId)
-            .HasColumnName("updated_by_user_id")
-            .IsRequired();
-        builder.Property(definition => definition.CreatedAt)
-            .HasColumnName("created_at")
-            .IsRequired();
-        builder.Property(definition => definition.UpdatedAt)
-            .HasColumnName("updated_at")
-            .IsRequired();
-        builder.Property(definition => definition.ArchivedByUserId)
-            .HasColumnName("archived_by_user_id");
-        builder.Property(definition => definition.ArchivedAt)
-            .HasColumnName("archived_at");
+            .HasConversion(OutputConverter)
+            .IsRequired()
+            .Metadata.SetValueComparer(OutputComparer);
+        builder.Property(definition => definition.CreatedByUserId).HasColumnName("created_by_user_id").IsRequired();
+        builder.Property(definition => definition.UpdatedByUserId).HasColumnName("updated_by_user_id").IsRequired();
+        builder.Property(definition => definition.CreatedAt).HasColumnName("created_at").IsRequired();
+        builder.Property(definition => definition.UpdatedAt).HasColumnName("updated_at").IsRequired();
+        builder.Property(definition => definition.ArchivedByUserId).HasColumnName("archived_by_user_id");
+        builder.Property(definition => definition.ArchivedAt).HasColumnName("archived_at");
 
         builder.Property<string>("SearchTitle")
             .HasColumnName("search_title")
-            .HasComputedColumnSql(
-                "axis_unaccent(lower(coalesce(name, '')))",
-                stored: true);
+            .HasComputedColumnSql("axis_unaccent(lower(coalesce(name, '')))", stored: true);
         builder.Property<string>("SearchText")
             .HasColumnName("search_text")
-            .HasComputedColumnSql(
-                "axis_unaccent(lower(coalesce(name, '') || ' ' || coalesce(description, '') || ' ' || coalesce(definition_key, '') || ' ' || coalesce(context_key, '')))",
-                stored: true);
+            .HasComputedColumnSql("axis_unaccent(lower(coalesce(name, '') || ' ' || coalesce(description, '') || ' ' || coalesce(definition_key, '')))", stored: true);
         builder.Property<NpgsqlTsVector>("SearchVector")
             .HasColumnName("search_vector")
-            .HasComputedColumnSql(
-                "to_tsvector('simple', axis_unaccent(lower(coalesce(name, '') || ' ' || coalesce(description, '') || ' ' || coalesce(definition_key, '') || ' ' || coalesce(context_key, ''))))",
-                stored: true);
+            .HasComputedColumnSql("to_tsvector('simple', axis_unaccent(lower(coalesce(name, '') || ' ' || coalesce(description, '') || ' ' || coalesce(definition_key, ''))))", stored: true);
 
-        builder.HasIndex(definition => new { definition.WorkspaceId, definition.Key })
-            .IsUnique();
+        builder.HasIndex(definition => new { definition.WorkspaceId, definition.Key }).IsUnique();
         builder.HasIndex(definition => new { definition.WorkspaceId, definition.Status, definition.Name });
-        builder.HasIndex("SearchTitle")
-            .HasDatabaseName("ix_rule_definitions_search_title")
-            .HasMethod("gin")
-            .HasOperators("gin_trgm_ops");
-        builder.HasIndex("SearchText")
-            .HasDatabaseName("ix_rule_definitions_search_text")
-            .HasMethod("gin")
-            .HasOperators("gin_trgm_ops");
-        builder.HasIndex("SearchVector")
-            .HasDatabaseName("ix_rule_definitions_search_vector")
-            .HasMethod("gin");
+        builder.HasIndex("SearchTitle").HasDatabaseName("ix_rule_definitions_search_title").HasMethod("gin").HasOperators("gin_trgm_ops");
+        builder.HasIndex("SearchText").HasDatabaseName("ix_rule_definitions_search_text").HasMethod("gin").HasOperators("gin_trgm_ops");
+        builder.HasIndex("SearchVector").HasDatabaseName("ix_rule_definitions_search_vector").HasMethod("gin");
 
         builder.HasMany(definition => definition.Versions)
             .WithOne()
             .HasForeignKey(version => version.DefinitionId)
             .OnDelete(DeleteBehavior.Cascade)
             .IsRequired();
-        builder.Navigation(definition => definition.Versions)
-            .HasField("_versions")
-            .UsePropertyAccessMode(PropertyAccessMode.Field);
+        builder.Navigation(definition => definition.Versions).HasField("_versions").UsePropertyAccessMode(PropertyAccessMode.Field);
     }
 }

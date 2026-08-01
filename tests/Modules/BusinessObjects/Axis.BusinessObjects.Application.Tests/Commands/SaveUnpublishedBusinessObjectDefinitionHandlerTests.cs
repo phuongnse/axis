@@ -80,10 +80,7 @@ public sealed class SaveUnpublishedBusinessObjectDefinitionHandlerTests
                         "Credit limit",
                         BusinessObjectFieldType.Decimal,
                         [
-                            new(
-                                RuleDefinitionKeys.NumericRange,
-                                DefinitionVersion: 1,
-                                Params(("min", ["0"]), ("max", ["100000"]))),
+                            new(TestBindingIds.NumericRange),
                         ]),
                 ]),
             CancellationToken.None);
@@ -92,10 +89,7 @@ public sealed class SaveUnpublishedBusinessObjectDefinitionHandlerTests
         BusinessObjectFieldDefinitionDto field = result.Value.Fields.Should().ContainSingle().Subject;
         field.FieldType.Should().Be(BusinessObjectFieldType.Decimal);
         field.Rules.Should().ContainSingle();
-        field.Rules[0].DefinitionKey.Should().Be(RuleDefinitionKeys.NumericRange);
-        field.Rules[0].DefinitionVersion.Should().Be(1);
-        field.Rules[0].Parameters["min"].Should().Equal("0");
-        field.Rules[0].Parameters["max"].Should().Equal("100000");
+        field.Rules[0].BindingId.Should().Be(TestBindingIds.NumericRange);
         await _context.UnitOfWork.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 
@@ -125,7 +119,7 @@ public sealed class SaveUnpublishedBusinessObjectDefinitionHandlerTests
                         "is_active",
                         "Is active",
                         BusinessObjectFieldType.Boolean,
-                        [new(RuleDefinitionKeys.TextLength, DefinitionVersion: 1, Params(("min", ["1"])))]),
+                        [new(Guid.Empty)]),
                 ]),
             CancellationToken.None);
 
@@ -167,9 +161,9 @@ public sealed class SaveUnpublishedBusinessObjectDefinitionHandlerTests
     }
 
     private static IReadOnlyDictionary<string, IReadOnlyList<string>> Params(
-        params (string Key, string[] Values)[] parameters) =>
-        parameters.ToDictionary(
-            parameter => parameter.Key,
-            parameter => (IReadOnlyList<string>)parameter.Values,
+        params (string Key, string[] Values)[] inputs) =>
+        inputs.ToDictionary(
+            input => input.Key,
+            input => (IReadOnlyList<string>)input.Values,
             StringComparer.Ordinal);
 }

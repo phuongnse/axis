@@ -5,29 +5,42 @@ namespace Axis.Rules.Domain;
 public static class RuleDefinitionValidator
 {
     public static Result Validate(
-        RuleContextSchema schema,
-        IReadOnlyList<RuleParameterDefinition> parameters,
+        IReadOnlyList<RuleInputDefinition> inputs,
         RuleConditionNode condition,
-        RuleOutcome outcome,
-        RuleOutcomeKind outcomeKind,
+        RuleOutputContract output,
         RuleEvaluationLimits? limits = null)
     {
-        if (outcome.Kind != outcomeKind)
-            return Result.Failure("Rule outcome does not match the selected outcome kind.");
+        if (inputs is null || inputs.Any(input => input is null))
+            return Result.Failure("Rule inputs are required.");
 
-        if (parameters.Select(parameter => parameter.Key).Distinct(StringComparer.Ordinal).Count() != parameters.Count)
-            return Result.Failure("Rule parameter keys must be unique.");
+        if (inputs.Select(input => input.Key).Distinct(StringComparer.Ordinal).Count() != inputs.Count)
+            return Result.Failure("Rule input keys must be unique.");
+
+        if (inputs.Select(input => input.Label).Distinct(StringComparer.OrdinalIgnoreCase).Count() != inputs.Count)
+            return Result.Failure("Rule input labels must be unique.");
+
+        if (condition is null)
+            return Result.Failure("Rule condition is required.");
+
+        if (output is null)
+            return Result.Failure("Rule output contract is required.");
+
+        if (output.Type != RuleValueType.Boolean ||
+            output.Cardinality != RuleExpressionCardinality.Scalar)
+        {
+            return Result.Failure("Rule conditions currently require a scalar Boolean output.");
+        }
 
         RuleEvaluationLimits effectiveLimits = limits ?? RuleEvaluationLimits.Default;
         if (effectiveLimits.MaxDepth <= 0 || effectiveLimits.MaxNodes <= 0 ||
-            effectiveLimits.MaxFunctionCalls <= 0 || effectiveLimits.MaxParameters <= 0 ||
+            effectiveLimits.MaxFunctionCalls <= 0 || effectiveLimits.MaxInputs <= 0 ||
             effectiveLimits.MaxExecutionSteps <= 0)
             return Result.Failure("Rule validation limits must be positive.");
 
-        if (parameters.Count > effectiveLimits.MaxParameters)
-            return Result.Failure("Rule definition exceeds the maximum parameter count.");
+        if (inputs.Count > effectiveLimits.MaxInputs)
+            return Result.Failure("Rule definition exceeds the maximum input count.");
 
-        ValidationState state = new(schema, parameters, effectiveLimits);
+        ValidationState state = new(inputs, effectiveLimits);
         return ValidateNode(condition, depth: 1, state);
     }
 
@@ -51,6 +64,7 @@ public static class RuleDefinitionValidator
                 if (childResult.IsFailure)
                     return childResult;
             }
+
             return Result.Success();
         }
 
@@ -75,8 +89,8 @@ public static class RuleDefinitionValidator
         if (!MatchesAnyShape(definition.RightShapes, right.Value))
             return Result.Failure("Rule predicate right operand is not type compatible.");
 
-        if (definition.RequiresMatchingTypes && left.Value.Type != right.Value.Type)
-            return Result.Failure("Rule predicate operands must use the same value type.");
+        if (definition.RequiresMatchingTypes && !left.Value.Types.Intersect(right.Value.Types).Any())
+            return Result.Failure("Rule predicate operands must use a compatible value type.");
 
         return Result.Success();
     }
@@ -84,24 +98,16 @@ public static class RuleDefinitionValidator
     private static Result<OperandShape> ResolveShape(RuleOperand operand, ValidationState state)
     {
         if (operand.Kind == RuleOperandKind.Literal)
-            return new OperandShape(operand.Literal!.Type, operand.Literal.IsMultiple);
+            return new OperandShape([operand.Literal!.Type], operand.Literal.IsMultiple);
 
         if (operand.Kind == RuleOperandKind.Function)
             return ResolveFunctionShape(operand, state);
 
-        if (operand.Kind == RuleOperandKind.Context)
-        {
-            RuleContextField? field = state.Schema.FindField(operand.Reference!);
-            return field is null
-                ? Result.Failure<OperandShape>($"Rule context path '{operand.Reference}' is not defined.")
-                : new OperandShape(field.Type, field.AllowMultiple);
-        }
-
-        RuleParameterDefinition? parameter = state.Parameters.SingleOrDefault(
-            candidate => candidate.Key.Equals(operand.Reference, StringComparison.Ordinal));
-        return parameter is null
-            ? Result.Failure<OperandShape>($"Rule parameter '{operand.Reference}' is not defined.")
-            : new OperandShape(parameter.Type, parameter.AllowMultiple);
+        RuleInputDefinition? input = state.Inputs.SingleOrDefault(candidate =>
+            candidate.Key.Equals(operand.Reference, StringComparison.Ordinal));
+        return input is null
+            ? Result.Failure<OperandShape>($"Rule input '{operand.Reference}' is not defined.")
+            : new OperandShape(input.Types, input.AllowMultiple);
     }
 
     private static Result<OperandShape> ResolveFunctionShape(
@@ -125,7 +131,7 @@ public static class RuleDefinitionValidator
                 return argument;
 
             RuleExpressionFunctionParameter parameter = definition.Parameters[index];
-            if (!parameter.AcceptedTypes.Contains(argument.Value.Type) ||
+            if (!parameter.AcceptedTypes.Intersect(argument.Value.Types).Any() ||
                 !MatchesCardinality(parameter.Cardinality, argument.Value.IsMultiple))
             {
                 return Result.Failure<OperandShape>(
@@ -133,9 +139,7 @@ public static class RuleDefinitionValidator
             }
         }
 
-        return new OperandShape(
-            definition.ReturnType,
-            definition.ReturnCardinality == RuleExpressionCardinality.Multiple);
+        return new OperandShape([definition.ReturnType], definition.ReturnCardinality == RuleExpressionCardinality.Multiple);
     }
 
     private static bool MatchesCardinality(
@@ -149,18 +153,16 @@ public static class RuleDefinitionValidator
         IReadOnlyList<RuleExpressionValueShape> shapes,
         OperandShape operand) =>
         shapes.Any(shape =>
-            shape.Type == operand.Type &&
+            operand.Types.Contains(shape.Type) &&
             MatchesCardinality(shape.Cardinality, operand.IsMultiple));
 
-    private sealed record OperandShape(RuleValueType Type, bool IsMultiple);
+    private sealed record OperandShape(IReadOnlyList<RuleValueType> Types, bool IsMultiple);
 
     private sealed class ValidationState(
-        RuleContextSchema schema,
-        IReadOnlyList<RuleParameterDefinition> parameters,
+        IReadOnlyList<RuleInputDefinition> inputs,
         RuleEvaluationLimits limits)
     {
-        public RuleContextSchema Schema { get; } = schema;
-        public IReadOnlyList<RuleParameterDefinition> Parameters { get; } = parameters;
+        public IReadOnlyList<RuleInputDefinition> Inputs { get; } = inputs;
         public RuleEvaluationLimits Limits { get; } = limits;
         public HashSet<string> NodeIds { get; } = new(StringComparer.Ordinal);
         public int NodeCount { get; set; }

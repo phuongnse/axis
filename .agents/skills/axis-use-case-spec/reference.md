@@ -32,6 +32,13 @@ Use with [SKILL.md](./SKILL.md) when writing or refreshing use-case acceptance c
 - Choose the lowest reliable boundary in the spec. Exact runners belong in implementation or ready-review evidence: Playwright for browser-level journeys, Vitest for focused UI states/validation, and xUnit for backend contracts, side effects, and business rules.
 - If the selected runner is not installed yet, record that adding the harness is a new-library Design Gate decision before implementation.
 
+## Reusable evaluator contracts
+
+- For a reusable evaluator or rules capability, specify definition, application/binding, and execution separately. The definition owns declared typed inputs, canonical logic, and declared typed outputs; application maps consumer sources into inputs; execution resolves one exact version and returns outputs plus safe diagnostics.
+- Define the polarity of every Boolean output in product language. Require paired acceptance examples for satisfied and unsatisfied assertions, plus absent optional input and malformed required input when applicable; a one-sided match example cannot establish Boolean semantics.
+- Keep consumer meaning and side effects outside the evaluator. Validation, calculation, classification, eligibility, routing, and transformation may consume the same contract without creating separate evaluator models.
+- Distinguish logic-visible inputs from execution-envelope data used only for isolation, authorization, audit, or tracing. Do not give logic ambient access to platform context or describe source mappings as part of the reusable definition.
+
 ## Slicing
 
 - Split oversized work into isolated slices and record the slice boundary in `Decisions` or `Deferred follow-ups`.

@@ -1,5 +1,4 @@
 using Axis.Rules.Application.Commands.SaveRuleDefinitionDraft;
-using Axis.Rules.Application.Services;
 using Axis.Rules.Contracts;
 using Axis.Shared.Application;
 using Axis.Shared.Domain.Primitives;
@@ -25,8 +24,6 @@ public sealed class SaveRuleDefinitionDraftHandlerTests
             .Returns<Task<int>>(_ => throw new ConcurrencyException());
         SaveRuleDefinitionDraftHandler sut = new(
             _context.CurrentUser,
-            _context.ContextRegistry,
-            new RuleExpressionAuthoringService(_context.ContextRegistry),
             _context.Repository,
             _context.UnitOfWork);
 
@@ -36,13 +33,8 @@ public sealed class SaveRuleDefinitionDraftHandlerTests
                 definition.Revision,
                 definition.Name,
                 definition.Description,
-                RuleScope.Field,
-                definition.ContextKey.Value,
-                definition.ContextSchemaVersion,
-                RuleOutcomeKind.Validation,
-                [new RuleParameterDefinitionDto("threshold", RuleValueType.Decimal, true, false, [])],
-                "@context.field.value GreaterThan @parameters.threshold",
-                RuleDefinitionHandlerTestContext.OutcomeDto()),
+                RuleDefinitionHandlerTestContext.DraftInputsDto(),
+                RuleDefinitionHandlerTestContext.ConditionDto()),
             CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();

@@ -16,7 +16,6 @@ public interface IRuleCatalogSearchProvider
         Guid workspaceId,
         IReadOnlyList<RuleTextSearchDocument> systemDocuments,
         bool includeWorkspace,
-        RuleScope? workspaceScope,
         RuleLifecycleStatus? workspaceStatus,
         int skip,
         int take,
