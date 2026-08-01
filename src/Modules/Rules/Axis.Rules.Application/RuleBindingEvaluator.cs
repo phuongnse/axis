@@ -2,9 +2,9 @@ using Axis.Rules.Application.Repositories;
 using Axis.Rules.Contracts;
 using Axis.Rules.Domain;
 using Axis.Shared.Domain.Primitives;
+using ContractValueType = Axis.Rules.Contracts.RuleValueType;
 using DomainMappingKind = Axis.Rules.Domain.RuleInputMappingKind;
 using DomainValueType = Axis.Rules.Domain.RuleValueType;
-using ContractValueType = Axis.Rules.Contracts.RuleValueType;
 
 namespace Axis.Rules.Application;
 
