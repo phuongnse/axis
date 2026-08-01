@@ -33,6 +33,24 @@ public sealed class RulePersistenceJsonTests
     }
 
     [Fact]
+    public void InputMappings_WhenInsertionOrderDiffers_SerializesDeterministically()
+    {
+        Dictionary<string, RuleInputMapping> first = new()
+        {
+            ["value"] = RuleInputMapping.FromContext("record.value").Value,
+            ["threshold"] = RuleInputMapping.FromLiteral(["10"]).Value,
+        };
+        Dictionary<string, RuleInputMapping> second = new()
+        {
+            ["threshold"] = RuleInputMapping.FromLiteral(["10"]).Value,
+            ["value"] = RuleInputMapping.FromContext("record.value").Value,
+        };
+
+        RulePersistenceJson.SerializeInputMappings(first)
+            .Should().Be(RulePersistenceJson.SerializeInputMappings(second));
+    }
+
+    [Fact]
     public void Condition_WhenFunctionOperandIsRoundTripped_PreservesCapabilityAndArguments()
     {
         RulePredicateCondition condition = RulePredicateCondition.Create(

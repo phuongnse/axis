@@ -63,4 +63,12 @@ public sealed class RuleBindingTests
         binding.TargetId.Should().Be("field-1");
         binding.InputMappings["value"].ContextKey.Should().Be("record.value");
     }
+
+    [Fact]
+    public void InputMapping_WhenPayloadExceedsDomainBounds_ReturnsFailure()
+    {
+        RuleInputMapping.FromContext($"record.{new string('a', 114)}").IsFailure.Should().BeTrue();
+        RuleInputMapping.FromLiteral(Enumerable.Repeat("value", 1001).ToArray()).IsFailure.Should().BeTrue();
+        RuleInputMapping.FromLiteral([new string('a', 4001)]).IsFailure.Should().BeTrue();
+    }
 }

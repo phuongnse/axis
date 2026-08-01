@@ -110,6 +110,10 @@ public sealed class RuleDefinition : AggregateRoot<RuleDefinitionId>
         if (identity.IsFailure)
             return Result.Failure<RuleDefinition>(identity.Error);
 
+        Result<RuleDefinitionKey> canonicalKey = RuleDefinitionKey.Create(key.Value);
+        if (canonicalKey.IsFailure)
+            return Result.Failure<RuleDefinition>(canonicalKey.Error);
+
         if (version <= 0)
             return Result.Failure<RuleDefinition>("System rule version must be positive.");
 
@@ -123,7 +127,7 @@ public sealed class RuleDefinition : AggregateRoot<RuleDefinitionId>
         RuleDefinition definition = new(
             RuleDefinitionId.New(),
             Guid.Empty,
-            key,
+            canonicalKey.Value,
             name.Trim(),
             description.Trim(),
             RuleOrigin.System,

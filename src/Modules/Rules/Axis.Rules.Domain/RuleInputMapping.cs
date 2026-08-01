@@ -22,6 +22,9 @@ public sealed partial record RuleInputMapping
     public static Result<RuleInputMapping> FromContext(string contextKey)
     {
         string normalized = contextKey?.Trim() ?? string.Empty;
+        if (normalized.Length > 120)
+            return Result.Failure<RuleInputMapping>("Rule context mapping key is too long.");
+
         return ContextKeyPattern().IsMatch(normalized)
             ? new RuleInputMapping(RuleInputMappingKind.Context, normalized, [])
             : Result.Failure<RuleInputMapping>("Rule context mapping key is invalid.");
@@ -31,6 +34,10 @@ public sealed partial record RuleInputMapping
     {
         if (values is null || values.Count == 0 || values.Any(string.IsNullOrWhiteSpace))
             return Result.Failure<RuleInputMapping>("Rule literal mapping values are required.");
+        if (values.Count > RuleValue.MaximumValueCount)
+            return Result.Failure<RuleInputMapping>("Rule literal mapping contains too many values.");
+        if (values.Any(value => value.Length > RuleValue.MaximumTextLength))
+            return Result.Failure<RuleInputMapping>("Rule literal mapping value is too long.");
 
         string[] normalized = values.Select(value => value.Trim()).ToArray();
         return new RuleInputMapping(RuleInputMappingKind.Literal, null, normalized);

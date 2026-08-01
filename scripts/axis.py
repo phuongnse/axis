@@ -1861,7 +1861,18 @@ def untracked_added_lines(include: callable[[str], bool]) -> list[tuple[str, str
 
 
 def added_lines(range_spec: str, include: callable[[str], bool]) -> Iterable[tuple[str, str]]:
-    diff_base = range_spec.split("...", 1)[0]
+    left, separator, right = range_spec.partition("...")
+    diff_base = left
+    if separator and right:
+        merge_base = run(
+            [exe("git"), "merge-base", left, right],
+            capture=True,
+            check=False,
+        )
+        if merge_base.returncode != 0 or not merge_base.stdout.strip():
+            detail = (merge_base.stderr or merge_base.stdout or "").strip()
+            raise CheckError(f"added_lines: cannot resolve merge base for {range_spec}: {detail}")
+        diff_base = merge_base.stdout.strip()
     result = run([exe("git"), "diff", "--unified=0", diff_base], capture=True, check=False)
     if result.returncode != 0:
         detail = (result.stderr or result.stdout or "").strip()

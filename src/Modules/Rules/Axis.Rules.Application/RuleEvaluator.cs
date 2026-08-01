@@ -29,6 +29,10 @@ public sealed class RuleEvaluator(IRuleDefinitionRepository repository) : IRuleE
             if (version.IsFailure)
                 return Failed(correlationId, version.ErrorCode ?? "definition_invalid", version.Error);
 
+            Result valid = RuleDefinitionValidator.Validate(version.Value.Inputs, version.Value.Condition, version.Value.Output);
+            if (valid.IsFailure)
+                return Failed(correlationId, "definition_invalid", valid.Error);
+
             Result<IReadOnlyDictionary<string, RuleValue>> inputs = RuleInputValidator.ValidateRaw(
                 version.Value.Inputs,
                 reference.Inputs,
@@ -38,10 +42,6 @@ public sealed class RuleEvaluator(IRuleDefinitionRepository repository) : IRuleE
                     StringComparer.Ordinal));
             if (inputs.IsFailure)
                 return Failed(correlationId, "input_invalid", inputs.Error);
-
-            Result valid = RuleDefinitionValidator.Validate(version.Value.Inputs, version.Value.Condition, version.Value.Output);
-            if (valid.IsFailure)
-                return Failed(correlationId, "definition_invalid", valid.Error);
 
             Result<RuleConditionEvaluation> evaluation = RuleConditionEvaluator.Evaluate(
                 version.Value.Condition,

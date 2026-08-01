@@ -25,6 +25,7 @@ public sealed class SearchRuleExpressionGuideQueryValidator
             RuleFor(query => query.Request.Inputs)
                 .Cascade(CascadeMode.Stop)
                 .NotNull()
+                .WithErrorCode(RulesProblemCodes.DefinitionInvalid)
                 .Must(inputs => inputs.Count <= Domain.RuleEvaluationLimits.Default.MaxInputs)
                 .WithErrorCode(RulesProblemCodes.DefinitionInvalid);
 

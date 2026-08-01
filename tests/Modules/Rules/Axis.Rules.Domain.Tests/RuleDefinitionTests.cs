@@ -72,6 +72,47 @@ public sealed class RuleDefinitionTests
             Now).IsFailure.Should().BeTrue();
 
     [Fact]
+    public void CreateSystem_WhenTypedKeyIsDefault_ReturnsFailure()
+    {
+        RuleDefinition template = SystemRuleCatalog.Definitions[0];
+
+        RuleDefinition.CreateSystem(
+            default,
+            1,
+            template.Name,
+            template.Description,
+            template.Documentation!,
+            template.Inputs,
+            template.Condition!,
+            template.Output).IsFailure.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Input_WhenAllowedValuesAreEmpty_AllowsMultipleAcceptedTypes()
+    {
+        Result<RuleInputDefinition> result = RuleInputDefinition.CreateSystem(
+            "value",
+            "Value",
+            [RuleValueType.Integer, RuleValueType.Decimal],
+            isRequired: false,
+            allowMultiple: false,
+            allowedValues: []);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.AllowedValues.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Input_WhenAllowedValuesExceedDomainBound_ReturnsFailure() =>
+        RuleInputDefinition.CreateSystem(
+            "value",
+            "Value",
+            [RuleValueType.Text],
+            isRequired: false,
+            allowMultiple: true,
+            allowedValues: Enumerable.Repeat("allowed", 1001).ToArray()).IsFailure.Should().BeTrue();
+
+    [Fact]
     public void Input_WhenCreatedFromBusinessLabel_DerivesStableTechnicalKey()
     {
         RuleInputDefinition input = RuleInputDefinition.CreateFromLabel(

@@ -19,6 +19,9 @@ public sealed class SearchRuleExpressionGuideHandlerTests
             new SearchRuleExpressionGuideQuery(new(1, null, null!, null, "en")));
 
         result.IsValid.Should().BeFalse();
+        result.Errors.Should().ContainSingle(error =>
+            error.PropertyName == "Request.Inputs" &&
+            error.ErrorCode == RulesProblemCodes.DefinitionInvalid);
     }
 
     [Fact]

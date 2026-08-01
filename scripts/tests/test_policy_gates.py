@@ -1750,7 +1750,8 @@ def main() -> int:
             untracked.write_text("untracked line\n", encoding="utf-8")
 
             outputs = {
-                ("diff", "--unified=0", "base"): (
+                ("merge-base", "base", "HEAD"): "shared-base\n",
+                ("diff", "--unified=0", "shared-base"): (
                     "+++ b/docs/committed.md\n"
                     "++++heading\n"
                     "+corrected committed line\n"

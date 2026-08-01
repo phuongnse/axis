@@ -44,13 +44,15 @@ internal static class RulePersistenceJson
 
     public static string SerializeInputMappings(IReadOnlyDictionary<string, RuleInputMapping> mappings) =>
         JsonSerializer.Serialize(
-            mappings.ToDictionary(
-                pair => pair.Key,
-                pair => new RuleInputMappingDto(
-                    (ContractInputMappingKind)pair.Value.Kind,
-                    pair.Value.ContextKey,
-                    pair.Value.LiteralValues),
-                StringComparer.Ordinal),
+            mappings
+                .OrderBy(pair => pair.Key, StringComparer.Ordinal)
+                .ToDictionary(
+                    pair => pair.Key,
+                    pair => new RuleInputMappingDto(
+                        (ContractInputMappingKind)pair.Value.Kind,
+                        pair.Value.ContextKey,
+                        pair.Value.LiteralValues),
+                    StringComparer.Ordinal),
             Options);
 
     public static Dictionary<string, RuleInputMapping> DeserializeInputMappings(string json)

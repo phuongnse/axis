@@ -99,9 +99,14 @@ public sealed partial record RuleInputDefinition
 
         RuleValueType[] normalizedTypes = types.Distinct().Order().ToArray();
         List<string> normalizedAllowedValues = [];
-        if (allowedValues is not null && normalizedTypes.Length != 1)
-            return Result.Failure<RuleInputDefinition>(
-                "Rule input allowed values require exactly one accepted type.");
+        if (allowedValues is { Count: > 0 })
+        {
+            if (normalizedTypes.Length != 1)
+                return Result.Failure<RuleInputDefinition>(
+                    "Rule input allowed values require exactly one accepted type.");
+            if (allowedValues.Count > RuleValue.MaximumValueCount)
+                return Result.Failure<RuleInputDefinition>("Rule input contains too many allowed values.");
+        }
 
         foreach (string allowedValue in allowedValues ?? [])
         {
