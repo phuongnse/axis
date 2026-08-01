@@ -4,6 +4,7 @@ using Axis.Rules.Domain;
 using Axis.Shared.Domain.Primitives;
 using ContractExpressionCardinality = Axis.Rules.Contracts.RuleExpressionCardinality;
 using ContractExpressionFunction = Axis.Rules.Contracts.RuleExpressionFunction;
+using ContractInputMappingKind = Axis.Rules.Contracts.RuleInputMappingKind;
 using ContractLogicalOperator = Axis.Rules.Contracts.RuleLogicalOperator;
 using ContractOperandKind = Axis.Rules.Contracts.RuleOperandKind;
 using ContractPredicateOperator = Axis.Rules.Contracts.RulePredicateOperator;
@@ -46,7 +47,7 @@ internal static class RulePersistenceJson
             mappings.ToDictionary(
                 pair => pair.Key,
                 pair => new RuleInputMappingDto(
-                    (Axis.Rules.Contracts.RuleInputMappingKind)pair.Value.Kind,
+                    (ContractInputMappingKind)pair.Value.Kind,
                     pair.Value.ContextKey,
                     pair.Value.LiteralValues),
                 StringComparer.Ordinal),
@@ -62,8 +63,8 @@ internal static class RulePersistenceJson
         {
             Result<RuleInputMapping> mapping = dto.Kind switch
             {
-                Axis.Rules.Contracts.RuleInputMappingKind.Context => RuleInputMapping.FromContext(dto.ContextKey ?? string.Empty),
-                Axis.Rules.Contracts.RuleInputMappingKind.Literal => RuleInputMapping.FromLiteral(dto.LiteralValues),
+                ContractInputMappingKind.Context => RuleInputMapping.FromContext(dto.ContextKey ?? string.Empty),
+                ContractInputMappingKind.Literal => RuleInputMapping.FromLiteral(dto.LiteralValues),
                 _ => Result.Failure<RuleInputMapping>("Persisted rule input mapping kind is invalid."),
             };
             if (mapping.IsFailure)

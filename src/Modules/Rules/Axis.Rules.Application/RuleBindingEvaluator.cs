@@ -4,6 +4,7 @@ using Axis.Rules.Domain;
 using Axis.Shared.Domain.Primitives;
 using DomainMappingKind = Axis.Rules.Domain.RuleInputMappingKind;
 using DomainValueType = Axis.Rules.Domain.RuleValueType;
+using ContractValueType = Axis.Rules.Contracts.RuleValueType;
 
 namespace Axis.Rules.Application;
 
@@ -27,7 +28,7 @@ public sealed class RuleBindingEvaluator(
             return Failed(correlationId, "binding_disabled", "Rule binding is disabled.");
 
         Dictionary<string, IReadOnlyList<string>> inputs = new(StringComparer.Ordinal);
-        Dictionary<string, Axis.Rules.Contracts.RuleValueType> inputTypes = new(StringComparer.Ordinal);
+        Dictionary<string, ContractValueType> inputTypes = new(StringComparer.Ordinal);
         foreach ((string ruleInputKey, RuleInputMapping mapping) in binding.InputMappings)
         {
             if (mapping.Kind == DomainMappingKind.Literal)
