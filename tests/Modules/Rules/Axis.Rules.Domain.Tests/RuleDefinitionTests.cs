@@ -110,7 +110,9 @@ public sealed class RuleDefinitionTests
             [RuleValueType.Text],
             isRequired: false,
             allowMultiple: true,
-            allowedValues: Enumerable.Repeat("allowed", 1001).ToArray()).IsFailure.Should().BeTrue();
+            allowedValues: Enumerable.Range(0, 1001)
+                .Select(index => $"allowed-{index}")
+                .ToArray()).IsFailure.Should().BeTrue();
 
     [Fact]
     public void Input_WhenCreatedFromBusinessLabel_DerivesStableTechnicalKey()
