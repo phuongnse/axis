@@ -52,7 +52,7 @@ Local overrides live in ignored root `.env.local`. See [.env.example](../../.env
 | Docker Compose stack | [docker-compose.yml](../../docker-compose.yml) | Default `local-dev up` — no `.env` file required. |
 | Compose overrides | `.env.local` (copy from [.env.example](../../.env.example)) | Optional; only when a compose default needs changing (e.g. `VITE_USE_POLLING`). |
 | API on host | [src/Axis.Api/appsettings.json](../../src/Axis.Api/appsettings.json) | Host-native dev without the API container (`python scripts/axis.py dotnet run-api`). Override with ASP.NET env vars (`Section__Key`) or ignored `appsettings.Development.json`. |
-| EF migrations | Owning module connection-string resolution | `python scripts/axis.py dotnet ef ...` only. |
+| EF migration scaffolding | Finite module mapping in [scripts/axis.py](../../scripts/axis.py) | `python scripts/axis.py migration add <module> <Name>`; the wrapper supplies a non-routable design-time connection string. |
 | Shell adapters | `python scripts/axis.py doctor --profile local-dev` | `DOCKER_HOST`, `NVM_DIR`, `PATH` when tools resolve from another context. |
 | Browser verification | [docker-compose.yml](../../docker-compose.yml), [frontend/Dockerfile.e2e](../../frontend/Dockerfile.e2e), and [frontend/playwright.config.ts](../../frontend/playwright.config.ts) | `local-dev smoke` and `local-dev e2e` both start or reconcile the local stack, build the pinned browser image, and run with API, web, Maildev, service URLs, and browser trust configured. Pass Playwright args after `--` to scope a file or title. |
 
@@ -60,7 +60,7 @@ Local overrides live in ignored root `.env.local`. See [.env.example](../../.env
 
 ## Daily Operations
 
-Prefer scoped CLI commands: `status`, `up`, `down`, `smoke`, `e2e`, and focused checks. Browser verification has one execution environment: both browser commands reconcile the mandatory stack, build the Compose E2E image, import the local CA into its container-local Chromium trust store, and keep HTTPS verification enabled. `python scripts/axis.py local-dev smoke` defaults to `e2e/local-dev-smoke.pw.ts`; pass another file or filter after `--` when the same narrow command is convenient. Use `python scripts/axis.py local-dev e2e -- e2e/sign-in-user.pw.ts` for acceptance evidence; add filters such as `-g "AT-001"` when one row is in scope. Running `python scripts/axis.py local-dev e2e` with no args runs the full browser suite; reserve it for CI or a cross-cutting diff that invalidates every browser surface, not routine review. The reconciled stack remains running after either command. Package Playwright scripts stay behind repo wrappers. `local-dev shell [service]` runs inside the container; host shell (PowerShell, bash, WSL) does not matter.
+Prefer scoped CLI commands: `status`, `up`, `down`, `smoke`, `e2e`, and focused checks. Browser verification has one execution environment: both browser commands reconcile the mandatory stack, build the Compose E2E image, import the local CA into its container-local Chromium trust store, and keep HTTPS verification enabled. `python scripts/axis.py local-dev smoke` defaults to `e2e/local-dev-smoke.pw.ts`; pass another file or filter after `--` when the same narrow command is convenient. Use `python scripts/axis.py local-dev e2e -- e2e/sign-in-user.pw.ts` for acceptance evidence; add filters such as `-g "AT-001"` when one row is in scope. Running `python scripts/axis.py local-dev e2e` with no args runs the full browser suite; reserve it for CI or a cross-cutting diff that invalidates every browser surface, not routine review. The reconciled stack remains running after either command. Package Playwright scripts stay behind repo wrappers. `local-dev shell [service]` is an unrestricted container diagnostic escape hatch; it is never a finite workflow or evidence command.
 
 Use runtime-specific dev servers only through the documented Axis wrapper or owning package script.
 
@@ -68,9 +68,11 @@ Run unit or focused frontend tests while iterating. Integration/API tests need D
 
 ## Database
 
-Create migrations through `python scripts/axis.py dotnet ef migrations add ...`. Use the owning module Infrastructure project as both project and startup project when a `*DbContextFactory` exists.
+Create migrations through `python scripts/axis.py migration add <identity|business-objects|rules> <PascalCaseName>`. Axis fixes the Infrastructure project, startup project, `DbContext`, output directory, and isolated design-time connection string for the selected module.
 
 Identity dev database startup uses `MigrateAsync`. Use reset paths only for disposable local data; do not use schema initialization shortcuts.
+
+Volume deletion is never implicit. `local-dev down --volumes`, `local-dev reset-db`, and `local-dev reset-all` refuse to run without `--yes`.
 
 ## Guardrails
 

@@ -25,7 +25,7 @@ Follow [reference.md](../reference.md).
 ## Workflow
 
 1. Classify existing slice, new bounded context, foundational pattern, or event-sourcing decision.
-2. Define ubiquitous language, owned lifecycle/data, mutation authority, upstream inputs, downstream contracts/events, and composition-root boundary.
+2. Define ubiquitous language, owned lifecycle/data, mutation authority, upstream inputs, downstream contracts/events, and composition-root boundary. For reusable evaluators, distinguish declared typed inputs, canonical logic, declared typed outputs, consumer-owned source mappings, and logic-invisible execution-envelope data before choosing domain types.
 3. Decide aggregates/invariants, CQRS requests/handlers, validation, idempotency, authorization/workspace scope, and business-failure mapping.
 4. Decide module-owned persistence, migrations, transaction/repository boundary, read models, concurrency, and rollback needs.
 5. Decide domain/integration/event-sourcing semantics, including delivery, idempotency, versioning, replay, retention, and rebuild concerns only when those patterns are in scope.

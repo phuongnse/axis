@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using Axis.BusinessObjects.Application.Repositories;
 using Axis.BusinessObjects.Application.Services;
 using Axis.BusinessObjects.Domain.Aggregates;
@@ -109,10 +111,7 @@ public sealed class BusinessObjectDefinitionRepositoryTests(BusinessObjectsDatab
         BusinessObjectFieldDefinition amount = loaded.Fields.Single(field => field.Key.Value == "amount");
         amount.FieldType.Should().Be(BusinessObjectFieldType.Decimal);
         amount.Rules.Should().ContainSingle();
-        amount.Rules[0].DefinitionKey.Should().Be(RuleDefinitionKeys.NumericRange);
-        amount.Rules[0].DefinitionVersion.Should().Be(1);
-        amount.Rules[0].Parameters["min"].Should().Equal("0");
-        amount.Rules[0].Parameters["max"].Should().Equal("100000");
+        amount.Rules[0].BindingId.Should().Be(BindingId(RuleDefinitionKeys.NumericRange));
         BusinessObjectDefinitionVersionField statusVersionField = loaded.Versions.Single().Fields
             .Single(field => field.Key.Value == "status");
         statusVersionField.FieldType.Should().Be(BusinessObjectFieldType.Choice);
@@ -200,9 +199,7 @@ public sealed class BusinessObjectDefinitionRepositoryTests(BusinessObjectsDatab
                     0,
                     BusinessObjectFieldType.Text,
                     [Rule(RuleDefinitionKeys.TextPattern, Params(("pattern", ["^[A-Z]{2}[0-9]{4}$"])))]) with
-                {
-                    Id = loaded.Fields.Single().Id,
-                },
+                { Id = loaded.Fields.Single().Id },
             ],
             expectedRevision: 2,
             DateTime.UtcNow).IsSuccess.Should().BeTrue();
@@ -217,8 +214,7 @@ public sealed class BusinessObjectDefinitionRepositoryTests(BusinessObjectsDatab
         BusinessObjectFieldDefinition field = reloaded.Fields.Single();
 
         field.Rules.Should().ContainSingle();
-        field.Rules[0].DefinitionKey.Should().Be(RuleDefinitionKeys.TextPattern);
-        field.Rules[0].Parameters["pattern"].Should().Equal("^[A-Z]{2}[0-9]{4}$");
+        field.Rules[0].BindingId.Should().Be(BindingId(RuleDefinitionKeys.TextPattern));
     }
 
     [Fact]
@@ -432,8 +428,11 @@ public sealed class BusinessObjectDefinitionRepositoryTests(BusinessObjectsDatab
 
     private static BusinessObjectFieldRuleSpec Rule(
         string definitionKey,
-        IReadOnlyDictionary<string, IReadOnlyList<string>>? parameters = null) =>
-        new(definitionKey, DefinitionVersion: 1, parameters);
+        IReadOnlyDictionary<string, IReadOnlyList<string>>? inputs = null) =>
+        new(BindingId(definitionKey));
+
+    private static Guid BindingId(string definitionKey) =>
+        new(MD5.HashData(Encoding.UTF8.GetBytes(definitionKey)));
 
     private static BusinessObjectChoiceFieldConfigurationSpec Choice(
         BusinessObjectChoiceSelectionMode selectionMode,
@@ -446,10 +445,10 @@ public sealed class BusinessObjectDefinitionRepositoryTests(BusinessObjectsDatab
                 index)).ToArray());
 
     private static IReadOnlyDictionary<string, IReadOnlyList<string>> Params(
-        params (string Key, string[] Values)[] parameters) =>
-        parameters.ToDictionary(
-            parameter => parameter.Key,
-            parameter => (IReadOnlyList<string>)parameter.Values,
+        params (string Key, string[] Values)[] inputs) =>
+        inputs.ToDictionary(
+            input => input.Key,
+            input => (IReadOnlyList<string>)input.Values,
             StringComparer.Ordinal);
 
     private static string UniqueKey(string prefix) =>

@@ -698,7 +698,7 @@ Ship user value.
 
 | AT ID | Evidence | Commands |
 |---|---|---|
-| AT-001 | `frontend/tests/sample.test.tsx` | `python scripts/axis.py frontend script test tests/sample.test.tsx` |
+| AT-001 | `frontend/tests/sample.test.tsx` | `python scripts/axis.py frontend test tests/sample.test.tsx` |
 
 """,
             ),
@@ -710,7 +710,7 @@ Ship user value.
 
 | AT ID | Evidence | Commands |
 |---|---|---|
-| AT-001 | `frontend/tests/sample.test.tsx` | `python scripts/axis.py frontend script test tests/sample.test.tsx` |
+| AT-001 | `frontend/tests/sample.test.tsx` | `python scripts/axis.py frontend test tests/sample.test.tsx` |
 """,
             evidence_files=("frontend/tests/sample.test.tsx",),
         )
@@ -732,7 +732,7 @@ Ship user value.
 
 | AT ID | Evidence | Commands |
 |---|---|---|
-| AT-001 | `frontend/tests/sample.test.tsx`, `tests/Api/Axis.Api.Tests/Identity/SampleTests.cs` | `python scripts/axis.py frontend script test tests/sample.test.tsx`, `python scripts/axis.py dotnet test tests/Api/Axis.Api.Tests/Axis.Api.Tests.csproj` |
+| AT-001 | `frontend/tests/sample.test.tsx`, `tests/Api/Axis.Api.Tests/Identity/SampleTests.cs` | `python scripts/axis.py frontend test tests/sample.test.tsx`, `python scripts/axis.py dotnet test tests/Api/Axis.Api.Tests/Axis.Api.Tests.csproj` |
 """,
             evidence_files=(
                 "frontend/tests/sample.test.tsx",
@@ -758,7 +758,7 @@ Ship user value.
 
 | AT ID | Evidence | Commands |
 |---|---|---|
-| AT-001, AT-002 | `frontend/tests/sample.test.tsx` | `python scripts/axis.py frontend script test tests/sample.test.tsx` |
+| AT-001, AT-002 | `frontend/tests/sample.test.tsx` | `python scripts/axis.py frontend test tests/sample.test.tsx` |
 """,
             evidence_files=("frontend/tests/sample.test.tsx",),
         )
@@ -802,7 +802,7 @@ Ship user value.
 
 | AT ID | Evidence | Commands |
 |---|---|---|
-| AT-001 | `frontend/e2e/sample.pw.ts` | `python scripts/axis.py frontend script test:e2e -- e2e/sample.pw.ts` |
+| AT-001 | `frontend/e2e/sample.pw.ts` | `python scripts/axis.py frontend test tests/sample.test.tsx` |
 """,
             evidence_files=("frontend/e2e/sample.pw.ts",),
         )
@@ -827,7 +827,7 @@ Ship user value.
 
 | AT ID | Evidence | Commands |
 |---|---|---|
-| AT-001 | `frontend/e2e/sample.pw.ts` | `python scripts/axis.py frontend script test -- --grep "local-dev e2e"` |
+| AT-001 | `frontend/e2e/sample.pw.ts` | `python scripts/axis.py frontend test tests/sample.test.tsx -t "local-dev e2e"` |
 """,
             evidence_files=("frontend/e2e/sample.pw.ts",),
         )
@@ -852,7 +852,7 @@ Ship user value.
 
 | AT ID | Evidence | Commands |
 |---|---|---|
-| AT-001 | `frontend/tests/sample.test.tsx` | `python scripts/axis.py frontend script test:e2e:smoke -- e2e/sample.pw.ts` |
+| AT-001 | `frontend/tests/sample.test.tsx` | `python scripts/axis.py local-dev e2e -- e2e/sample.pw.ts` |
 """,
             evidence_files=("frontend/tests/sample.test.tsx",),
         )
@@ -1208,7 +1208,7 @@ Provide an app frame.
 
 | AT ID | Evidence | Commands |
 |---|---|---|
-| AT-001 | `frontend/src/components/shared/AppShell.test.tsx` | `python scripts/axis.py frontend script test src/components/shared/AppShell.test.tsx` |
+| AT-001 | `frontend/src/components/shared/AppShell.test.tsx` | `python scripts/axis.py frontend test src/components/shared/AppShell.test.tsx` |
 | AT-002 | `frontend/e2e/app-frame.pw.ts` | `python scripts/axis.py local-dev e2e -- e2e/app-frame.pw.ts` |
 """
 
@@ -1227,7 +1227,7 @@ Provide an app frame.
 
 | AT ID | Evidence | Commands |
 |---|---|---|
-| AT-001 | `frontend/src/components/shared/AppShell.test.tsx` | `python scripts/axis.py frontend script test src/components/shared/AppShell.test.tsx` |
+| AT-001 | `frontend/src/components/shared/AppShell.test.tsx` | `python scripts/axis.py frontend test src/components/shared/AppShell.test.tsx` |
 """,
             evidence_files=("frontend/src/components/shared/AppShell.test.tsx",),
         )
@@ -1244,7 +1244,7 @@ Provide an app frame.
 
 | AT ID | Evidence | Commands |
 |---|---|---|
-| AT-001 | `frontend/src/components/shared/AppShell.test.tsx` | `python scripts/axis.py frontend script test src/components/shared/AppShell.test.tsx` |
+| AT-001 | `frontend/src/components/shared/AppShell.test.tsx` | `python scripts/axis.py frontend test src/components/shared/AppShell.test.tsx` |
 | AT-002 | `frontend/src/components/shared/AppShell.test.tsx` | `python scripts/axis.py local-dev e2e -- e2e/app-frame.pw.ts` |
 """,
             evidence_files=("frontend/src/components/shared/AppShell.test.tsx",),
@@ -1253,12 +1253,12 @@ Provide an app frame.
         self.assertIn("Browser automation must reference a committed `frontend/e2e/*.pw.ts` test", "\n".join(issues))
 
     def test_browser_foundation_evidence_requires_canonical_local_dev_runner(self) -> None:
-        legacy = self.valid_evidence_doc().replace(
+        wrong_runner = self.valid_evidence_doc().replace(
             "python scripts/axis.py local-dev e2e -- e2e/app-frame.pw.ts",
-            "python scripts/axis.py frontend script test:e2e -- e2e/app-frame.pw.ts",
+            "python scripts/axis.py frontend test tests/app-shell.test.tsx",
         )
         issues = self.issues_for_foundation(
-            evidence_doc=legacy,
+            evidence_doc=wrong_runner,
             evidence_files=(
                 "frontend/src/components/shared/AppShell.test.tsx",
                 "frontend/e2e/app-frame.pw.ts",
@@ -1273,7 +1273,7 @@ Provide an app frame.
     def test_browser_foundation_evidence_rejects_runner_name_in_arguments(self) -> None:
         near_miss = self.valid_evidence_doc().replace(
             "python scripts/axis.py local-dev e2e -- e2e/app-frame.pw.ts",
-            'python scripts/axis.py frontend script test -- --grep "local-dev e2e"',
+            'python scripts/axis.py frontend test tests/app-shell.test.tsx -t "local-dev e2e"',
         )
         issues = self.issues_for_foundation(
             evidence_doc=near_miss,
@@ -1323,6 +1323,50 @@ class TestDocDriftRatchets(unittest.TestCase):
         issues = self.issue_text([("src/Example.cs", "var now = DateTime.Now;")])
         self.assertIn("DateTime.Now introduced", issues)
 
+    def test_rejects_fully_qualified_axis_type_inside_implementation(self) -> None:
+        issues = self.issue_text(
+            [
+                (
+                    "src/Modules/Rules/Axis.Rules.Domain/Example.cs",
+                    "return Axis.Shared.Domain.Primitives.Result.Failure<Rule>(error);",
+                )
+            ]
+        )
+        self.assertIn("Fully-qualified Axis type introduced in implementation code", issues)
+
+    def test_accepts_axis_type_alias_in_using_directive(self) -> None:
+        issues = axis.doc_drift_added_line_issues(
+            [
+                (
+                    "src/Modules/Rules/Axis.Rules.Domain/Example.cs",
+                    "using ResultFactory = Axis.Shared.Domain.Primitives.Result;",
+                )
+            ]
+        )
+        self.assertEqual([], issues)
+
+    def test_accepts_axis_assembly_metadata_string(self) -> None:
+        issues = axis.doc_drift_added_line_issues(
+            [
+                (
+                    "src/Modules/Rules/Axis.Rules.Domain/AssemblyInfo.cs",
+                    '[assembly: InternalsVisibleTo("Axis.Rules.Infrastructure")]',
+                )
+            ]
+        )
+        self.assertEqual([], issues)
+
+    def test_still_rejects_axis_type_in_assembly_attribute(self) -> None:
+        issues = self.issue_text(
+            [
+                (
+                    "src/Modules/Rules/Axis.Rules.Domain/AssemblyInfo.cs",
+                    "[assembly: Example(typeof(Axis.Rules.Domain.RuleAssetDefinition))]",
+                )
+            ]
+        )
+        self.assertIn("Fully-qualified Axis type introduced in implementation code", issues)
+
     def test_ignores_todo_in_docs(self) -> None:
         issues = axis.doc_drift_added_line_issues([("docs/example.md", "TODO in docs is not this gate")])
         self.assertEqual([], issues)
@@ -1330,6 +1374,43 @@ class TestDocDriftRatchets(unittest.TestCase):
     def test_rejects_placeholder_marker_in_frontend_source(self) -> None:
         issues = self.issue_text([("frontend/src/features/example/Example.tsx", "const value = 'placeholder';")])
         self.assertIn("New TODO/FIXME/stub marker introduced", issues)
+
+    def test_rejects_double_quoted_placeholder_marker_in_frontend_source(self) -> None:
+        issues = self.issue_text([("frontend/src/features/example/Example.tsx", 'const value = "placeholder";')])
+        self.assertIn("New TODO/FIXME/stub marker introduced", issues)
+
+    def test_accepts_placeholder_identifier_in_source(self) -> None:
+        issues = axis.doc_drift_added_line_issues(
+            [
+                (
+                    "src/Modules/Rules/Axis.Rules.Domain/RuleAssetSource.cs",
+                    "found.Add(placeholder);",
+                )
+            ]
+        )
+        self.assertEqual([], issues)
+
+    def test_accepts_placeholder_user_copy_in_frontend_source(self) -> None:
+        issues = axis.doc_drift_added_line_issues(
+            [
+                (
+                    "frontend/src/features/preferences/translations.ts",
+                    "'Bind each {placeholder} to one configuration parameter.',",
+                )
+            ]
+        )
+        self.assertEqual([], issues)
+
+    def test_accepts_placeholder_translation_key_in_frontend_source(self) -> None:
+        issues = axis.doc_drift_added_line_issues(
+            [
+                (
+                    "frontend/src/features/rules/components/RuleDraftEditor.tsx",
+                    "label={t('rules.placeholder')}",
+                )
+            ]
+        )
+        self.assertEqual([], issues)
 
     def test_accepts_tailwind_placeholder_variant_in_frontend_source(self) -> None:
         issues = axis.doc_drift_added_line_issues(
@@ -1363,6 +1444,39 @@ class TestDocDriftRatchets(unittest.TestCase):
 
     def test_accepts_placeholder_paths_in_docs(self) -> None:
         issues = axis.doc_drift_added_line_issues([("docs/playbooks/local-dev.md", "cd <repo-root> && python scripts/axis.py local-dev up")])
+        self.assertEqual([], issues)
+
+    def test_rejects_session_approval_history_in_durable_docs(self) -> None:
+        issues = self.issue_text(
+            [
+                (
+                    "docs/use-cases/example.md",
+                    "The user approved this clean cutover on 2026-07-27.",
+                )
+            ]
+        )
+        self.assertIn("Session provenance introduced in durable guidance", issues)
+
+    def test_rejects_user_approved_label_in_product_contracts(self) -> None:
+        issues = self.issue_text(
+            [
+                (
+                    "docs/foundations/example.md",
+                    "Use the user-approved clean cutover.",
+                )
+            ]
+        )
+        self.assertIn("Approval history introduced in a durable product contract", issues)
+
+    def test_accepts_generic_approval_policy_in_workflow_guidance(self) -> None:
+        issues = axis.doc_drift_added_line_issues(
+            [
+                (
+                    ".agents/skills/example/SKILL.md",
+                    "High-risk work requires explicit user approval before implementation.",
+                )
+            ]
+        )
         self.assertEqual([], issues)
 
     def test_accepts_standard_doc_navigation(self) -> None:
@@ -1406,6 +1520,7 @@ class TestDocDriftRatchets(unittest.TestCase):
                         "",
                         "```bash",
                         "dotnet build",
+                        "dotnet ef migrations add AddWidget",
                         "npm run test",
                         "npx -y external-design-agent",
                         "openssl genrsa -out key.pem 2048",
@@ -1417,6 +1532,10 @@ class TestDocDriftRatchets(unittest.TestCase):
         )
 
         self.assertIn("use `python scripts/axis.py dotnet ...`", issues)
+        self.assertIn(
+            "use `python scripts/axis.py migration add <module> <Name>`",
+            issues,
+        )
         self.assertIn("use `python scripts/axis.py frontend ...`", issues)
         self.assertIn("use an approved project wrapper", issues)
         self.assertIn("use `python scripts/axis.py local-dev certs`", issues)
@@ -1623,7 +1742,7 @@ def main() -> int:
             changes,
         )
 
-    def test_added_lines_include_working_tree_and_untracked_content(self) -> None:
+    def test_added_lines_use_final_working_tree_diff_and_untracked_content(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             untracked = root / "docs" / "untracked.md"
@@ -1631,9 +1750,16 @@ def main() -> int:
             untracked.write_text("untracked line\n", encoding="utf-8")
 
             outputs = {
-                ("diff", "--unified=0", "base...HEAD"): "+++ b/docs/committed.md\n++++heading\n+committed line\n",
-                ("diff", "--unified=0", "--cached"): "+++ b/docs/staged.md\n+staged line\n",
-                ("diff", "--unified=0"): "+++ b/docs/unstaged.md\n+unstaged line\n",
+                ("merge-base", "base", "HEAD"): "shared-base\n",
+                ("diff", "--unified=0", "shared-base"): (
+                    "+++ b/docs/committed.md\n"
+                    "++++heading\n"
+                    "+corrected committed line\n"
+                    "+++ b/docs/staged.md\n"
+                    "+staged line\n"
+                    "+++ b/docs/unstaged.md\n"
+                    "+unstaged line\n"
+                ),
                 ("ls-files", "--others", "--exclude-standard"): "docs/untracked.md\n",
             }
 
@@ -1647,7 +1773,7 @@ def main() -> int:
         self.assertEqual(
             [
                 ("docs/committed.md", "+++heading"),
-                ("docs/committed.md", "committed line"),
+                ("docs/committed.md", "corrected committed line"),
                 ("docs/staged.md", "staged line"),
                 ("docs/unstaged.md", "unstaged line"),
                 ("docs/untracked.md", "untracked line"),
@@ -1851,6 +1977,47 @@ class TestVulnerablePackageGate(unittest.TestCase):
         run_npm.assert_called_once_with(["audit", "--json"], capture=True)
         self.assertIn("GHSA-frvp-7c67-39w9", stdout.getvalue())
 
+    def test_frontend_gate_uses_lock_graph_when_npm_omits_unaffected_direct_parent(self) -> None:
+        report = self.frontend_audit_report()
+        del report["vulnerabilities"]["shadcn"]
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            self.write_frontend_risk_acceptance(root)
+            frontend = root / "frontend"
+            (frontend / "package.json").write_text(
+                json.dumps({"dependencies": {}, "devDependencies": {"shadcn": "4.13.1"}}),
+                encoding="utf-8",
+            )
+            (frontend / "package-lock.json").write_text(
+                json.dumps(
+                    {
+                        "packages": {
+                            "": {"devDependencies": {"shadcn": "4.13.1"}},
+                            "node_modules/shadcn": {
+                                "dependencies": {"@modelcontextprotocol/sdk": "^1.26.0"}
+                            },
+                            "node_modules/@modelcontextprotocol/sdk": {
+                                "dependencies": {"@hono/node-server": "^1.19.9"}
+                            },
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+            with (
+                mock.patch.object(axis, "ROOT", root),
+                mock.patch.object(axis, "check_frontend_toolchain", return_value=0),
+                mock.patch.object(
+                    axis,
+                    "run_frontend_npm",
+                    return_value=axis.subprocess.CompletedProcess(
+                        [], 1, stdout=json.dumps(report), stderr=""
+                    ),
+                ),
+                contextlib.redirect_stdout(io.StringIO()),
+            ):
+                self.assertEqual(0, axis.check_frontend_vulnerable_packages())
+
     def test_frontend_gate_rejects_high_advisory_even_when_moderate_acceptance_exists(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
@@ -2031,6 +2198,24 @@ class TestVulnerablePackageGate(unittest.TestCase):
 
 
 class TestToolVersionGates(unittest.TestCase):
+    def test_run_replaces_inherited_invalid_temp_paths(self) -> None:
+        completed = axis.subprocess.CompletedProcess(["tool"], 0)
+        invalid = "/path/that/does/not/exist"
+        with (
+            mock.patch.dict(
+                axis.os.environ,
+                {"TMPDIR": invalid, "TEMP": invalid, "TMP": invalid},
+            ),
+            mock.patch.object(axis.tempfile, "gettempdir", return_value="/tmp"),
+            mock.patch.object(axis.subprocess, "run", return_value=completed) as run,
+        ):
+            axis.run(["tool"], check=False)
+
+        child_env = run.call_args.kwargs["env"]
+        self.assertEqual("/tmp", child_env["TMPDIR"])
+        self.assertEqual("/tmp", child_env["TEMP"])
+        self.assertEqual("/tmp", child_env["TMP"])
+
     def test_run_returns_timeout_result_when_optional_command_hangs(self) -> None:
         with mock.patch.object(
             axis.subprocess,
@@ -3714,8 +3899,27 @@ class TestLocalDevCli(unittest.TestCase):
             calls[0][1:],
         )
 
+    def test_volume_destructive_commands_require_explicit_confirmation(self) -> None:
+        cases = [
+            axis.argparse.Namespace(local_dev_command="down", volumes=True, yes=False),
+            axis.argparse.Namespace(local_dev_command="reset-db", yes=False),
+            axis.argparse.Namespace(local_dev_command="reset-all", yes=False),
+        ]
+        for args in cases:
+            with (
+                self.subTest(command=args.local_dev_command),
+                mock.patch.object(axis, "_docker_compose_ok", return_value=True),
+                mock.patch.object(axis, "run") as run,
+                contextlib.redirect_stderr(io.StringIO()) as stderr,
+            ):
+                self.assertEqual(1, axis.local_dev(args))
+                run.assert_not_called()
+                self.assertIn("rerun with --yes", stderr.getvalue())
+
     def test_reset_db_removes_postgres_volume_between_down_and_up(self) -> None:
-        calls = self.run_local_dev(axis.argparse.Namespace(local_dev_command="reset-db"))
+        calls = self.run_local_dev(
+            axis.argparse.Namespace(local_dev_command="reset-db", yes=True)
+        )
 
         self.assertEqual(["compose", "-p", "axis", "-f", str(axis.LOCAL_DEV_COMPOSE_FILE), "down"], calls[0][1:])
         self.assertEqual(["volume", "rm", "axis_postgres_data"], calls[1][1:])
@@ -3751,7 +3955,12 @@ class TestLocalDevCli(unittest.TestCase):
             mock.patch.object(axis, "run", side_effect=fake_run),
             contextlib.redirect_stderr(io.StringIO()),
         ):
-            self.assertEqual(1, axis.local_dev(axis.argparse.Namespace(local_dev_command="reset-db")))
+            self.assertEqual(
+                1,
+                axis.local_dev(
+                    axis.argparse.Namespace(local_dev_command="reset-db", yes=True)
+                ),
+            )
 
         self.assertEqual(2, len(calls))
 
@@ -3770,7 +3979,12 @@ class TestLocalDevCli(unittest.TestCase):
             mock.patch.object(axis, "_docker_compose_ok", return_value=True),
             mock.patch.object(axis, "run", side_effect=fake_run),
         ):
-            self.assertEqual(0, axis.local_dev(axis.argparse.Namespace(local_dev_command="reset-db")))
+            self.assertEqual(
+                0,
+                axis.local_dev(
+                    axis.argparse.Namespace(local_dev_command="reset-db", yes=True)
+                ),
+            )
 
         self.assertEqual(
             [
@@ -3797,6 +4011,292 @@ class TestLocalDevShellArgv(unittest.TestCase):
 
     def test_strips_double_dash_prefix(self) -> None:
         self.assertEqual(["bash"], axis.local_dev_shell_argv("web", ["--", "bash"]))
+
+
+class TestGitWorkflows(unittest.TestCase):
+    def test_sync_fast_forwards_existing_branch(self) -> None:
+        calls: list[list[str]] = []
+
+        def fake_git(args: list[str], **_kwargs) -> str:
+            calls.append(args)
+            if args == ["branch", "--show-current"]:
+                return "main\n"
+            return ""
+
+        with (
+            mock.patch.object(axis, "working_tree_paths", return_value=[]),
+            mock.patch.object(axis, "ref_exists", return_value=True),
+            mock.patch.object(axis, "git_is_ancestor", side_effect=[False, True]),
+            mock.patch.object(axis, "git", side_effect=fake_git),
+            contextlib.redirect_stdout(io.StringIO()),
+        ):
+            self.assertEqual(0, axis.git_sync(axis.argparse.Namespace(branch="feat/rules")))
+
+        self.assertEqual(
+            [
+                ["branch", "--show-current"],
+                [
+                    "fetch",
+                    "--no-tags",
+                    "origin",
+                    "refs/heads/feat/rules:refs/remotes/origin/feat/rules",
+                ],
+                ["switch", "feat/rules"],
+                ["merge", "--ff-only", "refs/remotes/origin/feat/rules"],
+            ],
+            calls,
+        )
+
+    def test_sync_refuses_dirty_tree_before_fetch(self) -> None:
+        with (
+            mock.patch.object(axis, "working_tree_paths", return_value=["user-change.txt"]),
+            mock.patch.object(axis, "git", return_value="feat/rules\n") as git,
+        ):
+            with self.assertRaisesRegex(axis.CheckError, "clean working tree"):
+                axis.git_sync(axis.argparse.Namespace(branch="feat/rules"))
+
+        git.assert_called_once_with(["branch", "--show-current"])
+
+    def test_sync_refuses_detached_head_before_inspection_or_fetch(self) -> None:
+        with (
+            mock.patch.object(axis, "working_tree_paths") as working_tree,
+            mock.patch.object(axis, "git", return_value="") as git,
+        ):
+            with self.assertRaisesRegex(axis.CheckError, "detached HEAD"):
+                axis.git_sync(axis.argparse.Namespace(branch="feat/rules"))
+
+        git.assert_called_once_with(["branch", "--show-current"])
+        working_tree.assert_not_called()
+
+    def test_sync_allows_local_branch_ahead(self) -> None:
+        calls: list[list[str]] = []
+
+        def fake_git(args: list[str], **_kwargs) -> str:
+            calls.append(args)
+            return "feat/rules\n" if args == ["branch", "--show-current"] else ""
+
+        with (
+            mock.patch.object(axis, "working_tree_paths", return_value=[]),
+            mock.patch.object(axis, "ref_exists", return_value=True),
+            mock.patch.object(axis, "git_is_ancestor", side_effect=[True, False]),
+            mock.patch.object(axis, "git", side_effect=fake_git),
+            contextlib.redirect_stdout(io.StringIO()),
+        ):
+            self.assertEqual(0, axis.git_sync(axis.argparse.Namespace(branch="feat/rules")))
+
+        self.assertEqual(
+            [
+                ["branch", "--show-current"],
+                [
+                    "fetch",
+                    "--no-tags",
+                    "origin",
+                    "refs/heads/feat/rules:refs/remotes/origin/feat/rules",
+                ],
+                ["merge", "--ff-only", "refs/remotes/origin/feat/rules"],
+            ],
+            calls,
+        )
+
+    def test_sync_refuses_diverged_branch_before_switch(self) -> None:
+        calls: list[list[str]] = []
+
+        def fake_git(args: list[str], **_kwargs) -> str:
+            calls.append(args)
+            return "main\n" if args == ["branch", "--show-current"] else ""
+
+        with (
+            mock.patch.object(axis, "working_tree_paths", return_value=[]),
+            mock.patch.object(axis, "ref_exists", return_value=True),
+            mock.patch.object(axis, "git_is_ancestor", side_effect=[False, False]),
+            mock.patch.object(axis, "git", side_effect=fake_git),
+        ):
+            with self.assertRaisesRegex(axis.CheckError, "diverged"):
+                axis.git_sync(axis.argparse.Namespace(branch="feat/rules"))
+
+        self.assertEqual(
+            [
+                ["branch", "--show-current"],
+                [
+                    "fetch",
+                    "--no-tags",
+                    "origin",
+                    "refs/heads/feat/rules:refs/remotes/origin/feat/rules",
+                ]
+            ],
+            calls,
+        )
+
+    def test_sync_creates_missing_tracking_branch(self) -> None:
+        calls: list[list[str]] = []
+
+        def fake_git(args: list[str], **_kwargs) -> str:
+            calls.append(args)
+            return "main\n" if args == ["branch", "--show-current"] else ""
+
+        with (
+            mock.patch.object(axis, "working_tree_paths", return_value=[]),
+            mock.patch.object(axis, "ref_exists", return_value=False),
+            mock.patch.object(axis, "git", side_effect=fake_git),
+            contextlib.redirect_stdout(io.StringIO()),
+        ):
+            self.assertEqual(0, axis.git_sync(axis.argparse.Namespace(branch="feat/rules")))
+
+        self.assertEqual(
+            [
+                ["branch", "--show-current"],
+                [
+                    "fetch",
+                    "--no-tags",
+                    "origin",
+                    "refs/heads/feat/rules:refs/remotes/origin/feat/rules",
+                ],
+                [
+                    "switch",
+                    "--track",
+                    "-c",
+                    "feat/rules",
+                    "refs/remotes/origin/feat/rules",
+                ],
+            ],
+            calls,
+        )
+
+    def test_sync_accepts_renovate_branch(self) -> None:
+        calls: list[list[str]] = []
+
+        def fake_git(args: list[str], **_kwargs) -> str:
+            calls.append(args)
+            return "main\n" if args == ["branch", "--show-current"] else ""
+
+        with (
+            mock.patch.object(axis, "working_tree_paths", return_value=[]),
+            mock.patch.object(axis, "ref_exists", return_value=False),
+            mock.patch.object(axis, "git", side_effect=fake_git),
+            contextlib.redirect_stdout(io.StringIO()),
+        ):
+            self.assertEqual(
+                0,
+                axis.git_sync(
+                    axis.argparse.Namespace(branch="renovate/all-non-major")
+                ),
+            )
+
+        self.assertIn(
+            [
+                "fetch",
+                "--no-tags",
+                "origin",
+                "refs/heads/renovate/all-non-major:"
+                "refs/remotes/origin/renovate/all-non-major",
+            ],
+            calls,
+        )
+
+    def test_checkpoint_commits_only_staged_changes_by_default(self) -> None:
+        calls: list[list[str]] = []
+
+        def fake_git(args: list[str], **_kwargs) -> str:
+            calls.append(args)
+            return "feat/rules\n" if args == ["branch", "--show-current"] else ""
+
+        with (
+            mock.patch.object(axis, "git_lines", return_value=["wanted.txt"]),
+            mock.patch.object(axis, "git", side_effect=fake_git),
+            contextlib.redirect_stdout(io.StringIO()),
+        ):
+            self.assertEqual(
+                0,
+                axis.git_checkpoint(
+                    axis.argparse.Namespace(
+                        branch="feat/rules",
+                        subject="test: checkpoint",
+                        body=None,
+                        all_changes=False,
+                    )
+                ),
+            )
+
+        self.assertEqual(
+            [["branch", "--show-current"], ["commit", "-m", "test: checkpoint"]],
+            calls,
+        )
+
+    def test_checkpoint_requires_staged_changes_without_all(self) -> None:
+        with (
+            mock.patch.object(axis, "git_lines", return_value=[]),
+            mock.patch.object(axis, "git") as git,
+        ):
+            with self.assertRaisesRegex(axis.CheckError, "no staged changes"):
+                axis.git_checkpoint(
+                    axis.argparse.Namespace(
+                        branch="feat/rules",
+                        subject="test: checkpoint",
+                        body=None,
+                        all_changes=False,
+                    )
+                )
+
+        git.assert_not_called()
+
+    def test_checkpoint_all_explicitly_stages_working_tree(self) -> None:
+        calls: list[list[str]] = []
+
+        def fake_git(args: list[str], **_kwargs) -> str:
+            calls.append(args)
+            return "feat/rules\n" if args == ["branch", "--show-current"] else ""
+
+        with (
+            mock.patch.object(axis, "working_tree_paths", return_value=["wanted.txt"]),
+            mock.patch.object(axis, "git", side_effect=fake_git),
+            contextlib.redirect_stdout(io.StringIO()),
+        ):
+            self.assertEqual(
+                0,
+                axis.git_checkpoint(
+                    axis.argparse.Namespace(
+                        branch="feat/rules",
+                        subject="test: checkpoint",
+                        body=None,
+                        all_changes=True,
+                    )
+                ),
+            )
+
+        self.assertEqual(
+            [
+                ["branch", "--show-current"],
+                ["add", "--all"],
+                ["commit", "-m", "test: checkpoint"],
+            ],
+            calls,
+        )
+
+    def test_cli_routes_sync_and_checkpoint_all(self) -> None:
+        with (
+            mock.patch.object(axis, "git_sync", return_value=0, create=True) as sync,
+            mock.patch.object(axis, "git_checkpoint", return_value=0) as checkpoint,
+            contextlib.redirect_stdout(io.StringIO()),
+            contextlib.redirect_stderr(io.StringIO()),
+        ):
+            self.assertEqual(0, axis.main(["git", "sync", "--branch", "feat/rules"]))
+            self.assertEqual(
+                0,
+                axis.main(
+                    [
+                        "git",
+                        "checkpoint",
+                        "--branch",
+                        "feat/rules",
+                        "--subject",
+                        "test: checkpoint",
+                        "--all",
+                    ]
+                ),
+            )
+
+        self.assertEqual("feat/rules", sync.call_args.args[0].branch)
+        self.assertTrue(checkpoint.call_args.args[0].all_changes)
 
 
 class TestAxisCommandWrappers(unittest.TestCase):
@@ -3828,6 +4328,22 @@ class TestAxisCommandWrappers(unittest.TestCase):
         )
 
         self.assertEqual(["dotnet", "build", "Axis.sln", "--nologo", "--no-restore"], calls[0])
+
+    def test_dotnet_restore_tools_uses_repository_manifest(self) -> None:
+        calls = self.run_with_fake_process(
+            axis.dotnet_command,
+            axis.argparse.Namespace(dotnet_command="restore-tools", dotnet_args=[]),
+        )
+
+        self.assertEqual(["dotnet", "tool", "restore"], calls[0])
+
+    def test_frontend_sync_lock_regenerates_from_exact_manifest_without_scripts(self) -> None:
+        calls = self.run_with_fake_process(
+            axis.frontend_command,
+            axis.argparse.Namespace(frontend_command="sync-lock"),
+        )
+
+        self.assertEqual(["npm", "install", "--package-lock-only", "--ignore-scripts"], calls[0])
 
     def test_setup_restores_locked_dependencies_and_optional_browser(self) -> None:
         calls: list[list[str]] = []
@@ -3895,7 +4411,7 @@ class TestAxisCommandWrappers(unittest.TestCase):
             axis.dotnet_command,
             axis.argparse.Namespace(
                 dotnet_command="test",
-                dotnet_args=[project, "--", "--filter", "FullyQualifiedName~CreateRuleDefinitionHandlerTests"],
+                dotnet_args=[project, "--", "--filter", "FullyQualifiedName~RuleAssetDefinitionHandlerTests"],
             ),
         )
 
@@ -3906,7 +4422,7 @@ class TestAxisCommandWrappers(unittest.TestCase):
                 project,
                 "--nologo",
                 "--filter",
-                "FullyQualifiedName~CreateRuleDefinitionHandlerTests",
+                "FullyQualifiedName~RuleAssetDefinitionHandlerTests",
             ],
             calls[0],
         )
@@ -3918,6 +4434,142 @@ class TestAxisCommandWrappers(unittest.TestCase):
         )
 
         self.assertEqual(["dotnet", "format", "Axis.sln", "--verify-no-changes"], calls[0])
+
+    def test_migration_add_uses_owned_module_contracts(self) -> None:
+        targets = {
+            "business-objects": (
+                "BusinessObjects/Axis.BusinessObjects.Infrastructure/"
+                "Axis.BusinessObjects.Infrastructure.csproj",
+                "BusinessObjectsDbContext",
+            ),
+            "identity": (
+                "Identity/Axis.Identity.Infrastructure/"
+                "Axis.Identity.Infrastructure.csproj",
+                "IdentityDbContext",
+            ),
+            "rules": (
+                "Rules/Axis.Rules.Infrastructure/"
+                "Axis.Rules.Infrastructure.csproj",
+                "RulesDbContext",
+            ),
+        }
+        for module, (project_suffix, context) in targets.items():
+            with self.subTest(module=module):
+                calls = self.run_with_fake_process(
+                    axis.migration_command,
+                    axis.argparse.Namespace(
+                        migration_command="add",
+                        module=module,
+                        name="AddDecisionTables",
+                    ),
+                )
+
+                project = str(axis.ROOT / "src" / "Modules" / project_suffix)
+                self.assertEqual(
+                    [
+                        "dotnet",
+                        "ef",
+                        "migrations",
+                        "add",
+                        "AddDecisionTables",
+                        "--project",
+                        project,
+                        "--startup-project",
+                        project,
+                        "--context",
+                        context,
+                        "--output-dir",
+                        "Migrations",
+                    ],
+                    calls[0],
+                )
+
+    def test_cli_routes_finite_migration_add(self) -> None:
+        with (
+            mock.patch.object(axis, "migration_command", return_value=0) as migration,
+            contextlib.redirect_stdout(io.StringIO()),
+        ):
+            self.assertEqual(
+                0,
+                axis.main(["migration", "add", "rules", "AddDecisionTables"]),
+            )
+
+        args = migration.call_args.args[0]
+        self.assertEqual("rules", args.module)
+        self.assertEqual("AddDecisionTables", args.name)
+
+    def test_migration_add_uses_non_routable_design_time_connection(self) -> None:
+        with (
+            mock.patch.object(axis, "check_dotnet_sdk", return_value=0),
+            mock.patch.object(
+                axis,
+                "run",
+                return_value=axis.subprocess.CompletedProcess([], 0),
+            ) as run,
+        ):
+            self.assertEqual(
+                0,
+                axis.migration_command(
+                    axis.argparse.Namespace(
+                        migration_command="add",
+                        module="identity",
+                        name="AddPreference",
+                    )
+                ),
+            )
+
+        self.assertEqual(
+            {
+                "ConnectionStrings__Identity": axis.DESIGN_TIME_CONNECTION_STRING,
+            },
+            run.call_args.kwargs["env"],
+        )
+
+    def test_migration_add_rejects_invalid_name_before_running_dotnet(self) -> None:
+        with (
+            mock.patch.object(axis, "check_dotnet_sdk", return_value=0),
+            mock.patch.object(axis, "run") as run,
+        ):
+            with self.assertRaisesRegex(axis.CheckError, "PascalCase"):
+                axis.migration_command(
+                    axis.argparse.Namespace(
+                        migration_command="add",
+                        module="rules",
+                        name="../unsafe",
+                    )
+                )
+
+        run.assert_not_called()
+
+    def test_frontend_test_maps_paths_and_name_filter(self) -> None:
+        calls = self.run_with_fake_process(
+            axis.frontend_command,
+            axis.argparse.Namespace(
+                frontend_command="test",
+                test_paths=["tests/rules-page.test.tsx"],
+                name="publishes",
+            ),
+        )
+
+        self.assertEqual(
+            [
+                "npm",
+                "run",
+                "test",
+                "--",
+                "tests/rules-page.test.tsx",
+                "-t",
+                "publishes",
+            ],
+            calls[0],
+        )
+
+    def test_frontend_test_rejects_arbitrary_vitest_flags(self) -> None:
+        with (
+            self.assertRaises(SystemExit),
+            contextlib.redirect_stderr(io.StringIO()),
+        ):
+            axis.main(["frontend", "test", "--watch"])
 
     def test_frontend_gen_api_types_check_generates_without_diffing_head(self) -> None:
         calls = self.run_with_fake_process(
@@ -3990,26 +4642,6 @@ class TestAxisCommandWrappers(unittest.TestCase):
         )
 
         self.assertEqual(["npm", "exec", "--", "playwright", "install", "chromium"], calls[0])
-
-    def test_frontend_test_e2e_compatibility_command_uses_canonical_browser_runner(self) -> None:
-        browser_runner = mock.Mock(return_value=0)
-        with (
-            mock.patch.object(axis, "check_frontend_toolchain", return_value=0),
-            mock.patch.object(axis, "require_docker_compose", return_value=0),
-            mock.patch.object(axis, "run_local_dev_browser", browser_runner),
-            mock.patch.object(axis, "run_frontend_npm") as run_npm,
-        ):
-            rc = axis.frontend_command(
-                axis.argparse.Namespace(
-                    frontend_command="script",
-                    script_name="test:e2e",
-                    script_args=["--", "e2e/app-frame.pw.ts", "-g", "AT-002"],
-                )
-            )
-
-        self.assertEqual(0, rc)
-        browser_runner.assert_called_once_with(["e2e/app-frame.pw.ts", "-g", "AT-002"])
-        run_npm.assert_not_called()
 
     def test_local_dev_certs_writes_extension_and_runs_openssl(self) -> None:
         with tempfile.TemporaryDirectory() as temp:

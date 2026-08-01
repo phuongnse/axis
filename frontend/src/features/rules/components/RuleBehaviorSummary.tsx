@@ -1,146 +1,202 @@
 import { useQuery } from '@tanstack/react-query';
+import { GitBranch, LogIn, LogOut, type LucideIcon } from 'lucide-react';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Card, CardContent } from '@/components/ui/card';
 import {
-  assistRuleExpression,
-  type RuleContextSchema,
+  projectRuleCondition,
   type RuleDefinitionDetail,
-  type RuleExpressionAuthoring,
-  type RuleParameterDefinition,
+  type RuleDraftInputDefinition,
+  type RuleInputDefinition,
   ruleDefinitionQueryKeys,
+  ruleExpressionLanguageQueryOptions,
 } from '../api';
+import { replaceConditionInputReferences, toDraftInputs } from '../condition-references';
+import { valueTypeLabel } from '../reference';
 import { RuleExpressionView } from './RuleExpressionView';
 
 export function RuleBehaviorSummary({
   condition,
-  outcome,
+  output,
   expressionLanguageVersion,
-  definitionKey,
   flowSlot = 'rule-behavior-flow',
-  outcomeSlot = 'rule-outcome',
-  effectSlot = 'rule-effect',
-  contextSchema,
-  parameters,
-  references = false,
-  authoring,
+  inputs,
 }: {
   condition: RuleDefinitionDetail['condition'];
-  outcome: RuleDefinitionDetail['outcome'];
+  output?: RuleDefinitionDetail['output'];
   expressionLanguageVersion?: number;
-  definitionKey?: string;
   flowSlot?: string;
-  outcomeSlot?: string;
-  effectSlot?: string;
-  contextSchema?: RuleContextSchema;
-  parameters?: RuleParameterDefinition[];
-  references?: boolean;
-  authoring?: RuleExpressionAuthoring;
+  inputs?: (RuleInputDefinition | RuleDraftInputDefinition)[];
+}) {
+  const { t, i18n } = useTranslation();
+  const languageQuery = useQuery(ruleExpressionLanguageQueryOptions());
+
+  return (
+    <div data-slot="rule-behavior-summary">
+      <ol data-slot="rule-behavior-steps" className="relative">
+        <li data-slot="rule-input-contract" className="flex min-w-0 gap-3">
+          <RuleBehaviorMarker icon={LogIn} position="start" />
+          <div className="min-w-0 flex-1 pb-4">
+            <h3 className="flex h-6 items-center text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              {t('rules.inputs')}
+            </h3>
+            <div className="mt-1.5 min-w-0">
+              {inputs?.length ? (
+                <dl className="space-y-2">
+                  {inputs.map((input) => {
+                    const inputLabel = input.label ?? t('rules.unknownInput');
+                    const typeLabel = (input.types ?? [])
+                      .map((type) => valueTypeLabel(languageQuery.data, type, i18n.language))
+                      .join(' · ');
+                    const requirement = input.isRequired
+                      ? t('rules.inputRequired')
+                      : t('rules.inputOptional');
+                    return (
+                      <div key={'key' in input ? (input.key ?? inputLabel) : inputLabel}>
+                        <dt className="text-sm font-medium text-foreground">{inputLabel}</dt>
+                        <dd className="mt-0.5 flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5 text-xs text-muted-foreground">
+                          <span>{typeLabel || t('rules.unknownValueType')}</span>
+                          <span aria-hidden="true">·</span>
+                          <span>{requirement}</span>
+                          {input.allowedValues?.length ? (
+                            <>
+                              <span aria-hidden="true">·</span>
+                              <span>
+                                {t('rules.allowedValues')}: {input.allowedValues.join(', ')}
+                              </span>
+                            </>
+                          ) : null}
+                        </dd>
+                      </div>
+                    );
+                  })}
+                </dl>
+              ) : (
+                <p className="text-sm text-muted-foreground">{t('rules.notSet')}</p>
+              )}
+            </div>
+          </div>
+        </li>
+
+        <li data-slot={flowSlot} className="flex min-w-0 gap-3">
+          <RuleBehaviorMarker icon={GitBranch} position="middle" />
+          <div className="min-w-0 flex-1 pb-4">
+            <h3 className="flex h-6 items-center text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              {t('rules.logic')}
+            </h3>
+            <div className="mt-1.5 min-w-0">
+              <RuleLogicPreview
+                condition={condition}
+                expressionLanguageVersion={expressionLanguageVersion}
+                inputs={inputs}
+              />
+            </div>
+          </div>
+        </li>
+
+        <li data-slot="rule-output-contract" className="flex min-w-0 gap-3">
+          <RuleBehaviorMarker icon={LogOut} position="end" />
+          <div className="min-w-0 flex-1">
+            <h3 className="flex h-6 items-center text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              {t('rules.outputs')}
+            </h3>
+            <div className="mt-1.5 min-w-0">
+              <RuleOutputSummary output={output} />
+            </div>
+          </div>
+        </li>
+      </ol>
+    </div>
+  );
+}
+
+function RuleBehaviorMarker({
+  icon: Icon,
+  position,
+}: {
+  icon: LucideIcon;
+  position: 'start' | 'middle' | 'end';
+}) {
+  return (
+    <div aria-hidden="true" className="relative flex w-6 shrink-0 self-stretch justify-center">
+      <span
+        data-slot="rule-behavior-rail-connector"
+        className={
+          position === 'start'
+            ? 'absolute top-3 bottom-0 left-3 w-px bg-border'
+            : position === 'end'
+              ? 'absolute top-0 left-3 h-3 w-px bg-border'
+              : 'absolute inset-y-0 left-3 w-px bg-border'
+        }
+      />
+      <span
+        data-slot="rule-behavior-rail-node"
+        className="relative z-10 flex size-6 items-center justify-center rounded-full border bg-background text-muted-foreground"
+      >
+        <Icon className="size-3.5" strokeWidth={1.75} />
+      </span>
+    </div>
+  );
+}
+
+export function RuleLogicPreview({
+  condition,
+  expressionLanguageVersion,
+  inputs,
+}: {
+  condition: RuleDefinitionDetail['condition'];
+  expressionLanguageVersion?: number;
+  inputs?: (RuleInputDefinition | RuleDraftInputDefinition)[];
 }) {
   const { t, i18n } = useTranslation();
   const projectionRequest = useMemo(
     () => ({
       expressionLanguageVersion,
-      contextKey: contextSchema?.contextKey ?? null,
-      contextSchemaVersion: contextSchema?.version ?? null,
-      parameters: parameters ?? [],
-      syntax: null,
-      condition: condition ?? undefined,
-      cursorOffset: 0,
+      inputs: toDraftInputs(inputs ?? []),
+      condition:
+        replaceConditionInputReferences(
+          condition,
+          new Map(
+            (inputs ?? []).flatMap((input) =>
+              'key' in input && input.key && input.label ? [[input.key, input.label] as const] : [],
+            ),
+          ),
+        ) ?? undefined,
       language: i18n.language,
     }),
-    [
-      condition,
-      contextSchema?.contextKey,
-      contextSchema?.version,
-      expressionLanguageVersion,
-      i18n.language,
-      parameters,
-    ],
+    [condition, expressionLanguageVersion, i18n.language, inputs],
   );
   const projectionQuery = useQuery({
-    queryKey: ruleDefinitionQueryKeys.expressionAssist(projectionRequest),
-    queryFn: () => assistRuleExpression(projectionRequest),
-    enabled: Boolean(condition) && !authoring,
+    queryKey: ruleDefinitionQueryKeys.conditionProjection(projectionRequest),
+    queryFn: () => projectRuleCondition(projectionRequest),
+    enabled: Boolean(condition),
     staleTime: Number.POSITIVE_INFINITY,
   });
-  const resolved = authoring ?? projectionQuery.data;
+  if (!condition) return <p className="text-sm text-muted-foreground">{t('rules.notSet')}</p>;
+  if (projectionQuery.isLoading)
+    return (
+      <p role="status" className="text-sm text-muted-foreground">
+        {t('rules.referenceLoading')}
+      </p>
+    );
+  if (!projectionQuery.data?.display)
+    return (
+      <p role="alert" className="text-sm text-destructive">
+        {t('rules.loadErrorTitle')}
+      </p>
+    );
 
+  return <RuleExpressionView display={projectionQuery.data.display} />;
+}
+
+export function RuleOutputSummary({ output }: { output?: RuleDefinitionDetail['output'] }) {
+  const { t, i18n } = useTranslation();
+  const languageQuery = useQuery(ruleExpressionLanguageQueryOptions());
+  if (!output) return <p className="text-sm text-muted-foreground">{t('rules.notSet')}</p>;
+
+  const outputType = valueTypeLabel(languageQuery.data, output.type, i18n.language);
   return (
-    <Card size="sm">
-      <CardContent>
-        <ol data-slot={flowSlot} className="space-y-0">
-          <li data-slot="rule-timeline-item" className="flex gap-3">
-            <div aria-hidden="true" className="flex w-5 shrink-0 flex-col items-center">
-              <span
-                data-slot="rule-timeline-marker"
-                className="mt-1 size-2.5 shrink-0 rounded-full bg-foreground"
-              />
-              <span data-slot="rule-timeline-line" className="w-px flex-1 bg-border" />
-            </div>
-            <div className="min-w-0 flex-1 pb-5">
-              <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-                {t('rules.when')}
-              </p>
-              <div className="mt-2">
-                {condition ? (
-                  projectionQuery.isLoading && !authoring ? (
-                    <p role="status" className="text-sm text-muted-foreground">
-                      {t('rules.referenceLoading')}
-                    </p>
-                  ) : resolved?.display ? (
-                    <RuleExpressionView
-                      display={resolved.display}
-                      definitionKey={definitionKey}
-                      expressionLanguageVersion={expressionLanguageVersion}
-                      contextSchema={contextSchema}
-                      parameters={parameters}
-                      references={references}
-                    />
-                  ) : (
-                    <p role="alert" className="text-sm text-destructive">
-                      {t('rules.loadErrorTitle')}
-                    </p>
-                  )
-                ) : (
-                  <p className="text-sm text-muted-foreground">{t('rules.notSet')}</p>
-                )}
-              </div>
-            </div>
-          </li>
-          <li data-slot="rule-timeline-item" className="flex gap-3">
-            <div aria-hidden="true" className="flex w-5 shrink-0 flex-col items-center">
-              <span data-slot="rule-timeline-tail" className="h-1 w-px shrink-0 bg-border" />
-              <span
-                data-slot="rule-timeline-marker"
-                className="size-2.5 shrink-0 rounded-full bg-foreground"
-              />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-                {t('rules.then')}
-              </p>
-              <div className="mt-2 space-y-2">
-                <p
-                  data-slot={outcomeSlot}
-                  className="text-sm leading-relaxed font-medium text-foreground"
-                >
-                  {outcome?.message ?? outcome?.decision ?? t('rules.notSet')}
-                </p>
-                {outcome?.severity ? (
-                  <p
-                    data-slot={effectSlot}
-                    className="text-xs leading-relaxed text-muted-foreground"
-                  >
-                    <span className="font-medium text-foreground">{t('rules.effect')}:</span>{' '}
-                    {t(`rules.effect${outcome.severity}`)}
-                  </p>
-                ) : null}
-              </div>
-            </div>
-          </li>
-        </ol>
-      </CardContent>
-    </Card>
+    <p data-slot="rule-output-summary" className="text-sm font-medium text-foreground">
+      {outputType || t('rules.unknownValueType')}
+    </p>
   );
 }

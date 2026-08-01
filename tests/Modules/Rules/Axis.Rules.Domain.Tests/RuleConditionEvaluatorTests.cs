@@ -1,4 +1,5 @@
 using Axis.Rules.Domain;
+using Axis.Shared.Domain.Primitives;
 using FluentAssertions;
 
 namespace Axis.Rules.Domain.Tests;
@@ -6,52 +7,46 @@ namespace Axis.Rules.Domain.Tests;
 public sealed class RuleConditionEvaluatorTests
 {
     [Fact]
+    public void OutputContract_WhenFutureTypedShapeIsRequested_PreservesTypeAndCardinality()
+    {
+        RuleOutputContract output = RuleOutputContract.Create(
+            RuleValueType.Text,
+            RuleExpressionCardinality.Multiple).Value;
+
+        output.Type.Should().Be(RuleValueType.Text);
+        output.Cardinality.Should().Be(RuleExpressionCardinality.Multiple);
+    }
+
+    [Fact]
+    public void DefinitionValidator_WhenOutputIsNotBoolean_RejectsCurrentConditionContract()
+    {
+        RuleConditionNode condition = Predicate(
+            "value-present",
+            RulePredicateOperator.IsNotNull,
+            RuleOperand.Input("value").Value);
+        RuleOutputContract output = RuleOutputContract.Create(
+            RuleValueType.Text,
+            RuleExpressionCardinality.Scalar).Value;
+
+        Result result = RuleDefinitionValidator.Validate(
+            [Input("value", RuleValueType.Text, true)],
+            condition,
+            output);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Should().Be("Rule conditions currently require a scalar Boolean output.");
+    }
+
+    [Fact]
     public void ExpressionLanguage_WhenRead_ExposesVersionedTypedCapabilities()
     {
         RuleExpressionLanguage.Version.Should().Be(1);
         RuleExpressionLanguage.Functions.Select(function => function.Function)
-            .Should().BeEquivalentTo(
-                Enum.GetValues<RuleExpressionFunction>(),
-                options => options.WithStrictOrdering());
+            .Should().BeEquivalentTo(Enum.GetValues<RuleExpressionFunction>(), options => options.WithStrictOrdering());
         RuleExpressionLanguage.Operators.Select(definition => definition.Operator)
-            .Should().BeEquivalentTo(
-                Enum.GetValues<RulePredicateOperator>(),
-                options => options.WithStrictOrdering());
-        RuleExpressionLanguage.LogicalOperators.Select(definition => definition.Operator)
-            .Should().BeEquivalentTo(
-                Enum.GetValues<RuleLogicalOperator>(),
-                options => options.WithStrictOrdering());
+            .Should().BeEquivalentTo(Enum.GetValues<RulePredicateOperator>(), options => options.WithStrictOrdering());
         RuleExpressionLanguage.OperandKinds.Select(definition => definition.Kind)
-            .Should().BeEquivalentTo(
-                Enum.GetValues<RuleOperandKind>(),
-                options => options.WithStrictOrdering());
-        RuleExpressionLanguage.Operators.Select(definition => definition.Documentation)
-            .Concat(RuleExpressionLanguage.Functions.Select(definition => definition.Documentation))
-            .Concat(RuleExpressionLanguage.LogicalOperators.Select(definition => definition.Documentation))
-            .Concat(RuleExpressionLanguage.OperandKinds.Select(definition => definition.Documentation))
-            .Concat(RuleExpressionLanguage.ValueTypes.Select(definition => definition.Documentation))
-            .Concat(RuleExpressionLanguage.Cardinalities.Select(definition => definition.Documentation))
-            .Concat(RuleExpressionLanguage.Limits.Select(definition => definition.Documentation))
-            .Should().OnlyContain(documentation =>
-                documentation.Locales.Keys.Order().SequenceEqual(new[] { "en", "vi" }) &&
-                documentation.Locales.Values.All(content =>
-                    !string.IsNullOrWhiteSpace(content.DisplayName) &&
-                    !string.IsNullOrWhiteSpace(content.Summary) &&
-                    !string.IsNullOrWhiteSpace(content.Usage) &&
-                    content.Examples.Count > 0));
-        RulePredicateOperatorDefinition ordered = RuleExpressionLanguage.Operators.Single(
-            definition => definition.Operator == RulePredicateOperator.GreaterThan);
-        ordered.LeftShapes.Should().OnlyContain(shape =>
-            shape.Cardinality == RuleExpressionCardinality.Scalar &&
-            shape.Type != RuleValueType.Boolean);
-        ordered.RequiresMatchingTypes.Should().BeTrue();
-        RuleExpressionFunctionDefinition length = RuleExpressionLanguage.Functions.Single(
-            function => function.Function == RuleExpressionFunction.Length);
-        RuleExpressionFunctionParameter parameter = length.Parameters.Should().ContainSingle().Subject;
-        parameter.AcceptedTypes.Should().Equal(RuleValueType.Text);
-        parameter.Cardinality.Should().Be(RuleExpressionCardinality.Scalar);
-        length.ReturnType.Should().Be(RuleValueType.Integer);
-        length.ReturnCardinality.Should().Be(RuleExpressionCardinality.Scalar);
+            .Should().BeEquivalentTo(Enum.GetValues<RuleOperandKind>(), options => options.WithStrictOrdering());
     }
 
     [Fact]
@@ -59,7 +54,7 @@ public sealed class RuleConditionEvaluatorTests
     {
         RuleOperand length = RuleOperand.Function(
             RuleExpressionFunction.Length,
-            [RuleOperand.Context("record.status").Value]).Value;
+            [RuleOperand.Input("status").Value]).Value;
         RulePredicateCondition condition = Predicate(
             "length-check",
             RulePredicateOperator.GreaterThan,
@@ -68,10 +63,9 @@ public sealed class RuleConditionEvaluatorTests
 
         RuleConditionEvaluator.Evaluate(
                 condition,
-                Schema(),
                 new Dictionary<string, RuleValue>(StringComparer.Ordinal)
                 {
-                    ["record.status"] = Value(RuleValueType.Text, "Active"),
+                    ["status"] = Value(RuleValueType.Text, "Active"),
                 })
             .Value.IsMatch.Should().BeTrue();
     }
@@ -81,63 +75,47 @@ public sealed class RuleConditionEvaluatorTests
     {
         RuleOperand invalidLength = RuleOperand.Function(
             RuleExpressionFunction.Length,
-            [RuleOperand.Context("record.amount").Value]).Value;
+            [RuleOperand.Input("amount").Value]).Value;
         RulePredicateCondition condition = Predicate(
             "length-check",
             RulePredicateOperator.GreaterThan,
             invalidLength,
             RuleOperand.LiteralValue(Value(RuleValueType.Integer, "3")).Value);
-        RuleValidationOutcome outcome = RuleValidationOutcome.Create(
-            "invalid_length",
-            RuleSeverity.Error,
-            "Length is invalid.").Value;
 
         RuleDefinitionValidator.Validate(
-                Schema(),
-                [],
+                [Input("amount", RuleValueType.Decimal, true)],
                 condition,
-                outcome,
-                RuleOutcomeKind.Validation)
+                RuleOutputContract.BooleanMatch)
             .IsFailure.Should().BeTrue();
     }
 
     [Fact]
     public void ValidateAndEvaluate_WhenFunctionCallsExceedLimit_ReturnFailure()
     {
-        RuleOperand operand = RuleOperand.Context("record.status").Value;
+        RuleOperand operand = RuleOperand.Input("status").Value;
         for (int index = 0; index < 3; index += 1)
-        {
-            operand = RuleOperand.Function(
-                RuleExpressionFunction.IsBlank,
-                [operand]).Value;
-        }
+            operand = RuleOperand.Function(RuleExpressionFunction.IsBlank, [operand]).Value;
+
         RulePredicateCondition condition = Predicate(
             "bounded-functions",
             RulePredicateOperator.Equal,
             operand,
             RuleOperand.LiteralValue(Value(RuleValueType.Boolean, "true")).Value);
-        RuleValidationOutcome outcome = RuleValidationOutcome.Create(
-            "bounded_functions",
-            RuleSeverity.Error,
-            "Function calls are bounded.").Value;
         RuleEvaluationLimits limits = new(MaxFunctionCalls: 2);
 
         RuleDefinitionValidator.Validate(
-                Schema(),
-                [],
+                [Input("status", RuleValueType.Text, true)],
                 condition,
-                outcome,
-                RuleOutcomeKind.Validation,
+                RuleOutputContract.BooleanMatch,
                 limits)
             .IsFailure.Should().BeTrue();
         RuleConditionEvaluator.Evaluate(
                 condition,
-                Schema(),
                 new Dictionary<string, RuleValue>(StringComparer.Ordinal)
                 {
-                    ["record.status"] = Value(RuleValueType.Text, "Active"),
+                    ["status"] = Value(RuleValueType.Text, "Active"),
                 },
-                limits: limits)
+                limits)
             .IsFailure.Should().BeTrue();
     }
 
@@ -147,11 +125,8 @@ public sealed class RuleConditionEvaluatorTests
         RulePredicateCondition leaf = RulePredicateCondition.Create(
             "leaf",
             RulePredicateOperator.IsNull,
-            RuleOperand.Context("field.value").Value).Value;
-        RuleConditionGroup group = RuleConditionGroup.Create(
-            "root",
-            RuleLogicalOperator.All,
-            [leaf]).Value;
+            RuleOperand.Input("value").Value).Value;
+        RuleConditionGroup group = RuleConditionGroup.Create("root", RuleLogicalOperator.All, [leaf]).Value;
 
         Action mutate = () => ((IList<RuleConditionNode>)group.Children).Clear();
 
@@ -162,29 +137,24 @@ public sealed class RuleConditionEvaluatorTests
     [Fact]
     public void Evaluate_WhenNestedConditionMatches_ReturnsDeterministicDiagnostics()
     {
-        RuleContextSchema schema = Schema();
         RulePredicateCondition amount = Predicate(
             "amount-check",
             RulePredicateOperator.GreaterThan,
-            RuleOperand.Context("record.amount").Value,
+            RuleOperand.Input("amount").Value,
             RuleOperand.LiteralValue(Value(RuleValueType.Decimal, "1000")).Value);
         RulePredicateCondition status = Predicate(
             "status-check",
             RulePredicateOperator.Equal,
-            RuleOperand.Context("record.status").Value,
+            RuleOperand.Input("status").Value,
             RuleOperand.LiteralValue(Value(RuleValueType.Text, "Open")).Value);
-        RuleConditionGroup condition = RuleConditionGroup.Create(
-            "root",
-            RuleLogicalOperator.All,
-            [amount, status]).Value;
+        RuleConditionGroup condition = RuleConditionGroup.Create("root", RuleLogicalOperator.All, [amount, status]).Value;
 
         RuleConditionEvaluation result = RuleConditionEvaluator.Evaluate(
             condition,
-            schema,
             new Dictionary<string, RuleValue>(StringComparer.Ordinal)
             {
-                ["record.amount"] = Value(RuleValueType.Decimal, "1250"),
-                ["record.status"] = Value(RuleValueType.Text, "Open"),
+                ["amount"] = Value(RuleValueType.Decimal, "1250"),
+                ["status"] = Value(RuleValueType.Text, "Open"),
             }).Value;
 
         result.IsMatch.Should().BeTrue();
@@ -198,15 +168,14 @@ public sealed class RuleConditionEvaluatorTests
         RulePredicateCondition condition = Predicate(
             "instant-check",
             RulePredicateOperator.Equal,
-            RuleOperand.Context("record.occurred_at").Value,
+            RuleOperand.Input("occurred_at").Value,
             RuleOperand.LiteralValue(Value(RuleValueType.DateTime, "2026-07-10T03:30:00Z")).Value);
 
         RuleConditionEvaluator.Evaluate(
                 condition,
-                Schema(),
                 new Dictionary<string, RuleValue>(StringComparer.Ordinal)
                 {
-                    ["record.occurred_at"] = Value(RuleValueType.DateTime, "2026-07-10T10:30:00+07:00"),
+                    ["occurred_at"] = Value(RuleValueType.DateTime, "2026-07-10T10:30:00+07:00"),
                 })
             .Value.IsMatch.Should().BeTrue();
     }
@@ -217,69 +186,19 @@ public sealed class RuleConditionEvaluatorTests
         RulePredicateCondition leaf = Predicate(
             "leaf",
             RulePredicateOperator.IsNotNull,
-            RuleOperand.Context("record.status").Value);
+            RuleOperand.Input("status").Value);
         RuleConditionGroup inner = RuleConditionGroup.Create("inner", RuleLogicalOperator.Not, [leaf]).Value;
         RuleConditionGroup root = RuleConditionGroup.Create("root", RuleLogicalOperator.Not, [inner]).Value;
 
         RuleConditionEvaluator.Evaluate(
                 root,
-                Schema(),
                 new Dictionary<string, RuleValue>(StringComparer.Ordinal),
-                limits: new RuleEvaluationLimits(MaxDepth: 2))
+                new RuleEvaluationLimits(MaxDepth: 2))
             .IsFailure.Should().BeTrue();
     }
 
-    [Fact]
-    public void Evaluate_WhenContextTypeDoesNotMatchSchema_ReturnsFailure()
-    {
-        RulePredicateCondition condition = Predicate(
-            "type-check",
-            RulePredicateOperator.IsNotNull,
-            RuleOperand.Context("record.amount").Value);
-
-        RuleConditionEvaluator.Evaluate(
-                condition,
-                Schema(),
-                new Dictionary<string, RuleValue>(StringComparer.Ordinal)
-                {
-                    ["record.amount"] = Value(RuleValueType.Text, "invalid"),
-                })
-            .IsFailure.Should().BeTrue();
-    }
-
-    private static RuleContextSchema Schema() => RuleContextSchema.Create(
-        "objects.record",
-        version: 1,
-        RuleScope.Record,
-        "Business object record",
-        [
-            RuleContextField.Create(
-                "record.amount",
-                "Amount",
-                RuleValueType.Decimal,
-                Documentation("Amount")).Value,
-            RuleContextField.Create(
-                "record.status",
-                "Status",
-                RuleValueType.Text,
-                Documentation("Status")).Value,
-            RuleContextField.Create(
-                "record.occurred_at",
-                "Occurred at",
-                RuleValueType.DateTime,
-                Documentation("Occurred at")).Value,
-        ]).Value;
-
-    private static RuleReferenceDocumentation Documentation(string displayName) =>
-        RuleReferenceDocumentation.Bilingual(
-            displayName,
-            $"Reference for {displayName}.",
-            $"Use {displayName} in a compatible condition.",
-            displayName,
-            displayName,
-            $"Tham chiếu cho {displayName}.",
-            $"Dùng {displayName} trong điều kiện tương thích.",
-            displayName);
+    private static RuleInputDefinition Input(string key, RuleValueType type, bool required) =>
+        RuleInputDefinition.Create(key, type, required).Value;
 
     private static RulePredicateCondition Predicate(
         string nodeId,

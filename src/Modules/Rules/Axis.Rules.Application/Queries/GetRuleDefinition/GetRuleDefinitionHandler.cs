@@ -23,9 +23,8 @@ public sealed class GetRuleDefinitionHandler(
         if (key.IsFailure)
             return RuleDefinitionFailures.NotFound<RuleDefinitionDetailDto>();
 
-        SystemRuleDefinition? system = SystemRuleCatalog.Definitions
+        RuleDefinition? system = SystemRuleCatalog.Definitions
             .Where(definition => definition.Key == key.Value)
-            .OrderByDescending(definition => definition.Version)
             .FirstOrDefault();
         if (system is not null)
             return RuleContractMapper.ToDetailDto(system);

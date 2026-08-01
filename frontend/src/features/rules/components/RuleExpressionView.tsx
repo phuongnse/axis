@@ -1,32 +1,8 @@
-import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button } from '@/components/ui/button';
-import type {
-  RuleContextSchema,
-  RuleExpressionDisplayNode,
-  RuleLogicalOperator,
-  RuleParameterDefinition,
-} from '../api';
-import { RuleConditionTree } from './RuleConditionTree';
-import { RuleExpressionGuide, type RuleExpressionGuideTarget } from './RuleExpressionGuide';
+import type { RuleExpressionDisplayNode, RuleLogicalOperator } from '../api';
 
-export function RuleExpressionView({
-  display,
-  definitionKey,
-  expressionLanguageVersion,
-  contextSchema,
-  parameters = [],
-  references = false,
-}: {
-  display: RuleExpressionDisplayNode;
-  definitionKey?: string;
-  expressionLanguageVersion?: number;
-  contextSchema?: RuleContextSchema;
-  parameters?: RuleParameterDefinition[];
-  references?: boolean;
-}) {
+export function RuleExpressionView({ display }: { display: RuleExpressionDisplayNode }) {
   const { t } = useTranslation();
-  const [target, setTarget] = useState<RuleExpressionGuideTarget | null>(null);
 
   if (!isValidRuleExpressionDisplay(display)) {
     return (
@@ -37,72 +13,30 @@ export function RuleExpressionView({
   }
 
   return (
-    <>
-      <div data-slot="rule-expression">
-        <DisplayNodeView node={display} references={references} onReference={setTarget} />
-      </div>
-      <RuleExpressionGuide
-        expressionLanguageVersion={expressionLanguageVersion}
-        definitionKey={definitionKey}
-        contextSchema={contextSchema}
-        parameters={parameters}
-        target={target}
-        open={target !== null}
-        trigger={false}
-        onOpenChange={(open) => !open && setTarget(null)}
-      />
-    </>
+    <div data-slot="rule-expression">
+      <DisplayNodeView node={display} />
+    </div>
   );
 }
 
-function DisplayNodeView({
-  node,
-  references,
-  onReference,
-}: {
-  node: RuleExpressionDisplayNode;
-  references: boolean;
-  onReference: (selection: RuleExpressionGuideTarget) => void;
-}) {
+function DisplayNodeView({ node }: { node: RuleExpressionDisplayNode }) {
+  const { t } = useTranslation();
   const children = node.children ?? [];
   const logicalToken = (node.tokens ?? []).find(
     (token) => token.referenceKind === 'LogicalOperator',
   );
   const logicalOperator = logicalOperatorFrom(logicalToken?.referenceKey);
-  const logicalSelection = logicalToken
-    ? displayTokenTarget(
-        logicalToken.referenceKind,
-        logicalToken.referenceKey,
-        logicalToken.text ?? '',
-      )
-    : null;
   const content = (
     <span className="text-sm leading-6 text-foreground">
       {(node.tokens ?? []).map((token, index, tokens) => {
         const text = token.text ?? '';
         const spacer = displayTokenSpacer(index, text, tokens[index - 1]?.text ?? '');
-        const selection = displayTokenTarget(token.referenceKind, token.referenceKey, text);
-        const tokenClassName =
-          token.referenceKind === 'Parameter' || token.referenceKind === 'Context' || token.isCode
-            ? 'font-mono text-xs font-medium'
-            : undefined;
+        const tokenClassName = token.isCode ? 'font-mono text-xs font-medium' : undefined;
         return (
           // biome-ignore lint/suspicious/noArrayIndexKey: Projection tokens are immutable and do not have independent identity.
           <span key={`${index}:${text}`}>
             {spacer}
-            {references && selection ? (
-              <Button
-                type="button"
-                variant="link"
-                size="xs"
-                className="inline-flex h-auto p-0 font-medium underline decoration-dotted underline-offset-4"
-                onClick={() => onReference(selection)}
-              >
-                <span className={tokenClassName}>{text}</span>
-              </Button>
-            ) : (
-              <span className={tokenClassName ?? 'font-medium'}>{text}</span>
-            )}
+            <span className={tokenClassName ?? 'font-medium'}>{text}</span>
           </span>
         );
       })}
@@ -117,23 +51,69 @@ function DisplayNodeView({
     throw new Error('Rule logical group projection is invalid.');
   }
 
+  const onlyChild = children.length === 1 ? children[0] : undefined;
+  if (onlyChild && logicalOperator !== 'Not') {
+    return <DisplayNodeView node={onlyChild} />;
+  }
+
+  const separator =
+    logicalOperator === 'All'
+      ? t('rules.logicAnd')
+      : logicalOperator === 'Any'
+        ? t('rules.logicOr')
+        : t('rules.logicNot');
+  const directPredicates = children.every((child) => (child.children ?? []).length === 0);
+
+  if (logicalOperator === 'Not') {
+    return (
+      <div
+        data-slot="rule-expression-group"
+        data-operator={logicalOperator}
+        className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-1"
+      >
+        <LogicalSeparator label={separator} accessibleLabel={logicalToken?.text ?? separator} />
+        {children.map((child, index) => (
+          <DisplayNodeView
+            key={child.nodeId ?? `${node.nodeId ?? 'display'}-${index}`}
+            node={child}
+          />
+        ))}
+      </div>
+    );
+  }
+
   return (
-    <RuleConditionTree
-      operator={logicalOperator}
-      operatorLabel={logicalToken?.text ?? ''}
-      onOperatorClick={
-        references && logicalSelection ? () => onReference(logicalSelection) : undefined
+    <div
+      data-slot="rule-expression-group"
+      data-operator={logicalOperator}
+      className={
+        directPredicates
+          ? 'flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-1'
+          : 'min-w-0 space-y-1'
       }
     >
       {children.map((child, index) => (
-        <DisplayNodeView
+        <div
           key={child.nodeId ?? `${node.nodeId ?? 'display'}-${index}`}
-          node={child}
-          references={references}
-          onReference={onReference}
-        />
+          className={directPredicates ? 'contents' : undefined}
+        >
+          {index > 0 ? (
+            <LogicalSeparator label={separator} accessibleLabel={logicalToken?.text ?? separator} />
+          ) : null}
+          <DisplayNodeView node={child} />
+        </div>
       ))}
-    </RuleConditionTree>
+    </div>
+  );
+}
+
+function LogicalSeparator({ label, accessibleLabel }: { label: string; accessibleLabel: string }) {
+  const className =
+    'h-auto p-0 text-xs font-semibold uppercase tracking-wide text-muted-foreground';
+  return (
+    <span data-slot="rule-expression-operator" title={accessibleLabel} className={className}>
+      {label}
+    </span>
   );
 }
 
@@ -151,19 +131,6 @@ function isValidRuleExpressionDisplay(node: RuleExpressionDisplayNode): boolean 
     logicalOperatorFrom(logicalToken?.referenceKey) !== null &&
     children.every(isValidRuleExpressionDisplay)
   );
-}
-
-function displayTokenTarget(
-  kind: NonNullable<RuleExpressionDisplayNode['tokens']>[number]['referenceKind'],
-  key: string | null | undefined,
-  displayText: string,
-): RuleExpressionGuideTarget | null {
-  if (!kind || !key || !displayText) return null;
-  return {
-    referenceKind: kind === 'Literal' ? 'ValueType' : kind,
-    referenceKey: key,
-    displayText,
-  };
 }
 
 function displayTokenSpacer(index: number, text: string, previous: string): string {

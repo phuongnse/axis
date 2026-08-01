@@ -25,12 +25,19 @@ const systemRule = (definitionKey: string, name: string, targetTypeKeys: string[
   name,
   description: `${name} validation.`,
   origin: 'System',
-  scope: 'Field',
-  outcomeKind: 'Validation',
   status: 'Published',
+  expressionLanguageVersion: 1,
   latestPublishedVersion: 1,
-  applicability: { targetTypeKeys, configurationConstraints: {} },
-  parameters: [],
+  output: { type: 'Boolean', cardinality: 'Scalar' },
+  inputs: [
+    {
+      key: 'value',
+      types: targetTypeKeys.map((type) => (type === 'Choice' ? 'Text' : type)),
+      isRequired: true,
+      allowMultiple: false,
+      allowedValues: [],
+    },
+  ],
 });
 
 const fieldRuleDefinitions = {
@@ -76,7 +83,7 @@ function accessToken(): string {
 
 async function mockAuthenticatedSession(page: Page): Promise<void> {
   await page.addInitScript(() => {
-    window.__AXIS_DISABLE_DEVTOOLS__ = true;
+    (window as Window & { __AXIS_DISABLE_DEVTOOLS__?: boolean }).__AXIS_DISABLE_DEVTOOLS__ = true;
     localStorage.setItem('axis.language', 'en');
     localStorage.setItem('axis.theme', 'light');
   });

@@ -28,9 +28,14 @@ internal sealed class BusinessObjectDefinitionVersionFieldRuleConfiguration
             .HasConversion(BusinessObjectValueConverters.FieldRuleId)
             .IsRequired();
 
-        BusinessObjectFieldRuleConfiguration.ConfigureRuleColumns(builder);
+        builder.Property<Guid>(nameof(BusinessObjectDefinitionVersionFieldRule.BindingId))
+            .HasColumnName("binding_id")
+            .IsRequired();
+        builder.Property<int>(nameof(BusinessObjectDefinitionVersionFieldRule.Order))
+            .HasColumnName("sort_order")
+            .IsRequired();
 
-        builder.HasIndex("BusinessObjectDefinitionVersionFieldId", nameof(BusinessObjectDefinitionVersionFieldRule.DefinitionKey))
+        builder.HasIndex("BusinessObjectDefinitionVersionFieldId", nameof(BusinessObjectDefinitionVersionFieldRule.BindingId))
             .IsUnique();
 
         builder.HasIndex("BusinessObjectDefinitionVersionFieldId", nameof(BusinessObjectDefinitionVersionFieldRule.Order));

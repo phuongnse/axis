@@ -11,7 +11,6 @@ namespace Axis.Rules.Application.Commands.PublishRuleDefinition;
 
 public sealed class PublishRuleDefinitionHandler(
     ICurrentUser currentUser,
-    RuleContextSchemaRegistry contextSchemas,
     IRuleDefinitionRepository repository,
     IUnitOfWork unitOfWork)
     : ICommandHandler<PublishRuleDefinitionCommand, RuleDefinitionDetailDto>
@@ -36,20 +35,10 @@ public sealed class PublishRuleDefinitionHandler(
         if (definition is null)
             return RuleDefinitionFailures.NotFound<RuleDefinitionDetailDto>();
 
-        RuleContextSchema? schema = await contextSchemas.FindAsync(
-            definition.WorkspaceId,
-            definition.ContextKey.Value,
-            definition.ContextSchemaVersion,
-            cancellationToken);
-        if (schema is null || definition.Condition is null || definition.Outcome is null)
-            return RuleDefinitionFailures.Invalid<RuleDefinitionDetailDto>("Rule draft is incomplete or its context schema is unavailable.");
+        if (definition.Condition is null)
+            return RuleDefinitionFailures.Invalid<RuleDefinitionDetailDto>("Rule draft is incomplete.");
 
-        Result valid = RuleDefinitionValidator.Validate(
-            schema,
-            definition.Parameters,
-            definition.Condition,
-            definition.Outcome,
-            definition.OutcomeKind);
+        Result valid = RuleDefinitionValidator.Validate(definition.Inputs, definition.Condition, definition.Output);
         if (valid.IsFailure)
             return RuleDefinitionFailures.Invalid<RuleDefinitionDetailDto>(valid.Error);
 

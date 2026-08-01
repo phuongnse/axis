@@ -311,19 +311,13 @@ namespace Axis.BusinessObjects.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<Guid>("BindingId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("binding_id");
+
                     b.Property<Guid>("BusinessObjectDefinitionVersionFieldId")
                         .HasColumnType("uuid")
                         .HasColumnName("business_object_definition_version_field_id");
-
-                    b.Property<string>("DefinitionKey")
-                        .IsRequired()
-                        .HasMaxLength(120)
-                        .HasColumnType("character varying(120)")
-                        .HasColumnName("definition_key");
-
-                    b.Property<int>("DefinitionVersion")
-                        .HasColumnType("integer")
-                        .HasColumnName("definition_version");
 
                     b.Property<int>("Order")
                         .HasColumnType("integer")
@@ -333,14 +327,9 @@ namespace Axis.BusinessObjects.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("source_field_rule_id");
 
-                    b.Property<string>("_parameters")
-                        .IsRequired()
-                        .HasColumnType("jsonb")
-                        .HasColumnName("parameters");
-
                     b.HasKey("Id");
 
-                    b.HasIndex("BusinessObjectDefinitionVersionFieldId", "DefinitionKey")
+                    b.HasIndex("BusinessObjectDefinitionVersionFieldId", "BindingId")
                         .IsUnique();
 
                     b.HasIndex("BusinessObjectDefinitionVersionFieldId", "Order")
@@ -407,32 +396,21 @@ namespace Axis.BusinessObjects.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<Guid>("BindingId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("binding_id");
+
                     b.Property<Guid>("BusinessObjectFieldDefinitionId")
                         .HasColumnType("uuid")
                         .HasColumnName("business_object_field_definition_id");
-
-                    b.Property<string>("DefinitionKey")
-                        .IsRequired()
-                        .HasMaxLength(120)
-                        .HasColumnType("character varying(120)")
-                        .HasColumnName("definition_key");
-
-                    b.Property<int>("DefinitionVersion")
-                        .HasColumnType("integer")
-                        .HasColumnName("definition_version");
 
                     b.Property<int>("Order")
                         .HasColumnType("integer")
                         .HasColumnName("sort_order");
 
-                    b.Property<string>("_parameters")
-                        .IsRequired()
-                        .HasColumnType("jsonb")
-                        .HasColumnName("parameters");
-
                     b.HasKey("Id");
 
-                    b.HasIndex("BusinessObjectFieldDefinitionId", "DefinitionKey")
+                    b.HasIndex("BusinessObjectFieldDefinitionId", "BindingId")
                         .IsUnique();
 
                     b.HasIndex("BusinessObjectFieldDefinitionId", "Order")

@@ -232,15 +232,10 @@ public static class RuleExpressionLanguage
         Array.AsReadOnly<RuleOperandKindDefinition>(
         [
             new(
-                RuleOperandKind.Context,
+                RuleOperandKind.Input,
                 Doc(
-                    "Context value", "A typed value supplied by the product context where the rule runs.", "Choose a field exposed by the selected context schema and reference it through @context.", "@context.field.value",
-                    "Giá trị context", "Giá trị có kiểu do context sản phẩm nơi rule chạy cung cấp.", "Chọn một trường được context schema đã chọn công bố và tham chiếu qua @context.", "@context.field.value")),
-            new(
-                RuleOperandKind.Parameter,
-                Doc(
-                    "Parameter", "A typed configurable value supplied when the rule is applied.", "Define the parameter, then reference its stable key through @parameters.", "@parameters.threshold",
-                    "Parameter", "Giá trị cấu hình có kiểu được cung cấp khi áp dụng rule.", "Khai báo parameter rồi tham chiếu stable key của nó qua @parameters.", "@parameters.threshold")),
+                    "Rule input", "A typed value supplied by the consumer that runs the rule.", "Give the input a clear label, then choose it in a condition.", "Threshold",
+                    "Input của rule", "Giá trị có kiểu do consumer chạy rule cung cấp.", "Đặt tên rõ ràng cho input rồi chọn nó trong điều kiện.", "Ngưỡng")),
             new(
                 RuleOperandKind.Literal,
                 Doc(
@@ -249,8 +244,8 @@ public static class RuleExpressionLanguage
             new(
                 RuleOperandKind.Function,
                 Doc(
-                    "Function result", "A typed value calculated by a registered pure function.", "Choose a function and provide arguments matching its signature.", "Length(@context.field.value)",
-                    "Kết quả function", "Giá trị có kiểu được tính bởi một pure function đã đăng ký.", "Chọn function và cung cấp argument đúng signature.", "Độ dài(@context.field.value)")),
+                    "Calculated value", "A typed value calculated by a registered pure function.", "Choose a calculation and provide compatible inputs or fixed values.", "Length of Customer name",
+                    "Giá trị tính toán", "Giá trị có kiểu được tính bởi một pure function đã đăng ký.", "Chọn phép tính và cung cấp input hoặc giá trị cố định tương thích.", "Độ dài của Tên khách hàng")),
         ]);
 
     public static IReadOnlyList<RuleValueTypeDefinition> ValueTypes { get; } =
@@ -302,9 +297,9 @@ public static class RuleExpressionLanguage
             new("maxFunctionCalls", RuleEvaluationLimits.Default.MaxFunctionCalls, Doc(
                 "Maximum function calls", "The largest number of function calls in one expression.", "Keep all nested and direct function calls within this value.", "50",
                 "Số lần gọi function tối đa", "Số lần gọi function lớn nhất trong một biểu thức.", "Giữ mọi lần gọi function trong giới hạn này.", "50")),
-            new("maxParameters", RuleEvaluationLimits.Default.MaxParameters, Doc(
-                "Maximum parameters", "The largest number of parameters available to one rule.", "Keep the rule parameter contract within this value.", "100",
-                "Số parameter tối đa", "Số parameter lớn nhất của một rule.", "Giữ contract parameter của rule trong giới hạn này.", "100")),
+            new("maxInputs", RuleEvaluationLimits.Default.MaxInputs, Doc(
+                "Maximum inputs", "The largest number of inputs available to one rule.", "Keep the rule input contract within this value.", "100",
+                "Số input tối đa", "Số input lớn nhất của một rule.", "Giữ contract input của rule trong giới hạn này.", "100")),
             new("maxExecutionSteps", RuleEvaluationLimits.Default.MaxExecutionSteps, Doc(
                 "Maximum evaluation steps", "The evaluation work allowed for one expression.", "Simplify the expression if it exceeds this safety limit.", "1000",
                 "Số bước đánh giá tối đa", "Lượng xử lý cho phép khi đánh giá một biểu thức.", "Đơn giản hóa biểu thức nếu vượt giới hạn an toàn này.", "1000")),

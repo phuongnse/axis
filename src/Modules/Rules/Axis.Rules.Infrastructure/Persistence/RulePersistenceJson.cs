@@ -1,14 +1,19 @@
 using System.Text.Json;
 using Axis.Rules.Contracts;
 using Axis.Rules.Domain;
-using Contracts = Axis.Rules.Contracts;
-using DomainDecision = Axis.Rules.Domain.RuleDecision;
+using Axis.Shared.Domain.Primitives;
+using ContractExpressionCardinality = Axis.Rules.Contracts.RuleExpressionCardinality;
+using ContractExpressionFunction = Axis.Rules.Contracts.RuleExpressionFunction;
+using ContractInputMappingKind = Axis.Rules.Contracts.RuleInputMappingKind;
+using ContractLogicalOperator = Axis.Rules.Contracts.RuleLogicalOperator;
+using ContractOperandKind = Axis.Rules.Contracts.RuleOperandKind;
+using ContractPredicateOperator = Axis.Rules.Contracts.RulePredicateOperator;
+using ContractValueType = Axis.Rules.Contracts.RuleValueType;
+using DomainExpressionCardinality = Axis.Rules.Domain.RuleExpressionCardinality;
 using DomainExpressionFunction = Axis.Rules.Domain.RuleExpressionFunction;
 using DomainLogicalOperator = Axis.Rules.Domain.RuleLogicalOperator;
 using DomainOperandKind = Axis.Rules.Domain.RuleOperandKind;
-using DomainOutcomeKind = Axis.Rules.Domain.RuleOutcomeKind;
 using DomainPredicateOperator = Axis.Rules.Domain.RulePredicateOperator;
-using DomainSeverity = Axis.Rules.Domain.RuleSeverity;
 using DomainValueType = Axis.Rules.Domain.RuleValueType;
 
 namespace Axis.Rules.Infrastructure.Persistence;
@@ -17,11 +22,11 @@ internal static class RulePersistenceJson
 {
     private static readonly JsonSerializerOptions Options = new(JsonSerializerDefaults.Web);
 
-    public static string SerializeParameters(IReadOnlyList<RuleParameterDefinition> parameters) =>
-        JsonSerializer.Serialize(parameters.Select(ToDto).ToArray(), Options);
+    public static string SerializeInputs(IReadOnlyList<RuleInputDefinition> inputs) =>
+        JsonSerializer.Serialize(inputs.Select(ToDto).ToArray(), Options);
 
-    public static List<RuleParameterDefinition> DeserializeParameters(string json) =>
-        (JsonSerializer.Deserialize<RuleParameterDefinitionDto[]>(json, Options) ?? [])
+    public static List<RuleInputDefinition> DeserializeInputs(string json) =>
+        (JsonSerializer.Deserialize<RuleInputDefinitionDto[]>(json, Options) ?? [])
         .Select(ToDomain)
         .ToList();
 
@@ -34,47 +39,92 @@ internal static class RulePersistenceJson
         return dto is null ? null : ToDomain(dto);
     }
 
-    public static string SerializeOutcome(RuleOutcome? outcome) =>
-        JsonSerializer.Serialize(outcome is null ? null : ToDto(outcome), Options);
+    public static string SerializeOutput(RuleOutputContract output) =>
+        JsonSerializer.Serialize(ToDto(output), Options);
 
-    public static RuleOutcome? DeserializeOutcome(string json)
+    public static string SerializeInputMappings(IReadOnlyDictionary<string, RuleInputMapping> mappings)
     {
-        RuleOutcomeDto? dto = JsonSerializer.Deserialize<RuleOutcomeDto>(json, Options);
-        return dto is null ? null : ToDomain(dto);
+        SortedDictionary<string, RuleInputMappingDto> serialized = new(StringComparer.Ordinal);
+        foreach ((string key, RuleInputMapping mapping) in mappings)
+        {
+            serialized.Add(
+                key,
+                new RuleInputMappingDto(
+                    (ContractInputMappingKind)mapping.Kind,
+                    mapping.ContextKey,
+                    mapping.LiteralValues));
+        }
+        return JsonSerializer.Serialize(serialized, Options);
     }
 
-    private static RuleParameterDefinitionDto ToDto(RuleParameterDefinition parameter) =>
-        new(
-            parameter.Key,
-            (Contracts.RuleValueType)parameter.Type,
-            parameter.IsRequired,
-            parameter.AllowMultiple,
-            parameter.AllowedValues);
-
-    private static RuleParameterDefinition ToDomain(RuleParameterDefinitionDto parameter)
+    public static Dictionary<string, RuleInputMapping> DeserializeInputMappings(string json)
     {
-        Shared.Domain.Primitives.Result<RuleParameterDefinition> result = RuleParameterDefinition.Create(
-            parameter.Key,
-            (DomainValueType)parameter.Type,
-            parameter.IsRequired,
-            parameter.AllowMultiple,
-            parameter.AllowedValues);
+        Dictionary<string, RuleInputMappingDto> dtos =
+            JsonSerializer.Deserialize<Dictionary<string, RuleInputMappingDto>>(json, Options)
+            ?? new(StringComparer.Ordinal);
+        Dictionary<string, RuleInputMapping> mappings = new(StringComparer.Ordinal);
+        foreach ((string key, RuleInputMappingDto dto) in dtos)
+        {
+            Result<RuleInputMapping> mapping = dto.Kind switch
+            {
+                ContractInputMappingKind.Context => RuleInputMapping.FromContext(dto.ContextKey ?? string.Empty),
+                ContractInputMappingKind.Literal => RuleInputMapping.FromLiteral(dto.LiteralValues),
+                _ => Result.Failure<RuleInputMapping>("Persisted rule input mapping kind is invalid."),
+            };
+            if (mapping.IsFailure)
+                throw new InvalidOperationException(mapping.Error);
+            mappings.Add(key, mapping.Value);
+        }
+        return mappings;
+    }
+
+    public static RuleOutputContract DeserializeOutput(string json)
+    {
+        RuleOutputContractDto dto = JsonSerializer.Deserialize<RuleOutputContractDto>(json, Options)
+            ?? throw new InvalidOperationException("Persisted rule output contract is missing.");
+        Result<RuleOutputContract> output = RuleOutputContract.Create(
+            (DomainValueType)dto.Type,
+            (DomainExpressionCardinality)dto.Cardinality);
+        return output.IsSuccess ? output.Value : throw new InvalidOperationException(output.Error);
+    }
+
+    private static RuleInputDefinitionDto ToDto(RuleInputDefinition input) =>
+        new(
+            input.Key,
+            input.Label,
+            input.Types.Select(type => (ContractValueType)type).ToArray(),
+            input.IsRequired,
+            input.AllowMultiple,
+            input.AllowedValues);
+
+    private static RuleOutputContractDto ToDto(RuleOutputContract output) =>
+        new((ContractValueType)output.Type, (ContractExpressionCardinality)output.Cardinality);
+
+    private static RuleInputDefinition ToDomain(RuleInputDefinitionDto input)
+    {
+        Result<RuleInputDefinition> result = RuleInputDefinition.Restore(
+            input.Key,
+            input.Label,
+            input.Types.Select(type => (DomainValueType)type).ToArray(),
+            input.IsRequired,
+            input.AllowMultiple,
+            input.AllowedValues);
         return result.IsSuccess ? result.Value : throw new InvalidOperationException(result.Error);
     }
 
     private static RuleConditionNodeDto ToDto(RuleConditionNode node) => node switch
     {
-        RuleConditionGroup group => new RuleConditionNodeDto(
+        RuleConditionGroup group => new(
             group.NodeId,
-            (Contracts.RuleLogicalOperator)group.Operator,
+            (ContractLogicalOperator)group.Operator,
             null,
             null,
             null,
             group.Children.Select(ToDto).ToArray()),
-        RulePredicateCondition predicate => new RuleConditionNodeDto(
+        RulePredicateCondition predicate => new(
             predicate.NodeId,
             null,
-            (Contracts.RulePredicateOperator)predicate.Operator,
+            (ContractPredicateOperator)predicate.Operator,
             ToDto(predicate.Left),
             predicate.Right is null ? null : ToDto(predicate.Right),
             []),
@@ -98,11 +148,8 @@ internal static class RulePersistenceJson
 
         if (isGroup)
         {
-            if (node.Children!.Any(child => child is null))
-                throw new InvalidOperationException("Persisted rule condition shape is invalid.");
-
             RuleConditionNode[] children = node.Children!.Select(ToDomain).ToArray();
-            Shared.Domain.Primitives.Result<RuleConditionGroup> group = RuleConditionGroup.Create(
+            Result<RuleConditionGroup> group = RuleConditionGroup.Create(
                 node.NodeId,
                 (DomainLogicalOperator)node.LogicalOperator!.Value,
                 children);
@@ -111,7 +158,7 @@ internal static class RulePersistenceJson
 
         RuleOperand left = ToDomain(node.Left!);
         RuleOperand? right = node.Right is null ? null : ToDomain(node.Right);
-        Shared.Domain.Primitives.Result<RulePredicateCondition> predicate = RulePredicateCondition.Create(
+        Result<RulePredicateCondition> predicate = RulePredicateCondition.Create(
             node.NodeId,
             (DomainPredicateOperator)node.PredicateOperator!.Value,
             left,
@@ -121,24 +168,19 @@ internal static class RulePersistenceJson
 
     private static RuleOperandDto ToDto(RuleOperand operand) =>
         new(
-            (Contracts.RuleOperandKind)operand.Kind,
+            (ContractOperandKind)operand.Kind,
             operand.Reference,
             operand.Literal is null
                 ? null
-                : new RuleValueDto(
-                    (Contracts.RuleValueType)operand.Literal.Type,
-                    operand.Literal.Values),
-            operand.FunctionKind is null
-                ? null
-                : (Contracts.RuleExpressionFunction)operand.FunctionKind.Value,
+                : new RuleValueDto((ContractValueType)operand.Literal.Type, operand.Literal.Values),
+            operand.FunctionKind is null ? null : (ContractExpressionFunction)operand.FunctionKind.Value,
             operand.Arguments.Select(ToDto).ToArray());
 
     private static RuleOperand ToDomain(RuleOperandDto operand)
     {
-        Shared.Domain.Primitives.Result<RuleOperand> result = (DomainOperandKind)operand.Kind switch
+        Result<RuleOperand> result = (DomainOperandKind)operand.Kind switch
         {
-            DomainOperandKind.Context => RuleOperand.Context(operand.Reference ?? string.Empty),
-            DomainOperandKind.Parameter => RuleOperand.Parameter(operand.Reference ?? string.Empty),
+            DomainOperandKind.Input => RuleOperand.Input(operand.Reference ?? string.Empty),
             DomainOperandKind.Literal => Literal(operand.Literal),
             DomainOperandKind.Function => Function(operand),
             _ => throw new InvalidOperationException("Persisted rule operand kind is invalid."),
@@ -146,68 +188,29 @@ internal static class RulePersistenceJson
         return result.IsSuccess ? result.Value : throw new InvalidOperationException(result.Error);
     }
 
-    private static Axis.Shared.Domain.Primitives.Result<RuleOperand> Literal(RuleValueDto? literal)
+    private static Result<RuleOperand> Literal(RuleValueDto? literal)
     {
         if (literal is null)
-            return Axis.Shared.Domain.Primitives.Result.Failure<RuleOperand>("Persisted rule literal is missing.");
+            return Result.Failure<RuleOperand>("Persisted rule literal is missing.");
 
-        Shared.Domain.Primitives.Result<RuleValue> value = RuleValue.Create((DomainValueType)literal.Type, literal.Values, allowMultiple: true);
+        Result<RuleValue> value = RuleValue.Create(
+            (DomainValueType)literal.Type,
+            literal.Values,
+            allowMultiple: true);
         return value.IsSuccess
             ? RuleOperand.LiteralValue(value.Value)
-            : Axis.Shared.Domain.Primitives.Result.Failure<RuleOperand>(value.Error);
+            : Result.Failure<RuleOperand>(value.Error);
     }
 
-    private static Axis.Shared.Domain.Primitives.Result<RuleOperand> Function(RuleOperandDto operand)
+    private static Result<RuleOperand> Function(RuleOperandDto operand)
     {
         if (operand.Function is null || operand.Arguments is null)
-            return Axis.Shared.Domain.Primitives.Result.Failure<RuleOperand>(
-                "Persisted rule function is invalid.");
+            return Result.Failure<RuleOperand>("Persisted rule function is invalid.");
 
         List<RuleOperand> arguments = [];
         foreach (RuleOperandDto argumentDto in operand.Arguments)
             arguments.Add(ToDomain(argumentDto));
 
         return RuleOperand.Function((DomainExpressionFunction)operand.Function.Value, arguments);
-    }
-
-    private static RuleOutcomeDto ToDto(RuleOutcome outcome) => outcome switch
-    {
-        RuleValidationOutcome validation => new RuleOutcomeDto(
-            Contracts.RuleOutcomeKind.Validation,
-            validation.Code,
-            (Contracts.RuleSeverity)validation.Severity,
-            validation.Message,
-            null),
-        RuleDecisionOutcome decision => new RuleOutcomeDto(
-            Contracts.RuleOutcomeKind.Decision,
-            null,
-            null,
-            null,
-            (Contracts.RuleDecision)decision.Decision),
-        _ => throw new InvalidOperationException("Rule outcome type is not supported."),
-    };
-
-    private static RuleOutcome ToDomain(RuleOutcomeDto outcome)
-    {
-        if ((DomainOutcomeKind)outcome.Kind == DomainOutcomeKind.Validation && outcome.Severity is not null)
-        {
-            Shared.Domain.Primitives.Result<RuleValidationOutcome> validation = RuleValidationOutcome.Create(
-                outcome.ViolationCode ?? string.Empty,
-                (DomainSeverity)outcome.Severity.Value,
-                outcome.Message ?? string.Empty);
-            return validation.IsSuccess
-                ? validation.Value
-                : throw new InvalidOperationException(validation.Error);
-        }
-
-        if ((DomainOutcomeKind)outcome.Kind == DomainOutcomeKind.Decision && outcome.Decision is not null)
-        {
-            Shared.Domain.Primitives.Result<RuleDecisionOutcome> decision = RuleDecisionOutcome.Create((DomainDecision)outcome.Decision.Value);
-            return decision.IsSuccess
-                ? decision.Value
-                : throw new InvalidOperationException(decision.Error);
-        }
-
-        throw new InvalidOperationException("Persisted rule outcome shape is invalid.");
     }
 }

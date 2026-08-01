@@ -20,10 +20,6 @@ public sealed class PostgresRuleCatalogSearchProviderTests(RulesDatabaseFixture 
             RuleDefinitionKey.Create($"customer_archive_{Guid.NewGuid():N}"[..26]).Value,
             "Customer archive",
             "Workspace customer retention rule.",
-            RuleScope.Field,
-            RuleContextKey.Create("business_objects.field.text").Value,
-            1,
-            RuleOutcomeKind.Validation,
             Guid.NewGuid(),
             DateTime.UtcNow).Value;
         context.RuleDefinitions.Add(workspaceDefinition);
@@ -34,7 +30,6 @@ public sealed class PostgresRuleCatalogSearchProviderTests(RulesDatabaseFixture 
             workspaceId,
             [new RuleTextSearchDocument("field.customer", "Customer", "System customer rule.")],
             includeWorkspace: true,
-            workspaceScope: null,
             workspaceStatus: null,
             skip: 0,
             take: 1,

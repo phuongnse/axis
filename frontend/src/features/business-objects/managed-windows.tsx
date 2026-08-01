@@ -46,9 +46,7 @@ export const businessObjectsManagedWindowRenderers: ManagedWindowRendererRegistr
 function BusinessObjectDefinitionWindowRenderer({ descriptor }: ManagedWindowRendererProps) {
   const { windowId, closeWindow, replaceWindow } = useCurrentManagedWindow();
   const payload = readPayload(descriptor);
-  const rulesQuery = useQuery(
-    ruleDefinitionsListQueryOptions({ page: 1, pageSize: 100, scope: 'Field' }),
-  );
+  const rulesQuery = useQuery(ruleDefinitionsListQueryOptions({ page: 1, pageSize: 100 }));
 
   return (
     <BusinessObjectDefinitionDialog

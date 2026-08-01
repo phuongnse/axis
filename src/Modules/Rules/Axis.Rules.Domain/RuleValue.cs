@@ -6,8 +6,8 @@ namespace Axis.Rules.Domain;
 
 public sealed partial record RuleValue
 {
-    private const int MaxValueCount = 1000;
-    private const int MaxTextLength = 4000;
+    internal const int MaximumValueCount = 1000;
+    internal const int MaximumTextLength = 4000;
 
     private RuleValue(RuleValueType type, IReadOnlyList<string> values)
     {
@@ -34,7 +34,7 @@ public sealed partial record RuleValue
         if (!allowMultiple && source.Length != 1)
             return Result.Failure<RuleValue>("Rule value must contain exactly one value.");
 
-        if (source.Length > MaxValueCount)
+        if (source.Length > MaximumValueCount)
             return Result.Failure<RuleValue>("Rule value contains too many values.");
 
         List<string> normalized = [];
@@ -66,7 +66,7 @@ public sealed partial record RuleValue
     }
 
     private static Result<string> NormalizeText(string value) =>
-        value.Length > MaxTextLength
+        value.Length > MaximumTextLength
             ? Result.Failure<string>("Text rule value is too long.")
             : value;
 

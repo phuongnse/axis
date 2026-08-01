@@ -58,7 +58,6 @@ public sealed class ListRuleDefinitionsHandlerTests
                 Arg.Any<IReadOnlyList<RuleTextSearchDocument>>(),
                 true,
                 null,
-                null,
                 0,
                 20,
                 "required",

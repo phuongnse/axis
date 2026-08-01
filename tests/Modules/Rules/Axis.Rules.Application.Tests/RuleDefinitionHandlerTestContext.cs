@@ -6,8 +6,12 @@ using Axis.Rules.Domain;
 using Axis.Shared.Application.Identity;
 using FluentAssertions;
 using NSubstitute;
-using ContractOutcomeKind = Axis.Rules.Contracts.RuleOutcomeKind;
-using ContractScope = Axis.Rules.Contracts.RuleScope;
+using ContractOperandKind = Axis.Rules.Contracts.RuleOperandKind;
+using ContractPredicateOperator = Axis.Rules.Contracts.RulePredicateOperator;
+using ContractValueType = Axis.Rules.Contracts.RuleValueType;
+using DomainOperandKind = Axis.Rules.Domain.RuleOperandKind;
+using DomainPredicateOperator = Axis.Rules.Domain.RulePredicateOperator;
+using DomainValueType = Axis.Rules.Domain.RuleValueType;
 
 namespace Axis.Rules.Application.Tests;
 
@@ -20,17 +24,6 @@ internal sealed class RuleDefinitionHandlerTestContext
     {
         CurrentUser.UserId.Returns(UserId);
         CurrentUser.workspaceId.Returns(WorkspaceId);
-        SchemaProvider.FindSchemaAsync(
-                WorkspaceId,
-                Schema.ContextKey,
-                Schema.Version,
-                Arg.Any<CancellationToken>())
-            .Returns(Schema);
-        SchemaProvider.ListSchemasAsync(
-                WorkspaceId,
-                Arg.Any<ContractScope?>(),
-                Arg.Any<CancellationToken>())
-            .Returns([Schema]);
     }
 
     public ICurrentUser CurrentUser { get; } = Substitute.For<ICurrentUser>();
@@ -38,39 +31,6 @@ internal sealed class RuleDefinitionHandlerTestContext
     public IRuleCatalogSearchProvider CatalogSearch { get; } = Substitute.For<IRuleCatalogSearchProvider>();
     public IRuleTextSearchProvider TextSearch { get; } = Substitute.For<IRuleTextSearchProvider>();
     public IUnitOfWork UnitOfWork { get; } = Substitute.For<IUnitOfWork>();
-    public IRuleContextSchemaProvider SchemaProvider { get; } = Substitute.For<IRuleContextSchemaProvider>();
-    public RuleContextSchemaRegistry ContextRegistry => new([SchemaProvider]);
-
-    public static RuleContextSchemaDto Schema { get; } = new(
-        "business_objects.field.decimal",
-        Version: 1,
-        ContractScope.Field,
-        "Decimal field value",
-        [
-            new RuleContextFieldDto(
-                "field.value",
-                "Field value",
-                Axis.Rules.Contracts.RuleValueType.Decimal,
-                false,
-                ReferenceDocumentation("Field value")),
-        ],
-        TargetTypeKey: "Decimal");
-
-    public static RuleReferenceDocumentationDto ReferenceDocumentation(string displayName) =>
-        new(
-            new Dictionary<string, RuleReferenceContentDto>(StringComparer.OrdinalIgnoreCase)
-            {
-                ["en"] = new(
-                    displayName,
-                    $"Reference for {displayName}.",
-                    $"Use {displayName} in a compatible condition.",
-                    [displayName]),
-                ["vi"] = new(
-                    displayName,
-                    $"Tham chiếu cho {displayName}.",
-                    $"Dùng {displayName} trong điều kiện tương thích.",
-                    [displayName]),
-            });
 
     public static RuleDefinition DraftDefinition(bool configured = false)
     {
@@ -79,10 +39,6 @@ internal sealed class RuleDefinitionHandlerTestContext
             RuleDefinitionKey.Create("credit_threshold").Value,
             "Credit threshold",
             "Flags high credit values.",
-            Axis.Rules.Domain.RuleScope.Field,
-            RuleContextKey.Create(Schema.ContextKey).Value,
-            Schema.Version,
-            Axis.Rules.Domain.RuleOutcomeKind.Validation,
             UserId,
             DateTime.UtcNow).Value;
 
@@ -101,48 +57,38 @@ internal sealed class RuleDefinitionHandlerTestContext
 
     public static void Configure(RuleDefinition definition)
     {
-        RuleParameterDefinition parameter = RuleParameterDefinition.Create(
-            "threshold",
-            Axis.Rules.Domain.RuleValueType.Decimal,
-            isRequired: true).Value;
+        RuleInputDefinition value = RuleInputDefinition.Create(
+            "value", DomainValueType.Decimal, isRequired: true).Value;
+        RuleInputDefinition threshold = RuleInputDefinition.Create(
+            "threshold", DomainValueType.Decimal, isRequired: true).Value;
         RulePredicateCondition condition = RulePredicateCondition.Create(
             "threshold_check",
-            Axis.Rules.Domain.RulePredicateOperator.GreaterThan,
-            RuleOperand.Context("field.value").Value,
-            RuleOperand.Parameter("threshold").Value).Value;
-        RuleValidationOutcome outcome = RuleValidationOutcome.Create(
-            "credit.threshold.exceeded",
-            Axis.Rules.Domain.RuleSeverity.Error,
-            "Credit value exceeds the configured threshold.").Value;
+            DomainPredicateOperator.GreaterThan,
+            RuleOperand.Input("value").Value,
+            RuleOperand.Input("threshold").Value).Value;
 
         definition.SaveDraft(
                 definition.Revision,
                 definition.Name,
                 definition.Description,
-                definition.Scope,
-                definition.ContextKey,
-                definition.ContextSchemaVersion,
-                definition.OutcomeKind,
-                [parameter],
+                [value, threshold],
                 condition,
-                outcome,
                 UserId,
                 DateTime.UtcNow)
             .IsSuccess.Should().BeTrue();
     }
 
+    public static IReadOnlyList<RuleDraftInputDefinitionDto> DraftInputsDto() =>
+    [
+        new("Value", [ContractValueType.Decimal], true, false, []),
+        new("Threshold", [ContractValueType.Decimal], true, false, []),
+    ];
+
     public static RuleConditionNodeDto ConditionDto() => new(
         "threshold_check",
         LogicalOperator: null,
-        Axis.Rules.Contracts.RulePredicateOperator.GreaterThan,
-        new RuleOperandDto(Axis.Rules.Contracts.RuleOperandKind.Context, "field.value", Literal: null),
-        new RuleOperandDto(Axis.Rules.Contracts.RuleOperandKind.Parameter, "threshold", Literal: null),
+        ContractPredicateOperator.GreaterThan,
+        new RuleOperandDto(ContractOperandKind.Input, "Value", Literal: null),
+        new RuleOperandDto(ContractOperandKind.Input, "Threshold", Literal: null),
         []);
-
-    public static RuleOutcomeDto OutcomeDto() => new(
-        ContractOutcomeKind.Validation,
-        "credit.threshold.exceeded",
-        Axis.Rules.Contracts.RuleSeverity.Error,
-        "Credit value exceeds the configured threshold.",
-        Decision: null);
 }

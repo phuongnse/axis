@@ -8,9 +8,7 @@ using Axis.Shared.Application.Identity;
 using Axis.Shared.Domain.Primitives;
 using ContractLifecycleStatus = Axis.Rules.Contracts.RuleLifecycleStatus;
 using ContractOrigin = Axis.Rules.Contracts.RuleOrigin;
-using ContractScope = Axis.Rules.Contracts.RuleScope;
 using DomainLifecycleStatus = Axis.Rules.Domain.RuleLifecycleStatus;
-using DomainScope = Axis.Rules.Domain.RuleScope;
 
 namespace Axis.Rules.Application.Queries.ListRuleDefinitions;
 
@@ -27,17 +25,15 @@ public sealed class ListRuleDefinitionsHandler(
         if (currentUser.workspaceId is not Guid workspaceId)
             return RuleDefinitionFailures.MissingWorkspace<PagedResult<RuleDefinitionSummaryDto>>();
 
-        IReadOnlyList<SystemRuleDefinition> systemCandidates = query.Origin == ContractOrigin.Workspace
+        IReadOnlyList<RuleDefinition> systemCandidates = query.Origin == ContractOrigin.Workspace
             ? []
             : SystemRuleCatalog.Definitions
-                .Where(definition => query.Scope is null || (ContractScope)definition.Scope == query.Scope)
                 .Where(definition => query.Status is null || query.Status == ContractLifecycleStatus.Published)
-                .OrderBy(definition => definition.DisplayName, StringComparer.Ordinal)
+                .OrderBy(definition => definition.Name, StringComparer.Ordinal)
                 .ThenBy(definition => definition.Key.Value, StringComparer.Ordinal)
                 .ToArray();
 
         bool includeWorkspace = query.Origin != ContractOrigin.System;
-        DomainScope? workspaceScope = query.Scope is null ? null : (DomainScope)query.Scope.Value;
         DomainLifecycleStatus? workspaceStatus = query.Status is null
             ? null
             : (DomainLifecycleStatus)query.Status.Value;
@@ -49,7 +45,6 @@ public sealed class ListRuleDefinitionsHandler(
                 workspaceId,
                 CreateSearchDocuments(systemCandidates, query.Language),
                 includeWorkspace,
-                workspaceScope,
                 workspaceStatus,
                 searchSkip,
                 query.PageSize,
@@ -74,7 +69,6 @@ public sealed class ListRuleDefinitionsHandler(
         int workspaceCount = includeWorkspace
             ? await repository.CountForWorkspaceAsync(
                 workspaceId,
-                workspaceScope,
                 workspaceStatus,
                 searchQuery: null,
                 cancellationToken)
@@ -94,7 +88,6 @@ public sealed class ListRuleDefinitionsHandler(
                 workspaceId,
                 workspaceSkip,
                 remaining,
-                workspaceScope,
                 workspaceStatus,
                 searchQuery: null,
                 cancellationToken);
@@ -109,7 +102,7 @@ public sealed class ListRuleDefinitionsHandler(
     }
 
     private static IReadOnlyList<RuleTextSearchDocument> CreateSearchDocuments(
-        IReadOnlyList<SystemRuleDefinition> definitions,
+        IReadOnlyList<RuleDefinition> definitions,
         string? language)
     {
         string locale = language?.StartsWith("vi", StringComparison.OrdinalIgnoreCase) == true
@@ -119,11 +112,11 @@ public sealed class ListRuleDefinitionsHandler(
             .Select(definition =>
             {
                 RuleReferenceContent content =
-                    definition.Documentation.Locales.TryGetValue(
+                    definition.Documentation!.Locales.TryGetValue(
                         locale,
                         out RuleReferenceContent? localized)
                         ? localized
-                        : definition.Documentation.Locales["en"];
+                        : definition.Documentation!.Locales["en"];
                 return new RuleTextSearchDocument(
                     definition.Key.Value,
                     content.DisplayName,
@@ -134,12 +127,12 @@ public sealed class ListRuleDefinitionsHandler(
 
     private static async Task<IReadOnlyList<RuleDefinitionSummaryDto>> HydrateSearchItemsAsync(
         IReadOnlyList<RuleCatalogSearchItem> searchItems,
-        IReadOnlyList<SystemRuleDefinition> systemCandidates,
+        IReadOnlyList<RuleDefinition> systemCandidates,
         Guid workspaceId,
         IRuleDefinitionRepository repository,
         CancellationToken cancellationToken)
     {
-        Dictionary<string, SystemRuleDefinition> systemByKey = systemCandidates
+        Dictionary<string, RuleDefinition> systemByKey = systemCandidates
             .ToDictionary(definition => definition.Key.Value, StringComparer.Ordinal);
         IReadOnlyList<RuleDefinitionKey> workspaceKeys = searchItems
             .Where(item => item.Origin == Axis.Rules.Domain.RuleOrigin.Workspace)
@@ -159,7 +152,7 @@ public sealed class ListRuleDefinitionsHandler(
         foreach (RuleCatalogSearchItem item in searchItems)
         {
             if (item.Origin == Axis.Rules.Domain.RuleOrigin.System &&
-                systemByKey.TryGetValue(item.Key, out SystemRuleDefinition? systemDefinition))
+                systemByKey.TryGetValue(item.Key, out RuleDefinition? systemDefinition))
             {
                 definitions.Add(RuleContractMapper.ToSummaryDto(systemDefinition));
             }

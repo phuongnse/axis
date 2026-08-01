@@ -21,14 +21,16 @@ public static class RulesInfrastructureExtensions
         services.AddDbContext<RulesDbContext>(options =>
             options.UseNpgsql(configuration.GetConnectionString("Rules")));
         services.AddScoped<IRuleDefinitionRepository, RuleDefinitionRepository>();
+        services.AddScoped<IRuleBindingRepository, RuleBindingRepository>();
         services.AddScoped<IRuleCatalogSearchProvider, PostgresRuleCatalogSearchProvider>();
         services.AddScoped<IRuleTextSearchProvider, PostgresRuleTextSearchProvider>();
         services.AddScoped<IUnitOfWork, RulesUnitOfWork>();
-        services.AddScoped<RuleContextSchemaRegistry>();
-        services.AddScoped<RuleExpressionAuthoringService>();
+        services.AddScoped<RuleConditionProjectionService>();
         services.AddScoped<RuleExpressionGuideService>();
         services.AddScoped<IRuleApplicationValidator, RuleApplicationValidator>();
         services.AddScoped<IRuleEvaluator, RuleEvaluator>();
+        services.AddScoped<IRuleBindingEvaluator, RuleBindingEvaluator>();
+        services.AddScoped<IRuleBindingReferenceValidator, RuleBindingReferenceValidator>();
         return services;
     }
 }

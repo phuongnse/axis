@@ -6,6 +6,7 @@ import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 import { ManagedDialog, ManagedDialogBody } from '@/components/shared/ManagedDialog';
+import { ManagedDialogTabs } from '@/components/shared/ManagedDialogTabs';
 import { MetadataTag } from '@/components/shared/MetadataTag';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { StatusNotice } from '@/components/shared/StatusNotice';
@@ -37,8 +38,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import type { RuleDefinitionSummary } from '@/features/rules';
+import { createRuleBinding, type RuleDefinitionSummary } from '@/features/rules';
 import { ApiError } from '@/lib/api';
 import { referenceContent } from '@/lib/reference-metadata';
 import {
@@ -74,9 +74,10 @@ const optionSchema = z.object({
 const appliedRuleSchema = z.object({
   clientId: z.string(),
   id: z.string().optional(),
-  definitionKey: z.string().min(1),
-  definitionVersion: z.number().int().positive(),
-  parameters: z.record(z.string(), z.array(z.string())),
+  bindingId: z.string().uuid().optional(),
+  definitionKey: z.string().optional(),
+  definitionVersion: z.number().int().positive().optional(),
+  inputs: z.record(z.string(), z.array(z.string())),
 });
 
 const fieldSchema = z
@@ -166,6 +167,7 @@ export function BusinessObjectDefinitionDialog({
   const [requestError, setRequestError] = useState<string | null>(null);
   const [discardOpen, setDiscardOpen] = useState(false);
   const [publishOpen, setPublishOpen] = useState(false);
+  const [activeSection, setActiveSection] = useState('general');
   const form = useForm<DefinitionFormValues>({
     resolver: zodResolver(definitionSchema),
     defaultValues: emptyDefinition,
@@ -203,7 +205,7 @@ export function BusinessObjectDefinitionDialog({
   });
 
   const saveMutation = useMutation({
-    mutationFn: ({
+    mutationFn: async ({
       id,
       values,
       revision,
@@ -215,7 +217,10 @@ export function BusinessObjectDefinitionDialog({
       saveUnpublishedBusinessObjectDefinition(id, {
         expectedRevision: revision,
         name: values.name.trim(),
-        fields: toFieldInputs(values.fields, ruleDefinitions),
+        fields: toFieldInputs(
+          await ensureRuleBindings(values.fields, ruleDefinitions, values.name),
+          ruleDefinitions,
+        ),
       }),
     onSuccess: async (saved) => {
       cacheDefinition(queryClient, saved);
@@ -271,16 +276,19 @@ export function BusinessObjectDefinitionDialog({
     updateFields(next);
   }
 
-  const submit = form.handleSubmit((values) => {
-    setRequestError(null);
-    if (mode === 'create') {
-      createMutation.mutate({ name: values.name.trim() });
-      return;
-    }
-    if (definition?.id && definition.revision != null) {
-      saveMutation.mutate({ id: definition.id, values, revision: definition.revision });
-    }
-  });
+  const submit = form.handleSubmit(
+    (values) => {
+      setRequestError(null);
+      if (mode === 'create') {
+        createMutation.mutate({ name: values.name.trim() });
+        return;
+      }
+      if (definition?.id && definition.revision != null) {
+        saveMutation.mutate({ id: definition.id, values, revision: definition.revision });
+      }
+    },
+    (errors) => setActiveSection(errors.fields ? 'fields' : 'general'),
+  );
 
   return (
     <>
@@ -364,25 +372,14 @@ export function BusinessObjectDefinitionDialog({
             ) : null}
 
             {readOnly && definition ? (
-              <BusinessObjectReadOnlyDetails
-                definition={definition}
-                ruleDefinitions={ruleDefinitions}
-              />
+              <BusinessObjectReadOnlyDetails definition={definition} />
             ) : !detailQuery.isLoading || mode === 'create' ? (
-              <Tabs defaultValue="details">
-                <TabsList aria-label={t('businessObjects.definitionSections')}>
-                  <TabsTrigger value="details">{t('businessObjects.details')}</TabsTrigger>
-                  {mode !== 'create' ? (
-                    <TabsTrigger value="fields">{t('businessObjects.fields')}</TabsTrigger>
-                  ) : null}
-                  {definition?.latestPublishedVersion ? (
-                    <TabsTrigger value="published">
-                      {t('businessObjects.publishedVersion')}
-                    </TabsTrigger>
-                  ) : null}
-                </TabsList>
-
-                <TabsContent value="details">
+              <ManagedDialogTabs
+                label={t('businessObjects.definitionSections')}
+                generalLabel={t('dialog.general')}
+                activeSection={activeSection}
+                onActiveSectionChange={setActiveSection}
+                general={
                   <DefinitionDetails
                     name={name}
                     objectKey={definition?.objectKey ?? deriveKey(name)}
@@ -392,33 +389,43 @@ export function BusinessObjectDefinitionDialog({
                       form.setValue('name', value, { shouldDirty: true, shouldValidate: true })
                     }
                   />
-                </TabsContent>
-
-                {mode !== 'create' ? (
-                  <TabsContent value="fields">
-                    <FieldsEditor
-                      fields={fields}
-                      errors={form.formState.errors.fields}
-                      readOnly={readOnly}
-                      ruleDefinitions={ruleDefinitions}
-                      ruleCatalogLoading={ruleCatalogLoading}
-                      ruleCatalogUnavailable={ruleCatalogUnavailable}
-                      onChange={updateField}
-                      onMove={moveField}
-                      onRemove={(index) =>
-                        updateFields(fields.filter((_, fieldIndex) => fieldIndex !== index))
-                      }
-                      onAdd={() => updateFields([...fields, newField()])}
-                    />
-                  </TabsContent>
-                ) : null}
-
-                {definition?.latestPublishedVersion ? (
-                  <TabsContent value="published">
-                    <PublishedVersion definition={definition} />
-                  </TabsContent>
-                ) : null}
-              </Tabs>
+                }
+                sections={[
+                  ...(mode !== 'create'
+                    ? [
+                        {
+                          id: 'fields',
+                          label: t('businessObjects.fields'),
+                          content: (
+                            <FieldsEditor
+                              fields={fields}
+                              errors={form.formState.errors.fields}
+                              readOnly={readOnly}
+                              ruleDefinitions={ruleDefinitions}
+                              ruleCatalogLoading={ruleCatalogLoading}
+                              ruleCatalogUnavailable={ruleCatalogUnavailable}
+                              onChange={updateField}
+                              onMove={moveField}
+                              onRemove={(index) =>
+                                updateFields(fields.filter((_, fieldIndex) => fieldIndex !== index))
+                              }
+                              onAdd={() => updateFields([...fields, newField()])}
+                            />
+                          ),
+                        },
+                      ]
+                    : []),
+                  ...(definition?.latestPublishedVersion
+                    ? [
+                        {
+                          id: 'published',
+                          label: t('businessObjects.publishedVersion'),
+                          content: <PublishedVersion definition={definition} />,
+                        },
+                      ]
+                    : []),
+                ]}
+              />
             ) : null}
           </ManagedDialogBody>
         </form>
@@ -484,10 +491,8 @@ export function BusinessObjectDefinitionDialog({
 
 function BusinessObjectReadOnlyDetails({
   definition,
-  ruleDefinitions,
 }: {
   definition: BusinessObjectDefinitionDetail;
-  ruleDefinitions: RuleDefinitionSummary[];
 }) {
   const { t, i18n } = useTranslation();
   const detailsId = useId();
@@ -504,152 +509,142 @@ function BusinessObjectReadOnlyDetails({
   return (
     <div
       data-slot="business-object-read-only-details"
-      className="@container/business-object-details space-y-6"
+      className="@container/business-object-details"
     >
-      <p className="text-sm leading-relaxed text-muted-foreground">
-        {t(
-          published
-            ? 'businessObjects.readOnlyPublishedSummary'
-            : 'businessObjects.readOnlyUnpublishedSummary',
-        )}
-      </p>
+      <ManagedDialogTabs
+        label={t('businessObjects.definitionSections')}
+        generalLabel={t('dialog.general')}
+        general={
+          <div className="space-y-5">
+            <p className="text-sm leading-relaxed text-muted-foreground">
+              {t(
+                published
+                  ? 'businessObjects.readOnlyPublishedSummary'
+                  : 'businessObjects.readOnlyUnpublishedSummary',
+              )}
+            </p>
+            <dl className="grid gap-5 @md/business-object-details:grid-cols-2">
+              <ReadOnlyFact
+                label={t('businessObjects.name')}
+                value={definition.name ?? t('businessObjects.notAvailable')}
+              />
+              <ReadOnlyFact
+                label={t('businessObjects.objectKey')}
+                value={definition.objectKey ?? t('businessObjects.notAvailable')}
+              />
+              <ReadOnlyFact
+                label={t('businessObjects.version')}
+                value={
+                  definition.latestPublishedVersionNumber
+                    ? t('businessObjects.latestVersion', {
+                        version: definition.latestPublishedVersionNumber,
+                      })
+                    : t('businessObjects.notAvailable')
+                }
+              />
+              <ReadOnlyFact
+                label={t('businessObjects.fields')}
+                value={t('businessObjects.fieldCount', { count: fields.length })}
+              />
+              <ReadOnlyFact
+                label={
+                  publishedAt ? t('businessObjects.publishedAt') : t('businessObjects.updated')
+                }
+                value={formatBusinessObjectDate(
+                  publishedAt ?? definition.updatedAt,
+                  dateFormatter,
+                  t('businessObjects.notAvailable'),
+                )}
+              />
+            </dl>
+          </div>
+        }
+        sections={[
+          {
+            id: 'fields',
+            label: t('businessObjects.fields'),
+            content: (
+              <section aria-labelledby={`${detailsId}-fields`} className="space-y-4">
+                <ReadOnlyHeading
+                  id={`${detailsId}-fields`}
+                  title={t('businessObjects.fields')}
+                  description={t('businessObjects.fieldsDescription')}
+                />
+                {fields.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    {t('businessObjects.noFieldsDescription')}
+                  </p>
+                ) : (
+                  <ol className="divide-y divide-border">
+                    {fields.map((field, index) => (
+                      <li
+                        key={field.id ?? field.fieldKey ?? index}
+                        className="space-y-4 py-5 first:pt-0 last:pb-0"
+                      >
+                        <div>
+                          <h4 className="text-sm font-semibold text-foreground">
+                            {field.label ?? t('businessObjects.newField')}
+                          </h4>
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            <MetadataTag>{field.fieldKey ?? '—'}</MetadataTag>
+                            <MetadataTag>
+                              {t(`businessObjects.fieldType${field.fieldType ?? 'Text'}`)}
+                            </MetadataTag>
+                          </div>
+                        </div>
 
-      <section aria-labelledby={`${detailsId}-identity`} className="space-y-4">
-        <ReadOnlyHeading
-          id={`${detailsId}-identity`}
-          title={t('businessObjects.details')}
-          description={t('businessObjects.definitionDetailsDescription')}
-        />
-        <dl className="grid gap-5 @md/business-object-details:grid-cols-2">
-          <ReadOnlyFact
-            label={t('businessObjects.objectKey')}
-            value={definition.objectKey ?? t('businessObjects.notAvailable')}
-          />
-          <ReadOnlyFact
-            label={t('businessObjects.version')}
-            value={
-              definition.latestPublishedVersionNumber
-                ? t('businessObjects.latestVersion', {
-                    version: definition.latestPublishedVersionNumber,
-                  })
-                : t('businessObjects.notAvailable')
-            }
-          />
-          <ReadOnlyFact
-            label={t('businessObjects.fields')}
-            value={t('businessObjects.fieldCount', { count: fields.length })}
-          />
-          <ReadOnlyFact
-            label={publishedAt ? t('businessObjects.publishedAt') : t('businessObjects.updated')}
-            value={formatBusinessObjectDate(
-              publishedAt ?? definition.updatedAt,
-              dateFormatter,
-              t('businessObjects.notAvailable'),
-            )}
-          />
-        </dl>
-      </section>
+                        {field.choiceConfiguration ? (
+                          <dl className="grid gap-4 @md/business-object-details:grid-cols-2">
+                            <ReadOnlyFact
+                              label={t('businessObjects.selectionMode')}
+                              value={t(
+                                field.choiceConfiguration.selectionMode === 'Multiple'
+                                  ? 'businessObjects.selectionMultiple'
+                                  : 'businessObjects.selectionSingle',
+                              )}
+                            />
+                            <ReadOnlyFact
+                              label={t('businessObjects.options')}
+                              value={
+                                (field.choiceConfiguration.options ?? []).length > 0 ? (
+                                  <ul className="space-y-1 font-normal">
+                                    {(field.choiceConfiguration.options ?? []).map((option) => (
+                                      <li key={option.id ?? option.optionKey}>
+                                        {option.label ?? option.optionKey ?? '—'}
+                                        {option.optionKey ? (
+                                          <span className="text-muted-foreground">
+                                            {' '}
+                                            ({option.optionKey})
+                                          </span>
+                                        ) : null}
+                                      </li>
+                                    ))}
+                                  </ul>
+                                ) : (
+                                  t('businessObjects.notAvailable')
+                                )
+                              }
+                            />
+                          </dl>
+                        ) : null}
 
-      <section aria-labelledby={`${detailsId}-fields`} className="space-y-4 border-t pt-6">
-        <ReadOnlyHeading
-          id={`${detailsId}-fields`}
-          title={t('businessObjects.fields')}
-          description={t('businessObjects.fieldsDescription')}
-        />
-        {fields.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            {t('businessObjects.noFieldsDescription')}
-          </p>
-        ) : (
-          <ol className="divide-y divide-border">
-            {fields.map((field, index) => (
-              <li
-                key={field.id ?? field.fieldKey ?? index}
-                className="space-y-4 py-5 first:pt-0 last:pb-0"
-              >
-                <div>
-                  <h4 className="text-sm font-semibold text-foreground">
-                    {field.label ?? t('businessObjects.newField')}
-                  </h4>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    <MetadataTag>{field.fieldKey ?? '—'}</MetadataTag>
-                    <MetadataTag>
-                      {t(`businessObjects.fieldType${field.fieldType ?? 'Text'}`)}
-                    </MetadataTag>
-                  </div>
-                </div>
-
-                {field.choiceConfiguration ? (
-                  <dl className="grid gap-4 @md/business-object-details:grid-cols-2">
-                    <ReadOnlyFact
-                      label={t('businessObjects.selectionMode')}
-                      value={t(
-                        field.choiceConfiguration.selectionMode === 'Multiple'
-                          ? 'businessObjects.selectionMultiple'
-                          : 'businessObjects.selectionSingle',
-                      )}
-                    />
-                    <ReadOnlyFact
-                      label={t('businessObjects.options')}
-                      value={
-                        (field.choiceConfiguration.options ?? []).length > 0 ? (
-                          <ul className="space-y-1 font-normal">
-                            {(field.choiceConfiguration.options ?? []).map((option) => (
-                              <li key={option.id ?? option.optionKey}>
-                                {option.label ?? option.optionKey ?? '—'}
-                                {option.optionKey ? (
-                                  <span className="text-muted-foreground">
-                                    {' '}
-                                    ({option.optionKey})
-                                  </span>
-                                ) : null}
-                              </li>
-                            ))}
-                          </ul>
-                        ) : (
-                          t('businessObjects.notAvailable')
-                        )
-                      }
-                    />
-                  </dl>
-                ) : null}
-
-                {(field.rules ?? []).length > 0 ? (
-                  <div>
-                    <p className="text-xs font-medium text-muted-foreground">
-                      {t('businessObjects.fieldRulesTitle')}
-                    </p>
-                    <ul className="mt-2 space-y-2">
-                      {(field.rules ?? []).map((rule) => {
-                        const definitionMetadata = ruleDefinitions.find(
-                          (candidate) => candidate.definitionKey === rule.definitionKey,
-                        );
-                        return (
-                          <li
-                            key={rule.id ?? `${rule.definitionKey}:${rule.definitionVersion}`}
-                            className="text-sm text-foreground"
-                          >
-                            <span className="font-medium">
-                              {definitionMetadata
-                                ? ruleDisplayName(definitionMetadata, i18n.language, t)
-                                : rule.definitionKey}
-                            </span>{' '}
-                            <span className="text-muted-foreground">
-                              {t('businessObjects.ruleVersion', {
-                                version: rule.definitionVersion,
-                              })}
-                            </span>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  </div>
-                ) : null}
-              </li>
-            ))}
-          </ol>
-        )}
-      </section>
+                        {(field.rules ?? []).length > 0 ? (
+                          <ReadOnlyFact
+                            label={t('businessObjects.fieldRulesTitle')}
+                            value={t('businessObjects.configuredRulesCount', {
+                              count: field.rules?.length ?? 0,
+                            })}
+                          />
+                        ) : null}
+                      </li>
+                    ))}
+                  </ol>
+                )}
+              </section>
+            ),
+          },
+        ]}
+      />
     </div>
   );
 }
@@ -736,7 +731,7 @@ function DefinitionDetails({
 }) {
   const { t } = useTranslation();
   return (
-    <div className="grid gap-4 pt-4 md:grid-cols-2">
+    <div className="grid gap-4 md:grid-cols-2">
       <Field data-invalid={Boolean(nameError)}>
         <FieldLabel htmlFor="business-object-name">{t('businessObjects.name')}</FieldLabel>
         <Input
@@ -783,7 +778,7 @@ function FieldsEditor({
 }) {
   const { t } = useTranslation();
   return (
-    <div className="pt-4">
+    <div>
       {!readOnly ? (
         <div className="mb-4">
           <Button type="button" variant="outline" onClick={onAdd}>
@@ -1153,12 +1148,16 @@ function RulesEditor({
             <Item key={rule.clientId} variant="muted" size="sm">
               <ItemHeader>
                 <ItemTitle>
-                  {definition ? ruleDisplayName(definition, i18n.language, t) : rule.definitionKey}
+                  {definition
+                    ? ruleDisplayName(definition, i18n.language, t)
+                    : (rule.bindingId ?? rule.definitionKey ?? t('businessObjects.unknownRule'))}
                 </ItemTitle>
                 <ItemActions>
-                  <span className="text-xs text-muted-foreground">
-                    {t('businessObjects.ruleVersion', { version: rule.definitionVersion })}
-                  </span>
+                  {rule.definitionVersion ? (
+                    <span className="text-xs text-muted-foreground">
+                      {t('businessObjects.ruleVersion', { version: rule.definitionVersion })}
+                    </span>
+                  ) : null}
                   {!readOnly ? (
                     <Button
                       type="button"
@@ -1179,15 +1178,15 @@ function RulesEditor({
                 </ItemActions>
               </ItemHeader>
               <ItemContent>
-                {(definition?.parameters ?? []).map((parameter) => (
-                  <RuleParameterEditor
-                    key={parameter.key}
-                    parameter={parameter}
-                    values={rule.parameters[parameter.key ?? ''] ?? []}
+                {(definition?.inputs ?? []).map((input) => (
+                  <RuleInputEditor
+                    key={input.key}
+                    input={input}
+                    values={rule.inputs[input.key ?? ''] ?? []}
                     readOnly={readOnly}
                     onChange={(values) =>
                       updateRule(ruleIndex, {
-                        parameters: { ...rule.parameters, [parameter.key ?? '']: values },
+                        inputs: { ...rule.inputs, [input.key ?? '']: values },
                       })
                     }
                   />
@@ -1206,22 +1205,23 @@ function RulesEditor({
   );
 }
 
-type RuleParameter = NonNullable<RuleDefinitionSummary['parameters']>[number];
+type RuleInput = NonNullable<RuleDefinitionSummary['inputs']>[number];
+type RuleInputValueType = NonNullable<RuleInput['types']>[number];
 
-function RuleParameterEditor({
-  parameter,
+function RuleInputEditor({
+  input,
   values,
   readOnly,
   onChange,
 }: {
-  parameter: RuleParameter;
+  input: RuleInput;
   values: string[];
   readOnly: boolean;
   onChange: (values: string[]) => void;
 }) {
   const { t } = useTranslation();
-  const key = parameter.key ?? '';
-  const currentValues = parameter.allowMultiple
+  const key = input.key ?? '';
+  const currentValues = input.allowMultiple
     ? values.length > 0
       ? values
       : ['']
@@ -1240,13 +1240,13 @@ function RuleParameterEditor({
 
   return (
     <Field>
-      <FieldLabel htmlFor={`rule-parameter-${key}`}>{humanize(key)}</FieldLabel>
+      <FieldLabel htmlFor={`rule-input-${key}`}>{humanize(key)}</FieldLabel>
       <div className="flex flex-col gap-2">
         {currentValues.map((value, valueIndex) => (
           <div key={valueIds[valueIndex]} className="flex items-center gap-2">
-            <RuleParameterValue
-              id={`rule-parameter-${key}-${valueIndex}`}
-              parameter={parameter}
+            <RuleInputValue
+              id={`rule-input-${key}-${valueIndex}`}
+              input={input}
               value={value}
               readOnly={readOnly}
               onChange={(nextValue) =>
@@ -1257,7 +1257,7 @@ function RuleParameterEditor({
                 )
               }
             />
-            {!readOnly && parameter.allowMultiple && currentValues.length > 1 ? (
+            {!readOnly && input.allowMultiple && currentValues.length > 1 ? (
               <Button
                 type="button"
                 variant="destructive"
@@ -1271,7 +1271,7 @@ function RuleParameterEditor({
           </div>
         ))}
       </div>
-      {!readOnly && parameter.allowMultiple ? (
+      {!readOnly && input.allowMultiple ? (
         <Button type="button" variant="outline" size="sm" onClick={addValue}>
           <Plus aria-hidden />
           {t('businessObjects.addParameterValue')}
@@ -1281,23 +1281,23 @@ function RuleParameterEditor({
   );
 }
 
-function RuleParameterValue({
+function RuleInputValue({
   id,
-  parameter,
+  input,
   value,
   readOnly,
   onChange,
 }: {
   id: string;
-  parameter: RuleParameter;
+  input: RuleInput;
   value: string;
   readOnly: boolean;
   onChange: (value: string) => void;
 }) {
   const { t } = useTranslation();
   const options =
-    parameter.allowedValues?.map((allowed) => ({ value: allowed, label: allowed })) ??
-    (parameter.type === 'Boolean'
+    input.allowedValues?.map((allowed) => ({ value: allowed, label: allowed })) ??
+    (input.types?.[0] === 'Boolean'
       ? [
           { value: 'true', label: t('table.trueValue') },
           { value: 'false', label: t('table.falseValue') },
@@ -1330,7 +1330,7 @@ function RuleParameterValue({
   return (
     <Input
       id={id}
-      type={parameterInputType(parameter.type)}
+      type={parameterInputType(input.types?.[0])}
       value={value}
       readOnly={readOnly}
       onChange={(event) => onChange(event.target.value)}
@@ -1343,7 +1343,7 @@ function PublishedVersion({ definition }: { definition: BusinessObjectDefinition
   const version = definition.latestPublishedVersion;
   if (!version) return null;
   return (
-    <div className="pt-4">
+    <div>
       <p className="text-sm text-muted-foreground">
         {t('businessObjects.publishedVersionSummary', {
           version: version.versionNumber,
@@ -1388,24 +1388,19 @@ function newOption(): EditableOption {
 function newAppliedRule(definition: RuleDefinitionSummary): AppliedRule {
   return {
     clientId: crypto.randomUUID(),
+    bindingId: undefined,
     definitionKey: definition.definitionKey ?? '',
     definitionVersion: definition.latestPublishedVersion ?? 1,
-    parameters: Object.fromEntries(
-      (definition.parameters ?? []).map((parameter) => [
-        parameter.key ?? '',
-        parameter.isRequired ? [''] : [],
-      ]),
+    inputs: Object.fromEntries(
+      (definition.inputs ?? []).map((input) => [input.key ?? '', input.isRequired ? [''] : []]),
     ),
   };
 }
 
 function toFormValues(
   definition: BusinessObjectDefinitionDetail,
-  ruleDefinitions: RuleDefinitionSummary[],
+  _ruleDefinitions: RuleDefinitionSummary[],
 ): DefinitionFormValues {
-  const definitionsByKey = new Map(
-    ruleDefinitions.map((rule) => [rule.definitionKey, rule] as const),
-  );
   return {
     name: definition.name ?? '',
     fields: (definition.fields ?? []).map((field) => ({
@@ -1422,20 +1417,11 @@ function toFormValues(
         label: option.label ?? '',
       })),
       rules: (field.rules ?? []).map((rule) => {
-        const definitionMetadata = definitionsByKey.get(rule.definitionKey);
         return {
           clientId: rule.id ?? crypto.randomUUID(),
           id: rule.id,
-          definitionKey: rule.definitionKey ?? '',
-          definitionVersion: rule.definitionVersion ?? 1,
-          parameters: Object.fromEntries(
-            Object.entries(rule.parameters ?? {}).map(([key, values]) => {
-              const type = definitionMetadata?.parameters?.find(
-                (parameter) => parameter.key === key,
-              )?.type;
-              return [key, values.map((value) => toEditorValue(value, type))];
-            }),
-          ),
+          bindingId: rule.bindingId,
+          inputs: {},
         };
       }),
     })),
@@ -1444,11 +1430,8 @@ function toFormValues(
 
 function toFieldInputs(
   fields: EditableField[],
-  ruleDefinitions: RuleDefinitionSummary[],
+  _ruleDefinitions: RuleDefinitionSummary[],
 ): BusinessObjectFieldDefinitionInput[] {
-  const definitionsByKey = new Map(
-    ruleDefinitions.map((rule) => [rule.definitionKey, rule] as const),
-  );
   return fields.map((field) => ({
     id: field.id,
     fieldKey: field.fieldKey.trim(),
@@ -1466,36 +1449,80 @@ function toFieldInputs(
           }
         : undefined,
     rules: field.rules.map((rule) => {
-      const metadata = definitionsByKey.get(rule.definitionKey);
+      if (!rule.bindingId) {
+        throw new Error('A rule binding must be created before the object is saved.');
+      }
       return {
         id: rule.id,
-        definitionKey: rule.definitionKey,
-        definitionVersion: rule.definitionVersion,
-        parameters: Object.fromEntries(
-          Object.entries(rule.parameters).map(([key, values]) => {
-            const type = metadata?.parameters?.find((parameter) => parameter.key === key)?.type;
-            return [
-              key,
-              values.filter((value) => value.trim()).map((value) => toContractValue(value, type)),
-            ];
-          }),
-        ),
+        bindingId: rule.bindingId,
       };
     }),
   }));
 }
 
+async function ensureRuleBindings(
+  fields: EditableField[],
+  ruleDefinitions: RuleDefinitionSummary[],
+  objectName: string,
+): Promise<EditableField[]> {
+  const objectKey = deriveKey(objectName);
+  const definitionsByKey = new Map(
+    ruleDefinitions.map((definition) => [definition.definitionKey, definition] as const),
+  );
+  const nextFields: EditableField[] = [];
+  for (const field of fields) {
+    const nextRules: AppliedRule[] = [];
+    for (const [ruleIndex, rule] of field.rules.entries()) {
+      if (rule.bindingId) {
+        nextRules.push(rule);
+        continue;
+      }
+      if (!rule.definitionKey || !rule.definitionVersion) {
+        throw new Error('A rule definition and version are required before saving.');
+      }
+      const inputMappings: Record<
+        string,
+        { kind: 'Literal'; contextKey: null; literalValues: string[] }
+      > = {};
+      const definition = definitionsByKey.get(rule.definitionKey);
+      for (const [key, values] of Object.entries(rule.inputs)) {
+        const type = definition?.inputs?.find((input) => input.key === key)?.types?.[0];
+        const literalValues = values
+          .filter((value) => value.trim())
+          .map((value) => toRuleContractValue(value, type));
+        if (literalValues.length > 0) {
+          inputMappings[key] = { kind: 'Literal', contextKey: null, literalValues };
+        }
+      }
+      const binding = await createRuleBinding({
+        definitionKey: rule.definitionKey,
+        definitionVersion: rule.definitionVersion,
+        targetType: 'business-object-field',
+        targetId: `${objectKey}.${field.fieldKey.trim()}`,
+        useCaseOrTrigger: 'field-validation',
+        inputMappings,
+        priority: ruleIndex,
+        enabled: true,
+        failureBehavior: 'FailClosed',
+      });
+      if (!binding.id) throw new Error('The rule binding response did not include an ID.');
+      nextRules.push({ ...rule, bindingId: binding.id });
+    }
+    nextFields.push({ ...field, rules: nextRules });
+  }
+  return nextFields;
+}
+
 function isCompatibleRule(definition: RuleDefinitionSummary, field: EditableField): boolean {
   if (!definition.definitionKey || !definition.latestPublishedVersion) return false;
   if (definition.origin === 'Workspace' && definition.status !== 'Published') return false;
-  const targetTypes = definition.applicability?.targetTypeKeys ?? [];
-  if (targetTypes.length > 0 && !targetTypes.includes(field.fieldType)) return false;
-  const selectionModes = definition.applicability?.configurationConstraints?.selection_mode;
-  return (
-    !selectionModes ||
-    field.fieldType !== 'Choice' ||
-    selectionModes.includes(field.choiceSelectionMode)
-  );
+  const valueInput = definition.inputs?.find((input) => input.key === 'value');
+  const valueType = field.fieldType === 'Choice' ? 'Text' : field.fieldType;
+  return valueInput?.types?.includes(valueType) ?? false;
+}
+
+function toRuleContractValue(value: string, type?: RuleInputValueType): string {
+  return type === 'DateTime' && value ? new Date(value).toISOString() : value.trim();
 }
 
 function ruleDisplayName(
@@ -1508,24 +1535,12 @@ function ruleDisplayName(
 }
 
 function parameterInputType(
-  type: RuleParameter['type'],
+  type?: RuleInputValueType,
 ): 'text' | 'number' | 'date' | 'datetime-local' {
   if (type === 'Integer' || type === 'Decimal') return 'number';
   if (type === 'Date') return 'date';
   if (type === 'DateTime') return 'datetime-local';
   return 'text';
-}
-
-function toEditorValue(value: string, type?: RuleParameter['type']): string {
-  if (type !== 'DateTime' || !value) return value;
-  const date = new Date(value);
-  if (Number.isNaN(date.valueOf())) return value;
-  const local = new Date(date.valueOf() - date.getTimezoneOffset() * 60_000);
-  return local.toISOString().slice(0, 16);
-}
-
-function toContractValue(value: string, type?: RuleParameter['type']): string {
-  return type === 'DateTime' && value ? new Date(value).toISOString() : value.trim();
 }
 
 function deriveKey(value: string): string {

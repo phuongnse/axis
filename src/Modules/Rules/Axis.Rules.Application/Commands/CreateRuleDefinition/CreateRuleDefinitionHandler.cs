@@ -6,14 +6,11 @@ using Axis.Shared.Application;
 using Axis.Shared.Application.CQRS;
 using Axis.Shared.Application.Identity;
 using Axis.Shared.Domain.Primitives;
-using DomainOutcomeKind = Axis.Rules.Domain.RuleOutcomeKind;
-using DomainScope = Axis.Rules.Domain.RuleScope;
 
 namespace Axis.Rules.Application.Commands.CreateRuleDefinition;
 
 public sealed class CreateRuleDefinitionHandler(
     ICurrentUser currentUser,
-    RuleContextSchemaRegistry contextSchemas,
     IRuleDefinitionRepository repository,
     IUnitOfWork unitOfWork)
     : ICommandHandler<CreateRuleDefinitionCommand, RuleDefinitionDetailDto>
@@ -37,23 +34,11 @@ public sealed class CreateRuleDefinitionHandler(
             return RuleDefinitionFailures.DuplicateKey<RuleDefinitionDetailDto>();
         }
 
-        RuleContextSchema? contextSchema = await contextSchemas.FindAsync(
-            workspaceId,
-            command.ContextKey,
-            command.ContextSchemaVersion,
-            cancellationToken);
-        if (contextSchema is null || (DomainScope)command.Scope != contextSchema.Scope)
-            return RuleDefinitionFailures.Invalid<RuleDefinitionDetailDto>("Rule context schema is unavailable or incompatible.");
-
         Result<RuleDefinition> definition = RuleDefinition.CreateDraft(
             workspaceId,
             key.Value,
             command.Name,
             command.Description,
-            (DomainScope)command.Scope,
-            contextSchema.Key,
-            contextSchema.Version,
-            (DomainOutcomeKind)command.OutcomeKind,
             userId,
             DateTime.UtcNow);
         if (definition.IsFailure)

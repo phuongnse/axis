@@ -30,7 +30,7 @@ Follow [reference.md](../reference.md).
 4. Run the smallest `rg` search that covers callers, consumers, tests, docs, generated artifacts, and manifests in scope.
 5. For a retirement, apply [docs/playbooks/design-gate.md § Dossier](../../../docs/playbooks/design-gate.md#dossier): choose clean cutover or evidence-backed compatibility, name the retired surface, and define pre/post-edit sweeps. An approved pre-production clean cutover forbids shims, dual paths, flags, fallbacks, and preserved obsolete tests.
 6. Record the wire/schema contract decision or `N/A because no wire shape changes`.
-7. Name focused development checks and review-boundary verification, then delegate implementation through [README.md § Responsibility catalog](../README.md#responsibility-catalog) with the dossier attached.
+7. Name focused development checks and review-boundary verification, then delegate implementation through [README.md § Responsibility catalog](../README.md#responsibility-catalog) with the dossier attached. Keep sign-off status in this transient handoff; durable owner docs receive the resulting decision and rationale, not actor, date, or conversation provenance.
 
 ## Output
 

@@ -20,6 +20,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -49,6 +50,41 @@ LOCAL_DEV_PROJECT_NAME = "axis"
 LOCAL_DEV_POSTGRES_VOLUME = f"{LOCAL_DEV_PROJECT_NAME}_postgres_data"
 API_PROJECT = ROOT / "src" / "Axis.Api" / "Axis.Api.csproj"
 FRONTEND_DIR = ROOT / "frontend"
+MIGRATION_TARGETS: dict[str, tuple[Path, str, str]] = {
+    "business-objects": (
+        ROOT
+        / "src"
+        / "Modules"
+        / "BusinessObjects"
+        / "Axis.BusinessObjects.Infrastructure"
+        / "Axis.BusinessObjects.Infrastructure.csproj",
+        "BusinessObjectsDbContext",
+        "ConnectionStrings__BusinessObjects",
+    ),
+    "identity": (
+        ROOT
+        / "src"
+        / "Modules"
+        / "Identity"
+        / "Axis.Identity.Infrastructure"
+        / "Axis.Identity.Infrastructure.csproj",
+        "IdentityDbContext",
+        "ConnectionStrings__Identity",
+    ),
+    "rules": (
+        ROOT
+        / "src"
+        / "Modules"
+        / "Rules"
+        / "Axis.Rules.Infrastructure"
+        / "Axis.Rules.Infrastructure.csproj",
+        "RulesDbContext",
+        "ConnectionStrings__Rules",
+    ),
+}
+DESIGN_TIME_CONNECTION_STRING = (
+    "Host=axis.invalid;Database=axis_design;Username=axis;Password=axis"
+)
 LOCAL_CERT_DIR = ROOT / ".dev-certs"
 LOCAL_ROOT_CA_KEY = LOCAL_CERT_DIR / "rootCA-key.pem"
 LOCAL_ROOT_CA_PEM = LOCAL_CERT_DIR / "rootCA.pem"
@@ -163,6 +199,28 @@ def command_exists(name: str, *, env: dict[str, str] | None = None) -> bool:
     return shutil.which(name, path=path) is not None or shutil.which(f"{name}.cmd", path=path) is not None
 
 
+def managed_command_env(args: list[str]) -> dict[str, str]:
+    if not args:
+        return {}
+    try:
+        managed_dotnet = axis_setup.managed_executable("dotnet")
+    except axis_setup.SetupError:
+        return {}
+    if Path(args[0]).resolve(strict=False) != managed_dotnet.resolve(strict=False):
+        return {}
+    return {"DOTNET_ROOT": str(managed_dotnet.parent)}
+
+
+def command_temp_dir(env: dict[str, str]) -> str:
+    for name in ("TMPDIR", "TEMP", "TMP"):
+        value = env.get(name)
+        if value:
+            path = Path(value)
+            if path.is_absolute() and path.is_dir() and os.access(path, os.W_OK | os.X_OK):
+                return str(path)
+    return tempfile.gettempdir()
+
+
 def run(
     args: list[str],
     *,
@@ -174,8 +232,11 @@ def run(
 ) -> subprocess.CompletedProcess[str]:
     merged_env = os.environ.copy()
     merged_env["PYTHONDONTWRITEBYTECODE"] = "1"
+    merged_env.update(managed_command_env(args))
     if env:
         merged_env.update(env)
+    temp_dir = command_temp_dir(merged_env)
+    merged_env.update({"TMPDIR": temp_dir, "TEMP": temp_dir, "TMP": temp_dir})
     try:
         result = subprocess.run(
             args,
@@ -217,8 +278,81 @@ def git(args: list[str], *, capture: bool = True, check: bool = True) -> str:
     return result.stdout if result.stdout is not None else ""
 
 
+BRANCH_PATTERN = re.compile(r"^(feat|fix|docs|refactor|test|chore)/[a-z0-9]+(?:-[a-z0-9]+)*$")
+RENOVATE_BRANCH_PATTERN = re.compile(r"^renovate/[a-z0-9](?:[a-z0-9._/-]*[a-z0-9])?$")
+
+
+def git_checkpoint(args: argparse.Namespace) -> int:
+    branch = args.branch
+    if not BRANCH_PATTERN.fullmatch(branch):
+        raise CheckError(f"git checkpoint: invalid branch name: {branch}")
+
+    all_changes = args.all_changes
+    if all_changes:
+        if not working_tree_paths():
+            raise CheckError("git checkpoint: working tree has no changes")
+    elif not git_lines(["diff", "--name-only", "--cached"], label="git checkpoint staged paths"):
+        raise CheckError(
+            "git checkpoint: no staged changes; stage intended paths or rerun with --all"
+        )
+
+    current_branch = git(["branch", "--show-current"]).strip()
+    if current_branch == "main":
+        git(["switch", "-c", branch], capture=False)
+    elif current_branch != branch:
+        raise CheckError(
+            f"git checkpoint: current branch is {current_branch or '<detached>'}; "
+            f"expected main or {branch}"
+        )
+
+    if all_changes:
+        git(["add", "--all"], capture=False)
+    commit_args = ["commit", "-m", args.subject]
+    if args.body:
+        commit_args.extend(["-m", args.body])
+    git(commit_args, capture=False)
+    print(f"git checkpoint: committed {branch}")
+    return 0
+
+
+def git_push_checkpoint(args: argparse.Namespace) -> int:
+    branch = args.branch
+    if not BRANCH_PATTERN.fullmatch(branch):
+        raise CheckError(f"git push-checkpoint: invalid branch name: {branch}")
+
+    current_branch = git(["branch", "--show-current"]).strip()
+    if current_branch != branch:
+        raise CheckError(
+            f"git push-checkpoint: current branch is {current_branch or '<detached>'}; "
+            f"expected {branch}"
+        )
+
+    push_args = ["push"]
+    if args.skip_pre_push:
+        push_args.append("--no-verify")
+    push_args.extend(["--set-upstream", "origin", branch])
+    git(push_args, capture=False)
+    print(f"git push-checkpoint: pushed {branch}")
+    return 0
+
+
 def ref_exists(ref: str) -> bool:
     return run([exe("git"), "rev-parse", "--verify", ref], capture=True, check=False).returncode == 0
+
+
+def git_is_ancestor(ancestor: str, descendant: str) -> bool:
+    result = run(
+        [exe("git"), "merge-base", "--is-ancestor", ancestor, descendant],
+        capture=True,
+        check=False,
+    )
+    if result.returncode in {0, 1}:
+        return result.returncode == 0
+    detail = (result.stderr or result.stdout or "").strip()
+    raise CheckError(
+        f"git sync: cannot compare {ancestor} with {descendant}: "
+        f"{detail or f'git exited {result.returncode}'}"
+    )
 
 
 def diff_range() -> str:
@@ -266,6 +400,51 @@ def working_tree_paths() -> list[str]:
             *git_lines(["ls-files", "--others", "--exclude-standard"], label="working_tree_paths untracked"),
         ]
     )
+
+
+def git_sync(args: argparse.Namespace) -> int:
+    branch = args.branch
+    if (
+        branch != "main"
+        and not BRANCH_PATTERN.fullmatch(branch)
+        and not RENOVATE_BRANCH_PATTERN.fullmatch(branch)
+    ):
+        raise CheckError(f"git sync: invalid branch name: {branch}")
+
+    current_branch = git(["branch", "--show-current"]).strip()
+    if not current_branch:
+        raise CheckError("git sync: detached HEAD is not supported")
+    if working_tree_paths():
+        raise CheckError("git sync: clean working tree required")
+
+    local_ref = f"refs/heads/{branch}"
+    remote_ref = f"refs/remotes/origin/{branch}"
+    git(
+        [
+            "fetch",
+            "--no-tags",
+            "origin",
+            f"refs/heads/{branch}:{remote_ref}",
+        ],
+        capture=False,
+    )
+
+    if not ref_exists(local_ref):
+        git(["switch", "--track", "-c", branch, remote_ref], capture=False)
+    else:
+        local_contains_remote = git_is_ancestor(remote_ref, local_ref)
+        remote_contains_local = git_is_ancestor(local_ref, remote_ref)
+        if not local_contains_remote and not remote_contains_local:
+            raise CheckError(
+                f"git sync: local {branch} diverged from origin/{branch}; "
+                "resolve explicitly without stash, rebase, or reset"
+            )
+        if current_branch != branch:
+            git(["switch", branch], capture=False)
+        git(["merge", "--ff-only", remote_ref], capture=False)
+
+    print(f"git sync: synced {branch}")
+    return 0
 
 
 def changed_paths(range_spec: str | None = None) -> list[str]:
@@ -712,7 +891,39 @@ def check_frontend_vulnerable_packages(_args: argparse.Namespace | None = None) 
         )
         return 1
 
-    policy = evaluate_npm_audit(report, acceptance_document, today=date.today())
+    package_path = ROOT / "frontend" / "package.json"
+    package_lock_path = ROOT / "frontend" / "package-lock.json"
+    direct_dependencies: set[str] = set()
+    dependency_edges: dict[str, set[str]] = {}
+    if package_path.exists() or package_lock_path.exists():
+        try:
+            package_document = json.loads(package_path.read_text(encoding="utf-8"))
+            package_lock_document = json.loads(package_lock_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            print(
+                f"check-frontend-vulnerable-packages: FAIL - cannot read dependency graph: {exc}",
+                file=sys.stderr,
+            )
+            return 1
+
+        direct_dependencies = {
+            name
+            for section in ("dependencies", "devDependencies")
+            for name in package_document.get(section, {})
+        }
+        for package_location, metadata in package_lock_document.get("packages", {}).items():
+            if not package_location or not isinstance(metadata, dict):
+                continue
+            package_name = package_location.rsplit("node_modules/", maxsplit=1)[-1]
+            dependency_edges.setdefault(package_name, set()).update(metadata.get("dependencies", {}))
+
+    policy = evaluate_npm_audit(
+        report,
+        acceptance_document,
+        today=date.today(),
+        direct_dependencies=direct_dependencies,
+        dependency_edges=dependency_edges,
+    )
     if policy.issues:
         for issue in policy.issues:
             print(f"check-frontend-vulnerable-packages: FAIL - {issue}", file=sys.stderr)
@@ -846,7 +1057,7 @@ def ui_baseline_payload(root: Path = ROOT) -> dict[str, object]:
         theme_path,
         generated_theme_path,
         *(path for path in support_paths if path.is_file()),
-        *sorted(ui_root.rglob("*.tsx")),
+        *sorted((*ui_root.rglob("*.css"), *ui_root.rglob("*.tsx"))),
     ]
     files = {
         str(path.relative_to(frontend_root)).replace("\\", "/"): hashlib.sha256(path.read_bytes()).hexdigest()
@@ -1650,23 +1861,23 @@ def untracked_added_lines(include: callable[[str], bool]) -> list[tuple[str, str
 
 
 def added_lines(range_spec: str, include: callable[[str], bool]) -> Iterable[tuple[str, str]]:
-    rows: list[tuple[str, str]] = []
-    result = run([exe("git"), "diff", "--unified=0", range_spec], capture=True, check=False)
+    left, separator, right = range_spec.partition("...")
+    diff_base = left
+    if separator and right:
+        merge_base = run(
+            [exe("git"), "merge-base", left, right],
+            capture=True,
+            check=False,
+        )
+        if merge_base.returncode != 0 or not merge_base.stdout.strip():
+            detail = (merge_base.stderr or merge_base.stdout or "").strip()
+            raise CheckError(f"added_lines: cannot resolve merge base for {range_spec}: {detail}")
+        diff_base = merge_base.stdout.strip()
+    result = run([exe("git"), "diff", "--unified=0", diff_base], capture=True, check=False)
     if result.returncode != 0:
         detail = (result.stderr or result.stdout or "").strip()
-        raise CheckError(f"added_lines: git diff failed for {range_spec}: {detail}")
-    rows.extend(parse_added_lines(result.stdout, include))
-
-    for args, label in (
-        (["diff", "--unified=0", "--cached"], "added_lines staged"),
-        (["diff", "--unified=0"], "added_lines unstaged"),
-    ):
-        local_result = run([exe("git"), *args], capture=True, check=False)
-        if local_result.returncode != 0:
-            detail = (local_result.stderr or local_result.stdout or "").strip()
-            raise CheckError(f"{label}: git {' '.join(args)} failed: {detail}")
-        rows.extend(parse_added_lines(local_result.stdout, include))
-
+        raise CheckError(f"added_lines: git diff failed for {diff_base}: {detail}")
+    rows = parse_added_lines(result.stdout, include)
     rows.extend(untracked_added_lines(include))
     return rows
 
@@ -1686,6 +1897,27 @@ def fail(issues: list[str], message: str) -> None:
 
 
 DOC_DRIFT_ADDED_LINE_RULES = [
+    (
+        r"^(?!\s*(?:global\s+)?using\b)(?!\s*namespace\b)(?!\s*//).*"
+        r"(?<![\"'])\b(?:global::)?Axis[.](?:Shared|Rules|Identity|BusinessObjects)[.]",
+        lambda p: p.startswith("src/")
+        and p.endswith(".cs")
+        and "/Migrations/" not in p,
+        "Fully-qualified Axis type introduced in implementation code - use an import or explicit alias",
+    ),
+    (
+        r"(?i)\b(?:the user\s+(?:approved|requested|asked|confirmed|decided)|"
+        r"(?:approved|requested|asked|confirmed|decided)\s+by\s+the user)\b",
+        lambda p: (p == "AGENTS.md" or p.startswith(".agents/skills/") or p.startswith("docs/"))
+        and p.endswith(".md"),
+        "Session provenance introduced in durable guidance - keep only the current contract and durable rationale",
+    ),
+    (
+        r"(?i)\buser-approved\b",
+        lambda p: (p.startswith("docs/use-cases/") or p.startswith("docs/foundations/"))
+        and p.endswith(".md"),
+        "Approval history introduced in a durable product contract - keep only the current decision",
+    ),
     (
         r"(?:/mnt/[a-z]/(?:[^`\s]+/)*projects/|[A-Za-z]:\\(?:Users|projects)\\|/Users/[^`\s]+/|/home/[^`\s]+/)",
         lambda p: (p.startswith("docs/") or p.startswith("scripts/"))
@@ -1729,7 +1961,7 @@ DOC_DRIFT_ADDED_LINE_RULES = [
         "Database setup must use the owning DbContext migration chain, not EnsureCreated",
     ),
     (
-        r"\b(?:TODO|FIXME|NotImplementedException|stub)\b|(?<![:\w-])placeholder(?!\s*=)(?![:\w-])",
+        r"\b(?:TODO|FIXME|NotImplementedException|stub)\b|(?P<stub_quote>[\"'])placeholder(?P=stub_quote)",
         lambda p: (p.startswith("src/") or p.startswith("tests/") or p.startswith("frontend/src/"))
         and "/obj/" not in p
         and "/node_modules/" not in p,
@@ -1740,6 +1972,10 @@ DOC_DRIFT_ADDED_LINE_RULES = [
 DOC_COMMAND_DOC_PATHS = {"AGENTS.md", "README.md", "CONTRIBUTING.md"}
 
 RAW_DOC_COMMAND_PATTERNS = [
+    (
+        re.compile(r"^(?:cd\s+\S+\s+&&\s+)?dotnet\s+ef\s+migrations\s+add\b"),
+        "use `python scripts/axis.py migration add <module> <Name>`",
+    ),
     (
         re.compile(r"^(?:cd\s+\S+\s+&&\s+)?dotnet\s+(?:restore|build|test|format|run|ef)\b"),
         "use `python scripts/axis.py dotnet ...`",
@@ -2262,7 +2498,11 @@ def check_doc_drift(_args: argparse.Namespace | None = None) -> int:
         if migration.name.endswith(".Designer.cs") or "Snapshot" in migration.name:
             continue
         if not migration.with_name(f"{migration.stem}.Designer.cs").is_file():
-            fail(issues, f"EF migration missing .Designer.cs - regenerate with dotnet ef: {rel(migration)}")
+            fail(
+                issues,
+                "EF migration missing .Designer.cs - recreate through "
+                f"`python scripts/axis.py migration add <module> <Name>`: {rel(migration)}",
+            )
 
     checkers = [
         ("check-text-encoding", check_text_encoding),
@@ -2795,6 +3035,21 @@ def check_coderabbit_cli(_args: argparse.Namespace | None = None) -> int:
     return 0
 
 
+MIGRATION_NAME_RE = re.compile(r"^[A-Z][A-Za-z0-9]*$")
+
+
+def explicit_confirmation(
+    args: argparse.Namespace,
+    *,
+    command: str,
+    target: str,
+) -> bool:
+    if args.yes:
+        return True
+    print(f"{command}: would destroy {target}; rerun with --yes", file=sys.stderr)
+    return False
+
+
 def dotnet_command(args: argparse.Namespace) -> int:
     rc = check_dotnet_sdk()
     if rc != 0:
@@ -2806,6 +3061,8 @@ def dotnet_command(args: argparse.Namespace) -> int:
         dotnet_args = dotnet_args[1:]
     if command == "restore":
         return run([exe("dotnet"), "restore", "Axis.sln", *dotnet_args], check=False).returncode
+    if command == "restore-tools":
+        return run([exe("dotnet"), "tool", "restore", *dotnet_args], check=False).returncode
     if command == "build":
         return run([exe("dotnet"), "build", "Axis.sln", "--nologo", *dotnet_args], check=False).returncode
     if command == "test":
@@ -2823,9 +3080,38 @@ def dotnet_command(args: argparse.Namespace) -> int:
         return run([exe("dotnet"), *format_args], check=False).returncode
     if command == "run-api":
         return run([exe("dotnet"), "run", "--project", str(API_PROJECT), *dotnet_args], check=False).returncode
-    if command == "ef":
-        return run([exe("dotnet"), "ef", *dotnet_args], check=False).returncode
     raise CheckError(f"Unknown dotnet command: {command}")
+
+
+def migration_command(args: argparse.Namespace) -> int:
+    rc = check_dotnet_sdk()
+    if rc != 0:
+        return rc
+    if args.migration_command != "add":
+        raise CheckError(f"Unknown migration command: {args.migration_command}")
+    if MIGRATION_NAME_RE.fullmatch(args.name) is None:
+        raise CheckError("migration add: name must be PascalCase letters and digits")
+
+    project, context, connection_key = MIGRATION_TARGETS[args.module]
+    return run(
+        [
+            exe("dotnet"),
+            "ef",
+            "migrations",
+            "add",
+            args.name,
+            "--project",
+            str(project),
+            "--startup-project",
+            str(project),
+            "--context",
+            context,
+            "--output-dir",
+            "Migrations",
+        ],
+        check=False,
+        env={connection_key: DESIGN_TIME_CONNECTION_STRING},
+    ).returncode
 
 
 def run_frontend_npm(
@@ -2848,6 +3134,22 @@ def passthrough_args(raw_args: list[str]) -> list[str]:
     return args
 
 
+def frontend_test_path(value: str) -> str:
+    path = Path(value)
+    normalized = path.as_posix()
+    if (
+        value.startswith("-")
+        or path.is_absolute()
+        or ".." in path.parts
+        or re.fullmatch(r"(?:tests|src)/.+[.](?:test|spec)[.](?:ts|tsx)", normalized) is None
+        or not (FRONTEND_DIR / path).is_file()
+    ):
+        raise argparse.ArgumentTypeError(
+            "frontend test paths must name existing tests/ or src/ *.test|spec.ts|tsx files"
+        )
+    return normalized
+
+
 def frontend_command(args: argparse.Namespace) -> int:
     command = args.frontend_command
     if command == "ui-baseline":
@@ -2868,12 +3170,20 @@ def frontend_command(args: argparse.Namespace) -> int:
 
     if command == "install":
         return run_frontend_npm(["ci"]).returncode
+    if command == "sync-lock":
+        return run_frontend_npm(["install", "--package-lock-only", "--ignore-scripts"]).returncode
     if command == "install-browsers":
         return run_frontend_npm(["exec", "--", "playwright", "install", "chromium"]).returncode
     if command == "ci":
         return run_frontend_npm(["run", "ci"]).returncode
     if command == "test":
-        return run_frontend_npm(["run", "test"]).returncode
+        npm_args = ["run", "test"]
+        vitest_args = list(getattr(args, "test_paths", []))
+        if getattr(args, "name", None):
+            vitest_args.extend(["-t", args.name])
+        if vitest_args:
+            npm_args.extend(["--", *vitest_args])
+        return run_frontend_npm(npm_args).returncode
     if command == "gen-api-types":
         generated_path = FRONTEND_DIR / "src" / "lib" / "api-generated"
 
@@ -2905,13 +3215,6 @@ def frontend_command(args: argparse.Namespace) -> int:
             )
             return 1
         return 0
-    if command == "script":
-        npm_args = ["run", args.script_name]
-        script_args = passthrough_args(args.script_args)
-        if script_args:
-            npm_args.append("--")
-            npm_args.extend(script_args)
-        return run_frontend_npm(npm_args).returncode
     raise CheckError(f"Unknown frontend command: {command}")
 
 
@@ -3184,7 +3487,16 @@ def verify(args: argparse.Namespace) -> int:
                         lambda: run_local_dev_browser(changed_e2e_tests),
                     )
             else:
-                step("frontend test", lambda: frontend_command(argparse.Namespace(frontend_command="test")))
+                step(
+                    "frontend test",
+                    lambda: frontend_command(
+                        argparse.Namespace(
+                            frontend_command="test",
+                            test_paths=[],
+                            name=None,
+                        )
+                    ),
+                )
 
     if scripts_changed:
         step("scripts standard", lambda: check_scripts_standard())
@@ -3405,6 +3717,7 @@ def generate_api_contracts(_args: argparse.Namespace | None = None) -> int:
         if rc != 0:
             return rc
     commands = [
+        ([exe("dotnet"), "tool", "restore"], ROOT, None),
         ([exe("dotnet"), "build", "src/Axis.Api/Axis.Api.csproj", "--nologo"], ROOT, None),
         (
             [
@@ -3998,6 +4311,12 @@ def local_dev(args: argparse.Namespace) -> int:
     if command == "down":
         compose = ["down", "--remove-orphans"]
         if args.volumes:
+            if not explicit_confirmation(
+                args,
+                command="local-dev down --volumes",
+                target="all Axis local-development volumes",
+            ):
+                return 1
             compose.append("--volumes")
         return run(local_dev_compose_args(*compose), check=False).returncode
 
@@ -4059,6 +4378,12 @@ def local_dev(args: argparse.Namespace) -> int:
             return run(local_dev_compose_args(*compose), check=False).returncode
 
     if command == "reset-db":
+        if not explicit_confirmation(
+            args,
+            command="local-dev reset-db",
+            target=f"the {LOCAL_DEV_POSTGRES_VOLUME} volume",
+        ):
+            return 1
         down = run(local_dev_compose_args("down"), check=False)
         if down.returncode != 0:
             return down.returncode
@@ -4071,6 +4396,12 @@ def local_dev(args: argparse.Namespace) -> int:
         return run(local_dev_up_args(), check=False).returncode
 
     if command == "reset-all":
+        if not explicit_confirmation(
+            args,
+            command="local-dev reset-all",
+            target="all Axis local-development volumes",
+        ):
+            return 1
         down = run(local_dev_compose_args("down", "--volumes"), check=False)
         if down.returncode != 0:
             return down.returncode
@@ -4559,6 +4890,36 @@ def main(argv: list[str] | None = None) -> int:
     doctor_parser.set_defaults(func=doctor)
     sub.add_parser("install-hooks", help="Install the repository-managed pre-push hook").set_defaults(func=install_hooks)
     sub.add_parser("pre-push", help="Run the pre-push policy profile").set_defaults(func=pre_push)
+    git_parser = sub.add_parser("git", help="Run finite repository Git workflows")
+    git_sub = git_parser.add_subparsers(dest="git_command", required=True)
+    git_sync_parser = git_sub.add_parser(
+        "sync",
+        help="Fetch and fast-forward a clean local branch from origin",
+    )
+    git_sync_parser.add_argument("--branch", required=True)
+    git_sync_parser.set_defaults(func=git_sync)
+    git_checkpoint_parser = git_sub.add_parser(
+        "checkpoint",
+        help="Create a branch if needed and commit staged changes",
+    )
+    git_checkpoint_parser.add_argument("--branch", required=True)
+    git_checkpoint_parser.add_argument("--subject", required=True)
+    git_checkpoint_parser.add_argument("--body")
+    git_checkpoint_parser.add_argument(
+        "--all",
+        action="store_true",
+        dest="all_changes",
+        help="Stage all tracked, deleted, and untracked paths before committing",
+    )
+    git_checkpoint_parser.set_defaults(func=git_checkpoint)
+    git_push_parser = git_sub.add_parser("push-checkpoint", help="Push the current checkpoint branch")
+    git_push_parser.add_argument("--branch", required=True)
+    git_push_parser.add_argument(
+        "--skip-pre-push",
+        action="store_true",
+        help="Skip the pre-push hook only when explicitly authorized",
+    )
+    git_push_parser.set_defaults(func=git_push_checkpoint)
     ready_review_parser = sub.add_parser("ready-review", help="Verify a clean checkpoint before review")
     ready_review_parser.add_argument("--since", help="Scope expensive verification after this checkpoint")
     ready_review_parser.add_argument(
@@ -4578,10 +4939,14 @@ def main(argv: list[str] | None = None) -> int:
 
     dotnet_parser = sub.add_parser("dotnet", help="Run repository-standard .NET commands")
     dotnet_sub = dotnet_parser.add_subparsers(dest="dotnet_command", required=True)
-    for dotnet_passthrough in ("restore", "build", "test"):
+    for dotnet_passthrough in ("restore", "restore-tools", "build", "test"):
         parser_for_dotnet = dotnet_sub.add_parser(
             dotnet_passthrough,
-            help=f"Run dotnet {dotnet_passthrough} through the repository wrapper",
+            help=(
+                "Restore repository-local .NET tools through the repository wrapper"
+                if dotnet_passthrough == "restore-tools"
+                else f"Run dotnet {dotnet_passthrough} through the repository wrapper"
+            ),
         )
         parser_for_dotnet.add_argument("dotnet_args", nargs=argparse.REMAINDER)
         parser_for_dotnet.set_defaults(func=dotnet_command)
@@ -4592,16 +4957,32 @@ def main(argv: list[str] | None = None) -> int:
     dotnet_run_api = dotnet_sub.add_parser("run-api", help="Run the Axis API project")
     dotnet_run_api.add_argument("dotnet_args", nargs=argparse.REMAINDER)
     dotnet_run_api.set_defaults(func=dotnet_command)
-    dotnet_ef = dotnet_sub.add_parser("ef", help="Run Entity Framework tooling")
-    dotnet_ef.add_argument("dotnet_args", nargs=argparse.REMAINDER)
-    dotnet_ef.set_defaults(func=dotnet_command)
+
+    migration_parser = sub.add_parser("migration", help="Manage repository-owned EF migration source")
+    migration_sub = migration_parser.add_subparsers(dest="migration_command", required=True)
+    migration_add = migration_sub.add_parser("add", help="Scaffold a migration for one Axis module")
+    migration_add.add_argument("module", choices=sorted(MIGRATION_TARGETS))
+    migration_add.add_argument("name", help="PascalCase migration name")
+    migration_add.set_defaults(func=migration_command)
 
     frontend_parser = sub.add_parser("frontend", help="Run repository-standard frontend commands")
     frontend_sub = frontend_parser.add_subparsers(dest="frontend_command", required=True)
     frontend_sub.add_parser("install", help="Install locked frontend dependencies with npm ci").set_defaults(func=frontend_command)
+    frontend_sub.add_parser(
+        "sync-lock",
+        help="Regenerate package-lock.json from exact package.json versions",
+    ).set_defaults(func=frontend_command)
     frontend_sub.add_parser("install-browsers", help="Install Playwright Chromium").set_defaults(func=frontend_command)
     frontend_sub.add_parser("ci", help="Run frontend type-check and lint gates").set_defaults(func=frontend_command)
-    frontend_sub.add_parser("test", help="Run frontend unit tests").set_defaults(func=frontend_command)
+    frontend_test = frontend_sub.add_parser("test", help="Run all or selected frontend unit tests")
+    frontend_test.add_argument(
+        "test_paths",
+        nargs="*",
+        type=frontend_test_path,
+        help="Existing frontend-relative test paths",
+    )
+    frontend_test.add_argument("-t", "--name", help="Run tests whose full name matches this pattern")
+    frontend_test.set_defaults(func=frontend_command)
     frontend_gen_api = frontend_sub.add_parser("gen-api-types", help="Generate TypeScript API types from OpenAPI")
     frontend_gen_api.add_argument("--check", action="store_true", help="Fail if generated frontend API types are stale")
     frontend_gen_api.set_defaults(func=frontend_command)
@@ -4612,7 +4993,6 @@ def main(argv: list[str] | None = None) -> int:
     frontend_script.add_argument("script_name")
     frontend_script.add_argument("script_args", nargs=argparse.REMAINDER)
     frontend_script.set_defaults(func=frontend_command)
-
     local_dev_parser = sub.add_parser("local-dev", help="Manage the Docker Compose local-development stack")
     local_dev_sub = local_dev_parser.add_subparsers(dest="local_dev_command", required=True)
     local_certs = local_dev_sub.add_parser("certs", help="Create or reuse local HTTPS certificates")
@@ -4630,6 +5010,7 @@ def main(argv: list[str] | None = None) -> int:
     local_up.set_defaults(func=local_dev)
     local_down = local_dev_sub.add_parser("down", help="Stop and remove local services")
     local_down.add_argument("--volumes", action="store_true")
+    local_down.add_argument("--yes", action="store_true", help="Confirm deletion of local volumes")
     local_down.set_defaults(func=local_dev)
     for local_command in ("start", "stop", "restart"):
         parser_for_command = local_dev_sub.add_parser(local_command, help=f"{local_command.capitalize()} local services")
@@ -4643,7 +5024,10 @@ def main(argv: list[str] | None = None) -> int:
     local_logs.add_argument("-f", "--follow", action="store_true")
     local_logs.add_argument("services", nargs="*")
     local_logs.set_defaults(func=local_dev)
-    local_shell = local_dev_sub.add_parser("shell", help="Open an interactive shell in a compose service container")
+    local_shell = local_dev_sub.add_parser(
+        "shell",
+        help="Open an unrestricted diagnostic shell in a compose service container",
+    )
     local_shell.add_argument("service", nargs="?", default="api")
     local_shell.add_argument("exec_command", nargs=argparse.REMAINDER)
     local_shell.set_defaults(func=local_dev)
@@ -4664,8 +5048,12 @@ def main(argv: list[str] | None = None) -> int:
     local_observability_logs = local_observability_sub.add_parser("logs", help="Show observability logs")
     local_observability_logs.add_argument("-f", "--follow", action="store_true")
     local_observability_logs.set_defaults(func=local_dev)
-    local_dev_sub.add_parser("reset-db", help="Recreate the local database volume").set_defaults(func=local_dev)
-    local_dev_sub.add_parser("reset-all", help="Recreate all local volumes and services").set_defaults(func=local_dev)
+    local_reset_db = local_dev_sub.add_parser("reset-db", help="Recreate the local database volume")
+    local_reset_db.add_argument("--yes", action="store_true", help="Confirm deletion of the local database volume")
+    local_reset_db.set_defaults(func=local_dev)
+    local_reset_all = local_dev_sub.add_parser("reset-all", help="Recreate all local volumes and services")
+    local_reset_all.add_argument("--yes", action="store_true", help="Confirm deletion of all local volumes")
+    local_reset_all.set_defaults(func=local_dev)
 
     check = sub.add_parser("check", help="Run an individual deterministic repository gate")
     check_sub = check.add_subparsers(dest="check_command", required=True)

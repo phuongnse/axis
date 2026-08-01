@@ -4,7 +4,7 @@
 
 ## Purpose
 
-Let a signed-in workspace user configure enterprise field types, type-specific field configuration, and compatible reusable rules on an unpublished business object definition so each published version carries an explicit, stable record contract.
+Let a signed-in workspace user configure enterprise field types, type-specific field configuration, and reusable rule bindings on an unpublished business object definition so each published version carries an explicit, stable record contract.
 
 ## Primary actor
 
@@ -21,21 +21,21 @@ Let a signed-in workspace user configure enterprise field types, type-specific f
 2. System shows each field's stable key, label, type, type-specific configuration, ordering, and applied rule summary.
 3. User chooses text, integer, decimal, date, date-and-time, boolean, or choice as the field type.
 4. For a choice field, user chooses single or multiple selection and manages ordered structured options with stable option IDs, keys, and labels.
-5. System loads reusable rule definitions compatible with the field type and configuration.
-6. User applies compatible rules and enters their required parameters.
-7. System validates identity, type configuration, rule version, applicability, parameters, workspace scope, and the user's last-seen revision.
-8. System saves the unpublished definition and returns the current revision with canonical field configuration and applied rule snapshots.
+5. System loads reusable rule definitions whose input contracts can be bound to the field and configured values.
+6. User applies a rule version and maps its inputs to the field value or consumer-owned configured values.
+7. System validates identity, type configuration, rule version, input bindings, workspace scope, and the user's last-seen revision.
+8. System saves the unpublished definition and returns the current revision with canonical field configuration and applied rule-binding snapshots.
 9. User publishes the unpublished definition using the current revision.
 10. System creates an immutable published object definition version preserving field identity, type, type configuration, ordering, label, and versioned applied rule snapshots.
 
 ## Alternate / error flows
 
 - Unsupported field type or malformed type configuration: reject save and publish with a field-specific error.
-- Date value used where date-and-time is required, or date-and-time parameter without an explicit offset: reject the affected rule parameter.
+- Date value used where date-and-time is required, or date-and-time input without an explicit offset: reject the affected rule input.
 - Choice field without a selection mode, without options, or with duplicate option keys: reject save and publish.
 - Multiple-choice selection bounds with a negative minimum or maximum below minimum: reject the affected rule.
-- Unknown, unpublished, archived, or incompatible rule version: reject without persistence.
-- Missing, malformed, or type-incompatible rule parameter: reject with a parameter-specific error.
+- Unknown, unpublished, archived, or input-incompatible rule version: reject without persistence.
+- Missing, malformed, or type-incompatible rule input binding: reject with an input-specific error.
 - Stale save or concurrent publish: reject without overwriting newer unpublished state or published versions.
 - Missing, unavailable, or cross-workspace scope: reject without mutation or resource disclosure.
 
@@ -46,14 +46,14 @@ Let a signed-in workspace user configure enterprise field types, type-specific f
 - **AC-002** Date and date-and-time remain distinct contracts: date values use calendar-date semantics without time or zone, while date-and-time values require an explicit offset and are canonicalized as an instant.
 - **AC-003** Choice fields store `Single` or `Multiple` selection mode plus ordered static options as type configuration; option definitions are not modeled as validation rules.
 - **AC-004** Static choice options have stable IDs and immutable persisted keys, editable labels, deterministic ordering, and are snapshotted into published definition versions with distinct snapshot IDs and source option identities.
-- **AC-005** User can apply a published system or workspace rule version compatible with the selected field type and configuration.
-- **AC-006** Applied rules store a stable rule definition key, immutable rule version, and canonical parameter values rather than per-rule nullable columns or consumer-owned rule enums.
+- **AC-005** User can apply a published built-in or workspace rule version when the consumer can bind its inputs to the selected field and configured values.
+- **AC-006** Applied rules store a stable `RuleBindingId`; Rules owns the exact definition version and canonical input mappings behind that binding rather than Business Objects copying definition keys, versions, or input dictionaries.
 - **AC-007** Saving field configuration round-trips and preserves stable field and option identities while returning the current revision required by later save and publish attempts.
 - **AC-008** Publishing creates an immutable field contract containing type configuration and versioned applied rule snapshots for later record validation.
 
 *Validation & errors*
-- **AC-009** Unsupported types, malformed type configuration, unknown rule definitions, non-published rule versions, and incompatible rules are rejected before persistence.
-- **AC-010** Rule parameters are required, typed, canonicalized, and validated, including decimal, calendar-date, offset date-and-time, text, boolean, and multiple-value parameters.
+- **AC-009** Unsupported types, malformed type configuration, unknown rule definitions, non-published, archived, or input-incompatible rules are rejected before persistence.
+- **AC-010** Rule inputs and bindings are required, typed, canonicalized, and validated, including decimal, calendar-date, offset date-and-time, text, boolean, and multiple-value values.
 - **AC-011** Choice configuration rejects missing selection mode, empty option sets, duplicate option keys, blank labels, and invalid ordering.
 - **AC-012** Publication is blocked while any field type, type configuration, or applied rule is invalid; the unpublished definition remains editable.
 - **AC-013** Stale saves and concurrent publish attempts fail without silently overwriting newer field configuration or rule snapshots.
@@ -61,7 +61,7 @@ Let a signed-in workspace user configure enterprise field types, type-specific f
 
 *Edge cases*
 - **AC-015** Current workspace scope is required for save, publish, list, and load operations; unavailable and cross-workspace access is rejected without mutation or disclosure.
-- **AC-016** Business Objects owns fields, choice configuration, and applied snapshots; Rules owns reusable definitions, versions, parameter schemas, applicability, and deterministic evaluation contracts.
+- **AC-016** Business Objects owns fields, choice configuration, input bindings, and applied snapshots; Rules owns reusable definitions, versions, input schemas, and deterministic evaluation contracts.
 - **AC-017** Mutable field, option, and applied-rule entities use identities distinct from immutable published snapshots, and every published snapshot retains its source entity identity.
 - **AC-018** The initial Business Objects schema contains only the approved `Choice` plus `Single` or `Multiple` contract and uses one clean initial migration without compatibility aliases.
 - **AC-019** Save, migration, and publish operations are atomic; failures leave the previous unpublished state and published versions unchanged.
@@ -71,7 +71,7 @@ Let a signed-in workspace user configure enterprise field types, type-specific f
 | ID | Boundary | Scenario | Covers AC | Verification | Required |
 |---|---|---|---|---|---|
 | AT-001 | Domain boundary | Valid field contracts preserve supported types, Date/DateTime semantics, Choice selection mode, options, and versioned rule snapshots | AC-001, AC-002, AC-003, AC-004, AC-006, AC-008 | Domain test | Yes |
-| AT-002 | Application boundary | Invalid field configuration, incompatible rule versions, and malformed parameters fail before persistence | AC-009, AC-010, AC-011, AC-012, AC-014 | Domain test + Application test | Yes |
+| AT-002 | Application boundary | Invalid field configuration, incompatible rule versions, and malformed input bindings fail before persistence | AC-009, AC-010, AC-011, AC-012, AC-014 | Domain test + Application test | Yes |
 | AT-003 | Application boundary | Saving configured fields preserves identities and returns the revision required by later save and publish attempts | AC-005, AC-007, AC-013, AC-019 | Application test | Yes |
 | AT-004 | Application/Infrastructure boundaries | Publishing preserves immutable type configuration and exact applied rule versions atomically | AC-006, AC-008, AC-019 | Application test + Infrastructure integration test | Yes |
 | AT-005 | Infrastructure boundary | The clean initial schema enforces distinct current/snapshot identities, source references, choice configuration, constraints, and no retired compatibility residue | AC-017, AC-018, AC-019 | Infrastructure integration test | Yes |
@@ -95,7 +95,7 @@ Let a signed-in workspace user configure enterprise field types, type-specific f
 | Business object collection | Keep one primary table and open or focus unpublished definition editing through [docs/foundations/data-display/collection-page.md](../../foundations/data-display/collection-page.md). |
 | Field definition editor | Show stable identity, selected type, type configuration, applied rules, and configuration state for each unpublished field. |
 | Type configuration | Show calendar-date controls for Date, offset-aware controls for DateTime, and selection mode plus ordered option management for Choice. |
-| Rule configuration | Show only compatible published rules, identify their owner and version when needed, and associate parameter errors with the affected rule control. |
+| Rule configuration | Show published rules whose input contracts can be bound, create or update a Rules-owned binding in the managed dialog, identify source and version when available, map inputs to the field/configuration, and associate input errors with the affected control. |
 | Publish review | Before mutation, summarize field and configured-rule counts, block publication while invalid configuration remains, and identify every affected field or rule. |
 | Published definition detail | Show immutable field type configuration, choice settings and options, and exact applied rule versions as semantic read-only content rather than disabled authoring controls. |
 
@@ -116,12 +116,12 @@ sequenceDiagram
 
   User->>Web: Configure field type and type-specific settings
   Web->>API: Load compatible published rules
-  API->>Rules: Query rule catalog and applicability
-  Rules-->>API: Versioned compatible definitions
+  API->>Rules: Query rule catalog and input compatibility
+  Rules-->>API: Versioned definitions
   User->>Web: Apply rules and publish definition
   Web->>API: Save typed field contract and applied versions
   API->>BusinessObjects: Validate revision and field configuration
-  BusinessObjects->>Rules: Validate applied rule versions and parameters
+  BusinessObjects->>Rules: Validate applied rule versions and inputs
   BusinessObjects->>Store: Persist unpublished state atomically
   BusinessObjects->>Store: Publish immutable version
   BusinessObjects-->>Web: Published field contract
@@ -143,4 +143,4 @@ sequenceDiagram
 >
 > **Verification:** Acceptance proof is tracked in the sibling evidence sidecar.
 >
-> **Decisions:** Date remains a calendar-only type and DateTime is additive with explicit-offset semantics. `Choice` plus immutable `Single` or `Multiple` selection mode is the only initial selection contract. Static options are field type configuration, not a rule. No compatibility migration is retained because no production data exists; the module receives one clean initial migration after restructuring. Applied rules reference immutable published versions and the frontend renders their parameters from Rules metadata rather than a hard-coded catalog. Rules remain pure and side-effect free; consumers own business state and enforcement transactions. Event sourcing, integration events, inbox/outbox, and workflow automation are rejected.
+> **Decisions:** Date remains a calendar-only type and DateTime is additive with explicit-offset semantics. `Choice` plus immutable `Single` or `Multiple` selection mode is the only initial selection contract. Static options are field type configuration, not a rule. No compatibility migration is retained because no production data exists; the module receives one clean initial migration after restructuring. Applied rules reference immutable published versions and the frontend renders their input contract from Rules metadata rather than a hard-coded catalog. Rules remain pure and side-effect free; consumers own input binding, business state, and enforcement transactions. Event sourcing, integration events, inbox/outbox, and workflow automation are rejected.

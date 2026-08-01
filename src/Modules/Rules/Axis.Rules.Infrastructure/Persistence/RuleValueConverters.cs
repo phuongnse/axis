@@ -11,9 +11,10 @@ internal static class RuleValueConverters
     public static readonly ValueConverter<RuleDefinitionVersionId, Guid> DefinitionVersionId =
         new(id => id.Value, value => RuleDefinitionVersionId.From(value));
 
+    public static readonly ValueConverter<RuleBindingId, Guid> BindingId =
+        new(id => id.Value, value => RuleBindingId.From(value));
+
     public static readonly ValueConverter<RuleDefinitionKey, string> DefinitionKey =
         new(key => key.Value, value => RuleDefinitionKey.Create(value).Value);
 
-    public static readonly ValueConverter<RuleContextKey, string> ContextKey =
-        new(key => key.Value, value => RuleContextKey.Create(value).Value);
 }

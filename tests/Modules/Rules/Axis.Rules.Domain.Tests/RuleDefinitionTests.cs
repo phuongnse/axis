@@ -14,28 +14,18 @@ public sealed class RuleDefinitionTests
     public void Lifecycle_WhenValid_PreservesImmutablePublishedVersions()
     {
         RuleDefinition definition = Draft();
-        Configure(definition, "Amount exceeds approval threshold");
+        Configure(definition);
 
-        RuleDefinitionVersion versionOne = definition.Publish(
-            definition.Revision,
-            UserId,
-            Now.AddMinutes(1)).Value;
+        RuleDefinitionVersion versionOne = definition.Publish(definition.Revision, UserId, Now.AddMinutes(1)).Value;
         definition.StartNextDraft(definition.Revision, UserId, Now.AddMinutes(2)).IsSuccess.Should().BeTrue();
-        Configure(definition, "Amount requires executive approval");
-        RuleDefinitionVersion versionTwo = definition.Publish(
-            definition.Revision,
-            UserId,
-            Now.AddMinutes(3)).Value;
+        Configure(definition);
+        RuleDefinitionVersion versionTwo = definition.Publish(definition.Revision, UserId, Now.AddMinutes(3)).Value;
 
         versionOne.Version.Should().Be(1);
-        definition.ExpressionLanguageVersion.Should().Be(RuleExpressionLanguage.Version);
-        versionOne.ExpressionLanguageVersion.Should().Be(RuleExpressionLanguage.Version);
-        versionTwo.ExpressionLanguageVersion.Should().Be(RuleExpressionLanguage.Version);
-        versionOne.Outcome.Should().BeOfType<RuleValidationOutcome>()
-            .Which.Message.Should().Be("Amount exceeds approval threshold");
         versionTwo.Version.Should().Be(2);
-        versionTwo.Outcome.Should().BeOfType<RuleValidationOutcome>()
-            .Which.Message.Should().Be("Amount requires executive approval");
+        versionOne.Condition.Should().NotBeNull();
+        versionOne.Output.Should().Be(RuleOutputContract.BooleanMatch);
+        definition.Output.Should().Be(RuleOutputContract.BooleanMatch);
         definition.FindVersion(1).Should().BeSameAs(versionOne);
     }
 
@@ -48,13 +38,8 @@ public sealed class RuleDefinitionTests
             expectedRevision: 0,
             definition.Name,
             definition.Description,
-            definition.Scope,
-            definition.ContextKey,
-            definition.ContextSchemaVersion,
-            definition.OutcomeKind,
-            [],
+            Inputs(),
             Condition(),
-            Outcome("Should not save"),
             UserId,
             Now);
 
@@ -67,7 +52,7 @@ public sealed class RuleDefinitionTests
     public void Archive_WhenPublished_PreservesVersionResolution()
     {
         RuleDefinition definition = Draft();
-        Configure(definition, "Approval required");
+        Configure(definition);
         RuleDefinitionVersion published = definition.Publish(definition.Revision, UserId, Now).Value;
 
         definition.Archive(definition.Revision, UserId, Now.AddMinutes(1)).IsSuccess.Should().BeTrue();
@@ -77,44 +62,70 @@ public sealed class RuleDefinitionTests
     }
 
     [Fact]
-    public void CreateDraft_WhenTypedKeysAreDefault_ReturnsFailure()
-    {
-        Result<RuleDefinition> result = RuleDefinition.CreateDraft(
+    public void CreateDraft_WhenTypedKeysAreDefault_ReturnsFailure() =>
+        RuleDefinition.CreateDraft(
             WorkspaceId,
             default,
             "Amount approval",
             "Requires approval for high-value records.",
-            RuleScope.Record,
-            default,
-            contextSchemaVersion: 1,
-            RuleOutcomeKind.Validation,
             UserId,
-            Now);
+            Now).IsFailure.Should().BeTrue();
 
-        result.IsFailure.Should().BeTrue();
+    [Fact]
+    public void CreateSystem_WhenTypedKeyIsDefault_ReturnsFailure()
+    {
+        RuleDefinition template = SystemRuleCatalog.Definitions[0];
+
+        RuleDefinition.CreateSystem(
+            default,
+            1,
+            template.Name,
+            template.Description,
+            template.Documentation!,
+            template.Inputs,
+            template.Condition!,
+            template.Output).IsFailure.Should().BeTrue();
     }
 
     [Fact]
-    public void SaveDraft_WhenContextKeyIsDefault_ReturnsFailureWithoutMutation()
+    public void Input_WhenAllowedValuesAreEmpty_AllowsMultipleAcceptedTypes()
     {
-        RuleDefinition definition = Draft();
+        Result<RuleInputDefinition> result = RuleInputDefinition.CreateSystem(
+            "value",
+            "Value",
+            [RuleValueType.Integer, RuleValueType.Decimal],
+            isRequired: false,
+            allowMultiple: false,
+            allowedValues: []);
 
-        Result result = definition.SaveDraft(
-            definition.Revision,
-            definition.Name,
-            definition.Description,
-            definition.Scope,
-            default,
-            definition.ContextSchemaVersion,
-            definition.OutcomeKind,
-            [],
-            Condition(),
-            Outcome("Should not save"),
-            UserId,
-            Now);
+        result.IsSuccess.Should().BeTrue();
+        result.Value.AllowedValues.Should().BeEmpty();
+    }
 
-        result.IsFailure.Should().BeTrue();
-        definition.Condition.Should().BeNull();
+    [Fact]
+    public void Input_WhenAllowedValuesExceedDomainBound_ReturnsFailure() =>
+        RuleInputDefinition.CreateSystem(
+            "value",
+            "Value",
+            [RuleValueType.Text],
+            isRequired: false,
+            allowMultiple: true,
+            allowedValues: Enumerable.Range(0, 1001)
+                .Select(index => $"allowed-{index}")
+                .ToArray()).IsFailure.Should().BeTrue();
+
+    [Fact]
+    public void Input_WhenCreatedFromBusinessLabel_DerivesStableTechnicalKey()
+    {
+        RuleInputDefinition input = RuleInputDefinition.CreateFromLabel(
+            "Ngày bắt đầu",
+            RuleValueType.Date,
+            isRequired: true).Value;
+
+        input.Label.Should().Be("Ngày bắt đầu");
+        input.Key.Should().MatchRegex("^ngay_bat_dau_[a-f0-9]{8}$");
+        RuleInputDefinition.CreateFromLabel("Ngày bắt đầu", RuleValueType.Date, true)
+            .Value.Key.Should().Be(input.Key);
     }
 
     private static RuleDefinition Draft() => RuleDefinition.CreateDraft(
@@ -122,37 +133,26 @@ public sealed class RuleDefinitionTests
         RuleDefinitionKey.Create("amount_approval").Value,
         "Amount approval",
         "Requires approval for high-value records.",
-        RuleScope.Record,
-        RuleContextKey.Create("objects.record").Value,
-        contextSchemaVersion: 1,
-        RuleOutcomeKind.Validation,
         UserId,
         Now).Value;
 
-    private static void Configure(RuleDefinition definition, string message)
-    {
+    private static void Configure(RuleDefinition definition) =>
         definition.SaveDraft(
                 definition.Revision,
                 definition.Name,
                 definition.Description,
-                definition.Scope,
-                definition.ContextKey,
-                definition.ContextSchemaVersion,
-                definition.OutcomeKind,
-                [],
+                Inputs(),
                 Condition(),
-                Outcome(message),
                 UserId,
                 Now)
             .IsSuccess.Should().BeTrue();
-    }
+
+    private static IReadOnlyList<RuleInputDefinition> Inputs() =>
+        [RuleInputDefinition.Create("amount", RuleValueType.Decimal, true).Value];
 
     private static RuleConditionNode Condition() => RulePredicateCondition.Create(
         "amount-check",
         RulePredicateOperator.GreaterThan,
-        RuleOperand.Context("record.amount").Value,
+        RuleOperand.Input("amount").Value,
         RuleOperand.LiteralValue(RuleValue.Create(RuleValueType.Decimal, ["1000"]).Value).Value).Value;
-
-    private static RuleOutcome Outcome(string message) =>
-        RuleValidationOutcome.Create("record.amount_approval", RuleSeverity.Error, message).Value;
 }

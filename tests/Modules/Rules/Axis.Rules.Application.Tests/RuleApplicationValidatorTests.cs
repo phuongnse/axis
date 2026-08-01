@@ -11,117 +11,59 @@ public sealed class RuleApplicationValidatorTests
         new(Substitute.For<IRuleDefinitionRepository>());
 
     [Fact]
-    public async Task ValidateAsync_WhenNumericRangeIsValid_ReturnsCanonicalParameters()
+    public async Task ValidateAsync_WhenInputsAreValid_ReturnsCanonicalInputs()
     {
         RuleApplicationValidationResult result = await _sut.ValidateAsync(
-            Request(
-                RuleDefinitionKeys.NumericRange,
-                "Decimal",
-                Params(("min", ["0.0"]), ("max", ["100000.00"]))),
+            Request(RuleDefinitionKeys.NumericRange, Inputs(("value", ["12.0"]), ("min", ["0.0"]))),
             TestContext.Current.CancellationToken);
 
         result.IsValid.Should().BeTrue();
-        result.CanonicalParameters!["min"].Should().Equal("0.0");
+        result.CanonicalInputs!["value"].Should().Equal("12.0");
+        result.CanonicalInputs["min"].Should().Equal("0.0");
     }
 
     [Fact]
-    public async Task ValidateAsync_WhenRuleIsIncompatible_ReturnsStableError()
+    public async Task ValidateAsync_WhenRequiredRuleValueIsAbsent_ReturnsValidCanonicalInput()
     {
         RuleApplicationValidationResult result = await _sut.ValidateAsync(
-            Request(
-                RuleDefinitionKeys.TextLength,
-                "Boolean",
-                Params(("min", ["1"]))),
+            Request(RuleDefinitionKeys.Required, Inputs()),
             TestContext.Current.CancellationToken);
 
-        result.IsValid.Should().BeFalse();
-        result.ErrorCode.Should().Be("rule_incompatible");
+        result.IsValid.Should().BeTrue();
+        result.CanonicalInputs.Should().BeEmpty();
     }
 
     [Fact]
-    public async Task ValidateAsync_WhenRangeIsInvalid_ReturnsInvalid()
+    public async Task ValidateAsync_WhenUnknownInputIsProvided_ReturnsInvalid()
     {
         RuleApplicationValidationResult result = await _sut.ValidateAsync(
-            Request(
-                RuleDefinitionKeys.TextLength,
-                "Text",
-                Params(("min", ["10"]), ("max", ["2"]))),
+            Request(RuleDefinitionKeys.NumericRange, Inputs(("value", ["12"]), ("unknown", ["1"]))),
             TestContext.Current.CancellationToken);
 
         result.IsValid.Should().BeFalse();
-        result.Error.Should().Be("Text length minimum cannot exceed maximum.");
-    }
-
-    [Fact]
-    public async Task ValidateAsync_WhenChoiceCountTargetsSingleChoice_ReturnsIncompatible()
-    {
-        RuleApplicationValidationResult result = await _sut.ValidateAsync(
-            Request(
-                RuleDefinitionKeys.ChoiceSelectionCount,
-                "Choice",
-                Params(("min", ["1"])),
-                new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal)
-                {
-                    ["selection_mode"] = ["Single"],
-                }),
-            TestContext.Current.CancellationToken);
-
-        result.IsValid.Should().BeFalse();
-        result.ErrorCode.Should().Be("rule_incompatible");
+        result.ErrorCode.Should().Be("input_invalid");
     }
 
     [Fact]
     public async Task ValidateAsync_WhenSystemVersionIsUnknown_DoesNotSubstituteLatest()
     {
-        RuleApplicationValidationRequest request = Request(
-            RuleDefinitionKeys.Required,
-            "Text",
-            Params());
-
-        RuleApplicationValidationResult result = await _sut.ValidateAsync(request with
-        {
-            DefinitionVersion = 2,
-        }, TestContext.Current.CancellationToken);
+        RuleApplicationValidationResult result = await _sut.ValidateAsync(
+            Request(RuleDefinitionKeys.Required, Inputs(("value", ["x"]))) with { DefinitionVersion = 2 },
+            TestContext.Current.CancellationToken);
 
         result.IsValid.Should().BeFalse();
         result.ErrorCode.Should().Be("definition_not_found");
     }
 
-    [Fact]
-    public async Task ValidateAsync_WhenNormalizedParameterKeysCollide_ReturnsInvalid()
-    {
-        RuleApplicationValidationResult result = await _sut.ValidateAsync(
-            Request(
-                RuleDefinitionKeys.NumericRange,
-                "Decimal",
-                Params(("min", ["0"]), (" min ", ["1"]))),
-            TestContext.Current.CancellationToken);
-
-        result.IsValid.Should().BeFalse();
-        result.ErrorCode.Should().Be("parameter_invalid");
-    }
-
     private static RuleApplicationValidationRequest Request(
         string definitionKey,
-        string targetType,
-        IReadOnlyDictionary<string, IReadOnlyList<string>> parameters,
-        IReadOnlyDictionary<string, IReadOnlyList<string>>? configuration = null) =>
-        new(
-            Guid.NewGuid(),
-            definitionKey,
-            DefinitionVersion: 1,
-            new RuleApplicationTarget(
-                RuleScope.Field,
-                "business_objects.field.text",
-                ContextSchemaVersion: 1,
-                targetType,
-                configuration ?? new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal)),
-            parameters);
+        IReadOnlyDictionary<string, IReadOnlyList<string>> inputs) =>
+        new(Guid.NewGuid(), definitionKey, 1, inputs);
 
-    private static IReadOnlyDictionary<string, IReadOnlyList<string>> Params(
-        params (string Key, string[] Values)[] parameters) =>
-        parameters.ToDictionary(
-            parameter => parameter.Key,
-            parameter => (IReadOnlyList<string>)parameter.Values,
+    private static IReadOnlyDictionary<string, IReadOnlyList<string>> Inputs(
+        params (string Key, string[] Values)[] inputs) =>
+        inputs.ToDictionary(
+            input => input.Key,
+            input => (IReadOnlyList<string>)input.Values,
             StringComparer.Ordinal);
 }

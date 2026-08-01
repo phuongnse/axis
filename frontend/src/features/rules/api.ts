@@ -5,36 +5,36 @@ import type * as ApiTypes from '@/lib/api-generated';
 export type RuleDefinitionSummary = ApiTypes.RuleDefinitionSummaryDto;
 export type RuleDefinitionsPage = ApiTypes.RuleDefinitionSummaryDtoPagedResult;
 export type RuleDefinitionDetail = ApiTypes.RuleDefinitionDetailDto;
-export type RuleContextSchema = ApiTypes.RuleContextSchemaDto;
-export type RuleParameterDefinition = ApiTypes.RuleParameterDefinitionDto;
+export type RuleInputDefinition = ApiTypes.RuleInputDefinitionDto;
+export type RuleDraftInputDefinition = ApiTypes.RuleDraftInputDefinitionDto;
+export type RuleOutputContract = ApiTypes.RuleOutputContractDto;
 export type RuleSimulationResult = ApiTypes.RuleSimulationResultDto;
 export type CreateRuleDefinitionRequest = ApiTypes.CreateRuleDefinitionRequest;
 export type SaveRuleDefinitionDraftRequest = ApiTypes.SaveRuleDefinitionDraftRequest;
 export type SimulateRuleRequest = ApiTypes.SimulateRuleRequest;
-export type RuleScope = ApiTypes.RuleScope;
 export type RuleOrigin = ApiTypes.RuleOrigin;
 export type RuleLifecycleStatus = ApiTypes.RuleLifecycleStatus;
 export type RuleValueType = ApiTypes.RuleValueType;
 export type RulePredicateOperator = ApiTypes.RulePredicateOperator;
 export type RuleLogicalOperator = ApiTypes.RuleLogicalOperator;
-export type RuleSeverity = ApiTypes.RuleSeverity;
-export type RuleDecision = ApiTypes.RuleDecision;
 export type RuleConditionNode = ApiTypes.RuleConditionNodeDto;
 export type RuleOperand = ApiTypes.RuleOperandDto;
 export type RuleExpressionLanguage = ApiTypes.RuleExpressionLanguageDto;
 export type RuleExpressionFunction = ApiTypes.RuleExpressionFunction;
 export type RuleExpressionCardinality = ApiTypes.RuleExpressionCardinality;
-export type AssistRuleExpressionRequest = ApiTypes.AssistRuleExpressionRequest;
-export type RuleExpressionAuthoring = ApiTypes.RuleExpressionAuthoringDto;
-export type RuleExpressionCompletion = ApiTypes.RuleExpressionCompletionDto;
+export type ProjectRuleConditionRequest = ApiTypes.ProjectRuleConditionRequest;
+export type RuleConditionProjection = ApiTypes.RuleConditionProjectionDto;
+export type RuleExpressionReferenceKind = ApiTypes.RuleExpressionReferenceKind;
 export type RuleExpressionDisplayNode = ApiTypes.RuleExpressionDisplayNodeDto;
 export type RuleExpressionGuide = ApiTypes.RuleExpressionGuideDto;
 export type SearchRuleExpressionGuideRequest = ApiTypes.SearchRuleExpressionGuideRequest;
+export type RuleBinding = ApiTypes.RuleBindingDto;
+export type CreateRuleBindingRequest = ApiTypes.CreateRuleBindingRequest;
+export type RuleBindingUsage = ApiTypes.RuleBindingUsageDto;
 
 export interface RuleDefinitionFilters {
   page?: number;
   pageSize?: number;
-  scope?: RuleScope;
   origin?: RuleOrigin;
   status?: RuleLifecycleStatus;
   query?: string;
@@ -51,10 +51,11 @@ export const ruleDefinitionQueryKeys = {
     [...ruleDefinitionQueryKeys.all, 'list', filters] as const,
   detail: (definitionKey: string) =>
     [...ruleDefinitionQueryKeys.all, 'detail', definitionKey] as const,
-  contextSchemas: () => [...ruleDefinitionQueryKeys.all, 'context-schemas'] as const,
+  usage: (definitionKey: string, version: number) =>
+    [...ruleDefinitionQueryKeys.all, 'usage', definitionKey, version] as const,
   expressionLanguage: () => [...ruleDefinitionQueryKeys.all, 'expression-language'] as const,
-  expressionAssist: (request: AssistRuleExpressionRequest) =>
-    [...ruleDefinitionQueryKeys.all, 'expression-assist', request] as const,
+  conditionProjection: (request: ProjectRuleConditionRequest) =>
+    [...ruleDefinitionQueryKeys.all, 'condition-projection', request] as const,
   expressionGuide: (request: SearchRuleExpressionGuideRequest) =>
     [...ruleDefinitionQueryKeys.all, 'expression-guide', request] as const,
 };
@@ -63,14 +64,6 @@ export function ruleDefinitionsListQueryOptions(filters: RuleDefinitionFilters =
   return queryOptions({
     queryKey: ruleDefinitionQueryKeys.list(filters),
     queryFn: ({ signal }) => listRuleDefinitions(filters, signal),
-    staleTime: ruleDefinitionStaleTimeMs,
-  });
-}
-
-export function ruleContextSchemasQueryOptions() {
-  return queryOptions({
-    queryKey: ruleDefinitionQueryKeys.contextSchemas(),
-    queryFn: listRuleContextSchemas,
     staleTime: ruleDefinitionStaleTimeMs,
   });
 }
@@ -99,7 +92,6 @@ export async function listRuleDefinitions(
     page: String(filters.page ?? defaultFilters.page),
     pageSize: String(filters.pageSize ?? defaultFilters.pageSize),
   });
-  if (filters.scope) search.set('scope', filters.scope);
   if (filters.origin) search.set('origin', filters.origin);
   if (filters.status) search.set('status', filters.status);
   if (filters.query?.trim()) search.set('query', filters.query.trim());
@@ -107,18 +99,14 @@ export async function listRuleDefinitions(
   return fetchApi<RuleDefinitionsPage>(`/rules?${search.toString()}`, { signal });
 }
 
-export async function listRuleContextSchemas(): Promise<RuleContextSchema[]> {
-  return fetchApi<RuleContextSchema[]>('/rules/context-schemas');
-}
-
 export async function getRuleExpressionLanguage(): Promise<RuleExpressionLanguage> {
   return fetchApi<RuleExpressionLanguage>('/rules/expression-language');
 }
 
-export async function assistRuleExpression(
-  request: AssistRuleExpressionRequest,
-): Promise<RuleExpressionAuthoring> {
-  return fetchApi<RuleExpressionAuthoring>('/rules/expression-language/assist', {
+export async function projectRuleCondition(
+  request: ProjectRuleConditionRequest,
+): Promise<RuleConditionProjection> {
+  return fetchApi<RuleConditionProjection>('/rules/condition/project', {
     method: 'POST',
     body: JSON.stringify(request),
   });
@@ -146,6 +134,35 @@ export async function createRuleDefinition(
     method: 'POST',
     body: JSON.stringify(request),
   });
+}
+
+export async function createRuleBinding(request: CreateRuleBindingRequest): Promise<RuleBinding> {
+  return fetchApi<RuleBinding>('/rule-bindings', {
+    method: 'POST',
+    body: JSON.stringify(request),
+  });
+}
+
+export async function deleteRuleBinding(bindingId: string): Promise<void> {
+  await fetchApi<void>(`/rule-bindings/${encodeURIComponent(bindingId)}`, {
+    method: 'DELETE',
+  });
+}
+
+export function ruleBindingUsageQueryOptions(definitionKey: string, version: number) {
+  return queryOptions({
+    queryKey: ruleDefinitionQueryKeys.usage(definitionKey, version),
+    queryFn: () => listRuleBindingUsage(definitionKey, version),
+  });
+}
+
+export async function listRuleBindingUsage(
+  definitionKey: string,
+  version: number,
+): Promise<RuleBindingUsage[]> {
+  return fetchApi<RuleBindingUsage[]>(
+    `/rules/${encodeURIComponent(definitionKey)}/bindings?version=${version}`,
+  );
 }
 
 export async function saveRuleDefinitionDraft(

@@ -49,12 +49,11 @@ internal sealed class RuleDefinitionRepository(RulesDbContext context) : IRuleDe
 
     public async Task<int> CountForWorkspaceAsync(
         Guid workspaceId,
-        RuleScope? scope = null,
         RuleLifecycleStatus? status = null,
         string? searchQuery = null,
         CancellationToken cancellationToken = default)
     {
-        IQueryable<RuleDefinition> query = Filter(context.RuleDefinitions.AsNoTracking(), workspaceId, scope, status);
+        IQueryable<RuleDefinition> query = Filter(context.RuleDefinitions.AsNoTracking(), workspaceId, status);
         return await Search(query, searchQuery).CountAsync(cancellationToken);
     }
 
@@ -62,12 +61,11 @@ internal sealed class RuleDefinitionRepository(RulesDbContext context) : IRuleDe
         Guid workspaceId,
         int skip,
         int take,
-        RuleScope? scope = null,
         RuleLifecycleStatus? status = null,
         string? searchQuery = null,
         CancellationToken cancellationToken = default)
     {
-        IQueryable<RuleDefinition> query = Filter(context.RuleDefinitions.AsNoTracking(), workspaceId, scope, status);
+        IQueryable<RuleDefinition> query = Filter(context.RuleDefinitions.AsNoTracking(), workspaceId, status);
         return await Order(Search(query, searchQuery), searchQuery)
             .Skip(skip)
             .Take(take)
@@ -77,12 +75,9 @@ internal sealed class RuleDefinitionRepository(RulesDbContext context) : IRuleDe
     private static IQueryable<RuleDefinition> Filter(
         IQueryable<RuleDefinition> query,
         Guid workspaceId,
-        RuleScope? scope,
         RuleLifecycleStatus? status)
     {
         query = query.Where(definition => definition.WorkspaceId == workspaceId);
-        if (scope is not null)
-            query = query.Where(definition => definition.Scope == scope.Value);
         if (status is not null)
             query = query.Where(definition => definition.Status == status.Value);
         return query;

@@ -19,7 +19,6 @@ import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { referenceContent } from '@/lib/reference-metadata';
 import { type RuleDefinitionSummary, ruleDefinitionsListQueryOptions } from '../api';
 import { ruleCreateWindowDescriptor, ruleDefinitionWindowDescriptor } from '../managed-windows';
-import { compareFieldTypes, fieldTypeTranslationKey } from '../metadata';
 import { RuleOriginBadge } from './RuleOriginBadge';
 
 const route = getRouteApi('/_authenticated/rules');
@@ -112,24 +111,14 @@ export function RulesPage() {
         ),
       },
       {
-        id: 'appliesTo',
-        accessorFn: ruleTargets,
+        id: 'inputs',
+        accessorFn: (definition) => (definition.inputs ?? []).map((input) => input.label ?? ''),
         size: 220,
         minSize: 200,
         enableSorting: false,
         enableGrouping: false,
-        meta: { label: t('rules.appliesToColumn') },
-        cell: ({ row }) => <RuleTargetsCell definition={row.original} />,
-      },
-      {
-        id: 'scope',
-        accessorFn: (definition) => definition.scope,
-        size: 160,
-        minSize: 150,
-        enableSorting: false,
-        enableGrouping: false,
-        meta: { label: t('rules.scope') },
-        cell: ({ row }) => <RuleScopeCell definition={row.original} />,
+        meta: { label: t('rules.inputs') },
+        cell: ({ row }) => <RuleInputsCell definition={row.original} />,
       },
       {
         id: 'origin',
@@ -180,7 +169,7 @@ export function RulesPage() {
       }),
       getRowId: (definition) =>
         definition.definitionKey ??
-        `${definition.origin ?? 'Unknown'}:${definition.name ?? definition.contextKey ?? 'rule'}`,
+        `${definition.origin ?? 'Unknown'}:${definition.name ?? definition.definitionKey ?? 'rule'}`,
       queryState: tableQuery,
       onQueryStateChange: (next) => {
         void navigate({
@@ -278,38 +267,19 @@ function RuleIdentityCell({
   );
 }
 
-function RuleTargetsCell({ definition }: { definition: RuleDefinitionSummary }) {
-  const { t } = useTranslation();
-  const targetTypes = [...(definition.applicability?.targetTypeKeys ?? [])].sort(compareFieldTypes);
-  return targetTypes.length > 0 ? (
+function RuleInputsCell({ definition }: { definition: RuleDefinitionSummary }) {
+  const inputs = definition.inputs ?? [];
+  return inputs.length > 0 ? (
     <span data-slot="rule-table-value" className="whitespace-normal text-sm text-foreground">
-      {targetTypes.map((fieldType) => t(fieldTypeTranslationKey(fieldType))).join(', ')}
+      {inputs
+        .map((input) => input.label)
+        .filter(Boolean)
+        .join(', ')}
     </span>
   ) : (
     <span data-slot="rule-table-value" className="whitespace-normal text-sm text-foreground">
-      {humanizeContext(definition.contextKey, t('rules.contextUnavailable'))}
+      —
     </span>
-  );
-}
-
-function RuleScopeCell({ definition }: { definition: RuleDefinitionSummary }) {
-  const { t, i18n } = useTranslation();
-  const setup = referenceContent(definition.documentation, i18n.language)?.usage;
-  return (
-    <div className="whitespace-normal">
-      <div className="flex flex-wrap gap-x-1.5 text-sm font-medium text-foreground">
-        <span data-slot="rule-table-value">
-          {definition.scope ? t(`rules.scope${definition.scope}`) : '—'}
-        </span>
-        {definition.outcomeKind === 'Decision' ? (
-          <>
-            <span aria-hidden>·</span>
-            <span>{t('rules.outcomeDecision')}</span>
-          </>
-        ) : null}
-      </div>
-      <p className="mt-1.5 text-xs text-muted-foreground">{setup ?? t('rules.setup.configured')}</p>
-    </div>
   );
 }
 
@@ -337,12 +307,6 @@ function RuleStatusCell({ definition }: { definition: RuleDefinitionSummary }) {
   );
 }
 
-function humanizeContext(contextKey: string | null | undefined, fallback: string): string {
-  if (!contextKey) return fallback;
-  const label = contextKey.split('.').slice(1).join(' ');
-  return label.charAt(0).toUpperCase() + label.slice(1);
-}
-
 function localizedRuleName(
   definition: RuleDefinitionSummary,
   locale: string,
@@ -365,13 +329,4 @@ function localizedRuleDescription(
     definition.description ??
     t('rules.unknownRuleDescription')
   );
-}
-
-function ruleTargets(definition: RuleDefinitionSummary): string[] {
-  const targetTypes = definition.applicability?.targetTypeKeys ?? [];
-  return targetTypes.length > 0
-    ? [...targetTypes]
-    : definition.contextKey
-      ? [definition.contextKey]
-      : [];
 }

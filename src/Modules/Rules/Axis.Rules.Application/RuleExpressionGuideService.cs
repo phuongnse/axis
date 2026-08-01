@@ -13,7 +13,6 @@ using DomainValueType = Axis.Rules.Domain.RuleValueType;
 namespace Axis.Rules.Application;
 
 public sealed partial class RuleExpressionGuideService(
-    RuleContextSchemaRegistry contextSchemas,
     IRuleTextSearchProvider search)
 {
     public async Task<Result<RuleExpressionGuideDto>> SearchAsync(
@@ -27,32 +26,10 @@ public sealed partial class RuleExpressionGuideService(
                 "Rule expression language version is unavailable.");
         }
 
-        RuleContextSchema? schema = null;
-        if (!string.IsNullOrWhiteSpace(request.ContextKey))
-        {
-            if (request.ContextSchemaVersion is not > 0)
-            {
-                return RuleDefinitionFailures.Invalid<RuleExpressionGuideDto>(
-                    "Rule context schema version is required.");
-            }
-
-            schema = await contextSchemas.FindAsync(
-                workspaceId,
-                request.ContextKey,
-                request.ContextSchemaVersion.Value,
-                cancellationToken);
-            if (schema is null)
-            {
-                return RuleDefinitionFailures.Invalid<RuleExpressionGuideDto>(
-                    "Rule context schema is unavailable.");
-            }
-        }
-
         string language = NormalizeLanguage(request.Language);
         List<GuideSection> sections =
         [
-            ContextSection(schema, request.DefinitionKey, language),
-            ParameterSection(request.Parameters, language),
+            InputSection(request.Inputs, language),
             LogicalOperatorSection(language),
             PredicateOperatorSection(language),
             FunctionSection(language),
@@ -106,102 +83,41 @@ public sealed partial class RuleExpressionGuideService(
             visible);
     }
 
-    private static GuideSection ContextSection(
-        RuleContextSchema? schema,
-        string? definitionKey,
+    private static GuideSection InputSection(
+        IReadOnlyList<RuleInputDefinitionDto> inputs,
         string language)
     {
-        List<GuideItem> items = [];
-        if (schema is not null)
-        {
-            items.AddRange(schema.Fields.Select(field => Item(
-                ContractReferenceKind.Context,
-                field.Path,
-                Content(field.Documentation, language),
-                $"@context.{field.Path} · {ValueTypeName(field.Type, language)}" +
-                (field.AllowMultiple ? $" · {CardinalityName(DomainCardinality.Multiple, language)}" : string.Empty))));
-        }
-        else if (!string.IsNullOrWhiteSpace(definitionKey))
-        {
-            SystemRuleDefinition? definition = SystemRuleCatalog.Definitions
-                .Where(candidate => candidate.Key.Value.Equals(definitionKey.Trim(), StringComparison.Ordinal))
-                .OrderByDescending(candidate => candidate.Version)
-                .FirstOrDefault();
-            if (definition is not null)
+        List<GuideItem> items = inputs
+            .OrderBy(input => input.Label, StringComparer.OrdinalIgnoreCase)
+            .Select(input =>
             {
-                foreach (string reference in ContextReferences(definition.Condition))
-                {
-                    string targetTypes = string.Join(", ", definition.Applicability.TargetTypeKeys);
-                    items.Add(Item(
-                        ContractReferenceKind.Context,
-                        reference,
-                        language == "vi"
-                            ? new(
-                                "Giá trị trường",
-                                "Giá trị được context sản phẩm cung cấp khi rule chạy.",
-                                "Dùng giá trị này trong các operator và function tương thích.",
-                                [$"@context.{reference}"])
-                            : new(
-                                "Field value",
-                                "The value supplied by the product context when the rule runs.",
-                                "Use this value with compatible operators and functions.",
-                                [$"@context.{reference}"]),
-                        $"@context.{reference} · {targetTypes}"));
-                }
-            }
-        }
-
-        return new(
-            "context",
-            language == "vi" ? "Context hiện tại" : "Current context",
-            language == "vi"
-                ? "Các giá trị có kiểu mà rule hiện tại có thể đọc."
-                : "Typed values the current rule can read.",
-            items);
-    }
-
-    private static GuideSection ParameterSection(
-        IReadOnlyList<RuleParameterDefinitionDto> parameters,
-        string language)
-    {
-        List<GuideItem> items = parameters
-            .OrderBy(parameter => parameter.Key, StringComparer.Ordinal)
-            .Select(parameter =>
-            {
-                string typeName = ValueTypeName((DomainValueType)parameter.Type, language);
+                string types = string.Join(", ", input.Types.Select(type => ValueTypeName((DomainValueType)type, language)));
                 string cardinality = CardinalityName(
-                    parameter.AllowMultiple
-                        ? DomainCardinality.Multiple
-                        : DomainCardinality.Scalar,
+                    input.AllowMultiple ? DomainCardinality.Multiple : DomainCardinality.Scalar,
                     language);
-                RuleReferenceContent content = language == "vi"
-                    ? new(
-                        $"@parameters.{parameter.Key}",
-                        $"Parameter {typeName} được cấu hình khi áp dụng rule.",
-                        "Tham chiếu stable key này trong biểu thức; giá trị được kiểm tra theo contract parameter.",
-                        [$"@parameters.{parameter.Key}"])
-                    : new(
-                        $"@parameters.{parameter.Key}",
-                        $"A {typeName} parameter configured when the rule is applied.",
-                        "Reference this stable key in the expression; its value is checked against the parameter contract.",
-                        [$"@parameters.{parameter.Key}"]);
-                string required = parameter.IsRequired
+                string required = input.IsRequired
                     ? language == "vi" ? "bắt buộc" : "required"
                     : language == "vi" ? "tùy chọn" : "optional";
-                return Item(
-                    ContractReferenceKind.Parameter,
-                    parameter.Key,
-                    content,
-                    $"{typeName} · {cardinality} · {required}");
+                RuleReferenceContent content = language == "vi"
+                    ? new(
+                        input.Label,
+                        $"Input {types} của rule.",
+                        "Chọn input này khi soạn điều kiện; giá trị được kiểm tra theo contract của rule.",
+                        [input.Label])
+                    : new(
+                        input.Label,
+                        $"A {types} rule input.",
+                        "Choose this input while composing a condition; its value is checked against the rule contract.",
+                        [input.Label]);
+                return Item(ContractReferenceKind.Input, input.Key, content, $"{types} · {cardinality} · {required}");
             })
             .ToList();
-
         return new(
-            "parameters",
-            language == "vi" ? "Parameters của rule" : "Rule parameters",
+            "inputs",
+            language == "vi" ? "Inputs của rule" : "Rule inputs",
             language == "vi"
-                ? "Các giá trị cấu hình có stable key riêng của rule hiện tại."
-                : "Configured values with stable keys owned by the current rule.",
+                ? "Các giá trị có kiểu mà consumer truyền vào khi rule chạy."
+                : "Typed values supplied by the consumer when the rule runs.",
             items);
     }
 
@@ -259,8 +175,8 @@ public sealed partial class RuleExpressionGuideService(
             "types",
             language == "vi" ? "Kiểu giá trị" : "Value types",
             language == "vi"
-                ? "Các kiểu literal, context, parameter và kết quả function được hỗ trợ."
-                : "Supported literal, context, parameter, and function-result types.",
+                ? "Các kiểu literal, input và kết quả function được hỗ trợ."
+                : "Supported literal, input, and function-result types.",
             RuleExpressionLanguage.ValueTypes.Select(definition => Item(
                 ContractReferenceKind.ValueType,
                 definition.Type.ToString(),
@@ -272,8 +188,8 @@ public sealed partial class RuleExpressionGuideService(
             "operands",
             language == "vi" ? "Nguồn giá trị" : "Value sources",
             language == "vi"
-                ? "Phân biệt giá trị đến từ context, parameter, literal hay function."
-                : "Distinguish context, parameter, literal, and function values.",
+                ? "Phân biệt giá trị đến từ input, literal hay function."
+                : "Distinguish input, literal, and function values.",
             RuleExpressionLanguage.OperandKinds.Select(definition => Item(
                 ContractReferenceKind.OperandKind,
                 definition.Kind.ToString(),
@@ -386,28 +302,6 @@ public sealed partial class RuleExpressionGuideService(
             shapes.Select(shape =>
                     $"{ValueTypeName(shape.Type, language)} · {CardinalityName(shape.Cardinality, language)}")
                 .Distinct(StringComparer.Ordinal));
-
-    private static IEnumerable<string> ContextReferences(RuleConditionNode node)
-    {
-        if (node is RuleConditionGroup group)
-            return group.Children.SelectMany(ContextReferences).Distinct(StringComparer.Ordinal);
-
-        RulePredicateCondition predicate = (RulePredicateCondition)node;
-        return ContextReferences(predicate.Left)
-            .Concat(predicate.Right is null ? [] : ContextReferences(predicate.Right))
-            .Distinct(StringComparer.Ordinal);
-    }
-
-    private static IEnumerable<string> ContextReferences(RuleOperand operand)
-    {
-        if (operand.Kind == DomainOperandKind.Context && operand.Reference is not null)
-            yield return operand.Reference;
-        foreach (RuleOperand argument in operand.Arguments)
-        {
-            foreach (string reference in ContextReferences(argument))
-                yield return reference;
-        }
-    }
 
     private static SearchTextDto Highlight(string text, string query)
     {

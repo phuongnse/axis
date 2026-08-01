@@ -8,11 +8,6 @@ public sealed record SaveRuleDefinitionDraftCommand(
     int ExpectedRevision,
     string Name,
     string Description,
-    RuleScope Scope,
-    string ContextKey,
-    int ContextSchemaVersion,
-    RuleOutcomeKind OutcomeKind,
-    IReadOnlyList<RuleParameterDefinitionDto> Parameters,
-    string ExpressionSyntax,
-    RuleOutcomeDto Outcome)
+    IReadOnlyList<RuleDraftInputDefinitionDto> Inputs,
+    RuleConditionNodeDto Condition)
     : ICommand<RuleDefinitionDetailDto>;

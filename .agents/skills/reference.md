@@ -37,6 +37,7 @@ Delegated skills do not auto-route back, commit, publish, or invoke another work
 6. **Clean replacement.** When compatibility is not required, update spec, implementation, callers, generated artifacts, tests, and guidance as one cutover, then prove the retired identifiers are gone. Keeping both paths is additional product behavior, not a safety default.
 7. **Communication clarity.** Lead with outcome and decisive evidence; preserve exact paths, commands, identifiers, and errors; remove filler and repeated summaries. Expand when compression could obscure sequence, risk, ambiguity, or an irreversible action.
 8. **Skill proof.** Pair deterministic skill checks with a realistic forward test when a fresh agent is available; pass task artifacts, not the intended answer. Compare with the current Axis baseline, not a deliberately weak workflow, and measure task fidelity plus workflow cost rather than brevity alone. Otherwise report semantic compliance as review-only.
+9. **Local convention first.** Before introducing a naming, syntax, import, or ambiguity workaround, inspect the same module and preserve its domain vocabulary. Resolve C# type-name ambiguity through `using` or a clear alias; do not rename the domain concept or inline a project namespace inside implementation code.
 
 ## Improvement loop
 

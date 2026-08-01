@@ -13,9 +13,8 @@ public sealed record BusinessObjectFieldDefinitionDto(
 
 public sealed record BusinessObjectFieldRuleDto(
     Guid Id,
-    string DefinitionKey,
-    int DefinitionVersion,
-    IReadOnlyDictionary<string, IReadOnlyList<string>> Parameters);
+    Guid BindingId,
+    int Order);
 
 public sealed record BusinessObjectChoiceOptionDto(
     Guid Id,
@@ -48,9 +47,8 @@ public sealed record BusinessObjectDefinitionVersionFieldDto(
 public sealed record BusinessObjectDefinitionVersionFieldRuleDto(
     Guid Id,
     Guid SourceFieldRuleId,
-    string DefinitionKey,
-    int DefinitionVersion,
-    IReadOnlyDictionary<string, IReadOnlyList<string>> Parameters);
+    Guid BindingId,
+    int Order);
 
 public sealed record BusinessObjectDefinitionVersionChoiceOptionDto(
     Guid Id,
@@ -94,9 +92,7 @@ public sealed record BusinessObjectFieldDefinitionInput(
     Guid? Id = null);
 
 public sealed record BusinessObjectFieldRuleInput(
-    string DefinitionKey,
-    int DefinitionVersion,
-    IReadOnlyDictionary<string, IReadOnlyList<string>>? Parameters = null,
+    Guid BindingId,
     Guid? Id = null);
 
 public sealed record BusinessObjectChoiceOptionInput(

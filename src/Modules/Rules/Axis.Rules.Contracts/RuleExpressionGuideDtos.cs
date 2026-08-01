@@ -31,8 +31,6 @@ public sealed record RuleExpressionGuideDto(
 public sealed record SearchRuleExpressionGuideRequest(
     int ExpressionLanguageVersion,
     string? DefinitionKey,
-    string? ContextKey,
-    int? ContextSchemaVersion,
-    IReadOnlyList<RuleParameterDefinitionDto> Parameters,
+    IReadOnlyList<RuleInputDefinitionDto> Inputs,
     string? Query,
     string Language);

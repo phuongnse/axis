@@ -20,10 +20,9 @@ import {
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { cn } from '@/lib/utils';
 import type {
-  RuleContextSchema,
-  RuleExpressionCompletion,
   RuleExpressionGuide as RuleExpressionGuideDocument,
-  RuleParameterDefinition,
+  RuleExpressionReferenceKind,
+  RuleInputDefinition,
 } from '../api';
 import {
   ruleDefinitionQueryKeys,
@@ -32,7 +31,7 @@ import {
 } from '../api';
 
 export interface RuleExpressionGuideTarget {
-  referenceKind: RuleExpressionCompletion['referenceKind'];
+  referenceKind: RuleExpressionReferenceKind;
   referenceKey: string;
   displayText?: string;
 }
@@ -40,10 +39,7 @@ export interface RuleExpressionGuideTarget {
 export function RuleExpressionGuide({
   expressionLanguageVersion = 1,
   definitionKey,
-  contextSchema,
-  parameters = [],
-  completions = [],
-  onInsert,
+  inputs = [],
   open,
   onOpenChange,
   target,
@@ -51,10 +47,7 @@ export function RuleExpressionGuide({
 }: {
   expressionLanguageVersion?: number;
   definitionKey?: string;
-  contextSchema?: RuleContextSchema;
-  parameters?: RuleParameterDefinition[];
-  completions?: RuleExpressionCompletion[];
-  onInsert?: (completion: RuleExpressionCompletion) => void;
+  inputs?: RuleInputDefinition[];
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   target?: RuleExpressionGuideTarget | null;
@@ -86,14 +79,10 @@ export function RuleExpressionGuide({
           request={{
             expressionLanguageVersion,
             definitionKey: definitionKey ?? null,
-            contextKey: contextSchema?.contextKey ?? null,
-            contextSchemaVersion: contextSchema?.version ?? null,
-            parameters,
+            inputs,
             query: null,
             language: i18n.language,
           }}
-          completions={completions}
-          onInsert={onInsert}
           target={target}
         />
       </SheetContent>
@@ -104,14 +93,10 @@ export function RuleExpressionGuide({
 function ExpressionGuideContent({
   open,
   request,
-  completions,
-  onInsert,
   target,
 }: {
   open: boolean;
   request: SearchRuleExpressionGuideRequest;
-  completions: RuleExpressionCompletion[];
-  onInsert?: (completion: RuleExpressionCompletion) => void;
   target?: RuleExpressionGuideTarget | null;
 }) {
   const { t } = useTranslation();
@@ -224,8 +209,6 @@ function ExpressionGuideContent({
           <ReferenceSection
             key={section.key}
             section={section}
-            completions={completions}
-            onInsert={onInsert}
             target={hasSearch ? null : target}
           />
         ))}
@@ -236,13 +219,9 @@ function ExpressionGuideContent({
 
 function ReferenceSection({
   section,
-  completions,
-  onInsert,
   target,
 }: {
   section: NonNullable<RuleExpressionGuideDocument['sections']>[number];
-  completions: RuleExpressionCompletion[];
-  onInsert?: (completion: RuleExpressionCompletion) => void;
   target?: RuleExpressionGuideTarget | null;
 }) {
   const { t } = useTranslation();
@@ -255,11 +234,6 @@ function ReferenceSection({
       </div>
       <ul className="divide-y divide-border">
         {(section.items ?? []).map((item) => {
-          const completion = completions.find(
-            (candidate) =>
-              candidate.referenceKind === item.referenceKind &&
-              candidate.referenceKey === item.referenceKey,
-          );
           const itemId = guideItemId(item.referenceKind, item.referenceKey ?? '');
           const isTarget = itemId === targetId;
           return (
@@ -287,16 +261,6 @@ function ReferenceSection({
                     <SearchText value={item.summary} />
                   </p>
                 </div>
-                {completion && onInsert ? (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="xs"
-                    onClick={() => onInsert(completion)}
-                  >
-                    {t('rules.insertSyntax')}
-                  </Button>
-                ) : null}
               </div>
               <dl className="mt-4 grid gap-3">
                 <div>
@@ -317,7 +281,7 @@ function ReferenceSection({
                     </dd>
                   </div>
                 ) : null}
-                {completion && onInsert && !isTarget && (item.examples ?? []).length > 0 ? (
+                {!isTarget && (item.examples ?? []).length > 0 ? (
                   <div>
                     <dt className="text-xs font-medium text-muted-foreground">
                       {t('rules.expressionGuideExamplesLabel')}

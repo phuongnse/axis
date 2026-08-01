@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using Axis.BusinessObjects.Domain.Aggregates;
 using Axis.BusinessObjects.Domain.ValueObjects;
 using Axis.Rules.Contracts;
@@ -159,10 +161,8 @@ public sealed class BusinessObjectDefinitionTests
 
         result.IsSuccess.Should().BeTrue();
         BusinessObjectFieldDefinition name = definition.Fields.Single(field => field.Key.Value == "name");
-        name.Rules.Select(rule => rule.DefinitionKey)
-            .Should().Equal(RuleDefinitionKeys.Required, RuleDefinitionKeys.TextLength);
-        name.Rules.Single(rule => rule.DefinitionKey == RuleDefinitionKeys.TextLength)
-            .Parameters["max"].Should().Equal("80");
+        name.Rules.Select(rule => rule.BindingId)
+            .Should().Equal(BindingId(RuleDefinitionKeys.Required), BindingId(RuleDefinitionKeys.TextLength));
         BusinessObjectFieldDefinition choice = definition.Fields.Single(field => field.Key.Value == "status");
         choice.FieldType.Should().Be(BusinessObjectFieldType.Choice);
         choice.ChoiceSelectionMode.Should().Be(BusinessObjectChoiceSelectionMode.Single);
@@ -244,7 +244,7 @@ public sealed class BusinessObjectDefinitionTests
     }
 
     [Fact]
-    public void SaveUnpublished_WhenAppliedRuleKeyIsDuplicated_ReturnsInvalidInput()
+    public void SaveUnpublished_WhenBindingIdIsDuplicated_ReturnsInvalidInput()
     {
         BusinessObjectDefinition definition = CreateUnpublished();
 
@@ -266,7 +266,7 @@ public sealed class BusinessObjectDefinitionTests
 
         result.IsFailure.Should().BeTrue();
         result.ErrorCode.Should().Be(ErrorCodes.InvalidInput);
-        result.Error.Should().Be("Field rules must be unique per field.");
+        result.Error.Should().Be("Field rule bindings must be unique and non-empty.");
     }
 
     [Fact]
@@ -282,14 +282,14 @@ public sealed class BusinessObjectDefinitionTests
                     "Name",
                     order: 0,
                     BusinessObjectFieldType.Text,
-                    [Rule("Field.Required")]),
+                    [new(Guid.Empty)]),
             ],
             expectedRevision: 1,
             Now);
 
         result.IsFailure.Should().BeTrue();
         result.ErrorCode.Should().Be(ErrorCodes.InvalidInput);
-        result.Error.Should().Be("Field rule definition key format is invalid.");
+        result.Error.Should().Be("Field rule bindings must be unique and non-empty.");
     }
 
     [Fact]
@@ -402,8 +402,11 @@ public sealed class BusinessObjectDefinitionTests
 
     private static BusinessObjectFieldRuleSpec Rule(
         string definitionKey,
-        IReadOnlyDictionary<string, IReadOnlyList<string>>? parameters = null) =>
-        new(definitionKey, DefinitionVersion: 1, parameters);
+        IReadOnlyDictionary<string, IReadOnlyList<string>>? inputs = null) =>
+        new(BindingId(definitionKey));
+
+    private static Guid BindingId(string value) =>
+        new(MD5.HashData(Encoding.UTF8.GetBytes(value)));
 
     private static BusinessObjectChoiceFieldConfigurationSpec Choice(
         BusinessObjectChoiceSelectionMode selectionMode,
@@ -416,10 +419,10 @@ public sealed class BusinessObjectDefinitionTests
                 index)).ToArray());
 
     private static IReadOnlyDictionary<string, IReadOnlyList<string>> Params(
-        params (string Key, string[] Values)[] parameters) =>
-        parameters.ToDictionary(
-            parameter => parameter.Key,
-            parameter => (IReadOnlyList<string>)parameter.Values,
+        params (string Key, string[] Values)[] inputs) =>
+        inputs.ToDictionary(
+            input => input.Key,
+            input => (IReadOnlyList<string>)input.Values,
             StringComparer.Ordinal);
 
     private static IReadOnlyList<BusinessObjectFieldDefinitionSpec> ValidFields() =>

@@ -126,8 +126,7 @@ public sealed record RuleOperand
     public RuleExpressionFunction? FunctionKind { get; }
     public IReadOnlyList<RuleOperand> Arguments { get; }
 
-    public static Result<RuleOperand> Context(string path) => ReferenceOperand(RuleOperandKind.Context, path);
-    public static Result<RuleOperand> Parameter(string key) => ReferenceOperand(RuleOperandKind.Parameter, key);
+    public static Result<RuleOperand> Input(string key) => ReferenceOperand(RuleOperandKind.Input, key);
 
     public static Result<RuleOperand> LiteralValue(RuleValue value) =>
         value is null

@@ -22,7 +22,6 @@ public static class BusinessObjectsInfrastructureExtensions
         services.AddScoped<IBusinessObjectDefinitionRepository, BusinessObjectDefinitionRepository>();
         services.AddScoped<IBusinessObjectDefinitionInputPlanner, BusinessObjectDefinitionInputPlanner>();
         services.AddScoped<IUnitOfWork, BusinessObjectsUnitOfWork>();
-        services.AddSingleton<IRuleContextSchemaProvider, BusinessObjectRuleContextSchemaProvider>();
 
         return services;
     }

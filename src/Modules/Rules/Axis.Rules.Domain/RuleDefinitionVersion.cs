@@ -4,20 +4,16 @@ namespace Axis.Rules.Domain;
 
 public sealed class RuleDefinitionVersion : Entity<RuleDefinitionVersionId>
 {
-    private readonly List<RuleParameterDefinition> _parameters = [];
+    private readonly List<RuleInputDefinition> _inputs = [];
 
     public RuleDefinitionId DefinitionId { get; private set; }
     public int Version { get; private set; }
     public string Name { get; private set; }
     public string Description { get; private set; }
-    public RuleScope Scope { get; private set; }
-    public RuleContextKey ContextKey { get; private set; }
-    public int ContextSchemaVersion { get; private set; }
     public int ExpressionLanguageVersion { get; private set; }
-    public RuleOutcomeKind OutcomeKind { get; private set; }
     public RuleConditionNode Condition { get; private set; }
-    public RuleOutcome Outcome { get; private set; }
-    public IReadOnlyList<RuleParameterDefinition> Parameters => _parameters.AsReadOnly();
+    public RuleOutputContract Output { get; private set; }
+    public IReadOnlyList<RuleInputDefinition> Inputs => _inputs.AsReadOnly();
     public Guid PublishedByUserId { get; private set; }
     public DateTime PublishedAt { get; private set; }
 
@@ -26,9 +22,8 @@ public sealed class RuleDefinitionVersion : Entity<RuleDefinitionVersionId>
     {
         Name = string.Empty;
         Description = string.Empty;
-        ContextKey = default;
         Condition = null!;
-        Outcome = null!;
+        Output = RuleOutputContract.BooleanMatch;
     }
 
     private RuleDefinitionVersion(
@@ -37,14 +32,10 @@ public sealed class RuleDefinitionVersion : Entity<RuleDefinitionVersionId>
         int version,
         string name,
         string description,
-        RuleScope scope,
-        RuleContextKey contextKey,
-        int contextSchemaVersion,
         int expressionLanguageVersion,
-        RuleOutcomeKind outcomeKind,
-        IReadOnlyList<RuleParameterDefinition> parameters,
+        IReadOnlyList<RuleInputDefinition> inputs,
         RuleConditionNode condition,
-        RuleOutcome outcome,
+        RuleOutputContract output,
         Guid publishedByUserId,
         DateTime publishedAt)
         : base(id)
@@ -53,14 +44,10 @@ public sealed class RuleDefinitionVersion : Entity<RuleDefinitionVersionId>
         Version = version;
         Name = name;
         Description = description;
-        Scope = scope;
-        ContextKey = contextKey;
-        ContextSchemaVersion = contextSchemaVersion;
         ExpressionLanguageVersion = expressionLanguageVersion;
-        OutcomeKind = outcomeKind;
-        _parameters.AddRange(parameters);
+        _inputs.AddRange(inputs);
         Condition = condition;
-        Outcome = outcome;
+        Output = output;
         PublishedByUserId = publishedByUserId;
         PublishedAt = publishedAt;
     }
@@ -76,14 +63,10 @@ public sealed class RuleDefinitionVersion : Entity<RuleDefinitionVersionId>
             version,
             definition.Name,
             definition.Description,
-            definition.Scope,
-            definition.ContextKey,
-            definition.ContextSchemaVersion,
             definition.ExpressionLanguageVersion,
-            definition.OutcomeKind,
-            definition.Parameters.ToArray(),
+            definition.Inputs.ToArray(),
             definition.Condition!,
-            definition.Outcome!,
+            definition.Output,
             publishedByUserId,
             publishedAt);
 }

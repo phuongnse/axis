@@ -22,19 +22,11 @@ public sealed class SearchRuleExpressionGuideQueryValidator
                 .MaximumLength(63)
                 .WithErrorCode(RulesProblemCodes.DefinitionInvalid);
 
-            RuleFor(query => query.Request.ContextKey)
-                .MaximumLength(120)
-                .WithErrorCode(RulesProblemCodes.DefinitionInvalid);
-
-            RuleFor(query => query.Request.ContextSchemaVersion)
-                .GreaterThan(0)
-                .When(query => query.Request.ContextSchemaVersion.HasValue)
-                .WithErrorCode(RulesProblemCodes.DefinitionInvalid);
-
-            RuleFor(query => query.Request.Parameters)
+            RuleFor(query => query.Request.Inputs)
                 .Cascade(CascadeMode.Stop)
                 .NotNull()
-                .Must(parameters => parameters.Count <= Domain.RuleEvaluationLimits.Default.MaxParameters)
+                .WithErrorCode(RulesProblemCodes.DefinitionInvalid)
+                .Must(inputs => inputs.Count <= Domain.RuleEvaluationLimits.Default.MaxInputs)
                 .WithErrorCode(RulesProblemCodes.DefinitionInvalid);
 
             RuleFor(query => query.Request.Query)

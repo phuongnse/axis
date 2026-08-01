@@ -4,25 +4,23 @@ namespace Axis.Rules.Domain;
 
 public sealed class RuleDefinition : AggregateRoot<RuleDefinitionId>
 {
-    private readonly List<RuleParameterDefinition> _parameters = [];
+    private readonly List<RuleInputDefinition> _inputs = [];
     private readonly List<RuleDefinitionVersion> _versions = [];
 
     public Guid WorkspaceId { get; private set; }
     public RuleDefinitionKey Key { get; private set; }
     public string Name { get; private set; }
     public string Description { get; private set; }
-    public RuleScope Scope { get; private set; }
-    public RuleContextKey ContextKey { get; private set; }
-    public int ContextSchemaVersion { get; private set; }
+    public RuleOrigin Origin { get; private set; }
     public int ExpressionLanguageVersion { get; private set; }
-    public RuleOutcomeKind OutcomeKind { get; private set; }
     public RuleLifecycleStatus Status { get; private set; }
     public int Revision { get; private set; }
     public int? LatestPublishedVersion { get; private set; }
     public RuleConditionNode? Condition { get; private set; }
-    public RuleOutcome? Outcome { get; private set; }
-    public IReadOnlyList<RuleParameterDefinition> Parameters => _parameters.AsReadOnly();
+    public RuleOutputContract Output { get; private set; }
+    public IReadOnlyList<RuleInputDefinition> Inputs => _inputs.AsReadOnly();
     public IReadOnlyList<RuleDefinitionVersion> Versions => _versions.AsReadOnly();
+    public RuleReferenceDocumentation? Documentation { get; private set; }
     public Guid CreatedByUserId { get; private set; }
     public Guid UpdatedByUserId { get; private set; }
     public DateTime CreatedAt { get; private set; }
@@ -36,7 +34,7 @@ public sealed class RuleDefinition : AggregateRoot<RuleDefinitionId>
         Key = default;
         Name = string.Empty;
         Description = string.Empty;
-        ContextKey = default;
+        Output = RuleOutputContract.BooleanMatch;
     }
 
     private RuleDefinition(
@@ -45,10 +43,7 @@ public sealed class RuleDefinition : AggregateRoot<RuleDefinitionId>
         RuleDefinitionKey key,
         string name,
         string description,
-        RuleScope scope,
-        RuleContextKey contextKey,
-        int contextSchemaVersion,
-        RuleOutcomeKind outcomeKind,
+        RuleOrigin origin,
         Guid createdByUserId,
         DateTime createdAt)
         : base(id)
@@ -57,11 +52,9 @@ public sealed class RuleDefinition : AggregateRoot<RuleDefinitionId>
         Key = key;
         Name = name;
         Description = description;
-        Scope = scope;
-        ContextKey = contextKey;
-        ContextSchemaVersion = contextSchemaVersion;
+        Origin = origin;
         ExpressionLanguageVersion = RuleExpressionLanguage.Version;
-        OutcomeKind = outcomeKind;
+        Output = RuleOutputContract.BooleanMatch;
         Status = RuleLifecycleStatus.Draft;
         Revision = 1;
         CreatedByUserId = createdByUserId;
@@ -75,15 +68,11 @@ public sealed class RuleDefinition : AggregateRoot<RuleDefinitionId>
         RuleDefinitionKey key,
         string name,
         string description,
-        RuleScope scope,
-        RuleContextKey contextKey,
-        int contextSchemaVersion,
-        RuleOutcomeKind outcomeKind,
         Guid createdByUserId,
         DateTime createdAt)
     {
         if (workspaceId == Guid.Empty)
-            return Result.Failure<RuleDefinition>("Workspace scope is required.");
+            return Result.Failure<RuleDefinition>("Workspace is required.");
 
         if (createdByUserId == Guid.Empty)
             return Result.Failure<RuleDefinition>("Creating user is required.");
@@ -92,11 +81,7 @@ public sealed class RuleDefinition : AggregateRoot<RuleDefinitionId>
         if (canonicalKey.IsFailure)
             return Result.Failure<RuleDefinition>(canonicalKey.Error);
 
-        Result<RuleContextKey> canonicalContextKey = RuleContextKey.Create(contextKey.Value);
-        if (canonicalContextKey.IsFailure)
-            return Result.Failure<RuleDefinition>(canonicalContextKey.Error);
-
-        Result identity = ValidateIdentity(name, description, scope, contextSchemaVersion, outcomeKind);
+        Result identity = ValidateIdentity(name, description);
         if (identity.IsFailure)
             return Result.Failure<RuleDefinition>(identity.Error);
 
@@ -106,28 +91,73 @@ public sealed class RuleDefinition : AggregateRoot<RuleDefinitionId>
             canonicalKey.Value,
             name.Trim(),
             description.Trim(),
-            scope,
-            canonicalContextKey.Value,
-            contextSchemaVersion,
-            outcomeKind,
+            RuleOrigin.Workspace,
             createdByUserId,
             createdAt);
+    }
+
+    public static Result<RuleDefinition> CreateSystem(
+        RuleDefinitionKey key,
+        int version,
+        string name,
+        string description,
+        RuleReferenceDocumentation documentation,
+        IReadOnlyList<RuleInputDefinition> inputs,
+        RuleConditionNode condition,
+        RuleOutputContract output)
+    {
+        Result identity = ValidateIdentity(name, description);
+        if (identity.IsFailure)
+            return Result.Failure<RuleDefinition>(identity.Error);
+
+        Result<RuleDefinitionKey> canonicalKey = RuleDefinitionKey.Create(key.Value);
+        if (canonicalKey.IsFailure)
+            return Result.Failure<RuleDefinition>(canonicalKey.Error);
+
+        if (version <= 0)
+            return Result.Failure<RuleDefinition>("System rule version must be positive.");
+
+        if (documentation is null || !documentation.IsComplete("en", "vi"))
+            return Result.Failure<RuleDefinition>("System rule documentation is incomplete.");
+
+        Result semantic = RuleDefinitionValidator.Validate(inputs, condition, output);
+        if (semantic.IsFailure)
+            return Result.Failure<RuleDefinition>(semantic.Error);
+
+        RuleDefinition definition = new(
+            RuleDefinitionId.New(),
+            Guid.Empty,
+            canonicalKey.Value,
+            name.Trim(),
+            description.Trim(),
+            RuleOrigin.System,
+            Guid.Empty,
+            default)
+        {
+            Documentation = documentation,
+            Status = RuleLifecycleStatus.Published,
+            Revision = 0,
+            LatestPublishedVersion = version,
+            Condition = condition,
+            Output = output,
+        };
+        definition._inputs.AddRange(inputs);
+        definition._versions.Add(RuleDefinitionVersion.Create(definition, version, Guid.Empty, default));
+        return definition;
     }
 
     public Result SaveDraft(
         int expectedRevision,
         string name,
         string description,
-        RuleScope scope,
-        RuleContextKey contextKey,
-        int contextSchemaVersion,
-        RuleOutcomeKind outcomeKind,
-        IReadOnlyList<RuleParameterDefinition> parameters,
+        IReadOnlyList<RuleInputDefinition> inputs,
         RuleConditionNode condition,
-        RuleOutcome outcome,
         Guid updatedByUserId,
         DateTime updatedAt)
     {
+        if (Origin != RuleOrigin.Workspace)
+            return Result.Failure(ErrorCodes.Conflict, "System rules are read-only.");
+
         if (Status != RuleLifecycleStatus.Draft)
             return Result.Failure(ErrorCodes.Conflict, "Only a draft rule can be edited.");
 
@@ -135,28 +165,19 @@ public sealed class RuleDefinition : AggregateRoot<RuleDefinitionId>
         if (concurrency.IsFailure)
             return concurrency;
 
-        Result identity = ValidateIdentity(name, description, scope, contextSchemaVersion, outcomeKind);
+        Result identity = ValidateIdentity(name, description);
         if (identity.IsFailure)
             return identity;
 
-        Result<RuleContextKey> canonicalContextKey = RuleContextKey.Create(contextKey.Value);
-        if (canonicalContextKey.IsFailure)
-            return Result.Failure(ErrorCodes.InvalidInput, canonicalContextKey.Error);
-
-        Result draft = ValidateDraft(parameters, condition, outcome, outcomeKind);
-        if (draft.IsFailure)
-            return draft;
+        Result semantic = RuleDefinitionValidator.Validate(inputs, condition, Output);
+        if (semantic.IsFailure)
+            return semantic;
 
         Name = name.Trim();
         Description = description.Trim();
-        Scope = scope;
-        ContextKey = canonicalContextKey.Value;
-        ContextSchemaVersion = contextSchemaVersion;
-        OutcomeKind = outcomeKind;
-        _parameters.Clear();
-        _parameters.AddRange(parameters);
+        _inputs.Clear();
+        _inputs.AddRange(inputs);
         Condition = condition;
-        Outcome = outcome;
         Revision += 1;
         UpdatedByUserId = updatedByUserId;
         UpdatedAt = updatedAt;
@@ -168,6 +189,9 @@ public sealed class RuleDefinition : AggregateRoot<RuleDefinitionId>
         Guid publishedByUserId,
         DateTime publishedAt)
     {
+        if (Origin != RuleOrigin.Workspace)
+            return Result.Failure<RuleDefinitionVersion>(ErrorCodes.Conflict, "System rules are read-only.");
+
         if (Status != RuleLifecycleStatus.Draft)
             return Result.Failure<RuleDefinitionVersion>(ErrorCodes.Conflict, "Only a draft rule can be published.");
 
@@ -175,15 +199,11 @@ public sealed class RuleDefinition : AggregateRoot<RuleDefinitionId>
         if (concurrency.IsFailure)
             return Result.Failure<RuleDefinitionVersion>(concurrency.ErrorCode ?? ErrorCodes.InvalidInput, concurrency.Error);
 
-        if (Condition is null || Outcome is null)
+        if (Condition is null)
             return Result.Failure<RuleDefinitionVersion>(ErrorCodes.InvalidInput, "Rule draft must be configured before publication.");
 
         int versionNumber = (LatestPublishedVersion ?? 0) + 1;
-        RuleDefinitionVersion version = RuleDefinitionVersion.Create(
-            this,
-            versionNumber,
-            publishedByUserId,
-            publishedAt);
+        RuleDefinitionVersion version = RuleDefinitionVersion.Create(this, versionNumber, publishedByUserId, publishedAt);
         _versions.Add(version);
         LatestPublishedVersion = versionNumber;
         Status = RuleLifecycleStatus.Published;
@@ -195,8 +215,8 @@ public sealed class RuleDefinition : AggregateRoot<RuleDefinitionId>
 
     public Result StartNextDraft(int expectedRevision, Guid updatedByUserId, DateTime updatedAt)
     {
-        if (Status != RuleLifecycleStatus.Published)
-            return Result.Failure(ErrorCodes.Conflict, "Only a published rule can start a new draft.");
+        if (Origin != RuleOrigin.Workspace || Status != RuleLifecycleStatus.Published)
+            return Result.Failure(ErrorCodes.Conflict, "Only a published workspace rule can start a new draft.");
 
         Result concurrency = ValidateMutation(expectedRevision, updatedByUserId);
         if (concurrency.IsFailure)
@@ -211,6 +231,9 @@ public sealed class RuleDefinition : AggregateRoot<RuleDefinitionId>
 
     public Result Archive(int expectedRevision, Guid archivedByUserId, DateTime archivedAt)
     {
+        if (Origin != RuleOrigin.Workspace)
+            return Result.Failure(ErrorCodes.Conflict, "System rules are read-only.");
+
         if (Status == RuleLifecycleStatus.Archived)
             return Result.Success();
 
@@ -233,59 +256,20 @@ public sealed class RuleDefinition : AggregateRoot<RuleDefinitionId>
     public RuleDefinitionVersion? FindVersion(int version) =>
         _versions.SingleOrDefault(candidate => candidate.Version == version);
 
-    private Result ValidateMutation(int expectedRevision, Guid userId)
-    {
-        if (userId == Guid.Empty)
-            return Result.Failure(ErrorCodes.InvalidInput, "Acting user is required.");
+    private Result ValidateMutation(int expectedRevision, Guid userId) =>
+        userId == Guid.Empty
+            ? Result.Failure(ErrorCodes.InvalidInput, "Acting user is required.")
+            : expectedRevision == Revision
+                ? Result.Success()
+                : Result.Failure(ErrorCodes.Conflict, "The rule definition has changed.");
 
-        return expectedRevision == Revision
-            ? Result.Success()
-            : Result.Failure(ErrorCodes.Conflict, "The rule definition has changed.");
-    }
-
-    private static Result ValidateIdentity(
-        string name,
-        string description,
-        RuleScope scope,
-        int contextSchemaVersion,
-        RuleOutcomeKind outcomeKind)
+    private static Result ValidateIdentity(string name, string description)
     {
         if (string.IsNullOrWhiteSpace(name) || name.Trim().Length > 200)
             return Result.Failure(ErrorCodes.InvalidInput, "Rule name is required and cannot exceed 200 characters.");
 
-        if (string.IsNullOrWhiteSpace(description) || description.Trim().Length > 1000)
-            return Result.Failure(ErrorCodes.InvalidInput, "Rule description is required and cannot exceed 1000 characters.");
-
-        if (!Enum.IsDefined(scope))
-            return Result.Failure(ErrorCodes.InvalidInput, "Rule scope is not supported.");
-
-        if (contextSchemaVersion <= 0)
-            return Result.Failure(ErrorCodes.InvalidInput, "Rule context schema version must be positive.");
-
-        if (!Enum.IsDefined(outcomeKind))
-            return Result.Failure(ErrorCodes.InvalidInput, "Rule outcome kind is not supported.");
-
-        return Result.Success();
-    }
-
-    private static Result ValidateDraft(
-        IReadOnlyList<RuleParameterDefinition> parameters,
-        RuleConditionNode condition,
-        RuleOutcome outcome,
-        RuleOutcomeKind outcomeKind)
-    {
-        if (parameters is null || parameters.Any(parameter => parameter is null))
-            return Result.Failure(ErrorCodes.InvalidInput, "Rule parameters are required.");
-
-        if (parameters.Select(parameter => parameter.Key).Distinct(StringComparer.Ordinal).Count() != parameters.Count)
-            return Result.Failure(ErrorCodes.InvalidInput, "Rule parameter keys must be unique.");
-
-        if (condition is null)
-            return Result.Failure(ErrorCodes.InvalidInput, "Rule condition is required.");
-
-        if (outcome is null || outcome.Kind != outcomeKind)
-            return Result.Failure(ErrorCodes.InvalidInput, "Rule outcome does not match the selected outcome kind.");
-
-        return Result.Success();
+        return string.IsNullOrWhiteSpace(description) || description.Trim().Length > 1000
+            ? Result.Failure(ErrorCodes.InvalidInput, "Rule description is required and cannot exceed 1000 characters.")
+            : Result.Success();
     }
 }

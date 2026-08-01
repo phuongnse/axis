@@ -6,20 +6,6 @@ public enum RuleOrigin
     Workspace = 1,
 }
 
-public enum RuleScope
-{
-    Field = 0,
-    Object = 1,
-    Record = 2,
-    Lifecycle = 3,
-}
-
-public enum RuleOutcomeKind
-{
-    Validation = 0,
-    Decision = 1,
-}
-
 public enum RuleLifecycleStatus
 {
     Draft = 0,
@@ -74,10 +60,9 @@ public enum RulePredicateOperator
 
 public enum RuleOperandKind
 {
-    Context = 0,
-    Parameter = 1,
-    Literal = 2,
-    Function = 3,
+    Input = 0,
+    Literal = 1,
+    Function = 2,
 }
 
 public enum RuleExpressionFunction

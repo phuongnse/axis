@@ -4,32 +4,36 @@ public sealed record RuleValueDto(
     RuleValueType Type,
     IReadOnlyList<string> Values);
 
-public sealed record RuleParameterDefinitionDto(
+public sealed record RuleInputDefinitionDto(
     string Key,
-    RuleValueType Type,
+    string Label,
+    IReadOnlyList<RuleValueType> Types,
     bool IsRequired,
     bool AllowMultiple,
     IReadOnlyList<string> AllowedValues);
 
-public sealed record RuleApplicabilityDto(
-    IReadOnlyList<string> TargetTypeKeys,
-    IReadOnlyDictionary<string, IReadOnlyList<string>> ConfigurationConstraints);
+public sealed record RuleDraftInputDefinitionDto(
+    string Label,
+    IReadOnlyList<RuleValueType> Types,
+    bool IsRequired,
+    bool AllowMultiple,
+    IReadOnlyList<string> AllowedValues);
+
+public sealed record RuleOutputContractDto(
+    RuleValueType Type,
+    RuleExpressionCardinality Cardinality);
 
 public sealed record RuleDefinitionSummaryDto(
     string DefinitionKey,
     string Name,
     string Description,
     RuleOrigin Origin,
-    RuleScope Scope,
-    RuleOutcomeKind OutcomeKind,
     RuleLifecycleStatus Status,
     int ExpressionLanguageVersion,
     int? Revision,
     int? LatestPublishedVersion,
-    string? ContextKey,
-    int? ContextSchemaVersion,
-    RuleApplicabilityDto? Applicability,
-    IReadOnlyList<RuleParameterDefinitionDto> Parameters,
+    IReadOnlyList<RuleInputDefinitionDto> Inputs,
+    RuleOutputContractDto Output,
     DateTime? UpdatedAt,
     RuleReferenceDocumentationDto? Documentation = null);
 
@@ -38,18 +42,13 @@ public sealed record RuleDefinitionDetailDto(
     string Name,
     string Description,
     RuleOrigin Origin,
-    RuleScope Scope,
-    RuleOutcomeKind OutcomeKind,
     RuleLifecycleStatus Status,
     int ExpressionLanguageVersion,
     int? Revision,
     int? LatestPublishedVersion,
-    string? ContextKey,
-    int? ContextSchemaVersion,
-    RuleApplicabilityDto? Applicability,
-    IReadOnlyList<RuleParameterDefinitionDto> Parameters,
+    IReadOnlyList<RuleInputDefinitionDto> Inputs,
+    RuleOutputContractDto Output,
     RuleConditionNodeDto? Condition,
-    RuleOutcomeDto? Outcome,
     IReadOnlyList<RuleDefinitionVersionDto> Versions,
     DateTime? CreatedAt,
     DateTime? UpdatedAt,
@@ -60,14 +59,10 @@ public sealed record RuleDefinitionVersionDto(
     int Version,
     string Name,
     string Description,
-    RuleScope Scope,
-    RuleOutcomeKind OutcomeKind,
     int ExpressionLanguageVersion,
-    string ContextKey,
-    int ContextSchemaVersion,
-    IReadOnlyList<RuleParameterDefinitionDto> Parameters,
+    IReadOnlyList<RuleInputDefinitionDto> Inputs,
+    RuleOutputContractDto Output,
     RuleConditionNodeDto Condition,
-    RuleOutcomeDto Outcome,
     Guid PublishedByUserId,
     DateTime PublishedAt);
 
@@ -85,26 +80,3 @@ public sealed record RuleOperandDto(
     RuleValueDto? Literal,
     RuleExpressionFunction? Function = null,
     IReadOnlyList<RuleOperandDto>? Arguments = null);
-
-public sealed record RuleOutcomeDto(
-    RuleOutcomeKind Kind,
-    string? ViolationCode,
-    RuleSeverity? Severity,
-    string? Message,
-    RuleDecision? Decision);
-
-public sealed record RuleContextFieldDto(
-    string Path,
-    string DisplayName,
-    RuleValueType Type,
-    bool AllowMultiple,
-    RuleReferenceDocumentationDto Documentation);
-
-public sealed record RuleContextSchemaDto(
-    string ContextKey,
-    int Version,
-    RuleScope Scope,
-    string DisplayName,
-    IReadOnlyList<RuleContextFieldDto> Fields,
-    string? TargetTypeKey = null,
-    IReadOnlyDictionary<string, IReadOnlyList<string>>? Configuration = null);

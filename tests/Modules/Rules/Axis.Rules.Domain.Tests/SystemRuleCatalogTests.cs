@@ -1,5 +1,4 @@
 using Axis.Rules.Domain;
-using Axis.Shared.Domain.Primitives;
 using FluentAssertions;
 
 namespace Axis.Rules.Domain.Tests;
@@ -25,199 +24,165 @@ public sealed class SystemRuleCatalogTests
     [Fact]
     public void Definitions_WhenRead_HaveVersionedNormalizedMetadata()
     {
-        IReadOnlyList<SystemRuleDefinition> definitions = SystemRuleCatalog.Definitions;
+        IReadOnlyList<RuleDefinition> definitions = SystemRuleCatalog.Definitions;
 
-        definitions.Select(definition => (definition.Key.Value, definition.Version))
+        definitions.Select(definition => (definition.Key.Value, definition.LatestPublishedVersion))
             .Should().OnlyHaveUniqueItems();
         definitions.Should().OnlyContain(definition =>
-            definition.Version == 1 &&
+            definition.LatestPublishedVersion == 1 &&
             definition.Origin == RuleOrigin.System &&
-            definition.Scope == RuleScope.Field &&
-            definition.Status == RuleLifecycleStatus.Published &&
-            definition.Applicability.TargetTypeKeys.Count > 0);
+            definition.Status == RuleLifecycleStatus.Published);
         definitions.Should().OnlyContain(definition =>
-            definition.Parameters.Select(parameter => parameter.Key).Distinct(StringComparer.Ordinal).Count()
-            == definition.Parameters.Count);
+            definition.Inputs.Select(input => input.Key).Distinct(StringComparer.Ordinal).Count() ==
+            definition.Inputs.Count);
         definitions.Should().OnlyContain(definition =>
-            definition.Documentation.Locales.Values.All(content =>
+            definition.Documentation!.Locales.Values.All(content =>
                 content.Examples.All(example => example != definition.Key.Value)));
 
-        SystemRuleDefinition textFormat = definitions.Single(
-            definition => definition.Key.Value == "field.text_format");
-        textFormat.Parameters.Should().ContainSingle(parameter =>
-            parameter.Key == "format" &&
-            parameter.Type == RuleValueType.Text &&
-            parameter.AllowedValues.Count == 3 &&
-            parameter.AllowedValues[0] == "Email" &&
-            parameter.AllowedValues[1] == "Url" &&
-            parameter.AllowedValues[2] == "Uuid");
-
-        SystemRuleDefinition choiceCount = definitions.Single(
-            definition => definition.Key.Value == "field.choice_selection_count");
-        choiceCount.Applicability.ConfigurationConstraints["selection_mode"]
-            .Should().Equal("Multiple");
+        RuleDefinition textFormat = definitions.Single(definition => definition.Key.Value == "field.text_format");
+        RuleInputDefinition format = textFormat.Inputs.Single(input => input.Key == "format");
+        format.Types.Should().Equal(RuleValueType.Text);
+        format.AllowedValues.Should().Equal("Email", "Url", "Uuid");
     }
 
-    [Fact]
-    public void Definitions_WhenRead_OwnValidSharedExpressionsAndOutcomes()
+    [Theory]
+    [MemberData(nameof(SatisfiedAssertions))]
+    public void Definition_WhenAssertionIsSatisfied_ReturnsMatch(
+        string definitionKey,
+        IReadOnlyDictionary<string, RuleValue> inputs)
     {
-        foreach (SystemRuleDefinition definition in SystemRuleCatalog.Definitions)
-        {
-            definition.ExpressionLanguageVersion.Should().Be(RuleExpressionLanguage.Version);
-            definition.Condition.Should().NotBeNull();
-            definition.Outcome.Kind.Should().Be(definition.OutcomeKind);
+        RuleDefinition definition = SystemRuleCatalog.Find(definitionKey, 1)!;
 
-            foreach (string targetType in definition.Applicability.TargetTypeKeys)
-            {
-                RuleContextSchema schema = SystemSchema(
-                    targetType,
-                    allowMultiple: definition.Key.Value == "field.choice_selection_count");
-
-                RuleDefinitionValidator.Validate(
-                        schema,
-                        definition.Parameters,
-                        definition.Condition,
-                        definition.Outcome,
-                        definition.OutcomeKind)
-                    .IsSuccess.Should().BeTrue(
-                        $"{definition.Key.Value} must be valid for {targetType}");
-            }
-        }
-    }
-
-    [Fact]
-    public void Definitions_WhenEvaluated_UseRegisteredFunctionsForSystemSemantics()
-    {
-        SystemRuleDefinition required = SystemRuleCatalog.Find("field.required", 1)!;
-        RuleContextSchema textSchema = SystemSchema("Text");
         RuleConditionEvaluator.Evaluate(
-                required.Condition,
-                textSchema,
-                new Dictionary<string, RuleValue>(StringComparer.Ordinal)
-                {
-                    ["field.value"] = Value(RuleValueType.Text, "   "),
-                })
-            .Value.IsMatch.Should().BeTrue();
-
-        SystemRuleDefinition precision = SystemRuleCatalog.Find("field.decimal_precision", 1)!;
-        RuleConditionEvaluator.Evaluate(
-                precision.Condition,
-                SystemSchema("Decimal"),
-                new Dictionary<string, RuleValue>(StringComparer.Ordinal)
-                {
-                    ["field.value"] = Value(RuleValueType.Decimal, "123.456"),
-                },
-                new Dictionary<string, RuleValue>(StringComparer.Ordinal)
-                {
-                    ["precision"] = Value(RuleValueType.Integer, "5"),
-                    ["scale"] = Value(RuleValueType.Integer, "2"),
-                })
-            .Value.IsMatch.Should().BeTrue();
-
-        SystemRuleDefinition format = SystemRuleCatalog.Find("field.text_format", 1)!;
-        RuleConditionEvaluator.Evaluate(
-                format.Condition,
-                textSchema,
-                new Dictionary<string, RuleValue>(StringComparer.Ordinal)
-                {
-                    ["field.value"] = Value(RuleValueType.Text, "not-an-email"),
-                },
-                new Dictionary<string, RuleValue>(StringComparer.Ordinal)
-                {
-                    ["format"] = Value(RuleValueType.Text, "Email"),
-                })
+                definition.Condition!,
+                inputs)
             .Value.IsMatch.Should().BeTrue();
     }
 
-    [Fact]
-    public void DecimalPrecision_WhenValueRetainsFractionalZeros_CountsRetainedDigits()
+    [Theory]
+    [MemberData(nameof(UnsatisfiedAssertions))]
+    public void Definition_WhenAssertionIsNotSatisfied_ReturnsNonMatch(
+        string definitionKey,
+        IReadOnlyDictionary<string, RuleValue> inputs)
     {
-        SystemRuleDefinition precision = SystemRuleCatalog.Find("field.decimal_precision", 1)!;
+        RuleDefinition definition = SystemRuleCatalog.Find(definitionKey, 1)!;
 
-        RuleConditionEvaluation result = RuleConditionEvaluator.Evaluate(
-            precision.Condition,
-            SystemSchema("Decimal"),
-            new Dictionary<string, RuleValue>(StringComparer.Ordinal)
-            {
-                ["field.value"] = Value(RuleValueType.Decimal, "1.50"),
-            },
-            new Dictionary<string, RuleValue>(StringComparer.Ordinal)
-            {
-                ["precision"] = Value(RuleValueType.Integer, "2"),
-                ["scale"] = Value(RuleValueType.Integer, "2"),
-            }).Value;
-
-        result.IsMatch.Should().BeTrue();
+        RuleConditionEvaluator.Evaluate(
+                definition.Condition!,
+                inputs)
+            .Value.IsMatch.Should().BeFalse();
     }
 
     [Fact]
-    public void Find_WhenVersionIsUnknown_ReturnsNull()
+    public void Required_WhenValueIsAbsent_ReturnsNonMatch()
     {
+        RuleDefinition required = SystemRuleCatalog.Find("field.required", 1)!;
+
+        required.Inputs.Single(input => input.Key == "value").IsRequired.Should().BeFalse();
+        RuleConditionEvaluator.Evaluate(
+                required.Condition!,
+                new Dictionary<string, RuleValue>(StringComparer.Ordinal))
+            .Value.IsMatch.Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData("field.numeric_range")]
+    [InlineData("field.date_range")]
+    [InlineData("field.datetime_range")]
+    [InlineData("field.text_length")]
+    [InlineData("field.choice_selection_count")]
+    public void RangeDefinition_WhenRead_UsesDirectPositiveBoundAssertions(string definitionKey)
+    {
+        RuleConditionGroup range = SystemRuleCatalog.Find(definitionKey, 1)!.Condition!
+            .Should().BeOfType<RuleConditionGroup>().Subject;
+
+        range.Operator.Should().Be(RuleLogicalOperator.All);
+        range.Children.Should().HaveCount(2);
+        AssertOptionalBound(
+            range.Children[0],
+            RulePredicateOperator.GreaterThanOrEqual);
+        AssertOptionalBound(
+            range.Children[1],
+            RulePredicateOperator.LessThanOrEqual);
+    }
+
+    [Fact]
+    public void DecimalPrecision_WhenRead_UsesDirectPositiveLimitAssertions()
+    {
+        RuleConditionGroup precision = SystemRuleCatalog.Find("field.decimal_precision", 1)!.Condition!
+            .Should().BeOfType<RuleConditionGroup>().Subject;
+
+        precision.Operator.Should().Be(RuleLogicalOperator.All);
+        precision.Children.Should().HaveCount(2);
+        precision.Children.Cast<RulePredicateCondition>()
+            .Should().OnlyContain(predicate =>
+                predicate.Operator == RulePredicateOperator.LessThanOrEqual);
+    }
+
+    [Fact]
+    public void Find_WhenVersionIsUnknown_ReturnsNull() =>
         SystemRuleCatalog.Find("field.required", version: 2).Should().BeNull();
-    }
 
     [Fact]
     public void Definitions_WhenCastToMutableCollections_RejectMutation()
     {
-        SystemRuleDefinition definition = SystemRuleCatalog.Definitions[0];
+        RuleDefinition definition = SystemRuleCatalog.Definitions[0];
 
-        Action mutateCatalog = () => ((IList<SystemRuleDefinition>)SystemRuleCatalog.Definitions).Clear();
-        Action mutateTargets = () => ((IList<string>)definition.Applicability.TargetTypeKeys).Clear();
-        Action mutateParameters = () => ((IList<RuleParameterDefinition>)definition.Parameters).Clear();
+        Action mutateCatalog = () => ((IList<RuleDefinition>)SystemRuleCatalog.Definitions).Clear();
+        Action mutateInputs = () => ((IList<RuleInputDefinition>)definition.Inputs).Clear();
 
         mutateCatalog.Should().Throw<NotSupportedException>();
-        mutateTargets.Should().Throw<NotSupportedException>();
-        mutateParameters.Should().Throw<NotSupportedException>();
+        mutateInputs.Should().Throw<NotSupportedException>();
     }
 
-    [Fact]
-    public void Applicability_WhenNormalizedConfigurationKeysCollide_ReturnsFailure()
-    {
-        Result<RuleApplicability> result = RuleApplicability.Create(
-            ["Text"],
-            new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal)
-            {
-                ["mode"] = ["One"],
-                [" mode "] = ["Two"],
-            });
+    public static TheoryData<string, IReadOnlyDictionary<string, RuleValue>> SatisfiedAssertions() =>
+        new()
+        {
+            { "field.required", Inputs(("value", Value(RuleValueType.Text, "Axis"))) },
+            { "field.numeric_range", Inputs(("value", Value(RuleValueType.Integer, "12")), ("min", Value(RuleValueType.Decimal, "0"))) },
+            { "field.decimal_precision", Inputs(("value", Value(RuleValueType.Decimal, "123.45")), ("precision", Value(RuleValueType.Integer, "5")), ("scale", Value(RuleValueType.Integer, "2"))) },
+            { "field.date_range", Inputs(("value", Value(RuleValueType.Date, "2026-06-15")), ("max", Value(RuleValueType.Date, "2026-12-31"))) },
+            { "field.datetime_range", Inputs(("value", Value(RuleValueType.DateTime, "2026-06-15T10:00:00Z"))) },
+            { "field.text_length", Inputs(("value", Value(RuleValueType.Text, "Axis")), ("min", Value(RuleValueType.Integer, "2")), ("max", Value(RuleValueType.Integer, "8"))) },
+            { "field.text_pattern", Inputs(("value", Value(RuleValueType.Text, "AX-123")), ("pattern", Value(RuleValueType.Text, "^AX-[0-9]+$"))) },
+            { "field.text_format", Inputs(("value", Value(RuleValueType.Text, "axis@example.com")), ("format", Value(RuleValueType.Text, "Email"))) },
+            { "field.choice_selection_count", Inputs(("value", Values(RuleValueType.Text, "one", "two")), ("min", Value(RuleValueType.Integer, "1")), ("max", Value(RuleValueType.Integer, "3"))) },
+        };
 
-        result.IsFailure.Should().BeTrue();
-    }
+    public static TheoryData<string, IReadOnlyDictionary<string, RuleValue>> UnsatisfiedAssertions() =>
+        new()
+        {
+            { "field.required", Inputs(("value", Value(RuleValueType.Text, "   "))) },
+            { "field.numeric_range", Inputs(("value", Value(RuleValueType.Integer, "-1")), ("min", Value(RuleValueType.Decimal, "0"))) },
+            { "field.decimal_precision", Inputs(("value", Value(RuleValueType.Decimal, "123.456")), ("precision", Value(RuleValueType.Integer, "5")), ("scale", Value(RuleValueType.Integer, "2"))) },
+            { "field.date_range", Inputs(("value", Value(RuleValueType.Date, "2027-01-01")), ("max", Value(RuleValueType.Date, "2026-12-31"))) },
+            { "field.datetime_range", Inputs(("value", Value(RuleValueType.DateTime, "2025-12-31T23:59:59Z")), ("min", Value(RuleValueType.DateTime, "2026-01-01T00:00:00Z"))) },
+            { "field.text_length", Inputs(("value", Value(RuleValueType.Text, "Axis Rules")), ("max", Value(RuleValueType.Integer, "4"))) },
+            { "field.text_pattern", Inputs(("value", Value(RuleValueType.Text, "wrong")), ("pattern", Value(RuleValueType.Text, "^AX-[0-9]+$"))) },
+            { "field.text_format", Inputs(("value", Value(RuleValueType.Text, "not-an-email")), ("format", Value(RuleValueType.Text, "Email"))) },
+            { "field.choice_selection_count", Inputs(("value", Values(RuleValueType.Text, "one", "two", "three", "four")), ("max", Value(RuleValueType.Integer, "3"))) },
+        };
 
-    private static RuleContextSchema SystemSchema(string targetType, bool allowMultiple = false) =>
-        RuleContextSchema.Create(
-            $"system.field.{targetType.ToLowerInvariant()}",
-            1,
-            RuleScope.Field,
-            $"{targetType} field",
-            [
-                RuleContextField.Create(
-                    "field.value",
-                    "Value",
-                    targetType switch
-                    {
-                        "Integer" => RuleValueType.Integer,
-                        "Decimal" => RuleValueType.Decimal,
-                        "Date" => RuleValueType.Date,
-                        "DateTime" => RuleValueType.DateTime,
-                        "Boolean" => RuleValueType.Boolean,
-                        _ => RuleValueType.Text,
-                    },
-                    Documentation("Value"),
-                    allowMultiple).Value,
-            ]).Value;
-
-    private static RuleReferenceDocumentation Documentation(string displayName) =>
-        RuleReferenceDocumentation.Bilingual(
-            displayName,
-            $"Reference for {displayName}.",
-            $"Use {displayName} in a compatible condition.",
-            displayName,
-            displayName,
-            $"Tham chiếu cho {displayName}.",
-            $"Dùng {displayName} trong điều kiện tương thích.",
-            displayName);
+    private static IReadOnlyDictionary<string, RuleValue> Inputs(
+        params (string Key, RuleValue Value)[] inputs) =>
+        inputs.ToDictionary(input => input.Key, input => input.Value, StringComparer.Ordinal);
 
     private static RuleValue Value(RuleValueType type, string value) =>
         RuleValue.Create(type, [value]).Value;
+
+    private static RuleValue Values(RuleValueType type, params string[] values) =>
+        RuleValue.Create(type, values, allowMultiple: true).Value;
+
+    private static void AssertOptionalBound(
+        RuleConditionNode node,
+        RulePredicateOperator satisfiedOperator)
+    {
+        RuleConditionGroup bound = node.Should().BeOfType<RuleConditionGroup>().Subject;
+        bound.Operator.Should().Be(RuleLogicalOperator.Any);
+        bound.Children.Should().HaveCount(2);
+        bound.Children[0].Should().BeOfType<RulePredicateCondition>()
+            .Which.Operator.Should().Be(RulePredicateOperator.IsNull);
+        bound.Children[1].Should().BeOfType<RulePredicateCondition>()
+            .Which.Operator.Should().Be(satisfiedOperator);
+    }
 }

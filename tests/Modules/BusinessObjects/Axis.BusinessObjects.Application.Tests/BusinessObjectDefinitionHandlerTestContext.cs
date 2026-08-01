@@ -2,8 +2,6 @@ using Axis.BusinessObjects.Application.Repositories;
 using Axis.BusinessObjects.Application.Services;
 using Axis.BusinessObjects.Domain.Aggregates;
 using Axis.BusinessObjects.Domain.ValueObjects;
-using Axis.Rules.Application;
-using Axis.Rules.Application.Repositories;
 using Axis.Rules.Contracts;
 using Axis.Shared.Application.Identity;
 using Axis.Shared.Domain.Primitives;
@@ -19,15 +17,25 @@ internal sealed class BusinessObjectDefinitionHandlerTestContext
 
     public IBusinessObjectDefinitionRepository Repository { get; } = Substitute.For<IBusinessObjectDefinitionRepository>();
     public IUnitOfWork UnitOfWork { get; } = Substitute.For<IUnitOfWork>();
-    public IRuleApplicationValidator RuleValidator { get; } =
-        new RuleApplicationValidator(Substitute.For<IRuleDefinitionRepository>());
+    public IRuleBindingReferenceValidator BindingValidator { get; } =
+        Substitute.For<IRuleBindingReferenceValidator>();
     public IBusinessObjectDefinitionInputPlanner InputPlanner =>
-        new BusinessObjectDefinitionInputPlanner(RuleValidator);
+        new BusinessObjectDefinitionInputPlanner(BindingValidator);
     public FakeCurrentUser CurrentUser { get; } = new()
     {
         UserId = UserId,
         workspaceId = WorkspaceId,
     };
+
+    public BusinessObjectDefinitionHandlerTestContext()
+    {
+        BindingValidator.ValidateAsync(
+                Arg.Any<Guid>(),
+                Arg.Any<Guid>(),
+                Arg.Any<CancellationToken>())
+            .Returns(call => Task.FromResult(
+                RuleBindingReferenceValidationResult.Valid(call.ArgAt<Guid>(1))));
+    }
 
     public static BusinessObjectDefinition UnpublishedWithOneSave()
     {
@@ -70,4 +78,10 @@ internal sealed class BusinessObjectDefinitionHandlerTestContext
         public Guid? UserId { get; set; }
         public Guid? workspaceId { get; set; }
     }
+}
+
+internal static class TestBindingIds
+{
+    public static readonly Guid NumericRange = Guid.Parse("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
+    public static readonly Guid TextLength = Guid.Parse("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb");
 }

@@ -43,11 +43,10 @@ public sealed class GetRuleDefinitionHandlerTests
         result.Value.Origin.Should().Be(RuleOrigin.System);
         result.Value.Status.Should().Be(RuleLifecycleStatus.Published);
         result.Value.ExpressionLanguageVersion.Should().Be(DomainExpressionLanguage.Version);
-        result.Value.Applicability.Should().NotBeNull();
         result.Value.Condition.Should().NotBeNull();
         result.Value.Condition!.Left!.Kind.Should().Be(RuleOperandKind.Function);
         result.Value.Condition.Left.Function.Should().Be(RuleExpressionFunction.IsBlank);
-        result.Value.Outcome.Should().NotBeNull();
+        result.Value.Condition.Should().NotBeNull();
         await _context.Repository.DidNotReceiveWithAnyArgs()
             .GetByKeyForWorkspaceAsync(default, default, TestContext.Current.CancellationToken);
     }

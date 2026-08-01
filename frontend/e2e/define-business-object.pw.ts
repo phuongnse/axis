@@ -28,12 +28,19 @@ const systemRule = (definitionKey: string, name: string, targetTypeKeys: string[
   name,
   description: `${name} validation.`,
   origin: 'System',
-  scope: 'Field',
-  outcomeKind: 'Validation',
   status: 'Published',
+  expressionLanguageVersion: 1,
   latestPublishedVersion: 1,
-  applicability: { targetTypeKeys, configurationConstraints: {} },
-  parameters: [],
+  output: { type: 'Boolean', cardinality: 'Scalar' },
+  inputs: [
+    {
+      key: 'value',
+      types: targetTypeKeys.map((type) => (type === 'Choice' ? 'Text' : type)),
+      isRequired: true,
+      allowMultiple: false,
+      allowedValues: [],
+    },
+  ],
 });
 const fieldRuleDefinitions = {
   items: [
@@ -72,7 +79,7 @@ type BusinessObjectFieldType =
 interface BusinessObjectFieldRuleRequest {
   definitionKey: string;
   definitionVersion?: number;
-  parameters?: Record<string, string[]>;
+  inputs?: Record<string, string[]>;
 }
 
 interface BusinessObjectFieldRequest {
@@ -145,7 +152,7 @@ function unpublishedDetail({
     objectKey,
     status: 'Unpublished',
     revision,
-    latestPublishedVersionNumber: null,
+    latestPublishedVersionNumber: null as number | null,
     createdAt: now,
     updatedAt: now,
     fields: fields.map((field, index) => ({
@@ -153,7 +160,13 @@ function unpublishedDetail({
       order: index,
       ...field,
     })),
-    latestPublishedVersion: null,
+    latestPublishedVersion: null as {
+      id: string;
+      versionNumber: number;
+      publishedByUserId: string;
+      publishedAt: string;
+      fields: unknown[];
+    } | null,
   };
 }
 
@@ -196,8 +209,8 @@ function publishedDetail(definition: BusinessObjectDefinitionDetail) {
       publishedAt: now,
       fields: fields.map((field, index) => ({
         id: index === 0 ? fieldId : `44444444-4444-4444-8444-${String(index).padStart(12, '0')}`,
-        order: index,
         ...field,
+        order: index,
       })),
     },
   };
@@ -211,7 +224,7 @@ async function mockAuthenticatedSession(
   const sessionProfile = { ...profile, theme };
 
   await page.addInitScript((selectedTheme) => {
-    window.__AXIS_DISABLE_DEVTOOLS__ = true;
+    (window as Window & { __AXIS_DISABLE_DEVTOOLS__?: boolean }).__AXIS_DISABLE_DEVTOOLS__ = true;
     localStorage.setItem('axis.language', 'en');
     localStorage.setItem('axis.theme', selectedTheme);
   }, theme);
@@ -735,9 +748,10 @@ test.describe('define business object', () => {
     const publishedDetails = dialog.locator('[data-slot="business-object-read-only-details"]');
     await expect(publishedDetails).toBeVisible();
     await expect(publishedDetails.getByText('customer', { exact: true })).toBeVisible();
+    await expect(dialog.getByRole('tab')).toHaveText(['General', 'Fields']);
+    await dialog.getByRole('tab', { name: 'Fields' }).click();
     await expect(publishedDetails.getByRole('heading', { name: 'Name' })).toBeVisible();
     await expect(publishedDetails.getByText('Text', { exact: true })).toBeVisible();
-    await expect(dialog.getByRole('tablist')).toHaveCount(0);
     await expect(dialog.getByRole('button', { name: 'Publish', exact: true })).toHaveCount(0);
     await expectNoPageOverflow(page);
 
@@ -844,7 +858,7 @@ test.describe('define business object', () => {
                 { optionKey: 'approved', label: 'Approved' },
               ],
             },
-            rules: [{ definitionKey: 'field.required', definitionVersion: 1, parameters: {} }],
+            rules: [{ definitionKey: 'field.required', definitionVersion: 1, inputs: {} }],
           },
         ],
       });
@@ -861,12 +875,13 @@ test.describe('define business object', () => {
 
     const publishedDetails = dialog.locator('[data-slot="business-object-read-only-details"]');
     await expect(publishedDetails).toBeVisible();
+    await expect(dialog.getByRole('tab')).toHaveText(['General', 'Fields']);
+    await dialog.getByRole('tab', { name: 'Fields' }).click();
     await expect(publishedDetails.getByRole('heading', { name: 'Status' })).toBeVisible();
     await expect(publishedDetails.getByText('Choice', { exact: true })).toBeVisible();
     await expect(publishedDetails.getByText('Single', { exact: true })).toBeVisible();
     await expect(publishedDetails.getByText('Approved', { exact: false })).toBeVisible();
     await expect(publishedDetails.getByText('Required value', { exact: true })).toBeVisible();
-    await expect(dialog.getByRole('tablist')).toHaveCount(0);
     await expectNoDesktopDocumentScroll(page);
     await expectNoPageOverflow(page);
 

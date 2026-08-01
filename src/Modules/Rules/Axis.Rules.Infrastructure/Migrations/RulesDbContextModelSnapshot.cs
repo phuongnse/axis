@@ -23,6 +23,98 @@ namespace Axis.Rules.Infrastructure.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("Axis.Rules.Domain.RuleBinding", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("CreatedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<string>("DefinitionKey")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("definition_key");
+
+                    b.Property<int>("DefinitionVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("definition_version");
+
+                    b.Property<bool>("Enabled")
+                        .HasColumnType("boolean")
+                        .HasColumnName("enabled");
+
+                    b.Property<string>("FailureBehavior")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("failure_behavior");
+
+                    b.Property<int>("Priority")
+                        .HasColumnType("integer")
+                        .HasColumnName("priority");
+
+                    b.Property<int>("Revision")
+                        .HasColumnType("integer")
+                        .HasColumnName("revision");
+
+                    b.Property<string>("TargetId")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("target_id");
+
+                    b.Property<string>("TargetType")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("target_type");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid>("UpdatedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by_user_id");
+
+                    b.Property<string>("UseCaseOrTrigger")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("use_case_or_trigger");
+
+                    b.Property<Guid>("WorkspaceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("workspace_id");
+
+                    b.Property<string>("_inputMappings")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("input_mappings");
+
+                    b.Property<uint>("xmin")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("WorkspaceId", "DefinitionKey", "DefinitionVersion");
+
+                    b.HasIndex("WorkspaceId", "TargetType", "TargetId", "UseCaseOrTrigger", "DefinitionKey", "DefinitionVersion");
+
+                    b.ToTable("rule_bindings", (string)null);
+                });
+
             modelBuilder.Entity("Axis.Rules.Domain.RuleDefinition", b =>
                 {
                     b.Property<Guid>("Id")
@@ -40,16 +132,6 @@ namespace Axis.Rules.Infrastructure.Migrations
                     b.Property<string>("Condition")
                         .HasColumnType("jsonb")
                         .HasColumnName("condition");
-
-                    b.Property<string>("ContextKey")
-                        .IsRequired()
-                        .HasMaxLength(120)
-                        .HasColumnType("character varying(120)")
-                        .HasColumnName("context_key");
-
-                    b.Property<int>("ContextSchemaVersion")
-                        .HasColumnType("integer")
-                        .HasColumnName("context_schema_version");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
@@ -85,31 +167,26 @@ namespace Axis.Rules.Infrastructure.Migrations
                         .HasColumnType("character varying(200)")
                         .HasColumnName("name");
 
-                    b.Property<string>("Outcome")
-                        .HasColumnType("jsonb")
-                        .HasColumnName("outcome");
-
-                    b.Property<string>("OutcomeKind")
+                    b.Property<string>("Origin")
                         .IsRequired()
                         .HasMaxLength(32)
                         .HasColumnType("character varying(32)")
-                        .HasColumnName("outcome_kind");
+                        .HasColumnName("origin");
+
+                    b.Property<string>("Output")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("output");
 
                     b.Property<int>("Revision")
                         .HasColumnType("integer")
                         .HasColumnName("revision");
 
-                    b.Property<string>("Scope")
-                        .IsRequired()
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)")
-                        .HasColumnName("scope");
-
                     b.Property<string>("SearchText")
                         .ValueGeneratedOnAddOrUpdate()
                         .HasColumnType("text")
                         .HasColumnName("search_text")
-                        .HasComputedColumnSql("axis_unaccent(lower(coalesce(name, '') || ' ' || coalesce(description, '') || ' ' || coalesce(definition_key, '') || ' ' || coalesce(context_key, '')))", true);
+                        .HasComputedColumnSql("axis_unaccent(lower(coalesce(name, '') || ' ' || coalesce(description, '') || ' ' || coalesce(definition_key, '')))", true);
 
                     b.Property<string>("SearchTitle")
                         .ValueGeneratedOnAddOrUpdate()
@@ -121,7 +198,7 @@ namespace Axis.Rules.Infrastructure.Migrations
                         .ValueGeneratedOnAddOrUpdate()
                         .HasColumnType("tsvector")
                         .HasColumnName("search_vector")
-                        .HasComputedColumnSql("to_tsvector('simple', axis_unaccent(lower(coalesce(name, '') || ' ' || coalesce(description, '') || ' ' || coalesce(definition_key, '') || ' ' || coalesce(context_key, ''))))", true);
+                        .HasComputedColumnSql("to_tsvector('simple', axis_unaccent(lower(coalesce(name, '') || ' ' || coalesce(description, '') || ' ' || coalesce(definition_key, ''))))", true);
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -141,10 +218,10 @@ namespace Axis.Rules.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("workspace_id");
 
-                    b.Property<string>("_parameters")
+                    b.Property<string>("_inputs")
                         .IsRequired()
                         .HasColumnType("jsonb")
-                        .HasColumnName("parameters");
+                        .HasColumnName("inputs");
 
                     b.Property<uint>("xmin")
                         .IsConcurrencyToken()
@@ -190,16 +267,6 @@ namespace Axis.Rules.Infrastructure.Migrations
                         .HasColumnType("jsonb")
                         .HasColumnName("condition");
 
-                    b.Property<string>("ContextKey")
-                        .IsRequired()
-                        .HasMaxLength(120)
-                        .HasColumnType("character varying(120)")
-                        .HasColumnName("context_key");
-
-                    b.Property<int>("ContextSchemaVersion")
-                        .HasColumnType("integer")
-                        .HasColumnName("context_schema_version");
-
                     b.Property<Guid>("DefinitionId")
                         .HasColumnType("uuid")
                         .HasColumnName("rule_definition_id");
@@ -220,16 +287,10 @@ namespace Axis.Rules.Infrastructure.Migrations
                         .HasColumnType("character varying(200)")
                         .HasColumnName("name");
 
-                    b.Property<string>("Outcome")
+                    b.Property<string>("Output")
                         .IsRequired()
                         .HasColumnType("jsonb")
-                        .HasColumnName("outcome");
-
-                    b.Property<string>("OutcomeKind")
-                        .IsRequired()
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)")
-                        .HasColumnName("outcome_kind");
+                        .HasColumnName("output");
 
                     b.Property<DateTime>("PublishedAt")
                         .HasColumnType("timestamp with time zone")
@@ -239,20 +300,14 @@ namespace Axis.Rules.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("published_by_user_id");
 
-                    b.Property<string>("Scope")
-                        .IsRequired()
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)")
-                        .HasColumnName("scope");
-
                     b.Property<int>("Version")
                         .HasColumnType("integer")
                         .HasColumnName("version_number");
 
-                    b.Property<string>("_parameters")
+                    b.Property<string>("_inputs")
                         .IsRequired()
                         .HasColumnType("jsonb")
-                        .HasColumnName("parameters");
+                        .HasColumnName("inputs");
 
                     b.HasKey("Id");
 
