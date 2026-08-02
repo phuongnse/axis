@@ -15,6 +15,7 @@ Follow [reference.md](../reference.md).
 - Do not create commits, draft PR metadata, push, or publish.
 - Dirty or missing checkpoint evidence is **Not ready**.
 - Failed, missing, or stale required evidence cannot become a green claim.
+- Non-trivial implementation or cross-surface changes **Require** an independent review by `gpt-5.6-sol` at High reasoning when available; primary self-review is not a substitute. If Sol is unavailable, record the limitation and use another independent reviewer only when that preserves the user's intent.
 
 ## Inputs
 
@@ -28,9 +29,10 @@ Follow [reference.md](../reference.md).
 2. Reconcile the diff with the Design Gate, sign-off, retirement, and contract decisions.
 3. Audit product evidence only when behavior/status is touched: AC coverage, implementation status, evidence sidecar, and exact deferrals. Build the review verification set from the diff owners and their acceptance evidence; run missing or invalidated focused browser commands, never the full Playwright suite unless the diff is cross-cutting across every browser surface.
 4. Audit minimality after correctness: prefer existing code, the standard library, native platform capabilities, and installed dependencies before custom code; reject speculative abstractions, dependencies, flags, or files without weakening required safety, accessibility, or ACs.
-5. Run `python scripts/axis.py ready-review` once, or `--since <checkpoint>` for an immutable follow-up delta. Debug failures with narrow checks only.
-6. Apply [reference.md § Improvement loop](../reference.md#improvement-loop) and [docs/playbooks/agent-checklist.md](../../../docs/playbooks/agent-checklist.md); update one owner only when evidence justifies promotion or retirement.
-7. Return the verdict and evidence to the caller. Publication is a separate user-authorized workflow.
+5. Delegate an independent review of the immutable implementation diff to the configured Sol reviewer; classify every finding by severity and resolve or explicitly defer it with user-approved evidence. Primary verification does not replace this review.
+6. Run `python scripts/axis.py ready-review` once, or `--since <checkpoint>` for an immutable follow-up delta. Debug failures with narrow checks only.
+7. Apply [reference.md § Improvement loop](../reference.md#improvement-loop) and [docs/playbooks/agent-checklist.md](../../../docs/playbooks/agent-checklist.md); update one owner only when evidence justifies promotion or retirement.
+8. Return the verdict and evidence to the caller. Publication is a separate user-authorized workflow.
 
 ## Output
 
