@@ -31,6 +31,9 @@ internal sealed class BusinessObjectDefinitionVersionFieldRuleConfiguration
         builder.Property<Guid>(nameof(BusinessObjectDefinitionVersionFieldRule.BindingId))
             .HasColumnName("binding_id")
             .IsRequired();
+        builder.Property<int>(nameof(BusinessObjectDefinitionVersionFieldRule.BindingRevision))
+            .HasColumnName("binding_revision")
+            .IsRequired();
         builder.Property<int>(nameof(BusinessObjectDefinitionVersionFieldRule.Order))
             .HasColumnName("sort_order")
             .IsRequired();

@@ -37,7 +37,7 @@ const systemSummary = {
     {
       key: 'value',
       label: 'Value',
-      types: ['Text'],
+      types: ['Integer', 'Decimal', 'Date'],
       isRequired: false,
       allowMultiple: false,
       allowedValues: [],
@@ -299,9 +299,19 @@ describe('RulesPage', () => {
       'The declared inputs, canonical logic, and outputs for this rule.',
     );
     expect(details).toHaveTextContent('Value');
-    expect(details).toHaveTextContent('Text');
     const inputContract = behavior?.querySelector<HTMLElement>('[data-slot="rule-input-contract"]');
-    expect(within(inputContract as HTMLElement).getByText('May be absent')).toBeInTheDocument();
+    expect(within(inputContract as HTMLElement).getByText('Optional')).toBeInTheDocument();
+    expect(within(inputContract as HTMLElement).getByText('Accepted types')).toBeInTheDocument();
+    for (const type of ['Integer', 'Decimal', 'Date']) {
+      expect(
+        within(inputContract as HTMLElement)
+          .getByText(type)
+          .closest('[data-slot="badge"]'),
+      ).not.toBeNull();
+    }
+    expect(
+      within(inputContract as HTMLElement).queryByText('May be absent'),
+    ).not.toBeInTheDocument();
     expect(
       within(inputContract as HTMLElement).queryByText('Single value'),
     ).not.toBeInTheDocument();

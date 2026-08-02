@@ -5,6 +5,454 @@
     "version": "v1"
   },
   "paths": {
+    "/api/business-object-records": {
+      "get": {
+        "tags": [
+          "Business Object Records"
+        ],
+        "summary": "List business object records for the current workspace",
+        "operationId": "ListBusinessObjectRecords",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 20
+            }
+          },
+          {
+            "name": "objectKey",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BusinessObjectRecordListItemDtoPagedResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/api/business-object-records/{objectKey}": {
+      "post": {
+        "tags": [
+          "Business Object Records"
+        ],
+        "summary": "Create a draft record from the latest published business object version",
+        "operationId": "CreateBusinessObjectRecord",
+        "parameters": [
+          {
+            "name": "objectKey",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateBusinessObjectRecordRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BusinessObjectRecordDetailDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/api/business-object-records/{recordId}": {
+      "get": {
+        "tags": [
+          "Business Object Records"
+        ],
+        "summary": "Get a business object record",
+        "operationId": "GetBusinessObjectRecord",
+        "parameters": [
+          {
+            "name": "recordId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BusinessObjectRecordDetailDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "Business Object Records"
+        ],
+        "summary": "Save a draft business object record",
+        "operationId": "SaveBusinessObjectRecord",
+        "parameters": [
+          {
+            "name": "recordId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveBusinessObjectRecordRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BusinessObjectRecordDetailDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/api/business-object-records/{recordId}/submit": {
+      "post": {
+        "tags": [
+          "Business Object Records"
+        ],
+        "summary": "Run published field rules and submit a draft business object record",
+        "operationId": "SubmitBusinessObjectRecord",
+        "parameters": [
+          {
+            "name": "recordId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubmitBusinessObjectRecordRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BusinessObjectRecordSubmitResultDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
+    },
     "/api/business-object-definitions": {
       "get": {
         "tags": [
@@ -2350,6 +2798,10 @@
             "type": "string",
             "format": "uuid"
           },
+          "bindingRevision": {
+            "type": "integer",
+            "format": "int32"
+          },
           "order": {
             "type": "integer",
             "format": "int32"
@@ -2430,6 +2882,10 @@
             "type": "string",
             "format": "uuid"
           },
+          "bindingRevision": {
+            "type": "integer",
+            "format": "int32"
+          },
           "order": {
             "type": "integer",
             "format": "int32"
@@ -2464,11 +2920,264 @@
         ],
         "type": "string"
       },
+      "BusinessObjectRecordDetailDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "workspaceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "objectKey": {
+            "type": "string"
+          },
+          "definitionVersion": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "definitionVersionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "$ref": "#/components/schemas/BusinessObjectRecordStatus"
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "values": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BusinessObjectRecordFieldContractDto"
+            }
+          },
+          "ruleEvaluations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BusinessObjectRecordRuleEvaluationDto"
+            }
+          },
+          "createdByUserId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedByUserId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "submittedByUserId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "submittedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "BusinessObjectRecordFieldContractDto": {
+        "type": "object",
+        "properties": {
+          "fieldKey": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "order": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "fieldType": {
+            "$ref": "#/components/schemas/BusinessObjectFieldType"
+          },
+          "choiceConfiguration": {
+            "$ref": "#/components/schemas/BusinessObjectDefinitionVersionChoiceFieldConfigurationDto"
+          },
+          "rules": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BusinessObjectDefinitionVersionFieldRuleDto"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "BusinessObjectRecordListItemDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "objectKey": {
+            "type": "string"
+          },
+          "definitionVersion": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "status": {
+            "$ref": "#/components/schemas/BusinessObjectRecordStatus"
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "submittedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "BusinessObjectRecordListItemDtoPagedResult": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BusinessObjectRecordListItemDto"
+            }
+          },
+          "totalCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "BusinessObjectRecordRuleDiagnosticDto": {
+        "type": "object",
+        "properties": {
+          "nodeId": {
+            "type": "string"
+          },
+          "isMatch": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "BusinessObjectRecordRuleEvaluationDto": {
+        "type": "object",
+        "properties": {
+          "fieldKey": {
+            "type": "string"
+          },
+          "bindingId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "bindingRevision": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "definitionKey": {
+            "type": "string"
+          },
+          "definitionVersion": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "isMatch": {
+            "type": "boolean"
+          },
+          "diagnostics": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BusinessObjectRecordRuleDiagnosticDto"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "BusinessObjectRecordStatus": {
+        "enum": [
+          "Draft",
+          "Submitted"
+        ],
+        "type": "string"
+      },
+      "BusinessObjectRecordSubmitResultDto": {
+        "type": "object",
+        "properties": {
+          "isSubmitted": {
+            "type": "boolean"
+          },
+          "record": {
+            "$ref": "#/components/schemas/BusinessObjectRecordDetailDto"
+          },
+          "ruleEvaluations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BusinessObjectRecordRuleEvaluationDto"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
       "CreateBusinessObjectDefinitionRequest": {
         "type": "object",
         "properties": {
           "name": {
             "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "CreateBusinessObjectRecordRequest": {
+        "type": "object",
+        "properties": {
+          "idempotencyKey": {
+            "type": "string"
+          },
+          "values": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -2560,6 +3269,58 @@
           }
         },
         "additionalProperties": false
+      },
+      "HttpValidationProblemDetails": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "nullable": true
+          },
+          "title": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "detail": {
+            "type": "string",
+            "nullable": true
+          },
+          "instance": {
+            "type": "string",
+            "nullable": true
+          },
+          "errors": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "code": {
+            "type": "string",
+            "description": "Stable machine-readable problem code for client behavior and localization.",
+            "nullable": true
+          },
+          "errorCodes": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "description": "Optional field-level machine-readable validation codes keyed by JSON field name.",
+            "nullable": true
+          }
+        },
+        "additionalProperties": { }
       },
       "LanguagePreferenceDto": {
         "type": "object",
@@ -3682,6 +4443,25 @@
         },
         "additionalProperties": false
       },
+      "SaveBusinessObjectRecordRequest": {
+        "type": "object",
+        "properties": {
+          "expectedRevision": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "values": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "additionalProperties": false
+      },
       "SaveRuleDefinitionDraftRequest": {
         "type": "object",
         "properties": {
@@ -3826,6 +4606,16 @@
           },
           "correlationId": {
             "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "SubmitBusinessObjectRecordRequest": {
+        "type": "object",
+        "properties": {
+          "expectedRevision": {
+            "type": "integer",
+            "format": "int32"
           }
         },
         "additionalProperties": false

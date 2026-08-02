@@ -12,7 +12,8 @@ public sealed class BusinessObjectDefinitionInputPlanner(IRuleBindingReferenceVa
     public async Task<Result<IReadOnlyList<BusinessObjectFieldDefinitionSpec>>> PlanAsync(
         Guid workspaceId,
         IReadOnlyList<BusinessObjectFieldDefinitionInput> fields,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        BusinessObjectDefinitionKey? objectKey = null)
     {
         List<BusinessObjectFieldDefinitionSpec> specs = [];
         for (int index = 0; index < fields.Count; index++)
@@ -24,6 +25,7 @@ public sealed class BusinessObjectDefinitionInputPlanner(IRuleBindingReferenceVa
 
             Result<IReadOnlyList<BusinessObjectFieldRuleSpec>> rules = await PlanRulesAsync(
                 workspaceId,
+                objectKey,
                 field,
                 cancellationToken);
             if (rules.IsFailure)
@@ -44,6 +46,7 @@ public sealed class BusinessObjectDefinitionInputPlanner(IRuleBindingReferenceVa
 
     private async Task<Result<IReadOnlyList<BusinessObjectFieldRuleSpec>>> PlanRulesAsync(
         Guid workspaceId,
+        BusinessObjectDefinitionKey? objectKey,
         BusinessObjectFieldDefinitionInput field,
         CancellationToken cancellationToken)
     {
@@ -56,13 +59,17 @@ public sealed class BusinessObjectDefinitionInputPlanner(IRuleBindingReferenceVa
             RuleBindingReferenceValidationResult validation = await bindingValidator.ValidateAsync(
                 workspaceId,
                 rule.BindingId,
-                cancellationToken);
+                cancellationToken,
+                expectedTargetType: objectKey is null ? null : BusinessObjectRecordRuleBindingContract.TargetType,
+                expectedTargetId: objectKey is null ? null : BusinessObjectRecordRuleBindingContract.TargetId(objectKey, field.FieldKey),
+                expectedUseCaseOrTrigger: objectKey is null ? null : BusinessObjectRecordRuleBindingContract.UseCaseOrTrigger);
             if (!validation.IsValid)
                 return Result.Failure<IReadOnlyList<BusinessObjectFieldRuleSpec>>(validation.Error!);
 
             rules.Add(new BusinessObjectFieldRuleSpec(
                 rule.BindingId,
-                rule.Id is Guid ruleId ? BusinessObjectFieldRuleId.From(ruleId) : null));
+                rule.Id is Guid ruleId ? BusinessObjectFieldRuleId.From(ruleId) : null,
+                validation.Revision ?? 0));
         }
 
         return rules;

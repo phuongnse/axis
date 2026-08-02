@@ -28,6 +28,7 @@ Axis is an open-source platform being built for adaptable, workflow-driven busin
 | [docs/playbooks/docs-style.md](./playbooks/docs-style.md) | Documentation ownership and size rules. |
 | [docs/playbooks/scripts.md](./playbooks/scripts.md) | Axis CLI and repo script standards. |
 | [docs/playbooks/local-dev.md](./playbooks/local-dev.md) | Local stack commands and ports. |
+| [docs/playbooks/mcp.md](./playbooks/mcp.md) | Local MCP bridge boundary, auth, tools, and verification. |
 
 ## Current Diagram
 

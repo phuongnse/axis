@@ -84,6 +84,7 @@ internal static class AxisApiApplicationExtensions
         app.MapRuleDefinitionEndpoints();
         app.MapRuleBindingEndpoints();
         app.MapBusinessObjectDefinitionEndpoints();
+        app.MapBusinessObjectRecordEndpoints();
 
         return app;
     }

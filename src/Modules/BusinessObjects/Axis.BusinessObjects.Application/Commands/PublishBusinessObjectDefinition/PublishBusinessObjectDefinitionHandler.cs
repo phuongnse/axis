@@ -2,6 +2,7 @@ using Axis.BusinessObjects.Application.Repositories;
 using Axis.BusinessObjects.Application.Services;
 using Axis.BusinessObjects.Domain.Aggregates;
 using Axis.BusinessObjects.Domain.ValueObjects;
+using Axis.Rules.Contracts;
 using Axis.Shared.Application;
 using Axis.Shared.Application.CQRS;
 using Axis.Shared.Application.Identity;
@@ -12,7 +13,8 @@ namespace Axis.BusinessObjects.Application.Commands.PublishBusinessObjectDefinit
 public sealed class PublishBusinessObjectDefinitionHandler(
     ICurrentUser currentUser,
     IBusinessObjectDefinitionRepository repository,
-    IUnitOfWork unitOfWork)
+    IUnitOfWork unitOfWork,
+    IRuleBindingReferenceValidator bindingReferenceValidator)
     : ICommandHandler<PublishBusinessObjectDefinitionCommand, BusinessObjectDefinitionDetailDto>
 {
     public async Task<Result<BusinessObjectDefinitionDetailDto>> Handle(
@@ -31,6 +33,26 @@ public sealed class PublishBusinessObjectDefinitionHandler(
             cancellationToken);
         if (definition is null)
             return BusinessObjectDefinitionFailures.NotFound<BusinessObjectDefinitionDetailDto>();
+
+        foreach (BusinessObjectFieldDefinition field in definition.Fields)
+        {
+            foreach (BusinessObjectFieldRule rule in field.Rules)
+            {
+                RuleBindingReferenceValidationResult validation = await bindingReferenceValidator.ValidateAsync(
+                    workspaceId,
+                    rule.BindingId,
+                    cancellationToken,
+                    expectedTargetType: BusinessObjectRecordRuleBindingContract.TargetType,
+                    expectedTargetId: BusinessObjectRecordRuleBindingContract.TargetId(definition.Key, field.Key.Value),
+                    expectedUseCaseOrTrigger: BusinessObjectRecordRuleBindingContract.UseCaseOrTrigger);
+                if (!validation.IsValid)
+                    return BusinessObjectDefinitionFailures.Invalid<BusinessObjectDefinitionDetailDto>(
+                        validation.Error!);
+                if (validation.Revision != rule.BindingRevision)
+                    return BusinessObjectDefinitionFailures.Conflict<BusinessObjectDefinitionDetailDto>(
+                        "A field rule binding has changed. Save the object definition again before publishing.");
+            }
+        }
 
         Result<BusinessObjectDefinitionVersion> published = definition.Publish(
             command.ExpectedRevision,

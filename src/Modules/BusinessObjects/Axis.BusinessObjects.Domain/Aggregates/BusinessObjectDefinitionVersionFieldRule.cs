@@ -9,16 +9,19 @@ public sealed class BusinessObjectDefinitionVersionFieldRule : Entity<BusinessOb
         BusinessObjectDefinitionVersionFieldRuleId id,
         BusinessObjectFieldRuleId sourceFieldRuleId,
         Guid bindingId,
+        int bindingRevision,
         int order)
         : base(id)
     {
         SourceFieldRuleId = sourceFieldRuleId;
         BindingId = bindingId;
+        BindingRevision = bindingRevision;
         Order = order;
     }
 
     public BusinessObjectFieldRuleId SourceFieldRuleId { get; private set; }
     public Guid BindingId { get; private set; }
+    public int BindingRevision { get; private set; }
     public int Order { get; private set; }
 
     public static BusinessObjectDefinitionVersionFieldRule FromCurrentRule(BusinessObjectFieldRule rule) =>
@@ -26,5 +29,6 @@ public sealed class BusinessObjectDefinitionVersionFieldRule : Entity<BusinessOb
             BusinessObjectDefinitionVersionFieldRuleId.New(),
             rule.Id,
             rule.BindingId,
+            rule.BindingRevision,
             rule.Order);
 }

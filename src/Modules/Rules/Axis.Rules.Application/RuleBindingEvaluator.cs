@@ -27,9 +27,15 @@ public sealed class RuleBindingEvaluator(
         if (!binding.Enabled)
             return Failed(correlationId, "binding_disabled", "Rule binding is disabled.");
 
+        RuleBindingRevision? bindingRevision = binding.FindRevision(request.BindingRevision);
+        if (bindingRevision is null)
+            return Failed(correlationId, "binding_revision_not_found", "Rule binding revision was not found.");
+        if (!bindingRevision.Enabled)
+            return Failed(correlationId, "binding_revision_disabled", "Rule binding revision is disabled.");
+
         Dictionary<string, IReadOnlyList<string>> inputs = new(StringComparer.Ordinal);
         Dictionary<string, ContractValueType> inputTypes = new(StringComparer.Ordinal);
-        foreach ((string ruleInputKey, RuleInputMapping mapping) in binding.InputMappings)
+        foreach ((string ruleInputKey, RuleInputMapping mapping) in bindingRevision.InputMappings)
         {
             if (mapping.Kind == DomainMappingKind.Literal)
             {
@@ -47,7 +53,11 @@ public sealed class RuleBindingEvaluator(
         RuleEvaluationResult result = await evaluator.EvaluateAsync(
             new RuleEvaluationRequest(
                 request.WorkspaceId,
-                [new RuleEvaluationReference(binding.DefinitionKey.Value, binding.DefinitionVersion, inputs, inputTypes)],
+                [new RuleEvaluationReference(
+                    bindingRevision.DefinitionKey.Value,
+                    bindingRevision.DefinitionVersion,
+                    inputs,
+                    inputTypes)],
                 correlationId),
             cancellationToken);
         return result;

@@ -16,6 +16,26 @@ Universal semantics for every repo skill. Intent routing lives in [README.md](./
 10. **Route durable guidance before edit.** The entry domain owner keeps spec, status, and evidence decisions. Other durable guidance **Requires** selecting `$axis-doc-hygiene` or entering it through a typed handoff before edit.
 11. **Compatibility is explicit.** Derive compatibility from the owning contract, real consumers/data, and current product phase. An approved pre-production clean cutover removes the old path completely; it does not preserve shims, dual contracts, feature flags, fallback parsing, or duplicate tests.
 
+## Blocker and completion protocol
+
+Use this protocol whenever progress depends on state outside the repository or on a decision only the user can make. It is a process boundary, not a prompt to invent a workaround.
+
+1. **Classify the boundary.** Decide whether the evidence shows a repository defect, an external-state blocker, or a missing product decision. External-state blockers include sign-in/consent, an app-managed client reload or restart, a host dependency, sudo/permissions, certificate or trust-store state, approval, and destructive-action confirmation.
+2. **Reproduce safely.** Run the smallest permitted check, capture the exact command, exit status, error/output, and the boundary where it occurred. Read-only diagnosis may continue; state-changing work stops when it reaches user-controlled state.
+3. **No workaround: stop and ask.** An alternate executable, user-local installation or extraction, symlink/PATH change, temporary proxy/harness, raw REST call, or security-control bypass is still a workaround when it crosses the failed boundary. Do not run it or claim it as completion evidence without explicit user approval. Report `Blocker`, `Evidence`, `Boundary`, `User action or decision needed`, and `Safe next step after confirmation`; never silently install host packages, kill or replace app-managed processes, bypass authentication or TLS/sandbox controls, inject credentials or tokens, or mutate the database directly.
+4. **Separate evidence boundaries.** Unit/contract tests prove code and protocol behavior. A purpose-built protocol harness may diagnose or prove that protocol boundary, but it does not prove that the currently registered agent client has the current tool registry or usable authenticated session. Do not use stale registry state, indirect API calls, or a separate harness as a substitute for a required live-agent boundary.
+5. **Audit completion.** Build an acceptance-to-evidence matrix. Current source, focused tests, and any required runtime/read-back evidence must all be present; stale, missing, indirect, or blocked evidence remains `not run` or `blocked`. Only then may the owner mark the work complete.
+
+Use this compact handoff when asking the user:
+
+```text
+Blocker: <what cannot proceed>
+Evidence: <exact command/error or observed state>
+Boundary: <host, client, account, permission, approval, or destructive action>
+User action or decision needed: <one concrete request>
+Safe next step after confirmation: <what will be run or changed>
+```
+
 ## Handoff types
 
 | Type | Meaning |

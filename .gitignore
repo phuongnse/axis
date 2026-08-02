@@ -1,6 +1,9 @@
 # Claude Code — local machine settings (do not commit)
 .claude/
 
+# Codex project-local machine configuration (do not commit)
+.codex/
+
 # Build outputs
 bin/
 obj/

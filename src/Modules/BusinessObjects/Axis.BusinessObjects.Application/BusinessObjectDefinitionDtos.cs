@@ -14,6 +14,7 @@ public sealed record BusinessObjectFieldDefinitionDto(
 public sealed record BusinessObjectFieldRuleDto(
     Guid Id,
     Guid BindingId,
+    int BindingRevision,
     int Order);
 
 public sealed record BusinessObjectChoiceOptionDto(
@@ -48,6 +49,7 @@ public sealed record BusinessObjectDefinitionVersionFieldRuleDto(
     Guid Id,
     Guid SourceFieldRuleId,
     Guid BindingId,
+    int BindingRevision,
     int Order);
 
 public sealed record BusinessObjectDefinitionVersionChoiceOptionDto(

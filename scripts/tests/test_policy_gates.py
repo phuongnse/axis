@@ -3018,6 +3018,55 @@ class TestReviewVerificationGates(unittest.TestCase):
             calls,
         )
 
+    def test_maps_mcp_source_to_mcp_contract_tests(self) -> None:
+        self.assertEqual(
+            "tests/Tools/Axis.Mcp.Tests/Axis.Mcp.Tests.csproj",
+            axis.related_test_project_for_source_project("src/Axis.Mcp/Axis.Mcp.csproj"),
+        )
+
+    def test_mcp_source_and_openapi_changes_run_api_coverage(self) -> None:
+        for changed_path in ("src/Axis.Mcp/Tools/AxisMcpTool.cs", "openapi.json"):
+            with self.subTest(changed_path=changed_path):
+                calls: list[str] = []
+                with (
+                    mock.patch.object(
+                        axis,
+                        "verify_scope_paths",
+                        return_value=("working tree", [changed_path]),
+                    ),
+                    mock.patch.object(axis, "run_text_encoding_check", return_value=0),
+                    mock.patch.object(axis, "check_dotnet_sdk", return_value=0),
+                    mock.patch.object(axis, "dotnet_build_projects", return_value=0),
+                    mock.patch.object(axis, "dotnet_format_changed_paths", return_value=0),
+                    mock.patch.object(axis, "dotnet_test_projects", return_value=0),
+                    mock.patch.object(axis, "check_frontend_toolchain", return_value=0),
+                    mock.patch.object(axis, "check_frontend_dependency_versions", return_value=0),
+                    mock.patch.object(axis, "check_frontend_vulnerable_packages", return_value=0),
+                    mock.patch.object(axis, "frontend_command", return_value=0),
+                    mock.patch.object(
+                        axis,
+                        "check_mcp_api_coverage",
+                        side_effect=lambda: calls.append("mcp-api-coverage") or 0,
+                    ),
+                    mock.patch.object(
+                        axis,
+                        "check_mcp_contracts",
+                        side_effect=lambda: calls.append("mcp-contracts") or 0,
+                    ),
+                    mock.patch.object(
+                        axis,
+                        "check_mcp_tool_safety",
+                        side_effect=lambda: calls.append("mcp-tool-safety") or 0,
+                    ),
+                    contextlib.redirect_stdout(io.StringIO()),
+                ):
+                    self.assertEqual(0, axis.verify(object()))
+
+                expected = ["mcp-api-coverage"]
+                if changed_path.startswith("src/Axis.Mcp/"):
+                    expected.extend(["mcp-contracts", "mcp-tool-safety"])
+                self.assertEqual(expected, calls)
+
     def test_discovers_related_test_projects_for_every_module_layer(self) -> None:
         source_projects = sorted((axis.ROOT / "src" / "Modules").glob("*/*/*.csproj"))
         mapped_projects: dict[str, str | None] = {}
@@ -4329,6 +4378,123 @@ class TestAxisCommandWrappers(unittest.TestCase):
 
         self.assertEqual(["dotnet", "build", "Axis.sln", "--nologo", "--no-restore"], calls[0])
 
+    def test_mcp_serve_keeps_wrapper_diagnostics_off_protocol_stdout(self) -> None:
+        calls: list[list[str]] = []
+        environments: list[dict[str, str]] = []
+
+        def fake_run(command: list[str], **kwargs):
+            calls.append(command)
+            environments.append(kwargs.get("env", {}))
+            return axis.subprocess.CompletedProcess(command, 0, stdout="", stderr="")
+
+        with tempfile.TemporaryDirectory() as temp:
+            root_ca = Path(temp) / "rootCA.pem"
+            root_ca.write_text("test", encoding="utf-8")
+            with (
+                mock.patch.object(axis, "LOCAL_ROOT_CA_PEM", root_ca),
+                mock.patch.object(axis, "dotnet_sdk_status", return_value=(True, "8.0.423")),
+                mock.patch.object(axis, "mcp_api_health_ok", return_value=True),
+                mock.patch.object(axis, "run", side_effect=fake_run),
+                mock.patch.object(axis, "exe", side_effect=lambda name: name),
+                contextlib.redirect_stdout(io.StringIO()) as stdout,
+                contextlib.redirect_stderr(io.StringIO()),
+            ):
+                self.assertEqual(
+                    0,
+                    axis.mcp_command(
+                        axis.argparse.Namespace(mcp_command="serve", mcp_args=["--", "--probe"])
+                    ),
+                )
+
+        self.assertEqual("", stdout.getvalue())
+        self.assertEqual(
+            ["dotnet", "build", str(axis.MCP_PROJECT), "--nologo"],
+            calls[0],
+        )
+        self.assertEqual(
+            [
+                "dotnet",
+                "run",
+                "--project",
+                str(axis.MCP_PROJECT),
+                "--no-launch-profile",
+                "--no-build",
+                "--",
+                "--probe",
+            ],
+            calls[1],
+        )
+        self.assertEqual("read", environments[1]["AXIS_MCP_ACCESS"])
+
+    def test_mcp_serve_starts_local_dev_before_bridge_when_api_is_unhealthy(self) -> None:
+        calls: list[list[str]] = []
+
+        def fake_run(command: list[str], **_kwargs):
+            calls.append(command)
+            return axis.subprocess.CompletedProcess(command, 0, stdout="compose output", stderr="")
+
+        with tempfile.TemporaryDirectory() as temp:
+            root_ca = Path(temp) / "rootCA.pem"
+            root_ca.write_text("test", encoding="utf-8")
+            with (
+                mock.patch.object(axis, "LOCAL_ROOT_CA_PEM", root_ca),
+                mock.patch.object(axis, "dotnet_sdk_status", return_value=(True, "8.0.423")),
+                mock.patch.object(axis, "mcp_api_health_ok", side_effect=[False, True]),
+                mock.patch.object(axis, "require_docker_compose", return_value=0),
+                mock.patch.object(axis, "local_dev_up_args", return_value=["docker", "compose", "up"]),
+                mock.patch.object(axis, "run", side_effect=fake_run),
+                mock.patch.object(axis, "exe", side_effect=lambda name: name),
+                contextlib.redirect_stdout(io.StringIO()) as stdout,
+                contextlib.redirect_stderr(io.StringIO()) as stderr,
+            ):
+                self.assertEqual(
+                    0,
+                    axis.mcp_command(
+                        axis.argparse.Namespace(
+                            mcp_command="serve",
+                            no_build=True,
+                            mcp_args=[],
+                        )
+                    ),
+                )
+
+        self.assertEqual(["docker", "compose", "up"], calls[0])
+        self.assertEqual("dotnet", calls[1][0])
+        self.assertEqual("", stdout.getvalue())
+        self.assertIn("starting the local-dev stack", stderr.getvalue())
+
+    def test_mcp_serve_passes_explicit_write_access_to_bridge(self) -> None:
+        environments: list[dict[str, str]] = []
+
+        def fake_run(command: list[str], **kwargs):
+            environments.append(kwargs.get("env", {}))
+            return axis.subprocess.CompletedProcess(command, 0, stdout="", stderr="")
+
+        with tempfile.TemporaryDirectory() as temp:
+            root_ca = Path(temp) / "rootCA.pem"
+            root_ca.write_text("test", encoding="utf-8")
+            with (
+                mock.patch.object(axis, "LOCAL_ROOT_CA_PEM", root_ca),
+                mock.patch.object(axis, "dotnet_sdk_status", return_value=(True, "8.0.423")),
+                mock.patch.object(axis, "mcp_api_health_ok", return_value=True),
+                mock.patch.object(axis, "run", side_effect=fake_run),
+                mock.patch.object(axis, "exe", side_effect=lambda name: name),
+                contextlib.redirect_stdout(io.StringIO()),
+                contextlib.redirect_stderr(io.StringIO()),
+            ):
+                self.assertEqual(
+                    0,
+                    axis.mcp_command(
+                        axis.argparse.Namespace(
+                            mcp_command="serve",
+                            access="write",
+                            mcp_args=[],
+                        )
+                    ),
+                )
+
+        self.assertEqual("write", environments[1]["AXIS_MCP_ACCESS"])
+
     def test_dotnet_restore_tools_uses_repository_manifest(self) -> None:
         calls = self.run_with_fake_process(
             axis.dotnet_command,
@@ -5040,7 +5206,10 @@ class TestRepoSkillsGate(unittest.TestCase):
                 "handoff before edit.\n\n"
                 "## Engineering method\n\n"
                 "Minimal solution ladder. Root-cause loop. Fail-before/pass-after. "
-                "Safety floor. Communication clarity. Skill proof.\n"
+                "Safety floor. Communication clarity. Skill proof.\n\n"
+                "## Blocker and completion protocol\n\n"
+                "No workaround: ask before an alternate user-local route; explicit user approval is "
+                "required. Stale, missing, indirect, or blocked evidence cannot become a completion claim.\n"
             ),
             ".agents/skills/axis-example/SKILL.md": (
                 "---\n"

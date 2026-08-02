@@ -8,6 +8,8 @@ This file owns durable source and runtime boundaries. Current behavior lives in 
 
 - `frontend/` calls `Axis.Api` only.
 - `Axis.Api` is the REST/OpenAPI gateway and composes module infrastructure at startup.
+- `Axis.Mcp` is a host-side stdio adapter with one typed semantic tool per exposed authenticated OpenAPI operation. It calls `Axis.Api` over authenticated loopback HTTPS and must not reference module projects, MediatR, EF Core, DbContext, database storage, or arbitrary request paths.
+- `Axis.Mcp` stdout is reserved for MCP JSON-RPC; diagnostics belong on stderr. It is local tooling, not a Compose service or a second HTTP gateway.
 - Modules expose Application contracts to `Axis.Api`; module internals stay inside the module.
 - Modules may expose optional `Axis.{Module}.Contracts` projects for stable cross-module contracts; consumers may reference another module's Contracts project only, not its Domain, Application, or Infrastructure projects.
 - Module Domain models follow DDD tactical boundaries; aggregate roots own invariants and domain events.

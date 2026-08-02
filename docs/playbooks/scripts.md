@@ -9,6 +9,7 @@
 | Tool | Required source | Used by |
 |---|---|---|
 | .NET SDK | [global.json](../../global.json) / [docs/TECH_STACK.md](../TECH_STACK.md); portable setup pin in [scripts/axis_setup.py](../../scripts/axis_setup.py) | build, tests, format, package scan, API contracts |
+| MCP SDK | Exact `ModelContextProtocol` pin in [Directory.Packages.props](../../Directory.Packages.props) | local `Axis.Mcp` stdio bridge and focused MCP contract tests |
 | Node.js | [frontend/.nvmrc](../../frontend/.nvmrc); portable setup pin in [scripts/axis_setup.py](../../scripts/axis_setup.py) | frontend commands and API types |
 | Playwright browser runtime | [frontend/Dockerfile.e2e](../../frontend/Dockerfile.e2e) and [frontend/package.json](../../frontend/package.json) | Containerized `local-dev smoke` and `local-dev e2e` workflows |
 | Lychee | [scripts/axis.py](../../scripts/axis.py) check and [.github/workflows/build-and-test.yml](../../.github/workflows/build-and-test.yml) pin | Markdown link checks |
@@ -52,6 +53,8 @@ Project commands use `python`; substitute `python3` on WSL/Linux or `py -3` on W
 - Keep raw Docker, dotnet, npm, Lychee, and OpenSSL calls inside wrappers or package scripts.
 - The shared runner normalizes `TMPDIR`, `TEMP`, and `TMP` to one existing writable directory before every governed subprocess; inherited cross-OS paths are never passed through.
 - Use `python scripts/axis.py local-dev smoke -- <playwright-args>` for the narrow smoke journey and `python scripts/axis.py local-dev e2e -- <playwright-args>` for diff-triggered browser evidence. Omit Playwright arguments only for CI or a cross-cutting diff that invalidates every browser surface. Both commands reconcile the local stack and run Playwright in the same Compose-managed browser environment.
+- Use `python scripts/axis.py mcp serve` as the single local MCP entrypoint; it reuses a healthy stack or starts `local-dev up`, builds the bridge with diagnostics on stderr, and then keeps stdout protocol-only. It defaults to read access. Pass `--access write` only for an approved mutation task; pass `--no-build` only when the bridge output is already current. See [docs/playbooks/mcp.md](./mcp.md).
+- Use `python scripts/axis.py check mcp-api-coverage`, `python scripts/axis.py check mcp-contracts`, and `python scripts/axis.py check mcp-tool-safety` when an API operation, MCP tool, auth boundary, or mutation policy changes. These are the maintained MCP parity and safety checks.
 - `local-dev shell` is an unrestricted diagnostic escape hatch, not a finite workflow or evidence route. Volume-destructive local-dev commands require explicit `--yes`.
 - Use `python scripts/axis.py ready-review` on a clean checkpoint commit at the review boundary. It runs changed-path verification plus the deterministic policy profile shared with CI.
 - Treat `python scripts/axis.py verify` as the changed-path verification engine behind ready-review, not as complete PR-readiness evidence by itself.

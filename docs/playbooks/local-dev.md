@@ -37,6 +37,8 @@ Mandatory services in [docker-compose.yml](../../docker-compose.yml): `postgres`
 
 Host ports published by compose: `1025`, `1080`, `3000`, `4318`, `5281`, `5432`, `6379`.
 
+`Axis.Mcp` runs on the host through the MCP client's `python scripts/axis.py mcp serve` command; it is intentionally not a Compose service. The bridge uses the API's loopback HTTPS endpoint and the local CA from `.dev-certs/`. The MCP entrypoint reuses a healthy stack or starts `local-dev up` before handing stdin/stdout to the stdio bridge. Do not daemonize the bridge or run it as a detached background process: its stdout is the MCP protocol stream.
+
 [docker-compose.yml](../../docker-compose.yml) and this playbook are the source of truth for Axis local Docker services. If compose changes, update this file in the same PR.
 
 After frontend manifest or toolchain changes, reconcile running local-dev services with the current manifests before trusting browser smoke or E2E results. Use the Axis local-dev wrapper to recreate affected services when dependency volumes or runtime caches may be stale.

@@ -21,6 +21,29 @@ internal sealed class BusinessObjectDefinitionRepository(BusinessObjectsDbContex
                 definition => definition.Id == id && definition.WorkspaceId == workspaceId,
                 ct);
 
+    public async Task<BusinessObjectDefinition?> GetByKeyForWorkspaceAsync(
+        BusinessObjectDefinitionKey key,
+        Guid workspaceId,
+        CancellationToken ct = default) =>
+        await DefinitionsWithGraph()
+            .FirstOrDefaultAsync(
+                definition => definition.Key == key && definition.WorkspaceId == workspaceId,
+                ct);
+
+    public async Task<BusinessObjectDefinitionVersion?> GetPublishedVersionByIdForWorkspaceAsync(
+        BusinessObjectDefinitionVersionId id,
+        Guid workspaceId,
+        CancellationToken ct = default) =>
+        await context.BusinessObjectDefinitions
+            .AsNoTracking()
+            .Where(definition => definition.WorkspaceId == workspaceId)
+            .SelectMany(definition => definition.Versions)
+            .Include(version => version.Fields)
+            .ThenInclude(field => field.Rules)
+            .Include(version => version.Fields)
+            .ThenInclude(field => field.ChoiceOptions)
+            .FirstOrDefaultAsync(version => version.Id == id, ct);
+
     public async Task<bool> ObjectKeyExistsAsync(
         Guid workspaceId,
         BusinessObjectDefinitionKey key,

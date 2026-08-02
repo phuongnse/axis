@@ -100,6 +100,7 @@ internal static class BusinessObjectDefinitionMapper
         new(
             rule.Id.Value,
             rule.BindingId,
+            rule.BindingRevision,
             rule.Order);
 
     private static BusinessObjectDefinitionVersionFieldRuleDto ToRuleDto(
@@ -108,5 +109,6 @@ internal static class BusinessObjectDefinitionMapper
             rule.Id.Value,
             rule.SourceFieldRuleId.Value,
             rule.BindingId,
+            rule.BindingRevision,
             rule.Order);
 }

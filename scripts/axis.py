@@ -18,6 +18,7 @@ import os
 import platform
 import re
 import shutil
+import ssl
 import subprocess
 import sys
 import tempfile
@@ -49,6 +50,7 @@ LOCAL_DEV_ENV_FILE = ROOT / ".env.local"
 LOCAL_DEV_PROJECT_NAME = "axis"
 LOCAL_DEV_POSTGRES_VOLUME = f"{LOCAL_DEV_PROJECT_NAME}_postgres_data"
 API_PROJECT = ROOT / "src" / "Axis.Api" / "Axis.Api.csproj"
+MCP_PROJECT = ROOT / "src" / "Axis.Mcp" / "Axis.Mcp.csproj"
 FRONTEND_DIR = ROOT / "frontend"
 MIGRATION_TARGETS: dict[str, tuple[Path, str, str]] = {
     "business-objects": (
@@ -730,7 +732,7 @@ def check_test_project_classification(_args: argparse.Namespace | None = None) -
         allowed = (
             re.fullmatch(r"Axis\..*\.(Domain|Application)\.Tests", name)
             or re.fullmatch(r"Axis\..*\.Infrastructure\.Tests", name)
-            or name in {"Axis.Api.Tests", "Axis.Architecture.Tests", "Axis.Testing"}
+            or name in {"Axis.Api.Tests", "Axis.Architecture.Tests", "Axis.Mcp.Tests", "Axis.Testing"}
         )
         if not allowed:
             print(f"check-test-project-classification: {project} is not classified", file=sys.stderr)
@@ -1699,6 +1701,50 @@ def repo_skill_verification_scope_issues(
                 "for minimal solutions, root-cause fixes, behavior proof, safety, communication, "
                 "and skill validation"
             )
+        blocker_fragments = (
+            "## Blocker and completion protocol",
+            "No workaround",
+            "user-local",
+            "explicit user approval",
+            "stale, missing, indirect, or blocked evidence",
+        )
+        if any(fragment.lower() not in reference_text.lower() for fragment in blocker_fragments):
+            issues.append(
+                f"{rel_from(reference, root)}: universal contract must own the blocker handshake "
+                "and completion evidence boundary"
+            )
+
+    mcp_skill = by_name.get("axis-mcp-integration")
+    if mcp_skill is not None:
+        skill_md, text = mcp_skill
+        mcp_skill_fragments = (
+            "supported MCP client lifecycle",
+            "`tools/list`",
+            "`tools/call`",
+            "stop and ask",
+        )
+        if any(fragment.lower() not in text.lower() for fragment in mcp_skill_fragments):
+            issues.append(
+                f"{rel_from(skill_md, root)}: MCP skill must require supported client lifecycle "
+                "evidence and the blocker handshake"
+            )
+        playbook = root / "docs" / "playbooks" / "mcp.md"
+        if not playbook.is_file():
+            issues.append("docs/playbooks/mcp.md: MCP skill requires the runtime lifecycle playbook")
+        else:
+            playbook_text = playbook.read_text(encoding="utf-8")
+            playbook_fragments = (
+                "## Runtime lifecycle and blocker protocol",
+                "reload or reconnect",
+                "`tools/list`",
+                "`tools/call`",
+                "stop and ask",
+            )
+            if any(fragment.lower() not in playbook_text.lower() for fragment in playbook_fragments):
+                issues.append(
+                    "docs/playbooks/mcp.md: MCP runtime lifecycle must document reload/reconnect, "
+                    "current tools/list/tools/call evidence, and stop-and-ask blockers"
+                )
     return issues
 
 
@@ -1828,6 +1874,50 @@ def check_policy_tests(_args: argparse.Namespace | None = None) -> int:
         ],
         check=False,
     ).returncode
+
+
+MCP_TEST_PROJECT = ROOT / "tests" / "Tools" / "Axis.Mcp.Tests" / "Axis.Mcp.Tests.csproj"
+
+
+def run_mcp_test(filter_expression: str | None, label: str) -> int:
+    rc = check_dotnet_sdk()
+    if rc != 0:
+        return rc
+
+    command = [
+        exe("dotnet"),
+        "test",
+        str(MCP_TEST_PROJECT),
+        "--nologo",
+        "--no-restore",
+    ]
+    if filter_expression:
+        command.extend(["--filter", filter_expression])
+
+    result = run(command, check=False)
+    if result.returncode == 0:
+        print(f"{label}: OK")
+    else:
+        print(f"{label}: FAIL", file=sys.stderr)
+    return result.returncode
+
+
+def check_mcp_api_coverage(_args: argparse.Namespace | None = None) -> int:
+    return run_mcp_test(
+        "FullyQualifiedName~McpApiCoverageTests",
+        "check-mcp-api-coverage",
+    )
+
+
+def check_mcp_contracts(_args: argparse.Namespace | None = None) -> int:
+    return run_mcp_test(None, "check-mcp-contracts")
+
+
+def check_mcp_tool_safety(_args: argparse.Namespace | None = None) -> int:
+    return run_mcp_test(
+        "FullyQualifiedName~MutationGuard",
+        "check-mcp-tool-safety",
+    )
 
 
 def parse_added_lines(diff_text: str, include: callable[[str], bool]) -> list[tuple[str, str]]:
@@ -2944,6 +3034,13 @@ def emit_captured_process(result: subprocess.CompletedProcess[str]) -> None:
         print(result.stderr, end="", file=sys.stderr)
 
 
+def emit_captured_process_to_stderr(result: subprocess.CompletedProcess[str]) -> None:
+    if result.stdout:
+        print(result.stdout, end="", file=sys.stderr)
+    if result.stderr:
+        print(result.stderr, end="", file=sys.stderr)
+
+
 def check_markdown_links(_args: argparse.Namespace | None = None) -> int:
     return check_markdown_links_for_paths(None)
 
@@ -3081,6 +3178,81 @@ def dotnet_command(args: argparse.Namespace) -> int:
     if command == "run-api":
         return run([exe("dotnet"), "run", "--project", str(API_PROJECT), *dotnet_args], check=False).returncode
     raise CheckError(f"Unknown dotnet command: {command}")
+
+
+def mcp_command(args: argparse.Namespace) -> int:
+    if args.mcp_command != "serve":
+        raise CheckError(f"Unknown mcp command: {args.mcp_command}")
+
+    sdk_ok, sdk_detail = dotnet_sdk_status()
+    if not sdk_ok:
+        print(f"mcp serve: .NET SDK is unavailable: {sdk_detail}", file=sys.stderr)
+        return 1
+
+    root_ca = Path(
+        os.environ.get("AXIS_MCP_ROOT_CA_PATH", str(LOCAL_ROOT_CA_PEM))
+    ).expanduser()
+    if not root_ca.is_file():
+        print(
+            "mcp serve: local root CA is missing; run `python scripts/axis.py local-dev certs` first",
+            file=sys.stderr,
+        )
+        return 1
+
+    api_base = os.environ.get("AXIS_MCP_API_BASE_URL", "https://localhost:5281/")
+    parsed_api_base = urllib.parse.urlparse(api_base)
+    if (
+        parsed_api_base.scheme != "https"
+        or parsed_api_base.hostname not in {"localhost", "127.0.0.1", "::1"}
+    ):
+        print("mcp serve: AXIS_MCP_API_BASE_URL must be an HTTPS loopback URL", file=sys.stderr)
+        return 1
+
+    access = getattr(args, "access", None) or os.environ.get("AXIS_MCP_ACCESS", "read")
+    if access not in {"read", "write"}:
+        print("mcp serve: --access must be 'read' or 'write'", file=sys.stderr)
+        return 1
+
+    health_url = api_base.rstrip("/") + "/health"
+    if not ensure_mcp_api_ready(health_url, root_ca):
+        print(
+            f"mcp serve: Axis API health check failed at {health_url}; start the stack with "
+            "`python scripts/axis.py local-dev up`",
+            file=sys.stderr,
+        )
+        return 1
+
+    if not getattr(args, "no_build", False):
+        build = run(
+            [exe("dotnet"), "build", str(MCP_PROJECT), "--nologo"],
+            capture=True,
+            check=False,
+        )
+        emit_captured_process_to_stderr(build)
+        if build.returncode != 0:
+            print("mcp serve: Axis MCP bridge build failed", file=sys.stderr)
+            return build.returncode
+
+    mcp_args = passthrough_args(getattr(args, "mcp_args", []))
+    command = [
+        exe("dotnet"),
+        "run",
+        "--project",
+        str(MCP_PROJECT),
+        "--no-launch-profile",
+        "--no-build",
+    ]
+    if mcp_args:
+        command.extend(["--", *mcp_args])
+
+    return run(
+        command,
+        check=False,
+        env={
+            "AXIS_MCP_ACCESS": access,
+            "AXIS_MCP_ROOT_CA_PATH": str(root_ca),
+        },
+    ).returncode
 
 
 def migration_command(args: argparse.Namespace) -> int:
@@ -3277,6 +3449,8 @@ def related_test_project_for_source_project(project: str) -> str | None:
     project_name = Path(project).stem
     if project == "src/Axis.Api/Axis.Api.csproj":
         candidate = ROOT / "tests/Api/Axis.Api.Tests/Axis.Api.Tests.csproj"
+    elif project == "src/Axis.Mcp/Axis.Mcp.csproj":
+        candidate = ROOT / "tests/Tools/Axis.Mcp.Tests/Axis.Mcp.Tests.csproj"
     elif project.startswith("src/Modules/"):
         parts = Path(project).parts
         if len(parts) < 4:
@@ -3404,6 +3578,8 @@ def verify(args: argparse.Namespace) -> int:
     frontend_api_types = "openapi.json" in paths or any(
         path.startswith("frontend/src/lib/api-generated/") for path in paths
     )
+    mcp_source_changed = any(path.startswith("src/Axis.Mcp/") for path in paths)
+    mcp_api_coverage = "openapi.json" in paths or mcp_source_changed
     frontend_tests_only = frontend and all(
         path.startswith("frontend/tests/") or path.startswith("frontend/e2e/")
         for path in paths
@@ -3497,6 +3673,12 @@ def verify(args: argparse.Namespace) -> int:
                         )
                     ),
                 )
+
+    if mcp_api_coverage:
+        step("MCP API coverage", lambda: check_mcp_api_coverage())
+    if mcp_source_changed:
+        step("MCP contract tests", lambda: check_mcp_contracts())
+        step("MCP tool safety", lambda: check_mcp_tool_safety())
 
     if scripts_changed:
         step("scripts standard", lambda: check_scripts_standard())
@@ -3816,6 +3998,38 @@ def _http_ok(url: str, timeout_seconds: float = 1.5) -> bool:
             return 200 <= response.status < 300
     except (OSError, urllib.error.URLError):
         return False
+
+
+def mcp_api_health_ok(url: str, root_ca: Path, timeout_seconds: float = 1.5) -> bool:
+    try:
+        context = ssl.create_default_context(cafile=str(root_ca))
+        with urllib.request.urlopen(url, context=context, timeout=timeout_seconds) as response:
+            return 200 <= response.status < 300
+    except (OSError, ssl.SSLError, urllib.error.URLError):
+        return False
+
+
+def ensure_mcp_api_ready(health_url: str, root_ca: Path) -> bool:
+    if mcp_api_health_ok(health_url, root_ca):
+        return True
+
+    if require_docker_compose("mcp serve") != 0:
+        return False
+
+    print(
+        "mcp serve: Axis API is not healthy; starting the local-dev stack",
+        file=sys.stderr,
+    )
+    result = run(local_dev_up_args(), capture=True, check=False)
+    emit_captured_process_to_stderr(result)
+    if result.returncode != 0:
+        print(
+            f"mcp serve: local-dev up failed with exit code {result.returncode}",
+            file=sys.stderr,
+        )
+        return False
+
+    return mcp_api_health_ok(health_url, root_ca)
 
 
 def _docker_host_ping_ok(docker_host: str | None) -> bool:
@@ -4958,6 +5172,26 @@ def main(argv: list[str] | None = None) -> int:
     dotnet_run_api.add_argument("dotnet_args", nargs=argparse.REMAINDER)
     dotnet_run_api.set_defaults(func=dotnet_command)
 
+    mcp_parser = sub.add_parser("mcp", help="Run the local Axis MCP bridge")
+    mcp_sub = mcp_parser.add_subparsers(dest="mcp_command", required=True)
+    mcp_serve = mcp_sub.add_parser(
+        "serve",
+        help="Run the stdio MCP bridge against the local Axis API",
+    )
+    mcp_serve.add_argument(
+        "--access",
+        choices=("read", "write"),
+        default=None,
+        help="Expose read tools only (default) or the approved write surface",
+    )
+    mcp_serve.add_argument(
+        "--no-build",
+        action="store_true",
+        help="Skip the bridge build when the current output is already up to date",
+    )
+    mcp_serve.add_argument("mcp_args", nargs=argparse.REMAINDER)
+    mcp_serve.set_defaults(func=mcp_command)
+
     migration_parser = sub.add_parser("migration", help="Manage repository-owned EF migration source")
     migration_sub = migration_parser.add_subparsers(dest="migration_command", required=True)
     migration_add = migration_sub.add_parser("add", help="Scaffold a migration for one Axis module")
@@ -5059,6 +5293,9 @@ def main(argv: list[str] | None = None) -> int:
     check_sub = check.add_subparsers(dest="check_command", required=True)
     check_sub.add_parser("doc-drift", help="Check documented enforcement against repository truth").set_defaults(func=check_doc_drift)
     check_sub.add_parser("policy-tests", help="Run repository policy regression tests").set_defaults(func=check_policy_tests)
+    check_sub.add_parser("mcp-api-coverage", help="Check MCP coverage against the committed OpenAPI operations").set_defaults(func=check_mcp_api_coverage)
+    check_sub.add_parser("mcp-contracts", help="Run the focused MCP protocol and API client contract tests").set_defaults(func=check_mcp_contracts)
+    check_sub.add_parser("mcp-tool-safety", help="Check MCP mutation gating behavior").set_defaults(func=check_mcp_tool_safety)
     check_sub.add_parser("text-encoding", help="Check repository text encoding and line endings").set_defaults(func=check_text_encoding)
     check_sub.add_parser("scripts-standard", help="Check repository script ownership conventions").set_defaults(func=check_scripts_standard)
     check_sub.add_parser("repo-skills", help="Validate repository skill contracts").set_defaults(func=check_repo_skills)

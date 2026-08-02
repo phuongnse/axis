@@ -213,6 +213,34 @@ public sealed class ApiTestFixture : IAsyncLifetime
                 },
             });
         }
+
+        if (await appManager.FindByClientIdAsync("axis_mcp") is null)
+        {
+            await appManager.CreateAsync(new OpenIddictApplicationDescriptor
+            {
+                ClientId = "axis_mcp",
+                ClientType = ClientTypes.Public,
+                DisplayName = "Axis MCP local client (Test)",
+                Permissions =
+                {
+                    Permissions.Endpoints.Authorization,
+                    Permissions.Endpoints.Token,
+                    Permissions.GrantTypes.AuthorizationCode,
+                    Permissions.ResponseTypes.Code,
+                    Permissions.Prefixes.Scope + Scopes.OpenId,
+                    Permissions.Prefixes.Scope + Scopes.Email,
+                    Permissions.Prefixes.Scope + Scopes.Profile,
+                },
+                RedirectUris =
+                {
+                    new Uri("http://127.0.0.1:48123/callback"),
+                },
+                Requirements =
+                {
+                    Requirements.Features.ProofKeyForCodeExchange,
+                },
+            });
+        }
     }
 }
 

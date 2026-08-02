@@ -20,6 +20,8 @@ public static class BusinessObjectsInfrastructureExtensions
             opts.UseNpgsql(configuration.GetConnectionString("BusinessObjects")));
 
         services.AddScoped<IBusinessObjectDefinitionRepository, BusinessObjectDefinitionRepository>();
+        services.AddScoped<IBusinessObjectRecordRepository, BusinessObjectRecordRepository>();
+        services.AddScoped<BusinessObjectRecordRuleEvaluator>();
         services.AddScoped<IBusinessObjectDefinitionInputPlanner, BusinessObjectDefinitionInputPlanner>();
         services.AddScoped<IUnitOfWork, BusinessObjectsUnitOfWork>();
 

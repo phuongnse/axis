@@ -37,6 +37,10 @@ internal sealed class BusinessObjectFieldRuleConfiguration : IEntityTypeConfigur
             .HasColumnName("binding_id")
             .IsRequired();
 
+        builder.Property<int>(nameof(BusinessObjectFieldRule.BindingRevision))
+            .HasColumnName("binding_revision")
+            .IsRequired();
+
         builder.Property<int>(nameof(BusinessObjectFieldRule.Order))
             .HasColumnName("sort_order")
             .IsRequired();

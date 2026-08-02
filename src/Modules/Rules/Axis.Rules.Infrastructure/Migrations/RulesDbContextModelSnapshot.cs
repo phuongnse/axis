@@ -100,6 +100,11 @@ namespace Axis.Rules.Infrastructure.Migrations
                         .HasColumnType("jsonb")
                         .HasColumnName("input_mappings");
 
+                    b.Property<string>("_revisionHistory")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("revision_history");
+
                     b.Property<uint>("xmin")
                         .IsConcurrencyToken()
                         .ValueGeneratedOnAddOrUpdate()

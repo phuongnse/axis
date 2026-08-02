@@ -5,6 +5,7 @@ using System.Threading.RateLimiting;
 using Axis.Api.HealthChecks;
 using Axis.Api.Infrastructure;
 using Axis.BusinessObjects.Application.Commands.CreateBusinessObjectDefinition;
+using Axis.BusinessObjects.Application.Commands.CreateBusinessObjectRecord;
 using Axis.BusinessObjects.Infrastructure.Extensions;
 using Axis.Identity.Application.Commands.RegisterUser;
 using Axis.Identity.Infrastructure.Extensions;
@@ -69,6 +70,7 @@ internal static class AxisApiServiceExtensions
             cfg.RegisterServicesFromAssemblies(
                 typeof(RegisterUserCommand).Assembly,
                 typeof(CreateBusinessObjectDefinitionCommand).Assembly,
+                typeof(CreateBusinessObjectRecordCommand).Assembly,
                 typeof(ListRuleDefinitionsQuery).Assembly);
             cfg.AddOpenBehavior(typeof(LoggingBehavior<,>));
             cfg.AddOpenBehavior(typeof(ValidationBehavior<,>));
@@ -77,6 +79,7 @@ internal static class AxisApiServiceExtensions
         services.AddValidatorsFromAssemblies([
             typeof(RegisterUserCommand).Assembly,
             typeof(CreateBusinessObjectDefinitionCommand).Assembly,
+            typeof(CreateBusinessObjectRecordCommand).Assembly,
             typeof(ListRuleDefinitionsQuery).Assembly,
         ]);
     }

@@ -18,6 +18,7 @@ Follow [reference.md](../reference.md).
 - Report omitted checks with a reason.
 - Native read-only inspection is allowed. Repeatable repository workflows, repo-owned tools, and verification evidence require a finite `python scripts/axis.py ...` route. A rare one-off mutation without a route requires explicit approval of the exact command and targets; recurrence requires a route. A pass-through shell never counts as a finite route or evidence.
 - General shell access remains inspection-only unless the exact rare-mutation exception above is approved.
+- A missing native prerequisite is a blocker. Do not install, extract, symlink, prepend, or otherwise substitute a user-local runtime/tool, change `PATH`, or use an alternate environment to make a check pass without explicit user approval; report the exact host action needed and keep the dependent evidence blocked.
 - Keep dependency changes controlled: exact direct versions, generated lockfiles, repository vulnerability gates, and Renovate-owned proposals. Do not use ranges, manual lockfile edits, compatibility shims, or risk acceptance as an update mechanism.
 
 ## Inputs
