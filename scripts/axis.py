@@ -4210,6 +4210,34 @@ def local_dev_certificates_valid(openssl: str) -> bool:
             if result.returncode != 0 or any(marker not in result.stdout for marker in required_markers):
                 return False
 
+    root_fingerprints: list[str] = []
+    for certificate_path, format_args in (
+        (LOCAL_ROOT_CA_PEM, []),
+        (LOCAL_ROOT_CA_CER, ["-inform", "der"]),
+    ):
+        result = run(
+            [
+                openssl,
+                "x509",
+                *format_args,
+                "-in",
+                str(certificate_path),
+                "-fingerprint",
+                "-sha256",
+                "-noout",
+            ],
+            check=False,
+            capture=True,
+        )
+        if result.returncode != 0:
+            return False
+        fingerprint = result.stdout.partition("=")[2].replace(":", "").strip().lower()
+        if not fingerprint:
+            return False
+        root_fingerprints.append(fingerprint)
+    if len(set(root_fingerprints)) != 1:
+        return False
+
     public_key_commands = (
         (
             [openssl, "x509", "-in", str(LOCAL_ROOT_CA_PEM), "-pubkey", "-noout"],
