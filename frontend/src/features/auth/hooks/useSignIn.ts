@@ -6,6 +6,7 @@ import { type FieldPath, type UseFormReturn, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { completePostSignInPkceFlow, signInUser } from '@/features/auth/api';
 import { useRefreshClientValidationErrors } from '@/features/auth/hooks/useRefreshClientValidationErrors';
+import { isAuthorizationRequestHandle } from '@/features/auth/pkce';
 import {
   classifySignInError,
   getFirstFieldError,
@@ -14,9 +15,8 @@ import {
   type SignInSubmitErrorKind,
 } from '@/features/auth/problem-details';
 import { createSignInSchema, type SignInFormValues } from '@/features/auth/schemas/sign-in-schema';
-import { isAuthorizationRequestHandle } from '@/features/auth/pkce';
-import { useQueryParam } from '@/features/auth/use-query-param';
 import type { SignInValidationErrorData } from '@/features/auth/types';
+import { useQueryParam } from '@/features/auth/use-query-param';
 import { currentSiteLanguage } from '@/features/preferences';
 import type { TranslationKey } from '@/features/preferences/translations';
 import { ApiError } from '@/lib/api';

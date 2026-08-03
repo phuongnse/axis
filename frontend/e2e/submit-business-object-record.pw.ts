@@ -145,10 +145,7 @@ test.describe('submit business object record', () => {
     expect(pageErrors).toEqual([]);
   });
 
-  test('AT-009 user recovers from a rule mismatch before submitting', async ({
-    page,
-    request,
-  }) => {
+  test('AT-009 user recovers from a rule mismatch before submitting', async ({ page, request }) => {
     test.skip(!maildevURL, 'Set E2E_MAILDEV_URL to run application verification.');
 
     const pageErrors: string[] = [];

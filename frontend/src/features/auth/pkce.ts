@@ -45,11 +45,8 @@ interface AuthorizeUrlOptions {
 }
 
 export function isAuthorizationRequestHandle(value: string | undefined): value is string {
-  return Boolean(
-    value &&
-      value.length <= 2048 &&
-      !/[\u0000-\u001f\u007f]/.test(value),
-  );
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: Reject control characters in authorization request handles.
+  return Boolean(value && value.length <= 2048 && !/[\u0000-\u001f\u007f]/.test(value));
 }
 
 export function createPkceSession(): PkceSession {

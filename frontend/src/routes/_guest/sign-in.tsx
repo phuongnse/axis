@@ -13,8 +13,6 @@ export interface SignInRouteSearch {
 export const Route = createFileRoute('/_guest/sign-in')({
   validateSearch: (search: Record<string, unknown>): SignInRouteSearch => ({
     authorization_request:
-      typeof search.authorization_request === 'string'
-        ? search.authorization_request
-        : undefined,
+      typeof search.authorization_request === 'string' ? search.authorization_request : undefined,
   }),
 });

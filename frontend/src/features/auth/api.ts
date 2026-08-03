@@ -1,8 +1,8 @@
 import { fetchApi } from '@/lib/api';
 import { getAccessToken, getBrowserSessionStatus, useAuthStore } from './auth-store';
 import {
-  buildAuthorizeUrl,
   buildAuthorizationRequestResumeUrl,
+  buildAuthorizeUrl,
   CLIENT_ID,
   clearPkceSession,
   connectEndpoint,
@@ -226,9 +226,7 @@ async function restoreSessionFromBrowserAuthOnce(): Promise<boolean> {
   }
 }
 
-export async function completePostSignInPkceFlow(
-  authorizationRequest?: string,
-): Promise<boolean> {
+export async function completePostSignInPkceFlow(authorizationRequest?: string): Promise<boolean> {
   if (authorizationRequest) {
     window.location.assign(buildAuthorizationRequestResumeUrl(authorizationRequest));
     return false;

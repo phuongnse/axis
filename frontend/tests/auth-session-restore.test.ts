@@ -6,12 +6,12 @@ import {
   restoreSessionFromBrowserAuth,
 } from '@/features/auth/api';
 import { getAccessToken, useAuthStore } from '@/features/auth/auth-store';
+import { buildAuthorizationRequestResumeUrl } from '@/features/auth/pkce';
 import {
   redirectAuthenticatedUserFromGuestRoute,
   redirectFromAppEntryRoute,
   redirectFromCallbackRoute,
 } from '@/features/auth/route-guards';
-import { buildAuthorizationRequestResumeUrl } from '@/features/auth/pkce';
 import { ensureAuthenticatedRouteSession } from '@/routes/_authenticated';
 
 function authResponse(state: string): Response {
