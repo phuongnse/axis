@@ -2286,11 +2286,11 @@ def enforcement_truth_required_snippets() -> list[tuple[Path, list[tuple[str, st
             ("dotnet_projects_for_changed_paths(paths)", "local verify routes .NET work by changed project paths"),
             ('step("policy gate tests", lambda: check_policy_tests())', "local verify runs policy gate tests when scripts change"),
             ('step("doc navigation", lambda: check_doc_navigation())', "local verify runs docs checks when docs change"),
-            ('step("markdown links (changed files)",', "local verify runs markdown link checks for changed markdown paths"),
+            ('"markdown links (changed files)",', "local verify runs markdown link checks for changed markdown paths"),
             ('def pre_push(args: argparse.Namespace) -> int:', "pre-push quick gate is implemented in Python"),
             ('return ready_review(argparse.Namespace(since=None, policy_only=False))', "pre-push can opt into ready-review with AXIS_PRE_PUSH_FULL"),
             ('def ready_review(args: argparse.Namespace) -> int:', "ready-review owns local review-boundary verification"),
-            ('gates.append(("doc drift", lambda: check_doc_drift(None)))', "ready-review and CI share the doc-drift policy profile"),
+            ("lambda: check_doc_drift(", "ready-review and CI share the doc-drift policy profile"),
             ("for issue in governance_owner_boundary_issues():", "doc drift checks governance owner boundaries"),
             ("for issue in enforcement_ledger_issues():", "doc drift checks enforcement ledger rows"),
             ("for issue in enforcement_truth_audit_issues():", "doc drift checks enforcement truth wiring"),
@@ -2397,6 +2397,18 @@ def normalized_text(path: Path) -> str:
     return path.read_text(encoding="utf-8", errors="ignore").replace("\r\n", "\n").replace("\r", "\n")
 
 
+def enforcement_truth_search_text(relative: Path, path: Path) -> str:
+    text = normalized_text(path)
+    if relative != Path("scripts/axis.py"):
+        return text
+
+    start = text.find("def enforcement_truth_required_snippets")
+    end = text.find("\ndef governance_owner_boundary_issues", start)
+    if start == -1 or end == -1:
+        return text
+    return text[:start] + text[end:]
+
+
 def enforcement_truth_audit_issues(*, root: Path | None = None) -> list[str]:
     """Verify committed CI/script wiring still supports registry enforcement claims."""
     root = root or ROOT
@@ -2409,7 +2421,7 @@ def enforcement_truth_audit_issues(*, root: Path | None = None) -> list[str]:
             issues.append(f"{normalized}: enforcement truth audit missing required file")
             continue
 
-        text = normalized_text(path)
+        text = enforcement_truth_search_text(relative, path)
         for snippet, description in requirements:
             if snippet not in text:
                 issues.append(f"{normalized}: enforcement truth audit missing {description}: `{snippet}`")
@@ -3803,6 +3815,10 @@ def verify(args: argparse.Namespace) -> int:
 
 def ready_review_doc_drift_coverage(paths: list[str]) -> set[str]:
     covered: set[str] = set()
+    if any((ROOT / path).is_file() and should_check_text_encoding(path) for path in paths):
+        covered.add("check-text-encoding")
+    if any(axis_theme.is_theme_path(path) for path in paths):
+        covered.add("check-theme")
     if any(path.startswith("scripts/") for path in paths):
         covered.add("check-scripts-standard")
     if any(path.startswith(f"{REPO_SKILLS_DIR}/") or is_project_orchestration_path(path) for path in paths):

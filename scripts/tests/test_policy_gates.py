@@ -2898,6 +2898,7 @@ class TestReviewVerificationGates(unittest.TestCase):
 
         self.assertEqual(
             {
+                "check-text-encoding",
                 "check-scripts-standard",
                 "check-repo-skills",
                 "check-doc-navigation",
@@ -2907,6 +2908,10 @@ class TestReviewVerificationGates(unittest.TestCase):
                 "check-foundation-docs.py",
             },
             axis.ready_review_doc_drift_coverage(paths),
+        )
+        self.assertIn(
+            "check-theme",
+            axis.ready_review_doc_drift_coverage(["theme/axis-theme.json"]),
         )
 
     def test_doc_drift_selects_only_checkers_for_touched_surfaces(self) -> None:
@@ -3372,7 +3377,7 @@ class TestEnforcementTruthAudit(unittest.TestCase):
     def test_rejects_local_verify_without_markdown_links(self) -> None:
         def mutate(files: dict[Path, str]) -> None:
             script = Path("scripts/axis.py")
-            files[script] = files[script].replace('step("markdown links (changed files)",\n', "")
+            files[script] = files[script].replace('"markdown links (changed files)",\n', "")
 
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
@@ -3380,6 +3385,21 @@ class TestEnforcementTruthAudit(unittest.TestCase):
             issues = axis.enforcement_truth_audit_issues(root=root)
 
         self.assertIn("local verify runs markdown link check", "\n".join(issues))
+
+    def test_rejects_missing_doc_drift_wiring_without_matching_its_own_requirement(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            self.write_truth_repo(root)
+            script = Path("scripts/axis.py")
+            source = axis.normalized_text(axis.ROOT / script)
+            prefix, marker, implementation = source.partition("def ready_review_policy_gates(")
+            self.assertTrue(marker)
+            implementation = implementation.replace("lambda: check_doc_drift(", "lambda: missing_doc_drift(", 1)
+            (root / script).write_text(prefix + marker + implementation, encoding="utf-8")
+
+            issues = axis.enforcement_truth_audit_issues(root=root)
+
+        self.assertIn("ready-review and CI share the doc-drift policy profile", "\n".join(issues))
 
     def test_rejects_missing_pre_push_quick_gate_delegate(self) -> None:
         def mutate(files: dict[Path, str]) -> None:
