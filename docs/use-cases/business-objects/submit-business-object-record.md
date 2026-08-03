@@ -147,7 +147,7 @@ sequenceDiagram
 > | API | Done |
 > | Frontend | Done |
 >
-> **Gaps vs spec:** No product behavior gap remains for this executable slice. A Codex thread that was opened before the bridge build may retain a stale tool snapshot; use the app-server MCP reload/reconnect control or restart Codex before relying on newly added record tool names in that existing thread.
+> **Gaps vs spec:** No product behavior gap remains for this executable slice. An MCP client session opened before the bridge build may retain a stale tool snapshot; use the supported MCP host reload/reconnect control or restart that client before relying on newly added record tool names in that existing session.
 >
 > **Deferred follow-ups:** Generic workflow-definition authoring, approval/assignment lifecycle, and additional record mutations remain explicitly out of scope for this first executable slice.
 >

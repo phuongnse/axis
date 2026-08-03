@@ -14,7 +14,7 @@ Agent -> Axis.Mcp (stdio JSON-RPC) -> authenticated HTTPS loopback -> Axis.Api -
 
 ## Run
 
-The local Codex registration for this checkout lives in `.codex/config.toml`; it contains machine-specific WSL paths, so it is ignored and must not be committed. Keep this Axis-only entry project-scoped rather than copying it into the global Codex config. Codex loads the file when the project is trusted. For another MCP client, register the same finite wrapper manually:
+The MCP host registers this local server through its own client configuration. Keep host-specific registration and machine paths outside the repository; Axis exposes one finite wrapper for any compatible MCP client:
 
 ```text
 python scripts/axis.py mcp serve
