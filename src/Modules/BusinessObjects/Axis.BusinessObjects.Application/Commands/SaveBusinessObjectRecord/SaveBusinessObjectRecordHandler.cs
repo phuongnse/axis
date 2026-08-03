@@ -36,20 +36,20 @@ public sealed class SaveBusinessObjectRecordHandler(
         if (definition is null)
             return BusinessObjectRecordFailures.DefinitionNotFound<BusinessObjectRecordDetailDto>();
 
-        Result validValues = BusinessObjectRecordValueValidator.Validate(definition, command.Values);
+        Result<IReadOnlyDictionary<string, IReadOnlyList<string>>> validValues =
+            BusinessObjectRecordValueValidator.ValidateAndCanonicalize(definition, command.Values);
         if (validValues.IsFailure)
-            return validValues.ErrorCode == Axis.Shared.Domain.Primitives.ErrorCodes.FieldValidation && validValues.FieldErrors is not null
+            return validValues.ErrorCode == ErrorCodes.FieldValidation && validValues.FieldErrors is not null
                 ? BusinessObjectRecordFailures.Validation<BusinessObjectRecordDetailDto>(validValues.FieldErrors)
                 : BusinessObjectRecordFailures.Invalid<BusinessObjectRecordDetailDto>(validValues.Error);
 
         Result saved = record.SaveDraft(
             command.ExpectedRevision,
-            command.Values,
-            BusinessObjectRecordPayloadHasher.Compute(command.Values),
+            validValues.Value,
             userId,
             DateTime.UtcNow);
         if (saved.IsFailure)
-            return saved.ErrorCode == Axis.Shared.Domain.Primitives.ErrorCodes.Conflict
+            return saved.ErrorCode == ErrorCodes.Conflict
                 ? BusinessObjectRecordFailures.Conflict<BusinessObjectRecordDetailDto>(saved.Error)
                 : BusinessObjectRecordFailures.Invalid<BusinessObjectRecordDetailDto>(saved.Error);
 

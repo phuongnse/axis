@@ -62,7 +62,8 @@ public sealed class CreateBusinessObjectRecordHandler(
         if (definition is null || definition.Status != BusinessObjectDefinitionStatus.Published || publishedVersion is null)
             return BusinessObjectRecordFailures.DefinitionNotFound<BusinessObjectRecordDetailDto>();
 
-        Result validValues = BusinessObjectRecordValueValidator.Validate(publishedVersion, values);
+        Result<IReadOnlyDictionary<string, IReadOnlyList<string>>> validValues =
+            BusinessObjectRecordValueValidator.ValidateAndCanonicalize(publishedVersion, values);
         if (validValues.IsFailure)
             return validValues.ErrorCode == ErrorCodes.FieldValidation && validValues.FieldErrors is not null
                 ? BusinessObjectRecordFailures.Validation<BusinessObjectRecordDetailDto>(validValues.FieldErrors)
@@ -75,7 +76,7 @@ public sealed class CreateBusinessObjectRecordHandler(
             publishedVersion.Key,
             command.IdempotencyKey,
             payloadHash,
-            values,
+            validValues.Value,
             userId,
             DateTime.UtcNow);
         if (record.IsFailure)

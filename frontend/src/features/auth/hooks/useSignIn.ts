@@ -14,6 +14,8 @@ import {
   type SignInSubmitErrorKind,
 } from '@/features/auth/problem-details';
 import { createSignInSchema, type SignInFormValues } from '@/features/auth/schemas/sign-in-schema';
+import { isAuthorizationRequestHandle } from '@/features/auth/pkce';
+import { useQueryParam } from '@/features/auth/use-query-param';
 import type { SignInValidationErrorData } from '@/features/auth/types';
 import { currentSiteLanguage } from '@/features/preferences';
 import type { TranslationKey } from '@/features/preferences/translations';
@@ -60,8 +62,17 @@ export function useSignIn() {
   const navigate = useNavigate();
   const { t } = useTranslation();
   const language = currentSiteLanguage();
+  const rawAuthorizationRequest = useQueryParam('authorization_request');
+  const authorizationRequest = isAuthorizationRequestHandle(rawAuthorizationRequest)
+    ? rawAuthorizationRequest
+    : undefined;
+  const invalidAuthorizationRequest =
+    rawAuthorizationRequest !== undefined && authorizationRequest === undefined;
   const [submitErrorKind, setSubmitErrorKind] = useState<SignInSubmitErrorKind | null>(null);
   const [dashboardHandoffPending, setDashboardHandoffPending] = useState(false);
+  const [authorizationRequestError, setAuthorizationRequestError] = useState(
+    invalidAuthorizationRequest,
+  );
   const signInSchema = useMemo(
     () =>
       createSignInSchema({
@@ -89,7 +100,17 @@ export function useSignIn() {
       }),
     onSuccess: async (data) => {
       if (data?.sessionEstablished) {
+        if (invalidAuthorizationRequest) {
+          setAuthorizationRequestError(true);
+          return;
+        }
+
         setDashboardHandoffPending(true);
+        if (authorizationRequest) {
+          await completePostSignInPkceFlow(authorizationRequest);
+          return;
+        }
+
         try {
           const completed = await completePostSignInPkceFlow();
           if (completed) {
@@ -131,6 +152,7 @@ export function useSignIn() {
 
   async function submit(values: SignInFormValues) {
     setDashboardHandoffPending(false);
+    setAuthorizationRequestError(invalidAuthorizationRequest);
     setSubmitErrorKind(null);
     form.clearErrors();
     await mutation.mutateAsync(values).catch(() => undefined);
@@ -141,6 +163,7 @@ export function useSignIn() {
     loading: mutation.isPending || dashboardHandoffPending,
     submit,
     submitError: submitErrorKind ? getSignInFormErrorMessage(submitErrorKind, t) : null,
+    authorizationRequestError,
     verificationEmail:
       submitErrorKind === 'verification_required' ? form.getValues('email').trim() : null,
     rateLimited: submitErrorKind === 'rate_limited',

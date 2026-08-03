@@ -101,7 +101,6 @@ public sealed class BusinessObjectRecord : AggregateRoot<BusinessObjectRecordId>
     public Result SaveDraft(
         int expectedRevision,
         IReadOnlyDictionary<string, IReadOnlyList<string>> values,
-        string payloadHash,
         Guid updatedByUserId,
         DateTime updatedAt)
     {
@@ -111,15 +110,11 @@ public sealed class BusinessObjectRecord : AggregateRoot<BusinessObjectRecordId>
             return Result.Failure(ErrorCodes.Conflict, "The record has changed.");
         if (updatedByUserId == Guid.Empty)
             return Result.Failure(ErrorCodes.InvalidInput, "Updating user is required.");
-        if (string.IsNullOrWhiteSpace(payloadHash))
-            return Result.Failure(ErrorCodes.InvalidInput, "A payload hash is required.");
-
         Result<IReadOnlyDictionary<string, IReadOnlyList<string>>> canonicalValues = CanonicalizeValues(values);
         if (canonicalValues.IsFailure)
             return Result.Failure(ErrorCodes.InvalidInput, canonicalValues.Error);
 
         _values = CloneValues(canonicalValues.Value);
-        PayloadHash = payloadHash;
         Revision += 1;
         UpdatedByUserId = updatedByUserId;
         UpdatedAt = updatedAt;
@@ -128,6 +123,7 @@ public sealed class BusinessObjectRecord : AggregateRoot<BusinessObjectRecordId>
 
     public Result Submit(
         int expectedRevision,
+        IReadOnlyDictionary<string, IReadOnlyList<string>> values,
         IReadOnlyList<BusinessObjectRecordRuleEvaluation> evaluations,
         Guid submittedByUserId,
         DateTime submittedAt)
@@ -138,9 +134,16 @@ public sealed class BusinessObjectRecord : AggregateRoot<BusinessObjectRecordId>
             return Result.Failure(ErrorCodes.Conflict, "The record has changed.");
         if (submittedByUserId == Guid.Empty)
             return Result.Failure(ErrorCodes.InvalidInput, "Submitting user is required.");
+        if (values is null)
+            return Result.Failure(ErrorCodes.InvalidInput, "Record values are required.");
         if (evaluations is null)
             return Result.Failure(ErrorCodes.InvalidInput, "Rule evaluation evidence is required.");
 
+        Result<IReadOnlyDictionary<string, IReadOnlyList<string>>> canonicalValues = CanonicalizeValues(values);
+        if (canonicalValues.IsFailure)
+            return Result.Failure(ErrorCodes.InvalidInput, canonicalValues.Error);
+
+        _values = CloneValues(canonicalValues.Value);
         _ruleEvaluations = evaluations.ToList();
         Status = BusinessObjectRecordStatus.Submitted;
         Revision += 1;
@@ -163,11 +166,11 @@ public sealed class BusinessObjectRecord : AggregateRoot<BusinessObjectRecordId>
             string normalizedKey = key?.Trim() ?? string.Empty;
             if (normalizedKey.Length == 0 || normalizedKey.Length > 63)
                 return Result.Failure<IReadOnlyDictionary<string, IReadOnlyList<string>>>("Record field keys are invalid.");
-            if (fieldValues is null || fieldValues.Count > 100)
+            if (fieldValues is null || fieldValues.Count > 100 || fieldValues.Any(value => value is null))
                 return Result.Failure<IReadOnlyDictionary<string, IReadOnlyList<string>>>("Record field values are invalid.");
             if (!canonical.TryAdd(
                     normalizedKey,
-                    fieldValues.Select(value => value ?? string.Empty).ToArray()))
+                    fieldValues.ToArray()))
             {
                 return Result.Failure<IReadOnlyDictionary<string, IReadOnlyList<string>>>("Record field keys must be unique.");
             }

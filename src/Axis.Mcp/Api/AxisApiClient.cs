@@ -79,11 +79,18 @@ public sealed class AxisApiClient(
     {
         string message = $"Axis API returned HTTP {(int)response.StatusCode} {response.StatusCode}.";
 
-        if (!string.IsNullOrWhiteSpace(responseBody) && responseBody.Length <= 1000)
+        string? problemCode = null;
+        string? problemType = null;
+        Dictionary<string, string[]> fieldErrors = new(StringComparer.Ordinal);
+
+        if (!string.IsNullOrWhiteSpace(responseBody) && responseBody.Length <= 64_000)
         {
             try
             {
                 using JsonDocument document = JsonDocument.Parse(responseBody);
+                JsonElement root = document.RootElement;
+                problemCode = ReadString(root, "code");
+                problemType = ReadString(root, "type");
                 string? title = document.RootElement.TryGetProperty("title", out JsonElement titleElement)
                     ? titleElement.GetString()
                     : null;
@@ -95,6 +102,9 @@ public sealed class AxisApiClient(
                     new[] { title, detail }.Where(value => !string.IsNullOrWhiteSpace(value)));
                 if (!string.IsNullOrWhiteSpace(description))
                     message = $"{message} {description}";
+
+                ReadStringArrays(root, "errors", fieldErrors);
+                ReadStringArrays(root, "errorCodes", fieldErrors);
             }
             catch (JsonException)
             {
@@ -102,6 +112,40 @@ public sealed class AxisApiClient(
             }
         }
 
-        return new AxisApiException((int)response.StatusCode, message);
+        return new AxisApiException(
+            (int)response.StatusCode,
+            message,
+            problemCode,
+            problemType,
+            fieldErrors);
+    }
+
+    private static string? ReadString(JsonElement root, string propertyName) =>
+        root.TryGetProperty(propertyName, out JsonElement property) && property.ValueKind == JsonValueKind.String
+            ? property.GetString()
+            : null;
+
+    private static void ReadStringArrays(
+        JsonElement root,
+        string propertyName,
+        IDictionary<string, string[]> destination)
+    {
+        if (!root.TryGetProperty(propertyName, out JsonElement property) || property.ValueKind != JsonValueKind.Object)
+            return;
+
+        foreach (JsonProperty item in property.EnumerateObject())
+        {
+            if (item.Value.ValueKind != JsonValueKind.Array)
+                continue;
+
+            string[] values = item.Value.EnumerateArray()
+                .Where(value => value.ValueKind == JsonValueKind.String)
+                .Select(value => value.GetString() ?? string.Empty)
+                .Where(value => value.Length > 0)
+                .Take(20)
+                .ToArray();
+            if (values.Length > 0)
+                destination[item.Name] = values;
+        }
     }
 }

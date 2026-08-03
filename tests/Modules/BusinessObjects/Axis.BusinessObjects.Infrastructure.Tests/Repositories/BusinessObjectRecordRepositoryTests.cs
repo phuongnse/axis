@@ -38,6 +38,7 @@ public sealed class BusinessObjectRecordRepositoryTests(BusinessObjectsDatabaseF
         BusinessObjectRecord record = CreateRecord(workspaceId, userId, objectKey, "record-1");
         record.Submit(
             expectedRevision: 1,
+            values: record.Values,
             [new(
                 "applicant_name",
                 Guid.NewGuid(),

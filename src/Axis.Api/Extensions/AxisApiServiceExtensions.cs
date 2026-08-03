@@ -19,6 +19,7 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.OpenApi.Models;
 using OpenIddict.Validation.AspNetCore;
 using Serilog;
@@ -117,7 +118,12 @@ internal static class AxisApiServiceExtensions
 
                 opts.UseAspNetCore()
                     .EnableAuthorizationEndpointPassthrough()
-                    .EnableTokenEndpointPassthrough();
+                    .EnableTokenEndpointPassthrough()
+                    .EnableAuthorizationRequestCaching()
+                    .SetAuthorizationRequestCachingPolicy(new DistributedCacheEntryOptions
+                    {
+                        AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(5),
+                    });
             })
             .AddValidation(opts =>
             {
@@ -222,10 +228,12 @@ internal static class AxisApiServiceExtensions
         this IServiceCollection services,
         IConfiguration configuration)
     {
+        string connectionString = configuration["Redis:ConnectionString"]
+            ?? throw new InvalidOperationException("Redis:ConnectionString is required");
+
         services.AddSingleton<IConnectionMultiplexer>(_ =>
-            ConnectionMultiplexer.Connect(
-                configuration["Redis:ConnectionString"]
-                    ?? throw new InvalidOperationException("Redis:ConnectionString is required")));
+            ConnectionMultiplexer.Connect(connectionString));
+        services.AddStackExchangeRedisCache(options => options.Configuration = connectionString);
     }
 
     private static void AddAxisRequestContext(this IServiceCollection services)

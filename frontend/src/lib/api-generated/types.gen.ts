@@ -54,10 +54,10 @@ export type BusinessObjectDefinitionListItemDto = {
 };
 
 export type BusinessObjectDefinitionListItemDtoPagedResult = {
-    items?: Array<BusinessObjectDefinitionListItemDto>;
-    totalCount?: number;
-    page?: number;
-    pageSize?: number;
+    items: Array<BusinessObjectDefinitionListItemDto>;
+    totalCount: number;
+    page: number;
+    pageSize: number;
 };
 
 export type BusinessObjectDefinitionStatus = 'Unpublished' | 'Published';
@@ -137,73 +137,73 @@ export type BusinessObjectFieldRuleInput = {
 export type BusinessObjectFieldType = 'Text' | 'Integer' | 'Decimal' | 'Date' | 'DateTime' | 'Boolean' | 'Choice';
 
 export type BusinessObjectRecordDetailDto = {
-    id?: string;
-    workspaceId?: string;
-    objectKey?: string;
-    definitionVersion?: number;
-    definitionVersionId?: string;
-    status?: BusinessObjectRecordStatus;
-    revision?: number;
-    values?: {
+    id: string;
+    workspaceId: string;
+    objectKey: string;
+    definitionVersion: number;
+    definitionVersionId: string;
+    status: BusinessObjectRecordStatus;
+    revision: number;
+    values: {
         [key: string]: Array<string>;
     };
-    fields?: Array<BusinessObjectRecordFieldContractDto>;
-    ruleEvaluations?: Array<BusinessObjectRecordRuleEvaluationDto>;
-    createdByUserId?: string;
-    createdAt?: string;
-    updatedByUserId?: string;
-    updatedAt?: string;
+    fields: Array<BusinessObjectRecordFieldContractDto>;
+    ruleEvaluations: Array<BusinessObjectRecordRuleEvaluationDto>;
+    createdByUserId: string;
+    createdAt: string;
+    updatedByUserId: string;
+    updatedAt: string;
     submittedByUserId?: string | null;
     submittedAt?: string | null;
 };
 
 export type BusinessObjectRecordFieldContractDto = {
-    fieldKey?: string;
-    label?: string;
-    order?: number;
-    fieldType?: BusinessObjectFieldType;
+    fieldKey: string;
+    label: string;
+    order: number;
+    fieldType: BusinessObjectFieldType;
     choiceConfiguration?: BusinessObjectDefinitionVersionChoiceFieldConfigurationDto;
-    rules?: Array<BusinessObjectDefinitionVersionFieldRuleDto>;
+    rules: Array<BusinessObjectDefinitionVersionFieldRuleDto>;
 };
 
 export type BusinessObjectRecordListItemDto = {
-    id?: string;
-    objectKey?: string;
-    definitionVersion?: number;
-    status?: BusinessObjectRecordStatus;
-    revision?: number;
-    updatedAt?: string;
+    id: string;
+    objectKey: string;
+    definitionVersion: number;
+    status: BusinessObjectRecordStatus;
+    revision: number;
+    updatedAt: string;
     submittedAt?: string | null;
 };
 
 export type BusinessObjectRecordListItemDtoPagedResult = {
-    items?: Array<BusinessObjectRecordListItemDto>;
-    totalCount?: number;
-    page?: number;
-    pageSize?: number;
+    items: Array<BusinessObjectRecordListItemDto>;
+    totalCount: number;
+    page: number;
+    pageSize: number;
 };
 
 export type BusinessObjectRecordRuleDiagnosticDto = {
-    nodeId?: string;
-    isMatch?: boolean;
+    nodeId: string;
+    isMatch: boolean;
 };
 
 export type BusinessObjectRecordRuleEvaluationDto = {
-    fieldKey?: string;
-    bindingId?: string;
-    bindingRevision?: number;
-    definitionKey?: string;
-    definitionVersion?: number;
-    isMatch?: boolean;
-    diagnostics?: Array<BusinessObjectRecordRuleDiagnosticDto>;
+    fieldKey: string;
+    bindingId: string;
+    bindingRevision: number;
+    definitionKey: string;
+    definitionVersion: number;
+    isMatch: boolean;
+    diagnostics: Array<BusinessObjectRecordRuleDiagnosticDto>;
 };
 
 export type BusinessObjectRecordStatus = 'Draft' | 'Submitted';
 
 export type BusinessObjectRecordSubmitResultDto = {
-    isSubmitted?: boolean;
-    record?: BusinessObjectRecordDetailDto;
-    ruleEvaluations?: Array<BusinessObjectRecordRuleEvaluationDto>;
+    isSubmitted: boolean;
+    record: BusinessObjectRecordDetailDto;
+    ruleEvaluations: Array<BusinessObjectRecordRuleEvaluationDto>;
 };
 
 export type CreateBusinessObjectDefinitionRequest = {
@@ -211,7 +211,7 @@ export type CreateBusinessObjectDefinitionRequest = {
 };
 
 export type CreateBusinessObjectRecordRequest = {
-    idempotencyKey?: string;
+    idempotencyKey: string;
     values?: {
         [key: string]: Array<string>;
     } | null;
@@ -408,10 +408,10 @@ export type RuleDefinitionSummaryDto = {
 };
 
 export type RuleDefinitionSummaryDtoPagedResult = {
-    items?: Array<RuleDefinitionSummaryDto>;
-    totalCount?: number;
-    page?: number;
-    pageSize?: number;
+    items: Array<RuleDefinitionSummaryDto>;
+    totalCount: number;
+    page: number;
+    pageSize: number;
 };
 
 export type RuleDefinitionVersionDto = {
@@ -628,8 +628,8 @@ export type RuleValueTypeDefinitionDto = {
 };
 
 export type SaveBusinessObjectRecordRequest = {
-    expectedRevision?: number;
-    values?: {
+    expectedRevision: number;
+    values: {
         [key: string]: Array<string>;
     };
 };
@@ -687,7 +687,7 @@ export type SimulateRuleRequest = {
 };
 
 export type SubmitBusinessObjectRecordRequest = {
-    expectedRevision?: number;
+    expectedRevision: number;
 };
 
 export type ThemePreferenceDto = {
@@ -803,6 +803,10 @@ export type CreateBusinessObjectRecordErrors = {
      * Conflict
      */
     409: ProblemDetails;
+    /**
+     * Unprocessable Content
+     */
+    422: ProblemDetails;
 };
 
 export type CreateBusinessObjectRecordError = CreateBusinessObjectRecordErrors[keyof CreateBusinessObjectRecordErrors];
@@ -881,6 +885,10 @@ export type SaveBusinessObjectRecordErrors = {
      * Conflict
      */
     409: ProblemDetails;
+    /**
+     * Unprocessable Content
+     */
+    422: ProblemDetails;
 };
 
 export type SaveBusinessObjectRecordError = SaveBusinessObjectRecordErrors[keyof SaveBusinessObjectRecordErrors];

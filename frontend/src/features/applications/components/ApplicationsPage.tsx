@@ -34,13 +34,21 @@ export function ApplicationsPage() {
   const { openWindow } = useManagedWindowActions();
   const navigate = route.useNavigate();
   const search = route.useSearch();
+  const page = search.page;
+  const pageSize = search.pageSize;
   const [requestError, setRequestError] = useState<string | null>(null);
+  const [tableQuery, setTableQuery] = useState<DataTableQueryState>(() => ({
+    globalFilter: '',
+    filterExpression: createEmptyFilterExpression(),
+    sorting: [],
+    grouping: [],
+  }));
   const definitionQuery = useQuery({
     queryKey: [...applicationQueryKeys.definitions(), i18n.language],
     queryFn: findSampleApplicationDefinition,
   });
   const definition = definitionQuery.data;
-  const recordsQuery = useQuery(applicationRecordsQueryOptions(1, 20));
+  const recordsQuery = useQuery(applicationRecordsQueryOptions(page, pageSize));
   const records = recordsQuery.data?.items ?? [];
   const setupMutation = useMutation({
     mutationFn: provisionSampleApplication,
@@ -97,7 +105,10 @@ export function ApplicationsPage() {
         title: t('applications.editorTitle'),
       }),
     );
-    void navigate({ replace: true, search: {} });
+    void navigate({
+      replace: true,
+      search: (current) => ({ page: current.page, pageSize: current.pageSize }),
+    });
   }, [navigate, openWindow, search.recordId, t]);
 
   const tableDefinition = useMemo<DataTableDefinition<BusinessObjectRecordListItem>>(() => {
@@ -118,6 +129,23 @@ export function ApplicationsPage() {
             {shortId(row.original.id)}
           </Button>
         ),
+      },
+      {
+        id: 'object',
+        accessorKey: 'objectKey',
+        size: 240,
+        minSize: 180,
+        enableSorting: false,
+        meta: { label: t('applications.object') },
+        cell: ({ row }) => definition?.name ?? row.original.objectKey,
+      },
+      {
+        id: 'objectKey',
+        accessorKey: 'objectKey',
+        size: 220,
+        minSize: 160,
+        enableSorting: false,
+        meta: { label: t('applications.objectKey') },
       },
       {
         id: 'status',
@@ -157,20 +185,22 @@ export function ApplicationsPage() {
       },
     ];
 
-    const tableQuery: DataTableQueryState = {
-      globalFilter: '',
-      filterExpression: createEmptyFilterExpression(),
-      sorting: [],
-      grouping: [],
-    };
     return {
       ariaLabel: t('applications.listTitle'),
       source: {
         mode: 'page',
         data: records,
-        pagination: { pageIndex: 0, pageSize: recordsQuery.data?.pageSize ?? 20 },
+        pagination: { pageIndex: page - 1, pageSize: recordsQuery.data?.pageSize ?? pageSize },
         rowCount: recordsQuery.data?.totalCount ?? records.length,
-        onPaginationChange: () => undefined,
+        onPaginationChange: (pagination) => {
+          void navigate({
+            search: (current) => ({
+              ...current,
+              page: pagination.pageIndex + 1,
+              pageSize: pagination.pageSize,
+            }),
+          });
+        },
       },
       columns,
       messages: createDataTableMessages(t, {
@@ -183,7 +213,7 @@ export function ApplicationsPage() {
       }),
       getRowId: (record) => record.id ?? 'record',
       queryState: tableQuery,
-      onQueryStateChange: () => undefined,
+      onQueryStateChange: setTableQuery,
       globalSearch: false,
       grouping: false,
       columnControls: true,
@@ -206,15 +236,20 @@ export function ApplicationsPage() {
     };
   }, [
     createMutation,
+    definition?.name,
     definition?.status,
     i18n.language,
+    navigate,
     openRecord,
+    page,
+    pageSize,
     records,
     recordsQuery.data?.pageSize,
     recordsQuery.data?.totalCount,
     recordsQuery.isError,
     recordsQuery.isFetching,
     recordsQuery.refetch,
+    tableQuery,
     t,
   ]);
 

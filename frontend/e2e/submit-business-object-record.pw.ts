@@ -120,7 +120,7 @@ test.describe('submit business object record', () => {
     await signIn(page, email);
 
     await page.getByRole('link', { name: 'Applications', exact: true }).click();
-    await expect(page).toHaveURL(/\/applications$/);
+    await expect(page).toHaveURL(/\/applications(?:\?|$)/);
     await page.getByRole('button', { name: 'Set up workflow' }).click();
     await expect(page.getByRole('button', { name: 'New application' })).toBeVisible({
       timeout: 30_000,
@@ -141,7 +141,51 @@ test.describe('submit business object record', () => {
     await expect(dialog.getByText('Application submitted')).toBeVisible({ timeout: 30_000 });
     await expect(dialog.getByText('Submitted', { exact: true })).toBeVisible();
     await expect(dialog.getByLabel(/Applicant name/)).toBeDisabled();
-    await expect(dialog.getByText('Rule passed', { exact: true })).toHaveCount(3);
+    await expect(dialog.getByText('Rule passed', { exact: true })).toHaveCount(6);
+    expect(pageErrors).toEqual([]);
+  });
+
+  test('AT-009 user recovers from a rule mismatch before submitting', async ({
+    page,
+    request,
+  }) => {
+    test.skip(!maildevURL, 'Set E2E_MAILDEV_URL to run application verification.');
+
+    const pageErrors: string[] = [];
+    page.on('console', (message) => {
+      if (message.type() === 'error') pageErrors.push(message.text());
+    });
+    page.on('pageerror', (error) => pageErrors.push(error.message));
+
+    const email = uniqueEmail();
+    await createVerifiedUser(request, email);
+    await signIn(page, email);
+
+    await page.getByRole('link', { name: 'Applications', exact: true }).click();
+    await expect(page).toHaveURL(/\/applications(?:\?|$)/);
+    await page.getByRole('button', { name: 'Set up workflow' }).click();
+    await expect(page.getByRole('button', { name: 'New application' })).toBeVisible({
+      timeout: 30_000,
+    });
+
+    await page.getByRole('button', { name: 'New application' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Loan application' });
+    await expect(dialog).toBeVisible();
+    await dialog.getByLabel(/Applicant name/).fill('Ada Lovelace');
+    await dialog.getByLabel(/Contact email/).fill('ada@example.com');
+    await dialog.getByLabel(/Requested amount/).fill('50');
+    await dialog.getByLabel(/Purpose/).fill('Recoverable workflow demonstration');
+
+    await dialog.getByRole('button', { name: 'Submit application' }).click();
+    await expect(dialog.getByText('Some rules need attention')).toBeVisible({ timeout: 30_000 });
+    await expect(dialog.getByText('Needs attention', { exact: true })).toHaveCount(2);
+    await expect(dialog.getByLabel(/Requested amount/)).toBeEnabled();
+
+    await dialog.getByLabel(/Requested amount/).fill('12000');
+    await dialog.getByRole('button', { name: 'Submit application' }).click();
+    await expect(dialog.getByText('Application submitted')).toBeVisible({ timeout: 30_000 });
+    await expect(dialog.getByLabel(/Applicant name/)).toBeDisabled();
+    await expect(dialog.getByText('Rule passed', { exact: true })).toHaveCount(6);
     expect(pageErrors).toEqual([]);
   });
 });

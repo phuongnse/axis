@@ -26,6 +26,12 @@ Use this protocol whenever progress depends on state outside the repository or o
 4. **Separate evidence boundaries.** Unit/contract tests prove code and protocol behavior. A purpose-built protocol harness may diagnose or prove that protocol boundary, but it does not prove that the currently registered agent client has the current tool registry or usable authenticated session. Do not use stale registry state, indirect API calls, or a separate harness as a substitute for a required live-agent boundary.
 5. **Audit completion.** Build an acceptance-to-evidence matrix. Current source, focused tests, and any required runtime/read-back evidence must all be present; stale, missing, indirect, or blocked evidence remains `not run` or `blocked`. Only then may the owner mark the work complete.
 
+## Delegated review lifecycle
+
+Delegated review is asynchronous. A reviewer reported as `running` or `pending`, and a bounded wait that returns no result, means **review pending**, not review failure or a readiness verdict. Keep the reviewer alive, continue bounded waits, and close the review only after a final completed result or an explicit runtime failure.
+
+Review read-only means no intentional edits to tracked source, tests, contracts, migrations, documentation, Git state, or PR state. A reviewer may run build, test, format-check, and generation commands when they are part of the review; normal ignored build/test outputs and temporary files are allowed. If a command would modify a tracked artifact, the reviewer must stop and report that boundary instead of silently changing it.
+
 Use this compact handoff when asking the user:
 
 ```text

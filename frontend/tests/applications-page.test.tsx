@@ -115,7 +115,7 @@ describe('application workflow UI', () => {
     });
     expect(await screen.findByText('Application submitted')).toBeInTheDocument();
     expect(screen.getByLabelText(/Applicant name/)).toBeDisabled();
-    expect(screen.getByText('Rule passed')).toBeInTheDocument();
+    expect(screen.getAllByText('Rule passed')).toHaveLength(2);
   });
 
   it('keeps a rule mismatch in draft and lets the user correct it', async () => {
@@ -129,14 +129,13 @@ describe('application workflow UI', () => {
       values: { applicant_name: [''] },
       revision: 1,
       status: 'Draft',
-      ruleEvaluations: [
-        {
-          ...matchedEvaluation(),
-          isMatch: false,
-          diagnostics: [{ nodeId: 'required', isMatch: false }],
-        },
-      ],
+      ruleEvaluations: [],
     });
+    const mismatchEvaluation: BusinessObjectRecordRuleEvaluation = {
+      ...matchedEvaluation(),
+      isMatch: false,
+      diagnostics: [{ nodeId: 'required', isMatch: false }],
+    };
 
     vi.mocked(fetch).mockImplementation(async (input, init) => {
       const path = requestPath(input);
@@ -148,7 +147,7 @@ describe('application workflow UI', () => {
         return jsonResponse({
           isSubmitted: false,
           record: mismatch,
-          ruleEvaluations: mismatch.ruleEvaluations,
+          ruleEvaluations: [mismatchEvaluation],
         });
       }
       throw new Error(`Unexpected ${method} ${path}`);
@@ -164,7 +163,8 @@ describe('application workflow UI', () => {
     await user.click(screen.getByRole('button', { name: 'Submit application' }));
 
     expect(await screen.findByText('Some rules need attention')).toBeInTheDocument();
-    expect(screen.getByText('Needs attention')).toBeInTheDocument();
+    expect(screen.getAllByText('Needs attention')).toHaveLength(2);
+    expect(screen.getByText('required: not matched')).toBeInTheDocument();
     expect(screen.getByLabelText(/Applicant name/)).not.toBeDisabled();
   });
 });

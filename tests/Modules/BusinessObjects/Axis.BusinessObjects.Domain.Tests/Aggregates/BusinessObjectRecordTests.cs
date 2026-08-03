@@ -37,14 +37,13 @@ public sealed class BusinessObjectRecordTests
                 ["applicant_name"] = ["Grace Hopper"],
                 ["requested_amount"] = ["12000"],
             },
-            payloadHash: "hash-2",
             updatedByUserId: OtherUserId,
             updatedAt: Now.AddMinutes(1));
 
         result.IsSuccess.Should().BeTrue();
         record.Revision.Should().Be(2);
         record.UpdatedByUserId.Should().Be(OtherUserId);
-        record.PayloadHash.Should().Be("hash-2");
+        record.PayloadHash.Should().Be("hash-1");
         record.Values["applicant_name"].Should().Equal("Grace Hopper");
     }
 
@@ -60,7 +59,6 @@ public sealed class BusinessObjectRecordTests
             {
                 ["applicant_name"] = ["Grace Hopper"],
             },
-            payloadHash: "hash-stale",
             updatedByUserId: OtherUserId,
             updatedAt: Now.AddMinutes(1));
 
@@ -78,6 +76,7 @@ public sealed class BusinessObjectRecordTests
 
         Result submit = record.Submit(
             expectedRevision: 1,
+            values: record.Values,
             evaluations:
             [
                 new(
@@ -102,7 +101,6 @@ public sealed class BusinessObjectRecordTests
         Result saveAfterSubmit = record.SaveDraft(
             expectedRevision: 2,
             values: record.Values,
-            payloadHash: "hash-3",
             updatedByUserId: OtherUserId,
             updatedAt: Now.AddMinutes(3));
 

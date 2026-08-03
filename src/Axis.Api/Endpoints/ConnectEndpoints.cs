@@ -7,6 +7,7 @@ using Microsoft.AspNetCore;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.WebUtilities;
 using OpenIddict.Abstractions;
 using OpenIddict.Server.AspNetCore;
 using static OpenIddict.Abstractions.OpenIddictConstants;
@@ -35,7 +36,7 @@ public static class ConnectEndpoints
         return app;
     }
 
-    private static async Task<IResult> Authorize(HttpContext httpContext)
+    private static async Task<IResult> Authorize(HttpContext httpContext, IConfiguration configuration)
     {
         OpenIddictRequest? request = httpContext.GetOpenIddictServerRequest()
             ?? throw new InvalidOperationException("OpenIddict server request not found.");
@@ -58,7 +59,16 @@ public static class ConnectEndpoints
                     [OpenIddictServerAspNetCoreDefaults.AuthenticationScheme]);
             }
 
-            return Results.Unauthorized();
+            string? requestUri = httpContext.Request.Query["request_uri"].FirstOrDefault()
+                ?? request.RequestUri;
+            if (string.IsNullOrWhiteSpace(requestUri))
+            {
+                return Results.Problem(
+                    detail: "The authorization request could not be resumed.",
+                    statusCode: StatusCodes.Status400BadRequest);
+            }
+
+            return Results.Redirect(BuildSignInRedirectUri(configuration, requestUri));
         }
 
         ClaimsPrincipal cookiePrincipal = cookieResult.Principal!;
@@ -69,6 +79,21 @@ public static class ConnectEndpoints
             openIddictPrincipal,
             properties: null,
             OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
+    }
+
+    private static string BuildSignInRedirectUri(IConfiguration configuration, string requestUri)
+    {
+        string baseUrl = configuration["App:BaseUrl"]
+            ?? throw new InvalidOperationException("App:BaseUrl is required for browser authorization.");
+        if (!Uri.TryCreate(baseUrl, UriKind.Absolute, out Uri? baseUri) ||
+            baseUri.Scheme != Uri.UriSchemeHttps ||
+            !string.IsNullOrEmpty(baseUri.UserInfo))
+        {
+            throw new InvalidOperationException("App:BaseUrl must be an absolute HTTPS URL without credentials.");
+        }
+
+        Uri signInUri = new(baseUri, "/sign-in");
+        return QueryHelpers.AddQueryString(signInUri.ToString(), "authorization_request", requestUri);
     }
 
     private static async Task<IResult> Token(

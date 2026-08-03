@@ -44,7 +44,12 @@ public sealed class SubmitBusinessObjectRecordHandler(
             return new BusinessObjectRecordSubmitResultDto(true, submitted, submitted.RuleEvaluations);
         }
 
-        Result validValues = BusinessObjectRecordValueValidator.Validate(definition, record.Values);
+        if (command.ExpectedRevision != record.Revision)
+            return BusinessObjectRecordFailures.Conflict<BusinessObjectRecordSubmitResultDto>(
+                "The record has changed.");
+
+        Result<IReadOnlyDictionary<string, IReadOnlyList<string>>> validValues =
+            BusinessObjectRecordValueValidator.ValidateAndCanonicalize(definition, record.Values);
         if (validValues.IsFailure)
             return validValues.ErrorCode == ErrorCodes.FieldValidation && validValues.FieldErrors is not null
                 ? BusinessObjectRecordFailures.Validation<BusinessObjectRecordSubmitResultDto>(validValues.FieldErrors)
@@ -53,7 +58,7 @@ public sealed class SubmitBusinessObjectRecordHandler(
         Result<IReadOnlyList<BusinessObjectRecordRuleEvaluation>> evaluations = await ruleEvaluator.EvaluateAsync(
             workspaceId,
             definition,
-            record.Values,
+            validValues.Value,
             cancellationToken);
         if (evaluations.IsFailure)
             return BusinessObjectRecordFailures.RuleExecutionFailed<BusinessObjectRecordSubmitResultDto>(
@@ -70,6 +75,7 @@ public sealed class SubmitBusinessObjectRecordHandler(
 
         Result submittedResult = record.Submit(
             command.ExpectedRevision,
+            validValues.Value,
             evaluations.Value,
             userId,
             DateTime.UtcNow);

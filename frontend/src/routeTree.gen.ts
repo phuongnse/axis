@@ -15,11 +15,11 @@ import { Route as CallbackRouteImport } from './routes/callback'
 import { Route as GuestRouteImport } from './routes/_guest'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as GuestSignInRouteImport } from './routes/_guest/sign-in'
 import { Route as AuthenticatedRulesRouteImport } from './routes/_authenticated/rules'
 import { Route as AuthenticatedBusinessObjectsRouteImport } from './routes/_authenticated/business-objects'
 import { Route as AuthenticatedApplicationsRouteImport } from './routes/_authenticated/applications'
 
-const GuestSignInLazyRouteImport = createFileRoute('/_guest/sign-in')()
 const GuestRegisterLazyRouteImport = createFileRoute('/_guest/register')()
 const AuthenticatedDashboardLazyRouteImport = createFileRoute(
   '/_authenticated/dashboard',
@@ -47,13 +47,6 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const GuestSignInLazyRoute = GuestSignInLazyRouteImport.update({
-  id: '/sign-in',
-  path: '/sign-in',
-  getParentRoute: () => GuestRoute,
-} as any).lazy(() =>
-  import('./routes/_guest/sign-in.lazy').then((d) => d.Route),
-)
 const GuestRegisterLazyRoute = GuestRegisterLazyRouteImport.update({
   id: '/register',
   path: '/register',
@@ -69,6 +62,13 @@ const AuthenticatedDashboardLazyRoute =
   } as any).lazy(() =>
     import('./routes/_authenticated/dashboard.lazy').then((d) => d.Route),
   )
+const GuestSignInRoute = GuestSignInRouteImport.update({
+  id: '/sign-in',
+  path: '/sign-in',
+  getParentRoute: () => GuestRoute,
+} as any).lazy(() =>
+  import('./routes/_guest/sign-in.lazy').then((d) => d.Route),
+)
 const AuthenticatedRulesRoute = AuthenticatedRulesRouteImport.update({
   id: '/rules',
   path: '/rules',
@@ -116,9 +116,9 @@ export interface FileRoutesByFullPath {
   '/applications': typeof AuthenticatedApplicationsRoute
   '/business-objects': typeof AuthenticatedBusinessObjectsRoute
   '/rules': typeof AuthenticatedRulesRoute
+  '/sign-in': typeof GuestSignInRoute
   '/dashboard': typeof AuthenticatedDashboardLazyRoute
   '/register': typeof GuestRegisterLazyRoute
-  '/sign-in': typeof GuestSignInLazyRoute
   '/auth/verify': typeof GuestAuthVerifyLazyRoute
   '/register/confirmation': typeof GuestRegisterConfirmationLazyRoute
 }
@@ -128,9 +128,9 @@ export interface FileRoutesByTo {
   '/applications': typeof AuthenticatedApplicationsRoute
   '/business-objects': typeof AuthenticatedBusinessObjectsRoute
   '/rules': typeof AuthenticatedRulesRoute
+  '/sign-in': typeof GuestSignInRoute
   '/dashboard': typeof AuthenticatedDashboardLazyRoute
   '/register': typeof GuestRegisterLazyRoute
-  '/sign-in': typeof GuestSignInLazyRoute
   '/auth/verify': typeof GuestAuthVerifyLazyRoute
   '/register/confirmation': typeof GuestRegisterConfirmationLazyRoute
 }
@@ -143,9 +143,9 @@ export interface FileRoutesById {
   '/_authenticated/applications': typeof AuthenticatedApplicationsRoute
   '/_authenticated/business-objects': typeof AuthenticatedBusinessObjectsRoute
   '/_authenticated/rules': typeof AuthenticatedRulesRoute
+  '/_guest/sign-in': typeof GuestSignInRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardLazyRoute
   '/_guest/register': typeof GuestRegisterLazyRoute
-  '/_guest/sign-in': typeof GuestSignInLazyRoute
   '/_guest/auth/verify': typeof GuestAuthVerifyLazyRoute
   '/_guest/register_/confirmation': typeof GuestRegisterConfirmationLazyRoute
 }
@@ -157,9 +157,9 @@ export interface FileRouteTypes {
     | '/applications'
     | '/business-objects'
     | '/rules'
+    | '/sign-in'
     | '/dashboard'
     | '/register'
-    | '/sign-in'
     | '/auth/verify'
     | '/register/confirmation'
   fileRoutesByTo: FileRoutesByTo
@@ -169,9 +169,9 @@ export interface FileRouteTypes {
     | '/applications'
     | '/business-objects'
     | '/rules'
+    | '/sign-in'
     | '/dashboard'
     | '/register'
-    | '/sign-in'
     | '/auth/verify'
     | '/register/confirmation'
   id:
@@ -183,9 +183,9 @@ export interface FileRouteTypes {
     | '/_authenticated/applications'
     | '/_authenticated/business-objects'
     | '/_authenticated/rules'
+    | '/_guest/sign-in'
     | '/_authenticated/dashboard'
     | '/_guest/register'
-    | '/_guest/sign-in'
     | '/_guest/auth/verify'
     | '/_guest/register_/confirmation'
   fileRoutesById: FileRoutesById
@@ -227,13 +227,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/_guest/sign-in': {
-      id: '/_guest/sign-in'
-      path: '/sign-in'
-      fullPath: '/sign-in'
-      preLoaderRoute: typeof GuestSignInLazyRouteImport
-      parentRoute: typeof GuestRoute
-    }
     '/_guest/register': {
       id: '/_guest/register'
       path: '/register'
@@ -247,6 +240,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/dashboard'
       preLoaderRoute: typeof AuthenticatedDashboardLazyRouteImport
       parentRoute: typeof AuthenticatedRoute
+    }
+    '/_guest/sign-in': {
+      id: '/_guest/sign-in'
+      path: '/sign-in'
+      fullPath: '/sign-in'
+      preLoaderRoute: typeof GuestSignInRouteImport
+      parentRoute: typeof GuestRoute
     }
     '/_authenticated/rules': {
       id: '/_authenticated/rules'
@@ -305,15 +305,15 @@ const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
 )
 
 interface GuestRouteChildren {
+  GuestSignInRoute: typeof GuestSignInRoute
   GuestRegisterLazyRoute: typeof GuestRegisterLazyRoute
-  GuestSignInLazyRoute: typeof GuestSignInLazyRoute
   GuestAuthVerifyLazyRoute: typeof GuestAuthVerifyLazyRoute
   GuestRegisterConfirmationLazyRoute: typeof GuestRegisterConfirmationLazyRoute
 }
 
 const GuestRouteChildren: GuestRouteChildren = {
+  GuestSignInRoute: GuestSignInRoute,
   GuestRegisterLazyRoute: GuestRegisterLazyRoute,
-  GuestSignInLazyRoute: GuestSignInLazyRoute,
   GuestAuthVerifyLazyRoute: GuestAuthVerifyLazyRoute,
   GuestRegisterConfirmationLazyRoute: GuestRegisterConfirmationLazyRoute,
 }

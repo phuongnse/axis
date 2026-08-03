@@ -37,6 +37,7 @@ public static class BusinessObjectRecordEndpoints
             .ProducesProblem(403)
             .ProducesProblem(404)
             .ProducesProblem(409)
+            .ProducesProblem(422)
             .ProducesValidationProblem();
 
         group.MapGet("/{recordId:guid}", Get)
@@ -56,6 +57,7 @@ public static class BusinessObjectRecordEndpoints
             .ProducesProblem(403)
             .ProducesProblem(404)
             .ProducesProblem(409)
+            .ProducesProblem(422)
             .ProducesValidationProblem();
 
         group.MapPost("/{recordId:guid}/submit", Submit)

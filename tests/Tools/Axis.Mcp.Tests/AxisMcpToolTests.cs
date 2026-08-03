@@ -186,6 +186,27 @@ public sealed class AxisMcpToolTests
         Assert.Equal(["first-token", "second-token"], handler.AuthorizationTokens);
     }
 
+    [Fact]
+    public async Task ApiClient_WhenApiReturnsProblemDetails_PreservesStableCodeAndFieldErrors()
+    {
+        using HttpClient httpClient = new(new ProblemHandler())
+        {
+            BaseAddress = new Uri("https://localhost:5281/"),
+        };
+        AxisApiClient api = new(httpClient, new FixedAccessTokenProvider("test-token"));
+
+        AxisApiException exception = await Assert.ThrowsAsync<AxisApiException>(
+            () => api.PutJsonAsync(
+                "api/business-object-records/11111111-1111-1111-1111-111111111111",
+                new { expectedRevision = 1, values = new { amount = new[] { "invalid" } } },
+                TestContext.Current.CancellationToken));
+
+        Assert.Equal(422, exception.StatusCode);
+        Assert.Equal("businessObjects.recordInvalid", exception.ProblemCode);
+        Assert.Equal("urn:axis:problem:businessObjects.recordInvalid", exception.ProblemType);
+        Assert.Equal(["businessObjects.amountInvalid"], exception.FieldErrors["amount"]);
+    }
+
     private sealed class FixedAccessTokenProvider(string token) : IAxisAccessTokenProvider
     {
         public Task<string> GetAccessTokenAsync(CancellationToken cancellationToken) => Task.FromResult(token);
@@ -254,5 +275,18 @@ public sealed class AxisMcpToolTests
                         Content = new StringContent("{\"ok\":true}"),
                     });
         }
+    }
+
+    private sealed class ProblemHandler : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(
+                new HttpResponseMessage(HttpStatusCode.UnprocessableEntity)
+                {
+                    Content = new StringContent(
+                        "{\"type\":\"urn:axis:problem:businessObjects.recordInvalid\",\"title\":\"Validation failed\",\"detail\":\"Fix the values.\",\"code\":\"businessObjects.recordInvalid\",\"errors\":{\"amount\":[\"The value is invalid.\"]},\"errorCodes\":{\"amount\":[\"businessObjects.amountInvalid\"]}}"),
+                });
     }
 }

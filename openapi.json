@@ -175,6 +175,16 @@
                 }
               }
             }
+          },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -330,6 +340,16 @@
           },
           "409": {
             "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Content",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -2646,6 +2666,12 @@
         "additionalProperties": false
       },
       "BusinessObjectDefinitionListItemDtoPagedResult": {
+        "required": [
+          "items",
+          "page",
+          "pageSize",
+          "totalCount"
+        ],
         "type": "object",
         "properties": {
           "items": {
@@ -2921,6 +2947,22 @@
         "type": "string"
       },
       "BusinessObjectRecordDetailDto": {
+        "required": [
+          "createdAt",
+          "createdByUserId",
+          "definitionVersion",
+          "definitionVersionId",
+          "fields",
+          "id",
+          "objectKey",
+          "revision",
+          "ruleEvaluations",
+          "status",
+          "updatedAt",
+          "updatedByUserId",
+          "values",
+          "workspaceId"
+        ],
         "type": "object",
         "properties": {
           "id": {
@@ -2932,6 +2974,7 @@
             "format": "uuid"
           },
           "objectKey": {
+            "minLength": 1,
             "type": "string"
           },
           "definitionVersion": {
@@ -3000,12 +3043,21 @@
         "additionalProperties": false
       },
       "BusinessObjectRecordFieldContractDto": {
+        "required": [
+          "fieldKey",
+          "fieldType",
+          "label",
+          "order",
+          "rules"
+        ],
         "type": "object",
         "properties": {
           "fieldKey": {
+            "minLength": 1,
             "type": "string"
           },
           "label": {
+            "minLength": 1,
             "type": "string"
           },
           "order": {
@@ -3028,6 +3080,14 @@
         "additionalProperties": false
       },
       "BusinessObjectRecordListItemDto": {
+        "required": [
+          "definitionVersion",
+          "id",
+          "objectKey",
+          "revision",
+          "status",
+          "updatedAt"
+        ],
         "type": "object",
         "properties": {
           "id": {
@@ -3035,6 +3095,7 @@
             "format": "uuid"
           },
           "objectKey": {
+            "minLength": 1,
             "type": "string"
           },
           "definitionVersion": {
@@ -3061,6 +3122,12 @@
         "additionalProperties": false
       },
       "BusinessObjectRecordListItemDtoPagedResult": {
+        "required": [
+          "items",
+          "page",
+          "pageSize",
+          "totalCount"
+        ],
         "type": "object",
         "properties": {
           "items": {
@@ -3085,9 +3152,14 @@
         "additionalProperties": false
       },
       "BusinessObjectRecordRuleDiagnosticDto": {
+        "required": [
+          "isMatch",
+          "nodeId"
+        ],
         "type": "object",
         "properties": {
           "nodeId": {
+            "minLength": 1,
             "type": "string"
           },
           "isMatch": {
@@ -3097,9 +3169,19 @@
         "additionalProperties": false
       },
       "BusinessObjectRecordRuleEvaluationDto": {
+        "required": [
+          "bindingId",
+          "bindingRevision",
+          "definitionKey",
+          "definitionVersion",
+          "diagnostics",
+          "fieldKey",
+          "isMatch"
+        ],
         "type": "object",
         "properties": {
           "fieldKey": {
+            "minLength": 1,
             "type": "string"
           },
           "bindingId": {
@@ -3111,6 +3193,7 @@
             "format": "int32"
           },
           "definitionKey": {
+            "minLength": 1,
             "type": "string"
           },
           "definitionVersion": {
@@ -3137,6 +3220,11 @@
         "type": "string"
       },
       "BusinessObjectRecordSubmitResultDto": {
+        "required": [
+          "isSubmitted",
+          "record",
+          "ruleEvaluations"
+        ],
         "type": "object",
         "properties": {
           "isSubmitted": {
@@ -3164,9 +3252,13 @@
         "additionalProperties": false
       },
       "CreateBusinessObjectRecordRequest": {
+        "required": [
+          "idempotencyKey"
+        ],
         "type": "object",
         "properties": {
           "idempotencyKey": {
+            "minLength": 1,
             "type": "string"
           },
           "values": {
@@ -3728,6 +3820,12 @@
         "additionalProperties": false
       },
       "RuleDefinitionSummaryDtoPagedResult": {
+        "required": [
+          "items",
+          "page",
+          "pageSize",
+          "totalCount"
+        ],
         "type": "object",
         "properties": {
           "items": {
@@ -4444,6 +4542,10 @@
         "additionalProperties": false
       },
       "SaveBusinessObjectRecordRequest": {
+        "required": [
+          "expectedRevision",
+          "values"
+        ],
         "type": "object",
         "properties": {
           "expectedRevision": {
@@ -4611,6 +4713,9 @@
         "additionalProperties": false
       },
       "SubmitBusinessObjectRecordRequest": {
+        "required": [
+          "expectedRevision"
+        ],
         "type": "object",
         "properties": {
           "expectedRevision": {
