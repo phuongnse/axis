@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.StackExchangeRedis;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using OpenIddict.Abstractions;
 using StackExchange.Redis;
@@ -136,6 +137,8 @@ public sealed class ApiTestFixture : IAsyncLifetime
                 services.RemoveAll<IConnectionMultiplexer>();
                 services.AddSingleton<IConnectionMultiplexer>(_ =>
                     ConnectionMultiplexer.Connect(_redis.GetConnectionString()));
+                services.Configure<RedisCacheOptions>(options =>
+                    options.Configuration = _redis.GetConnectionString());
 
                 services.RemoveAll<IEmailSender>();
                 services.AddSingleton(_emailCapture);
