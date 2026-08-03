@@ -1413,7 +1413,7 @@ def check_project_orchestration() -> int:
 
 
 def is_project_orchestration_path(path: str) -> bool:
-    return path.startswith(".codex/")
+    return path == ".gitignore" or path.startswith(".codex/")
 
 
 def markdown_anchor_slug(text: str) -> str:

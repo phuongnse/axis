@@ -50,7 +50,6 @@ def config_issues() -> list[str]:
         expected_mcp = {
             "command": "python",
             "args": ["scripts/axis.py", "mcp", "serve"],
-            "cwd": "..",
         }
         if not isinstance(axis_mcp, dict):
             issues.append(".codex/config.toml: missing `[mcp_servers.axis]` table")
@@ -58,7 +57,16 @@ def config_issues() -> list[str]:
             for key, value in expected_mcp.items():
                 if axis_mcp.get(key) != value:
                     issues.append(f".codex/config.toml: `mcp_servers.axis.{key}` must be `{value}`")
+            if "cwd" in axis_mcp:
+                issues.append(".codex/config.toml: `mcp_servers.axis.cwd` must be omitted")
+            args = axis_mcp.get("args")
+            if not isinstance(args, list) or not args or not (ROOT / str(args[0])).is_file():
+                issues.append(".codex/config.toml: Axis MCP entrypoint must resolve from project root")
 
+    expected_agent_files = {f"{name}.toml" for name in AGENT_SPECS}
+    actual_agent_files = {path.name for path in (ROOT / ".codex" / "agents").glob("*.toml")}
+    for name in sorted(actual_agent_files - expected_agent_files):
+        issues.append(f".codex/agents/{name}: unexpected project agent role")
     for name, (model, effort, sandbox) in AGENT_SPECS.items():
         path = ROOT / ".codex" / "agents" / f"{name}.toml"
         agent = load(path)

@@ -10,5 +10,4 @@ default_subagent_reasoning_effort = "medium"
 [mcp_servers.axis]
 command = "python"
 args = ["scripts/axis.py", "mcp", "serve"]
-cwd = ".."
 startup_timeout_sec = 120

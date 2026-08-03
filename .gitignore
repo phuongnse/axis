@@ -6,7 +6,6 @@
 !.codex/config.toml
 !.codex/check.py
 !.codex/agents/
-!.codex/agents/*.toml
 
 # Build outputs
 bin/

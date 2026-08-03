@@ -2764,15 +2764,17 @@ class TestVerifyGate(unittest.TestCase):
         )
 
     def test_project_orchestration_change_runs_repo_skills_gate(self) -> None:
-        with (
-            mock.patch.object(axis, "verify_scope_paths", return_value=("working tree", [".codex/config.toml"])),
-            mock.patch.object(axis, "run_text_encoding_check", return_value=0),
-            mock.patch.object(axis, "check_repo_skills", return_value=0) as repo_skills,
-            contextlib.redirect_stdout(io.StringIO()),
-        ):
-            self.assertEqual(0, axis.verify(object()))
+        for path in (".codex/config.toml", ".gitignore"):
+            with self.subTest(path=path):
+                with (
+                    mock.patch.object(axis, "verify_scope_paths", return_value=("working tree", [path])),
+                    mock.patch.object(axis, "run_text_encoding_check", return_value=0),
+                    mock.patch.object(axis, "check_repo_skills", return_value=0) as repo_skills,
+                    contextlib.redirect_stdout(io.StringIO()),
+                ):
+                    self.assertEqual(0, axis.verify(object()))
 
-        repo_skills.assert_called_once_with()
+                repo_skills.assert_called_once_with()
 
 
 class TestReviewVerificationGates(unittest.TestCase):
