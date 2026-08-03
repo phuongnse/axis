@@ -32,7 +32,8 @@ public sealed class SaveUnpublishedBusinessObjectDefinitionHandler(
         Result<IReadOnlyList<BusinessObjectFieldDefinitionSpec>> fields = await inputPlanner.PlanAsync(
             workspaceId,
             command.Fields,
-            cancellationToken);
+            cancellationToken,
+            definition.Key);
         if (fields.IsFailure)
             return BusinessObjectDefinitionFailures.Invalid<BusinessObjectDefinitionDetailDto>(fields.Error);
 

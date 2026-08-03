@@ -16,6 +16,49 @@ Universal semantics for every repo skill. Intent routing lives in [README.md](./
 10. **Route durable guidance before edit.** The entry domain owner keeps spec, status, and evidence decisions. Other durable guidance **Requires** selecting `$axis-doc-hygiene` or entering it through a typed handoff before edit.
 11. **Compatibility is explicit.** Derive compatibility from the owning contract, real consumers/data, and current product phase. An approved pre-production clean cutover removes the old path completely; it does not preserve shims, dual contracts, feature flags, fallback parsing, or duplicate tests.
 
+## Agent routing
+
+Select the Axis workflow before selecting an agent. Skill ownership, Design Gate evidence, typed handoffs, acceptance criteria, and verification remain unchanged after delegation.
+
+Project-local agent configuration owns runtime-specific role and model selection. This contract owns only portable work-shape semantics; user-level tooling preferences are never a project dependency.
+
+| Work shape | Semantic role | Boundary |
+|---|---|---|
+| Primary orchestration, ambiguous or high-risk decisions, integration, routine checks, final verification | Primary orchestrator | Keep small, clear, single-path work on the primary |
+| Broad exploration or failure triage that materially benefits from parallel read-only work | Read-only scout | No edits; do not spawn only to run a routine check |
+| Bounded implementation with exact ACs, disjoint ownership, and known verification | Implementation worker or default delegate | One writer; return on ambiguity, scope growth, or owner decision |
+| Immutable checkpoint review, security, or high-risk architecture | Independent read-only reviewer | Follow the delegated review lifecycle |
+
+Delegate only when bounded independent work materially improves elapsed time or isolates noisy context. Every prompt names objective, scope, base or checkpoint, permissions, stop conditions, and final output contract. The primary integrates results and retains completion ownership.
+
+Delegation also assigns verification ownership. The primary owns routine verification and final evidence unless the prompt explicitly transfers one focused check. Run each check once per still-valid checkpoint, reuse its result across agents, and rerun only when later edits or a concrete finding invalidate it. Reviewers inspect the diff and existing evidence; they run only the smallest reproducer for a finding or evidence gap, never an already-passing routine suite.
+
+## Blocker and completion protocol
+
+Use this protocol whenever progress depends on state outside the repository or on a decision only the user can make. It is a process boundary, not a prompt to invent a workaround.
+
+1. **Classify the boundary.** Decide whether the evidence shows a repository defect, an external-state blocker, or a missing product decision. External-state blockers include sign-in/consent, an app-managed client reload or restart, a host dependency, sudo/permissions, certificate or trust-store state, approval, and destructive-action confirmation.
+2. **Reproduce safely.** Run the smallest permitted check, capture the exact command, exit status, error/output, and the boundary where it occurred. Read-only diagnosis may continue; state-changing work stops when it reaches user-controlled state.
+3. **No workaround: stop and ask.** An alternate executable, user-local installation or extraction, symlink/PATH change, temporary proxy/harness, raw REST call, or security-control bypass is still a workaround when it crosses the failed boundary. Do not run it or claim it as completion evidence without explicit user approval. Report `Blocker`, `Evidence`, `Boundary`, `User action or decision needed`, and `Safe next step after confirmation`; never silently install host packages, kill or replace app-managed processes, bypass authentication or TLS/sandbox controls, inject credentials or tokens, or mutate the database directly.
+4. **Separate evidence boundaries.** Unit/contract tests prove code and protocol behavior. A purpose-built protocol harness may diagnose or prove that protocol boundary, but it does not prove that the currently registered agent client has the current tool registry or usable authenticated session. Do not use stale registry state, indirect API calls, or a separate harness as a substitute for a required live-agent boundary.
+5. **Audit completion.** Build an acceptance-to-evidence matrix. Current source, focused tests, and any required runtime/read-back evidence must all be present; stale, missing, indirect, or blocked evidence remains `not run` or `blocked`. Only then may the owner mark the work complete.
+
+## Delegated review lifecycle
+
+Delegated review is asynchronous. A reviewer reported as `running` or `pending`, and a bounded wait that returns no result, means **review pending**, not review failure or a readiness verdict. Keep the reviewer alive, continue bounded waits, and close the review only after a final completed result or an explicit runtime failure.
+
+Review read-only means no intentional edits to tracked source, tests, contracts, migrations, documentation, Git state, or PR state. A reviewer reuses current parent evidence and may run only the smallest focused check needed to reproduce a finding or fill a missing or invalidated evidence gap; normal ignored outputs and temporary files are allowed. If a command would modify a tracked artifact, the reviewer must stop and report that boundary instead of silently changing it.
+
+Use this compact handoff when asking the user:
+
+```text
+Blocker: <what cannot proceed>
+Evidence: <exact command/error or observed state>
+Boundary: <host, client, account, permission, approval, or destructive action>
+User action or decision needed: <one concrete request>
+Safe next step after confirmation: <what will be run or changed>
+```
+
 ## Handoff types
 
 | Type | Meaning |

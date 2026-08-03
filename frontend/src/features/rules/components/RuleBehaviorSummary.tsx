@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { GitBranch, LogIn, LogOut, type LucideIcon } from 'lucide-react';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { MetadataTag } from '@/components/shared/MetadataTag';
 import {
   projectRuleCondition,
   type RuleDefinitionDetail,
@@ -44,26 +45,41 @@ export function RuleBehaviorSummary({
                 <dl className="space-y-2">
                   {inputs.map((input) => {
                     const inputLabel = input.label ?? t('rules.unknownInput');
-                    const typeLabel = (input.types ?? [])
-                      .map((type) => valueTypeLabel(languageQuery.data, type, i18n.language))
-                      .join(' · ');
+                    const acceptedTypes = (input.types ?? []).map((type) => ({
+                      type,
+                      label: valueTypeLabel(languageQuery.data, type, i18n.language),
+                    }));
                     const requirement = input.isRequired
-                      ? t('rules.inputRequired')
-                      : t('rules.inputOptional');
+                      ? t('rules.inputRequirementRequired')
+                      : t('rules.inputRequirementOptional');
                     return (
                       <div key={'key' in input ? (input.key ?? inputLabel) : inputLabel}>
-                        <dt className="text-sm font-medium text-foreground">{inputLabel}</dt>
-                        <dd className="mt-0.5 flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5 text-xs text-muted-foreground">
-                          <span>{typeLabel || t('rules.unknownValueType')}</span>
-                          <span aria-hidden="true">·</span>
-                          <span>{requirement}</span>
-                          {input.allowedValues?.length ? (
-                            <>
-                              <span aria-hidden="true">·</span>
-                              <span>
-                                {t('rules.allowedValues')}: {input.allowedValues.join(', ')}
+                        <dt className="flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
+                          <span className="text-sm font-medium text-foreground">{inputLabel}</span>
+                          <span className="text-xs text-muted-foreground" aria-hidden="true">
+                            ·
+                          </span>
+                          <span className="text-xs text-muted-foreground">{requirement}</span>
+                        </dt>
+                        <dd className="mt-1 space-y-1">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span className="text-xs text-muted-foreground">
+                              {t('rules.acceptedTypes')}
+                            </span>
+                            {acceptedTypes.length ? (
+                              acceptedTypes.map(({ type, label }) => (
+                                <MetadataTag key={type}>{label}</MetadataTag>
+                              ))
+                            ) : (
+                              <span className="text-xs text-muted-foreground">
+                                {t('rules.unknownValueType')}
                               </span>
-                            </>
+                            )}
+                          </div>
+                          {input.allowedValues?.length ? (
+                            <p className="text-xs text-muted-foreground">
+                              {t('rules.allowedValues')}: {input.allowedValues.join(', ')}
+                            </p>
                           ) : null}
                         </dd>
                       </div>

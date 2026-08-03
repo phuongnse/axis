@@ -42,6 +42,20 @@ function anyGroup(
   };
 }
 
+function notGroup(child: RuleExpressionDisplayNode): RuleExpressionDisplayNode {
+  return {
+    nodeId: `not-${child.nodeId}`,
+    tokens: [
+      {
+        text: 'This must not match',
+        referenceKind: 'LogicalOperator',
+        referenceKey: 'Not',
+      },
+    ],
+    children: [child],
+  };
+}
+
 describe('RuleExpressionView', () => {
   it('hides redundant All or Any grouping for a single condition', () => {
     const { container } = render(
@@ -71,33 +85,51 @@ describe('RuleExpressionView', () => {
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
   });
 
-  it('renders positive optional-bound assertions without diagram rails', () => {
+  it('preserves nested All, Any, and Not grouping semantics', () => {
     const { container } = render(
       <RuleExpressionView
         display={allGroup([
-          anyGroup(
-            [
-              predicate('minimum-absent', 'Minimum is not provided'),
-              predicate('minimum-satisfied', 'Value is greater than or equal to Minimum'),
-            ],
+          anyGroup([
+            predicate('first', 'Status is Draft'),
+            predicate('second', 'Status is Pending'),
+          ]),
+          notGroup(predicate('third', 'Status is Archived')),
+        ])}
+      />,
+    );
+
+    expect(screen.getByText('or')).toBeInTheDocument();
+    expect(screen.getByText('and')).toBeInTheDocument();
+    expect(screen.getByText('not')).toBeInTheDocument();
+    expect(container.querySelectorAll('[data-slot="rule-expression-operator"]')).toHaveLength(3);
+    expect(container.querySelector('[data-operator="All"]')).toBeInTheDocument();
+    expect(container.querySelector('[data-operator="Any"]')).toBeInTheDocument();
+    expect(container.querySelector('[data-operator="Not"]')).toBeInTheDocument();
+  });
+
+  it('renders optional-bound assertions as conditional expressions', () => {
+    const { container } = render(
+      <RuleExpressionView
+        display={allGroup([
+          predicate(
             'minimum-bound',
+            'Value is greater than or equal to Minimum when Minimum is specified',
           ),
-          anyGroup(
-            [
-              predicate('maximum-absent', 'Maximum is not provided'),
-              predicate('maximum-satisfied', 'Value is less than or equal to Maximum'),
-            ],
+          predicate(
             'maximum-bound',
+            'Value is less than or equal to Maximum when Maximum is specified',
           ),
         ])}
       />,
     );
 
-    expect(container.querySelectorAll('[data-slot="rule-expression-operator"]')).toHaveLength(3);
+    expect(container.querySelectorAll('[data-slot="rule-expression-operator"]')).toHaveLength(1);
     expect(screen.queryByText('not')).not.toBeInTheDocument();
-    expect(screen.getByText('Value is greater than or equal to Minimum')).toBeInTheDocument();
-    expect(screen.getByText('Value is less than or equal to Maximum')).toBeInTheDocument();
-    expect(container.querySelector('[data-slot="rule-condition-parallel-rail"]')).toBeNull();
-    expect(container.querySelector('[data-slot="rule-condition-serial-rail"]')).toBeNull();
+    expect(
+      screen.getByText('Value is greater than or equal to Minimum when Minimum is specified'),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('Value is less than or equal to Maximum when Maximum is specified'),
+    ).toBeInTheDocument();
   });
 });

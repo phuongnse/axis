@@ -9,6 +9,7 @@ using ContractLogicalOperator = Axis.Rules.Contracts.RuleLogicalOperator;
 using ContractOperandKind = Axis.Rules.Contracts.RuleOperandKind;
 using ContractPredicateOperator = Axis.Rules.Contracts.RulePredicateOperator;
 using ContractValueType = Axis.Rules.Contracts.RuleValueType;
+using DomainBindingFailureBehavior = Axis.Rules.Domain.RuleBindingFailureBehavior;
 using DomainExpressionCardinality = Axis.Rules.Domain.RuleExpressionCardinality;
 using DomainExpressionFunction = Axis.Rules.Domain.RuleExpressionFunction;
 using DomainLogicalOperator = Axis.Rules.Domain.RuleLogicalOperator;
@@ -76,6 +77,57 @@ internal static class RulePersistenceJson
             mappings.Add(key, mapping.Value);
         }
         return mappings;
+    }
+
+    public static string SerializeBindingRevisionHistory(IReadOnlyList<RuleBindingRevision> revisions)
+    {
+        BindingRevisionDto[] serialized = revisions
+            .OrderBy(revision => revision.Revision)
+            .Select(revision => new BindingRevisionDto(
+                revision.Revision,
+                revision.DefinitionKey.Value,
+                revision.DefinitionVersion,
+                revision.TargetType,
+                revision.TargetId,
+                revision.UseCaseOrTrigger,
+                JsonSerializer.Deserialize<Dictionary<string, RuleInputMappingDto>>(
+                    SerializeInputMappings(revision.InputMappings),
+                    Options) ?? new(StringComparer.Ordinal),
+                revision.Priority,
+                revision.Enabled,
+                (ContractRuleBindingFailureBehavior)revision.FailureBehavior,
+                revision.UpdatedByUserId,
+                revision.UpdatedAt))
+            .ToArray();
+        return JsonSerializer.Serialize(serialized, Options);
+    }
+
+    public static List<RuleBindingRevision> DeserializeBindingRevisionHistory(string json)
+    {
+        BindingRevisionDto[] revisions = JsonSerializer.Deserialize<BindingRevisionDto[]>(json, Options) ?? [];
+        List<RuleBindingRevision> result = [];
+        foreach (BindingRevisionDto revision in revisions.OrderBy(item => item.Revision))
+        {
+            Dictionary<string, RuleInputMapping> mappings = DeserializeInputMappings(
+                JsonSerializer.Serialize(revision.InputMappings, Options));
+            Result<RuleDefinitionKey> key = RuleDefinitionKey.Create(revision.DefinitionKey);
+            if (key.IsFailure)
+                throw new InvalidOperationException(key.Error);
+            result.Add(new RuleBindingRevision(
+                revision.Revision,
+                key.Value,
+                revision.DefinitionVersion,
+                revision.TargetType,
+                revision.TargetId,
+                revision.UseCaseOrTrigger,
+                mappings,
+                revision.Priority,
+                revision.Enabled,
+                (DomainBindingFailureBehavior)revision.FailureBehavior,
+                revision.UpdatedByUserId,
+                revision.UpdatedAt));
+        }
+        return result;
     }
 
     public static RuleOutputContract DeserializeOutput(string json)
@@ -213,4 +265,25 @@ internal static class RulePersistenceJson
 
         return RuleOperand.Function((DomainExpressionFunction)operand.Function.Value, arguments);
     }
+
+    private sealed record BindingRevisionDto(
+        int Revision,
+        string DefinitionKey,
+        int DefinitionVersion,
+        string TargetType,
+        string TargetId,
+        string UseCaseOrTrigger,
+        Dictionary<string, RuleInputMappingDto> InputMappings,
+        int Priority,
+        bool Enabled,
+        ContractRuleBindingFailureBehavior FailureBehavior,
+        Guid UpdatedByUserId,
+        DateTime UpdatedAt);
+
+    private enum ContractRuleBindingFailureBehavior
+    {
+        FailClosed = 0,
+        FailOpen = 1,
+    }
+
 }

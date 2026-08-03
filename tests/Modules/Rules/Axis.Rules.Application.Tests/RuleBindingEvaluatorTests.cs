@@ -91,6 +91,59 @@ public sealed class RuleBindingEvaluatorTests
     }
 
     [Fact]
+    public async Task EvaluateBinding_WhenCurrentBindingIsDisabled_UsesEnabledHistoricalRevision()
+    {
+        Guid workspaceId = Guid.NewGuid();
+        Guid userId = Guid.NewGuid();
+        RuleDefinitionKey key = RuleDefinitionKey.Create(RuleDefinitionKeys.Required).Value;
+        RuleBinding binding = Binding(workspaceId, key);
+        binding.Update(
+            expectedRevision: 1,
+            key,
+            1,
+            "invoice-line",
+            "line-42",
+            "invoice.validate",
+            new Dictionary<string, RuleInputMapping>
+            {
+                ["value"] = RuleInputMapping.FromContext("payload.description").Value,
+            },
+            priority: 0,
+            enabled: false,
+            DomainFailureBehavior.FailClosed,
+            userId,
+            DateTime.UtcNow).IsSuccess.Should().BeTrue();
+
+        IRuleBindingRepository repository = Substitute.For<IRuleBindingRepository>();
+        repository.GetByIdForWorkspaceAsync(binding.Id, workspaceId, Arg.Any<CancellationToken>())
+            .Returns(binding);
+        IRuleEvaluator evaluator = Substitute.For<IRuleEvaluator>();
+        evaluator.EvaluateAsync(Arg.Any<RuleEvaluationRequest>(), Arg.Any<CancellationToken>())
+            .Returns(new RuleEvaluationResult(
+                true,
+                [new RuleEvaluationItemDto(key.Value, 1, true, [])],
+                "historical-revision",
+                null,
+                null));
+
+        RuleBindingEvaluator sut = new(repository, evaluator);
+        RuleEvaluationResult result = await sut.EvaluateBindingAsync(
+            new RuleBindingEvaluationRequest(
+                workspaceId,
+                binding.Id.Value,
+                new RuleContext(new Dictionary<string, RuleContextValue>
+                {
+                    ["payload.description"] = new(ContractRuleValueType.Text, ["Approved"]),
+                }),
+                "historical-revision",
+                BindingRevision: 1),
+            TestContext.Current.CancellationToken);
+
+        result.IsSuccess.Should().BeTrue();
+        await evaluator.Received(1).EvaluateAsync(Arg.Any<RuleEvaluationRequest>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task EvaluateBinding_WhenRequiredMappedContextIsAbsent_ReturnsInputFailure()
     {
         Guid workspaceId = Guid.NewGuid();

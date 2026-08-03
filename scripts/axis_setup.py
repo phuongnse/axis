@@ -380,8 +380,6 @@ def setup_plan(
     steps = [f"detect supported platform ({platform_spec.label})", "validate Python 3 and Git prerequisites"]
     if normalized in {"local-dev", "review"}:
         steps.append("diagnose Docker Engine, Compose, and OpenSSL without changing OS services")
-    if normalized == "review":
-        steps.append("diagnose external CodeRabbit prerequisite without changing authentication")
     if install_user_tools:
         labels: list[str] = []
         external: list[str] = []

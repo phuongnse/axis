@@ -8,7 +8,8 @@ Repo skills are executable workflows. [reference.md](./reference.md) owns univer
 2. Read [reference.md](./reference.md) and the full owner skill before editing.
 3. Follow only handoffs explicitly typed as **Requires**, **Delegates**, or **Returns to**.
 4. Reuse current evidence; do not recurse into an already-satisfied prerequisite.
-5. Run repeatable repository workflows and verification through finite `python scripts/axis.py ...` routes; `$axis-script-scope` owns rare mutation exceptions.
+5. Apply [reference.md § Agent routing](./reference.md#agent-routing) after choosing the workflow owner; model choice does not change ownership or gates.
+6. Run repeatable repository workflows and verification through finite `python scripts/axis.py ...` routes; `$axis-script-scope` owns rare mutation exceptions.
 
 `$axis-*` aliases map to `.agents/skills/<name>/SKILL.md`.
 
@@ -22,6 +23,7 @@ Repo skills are executable workflows. [reference.md](./reference.md) owns univer
 | Decide module boundaries or foundational patterns | [axis-module-architecture/SKILL.md](./axis-module-architecture/SKILL.md) | Decides architecture; does not implement tactical patterns |
 | Implement adopted module patterns | [axis-module-patterns/SKILL.md](./axis-module-patterns/SKILL.md) | Implements only decisions required by current ACs or architecture |
 | Change REST/OpenAPI wire shape | [axis-api-contract/SKILL.md](./axis-api-contract/SKILL.md) | Owns contract shape, generation, and parity |
+| Change MCP tools, API coverage, auth boundary, or MCP maintenance workflow | [axis-mcp-integration/SKILL.md](./axis-mcp-integration/SKILL.md) | Owns typed MCP operation parity, mutation safety, and agent-facing process |
 | Design and implement a client journey | [axis-frontend-feature/SKILL.md](./axis-frontend-feature/SKILL.md) | Owns self-directed experience, route, state, form, recovery, and feature behavior |
 | Define shared SPA foundation contracts | [axis-frontend-foundation/SKILL.md](./axis-frontend-foundation/SKILL.md) | Owns product-neutral foundation specs, not product journeys |
 | Decide view composition or change UI-system source | [axis-ui-system/SKILL.md](./axis-ui-system/SKILL.md) | Owns hierarchy, semantic component choice, UI source boundaries, and safe replacement |

@@ -368,6 +368,19 @@ public sealed class BusinessObjectDefinitionEndpointTests(ApiTestFixture fixture
 
         Uri redirect = authorizeResponse.Headers.Location
             ?? throw new InvalidOperationException("Authorization response did not include a redirect.");
+        if (!redirect.IsAbsoluteUri)
+            redirect = new Uri(new Uri("https://localhost"), redirect);
+        if (redirect.AbsolutePath == "/connect/authorize")
+        {
+            authorizeResponse = await fixture.Client.GetAsync(
+                redirect.PathAndQuery,
+                TestContext.Current.CancellationToken);
+            authorizeResponse.StatusCode.Should().Be(HttpStatusCode.Redirect);
+            redirect = authorizeResponse.Headers.Location
+                ?? throw new InvalidOperationException("Authorization callback did not include a redirect.");
+            if (!redirect.IsAbsoluteUri)
+                redirect = new Uri(new Uri("https://localhost"), redirect);
+        }
         Dictionary<string, Microsoft.Extensions.Primitives.StringValues> callbackQuery =
             QueryHelpers.ParseQuery(redirect.Query);
         callbackQuery["state"].ToString().Should().Be(state);

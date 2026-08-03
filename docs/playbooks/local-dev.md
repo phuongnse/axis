@@ -6,7 +6,7 @@ Use `python scripts/axis.py local-dev ...` for local stack work. Do not document
 
 ## Prerequisites
 
-- Python 3 and Git; use `python3` on WSL/Linux or `py -3` on Windows when `python` is unavailable.
+- Python and Git from [scripts.md § Tool Versions](./scripts.md#tool-versions).
 - Docker Engine with Compose reachable from the shell running tests. Native Docker Engine inside WSL is supported; Docker Desktop is not required.
 - OpenSSL on PATH, or from Git for Windows, for local HTTPS certificates.
 - .NET SDK from [global.json](../../global.json) and Node from [frontend/.nvmrc](../../frontend/.nvmrc), either already available or installed user-locally by Axis.
@@ -36,6 +36,8 @@ Use `python scripts/axis.py local-dev up`; it waits for Compose healthchecks and
 Mandatory services in [docker-compose.yml](../../docker-compose.yml): `postgres`, `redis`, `maildev`, `api`, and `web`; optional services: `otel-lgtm` for observability debugging and `e2e`.
 
 Host ports published by compose: `1025`, `1080`, `3000`, `4318`, `5281`, `5432`, `6379`.
+
+`Axis.Mcp` runs on the host through the MCP client's `python scripts/axis.py mcp serve` command; it is intentionally not a Compose service. The bridge uses the API's loopback HTTPS endpoint and the local CA from `.dev-certs/`. The MCP entrypoint reuses a healthy stack or starts `local-dev up` before handing stdin/stdout to the stdio bridge. Do not daemonize the bridge or run it as a detached background process: its stdout is the MCP protocol stream.
 
 [docker-compose.yml](../../docker-compose.yml) and this playbook are the source of truth for Axis local Docker services. If compose changes, update this file in the same PR.
 

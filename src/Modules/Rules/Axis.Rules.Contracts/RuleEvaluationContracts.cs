@@ -64,7 +64,8 @@ public sealed record RuleBindingEvaluationRequest(
     Guid WorkspaceId,
     Guid BindingId,
     RuleContext Context,
-    string CorrelationId);
+    string CorrelationId,
+    int? BindingRevision = null);
 
 public interface IRuleBindingEvaluator
 {

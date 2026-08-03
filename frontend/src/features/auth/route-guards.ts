@@ -2,14 +2,32 @@ import { redirect } from '@tanstack/react-router';
 
 import { exchangeAuthorizationCode, restoreSessionFromBrowserAuth } from '@/features/auth/api';
 import { getAccessToken } from '@/features/auth/auth-store';
-import { clearPkceSession, loadPkceSession } from '@/features/auth/pkce';
+import {
+  clearPkceSession,
+  isAuthorizationRequestHandle,
+  loadPkceSession,
+} from '@/features/auth/pkce';
 
 interface RouteGuardContext {
   preload?: boolean;
 }
 
+function hasPendingAuthorizationRequest(): boolean {
+  if (typeof window === 'undefined' || window.location.pathname !== '/sign-in') {
+    return false;
+  }
+
+  return isAuthorizationRequestHandle(
+    new URLSearchParams(window.location.search).get('authorization_request') ?? undefined,
+  );
+}
+
 export async function redirectAuthenticatedUserFromGuestRoute(context: RouteGuardContext = {}) {
   if (context.preload) {
+    return;
+  }
+
+  if (hasPendingAuthorizationRequest()) {
     return;
   }
 

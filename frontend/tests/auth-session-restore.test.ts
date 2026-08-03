@@ -6,6 +6,7 @@ import {
   restoreSessionFromBrowserAuth,
 } from '@/features/auth/api';
 import { getAccessToken, useAuthStore } from '@/features/auth/auth-store';
+import { buildAuthorizationRequestResumeUrl } from '@/features/auth/pkce';
 import {
   redirectAuthenticatedUserFromGuestRoute,
   redirectFromAppEntryRoute,
@@ -145,6 +146,14 @@ describe('auth session restore', () => {
 
     expect(getAccessToken()).toBe('sign-in-access-token');
     expect(window.location.pathname).toBe('/');
+  });
+
+  it('resumes cached authorization with OpenIddict request_id only', () => {
+    const url = new URL(buildAuthorizationRequestResumeUrl('opaque-request-id'));
+
+    expect(url.pathname).toBe('/connect/authorize');
+    expect(url.searchParams.get('request_id')).toBe('opaque-request-id');
+    expect(url.searchParams.get('request_uri')).toBeNull();
   });
 
   it('redirects the authenticated route when no browser auth session exists', async () => {

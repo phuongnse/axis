@@ -6,6 +6,7 @@ import { type FieldPath, type UseFormReturn, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { completePostSignInPkceFlow, signInUser } from '@/features/auth/api';
 import { useRefreshClientValidationErrors } from '@/features/auth/hooks/useRefreshClientValidationErrors';
+import { isAuthorizationRequestHandle } from '@/features/auth/pkce';
 import {
   classifySignInError,
   getFirstFieldError,
@@ -15,6 +16,7 @@ import {
 } from '@/features/auth/problem-details';
 import { createSignInSchema, type SignInFormValues } from '@/features/auth/schemas/sign-in-schema';
 import type { SignInValidationErrorData } from '@/features/auth/types';
+import { useQueryParam } from '@/features/auth/use-query-param';
 import { currentSiteLanguage } from '@/features/preferences';
 import type { TranslationKey } from '@/features/preferences/translations';
 import { ApiError } from '@/lib/api';
@@ -60,8 +62,17 @@ export function useSignIn() {
   const navigate = useNavigate();
   const { t } = useTranslation();
   const language = currentSiteLanguage();
+  const rawAuthorizationRequest = useQueryParam('authorization_request');
+  const authorizationRequest = isAuthorizationRequestHandle(rawAuthorizationRequest)
+    ? rawAuthorizationRequest
+    : undefined;
+  const invalidAuthorizationRequest =
+    rawAuthorizationRequest !== undefined && authorizationRequest === undefined;
   const [submitErrorKind, setSubmitErrorKind] = useState<SignInSubmitErrorKind | null>(null);
   const [dashboardHandoffPending, setDashboardHandoffPending] = useState(false);
+  const [authorizationRequestError, setAuthorizationRequestError] = useState(
+    invalidAuthorizationRequest,
+  );
   const signInSchema = useMemo(
     () =>
       createSignInSchema({
@@ -89,7 +100,17 @@ export function useSignIn() {
       }),
     onSuccess: async (data) => {
       if (data?.sessionEstablished) {
+        if (invalidAuthorizationRequest) {
+          setAuthorizationRequestError(true);
+          return;
+        }
+
         setDashboardHandoffPending(true);
+        if (authorizationRequest) {
+          await completePostSignInPkceFlow(authorizationRequest);
+          return;
+        }
+
         try {
           const completed = await completePostSignInPkceFlow();
           if (completed) {
@@ -131,6 +152,7 @@ export function useSignIn() {
 
   async function submit(values: SignInFormValues) {
     setDashboardHandoffPending(false);
+    setAuthorizationRequestError(invalidAuthorizationRequest);
     setSubmitErrorKind(null);
     form.clearErrors();
     await mutation.mutateAsync(values).catch(() => undefined);
@@ -141,6 +163,7 @@ export function useSignIn() {
     loading: mutation.isPending || dashboardHandoffPending,
     submit,
     submitError: submitErrorKind ? getSignInFormErrorMessage(submitErrorKind, t) : null,
+    authorizationRequestError,
     verificationEmail:
       submitErrorKind === 'verification_required' ? form.getValues('email').trim() : null,
     rateLimited: submitErrorKind === 'rate_limited',

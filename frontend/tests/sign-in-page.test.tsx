@@ -112,6 +112,57 @@ describe('SignInPage', () => {
     expect(signInBody?.password).toBe('  maple river sunrise  ');
   });
 
+  it('keeps a pending authorization request through a credential error and resumes it after sign-in', async () => {
+    const user = userEvent.setup();
+    let attempts = 0;
+    vi.mocked(fetch).mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input.toString();
+      if (url.includes('/api/auth/sign-in') && init?.method === 'POST') {
+        attempts += 1;
+        if (attempts === 1) {
+          return Promise.resolve({
+            ok: false,
+            status: 422,
+            statusText: 'Unprocessable Entity',
+            json: () =>
+              Promise.resolve({
+                code: 'identity.signIn.invalidCredentials',
+                detail: 'Do not show this backend fallback.',
+              }),
+          } as unknown as Response);
+        }
+
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          text: () =>
+            Promise.resolve(
+              JSON.stringify({
+                sessionEstablished: true,
+                nextStep: 'Dashboard',
+              }),
+            ),
+        } as unknown as Response);
+      }
+      return Promise.reject(new Error(`Unexpected fetch: ${url}`));
+    });
+
+    await renderWithRouter(<SignInPage />, {
+      path: '/sign-in?authorization_request=opaque-request-handle',
+    });
+
+    await fillSignInForm(user);
+    await user.click(screen.getByRole('button', { name: /sign in/i }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Unable to sign in');
+
+    await user.click(screen.getByRole('button', { name: /sign in/i }));
+
+    await waitFor(() =>
+      expect(completePostSignInPkceFlow).toHaveBeenCalledWith('opaque-request-handle'),
+    );
+    expect(navigateMock).not.toHaveBeenCalled();
+  });
+
   it('shows generic credential errors without field enumeration', async () => {
     const user = userEvent.setup();
     vi.mocked(fetch).mockResolvedValueOnce({

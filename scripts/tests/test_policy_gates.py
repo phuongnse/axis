@@ -66,6 +66,7 @@ check_pr = load_script("check-pr.py")
 check_local_dev_docs = load_script("check-local-dev-docs.py")
 check_use_case_docs = load_script("check-use-case-docs.py")
 check_foundation_docs = load_script("check-foundation-docs.py")
+project_orchestration = load_python_file(ROOT / ".codex" / "check.py")
 
 
 class TestCliTextStreams(unittest.TestCase):
@@ -1559,6 +1560,24 @@ class TestDocDriftRatchets(unittest.TestCase):
 
         self.assertEqual("", issues)
 
+    def test_rejects_noncanonical_python_launchers_in_docs(self) -> None:
+        issues = self.documented_issue_text(
+            {
+                "README.md": "\n".join(
+                    [
+                        "```bash",
+                        "python3 scripts/axis.py doctor",
+                        "```",
+                        "```powershell",
+                        "py -3 scripts/axis.py doctor",
+                        "```",
+                    ]
+                ),
+            }
+        )
+
+        self.assertEqual(2, issues.count("use `python scripts/axis.py ...`"))
+
 class TestWorkingTreeDiffHelpers(unittest.TestCase):
     def test_module_main_supports_dataclass_scripts(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -2395,11 +2414,11 @@ class TestToolVersionGates(unittest.TestCase):
         with (
             mock.patch.object(axis, "find_lychee", return_value="/usr/bin/lychee"),
             mock.patch.object(axis, "lychee_version_status", return_value=(True, "lychee 0.23.0")),
-            mock.patch.object(axis, "coderabbit_cli_status", return_value=(True, "coderabbit 0.6.0")),
             mock.patch.object(axis, "dotnet_sdk_status", return_value=(True, "8.0.100")),
             mock.patch.object(axis, "frontend_toolchain_env", return_value={}),
             mock.patch.object(axis, "node_version_status", return_value=(True, "v24.18.0")),
             mock.patch.object(axis, "playwright_chromium_status", playwright_status),
+            mock.patch.object(axis, "python_launcher_status", return_value=("OK", "Python 3.14.4")),
             mock.patch.object(axis, "_command_version", return_value=("OK", "/usr/bin/tool")),
             mock.patch.object(axis, "find_openssl", return_value="/usr/bin/openssl"),
             mock.patch.object(axis, "_docker_info_ok", return_value=True),
@@ -2429,12 +2448,12 @@ class TestToolVersionGates(unittest.TestCase):
     def test_core_doctor_profile_skips_build_local_dev_and_review_tools(self) -> None:
         with (
             mock.patch.object(axis.shutil, "which", return_value="/usr/bin/tool"),
+            mock.patch.object(axis, "python_launcher_status", return_value=("OK", "Python 3.14.4")),
             mock.patch.object(axis, "_command_version", return_value=("OK", "tool 1.0")),
             mock.patch.object(axis, "dotnet_sdk_status") as dotnet,
             mock.patch.object(axis, "frontend_toolchain_env") as frontend,
             mock.patch.object(axis, "_docker_info_ok") as docker,
             mock.patch.object(axis, "find_lychee") as lychee,
-            mock.patch.object(axis, "coderabbit_doctor_status") as coderabbit,
             contextlib.redirect_stdout(io.StringIO()) as stdout,
         ):
             self.assertEqual(
@@ -2443,22 +2462,20 @@ class TestToolVersionGates(unittest.TestCase):
             )
 
         self.assertIn("profile=core", stdout.getvalue())
-        for skipped in (dotnet, frontend, docker, lychee, coderabbit):
+        for skipped in (dotnet, frontend, docker, lychee):
             skipped.assert_not_called()
 
-    def test_coderabbit_doctor_skips_windows_command_shim_in_non_strict_mode(self) -> None:
+    def test_core_doctor_requires_canonical_python_launcher(self) -> None:
         with (
-            mock.patch.object(axis.os, "name", "nt"),
-            mock.patch.object(axis, "resolve_exe", return_value="coderabbit.cmd"),
-            mock.patch.object(axis.shutil, "which", return_value=r"C:\Users\alice\.local\bin\coderabbit.cmd"),
-            mock.patch.object(axis, "coderabbit_cli_status") as version_check,
+            mock.patch.object(axis, "python_launcher_status", return_value=("FAIL", "python not found in PATH")),
+            mock.patch.object(axis, "_command_version", return_value=("OK", "git version 2.53.0")),
+            contextlib.redirect_stdout(io.StringIO()) as stdout,
+            contextlib.redirect_stderr(io.StringIO()) as stderr,
         ):
-            status, detail = axis.coderabbit_doctor_status(strict=False)
+            self.assertEqual(1, axis.doctor(axis.argparse.Namespace(profile="core", strict=True)))
 
-        self.assertEqual("WARN", status)
-        self.assertIn("version check skipped", detail)
-        version_check.assert_not_called()
-
+        self.assertIn("[FAIL] python launcher: python not found in PATH", stdout.getvalue())
+        self.assertIn("python launcher", stderr.getvalue())
 
 class TestMarkdownLinkGate(unittest.TestCase):
     def test_runs_lychee_with_shared_config(self) -> None:
@@ -2515,72 +2532,6 @@ class TestMarkdownLinkGate(unittest.TestCase):
             self.assertEqual(1, axis.check_markdown_links())
 
         self.assertIn("Lychee 0.23.0 is required", stderr.getvalue())
-
-    def test_coderabbit_cli_rejects_missing_cli(self) -> None:
-        with (
-            mock.patch.object(axis, "inactive_coderabbit_path", return_value=None),
-            mock.patch.object(
-                axis,
-                "command_version_line",
-                return_value=(False, "coderabbit not found in PATH", "coderabbit"),
-            ),
-            contextlib.redirect_stderr(io.StringIO()) as stderr,
-        ):
-            self.assertEqual(1, axis.check_coderabbit_cli())
-
-        output = stderr.getvalue()
-        self.assertIn("CodeRabbit CLI is required", output)
-        self.assertIn("docs/playbooks/scripts.md#tool-versions", output)
-
-    def test_coderabbit_cli_reports_installed_command_directory_missing_from_path(self) -> None:
-        with tempfile.TemporaryDirectory() as temp:
-            home = Path(temp)
-            coderabbit = home / ".local" / "bin" / "coderabbit"
-            coderabbit.parent.mkdir(parents=True)
-            coderabbit.write_text("", encoding="utf-8")
-            coderabbit.chmod(0o755)
-            with (
-                mock.patch.object(axis.os, "name", "posix"),
-                mock.patch.object(axis.Path, "home", return_value=home),
-                mock.patch.object(
-                    axis,
-                    "command_version_line",
-                    return_value=(False, "coderabbit not found in PATH", "coderabbit"),
-                ),
-            ):
-                ok, detail = axis.coderabbit_cli_status()
-
-        self.assertFalse(ok)
-        self.assertIn(str(coderabbit), detail)
-        self.assertIn("not active in PATH", detail)
-        self.assertIn("new login shell", detail)
-
-    def test_coderabbit_cli_rejects_old_version(self) -> None:
-        with (
-            mock.patch.object(
-                axis,
-                "command_version_line",
-                return_value=(True, "0.5.9", "/usr/bin/coderabbit"),
-            ),
-            contextlib.redirect_stderr(io.StringIO()) as stderr,
-        ):
-            self.assertEqual(1, axis.check_coderabbit_cli())
-
-        self.assertIn("expected version >= 0.6.0", stderr.getvalue())
-
-    def test_coderabbit_cli_accepts_supported_version(self) -> None:
-        with (
-            mock.patch.object(
-                axis,
-                "command_version_line",
-                return_value=(True, "0.6.3", "/usr/bin/coderabbit"),
-            ),
-            contextlib.redirect_stdout(io.StringIO()) as stdout,
-        ):
-            self.assertEqual(0, axis.check_coderabbit_cli())
-
-        self.assertIn("coderabbit-cli: OK", stdout.getvalue())
-
 
 class TestVerifyGate(unittest.TestCase):
     def test_plan_only_prints_selected_steps_without_running_checks(self) -> None:
@@ -2731,8 +2682,59 @@ class TestVerifyGate(unittest.TestCase):
             calls,
         )
 
+    def test_project_orchestration_change_runs_repo_skills_gate(self) -> None:
+        for path in (".codex/config.toml", ".gitignore"):
+            with self.subTest(path=path):
+                with (
+                    mock.patch.object(axis, "verify_scope_paths", return_value=("working tree", [path])),
+                    mock.patch.object(axis, "run_text_encoding_check", return_value=0),
+                    mock.patch.object(axis, "check_repo_skills", return_value=0) as repo_skills,
+                    contextlib.redirect_stdout(io.StringIO()),
+                ):
+                    self.assertEqual(0, axis.verify(object()))
+
+                repo_skills.assert_called_once_with()
+
 
 class TestReviewVerificationGates(unittest.TestCase):
+    def test_policy_tests_default_to_full_discovery(self) -> None:
+        completed = axis.subprocess.CompletedProcess([], 0)
+
+        with mock.patch.object(axis, "run", return_value=completed) as run:
+            self.assertEqual(0, axis.check_policy_tests())
+
+        run.assert_called_once_with(
+            [
+                axis.sys.executable,
+                "-m",
+                "unittest",
+                "discover",
+                "-s",
+                "scripts/tests",
+                "-p",
+                "test_*.py",
+            ],
+            check=False,
+        )
+
+    def test_policy_tests_can_select_only_named_cases(self) -> None:
+        completed = axis.subprocess.CompletedProcess([], 0)
+        args = axis.argparse.Namespace(tests=["tests.Example.test_one", "tests.Example.test_two"])
+
+        with mock.patch.object(axis, "run", return_value=completed) as run:
+            self.assertEqual(0, axis.check_policy_tests(args))
+
+        run.assert_called_once_with(
+            [
+                axis.sys.executable,
+                "-m",
+                "unittest",
+                "tests.Example.test_one",
+                "tests.Example.test_two",
+            ],
+            check=False,
+        )
+
     def test_rejects_dirty_worktree_before_running_checks(self) -> None:
         with (
             mock.patch.object(axis, "working_tree_paths", return_value=["scripts/axis.py"]),
@@ -2762,6 +2764,7 @@ class TestReviewVerificationGates(unittest.TestCase):
             ["frontend/src/App.tsx"],
             policy_tests_covered=False,
             doc_drift_covered=set(),
+            doc_drift_range=None,
         )
 
     def test_policy_only_uses_same_profile_without_verify(self) -> None:
@@ -2780,6 +2783,7 @@ class TestReviewVerificationGates(unittest.TestCase):
             ["scripts/axis.py"],
             policy_tests_covered=False,
             doc_drift_covered=set(),
+            doc_drift_range=None,
         )
 
     def test_policy_registry_routes_only_triggered_expensive_checks(self) -> None:
@@ -2812,6 +2816,7 @@ class TestReviewVerificationGates(unittest.TestCase):
 
         self.assertEqual(
             {
+                "check-text-encoding",
                 "check-scripts-standard",
                 "check-repo-skills",
                 "check-doc-navigation",
@@ -2822,6 +2827,46 @@ class TestReviewVerificationGates(unittest.TestCase):
             },
             axis.ready_review_doc_drift_coverage(paths),
         )
+        self.assertIn(
+            "check-theme",
+            axis.ready_review_doc_drift_coverage(["theme/axis-theme.json"]),
+        )
+
+    def test_doc_drift_selects_only_checkers_for_touched_surfaces(self) -> None:
+        selected = axis.doc_drift_checker_names(
+            [
+                "scripts/axis.py",
+                ".agents/skills/reference.md",
+                ".codex/config.toml",
+                "docs/playbooks/scripts.md",
+            ]
+        )
+
+        self.assertEqual(
+            {
+                "check-text-encoding",
+                "check-scripts-standard",
+                "check-repo-skills",
+                "check-doc-link-targets.py",
+                "check-doc-navigation",
+                "check-doc-size-budgets",
+                "check-doc-code-fences.py",
+            },
+            selected,
+        )
+        self.assertFalse(
+            {
+                "check-ef-domain-mapping",
+                "check-frontend-api-contracts",
+                "check-ui-baseline",
+                "check-theme",
+                "check-frontend-quality",
+                "check-use-case-docs.py",
+                "check-foundation-docs.py",
+                "check-local-dev-docs.py",
+            }
+            & selected
+        )
 
     def test_doc_drift_gate_receives_covered_checks(self) -> None:
         covered = {"check-repo-skills"}
@@ -2829,6 +2874,7 @@ class TestReviewVerificationGates(unittest.TestCase):
             axis.ready_review_policy_gates(
                 [".agents/skills/axis-example/SKILL.md"],
                 doc_drift_covered=covered,
+                doc_drift_range="base..HEAD",
             )
         )
 
@@ -2837,6 +2883,8 @@ class TestReviewVerificationGates(unittest.TestCase):
 
         args = doc_drift.call_args.args[0]
         self.assertEqual(covered, args.skip_checkers)
+        self.assertEqual([".agents/skills/axis-example/SKILL.md"], args.paths)
+        self.assertEqual("base..HEAD", args.range_spec)
 
     def test_pre_push_full_delegates_to_ready_review(self) -> None:
         with (
@@ -3018,6 +3066,55 @@ class TestReviewVerificationGates(unittest.TestCase):
             calls,
         )
 
+    def test_maps_mcp_source_to_mcp_contract_tests(self) -> None:
+        self.assertEqual(
+            "tests/Tools/Axis.Mcp.Tests/Axis.Mcp.Tests.csproj",
+            axis.related_test_project_for_source_project("src/Axis.Mcp/Axis.Mcp.csproj"),
+        )
+
+    def test_mcp_source_and_openapi_changes_run_api_coverage(self) -> None:
+        for changed_path in ("src/Axis.Mcp/Tools/AxisMcpTool.cs", "openapi.json"):
+            with self.subTest(changed_path=changed_path):
+                calls: list[str] = []
+                with (
+                    mock.patch.object(
+                        axis,
+                        "verify_scope_paths",
+                        return_value=("working tree", [changed_path]),
+                    ),
+                    mock.patch.object(axis, "run_text_encoding_check", return_value=0),
+                    mock.patch.object(axis, "check_dotnet_sdk", return_value=0),
+                    mock.patch.object(axis, "dotnet_build_projects", return_value=0),
+                    mock.patch.object(axis, "dotnet_format_changed_paths", return_value=0),
+                    mock.patch.object(axis, "dotnet_test_projects", return_value=0),
+                    mock.patch.object(axis, "check_frontend_toolchain", return_value=0),
+                    mock.patch.object(axis, "check_frontend_dependency_versions", return_value=0),
+                    mock.patch.object(axis, "check_frontend_vulnerable_packages", return_value=0),
+                    mock.patch.object(axis, "frontend_command", return_value=0),
+                    mock.patch.object(
+                        axis,
+                        "check_mcp_api_coverage",
+                        side_effect=lambda: calls.append("mcp-api-coverage") or 0,
+                    ),
+                    mock.patch.object(
+                        axis,
+                        "check_mcp_contracts",
+                        side_effect=lambda: calls.append("mcp-contracts") or 0,
+                    ),
+                    mock.patch.object(
+                        axis,
+                        "check_mcp_tool_safety",
+                        side_effect=lambda: calls.append("mcp-tool-safety") or 0,
+                    ),
+                    contextlib.redirect_stdout(io.StringIO()),
+                ):
+                    self.assertEqual(0, axis.verify(object()))
+
+                expected = ["mcp-api-coverage"]
+                if changed_path.startswith("src/Axis.Mcp/"):
+                    expected.extend(["mcp-contracts", "mcp-tool-safety"])
+                self.assertEqual(expected, calls)
+
     def test_discovers_related_test_projects_for_every_module_layer(self) -> None:
         source_projects = sorted((axis.ROOT / "src" / "Modules").glob("*/*/*.csproj"))
         mapped_projects: dict[str, str | None] = {}
@@ -3146,6 +3243,15 @@ class TestEnforcementTruthAudit(unittest.TestCase):
         for relative, requirements in axis.enforcement_truth_required_snippets():
             files[relative] = "\n".join(snippet for snippet, _description in requirements) + "\n"
 
+        script = Path("scripts/axis.py")
+        files[script] = (
+            "def enforcement_truth_required_snippets():\n"
+            "    pass\n\n"
+            "def governance_owner_boundary_issues():\n"
+            "    pass\n\n"
+            f"{files[script]}"
+        )
+
         workflow = Path(".github/workflows/build-and-test.yml")
         files[workflow] += "- 'openapi.json'\n- 'openapi.json'\n"
 
@@ -3198,7 +3304,7 @@ class TestEnforcementTruthAudit(unittest.TestCase):
     def test_rejects_local_verify_without_markdown_links(self) -> None:
         def mutate(files: dict[Path, str]) -> None:
             script = Path("scripts/axis.py")
-            files[script] = files[script].replace('step("markdown links (changed files)",\n', "")
+            files[script] = files[script].replace('"markdown links (changed files)",\n', "")
 
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
@@ -3206,6 +3312,33 @@ class TestEnforcementTruthAudit(unittest.TestCase):
             issues = axis.enforcement_truth_audit_issues(root=root)
 
         self.assertIn("local verify runs markdown link check", "\n".join(issues))
+
+    def test_rejects_missing_doc_drift_wiring_without_matching_its_own_requirement(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            self.write_truth_repo(root)
+            script = Path("scripts/axis.py")
+            source = axis.normalized_text(axis.ROOT / script)
+            prefix, marker, implementation = source.partition("def ready_review_policy_gates(")
+            self.assertTrue(marker)
+            implementation = implementation.replace("lambda: check_doc_drift(", "lambda: missing_doc_drift(", 1)
+            (root / script).write_text(prefix + marker + implementation, encoding="utf-8")
+
+            issues = axis.enforcement_truth_audit_issues(root=root)
+
+        self.assertIn("ready-review and CI share the doc-drift policy profile", "\n".join(issues))
+
+    def test_enforcement_truth_audit_fails_closed_when_isolation_marker_is_missing(self) -> None:
+        def mutate(files: dict[Path, str]) -> None:
+            script = Path("scripts/axis.py")
+            files[script] = files[script].replace("def governance_owner_boundary_issues():", "def renamed_owner_check():")
+
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            self.write_truth_repo(root, mutate)
+            issues = axis.enforcement_truth_audit_issues(root=root)
+
+        self.assertIn("ready-review and CI share the doc-drift policy profile", "\n".join(issues))
 
     def test_rejects_missing_pre_push_quick_gate_delegate(self) -> None:
         def mutate(files: dict[Path, str]) -> None:
@@ -4329,6 +4462,123 @@ class TestAxisCommandWrappers(unittest.TestCase):
 
         self.assertEqual(["dotnet", "build", "Axis.sln", "--nologo", "--no-restore"], calls[0])
 
+    def test_mcp_serve_keeps_wrapper_diagnostics_off_protocol_stdout(self) -> None:
+        calls: list[list[str]] = []
+        environments: list[dict[str, str]] = []
+
+        def fake_run(command: list[str], **kwargs):
+            calls.append(command)
+            environments.append(kwargs.get("env", {}))
+            return axis.subprocess.CompletedProcess(command, 0, stdout="", stderr="")
+
+        with tempfile.TemporaryDirectory() as temp:
+            root_ca = Path(temp) / "rootCA.pem"
+            root_ca.write_text("test", encoding="utf-8")
+            with (
+                mock.patch.object(axis, "LOCAL_ROOT_CA_PEM", root_ca),
+                mock.patch.object(axis, "dotnet_sdk_status", return_value=(True, "8.0.423")),
+                mock.patch.object(axis, "mcp_api_health_ok", return_value=True),
+                mock.patch.object(axis, "run", side_effect=fake_run),
+                mock.patch.object(axis, "exe", side_effect=lambda name: name),
+                contextlib.redirect_stdout(io.StringIO()) as stdout,
+                contextlib.redirect_stderr(io.StringIO()),
+            ):
+                self.assertEqual(
+                    0,
+                    axis.mcp_command(
+                        axis.argparse.Namespace(mcp_command="serve", mcp_args=["--", "--probe"])
+                    ),
+                )
+
+        self.assertEqual("", stdout.getvalue())
+        self.assertEqual(
+            ["dotnet", "build", str(axis.MCP_PROJECT), "--nologo"],
+            calls[0],
+        )
+        self.assertEqual(
+            [
+                "dotnet",
+                "run",
+                "--project",
+                str(axis.MCP_PROJECT),
+                "--no-launch-profile",
+                "--no-build",
+                "--",
+                "--probe",
+            ],
+            calls[1],
+        )
+        self.assertEqual("read", environments[1]["AXIS_MCP_ACCESS"])
+
+    def test_mcp_serve_starts_local_dev_before_bridge_when_api_is_unhealthy(self) -> None:
+        calls: list[list[str]] = []
+
+        def fake_run(command: list[str], **_kwargs):
+            calls.append(command)
+            return axis.subprocess.CompletedProcess(command, 0, stdout="compose output", stderr="")
+
+        with tempfile.TemporaryDirectory() as temp:
+            root_ca = Path(temp) / "rootCA.pem"
+            root_ca.write_text("test", encoding="utf-8")
+            with (
+                mock.patch.object(axis, "LOCAL_ROOT_CA_PEM", root_ca),
+                mock.patch.object(axis, "dotnet_sdk_status", return_value=(True, "8.0.423")),
+                mock.patch.object(axis, "mcp_api_health_ok", side_effect=[False, True]),
+                mock.patch.object(axis, "require_docker_compose", return_value=0),
+                mock.patch.object(axis, "local_dev_up_args", return_value=["docker", "compose", "up"]),
+                mock.patch.object(axis, "run", side_effect=fake_run),
+                mock.patch.object(axis, "exe", side_effect=lambda name: name),
+                contextlib.redirect_stdout(io.StringIO()) as stdout,
+                contextlib.redirect_stderr(io.StringIO()) as stderr,
+            ):
+                self.assertEqual(
+                    0,
+                    axis.mcp_command(
+                        axis.argparse.Namespace(
+                            mcp_command="serve",
+                            no_build=True,
+                            mcp_args=[],
+                        )
+                    ),
+                )
+
+        self.assertEqual(["docker", "compose", "up"], calls[0])
+        self.assertEqual("dotnet", calls[1][0])
+        self.assertEqual("", stdout.getvalue())
+        self.assertIn("starting the local-dev stack", stderr.getvalue())
+
+    def test_mcp_serve_passes_explicit_write_access_to_bridge(self) -> None:
+        environments: list[dict[str, str]] = []
+
+        def fake_run(command: list[str], **kwargs):
+            environments.append(kwargs.get("env", {}))
+            return axis.subprocess.CompletedProcess(command, 0, stdout="", stderr="")
+
+        with tempfile.TemporaryDirectory() as temp:
+            root_ca = Path(temp) / "rootCA.pem"
+            root_ca.write_text("test", encoding="utf-8")
+            with (
+                mock.patch.object(axis, "LOCAL_ROOT_CA_PEM", root_ca),
+                mock.patch.object(axis, "dotnet_sdk_status", return_value=(True, "8.0.423")),
+                mock.patch.object(axis, "mcp_api_health_ok", return_value=True),
+                mock.patch.object(axis, "run", side_effect=fake_run),
+                mock.patch.object(axis, "exe", side_effect=lambda name: name),
+                contextlib.redirect_stdout(io.StringIO()),
+                contextlib.redirect_stderr(io.StringIO()),
+            ):
+                self.assertEqual(
+                    0,
+                    axis.mcp_command(
+                        axis.argparse.Namespace(
+                            mcp_command="serve",
+                            access="write",
+                            mcp_args=[],
+                        )
+                    ),
+                )
+
+        self.assertEqual("write", environments[1]["AXIS_MCP_ACCESS"])
+
     def test_dotnet_restore_tools_uses_repository_manifest(self) -> None:
         calls = self.run_with_fake_process(
             axis.dotnet_command,
@@ -4682,8 +4932,15 @@ class TestAxisCommandWrappers(unittest.TestCase):
             chmod.assert_any_call(cert_dir / "rootCA-key.pem", 0o600)
             chmod.assert_any_call(cert_dir / "localhost-key.pem", 0o600)
             self.assertEqual("/usr/bin/openssl", calls[0][0])
+            root_ca_command = next(
+                command
+                for command in calls
+                if str(cert_dir / "rootCA.pem") in command
+            )
+            self.assertIn("basicConstraints=critical,CA:TRUE", root_ca_command)
+            self.assertIn("keyUsage=critical,keyCertSign,cRLSign", root_ca_command)
 
-    def test_local_dev_certs_reuses_valid_existing_material(self) -> None:
+    def test_local_dev_certs_reuses_current_and_regenerates_legacy_material(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             cert_dir = Path(temp) / ".dev-certs"
             cert_dir.mkdir()
@@ -4702,9 +4959,28 @@ class TestAxisCommandWrappers(unittest.TestCase):
                     path.write_text("existing\n", encoding="utf-8")
 
             calls: list[list[str]] = []
+            legacy_key_usage = False
+            legacy_der_key_usage = False
+            legacy_der_identity = False
 
             def fake_run(command: list[str], **_kwargs):
                 calls.append(command)
+                if "-ext" in command:
+                    if "basicConstraints" in command:
+                        stdout = "X509v3 Basic Constraints: critical\n    CA:TRUE\n"
+                    elif legacy_key_usage or (legacy_der_key_usage and "-inform" in command):
+                        stdout = "X509v3 Key Usage: critical\n    Certificate Sign\n"
+                    else:
+                        stdout = "X509v3 Key Usage: critical\n    Certificate Sign, CRL Sign\n"
+                    return axis.subprocess.CompletedProcess(command, 0, stdout=stdout, stderr="")
+                if "-fingerprint" in command:
+                    fingerprint = "DER" if legacy_der_identity and "-inform" in command else "ROOT"
+                    return axis.subprocess.CompletedProcess(
+                        command,
+                        0,
+                        stdout=f"sha256 Fingerprint={fingerprint}\n",
+                        stderr="",
+                    )
                 return axis.subprocess.CompletedProcess(command, 0, stdout="public-key\n", stderr="")
 
             patches = [mock.patch.object(axis, name, value) for name, value in paths.items()]
@@ -4715,14 +4991,83 @@ class TestAxisCommandWrappers(unittest.TestCase):
                 stack.enter_context(mock.patch.object(axis, "find_openssl", return_value="/usr/bin/openssl"))
                 stack.enter_context(mock.patch.object(axis.os, "name", "posix"))
                 stack.enter_context(mock.patch.object(axis.Path, "chmod", autospec=True))
+                stack.enter_context(
+                    mock.patch.object(
+                        axis,
+                        "LOCAL_TRUSTED_ROOT_CA_FINGERPRINT",
+                        cert_dir / "trusted-rootCA.sha1",
+                    )
+                )
                 stdout = stack.enter_context(contextlib.redirect_stdout(io.StringIO()))
+                self.assertEqual(0, axis.local_dev_certs(axis.argparse.Namespace(renew=False)))
+
+                self.assertTrue(any("-ext" in command and "keyUsage" in command for command in calls))
+                self.assertTrue(any("-inform" in command and "-ext" in command for command in calls))
+                self.assertTrue(any("-fingerprint" in command for command in calls))
+                self.assertFalse(any("genrsa" in command for command in calls))
+                self.assertIn("reusing", stdout.getvalue())
+
+                legacy_key_usage = True
+                calls.clear()
+                stdout.seek(0)
+                stdout.truncate(0)
                 self.assertEqual(0, axis.local_dev_certs(axis.argparse.Namespace(renew=False)))
 
             self.assertTrue(any("-checkend" in command for command in calls))
             self.assertTrue(any("-checkhost" in command and "api" in command for command in calls))
             self.assertTrue(any("-checkip" in command and "::1" in command for command in calls))
-            self.assertFalse(any("genrsa" in command for command in calls))
-            self.assertIn("reusing", stdout.getvalue())
+            self.assertTrue(any("genrsa" in command for command in calls))
+            self.assertIn("generated", stdout.getvalue())
+
+            legacy_key_usage = False
+            legacy_der_key_usage = True
+            calls.clear()
+            stdout.seek(0)
+            stdout.truncate(0)
+            with contextlib.ExitStack() as stack:
+                for patcher in patches:
+                    stack.enter_context(patcher)
+                stack.enter_context(mock.patch.object(axis, "run", side_effect=fake_run))
+                stack.enter_context(mock.patch.object(axis, "find_openssl", return_value="/usr/bin/openssl"))
+                stack.enter_context(mock.patch.object(axis.os, "name", "posix"))
+                stack.enter_context(mock.patch.object(axis.Path, "chmod", autospec=True))
+                stack.enter_context(
+                    mock.patch.object(
+                        axis,
+                        "LOCAL_TRUSTED_ROOT_CA_FINGERPRINT",
+                        cert_dir / "trusted-rootCA.sha1",
+                    )
+                )
+                with contextlib.redirect_stdout(stdout):
+                    self.assertEqual(0, axis.local_dev_certs(axis.argparse.Namespace(renew=False)))
+
+            self.assertTrue(any("-inform" in command and "-ext" in command for command in calls))
+            self.assertTrue(any("genrsa" in command for command in calls))
+
+            legacy_der_key_usage = False
+            legacy_der_identity = True
+            calls.clear()
+            stdout.seek(0)
+            stdout.truncate(0)
+            with contextlib.ExitStack() as stack:
+                for patcher in patches:
+                    stack.enter_context(patcher)
+                stack.enter_context(mock.patch.object(axis, "run", side_effect=fake_run))
+                stack.enter_context(mock.patch.object(axis, "find_openssl", return_value="/usr/bin/openssl"))
+                stack.enter_context(mock.patch.object(axis.os, "name", "posix"))
+                stack.enter_context(mock.patch.object(axis.Path, "chmod", autospec=True))
+                stack.enter_context(
+                    mock.patch.object(
+                        axis,
+                        "LOCAL_TRUSTED_ROOT_CA_FINGERPRINT",
+                        cert_dir / "trusted-rootCA.sha1",
+                    )
+                )
+                with contextlib.redirect_stdout(stdout):
+                    self.assertEqual(0, axis.local_dev_certs(axis.argparse.Namespace(renew=False)))
+
+            self.assertTrue(any("-fingerprint" in command for command in calls))
+            self.assertTrue(any("genrsa" in command for command in calls))
 
     def test_local_dev_certs_refuses_to_replace_an_axis_managed_trusted_ca(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -5040,7 +5385,10 @@ class TestRepoSkillsGate(unittest.TestCase):
                 "handoff before edit.\n\n"
                 "## Engineering method\n\n"
                 "Minimal solution ladder. Root-cause loop. Fail-before/pass-after. "
-                "Safety floor. Communication clarity. Skill proof.\n"
+                "Safety floor. Communication clarity. Skill proof.\n\n"
+                "## Blocker and completion protocol\n\n"
+                "No workaround: ask before an alternate user-local route; explicit user approval is "
+                "required. Stale, missing, indirect, or blocked evidence cannot become a completion claim.\n"
             ),
             ".agents/skills/axis-example/SKILL.md": (
                 "---\n"
@@ -5533,8 +5881,74 @@ class TestRepoSkillsGate(unittest.TestCase):
         with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
             self.assertEqual(0, axis.check_repo_skills())
 
+    def test_current_project_orchestration_is_valid(self) -> None:
+        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+            self.assertEqual(0, axis.check_project_orchestration())
+
+    def test_nested_project_agent_role_is_discovered_for_rejection(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            nested = root / ".codex" / "agents" / "nested"
+            nested.mkdir(parents=True)
+            (nested / "rogue.toml").write_text('name = "rogue"\n', encoding="utf-8")
+
+            self.assertEqual({"nested/rogue.toml"}, project_orchestration.project_agent_role_files(root))
+
 
 class TestDoctorPythonPackageChecks(unittest.TestCase):
+    def test_python_launcher_status_rejects_python_2(self) -> None:
+        with mock.patch.object(
+            axis,
+            "command_version_line",
+            return_value=(True, "Python 2.7.18", "/usr/bin/python"),
+        ):
+            status, detail = axis.python_launcher_status()
+
+        self.assertEqual("FAIL", status)
+        self.assertIn("expected Python 3", detail)
+
+    def test_python_launcher_status_requires_tar_data_filter(self) -> None:
+        probe = axis.subprocess.CompletedProcess(
+            ["/usr/bin/python", "-c", "probe"],
+            1,
+            stdout="",
+            stderr="",
+        )
+        with (
+            mock.patch.object(
+                axis,
+                "command_version_line",
+                return_value=(True, "Python 3.11.0", "/usr/bin/python"),
+            ),
+            mock.patch.object(axis, "run_optional", return_value=probe),
+        ):
+            status, detail = axis.python_launcher_status()
+
+        self.assertEqual("FAIL", status)
+        self.assertIn("tar data extraction filter", detail)
+
+    def test_python_launcher_status_checks_tar_filter_when_optimized(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            Path(temp, "tarfile.py").write_text(
+                "class TarFile:\n    def extractall(self): pass\n",
+                encoding="utf-8",
+            )
+            with (
+                mock.patch.object(
+                    axis,
+                    "command_version_line",
+                    return_value=(True, f"Python {axis.platform.python_version()}", axis.sys.executable),
+                ),
+                mock.patch.dict(
+                    axis.os.environ,
+                    {"PYTHONOPTIMIZE": "1", "PYTHONPATH": temp},
+                ),
+            ):
+                status, detail = axis.python_launcher_status()
+
+        self.assertEqual("FAIL", status)
+        self.assertIn("tar data extraction filter", detail)
+
     def test_python_module_version_rejects_missing_package(self) -> None:
         with mock.patch.object(axis.importlib.util, "find_spec", return_value=None):
             status, detail = axis._python_module_version("yaml", "PyYAML")

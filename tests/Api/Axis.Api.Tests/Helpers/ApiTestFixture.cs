@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.StackExchangeRedis;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using OpenIddict.Abstractions;
 using StackExchange.Redis;
@@ -136,6 +137,8 @@ public sealed class ApiTestFixture : IAsyncLifetime
                 services.RemoveAll<IConnectionMultiplexer>();
                 services.AddSingleton<IConnectionMultiplexer>(_ =>
                     ConnectionMultiplexer.Connect(_redis.GetConnectionString()));
+                services.Configure<RedisCacheOptions>(options =>
+                    options.Configuration = _redis.GetConnectionString());
 
                 services.RemoveAll<IEmailSender>();
                 services.AddSingleton(_emailCapture);
@@ -206,6 +209,34 @@ public sealed class ApiTestFixture : IAsyncLifetime
                 {
                     new Uri("https://localhost:3000/callback"),
                     new Uri("https://localhost/callback"),
+                },
+                Requirements =
+                {
+                    Requirements.Features.ProofKeyForCodeExchange,
+                },
+            });
+        }
+
+        if (await appManager.FindByClientIdAsync("axis_mcp") is null)
+        {
+            await appManager.CreateAsync(new OpenIddictApplicationDescriptor
+            {
+                ClientId = "axis_mcp",
+                ClientType = ClientTypes.Public,
+                DisplayName = "Axis MCP local client (Test)",
+                Permissions =
+                {
+                    Permissions.Endpoints.Authorization,
+                    Permissions.Endpoints.Token,
+                    Permissions.GrantTypes.AuthorizationCode,
+                    Permissions.ResponseTypes.Code,
+                    Permissions.Prefixes.Scope + Scopes.OpenId,
+                    Permissions.Prefixes.Scope + Scopes.Email,
+                    Permissions.Prefixes.Scope + Scopes.Profile,
+                },
+                RedirectUris =
+                {
+                    new Uri("http://127.0.0.1:48123/callback"),
                 },
                 Requirements =
                 {

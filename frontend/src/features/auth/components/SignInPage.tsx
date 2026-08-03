@@ -24,7 +24,15 @@ function SignInFooter({ t }: { t: ReturnType<typeof useTranslation>['t'] }) {
 
 export function SignInPage() {
   const { t } = useTranslation();
-  const { form, loading, submit, submitError, verificationEmail, rateLimited } = useSignIn();
+  const {
+    form,
+    loading,
+    submit,
+    submitError,
+    authorizationRequestError,
+    verificationEmail,
+    rateLimited,
+  } = useSignIn();
   const { resend, state: resendState } = useResendVerification();
   const {
     register,
@@ -50,6 +58,12 @@ export function SignInPage() {
   return (
     <AuthCard title={t('auth.signIn')} footer={<SignInFooter t={t} />}>
       <form className="space-y-4" onSubmit={handleSubmit(submit)} noValidate>
+        {authorizationRequestError ? (
+          <StatusNotice tone="destructive" title={t('auth.signInErrorTitle')}>
+            {t('auth.authorizationRequestInvalid')}
+          </StatusNotice>
+        ) : null}
+
         {submitError ? (
           showVerificationRequired ? (
             <div className="space-y-2">

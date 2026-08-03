@@ -178,6 +178,61 @@ function conditionProjection(
 function conditionDisplay(
   condition: ApiTypes.RuleConditionNodeDto,
 ): ApiTypes.RuleExpressionDisplayNodeDto {
+  if (condition.nodeId === 'date-range') {
+    return {
+      nodeId: condition.nodeId,
+      tokens: [
+        {
+          text: 'All conditions must match',
+          referenceKind: 'LogicalOperator',
+          referenceKey: 'All',
+        },
+      ],
+      children: [
+        {
+          nodeId: 'minimum-bound',
+          tokens: [
+            { text: 'Value', referenceKind: 'Input', referenceKey: 'value' },
+            {
+              text: 'is greater than or equal to',
+              referenceKind: 'PredicateOperator',
+              referenceKey: 'GreaterThanOrEqual',
+            },
+            { text: 'Minimum', referenceKind: 'Input', referenceKey: 'min' },
+            { text: 'when' },
+            { text: 'Minimum', referenceKind: 'Input', referenceKey: 'min' },
+            {
+              text: 'is specified',
+              referenceKind: 'PredicateOperator',
+              referenceKey: 'IsNotNull',
+            },
+          ],
+          children: [],
+        },
+        {
+          nodeId: 'maximum-bound',
+          tokens: [
+            { text: 'Value', referenceKind: 'Input', referenceKey: 'value' },
+            {
+              text: 'is less than or equal to',
+              referenceKind: 'PredicateOperator',
+              referenceKey: 'LessThanOrEqual',
+            },
+            { text: 'Maximum', referenceKind: 'Input', referenceKey: 'max' },
+            { text: 'when' },
+            { text: 'Maximum', referenceKind: 'Input', referenceKey: 'max' },
+            {
+              text: 'is specified',
+              referenceKind: 'PredicateOperator',
+              referenceKey: 'IsNotNull',
+            },
+          ],
+          children: [],
+        },
+      ],
+    };
+  }
+
   if (condition.logicalOperator) {
     const labels: Record<ApiTypes.RuleLogicalOperator, string> = {
       All: 'All conditions must match',
@@ -197,13 +252,7 @@ function conditionDisplay(
     };
   }
 
-  const labels: Record<string, string[]> = {
-    'minimum-absent': ['Minimum', 'is not provided'],
-    'minimum-satisfied': ['Value', 'is greater than or equal to', 'Minimum'],
-    'maximum-absent': ['Maximum', 'is not provided'],
-    'maximum-satisfied': ['Value', 'is less than or equal to', 'Maximum'],
-  };
-  const text = labels[condition.nodeId ?? ''] ?? ['Value', 'greater than', 'Threshold'];
+  const text = ['Value', 'greater than', 'Threshold'];
   return {
     nodeId: condition.nodeId,
     tokens: text.map((token, index) => ({
@@ -555,7 +604,7 @@ test('rule catalog exposes inputs and pure system details', async ({ page }) => 
   await expect(details.getByText('Expression language')).toBeVisible();
 });
 
-test('date range presents nested logic as a compact boolean expression', async ({ page }) => {
+test('date range presents optional bounds as conditional assertions', async ({ page }) => {
   await mockAuthenticatedSession(page);
   await mockRulesApi(page);
   await page.goto('/rules');
@@ -565,15 +614,13 @@ test('date range presents nested logic as a compact boolean expression', async (
   await details.getByRole('tab', { name: 'Rule behavior' }).click();
   const logic = details.locator('[data-slot="rule-behavior-flow"]');
 
-  await expect(logic.getByText('Minimum is not provided')).toBeVisible();
-  await expect(logic.getByText('Value is greater than or equal to Minimum')).toBeVisible();
-  await expect(logic.getByText('Maximum is not provided')).toBeVisible();
-  await expect(logic.getByText('Value is less than or equal to Maximum')).toBeVisible();
-  await expect(logic.locator('[data-slot="rule-expression-operator"]')).toHaveText([
-    'or',
-    'and',
-    'or',
-  ]);
+  await expect(
+    logic.getByText('Value is greater than or equal to Minimum when Minimum is specified'),
+  ).toBeVisible();
+  await expect(
+    logic.getByText('Value is less than or equal to Maximum when Maximum is specified'),
+  ).toBeVisible();
+  await expect(logic.locator('[data-slot="rule-expression-operator"]')).toHaveText(['and']);
   await expect(logic.getByRole('button')).toHaveCount(0);
   await expect(logic.locator('[data-slot^="rule-condition-"]')).toHaveCount(0);
   const expression = logic.locator('[data-slot="rule-expression"]');

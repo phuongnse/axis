@@ -44,6 +44,11 @@ interface AuthorizeUrlOptions {
   prompt?: 'none';
 }
 
+export function isAuthorizationRequestHandle(value: string | undefined): value is string {
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: Reject control characters in authorization request handles.
+  return Boolean(value && value.length <= 2048 && !/[\u0000-\u001f\u007f]/.test(value));
+}
+
 export function createPkceSession(): PkceSession {
   const verifier = randomString(64);
   const state = randomString(32);
@@ -87,6 +92,11 @@ export async function buildAuthorizeUrl(
 
 export function connectEndpoint(path: string): string {
   return `${connectBaseUrl()}${path}`;
+}
+
+export function buildAuthorizationRequestResumeUrl(requestId: string): string {
+  const params = new URLSearchParams({ request_id: requestId });
+  return `${connectEndpoint('/connect/authorize')}?${params.toString()}`;
 }
 
 export { CLIENT_ID, REDIRECT_URI };

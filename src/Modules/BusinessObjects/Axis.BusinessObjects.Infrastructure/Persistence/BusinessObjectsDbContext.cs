@@ -7,6 +7,7 @@ namespace Axis.BusinessObjects.Infrastructure.Persistence;
 public sealed class BusinessObjectsDbContext(DbContextOptions<BusinessObjectsDbContext> options) : DbContext(options)
 {
     public DbSet<BusinessObjectDefinition> BusinessObjectDefinitions => Set<BusinessObjectDefinition>();
+    public DbSet<BusinessObjectRecord> BusinessObjectRecords => Set<BusinessObjectRecord>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -18,5 +19,6 @@ public sealed class BusinessObjectsDbContext(DbContextOptions<BusinessObjectsDbC
         modelBuilder.ApplyConfiguration(new BusinessObjectDefinitionVersionFieldConfiguration());
         modelBuilder.ApplyConfiguration(new BusinessObjectDefinitionVersionChoiceOptionConfiguration());
         modelBuilder.ApplyConfiguration(new BusinessObjectDefinitionVersionFieldRuleConfiguration());
+        modelBuilder.ApplyConfiguration(new BusinessObjectRecordConfiguration());
     }
 }

@@ -1,0 +1,37 @@
+# Submit A Business Object Record Evidence
+
+> **Navigation**: [docs/use-cases/business-objects/submit-business-object-record.md](./submit-business-object-record.md) · [docs/use-cases/business-objects/README.md](./README.md) · [docs/use-cases/README.md](../README.md) · [docs/README.md](../../README.md)
+
+## Acceptance Evidence
+
+The evidence below records the current proof boundary for the first executable Draft → Submitted workflow slice.
+
+| AT ID | Evidence | Commands |
+|---|---|---|
+| AT-001 | `src/Modules/BusinessObjects/Axis.BusinessObjects.Domain/Aggregates/BusinessObjectRecord.cs`, `tests/Modules/BusinessObjects/Axis.BusinessObjects.Domain.Tests/Aggregates/BusinessObjectRecordTests.cs` | `python scripts/axis.py dotnet test tests/Modules/BusinessObjects/Axis.BusinessObjects.Domain.Tests/Axis.BusinessObjects.Domain.Tests.csproj` |
+| AT-002 | `src/Modules/BusinessObjects/Axis.BusinessObjects.Application/BusinessObjectRecordValueValidator.cs`, `tests/Modules/BusinessObjects/Axis.BusinessObjects.Application.Tests/BusinessObjectRecordApplicationTests.cs` | `python scripts/axis.py dotnet test tests/Modules/BusinessObjects/Axis.BusinessObjects.Application.Tests/Axis.BusinessObjects.Application.Tests.csproj`; `python scripts/axis.py dotnet test tests/Api/Axis.Api.Tests/Axis.Api.Tests.csproj --filter FullyQualifiedName~BusinessObjectRecordEndpointTests` |
+| AT-003 | `src/Modules/BusinessObjects/Axis.BusinessObjects.Application/BusinessObjectRecordRuleEvaluator.cs`, `src/Modules/BusinessObjects/Axis.BusinessObjects.Application/BusinessObjectRecordRuleBindingContract.cs`, `src/Modules/Rules/Axis.Rules.Application/RuleBindingEvaluator.cs`, `tests/Modules/BusinessObjects/Axis.BusinessObjects.Application.Tests/BusinessObjectRecordApplicationTests.cs` | `python scripts/axis.py dotnet test tests/Modules/BusinessObjects/Axis.BusinessObjects.Application.Tests/Axis.BusinessObjects.Application.Tests.csproj`; `python scripts/axis.py dotnet test tests/Api/Axis.Api.Tests/Axis.Api.Tests.csproj --filter FullyQualifiedName~BusinessObjectRecordEndpointTests` |
+| AT-004 | `src/Modules/BusinessObjects/Axis.BusinessObjects.Application/Commands/SubmitBusinessObjectRecord/SubmitBusinessObjectRecordHandler.cs`, `tests/Modules/BusinessObjects/Axis.BusinessObjects.Application.Tests/BusinessObjectRecordApplicationTests.cs` | `python scripts/axis.py dotnet test tests/Modules/BusinessObjects/Axis.BusinessObjects.Application.Tests/Axis.BusinessObjects.Application.Tests.csproj`; `python scripts/axis.py dotnet test tests/Api/Axis.Api.Tests/Axis.Api.Tests.csproj --filter FullyQualifiedName~BusinessObjectRecordEndpointTests` |
+| AT-005 | `src/Modules/BusinessObjects/Axis.BusinessObjects.Infrastructure/Migrations/20260802121207_AddBusinessObjectRecords.cs`, `src/Modules/BusinessObjects/Axis.BusinessObjects.Infrastructure/Persistence/Configurations/BusinessObjectRecordConfiguration.cs`, `tests/Modules/BusinessObjects/Axis.BusinessObjects.Infrastructure.Tests/Repositories/BusinessObjectRecordRepositoryTests.cs` | `python scripts/axis.py dotnet test tests/Modules/BusinessObjects/Axis.BusinessObjects.Infrastructure.Tests/Axis.BusinessObjects.Infrastructure.Tests.csproj` |
+| AT-006 | `src/Axis.Api/Endpoints/BusinessObjectRecordEndpoints.cs`, `openapi.json`, `frontend/src/lib/api-generated/types.gen.ts`, `tests/Api/Axis.Api.Tests/BusinessObjects/BusinessObjectRecordEndpointTests.cs` | `python scripts/axis.py dotnet test tests/Api/Axis.Api.Tests/Axis.Api.Tests.csproj --filter FullyQualifiedName~BusinessObjectRecordEndpointTests`; `python scripts/axis.py check frontend-api-contracts` |
+| AT-007 | `src/Modules/Rules/Axis.Rules.Domain/RuleBindingRevision.cs`, `src/Modules/BusinessObjects/Axis.BusinessObjects.Application/Commands/PublishBusinessObjectDefinition/PublishBusinessObjectDefinitionHandler.cs`, `tests/Modules/BusinessObjects/Axis.BusinessObjects.Application.Tests/BusinessObjectRecordApplicationTests.cs`, `tests/Api/Axis.Api.Tests/BusinessObjects/BusinessObjectRecordEndpointTests.cs` | `python scripts/axis.py dotnet test tests/Modules/BusinessObjects/Axis.BusinessObjects.Application.Tests/Axis.BusinessObjects.Application.Tests.csproj`; `python scripts/axis.py dotnet test tests/Api/Axis.Api.Tests/Axis.Api.Tests.csproj --filter FullyQualifiedName~BusinessObjectRecordEndpointTests` |
+| AT-008 | `frontend/src/features/applications/components/ApplicationsPage.tsx`, `frontend/src/features/applications/components/ApplicationRecordDialog.tsx`, `frontend/tests/applications-page.test.tsx` | `python scripts/axis.py frontend test tests/applications-page.test.tsx`; `python scripts/axis.py frontend test` |
+| AT-009 | `frontend/e2e/submit-business-object-record.pw.ts`; authenticated browser journey passed through the repository E2E runner: setup workflow, create Draft, Save revision 2, Submit, verify Submitted/rule evidence/read-only form. | `python scripts/axis.py local-dev e2e -- e2e/submit-business-object-record.pw.ts` |
+| AT-010 | API lifecycle proof is in `tests/Api/Axis.Api.Tests/BusinessObjects/BusinessObjectRecordEndpointTests.cs`; the typed agent bridge and complete operation classification are in `src/Axis.Mcp/Tools/AxisMcpBusinessObjectRecordTools.cs`, `src/Axis.Mcp/Tools/AxisMcpOperationCatalog.cs`, `tests/Tools/Axis.Mcp.Tests/AxisMcpToolTests.cs`, `tests/Tools/Axis.Mcp.Tests/McpProtocolTests.cs`, and `tests/Tools/Axis.Mcp.Tests/McpApiCoverageTests.cs`. A purpose-built authenticated MCP protocol run proved the bridge boundary by reading the persisted loan_application record, returning Submitted revision 3, and returning three matching rule evaluations—field.required, field.text_format, and field.numeric_range—with diagnostics. This is protocol-boundary evidence only; it does not substitute for a supported host-client reload, current registry, and authenticated client-session read-back. | `python scripts/axis.py dotnet test tests/Api/Axis.Api.Tests/Axis.Api.Tests.csproj --filter FullyQualifiedName~BusinessObjectRecordEndpointTests`; `python scripts/axis.py dotnet test tests/Tools/Axis.Mcp.Tests/Axis.Mcp.Tests.csproj`; `python scripts/axis.py check mcp-api-coverage`; `python scripts/axis.py check mcp-contracts`; `python scripts/axis.py check mcp-tool-safety` |
+
+## Current notes
+
+- The bridge protocol is verified against the current API through OAuth Authorization Code + PKCE. A standalone protocol run is not host-client evidence; after bridge source changes, reload the app-managed MCP server and complete the supported authenticated client-session read-back.
+- The WSL launcher opens the authorization URL through the Windows browser when available and keeps a stderr URL fallback; MCP stdout remains protocol-only.
+
+## Verification summary
+
+- .NET build: passed with zero warnings and zero errors.
+- Unit matrix: passed.
+- Business Object API endpoint tests: 5 passed.
+- Business Objects infrastructure tests: 10 passed.
+- Rules infrastructure tests: 12 passed.
+- Frontend: 29 files / 177 tests passed; type-check and Biome passed.
+- MCP: 16 tests passed; OpenAPI coverage classified all 34 operations; contract and safety checks passed. The authenticated live bridge read the persisted submitted record and its three matching rule evaluations.
+- Browser E2E: 1 passed through the containerized Chromium runner.
+- Local stack: API and web services healthy; `/health` returned 200 and `/applications` served the current SPA shell.

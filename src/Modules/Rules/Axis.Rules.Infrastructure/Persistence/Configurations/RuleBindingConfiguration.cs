@@ -19,6 +19,19 @@ internal sealed class RuleBindingConfiguration : IEntityTypeConfiguration<RuleBi
             value => RulePersistenceJson.SerializeInputMappings(value ?? new()).GetHashCode(StringComparison.Ordinal),
             value => RulePersistenceJson.DeserializeInputMappings(RulePersistenceJson.SerializeInputMappings(value ?? new())));
 
+    private static readonly ValueConverter<List<RuleBindingRevision>, string> RevisionHistoryConverter =
+        new(
+            value => RulePersistenceJson.SerializeBindingRevisionHistory(value),
+            value => RulePersistenceJson.DeserializeBindingRevisionHistory(value));
+
+    private static readonly ValueComparer<List<RuleBindingRevision>> RevisionHistoryComparer =
+        new(
+            (left, right) => RulePersistenceJson.SerializeBindingRevisionHistory(left ?? new List<RuleBindingRevision>()) ==
+                RulePersistenceJson.SerializeBindingRevisionHistory(right ?? new List<RuleBindingRevision>()),
+            value => RulePersistenceJson.SerializeBindingRevisionHistory(value ?? new List<RuleBindingRevision>()).GetHashCode(StringComparison.Ordinal),
+            value => RulePersistenceJson.DeserializeBindingRevisionHistory(
+                RulePersistenceJson.SerializeBindingRevisionHistory(value ?? new List<RuleBindingRevision>())));
+
     public void Configure(EntityTypeBuilder<RuleBinding> builder)
     {
         builder.ToTable("rule_bindings");
@@ -39,6 +52,7 @@ internal sealed class RuleBindingConfiguration : IEntityTypeConfiguration<RuleBi
         builder.Property(binding => binding.TargetId).HasColumnName("target_id").HasMaxLength(200).IsRequired();
         builder.Property(binding => binding.UseCaseOrTrigger).HasColumnName("use_case_or_trigger").HasMaxLength(120).IsRequired();
         builder.Ignore(binding => binding.InputMappings);
+        builder.Ignore(binding => binding.RevisionHistory);
         builder.Property<Dictionary<string, RuleInputMapping>>("_inputMappings")
             .HasColumnName("input_mappings")
             .HasColumnType("jsonb")
@@ -49,6 +63,12 @@ internal sealed class RuleBindingConfiguration : IEntityTypeConfiguration<RuleBi
         builder.Property(binding => binding.Enabled).HasColumnName("enabled").IsRequired();
         builder.Property(binding => binding.FailureBehavior).HasColumnName("failure_behavior").HasConversion<string>().HasMaxLength(32).IsRequired();
         builder.Property(binding => binding.Revision).HasColumnName("revision").IsRequired();
+        builder.Property<List<RuleBindingRevision>>("_revisionHistory")
+            .HasColumnName("revision_history")
+            .HasColumnType("jsonb")
+            .HasConversion(RevisionHistoryConverter)
+            .IsRequired()
+            .Metadata.SetValueComparer(RevisionHistoryComparer);
         builder.Property(binding => binding.CreatedByUserId).HasColumnName("created_by_user_id").IsRequired();
         builder.Property(binding => binding.UpdatedByUserId).HasColumnName("updated_by_user_id").IsRequired();
         builder.Property(binding => binding.CreatedAt).HasColumnName("created_at").IsRequired();

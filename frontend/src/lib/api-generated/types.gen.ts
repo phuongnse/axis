@@ -54,10 +54,10 @@ export type BusinessObjectDefinitionListItemDto = {
 };
 
 export type BusinessObjectDefinitionListItemDtoPagedResult = {
-    items?: Array<BusinessObjectDefinitionListItemDto>;
-    totalCount?: number;
-    page?: number;
-    pageSize?: number;
+    items: Array<BusinessObjectDefinitionListItemDto>;
+    totalCount: number;
+    page: number;
+    pageSize: number;
 };
 
 export type BusinessObjectDefinitionStatus = 'Unpublished' | 'Published';
@@ -99,6 +99,7 @@ export type BusinessObjectDefinitionVersionFieldRuleDto = {
     id?: string;
     sourceFieldRuleId?: string;
     bindingId?: string;
+    bindingRevision?: number;
     order?: number;
 };
 
@@ -124,6 +125,7 @@ export type BusinessObjectFieldDefinitionInput = {
 export type BusinessObjectFieldRuleDto = {
     id?: string;
     bindingId?: string;
+    bindingRevision?: number;
     order?: number;
 };
 
@@ -134,8 +136,85 @@ export type BusinessObjectFieldRuleInput = {
 
 export type BusinessObjectFieldType = 'Text' | 'Integer' | 'Decimal' | 'Date' | 'DateTime' | 'Boolean' | 'Choice';
 
+export type BusinessObjectRecordDetailDto = {
+    id: string;
+    workspaceId: string;
+    objectKey: string;
+    definitionVersion: number;
+    definitionVersionId: string;
+    status: BusinessObjectRecordStatus;
+    revision: number;
+    values: {
+        [key: string]: Array<string>;
+    };
+    fields: Array<BusinessObjectRecordFieldContractDto>;
+    ruleEvaluations: Array<BusinessObjectRecordRuleEvaluationDto>;
+    createdByUserId: string;
+    createdAt: string;
+    updatedByUserId: string;
+    updatedAt: string;
+    submittedByUserId?: string | null;
+    submittedAt?: string | null;
+};
+
+export type BusinessObjectRecordFieldContractDto = {
+    fieldKey: string;
+    label: string;
+    order: number;
+    fieldType: BusinessObjectFieldType;
+    choiceConfiguration?: BusinessObjectDefinitionVersionChoiceFieldConfigurationDto;
+    rules: Array<BusinessObjectDefinitionVersionFieldRuleDto>;
+};
+
+export type BusinessObjectRecordListItemDto = {
+    id: string;
+    objectKey: string;
+    definitionVersion: number;
+    status: BusinessObjectRecordStatus;
+    revision: number;
+    updatedAt: string;
+    submittedAt?: string | null;
+};
+
+export type BusinessObjectRecordListItemDtoPagedResult = {
+    items: Array<BusinessObjectRecordListItemDto>;
+    totalCount: number;
+    page: number;
+    pageSize: number;
+};
+
+export type BusinessObjectRecordRuleDiagnosticDto = {
+    nodeId: string;
+    isMatch: boolean;
+};
+
+export type BusinessObjectRecordRuleEvaluationDto = {
+    fieldKey: string;
+    bindingId: string;
+    bindingRevision: number;
+    definitionKey: string;
+    definitionVersion: number;
+    isMatch: boolean;
+    diagnostics: Array<BusinessObjectRecordRuleDiagnosticDto>;
+};
+
+export type BusinessObjectRecordStatus = 'Draft' | 'Submitted';
+
+export type BusinessObjectRecordSubmitResultDto = {
+    isSubmitted: boolean;
+    record: BusinessObjectRecordDetailDto;
+    ruleEvaluations: Array<BusinessObjectRecordRuleEvaluationDto>;
+};
+
 export type CreateBusinessObjectDefinitionRequest = {
     name?: string;
+};
+
+export type CreateBusinessObjectRecordRequest = {
+    idempotencyKey: string;
+    values?: {
+        [key: string]: Array<string>;
+    } | null;
 };
 
 export type CreateRuleBindingRequest = {
@@ -166,6 +245,28 @@ export type CurrentUserProfileDto = {
     theme?: string | null;
     workspaceId?: string | null;
     workspaces?: Array<UserWorkspaceDto>;
+};
+
+export type HttpValidationProblemDetails = {
+    type?: string | null;
+    title?: string | null;
+    status?: number | null;
+    detail?: string | null;
+    instance?: string | null;
+    errors?: {
+        [key: string]: Array<string>;
+    };
+    /**
+     * Stable machine-readable problem code for client behavior and localization.
+     */
+    code?: string | null;
+    /**
+     * Optional field-level machine-readable validation codes keyed by JSON field name.
+     */
+    errorCodes?: {
+        [key: string]: Array<string>;
+    } | null;
+    [key: string]: unknown;
 };
 
 export type LanguagePreferenceDto = {
@@ -307,10 +408,10 @@ export type RuleDefinitionSummaryDto = {
 };
 
 export type RuleDefinitionSummaryDtoPagedResult = {
-    items?: Array<RuleDefinitionSummaryDto>;
-    totalCount?: number;
-    page?: number;
-    pageSize?: number;
+    items: Array<RuleDefinitionSummaryDto>;
+    totalCount: number;
+    page: number;
+    pageSize: number;
 };
 
 export type RuleDefinitionVersionDto = {
@@ -526,6 +627,13 @@ export type RuleValueTypeDefinitionDto = {
     documentation?: RuleReferenceDocumentationDto;
 };
 
+export type SaveBusinessObjectRecordRequest = {
+    expectedRevision: number;
+    values: {
+        [key: string]: Array<string>;
+    };
+};
+
 export type SaveRuleDefinitionDraftRequest = {
     expectedRevision?: number;
     name?: string;
@@ -578,6 +686,10 @@ export type SimulateRuleRequest = {
     correlationId?: string;
 };
 
+export type SubmitBusinessObjectRecordRequest = {
+    expectedRevision: number;
+};
+
 export type ThemePreferenceDto = {
     theme?: string;
 };
@@ -623,6 +735,219 @@ export type VerifyEmailSessionEstablishedDto = {
     sessionEstablished?: boolean;
     nextStep?: VerifyEmailNextStep;
 };
+
+export type ListBusinessObjectRecordsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        page?: number;
+        pageSize?: number;
+        objectKey?: string;
+    };
+    url: '/api/business-object-records';
+};
+
+export type ListBusinessObjectRecordsErrors = {
+    /**
+     * Bad Request
+     */
+    400: ProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+};
+
+export type ListBusinessObjectRecordsError = ListBusinessObjectRecordsErrors[keyof ListBusinessObjectRecordsErrors];
+
+export type ListBusinessObjectRecordsResponses = {
+    /**
+     * OK
+     */
+    200: BusinessObjectRecordListItemDtoPagedResult;
+};
+
+export type ListBusinessObjectRecordsResponse = ListBusinessObjectRecordsResponses[keyof ListBusinessObjectRecordsResponses];
+
+export type CreateBusinessObjectRecordData = {
+    body: CreateBusinessObjectRecordRequest;
+    path: {
+        objectKey: string;
+    };
+    query?: never;
+    url: '/api/business-object-records/{objectKey}';
+};
+
+export type CreateBusinessObjectRecordErrors = {
+    /**
+     * Bad Request
+     */
+    400: HttpValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+    /**
+     * Unprocessable Content
+     */
+    422: ProblemDetails;
+};
+
+export type CreateBusinessObjectRecordError = CreateBusinessObjectRecordErrors[keyof CreateBusinessObjectRecordErrors];
+
+export type CreateBusinessObjectRecordResponses = {
+    /**
+     * Created
+     */
+    201: BusinessObjectRecordDetailDto;
+};
+
+export type CreateBusinessObjectRecordResponse = CreateBusinessObjectRecordResponses[keyof CreateBusinessObjectRecordResponses];
+
+export type GetBusinessObjectRecordData = {
+    body?: never;
+    path: {
+        recordId: string;
+    };
+    query?: never;
+    url: '/api/business-object-records/{recordId}';
+};
+
+export type GetBusinessObjectRecordErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type GetBusinessObjectRecordError = GetBusinessObjectRecordErrors[keyof GetBusinessObjectRecordErrors];
+
+export type GetBusinessObjectRecordResponses = {
+    /**
+     * OK
+     */
+    200: BusinessObjectRecordDetailDto;
+};
+
+export type GetBusinessObjectRecordResponse = GetBusinessObjectRecordResponses[keyof GetBusinessObjectRecordResponses];
+
+export type SaveBusinessObjectRecordData = {
+    body: SaveBusinessObjectRecordRequest;
+    path: {
+        recordId: string;
+    };
+    query?: never;
+    url: '/api/business-object-records/{recordId}';
+};
+
+export type SaveBusinessObjectRecordErrors = {
+    /**
+     * Bad Request
+     */
+    400: HttpValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+    /**
+     * Unprocessable Content
+     */
+    422: ProblemDetails;
+};
+
+export type SaveBusinessObjectRecordError = SaveBusinessObjectRecordErrors[keyof SaveBusinessObjectRecordErrors];
+
+export type SaveBusinessObjectRecordResponses = {
+    /**
+     * OK
+     */
+    200: BusinessObjectRecordDetailDto;
+};
+
+export type SaveBusinessObjectRecordResponse = SaveBusinessObjectRecordResponses[keyof SaveBusinessObjectRecordResponses];
+
+export type SubmitBusinessObjectRecordData = {
+    body: SubmitBusinessObjectRecordRequest;
+    path: {
+        recordId: string;
+    };
+    query?: never;
+    url: '/api/business-object-records/{recordId}/submit';
+};
+
+export type SubmitBusinessObjectRecordErrors = {
+    /**
+     * Bad Request
+     */
+    400: HttpValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+    /**
+     * Unprocessable Content
+     */
+    422: ProblemDetails;
+};
+
+export type SubmitBusinessObjectRecordError = SubmitBusinessObjectRecordErrors[keyof SubmitBusinessObjectRecordErrors];
+
+export type SubmitBusinessObjectRecordResponses = {
+    /**
+     * OK
+     */
+    200: BusinessObjectRecordSubmitResultDto;
+};
+
+export type SubmitBusinessObjectRecordResponse = SubmitBusinessObjectRecordResponses[keyof SubmitBusinessObjectRecordResponses];
 
 export type ListBusinessObjectDefinitionsData = {
     body?: never;

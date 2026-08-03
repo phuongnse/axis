@@ -34,6 +34,7 @@ Annotate routes with names, summaries, tags, success type, and problem responses
 |---|---|
 | Success | `200`, `201`, or `204` |
 | Validation | `400` |
+| Domain field validation | `422` |
 | Unauthorized | `401` |
 | Forbidden | `403` |
 | Not found / cross-workspace isolation | `404` |

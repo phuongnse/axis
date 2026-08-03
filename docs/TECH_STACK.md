@@ -16,6 +16,7 @@ Tech-stack changes need explicit user approval before implementation. Update thi
 | Persistence | EF Core migrations, Npgsql/PostgreSQL, Redis. |
 | Search | Server-owned CQRS read providers; PostgreSQL full-text search with `unaccent` and `pg_trgm` is the first adapter. |
 | Auth | OpenIddict Authorization Code + PKCE, BCrypt password hashing, MailKit SMTP. |
+| Agent integration | .NET 8 local stdio bridge using the official Model Context Protocol C# SDK 1.4.1; typed MCP tools cover authenticated product OpenAPI operations through loopback HTTPS. |
 | Observability | Serilog, OpenTelemetry, optional local OTEL/LGTM stack. |
 | API contract | OpenAPI via Swashbuckle/Scalar; SPA types generated with `@hey-api/openapi-ts`. |
 | Frontend | React, TypeScript, Vite, TanStack Router, TanStack Query, TanStack Table, TanStack Virtual, React Query Builder, Zustand, react-hook-form, Zod, i18next/react-i18next. |

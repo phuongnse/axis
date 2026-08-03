@@ -6,6 +6,7 @@ namespace Axis.Rules.Domain;
 public sealed partial class RuleBinding : AggregateRoot<RuleBindingId>
 {
     private Dictionary<string, RuleInputMapping> _inputMappings = new(StringComparer.Ordinal);
+    private List<RuleBindingRevision> _revisionHistory = [];
 
     private RuleBinding()
         : base(default)
@@ -47,6 +48,7 @@ public sealed partial class RuleBinding : AggregateRoot<RuleBindingId>
         UpdatedByUserId = createdByUserId;
         CreatedAt = createdAt;
         UpdatedAt = createdAt;
+        _revisionHistory.Add(CreateRevision(createdByUserId, createdAt));
     }
 
     public Guid WorkspaceId { get; private set; }
@@ -65,6 +67,7 @@ public sealed partial class RuleBinding : AggregateRoot<RuleBindingId>
     public Guid UpdatedByUserId { get; private set; }
     public DateTime CreatedAt { get; private set; }
     public DateTime UpdatedAt { get; private set; }
+    public IReadOnlyList<RuleBindingRevision> RevisionHistory => _revisionHistory.AsReadOnly();
 
     public static Result<RuleBinding> Create(
         Guid workspaceId,
@@ -141,8 +144,38 @@ public sealed partial class RuleBinding : AggregateRoot<RuleBindingId>
         Revision += 1;
         UpdatedByUserId = updatedByUserId;
         UpdatedAt = updatedAt;
+        _revisionHistory.Add(CreateRevision(updatedByUserId, updatedAt));
         return Result.Success();
     }
+
+    public RuleBindingRevision? FindRevision(int? revision)
+    {
+        int requestedRevision = revision ?? Revision;
+        if (requestedRevision <= 0 || requestedRevision > Revision)
+            return null;
+
+        RuleBindingRevision? historical = _revisionHistory
+            .SingleOrDefault(candidate => candidate.Revision == requestedRevision);
+        return historical ??
+            (requestedRevision == Revision
+                ? CreateRevision(UpdatedByUserId, UpdatedAt)
+                : null);
+    }
+
+    private RuleBindingRevision CreateRevision(Guid updatedByUserId, DateTime updatedAt) =>
+        new(
+            Revision,
+            DefinitionKey,
+            DefinitionVersion,
+            TargetType,
+            TargetId,
+            UseCaseOrTrigger,
+            Clone(_inputMappings),
+            Priority,
+            Enabled,
+            FailureBehavior,
+            updatedByUserId,
+            updatedAt);
 
     private static Result ValidateCommon(
         int definitionVersion,

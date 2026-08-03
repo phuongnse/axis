@@ -8,6 +8,9 @@ internal static class BusinessObjectValueConverters
     public static readonly ValueConverter<BusinessObjectDefinitionId, Guid> DefinitionId =
         new(id => id.Value, value => BusinessObjectDefinitionId.From(value));
 
+    public static readonly ValueConverter<BusinessObjectRecordId, Guid> RecordId =
+        new(id => id.Value, value => BusinessObjectRecordId.From(value));
+
     public static readonly ValueConverter<BusinessObjectFieldDefinitionId, Guid> FieldDefinitionId =
         new(id => id.Value, value => BusinessObjectFieldDefinitionId.From(value));
 

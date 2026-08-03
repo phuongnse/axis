@@ -24,7 +24,8 @@ public sealed class PublishBusinessObjectDefinitionHandlerTests
         PublishBusinessObjectDefinitionHandler sut = new(
             _context.CurrentUser,
             _context.Repository,
-            _context.UnitOfWork);
+            _context.UnitOfWork,
+            _context.BindingValidator);
 
         Result<BusinessObjectDefinitionDetailDto> result = await sut.Handle(
             new PublishBusinessObjectDefinitionCommand(definition.Id.Value, ExpectedRevision: 2),
@@ -49,7 +50,8 @@ public sealed class PublishBusinessObjectDefinitionHandlerTests
         PublishBusinessObjectDefinitionHandler sut = new(
             _context.CurrentUser,
             _context.Repository,
-            _context.UnitOfWork);
+            _context.UnitOfWork,
+            _context.BindingValidator);
 
         Result<BusinessObjectDefinitionDetailDto> result = await sut.Handle(
             new PublishBusinessObjectDefinitionCommand(Guid.NewGuid(), ExpectedRevision: 1),

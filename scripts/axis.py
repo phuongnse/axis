@@ -18,6 +18,7 @@ import os
 import platform
 import re
 import shutil
+import ssl
 import subprocess
 import sys
 import tempfile
@@ -34,7 +35,6 @@ ROOT = Path(__file__).resolve().parent.parent
 SCRIPTS = ROOT / "scripts"
 REQUIRED_DOTNET_SDK_MAJOR = "8"
 REQUIRED_RENOVATE_VALIDATOR_VERSION = "43.280.5"
-MINIMUM_CODERABBIT_CLI_VERSION = "0.6.0"
 VERSION_PROBE_TIMEOUT_SECONDS = 15
 PLAYWRIGHT_BROWSER_PROBE_TIMEOUT_SECONDS = 20
 DOCKER_PROBE_TIMEOUT_SECONDS = 20
@@ -49,6 +49,7 @@ LOCAL_DEV_ENV_FILE = ROOT / ".env.local"
 LOCAL_DEV_PROJECT_NAME = "axis"
 LOCAL_DEV_POSTGRES_VOLUME = f"{LOCAL_DEV_PROJECT_NAME}_postgres_data"
 API_PROJECT = ROOT / "src" / "Axis.Api" / "Axis.Api.csproj"
+MCP_PROJECT = ROOT / "src" / "Axis.Mcp" / "Axis.Mcp.csproj"
 FRONTEND_DIR = ROOT / "frontend"
 MIGRATION_TARGETS: dict[str, tuple[Path, str, str]] = {
     "business-objects": (
@@ -730,7 +731,7 @@ def check_test_project_classification(_args: argparse.Namespace | None = None) -
         allowed = (
             re.fullmatch(r"Axis\..*\.(Domain|Application)\.Tests", name)
             or re.fullmatch(r"Axis\..*\.Infrastructure\.Tests", name)
-            or name in {"Axis.Api.Tests", "Axis.Architecture.Tests", "Axis.Testing"}
+            or name in {"Axis.Api.Tests", "Axis.Architecture.Tests", "Axis.Mcp.Tests", "Axis.Testing"}
         )
         if not allowed:
             print(f"check-test-project-classification: {project} is not classified", file=sys.stderr)
@@ -1399,6 +1400,21 @@ def simple_yaml_value(text: str, key: str) -> str:
     return value
 
 
+def check_project_orchestration() -> int:
+    result = run(
+        [sys.executable, str(ROOT / ".codex" / "check.py")],
+        check=False,
+        capture=True,
+    )
+    if result.returncode != 0:
+        print(result.stderr or result.stdout, file=sys.stderr)
+    return result.returncode
+
+
+def is_project_orchestration_path(path: str) -> bool:
+    return path == ".gitignore" or path.startswith(".codex/")
+
+
 def markdown_anchor_slug(text: str) -> str:
     text = re.sub(r"`([^`]*)`", r"\1", text.strip().lower())
     text = re.sub(r"<[^>]+>", "", text)
@@ -1699,6 +1715,50 @@ def repo_skill_verification_scope_issues(
                 "for minimal solutions, root-cause fixes, behavior proof, safety, communication, "
                 "and skill validation"
             )
+        blocker_fragments = (
+            "## Blocker and completion protocol",
+            "No workaround",
+            "user-local",
+            "explicit user approval",
+            "stale, missing, indirect, or blocked evidence",
+        )
+        if any(fragment.lower() not in reference_text.lower() for fragment in blocker_fragments):
+            issues.append(
+                f"{rel_from(reference, root)}: universal contract must own the blocker handshake "
+                "and completion evidence boundary"
+            )
+
+    mcp_skill = by_name.get("axis-mcp-integration")
+    if mcp_skill is not None:
+        skill_md, text = mcp_skill
+        mcp_skill_fragments = (
+            "supported MCP client lifecycle",
+            "`tools/list`",
+            "`tools/call`",
+            "stop and ask",
+        )
+        if any(fragment.lower() not in text.lower() for fragment in mcp_skill_fragments):
+            issues.append(
+                f"{rel_from(skill_md, root)}: MCP skill must require supported client lifecycle "
+                "evidence and the blocker handshake"
+            )
+        playbook = root / "docs" / "playbooks" / "mcp.md"
+        if not playbook.is_file():
+            issues.append("docs/playbooks/mcp.md: MCP skill requires the runtime lifecycle playbook")
+        else:
+            playbook_text = playbook.read_text(encoding="utf-8")
+            playbook_fragments = (
+                "## Runtime lifecycle and blocker protocol",
+                "reload or reconnect",
+                "`tools/list`",
+                "`tools/call`",
+                "stop and ask",
+            )
+            if any(fragment.lower() not in playbook_text.lower() for fragment in playbook_fragments):
+                issues.append(
+                    "docs/playbooks/mcp.md: MCP runtime lifecycle must document reload/reconnect, "
+                    "current tools/list/tools/call evidence, and stop-and-ask blockers"
+                )
     return issues
 
 
@@ -1810,24 +1870,64 @@ def check_repo_skills(_args: argparse.Namespace | None = None) -> int:
         for issue in issues:
             print(f"  - {issue}", file=sys.stderr)
         return 1
+    if check_project_orchestration() != 0:
+        return 1
     print("check-repo-skills: OK")
     return 0
 
 
-def check_policy_tests(_args: argparse.Namespace | None = None) -> int:
-    return run(
-        [
-            sys.executable,
-            "-m",
-            "unittest",
-            "discover",
-            "-s",
-            "scripts/tests",
-            "-p",
-            "test_*.py",
-        ],
-        check=False,
-    ).returncode
+def check_policy_tests(args: argparse.Namespace | None = None) -> int:
+    tests = getattr(args, "tests", None) or []
+    command = [sys.executable, "-m", "unittest"]
+    if tests:
+        command.extend(tests)
+    else:
+        command.extend(["discover", "-s", "scripts/tests", "-p", "test_*.py"])
+    return run(command, check=False).returncode
+
+
+MCP_TEST_PROJECT = ROOT / "tests" / "Tools" / "Axis.Mcp.Tests" / "Axis.Mcp.Tests.csproj"
+
+
+def run_mcp_test(filter_expression: str | None, label: str) -> int:
+    rc = check_dotnet_sdk()
+    if rc != 0:
+        return rc
+
+    command = [
+        exe("dotnet"),
+        "test",
+        str(MCP_TEST_PROJECT),
+        "--nologo",
+        "--no-restore",
+    ]
+    if filter_expression:
+        command.extend(["--filter", filter_expression])
+
+    result = run(command, check=False)
+    if result.returncode == 0:
+        print(f"{label}: OK")
+    else:
+        print(f"{label}: FAIL", file=sys.stderr)
+    return result.returncode
+
+
+def check_mcp_api_coverage(_args: argparse.Namespace | None = None) -> int:
+    return run_mcp_test(
+        "FullyQualifiedName~McpApiCoverageTests",
+        "check-mcp-api-coverage",
+    )
+
+
+def check_mcp_contracts(_args: argparse.Namespace | None = None) -> int:
+    return run_mcp_test(None, "check-mcp-contracts")
+
+
+def check_mcp_tool_safety(_args: argparse.Namespace | None = None) -> int:
+    return run_mcp_test(
+        "FullyQualifiedName~MutationGuard",
+        "check-mcp-tool-safety",
+    )
 
 
 def parse_added_lines(diff_text: str, include: callable[[str], bool]) -> list[tuple[str, str]]:
@@ -1993,6 +2093,10 @@ RAW_DOC_COMMAND_PATTERNS = [
         "use `python scripts/axis.py local-dev ...` or `python scripts/axis.py check docker`",
     ),
     (re.compile(r"^openssl\b"), "use `python scripts/axis.py local-dev certs`"),
+    (
+        re.compile(r"^(?:python3|py\s+-3)\s+scripts/axis[.]py\b"),
+        "use `python scripts/axis.py ...`",
+    ),
     (re.compile(r"^python\s+docs/scripts/"), "use an approved project wrapper"),
     (re.compile(r"^lychee\s+--version\b"), "use `python scripts/axis.py check markdown-links` or `python scripts/axis.py doctor`"),
     (re.compile(r"^cargo\s+install\s+lychee\b"), "install tools externally, then verify through `python scripts/axis.py doctor`"),
@@ -2037,7 +2141,7 @@ def documented_raw_command_issues(paths: Iterable[str] | None = None, *, root: P
                 fence_lang = None if fence_lang is not None else fence_match.group(1).lower()
                 continue
 
-            if fence_lang in {"bash", "sh", "shell", "console"}:
+            if fence_lang in {"bash", "sh", "shell", "console", "powershell", "pwsh", "ps1"}:
                 message = raw_doc_command_message(line)
                 if message is not None:
                     issues.append(f"{normalized}:{idx}: raw documented command `{line.strip()}` - {message}")
@@ -2181,11 +2285,11 @@ def enforcement_truth_required_snippets() -> list[tuple[Path, list[tuple[str, st
             ("dotnet_projects_for_changed_paths(paths)", "local verify routes .NET work by changed project paths"),
             ('step("policy gate tests", lambda: check_policy_tests())', "local verify runs policy gate tests when scripts change"),
             ('step("doc navigation", lambda: check_doc_navigation())', "local verify runs docs checks when docs change"),
-            ('step("markdown links (changed files)",', "local verify runs markdown link checks for changed markdown paths"),
+            ('"markdown links (changed files)",', "local verify runs markdown link checks for changed markdown paths"),
             ('def pre_push(args: argparse.Namespace) -> int:', "pre-push quick gate is implemented in Python"),
             ('return ready_review(argparse.Namespace(since=None, policy_only=False))', "pre-push can opt into ready-review with AXIS_PRE_PUSH_FULL"),
             ('def ready_review(args: argparse.Namespace) -> int:', "ready-review owns local review-boundary verification"),
-            ('gates.append(("doc drift", lambda: check_doc_drift(None)))', "ready-review and CI share the doc-drift policy profile"),
+            ("lambda: check_doc_drift(", "ready-review and CI share the doc-drift policy profile"),
             ("for issue in governance_owner_boundary_issues():", "doc drift checks governance owner boundaries"),
             ("for issue in enforcement_ledger_issues():", "doc drift checks enforcement ledger rows"),
             ("for issue in enforcement_truth_audit_issues():", "doc drift checks enforcement truth wiring"),
@@ -2292,6 +2396,18 @@ def normalized_text(path: Path) -> str:
     return path.read_text(encoding="utf-8", errors="ignore").replace("\r\n", "\n").replace("\r", "\n")
 
 
+def enforcement_truth_search_text(relative: Path, path: Path) -> str:
+    text = normalized_text(path)
+    if relative != Path("scripts/axis.py"):
+        return text
+
+    start = text.find("def enforcement_truth_required_snippets")
+    end = text.find("\ndef governance_owner_boundary_issues", start)
+    if start == -1 or end == -1:
+        return ""
+    return text[:start] + text[end:]
+
+
 def enforcement_truth_audit_issues(*, root: Path | None = None) -> list[str]:
     """Verify committed CI/script wiring still supports registry enforcement claims."""
     root = root or ROOT
@@ -2304,7 +2420,7 @@ def enforcement_truth_audit_issues(*, root: Path | None = None) -> list[str]:
             issues.append(f"{normalized}: enforcement truth audit missing required file")
             continue
 
-        text = normalized_text(path)
+        text = enforcement_truth_search_text(relative, path)
         for snippet, description in requirements:
             if snippet not in text:
                 issues.append(f"{normalized}: enforcement truth audit missing {description}: `{snippet}`")
@@ -2425,8 +2541,62 @@ def enforcement_ledger_issues(*, root: Path | None = None) -> list[str]:
     return issues
 
 
+def doc_drift_checker_names(paths: list[str]) -> set[str]:
+    names: set[str] = set()
+    if any(should_check_text_encoding(path) for path in paths):
+        names.add("check-text-encoding")
+    if any(path.startswith("scripts/") for path in paths):
+        names.add("check-scripts-standard")
+    if any(path.startswith(f"{REPO_SKILLS_DIR}/") or is_project_orchestration_path(path) for path in paths):
+        names.add("check-repo-skills")
+    if any(path.startswith(("src/", "tests/")) and path.endswith(".cs") for path in paths):
+        names.add("check-ef-domain-mapping")
+    if any(is_frontend_path(path) for path in paths):
+        names.update({"check-frontend-api-contracts", "check-frontend-quality"})
+    if any(
+        path in {
+            "frontend/components.json",
+            "frontend/ui-baseline.json",
+            "frontend/src/index.css",
+            "frontend/src/theme.generated.css",
+            "frontend/src/hooks/use-mobile.ts",
+            "frontend/src/lib/utils.ts",
+        }
+        or path.startswith("frontend/src/components/ui/")
+        for path in paths
+    ):
+        names.add("check-ui-baseline")
+    if any(axis_theme.is_theme_path(path) for path in paths):
+        names.add("check-theme")
+    if any(path.startswith("docs/use-cases/") for path in paths):
+        names.add("check-use-case-docs.py")
+    if any(path.startswith("docs/foundations/") for path in paths):
+        names.add("check-foundation-docs.py")
+    if any(is_docs_path(path) for path in paths):
+        names.update(
+            {
+                "check-doc-link-targets.py",
+                "check-doc-navigation",
+                "check-doc-size-budgets",
+                "check-doc-code-fences.py",
+            }
+        )
+    if any(
+        path in {
+            "docker-compose.yml",
+            "docs/playbooks/local-dev.md",
+            "docs/TECH_STACK.md",
+            "src/Axis.Api/appsettings.json",
+            "scripts/check-local-dev-docs.py",
+        }
+        for path in paths
+    ):
+        names.add("check-local-dev-docs.py")
+    return names
+
+
 def check_doc_drift(_args: argparse.Namespace | None = None) -> int:
-    range_spec = diff_range()
+    range_spec = getattr(_args, "range_spec", None) or diff_range()
     issues: list[str] = []
     skip_checkers = set(getattr(_args, "skip_checkers", ()) or ())
 
@@ -2437,7 +2607,8 @@ def check_doc_drift(_args: argparse.Namespace | None = None) -> int:
             print(f"  - {issue}", file=sys.stderr)
         issues.extend(discovery)
 
-    paths = changed_paths(range_spec)
+    supplied_paths = getattr(_args, "paths", None)
+    paths = list(supplied_paths) if supplied_paths is not None else changed_paths(range_spec)
     if not paths:
         if not issues:
             print(f"check-doc-drift: no diff in {range_spec} - skip")
@@ -2504,8 +2675,12 @@ def check_doc_drift(_args: argparse.Namespace | None = None) -> int:
                 f"`python scripts/axis.py migration add <module> <Name>`: {rel(migration)}",
             )
 
+    text_paths = [path for path in paths if (ROOT / path).is_file() and should_check_text_encoding(path)]
     checkers = [
-        ("check-text-encoding", check_text_encoding),
+        (
+            "check-text-encoding",
+            lambda _=None: run_text_encoding_check(text_paths, label="check-text-encoding-changed"),
+        ),
         ("check-scripts-standard", check_scripts_standard),
         ("check-repo-skills", check_repo_skills),
         ("check-ef-domain-mapping", check_ef_domain_mapping),
@@ -2521,8 +2696,9 @@ def check_doc_drift(_args: argparse.Namespace | None = None) -> int:
         ("check-doc-code-fences.py", lambda _=None: run_module_check("check-doc-code-fences.py", ["--check"])),
         ("check-local-dev-docs.py", lambda _=None: run_module_check("check-local-dev-docs.py", ["--check"])),
     ]
+    selected_checkers = doc_drift_checker_names(paths)
     for name, checker in checkers:
-        if name in skip_checkers:
+        if name not in selected_checkers or name in skip_checkers:
             continue
         if checker() != 0:
             issues.append(f"{name} failed")
@@ -2944,6 +3120,13 @@ def emit_captured_process(result: subprocess.CompletedProcess[str]) -> None:
         print(result.stderr, end="", file=sys.stderr)
 
 
+def emit_captured_process_to_stderr(result: subprocess.CompletedProcess[str]) -> None:
+    if result.stdout:
+        print(result.stdout, end="", file=sys.stderr)
+    if result.stderr:
+        print(result.stderr, end="", file=sys.stderr)
+
+
 def check_markdown_links(_args: argparse.Namespace | None = None) -> int:
     return check_markdown_links_for_paths(None)
 
@@ -2969,70 +3152,6 @@ def check_markdown_links_for_paths(paths: list[str] | None) -> int:
     result = run_lychee_markdown_check(lychee, paths)
     emit_captured_process(result)
     return result.returncode
-
-
-def inactive_coderabbit_path() -> Path | None:
-    if os.name == "nt":
-        return None
-    candidate = Path.home() / ".local" / "bin" / "coderabbit"
-    return candidate if candidate.is_file() and os.access(candidate, os.X_OK) else None
-
-
-def coderabbit_missing_detail(version_line: str) -> str:
-    inactive = inactive_coderabbit_path()
-    if inactive is not None:
-        return (
-            f"coderabbit is installed at {inactive}, but {inactive.parent} is not active in PATH; "
-            f"add that directory to PATH and start a new login shell, then rerun. See {TOOL_VERSIONS_DOC}."
-        )
-    return f"{version_line}; CodeRabbit CLI is required for the local pre-PR review checkpoint. See {TOOL_VERSIONS_DOC}."
-
-
-def coderabbit_cli_status() -> tuple[bool, str]:
-    ok, version_line, resolved = command_version_line("coderabbit", "--version")
-    if not ok:
-        return False, coderabbit_missing_detail(version_line)
-
-    version_match = re.search(r"\b([0-9]+(?:[.][0-9]+)+)\b", version_line)
-    if version_match is None:
-        return False, f"found `{version_line or 'unknown'}` at {resolved}; expected version >= {MINIMUM_CODERABBIT_CLI_VERSION}"
-
-    if _version_sort_key(version_match.group(1)) < _version_sort_key(MINIMUM_CODERABBIT_CLI_VERSION):
-        return (
-            False,
-            f"found `{version_line or 'unknown'}` at {resolved}; expected version >= {MINIMUM_CODERABBIT_CLI_VERSION}",
-        )
-
-    return True, f"{version_line} ({resolved}); expected >= {MINIMUM_CODERABBIT_CLI_VERSION}"
-
-
-def coderabbit_doctor_status(*, strict: bool) -> tuple[str, str]:
-    if strict:
-        ok, detail = coderabbit_cli_status()
-        return ("OK" if ok else "FAIL", detail)
-
-    resolved = shutil.which(resolve_exe("coderabbit")) or shutil.which("coderabbit")
-    if resolved is None:
-        return "FAIL", coderabbit_missing_detail("coderabbit not found in PATH")
-
-    suffix = Path(resolved).suffix.lower()
-    if os.name == "nt" and suffix in {".cmd", ".bat"}:
-        return (
-            "WARN",
-            f"{resolved}; version check skipped for Windows command shim. Run `python scripts/axis.py check coderabbit-cli` before PR review.",
-        )
-
-    ok, detail = coderabbit_cli_status()
-    return ("OK" if ok else "FAIL", detail)
-
-
-def check_coderabbit_cli(_args: argparse.Namespace | None = None) -> int:
-    ok, detail = coderabbit_cli_status()
-    if not ok:
-        print(f"coderabbit-cli: FAIL - {detail}", file=sys.stderr)
-        return 1
-    print(f"coderabbit-cli: OK ({detail})")
-    return 0
 
 
 MIGRATION_NAME_RE = re.compile(r"^[A-Z][A-Za-z0-9]*$")
@@ -3081,6 +3200,81 @@ def dotnet_command(args: argparse.Namespace) -> int:
     if command == "run-api":
         return run([exe("dotnet"), "run", "--project", str(API_PROJECT), *dotnet_args], check=False).returncode
     raise CheckError(f"Unknown dotnet command: {command}")
+
+
+def mcp_command(args: argparse.Namespace) -> int:
+    if args.mcp_command != "serve":
+        raise CheckError(f"Unknown mcp command: {args.mcp_command}")
+
+    sdk_ok, sdk_detail = dotnet_sdk_status()
+    if not sdk_ok:
+        print(f"mcp serve: .NET SDK is unavailable: {sdk_detail}", file=sys.stderr)
+        return 1
+
+    root_ca = Path(
+        os.environ.get("AXIS_MCP_ROOT_CA_PATH", str(LOCAL_ROOT_CA_PEM))
+    ).expanduser()
+    if not root_ca.is_file():
+        print(
+            "mcp serve: local root CA is missing; run `python scripts/axis.py local-dev certs` first",
+            file=sys.stderr,
+        )
+        return 1
+
+    api_base = os.environ.get("AXIS_MCP_API_BASE_URL", "https://localhost:5281/")
+    parsed_api_base = urllib.parse.urlparse(api_base)
+    if (
+        parsed_api_base.scheme != "https"
+        or parsed_api_base.hostname not in {"localhost", "127.0.0.1", "::1"}
+    ):
+        print("mcp serve: AXIS_MCP_API_BASE_URL must be an HTTPS loopback URL", file=sys.stderr)
+        return 1
+
+    access = getattr(args, "access", None) or os.environ.get("AXIS_MCP_ACCESS", "read")
+    if access not in {"read", "write"}:
+        print("mcp serve: --access must be 'read' or 'write'", file=sys.stderr)
+        return 1
+
+    health_url = api_base.rstrip("/") + "/health"
+    if not ensure_mcp_api_ready(health_url, root_ca):
+        print(
+            f"mcp serve: Axis API health check failed at {health_url}; start the stack with "
+            "`python scripts/axis.py local-dev up`",
+            file=sys.stderr,
+        )
+        return 1
+
+    if not getattr(args, "no_build", False):
+        build = run(
+            [exe("dotnet"), "build", str(MCP_PROJECT), "--nologo"],
+            capture=True,
+            check=False,
+        )
+        emit_captured_process_to_stderr(build)
+        if build.returncode != 0:
+            print("mcp serve: Axis MCP bridge build failed", file=sys.stderr)
+            return build.returncode
+
+    mcp_args = passthrough_args(getattr(args, "mcp_args", []))
+    command = [
+        exe("dotnet"),
+        "run",
+        "--project",
+        str(MCP_PROJECT),
+        "--no-launch-profile",
+        "--no-build",
+    ]
+    if mcp_args:
+        command.extend(["--", *mcp_args])
+
+    return run(
+        command,
+        check=False,
+        env={
+            "AXIS_MCP_ACCESS": access,
+            "AXIS_MCP_ROOT_CA_PATH": str(root_ca),
+        },
+    ).returncode
 
 
 def migration_command(args: argparse.Namespace) -> int:
@@ -3277,6 +3471,8 @@ def related_test_project_for_source_project(project: str) -> str | None:
     project_name = Path(project).stem
     if project == "src/Axis.Api/Axis.Api.csproj":
         candidate = ROOT / "tests/Api/Axis.Api.Tests/Axis.Api.Tests.csproj"
+    elif project == "src/Axis.Mcp/Axis.Mcp.csproj":
+        candidate = ROOT / "tests/Tools/Axis.Mcp.Tests/Axis.Mcp.Tests.csproj"
     elif project.startswith("src/Modules/"):
         parts = Path(project).parts
         if len(parts) < 4:
@@ -3404,6 +3600,8 @@ def verify(args: argparse.Namespace) -> int:
     frontend_api_types = "openapi.json" in paths or any(
         path.startswith("frontend/src/lib/api-generated/") for path in paths
     )
+    mcp_source_changed = any(path.startswith("src/Axis.Mcp/") for path in paths)
+    mcp_api_coverage = "openapi.json" in paths or mcp_source_changed
     frontend_tests_only = frontend and all(
         path.startswith("frontend/tests/") or path.startswith("frontend/e2e/")
         for path in paths
@@ -3416,7 +3614,10 @@ def verify(args: argparse.Namespace) -> int:
     docs = any(is_docs_path(path) for path in paths)
     use_case_docs = any(path.startswith("docs/use-cases/") for path in paths)
     foundation_docs = any(path.startswith("docs/foundations/") for path in paths)
-    skills = any(path.startswith(f"{REPO_SKILLS_DIR}/") for path in paths)
+    skills = any(
+        path.startswith(f"{REPO_SKILLS_DIR}/") or is_project_orchestration_path(path)
+        for path in paths
+    )
     scripts_changed = any(path.startswith("scripts/") for path in paths)
     theme_changed = any(axis_theme.is_theme_path(path) for path in paths)
     text_paths = [path for path in paths if (ROOT / path).is_file() and should_check_text_encoding(path)]
@@ -3498,6 +3699,12 @@ def verify(args: argparse.Namespace) -> int:
                     ),
                 )
 
+    if mcp_api_coverage:
+        step("MCP API coverage", lambda: check_mcp_api_coverage())
+    if mcp_source_changed:
+        step("MCP contract tests", lambda: check_mcp_contracts())
+        step("MCP tool safety", lambda: check_mcp_tool_safety())
+
     if scripts_changed:
         step("scripts standard", lambda: check_scripts_standard())
         step("policy gate tests", lambda: check_policy_tests())
@@ -3543,9 +3750,13 @@ def verify(args: argparse.Namespace) -> int:
 
 def ready_review_doc_drift_coverage(paths: list[str]) -> set[str]:
     covered: set[str] = set()
+    if any((ROOT / path).is_file() and should_check_text_encoding(path) for path in paths):
+        covered.add("check-text-encoding")
+    if any(axis_theme.is_theme_path(path) for path in paths):
+        covered.add("check-theme")
     if any(path.startswith("scripts/") for path in paths):
         covered.add("check-scripts-standard")
-    if any(path.startswith(f"{REPO_SKILLS_DIR}/") for path in paths):
+    if any(path.startswith(f"{REPO_SKILLS_DIR}/") or is_project_orchestration_path(path) for path in paths):
         covered.add("check-repo-skills")
     if any(is_docs_path(path) for path in paths):
         covered.update({"check-doc-navigation", "check-doc-size-budgets", "check-doc-code-fences.py"})
@@ -3561,6 +3772,7 @@ def ready_review_policy_gates(
     *,
     policy_tests_covered: bool = False,
     doc_drift_covered: set[str] | None = None,
+    doc_drift_range: str | None = None,
 ) -> list[tuple[str, callable[[], int]]]:
     gates: list[tuple[str, callable[[], int]]] = []
     if any(path.startswith("scripts/") for path in paths) and not policy_tests_covered:
@@ -3571,7 +3783,13 @@ def ready_review_policy_gates(
     gates.append(
         (
             "doc drift",
-            lambda: check_doc_drift(argparse.Namespace(skip_checkers=skip_checkers)),
+            lambda: check_doc_drift(
+                argparse.Namespace(
+                    skip_checkers=skip_checkers,
+                    paths=paths,
+                    range_spec=doc_drift_range,
+                )
+            ),
         )
     )
     return gates
@@ -3582,6 +3800,7 @@ def run_ready_review_policy(
     *,
     policy_tests_covered: bool = False,
     doc_drift_covered: set[str] | None = None,
+    doc_drift_range: str | None = None,
 ) -> tuple[int, list[str]]:
     failed: list[str] = []
     executed: list[str] = []
@@ -3589,6 +3808,7 @@ def run_ready_review_policy(
         paths,
         policy_tests_covered=policy_tests_covered,
         doc_drift_covered=doc_drift_covered,
+        doc_drift_range=doc_drift_range,
     ):
         print()
         print(f"> ready-review: {name}")
@@ -3621,6 +3841,7 @@ def ready_review(args: argparse.Namespace) -> int:
         return 1
 
     policy_only = bool(getattr(args, "policy_only", False))
+    since = getattr(args, "since", None)
     executed: list[str] = []
     if not policy_only:
         if verify(args) != 0:
@@ -3633,6 +3854,7 @@ def ready_review(args: argparse.Namespace) -> int:
         paths,
         policy_tests_covered=not policy_only and scripts_changed,
         doc_drift_covered=set() if policy_only else ready_review_doc_drift_coverage(paths),
+        doc_drift_range=f"{since}..HEAD" if since else None,
     )
     executed.extend(policy_gates)
     if policy_rc != 0:
@@ -3663,7 +3885,10 @@ def pre_push(args: argparse.Namespace) -> int:
         for p in paths
     )
     docs = not paths or any(re.search(r"^(AGENTS[.]md|README[.]md|docs/|[.]github/PULL_REQUEST_TEMPLATE[.]md)", p) for p in paths)
-    skills = not paths or any(p.startswith(f"{REPO_SKILLS_DIR}/") for p in paths)
+    skills = not paths or any(
+        p.startswith(f"{REPO_SKILLS_DIR}/") or is_project_orchestration_path(p)
+        for p in paths
+    )
     scripts_changed = not paths or any(p.startswith("scripts/") for p in paths)
     renovate_config = not paths or ".github/renovate.json5" in paths
     failed: list[str] = []
@@ -3793,6 +4018,27 @@ def _command_version(name: str, *version_args: str, env: dict[str, str] | None =
     return "OK", f"{version} ({resolved})"
 
 
+def python_launcher_status() -> tuple[str, str]:
+    ok, version, resolved = command_version_line("python", "--version")
+    if not ok:
+        return "FAIL", version
+    if version_major(version) != "3":
+        return "FAIL", f"found `{version}` at {resolved}; expected Python 3"
+
+    probe = run_optional(
+        [
+            resolved,
+            "-c",
+            "import inspect, tarfile; raise SystemExit(0 if hasattr(tarfile, 'data_filter') and "
+            "'filter' in inspect.signature(tarfile.TarFile.extractall).parameters else 1)",
+        ],
+        timeout=VERSION_PROBE_TIMEOUT_SECONDS,
+    )
+    if probe is None or probe.returncode != 0:
+        return "FAIL", f"{version} ({resolved}); missing required tar data extraction filter"
+    return "OK", f"{version} ({resolved})"
+
+
 def _python_module_version(module_name: str, package_name: str) -> tuple[str, str]:
     if importlib.util.find_spec(module_name) is None:
         return (
@@ -3816,6 +4062,38 @@ def _http_ok(url: str, timeout_seconds: float = 1.5) -> bool:
             return 200 <= response.status < 300
     except (OSError, urllib.error.URLError):
         return False
+
+
+def mcp_api_health_ok(url: str, root_ca: Path, timeout_seconds: float = 1.5) -> bool:
+    try:
+        context = ssl.create_default_context(cafile=str(root_ca))
+        with urllib.request.urlopen(url, context=context, timeout=timeout_seconds) as response:
+            return 200 <= response.status < 300
+    except (OSError, ssl.SSLError, urllib.error.URLError):
+        return False
+
+
+def ensure_mcp_api_ready(health_url: str, root_ca: Path) -> bool:
+    if mcp_api_health_ok(health_url, root_ca):
+        return True
+
+    if require_docker_compose("mcp serve") != 0:
+        return False
+
+    print(
+        "mcp serve: Axis API is not healthy; starting the local-dev stack",
+        file=sys.stderr,
+    )
+    result = run(local_dev_up_args(), capture=True, check=False)
+    emit_captured_process_to_stderr(result)
+    if result.returncode != 0:
+        print(
+            f"mcp serve: local-dev up failed with exit code {result.returncode}",
+            file=sys.stderr,
+        )
+        return False
+
+    return mcp_api_health_ok(health_url, root_ca)
 
 
 def _docker_host_ping_ok(docker_host: str | None) -> bool:
@@ -3968,6 +4246,60 @@ def local_dev_certificates_valid(openssl: str) -> bool:
         [openssl, "x509", "-in", str(LOCALHOST_CERT), "-checkip", "::1", "-noout"],
     ]
     if any(run(command, check=False, capture=True).returncode != 0 for command in checks):
+        return False
+
+    required_root_extensions = (
+        ("basicConstraints", ("X509v3 Basic Constraints: critical", "CA:TRUE")),
+        ("keyUsage", ("X509v3 Key Usage: critical", "Certificate Sign", "CRL Sign")),
+    )
+    for certificate_path, format_args in (
+        (LOCAL_ROOT_CA_PEM, []),
+        (LOCAL_ROOT_CA_CER, ["-inform", "der"]),
+    ):
+        for extension, required_markers in required_root_extensions:
+            result = run(
+                [
+                    openssl,
+                    "x509",
+                    *format_args,
+                    "-in",
+                    str(certificate_path),
+                    "-ext",
+                    extension,
+                    "-noout",
+                ],
+                check=False,
+                capture=True,
+            )
+            if result.returncode != 0 or any(marker not in result.stdout for marker in required_markers):
+                return False
+
+    root_fingerprints: list[str] = []
+    for certificate_path, format_args in (
+        (LOCAL_ROOT_CA_PEM, []),
+        (LOCAL_ROOT_CA_CER, ["-inform", "der"]),
+    ):
+        result = run(
+            [
+                openssl,
+                "x509",
+                *format_args,
+                "-in",
+                str(certificate_path),
+                "-fingerprint",
+                "-sha256",
+                "-noout",
+            ],
+            check=False,
+            capture=True,
+        )
+        if result.returncode != 0:
+            return False
+        fingerprint = result.stdout.partition("=")[2].replace(":", "").strip().lower()
+        if not fingerprint:
+            return False
+        root_fingerprints.append(fingerprint)
+    if len(set(root_fingerprints)) != 1:
         return False
 
     public_key_commands = (
@@ -4235,6 +4567,10 @@ def local_dev_certs(args: argparse.Namespace | None = None) -> int:
             str(LOCAL_ROOT_CA_PEM),
             "-subj",
             "/CN=Axis Local Dev Root CA",
+            "-addext",
+            "basicConstraints=critical,CA:TRUE",
+            "-addext",
+            "keyUsage=critical,keyCertSign,cRLSign",
         ],
         [openssl, "x509", "-outform", "der", "-in", str(LOCAL_ROOT_CA_PEM), "-out", str(LOCAL_ROOT_CA_CER)],
         [openssl, "genrsa", "-out", str(LOCALHOST_KEY), "2048"],
@@ -4508,13 +4844,6 @@ def setup_external_preflight(profile: str) -> int:
             return 1
         if require_docker_compose("setup") != 0:
             return 1
-    if normalized == "review" and check_coderabbit_cli() != 0:
-        print(
-            "setup: CodeRabbit remains an external prerequisite because its publisher "
-            "does not provide verified cross-platform artifacts",
-            file=sys.stderr,
-        )
-        return 1
     return 0
 
 
@@ -4645,10 +4974,8 @@ def setup(args: argparse.Namespace) -> int:
         if trust_status != "OK":
             print(f"setup: [{trust_status}] host browser trust: {trust_detail}")
     if normalized == "review":
-        followups = ["`coderabbit auth status`"]
         if setup_tool_ready("gh"):
-            followups.insert(0, "`gh auth status`")
-        print(f"review authentication remains interactive: run {' and '.join(followups)}")
+            print("review authentication remains interactive: run `gh auth status`")
     return 0
 
 
@@ -4674,11 +5001,8 @@ def doctor(args: argparse.Namespace) -> int:
     record("OK", "os", f"{platform.system()} {platform.release()} ({platform.machine()})")
     record("OK", "python", f"{platform.python_version()} ({sys.executable})")
 
-    python_in_path = shutil.which("python") or shutil.which("python3") or shutil.which("py")
-    if python_in_path:
-        record("OK", "python launcher", python_in_path)
-    else:
-        record("WARN", "python launcher", "not found in PATH; use `python3` on WSL/Linux or `py -3` on Windows")
+    python_status, python_detail = python_launcher_status()
+    record(python_status, "python launcher", python_detail)
 
     git_status, git_detail = _command_version("git", "--version")
     record(git_status, "git", git_detail)
@@ -4781,9 +5105,6 @@ def doctor(args: argparse.Namespace) -> int:
         else:
             lychee_ok, lychee_detail = lychee_version_status(lychee)
             record("OK" if lychee_ok else "FAIL", "lychee", lychee_detail)
-
-        coderabbit_status, coderabbit_detail = coderabbit_doctor_status(strict=getattr(args, "strict", False))
-        record(coderabbit_status, "coderabbit", coderabbit_detail)
 
         gh_ok, gh_detail = gh_cli_status()
         record("OK" if gh_ok else "WARN", "github cli (optional)", gh_detail)
@@ -4958,6 +5279,26 @@ def main(argv: list[str] | None = None) -> int:
     dotnet_run_api.add_argument("dotnet_args", nargs=argparse.REMAINDER)
     dotnet_run_api.set_defaults(func=dotnet_command)
 
+    mcp_parser = sub.add_parser("mcp", help="Run the local Axis MCP bridge")
+    mcp_sub = mcp_parser.add_subparsers(dest="mcp_command", required=True)
+    mcp_serve = mcp_sub.add_parser(
+        "serve",
+        help="Run the stdio MCP bridge against the local Axis API",
+    )
+    mcp_serve.add_argument(
+        "--access",
+        choices=("read", "write"),
+        default=None,
+        help="Expose read tools only (default) or the approved write surface",
+    )
+    mcp_serve.add_argument(
+        "--no-build",
+        action="store_true",
+        help="Skip the bridge build when the current output is already up to date",
+    )
+    mcp_serve.add_argument("mcp_args", nargs=argparse.REMAINDER)
+    mcp_serve.set_defaults(func=mcp_command)
+
     migration_parser = sub.add_parser("migration", help="Manage repository-owned EF migration source")
     migration_sub = migration_parser.add_subparsers(dest="migration_command", required=True)
     migration_add = migration_sub.add_parser("add", help="Scaffold a migration for one Axis module")
@@ -5058,7 +5399,18 @@ def main(argv: list[str] | None = None) -> int:
     check = sub.add_parser("check", help="Run an individual deterministic repository gate")
     check_sub = check.add_subparsers(dest="check_command", required=True)
     check_sub.add_parser("doc-drift", help="Check documented enforcement against repository truth").set_defaults(func=check_doc_drift)
-    check_sub.add_parser("policy-tests", help="Run repository policy regression tests").set_defaults(func=check_policy_tests)
+    policy_tests = check_sub.add_parser("policy-tests", help="Run all or selected repository policy regression tests")
+    policy_tests.add_argument(
+        "--test",
+        dest="tests",
+        action="append",
+        default=[],
+        help="Run one dotted unittest name; repeat for multiple focused cases",
+    )
+    policy_tests.set_defaults(func=check_policy_tests)
+    check_sub.add_parser("mcp-api-coverage", help="Check MCP coverage against the committed OpenAPI operations").set_defaults(func=check_mcp_api_coverage)
+    check_sub.add_parser("mcp-contracts", help="Run the focused MCP protocol and API client contract tests").set_defaults(func=check_mcp_contracts)
+    check_sub.add_parser("mcp-tool-safety", help="Check MCP mutation gating behavior").set_defaults(func=check_mcp_tool_safety)
     check_sub.add_parser("text-encoding", help="Check repository text encoding and line endings").set_defaults(func=check_text_encoding)
     check_sub.add_parser("scripts-standard", help="Check repository script ownership conventions").set_defaults(func=check_scripts_standard)
     check_sub.add_parser("repo-skills", help="Validate repository skill contracts").set_defaults(func=check_repo_skills)
@@ -5083,7 +5435,6 @@ def main(argv: list[str] | None = None) -> int:
     check_sub.add_parser("ui-baseline", help="Check the approved frontend UI baseline").set_defaults(func=check_ui_baseline)
     check_sub.add_parser("theme", help="Check canonical theme generated artifacts").set_defaults(func=check_theme)
     check_sub.add_parser("frontend-quality", help="Run deterministic frontend policy checks").set_defaults(func=check_frontend_quality)
-    check_sub.add_parser("coderabbit-cli", help="Check the CodeRabbit CLI review dependency").set_defaults(func=check_coderabbit_cli)
     check_sub.add_parser("local-dev-docs", help="Check local-development docs against Compose").set_defaults(
         func=lambda _args: run_module_check("check-local-dev-docs.py", ["--check"])
     )

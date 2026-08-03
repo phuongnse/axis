@@ -70,14 +70,15 @@ public sealed record UpdateRuleBindingRequest(
 public sealed record RuleBindingReferenceValidationResult(
     bool IsValid,
     Guid? BindingId,
+    int? Revision,
     string? ErrorCode,
     string? Error)
 {
-    public static RuleBindingReferenceValidationResult Valid(Guid bindingId) =>
-        new(true, bindingId, null, null);
+    public static RuleBindingReferenceValidationResult Valid(Guid bindingId, int revision) =>
+        new(true, bindingId, revision, null, null);
 
     public static RuleBindingReferenceValidationResult Invalid(string errorCode, string error) =>
-        new(false, null, errorCode, error);
+        new(false, null, null, errorCode, error);
 }
 
 public interface IRuleBindingReferenceValidator
@@ -85,5 +86,8 @@ public interface IRuleBindingReferenceValidator
     Task<RuleBindingReferenceValidationResult> ValidateAsync(
         Guid workspaceId,
         Guid bindingId,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default,
+        string? expectedTargetType = null,
+        string? expectedTargetId = null,
+        string? expectedUseCaseOrTrigger = null);
 }
