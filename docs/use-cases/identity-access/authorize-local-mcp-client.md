@@ -17,10 +17,10 @@ Let a local Axis MCP client obtain an access token through the existing browser 
 ## Main flow
 
 1. MCP creates an OAuth Authorization Code + PKCE request and opens the configured Axis authorization endpoint.
-2. OpenIddict validates and stores the request in the distributed cache, exposing only an opaque `request_uri` handle.
+2. OpenIddict validates and stores the request in the distributed cache, exposing only an opaque `request_id` handle.
 3. If the browser session is absent, Axis redirects to the configured SPA `/sign-in` route with that opaque handle.
 4. The account owner signs in through the existing email/password form; recoverable credential errors retain the pending authorization request.
-5. After the browser session is established, the SPA resumes only the fixed `/connect/authorize?request_uri=...` endpoint.
+5. After the browser session is established, the SPA resumes only the fixed `/connect/authorize?request_id=...` endpoint.
 6. Axis restores and revalidates the cached request, then sends the authorization code and original OAuth `state` to MCP's registered loopback callback.
 7. MCP validates `state`, exchanges the code with its PKCE verifier, and retries the original authenticated operation once through the API.
 
@@ -63,8 +63,14 @@ Let a local Axis MCP client obtain an access token through the existing browser 
 | AT-004 | UI component | Pending authorization survives recoverable sign-in failures and resumes without a second SPA PKCE flow | AC-003, AC-006 | UI component test | Yes |
 | AT-005 | API boundary | Silent authorization returns `login_required` without sign-in UI | AC-005 | API integration test | Yes |
 | AT-006 | API boundary | Invalid, expired, tampered, and replayed handles fail closed | AC-007 | API integration test | Yes |
-| AT-007 | API/infrastructure boundary | Cache or callback failure does not issue a token and remains bounded | AC-008 | Infrastructure integration test / API integration test | Yes |
-| AT-008 | UI component / Browser journey | Normal sign-in remains the dashboard flow and MCP credential tools are absent | AC-009, AC-010 | UI component test / Browser automation / MCP contract test | Yes |
+| AT-007 | Infrastructure boundary | Cache or callback failure does not issue a token and remains bounded | AC-008 | Infrastructure integration test+API integration test | Yes |
+| AT-008 | UI/API boundaries | Normal sign-in remains the dashboard flow and MCP credential tools are absent | AC-009, AC-010 | UI component test+API integration test | Yes |
+
+## Out Of Scope
+
+- Adding password, email-verification, or arbitrary OAuth-request tools to the MCP bridge.
+- Changing the registered client scopes, fixed loopback callback, token lifetime, or `prompt=login` semantics.
+- Global device sign-out or revocation of already issued short-lived access tokens.
 
 ## Screen flow
 
@@ -83,19 +89,21 @@ The existing sign-in labels, validation, focus, keyboard, localization, loading,
 - MCP owns the PKCE verifier, callback listener, state check, token exchange, and one authentication refresh; it does not own browser credentials.
 - OpenIddict's built-in distributed authorization-request cache uses the existing Redis infrastructure with an absolute five-minute policy, matching the local MCP authorization wait window.
 
-## Implementation status
-
-| Layer | Status |
-|---|---|
-| Domain | N/A |
-| Application | N/A |
-| Infrastructure | In progress |
-| API | In progress |
-| Frontend | In progress |
-| MCP | Verification required |
-
-## Deferred follow-ups
-
-- Reauthentication semantics for `prompt=login`.
-- Replacing the fixed MCP loopback callback port with an ephemeral port.
-- OpenIddict package lifecycle review.
+> **Implementation status**
+>
+> | Layer | Status |
+> |---|---|
+> | Domain | N/A |
+> | Application | N/A |
+> | Infrastructure | Partial |
+> | API | Partial |
+> | Frontend | Partial |
+> | MCP | Partial |
+>
+> **Gaps vs spec:** API and SPA continuation behavior have focused proof, but the supported browser journey to the registered MCP loopback callback, cache/callback failure injection, and app-managed MCP client reload plus authenticated read-back remain unverified.
+>
+> **Deferred follow-ups:** Reauthentication semantics for `prompt=login`, replacing the fixed MCP loopback callback port with an ephemeral port, and OpenIddict package lifecycle review remain outside this checkpoint.
+>
+> **Verification:** See [authorize-local-mcp-client.evidence.md](./authorize-local-mcp-client.evidence.md). Focused API, frontend, MCP contract, and safety checks pass; supported browser/client runtime evidence is not run.
+>
+> **Decisions:** OpenIddict owns request validation and distributed caching; the SPA carries only the opaque `request_id`; MCP remains the credential-free PKCE client and does not expose account or OAuth-request tools.

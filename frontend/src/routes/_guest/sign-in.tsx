@@ -1,5 +1,11 @@
 import { createFileRoute } from '@tanstack/react-router';
 
+import { publicRouteNavigation } from '@/lib/route-navigation';
+
+export const routeNavigation = publicRouteNavigation({
+  escapeTargets: ['/register'],
+});
+
 export interface SignInRouteSearch {
   authorization_request?: string;
 }

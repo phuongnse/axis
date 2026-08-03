@@ -97,8 +97,8 @@ export function connectEndpoint(path: string): string {
   return `${connectBaseUrl()}${path}`;
 }
 
-export function buildAuthorizationRequestResumeUrl(requestUri: string): string {
-  const params = new URLSearchParams({ request_uri: requestUri });
+export function buildAuthorizationRequestResumeUrl(requestId: string): string {
+  const params = new URLSearchParams({ request_id: requestId });
   return `${connectEndpoint('/connect/authorize')}?${params.toString()}`;
 }
 

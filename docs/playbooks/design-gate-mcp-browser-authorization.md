@@ -44,11 +44,11 @@ docs/TECH_STACK.md
 
 ## Contract and invariant decisions
 
-- OpenIddict's built-in authorization-request caching stores the validated request in the configured distributed cache and exposes only its opaque `request_uri` handle across the browser handoff.
+- OpenIddict's built-in authorization-request caching stores the validated request in the configured distributed cache and exposes only its opaque `request_id` handle across the browser handoff.
 - The cache uses the existing Redis infrastructure with an absolute five-minute policy, matching the MCP authorization wait window. Missing, expired, tampered, or already-redeemed handles fail closed through the authorization server.
 - An unauthenticated interactive authorization request redirects only to the configured `App:BaseUrl` `/sign-in` route with the opaque handle. The raw client ID, redirect URI, state, code challenge, scopes, and arbitrary return URLs are not copied into SPA state.
 - `prompt=none` remains a non-interactive flow and returns `login_required` to the registered callback when the browser session is absent.
-- After successful sign-in, the SPA navigates only to the fixed API `/connect/authorize?request_uri=...` endpoint. It does not begin a second SPA PKCE transaction and does not accept an arbitrary redirect target.
+- After successful sign-in, the SPA navigates only to the fixed API `/connect/authorize?request_id=...` endpoint. It does not begin a second SPA PKCE transaction and does not accept an arbitrary redirect target.
 - The MCP client keeps its existing PKCE verifier, state validation, loopback listener, token exchange, and bounded timeout. No credential or auth tool is added.
 
 ## Retirement and compatibility
@@ -60,7 +60,7 @@ Preserve `prompt=none` callback behavior and the normal SPA sign-in/dashboard ha
 Post-edit sweep:
 
 ```text
-rg -n "Results\.Unauthorized\(\)|returnUrl|returnTo|window\.location.*authorization|request_uri" src/Axis.Api frontend/src tests/Api frontend/tests docs/use-cases/identity-access docs/playbooks/mcp.md
+rg -n "Results\.Unauthorized\(\)|returnUrl|returnTo|window\.location.*authorization|request_id" src/Axis.Api frontend/src tests/Api frontend/tests docs/use-cases/identity-access docs/playbooks/mcp.md
 ```
 
 The sweep must show only the intentional fail-closed API branch, fixed authorization continuation, and current tests/guidance.
