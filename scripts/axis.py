@@ -3990,8 +3990,8 @@ def python_launcher_status() -> tuple[str, str]:
         [
             resolved,
             "-c",
-            "import inspect, tarfile; assert hasattr(tarfile, 'data_filter') and "
-            "'filter' in inspect.signature(tarfile.TarFile.extractall).parameters",
+            "import inspect, tarfile; raise SystemExit(0 if hasattr(tarfile, 'data_filter') and "
+            "'filter' in inspect.signature(tarfile.TarFile.extractall).parameters else 1)",
         ],
         timeout=VERSION_PROBE_TIMEOUT_SECONDS,
     )

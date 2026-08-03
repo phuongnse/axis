@@ -5862,6 +5862,28 @@ class TestDoctorPythonPackageChecks(unittest.TestCase):
         self.assertEqual("FAIL", status)
         self.assertIn("tar data extraction filter", detail)
 
+    def test_python_launcher_status_checks_tar_filter_when_optimized(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            Path(temp, "tarfile.py").write_text(
+                "class TarFile:\n    def extractall(self): pass\n",
+                encoding="utf-8",
+            )
+            with (
+                mock.patch.object(
+                    axis,
+                    "command_version_line",
+                    return_value=(True, f"Python {axis.platform.python_version()}", axis.sys.executable),
+                ),
+                mock.patch.dict(
+                    axis.os.environ,
+                    {"PYTHONOPTIMIZE": "1", "PYTHONPATH": temp},
+                ),
+            ):
+                status, detail = axis.python_launcher_status()
+
+        self.assertEqual("FAIL", status)
+        self.assertIn("tar data extraction filter", detail)
+
     def test_python_module_version_rejects_missing_package(self) -> None:
         with mock.patch.object(axis.importlib.util, "find_spec", return_value=None):
             status, detail = axis._python_module_version("yaml", "PyYAML")
