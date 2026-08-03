@@ -4848,6 +4848,13 @@ class TestAxisCommandWrappers(unittest.TestCase):
             chmod.assert_any_call(cert_dir / "rootCA-key.pem", 0o600)
             chmod.assert_any_call(cert_dir / "localhost-key.pem", 0o600)
             self.assertEqual("/usr/bin/openssl", calls[0][0])
+            root_ca_command = next(
+                command
+                for command in calls
+                if str(cert_dir / "rootCA.pem") in command
+            )
+            self.assertIn("basicConstraints=critical,CA:TRUE", root_ca_command)
+            self.assertIn("keyUsage=critical,keyCertSign,cRLSign", root_ca_command)
 
     def test_local_dev_certs_reuses_valid_existing_material(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
