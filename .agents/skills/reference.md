@@ -31,6 +31,8 @@ Project-local agent configuration owns runtime-specific role and model selection
 
 Delegate only when bounded independent work materially improves elapsed time or isolates noisy context. Every prompt names objective, scope, base or checkpoint, permissions, stop conditions, and final output contract. The primary integrates results and retains completion ownership.
 
+Delegation also assigns verification ownership. The primary owns routine verification and final evidence unless the prompt explicitly transfers one focused check. Run each check once per still-valid checkpoint, reuse its result across agents, and rerun only when later edits or a concrete finding invalidate it. Reviewers inspect the diff and existing evidence; they run only the smallest reproducer for a finding or evidence gap, never an already-passing routine suite.
+
 ## Blocker and completion protocol
 
 Use this protocol whenever progress depends on state outside the repository or on a decision only the user can make. It is a process boundary, not a prompt to invent a workaround.
@@ -45,7 +47,7 @@ Use this protocol whenever progress depends on state outside the repository or o
 
 Delegated review is asynchronous. A reviewer reported as `running` or `pending`, and a bounded wait that returns no result, means **review pending**, not review failure or a readiness verdict. Keep the reviewer alive, continue bounded waits, and close the review only after a final completed result or an explicit runtime failure.
 
-Review read-only means no intentional edits to tracked source, tests, contracts, migrations, documentation, Git state, or PR state. A reviewer may run build, test, format-check, and generation commands when they are part of the review; normal ignored build/test outputs and temporary files are allowed. If a command would modify a tracked artifact, the reviewer must stop and report that boundary instead of silently changing it.
+Review read-only means no intentional edits to tracked source, tests, contracts, migrations, documentation, Git state, or PR state. A reviewer reuses current parent evidence and may run only the smallest focused check needed to reproduce a finding or fill a missing or invalidated evidence gap; normal ignored outputs and temporary files are allowed. If a command would modify a tracked artifact, the reviewer must stop and report that boundary instead of silently changing it.
 
 Use this compact handoff when asking the user:
 

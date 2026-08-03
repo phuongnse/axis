@@ -1877,20 +1877,14 @@ def check_repo_skills(_args: argparse.Namespace | None = None) -> int:
     return 0
 
 
-def check_policy_tests(_args: argparse.Namespace | None = None) -> int:
-    return run(
-        [
-            sys.executable,
-            "-m",
-            "unittest",
-            "discover",
-            "-s",
-            "scripts/tests",
-            "-p",
-            "test_*.py",
-        ],
-        check=False,
-    ).returncode
+def check_policy_tests(args: argparse.Namespace | None = None) -> int:
+    tests = getattr(args, "tests", None) or []
+    command = [sys.executable, "-m", "unittest"]
+    if tests:
+        command.extend(tests)
+    else:
+        command.extend(["discover", "-s", "scripts/tests", "-p", "test_*.py"])
+    return run(command, check=False).returncode
 
 
 MCP_TEST_PROJECT = ROOT / "tests" / "Tools" / "Axis.Mcp.Tests" / "Axis.Mcp.Tests.csproj"
@@ -5395,7 +5389,15 @@ def main(argv: list[str] | None = None) -> int:
     check = sub.add_parser("check", help="Run an individual deterministic repository gate")
     check_sub = check.add_subparsers(dest="check_command", required=True)
     check_sub.add_parser("doc-drift", help="Check documented enforcement against repository truth").set_defaults(func=check_doc_drift)
-    check_sub.add_parser("policy-tests", help="Run repository policy regression tests").set_defaults(func=check_policy_tests)
+    policy_tests = check_sub.add_parser("policy-tests", help="Run all or selected repository policy regression tests")
+    policy_tests.add_argument(
+        "--test",
+        dest="tests",
+        action="append",
+        default=[],
+        help="Run one dotted unittest name; repeat for multiple focused cases",
+    )
+    policy_tests.set_defaults(func=check_policy_tests)
     check_sub.add_parser("mcp-api-coverage", help="Check MCP coverage against the committed OpenAPI operations").set_defaults(func=check_mcp_api_coverage)
     check_sub.add_parser("mcp-contracts", help="Run the focused MCP protocol and API client contract tests").set_defaults(func=check_mcp_contracts)
     check_sub.add_parser("mcp-tool-safety", help="Check MCP mutation gating behavior").set_defaults(func=check_mcp_tool_safety)

@@ -66,6 +66,7 @@ check_pr = load_script("check-pr.py")
 check_local_dev_docs = load_script("check-local-dev-docs.py")
 check_use_case_docs = load_script("check-use-case-docs.py")
 check_foundation_docs = load_script("check-foundation-docs.py")
+project_orchestration = load_python_file(ROOT / ".codex" / "check.py")
 
 
 class TestCliTextStreams(unittest.TestCase):
@@ -2778,6 +2779,44 @@ class TestVerifyGate(unittest.TestCase):
 
 
 class TestReviewVerificationGates(unittest.TestCase):
+    def test_policy_tests_default_to_full_discovery(self) -> None:
+        completed = axis.subprocess.CompletedProcess([], 0)
+
+        with mock.patch.object(axis, "run", return_value=completed) as run:
+            self.assertEqual(0, axis.check_policy_tests())
+
+        run.assert_called_once_with(
+            [
+                axis.sys.executable,
+                "-m",
+                "unittest",
+                "discover",
+                "-s",
+                "scripts/tests",
+                "-p",
+                "test_*.py",
+            ],
+            check=False,
+        )
+
+    def test_policy_tests_can_select_only_named_cases(self) -> None:
+        completed = axis.subprocess.CompletedProcess([], 0)
+        args = axis.argparse.Namespace(tests=["tests.Example.test_one", "tests.Example.test_two"])
+
+        with mock.patch.object(axis, "run", return_value=completed) as run:
+            self.assertEqual(0, axis.check_policy_tests(args))
+
+        run.assert_called_once_with(
+            [
+                axis.sys.executable,
+                "-m",
+                "unittest",
+                "tests.Example.test_one",
+                "tests.Example.test_two",
+            ],
+            check=False,
+        )
+
     def test_rejects_dirty_worktree_before_running_checks(self) -> None:
         with (
             mock.patch.object(axis, "working_tree_paths", return_value=["scripts/axis.py"]),
@@ -5845,6 +5884,15 @@ class TestRepoSkillsGate(unittest.TestCase):
     def test_current_project_orchestration_is_valid(self) -> None:
         with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
             self.assertEqual(0, axis.check_project_orchestration())
+
+    def test_nested_project_agent_role_is_discovered_for_rejection(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            nested = root / ".codex" / "agents" / "nested"
+            nested.mkdir(parents=True)
+            (nested / "rogue.toml").write_text('name = "rogue"\n', encoding="utf-8")
+
+            self.assertEqual({"nested/rogue.toml"}, project_orchestration.project_agent_role_files(root))
 
 
 class TestDoctorPythonPackageChecks(unittest.TestCase):

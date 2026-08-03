@@ -14,6 +14,11 @@ AGENT_SPECS = {
 }
 
 
+def project_agent_role_files(root: Path = ROOT) -> set[str]:
+    agent_root = root / ".codex" / "agents"
+    return {path.relative_to(agent_root).as_posix() for path in agent_root.rglob("*.toml")}
+
+
 def config_issues() -> list[str]:
     issues: list[str] = []
 
@@ -64,7 +69,7 @@ def config_issues() -> list[str]:
                 issues.append(".codex/config.toml: Axis MCP entrypoint must resolve from project root")
 
     expected_agent_files = {f"{name}.toml" for name in AGENT_SPECS}
-    actual_agent_files = {path.name for path in (ROOT / ".codex" / "agents").glob("*.toml")}
+    actual_agent_files = project_agent_role_files()
     for name in sorted(actual_agent_files - expected_agent_files):
         issues.append(f".codex/agents/{name}: unexpected project agent role")
     for name, (model, effort, sandbox) in AGENT_SPECS.items():

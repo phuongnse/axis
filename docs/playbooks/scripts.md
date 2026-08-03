@@ -29,6 +29,7 @@
 - CodeRabbit remains an external prerequisite: review setup diagnoses it but does not install or authenticate it. Diagnosis distinguishes a missing CLI from an installed user command whose directory is not active in the current shell, and reports the discovered path plus session-refresh action. Authentication for GitHub CLI and CodeRabbit always remains interactive and outside setup.
 - Doctor profiles are cumulative: `core`, `build`, `local-dev`, `review`, and `all`. The default is `local-dev`; review-only tools such as Lychee and CodeRabbit are checked by `review`/`all`.
 - Use the exact `check` subcommand for one machine-readable prerequisite or policy gate.
+- During policy-script development, use repeatable `python scripts/axis.py check policy-tests --test <dotted-test-name>` selectors for only the touched regression cases. Omit `--test` only when the full policy suite is triggered at the review boundary or in CI.
 
 ## Pre-PR review checkpoint
 
@@ -56,6 +57,7 @@
 - Use `python scripts/axis.py check mcp-api-coverage`, `python scripts/axis.py check mcp-contracts`, and `python scripts/axis.py check mcp-tool-safety` when an API operation, MCP tool, auth boundary, or mutation policy changes. These are the maintained MCP parity and safety checks.
 - `local-dev shell` is an unrestricted diagnostic escape hatch, not a finite workflow or evidence route. Volume-destructive local-dev commands require explicit `--yes`.
 - Use `python scripts/axis.py ready-review` on a clean checkpoint commit at the review boundary. It runs changed-path verification plus the deterministic policy profile shared with CI.
+- Pass current verification evidence to delegated reviewers. The primary owns routine checks; reviewers do not repeat passing suites and run only the smallest reproducer for a finding or evidence gap.
 - Treat `python scripts/axis.py verify` as the changed-path verification engine behind ready-review, not as complete PR-readiness evidence by itself.
 - Use `python scripts/axis.py verify --plan-only` to inspect changed-path routing without executing tools.
 - Use `python scripts/axis.py pre-push` for ordinary Git push sanity; it is not a substitute for the pre-PR review checkpoint on published PR branches.
