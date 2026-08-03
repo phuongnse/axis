@@ -4856,7 +4856,7 @@ class TestAxisCommandWrappers(unittest.TestCase):
             self.assertIn("basicConstraints=critical,CA:TRUE", root_ca_command)
             self.assertIn("keyUsage=critical,keyCertSign,cRLSign", root_ca_command)
 
-    def test_local_dev_certs_reuses_valid_existing_material(self) -> None:
+    def test_local_dev_certs_reuses_current_and_regenerates_legacy_material(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             cert_dir = Path(temp) / ".dev-certs"
             cert_dir.mkdir()
@@ -4875,9 +4875,18 @@ class TestAxisCommandWrappers(unittest.TestCase):
                     path.write_text("existing\n", encoding="utf-8")
 
             calls: list[list[str]] = []
+            legacy_key_usage = False
 
             def fake_run(command: list[str], **_kwargs):
                 calls.append(command)
+                if "-ext" in command:
+                    if "basicConstraints" in command:
+                        stdout = "X509v3 Basic Constraints: critical\n    CA:TRUE\n"
+                    elif legacy_key_usage:
+                        stdout = "X509v3 Key Usage: critical\n    Certificate Sign\n"
+                    else:
+                        stdout = "X509v3 Key Usage: critical\n    Certificate Sign, CRL Sign\n"
+                    return axis.subprocess.CompletedProcess(command, 0, stdout=stdout, stderr="")
                 return axis.subprocess.CompletedProcess(command, 0, stdout="public-key\n", stderr="")
 
             patches = [mock.patch.object(axis, name, value) for name, value in paths.items()]
@@ -4888,14 +4897,31 @@ class TestAxisCommandWrappers(unittest.TestCase):
                 stack.enter_context(mock.patch.object(axis, "find_openssl", return_value="/usr/bin/openssl"))
                 stack.enter_context(mock.patch.object(axis.os, "name", "posix"))
                 stack.enter_context(mock.patch.object(axis.Path, "chmod", autospec=True))
+                stack.enter_context(
+                    mock.patch.object(
+                        axis,
+                        "LOCAL_TRUSTED_ROOT_CA_FINGERPRINT",
+                        cert_dir / "trusted-rootCA.sha1",
+                    )
+                )
                 stdout = stack.enter_context(contextlib.redirect_stdout(io.StringIO()))
+                self.assertEqual(0, axis.local_dev_certs(axis.argparse.Namespace(renew=False)))
+
+                self.assertTrue(any("-ext" in command and "keyUsage" in command for command in calls))
+                self.assertFalse(any("genrsa" in command for command in calls))
+                self.assertIn("reusing", stdout.getvalue())
+
+                legacy_key_usage = True
+                calls.clear()
+                stdout.seek(0)
+                stdout.truncate(0)
                 self.assertEqual(0, axis.local_dev_certs(axis.argparse.Namespace(renew=False)))
 
             self.assertTrue(any("-checkend" in command for command in calls))
             self.assertTrue(any("-checkhost" in command and "api" in command for command in calls))
             self.assertTrue(any("-checkip" in command and "::1" in command for command in calls))
-            self.assertFalse(any("genrsa" in command for command in calls))
-            self.assertIn("reusing", stdout.getvalue())
+            self.assertTrue(any("genrsa" in command for command in calls))
+            self.assertIn("generated", stdout.getvalue())
 
     def test_local_dev_certs_refuses_to_replace_an_axis_managed_trusted_ca(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
