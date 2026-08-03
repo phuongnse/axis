@@ -4876,13 +4876,14 @@ class TestAxisCommandWrappers(unittest.TestCase):
 
             calls: list[list[str]] = []
             legacy_key_usage = False
+            legacy_der_key_usage = False
 
             def fake_run(command: list[str], **_kwargs):
                 calls.append(command)
                 if "-ext" in command:
                     if "basicConstraints" in command:
                         stdout = "X509v3 Basic Constraints: critical\n    CA:TRUE\n"
-                    elif legacy_key_usage:
+                    elif legacy_key_usage or (legacy_der_key_usage and "-inform" in command):
                         stdout = "X509v3 Key Usage: critical\n    Certificate Sign\n"
                     else:
                         stdout = "X509v3 Key Usage: critical\n    Certificate Sign, CRL Sign\n"
@@ -4908,6 +4909,7 @@ class TestAxisCommandWrappers(unittest.TestCase):
                 self.assertEqual(0, axis.local_dev_certs(axis.argparse.Namespace(renew=False)))
 
                 self.assertTrue(any("-ext" in command and "keyUsage" in command for command in calls))
+                self.assertTrue(any("-inform" in command and "-ext" in command for command in calls))
                 self.assertFalse(any("genrsa" in command for command in calls))
                 self.assertIn("reusing", stdout.getvalue())
 
@@ -4922,6 +4924,31 @@ class TestAxisCommandWrappers(unittest.TestCase):
             self.assertTrue(any("-checkip" in command and "::1" in command for command in calls))
             self.assertTrue(any("genrsa" in command for command in calls))
             self.assertIn("generated", stdout.getvalue())
+
+            legacy_key_usage = False
+            legacy_der_key_usage = True
+            calls.clear()
+            stdout.seek(0)
+            stdout.truncate(0)
+            with contextlib.ExitStack() as stack:
+                for patcher in patches:
+                    stack.enter_context(patcher)
+                stack.enter_context(mock.patch.object(axis, "run", side_effect=fake_run))
+                stack.enter_context(mock.patch.object(axis, "find_openssl", return_value="/usr/bin/openssl"))
+                stack.enter_context(mock.patch.object(axis.os, "name", "posix"))
+                stack.enter_context(mock.patch.object(axis.Path, "chmod", autospec=True))
+                stack.enter_context(
+                    mock.patch.object(
+                        axis,
+                        "LOCAL_TRUSTED_ROOT_CA_FINGERPRINT",
+                        cert_dir / "trusted-rootCA.sha1",
+                    )
+                )
+                with contextlib.redirect_stdout(stdout):
+                    self.assertEqual(0, axis.local_dev_certs(axis.argparse.Namespace(renew=False)))
+
+            self.assertTrue(any("-inform" in command and "-ext" in command for command in calls))
+            self.assertTrue(any("genrsa" in command for command in calls))
 
     def test_local_dev_certs_refuses_to_replace_an_axis_managed_trusted_ca(self) -> None:
         with tempfile.TemporaryDirectory() as temp:

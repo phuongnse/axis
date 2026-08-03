@@ -4184,20 +4184,31 @@ def local_dev_certificates_valid(openssl: str) -> bool:
     if any(run(command, check=False, capture=True).returncode != 0 for command in checks):
         return False
 
-    root_extensions = (
-        (
-            [openssl, "x509", "-in", str(LOCAL_ROOT_CA_PEM), "-ext", "basicConstraints", "-noout"],
-            ("X509v3 Basic Constraints: critical", "CA:TRUE"),
-        ),
-        (
-            [openssl, "x509", "-in", str(LOCAL_ROOT_CA_PEM), "-ext", "keyUsage", "-noout"],
-            ("X509v3 Key Usage: critical", "Certificate Sign", "CRL Sign"),
-        ),
+    required_root_extensions = (
+        ("basicConstraints", ("X509v3 Basic Constraints: critical", "CA:TRUE")),
+        ("keyUsage", ("X509v3 Key Usage: critical", "Certificate Sign", "CRL Sign")),
     )
-    for command, required_markers in root_extensions:
-        result = run(command, check=False, capture=True)
-        if result.returncode != 0 or any(marker not in result.stdout for marker in required_markers):
-            return False
+    for certificate_path, format_args in (
+        (LOCAL_ROOT_CA_PEM, []),
+        (LOCAL_ROOT_CA_CER, ["-inform", "der"]),
+    ):
+        for extension, required_markers in required_root_extensions:
+            result = run(
+                [
+                    openssl,
+                    "x509",
+                    *format_args,
+                    "-in",
+                    str(certificate_path),
+                    "-ext",
+                    extension,
+                    "-noout",
+                ],
+                check=False,
+                capture=True,
+            )
+            if result.returncode != 0 or any(marker not in result.stdout for marker in required_markers):
+                return False
 
     public_key_commands = (
         (
