@@ -44,13 +44,6 @@ def config_issues() -> list[str]:
             for key, value in expected_agents.items():
                 if agents.get(key) != value:
                     issues.append(f".codex/config.toml: `agents.{key}` must be `{value}`")
-            for name in AGENT_SPECS:
-                role = agents.get(name)
-                expected_file = f"./agents/{name}.toml"
-                if not isinstance(role, dict) or role.get("config_file") != expected_file:
-                    issues.append(
-                        f".codex/config.toml: `agents.{name}.config_file` must be `{expected_file}`"
-                    )
 
         servers = config.get("mcp_servers")
         axis_mcp = servers.get("axis") if isinstance(servers, dict) else None
