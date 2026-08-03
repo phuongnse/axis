@@ -2414,7 +2414,6 @@ class TestToolVersionGates(unittest.TestCase):
         with (
             mock.patch.object(axis, "find_lychee", return_value="/usr/bin/lychee"),
             mock.patch.object(axis, "lychee_version_status", return_value=(True, "lychee 0.23.0")),
-            mock.patch.object(axis, "coderabbit_cli_status", return_value=(True, "coderabbit 0.6.0")),
             mock.patch.object(axis, "dotnet_sdk_status", return_value=(True, "8.0.100")),
             mock.patch.object(axis, "frontend_toolchain_env", return_value={}),
             mock.patch.object(axis, "node_version_status", return_value=(True, "v24.18.0")),
@@ -2455,7 +2454,6 @@ class TestToolVersionGates(unittest.TestCase):
             mock.patch.object(axis, "frontend_toolchain_env") as frontend,
             mock.patch.object(axis, "_docker_info_ok") as docker,
             mock.patch.object(axis, "find_lychee") as lychee,
-            mock.patch.object(axis, "coderabbit_doctor_status") as coderabbit,
             contextlib.redirect_stdout(io.StringIO()) as stdout,
         ):
             self.assertEqual(
@@ -2464,7 +2462,7 @@ class TestToolVersionGates(unittest.TestCase):
             )
 
         self.assertIn("profile=core", stdout.getvalue())
-        for skipped in (dotnet, frontend, docker, lychee, coderabbit):
+        for skipped in (dotnet, frontend, docker, lychee):
             skipped.assert_not_called()
 
     def test_core_doctor_requires_canonical_python_launcher(self) -> None:
@@ -2478,20 +2476,6 @@ class TestToolVersionGates(unittest.TestCase):
 
         self.assertIn("[FAIL] python launcher: python not found in PATH", stdout.getvalue())
         self.assertIn("python launcher", stderr.getvalue())
-
-    def test_coderabbit_doctor_skips_windows_command_shim_in_non_strict_mode(self) -> None:
-        with (
-            mock.patch.object(axis.os, "name", "nt"),
-            mock.patch.object(axis, "resolve_exe", return_value="coderabbit.cmd"),
-            mock.patch.object(axis.shutil, "which", return_value=r"C:\Users\alice\.local\bin\coderabbit.cmd"),
-            mock.patch.object(axis, "coderabbit_cli_status") as version_check,
-        ):
-            status, detail = axis.coderabbit_doctor_status(strict=False)
-
-        self.assertEqual("WARN", status)
-        self.assertIn("version check skipped", detail)
-        version_check.assert_not_called()
-
 
 class TestMarkdownLinkGate(unittest.TestCase):
     def test_runs_lychee_with_shared_config(self) -> None:
@@ -2548,72 +2532,6 @@ class TestMarkdownLinkGate(unittest.TestCase):
             self.assertEqual(1, axis.check_markdown_links())
 
         self.assertIn("Lychee 0.23.0 is required", stderr.getvalue())
-
-    def test_coderabbit_cli_rejects_missing_cli(self) -> None:
-        with (
-            mock.patch.object(axis, "inactive_coderabbit_path", return_value=None),
-            mock.patch.object(
-                axis,
-                "command_version_line",
-                return_value=(False, "coderabbit not found in PATH", "coderabbit"),
-            ),
-            contextlib.redirect_stderr(io.StringIO()) as stderr,
-        ):
-            self.assertEqual(1, axis.check_coderabbit_cli())
-
-        output = stderr.getvalue()
-        self.assertIn("CodeRabbit CLI is required", output)
-        self.assertIn("docs/playbooks/scripts.md#tool-versions", output)
-
-    def test_coderabbit_cli_reports_installed_command_directory_missing_from_path(self) -> None:
-        with tempfile.TemporaryDirectory() as temp:
-            home = Path(temp)
-            coderabbit = home / ".local" / "bin" / "coderabbit"
-            coderabbit.parent.mkdir(parents=True)
-            coderabbit.write_text("", encoding="utf-8")
-            coderabbit.chmod(0o755)
-            with (
-                mock.patch.object(axis.os, "name", "posix"),
-                mock.patch.object(axis.Path, "home", return_value=home),
-                mock.patch.object(
-                    axis,
-                    "command_version_line",
-                    return_value=(False, "coderabbit not found in PATH", "coderabbit"),
-                ),
-            ):
-                ok, detail = axis.coderabbit_cli_status()
-
-        self.assertFalse(ok)
-        self.assertIn(str(coderabbit), detail)
-        self.assertIn("not active in PATH", detail)
-        self.assertIn("new login shell", detail)
-
-    def test_coderabbit_cli_rejects_old_version(self) -> None:
-        with (
-            mock.patch.object(
-                axis,
-                "command_version_line",
-                return_value=(True, "0.5.9", "/usr/bin/coderabbit"),
-            ),
-            contextlib.redirect_stderr(io.StringIO()) as stderr,
-        ):
-            self.assertEqual(1, axis.check_coderabbit_cli())
-
-        self.assertIn("expected version >= 0.6.0", stderr.getvalue())
-
-    def test_coderabbit_cli_accepts_supported_version(self) -> None:
-        with (
-            mock.patch.object(
-                axis,
-                "command_version_line",
-                return_value=(True, "0.6.3", "/usr/bin/coderabbit"),
-            ),
-            contextlib.redirect_stdout(io.StringIO()) as stdout,
-        ):
-            self.assertEqual(0, axis.check_coderabbit_cli())
-
-        self.assertIn("coderabbit-cli: OK", stdout.getvalue())
-
 
 class TestVerifyGate(unittest.TestCase):
     def test_plan_only_prints_selected_steps_without_running_checks(self) -> None:

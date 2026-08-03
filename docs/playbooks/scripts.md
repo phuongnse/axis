@@ -16,7 +16,6 @@
 | Lychee | [scripts/axis.py](../../scripts/axis.py) check and [.github/workflows/build-and-test.yml](../../.github/workflows/build-and-test.yml) pin | Markdown link checks |
 | GitHub CLI | portable setup pin in [scripts/axis_setup.py](../../scripts/axis_setup.py) | optional publication adapter |
 | Renovate validator | Exact version in [scripts/axis.py](../../scripts/axis.py) | Dependency automation config |
-| Pre-PR review checkpoint | [scripts/axis.py](../../scripts/axis.py) check | `$axis-pull-request` before GitHub PR actions |
 
 ## Bootstrap and diagnosis
 
@@ -25,20 +24,19 @@
 - Portable executables still rely on publisher-documented host libraries. Strict doctor output classifies known native-runtime failures and prints an exact host action only for a verified OS/version; unknown hosts receive publisher-level guidance. Setup never sets runtime fallbacks or installs OS packages silently.
 - Use `--plan-only` to print the selected OS/architecture plan without checks, network access, downloads, or repository mutations. Add `--browsers` only when explicit host-browser debugging needs a user-local Chromium binary; standard Axis browser workflows use the containerized runtime.
 - `local-dev` and `review` also create or reuse local HTTPS certificates and install the repository pre-push hook. `--trust-local-ca` explicitly opts into a confirmed current-user host trust-store change; when omitted, setup reports host trust and the browser-readiness follow-up. Setup never changes system-wide trust or invokes `sudo`. These profiles require Docker Engine, Compose, and OpenSSL in the active shell before dependency mutations.
-- Portable setup validates the current OS/architecture and reports unavailable verified artifacts in `--plan-only`; unsupported review-tool combinations remain external prerequisites. Setup never invokes an OS package manager, `sudo`, Docker Desktop, or service configuration.
-- CodeRabbit remains an external prerequisite: review setup diagnoses it but does not install or authenticate it. Diagnosis distinguishes a missing CLI from an installed user command whose directory is not active in the current shell, and reports the discovered path plus session-refresh action. Authentication for GitHub CLI and CodeRabbit always remains interactive and outside setup.
-- Doctor profiles are cumulative: `core`, `build`, `local-dev`, `review`, and `all`. The default is `local-dev`; review-only tools such as Lychee and CodeRabbit are checked by `review`/`all`.
+- Portable setup validates the current OS/architecture and reports unavailable verified artifacts in `--plan-only`; unsupported tool/platform combinations remain external prerequisites. Setup never invokes an OS package manager, `sudo`, Docker Desktop, or service configuration.
+- GitHub CLI authentication remains interactive and outside setup.
+- Doctor profiles are cumulative: `core`, `build`, `local-dev`, `review`, and `all`. The default is `local-dev`; review-only tools such as Lychee are checked by `review`/`all`.
 - Use the exact `check` subcommand for one machine-readable prerequisite or policy gate.
 - During policy-script development, use repeatable `python scripts/axis.py check policy-tests --test <dotted-test-name>` selectors for only the touched regression cases. Omit `--test` only when the full policy suite is triggered at the review boundary or in CI.
 
 ## Pre-PR review checkpoint
 
-`$axis-pull-request` owns trigger decisions, checkpoint commits, feedback loops, and publication. This playbook owns command behavior:
+`$axis-pull-request` owns trigger decisions, checkpoint commits, independent review, feedback loops, and publication. This playbook owns verification command behavior:
 
-- `python scripts/axis.py check coderabbit-cli` validates the review tool before a triggered review.
-- First review covers the committed publishable branch diff; follow-up review uses `--base-commit <reviewed-checkpoint>` and optional `--dir`.
+- First review covers the committed publishable branch diff; follow-up review covers only the new immutable checkpoint delta when earlier evidence remains valid.
 - Follow-up verification uses `python scripts/axis.py ready-review --since <reviewed-checkpoint>` when the delta has an immutable checkpoint.
-- Tool failure, missing authentication, timeout, or unresolved valid findings blocks publication unless the user explicitly approves the exact skip or deferral.
+- Reviewer unavailability or unresolved valid findings blocks publication unless the user explicitly approves the exact skip or deferral.
 
 ## Command Boundaries
 

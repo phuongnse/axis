@@ -35,7 +35,6 @@ ROOT = Path(__file__).resolve().parent.parent
 SCRIPTS = ROOT / "scripts"
 REQUIRED_DOTNET_SDK_MAJOR = "8"
 REQUIRED_RENOVATE_VALIDATOR_VERSION = "43.280.5"
-MINIMUM_CODERABBIT_CLI_VERSION = "0.6.0"
 VERSION_PROBE_TIMEOUT_SECONDS = 15
 PLAYWRIGHT_BROWSER_PROBE_TIMEOUT_SECONDS = 20
 DOCKER_PROBE_TIMEOUT_SECONDS = 20
@@ -3155,70 +3154,6 @@ def check_markdown_links_for_paths(paths: list[str] | None) -> int:
     return result.returncode
 
 
-def inactive_coderabbit_path() -> Path | None:
-    if os.name == "nt":
-        return None
-    candidate = Path.home() / ".local" / "bin" / "coderabbit"
-    return candidate if candidate.is_file() and os.access(candidate, os.X_OK) else None
-
-
-def coderabbit_missing_detail(version_line: str) -> str:
-    inactive = inactive_coderabbit_path()
-    if inactive is not None:
-        return (
-            f"coderabbit is installed at {inactive}, but {inactive.parent} is not active in PATH; "
-            f"add that directory to PATH and start a new login shell, then rerun. See {TOOL_VERSIONS_DOC}."
-        )
-    return f"{version_line}; CodeRabbit CLI is required for the local pre-PR review checkpoint. See {TOOL_VERSIONS_DOC}."
-
-
-def coderabbit_cli_status() -> tuple[bool, str]:
-    ok, version_line, resolved = command_version_line("coderabbit", "--version")
-    if not ok:
-        return False, coderabbit_missing_detail(version_line)
-
-    version_match = re.search(r"\b([0-9]+(?:[.][0-9]+)+)\b", version_line)
-    if version_match is None:
-        return False, f"found `{version_line or 'unknown'}` at {resolved}; expected version >= {MINIMUM_CODERABBIT_CLI_VERSION}"
-
-    if _version_sort_key(version_match.group(1)) < _version_sort_key(MINIMUM_CODERABBIT_CLI_VERSION):
-        return (
-            False,
-            f"found `{version_line or 'unknown'}` at {resolved}; expected version >= {MINIMUM_CODERABBIT_CLI_VERSION}",
-        )
-
-    return True, f"{version_line} ({resolved}); expected >= {MINIMUM_CODERABBIT_CLI_VERSION}"
-
-
-def coderabbit_doctor_status(*, strict: bool) -> tuple[str, str]:
-    if strict:
-        ok, detail = coderabbit_cli_status()
-        return ("OK" if ok else "FAIL", detail)
-
-    resolved = shutil.which(resolve_exe("coderabbit")) or shutil.which("coderabbit")
-    if resolved is None:
-        return "FAIL", coderabbit_missing_detail("coderabbit not found in PATH")
-
-    suffix = Path(resolved).suffix.lower()
-    if os.name == "nt" and suffix in {".cmd", ".bat"}:
-        return (
-            "WARN",
-            f"{resolved}; version check skipped for Windows command shim. Run `python scripts/axis.py check coderabbit-cli` before PR review.",
-        )
-
-    ok, detail = coderabbit_cli_status()
-    return ("OK" if ok else "FAIL", detail)
-
-
-def check_coderabbit_cli(_args: argparse.Namespace | None = None) -> int:
-    ok, detail = coderabbit_cli_status()
-    if not ok:
-        print(f"coderabbit-cli: FAIL - {detail}", file=sys.stderr)
-        return 1
-    print(f"coderabbit-cli: OK ({detail})")
-    return 0
-
-
 MIGRATION_NAME_RE = re.compile(r"^[A-Z][A-Za-z0-9]*$")
 
 
@@ -4909,13 +4844,6 @@ def setup_external_preflight(profile: str) -> int:
             return 1
         if require_docker_compose("setup") != 0:
             return 1
-    if normalized == "review" and check_coderabbit_cli() != 0:
-        print(
-            "setup: CodeRabbit remains an external prerequisite because its publisher "
-            "does not provide verified cross-platform artifacts",
-            file=sys.stderr,
-        )
-        return 1
     return 0
 
 
@@ -5046,10 +4974,8 @@ def setup(args: argparse.Namespace) -> int:
         if trust_status != "OK":
             print(f"setup: [{trust_status}] host browser trust: {trust_detail}")
     if normalized == "review":
-        followups = ["`coderabbit auth status`"]
         if setup_tool_ready("gh"):
-            followups.insert(0, "`gh auth status`")
-        print(f"review authentication remains interactive: run {' and '.join(followups)}")
+            print("review authentication remains interactive: run `gh auth status`")
     return 0
 
 
@@ -5179,9 +5105,6 @@ def doctor(args: argparse.Namespace) -> int:
         else:
             lychee_ok, lychee_detail = lychee_version_status(lychee)
             record("OK" if lychee_ok else "FAIL", "lychee", lychee_detail)
-
-        coderabbit_status, coderabbit_detail = coderabbit_doctor_status(strict=getattr(args, "strict", False))
-        record(coderabbit_status, "coderabbit", coderabbit_detail)
 
         gh_ok, gh_detail = gh_cli_status()
         record("OK" if gh_ok else "WARN", "github cli (optional)", gh_detail)
@@ -5512,7 +5435,6 @@ def main(argv: list[str] | None = None) -> int:
     check_sub.add_parser("ui-baseline", help="Check the approved frontend UI baseline").set_defaults(func=check_ui_baseline)
     check_sub.add_parser("theme", help="Check canonical theme generated artifacts").set_defaults(func=check_theme)
     check_sub.add_parser("frontend-quality", help="Run deterministic frontend policy checks").set_defaults(func=check_frontend_quality)
-    check_sub.add_parser("coderabbit-cli", help="Check the CodeRabbit CLI review dependency").set_defaults(func=check_coderabbit_cli)
     check_sub.add_parser("local-dev-docs", help="Check local-development docs against Compose").set_defaults(
         func=lambda _args: run_module_check("check-local-dev-docs.py", ["--check"])
     )
