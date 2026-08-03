@@ -2530,8 +2530,62 @@ def enforcement_ledger_issues(*, root: Path | None = None) -> list[str]:
     return issues
 
 
+def doc_drift_checker_names(paths: list[str]) -> set[str]:
+    names: set[str] = set()
+    if any(should_check_text_encoding(path) for path in paths):
+        names.add("check-text-encoding")
+    if any(path.startswith("scripts/") for path in paths):
+        names.add("check-scripts-standard")
+    if any(path.startswith(f"{REPO_SKILLS_DIR}/") or is_project_orchestration_path(path) for path in paths):
+        names.add("check-repo-skills")
+    if any(path.startswith(("src/", "tests/")) and path.endswith(".cs") for path in paths):
+        names.add("check-ef-domain-mapping")
+    if any(is_frontend_path(path) for path in paths):
+        names.update({"check-frontend-api-contracts", "check-frontend-quality"})
+    if any(
+        path in {
+            "frontend/components.json",
+            "frontend/ui-baseline.json",
+            "frontend/src/index.css",
+            "frontend/src/theme.generated.css",
+            "frontend/src/hooks/use-mobile.ts",
+            "frontend/src/lib/utils.ts",
+        }
+        or path.startswith("frontend/src/components/ui/")
+        for path in paths
+    ):
+        names.add("check-ui-baseline")
+    if any(axis_theme.is_theme_path(path) for path in paths):
+        names.add("check-theme")
+    if any(path.startswith("docs/use-cases/") for path in paths):
+        names.add("check-use-case-docs.py")
+    if any(path.startswith("docs/foundations/") for path in paths):
+        names.add("check-foundation-docs.py")
+    if any(is_docs_path(path) for path in paths):
+        names.update(
+            {
+                "check-doc-link-targets.py",
+                "check-doc-navigation",
+                "check-doc-size-budgets",
+                "check-doc-code-fences.py",
+            }
+        )
+    if any(
+        path in {
+            "docker-compose.yml",
+            "docs/playbooks/local-dev.md",
+            "docs/TECH_STACK.md",
+            "src/Axis.Api/appsettings.json",
+            "scripts/check-local-dev-docs.py",
+        }
+        for path in paths
+    ):
+        names.add("check-local-dev-docs.py")
+    return names
+
+
 def check_doc_drift(_args: argparse.Namespace | None = None) -> int:
-    range_spec = diff_range()
+    range_spec = getattr(_args, "range_spec", None) or diff_range()
     issues: list[str] = []
     skip_checkers = set(getattr(_args, "skip_checkers", ()) or ())
 
@@ -2542,7 +2596,8 @@ def check_doc_drift(_args: argparse.Namespace | None = None) -> int:
             print(f"  - {issue}", file=sys.stderr)
         issues.extend(discovery)
 
-    paths = changed_paths(range_spec)
+    supplied_paths = getattr(_args, "paths", None)
+    paths = list(supplied_paths) if supplied_paths is not None else changed_paths(range_spec)
     if not paths:
         if not issues:
             print(f"check-doc-drift: no diff in {range_spec} - skip")
@@ -2609,8 +2664,12 @@ def check_doc_drift(_args: argparse.Namespace | None = None) -> int:
                 f"`python scripts/axis.py migration add <module> <Name>`: {rel(migration)}",
             )
 
+    text_paths = [path for path in paths if (ROOT / path).is_file() and should_check_text_encoding(path)]
     checkers = [
-        ("check-text-encoding", check_text_encoding),
+        (
+            "check-text-encoding",
+            lambda _=None: run_text_encoding_check(text_paths, label="check-text-encoding-changed"),
+        ),
         ("check-scripts-standard", check_scripts_standard),
         ("check-repo-skills", check_repo_skills),
         ("check-ef-domain-mapping", check_ef_domain_mapping),
@@ -2626,8 +2685,9 @@ def check_doc_drift(_args: argparse.Namespace | None = None) -> int:
         ("check-doc-code-fences.py", lambda _=None: run_module_check("check-doc-code-fences.py", ["--check"])),
         ("check-local-dev-docs.py", lambda _=None: run_module_check("check-local-dev-docs.py", ["--check"])),
     ]
+    selected_checkers = doc_drift_checker_names(paths)
     for name, checker in checkers:
-        if name in skip_checkers:
+        if name not in selected_checkers or name in skip_checkers:
             continue
         if checker() != 0:
             issues.append(f"{name} failed")
@@ -3761,6 +3821,7 @@ def ready_review_policy_gates(
     *,
     policy_tests_covered: bool = False,
     doc_drift_covered: set[str] | None = None,
+    doc_drift_range: str | None = None,
 ) -> list[tuple[str, callable[[], int]]]:
     gates: list[tuple[str, callable[[], int]]] = []
     if any(path.startswith("scripts/") for path in paths) and not policy_tests_covered:
@@ -3771,7 +3832,13 @@ def ready_review_policy_gates(
     gates.append(
         (
             "doc drift",
-            lambda: check_doc_drift(argparse.Namespace(skip_checkers=skip_checkers)),
+            lambda: check_doc_drift(
+                argparse.Namespace(
+                    skip_checkers=skip_checkers,
+                    paths=paths,
+                    range_spec=doc_drift_range,
+                )
+            ),
         )
     )
     return gates
@@ -3782,6 +3849,7 @@ def run_ready_review_policy(
     *,
     policy_tests_covered: bool = False,
     doc_drift_covered: set[str] | None = None,
+    doc_drift_range: str | None = None,
 ) -> tuple[int, list[str]]:
     failed: list[str] = []
     executed: list[str] = []
@@ -3789,6 +3857,7 @@ def run_ready_review_policy(
         paths,
         policy_tests_covered=policy_tests_covered,
         doc_drift_covered=doc_drift_covered,
+        doc_drift_range=doc_drift_range,
     ):
         print()
         print(f"> ready-review: {name}")
@@ -3821,6 +3890,7 @@ def ready_review(args: argparse.Namespace) -> int:
         return 1
 
     policy_only = bool(getattr(args, "policy_only", False))
+    since = getattr(args, "since", None)
     executed: list[str] = []
     if not policy_only:
         if verify(args) != 0:
@@ -3833,6 +3903,7 @@ def ready_review(args: argparse.Namespace) -> int:
         paths,
         policy_tests_covered=not policy_only and scripts_changed,
         doc_drift_covered=set() if policy_only else ready_review_doc_drift_coverage(paths),
+        doc_drift_range=f"{since}..HEAD" if since else None,
     )
     executed.extend(policy_gates)
     if policy_rc != 0:

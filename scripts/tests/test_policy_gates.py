@@ -2846,6 +2846,7 @@ class TestReviewVerificationGates(unittest.TestCase):
             ["frontend/src/App.tsx"],
             policy_tests_covered=False,
             doc_drift_covered=set(),
+            doc_drift_range=None,
         )
 
     def test_policy_only_uses_same_profile_without_verify(self) -> None:
@@ -2864,6 +2865,7 @@ class TestReviewVerificationGates(unittest.TestCase):
             ["scripts/axis.py"],
             policy_tests_covered=False,
             doc_drift_covered=set(),
+            doc_drift_range=None,
         )
 
     def test_policy_registry_routes_only_triggered_expensive_checks(self) -> None:
@@ -2907,12 +2909,49 @@ class TestReviewVerificationGates(unittest.TestCase):
             axis.ready_review_doc_drift_coverage(paths),
         )
 
+    def test_doc_drift_selects_only_checkers_for_touched_surfaces(self) -> None:
+        selected = axis.doc_drift_checker_names(
+            [
+                "scripts/axis.py",
+                ".agents/skills/reference.md",
+                ".codex/agents/axis_reviewer.toml",
+                "docs/playbooks/scripts.md",
+            ]
+        )
+
+        self.assertEqual(
+            {
+                "check-text-encoding",
+                "check-scripts-standard",
+                "check-repo-skills",
+                "check-doc-link-targets.py",
+                "check-doc-navigation",
+                "check-doc-size-budgets",
+                "check-doc-code-fences.py",
+            },
+            selected,
+        )
+        self.assertFalse(
+            {
+                "check-ef-domain-mapping",
+                "check-frontend-api-contracts",
+                "check-ui-baseline",
+                "check-theme",
+                "check-frontend-quality",
+                "check-use-case-docs.py",
+                "check-foundation-docs.py",
+                "check-local-dev-docs.py",
+            }
+            & selected
+        )
+
     def test_doc_drift_gate_receives_covered_checks(self) -> None:
         covered = {"check-repo-skills"}
         gates = dict(
             axis.ready_review_policy_gates(
                 [".agents/skills/axis-example/SKILL.md"],
                 doc_drift_covered=covered,
+                doc_drift_range="base..HEAD",
             )
         )
 
@@ -2921,6 +2960,8 @@ class TestReviewVerificationGates(unittest.TestCase):
 
         args = doc_drift.call_args.args[0]
         self.assertEqual(covered, args.skip_checkers)
+        self.assertEqual([".agents/skills/axis-example/SKILL.md"], args.paths)
+        self.assertEqual("base..HEAD", args.range_spec)
 
     def test_pre_push_full_delegates_to_ready_review(self) -> None:
         with (
