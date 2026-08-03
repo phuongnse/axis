@@ -63,7 +63,7 @@ Let a local Axis MCP client obtain an access token through the existing browser 
 | AT-004 | UI component | Pending authorization survives recoverable sign-in failures and resumes without a second SPA PKCE flow | AC-003, AC-006 | UI component test | Yes |
 | AT-005 | API boundary | Silent authorization returns `login_required` without sign-in UI | AC-005 | API integration test | Yes |
 | AT-006 | API boundary | Invalid, expired, tampered, and replayed handles fail closed | AC-007 | API integration test | Yes |
-| AT-007 | Infrastructure boundary | Cache or callback failure does not issue a token and remains bounded | AC-008 | Infrastructure integration test+API integration test | Yes |
+| AT-007 | Infrastructure boundary | Cache or callback failure does not issue a token and remains bounded | AC-008 | API integration test | Yes |
 | AT-008 | UI/API boundaries | Normal sign-in remains the dashboard flow and MCP credential tools are absent | AC-009, AC-010 | UI component test+API integration test | Yes |
 
 ## Out Of Scope
@@ -100,7 +100,7 @@ The existing sign-in labels, validation, focus, keyboard, localization, loading,
 > | Frontend | Partial |
 > | MCP | Partial |
 >
-> **Gaps vs spec:** API and SPA continuation behavior have focused proof, but the supported browser journey to the registered MCP loopback callback, cache/callback failure injection, and app-managed MCP client reload plus authenticated read-back remain unverified.
+> **Gaps vs spec:** API and SPA continuation behavior plus expired-cache failure have focused proof, but the supported browser journey to the registered MCP loopback callback, client callback-failure injection, and app-managed MCP client reload plus authenticated read-back remain unverified.
 >
 > **Deferred follow-ups:** Reauthentication semantics for `prompt=login`, replacing the fixed MCP loopback callback port with an ephemeral port, and OpenIddict package lifecycle review remain outside this checkpoint.
 >

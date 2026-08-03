@@ -16,6 +16,8 @@ using Axis.Identity.Infrastructure.Persistence.Entities;
 using FluentAssertions;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Distributed;
+using OpenIddict.Server.AspNetCore;
 
 namespace Axis.Api.Tests.Identity;
 
@@ -179,15 +181,14 @@ public sealed class SignInUserFlowTests(ApiTestFixture fixture)
     }
 
     [Fact]
-    public async Task Authorize_WhenAuthenticatedMcpRequestResumes_UsesRegisteredLoopbackCallback()
+    public async Task Authorize_WhenInteractiveMcpRequestResumesAfterSignIn_UsesRegisteredLoopbackCallback()
     {
-        HttpResponseMessage signOutResponse =
-            await fixture.Client.PostAsync("/api/auth/sign-out", content: null, cancellationToken: TestContext.Current.CancellationToken);
         string email = UniqueEmail();
         await RegisterAsync(email);
         await VerifyEmailAsync(CapturedToken(email));
+        HttpResponseMessage signOutResponse =
+            await fixture.Client.PostAsync("/api/auth/sign-out", content: null, cancellationToken: TestContext.Current.CancellationToken);
 
-        HttpResponseMessage signInResponse = await SignInAsync(email, Password);
         string state = Guid.NewGuid().ToString("N");
         HttpResponseMessage cachedResponse = await AuthorizeAsync(
             state: state,
@@ -195,11 +196,25 @@ public sealed class SignInUserFlowTests(ApiTestFixture fixture)
             redirectUri: "http://127.0.0.1:48123/callback");
 
         signOutResponse.StatusCode.Should().Be(HttpStatusCode.NoContent);
-        signInResponse.StatusCode.Should().Be(HttpStatusCode.OK);
         cachedResponse.StatusCode.Should().Be(HttpStatusCode.Redirect);
         Uri cachedLocation = ResolveLocation(cachedResponse);
         string requestId = ReadRequestId(cachedLocation);
         requestId.Should().NotBeNullOrWhiteSpace();
+
+        HttpResponseMessage signInRedirect = await fixture.Client.GetAsync(
+            cachedLocation.PathAndQuery,
+            TestContext.Current.CancellationToken);
+
+        signInRedirect.StatusCode.Should().Be(HttpStatusCode.Redirect);
+        Uri signInLocation = ResolveLocation(signInRedirect);
+        signInLocation.AbsoluteUri.Should().StartWith("https://localhost:3000/sign-in?");
+        Dictionary<string, Microsoft.Extensions.Primitives.StringValues> signInQuery =
+            QueryHelpers.ParseQuery(signInLocation.Query);
+        signInQuery.Keys.Should().BeEquivalentTo(["authorization_request"]);
+        signInQuery["authorization_request"].ToString().Should().Be(requestId);
+
+        HttpResponseMessage signInResponse = await SignInAsync(email, Password);
+        signInResponse.StatusCode.Should().Be(HttpStatusCode.OK);
 
         HttpResponseMessage callbackResponse = await fixture.Client.GetAsync(
             cachedLocation.PathAndQuery,
@@ -212,13 +227,63 @@ public sealed class SignInUserFlowTests(ApiTestFixture fixture)
             QueryHelpers.ParseQuery(callbackLocation.Query);
         query["code"].ToString().Should().NotBeNullOrWhiteSpace();
         query["state"].ToString().Should().Be(state);
+
+        HttpResponseMessage replayResponse = await fixture.Client.GetAsync(
+            cachedLocation.PathAndQuery,
+            TestContext.Current.CancellationToken);
+
+        replayResponse.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        replayResponse.Headers.Location.Should().BeNull();
     }
 
     [Fact]
-    public async Task Authorize_WhenCachedRequestIdIsInvalid_FailsClosedWithoutRedirect()
+    public async Task Authorize_WhenAuthorizationHandleIsMissingOrTampered_FailsClosedWithoutRedirect()
     {
-        HttpResponseMessage response = await fixture.Client.GetAsync(
+        foreach (string path in new[]
+        {
+            "/connect/authorize",
             "/connect/authorize?request_id=tampered-request-id",
+        })
+        {
+            HttpResponseMessage response = await fixture.Client.GetAsync(
+                path,
+                TestContext.Current.CancellationToken);
+
+            response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+            response.Headers.Location.Should().BeNull();
+        }
+    }
+
+    [Fact]
+    public async Task Authorize_WhenCachedRequestIdExpires_FailsClosedWithoutCallbackCode()
+    {
+        HttpResponseMessage cachedResponse = await AuthorizeAsync();
+        cachedResponse.StatusCode.Should().Be(HttpStatusCode.Redirect);
+        Uri cachedLocation = ResolveLocation(cachedResponse);
+        string requestId = ReadRequestId(cachedLocation);
+
+        using IServiceScope scope = fixture.CreateScope();
+        IDistributedCache cache = scope.ServiceProvider.GetRequiredService<IDistributedCache>();
+        string cacheKey = $"{OpenIddictServerAspNetCoreConstants.Cache.AuthorizationRequest}{requestId}";
+        string cachedToken = await cache.GetStringAsync(
+            cacheKey,
+            TestContext.Current.CancellationToken)
+            ?? throw new InvalidOperationException($"No cached authorization request found for `{requestId}`.");
+        cachedToken.Should().NotBeNullOrWhiteSpace();
+        TimeSpan expiration = TimeSpan.FromMilliseconds(100);
+        await cache.SetStringAsync(
+            cacheKey,
+            cachedToken,
+            new DistributedCacheEntryOptions
+            {
+                AbsoluteExpirationRelativeToNow = expiration,
+            },
+            TestContext.Current.CancellationToken);
+        await Task.Delay(expiration + TimeSpan.FromMilliseconds(100), TestContext.Current.CancellationToken);
+        (await cache.GetStringAsync(cacheKey, TestContext.Current.CancellationToken)).Should().BeNull();
+
+        HttpResponseMessage response = await fixture.Client.GetAsync(
+            cachedLocation.PathAndQuery,
             TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
