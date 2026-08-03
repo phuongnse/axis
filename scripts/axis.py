@@ -2405,7 +2405,7 @@ def enforcement_truth_search_text(relative: Path, path: Path) -> str:
     start = text.find("def enforcement_truth_required_snippets")
     end = text.find("\ndef governance_owner_boundary_issues", start)
     if start == -1 or end == -1:
-        return text
+        return ""
     return text[:start] + text[end:]
 
 

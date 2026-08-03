@@ -3325,6 +3325,15 @@ class TestEnforcementTruthAudit(unittest.TestCase):
         for relative, requirements in axis.enforcement_truth_required_snippets():
             files[relative] = "\n".join(snippet for snippet, _description in requirements) + "\n"
 
+        script = Path("scripts/axis.py")
+        files[script] = (
+            "def enforcement_truth_required_snippets():\n"
+            "    pass\n\n"
+            "def governance_owner_boundary_issues():\n"
+            "    pass\n\n"
+            f"{files[script]}"
+        )
+
         workflow = Path(".github/workflows/build-and-test.yml")
         files[workflow] += "- 'openapi.json'\n- 'openapi.json'\n"
 
@@ -3397,6 +3406,18 @@ class TestEnforcementTruthAudit(unittest.TestCase):
             implementation = implementation.replace("lambda: check_doc_drift(", "lambda: missing_doc_drift(", 1)
             (root / script).write_text(prefix + marker + implementation, encoding="utf-8")
 
+            issues = axis.enforcement_truth_audit_issues(root=root)
+
+        self.assertIn("ready-review and CI share the doc-drift policy profile", "\n".join(issues))
+
+    def test_enforcement_truth_audit_fails_closed_when_isolation_marker_is_missing(self) -> None:
+        def mutate(files: dict[Path, str]) -> None:
+            script = Path("scripts/axis.py")
+            files[script] = files[script].replace("def governance_owner_boundary_issues():", "def renamed_owner_check():")
+
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            self.write_truth_repo(root, mutate)
             issues = axis.enforcement_truth_audit_issues(root=root)
 
         self.assertIn("ready-review and CI share the doc-drift policy profile", "\n".join(issues))
