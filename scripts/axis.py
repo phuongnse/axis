@@ -1401,6 +1401,21 @@ def simple_yaml_value(text: str, key: str) -> str:
     return value
 
 
+def check_project_orchestration() -> int:
+    result = run(
+        [sys.executable, str(ROOT / ".codex" / "check.py")],
+        check=False,
+        capture=True,
+    )
+    if result.returncode != 0:
+        print(result.stderr or result.stdout, file=sys.stderr)
+    return result.returncode
+
+
+def is_project_orchestration_path(path: str) -> bool:
+    return path.startswith(".codex/")
+
+
 def markdown_anchor_slug(text: str) -> str:
     text = re.sub(r"`([^`]*)`", r"\1", text.strip().lower())
     text = re.sub(r"<[^>]+>", "", text)
@@ -1855,6 +1870,8 @@ def check_repo_skills(_args: argparse.Namespace | None = None) -> int:
         print("check-repo-skills FAIL:", file=sys.stderr)
         for issue in issues:
             print(f"  - {issue}", file=sys.stderr)
+        return 1
+    if check_project_orchestration() != 0:
         return 1
     print("check-repo-skills: OK")
     return 0
@@ -3596,7 +3613,10 @@ def verify(args: argparse.Namespace) -> int:
     docs = any(is_docs_path(path) for path in paths)
     use_case_docs = any(path.startswith("docs/use-cases/") for path in paths)
     foundation_docs = any(path.startswith("docs/foundations/") for path in paths)
-    skills = any(path.startswith(f"{REPO_SKILLS_DIR}/") for path in paths)
+    skills = any(
+        path.startswith(f"{REPO_SKILLS_DIR}/") or is_project_orchestration_path(path)
+        for path in paths
+    )
     scripts_changed = any(path.startswith("scripts/") for path in paths)
     theme_changed = any(axis_theme.is_theme_path(path) for path in paths)
     text_paths = [path for path in paths if (ROOT / path).is_file() and should_check_text_encoding(path)]
@@ -3731,7 +3751,7 @@ def ready_review_doc_drift_coverage(paths: list[str]) -> set[str]:
     covered: set[str] = set()
     if any(path.startswith("scripts/") for path in paths):
         covered.add("check-scripts-standard")
-    if any(path.startswith(f"{REPO_SKILLS_DIR}/") for path in paths):
+    if any(path.startswith(f"{REPO_SKILLS_DIR}/") or is_project_orchestration_path(path) for path in paths):
         covered.add("check-repo-skills")
     if any(is_docs_path(path) for path in paths):
         covered.update({"check-doc-navigation", "check-doc-size-budgets", "check-doc-code-fences.py"})
@@ -3849,7 +3869,10 @@ def pre_push(args: argparse.Namespace) -> int:
         for p in paths
     )
     docs = not paths or any(re.search(r"^(AGENTS[.]md|README[.]md|docs/|[.]github/PULL_REQUEST_TEMPLATE[.]md)", p) for p in paths)
-    skills = not paths or any(p.startswith(f"{REPO_SKILLS_DIR}/") for p in paths)
+    skills = not paths or any(
+        p.startswith(f"{REPO_SKILLS_DIR}/") or is_project_orchestration_path(p)
+        for p in paths
+    )
     scripts_changed = not paths or any(p.startswith("scripts/") for p in paths)
     renovate_config = not paths or ".github/renovate.json5" in paths
     failed: list[str] = []

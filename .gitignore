@@ -1,8 +1,12 @@
 # Claude Code — local machine settings (do not commit)
 .claude/
 
-# Codex project-local machine configuration (do not commit)
-.codex/
+# Codex project orchestration is tracked; ignore any unrelated local state.
+.codex/*
+!.codex/config.toml
+!.codex/check.py
+!.codex/agents/
+!.codex/agents/*.toml
 
 # Build outputs
 bin/

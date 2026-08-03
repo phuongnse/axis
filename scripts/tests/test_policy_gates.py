@@ -2763,6 +2763,17 @@ class TestVerifyGate(unittest.TestCase):
             calls,
         )
 
+    def test_project_orchestration_change_runs_repo_skills_gate(self) -> None:
+        with (
+            mock.patch.object(axis, "verify_scope_paths", return_value=("working tree", [".codex/config.toml"])),
+            mock.patch.object(axis, "run_text_encoding_check", return_value=0),
+            mock.patch.object(axis, "check_repo_skills", return_value=0) as repo_skills,
+            contextlib.redirect_stdout(io.StringIO()),
+        ):
+            self.assertEqual(0, axis.verify(object()))
+
+        repo_skills.assert_called_once_with()
+
 
 class TestReviewVerificationGates(unittest.TestCase):
     def test_rejects_dirty_worktree_before_running_checks(self) -> None:
@@ -5828,6 +5839,10 @@ class TestRepoSkillsGate(unittest.TestCase):
     def test_current_repository_skills_still_pass(self) -> None:
         with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
             self.assertEqual(0, axis.check_repo_skills())
+
+    def test_current_project_orchestration_is_valid(self) -> None:
+        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+            self.assertEqual(0, axis.check_project_orchestration())
 
 
 class TestDoctorPythonPackageChecks(unittest.TestCase):

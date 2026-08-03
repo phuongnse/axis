@@ -1,0 +1,26 @@
+model = "gpt-5.6-sol"
+model_reasoning_effort = "high"
+
+[agents]
+enabled = true
+max_concurrent_threads_per_session = 2
+default_subagent_model = "gpt-5.6-terra"
+default_subagent_reasoning_effort = "medium"
+
+[agents.axis_scout]
+description = "Read-only Luna scout for broad Axis exploration and failure triage."
+config_file = "./agents/axis_scout.toml"
+
+[agents.axis_worker]
+description = "Terra worker for bounded Axis implementation with exact ownership and verification."
+config_file = "./agents/axis_worker.toml"
+
+[agents.axis_reviewer]
+description = "Read-only Sol High reviewer for immutable Axis checkpoints and high-risk decisions."
+config_file = "./agents/axis_reviewer.toml"
+
+[mcp_servers.axis]
+command = "python"
+args = ["scripts/axis.py", "mcp", "serve"]
+cwd = ".."
+startup_timeout_sec = 120
