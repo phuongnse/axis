@@ -1566,6 +1566,8 @@ class TestDocDriftRatchets(unittest.TestCase):
                     [
                         "```bash",
                         "python3 scripts/axis.py doctor",
+                        "```",
+                        "```powershell",
                         "py -3 scripts/axis.py doctor",
                         "```",
                     ]
@@ -2416,6 +2418,7 @@ class TestToolVersionGates(unittest.TestCase):
             mock.patch.object(axis, "frontend_toolchain_env", return_value={}),
             mock.patch.object(axis, "node_version_status", return_value=(True, "v24.18.0")),
             mock.patch.object(axis, "playwright_chromium_status", playwright_status),
+            mock.patch.object(axis, "python_launcher_status", return_value=("OK", "Python 3.14.4")),
             mock.patch.object(axis, "_command_version", return_value=("OK", "/usr/bin/tool")),
             mock.patch.object(axis, "find_openssl", return_value="/usr/bin/openssl"),
             mock.patch.object(axis, "_docker_info_ok", return_value=True),
@@ -2445,6 +2448,7 @@ class TestToolVersionGates(unittest.TestCase):
     def test_core_doctor_profile_skips_build_local_dev_and_review_tools(self) -> None:
         with (
             mock.patch.object(axis.shutil, "which", return_value="/usr/bin/tool"),
+            mock.patch.object(axis, "python_launcher_status", return_value=("OK", "Python 3.14.4")),
             mock.patch.object(axis, "_command_version", return_value=("OK", "tool 1.0")),
             mock.patch.object(axis, "dotnet_sdk_status") as dotnet,
             mock.patch.object(axis, "frontend_toolchain_env") as frontend,
@@ -2463,18 +2467,9 @@ class TestToolVersionGates(unittest.TestCase):
             skipped.assert_not_called()
 
     def test_core_doctor_requires_canonical_python_launcher(self) -> None:
-        def fake_command_version(name: str, *_args: str, **_kwargs) -> tuple[str, str]:
-            if name == "python":
-                return "FAIL", "python not found in PATH"
-            return "OK", "git version 2.53.0"
-
         with (
-            mock.patch.object(
-                axis.shutil,
-                "which",
-                side_effect=lambda name: "/usr/bin/python3" if name == "python3" else None,
-            ),
-            mock.patch.object(axis, "_command_version", side_effect=fake_command_version),
+            mock.patch.object(axis, "python_launcher_status", return_value=("FAIL", "python not found in PATH")),
+            mock.patch.object(axis, "_command_version", return_value=("OK", "git version 2.53.0")),
             contextlib.redirect_stdout(io.StringIO()) as stdout,
             contextlib.redirect_stderr(io.StringIO()) as stderr,
         ):
@@ -5836,6 +5831,37 @@ class TestRepoSkillsGate(unittest.TestCase):
 
 
 class TestDoctorPythonPackageChecks(unittest.TestCase):
+    def test_python_launcher_status_rejects_python_2(self) -> None:
+        with mock.patch.object(
+            axis,
+            "command_version_line",
+            return_value=(True, "Python 2.7.18", "/usr/bin/python"),
+        ):
+            status, detail = axis.python_launcher_status()
+
+        self.assertEqual("FAIL", status)
+        self.assertIn("expected Python 3", detail)
+
+    def test_python_launcher_status_requires_tar_data_filter(self) -> None:
+        probe = axis.subprocess.CompletedProcess(
+            ["/usr/bin/python", "-c", "probe"],
+            1,
+            stdout="",
+            stderr="",
+        )
+        with (
+            mock.patch.object(
+                axis,
+                "command_version_line",
+                return_value=(True, "Python 3.11.0", "/usr/bin/python"),
+            ),
+            mock.patch.object(axis, "run_optional", return_value=probe),
+        ):
+            status, detail = axis.python_launcher_status()
+
+        self.assertEqual("FAIL", status)
+        self.assertIn("tar data extraction filter", detail)
+
     def test_python_module_version_rejects_missing_package(self) -> None:
         with mock.patch.object(axis.importlib.util, "find_spec", return_value=None):
             status, detail = axis._python_module_version("yaml", "PyYAML")

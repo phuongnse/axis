@@ -24,7 +24,7 @@ Select the Axis workflow before selecting an agent. Skill ownership, Design Gate
 |---|---|---|
 | Primary orchestration, ambiguous or high-risk decisions, integration, routine checks, final verification | `gpt-5.6-sol`, High | Keep small, clear, single-path work on the primary |
 | Broad exploration or failure triage that materially benefits from parallel read-only work | `scout`: `gpt-5.6-luna`, Medium | No edits; do not spawn only to run a routine check |
-| Bounded implementation with exact ACs, disjoint ownership, and known verification | `worker`: `gpt-5.6-terra`, Medium | One writer; return on ambiguity, scope growth, or owner decision |
+| Bounded implementation with exact ACs, disjoint ownership, and known verification | `worker` or `default`: `gpt-5.6-terra`, Medium | One writer; return on ambiguity, scope growth, or owner decision |
 | Immutable checkpoint review, security, or high-risk architecture | `sol_reviewer`: `gpt-5.6-sol`, High | Read-only; follow the delegated review lifecycle |
 
 Delegate only when bounded independent work materially improves elapsed time or isolates noisy context. Every prompt names objective, scope, base or checkpoint, permissions, stop conditions, and final output contract. The primary integrates results and retains completion ownership.

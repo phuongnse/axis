@@ -2131,7 +2131,7 @@ def documented_raw_command_issues(paths: Iterable[str] | None = None, *, root: P
                 fence_lang = None if fence_lang is not None else fence_match.group(1).lower()
                 continue
 
-            if fence_lang in {"bash", "sh", "shell", "console"}:
+            if fence_lang in {"bash", "sh", "shell", "console", "powershell", "pwsh", "ps1"}:
                 message = raw_doc_command_message(line)
                 if message is not None:
                     issues.append(f"{normalized}:{idx}: raw documented command `{line.strip()}` - {message}")
@@ -3979,6 +3979,27 @@ def _command_version(name: str, *version_args: str, env: dict[str, str] | None =
     return "OK", f"{version} ({resolved})"
 
 
+def python_launcher_status() -> tuple[str, str]:
+    ok, version, resolved = command_version_line("python", "--version")
+    if not ok:
+        return "FAIL", version
+    if version_major(version) != "3":
+        return "FAIL", f"found `{version}` at {resolved}; expected Python 3"
+
+    probe = run_optional(
+        [
+            resolved,
+            "-c",
+            "import inspect, tarfile; assert hasattr(tarfile, 'data_filter') and "
+            "'filter' in inspect.signature(tarfile.TarFile.extractall).parameters",
+        ],
+        timeout=VERSION_PROBE_TIMEOUT_SECONDS,
+    )
+    if probe is None or probe.returncode != 0:
+        return "FAIL", f"{version} ({resolved}); missing required tar data extraction filter"
+    return "OK", f"{version} ({resolved})"
+
+
 def _python_module_version(module_name: str, package_name: str) -> tuple[str, str]:
     if importlib.util.find_spec(module_name) is None:
         return (
@@ -4950,7 +4971,7 @@ def doctor(args: argparse.Namespace) -> int:
     record("OK", "os", f"{platform.system()} {platform.release()} ({platform.machine()})")
     record("OK", "python", f"{platform.python_version()} ({sys.executable})")
 
-    python_status, python_detail = _command_version("python", "--version")
+    python_status, python_detail = python_launcher_status()
     record(python_status, "python launcher", python_detail)
 
     git_status, git_detail = _command_version("git", "--version")

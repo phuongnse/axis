@@ -6,7 +6,7 @@ Use `python scripts/axis.py local-dev ...` for local stack work. Do not document
 
 ## Prerequisites
 
-- Python 3 and Git; use `python3` on WSL/Linux or `py -3` on Windows when `python` is unavailable.
+- Python and Git from [scripts.md § Tool Versions](./scripts.md#tool-versions).
 - Docker Engine with Compose reachable from the shell running tests. Native Docker Engine inside WSL is supported; Docker Desktop is not required.
 - OpenSSL on PATH, or from Git for Windows, for local HTTPS certificates.
 - .NET SDK from [global.json](../../global.json) and Node from [frontend/.nvmrc](../../frontend/.nvmrc), either already available or installed user-locally by Axis.
