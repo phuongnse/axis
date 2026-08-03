@@ -146,8 +146,9 @@ sequenceDiagram
 > | Infrastructure | Done |
 > | API | Done |
 > | Frontend | Done |
+> | MCP | Partial |
 >
-> **Gaps vs spec:** No product behavior gap remains for this executable slice. An MCP client session opened before the bridge build may retain a stale tool snapshot; use the supported MCP host reload/reconnect control or restart that client before relying on newly added record tool names in that existing session.
+> **Gaps vs spec:** Product behavior evidence through the API, browser, and protocol boundaries is complete for this slice. Supported MCP host-client reload, current `tools/list`, authenticated `tools/call`, and client-session read-back remain unverified; the use case stays `Partial` until that runtime boundary is proven.
 >
 > **Deferred follow-ups:** Generic workflow-definition authoring, approval/assignment lifecycle, and additional record mutations remain explicitly out of scope for this first executable slice.
 >

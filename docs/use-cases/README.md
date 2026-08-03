@@ -10,6 +10,7 @@ Use cases are the product source of truth. One use case is a complete end-to-end
 |---|---|---|
 | [docs/use-cases/identity-access/README.md](./identity-access/README.md) | [docs/use-cases/identity-access/register-user.md](./identity-access/register-user.md) | Done |
 | [docs/use-cases/identity-access/README.md](./identity-access/README.md) | [docs/use-cases/identity-access/sign-in-user.md](./identity-access/sign-in-user.md) | Done |
+| [docs/use-cases/identity-access/README.md](./identity-access/README.md) | [docs/use-cases/identity-access/authorize-local-mcp-client.md](./identity-access/authorize-local-mcp-client.md) | Partial |
 | [docs/use-cases/identity-access/README.md](./identity-access/README.md) | [docs/use-cases/identity-access/sign-out-user.md](./identity-access/sign-out-user.md) | Done |
 | [docs/use-cases/business-objects/README.md](./business-objects/README.md) | [docs/use-cases/business-objects/configure-field-rules.md](./business-objects/configure-field-rules.md) | Partial |
 | [docs/use-cases/business-objects/README.md](./business-objects/README.md) | [docs/use-cases/business-objects/define-business-object.md](./business-objects/define-business-object.md) | Partial |
