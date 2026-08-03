@@ -2914,7 +2914,7 @@ class TestReviewVerificationGates(unittest.TestCase):
             [
                 "scripts/axis.py",
                 ".agents/skills/reference.md",
-                ".codex/agents/axis_reviewer.toml",
+                ".codex/config.toml",
                 "docs/playbooks/scripts.md",
             ]
         )
