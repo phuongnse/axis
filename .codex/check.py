@@ -8,9 +8,9 @@ import tomllib
 
 ROOT = Path(__file__).resolve().parent.parent
 AGENT_SPECS = {
-    "axis_scout": ("gpt-5.6-luna", "medium", "read-only"),
-    "axis_worker": ("gpt-5.6-terra", "medium", None),
-    "axis_reviewer": ("gpt-5.6-sol", "high", "read-only"),
+    "axis_scout": ("gpt-5.6-luna", "medium"),
+    "axis_worker": ("gpt-5.6-terra", "medium"),
+    "axis_reviewer": ("gpt-5.6-sol", "high"),
 }
 
 
@@ -72,17 +72,17 @@ def config_issues() -> list[str]:
     actual_agent_files = project_agent_role_files()
     for name in sorted(actual_agent_files - expected_agent_files):
         issues.append(f".codex/agents/{name}: unexpected project agent role")
-    for name, (model, effort, sandbox) in AGENT_SPECS.items():
+    for name, (model, effort) in AGENT_SPECS.items():
         path = ROOT / ".codex" / "agents" / f"{name}.toml"
         agent = load(path)
         if agent is None:
             continue
         expected = {"name": name, "model": model, "model_reasoning_effort": effort}
-        if sandbox is not None:
-            expected["sandbox_mode"] = sandbox
         for key, value in expected.items():
             if agent.get(key) != value:
                 issues.append(f"{path.relative_to(ROOT)}: `{key}` must be `{value}`")
+        if "sandbox_mode" in agent:
+            issues.append(f"{path.relative_to(ROOT)}: omit `sandbox_mode`; delegated agents inherit the primary runtime")
         for key in ("description", "developer_instructions"):
             if not isinstance(agent.get(key), str) or not agent[key].strip():
                 issues.append(f"{path.relative_to(ROOT)}: `{key}` is required")
