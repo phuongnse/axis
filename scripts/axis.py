@@ -2083,6 +2083,10 @@ RAW_DOC_COMMAND_PATTERNS = [
         "use `python scripts/axis.py local-dev ...` or `python scripts/axis.py check docker`",
     ),
     (re.compile(r"^openssl\b"), "use `python scripts/axis.py local-dev certs`"),
+    (
+        re.compile(r"^(?:python3|py\s+-3)\s+scripts/axis[.]py\b"),
+        "use `python scripts/axis.py ...`",
+    ),
     (re.compile(r"^python\s+docs/scripts/"), "use an approved project wrapper"),
     (re.compile(r"^lychee\s+--version\b"), "use `python scripts/axis.py check markdown-links` or `python scripts/axis.py doctor`"),
     (re.compile(r"^cargo\s+install\s+lychee\b"), "install tools externally, then verify through `python scripts/axis.py doctor`"),
@@ -4946,11 +4950,8 @@ def doctor(args: argparse.Namespace) -> int:
     record("OK", "os", f"{platform.system()} {platform.release()} ({platform.machine()})")
     record("OK", "python", f"{platform.python_version()} ({sys.executable})")
 
-    python_in_path = shutil.which("python") or shutil.which("python3") or shutil.which("py")
-    if python_in_path:
-        record("OK", "python launcher", python_in_path)
-    else:
-        record("WARN", "python launcher", "not found in PATH; use `python3` on WSL/Linux or `py -3` on Windows")
+    python_status, python_detail = _command_version("python", "--version")
+    record(python_status, "python launcher", python_detail)
 
     git_status, git_detail = _command_version("git", "--version")
     record(git_status, "git", git_detail)

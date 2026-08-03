@@ -19,7 +19,7 @@
 - `request_id` is the OpenIddict 5.8 authorization-cache handle; the continuation URL carries no raw OAuth request fields.
 - AT-003 is not run: the supported browser journey through the registered loopback callback and the app-managed MCP client boundary require runtime/client lifecycle evidence not available in this checkpoint.
 - AT-007 cache-failure evidence is limited to an expired distributed-cache request returning `400` without a callback code; supported client callback-failure/timeout evidence is not run.
-- MCP gates were run through the Axis routes: `python3 scripts/axis.py check mcp-api-coverage`, `python3 scripts/axis.py check mcp-contracts`, and `python3 scripts/axis.py check mcp-tool-safety` all passed. The repository documents the equivalent `python scripts/axis.py` form; this Linux host has no `python` alias.
+- MCP gates were run through the Axis routes: `python scripts/axis.py check mcp-api-coverage`, `python scripts/axis.py check mcp-contracts`, and `python scripts/axis.py check mcp-tool-safety` all passed.
 - MCP protocol, coverage, and safety gates are protocol-boundary evidence only. They do not substitute for a supported client reload, current tool registry, and authenticated `tools/call` read-back.
 - Local browser execution is blocked by the existing `axis_api` container health failure: startup migration exits with PostgreSQL `42P07` because relation `OpenIddictApplications` already exists. The database and app-managed process were not modified.
 

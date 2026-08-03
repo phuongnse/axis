@@ -16,6 +16,19 @@ Universal semantics for every repo skill. Intent routing lives in [README.md](./
 10. **Route durable guidance before edit.** The entry domain owner keeps spec, status, and evidence decisions. Other durable guidance **Requires** selecting `$axis-doc-hygiene` or entering it through a typed handoff before edit.
 11. **Compatibility is explicit.** Derive compatibility from the owning contract, real consumers/data, and current product phase. An approved pre-production clean cutover removes the old path completely; it does not preserve shims, dual contracts, feature flags, fallback parsing, or duplicate tests.
 
+## Agent routing
+
+Select the Axis workflow before selecting an agent. Skill ownership, Design Gate evidence, typed handoffs, acceptance criteria, and verification remain unchanged after delegation.
+
+| Work shape | Agent setup | Boundary |
+|---|---|---|
+| Primary orchestration, ambiguous or high-risk decisions, integration, routine checks, final verification | `gpt-5.6-sol`, High | Keep small, clear, single-path work on the primary |
+| Broad exploration or failure triage that materially benefits from parallel read-only work | `scout`: `gpt-5.6-luna`, Medium | No edits; do not spawn only to run a routine check |
+| Bounded implementation with exact ACs, disjoint ownership, and known verification | `worker`: `gpt-5.6-terra`, Medium | One writer; return on ambiguity, scope growth, or owner decision |
+| Immutable checkpoint review, security, or high-risk architecture | `sol_reviewer`: `gpt-5.6-sol`, High | Read-only; follow the delegated review lifecycle |
+
+Delegate only when bounded independent work materially improves elapsed time or isolates noisy context. Every prompt names objective, scope, base or checkpoint, permissions, stop conditions, and final output contract. The primary integrates results and retains completion ownership.
+
 ## Blocker and completion protocol
 
 Use this protocol whenever progress depends on state outside the repository or on a decision only the user can make. It is a process boundary, not a prompt to invent a workaround.

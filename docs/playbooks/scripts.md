@@ -8,6 +8,7 @@
 
 | Tool | Required source | Used by |
 |---|---|---|
+| Python | Current patched Python 3 exposed as `python`; Ubuntu/WSL provides the launcher through `python-is-python3` | repository maintenance |
 | .NET SDK | [global.json](../../global.json) / [docs/TECH_STACK.md](../TECH_STACK.md); portable setup pin in [scripts/axis_setup.py](../../scripts/axis_setup.py) | build, tests, format, package scan, API contracts |
 | MCP SDK | Exact `ModelContextProtocol` pin in [Directory.Packages.props](../../Directory.Packages.props) | local `Axis.Mcp` stdio bridge and focused MCP contract tests |
 | Node.js | [frontend/.nvmrc](../../frontend/.nvmrc); portable setup pin in [scripts/axis_setup.py](../../scripts/axis_setup.py) | frontend commands and API types |
@@ -17,11 +18,9 @@
 | Renovate validator | Exact version in [scripts/axis.py](../../scripts/axis.py) | Dependency automation config |
 | Pre-PR review checkpoint | [scripts/axis.py](../../scripts/axis.py) check | `$axis-pull-request` before GitHub PR actions |
 
-Project commands use `python`; substitute `python3` on WSL/Linux or `py -3` on Windows when that is the available Python 3 launcher.
-
 ## Bootstrap and diagnosis
 
-- A current patched Python 3 with the standard-library tar data extraction filter and Git are external prerequisites. Run `python scripts/axis.py setup --profile build`; select `local-dev`, `review`, or `all` for cumulative preparation.
+- Python from [Tool Versions](#tool-versions), including the standard-library tar data extraction filter, and Git are external prerequisites. Run `python scripts/axis.py setup --profile build`; select `local-dev`, `review`, or `all` for cumulative preparation.
 - Add `--install-user-tools` to install a missing pinned .NET SDK and Node.js. The review profile can also install pinned Lychee and GitHub CLI artifacts. It exposes the managed GitHub CLI as a stable user command without replacing an unmanaged command, and reports when the command directory is not active in `PATH`. Downloads require interactive confirmation or `--yes`, use HTTPS, verify the publisher's SHA-256/SHA-512 digest, and land under the native user data directory. `AXIS_TOOLS_DIR` overrides that location.
 - Portable executables still rely on publisher-documented host libraries. Strict doctor output classifies known native-runtime failures and prints an exact host action only for a verified OS/version; unknown hosts receive publisher-level guidance. Setup never sets runtime fallbacks or installs OS packages silently.
 - Use `--plan-only` to print the selected OS/architecture plan without checks, network access, downloads, or repository mutations. Add `--browsers` only when explicit host-browser debugging needs a user-local Chromium binary; standard Axis browser workflows use the containerized runtime.

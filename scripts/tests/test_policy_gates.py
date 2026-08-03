@@ -1559,6 +1559,22 @@ class TestDocDriftRatchets(unittest.TestCase):
 
         self.assertEqual("", issues)
 
+    def test_rejects_noncanonical_python_launchers_in_docs(self) -> None:
+        issues = self.documented_issue_text(
+            {
+                "README.md": "\n".join(
+                    [
+                        "```bash",
+                        "python3 scripts/axis.py doctor",
+                        "py -3 scripts/axis.py doctor",
+                        "```",
+                    ]
+                ),
+            }
+        )
+
+        self.assertEqual(2, issues.count("use `python scripts/axis.py ...`"))
+
 class TestWorkingTreeDiffHelpers(unittest.TestCase):
     def test_module_main_supports_dataclass_scripts(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -2445,6 +2461,27 @@ class TestToolVersionGates(unittest.TestCase):
         self.assertIn("profile=core", stdout.getvalue())
         for skipped in (dotnet, frontend, docker, lychee, coderabbit):
             skipped.assert_not_called()
+
+    def test_core_doctor_requires_canonical_python_launcher(self) -> None:
+        def fake_command_version(name: str, *_args: str, **_kwargs) -> tuple[str, str]:
+            if name == "python":
+                return "FAIL", "python not found in PATH"
+            return "OK", "git version 2.53.0"
+
+        with (
+            mock.patch.object(
+                axis.shutil,
+                "which",
+                side_effect=lambda name: "/usr/bin/python3" if name == "python3" else None,
+            ),
+            mock.patch.object(axis, "_command_version", side_effect=fake_command_version),
+            contextlib.redirect_stdout(io.StringIO()) as stdout,
+            contextlib.redirect_stderr(io.StringIO()) as stderr,
+        ):
+            self.assertEqual(1, axis.doctor(axis.argparse.Namespace(profile="core", strict=True)))
+
+        self.assertIn("[FAIL] python launcher: python not found in PATH", stdout.getvalue())
+        self.assertIn("python launcher", stderr.getvalue())
 
     def test_coderabbit_doctor_skips_windows_command_shim_in_non_strict_mode(self) -> None:
         with (
