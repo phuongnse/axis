@@ -1914,6 +1914,7 @@ class TestVulnerablePackageGate(unittest.TestCase):
             "version": 1,
             "projects": [
                 {
+                    "path": "/repo/Example.csproj",
                     "frameworks": [
                         {
                             "topLevelPackages": [
@@ -1940,6 +1941,25 @@ class TestVulnerablePackageGate(unittest.TestCase):
         self.assertEqual(
             ["NuGet vulnerability report must use JSON output version 1"],
             axis.nuget_vulnerability_report_issues({"projects": []}),
+        )
+
+    def test_nuget_vulnerability_report_accepts_projects_without_findings(self) -> None:
+        report = {
+            "version": 1,
+            "projects": [
+                {"path": "/repo/One.csproj"},
+                {"path": "/repo/Two.csproj", "frameworks": []},
+            ],
+        }
+
+        self.assertEqual([], axis.nuget_vulnerability_report_issues(report))
+
+    def test_nuget_vulnerability_report_requires_project_identity(self) -> None:
+        report = {"version": 1, "projects": [{"frameworks": []}]}
+
+        self.assertEqual(
+            ["NuGet vulnerability report project 1 has invalid path"],
+            axis.nuget_vulnerability_report_issues(report),
         )
 
     def test_shadcn_cli_is_owned_as_a_development_dependency(self) -> None:
@@ -2291,6 +2311,17 @@ class TestToolVersionGates(unittest.TestCase):
         self.assertIn("selects .NET SDK 9.x", detail)
         self.assertIn("expected 8.x", detail)
 
+    def test_dotnet_sdk_rejects_portable_setup_major_drift_before_runtime_probe(self) -> None:
+        with (
+            mock.patch.object(axis.axis_setup, "DOTNET_SDK_VERSION", "9.0.100"),
+            mock.patch.object(axis, "command_version_line") as command_version,
+        ):
+            ok, detail = axis.dotnet_sdk_status()
+
+        self.assertFalse(ok)
+        self.assertIn("portable setup pins 9.0.100", detail)
+        command_version.assert_not_called()
+
     def test_dotnet_sdk_rejects_wrong_major(self) -> None:
         with mock.patch.object(
             axis,
@@ -2302,6 +2333,21 @@ class TestToolVersionGates(unittest.TestCase):
         self.assertFalse(ok)
         self.assertIn("expected .NET SDK 8.x", detail)
         self.assertIn("docs/TECH_STACK.md", detail)
+        self.assertIn("axis.py setup --profile build --install-user-tools", detail)
+
+    def test_dotnet_sdk_missing_runtime_points_to_axis_managed_setup(self) -> None:
+        with (
+            mock.patch.object(
+                axis,
+                "command_version_line",
+                return_value=(False, "dotnet not found", "dotnet"),
+            ),
+            mock.patch.object(axis.axis_setup, "dotnet_native_prerequisite_hint", return_value=None),
+        ):
+            ok, detail = axis.dotnet_sdk_status()
+
+        self.assertFalse(ok)
+        self.assertIn("axis.py setup --profile build --install-user-tools", detail)
 
     def test_dotnet_sdk_surfaces_classified_native_prerequisite(self) -> None:
         with (
@@ -2341,6 +2387,66 @@ class TestToolVersionGates(unittest.TestCase):
 
         self.assertIn("expected Node 24.18.0", stderr.getvalue())
         self.assertIn("frontend/.nvmrc", stderr.getvalue())
+
+    def test_missing_node_points_to_axis_managed_setup(self) -> None:
+        with (
+            mock.patch.object(axis, "required_node_version", return_value=(True, "24.18.0")),
+            mock.patch.object(
+                axis,
+                "command_version_line",
+                return_value=(False, "node not found", "node"),
+            ),
+        ):
+            ok, detail = axis.node_version_status({})
+
+        self.assertFalse(ok)
+        self.assertIn("axis.py setup --profile build --install-user-tools", detail)
+
+    def test_wrong_npm_points_to_axis_managed_setup(self) -> None:
+        with mock.patch.object(
+            axis,
+            "command_version_line",
+            return_value=(True, "11.15.0", "/usr/bin/npm"),
+        ):
+            ok, detail = axis.npm_version_status({})
+
+        self.assertFalse(ok)
+        self.assertIn("axis.py setup --profile build --install-user-tools", detail)
+
+    def test_build_doctor_rejects_wrong_npm_version(self) -> None:
+        with (
+            mock.patch.object(axis, "python_launcher_status", return_value=("OK", "Python 3.12.3")),
+            mock.patch.object(axis, "_command_version", return_value=("OK", "git version 2.43.0")),
+            mock.patch.object(axis, "dotnet_sdk_status", return_value=(True, "8.0.423")),
+            mock.patch.object(axis, "frontend_toolchain_env", return_value={"PATH": "/managed/node"}),
+            mock.patch.object(axis, "node_version_status", return_value=(True, "v24.18.0")),
+            mock.patch.object(
+                axis,
+                "npm_version_status",
+                return_value=(
+                    False,
+                    "found npm `11.15.0`; expected 11.16.0; "
+                    "run `python scripts/axis.py setup --profile build --install-user-tools`",
+                ),
+            ),
+            contextlib.redirect_stdout(io.StringIO()) as stdout,
+            contextlib.redirect_stderr(io.StringIO()) as stderr,
+        ):
+            rc = axis.doctor(axis.argparse.Namespace(profile="build", strict=True))
+
+        self.assertEqual(1, rc)
+        self.assertIn("[FAIL] npm: found npm `11.15.0`", stdout.getvalue())
+        self.assertIn("npm", stderr.getvalue())
+
+    def test_missing_lychee_points_to_axis_managed_setup(self) -> None:
+        with (
+            mock.patch.object(axis, "find_lychee", return_value=None),
+            contextlib.redirect_stderr(io.StringIO()) as stderr,
+        ):
+            rc = axis.check_markdown_links_for_paths([])
+
+        self.assertEqual(1, rc)
+        self.assertIn("axis.py setup --profile review --install-user-tools", stderr.getvalue())
 
     def test_frontend_toolchain_env_resolves_nvm_when_path_lacks_node(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -5655,27 +5761,6 @@ class TestDoctorPythonPackageChecks(unittest.TestCase):
 
         self.assertEqual("FAIL", status)
         self.assertIn("tar data extraction filter", detail)
-
-    def test_python_module_version_rejects_missing_package(self) -> None:
-        with mock.patch.object(axis.importlib.util, "find_spec", return_value=None):
-            status, detail = axis._python_module_version("yaml", "PyYAML")
-
-        self.assertEqual("FAIL", status)
-        self.assertIn("PyYAML is not installed", detail)
-
-    def test_python_module_version_reports_package_version(self) -> None:
-        class Module:
-            __version__ = "6.0.3"
-
-        with (
-            mock.patch.object(axis.importlib.util, "find_spec", return_value=object()),
-            mock.patch.object(axis.importlib, "import_module", return_value=Module),
-        ):
-            status, detail = axis._python_module_version("yaml", "PyYAML")
-
-        self.assertEqual("OK", status)
-        self.assertIn("PyYAML 6.0.3", detail)
-
 
 class TestHandlerTestRatchet(unittest.TestCase):
     def test_modified_handler_requires_matching_test_file(self) -> None:

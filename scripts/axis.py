@@ -771,10 +771,18 @@ def nuget_vulnerability_report_issues(report: object) -> list[str]:
 
     issues: list[str] = []
     for project_index, project in enumerate(projects, 1):
-        if not isinstance(project, dict) or not isinstance(project.get("frameworks"), list):
+        if not isinstance(project, dict):
+            issues.append(f"NuGet vulnerability report project {project_index} is invalid")
+            continue
+        project_path = project.get("path")
+        if not isinstance(project_path, str) or not project_path.strip():
+            issues.append(f"NuGet vulnerability report project {project_index} has invalid path")
+            continue
+        frameworks = project.get("frameworks", [])
+        if not isinstance(frameworks, list):
             issues.append(f"NuGet vulnerability report project {project_index} has invalid frameworks")
             continue
-        for framework_index, framework in enumerate(project["frameworks"], 1):
+        for framework_index, framework in enumerate(frameworks, 1):
             if not isinstance(framework, dict):
                 issues.append(
                     f"NuGet vulnerability report project {project_index} framework {framework_index} is invalid"
@@ -2644,15 +2652,22 @@ def dotnet_sdk_status() -> tuple[bool, str]:
             f"{path_label(GLOBAL_JSON_PATH)} selects .NET SDK {source_major_or_error}.x; "
             f"expected {REQUIRED_DOTNET_SDK_MAJOR}.x per {TECH_STACK_DOC}",
         )
+    portable_major = version_major(axis_setup.DOTNET_SDK_VERSION)
+    if portable_major != source_major_or_error:
+        return (
+            False,
+            f"{path_label(GLOBAL_JSON_PATH)} selects .NET SDK {source_major_or_error}.x, "
+            f"but portable setup pins {axis_setup.DOTNET_SDK_VERSION} in scripts/axis_setup.py",
+        )
 
     ok, version_line, resolved = command_version_line("dotnet", "--version")
     if not ok:
         prerequisite = axis_setup.dotnet_native_prerequisite_hint(version_line)
-        prerequisite_detail = f"; {prerequisite}" if prerequisite else ""
+        next_action = prerequisite or managed_tool_install_hint("build")
         return (
             False,
             f"{version_line}; .NET SDK {REQUIRED_DOTNET_SDK_MAJOR}.x is required per "
-            f"{TECH_STACK_DOC} and {path_label(GLOBAL_JSON_PATH)}{prerequisite_detail}",
+            f"{TECH_STACK_DOC} and {path_label(GLOBAL_JSON_PATH)}; {next_action}",
         )
 
     major = version_major(version_line)
@@ -2661,7 +2676,7 @@ def dotnet_sdk_status() -> tuple[bool, str]:
             False,
             f"found `{version_line or 'unknown'}` at {resolved}; "
             f"expected .NET SDK {REQUIRED_DOTNET_SDK_MAJOR}.x per "
-            f"{TECH_STACK_DOC} and {path_label(GLOBAL_JSON_PATH)}",
+            f"{TECH_STACK_DOC} and {path_label(GLOBAL_JSON_PATH)}; {managed_tool_install_hint('build')}",
         )
     return True, f"{version_line} ({resolved}); expected major {REQUIRED_DOTNET_SDK_MAJOR} from {path_label(GLOBAL_JSON_PATH)}"
 
@@ -2684,14 +2699,18 @@ def node_version_status(env: dict[str, str] | None = None) -> tuple[bool, str]:
 
     ok, version_line, resolved = command_version_line("node", "--version", env=env)
     if not ok:
-        return False, f"{version_line}; Node {expected} is required per {rel(NVMRC_PATH)}"
+        return (
+            False,
+            f"{version_line}; Node {expected} is required per {rel(NVMRC_PATH)}; "
+            f"{managed_tool_install_hint('build')}",
+        )
 
     actual = version_line.removeprefix("v")
     if actual != expected:
         return (
             False,
             f"found `{version_line or 'unknown'}` at {resolved}; "
-            f"expected Node {expected} from {rel(NVMRC_PATH)}",
+            f"expected Node {expected} from {rel(NVMRC_PATH)}; {managed_tool_install_hint('build')}",
         )
     return True, f"{version_line} ({resolved}); expected exact {expected} from {rel(NVMRC_PATH)}"
 
@@ -2709,9 +2728,17 @@ def npm_version_status(env: dict[str, str] | None = None) -> tuple[bool, str]:
     expected = match.group(1)
     ok, version_line, resolved = command_version_line("npm", "--version", env=env)
     if not ok:
-        return False, f"{version_line}; npm {expected} is required per {path_label(package_path)}"
+        return (
+            False,
+            f"{version_line}; npm {expected} is required per {path_label(package_path)}; "
+            f"{managed_tool_install_hint('build')}",
+        )
     if version_line != expected:
-        return False, f"found npm `{version_line}` at {resolved}; expected {expected} per {path_label(package_path)}"
+        return (
+            False,
+            f"found npm `{version_line}` at {resolved}; expected {expected} per {path_label(package_path)}; "
+            f"{managed_tool_install_hint('build')}",
+        )
     return True, f"{version_line} ({resolved}); expected exact {expected} from {path_label(package_path)}"
 
 
@@ -2830,7 +2857,7 @@ def check_markdown_links_for_paths(paths: list[str] | None) -> int:
     if lychee is None:
         print(
             f"check-markdown-links: Lychee {axis_setup.LYCHEE_VERSION} is required, "
-            "but `lychee` was not found in PATH. See docs/playbooks/scripts.md#tool-versions.",
+            f"but it is unavailable; {managed_tool_install_hint('review')}.",
             file=sys.stderr,
         )
         return 1
@@ -2838,8 +2865,7 @@ def check_markdown_links_for_paths(paths: list[str] | None) -> int:
     if not version_ok:
         print(
             f"check-markdown-links: Lychee {axis_setup.LYCHEE_VERSION} is required; {version_detail}. "
-            "Install the documented version or put it earlier in PATH. "
-            "See docs/playbooks/scripts.md#tool-versions.",
+            f"{managed_tool_install_hint('review')}.",
             file=sys.stderr,
         )
         return 1
@@ -3737,23 +3763,6 @@ def python_launcher_status() -> tuple[str, str]:
     return "OK", f"{version} ({resolved})"
 
 
-def _python_module_version(module_name: str, package_name: str) -> tuple[str, str]:
-    if importlib.util.find_spec(module_name) is None:
-        return (
-            "FAIL",
-            f"{package_name} is not installed for {sys.executable}; install with "
-            f"`{sys.executable} -m pip install {package_name}`",
-        )
-
-    try:
-        module = importlib.import_module(module_name)
-    except Exception as exc:  # pragma: no cover - import side effects are environment-specific
-        return "FAIL", f"{package_name} import failed: {exc}"
-
-    version = getattr(module, "__version__", "available")
-    return "OK", f"{package_name} {version} ({sys.executable})"
-
-
 def _http_ok(url: str, timeout_seconds: float = 1.5) -> bool:
     try:
         with urllib.request.urlopen(url, timeout=timeout_seconds) as response:
@@ -4504,16 +4513,31 @@ def setup_tool_ready(tool: str) -> bool:
     raise CheckError(f"Unknown setup-managed tool: {tool}")
 
 
+def managed_tool_install_hint(profile: str) -> str:
+    return (
+        "run `python scripts/axis.py setup "
+        f"--profile {profile} --install-user-tools` to let Axis install the managed toolchain"
+    )
+
+
 def gh_cli_status() -> tuple[bool, str]:
     ok, version_line, resolved = command_version_line("gh", "--version")
     if not ok:
-        return False, version_line
+        return False, f"{version_line}; {managed_tool_install_hint('review')}"
     match = re.search(r"\bgh version ([0-9]+(?:[.][0-9]+)+)\b", version_line)
     if match is None:
-        return False, f"found `{version_line or 'unknown'}` at {resolved}; expected >= {axis_setup.GH_VERSION}"
+        return (
+            False,
+            f"found `{version_line or 'unknown'}` at {resolved}; expected >= {axis_setup.GH_VERSION}; "
+            f"{managed_tool_install_hint('review')}",
+        )
     version = match.group(1)
     if _version_sort_key(version) < _version_sort_key(axis_setup.GH_VERSION):
-        return False, f"found `{version_line}` at {resolved}; expected >= {axis_setup.GH_VERSION}"
+        return (
+            False,
+            f"found `{version_line}` at {resolved}; expected >= {axis_setup.GH_VERSION}; "
+            f"{managed_tool_install_hint('review')}",
+        )
     return True, f"{version_line} ({resolved}); expected >= {axis_setup.GH_VERSION}"
 
 
@@ -4550,7 +4574,7 @@ def setup_preflight(profile: str) -> int:
     rc = doctor(argparse.Namespace(profile=profile, strict=True))
     if rc != 0:
         if normalized == "review" and not setup_tool_ready("lychee"):
-            print("setup: rerun with --install-user-tools to install the pinned Lychee artifact", file=sys.stderr)
+            print(f"setup: {managed_tool_install_hint('review')}", file=sys.stderr)
         return rc
     return 0
 
@@ -4714,8 +4738,8 @@ def doctor(args: argparse.Namespace) -> int:
         frontend_env = frontend_toolchain_env()
         node_ok, node_detail = node_version_status(frontend_env)
         record("OK" if node_ok else "FAIL", "node", node_detail)
-        npm_status, npm_detail = _command_version("npm", "--version", env=frontend_env)
-        record(npm_status, "npm", npm_detail)
+        npm_ok, npm_detail = npm_version_status(frontend_env)
+        record("OK" if npm_ok else "FAIL", "npm", npm_detail)
 
         if os.name == "nt":
             npm_cmd = shutil.which("npm.cmd")
@@ -4795,11 +4819,13 @@ def doctor(args: argparse.Namespace) -> int:
     if "review" in groups:
         lychee = find_lychee()
         if lychee is None:
-            record(
-                "FAIL",
-                "lychee",
-                f"Lychee {axis_setup.LYCHEE_VERSION} is required; install it per {TOOL_VERSIONS_DOC}",
-            )
+            try:
+                platform_spec = axis_setup.detect_platform()
+                axis_setup.asset_name("lychee", platform_spec)
+                lychee_action = managed_tool_install_hint("review")
+            except axis_setup.SetupError as exc:
+                lychee_action = str(exc)
+            record("FAIL", "lychee", f"Lychee {axis_setup.LYCHEE_VERSION} is required; {lychee_action}")
         else:
             lychee_ok, lychee_detail = lychee_version_status(lychee)
             record("OK" if lychee_ok else "FAIL", "lychee", lychee_detail)

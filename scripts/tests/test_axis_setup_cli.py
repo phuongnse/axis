@@ -112,6 +112,17 @@ class TestPortableSetupCli(unittest.TestCase):
         ):
             self.assertFalse(axis.setup_tool_ready("gh"))
 
+    def test_missing_github_cli_points_to_axis_managed_setup(self) -> None:
+        with mock.patch.object(
+            axis,
+            "command_version_line",
+            return_value=(False, "gh not found", "gh"),
+        ):
+            ok, detail = axis.gh_cli_status()
+
+        self.assertFalse(ok)
+        self.assertIn("axis.py setup --profile review --install-user-tools", detail)
+
     def test_setup_treats_node_with_an_unresolved_npm_as_missing(self) -> None:
         with (
             mock.patch.object(axis, "node_version_status", return_value=(True, "v24.18.0")),
