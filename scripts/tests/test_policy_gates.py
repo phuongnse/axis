@@ -3753,25 +3753,67 @@ class TestLocalDevCli(unittest.TestCase):
         self.assertNotIn(expected, check(canonical))
         self.assertIn(expected, check(insecure))
 
-    def test_local_dev_doc_check_requires_browser_api_connect_origin(self) -> None:
+    def test_local_dev_doc_check_rejects_browser_connect_origin_override(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             compose = Path(temp) / "docker-compose.yml"
             compose.write_text(
                 "services:\n"
                 "  web:\n"
                 "    environment:\n"
-                '      VITE_CONNECT_URL: "https://localhost:5281"\n',
+                '      VITE_API_PROXY_TARGET: "https://api:8443"\n',
                 encoding="utf-8",
             )
 
-            self.assertTrue(check_local_dev_docs.web_has_browser_api_connect_origin(compose))
+            self.assertTrue(check_local_dev_docs.web_uses_same_origin_connect(compose))
 
             compose.write_text(
-                compose.read_text(encoding="utf-8").replace("localhost:5281", "api:8443"),
+                compose.read_text(encoding="utf-8")
+                + '      VITE_CONNECT_URL: "https://localhost:5281"\n',
                 encoding="utf-8",
             )
 
-            self.assertFalse(check_local_dev_docs.web_has_browser_api_connect_origin(compose))
+            self.assertFalse(check_local_dev_docs.web_uses_same_origin_connect(compose))
+
+    def test_local_dev_doc_check_requires_connect_proxy_to_preserve_browser_host(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            vite_config = Path(temp) / "vite.config.ts"
+            vite_config.write_text(
+                "proxy: {'/connect': {target: 'https://api:8443', changeOrigin: false}}",
+                encoding="utf-8",
+            )
+
+            self.assertTrue(
+                check_local_dev_docs.vite_connect_proxy_preserves_browser_host(vite_config)
+            )
+
+            vite_config.write_text(
+                vite_config.read_text(encoding="utf-8").replace(
+                    "changeOrigin: false",
+                    "changeOrigin: true",
+                ),
+                encoding="utf-8",
+            )
+
+            self.assertFalse(
+                check_local_dev_docs.vite_connect_proxy_preserves_browser_host(vite_config)
+            )
+
+    def test_local_dev_doc_check_requires_frontend_auth_to_use_same_origin_connect(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            pkce = Path(temp) / "pkce.ts"
+            pkce.write_text(
+                "return `${window.location.origin}/connect/authorize`;",
+                encoding="utf-8",
+            )
+
+            self.assertTrue(check_local_dev_docs.frontend_auth_uses_same_origin_connect(pkce))
+
+            pkce.write_text(
+                "const base = import.meta.env.VITE_CONNECT_URL; return `${base}/connect/authorize`;",
+                encoding="utf-8",
+            )
+
+            self.assertFalse(check_local_dev_docs.frontend_auth_uses_same_origin_connect(pkce))
 
     def test_api_appsettings_base_url_reads_app_base_url(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -3784,6 +3826,19 @@ class TestLocalDevCli(unittest.TestCase):
             self.assertEqual(
                 "https://localhost:3000",
                 check_local_dev_docs.api_appsettings_base_url(appsettings),
+            )
+
+    def test_api_appsettings_openiddict_issuer_reads_canonical_issuer(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            appsettings = Path(temp) / "appsettings.json"
+            appsettings.write_text(
+                '{"OpenIddict": {"Issuer": "https://localhost:5281"}}',
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                "https://localhost:5281",
+                check_local_dev_docs.api_appsettings_openiddict_issuer(appsettings),
             )
 
     def run_local_dev(

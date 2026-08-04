@@ -21,11 +21,12 @@
 - AT-007 cache-failure evidence is limited to an expired distributed-cache request returning `400` without a callback code; supported client callback-failure/timeout evidence is not run.
 - MCP gates were run through the Axis routes: `python scripts/axis.py check mcp-api-coverage`, `python scripts/axis.py check mcp-contracts`, and `python scripts/axis.py check mcp-tool-safety` all passed.
 - MCP protocol, coverage, and safety gates are protocol-boundary evidence only. They do not substitute for a supported client reload, current tool registry, and authenticated `tools/call` read-back.
-- Local authorization resume uses the browser-visible API origin `https://localhost:5281`; the supported client flow completed without weakening request-handle, state, PKCE, callback, or token validation.
+- Local authorization uses the canonical OpenIddict issuer `https://localhost:5281`; browser transport stays same-origin through `/connect`, and the supported client flow completed without weakening request-handle, state, PKCE, callback, or token validation.
 
 ## Verification summary
 
 - API `SignInUserFlowTests`: 11 passed, including the signed-out handoff/sign-in resume, silent `login_required`, missing/tampered/expired/replayed handle fail-closed behavior, and the registered `axis_mcp` loopback callback.
-- Frontend auth tests: 39 passed across the pending sign-in continuation and session-restore suites.
+- Frontend auth tests: 41 passed across the pending sign-in continuation, session-restore, and callback suites.
+- Compose browser regression: the focused `sign-in-user` AT-001 journey passed and verified `/connect/authorize` stayed on the browser-facing web origin before the dashboard handoff.
 - MCP contract tests: 17 passed; API coverage and tool-safety checks passed.
-- Supported browser/client runtime: passed against the app-managed Codex client; browser automation and callback-failure/timeout evidence remain not run, so the use case remains Partial.
+- Supported browser/client runtime: passed against the app-managed Codex client; MCP loopback browser automation and callback-failure/timeout evidence remain not run, so the use case remains Partial.

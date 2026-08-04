@@ -97,7 +97,7 @@ The existing sign-in labels, validation, focus, keyboard, localization, loading,
 > | Application | N/A |
 > | Infrastructure | Partial |
 > | API | Done |
-> | Frontend | Done |
+> | Frontend | Partial |
 > | MCP | Partial |
 >
 > **Gaps vs spec:** The supported app-managed MCP client journey, registered loopback callback, and authenticated list/read-back now have live proof. Durable browser automation and supported client callback-failure/timeout evidence remain unverified.

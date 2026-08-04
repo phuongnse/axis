@@ -43,7 +43,7 @@ export default defineConfig({
       },
       '/connect': {
         target: process.env.VITE_API_PROXY_TARGET ?? 'https://localhost:7275',
-        changeOrigin: true,
+        changeOrigin: false,
       },
     },
     watch: process.env.VITE_USE_POLLING ? { usePolling: true, interval: 300 } : undefined,

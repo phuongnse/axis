@@ -145,8 +145,15 @@ function watchThemePreferenceWrites(page: Page): () => number {
 
 function watchAuthorizationActivity(page: Page) {
   const statuses: number[] = [];
+  const origins: string[] = [];
   const consoleErrors: string[] = [];
 
+  page.on('request', (request) => {
+    const url = new URL(request.url());
+    if (url.pathname === '/connect/authorize') {
+      origins.push(url.origin);
+    }
+  });
   page.on('response', (response) => {
     if (new URL(response.url()).pathname === '/connect/authorize') {
       statuses.push(response.status());
@@ -163,6 +170,7 @@ function watchAuthorizationActivity(page: Page) {
 
   return {
     consoleErrors: () => consoleErrors,
+    origins: () => origins,
     statuses: () => statuses,
   };
 }
@@ -220,11 +228,13 @@ test.describe('sign in user', () => {
     test.skip(!maildevURL, 'Set E2E_MAILDEV_URL to run sign-in-user email verification.');
 
     const email = uniqueEmail('sign001');
+    const authorization = watchAuthorizationActivity(page);
     const languageWrites = watchLanguagePreferenceWrites(page);
     const themeWrites = watchThemePreferenceWrites(page);
     await createVerifiedUser(request, email);
 
     await page.goto('/sign-in');
+    const webOrigin = new URL(page.url()).origin;
     await recordVisitedPaths(page);
     await fillSignInForm(page, email);
     await page.getByRole('button', { name: /sign in/i }).click();
@@ -232,6 +242,8 @@ test.describe('sign in user', () => {
     await expect(page).toHaveURL(/\/dashboard$/, { timeout: 30_000 });
     await expectAuthenticatedFrame(page, 'Sign In User');
     await expect.poll(() => getVisitedPaths(page)).not.toContain('/callback');
+    expect(authorization.origins()).not.toHaveLength(0);
+    expect(new Set(authorization.origins())).toEqual(new Set([webOrigin]));
     expect(languageWrites()).toBe(0);
     expect(themeWrites()).toBe(0);
   });

@@ -21,8 +21,10 @@ MAIN_COMPOSE_FILE = ROOT / "docker-compose.yml"
 LOCAL_DEV_FILE = ROOT / "docs/playbooks/local-dev.md"
 TECH_STACK_FILE = ROOT / "docs/TECH_STACK.md"
 API_APPSETTINGS_FILE = ROOT / "src" / "Axis.Api" / "appsettings.json"
+VITE_CONFIG_FILE = ROOT / "frontend" / "vite.config.ts"
+FRONTEND_PKCE_FILE = ROOT / "frontend" / "src" / "features" / "auth" / "pkce.ts"
 LOCAL_BROWSER_APP_BASE_URL = "https://localhost:3000"
-LOCAL_BROWSER_API_CONNECT_URL = "https://localhost:5281"
+LOCAL_OPENIDDICT_ISSUER = "https://localhost:5281"
 
 TECH_STACK_FRAGMENT_LINK = re.compile(r"\]\(\.\./TECH_STACK\.md#([^)]+)\)")
 TECH_STACK_KNOWN_ANCHOR = re.compile(r"\[[^\]]+\]\(#([^)]+)\)")
@@ -219,18 +221,32 @@ def web_has_trusted_https_healthcheck(compose_file: Path) -> bool:
     return has_ca and has_https_probe and not disables_verification
 
 
-def web_has_browser_api_connect_origin(compose_file: Path) -> bool:
+def web_uses_same_origin_connect(compose_file: Path) -> bool:
     service_text = services_section(compose_file.read_text(encoding="utf-8"))
     web_block = next(
         (match.group(2) for match in SERVICE_BLOCK.finditer(service_text) if match.group(1) == "web"),
         "",
     )
     environment = service_property(web_block, "environment")
+    return "VITE_CONNECT_URL" not in environment
+
+
+def vite_connect_proxy_preserves_browser_host(vite_config_file: Path) -> bool:
+    text = vite_config_file.read_text(encoding="utf-8")
     return re.search(
-        rf'^VITE_CONNECT_URL:\s*["\']?{re.escape(LOCAL_BROWSER_API_CONNECT_URL)}["\']?$',
-        environment,
-        re.MULTILINE,
+        r"['\"]?/connect['\"]?\s*:\s*\{[^}]*changeOrigin\s*:\s*false",
+        text,
+        re.DOTALL,
     ) is not None
+
+
+def frontend_auth_uses_same_origin_connect(pkce_file: Path) -> bool:
+    text = pkce_file.read_text(encoding="utf-8")
+    return (
+        "VITE_CONNECT_URL" not in text
+        and "window.location.origin" in text
+        and "/connect/authorize" in text
+    )
 
 
 def api_appsettings_base_url(appsettings_file: Path) -> str | None:
@@ -247,6 +263,20 @@ def api_appsettings_base_url(appsettings_file: Path) -> str | None:
     return base_url if isinstance(base_url, str) else None
 
 
+def api_appsettings_openiddict_issuer(appsettings_file: Path) -> str | None:
+    try:
+        data = json.loads(appsettings_file.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return None
+
+    openiddict_section = data.get("OpenIddict")
+    if not isinstance(openiddict_section, dict):
+        return None
+
+    issuer = openiddict_section.get("Issuer")
+    return issuer if isinstance(issuer, str) else None
+
+
 def check_local_dev_doc() -> list[str]:
     errors: list[str] = []
 
@@ -256,6 +286,10 @@ def check_local_dev_doc() -> list[str]:
         errors.append(f"Missing {LOCAL_DEV_FILE.relative_to(ROOT)}")
     if not API_APPSETTINGS_FILE.is_file():
         errors.append(f"Missing {API_APPSETTINGS_FILE.relative_to(ROOT)}")
+    if not VITE_CONFIG_FILE.is_file():
+        errors.append(f"Missing {VITE_CONFIG_FILE.relative_to(ROOT)}")
+    if not FRONTEND_PKCE_FILE.is_file():
+        errors.append(f"Missing {FRONTEND_PKCE_FILE.relative_to(ROOT)}")
     if errors:
         return errors
 
@@ -285,16 +319,33 @@ def check_local_dev_doc() -> list[str]:
     if not web_has_trusted_https_healthcheck(MAIN_COMPOSE_FILE):
         errors.append("docker-compose.yml web service must expose a trusted HTTPS healthcheck")
 
-    if not web_has_browser_api_connect_origin(MAIN_COMPOSE_FILE):
+    if not web_uses_same_origin_connect(MAIN_COMPOSE_FILE):
         errors.append(
-            "docker-compose.yml web service must resume local authorization requests through "
-            f"{LOCAL_BROWSER_API_CONNECT_URL}"
+            "docker-compose.yml web service must keep browser authorization transport same-origin "
+            "without VITE_CONNECT_URL"
+        )
+
+    if not vite_connect_proxy_preserves_browser_host(VITE_CONFIG_FILE):
+        errors.append(
+            "frontend/vite.config.ts /connect proxy must preserve the browser-facing Host"
+        )
+
+    if not frontend_auth_uses_same_origin_connect(FRONTEND_PKCE_FILE):
+        errors.append(
+            "frontend auth must build /connect requests from window.location.origin without "
+            "VITE_CONNECT_URL"
         )
 
     if api_appsettings_base_url(API_APPSETTINGS_FILE) != LOCAL_BROWSER_APP_BASE_URL:
         errors.append(
             "src/Axis.Api/appsettings.json App:BaseUrl must default to "
             f"{LOCAL_BROWSER_APP_BASE_URL} for host-native local dev"
+        )
+
+    if api_appsettings_openiddict_issuer(API_APPSETTINGS_FILE) != LOCAL_OPENIDDICT_ISSUER:
+        errors.append(
+            "src/Axis.Api/appsettings.json OpenIddict:Issuer must default to "
+            f"{LOCAL_OPENIDDICT_ISSUER} for local authorization"
         )
 
     if (
@@ -308,13 +359,14 @@ def check_local_dev_doc() -> list[str]:
         )
 
     if (
-        "VITE_CONNECT_URL" not in doc
-        or LOCAL_BROWSER_API_CONNECT_URL not in doc
-        or "authorization request" not in doc_lower
+        "OpenIddict:Issuer" not in doc
+        or LOCAL_OPENIDDICT_ISSUER not in doc
+        or "/connect" not in doc
+        or "current web origin" not in doc_lower
     ):
         errors.append(
-            "local-dev.md should document VITE_CONNECT_URL as the browser-visible API origin "
-            "used to resume authorization requests"
+            "local-dev.md should document the canonical OpenIddict issuer and same-origin "
+            "browser /connect transport"
         )
 
     for host_port in sorted(mandatory_host_ports(main_services, main_optional)):

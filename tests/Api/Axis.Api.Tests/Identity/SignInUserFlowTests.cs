@@ -181,7 +181,7 @@ public sealed class SignInUserFlowTests(ApiTestFixture fixture)
     }
 
     [Fact]
-    public async Task Authorize_WhenInteractiveMcpRequestResumesAfterSignIn_UsesRegisteredLoopbackCallback()
+    public async Task Authorize_WhenInteractiveMcpRequestResumesThroughSpaProxy_UsesRegisteredLoopbackCallback()
     {
         string email = UniqueEmail();
         await RegisterAsync(email);
@@ -193,7 +193,8 @@ public sealed class SignInUserFlowTests(ApiTestFixture fixture)
         HttpResponseMessage cachedResponse = await AuthorizeAsync(
             state: state,
             clientId: "axis_mcp",
-            redirectUri: "http://127.0.0.1:48123/callback");
+            redirectUri: "http://127.0.0.1:48123/callback",
+            host: "localhost:5281");
 
         signOutResponse.StatusCode.Should().Be(HttpStatusCode.NoContent);
         cachedResponse.StatusCode.Should().Be(HttpStatusCode.Redirect);
@@ -201,9 +202,9 @@ public sealed class SignInUserFlowTests(ApiTestFixture fixture)
         string requestId = ReadRequestId(cachedLocation);
         requestId.Should().NotBeNullOrWhiteSpace();
 
-        HttpResponseMessage signInRedirect = await fixture.Client.GetAsync(
+        HttpResponseMessage signInRedirect = await GetWithHostAsync(
             cachedLocation.PathAndQuery,
-            TestContext.Current.CancellationToken);
+            "localhost:5281");
 
         signInRedirect.StatusCode.Should().Be(HttpStatusCode.Redirect);
         Uri signInLocation = ResolveLocation(signInRedirect);
@@ -216,9 +217,9 @@ public sealed class SignInUserFlowTests(ApiTestFixture fixture)
         HttpResponseMessage signInResponse = await SignInAsync(email, Password);
         signInResponse.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        HttpResponseMessage callbackResponse = await fixture.Client.GetAsync(
+        HttpResponseMessage callbackResponse = await GetWithHostAsync(
             cachedLocation.PathAndQuery,
-            TestContext.Current.CancellationToken);
+            "web:3000");
 
         callbackResponse.StatusCode.Should().Be(HttpStatusCode.Redirect);
         Uri callbackLocation = ResolveLocation(callbackResponse);
@@ -228,9 +229,9 @@ public sealed class SignInUserFlowTests(ApiTestFixture fixture)
         query["code"].ToString().Should().NotBeNullOrWhiteSpace();
         query["state"].ToString().Should().Be(state);
 
-        HttpResponseMessage replayResponse = await fixture.Client.GetAsync(
+        HttpResponseMessage replayResponse = await GetWithHostAsync(
             cachedLocation.PathAndQuery,
-            TestContext.Current.CancellationToken);
+            "web:3000");
 
         replayResponse.StatusCode.Should().Be(HttpStatusCode.BadRequest);
         replayResponse.Headers.Location.Should().BeNull();
@@ -373,7 +374,8 @@ public sealed class SignInUserFlowTests(ApiTestFixture fixture)
         string? prompt = null,
         string? state = null,
         string clientId = "axis_spa",
-        string? redirectUri = null)
+        string? redirectUri = null,
+        string? host = null)
     {
         string verifier = CreateCodeVerifier();
         Dictionary<string, string?> authorizeQuery = new()
@@ -389,9 +391,21 @@ public sealed class SignInUserFlowTests(ApiTestFixture fixture)
         };
 
         string authorizeUrl = QueryHelpers.AddQueryString("/connect/authorize", authorizeQuery);
-        return await fixture.Client.GetAsync(
-            authorizeUrl,
-            TestContext.Current.CancellationToken);
+        if (host is null)
+        {
+            return await fixture.Client.GetAsync(
+                authorizeUrl,
+                TestContext.Current.CancellationToken);
+        }
+
+        return await GetWithHostAsync(authorizeUrl, host);
+    }
+
+    private async Task<HttpResponseMessage> GetWithHostAsync(string path, string host)
+    {
+        using HttpRequestMessage request = new(HttpMethod.Get, path);
+        request.Headers.Host = host;
+        return await fixture.Client.SendAsync(request, TestContext.Current.CancellationToken);
     }
 
     private static Uri ResolveLocation(HttpResponseMessage response)
