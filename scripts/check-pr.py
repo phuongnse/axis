@@ -82,7 +82,7 @@ def validate_branch(branch: str) -> list[str]:
     ]
 
 
-def validate_body(body: str) -> list[str]:
+def validate_body(body: str, *, allow_pending: bool = False) -> list[str]:
     body = body.lstrip("\ufeff")
     issues: list[str] = []
     if not strip_comments(body).strip():
@@ -118,9 +118,12 @@ def validate_body(body: str) -> list[str]:
             issues.append(f"Requirement has invalid status `{status}`: {line}")
             continue
         checked = state.lower() == "x"
-        if status == "pending" and checked:
-            issues.append(f"Pending requirement must be unchecked: {line}")
-        elif status != "pending" and not checked:
+        if status == "pending":
+            if checked:
+                issues.append(f"Pending requirement must be unchecked: {line}")
+            if not allow_pending:
+                issues.append(f"Pending requirement is not publishable from this branch: {line}")
+        elif not checked:
             issues.append(f"Resolved requirement must be checked: {line}")
         if status == "not-applicable" and CHECKLIST_REASON_RE.search(line) is None:
             issues.append(f"Not-applicable requirement must include `[reason: ...]`: {line}")
@@ -130,7 +133,12 @@ def validate_body(body: str) -> list[str]:
 
 def validate(title: str, body: str, branch: str | None = None) -> list[str]:
     branch_issues = validate_branch(branch) if branch is not None else []
-    return [*validate_title(title), *validate_body(body), *branch_issues]
+    allow_pending = branch is not None and RENOVATE_BRANCH_RE.fullmatch(branch.strip()) is not None
+    return [
+        *validate_title(title),
+        *validate_body(body, allow_pending=allow_pending),
+        *branch_issues,
+    ]
 
 
 def resolve_branch(explicit: str | None) -> str:

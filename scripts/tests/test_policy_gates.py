@@ -180,7 +180,7 @@ class TestPrGuard(unittest.TestCase):
             with self.subTest(branch=branch):
                 self.assertTrue(check_pr.validate_branch(branch))
 
-    def test_rejects_unchecked_requirement(self) -> None:
+    def test_rejects_pending_requirement_on_human_branch(self) -> None:
         body = """## Summary
 This summary is long enough.
 
@@ -190,7 +190,27 @@ docs/use-cases/example/README.md
 ## Requirements & rules followed
 - [ ] **Verification gate** - local checks [status: pending]
 """
-        self.assertEqual([], check_pr.validate("feat(example): improve gates", body))
+        self.assertIn(
+            "Pending requirement is not publishable",
+            "\n".join(check_pr.validate("feat(example): improve gates", body, "feat/improve-gates")),
+        )
+
+    def test_accepts_pending_requirement_on_renovate_branch(self) -> None:
+        body = """## Summary
+Dependency update.
+
+## Linked spec
+N/A
+
+## Requirements & rules followed
+- [ ] **Review readiness** - awaits review [status: pending]
+- [ ] **Verification** - awaits CI [status: pending]
+"""
+
+        self.assertEqual(
+            [],
+            check_pr.validate("chore(deps): update packages", body, "renovate/all-non-major"),
+        )
 
     def test_accepts_checked_requirement(self) -> None:
         body = """## Summary

@@ -2,11 +2,9 @@
 
 > **Navigation**: [docs/playbooks/design-gate.md](./design-gate.md) · [scripts.md](./scripts.md) · [reference.md](../../.agents/skills/reference.md) · [docs/README.md](../README.md)
 
-## Timing, risk, and scope
+## Risk and scope
 
-This is a corrective full Design Gate completed during independent review of checkpoint `aabd1155`. The task was routed and classified before implementation in the working session, but its durable dossier was omitted. This record closes that process gap without representing the dossier as pre-code evidence.
-
-The change is standard-tier with a broad blast radius: it changes deterministic repository checks, agent routing, review workflow behavior, and documentation across 37 paths. It does not change product behavior, REST/OpenAPI contracts, database schema, authentication behavior, or the approved technology stack.
+This full Design Gate is standard-tier with a broad blast radius: it changes deterministic repository checks, agent routing, review workflow behavior, and documentation. It does not change product behavior, REST/OpenAPI contracts, database schema, authentication behavior, or the approved technology stack.
 
 ## Governing rules
 
@@ -18,14 +16,20 @@ The change is standard-tier with a broad blast radius: it changes deterministic 
 
 ## Blast radius
 
-The inventory was derived with:
+The inventory covers:
 
 ```text
-git diff-tree --no-commit-id --name-only -r aabd1155
-rg -n "Ready review|axis-ready-review|ready-review" .agents docs scripts .codex AGENTS.md .github
+.agents/skills/**
+.codex/**
+scripts/**
+.github/PULL_REQUEST_TEMPLATE.md
+.github/renovate.json5
+AGENTS.md
+docs/ENFORCEMENT.md
+docs/playbooks/**
 ```
 
-It covers `.agents/skills/**`, `.codex/**`, policy scripts and tests under `scripts/**`, PR/Renovate metadata, `AGENTS.md`, and their owner docs. Generated product contracts and runtime application code are outside the slice.
+Generated product contracts and runtime application code are outside the slice. Retirement sweeps use exact identifiers only as one-time migration evidence; no retired-name deny-list remains in steady-state policy.
 
 ## Decisions
 
@@ -34,7 +38,7 @@ It covers `.agents/skills/**`, `.codex/**`, policy scripts and tests under `scri
 - Review readiness and independent review are separate states. Review findings and approval are distinct graph edges; publication requires approval.
 - Project orchestration has named roles and no default delegate. Model, reasoning, minimality, and compression profiles live once in the manifest; `ultra` is not applied mechanically.
 - `Partial` and `Not started` use-case states require typed, unique GAP-ID rows. The gap description remains owner-reviewed prose.
-- PR requirements use explicit statuses with checkbox consistency. Automation may leave requirements pending; it may not pre-claim future review or verification.
+- PR requirements use explicit statuses with checkbox consistency. Supported automation branches may leave requirements pending; human publication branches must resolve every requirement and may not pre-claim future review or verification.
 
 ## Alternatives rejected
 
@@ -47,19 +51,20 @@ It covers `.agents/skills/**`, `.codex/**`, policy scripts and tests under `scri
 
 Clean cutover retires the `axis-ready-review` skill alias and the ambiguous `Ready review` label. The CLI command `python scripts/axis.py ready-review` remains because it names the checkpoint operation, not the review verdict. No fallback skill, dual routing path, or permanent retired-name checker is retained.
 
-The post-edit inventory uses the `rg` command above and structural catalog/link validation. Historical names may remain in Git history; current owner docs and configuration must resolve through the new skill.
+The post-edit inventory uses an exact-identifier `rg` migration sweep plus structural catalog and link validation. Historical names may remain in Git history; current owner docs and configuration must resolve through the new skill.
 
 ## Contract decision
 
 `N/A because no product wire shape, schema, casing, or generated frontend/backend contract changes.` The new TOML files are repository workflow configuration validated by their owning checker.
 
-## Verification and close-loop evidence
+## Verification plan
 
-- Focused policy classes and full policy suite passed at checkpoint `aabd1155`; repository skills, documentation checks, Markdown links, dependency audits, and Renovate schema validation passed.
-- Fresh `axis_investigator` and `axis_planner` scenarios proved blocker stopping, profile application, readiness/reviewer separation, outcome routing, and evidence reuse.
-- `python scripts/axis.py ready-review` passed on the clean checkpoint, including build, format, 49 API tests, 166 architecture tests, 179 frontend tests, and 383 policy tests.
-- Independent review found this missing dossier, dishonest generated checklist states, unstructured partial gaps, and two enforcement-ledger overclaims. The follow-up delta adds this honest record, typed statuses/GAP IDs, regression tests, and evidence-aligned ledger entries before a fresh delta readiness and review.
+- Run focused policy tests while changing each parser or workflow graph, then the complete policy suite.
+- Run `python scripts/axis.py check repo-skills`, use-case docs, documentation drift, and Markdown links.
+- Validate the real Renovate configuration and the exact PR metadata through their Axis commands.
+- Forward-test named-agent routing, blocker stopping, profile application, outcome routing, and evidence reuse with fresh agents.
+- Create an immutable checkpoint, run `$axis-review-readiness`, then obtain the configured independent review before publication.
 
 ## Sign-off boundary
 
-The user explicitly approved the repository-wide structural cleanup and role-profile decisions. No high-risk product, contract, schema, authentication, or stack decision was introduced by this slice, so no additional high-risk sign-off applies.
+`N/A because this standard-tier workflow change introduces no high-risk product, contract, schema, authentication, or stack decision.`
