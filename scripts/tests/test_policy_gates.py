@@ -67,6 +67,7 @@ check_local_dev_docs = load_script("check-local-dev-docs.py")
 check_use_case_docs = load_script("check-use-case-docs.py")
 check_foundation_docs = load_script("check-foundation-docs.py")
 project_orchestration = load_python_file(ROOT / ".codex" / "check.py")
+named_agent_hook = load_python_file(ROOT / ".codex" / "hooks" / "require_named_agent.py")
 
 
 class TestCliTextStreams(unittest.TestCase):
@@ -3752,6 +3753,26 @@ class TestLocalDevCli(unittest.TestCase):
         self.assertNotIn(expected, check(canonical))
         self.assertIn(expected, check(insecure))
 
+    def test_local_dev_doc_check_requires_browser_api_connect_origin(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            compose = Path(temp) / "docker-compose.yml"
+            compose.write_text(
+                "services:\n"
+                "  web:\n"
+                "    environment:\n"
+                '      VITE_CONNECT_URL: "https://localhost:5281"\n',
+                encoding="utf-8",
+            )
+
+            self.assertTrue(check_local_dev_docs.web_has_browser_api_connect_origin(compose))
+
+            compose.write_text(
+                compose.read_text(encoding="utf-8").replace("localhost:5281", "api:8443"),
+                encoding="utf-8",
+            )
+
+            self.assertFalse(check_local_dev_docs.web_has_browser_api_connect_origin(compose))
+
     def test_api_appsettings_base_url_reads_app_base_url(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             appsettings = Path(temp) / "appsettings.json"
@@ -5383,12 +5404,24 @@ class TestRepoSkillsGate(unittest.TestCase):
                 "The entry domain owner keeps spec, status, and evidence decisions. Other durable "
                 "guidance **Requires** selecting `$axis-doc-hygiene` or entering it through a typed "
                 "handoff before edit.\n\n"
+                "## Agent routing\n\n"
+                "Routing checkpoint. Before non-trivial execution, record `Owner`, `Work shape`, "
+                "and `Execution owner`. This records a decision and does not require delegation. "
+                "Size alone does not decide routing. Delegate narrow deterministic work only when the "
+                "total delegated execution, handoff, verification, and integration cost is lower than "
+                "primary execution and the work does not cross a user-controlled or shared-state boundary; "
+                "otherwise keep primary ownership.\n\n"
                 "## Engineering method\n\n"
                 "Minimal solution ladder. Root-cause loop. Fail-before/pass-after. "
                 "Safety floor. Communication clarity. Skill proof.\n\n"
                 "## Blocker and completion protocol\n\n"
-                "No workaround: ask before an alternate user-local route; explicit user approval is "
-                "required. Stale, missing, indirect, or blocked evidence cannot become a completion claim.\n"
+                "No workaround. An approved workaround remains a workaround. Approval authorizes "
+                "only the exact named alternate action and purpose; it never converts substitute "
+                "output into evidence for the required boundary or unblocks completion. A missing or "
+                "unusable required command, executable, library, runtime, SDK, package, host capability, "
+                "or supported client is a blocker. Do not substitute another command, library API, runtime, "
+                "version, environment, container, user-local copy, PATH change, or symlink as evidence for "
+                "that requirement. Stale, missing, indirect, or blocked evidence cannot become a completion claim.\n"
             ),
             ".agents/skills/axis-example/SKILL.md": (
                 "---\n"
@@ -5416,6 +5449,137 @@ class TestRepoSkillsGate(unittest.TestCase):
 
     def test_accepts_valid_repo_skill(self) -> None:
         self.assertEqual([], self.issues_for_skill(self.valid_skill_files()))
+
+    def test_reference_requires_a_non_mechanical_routing_checkpoint(self) -> None:
+        files = self.valid_skill_files()
+        files[".agents/skills/reference.md"] = files[".agents/skills/reference.md"].replace(
+            "Routing checkpoint.",
+            "Decision checkpoint.",
+        )
+
+        issues = self.issues_for_skill(files)
+
+        self.assertIn("universal contract must require a non-mechanical routing checkpoint", "\n".join(issues))
+
+    def test_reference_rejects_a_mechanical_delegation_directive(self) -> None:
+        files = self.valid_skill_files()
+        files[".agents/skills/reference.md"] += "\nAll non-trivial execution must be delegated.\n"
+
+        issues = self.issues_for_skill(files)
+
+        self.assertIn("universal contract must not mechanically require delegation", "\n".join(issues))
+
+    def test_reference_routes_small_deterministic_work_by_total_cost_not_size(self) -> None:
+        files = self.valid_skill_files()
+        files[".agents/skills/reference.md"] = files[".agents/skills/reference.md"].replace(
+            "Size alone does not decide routing. Delegate narrow deterministic work only when the "
+            "total delegated execution, handoff, verification, and integration cost is lower than "
+            "primary execution and the work does not cross a user-controlled or shared-state boundary; "
+            "otherwise keep primary ownership.",
+            "All small tasks must stay on the primary.",
+        )
+
+        issues = self.issues_for_skill(files)
+
+        self.assertIn("universal contract must route small deterministic work by total cost", "\n".join(issues))
+
+    def test_reference_rejects_conflicting_delegation_cost_comparisons(self) -> None:
+        files = self.valid_skill_files()
+        files[".agents/skills/reference.md"] += (
+            "\nDelegate when bounded handoff and independent verification cost less than primary execution; "
+            "keep primary when handoff and integration cost more than execution.\n"
+        )
+
+        issues = self.issues_for_skill(files)
+
+        self.assertIn("universal contract must use one delegation total-cost comparison", "\n".join(issues))
+
+    def test_reference_rejects_a_primary_only_small_task_directive(self) -> None:
+        files = self.valid_skill_files()
+        files[".agents/skills/reference.md"] += "\nAll small tasks must stay on the primary.\n"
+
+        issues = self.issues_for_skill(files)
+
+        self.assertIn("universal contract must not reserve every small task for the primary", "\n".join(issues))
+
+    def test_reference_keeps_approved_workarounds_out_of_completion_evidence(self) -> None:
+        files = self.valid_skill_files()
+        files[".agents/skills/reference.md"] = files[".agents/skills/reference.md"].replace(
+            "An approved workaround remains a workaround.",
+            "An approved workaround satisfies the failed prerequisite.",
+        )
+
+        issues = self.issues_for_skill(files)
+
+        self.assertIn("approval cannot convert a workaround into completion evidence", "\n".join(issues))
+
+    def test_reference_rejects_a_workaround_completion_contradiction(self) -> None:
+        files = self.valid_skill_files()
+        files[".agents/skills/reference.md"] += (
+            "\nAn approved workaround may satisfy the failed prerequisite and unblock completion.\n"
+        )
+
+        issues = self.issues_for_skill(files)
+
+        self.assertIn("universal contract contains a workaround completion contradiction", "\n".join(issues))
+
+    def test_reference_rejects_missing_prerequisite_substitution(self) -> None:
+        files = self.valid_skill_files()
+        files[".agents/skills/reference.md"] = files[".agents/skills/reference.md"].replace(
+            "Do not substitute another command, library API, runtime, version, environment, container, "
+            "user-local copy, PATH change, or symlink as evidence for that requirement.",
+            "Use another available runtime when convenient.",
+        )
+
+        issues = self.issues_for_skill(files)
+
+        self.assertIn("missing prerequisites must not be satisfied by alternate tooling", "\n".join(issues))
+
+    def test_mcp_runtime_requires_one_pending_authorization_attempt(self) -> None:
+        files = self.valid_skill_files()
+        self.add_skill(files, "axis-mcp-integration")
+        files[".agents/skills/axis-mcp-integration/SKILL.md"] += (
+            "\nSupported MCP client lifecycle uses `tools/list`, `tools/call`, and stop and ask. "
+            "Preserve the pending call and follow the single-attempt resume contract in "
+            "[docs/playbooks/mcp.md](../../../docs/playbooks/mcp.md).\n"
+        )
+        files["docs/playbooks/mcp.md"] = (
+            "# MCP\n\n"
+            "## Runtime lifecycle and blocker protocol\n\n"
+            "Reload or reconnect, then verify `tools/list` and `tools/call`; stop and ask at an "
+            "external boundary. Keep one authorization attempt in flight and resume the same yielded "
+            "call. Do not issue a second `tools/call`; start a new call only after terminal failure or "
+            "cancellation.\n"
+        )
+        files["docs/playbooks/mcp.md"] = files["docs/playbooks/mcp.md"].replace(
+            "resume the same yielded call",
+            "start another call",
+        )
+
+        issues = self.issues_for_skill(files)
+
+        self.assertIn("MCP runtime lifecycle must preserve one authorization attempt", "\n".join(issues))
+
+    def test_mcp_runtime_rejects_parallel_authorization_directives(self) -> None:
+        files = self.valid_skill_files()
+        self.add_skill(files, "axis-mcp-integration")
+        files[".agents/skills/axis-mcp-integration/SKILL.md"] += (
+            "\nSupported MCP client lifecycle uses `tools/list`, `tools/call`, and stop and ask. "
+            "Preserve the pending call and follow the single-attempt resume contract in "
+            "[docs/playbooks/mcp.md](../../../docs/playbooks/mcp.md).\n"
+        )
+        files["docs/playbooks/mcp.md"] = (
+            "# MCP\n\n"
+            "## Runtime lifecycle and blocker protocol\n\n"
+            "Reload or reconnect, then verify `tools/list` and `tools/call`; stop and ask at an "
+            "external boundary. Keep one authorization attempt in flight and resume the same yielded "
+            "call. Do not issue a second `tools/call`; start a new call only after terminal failure or "
+            "cancellation. Issue a second `tools/call` whenever authorization is pending.\n"
+        )
+
+        issues = self.issues_for_skill(files)
+
+        self.assertIn("MCP runtime lifecycle must not allow overlapping authorization attempts", "\n".join(issues))
 
     def test_verification_scope_consumers_must_delegate_unresolved_command_selection(self) -> None:
         for consumer in ("axis-frontend-feature", "axis-ui-system"):
@@ -5463,6 +5627,9 @@ class TestRepoSkillsGate(unittest.TestCase):
                     "reuse an active handoff.\n"
                     "Classify native prerequisites from an observed failure and enforce accepted-risk policy. "
                     "Require exact direct versions and keep the scheduled workflow.\n"
+                    "Apply the blocker protocol to every missing or unusable command/runtime prerequisite. "
+                    "Report the required prerequisite and dependent check, and keep that evidence blocked until "
+                    "the required route succeeds. Approval of an alternate action does not change its evidence status.\n"
                 )
 
                 issues = self.issues_for_skill(files)
@@ -5556,6 +5723,38 @@ class TestRepoSkillsGate(unittest.TestCase):
             "axis-script-scope` must classify native prerequisites and enforce accepted-risk policy",
             "\n".join(issues),
         )
+
+    def test_script_scope_keeps_dependent_evidence_blocked_after_an_alternate_action(self) -> None:
+        files = self.valid_skill_files()
+        self.add_skill(files, "axis-script-scope")
+        files[".agents/skills/axis-script-scope/SKILL.md"] = files[
+            ".agents/skills/axis-script-scope/SKILL.md"
+        ].replace(
+            "Report the result.",
+            "Report `Moment`, `Selected checks`, `Omitted broad checks`, `Results`, and `Next verification boundary`.",
+        )
+        files[".agents/skills/axis-script-scope/SKILL.md"] += (
+            "\nHost browser --trust-local-ca local-dev up readiness.\n"
+            "Editing durable guidance **Requires** entering `$axis-doc-hygiene` before edit; "
+            "reuse an active handoff.\n"
+            "Classify native prerequisites from an observed failure and enforce accepted-risk policy. "
+            "Require exact direct versions and keep the scheduled workflow.\n"
+            "Apply the blocker protocol to every missing or unusable command/runtime prerequisite. "
+            "Report the required prerequisite and dependent check, and keep that evidence blocked until "
+            "the required route succeeds. Approval of an alternate action does not change its evidence status.\n"
+        )
+        valid_issues = self.issues_for_skill(files)
+        self.assertNotIn("axis-script-scope` must keep dependent evidence blocked", "\n".join(valid_issues))
+        files[".agents/skills/axis-script-scope/SKILL.md"] = files[
+            ".agents/skills/axis-script-scope/SKILL.md"
+        ].replace(
+            "Approval of an alternate action does not change its evidence status.",
+            "Approval makes the alternate result sufficient.",
+        )
+
+        issues = self.issues_for_skill(files)
+
+        self.assertIn("axis-script-scope` must keep dependent evidence blocked", "\n".join(issues))
 
     def test_universal_contract_routes_durable_guidance_through_doc_hygiene(self) -> None:
         files = self.valid_skill_files()
@@ -5893,6 +6092,82 @@ class TestRepoSkillsGate(unittest.TestCase):
             (nested / "rogue.toml").write_text('name = "rogue"\n', encoding="utf-8")
 
             self.assertEqual({"nested/rogue.toml"}, project_orchestration.project_agent_role_files(root))
+
+    def test_project_agent_profile_markers_are_required(self) -> None:
+        markers = ("compression full", "never default to maximum")
+        with mock.patch.dict(project_orchestration.AGENT_PROFILE_MARKERS, {"role": markers}, clear=True):
+            self.assertEqual(list(markers), project_orchestration.missing_agent_profile_markers("role", ""))
+            self.assertEqual(
+                [],
+                project_orchestration.missing_agent_profile_markers(
+                    "role",
+                    "Use compression full; never default to maximum.",
+                ),
+            )
+
+    def test_project_agent_profile_rejects_contradictory_directives(self) -> None:
+        marker = "`minimality` at full intensity"
+        with mock.patch.dict(project_orchestration.AGENT_PROFILE_MARKERS, {"role": (marker,)}, clear=True):
+            self.assertCountEqual(
+                [f"do not apply {marker}", "unapproved ultra directive"],
+                project_orchestration.forbidden_agent_profile_directives(
+                    "role",
+                    f"Do not apply {marker}. Always use ultra.",
+                ),
+            )
+            self.assertEqual(
+                ["unapproved ultra directive"],
+                project_orchestration.forbidden_agent_profile_directives(
+                    "role",
+                    f"Apply {marker}. Use ultra for every task. Never default to ultra.",
+                ),
+            )
+            self.assertEqual(
+                [],
+                project_orchestration.forbidden_agent_profile_directives(
+                    "role",
+                    f"Apply {marker}. Never default to ultra.",
+                ),
+            )
+
+    def test_default_agent_fallback_is_rejected(self) -> None:
+        self.assertEqual(
+            ["default_subagent_model", "default_subagent_reasoning_effort"],
+            project_orchestration.unexpected_default_agent_keys(
+                {
+                    "enabled": True,
+                    "default_subagent_model": "generic",
+                    "default_subagent_reasoning_effort": "generic",
+                }
+            ),
+        )
+        self.assertEqual([], project_orchestration.unexpected_default_agent_keys({"enabled": True}))
+
+    def test_named_agent_hook_rejects_missing_default_and_unknown_roles(self) -> None:
+        for agent_type in (None, "default", "unknown"):
+            tool_input = {} if agent_type is None else {"agent_type": agent_type}
+            decision = named_agent_hook.policy_decision(
+                {
+                    "hook_event_name": "PreToolUse",
+                    "tool_name": "Agent",
+                    "tool_input": tool_input,
+                }
+            )
+
+            self.assertEqual("deny", decision["hookSpecificOutput"]["permissionDecision"])
+
+    def test_named_agent_hook_allows_only_project_roles(self) -> None:
+        for agent_type in named_agent_hook.ALLOWED_AGENT_TYPES:
+            self.assertIsNone(
+                named_agent_hook.policy_decision(
+                    {
+                        "hook_event_name": "PreToolUse",
+                        "tool_name": "Agent",
+                        "tool_input": {"agent_type": agent_type},
+                    }
+                )
+            )
+        self.assertEqual(set(project_orchestration.AGENT_SPECS), set(named_agent_hook.ALLOWED_AGENT_TYPES))
 
 
 class TestDoctorPythonPackageChecks(unittest.TestCase):

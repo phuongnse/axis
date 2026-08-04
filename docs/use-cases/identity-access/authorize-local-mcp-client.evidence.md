@@ -17,15 +17,15 @@
 ## Current notes
 
 - `request_id` is the OpenIddict 5.8 authorization-cache handle; the continuation URL carries no raw OAuth request fields.
-- AT-003 is not run: the supported browser journey through the registered loopback callback and the app-managed MCP client boundary require runtime/client lifecycle evidence not available in this checkpoint.
+- The supported client runtime journey covered by AT-003 passed manually: Codex loaded the current 13-tool registry, the browser completed the registered loopback flow, `axis_get_current_user` returned the authenticated user/workspace context, and `axis_list_rules` plus `axis_get_rule` agreed on the selected rule key and published version. AT-003 acceptance evidence remains incomplete because the required committed browser automation is not run.
 - AT-007 cache-failure evidence is limited to an expired distributed-cache request returning `400` without a callback code; supported client callback-failure/timeout evidence is not run.
 - MCP gates were run through the Axis routes: `python scripts/axis.py check mcp-api-coverage`, `python scripts/axis.py check mcp-contracts`, and `python scripts/axis.py check mcp-tool-safety` all passed.
 - MCP protocol, coverage, and safety gates are protocol-boundary evidence only. They do not substitute for a supported client reload, current tool registry, and authenticated `tools/call` read-back.
-- Local browser execution is blocked by the existing `axis_api` container health failure: startup migration exits with PostgreSQL `42P07` because relation `OpenIddictApplications` already exists. The database and app-managed process were not modified.
+- Local authorization resume uses the browser-visible API origin `https://localhost:5281`; the supported client flow completed without weakening request-handle, state, PKCE, callback, or token validation.
 
 ## Verification summary
 
 - API `SignInUserFlowTests`: 11 passed, including the signed-out handoff/sign-in resume, silent `login_required`, missing/tampered/expired/replayed handle fail-closed behavior, and the registered `axis_mcp` loopback callback.
 - Frontend auth tests: 39 passed across the pending sign-in continuation and session-restore suites.
 - MCP contract tests: 17 passed; API coverage and tool-safety checks passed.
-- Supported browser/client runtime: not run; the use case remains Partial.
+- Supported browser/client runtime: passed against the app-managed Codex client; browser automation and callback-failure/timeout evidence remain not run, so the use case remains Partial.

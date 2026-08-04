@@ -22,6 +22,7 @@ LOCAL_DEV_FILE = ROOT / "docs/playbooks/local-dev.md"
 TECH_STACK_FILE = ROOT / "docs/TECH_STACK.md"
 API_APPSETTINGS_FILE = ROOT / "src" / "Axis.Api" / "appsettings.json"
 LOCAL_BROWSER_APP_BASE_URL = "https://localhost:3000"
+LOCAL_BROWSER_API_CONNECT_URL = "https://localhost:5281"
 
 TECH_STACK_FRAGMENT_LINK = re.compile(r"\]\(\.\./TECH_STACK\.md#([^)]+)\)")
 TECH_STACK_KNOWN_ANCHOR = re.compile(r"\[[^\]]+\]\(#([^)]+)\)")
@@ -218,6 +219,20 @@ def web_has_trusted_https_healthcheck(compose_file: Path) -> bool:
     return has_ca and has_https_probe and not disables_verification
 
 
+def web_has_browser_api_connect_origin(compose_file: Path) -> bool:
+    service_text = services_section(compose_file.read_text(encoding="utf-8"))
+    web_block = next(
+        (match.group(2) for match in SERVICE_BLOCK.finditer(service_text) if match.group(1) == "web"),
+        "",
+    )
+    environment = service_property(web_block, "environment")
+    return re.search(
+        rf'^VITE_CONNECT_URL:\s*["\']?{re.escape(LOCAL_BROWSER_API_CONNECT_URL)}["\']?$',
+        environment,
+        re.MULTILINE,
+    ) is not None
+
+
 def api_appsettings_base_url(appsettings_file: Path) -> str | None:
     try:
         data = json.loads(appsettings_file.read_text(encoding="utf-8"))
@@ -270,6 +285,12 @@ def check_local_dev_doc() -> list[str]:
     if not web_has_trusted_https_healthcheck(MAIN_COMPOSE_FILE):
         errors.append("docker-compose.yml web service must expose a trusted HTTPS healthcheck")
 
+    if not web_has_browser_api_connect_origin(MAIN_COMPOSE_FILE):
+        errors.append(
+            "docker-compose.yml web service must resume local authorization requests through "
+            f"{LOCAL_BROWSER_API_CONNECT_URL}"
+        )
+
     if api_appsettings_base_url(API_APPSETTINGS_FILE) != LOCAL_BROWSER_APP_BASE_URL:
         errors.append(
             "src/Axis.Api/appsettings.json App:BaseUrl must default to "
@@ -284,6 +305,16 @@ def check_local_dev_doc() -> list[str]:
         errors.append(
             "local-dev.md should document App:BaseUrl as the browser-facing origin "
             "used in verification email links"
+        )
+
+    if (
+        "VITE_CONNECT_URL" not in doc
+        or LOCAL_BROWSER_API_CONNECT_URL not in doc
+        or "authorization request" not in doc_lower
+    ):
+        errors.append(
+            "local-dev.md should document VITE_CONNECT_URL as the browser-visible API origin "
+            "used to resume authorization requests"
         )
 
     for host_port in sorted(mandatory_host_ports(main_services, main_optional)):

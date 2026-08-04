@@ -1662,6 +1662,17 @@ def repo_skill_verification_scope_issues(
                 f"{rel_from(skill_md, root)}: `axis-script-scope` must classify native "
                 "prerequisites and enforce accepted-risk policy"
             )
+        blocked_evidence_fragments = (
+            "missing or unusable command/runtime prerequisite",
+            "dependent check",
+            "keep that evidence blocked until the required route succeeds",
+            "Approval of an alternate action does not change its evidence status",
+        )
+        if any(fragment not in text for fragment in blocked_evidence_fragments):
+            issues.append(
+                f"{rel_from(skill_md, root)}: `axis-script-scope` must keep dependent evidence "
+                "blocked after an alternate action"
+            )
 
     ready_review = by_name.get("axis-ready-review")
     if ready_review is not None:
@@ -1700,6 +1711,62 @@ def repo_skill_verification_scope_issues(
                 f"{rel_from(reference, root)}: universal contract must keep spec, status, "
                 "and evidence decisions with the entry domain owner"
             )
+        routing_checkpoint_fragments = (
+            "## Agent routing",
+            "routing checkpoint",
+            "`Owner`",
+            "`Work shape`",
+            "`Execution owner`",
+            "does not require delegation",
+        )
+        if any(fragment.lower() not in reference_text.lower() for fragment in routing_checkpoint_fragments):
+            issues.append(
+                f"{rel_from(reference, root)}: universal contract must require a non-mechanical "
+                "routing checkpoint"
+            )
+        routing_cost_fragments = (
+            "Size alone does not decide routing",
+            "narrow deterministic work",
+            "total delegated execution, handoff, verification, and integration cost",
+            "is lower than primary execution",
+            "user-controlled",
+            "shared-state boundary",
+            "otherwise keep primary ownership",
+        )
+        if any(fragment.lower() not in reference_text.lower() for fragment in routing_cost_fragments):
+            issues.append(
+                f"{rel_from(reference, root)}: universal contract must route small deterministic "
+                "work by total cost"
+            )
+        conflicting_cost_fragments = (
+            "bounded handoff and independent verification cost less than primary execution",
+            "handoff and integration cost more than execution",
+        )
+        if any(fragment in reference_text.lower() for fragment in conflicting_cost_fragments):
+            issues.append(
+                f"{rel_from(reference, root)}: universal contract must use one delegation "
+                "total-cost comparison"
+            )
+        routing_forbidden_fragments = (
+            "all non-trivial execution must be delegated",
+            "every non-trivial task must be delegated",
+            "always delegate non-trivial",
+        )
+        if any(fragment in reference_text.lower() for fragment in routing_forbidden_fragments):
+            issues.append(
+                f"{rel_from(reference, root)}: universal contract must not mechanically require "
+                "delegation"
+            )
+        primary_only_small_task_fragments = (
+            "all small tasks must stay on the primary",
+            "every small task must stay on the primary",
+            "small tasks always stay on the primary",
+        )
+        if any(fragment in reference_text.lower() for fragment in primary_only_small_task_fragments):
+            issues.append(
+                f"{rel_from(reference, root)}: universal contract must not reserve every small "
+                "task for the primary"
+            )
         engineering_method_fragments = (
             "## Engineering method",
             "Minimal solution ladder",
@@ -1718,14 +1785,47 @@ def repo_skill_verification_scope_issues(
         blocker_fragments = (
             "## Blocker and completion protocol",
             "No workaround",
+            "An approved workaround remains a workaround",
+            "Approval authorizes",
+            "converts substitute output into evidence for the required boundary",
+            "or unblocks completion",
+            "missing or unusable required command",
+            "Do not substitute another command, library API, runtime",
             "user-local",
-            "explicit user approval",
             "stale, missing, indirect, or blocked evidence",
         )
         if any(fragment.lower() not in reference_text.lower() for fragment in blocker_fragments):
             issues.append(
                 f"{rel_from(reference, root)}: universal contract must own the blocker handshake "
                 "and completion evidence boundary"
+            )
+        if "An approved workaround remains a workaround" not in reference_text:
+            issues.append(
+                f"{rel_from(reference, root)}: approval cannot convert a workaround into "
+                "completion evidence"
+            )
+        workaround_forbidden_fragments = (
+            "an approved workaround may satisfy the failed prerequisite",
+            "an approved workaround can satisfy the failed prerequisite",
+            "approval converts substitute output into evidence",
+            "approval unblocks completion",
+        )
+        if any(fragment in reference_text.lower() for fragment in workaround_forbidden_fragments):
+            issues.append(
+                f"{rel_from(reference, root)}: universal contract contains a workaround "
+                "completion contradiction"
+            )
+        prerequisite_fragments = (
+            "missing or unusable required command",
+            "library API",
+            "runtime",
+            "supported client",
+            "as evidence for that requirement",
+        )
+        if any(fragment.lower() not in reference_text.lower() for fragment in prerequisite_fragments):
+            issues.append(
+                f"{rel_from(reference, root)}: missing prerequisites must not be satisfied by "
+                "alternate tooling"
             )
 
     mcp_skill = by_name.get("axis-mcp-integration")
@@ -1741,6 +1841,16 @@ def repo_skill_verification_scope_issues(
             issues.append(
                 f"{rel_from(skill_md, root)}: MCP skill must require supported client lifecycle "
                 "evidence and the blocker handshake"
+            )
+        mcp_auth_resume_fragments = (
+            "preserve the pending call",
+            "single-attempt resume contract",
+            "docs/playbooks/mcp.md",
+        )
+        if any(fragment.lower() not in text.lower() for fragment in mcp_auth_resume_fragments):
+            issues.append(
+                f"{rel_from(skill_md, root)}: MCP skill must route yielded authorization calls "
+                "to the single-attempt resume contract"
             )
         playbook = root / "docs" / "playbooks" / "mcp.md"
         if not playbook.is_file():
@@ -1758,6 +1868,27 @@ def repo_skill_verification_scope_issues(
                 issues.append(
                     "docs/playbooks/mcp.md: MCP runtime lifecycle must document reload/reconnect, "
                     "current tools/list/tools/call evidence, and stop-and-ask blockers"
+                )
+            auth_resume_fragments = (
+                "one authorization attempt in flight",
+                "resume the same yielded call",
+                "second `tools/call`",
+                "terminal failure or cancellation",
+            )
+            if any(fragment.lower() not in playbook_text.lower() for fragment in auth_resume_fragments):
+                issues.append(
+                    "docs/playbooks/mcp.md: MCP runtime lifecycle must preserve one authorization "
+                    "attempt and resume the same yielded call"
+                )
+            overlapping_auth_fragments = (
+                "issue a second `tools/call` whenever authorization is pending",
+                "start a second `tools/call` while authorization is pending",
+                "open another authorization attempt while authorization is pending",
+            )
+            if any(fragment in playbook_text.lower() for fragment in overlapping_auth_fragments):
+                issues.append(
+                    "docs/playbooks/mcp.md: MCP runtime lifecycle must not allow overlapping "
+                    "authorization attempts"
                 )
     return issues
 

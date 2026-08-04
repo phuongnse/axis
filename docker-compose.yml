@@ -126,6 +126,7 @@ services:
     environment:
       NODE_EXTRA_CA_CERTS: "/https/rootCA.pem"
       VITE_API_PROXY_TARGET: "https://api:8443"
+      VITE_CONNECT_URL: "https://localhost:5281"
       VITE_ALLOWED_HOSTS: "localhost,127.0.0.1,web"
       VITE_DEV_HTTPS_CERT: "/https/localhost.pem"
       VITE_DEV_HTTPS_KEY: "/https/localhost-key.pem"

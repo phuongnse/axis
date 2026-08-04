@@ -6,6 +6,9 @@
 !.codex/config.toml
 !.codex/check.py
 !.codex/agents/
+!.codex/hooks/
+.codex/hooks/*
+!.codex/hooks/require_named_agent.py
 
 # Build outputs
 bin/
