@@ -4671,6 +4671,18 @@ class TestAxisCommandWrappers(unittest.TestCase):
 
         self.assertEqual(["npm", "install", "--package-lock-only", "--ignore-scripts"], calls[0])
 
+    def test_frontend_sync_lock_applies_compatible_audit_fixes_without_force_or_scripts(self) -> None:
+        calls = self.run_with_fake_process(
+            axis.frontend_command,
+            axis.argparse.Namespace(frontend_command="sync-lock", audit_fix=True),
+        )
+
+        self.assertEqual(
+            ["npm", "audit", "fix", "--package-lock-only", "--ignore-scripts"],
+            calls[0],
+        )
+        self.assertNotIn("--force", calls[0])
+
     def test_setup_restores_locked_dependencies_and_optional_browser(self) -> None:
         calls: list[list[str]] = []
 

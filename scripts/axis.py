@@ -3496,6 +3496,10 @@ def frontend_command(args: argparse.Namespace) -> int:
     if command == "install":
         return run_frontend_npm(["ci"]).returncode
     if command == "sync-lock":
+        if getattr(args, "audit_fix", False):
+            return run_frontend_npm(
+                ["audit", "fix", "--package-lock-only", "--ignore-scripts"]
+            ).returncode
         return run_frontend_npm(["install", "--package-lock-only", "--ignore-scripts"]).returncode
     if command == "install-browsers":
         return run_frontend_npm(["exec", "--", "playwright", "install", "chromium"]).returncode
@@ -5440,10 +5444,16 @@ def main(argv: list[str] | None = None) -> int:
     frontend_parser = sub.add_parser("frontend", help="Run repository-standard frontend commands")
     frontend_sub = frontend_parser.add_subparsers(dest="frontend_command", required=True)
     frontend_sub.add_parser("install", help="Install locked frontend dependencies with npm ci").set_defaults(func=frontend_command)
-    frontend_sub.add_parser(
+    frontend_sync_lock = frontend_sub.add_parser(
         "sync-lock",
         help="Regenerate package-lock.json from exact package.json versions",
-    ).set_defaults(func=frontend_command)
+    )
+    frontend_sync_lock.add_argument(
+        "--audit-fix",
+        action="store_true",
+        help="Apply compatible npm audit fixes to package-lock.json without force or install scripts",
+    )
+    frontend_sync_lock.set_defaults(func=frontend_command)
     frontend_sub.add_parser("install-browsers", help="Install Playwright Chromium").set_defaults(func=frontend_command)
     frontend_sub.add_parser("ci", help="Run frontend type-check and lint gates").set_defaults(func=frontend_command)
     frontend_test = frontend_sub.add_parser("test", help="Run all or selected frontend unit tests")
