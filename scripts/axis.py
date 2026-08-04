@@ -789,6 +789,19 @@ def nuget_vulnerability_report_issues(report: object) -> list[str]:
                     f"NuGet vulnerability report project {project_index} framework {framework_index} is invalid"
                 )
                 continue
+            framework_name = framework.get("framework")
+            if not isinstance(framework_name, str) or not framework_name.strip():
+                issues.append(
+                    f"NuGet vulnerability report project {project_index} framework {framework_index} "
+                    "has invalid identity"
+                )
+                continue
+            if not any(group in framework for group in ("topLevelPackages", "transitivePackages")):
+                issues.append(
+                    f"NuGet vulnerability report project {project_index} framework {framework_index} "
+                    "has no package groups"
+                )
+                continue
             for package_group in ("topLevelPackages", "transitivePackages"):
                 packages = framework.get(package_group, [])
                 if not isinstance(packages, list):
@@ -803,14 +816,21 @@ def nuget_vulnerability_report_issues(report: object) -> list[str]:
                             f"NuGet vulnerability report {package_group} item {package_index} is invalid"
                         )
                         continue
-                    vulnerabilities = package.get("vulnerabilities", [])
-                    if not isinstance(vulnerabilities, list):
+                    package_id = package.get("id")
+                    if not isinstance(package_id, str) or not package_id.strip():
                         issues.append(
-                            f"NuGet package {package.get('id', package_index)!r} has invalid vulnerabilities"
+                            f"NuGet vulnerability report {package_group} item {package_index} "
+                            "has invalid id"
                         )
-                    elif vulnerabilities:
+                        continue
+                    vulnerabilities = package.get("vulnerabilities")
+                    if not isinstance(vulnerabilities, list) or not vulnerabilities:
                         issues.append(
-                            f"NuGet package {package.get('id', package_index)!r} has "
+                            f"NuGet package {package_id!r} has invalid vulnerabilities"
+                        )
+                    else:
+                        issues.append(
+                            f"NuGet package {package_id!r} has "
                             f"{len(vulnerabilities)} known vulnerability record(s)"
                         )
     return issues
@@ -2164,13 +2184,23 @@ def axis_command_syntax_message(
         tokens = shlex.split(normalized)
     except ValueError as exc:
         return f"invalid shell syntax: {exc}"
-    route_message = axis_command_route_message(tokens[2:], parser=parser)
+    command_tokens: list[str] = []
+    for token in tokens:
+        placeholder = re.fullmatch(r"<[^>]+>|\[[^]]+\]", token) is not None
+        shell_control = not placeholder and (
+            token in {"|", "||", "&&", ";", "&", ">", ">>", "<", "<<", "&>"}
+            or re.match(r"^(?:[0-9]+)?(?:>>?|<<?|&>)", token) is not None
+        )
+        if shell_control:
+            break
+        command_tokens.append(token)
+    route_message = axis_command_route_message(command_tokens[2:], parser=parser)
     if route_message is not None:
         return route_message
-    if any(marker in normalized for marker in ("...", "<", ">", "[", "]")):
+    if "..." in normalized or re.search(r"<[^>]+>|\[[^]]+\]", normalized):
         return None
     try:
-        parser.parse_args(tokens[2:])
+        parser.parse_args(command_tokens[2:])
     except (SystemExit, ValueError) as exc:
         detail = str(exc).strip() or "invalid Axis command syntax"
         return detail

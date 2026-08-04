@@ -1569,6 +1569,17 @@ class TestDocDriftRatchets(unittest.TestCase):
 
         self.assertIn("unknown command route `unsupported`", issues)
 
+    def test_rejects_invalid_documented_commands_before_shell_redirection(self) -> None:
+        issues = self.documented_issue_text(
+            {
+                "docs/playbooks/example.md": (
+                    "`python scripts/axis.py doctor --unsupported > doctor.txt`"
+                ),
+            }
+        )
+
+        self.assertIn("unrecognized arguments: --unsupported", issues)
+
     def test_rejects_noncanonical_python_launchers_in_docs(self) -> None:
         issues = self.documented_issue_text(
             {
@@ -1950,6 +1961,7 @@ class TestVulnerablePackageGate(unittest.TestCase):
                     "path": "/repo/Example.csproj",
                     "frameworks": [
                         {
+                            "framework": "net8.0",
                             "topLevelPackages": [
                                 {
                                     "id": "Example.Package",
@@ -1992,6 +2004,59 @@ class TestVulnerablePackageGate(unittest.TestCase):
 
         self.assertEqual(
             ["NuGet vulnerability report project 1 has invalid path"],
+            axis.nuget_vulnerability_report_issues(report),
+        )
+
+    def test_nuget_vulnerability_report_rejects_framework_without_identity(self) -> None:
+        report = {
+            "version": 1,
+            "projects": [{"path": "/repo/Example.csproj", "frameworks": [{}]}],
+        }
+
+        self.assertEqual(
+            ["NuGet vulnerability report project 1 framework 1 has invalid identity"],
+            axis.nuget_vulnerability_report_issues(report),
+        )
+
+    def test_nuget_vulnerability_report_rejects_package_without_identity(self) -> None:
+        report = {
+            "version": 1,
+            "projects": [
+                {
+                    "path": "/repo/Example.csproj",
+                    "frameworks": [
+                        {
+                            "framework": "net8.0",
+                            "topLevelPackages": [{}],
+                        }
+                    ],
+                }
+            ],
+        }
+
+        self.assertEqual(
+            ["NuGet vulnerability report topLevelPackages item 1 has invalid id"],
+            axis.nuget_vulnerability_report_issues(report),
+        )
+
+    def test_nuget_vulnerability_report_rejects_package_without_findings_shape(self) -> None:
+        report = {
+            "version": 1,
+            "projects": [
+                {
+                    "path": "/repo/Example.csproj",
+                    "frameworks": [
+                        {
+                            "framework": "net8.0",
+                            "topLevelPackages": [{"id": "Example.Package"}],
+                        }
+                    ],
+                }
+            ],
+        }
+
+        self.assertEqual(
+            ["NuGet package 'Example.Package' has invalid vulnerabilities"],
             axis.nuget_vulnerability_report_issues(report),
         )
 
