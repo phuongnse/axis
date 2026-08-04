@@ -8,6 +8,7 @@ Review checklist only. Workflow lives in repo skills ([`.agents/skills/README.md
 
 - Use `$axis-design-gate` for non-trivial work; high-risk surfaces need sign-off.
 - Select the entry owner from [`.agents/skills/README.md`](../../.agents/skills/README.md) and preserve current prerequisite evidence across typed handoffs.
+- Confirm the routing checkpoint covers current independently ownable work units; re-evaluate unexecuted units after decisions resolve ambiguity or change their scope, ownership, or verification boundary.
 - Read the owning use-case, foundation, or domain docs and same-module code.
 - Map in-scope ACs before behavior work.
 - Resolve or explicitly defer lower-layer gaps before API work.
