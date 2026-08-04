@@ -2,8 +2,7 @@
 """Validate local-dev configuration invariants and documentation links.
 
 Usage:
-  python3 scripts/check-local-dev-docs.py          # validate (exit 0/1)
-  python3 scripts/check-local-dev-docs.py --check  # same (CI alias)
+  python3 scripts/check-local-dev-docs.py  # validate (exit 0/1)
 """
 
 from __future__ import annotations
@@ -253,14 +252,7 @@ def check_local_dev_doc() -> list[str]:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
-        "--check",
-        action="store_true",
-        help="CI alias — validate and exit non-zero on drift",
-    )
-    _args = parser.parse_args()
-
+    argparse.ArgumentParser(description=__doc__).parse_args()
     errors = check_local_dev_doc()
     if errors:
         print("check-local-dev-docs FAIL:", file=sys.stderr)

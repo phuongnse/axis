@@ -17,6 +17,7 @@ import json
 import os
 import platform
 import re
+import shlex
 import shutil
 import ssl
 import subprocess
@@ -1211,6 +1212,11 @@ def write_ui_baseline(root: Path = ROOT) -> None:
     print(f"ui-baseline: wrote {baseline_path.relative_to(root)}")
 
 
+def generate_ui_baseline(_args: argparse.Namespace | None = None) -> int:
+    write_ui_baseline()
+    return 0
+
+
 def check_ui_baseline(_args: argparse.Namespace | None = None) -> int:
     issues = ui_baseline_issues()
     if issues:
@@ -1219,7 +1225,7 @@ def check_ui_baseline(_args: argparse.Namespace | None = None) -> int:
             print(f"  - {issue}", file=sys.stderr)
         print(
             "\nReview registry/theme changes and required sign-off before running "
-            "`python scripts/axis.py frontend ui-baseline --write`.",
+            "`python scripts/axis.py generate ui-baseline`.",
             file=sys.stderr,
         )
         return 1
@@ -2049,7 +2055,13 @@ DOC_DRIFT_ADDED_LINE_RULES = [
     ),
 ]
 
-DOC_COMMAND_DOC_PATHS = {"AGENTS.md", "README.md", "CONTRIBUTING.md"}
+DOC_COMMAND_DOC_PATHS = {
+    ".editorconfig",
+    "AGENTS.md",
+    "CONTRIBUTING.md",
+    "README.md",
+    "docker-compose.yml",
+}
 
 RAW_DOC_COMMAND_PATTERNS = [
     (
@@ -2083,12 +2095,17 @@ RAW_DOC_COMMAND_PATTERNS = [
 ]
 
 def is_command_doc(path: str) -> bool:
-    return path in DOC_COMMAND_DOC_PATHS or (path.startswith("docs/") and path.endswith(".md"))
+    return (
+        path in DOC_COMMAND_DOC_PATHS
+        or (path.startswith(("docs/", ".agents/skills/")) and path.endswith(".md"))
+        or (path.startswith(".github/workflows/") and path.endswith((".yml", ".yaml")))
+    )
 
 
 def normalize_doc_command_fragment(fragment: str) -> str:
     text = fragment.strip()
     text = re.sub(r"^(?:[$>]|\#)\s*", "", text)
+    text = re.sub(r"^run:\s*", "", text)
     text = re.sub(r"^cd\s+frontend\s+&&\s+", "cd frontend && ", text)
     return text
 
@@ -2103,9 +2120,67 @@ def raw_doc_command_message(fragment: str) -> str | None:
     return None
 
 
-def documented_raw_command_issues(paths: Iterable[str] | None = None, *, root: Path = ROOT) -> list[str]:
+class CommandContractParser(argparse.ArgumentParser):
+    def error(self, message: str) -> None:
+        raise ValueError(message)
+
+
+def axis_command_route_message(
+    args: list[str],
+    *,
+    parser: argparse.ArgumentParser,
+) -> str | None:
+    current = parser
+    for token in args:
+        subcommands = next(
+            (
+                action
+                for action in current._actions
+                if isinstance(action, argparse._SubParsersAction)
+            ),
+            None,
+        )
+        if subcommands is None:
+            return None
+        if token == "..." or token.startswith(("<", "[")) or token.startswith("-"):
+            return None
+        child = subcommands.choices.get(token)
+        if child is None:
+            choices = ", ".join(sorted(subcommands.choices))
+            return f"unknown command route `{token}`; choose one of: {choices}"
+        current = child
+    return None
+
+
+def axis_command_syntax_message(
+    fragment: str,
+    *,
+    parser: argparse.ArgumentParser,
+) -> str | None:
+    normalized = normalize_doc_command_fragment(fragment)
+    if not normalized.startswith("python scripts/axis.py "):
+        return None
+    try:
+        tokens = shlex.split(normalized)
+    except ValueError as exc:
+        return f"invalid shell syntax: {exc}"
+    route_message = axis_command_route_message(tokens[2:], parser=parser)
+    if route_message is not None:
+        return route_message
+    if any(marker in normalized for marker in ("...", "<", ">", "[", "]")):
+        return None
+    try:
+        parser.parse_args(tokens[2:])
+    except (SystemExit, ValueError) as exc:
+        detail = str(exc).strip() or "invalid Axis command syntax"
+        return detail
+    return None
+
+
+def documented_command_issues(paths: Iterable[str] | None = None, *, root: Path = ROOT) -> list[str]:
     candidates = paths or repo_files()
     issues: list[str] = []
+    parser = build_parser(parser_class=CommandContractParser)
     for path in sorted(candidates):
         normalized = path.replace("\\", "/")
         if not is_command_doc(normalized):
@@ -2121,15 +2196,29 @@ def documented_raw_command_issues(paths: Iterable[str] | None = None, *, root: P
                 fence_lang = None if fence_lang is not None else fence_match.group(1).lower()
                 continue
 
-            if fence_lang in {"bash", "sh", "shell", "console", "powershell", "pwsh", "ps1"}:
+            command_line = fence_lang in {"bash", "sh", "shell", "console", "powershell", "pwsh", "ps1"}
+            command_line = command_line or normalized.startswith(".github/workflows/")
+            if command_line:
                 message = raw_doc_command_message(line)
                 if message is not None:
                     issues.append(f"{normalized}:{idx}: raw documented command `{line.strip()}` - {message}")
+                syntax_message = axis_command_syntax_message(line, parser=parser)
+                if syntax_message is not None:
+                    issues.append(
+                        f"{normalized}:{idx}: documented Axis command does not match the CLI contract: "
+                        f"{syntax_message}"
+                    )
 
             for fragment in re.findall(r"`([^`]+)`", line):
                 message = raw_doc_command_message(fragment)
                 if message is not None:
                     issues.append(f"{normalized}:{idx}: raw documented command `{fragment}` - {message}")
+                syntax_message = axis_command_syntax_message(fragment, parser=parser)
+                if syntax_message is not None:
+                    issues.append(
+                        f"{normalized}:{idx}: documented Axis command `{fragment}` does not match "
+                        f"the CLI contract: {syntax_message}"
+                    )
     return issues
 
 
@@ -2361,7 +2450,7 @@ def check_doc_drift(_args: argparse.Namespace | None = None) -> int:
     for issue in doc_drift_added_line_issues(all_added_lines):
         fail(issues, issue)
 
-    for issue in documented_raw_command_issues():
+    for issue in documented_command_issues():
         fail(issues, issue)
 
     for hit in endpoint_mediator_hits():
@@ -2400,13 +2489,13 @@ def check_doc_drift(_args: argparse.Namespace | None = None) -> int:
         ("check-ui-baseline", check_ui_baseline),
         ("check-theme", check_theme),
         ("check-frontend-quality", check_frontend_quality),
-        ("check-use-case-docs.py", lambda _=None: run_module_check("check-use-case-docs.py", ["--check"])),
-        ("check-foundation-docs.py", lambda _=None: run_module_check("check-foundation-docs.py", ["--check"])),
-        ("check-doc-link-targets.py", lambda _=None: run_module_check("check-doc-link-targets.py", ["--check"])),
+        ("check-use-case-docs.py", lambda _=None: run_module_check("check-use-case-docs.py", [])),
+        ("check-foundation-docs.py", lambda _=None: run_module_check("check-foundation-docs.py", [])),
+        ("check-doc-link-targets.py", lambda _=None: run_module_check("check-doc-link-targets.py", [])),
         ("check-doc-navigation", check_doc_navigation),
         ("check-doc-size-budgets", check_doc_size_budgets),
-        ("check-doc-code-fences.py", lambda _=None: run_module_check("check-doc-code-fences.py", ["--check"])),
-        ("check-local-dev-docs.py", lambda _=None: run_module_check("check-local-dev-docs.py", ["--check"])),
+        ("check-doc-code-fences.py", lambda _=None: run_module_check("check-doc-code-fences.py", [])),
+        ("check-local-dev-docs.py", lambda _=None: run_module_check("check-local-dev-docs.py", [])),
     ]
     selected_checkers = doc_drift_checker_names(paths)
     for name, checker in checkers:
@@ -3066,18 +3155,6 @@ def frontend_test_path(value: str) -> str:
 
 def frontend_command(args: argparse.Namespace) -> int:
     command = args.frontend_command
-    if command == "ui-baseline":
-        if args.write:
-            write_ui_baseline()
-            return 0
-        return check_ui_baseline()
-
-    if command == "script" and args.script_name == "test:e2e":
-        rc = require_docker_compose("frontend script test:e2e")
-        if rc != 0:
-            return rc
-        return run_local_dev_browser(passthrough_args(args.script_args))
-
     rc = check_frontend_toolchain()
     if rc != 0:
         return rc
@@ -3472,7 +3549,7 @@ def verify(args: argparse.Namespace) -> int:
     return 1
 
 
-def ready_review_doc_drift_coverage(paths: list[str]) -> set[str]:
+def review_readiness_doc_drift_coverage(paths: list[str]) -> set[str]:
     covered: set[str] = set()
     if any((ROOT / path).is_file() and should_check_text_encoding(path) for path in paths):
         covered.add("check-text-encoding")
@@ -3491,7 +3568,7 @@ def ready_review_doc_drift_coverage(paths: list[str]) -> set[str]:
     return covered
 
 
-def ready_review_policy_gates(
+def review_readiness_policy_gates(
     paths: list[str],
     *,
     policy_tests_covered: bool = False,
@@ -3519,7 +3596,7 @@ def ready_review_policy_gates(
     return gates
 
 
-def run_ready_review_policy(
+def run_review_readiness_policy(
     paths: list[str],
     *,
     policy_tests_covered: bool = False,
@@ -3528,14 +3605,14 @@ def run_ready_review_policy(
 ) -> tuple[int, list[str]]:
     failed: list[str] = []
     executed: list[str] = []
-    for name, checker in ready_review_policy_gates(
+    for name, checker in review_readiness_policy_gates(
         paths,
         policy_tests_covered=policy_tests_covered,
         doc_drift_covered=doc_drift_covered,
         doc_drift_range=doc_drift_range,
     ):
         print()
-        print(f"> ready-review: {name}")
+        print(f"> review-readiness: {name}")
         executed.append(name)
         try:
             rc = checker()
@@ -3543,17 +3620,17 @@ def run_ready_review_policy(
             print(exc, file=sys.stderr)
             rc = 1
         if rc == 0:
-            print(f"OK ready-review: {name}")
+            print(f"OK review-readiness: {name}")
         else:
-            print(f"FAIL ready-review: {name}")
+            print(f"FAIL review-readiness: {name}")
             failed.append(name)
     return (0 if not failed else 1), executed
 
 
-def ready_review(args: argparse.Namespace) -> int:
+def review_readiness(args: argparse.Namespace) -> int:
     if working_tree_paths():
         print(
-            "ready-review: FAIL - create an intentional checkpoint commit before review-boundary verification",
+            "review-readiness: FAIL - create an intentional checkpoint commit before review-boundary verification",
             file=sys.stderr,
         )
         return 1
@@ -3569,35 +3646,35 @@ def ready_review(args: argparse.Namespace) -> int:
     executed: list[str] = []
     if not policy_only:
         if verify(args) != 0:
-            print("ready-review: FAIL - changed-path verification failed", file=sys.stderr)
+            print("review-readiness: FAIL - changed-path verification failed", file=sys.stderr)
             return 1
         executed.append("verify")
 
     scripts_changed = any(path.startswith("scripts/") for path in paths)
-    policy_rc, policy_gates = run_ready_review_policy(
+    policy_rc, policy_gates = run_review_readiness_policy(
         paths,
         policy_tests_covered=not policy_only and scripts_changed,
-        doc_drift_covered=set() if policy_only else ready_review_doc_drift_coverage(paths),
+        doc_drift_covered=set() if policy_only else review_readiness_doc_drift_coverage(paths),
         doc_drift_range=f"{since}..HEAD" if since else None,
     )
     executed.extend(policy_gates)
     if policy_rc != 0:
-        print("ready-review: FAIL - policy profile failed", file=sys.stderr)
+        print("review-readiness: FAIL - policy profile failed", file=sys.stderr)
         return 1
 
     if policy_only:
-        print("ready-review: PASS (policy profile)")
+        print("review-readiness: PASS (policy profile)")
         return 0
 
-    print(f"ready-review: PASS ({', '.join(executed)})")
+    print(f"review-readiness: PASS ({', '.join(executed)})")
     return 0
 
 
 def pre_push(args: argparse.Namespace) -> int:
     full = os.environ.get("AXIS_PRE_PUSH_FULL", "").lower() in {"1", "true", "yes", "on"}
     if full:
-        print("pre-push: AXIS_PRE_PUSH_FULL is set; running ready-review.")
-        return ready_review(argparse.Namespace(since=None, policy_only=False))
+        print("pre-push: AXIS_PRE_PUSH_FULL is set; running review-readiness.")
+        return review_readiness(argparse.Namespace(since=None, policy_only=False))
 
     range_spec = diff_range()
     paths = changed_paths(range_spec)
@@ -3633,7 +3710,7 @@ def pre_push(args: argparse.Namespace) -> int:
 
     print("pre-push: quick gate")
     print("  Runs cheap sanity checks before the network push.")
-    print("  Run `python scripts/axis.py ready-review` before marking a PR ready for review.")
+    print("  Run `python scripts/axis.py review-readiness` before independent review.")
 
     if dotnet:
         step(".NET test naming", lambda: check_test_naming())
@@ -3903,11 +3980,8 @@ def run_local_dev_browser(playwright_args: list[str]) -> int:
     ).returncode
 
 
-def local_dev_smoke(args: argparse.Namespace) -> int:
-    smoke_args = passthrough_args(getattr(args, "smoke_args", []))
-    if not smoke_args:
-        smoke_args = ["e2e/local-dev-smoke.pw.ts"]
-    return run_local_dev_browser(smoke_args)
+def local_dev_smoke(_args: argparse.Namespace) -> int:
+    return run_local_dev_browser(["e2e/local-dev-smoke.pw.ts"])
 
 
 def require_docker_compose(label: str) -> int:
@@ -4542,10 +4616,9 @@ def gh_cli_status() -> tuple[bool, str]:
 
 
 def setup_external_preflight(profile: str) -> int:
-    normalized = "review" if profile == "all" else profile
     if doctor(argparse.Namespace(profile="core", strict=True)) != 0:
         return 1
-    if normalized in {"local-dev", "review"}:
+    if profile in {"local-dev", "review"}:
         if find_openssl() is None:
             print(
                 "setup: FAIL - OpenSSL is required for local HTTPS certificates; "
@@ -4570,10 +4643,9 @@ def setup_external_preflight(profile: str) -> int:
 
 
 def setup_preflight(profile: str) -> int:
-    normalized = "review" if profile == "all" else profile
     rc = doctor(argparse.Namespace(profile=profile, strict=True))
     if rc != 0:
-        if normalized == "review" and not setup_tool_ready("lychee"):
+        if profile == "review" and not setup_tool_ready("lychee"):
             print(f"setup: {managed_tool_install_hint('review')}", file=sys.stderr)
         return rc
     return 0
@@ -4585,9 +4657,8 @@ def setup(args: argparse.Namespace) -> int:
     install_user_tools = getattr(args, "install_user_tools", False)
     plan_only = getattr(args, "plan_only", False)
     trust_local_ca = getattr(args, "trust_local_ca", False)
-    normalized = "review" if profile == "all" else profile
-    if trust_local_ca and normalized not in {"local-dev", "review"}:
-        print("setup: FAIL - --trust-local-ca requires --profile local-dev, review, or all", file=sys.stderr)
+    if trust_local_ca and profile not in {"local-dev", "review"}:
+        print("setup: FAIL - --trust-local-ca requires --profile local-dev or review", file=sys.stderr)
         return 1
     try:
         platform_spec = axis_setup.detect_platform()
@@ -4607,7 +4678,7 @@ def setup(args: argparse.Namespace) -> int:
         for index, label in enumerate(plan, 1):
             print(f"{index}. {label}")
         print("setup plan: no checks, downloads, or repository mutations were performed")
-        if normalized in {"local-dev", "review"} and not trust_local_ca:
+        if profile in {"local-dev", "review"} and not trust_local_ca:
             print("setup plan: host browser trust is opt-in; add --trust-local-ca when required")
         return 0
 
@@ -4642,7 +4713,7 @@ def setup(args: argparse.Namespace) -> int:
                 print(f"> install pinned user-local {tool} {axis_setup.tool_version(tool)}", flush=True)
                 installed = axis_setup.install_tool(tool, platform_spec=platform_spec)
                 print(f"  installed: {installed}")
-            if normalized == "review" and ("gh" in missing or shutil.which("gh") is None):
+            if profile == "review" and ("gh" in missing or shutil.which("gh") is None):
                 exposed = axis_setup.expose_managed_command("gh", platform_spec=platform_spec)
                 print(f"  exposed: {exposed}")
                 active_dirs = {
@@ -4677,7 +4748,7 @@ def setup(args: argparse.Namespace) -> int:
                 lambda: run_frontend_npm(["exec", "--", "playwright", "install", "chromium"]).returncode,
             )
         )
-    if normalized in {"local-dev", "review"}:
+    if profile in {"local-dev", "review"}:
         steps.append(("generate local HTTPS certificates", lambda: local_dev_certs(args)))
         if trust_local_ca:
             steps.append(("trust local HTTPS root CA", lambda: local_dev_trust_certs(args)))
@@ -4691,11 +4762,11 @@ def setup(args: argparse.Namespace) -> int:
             return rc
 
     print("setup: OK")
-    if normalized in {"local-dev", "review"} and not trust_local_ca:
+    if profile in {"local-dev", "review"} and not trust_local_ca:
         trust_status, trust_detail = local_dev_host_trust_status()
         if trust_status != "OK":
             print(f"setup: [{trust_status}] host browser trust: {trust_detail}")
-    if normalized == "review":
+    if profile == "review":
         if setup_tool_ready("gh"):
             print("review authentication remains interactive: run `gh auth status`")
     return 0
@@ -4703,17 +4774,9 @@ def setup(args: argparse.Namespace) -> int:
 
 def doctor(args: argparse.Namespace) -> int:
     profile = getattr(args, "profile", "local-dev")
-    profile_groups = {
-        "core": {"core"},
-        "build": {"core", "build"},
-        "local-dev": {"core", "build", "local-dev"},
-        "review": {"core", "build", "local-dev", "review"},
-        "all": {"core", "build", "local-dev", "review"},
-    }
-    if profile not in profile_groups:
+    if profile not in axis_setup.DOCTOR_PROFILES:
         raise CheckError(f"Unknown doctor profile: {profile}")
-
-    groups = profile_groups[profile]
+    groups = set(axis_setup.DOCTOR_PROFILES[: axis_setup.DOCTOR_PROFILES.index(profile) + 1])
     rows: list[tuple[str, str, str]] = []
 
     def record(status: str, label: str, detail: str) -> None:
@@ -4885,16 +4948,19 @@ def check_renovate_config(_args: argparse.Namespace | None = None) -> int:
     ).returncode
 
 
-def main(argv: list[str] | None = None) -> int:
+def build_parser(
+    *,
+    parser_class: type[argparse.ArgumentParser] = argparse.ArgumentParser,
+) -> argparse.ArgumentParser:
     configure_cli_text_streams()
 
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = parser_class(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
 
     setup_parser = sub.add_parser("setup", help="Prepare a portable repository development profile")
     setup_parser.add_argument(
         "--profile",
-        choices=("build", "local-dev", "review", "all"),
+        choices=axis_setup.SETUP_PROFILES,
         default="build",
         help="Cumulative setup profile (default: build)",
     )
@@ -4927,7 +4993,7 @@ def main(argv: list[str] | None = None) -> int:
     doctor_parser = sub.add_parser("doctor", help="Diagnose tools required by a selected workflow profile")
     doctor_parser.add_argument(
         "--profile",
-        choices=("core", "build", "local-dev", "review", "all"),
+        choices=axis_setup.DOCTOR_PROFILES,
         default="local-dev",
         help="Tool group to diagnose (default: local-dev)",
     )
@@ -4965,14 +5031,17 @@ def main(argv: list[str] | None = None) -> int:
         help="Skip the pre-push hook only when explicitly authorized",
     )
     git_push_parser.set_defaults(func=git_push_checkpoint)
-    ready_review_parser = sub.add_parser("ready-review", help="Verify a clean checkpoint before review")
-    ready_review_parser.add_argument("--since", help="Scope expensive verification after this checkpoint")
-    ready_review_parser.add_argument(
+    review_readiness_parser = sub.add_parser(
+        "review-readiness",
+        help="Verify a clean checkpoint before independent review",
+    )
+    review_readiness_parser.add_argument("--since", help="Scope expensive verification after this checkpoint")
+    review_readiness_parser.add_argument(
         "--policy-only",
         action="store_true",
         help="Run only the deterministic policy profile shared with CI",
     )
-    ready_review_parser.set_defaults(func=ready_review)
+    review_readiness_parser.set_defaults(func=review_readiness)
     verify_parser = sub.add_parser("verify", help="Run checks selected from changed paths")
     verify_parser.add_argument("--since", help="Scope verification to changes after this checkpoint plus the working tree")
     verify_parser.add_argument(
@@ -5057,13 +5126,6 @@ def main(argv: list[str] | None = None) -> int:
     frontend_gen_api = frontend_sub.add_parser("gen-api-types", help="Generate TypeScript API types from OpenAPI")
     frontend_gen_api.add_argument("--check", action="store_true", help="Fail if generated frontend API types are stale")
     frontend_gen_api.set_defaults(func=frontend_command)
-    frontend_ui_baseline = frontend_sub.add_parser("ui-baseline", help="Check or write the approved UI baseline")
-    frontend_ui_baseline.add_argument("--write", action="store_true", help="Write the reviewed approved UI baseline")
-    frontend_ui_baseline.set_defaults(func=frontend_command)
-    frontend_script = frontend_sub.add_parser("script", help="Run an allow-listed package script")
-    frontend_script.add_argument("script_name")
-    frontend_script.add_argument("script_args", nargs=argparse.REMAINDER)
-    frontend_script.set_defaults(func=frontend_command)
     local_dev_parser = sub.add_parser("local-dev", help="Manage the Docker Compose local-development stack")
     local_dev_sub = local_dev_parser.add_subparsers(dest="local_dev_command", required=True)
     local_certs = local_dev_sub.add_parser("certs", help="Create or reuse local HTTPS certificates")
@@ -5109,7 +5171,6 @@ def main(argv: list[str] | None = None) -> int:
     local_e2e.add_argument("e2e_args", nargs=argparse.REMAINDER)
     local_e2e.set_defaults(func=local_dev)
     local_smoke = local_dev_sub.add_parser("smoke", help="Run local stack smoke checks")
-    local_smoke.add_argument("smoke_args", nargs=argparse.REMAINDER)
     local_smoke.set_defaults(func=local_dev)
     local_observability = local_dev_sub.add_parser("observability", help="Manage the optional observability profile")
     local_observability_sub = local_observability.add_subparsers(dest="observability_command", required=True)
@@ -5166,22 +5227,22 @@ def main(argv: list[str] | None = None) -> int:
     check_sub.add_parser("theme", help="Check canonical theme generated artifacts").set_defaults(func=check_theme)
     check_sub.add_parser("frontend-quality", help="Run deterministic frontend policy checks").set_defaults(func=check_frontend_quality)
     check_sub.add_parser("local-dev-docs", help="Check local-development docs against Compose").set_defaults(
-        func=lambda _args: run_module_check("check-local-dev-docs.py", ["--check"])
+        func=lambda _args: run_module_check("check-local-dev-docs.py", [])
     )
     check_sub.add_parser("doc-link-targets", help="Check local documentation link targets").set_defaults(
-        func=lambda _args: run_module_check("check-doc-link-targets.py", ["--check"])
+        func=lambda _args: run_module_check("check-doc-link-targets.py", [])
     )
     check_sub.add_parser("markdown-links", help="Check Markdown links with Lychee").set_defaults(func=check_markdown_links)
     check_sub.add_parser("doc-navigation", help="Check documentation navigation blocks").set_defaults(func=check_doc_navigation)
     check_sub.add_parser("doc-size-budgets", help="Check documentation size budgets").set_defaults(func=check_doc_size_budgets)
     check_sub.add_parser("doc-code-fences", help="Check canonical commands in documentation fences").set_defaults(
-        func=lambda _args: run_module_check("check-doc-code-fences.py", ["--check"])
+        func=lambda _args: run_module_check("check-doc-code-fences.py", [])
     )
     check_sub.add_parser("use-case-docs", help="Validate use-case documentation contracts").set_defaults(
-        func=lambda _args: run_module_check("check-use-case-docs.py", ["--check"])
+        func=lambda _args: run_module_check("check-use-case-docs.py", [])
     )
     check_sub.add_parser("foundation-docs", help="Validate foundation documentation contracts").set_defaults(
-        func=lambda _args: run_module_check("check-foundation-docs.py", ["--check"])
+        func=lambda _args: run_module_check("check-foundation-docs.py", [])
     )
     pr_parser = check_sub.add_parser("pr", help="Validate pull-request metadata and branch naming")
     pr_parser.add_argument("--title")
@@ -5199,6 +5260,13 @@ def main(argv: list[str] | None = None) -> int:
     generate_sub = generate.add_subparsers(dest="generate_command", required=True)
     generate_sub.add_parser("api-contracts", help="Generate OpenAPI and frontend API types").set_defaults(func=generate_api_contracts)
     generate_sub.add_parser("theme", help="Generate web and email theme projections").set_defaults(func=generate_theme)
+    generate_sub.add_parser("ui-baseline", help="Generate the reviewed approved UI baseline").set_defaults(func=generate_ui_baseline)
+
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = build_parser()
 
     args = parser.parse_args(argv)
     try:

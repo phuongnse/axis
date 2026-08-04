@@ -6,25 +6,25 @@ independent-reviewer = "axis_reviewer"
 [workflows.review]
 initial = "checkpoint"
 terminal_states = ["review-approved", "published"]
-states = ["checkpoint", "ready-for-review", "review-approved", "changes-requested", "published"]
+states = ["checkpoint", "readiness-verified", "review-approved", "changes-requested", "published"]
 
 [[workflows.review.transitions]]
 id = "verify-readiness"
 from = "checkpoint"
-to = "ready-for-review"
+to = "readiness-verified"
 owner = "skill:axis-review-readiness"
-evidence = "command:ready-review"
+evidence = "command:review-readiness"
 
 [[workflows.review.transitions]]
 id = "approve-review"
-from = "ready-for-review"
+from = "readiness-verified"
 to = "review-approved"
 owner = "role:independent-reviewer"
 evidence = "completed-review-pass"
 
 [[workflows.review.transitions]]
 id = "request-changes"
-from = "ready-for-review"
+from = "readiness-verified"
 to = "changes-requested"
 owner = "role:independent-reviewer"
 evidence = "completed-review-findings"

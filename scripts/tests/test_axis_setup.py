@@ -618,6 +618,19 @@ class TestVerifiedArtifacts(unittest.TestCase):
 
 
 class TestSetupProfiles(unittest.TestCase):
+    def test_profile_catalogs_have_one_cumulative_source(self) -> None:
+        self.assertEqual(("build", "local-dev", "review"), axis_setup.SETUP_PROFILES)
+        self.assertEqual(("core", *axis_setup.SETUP_PROFILES), axis_setup.DOCTOR_PROFILES)
+
+    def test_setup_plan_rejects_profiles_outside_the_catalog(self) -> None:
+        with self.assertRaisesRegex(axis_setup.SetupError, "unknown setup profile"):
+            axis_setup.setup_plan(
+                profile="unsupported",
+                install_user_tools=False,
+                browsers=False,
+                platform_spec=axis_setup.SetupPlatform("linux", "x64"),
+            )
+
     def test_profiles_are_cumulative_and_keep_system_tools_external(self) -> None:
         self.assertEqual(("dotnet", "node"), axis_setup.managed_tools_for_profile("build"))
         self.assertEqual(("dotnet", "node"), axis_setup.managed_tools_for_profile("local-dev"))

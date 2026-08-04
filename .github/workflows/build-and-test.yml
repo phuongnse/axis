@@ -210,7 +210,7 @@ jobs:
           node-version-file: frontend/.nvmrc
 
       - name: Run shared policy profile
-        run: python scripts/axis.py ready-review --policy-only
+        run: python scripts/axis.py review-readiness --policy-only
         env:
           BASE_BRANCH: main
 

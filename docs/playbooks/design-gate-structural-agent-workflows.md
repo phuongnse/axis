@@ -26,7 +26,9 @@ scripts/**
 .github/renovate.json5
 AGENTS.md
 docs/ENFORCEMENT.md
+docs/foundations/**
 docs/playbooks/**
+docs/use-cases/**
 ```
 
 Generated product contracts and runtime application code are outside the slice. Retirement sweeps use exact identifiers only as one-time migration evidence; no retired-name deny-list remains in steady-state policy.
@@ -36,6 +38,8 @@ Generated product contracts and runtime application code are outside the slice. 
 - Deterministic guards may parse schemas, configuration, graphs, state machines, command syntax, source symbols, or executable behavior. They must not infer semantic compliance from prose keywords, fragments, wording, or minimum text length.
 - Semantic routing and blocker behavior are proved by fresh-agent forward tests and independent review, not by scanning agent instructions for expected phrases.
 - Review readiness and independent review are separate states. Review findings and approval are distinct graph edges; publication requires approval.
+- Each repository workflow purpose has one public Axis command, one profile/state term, and one evidence vocabulary. Internal checker modules do not retain no-op mode flags.
+- Executable Axis command examples are validated by the CLI parser that owns those commands; the repository does not maintain a second command-name catalog.
 - Project orchestration has named roles and no default delegate. Model, reasoning, minimality, and compression profiles live once in the manifest; `ultra` is not applied mechanically.
 - `Partial` and `Not started` use-case states require typed, unique GAP-ID rows. The gap description remains owner-reviewed prose.
 - PR requirements use explicit statuses with checkbox consistency. Supported automation branches may leave requirements pending; human publication branches must resolve every requirement and may not pre-claim future review or verification.
@@ -45,11 +49,11 @@ Generated product contracts and runtime application code are outside the slice. 
 - Aggregated keyword, phrase, or retired-name deny-lists: they encode current wording rather than the invariant and become brittle as the repository evolves.
 - Duplicated profile prose in every named agent: it permits drift from the manifest.
 - A generic default agent or automatic `ultra`: neither expresses task ownership or proportional cost/value.
-- Compatibility shims for the renamed readiness skill: the project-local skill name is an internal pre-release workflow surface and is cleanly replaced.
+- Compatibility shims for renamed commands, profiles, readiness states, and evidence routes: these are internal pre-release workflow surfaces and are cleanly replaced.
 
 ## Retirement and compatibility
 
-Clean cutover retires the `axis-ready-review` skill alias and the ambiguous `Ready review` label. The CLI command `python scripts/axis.py ready-review` remains because it names the checkpoint operation, not the review verdict. No fallback skill, dual routing path, or permanent retired-name checker is retained.
+Clean cutover uses one `review-readiness` vocabulary across the skill, CLI command, workflow evidence, CI, hooks, tests, and guidance. The exact duplicate `all` setup/doctor profile is replaced by `review`; frontend component and browser evidence use `frontend test` and `local-dev e2e`; `local-dev smoke` owns only its fixed journey; UI baseline checking and generation use `check ui-baseline` and `generate ui-baseline`; internal documentation checkers expose one validation mode without a no-op `--check` flag. No fallback alias, dual routing path, or permanent retired-name checker is retained.
 
 The post-edit inventory uses an exact-identifier `rg` migration sweep plus structural catalog and link validation. Historical names may remain in Git history; current owner docs and configuration must resolve through the new skill.
 
@@ -60,7 +64,7 @@ The post-edit inventory uses an exact-identifier `rg` migration sweep plus struc
 ## Verification plan
 
 - Run focused policy tests while changing each parser or workflow graph, then the complete policy suite.
-- Run `python scripts/axis.py check repo-skills`, use-case docs, documentation drift, and Markdown links.
+- Run `python scripts/axis.py check repo-skills`, use-case docs, foundation docs, documentation drift, and Markdown links.
 - Validate the real Renovate configuration and the exact PR metadata through their Axis commands.
 - Forward-test named-agent routing, blocker stopping, profile application, outcome routing, and evidence reuse with fresh agents.
 - Create an immutable checkpoint, run `$axis-review-readiness`, then obtain the configured independent review before publication.

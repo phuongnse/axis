@@ -2,7 +2,7 @@
 """Validate flow-first use-case docs structure.
 
 Usage:
-  python3 scripts/check-use-case-docs.py --check
+  python3 scripts/check-use-case-docs.py
 """
 
 from __future__ import annotations
@@ -855,10 +855,7 @@ def iter_domain_readmes() -> list[Path]:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--check", action="store_true", help="validate and exit non-zero on issues")
-    _ = parser.parse_args()
-
+    argparse.ArgumentParser(description=__doc__).parse_args()
     issues: list[str] = []
     issues.extend(check_use_case_inventory_layout())
     files = iter_use_case_files()

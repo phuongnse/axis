@@ -1486,7 +1486,7 @@ class TestDocDriftRatchets(unittest.TestCase):
                 path = root / relative
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_text(content, encoding="utf-8")
-            return "\n".join(axis.documented_raw_command_issues(files.keys(), root=root))
+            return "\n".join(axis.documented_command_issues(files.keys(), root=root))
 
     def test_rejects_raw_repo_commands_in_documented_workflows(self) -> None:
         issues = self.documented_issue_text(
@@ -1535,6 +1535,39 @@ class TestDocDriftRatchets(unittest.TestCase):
         )
 
         self.assertEqual("", issues)
+
+    def test_rejects_documented_axis_commands_outside_the_cli_contract(self) -> None:
+        issues = self.documented_issue_text(
+            {
+                "docs/playbooks/example.md": (
+                    "`python scripts/axis.py frontend unsupported tests/sample.test.tsx`"
+                ),
+            }
+        )
+
+        self.assertIn("does not match the CLI contract", issues)
+
+    def test_accepts_documented_axis_command_templates_without_executing_them(self) -> None:
+        issues = self.documented_issue_text(
+            {
+                "docs/playbooks/example.md": (
+                    "`python scripts/axis.py git sync --branch <branch>`"
+                ),
+            }
+        )
+
+        self.assertEqual("", issues)
+
+    def test_rejects_unknown_routes_even_in_documented_command_templates(self) -> None:
+        issues = self.documented_issue_text(
+            {
+                "docs/playbooks/example.md": (
+                    "`python scripts/axis.py frontend unsupported [test-paths]`"
+                ),
+            }
+        )
+
+        self.assertIn("unknown command route `unsupported`", issues)
 
     def test_rejects_noncanonical_python_launchers_in_docs(self) -> None:
         issues = self.documented_issue_text(
@@ -2875,10 +2908,10 @@ class TestReviewVerificationGates(unittest.TestCase):
         with (
             mock.patch.object(axis, "working_tree_paths", return_value=["scripts/axis.py"]),
             mock.patch.object(axis, "verify") as verify,
-            mock.patch.object(axis, "run_ready_review_policy") as policy,
+            mock.patch.object(axis, "run_review_readiness_policy") as policy,
             contextlib.redirect_stderr(io.StringIO()),
         ):
-            result = axis.ready_review(axis.argparse.Namespace(since=None, policy_only=False))
+            result = axis.review_readiness(axis.argparse.Namespace(since=None, policy_only=False))
 
         self.assertEqual(1, result)
         verify.assert_not_called()
@@ -2889,10 +2922,10 @@ class TestReviewVerificationGates(unittest.TestCase):
             mock.patch.object(axis, "working_tree_paths", return_value=[]),
             mock.patch.object(axis, "verify_scope_paths", return_value=("base...HEAD", ["frontend/src/App.tsx"])),
             mock.patch.object(axis, "verify", return_value=0) as verify,
-            mock.patch.object(axis, "run_ready_review_policy", return_value=(0, ["doc drift"])) as policy,
+            mock.patch.object(axis, "run_review_readiness_policy", return_value=(0, ["doc drift"])) as policy,
             contextlib.redirect_stdout(io.StringIO()),
         ):
-            result = axis.ready_review(axis.argparse.Namespace(since=None, policy_only=False))
+            result = axis.review_readiness(axis.argparse.Namespace(since=None, policy_only=False))
 
         self.assertEqual(0, result)
         verify.assert_called_once()
@@ -2908,10 +2941,10 @@ class TestReviewVerificationGates(unittest.TestCase):
             mock.patch.object(axis, "working_tree_paths", return_value=[]),
             mock.patch.object(axis, "verify_scope_paths", return_value=("base...HEAD", ["scripts/axis.py"])),
             mock.patch.object(axis, "verify") as verify,
-            mock.patch.object(axis, "run_ready_review_policy", return_value=(0, ["policy gate tests", "doc drift"])) as policy,
+            mock.patch.object(axis, "run_review_readiness_policy", return_value=(0, ["policy gate tests", "doc drift"])) as policy,
             contextlib.redirect_stdout(io.StringIO()),
         ):
-            result = axis.ready_review(axis.argparse.Namespace(since=None, policy_only=True))
+            result = axis.review_readiness(axis.argparse.Namespace(since=None, policy_only=True))
 
         self.assertEqual(0, result)
         verify.assert_not_called()
@@ -2925,7 +2958,7 @@ class TestReviewVerificationGates(unittest.TestCase):
     def test_policy_registry_routes_only_triggered_expensive_checks(self) -> None:
         names = [
             name
-            for name, _checker in axis.ready_review_policy_gates(
+            for name, _checker in axis.review_readiness_policy_gates(
                 ["scripts/axis.py", ".github/renovate.json5"]
             )
         ]
@@ -2935,14 +2968,14 @@ class TestReviewVerificationGates(unittest.TestCase):
             ["doc drift"],
             [
                 name
-                for name, _checker in axis.ready_review_policy_gates(
+                for name, _checker in axis.review_readiness_policy_gates(
                     ["frontend/src/App.tsx"],
                     policy_tests_covered=True,
                 )
             ],
         )
 
-    def test_ready_review_reuses_verify_coverage_in_doc_drift(self) -> None:
+    def test_review_readiness_reuses_verify_coverage_in_doc_drift(self) -> None:
         paths = [
             "scripts/axis.py",
             ".agents/skills/axis-script-scope/SKILL.md",
@@ -2961,11 +2994,11 @@ class TestReviewVerificationGates(unittest.TestCase):
                 "check-use-case-docs.py",
                 "check-foundation-docs.py",
             },
-            axis.ready_review_doc_drift_coverage(paths),
+            axis.review_readiness_doc_drift_coverage(paths),
         )
         self.assertIn(
             "check-theme",
-            axis.ready_review_doc_drift_coverage(["theme/axis-theme.json"]),
+            axis.review_readiness_doc_drift_coverage(["theme/axis-theme.json"]),
         )
 
     def test_doc_drift_selects_only_checkers_for_touched_surfaces(self) -> None:
@@ -3007,7 +3040,7 @@ class TestReviewVerificationGates(unittest.TestCase):
     def test_doc_drift_gate_receives_covered_checks(self) -> None:
         covered = {"check-repo-skills"}
         gates = dict(
-            axis.ready_review_policy_gates(
+            axis.review_readiness_policy_gates(
                 [".agents/skills/axis-example/SKILL.md"],
                 doc_drift_covered=covered,
                 doc_drift_range="base..HEAD",
@@ -3022,17 +3055,17 @@ class TestReviewVerificationGates(unittest.TestCase):
         self.assertEqual([".agents/skills/axis-example/SKILL.md"], args.paths)
         self.assertEqual("base..HEAD", args.range_spec)
 
-    def test_pre_push_full_delegates_to_ready_review(self) -> None:
+    def test_pre_push_full_delegates_to_review_readiness(self) -> None:
         with (
             mock.patch.dict(axis.os.environ, {"AXIS_PRE_PUSH_FULL": "1"}),
-            mock.patch.object(axis, "ready_review", return_value=0) as ready_review,
+            mock.patch.object(axis, "review_readiness", return_value=0) as review_readiness,
             contextlib.redirect_stdout(io.StringIO()),
         ):
             result = axis.pre_push(object())
 
         self.assertEqual(0, result)
-        ready_review.assert_called_once()
-        delegated = ready_review.call_args.args[0]
+        review_readiness.assert_called_once()
+        delegated = review_readiness.call_args.args[0]
         self.assertIsNone(delegated.since)
         self.assertFalse(delegated.policy_only)
 
@@ -3866,10 +3899,7 @@ class TestLocalDevCli(unittest.TestCase):
 
     def test_smoke_uses_the_canonical_compose_browser_runner(self) -> None:
         calls = self.run_local_dev(
-            axis.argparse.Namespace(
-                local_dev_command="smoke",
-                smoke_args=["--", "e2e/app-frame.pw.ts", "-g", "AT-002"],
-            )
+            axis.argparse.Namespace(local_dev_command="smoke")
         )
 
         self.assertEqual(
@@ -3878,16 +3908,9 @@ class TestLocalDevCli(unittest.TestCase):
         )
         self.assertEqual(["--profile", "e2e", "build", "e2e"], calls[1][-4:])
         self.assertEqual(
-            ["e2e", "e2e/app-frame.pw.ts", "-g", "AT-002"],
-            calls[2][-4:],
+            ["e2e", "e2e/local-dev-smoke.pw.ts"],
+            calls[2][-2:],
         )
-
-    def test_smoke_defaults_to_the_local_dev_smoke_journey(self) -> None:
-        calls = self.run_local_dev(
-            axis.argparse.Namespace(local_dev_command="smoke", smoke_args=[])
-        )
-
-        self.assertEqual(["e2e", "e2e/local-dev-smoke.pw.ts"], calls[2][-2:])
 
     def test_shell_uses_service_default_inside_container(self) -> None:
         calls = self.run_local_dev(
@@ -4798,18 +4821,12 @@ class TestAxisCommandWrappers(unittest.TestCase):
 
         self.assertEqual(frontend_env, calls[0]["env"])
 
-    def test_frontend_ui_baseline_write_uses_deterministic_python_generator(self) -> None:
-        with (
-            mock.patch.object(axis, "write_ui_baseline") as write_baseline,
-            mock.patch.object(axis, "check_frontend_toolchain") as check_toolchain,
-        ):
-            rc = axis.frontend_command(
-                axis.argparse.Namespace(frontend_command="ui-baseline", write=True)
-            )
+    def test_generate_ui_baseline_uses_deterministic_python_generator(self) -> None:
+        with mock.patch.object(axis, "write_ui_baseline") as write_baseline:
+            rc = axis.generate_ui_baseline()
 
         self.assertEqual(0, rc)
         write_baseline.assert_called_once_with()
-        check_toolchain.assert_not_called()
 
     def test_frontend_install_browsers_installs_playwright_chromium(self) -> None:
         calls = self.run_with_fake_process(
