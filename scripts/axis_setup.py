@@ -22,6 +22,8 @@ DOTNET_SDK_VERSION = "8.0.423"
 NODE_VERSION = "24.18.0"
 LYCHEE_VERSION = "0.23.0"
 GH_VERSION = "2.96.0"
+SETUP_PROFILES = ("build", "local-dev", "review")
+DOCTOR_PROFILES = ("core", *SETUP_PROFILES)
 DOWNLOAD_TIMEOUT_SECONDS = 60
 USER_AGENT = "Axis setup"
 
@@ -348,12 +350,11 @@ def expose_managed_command(
 
 
 def managed_tools_for_profile(profile: str) -> tuple[str, ...]:
-    normalized = "review" if profile == "all" else profile
-    if normalized in {"build", "local-dev"}:
+    if profile not in SETUP_PROFILES:
+        raise SetupError(f"unknown setup profile `{profile}`")
+    if profile in {"build", "local-dev"}:
         return ("dotnet", "node")
-    if normalized == "review":
-        return ("dotnet", "node", "lychee", "gh")
-    raise SetupError(f"unknown setup profile `{profile}`")
+    return ("dotnet", "node", "lychee", "gh")
 
 
 def confirm_install(tools: tuple[str, ...], *, assume_yes: bool, stdin: TextIO) -> None:
@@ -376,14 +377,14 @@ def setup_plan(
     platform_spec: SetupPlatform,
     trust_local_ca: bool = False,
 ) -> list[str]:
-    normalized = "review" if profile == "all" else profile
+    managed_tools = managed_tools_for_profile(profile)
     steps = [f"detect supported platform ({platform_spec.label})", "validate Python 3 and Git prerequisites"]
-    if normalized in {"local-dev", "review"}:
+    if profile in {"local-dev", "review"}:
         steps.append("diagnose Docker Engine, Compose, and OpenSSL without changing OS services")
     if install_user_tools:
         labels: list[str] = []
         external: list[str] = []
-        for tool in managed_tools_for_profile(normalized):
+        for tool in managed_tools:
             label = {
                 "dotnet": f".NET SDK {DOTNET_SDK_VERSION}",
                 "node": f"Node.js {NODE_VERSION}",
@@ -398,17 +399,17 @@ def setup_plan(
                 labels.append(label)
         if labels:
             steps.append(f"install missing pinned user-local tools: {', '.join(labels)}")
-            if normalized == "review":
+            if profile == "review":
                 steps.append("expose the managed GitHub CLI through a stable user command")
         if external:
             steps.append(f"verified portable artifact unavailable; {', '.join(external)} requires external installation")
     else:
         steps.append("validate required toolchains; do not install executables")
-    steps.append(f"run strict doctor for the cumulative {normalized} profile")
+    steps.append(f"run strict doctor for the cumulative {profile} profile")
     steps.extend(["restore locked .NET dependencies", "install locked frontend dependencies"])
     if browsers:
         steps.append("install Playwright Chromium")
-    if normalized in {"local-dev", "review"}:
+    if profile in {"local-dev", "review"}:
         steps.append("generate local HTTPS certificates")
         if trust_local_ca:
             steps.append("trust local HTTPS root CA in the current user's host trust store")

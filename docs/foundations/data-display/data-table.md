@@ -107,6 +107,6 @@ Required UI quality: controls must be keyboard-reachable, visible copy must come
 >
 > **Deferred follow-ups:** Backend-owned grouping, aggregate, cursor, export, and persisted preference contracts remain with future consuming use cases.
 >
-> **Verification:** `python scripts/axis.py frontend ci`; `python scripts/axis.py frontend script test -- data-table.test.tsx rules-page.test.tsx`; `python scripts/axis.py local-dev e2e -- e2e/manage-rules.pw.ts -g "catalog table"`.
+> **Verification:** `python scripts/axis.py frontend ci`; `python scripts/axis.py frontend test tests/data-table.test.tsx tests/rules-page.test.tsx`; `python scripts/axis.py local-dev e2e -- e2e/manage-rules.pw.ts -g "catalog table"`.
 >
 > **Decisions:** One typed definition packages data and semantic column metadata; raw data reflection is rejected. Client, manual page, and infinite modes are explicit. Manual modes own whole-dataset processing on the server. Filter fields follow visible columns, use an Axis-owned serializable expression instead of a library-owned wire contract, and clear hidden-field conditions. Header and body share one native table layout and one scroll viewport; virtualization changes row rendering without introducing a second table layout. Advanced capabilities are opt-in so simple consumers do not inherit unused controls.

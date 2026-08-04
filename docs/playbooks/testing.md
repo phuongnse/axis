@@ -2,7 +2,7 @@
 
 > **Navigation**: [docs/README.md](../README.md) · [docs/playbooks/agent-checklist.md](./agent-checklist.md) · [AGENTS.md](../../AGENTS.md)
 
-Use the smallest test that proves the edit while developing. Use `$axis-ready-review` before review.
+Use the smallest test that proves the edit while developing. Use `$axis-review-readiness` before independent review.
 
 ## Shared
 

@@ -21,7 +21,7 @@ space is the fingerprint of collapsed indentation.
 a single space.
 
 Usage:
-  python3 scripts/check-doc-code-fences.py --check
+  python3 scripts/check-doc-code-fences.py
 """
 
 from __future__ import annotations
@@ -97,14 +97,7 @@ def check_file(path: Path) -> list[str]:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
-        "--check",
-        action="store_true",
-        help="validate and exit non-zero on issues",
-    )
-    _ = parser.parse_args()
-
+    argparse.ArgumentParser(description=__doc__).parse_args()
     files = iter_md_files()
     issues: list[str] = []
     for path in files:

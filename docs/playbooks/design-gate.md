@@ -37,7 +37,7 @@ Every non-trivial dossier covers:
 
    In both cases list retired identifiers and the post-edit `rg` sweep. Do not add compatibility “just in case.” Otherwise write `N/A because no supported surface is retired`.
 4. **Contract decision** — name request/response shape, schema, casing, FE/BE type parity, or write `N/A because no wire shape changes`.
-5. **Verification plan** — list exact development checks and ready-review checks. Do not call review-only artifacts gates.
+5. **Verification plan** — list exact development checks and review-readiness checks. Do not call review-only artifacts gates.
 
 Skip a row only with an explicit `N/A because ...`.
 

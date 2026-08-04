@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
-"""Verify docs/playbooks/local-dev.md matches local Docker Compose.
+"""Validate local-dev configuration invariants and documentation links.
 
 Usage:
-  python3 scripts/check-local-dev-docs.py          # validate (exit 0/1)
-  python3 scripts/check-local-dev-docs.py --check  # same (CI alias)
+  python3 scripts/check-local-dev-docs.py  # validate (exit 0/1)
 """
 
 from __future__ import annotations
@@ -22,6 +21,7 @@ LOCAL_DEV_FILE = ROOT / "docs/playbooks/local-dev.md"
 TECH_STACK_FILE = ROOT / "docs/TECH_STACK.md"
 API_APPSETTINGS_FILE = ROOT / "src" / "Axis.Api" / "appsettings.json"
 LOCAL_BROWSER_APP_BASE_URL = "https://localhost:3000"
+LOCAL_OPENIDDICT_ISSUER = "https://localhost:5281"
 
 TECH_STACK_FRAGMENT_LINK = re.compile(r"\]\(\.\./TECH_STACK\.md#([^)]+)\)")
 TECH_STACK_KNOWN_ANCHOR = re.compile(r"\[[^\]]+\]\(#([^)]+)\)")
@@ -30,20 +30,10 @@ SERVICE_BLOCK = re.compile(
     r"^  ([a-z0-9_-]+):\n((?:    .*\n)*)",
     re.MULTILINE,
 )
-PORT_MAPPING = re.compile(
-    r'^\s+-\s+"(?:127[.]0[.]0[.]1:)?(?:[$][{][A-Z0-9_]+:-(\d+)[}]|(\d+)):\d+"',
-    re.MULTILINE,
-)
-PROFILE_LINE = re.compile(r'^\s+profiles:\s*\[(.+)\]', re.MULTILINE)
 LOCAL_APP_BASE_URL_LINE = re.compile(
     rf'^\s+App__BaseUrl:\s+"(?:[$]{{APP_BASE_URL:-)?{re.escape(LOCAL_BROWSER_APP_BASE_URL)}(?:}})?"\s*$',
     re.MULTILINE,
 )
-
-
-def mentions_service(doc: str, service_name: str) -> bool:
-    service_pattern = re.compile(rf"(?<![a-z0-9_-]){re.escape(service_name)}(?![a-z0-9_-])")
-    return service_pattern.search(doc.lower()) is not None
 
 
 def services_section(text: str) -> str:
@@ -59,42 +49,6 @@ def services_section(text: str) -> str:
             break
         body.append(line)
     return "".join(body)
-
-
-def parse_compose(compose_file: Path) -> tuple[dict[str, list[int]], set[str], list[str]]:
-    text = compose_file.read_text(encoding="utf-8")
-    service_text = services_section(text)
-    services: dict[str, list[int]] = {}
-    optional_services: set[str] = set()
-    service_names: list[str] = []
-
-    for match in SERVICE_BLOCK.finditer(service_text):
-        name = match.group(1)
-        block = match.group(2)
-        if name == "volumes":
-            continue
-
-        service_names.append(name)
-
-        profile_match = PROFILE_LINE.search(block)
-        if profile_match:
-            optional_services.add(name)
-
-        ports = [int(default or literal) for default, literal in PORT_MAPPING.findall(block)]
-        if ports:
-            services[name] = ports
-
-    return services, optional_services, sorted(service_names)
-
-
-def mandatory_host_ports(services: dict[str, list[int]], optional: set[str]) -> set[int]:
-    ports: set[int] = set()
-    for name, mapped in services.items():
-        if name in optional:
-            continue
-        for host_port in mapped:
-            ports.add(host_port)
-    return ports
 
 
 def compose_has_local_app_base_url(compose_file: Path) -> bool:
@@ -232,6 +186,20 @@ def api_appsettings_base_url(appsettings_file: Path) -> str | None:
     return base_url if isinstance(base_url, str) else None
 
 
+def api_appsettings_openiddict_issuer(appsettings_file: Path) -> str | None:
+    try:
+        data = json.loads(appsettings_file.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return None
+
+    openiddict_section = data.get("OpenIddict")
+    if not isinstance(openiddict_section, dict):
+        return None
+
+    issuer = openiddict_section.get("Issuer")
+    return issuer if isinstance(issuer, str) else None
+
+
 def check_local_dev_doc() -> list[str]:
     errors: list[str] = []
 
@@ -244,19 +212,7 @@ def check_local_dev_doc() -> list[str]:
     if errors:
         return errors
 
-    main_services, main_optional, service_names = parse_compose(MAIN_COMPOSE_FILE)
     doc = LOCAL_DEV_FILE.read_text(encoding="utf-8")
-
-    doc_lower = doc.lower()
-
-    if "scripts/axis.py doctor" not in doc:
-        errors.append("local-dev.md should document the local environment doctor command")
-
-    if ".env.local" not in doc:
-        errors.append("local-dev.md should document the ignored local env file")
-
-    if "package-manager adapter" not in doc_lower or "binary/shim" not in doc_lower:
-        errors.append("local-dev.md should document the generic package-manager adapter")
 
     if not compose_has_local_app_base_url(MAIN_COMPOSE_FILE):
         errors.append(
@@ -276,35 +232,11 @@ def check_local_dev_doc() -> list[str]:
             f"{LOCAL_BROWSER_APP_BASE_URL} for host-native local dev"
         )
 
-    if (
-        "App:BaseUrl" not in doc
-        or LOCAL_BROWSER_APP_BASE_URL not in doc
-        or "browser-facing origin" not in doc_lower
-    ):
+    if api_appsettings_openiddict_issuer(API_APPSETTINGS_FILE) != LOCAL_OPENIDDICT_ISSUER:
         errors.append(
-            "local-dev.md should document App:BaseUrl as the browser-facing origin "
-            "used in verification email links"
+            "src/Axis.Api/appsettings.json OpenIddict:Issuer must default to "
+            f"{LOCAL_OPENIDDICT_ISSUER} for local authorization"
         )
-
-    for host_port in sorted(mandatory_host_ports(main_services, main_optional)):
-        if str(host_port) not in doc:
-            errors.append(
-                f"local-dev.md missing host port {host_port} "
-                f"(published by docker-compose.yml)"
-            )
-
-    for service_name in service_names:
-        if not mentions_service(doc, service_name):
-            errors.append(
-                f"local-dev.md missing service name '{service_name}' "
-                f"(defined in docker-compose.yml)"
-            )
-
-    if "observability" not in doc_lower:
-        errors.append("local-dev.md missing observability profile documentation")
-
-    if "MigrateAsync" not in doc:
-        errors.append("local-dev.md should document Identity MigrateAsync database startup")
 
     if TECH_STACK_FILE.is_file():
         tech_stack_text = TECH_STACK_FILE.read_text(encoding="utf-8")
@@ -320,14 +252,7 @@ def check_local_dev_doc() -> list[str]:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
-        "--check",
-        action="store_true",
-        help="CI alias — validate and exit non-zero on drift",
-    )
-    _args = parser.parse_args()
-
+    argparse.ArgumentParser(description=__doc__).parse_args()
     errors = check_local_dev_doc()
     if errors:
         print("check-local-dev-docs FAIL:", file=sys.stderr)

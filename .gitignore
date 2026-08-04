@@ -5,7 +5,11 @@
 .codex/*
 !.codex/config.toml
 !.codex/check.py
+!.codex/orchestration.toml
 !.codex/agents/
+!.codex/hooks/
+.codex/hooks/*
+!.codex/hooks/require_named_agent.py
 
 # Build outputs
 bin/

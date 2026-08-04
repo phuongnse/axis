@@ -1,6 +1,6 @@
 ---
 name: axis-doc-hygiene
-description: Keep durable Axis documentation, guidance, diagrams, links, status text, and ownership concise and current. Use when those artifacts change; this skill governs documentation quality, not the underlying domain decision.
+description: Keep and audit durable Axis documentation, repo skills, guidance, diagrams, links, status text, routing, and ownership. Use when those artifacts change or their consistency is reviewed; this skill governs hygiene, not the underlying domain decision.
 ---
 
 # Axis Doc Hygiene
@@ -26,7 +26,7 @@ Follow [reference.md](../reference.md).
 ## Workflow
 
 1. Classify the responsibility: product/spec/status, process/routing, policy/enforcement, stack, navigation/link, or visual source.
-2. Locate the single owner. Edit it once and replace other copies with inline owner links.
+2. Locate the single owner. Edit it once and replace other copies with inline owner links; update [workflows.toml](../workflows.toml) when cross-skill states, transitions, or owners change.
 3. Apply [docs/playbooks/docs-style.md](../../../docs/playbooks/docs-style.md): lead with the rule, keep current contracts, strip session provenance and filler/history, and preserve linked anchors.
 4. For Mermaid or committed visuals, edit the owning source, use product vocabulary, verify labels/connectors/clipping, and keep local URLs, keys, tokens, and personal exports out of the repo.
 5. Apply [reference.md § Improvement loop](../reference.md#improvement-loop) when feedback exposes a reusable gap; do not publish symptom-to-remedy recipes.

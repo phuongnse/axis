@@ -2,7 +2,7 @@
 """Validate foundation docs structure.
 
 Usage:
-  python3 scripts/check-foundation-docs.py --check
+  python3 scripts/check-foundation-docs.py
 """
 
 from __future__ import annotations
@@ -400,10 +400,7 @@ def validate_implementation_status(doc: FoundationDocument) -> list[str]:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--check", action="store_true", help="validate and exit non-zero on issues")
-    _ = parser.parse_args()
-
+    argparse.ArgumentParser(description=__doc__).parse_args()
     issues: list[str] = []
     issues.extend(check_foundation_inventory_layout())
     for path in iter_foundation_files():

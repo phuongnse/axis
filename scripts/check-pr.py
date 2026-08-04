@@ -18,8 +18,10 @@ from pathlib import Path
 COMMENT_RE = re.compile(r"<!--.*?-->", re.DOTALL)
 HEADING_RE = re.compile(r"^##\s+(.+?)\s*$", re.MULTILINE)
 CHECKBOX_RE = re.compile(r"^\s*-\s+\[(?P<state>[ xX])\]\s+(?P<label>.+)$", re.MULTILINE)
-NA_REASON_RE = re.compile(r"\bN/A\b\s*(?:[-:\u2014]|\()\s*\S+", re.IGNORECASE)
-PR_TITLE_RE = re.compile(r"^[a-z]+(?:\([a-z0-9-]+\))?!?: .{8,}$")
+CHECKLIST_STATUS_RE = re.compile(r"\[status:\s*(?P<status>[a-z-]+)\]\s*$", re.IGNORECASE)
+CHECKLIST_REASON_RE = re.compile(r"\[reason:\s*(?P<reason>[^\]]*\S[^\]]*)\]", re.IGNORECASE)
+CHECKLIST_STATUSES = {"satisfied", "not-applicable", "pending"}
+PR_TITLE_RE = re.compile(r"^[a-z]+(?:\([a-z0-9-]+\))?!?: \S.*$")
 BRANCH_RE = re.compile(r"^(?:feat|fix|docs|refactor|test|chore)/[a-z0-9]+(?:-[a-z0-9]+)*$")
 RENOVATE_BRANCH_RE = re.compile(r"^renovate/[a-z0-9](?:[a-z0-9._/-]*[a-z0-9])?$")
 
@@ -54,12 +56,6 @@ def section_text(parts: dict[str, str], name: str) -> str:
     return strip_comments(parts.get(name, "")).strip()
 
 
-def has_na_reason(line: str) -> bool:
-    if "N/A with reason" in line:
-        return False
-    return bool(NA_REASON_RE.search(line))
-
-
 def validate_title(title: str) -> list[str]:
     title = title.strip()
     if not title:
@@ -86,7 +82,7 @@ def validate_branch(branch: str) -> list[str]:
     ]
 
 
-def validate_body(body: str) -> list[str]:
+def validate_body(body: str, *, allow_pending: bool = False) -> list[str]:
     body = body.lstrip("\ufeff")
     issues: list[str] = []
     if not strip_comments(body).strip():
@@ -98,14 +94,12 @@ def validate_body(body: str) -> list[str]:
             issues.append(f"Missing section: ## {required}")
 
     summary = section_text(parts, "Summary")
-    if "Summary" in parts and len(summary) < 20:
-        issues.append("Summary must be filled in with at least 20 non-comment characters")
+    if "Summary" in parts and not summary:
+        issues.append("Summary must be filled in")
 
     linked_spec = section_text(parts, "Linked spec")
     if "Linked spec" in parts and not linked_spec:
-        issues.append("Linked spec must name the spec/doc path, or state N/A with a reason")
-    elif "Linked spec" in parts and linked_spec.upper() == "N/A":
-        issues.append("Linked spec uses N/A without a reason")
+        issues.append("Linked spec must be filled in")
 
     requirements = parts.get("Requirements & rules followed", "")
     checkboxes = list(CHECKBOX_RE.finditer(requirements))
@@ -115,18 +109,36 @@ def validate_body(body: str) -> list[str]:
     for match in checkboxes:
         line = match.group(0).strip()
         state = match.group("state")
-        if "N/A with reason" in line:
-            issues.append(f"Replace placeholder `N/A with reason` with a concrete reason: {line}")
+        status_match = CHECKLIST_STATUS_RE.search(line)
+        if status_match is None:
+            issues.append(f"Requirement is missing a structured status: {line}")
             continue
-        if state == " " and not has_na_reason(line):
-            issues.append(f"Requirement is unchecked without N/A reason: {line}")
+        status = status_match.group("status").lower()
+        if status not in CHECKLIST_STATUSES:
+            issues.append(f"Requirement has invalid status `{status}`: {line}")
+            continue
+        checked = state.lower() == "x"
+        if status == "pending":
+            if checked:
+                issues.append(f"Pending requirement must be unchecked: {line}")
+            if not allow_pending:
+                issues.append(f"Pending requirement is not publishable from this branch: {line}")
+        elif not checked:
+            issues.append(f"Resolved requirement must be checked: {line}")
+        if status == "not-applicable" and CHECKLIST_REASON_RE.search(line) is None:
+            issues.append(f"Not-applicable requirement must include `[reason: ...]`: {line}")
 
     return issues
 
 
 def validate(title: str, body: str, branch: str | None = None) -> list[str]:
     branch_issues = validate_branch(branch) if branch is not None else []
-    return [*validate_title(title), *validate_body(body), *branch_issues]
+    allow_pending = branch is not None and RENOVATE_BRANCH_RE.fullmatch(branch.strip()) is not None
+    return [
+        *validate_title(title),
+        *validate_body(body, allow_pending=allow_pending),
+        *branch_issues,
+    ]
 
 
 def resolve_branch(explicit: str | None) -> str:

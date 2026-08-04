@@ -2,8 +2,8 @@
 #
 # PR #60 added project-wide whitespace/encoding defaults. This file adds enforced C#
 # code-style, naming, and analyzer severities aligned with the existing codebase
-# (follow-up to PR #60). Run `dotnet format Axis.sln` before push; CI verifies with
-# `--verify-no-changes`.
+# (follow-up to PR #60). Run `python scripts/axis.py dotnet format --check` before push;
+# CI verifies through the same repository command.
 #
 # Audit summary (2026-05):
 # - Namespaces: file-scoped (`namespace Foo.Bar;`) throughout src/ and tests/
@@ -334,7 +334,7 @@ dotnet_naming_style.s_camelcase.word_separator =
 dotnet_naming_style.s_camelcase.capitalization = camel_case
 
 # ─── Analyzer severities (IDE/CA defaults; build uses TreatWarningsAsErrors) ──
-# Keep style/naming at suggestion so `dotnet format` applies fixers without
+# Keep style/naming at suggestion so the repository formatter applies fixers without
 # turning every legacy drift into a compile error. Escalate specific rules below.
 
 dotnet_analyzer_diagnostic.category-Style.severity = suggestion

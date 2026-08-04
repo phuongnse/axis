@@ -8,6 +8,7 @@ Review checklist only. Workflow lives in repo skills ([`.agents/skills/README.md
 
 - Use `$axis-design-gate` for non-trivial work; high-risk surfaces need sign-off.
 - Select the entry owner from [`.agents/skills/README.md`](../../.agents/skills/README.md) and preserve current prerequisite evidence across typed handoffs.
+- Confirm the routing checkpoint covers current independently ownable work units; re-evaluate unexecuted units after decisions resolve ambiguity or change their scope, ownership, or verification boundary.
 - Read the owning use-case, foundation, or domain docs and same-module code.
 - Map in-scope ACs before behavior work.
 - Resolve or explicitly defer lower-layer gaps before API work.
@@ -23,7 +24,7 @@ No blank in-scope rows; required AT rows name verification categories; incomplet
 
 ## Review Verification
 
-During development, run the smallest check that proves the edit. Before review, use `$axis-ready-review`.
+During development, run the smallest check that proves the edit. Before independent review, use `$axis-review-readiness`.
 
 Only claim a full local suite when full `python scripts/axis.py dotnet test` ran, including integration/API tests. CI remains authoritative before merge.
 
@@ -44,7 +45,7 @@ Pure refactor/style/test-only changes can report docs as not triggered.
 
 ## Retrospective Review
 
-Use `$axis-ready-review` and apply [`.agents/skills/reference.md § Improvement loop`](../../.agents/skills/reference.md#improvement-loop). Record one outcome instead of adding retrospective prose.
+Use `$axis-review-readiness` and apply [`.agents/skills/reference.md § Improvement loop`](../../.agents/skills/reference.md#improvement-loop). Record one outcome instead of adding retrospective prose.
 
 ## Layer Status
 

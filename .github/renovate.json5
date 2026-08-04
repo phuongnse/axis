@@ -41,7 +41,7 @@
     ],
     "vulnerabilityFixStrategy": "lowest"
   },
-  "prBodyTemplate": "## Summary\n\nRenovate proposes a dependency update for Axis version owners.\n\n{{{table}}}\n\n## Linked spec\n\nN/A - dependency automation update; version ownership lives in docs/TECH_STACK.md.\n\n## Requirements & rules followed\n\n- [ ] **Spec/code** - N/A - automated dependency update follows repository version owners; no product behavior is intended.\n- [ ] **Ready review** - N/A - automated dependency PR awaits human review before merge.\n- [ ] **Verification** - N/A - CI runs after the PR opens and must pass before merge.\n- [ ] **Docs/status** - N/A - per-update docs change only when stack policy changes.\n- [ ] **No placeholders** - N/A - generated Renovate body uses fixed Axis text plus the Renovate dependency table.\n",
+  "prBodyTemplate": "## Summary\n\nRenovate proposes a dependency update for Axis version owners.\n\n{{{table}}}\n\n## Linked spec\n\nN/A - dependency automation update; version ownership lives in docs/TECH_STACK.md.\n\n## Requirements & rules followed\n\n- [x] **Spec/code** - [reason: automated dependency update follows repository version owners; no product behavior is intended] [status: not-applicable]\n- [ ] **Review readiness** - automated dependency PR awaits human review before merge. [status: pending]\n- [ ] **Verification** - CI runs after the PR opens and must pass before merge. [status: pending]\n- [x] **Docs/status** - [reason: per-update docs change only when stack policy changes] [status: not-applicable]\n- [x] **No placeholders** - generated Renovate body uses fixed Axis text plus the dependency table. [status: satisfied]\n",
   "packageRules": [
     {
       "description": "Do not automate .NET SDK baseline changes.",

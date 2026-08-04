@@ -17,11 +17,13 @@ import json
 import os
 import platform
 import re
+import shlex
 import shutil
 import ssl
 import subprocess
 import sys
 import tempfile
+import tomllib
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -119,12 +121,9 @@ from axis_frontend_policy import (  # noqa: E402
     frontend_component_file_name_issues,
     frontend_e2e_structure_issues,
     frontend_form_schema_type_issues,
-    frontend_public_route_navigation_issues,
     frontend_quality_issues,
-    frontend_route_access_group_issues,
     frontend_tailwind_opacity_issues,
     frontend_test_async_boundary_issues,
-    frontend_transient_handoff_issues,
     frontend_ui_system_issues,
 )
 
@@ -525,13 +524,6 @@ def iter_files(root: Path, suffixes: tuple[str, ...]) -> Iterable[Path]:
     return axis_repo.iter_files(root, suffixes)
 
 
-def git_ls_files(pattern: str | None = None) -> list[str]:
-    args = ["ls-files"]
-    if pattern is not None:
-        args.append(pattern)
-    return [line for line in git(args).splitlines() if line.strip()]
-
-
 def repo_files(pattern: str | None = None) -> list[str]:
     args = ["ls-files", "--cached", "--others", "--exclude-standard"]
     if pattern is not None:
@@ -771,25 +763,115 @@ def test_unit(args: argparse.Namespace) -> int:
     return 0
 
 
+def nuget_vulnerability_report_issues(report: object) -> list[str]:
+    if not isinstance(report, dict) or report.get("version") != 1:
+        return ["NuGet vulnerability report must use JSON output version 1"]
+    projects = report.get("projects")
+    if not isinstance(projects, list):
+        return ["NuGet vulnerability report must contain a projects array"]
+
+    issues: list[str] = []
+    for project_index, project in enumerate(projects, 1):
+        if not isinstance(project, dict):
+            issues.append(f"NuGet vulnerability report project {project_index} is invalid")
+            continue
+        project_path = project.get("path")
+        if not isinstance(project_path, str) or not project_path.strip():
+            issues.append(f"NuGet vulnerability report project {project_index} has invalid path")
+            continue
+        frameworks = project.get("frameworks", [])
+        if not isinstance(frameworks, list):
+            issues.append(f"NuGet vulnerability report project {project_index} has invalid frameworks")
+            continue
+        for framework_index, framework in enumerate(frameworks, 1):
+            if not isinstance(framework, dict):
+                issues.append(
+                    f"NuGet vulnerability report project {project_index} framework {framework_index} is invalid"
+                )
+                continue
+            framework_name = framework.get("framework")
+            if not isinstance(framework_name, str) or not framework_name.strip():
+                issues.append(
+                    f"NuGet vulnerability report project {project_index} framework {framework_index} "
+                    "has invalid identity"
+                )
+                continue
+            if not any(group in framework for group in ("topLevelPackages", "transitivePackages")):
+                issues.append(
+                    f"NuGet vulnerability report project {project_index} framework {framework_index} "
+                    "has no package groups"
+                )
+                continue
+            for package_group in ("topLevelPackages", "transitivePackages"):
+                packages = framework.get(package_group, [])
+                if not isinstance(packages, list):
+                    issues.append(
+                        f"NuGet vulnerability report project {project_index} framework {framework_index} "
+                        f"has invalid {package_group}"
+                    )
+                    continue
+                for package_index, package in enumerate(packages, 1):
+                    if not isinstance(package, dict):
+                        issues.append(
+                            f"NuGet vulnerability report {package_group} item {package_index} is invalid"
+                        )
+                        continue
+                    package_id = package.get("id")
+                    if not isinstance(package_id, str) or not package_id.strip():
+                        issues.append(
+                            f"NuGet vulnerability report {package_group} item {package_index} "
+                            "has invalid id"
+                        )
+                        continue
+                    vulnerabilities = package.get("vulnerabilities")
+                    if not isinstance(vulnerabilities, list) or not vulnerabilities:
+                        issues.append(
+                            f"NuGet package {package_id!r} has invalid vulnerabilities"
+                        )
+                    else:
+                        issues.append(
+                            f"NuGet package {package_id!r} has "
+                            f"{len(vulnerabilities)} known vulnerability record(s)"
+                        )
+    return issues
+
+
 def check_vulnerable_packages(_args: argparse.Namespace | None = None) -> int:
     rc = check_dotnet_sdk()
     if rc != 0:
         return rc
     solution_path = ROOT / "Axis.sln"
     result = run(
-        [exe("dotnet"), "list", str(solution_path), "package", "--vulnerable", "--include-transitive"],
+        [
+            exe("dotnet"),
+            "list",
+            str(solution_path),
+            "package",
+            "--vulnerable",
+            "--include-transitive",
+            "--format",
+            "json",
+            "--output-version",
+            "1",
+        ],
         capture=True,
         check=False,
     )
-    if result.stdout:
-        print(result.stdout, end="")
     if result.stderr:
         print(result.stderr, end="", file=sys.stderr)
     if result.returncode != 0:
         print("check-vulnerable-packages: FAIL - dotnet vulnerable package scan failed", file=sys.stderr)
         return result.returncode
-    if "has the following vulnerable packages" in result.stdout:
-        print("check-vulnerable-packages: FAIL - vulnerable NuGet packages found", file=sys.stderr)
+    try:
+        report = json.loads(result.stdout)
+    except json.JSONDecodeError as exc:
+        print(f"check-vulnerable-packages: FAIL - invalid NuGet JSON report: {exc}", file=sys.stderr)
+        return 1
+    issues = nuget_vulnerability_report_issues(report)
+    if issues:
+        print("check-vulnerable-packages: FAIL:", file=sys.stderr)
+        for issue in issues:
+            print(f"  - {issue}", file=sys.stderr)
         return 1
     print("check-vulnerable-packages: OK")
     return 0
@@ -1150,6 +1232,11 @@ def write_ui_baseline(root: Path = ROOT) -> None:
     print(f"ui-baseline: wrote {baseline_path.relative_to(root)}")
 
 
+def generate_ui_baseline(_args: argparse.Namespace | None = None) -> int:
+    write_ui_baseline()
+    return 0
+
+
 def check_ui_baseline(_args: argparse.Namespace | None = None) -> int:
     issues = ui_baseline_issues()
     if issues:
@@ -1158,7 +1245,7 @@ def check_ui_baseline(_args: argparse.Namespace | None = None) -> int:
             print(f"  - {issue}", file=sys.stderr)
         print(
             "\nReview registry/theme changes and required sign-off before running "
-            "`python scripts/axis.py frontend ui-baseline --write`.",
+            "`python scripts/axis.py generate ui-baseline`.",
             file=sys.stderr,
         )
         return 1
@@ -1250,7 +1337,6 @@ def check_doc_navigation(_args: argparse.Namespace | None = None) -> int:
 
 
 PLAYBOOK_DEFAULT_MAX_LINES = 100
-PATTERN_ROUTER_MAX_LINES = 100
 DOC_SIZE_BUDGETS: dict[str, int] = {}
 
 
@@ -1354,12 +1440,9 @@ def check_scripts_standard(_args: argparse.Namespace | None = None) -> int:
 
 SKILL_NAME_RE = re.compile(r"^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$")
 REPO_SKILLS_DIR = ".agents/skills"
+REPO_SKILL_WORKFLOWS = "workflows.toml"
 FRONTMATTER_RE = re.compile(r"\A---\n(?P<header>.*?)\n---\n", re.DOTALL)
 SKILL_MAX_LINES = 80
-SKILL_AMBIGUOUS_WORD_RE = re.compile(
-    r"\b(best[- ]effort|if you have time|nice to have|maybe|probably|hopefully)\b",
-    re.IGNORECASE,
-)
 SKILL_REPO_REF_RE = re.compile(
     r"`(?P<target>(?:AGENTS\.md|\.agents/skills/[A-Za-z0-9._/#-]+|\.github/[A-Za-z0-9._/#-]+|"
     r"docs/[A-Za-z0-9._/#-]+|scripts/[A-Za-z0-9._/#-]+|tests/[A-Za-z0-9._/#-]+|"
@@ -1369,25 +1452,7 @@ SKILL_MD_LINK_RE = re.compile(r"\[[^\]]+\]\((?P<target>[^)]+)\)")
 SKILL_REQUIRED_HEADINGS = ("## Goal", "## Hard gates", "## Inputs", "## Workflow", "## Output")
 SKILL_ALIAS_RE = re.compile(r"(?<![A-Za-z0-9_-])\$(?P<name>axis-[a-z0-9-]+)(?![A-Za-z0-9_-])")
 SKILL_REQUIRES_RE = re.compile(r"[*][*]Requires[*][*]")
-SKILL_HANDOFF_WORD_RE = re.compile(r"\b(?:requires?|delegat(?:e|es|ed|ing)|returns?\s+to)\b", re.IGNORECASE)
-SKILL_TYPED_HANDOFF_RE = re.compile(r"[*][*](?:Requires|Delegates|Returns to)[*][*]")
 SKILL_CATALOG_LINK_RE = re.compile(r"\]\(\./(?P<name>axis-[a-z0-9-]+)/SKILL[.]md(?:#[^)]+)?\)")
-SKILL_DUPLICATE_INSTRUCTION_MIN_LENGTH = 80
-SKILL_VERIFICATION_SCOPE_CONSUMERS = ("axis-frontend-feature", "axis-ui-system")
-SKILL_VERIFICATION_SCOPE_OUTPUT_FIELDS = (
-    "Moment",
-    "Selected checks",
-    "Omitted broad checks",
-    "Results",
-    "Next verification boundary",
-)
-SKILL_VERIFICATION_SCOPE_DELEGATE_RE = re.compile(
-    r"Unresolved verification command selection [*][*]Delegates[*][*] to `\$axis-script-scope`[.]?",
-    re.IGNORECASE,
-)
-SKILL_SCRIPT_SCOPE_DELEGATE_LINE_RE = re.compile(
-    r"(?im)^[^\n]*[*][*]Delegates[*][*] to `\$axis-script-scope`[^\n]*$",
-)
 
 
 def simple_yaml_value(text: str, key: str) -> str:
@@ -1527,36 +1592,166 @@ def repo_skill_catalog_issues(skills_root: Path, skill_names: set[str], *, root:
     return issues
 
 
-def repo_skill_duplicate_instruction_issues(
-    records: list[tuple[Path, str]], *, root: Path
-) -> list[str]:
-    locations: dict[str, list[tuple[Path, int]]] = {}
-    for skill_md, text in records:
-        in_fence = False
-        for idx, line in enumerate(text.splitlines(), 1):
-            if line.strip().startswith("```"):
-                in_fence = not in_fence
-                continue
-            normalized = re.sub(r"\s+", " ", line.strip())
-            if (
-                in_fence
-                or not normalized.startswith("- ")
-                or len(normalized) < SKILL_DUPLICATE_INSTRUCTION_MIN_LENGTH
-            ):
-                continue
-            locations.setdefault(normalized, []).append((skill_md, idx))
+def repo_skill_workflow_issues(skills_root: Path, skill_names: set[str], *, root: Path) -> list[str]:
+    path = skills_root / REPO_SKILL_WORKFLOWS
+    normalized = rel_from(path, root)
+    if not path.is_file():
+        return [f"{normalized}: cross-skill workflow contract is missing"]
+
+    try:
+        contract = tomllib.loads(path.read_text(encoding="utf-8"))
+    except (OSError, tomllib.TOMLDecodeError) as exc:
+        return [f"{normalized}: cannot load workflow contract: {exc}"]
 
     issues: list[str] = []
-    for instruction, duplicates in sorted(locations.items()):
-        if len(duplicates) < 2:
+    allowed_root_keys = {"version", "semantic_roles", "workflows"}
+    unknown_root_keys = sorted(set(contract) - allowed_root_keys)
+    if unknown_root_keys:
+        issues.append(f"{normalized}: unknown root keys {unknown_root_keys}")
+    if contract.get("version") != 1:
+        issues.append(f"{normalized}: `version` must be 1")
+
+    semantic_roles = contract.get("semantic_roles", {})
+    if not isinstance(semantic_roles, dict) or any(
+        not isinstance(role, str) or not isinstance(agent, str)
+        for role, agent in semantic_roles.items()
+    ):
+        issues.append(f"{normalized}: `semantic_roles` must map role IDs to project agent IDs")
+        semantic_roles = {}
+    else:
+        for role, agent in semantic_roles.items():
+            if SKILL_NAME_RE.fullmatch(role) is None:
+                issues.append(f"{normalized}: semantic role `{role}` must use kebab-case")
+            if not (root / ".codex" / "agents" / f"{agent}.toml").is_file():
+                issues.append(f"{normalized}: semantic role `{role}` references unknown agent `{agent}`")
+
+    workflows = contract.get("workflows")
+    if not isinstance(workflows, dict) or not workflows:
+        issues.append(f"{normalized}: `workflows` must contain at least one workflow table")
+        return issues
+
+    used_roles: set[str] = set()
+    allowed_workflow_keys = {"initial", "terminal_states", "states", "transitions"}
+    allowed_transition_keys = {"id", "from", "to", "owner", "evidence"}
+    for workflow_name, workflow in workflows.items():
+        label = f"{normalized}: workflow `{workflow_name}`"
+        if SKILL_NAME_RE.fullmatch(workflow_name) is None:
+            issues.append(f"{label} ID must use kebab-case")
+        if not isinstance(workflow, dict):
+            issues.append(f"{label} must be a table")
             continue
-        owner_path, owner_line = duplicates[0]
-        owner = f"{rel_from(owner_path, root)}:{owner_line}"
-        for duplicate_path, duplicate_line in duplicates[1:]:
-            issues.append(
-                f"{rel_from(duplicate_path, root)}:{duplicate_line}: duplicate substantive instruction; "
-                f"move it to one owner and link `{owner}`: {instruction}"
-            )
+
+        unknown_keys = sorted(set(workflow) - allowed_workflow_keys)
+        if unknown_keys:
+            issues.append(f"{label} has unknown keys {unknown_keys}")
+        states = workflow.get("states")
+        if not isinstance(states, list) or not states or any(not isinstance(state, str) for state in states):
+            issues.append(f"{label} `states` must be a non-empty string array")
+            continue
+        if len(states) != len(set(states)):
+            issues.append(f"{label} states must be unique")
+        state_set = set(states)
+        for state in states:
+            if SKILL_NAME_RE.fullmatch(state) is None:
+                issues.append(f"{label} state `{state}` must use kebab-case")
+
+        initial = workflow.get("initial")
+        if initial not in state_set:
+            issues.append(f"{label} initial state `{initial}` is not declared")
+        terminal_states = workflow.get("terminal_states")
+        if (
+            not isinstance(terminal_states, list)
+            or not terminal_states
+            or any(not isinstance(state, str) for state in terminal_states)
+        ):
+            issues.append(f"{label} `terminal_states` must be a non-empty array")
+            terminal_states = []
+        for state in terminal_states:
+            if state not in state_set:
+                issues.append(f"{label} terminal state `{state}` is not declared")
+
+        transitions = workflow.get("transitions")
+        if not isinstance(transitions, list) or not transitions:
+            issues.append(f"{label} `transitions` must be a non-empty table array")
+            continue
+
+        transition_ids: set[str] = set()
+        edges: set[tuple[str, str]] = set()
+        adjacency: dict[str, set[str]] = {state: set() for state in states}
+        for index, transition in enumerate(transitions, 1):
+            transition_label = f"{label} transition {index}"
+            if not isinstance(transition, dict):
+                issues.append(f"{transition_label} must be a table")
+                continue
+            unknown_keys = sorted(set(transition) - allowed_transition_keys)
+            if unknown_keys:
+                issues.append(f"{transition_label} has unknown keys {unknown_keys}")
+            missing_keys = sorted(allowed_transition_keys - set(transition))
+            if missing_keys:
+                issues.append(f"{transition_label} is missing keys {missing_keys}")
+                continue
+
+            transition_id = transition["id"]
+            source = transition["from"]
+            target = transition["to"]
+            owner = transition["owner"]
+            evidence = transition["evidence"]
+            if not all(isinstance(value, str) and value for value in (transition_id, source, target, owner, evidence)):
+                issues.append(f"{transition_label} fields must be non-empty strings")
+                continue
+            if SKILL_NAME_RE.fullmatch(transition_id) is None:
+                issues.append(f"{transition_label} ID `{transition_id}` must use kebab-case")
+            if transition_id in transition_ids:
+                issues.append(f"{label} transition ID `{transition_id}` is duplicated")
+            transition_ids.add(transition_id)
+            if source not in state_set or target not in state_set:
+                issues.append(f"{transition_label} references an undeclared state `{source} -> {target}`")
+            else:
+                edge = (source, target)
+                if edge in edges:
+                    issues.append(f"{label} transition `{source} -> {target}` has multiple owners")
+                edges.add(edge)
+                adjacency[source].add(target)
+
+            owner_kind, separator, owner_id = owner.partition(":")
+            if separator != ":" or owner_kind not in {"skill", "role"} or not owner_id:
+                issues.append(f"{transition_label} owner must be `skill:<id>` or `role:<id>`")
+            elif owner_kind == "skill" and owner_id not in skill_names:
+                issues.append(f"{transition_label} references unknown skill owner `{owner_id}`")
+            elif owner_kind == "role":
+                used_roles.add(owner_id)
+                if owner_id not in semantic_roles:
+                    issues.append(f"{transition_label} references unknown semantic role `{owner_id}`")
+
+        if initial in state_set:
+            reachable = {initial}
+            pending = [initial]
+            while pending:
+                source = pending.pop()
+                for target in adjacency[source] - reachable:
+                    reachable.add(target)
+                    pending.append(target)
+            for state in sorted(state_set - reachable):
+                issues.append(f"{label} state `{state}` is unreachable from `{initial}`")
+
+        declared_terminals = state_set.intersection(terminal_states)
+        if declared_terminals:
+            reverse_adjacency: dict[str, set[str]] = {state: set() for state in states}
+            for source, targets in adjacency.items():
+                for target in targets:
+                    reverse_adjacency[target].add(source)
+            can_reach_terminal = set(declared_terminals)
+            pending = list(declared_terminals)
+            while pending:
+                target = pending.pop()
+                for source in reverse_adjacency[target] - can_reach_terminal:
+                    can_reach_terminal.add(source)
+                    pending.append(source)
+            for state in sorted(state_set - can_reach_terminal):
+                issues.append(f"{label} state `{state}` cannot reach a terminal state")
+
+    for role in sorted(set(semantic_roles) - used_roles):
+        issues.append(f"{normalized}: semantic role `{role}` is not used by any transition")
     return issues
 
 
@@ -1603,165 +1798,6 @@ def repo_skill_required_cycle_issues(records: list[tuple[Path, str]]) -> list[st
     return issues
 
 
-def repo_skill_verification_scope_issues(
-    records: list[tuple[Path, str]], *, root: Path
-) -> list[str]:
-    by_name = {path.parent.name: (path, text) for path, text in records}
-    issues: list[str] = []
-    for consumer in SKILL_VERIFICATION_SCOPE_CONSUMERS:
-        record = by_name.get(consumer)
-        if record is None:
-            continue
-        skill_md, text = record
-        script_scope_handoffs = SKILL_SCRIPT_SCOPE_DELEGATE_LINE_RE.findall(text)
-        if not script_scope_handoffs or any(
-            SKILL_VERIFICATION_SCOPE_DELEGATE_RE.search(handoff) is None
-            for handoff in script_scope_handoffs
-        ):
-            issues.append(
-                f"{rel_from(skill_md, root)}: `{consumer}` must use **Delegates** only for "
-                "unresolved verification command selection to `$axis-script-scope`"
-            )
-
-    owner = by_name.get("axis-script-scope")
-    if owner is not None:
-        skill_md, text = owner
-        output_match = re.search(r"(?ms)^## Output\s*$\n(?P<body>.*?)(?=^## |\Z)", text)
-        output = output_match.group("body") if output_match is not None else ""
-        missing = [field for field in SKILL_VERIFICATION_SCOPE_OUTPUT_FIELDS if f"`{field}`" not in output]
-        if missing:
-            formatted = [f"`{field}`" for field in SKILL_VERIFICATION_SCOPE_OUTPUT_FIELDS]
-            fields = f"{', '.join(formatted[:-1])}, and {formatted[-1]}"
-            issues.append(
-                f"{rel_from(skill_md, root)}: `axis-script-scope` output must include {fields}"
-            )
-        local_dev_fragments = ("host browser", "--trust-local-ca", "local-dev up", "readiness")
-        if any(fragment not in text for fragment in local_dev_fragments):
-            issues.append(
-                f"{rel_from(skill_md, root)}: `axis-script-scope` must require the local-dev "
-                "host-browser trust decision and readiness proof"
-            )
-        doc_hygiene_fragments = (
-            "Editing durable guidance **Requires** entering `$axis-doc-hygiene` before edit",
-            "reuse an active handoff",
-        )
-        if any(fragment not in text for fragment in doc_hygiene_fragments):
-            issues.append(
-                f"{rel_from(skill_md, root)}: `axis-script-scope` must use **Requires** for "
-                "`$axis-doc-hygiene` before editing durable guidance"
-            )
-        dependency_policy_fragments = (
-            "native prerequisites",
-            "observed failure",
-            "accepted-risk",
-            "exact direct versions",
-            "scheduled workflow",
-        )
-        if any(fragment not in text for fragment in dependency_policy_fragments):
-            issues.append(
-                f"{rel_from(skill_md, root)}: `axis-script-scope` must classify native "
-                "prerequisites and enforce accepted-risk policy"
-            )
-
-    ready_review = by_name.get("axis-ready-review")
-    if ready_review is not None:
-        skill_md, text = ready_review
-        minimality_fragments = (
-            "minimality",
-            "existing code",
-            "standard library",
-            "native platform",
-            "installed dependencies",
-            "speculative abstractions",
-            "accessibility",
-        )
-        if any(fragment not in text for fragment in minimality_fragments):
-            issues.append(
-                f"{rel_from(skill_md, root)}: `axis-ready-review` must audit minimality "
-                "after correctness without weakening required safety"
-            )
-
-    reference = root / REPO_SKILLS_DIR / "reference.md"
-    if reference.is_file():
-        reference_text = reference.read_text(encoding="utf-8")
-        reference_fragments = (
-            "Route durable guidance before edit",
-            "Other durable guidance **Requires**",
-            "`$axis-doc-hygiene`",
-            "typed handoff",
-        )
-        if any(fragment not in reference_text for fragment in reference_fragments):
-            issues.append(
-                f"{rel_from(reference, root)}: universal contract must route durable guidance "
-                "edits through `$axis-doc-hygiene` before edit"
-            )
-        if "The entry domain owner keeps spec, status, and evidence decisions" not in reference_text:
-            issues.append(
-                f"{rel_from(reference, root)}: universal contract must keep spec, status, "
-                "and evidence decisions with the entry domain owner"
-            )
-        engineering_method_fragments = (
-            "## Engineering method",
-            "Minimal solution ladder",
-            "Root-cause loop",
-            "Fail-before/pass-after",
-            "Safety floor",
-            "Communication clarity",
-            "Skill proof",
-        )
-        if any(fragment not in reference_text for fragment in engineering_method_fragments):
-            issues.append(
-                f"{rel_from(reference, root)}: universal contract must own the engineering method "
-                "for minimal solutions, root-cause fixes, behavior proof, safety, communication, "
-                "and skill validation"
-            )
-        blocker_fragments = (
-            "## Blocker and completion protocol",
-            "No workaround",
-            "user-local",
-            "explicit user approval",
-            "stale, missing, indirect, or blocked evidence",
-        )
-        if any(fragment.lower() not in reference_text.lower() for fragment in blocker_fragments):
-            issues.append(
-                f"{rel_from(reference, root)}: universal contract must own the blocker handshake "
-                "and completion evidence boundary"
-            )
-
-    mcp_skill = by_name.get("axis-mcp-integration")
-    if mcp_skill is not None:
-        skill_md, text = mcp_skill
-        mcp_skill_fragments = (
-            "supported MCP client lifecycle",
-            "`tools/list`",
-            "`tools/call`",
-            "stop and ask",
-        )
-        if any(fragment.lower() not in text.lower() for fragment in mcp_skill_fragments):
-            issues.append(
-                f"{rel_from(skill_md, root)}: MCP skill must require supported client lifecycle "
-                "evidence and the blocker handshake"
-            )
-        playbook = root / "docs" / "playbooks" / "mcp.md"
-        if not playbook.is_file():
-            issues.append("docs/playbooks/mcp.md: MCP skill requires the runtime lifecycle playbook")
-        else:
-            playbook_text = playbook.read_text(encoding="utf-8")
-            playbook_fragments = (
-                "## Runtime lifecycle and blocker protocol",
-                "reload or reconnect",
-                "`tools/list`",
-                "`tools/call`",
-                "stop and ask",
-            )
-            if any(fragment.lower() not in playbook_text.lower() for fragment in playbook_fragments):
-                issues.append(
-                    "docs/playbooks/mcp.md: MCP runtime lifecycle must document reload/reconnect, "
-                    "current tools/list/tools/call evidence, and stop-and-ask blockers"
-                )
-    return issues
-
-
 def repo_skill_issues(*, root: Path = ROOT) -> list[str]:
     issues: list[str] = []
     skills_root = root / REPO_SKILLS_DIR.replace("/", os.sep)
@@ -1800,20 +1836,6 @@ def repo_skill_issues(*, root: Path = ROOT) -> list[str]:
             issues.append(
                 f"{rel_from(skill_md, root)}: keep SKILL.md concise ({line_count} lines > {SKILL_MAX_LINES})"
             )
-        for idx, line in enumerate(text.splitlines(), 1):
-            if SKILL_AMBIGUOUS_WORD_RE.search(line):
-                issues.append(
-                    f"{rel_from(skill_md, root)}:{idx}: replace ambiguous best-effort wording with a concrete action"
-                )
-            if (
-                SKILL_ALIAS_RE.search(line)
-                and SKILL_HANDOFF_WORD_RE.search(line)
-                and SKILL_TYPED_HANDOFF_RE.search(line) is None
-            ):
-                issues.append(
-                    f"{rel_from(skill_md, root)}:{idx}: type the skill handoff as "
-                    "**Requires**, **Delegates**, or **Returns to**"
-                )
         issues.extend(repo_skill_raw_command_issues(skill_md, text, root=root))
 
         frontmatter = FRONTMATTER_RE.match(text)
@@ -1838,8 +1860,6 @@ def repo_skill_issues(*, root: Path = ROOT) -> list[str]:
             )
         if not description:
             issues.append(f"{rel_from(skill_md, root)}: frontmatter description is required")
-        elif len(description) < 40:
-            issues.append(f"{rel_from(skill_md, root)}: frontmatter description is too vague")
 
         body = text[frontmatter.end() :]
         if re.search(r"(?m)^#\s+\S", body) is None:
@@ -1857,9 +1877,8 @@ def repo_skill_issues(*, root: Path = ROOT) -> list[str]:
         issues.extend(repo_skill_reference_issues(skill_md, text, root=root))
 
     issues.extend(repo_skill_catalog_issues(skills_root, skill_names, root=root))
-    issues.extend(repo_skill_duplicate_instruction_issues(records, root=root))
+    issues.extend(repo_skill_workflow_issues(skills_root, skill_names, root=root))
     issues.extend(repo_skill_required_cycle_issues(records))
-    issues.extend(repo_skill_verification_scope_issues(records, root=root))
     return issues
 
 
@@ -2006,19 +2025,6 @@ DOC_DRIFT_ADDED_LINE_RULES = [
         "Fully-qualified Axis type introduced in implementation code - use an import or explicit alias",
     ),
     (
-        r"(?i)\b(?:the user\s+(?:approved|requested|asked|confirmed|decided)|"
-        r"(?:approved|requested|asked|confirmed|decided)\s+by\s+the user)\b",
-        lambda p: (p == "AGENTS.md" or p.startswith(".agents/skills/") or p.startswith("docs/"))
-        and p.endswith(".md"),
-        "Session provenance introduced in durable guidance - keep only the current contract and durable rationale",
-    ),
-    (
-        r"(?i)\buser-approved\b",
-        lambda p: (p.startswith("docs/use-cases/") or p.startswith("docs/foundations/"))
-        and p.endswith(".md"),
-        "Approval history introduced in a durable product contract - keep only the current decision",
-    ),
-    (
         r"(?:/mnt/[a-z]/(?:[^`\s]+/)*projects/|[A-Za-z]:\\(?:Users|projects)\\|/Users/[^`\s]+/|/home/[^`\s]+/)",
         lambda p: (p.startswith("docs/") or p.startswith("scripts/"))
         and not p.startswith("scripts/tests/")
@@ -2069,7 +2075,13 @@ DOC_DRIFT_ADDED_LINE_RULES = [
     ),
 ]
 
-DOC_COMMAND_DOC_PATHS = {"AGENTS.md", "README.md", "CONTRIBUTING.md"}
+DOC_COMMAND_DOC_PATHS = {
+    ".editorconfig",
+    "AGENTS.md",
+    "CONTRIBUTING.md",
+    "README.md",
+    "docker-compose.yml",
+}
 
 RAW_DOC_COMMAND_PATTERNS = [
     (
@@ -2103,12 +2115,17 @@ RAW_DOC_COMMAND_PATTERNS = [
 ]
 
 def is_command_doc(path: str) -> bool:
-    return path in DOC_COMMAND_DOC_PATHS or (path.startswith("docs/") and path.endswith(".md"))
+    return (
+        path in DOC_COMMAND_DOC_PATHS
+        or (path.startswith(("docs/", ".agents/skills/")) and path.endswith(".md"))
+        or (path.startswith(".github/workflows/") and path.endswith((".yml", ".yaml")))
+    )
 
 
 def normalize_doc_command_fragment(fragment: str) -> str:
     text = fragment.strip()
     text = re.sub(r"^(?:[$>]|\#)\s*", "", text)
+    text = re.sub(r"^run:\s*", "", text)
     text = re.sub(r"^cd\s+frontend\s+&&\s+", "cd frontend && ", text)
     return text
 
@@ -2123,9 +2140,118 @@ def raw_doc_command_message(fragment: str) -> str | None:
     return None
 
 
-def documented_raw_command_issues(paths: Iterable[str] | None = None, *, root: Path = ROOT) -> list[str]:
+class CommandContractParser(argparse.ArgumentParser):
+    def error(self, message: str) -> None:
+        raise ValueError(message)
+
+
+def axis_command_route_message(
+    args: list[str],
+    *,
+    parser: argparse.ArgumentParser,
+) -> str | None:
+    current = parser
+    for token in args:
+        subcommands = next(
+            (
+                action
+                for action in current._actions
+                if isinstance(action, argparse._SubParsersAction)
+            ),
+            None,
+        )
+        if subcommands is None:
+            return None
+        if token == "..." or token.startswith(("<", "[")) or token.startswith("-"):
+            return None
+        child = subcommands.choices.get(token)
+        if child is None:
+            choices = ", ".join(sorted(subcommands.choices))
+            return f"unknown command route `{token}`; choose one of: {choices}"
+        current = child
+    return None
+
+
+def axis_command_template_option_message(
+    args: list[str],
+    *,
+    parser: argparse.ArgumentParser,
+) -> str | None:
+    current = parser
+    route_end = 0
+    for index, token in enumerate(args):
+        subcommands = next(
+            (
+                action
+                for action in current._actions
+                if isinstance(action, argparse._SubParsersAction)
+            ),
+            None,
+        )
+        if subcommands is None:
+            route_end = index
+            break
+        child = subcommands.choices.get(token)
+        if child is None:
+            return None
+        current = child
+        route_end = index + 1
+    if any(action.nargs == argparse.REMAINDER for action in current._actions):
+        return None
+    for token in args[route_end:]:
+        if token == "--":
+            break
+        if token.startswith("[") or not token.startswith("-"):
+            continue
+        option = token.split("=", 1)[0]
+        if option not in current._option_string_actions:
+            return f"unknown option `{option}` for the documented Axis command route"
+    return None
+
+
+def axis_command_syntax_message(
+    fragment: str,
+    *,
+    parser: argparse.ArgumentParser,
+) -> str | None:
+    normalized = normalize_doc_command_fragment(fragment)
+    if not normalized.startswith("python scripts/axis.py "):
+        return None
+    try:
+        tokens = shlex.split(normalized)
+    except ValueError as exc:
+        return f"invalid shell syntax: {exc}"
+    command_tokens: list[str] = []
+    for token in tokens:
+        placeholder = re.fullmatch(r"<[^>]+>|\[[^]]+\]", token) is not None
+        shell_control = not placeholder and (
+            token in {"|", "||", "&&", ";", "&", ">", ">>", "<", "<<", "&>"}
+            or re.match(r"^(?:[0-9]+)?(?:>>?|<<?|&>)", token) is not None
+        )
+        if shell_control:
+            break
+        command_tokens.append(token)
+    route_message = axis_command_route_message(command_tokens[2:], parser=parser)
+    if route_message is not None:
+        return route_message
+    command_text = " ".join(command_tokens)
+    if "..." in command_text or re.search(r"<[^>]+>|\[[^]]+\]", command_text):
+        option_message = axis_command_template_option_message(command_tokens[2:], parser=parser)
+        if option_message is not None:
+            return option_message
+        return None
+    try:
+        parser.parse_args(command_tokens[2:])
+    except (SystemExit, ValueError) as exc:
+        detail = str(exc).strip() or "invalid Axis command syntax"
+        return detail
+    return None
+
+
+def documented_command_issues(paths: Iterable[str] | None = None, *, root: Path = ROOT) -> list[str]:
     candidates = paths or repo_files()
     issues: list[str] = []
+    parser = build_parser(parser_class=CommandContractParser)
     for path in sorted(candidates):
         normalized = path.replace("\\", "/")
         if not is_command_doc(normalized):
@@ -2141,15 +2267,29 @@ def documented_raw_command_issues(paths: Iterable[str] | None = None, *, root: P
                 fence_lang = None if fence_lang is not None else fence_match.group(1).lower()
                 continue
 
-            if fence_lang in {"bash", "sh", "shell", "console", "powershell", "pwsh", "ps1"}:
+            command_line = fence_lang in {"bash", "sh", "shell", "console", "powershell", "pwsh", "ps1"}
+            command_line = command_line or normalized.startswith(".github/workflows/")
+            if command_line:
                 message = raw_doc_command_message(line)
                 if message is not None:
                     issues.append(f"{normalized}:{idx}: raw documented command `{line.strip()}` - {message}")
+                syntax_message = axis_command_syntax_message(line, parser=parser)
+                if syntax_message is not None:
+                    issues.append(
+                        f"{normalized}:{idx}: documented Axis command does not match the CLI contract: "
+                        f"{syntax_message}"
+                    )
 
             for fragment in re.findall(r"`([^`]+)`", line):
                 message = raw_doc_command_message(fragment)
                 if message is not None:
                     issues.append(f"{normalized}:{idx}: raw documented command `{fragment}` - {message}")
+                syntax_message = axis_command_syntax_message(fragment, parser=parser)
+                if syntax_message is not None:
+                    issues.append(
+                        f"{normalized}:{idx}: documented Axis command `{fragment}` does not match "
+                        f"the CLI contract: {syntax_message}"
+                    )
     return issues
 
 
@@ -2204,18 +2344,6 @@ def endpoint_mediator_hits() -> list[str]:
     return hits
 
 
-GOVERNANCE_ENTRY_DOCS = [
-    Path("AGENTS.md"),
-    Path("CONTRIBUTING.md"),
-    Path(".github/PULL_REQUEST_TEMPLATE.md"),
-]
-
-GOVERNANCE_COMMANDS_OWNED_BY_AGENT_CHECKLIST = [
-    "python scripts/axis.py check policy-tests",
-    "python scripts/axis.py check doc-drift",
-    "python scripts/axis.py check markdown-links",
-]
-
 ENFORCEMENT_LEDGER_HEADER = [
     "Finding class",
     "Rule owner",
@@ -2230,212 +2358,6 @@ ENFORCEMENT_ALLOWED_STATUSES = {
     "Partial",
     "Review-only",
 }
-
-def enforcement_truth_required_snippets() -> list[tuple[Path, list[tuple[str, str]]]]:
-    return [
-    (
-        Path(".github/workflows/build-and-test.yml"),
-        [
-            ("pull_request:", "CI workflow runs for pull requests"),
-            ("run: python scripts/axis.py check pr", "PR metadata guard runs in CI"),
-            ("run: python scripts/axis.py ready-review --policy-only", "shared ready-review policy profile runs in CI"),
-            ("run: python scripts/axis.py check docker", "Docker endpoint is available for Testcontainers in CI through the Axis wrapper"),
-            ("run: python scripts/axis.py check vulnerable-packages", "vulnerable package gate runs in CI"),
-            ("run: python scripts/axis.py check test-naming", ".NET test naming gate runs in CI"),
-            ("dotnet-version: 8.0.x", ".NET CI setup uses the documented SDK major"),
-            ("run: python scripts/axis.py dotnet build -- --no-restore", ".NET build runs in CI through the Axis wrapper"),
-            ("run: python scripts/axis.py dotnet format --check", ".NET format gate runs in CI through the Axis wrapper"),
-            ("python scripts/axis.py dotnet test -- --no-build", "full .NET test suite runs in CI through the Axis wrapper"),
-            ("node-version-file: frontend/.nvmrc", "frontend CI setup uses the documented Node source"),
-            ("run: python scripts/axis.py frontend install", "frontend dependencies install through the Axis wrapper"),
-            ("run: python scripts/axis.py check frontend-dependency-versions", "frontend direct dependencies are exactly pinned"),
-            ("run: python scripts/axis.py check frontend-vulnerable-packages", "frontend dependency vulnerability gate runs in CI"),
-            ("run: python scripts/axis.py frontend gen-api-types --check", "frontend API type generation runs in CI through the Axis wrapper"),
-            ("run: python scripts/axis.py check ui-baseline", "approved frontend UI baseline is checked in CI"),
-            ("run: python scripts/axis.py frontend ci", "frontend typecheck/lint runs in CI through the Axis wrapper"),
-            ("run: python scripts/axis.py frontend test", "frontend tests run in CI through the Axis wrapper"),
-            ("uses: lycheeverse/lychee-action", "markdown link check runs in CI"),
-            (
-                f"lycheeVersion: v{axis_setup.LYCHEE_VERSION}",
-                "markdown link check pins the documented Lychee version",
-            ),
-            ("args: --config ./lychee.toml './**/*.md'", "markdown link check uses shared lychee config"),
-            ("BASE_BRANCH: main", "doc drift compares against main"),
-        ],
-    ),
-    (
-        Path(".github/workflows/dependency-security.yml"),
-        [
-            ("schedule:", "dependency security audit runs on a schedule"),
-            ("workflow_dispatch:", "dependency security audit can be started manually"),
-            ("run: python scripts/axis.py dotnet restore", "scheduled audit restores the locked .NET graph"),
-            ("run: python scripts/axis.py check vulnerable-packages", "scheduled audit checks NuGet advisories"),
-            ("run: python scripts/axis.py frontend install", "scheduled audit installs the locked frontend graph"),
-            ("run: python scripts/axis.py check frontend-dependency-versions", "scheduled audit checks exact frontend versions"),
-            ("run: python scripts/axis.py check frontend-vulnerable-packages", "scheduled audit checks npm advisories"),
-        ],
-    ),
-    (
-        Path("scripts/axis.py"),
-        [
-            ('step(".NET SDK", lambda: check_dotnet_sdk())', "local verify checks the documented .NET SDK before dotnet commands"),
-            ('step("frontend toolchain", lambda: check_frontend_toolchain())', "local verify checks the documented Node source before npm commands"),
-            ('step("frontend dependency versions", lambda: check_frontend_dependency_versions())', "local verify checks exact frontend dependency versions"),
-            ('step("frontend vulnerable packages", lambda: check_frontend_vulnerable_packages())', "local verify audits every changed frontend surface"),
-            ("dotnet_projects_for_changed_paths(paths)", "local verify routes .NET work by changed project paths"),
-            ('step("policy gate tests", lambda: check_policy_tests())', "local verify runs policy gate tests when scripts change"),
-            ('step("doc navigation", lambda: check_doc_navigation())', "local verify runs docs checks when docs change"),
-            ('"markdown links (changed files)",', "local verify runs markdown link checks for changed markdown paths"),
-            ('def pre_push(args: argparse.Namespace) -> int:', "pre-push quick gate is implemented in Python"),
-            ('return ready_review(argparse.Namespace(since=None, policy_only=False))', "pre-push can opt into ready-review with AXIS_PRE_PUSH_FULL"),
-            ('def ready_review(args: argparse.Namespace) -> int:', "ready-review owns local review-boundary verification"),
-            ("lambda: check_doc_drift(", "ready-review and CI share the doc-drift policy profile"),
-            ("for issue in governance_owner_boundary_issues():", "doc drift checks governance owner boundaries"),
-            ("for issue in enforcement_ledger_issues():", "doc drift checks enforcement ledger rows"),
-            ("for issue in enforcement_truth_audit_issues():", "doc drift checks enforcement truth wiring"),
-            ("for issue in documented_raw_command_issues():", "doc drift checks documented repo commands go through Axis"),
-        ],
-    ),
-    (
-        Path("global.json"),
-        [
-            ('"version": "8.0.100"', "global.json selects the documented .NET SDK major"),
-            ('"rollForward": "latestFeature"', "global.json allows latest installed .NET 8 feature band without selecting newer majors"),
-        ],
-    ),
-    (
-        Path("scripts/hooks/pre-push"),
-        [
-            ('root / "scripts" / "axis.py"), "pre-push"', "pre-push delegates to scripts/axis.py pre-push"),
-        ],
-    ),
-    (
-        Path("Directory.Build.props"),
-        [
-            ("<TreatWarningsAsErrors>true</TreatWarningsAsErrors>", "build treats warnings as errors"),
-            ('<PackageReference Include="Microsoft.VisualStudio.Threading.Analyzers"', "async-safety analyzer package is wired"),
-        ],
-    ),
-    (
-        Path(".editorconfig"),
-        [
-            ("dotnet_diagnostic.CA2016.severity = warning", "CA2016 dropped CancellationToken analyzer is escalated"),
-        ],
-    ),
-    (
-        Path("tests/Api/Axis.Api.Tests/Contracts/OpenApiDocumentTests.cs"),
-        [
-            ("OpenApiDocument_WhenGeneratedFromRunningApi_MatchesCommittedSnapshot", "OpenAPI snapshot test exists"),
-            ("openapi.json drifted from the API", "OpenAPI test fails on committed contract drift"),
-            ("SerializeAsJson(OpenApiSpecVersion.OpenApi3_0)", "OpenAPI test serializes the running contract"),
-            ("committed.Should().Be(", "OpenAPI test compares committed contract to the running contract"),
-        ],
-    ),
-    (
-        Path("frontend/package.json"),
-        [
-            (
-                '"gen:api-types": "openapi-ts -i ../openapi.json -o src/lib/api-generated -p @hey-api/typescript"',
-                "frontend API types generate from committed openapi.json",
-            ),
-        ],
-    ),
-    (
-        Path("Axis.sln"),
-        [
-            ("tests\\Architecture\\Axis.Architecture.Tests\\Axis.Architecture.Tests.csproj", "architecture fitness tests are included in Axis.sln"),
-        ],
-    ),
-    ]
-
-
-def governance_owner_boundary_issues(*, root: Path | None = None) -> list[str]:
-    """Keep governance entry docs from duplicating enforceable rule mechanics."""
-    root = root or ROOT
-    issues: list[str] = []
-
-    for relative in GOVERNANCE_ENTRY_DOCS:
-        path = root / relative
-        if not path.is_file():
-            continue
-
-        try:
-            lines = path.read_text(encoding="utf-8").splitlines()
-        except UnicodeDecodeError:
-            continue
-
-        normalized = relative.as_posix()
-        for idx, line in enumerate(lines, 1):
-            for command in GOVERNANCE_COMMANDS_OWNED_BY_AGENT_CHECKLIST:
-                if command in line:
-                    issues.append(
-                        f"{normalized}:{idx}: governance doc restates `{command}`. "
-                        "Link to agent-checklist.md#review-verification instead."
-                    )
-
-            if "Design Gate" not in line:
-                continue
-
-            line_lower = line.lower()
-            mentions_machine_gate = (
-                "ci gate" in line_lower
-                or "machine gate" in line_lower
-                or "machine-enforced" in line_lower
-                or "automated gate" in line_lower
-            )
-            if mentions_machine_gate and "not " not in line_lower and "not-a-" not in line_lower:
-                issues.append(
-                    f"{normalized}:{idx}: Design Gate is a review artifact, not a machine/CI gate. "
-                    "Move deterministic enforcement to scripts/tests and docs/ENFORCEMENT.md."
-                )
-
-    return issues
-
-
-def normalized_text(path: Path) -> str:
-    return path.read_text(encoding="utf-8", errors="ignore").replace("\r\n", "\n").replace("\r", "\n")
-
-
-def enforcement_truth_search_text(relative: Path, path: Path) -> str:
-    text = normalized_text(path)
-    if relative != Path("scripts/axis.py"):
-        return text
-
-    start = text.find("def enforcement_truth_required_snippets")
-    end = text.find("\ndef governance_owner_boundary_issues", start)
-    if start == -1 or end == -1:
-        return ""
-    return text[:start] + text[end:]
-
-
-def enforcement_truth_audit_issues(*, root: Path | None = None) -> list[str]:
-    """Verify committed CI/script wiring still supports registry enforcement claims."""
-    root = root or ROOT
-    issues: list[str] = []
-
-    for relative, requirements in enforcement_truth_required_snippets():
-        path = root / relative
-        normalized = relative.as_posix()
-        if not path.is_file():
-            issues.append(f"{normalized}: enforcement truth audit missing required file")
-            continue
-
-        text = enforcement_truth_search_text(relative, path)
-        for snippet, description in requirements:
-            if snippet not in text:
-                issues.append(f"{normalized}: enforcement truth audit missing {description}: `{snippet}`")
-
-    workflow = root / ".github" / "workflows" / "build-and-test.yml"
-    if workflow.is_file():
-        workflow_text = normalized_text(workflow)
-        if workflow_text.count("- 'openapi.json'") < 2:
-            issues.append(
-                ".github/workflows/build-and-test.yml: enforcement truth audit requires "
-                "`openapi.json` to trigger both backend and frontend CI filters"
-            )
-
-    return issues
-
 
 def markdown_table_cells(line: str) -> list[str]:
     if not line.lstrip().startswith("|"):
@@ -2516,25 +2438,6 @@ def enforcement_ledger_issues(*, root: Path | None = None) -> list[str]:
             )
             continue
 
-        owner = plain_markdown_cell(row["Rule owner"]).lower()
-        mechanism = plain_markdown_cell(row["Mechanism"]).lower()
-        proof = plain_markdown_cell(row["Proof / gap"]).lower()
-        combined = f"{owner} {mechanism} {proof}"
-
-        if status == "Enforced":
-            evidence_markers = ("ci", "test", "analyzer", "compiler", "build", "workflow")
-            if not any(marker in combined for marker in evidence_markers):
-                issues.append(
-                    f"{normalized}:{idx + 1}: Enforced row needs CI/build/tooling proof "
-                    "or a negative test"
-                )
-        elif status == "Partial":
-            if "known gap" not in proof:
-                issues.append(f"{normalized}:{idx + 1}: Partial row must name a known gap")
-        elif status == "Review-only":
-            if re.search(r"\b(gate|enforced)\b|fail(?:s|ed)? the pr|\bci\b", combined):
-                issues.append(f"{normalized}:{idx + 1}: Review-only row must not use gate/enforced language")
-
     if row_count == 0:
         issues.append(f"{normalized}: ## Ledger must contain at least one rule row")
 
@@ -2614,15 +2517,11 @@ def check_doc_drift(_args: argparse.Namespace | None = None) -> int:
             print(f"check-doc-drift: no diff in {range_spec} - skip")
         return 1 if issues else 0
 
-    domain_errors = doc_drift_domains.check_readme_api_status(paths)
-    for err in domain_errors:
-        fail(issues, err)
-
     all_added_lines = added_lines(range_spec, lambda _path: True)
     for issue in doc_drift_added_line_issues(all_added_lines):
         fail(issues, issue)
 
-    for issue in documented_raw_command_issues():
+    for issue in documented_command_issues():
         fail(issues, issue)
 
     for hit in endpoint_mediator_hits():
@@ -2635,35 +2534,8 @@ def check_doc_drift(_args: argparse.Namespace | None = None) -> int:
     for issue in missing_handler_test_issues(changed_name_status(range_spec)):
         fail(issues, issue)
 
-    for issue in governance_owner_boundary_issues():
-        fail(issues, issue)
-
     for issue in enforcement_ledger_issues():
         fail(issues, issue)
-
-    for issue in enforcement_truth_audit_issues():
-        fail(issues, issue)
-
-    spec_target = ROOT / "docs" / "ARCHITECTURE.md"
-    if spec_target.is_file():
-        spec_rx = re.compile(r"Not yet|\bplanned\b|Will be|To be implemented|Coming soon|in the future")
-        for idx, line in enumerate(spec_target.read_text(encoding="utf-8").splitlines(), 1):
-            if spec_rx.search(line):
-                fail(issues, f"Speculation in reference doc - move to an owning use-case file: {rel(spec_target)}:{idx}:{line}")
-
-    lesson_rx = re.compile(r"\*\*Lesson|[Ll]esson [(]|[Ll]esson[)]")
-    lesson_files = list((ROOT / "docs" / "playbooks").rglob("*.md"))
-    lesson_files.extend(ROOT / name for name in ("AGENTS.md", "docs/ARCHITECTURE.md"))
-    for path in lesson_files:
-        if not path.is_file():
-            continue
-        for idx, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
-            if lesson_rx.search(line):
-                fail(
-                    issues,
-                    "Incident/lesson framing in practice doc - generalize the rule, move specifics to "
-                    f"the owning use-case or PR retro (docs-style.md): {rel(path)}:{idx}:{line}",
-                )
 
     for migration in (ROOT / "src" / "Modules").glob("**/Migrations/*.cs"):
         if migration.name.endswith(".Designer.cs") or "Snapshot" in migration.name:
@@ -2688,13 +2560,13 @@ def check_doc_drift(_args: argparse.Namespace | None = None) -> int:
         ("check-ui-baseline", check_ui_baseline),
         ("check-theme", check_theme),
         ("check-frontend-quality", check_frontend_quality),
-        ("check-use-case-docs.py", lambda _=None: run_module_check("check-use-case-docs.py", ["--check"])),
-        ("check-foundation-docs.py", lambda _=None: run_module_check("check-foundation-docs.py", ["--check"])),
-        ("check-doc-link-targets.py", lambda _=None: run_module_check("check-doc-link-targets.py", ["--check"])),
+        ("check-use-case-docs.py", lambda _=None: run_module_check("check-use-case-docs.py", [])),
+        ("check-foundation-docs.py", lambda _=None: run_module_check("check-foundation-docs.py", [])),
+        ("check-doc-link-targets.py", lambda _=None: run_module_check("check-doc-link-targets.py", [])),
         ("check-doc-navigation", check_doc_navigation),
         ("check-doc-size-budgets", check_doc_size_budgets),
-        ("check-doc-code-fences.py", lambda _=None: run_module_check("check-doc-code-fences.py", ["--check"])),
-        ("check-local-dev-docs.py", lambda _=None: run_module_check("check-local-dev-docs.py", ["--check"])),
+        ("check-doc-code-fences.py", lambda _=None: run_module_check("check-doc-code-fences.py", [])),
+        ("check-local-dev-docs.py", lambda _=None: run_module_check("check-local-dev-docs.py", [])),
     ]
     selected_checkers = doc_drift_checker_names(paths)
     for name, checker in checkers:
@@ -2733,16 +2605,6 @@ def command_version_line(name: str, *version_args: str, env: dict[str, str] | No
 def version_major(version_line: str) -> str | None:
     match = re.search(r"\b[vV]?([0-9]+)(?:[.][0-9]+)*\b", version_line)
     return match.group(1) if match else None
-
-
-def required_node_major() -> tuple[bool, str]:
-    ok, version_or_error = required_node_version()
-    if not ok:
-        return False, version_or_error
-    major = version_major(version_or_error)
-    if major is None:
-        return False, f"{rel(NVMRC_PATH)} must contain an exact Node semver version"
-    return True, major
 
 
 def required_node_version() -> tuple[bool, str]:
@@ -2950,15 +2812,22 @@ def dotnet_sdk_status() -> tuple[bool, str]:
             f"{path_label(GLOBAL_JSON_PATH)} selects .NET SDK {source_major_or_error}.x; "
             f"expected {REQUIRED_DOTNET_SDK_MAJOR}.x per {TECH_STACK_DOC}",
         )
+    portable_major = version_major(axis_setup.DOTNET_SDK_VERSION)
+    if portable_major != source_major_or_error:
+        return (
+            False,
+            f"{path_label(GLOBAL_JSON_PATH)} selects .NET SDK {source_major_or_error}.x, "
+            f"but portable setup pins {axis_setup.DOTNET_SDK_VERSION} in scripts/axis_setup.py",
+        )
 
     ok, version_line, resolved = command_version_line("dotnet", "--version")
     if not ok:
         prerequisite = axis_setup.dotnet_native_prerequisite_hint(version_line)
-        prerequisite_detail = f"; {prerequisite}" if prerequisite else ""
+        next_action = prerequisite or managed_tool_install_hint("build")
         return (
             False,
             f"{version_line}; .NET SDK {REQUIRED_DOTNET_SDK_MAJOR}.x is required per "
-            f"{TECH_STACK_DOC} and {path_label(GLOBAL_JSON_PATH)}{prerequisite_detail}",
+            f"{TECH_STACK_DOC} and {path_label(GLOBAL_JSON_PATH)}; {next_action}",
         )
 
     major = version_major(version_line)
@@ -2967,7 +2836,7 @@ def dotnet_sdk_status() -> tuple[bool, str]:
             False,
             f"found `{version_line or 'unknown'}` at {resolved}; "
             f"expected .NET SDK {REQUIRED_DOTNET_SDK_MAJOR}.x per "
-            f"{TECH_STACK_DOC} and {path_label(GLOBAL_JSON_PATH)}",
+            f"{TECH_STACK_DOC} and {path_label(GLOBAL_JSON_PATH)}; {managed_tool_install_hint('build')}",
         )
     return True, f"{version_line} ({resolved}); expected major {REQUIRED_DOTNET_SDK_MAJOR} from {path_label(GLOBAL_JSON_PATH)}"
 
@@ -2990,14 +2859,18 @@ def node_version_status(env: dict[str, str] | None = None) -> tuple[bool, str]:
 
     ok, version_line, resolved = command_version_line("node", "--version", env=env)
     if not ok:
-        return False, f"{version_line}; Node {expected} is required per {rel(NVMRC_PATH)}"
+        return (
+            False,
+            f"{version_line}; Node {expected} is required per {rel(NVMRC_PATH)}; "
+            f"{managed_tool_install_hint('build')}",
+        )
 
     actual = version_line.removeprefix("v")
     if actual != expected:
         return (
             False,
             f"found `{version_line or 'unknown'}` at {resolved}; "
-            f"expected Node {expected} from {rel(NVMRC_PATH)}",
+            f"expected Node {expected} from {rel(NVMRC_PATH)}; {managed_tool_install_hint('build')}",
         )
     return True, f"{version_line} ({resolved}); expected exact {expected} from {rel(NVMRC_PATH)}"
 
@@ -3015,9 +2888,17 @@ def npm_version_status(env: dict[str, str] | None = None) -> tuple[bool, str]:
     expected = match.group(1)
     ok, version_line, resolved = command_version_line("npm", "--version", env=env)
     if not ok:
-        return False, f"{version_line}; npm {expected} is required per {path_label(package_path)}"
+        return (
+            False,
+            f"{version_line}; npm {expected} is required per {path_label(package_path)}; "
+            f"{managed_tool_install_hint('build')}",
+        )
     if version_line != expected:
-        return False, f"found npm `{version_line}` at {resolved}; expected {expected} per {path_label(package_path)}"
+        return (
+            False,
+            f"found npm `{version_line}` at {resolved}; expected {expected} per {path_label(package_path)}; "
+            f"{managed_tool_install_hint('build')}",
+        )
     return True, f"{version_line} ({resolved}); expected exact {expected} from {path_label(package_path)}"
 
 
@@ -3136,7 +3017,7 @@ def check_markdown_links_for_paths(paths: list[str] | None) -> int:
     if lychee is None:
         print(
             f"check-markdown-links: Lychee {axis_setup.LYCHEE_VERSION} is required, "
-            "but `lychee` was not found in PATH. See docs/playbooks/scripts.md#tool-versions.",
+            f"but it is unavailable; {managed_tool_install_hint('review')}.",
             file=sys.stderr,
         )
         return 1
@@ -3144,8 +3025,7 @@ def check_markdown_links_for_paths(paths: list[str] | None) -> int:
     if not version_ok:
         print(
             f"check-markdown-links: Lychee {axis_setup.LYCHEE_VERSION} is required; {version_detail}. "
-            "Install the documented version or put it earlier in PATH. "
-            "See docs/playbooks/scripts.md#tool-versions.",
+            f"{managed_tool_install_hint('review')}.",
             file=sys.stderr,
         )
         return 1
@@ -3346,18 +3226,6 @@ def frontend_test_path(value: str) -> str:
 
 def frontend_command(args: argparse.Namespace) -> int:
     command = args.frontend_command
-    if command == "ui-baseline":
-        if args.write:
-            write_ui_baseline()
-            return 0
-        return check_ui_baseline()
-
-    if command == "script" and args.script_name == "test:e2e":
-        rc = require_docker_compose("frontend script test:e2e")
-        if rc != 0:
-            return rc
-        return run_local_dev_browser(passthrough_args(args.script_args))
-
     rc = check_frontend_toolchain()
     if rc != 0:
         return rc
@@ -3365,6 +3233,10 @@ def frontend_command(args: argparse.Namespace) -> int:
     if command == "install":
         return run_frontend_npm(["ci"]).returncode
     if command == "sync-lock":
+        if getattr(args, "audit_fix", False):
+            return run_frontend_npm(
+                ["audit", "fix", "--package-lock-only", "--ignore-scripts"]
+            ).returncode
         return run_frontend_npm(["install", "--package-lock-only", "--ignore-scripts"]).returncode
     if command == "install-browsers":
         return run_frontend_npm(["exec", "--", "playwright", "install", "chromium"]).returncode
@@ -3748,7 +3620,7 @@ def verify(args: argparse.Namespace) -> int:
     return 1
 
 
-def ready_review_doc_drift_coverage(paths: list[str]) -> set[str]:
+def review_readiness_doc_drift_coverage(paths: list[str]) -> set[str]:
     covered: set[str] = set()
     if any((ROOT / path).is_file() and should_check_text_encoding(path) for path in paths):
         covered.add("check-text-encoding")
@@ -3767,7 +3639,7 @@ def ready_review_doc_drift_coverage(paths: list[str]) -> set[str]:
     return covered
 
 
-def ready_review_policy_gates(
+def review_readiness_policy_gates(
     paths: list[str],
     *,
     policy_tests_covered: bool = False,
@@ -3795,7 +3667,7 @@ def ready_review_policy_gates(
     return gates
 
 
-def run_ready_review_policy(
+def run_review_readiness_policy(
     paths: list[str],
     *,
     policy_tests_covered: bool = False,
@@ -3804,14 +3676,14 @@ def run_ready_review_policy(
 ) -> tuple[int, list[str]]:
     failed: list[str] = []
     executed: list[str] = []
-    for name, checker in ready_review_policy_gates(
+    for name, checker in review_readiness_policy_gates(
         paths,
         policy_tests_covered=policy_tests_covered,
         doc_drift_covered=doc_drift_covered,
         doc_drift_range=doc_drift_range,
     ):
         print()
-        print(f"> ready-review: {name}")
+        print(f"> review-readiness: {name}")
         executed.append(name)
         try:
             rc = checker()
@@ -3819,17 +3691,17 @@ def run_ready_review_policy(
             print(exc, file=sys.stderr)
             rc = 1
         if rc == 0:
-            print(f"OK ready-review: {name}")
+            print(f"OK review-readiness: {name}")
         else:
-            print(f"FAIL ready-review: {name}")
+            print(f"FAIL review-readiness: {name}")
             failed.append(name)
     return (0 if not failed else 1), executed
 
 
-def ready_review(args: argparse.Namespace) -> int:
+def review_readiness(args: argparse.Namespace) -> int:
     if working_tree_paths():
         print(
-            "ready-review: FAIL - create an intentional checkpoint commit before review-boundary verification",
+            "review-readiness: FAIL - create an intentional checkpoint commit before review-boundary verification",
             file=sys.stderr,
         )
         return 1
@@ -3845,35 +3717,35 @@ def ready_review(args: argparse.Namespace) -> int:
     executed: list[str] = []
     if not policy_only:
         if verify(args) != 0:
-            print("ready-review: FAIL - changed-path verification failed", file=sys.stderr)
+            print("review-readiness: FAIL - changed-path verification failed", file=sys.stderr)
             return 1
         executed.append("verify")
 
     scripts_changed = any(path.startswith("scripts/") for path in paths)
-    policy_rc, policy_gates = run_ready_review_policy(
+    policy_rc, policy_gates = run_review_readiness_policy(
         paths,
         policy_tests_covered=not policy_only and scripts_changed,
-        doc_drift_covered=set() if policy_only else ready_review_doc_drift_coverage(paths),
+        doc_drift_covered=set() if policy_only else review_readiness_doc_drift_coverage(paths),
         doc_drift_range=f"{since}..HEAD" if since else None,
     )
     executed.extend(policy_gates)
     if policy_rc != 0:
-        print("ready-review: FAIL - policy profile failed", file=sys.stderr)
+        print("review-readiness: FAIL - policy profile failed", file=sys.stderr)
         return 1
 
     if policy_only:
-        print("ready-review: PASS (policy profile)")
+        print("review-readiness: PASS (policy profile)")
         return 0
 
-    print(f"ready-review: PASS ({', '.join(executed)})")
+    print(f"review-readiness: PASS ({', '.join(executed)})")
     return 0
 
 
 def pre_push(args: argparse.Namespace) -> int:
     full = os.environ.get("AXIS_PRE_PUSH_FULL", "").lower() in {"1", "true", "yes", "on"}
     if full:
-        print("pre-push: AXIS_PRE_PUSH_FULL is set; running ready-review.")
-        return ready_review(argparse.Namespace(since=None, policy_only=False))
+        print("pre-push: AXIS_PRE_PUSH_FULL is set; running review-readiness.")
+        return review_readiness(argparse.Namespace(since=None, policy_only=False))
 
     range_spec = diff_range()
     paths = changed_paths(range_spec)
@@ -3909,7 +3781,7 @@ def pre_push(args: argparse.Namespace) -> int:
 
     print("pre-push: quick gate")
     print("  Runs cheap sanity checks before the network push.")
-    print("  Run `python scripts/axis.py ready-review` before marking a PR ready for review.")
+    print("  Run `python scripts/axis.py review-readiness` before independent review.")
 
     if dotnet:
         step(".NET test naming", lambda: check_test_naming())
@@ -4037,23 +3909,6 @@ def python_launcher_status() -> tuple[str, str]:
     if probe is None or probe.returncode != 0:
         return "FAIL", f"{version} ({resolved}); missing required tar data extraction filter"
     return "OK", f"{version} ({resolved})"
-
-
-def _python_module_version(module_name: str, package_name: str) -> tuple[str, str]:
-    if importlib.util.find_spec(module_name) is None:
-        return (
-            "FAIL",
-            f"{package_name} is not installed for {sys.executable}; install with "
-            f"`{sys.executable} -m pip install {package_name}`",
-        )
-
-    try:
-        module = importlib.import_module(module_name)
-    except Exception as exc:  # pragma: no cover - import side effects are environment-specific
-        return "FAIL", f"{package_name} import failed: {exc}"
-
-    version = getattr(module, "__version__", "available")
-    return "OK", f"{package_name} {version} ({sys.executable})"
 
 
 def _http_ok(url: str, timeout_seconds: float = 1.5) -> bool:
@@ -4196,11 +4051,8 @@ def run_local_dev_browser(playwright_args: list[str]) -> int:
     ).returncode
 
 
-def local_dev_smoke(args: argparse.Namespace) -> int:
-    smoke_args = passthrough_args(getattr(args, "smoke_args", []))
-    if not smoke_args:
-        smoke_args = ["e2e/local-dev-smoke.pw.ts"]
-    return run_local_dev_browser(smoke_args)
+def local_dev_smoke(_args: argparse.Namespace) -> int:
+    return run_local_dev_browser(["e2e/local-dev-smoke.pw.ts"])
 
 
 def require_docker_compose(label: str) -> int:
@@ -4806,24 +4658,38 @@ def setup_tool_ready(tool: str) -> bool:
     raise CheckError(f"Unknown setup-managed tool: {tool}")
 
 
+def managed_tool_install_hint(profile: str) -> str:
+    return (
+        "run `python scripts/axis.py setup "
+        f"--profile {profile} --install-user-tools` to let Axis install the managed toolchain"
+    )
+
+
 def gh_cli_status() -> tuple[bool, str]:
     ok, version_line, resolved = command_version_line("gh", "--version")
     if not ok:
-        return False, version_line
+        return False, f"{version_line}; {managed_tool_install_hint('review')}"
     match = re.search(r"\bgh version ([0-9]+(?:[.][0-9]+)+)\b", version_line)
     if match is None:
-        return False, f"found `{version_line or 'unknown'}` at {resolved}; expected >= {axis_setup.GH_VERSION}"
+        return (
+            False,
+            f"found `{version_line or 'unknown'}` at {resolved}; expected >= {axis_setup.GH_VERSION}; "
+            f"{managed_tool_install_hint('review')}",
+        )
     version = match.group(1)
     if _version_sort_key(version) < _version_sort_key(axis_setup.GH_VERSION):
-        return False, f"found `{version_line}` at {resolved}; expected >= {axis_setup.GH_VERSION}"
+        return (
+            False,
+            f"found `{version_line}` at {resolved}; expected >= {axis_setup.GH_VERSION}; "
+            f"{managed_tool_install_hint('review')}",
+        )
     return True, f"{version_line} ({resolved}); expected >= {axis_setup.GH_VERSION}"
 
 
 def setup_external_preflight(profile: str) -> int:
-    normalized = "review" if profile == "all" else profile
     if doctor(argparse.Namespace(profile="core", strict=True)) != 0:
         return 1
-    if normalized in {"local-dev", "review"}:
+    if profile in {"local-dev", "review"}:
         if find_openssl() is None:
             print(
                 "setup: FAIL - OpenSSL is required for local HTTPS certificates; "
@@ -4848,11 +4714,10 @@ def setup_external_preflight(profile: str) -> int:
 
 
 def setup_preflight(profile: str) -> int:
-    normalized = "review" if profile == "all" else profile
     rc = doctor(argparse.Namespace(profile=profile, strict=True))
     if rc != 0:
-        if normalized == "review" and not setup_tool_ready("lychee"):
-            print("setup: rerun with --install-user-tools to install the pinned Lychee artifact", file=sys.stderr)
+        if profile == "review" and not setup_tool_ready("lychee"):
+            print(f"setup: {managed_tool_install_hint('review')}", file=sys.stderr)
         return rc
     return 0
 
@@ -4863,9 +4728,8 @@ def setup(args: argparse.Namespace) -> int:
     install_user_tools = getattr(args, "install_user_tools", False)
     plan_only = getattr(args, "plan_only", False)
     trust_local_ca = getattr(args, "trust_local_ca", False)
-    normalized = "review" if profile == "all" else profile
-    if trust_local_ca and normalized not in {"local-dev", "review"}:
-        print("setup: FAIL - --trust-local-ca requires --profile local-dev, review, or all", file=sys.stderr)
+    if trust_local_ca and profile not in {"local-dev", "review"}:
+        print("setup: FAIL - --trust-local-ca requires --profile local-dev or review", file=sys.stderr)
         return 1
     try:
         platform_spec = axis_setup.detect_platform()
@@ -4885,7 +4749,7 @@ def setup(args: argparse.Namespace) -> int:
         for index, label in enumerate(plan, 1):
             print(f"{index}. {label}")
         print("setup plan: no checks, downloads, or repository mutations were performed")
-        if normalized in {"local-dev", "review"} and not trust_local_ca:
+        if profile in {"local-dev", "review"} and not trust_local_ca:
             print("setup plan: host browser trust is opt-in; add --trust-local-ca when required")
         return 0
 
@@ -4920,7 +4784,7 @@ def setup(args: argparse.Namespace) -> int:
                 print(f"> install pinned user-local {tool} {axis_setup.tool_version(tool)}", flush=True)
                 installed = axis_setup.install_tool(tool, platform_spec=platform_spec)
                 print(f"  installed: {installed}")
-            if normalized == "review" and ("gh" in missing or shutil.which("gh") is None):
+            if profile == "review" and ("gh" in missing or shutil.which("gh") is None):
                 exposed = axis_setup.expose_managed_command("gh", platform_spec=platform_spec)
                 print(f"  exposed: {exposed}")
                 active_dirs = {
@@ -4955,7 +4819,7 @@ def setup(args: argparse.Namespace) -> int:
                 lambda: run_frontend_npm(["exec", "--", "playwright", "install", "chromium"]).returncode,
             )
         )
-    if normalized in {"local-dev", "review"}:
+    if profile in {"local-dev", "review"}:
         steps.append(("generate local HTTPS certificates", lambda: local_dev_certs(args)))
         if trust_local_ca:
             steps.append(("trust local HTTPS root CA", lambda: local_dev_trust_certs(args)))
@@ -4969,11 +4833,11 @@ def setup(args: argparse.Namespace) -> int:
             return rc
 
     print("setup: OK")
-    if normalized in {"local-dev", "review"} and not trust_local_ca:
+    if profile in {"local-dev", "review"} and not trust_local_ca:
         trust_status, trust_detail = local_dev_host_trust_status()
         if trust_status != "OK":
             print(f"setup: [{trust_status}] host browser trust: {trust_detail}")
-    if normalized == "review":
+    if profile == "review":
         if setup_tool_ready("gh"):
             print("review authentication remains interactive: run `gh auth status`")
     return 0
@@ -4981,17 +4845,9 @@ def setup(args: argparse.Namespace) -> int:
 
 def doctor(args: argparse.Namespace) -> int:
     profile = getattr(args, "profile", "local-dev")
-    profile_groups = {
-        "core": {"core"},
-        "build": {"core", "build"},
-        "local-dev": {"core", "build", "local-dev"},
-        "review": {"core", "build", "local-dev", "review"},
-        "all": {"core", "build", "local-dev", "review"},
-    }
-    if profile not in profile_groups:
+    if profile not in axis_setup.DOCTOR_PROFILES:
         raise CheckError(f"Unknown doctor profile: {profile}")
-
-    groups = profile_groups[profile]
+    groups = set(axis_setup.DOCTOR_PROFILES[: axis_setup.DOCTOR_PROFILES.index(profile) + 1])
     rows: list[tuple[str, str, str]] = []
 
     def record(status: str, label: str, detail: str) -> None:
@@ -5016,8 +4872,8 @@ def doctor(args: argparse.Namespace) -> int:
         frontend_env = frontend_toolchain_env()
         node_ok, node_detail = node_version_status(frontend_env)
         record("OK" if node_ok else "FAIL", "node", node_detail)
-        npm_status, npm_detail = _command_version("npm", "--version", env=frontend_env)
-        record(npm_status, "npm", npm_detail)
+        npm_ok, npm_detail = npm_version_status(frontend_env)
+        record("OK" if npm_ok else "FAIL", "npm", npm_detail)
 
         if os.name == "nt":
             npm_cmd = shutil.which("npm.cmd")
@@ -5097,11 +4953,13 @@ def doctor(args: argparse.Namespace) -> int:
     if "review" in groups:
         lychee = find_lychee()
         if lychee is None:
-            record(
-                "FAIL",
-                "lychee",
-                f"Lychee {axis_setup.LYCHEE_VERSION} is required; install it per {TOOL_VERSIONS_DOC}",
-            )
+            try:
+                platform_spec = axis_setup.detect_platform()
+                axis_setup.asset_name("lychee", platform_spec)
+                lychee_action = managed_tool_install_hint("review")
+            except axis_setup.SetupError as exc:
+                lychee_action = str(exc)
+            record("FAIL", "lychee", f"Lychee {axis_setup.LYCHEE_VERSION} is required; {lychee_action}")
         else:
             lychee_ok, lychee_detail = lychee_version_status(lychee)
             record("OK" if lychee_ok else "FAIL", "lychee", lychee_detail)
@@ -5145,9 +5003,9 @@ def check_renovate_config(_args: argparse.Namespace | None = None) -> int:
     if rc != 0:
         return rc
 
-    return run(
+    return run_frontend_npm(
         [
-            exe("npx"),
+            "exec",
             "--yes",
             "--package",
             f"renovate@{REQUIRED_RENOVATE_VALIDATOR_VERSION}",
@@ -5157,20 +5015,23 @@ def check_renovate_config(_args: argparse.Namespace | None = None) -> int:
             "--no-global",
             str(RENOVATE_CONFIG_PATH),
         ],
-        check=False,
+        cwd=ROOT,
     ).returncode
 
 
-def main(argv: list[str] | None = None) -> int:
+def build_parser(
+    *,
+    parser_class: type[argparse.ArgumentParser] = argparse.ArgumentParser,
+) -> argparse.ArgumentParser:
     configure_cli_text_streams()
 
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = parser_class(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
 
     setup_parser = sub.add_parser("setup", help="Prepare a portable repository development profile")
     setup_parser.add_argument(
         "--profile",
-        choices=("build", "local-dev", "review", "all"),
+        choices=axis_setup.SETUP_PROFILES,
         default="build",
         help="Cumulative setup profile (default: build)",
     )
@@ -5203,7 +5064,7 @@ def main(argv: list[str] | None = None) -> int:
     doctor_parser = sub.add_parser("doctor", help="Diagnose tools required by a selected workflow profile")
     doctor_parser.add_argument(
         "--profile",
-        choices=("core", "build", "local-dev", "review", "all"),
+        choices=axis_setup.DOCTOR_PROFILES,
         default="local-dev",
         help="Tool group to diagnose (default: local-dev)",
     )
@@ -5241,14 +5102,17 @@ def main(argv: list[str] | None = None) -> int:
         help="Skip the pre-push hook only when explicitly authorized",
     )
     git_push_parser.set_defaults(func=git_push_checkpoint)
-    ready_review_parser = sub.add_parser("ready-review", help="Verify a clean checkpoint before review")
-    ready_review_parser.add_argument("--since", help="Scope expensive verification after this checkpoint")
-    ready_review_parser.add_argument(
+    review_readiness_parser = sub.add_parser(
+        "review-readiness",
+        help="Verify a clean checkpoint before independent review",
+    )
+    review_readiness_parser.add_argument("--since", help="Scope expensive verification after this checkpoint")
+    review_readiness_parser.add_argument(
         "--policy-only",
         action="store_true",
         help="Run only the deterministic policy profile shared with CI",
     )
-    ready_review_parser.set_defaults(func=ready_review)
+    review_readiness_parser.set_defaults(func=review_readiness)
     verify_parser = sub.add_parser("verify", help="Run checks selected from changed paths")
     verify_parser.add_argument("--since", help="Scope verification to changes after this checkpoint plus the working tree")
     verify_parser.add_argument(
@@ -5309,10 +5173,16 @@ def main(argv: list[str] | None = None) -> int:
     frontend_parser = sub.add_parser("frontend", help="Run repository-standard frontend commands")
     frontend_sub = frontend_parser.add_subparsers(dest="frontend_command", required=True)
     frontend_sub.add_parser("install", help="Install locked frontend dependencies with npm ci").set_defaults(func=frontend_command)
-    frontend_sub.add_parser(
+    frontend_sync_lock = frontend_sub.add_parser(
         "sync-lock",
         help="Regenerate package-lock.json from exact package.json versions",
-    ).set_defaults(func=frontend_command)
+    )
+    frontend_sync_lock.add_argument(
+        "--audit-fix",
+        action="store_true",
+        help="Apply compatible npm audit fixes to package-lock.json without force or install scripts",
+    )
+    frontend_sync_lock.set_defaults(func=frontend_command)
     frontend_sub.add_parser("install-browsers", help="Install Playwright Chromium").set_defaults(func=frontend_command)
     frontend_sub.add_parser("ci", help="Run frontend type-check and lint gates").set_defaults(func=frontend_command)
     frontend_test = frontend_sub.add_parser("test", help="Run all or selected frontend unit tests")
@@ -5327,13 +5197,6 @@ def main(argv: list[str] | None = None) -> int:
     frontend_gen_api = frontend_sub.add_parser("gen-api-types", help="Generate TypeScript API types from OpenAPI")
     frontend_gen_api.add_argument("--check", action="store_true", help="Fail if generated frontend API types are stale")
     frontend_gen_api.set_defaults(func=frontend_command)
-    frontend_ui_baseline = frontend_sub.add_parser("ui-baseline", help="Check or write the approved UI baseline")
-    frontend_ui_baseline.add_argument("--write", action="store_true", help="Write the reviewed approved UI baseline")
-    frontend_ui_baseline.set_defaults(func=frontend_command)
-    frontend_script = frontend_sub.add_parser("script", help="Run an allow-listed package script")
-    frontend_script.add_argument("script_name")
-    frontend_script.add_argument("script_args", nargs=argparse.REMAINDER)
-    frontend_script.set_defaults(func=frontend_command)
     local_dev_parser = sub.add_parser("local-dev", help="Manage the Docker Compose local-development stack")
     local_dev_sub = local_dev_parser.add_subparsers(dest="local_dev_command", required=True)
     local_certs = local_dev_sub.add_parser("certs", help="Create or reuse local HTTPS certificates")
@@ -5379,7 +5242,6 @@ def main(argv: list[str] | None = None) -> int:
     local_e2e.add_argument("e2e_args", nargs=argparse.REMAINDER)
     local_e2e.set_defaults(func=local_dev)
     local_smoke = local_dev_sub.add_parser("smoke", help="Run local stack smoke checks")
-    local_smoke.add_argument("smoke_args", nargs=argparse.REMAINDER)
     local_smoke.set_defaults(func=local_dev)
     local_observability = local_dev_sub.add_parser("observability", help="Manage the optional observability profile")
     local_observability_sub = local_observability.add_subparsers(dest="observability_command", required=True)
@@ -5436,22 +5298,22 @@ def main(argv: list[str] | None = None) -> int:
     check_sub.add_parser("theme", help="Check canonical theme generated artifacts").set_defaults(func=check_theme)
     check_sub.add_parser("frontend-quality", help="Run deterministic frontend policy checks").set_defaults(func=check_frontend_quality)
     check_sub.add_parser("local-dev-docs", help="Check local-development docs against Compose").set_defaults(
-        func=lambda _args: run_module_check("check-local-dev-docs.py", ["--check"])
+        func=lambda _args: run_module_check("check-local-dev-docs.py", [])
     )
     check_sub.add_parser("doc-link-targets", help="Check local documentation link targets").set_defaults(
-        func=lambda _args: run_module_check("check-doc-link-targets.py", ["--check"])
+        func=lambda _args: run_module_check("check-doc-link-targets.py", [])
     )
     check_sub.add_parser("markdown-links", help="Check Markdown links with Lychee").set_defaults(func=check_markdown_links)
     check_sub.add_parser("doc-navigation", help="Check documentation navigation blocks").set_defaults(func=check_doc_navigation)
     check_sub.add_parser("doc-size-budgets", help="Check documentation size budgets").set_defaults(func=check_doc_size_budgets)
     check_sub.add_parser("doc-code-fences", help="Check canonical commands in documentation fences").set_defaults(
-        func=lambda _args: run_module_check("check-doc-code-fences.py", ["--check"])
+        func=lambda _args: run_module_check("check-doc-code-fences.py", [])
     )
     check_sub.add_parser("use-case-docs", help="Validate use-case documentation contracts").set_defaults(
-        func=lambda _args: run_module_check("check-use-case-docs.py", ["--check"])
+        func=lambda _args: run_module_check("check-use-case-docs.py", [])
     )
     check_sub.add_parser("foundation-docs", help="Validate foundation documentation contracts").set_defaults(
-        func=lambda _args: run_module_check("check-foundation-docs.py", ["--check"])
+        func=lambda _args: run_module_check("check-foundation-docs.py", [])
     )
     pr_parser = check_sub.add_parser("pr", help="Validate pull-request metadata and branch naming")
     pr_parser.add_argument("--title")
@@ -5469,6 +5331,13 @@ def main(argv: list[str] | None = None) -> int:
     generate_sub = generate.add_subparsers(dest="generate_command", required=True)
     generate_sub.add_parser("api-contracts", help="Generate OpenAPI and frontend API types").set_defaults(func=generate_api_contracts)
     generate_sub.add_parser("theme", help="Generate web and email theme projections").set_defaults(func=generate_theme)
+    generate_sub.add_parser("ui-baseline", help="Generate the reviewed approved UI baseline").set_defaults(func=generate_ui_baseline)
+
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = build_parser()
 
     args = parser.parse_args(argv)
     try:

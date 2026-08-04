@@ -15,7 +15,7 @@ Rules:
   - Fail if the target file does not exist.
 
 Usage:
-  python3 scripts/check-doc-link-targets.py --check
+  python3 scripts/check-doc-link-targets.py
 """
 
 from __future__ import annotations
@@ -143,14 +143,7 @@ def check_file(path: Path) -> list[str]:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
-        "--check",
-        action="store_true",
-        help="validate and exit non-zero on issues",
-    )
-    _ = parser.parse_args()
-
+    argparse.ArgumentParser(description=__doc__).parse_args()
     files = iter_md_files()
     issues: list[str] = []
     for path in files:

@@ -20,6 +20,7 @@ Axis is an open-source platform being built for adaptable, workflow-driven busin
 |---|---|
 | [docs/playbooks/agent-checklist.md](./playbooks/agent-checklist.md) | Review checkpoints and verification boundary. |
 | [docs/playbooks/design-gate.md](./playbooks/design-gate.md) | Required reasoning artifact before non-trivial changes. |
+| [docs/playbooks/design-gate-structural-agent-workflows.md](./playbooks/design-gate-structural-agent-workflows.md) | Corrective full dossier for structural agent workflows and policy guards. |
 | [docs/playbooks/design-gate-executable-business-object-workflow.md](./playbooks/design-gate-executable-business-object-workflow.md) | Current full dossier for the executable Business Object workflow. |
 | [docs/playbooks/design-gate-mcp-browser-authorization.md](./playbooks/design-gate-mcp-browser-authorization.md) | Current full dossier for the local MCP browser-authorization handoff. |
 | [docs/playbooks/api-patterns.md](./playbooks/api-patterns.md) | REST/OpenAPI and API-type change guidance. |

@@ -1,6 +1,6 @@
 # Axis Repo Skills
 
-Repo skills are executable workflows. [reference.md](./reference.md) owns universal execution semantics; this catalog owns intent routing; each linked skill owns only its domain workflow.
+Repo skills are executable workflows. [reference.md](./reference.md) owns universal execution semantics; [workflows.toml](./workflows.toml) owns cross-skill state and transition topology; this catalog owns intent routing; each linked skill owns only its domain workflow.
 
 ## Usage
 
@@ -8,7 +8,7 @@ Repo skills are executable workflows. [reference.md](./reference.md) owns univer
 2. Read [reference.md](./reference.md) and the full owner skill before editing.
 3. Follow only handoffs explicitly typed as **Requires**, **Delegates**, or **Returns to**.
 4. Reuse current evidence; do not recurse into an already-satisfied prerequisite.
-5. Apply [reference.md § Agent routing](./reference.md#agent-routing) after choosing the workflow owner; model choice does not change ownership or gates.
+5. Apply [reference.md § Agent routing](./reference.md#agent-routing) to current work units after choosing the workflow owner, and re-evaluate unexecuted units when their ambiguity, scope, ownership, or verification changes; model choice does not change ownership or gates.
 6. Run repeatable repository workflows and verification through finite `python scripts/axis.py ...` routes; `$axis-script-scope` owns rare mutation exceptions.
 
 `$axis-*` aliases map to `.agents/skills/<name>/SKILL.md`.
@@ -27,9 +27,9 @@ Repo skills are executable workflows. [reference.md](./reference.md) owns univer
 | Design and implement a client journey | [axis-frontend-feature/SKILL.md](./axis-frontend-feature/SKILL.md) | Owns self-directed experience, route, state, form, recovery, and feature behavior |
 | Define shared SPA foundation contracts | [axis-frontend-foundation/SKILL.md](./axis-frontend-foundation/SKILL.md) | Owns product-neutral foundation specs, not product journeys |
 | Decide view composition or change UI-system source | [axis-ui-system/SKILL.md](./axis-ui-system/SKILL.md) | Owns hierarchy, semantic component choice, UI source boundaries, and safe replacement |
-| Change standalone guidance, diagrams, navigation, or documentation ownership | [axis-doc-hygiene/SKILL.md](./axis-doc-hygiene/SKILL.md) | Owns clarity and single-source hygiene; domain owners retain spec, status, and evidence decisions |
+| Change or audit guidance, repo skills, diagrams, navigation, routing, or documentation ownership | [axis-doc-hygiene/SKILL.md](./axis-doc-hygiene/SKILL.md) | Owns clarity and single-source hygiene; domain owners retain spec, status, and evidence decisions |
 | Select or change repository bootstrap, commands, and checks | [axis-script-scope/SKILL.md](./axis-script-scope/SKILL.md) | Chooses environment profiles, the smallest proof, and wrapper boundaries |
-| Decide local review readiness | [axis-ready-review/SKILL.md](./axis-ready-review/SKILL.md) | Audits immutable evidence; does not commit or publish |
+| Decide readiness for independent review | [axis-review-readiness/SKILL.md](./axis-review-readiness/SKILL.md) | Audits immutable evidence; does not review, commit, or publish |
 | Resolve review findings | [axis-review-feedback/SKILL.md](./axis-review-feedback/SKILL.md) | Classifies and fixes findings, then returns evidence |
 | Publish or update a PR branch | [axis-pull-request/SKILL.md](./axis-pull-request/SKILL.md) | Owns commits required for publication, review loop, metadata, and GitHub actions |
 

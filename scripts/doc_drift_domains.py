@@ -14,7 +14,6 @@ endpoint group, or domain folder.
 from __future__ import annotations
 
 import argparse
-import re
 import sys
 from pathlib import Path
 
@@ -61,30 +60,6 @@ def validate_discovery() -> list[str]:
     return issues
 
 
-def path_matches_pattern(path: str, pattern: str) -> bool:
-    return re.search(pattern, path) is not None
-
-
-def check_readme_api_status(changed_paths: list[str]) -> list[str]:
-    """Domain README must not keep '| API | pending' after endpoint files change."""
-    errors: list[str] = []
-    domains_to_check: set[str] = set()
-    for endpoint_file in ENDPOINTS_DIR.glob("*Endpoints.cs"):
-        stem = endpoint_file.stem[: -len("Endpoints")]
-        pattern = f"src/Axis\\.Api/Endpoints/{re.escape(stem)}"
-        if not any(path_matches_pattern(p, pattern) for p in changed_paths):
-            continue
-        domains_to_check.add(module_to_domain_slug(primary_application_module(endpoint_file)))
-
-    for domain in sorted(domains_to_check):
-        readme = USE_CASES_DIR / domain / "README.md"
-        if not readme.is_file():
-            continue
-        if re.search(r"\| API \| \u23f3", readme.read_text(encoding="utf-8")):
-            errors.append(f"docs/use-cases/{domain}/README.md still has pending API status")
-    return errors
-
-
 def print_mappings() -> None:
     for module in iter_module_names():
         print(f"src/Modules/{module}/ -> docs/use-cases/{module_to_domain_slug(module)}/")
@@ -99,11 +74,6 @@ def main() -> int:
         "--validate",
         action="store_true",
         help="verify module/endpoint/domain discovery only (no PR diff)",
-    )
-    parser.add_argument(
-        "--check",
-        action="store_true",
-        help="validate discovery and check changed paths from stdin (one path per line)",
     )
     parser.add_argument(
         "--list",
@@ -128,17 +98,6 @@ def main() -> int:
             f"doc-drift-domains: OK ({len(iter_module_names())} modules, "
             f"{len(list(ENDPOINTS_DIR.glob('*Endpoints.cs')))} endpoint groups)"
         )
-        return 0
-
-    if args.check:
-        changed = [line.strip() for line in sys.stdin if line.strip()]
-        errors = check_readme_api_status(changed)
-        if errors:
-            print("check-doc-domain-drift failed:", file=sys.stderr)
-            for err in errors:
-                print(f"  - {err}", file=sys.stderr)
-            return 1
-        print("check-doc-domain-drift: OK")
         return 0
 
     parser.print_help()

@@ -4,8 +4,15 @@ model_reasoning_effort = "high"
 [agents]
 enabled = true
 max_concurrent_threads_per_session = 2
-default_subagent_model = "gpt-5.6-terra"
-default_subagent_reasoning_effort = "medium"
+
+[[hooks.PreToolUse]]
+matcher = "^Agent$"
+
+[[hooks.PreToolUse.hooks]]
+type = "command"
+command = 'python "$(git rev-parse --show-toplevel)/.codex/hooks/require_named_agent.py"'
+timeout = 5
+statusMessage = "Checking Axis delegation role"
 
 [mcp_servers.axis]
 command = "python"

@@ -67,6 +67,7 @@ check_local_dev_docs = load_script("check-local-dev-docs.py")
 check_use_case_docs = load_script("check-use-case-docs.py")
 check_foundation_docs = load_script("check-foundation-docs.py")
 project_orchestration = load_python_file(ROOT / ".codex" / "check.py")
+named_agent_hook = load_python_file(ROOT / ".codex" / "hooks" / "require_named_agent.py")
 
 
 class TestCliTextStreams(unittest.TestCase):
@@ -179,7 +180,7 @@ class TestPrGuard(unittest.TestCase):
             with self.subTest(branch=branch):
                 self.assertTrue(check_pr.validate_branch(branch))
 
-    def test_rejects_unchecked_requirement_without_na_reason(self) -> None:
+    def test_rejects_pending_requirement_on_human_branch(self) -> None:
         body = """## Summary
 This summary is long enough.
 
@@ -187,9 +188,29 @@ This summary is long enough.
 docs/use-cases/example/README.md
 
 ## Requirements & rules followed
-- [ ] **Verification gate** - local checks
+- [ ] **Verification gate** - local checks [status: pending]
 """
-        self.assertTrue(check_pr.validate("feat(example): improve gates", body))
+        self.assertIn(
+            "Pending requirement is not publishable",
+            "\n".join(check_pr.validate("feat(example): improve gates", body, "feat/improve-gates")),
+        )
+
+    def test_accepts_pending_requirement_on_renovate_branch(self) -> None:
+        body = """## Summary
+Dependency update.
+
+## Linked spec
+N/A
+
+## Requirements & rules followed
+- [ ] **Review readiness** - awaits review [status: pending]
+- [ ] **Verification** - awaits CI [status: pending]
+"""
+
+        self.assertEqual(
+            [],
+            check_pr.validate("chore(deps): update packages", body, "renovate/all-non-major"),
+        )
 
     def test_accepts_checked_requirement(self) -> None:
         body = """## Summary
@@ -199,9 +220,35 @@ This summary is long enough.
 docs/use-cases/example/README.md
 
 ## Requirements & rules followed
-- [x] **Verification gate** - local checks
+- [x] **Verification gate** - local checks [status: satisfied]
 """
         self.assertEqual([], check_pr.validate("feat(example): improve gates", body))
+
+    def test_rejects_pending_checked_requirement(self) -> None:
+        body = """## Summary
+Summary.
+
+## Linked spec
+N/A
+
+## Requirements & rules followed
+- [x] **Verification gate** - waiting for CI [status: pending]
+"""
+
+        self.assertIn("Pending requirement must be unchecked", "\n".join(check_pr.validate("fix: x", body)))
+
+    def test_rejects_not_applicable_without_structured_reason(self) -> None:
+        body = """## Summary
+Summary.
+
+## Linked spec
+N/A
+
+## Requirements & rules followed
+- [x] **Spec/code** [status: not-applicable]
+"""
+
+        self.assertIn("must include `[reason: ...]`", "\n".join(check_pr.validate("fix: x", body)))
 
 
 class TestUseCaseDocsGate(unittest.TestCase):
@@ -351,55 +398,6 @@ Ship user value.
 
         self.assertIn("missing implementation status deferred follow-ups section", "\n".join(issues))
 
-    def test_rejects_pending_layer_with_empty_gap_and_deferred_status(self) -> None:
-        issues = self.issues_for_use_case(
-            """> **Implementation status**
->
-> | Layer | Status |
-> |-------|--------|
-> | Domain | N/A |
-> | Application | N/A |
-> | Infrastructure | N/A |
-> | API | N/A |
-> | Frontend | Not started |
->
-> **Gaps vs spec:** none.
->
-> **Deferred follow-ups:** N/A.
->
-> **Verification:** N/A.
->
-> **Decisions:** N/A.
-"""
-        )
-
-        joined = "\n".join(issues)
-        self.assertIn("pending layer cannot use `Gaps vs spec: none`", joined)
-
-    def test_rejects_generic_status_placeholder_prose(self) -> None:
-        issues = self.issues_for_use_case(
-            """> **Implementation status**
->
-> | Layer | Status |
-> |-------|--------|
-> | Domain | N/A |
-> | Application | N/A |
-> | Infrastructure | N/A |
-> | API | N/A |
-> | Frontend | Not started |
->
-> **Gaps vs spec:** Open work remains in layers marked pending above.
->
-> **Deferred follow-ups:** Complete the open items listed in Gaps vs spec before marking this use case complete.
->
-> **Decisions:** N/A.
-"""
-        )
-
-        joined = "\n".join(issues)
-        self.assertIn("implementation status gaps vs spec uses generic placeholder prose", joined)
-        self.assertIn("implementation status deferred follow-ups uses generic placeholder prose", joined)
-
     def test_rejects_empty_status_sections(self) -> None:
         issues = self.issues_for_use_case(
             """> **Implementation status**
@@ -437,6 +435,50 @@ Ship user value.
 > | Frontend | N/A |
 >
 > **Gaps vs spec:** none.
+>
+> **Deferred follow-ups:** N/A.
+>
+> **Verification:** N/A.
+>
+> **Decisions:** N/A.
+"""
+        )
+
+        self.assertEqual([], issues)
+
+    def test_rejects_partial_status_without_structured_gap_rows(self) -> None:
+        issues = self.issues_for_use_case(
+            """> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | API | Partial |
+>
+> **Gaps vs spec:** none.
+>
+> **Deferred follow-ups:** N/A.
+>
+> **Verification:** N/A.
+>
+> **Decisions:** N/A.
+"""
+        )
+
+        self.assertIn("Gaps vs spec must contain a markdown table", "\n".join(issues))
+
+    def test_accepts_partial_status_with_structured_gap_rows(self) -> None:
+        issues = self.issues_for_use_case(
+            """> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | API | Partial |
+>
+> **Gaps vs spec:**
+>
+> | ID | Gap |
+> |---|---|
+> | GAP-001 | Runtime evidence remains pending. |
 >
 > **Deferred follow-ups:** N/A.
 >
@@ -555,39 +597,6 @@ Ship user value.
         )
 
         self.assertIn("missing acceptance test matrix section", "\n".join(issues))
-
-    def test_rejects_file_paths_in_acceptance_test_matrix(self) -> None:
-        issues = self.issues_for_use_case(
-            """## Acceptance Test Matrix
-
-| ID | Boundary | Scenario | Covers AC | Verification | Required |
-|---|---|---|---|---|---|
-| AT-001 | Browser journey | User completes flow | AC-001 | `frontend/e2e/sample.pw.ts` | Yes |
-| AT-002 | API boundary | Backend side effect | AC-001 | Axis.Api.Tests | Yes |
-| AT-003 | UI component | UI validation | AC-001 | npm run test | Yes |
-
-> **Implementation status**
->
-> | Layer | Status |
-> |-------|--------|
-> | Domain | N/A |
-> | Application | N/A |
-> | Infrastructure | N/A |
-> | API | N/A |
-> | Frontend | N/A |
->
-> **Gaps vs spec:** none.
->
-> **Deferred follow-ups:** N/A.
->
-> **Verification:** N/A.
->
-> **Decisions:** N/A.
-"""
-        )
-
-        joined = "\n".join(issues)
-        self.assertIn("contains implementation details", joined)
 
     def test_accepts_high_level_acceptance_test_matrix(self) -> None:
         issues = self.issues_for_use_case(
@@ -1447,39 +1456,6 @@ class TestDocDriftRatchets(unittest.TestCase):
         issues = axis.doc_drift_added_line_issues([("docs/playbooks/local-dev.md", "cd <repo-root> && python scripts/axis.py local-dev up")])
         self.assertEqual([], issues)
 
-    def test_rejects_session_approval_history_in_durable_docs(self) -> None:
-        issues = self.issue_text(
-            [
-                (
-                    "docs/use-cases/example.md",
-                    "The user approved this clean cutover on 2026-07-27.",
-                )
-            ]
-        )
-        self.assertIn("Session provenance introduced in durable guidance", issues)
-
-    def test_rejects_user_approved_label_in_product_contracts(self) -> None:
-        issues = self.issue_text(
-            [
-                (
-                    "docs/foundations/example.md",
-                    "Use the user-approved clean cutover.",
-                )
-            ]
-        )
-        self.assertIn("Approval history introduced in a durable product contract", issues)
-
-    def test_accepts_generic_approval_policy_in_workflow_guidance(self) -> None:
-        issues = axis.doc_drift_added_line_issues(
-            [
-                (
-                    ".agents/skills/example/SKILL.md",
-                    "High-risk work requires explicit user approval before implementation.",
-                )
-            ]
-        )
-        self.assertEqual([], issues)
-
     def test_accepts_standard_doc_navigation(self) -> None:
         issues = axis.doc_navigation_line_issues(
             axis.ROOT / "docs/playbooks/example.md",
@@ -1510,7 +1486,7 @@ class TestDocDriftRatchets(unittest.TestCase):
                 path = root / relative
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_text(content, encoding="utf-8")
-            return "\n".join(axis.documented_raw_command_issues(files.keys(), root=root))
+            return "\n".join(axis.documented_command_issues(files.keys(), root=root))
 
     def test_rejects_raw_repo_commands_in_documented_workflows(self) -> None:
         issues = self.documented_issue_text(
@@ -1559,6 +1535,72 @@ class TestDocDriftRatchets(unittest.TestCase):
         )
 
         self.assertEqual("", issues)
+
+    def test_rejects_documented_axis_commands_outside_the_cli_contract(self) -> None:
+        issues = self.documented_issue_text(
+            {
+                "docs/playbooks/example.md": (
+                    "`python scripts/axis.py frontend unsupported tests/sample.test.tsx`"
+                ),
+            }
+        )
+
+        self.assertIn("does not match the CLI contract", issues)
+
+    def test_accepts_documented_axis_command_templates_without_executing_them(self) -> None:
+        issues = self.documented_issue_text(
+            {
+                "docs/playbooks/example.md": (
+                    "`python scripts/axis.py git sync --branch <branch>`"
+                ),
+            }
+        )
+
+        self.assertEqual("", issues)
+
+    def test_rejects_unknown_routes_even_in_documented_command_templates(self) -> None:
+        issues = self.documented_issue_text(
+            {
+                "docs/playbooks/example.md": (
+                    "`python scripts/axis.py frontend unsupported [test-paths]`"
+                ),
+            }
+        )
+
+        self.assertIn("unknown command route `unsupported`", issues)
+
+    def test_rejects_unknown_options_in_documented_command_templates(self) -> None:
+        issues = self.documented_issue_text(
+            {
+                "docs/playbooks/example.md": (
+                    "`python scripts/axis.py doctor --unsupported <profile>`"
+                ),
+            }
+        )
+
+        self.assertIn("unknown option `--unsupported`", issues)
+
+    def test_rejects_invalid_documented_commands_before_shell_redirection(self) -> None:
+        issues = self.documented_issue_text(
+            {
+                "docs/playbooks/example.md": (
+                    "`python scripts/axis.py doctor --unsupported > doctor.txt`"
+                ),
+            }
+        )
+
+        self.assertIn("unrecognized arguments: --unsupported", issues)
+
+    def test_redirection_target_placeholder_does_not_hide_invalid_command(self) -> None:
+        issues = self.documented_issue_text(
+            {
+                "docs/playbooks/example.md": (
+                    "`python scripts/axis.py doctor --unsupported > <doctor-output>`"
+                ),
+            }
+        )
+
+        self.assertIn("unrecognized arguments: --unsupported", issues)
 
     def test_rejects_noncanonical_python_launchers_in_docs(self) -> None:
         issues = self.documented_issue_text(
@@ -1801,6 +1843,21 @@ def main() -> int:
         )
 
 
+class TestRenovateConfigGate(unittest.TestCase):
+    def test_uses_project_frontend_runtime_for_validator(self) -> None:
+        completed = axis.subprocess.CompletedProcess([], 0, stdout="", stderr="")
+        with (
+            mock.patch.object(axis, "check_frontend_toolchain", return_value=0),
+            mock.patch.object(axis, "run_frontend_npm", return_value=completed) as run_npm,
+        ):
+            self.assertEqual(0, axis.check_renovate_config())
+
+        args = run_npm.call_args.args[0]
+        self.assertEqual("exec", args[0])
+        self.assertIn("renovate-config-validator", args)
+        self.assertEqual(axis.ROOT, run_npm.call_args.kwargs["cwd"])
+
+
 class TestVulnerablePackageGate(unittest.TestCase):
     @staticmethod
     def frontend_audit_report(*, severity: str = "moderate") -> dict[str, object]:
@@ -1898,7 +1955,12 @@ class TestVulnerablePackageGate(unittest.TestCase):
 
         def fake_run(args: list[str], **_kwargs):
             calls.append(args)
-            return axis.subprocess.CompletedProcess(args, 0, stdout="", stderr="")
+            return axis.subprocess.CompletedProcess(
+                args,
+                0,
+                stdout=json.dumps({"version": 1, "projects": []}),
+                stderr="",
+            )
 
         with (
             mock.patch.object(axis, "check_dotnet_sdk", return_value=0),
@@ -1911,6 +1973,114 @@ class TestVulnerablePackageGate(unittest.TestCase):
         self.assertEqual("dotnet", calls[0][0])
         self.assertEqual(str(axis.ROOT / "Axis.sln"), calls[0][2])
         self.assertTrue(Path(calls[0][2]).is_absolute())
+        self.assertEqual(["--format", "json", "--output-version", "1"], calls[0][-4:])
+
+    def test_nuget_vulnerability_report_rejects_structured_findings(self) -> None:
+        report = {
+            "version": 1,
+            "projects": [
+                {
+                    "path": "/repo/Example.csproj",
+                    "frameworks": [
+                        {
+                            "framework": "net8.0",
+                            "topLevelPackages": [
+                                {
+                                    "id": "Example.Package",
+                                    "vulnerabilities": [
+                                        {"severity": "High", "advisoryurl": "https://example.invalid/advisory"}
+                                    ],
+                                }
+                            ],
+                            "transitivePackages": [],
+                        }
+                    ]
+                }
+            ],
+        }
+
+        self.assertEqual(
+            ["NuGet package 'Example.Package' has 1 known vulnerability record(s)"],
+            axis.nuget_vulnerability_report_issues(report),
+        )
+
+    def test_nuget_vulnerability_report_rejects_invalid_schema(self) -> None:
+        self.assertEqual(
+            ["NuGet vulnerability report must use JSON output version 1"],
+            axis.nuget_vulnerability_report_issues({"projects": []}),
+        )
+
+    def test_nuget_vulnerability_report_accepts_projects_without_findings(self) -> None:
+        report = {
+            "version": 1,
+            "projects": [
+                {"path": "/repo/One.csproj"},
+                {"path": "/repo/Two.csproj", "frameworks": []},
+            ],
+        }
+
+        self.assertEqual([], axis.nuget_vulnerability_report_issues(report))
+
+    def test_nuget_vulnerability_report_requires_project_identity(self) -> None:
+        report = {"version": 1, "projects": [{"frameworks": []}]}
+
+        self.assertEqual(
+            ["NuGet vulnerability report project 1 has invalid path"],
+            axis.nuget_vulnerability_report_issues(report),
+        )
+
+    def test_nuget_vulnerability_report_rejects_framework_without_identity(self) -> None:
+        report = {
+            "version": 1,
+            "projects": [{"path": "/repo/Example.csproj", "frameworks": [{}]}],
+        }
+
+        self.assertEqual(
+            ["NuGet vulnerability report project 1 framework 1 has invalid identity"],
+            axis.nuget_vulnerability_report_issues(report),
+        )
+
+    def test_nuget_vulnerability_report_rejects_package_without_identity(self) -> None:
+        report = {
+            "version": 1,
+            "projects": [
+                {
+                    "path": "/repo/Example.csproj",
+                    "frameworks": [
+                        {
+                            "framework": "net8.0",
+                            "topLevelPackages": [{}],
+                        }
+                    ],
+                }
+            ],
+        }
+
+        self.assertEqual(
+            ["NuGet vulnerability report topLevelPackages item 1 has invalid id"],
+            axis.nuget_vulnerability_report_issues(report),
+        )
+
+    def test_nuget_vulnerability_report_rejects_package_without_findings_shape(self) -> None:
+        report = {
+            "version": 1,
+            "projects": [
+                {
+                    "path": "/repo/Example.csproj",
+                    "frameworks": [
+                        {
+                            "framework": "net8.0",
+                            "topLevelPackages": [{"id": "Example.Package"}],
+                        }
+                    ],
+                }
+            ],
+        }
+
+        self.assertEqual(
+            ["NuGet package 'Example.Package' has invalid vulnerabilities"],
+            axis.nuget_vulnerability_report_issues(report),
+        )
 
     def test_shadcn_cli_is_owned_as_a_development_dependency(self) -> None:
         package = json.loads((axis.ROOT / "frontend" / "package.json").read_text(encoding="utf-8"))
@@ -2261,6 +2431,17 @@ class TestToolVersionGates(unittest.TestCase):
         self.assertIn("selects .NET SDK 9.x", detail)
         self.assertIn("expected 8.x", detail)
 
+    def test_dotnet_sdk_rejects_portable_setup_major_drift_before_runtime_probe(self) -> None:
+        with (
+            mock.patch.object(axis.axis_setup, "DOTNET_SDK_VERSION", "9.0.100"),
+            mock.patch.object(axis, "command_version_line") as command_version,
+        ):
+            ok, detail = axis.dotnet_sdk_status()
+
+        self.assertFalse(ok)
+        self.assertIn("portable setup pins 9.0.100", detail)
+        command_version.assert_not_called()
+
     def test_dotnet_sdk_rejects_wrong_major(self) -> None:
         with mock.patch.object(
             axis,
@@ -2272,6 +2453,21 @@ class TestToolVersionGates(unittest.TestCase):
         self.assertFalse(ok)
         self.assertIn("expected .NET SDK 8.x", detail)
         self.assertIn("docs/TECH_STACK.md", detail)
+        self.assertIn("axis.py setup --profile build --install-user-tools", detail)
+
+    def test_dotnet_sdk_missing_runtime_points_to_axis_managed_setup(self) -> None:
+        with (
+            mock.patch.object(
+                axis,
+                "command_version_line",
+                return_value=(False, "dotnet not found", "dotnet"),
+            ),
+            mock.patch.object(axis.axis_setup, "dotnet_native_prerequisite_hint", return_value=None),
+        ):
+            ok, detail = axis.dotnet_sdk_status()
+
+        self.assertFalse(ok)
+        self.assertIn("axis.py setup --profile build --install-user-tools", detail)
 
     def test_dotnet_sdk_surfaces_classified_native_prerequisite(self) -> None:
         with (
@@ -2311,6 +2507,66 @@ class TestToolVersionGates(unittest.TestCase):
 
         self.assertIn("expected Node 24.18.0", stderr.getvalue())
         self.assertIn("frontend/.nvmrc", stderr.getvalue())
+
+    def test_missing_node_points_to_axis_managed_setup(self) -> None:
+        with (
+            mock.patch.object(axis, "required_node_version", return_value=(True, "24.18.0")),
+            mock.patch.object(
+                axis,
+                "command_version_line",
+                return_value=(False, "node not found", "node"),
+            ),
+        ):
+            ok, detail = axis.node_version_status({})
+
+        self.assertFalse(ok)
+        self.assertIn("axis.py setup --profile build --install-user-tools", detail)
+
+    def test_wrong_npm_points_to_axis_managed_setup(self) -> None:
+        with mock.patch.object(
+            axis,
+            "command_version_line",
+            return_value=(True, "11.15.0", "/usr/bin/npm"),
+        ):
+            ok, detail = axis.npm_version_status({})
+
+        self.assertFalse(ok)
+        self.assertIn("axis.py setup --profile build --install-user-tools", detail)
+
+    def test_build_doctor_rejects_wrong_npm_version(self) -> None:
+        with (
+            mock.patch.object(axis, "python_launcher_status", return_value=("OK", "Python 3.12.3")),
+            mock.patch.object(axis, "_command_version", return_value=("OK", "git version 2.43.0")),
+            mock.patch.object(axis, "dotnet_sdk_status", return_value=(True, "8.0.423")),
+            mock.patch.object(axis, "frontend_toolchain_env", return_value={"PATH": "/managed/node"}),
+            mock.patch.object(axis, "node_version_status", return_value=(True, "v24.18.0")),
+            mock.patch.object(
+                axis,
+                "npm_version_status",
+                return_value=(
+                    False,
+                    "found npm `11.15.0`; expected 11.16.0; "
+                    "run `python scripts/axis.py setup --profile build --install-user-tools`",
+                ),
+            ),
+            contextlib.redirect_stdout(io.StringIO()) as stdout,
+            contextlib.redirect_stderr(io.StringIO()) as stderr,
+        ):
+            rc = axis.doctor(axis.argparse.Namespace(profile="build", strict=True))
+
+        self.assertEqual(1, rc)
+        self.assertIn("[FAIL] npm: found npm `11.15.0`", stdout.getvalue())
+        self.assertIn("npm", stderr.getvalue())
+
+    def test_missing_lychee_points_to_axis_managed_setup(self) -> None:
+        with (
+            mock.patch.object(axis, "find_lychee", return_value=None),
+            contextlib.redirect_stderr(io.StringIO()) as stderr,
+        ):
+            rc = axis.check_markdown_links_for_paths([])
+
+        self.assertEqual(1, rc)
+        self.assertIn("axis.py setup --profile review --install-user-tools", stderr.getvalue())
 
     def test_frontend_toolchain_env_resolves_nvm_when_path_lacks_node(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -2739,10 +2995,10 @@ class TestReviewVerificationGates(unittest.TestCase):
         with (
             mock.patch.object(axis, "working_tree_paths", return_value=["scripts/axis.py"]),
             mock.patch.object(axis, "verify") as verify,
-            mock.patch.object(axis, "run_ready_review_policy") as policy,
+            mock.patch.object(axis, "run_review_readiness_policy") as policy,
             contextlib.redirect_stderr(io.StringIO()),
         ):
-            result = axis.ready_review(axis.argparse.Namespace(since=None, policy_only=False))
+            result = axis.review_readiness(axis.argparse.Namespace(since=None, policy_only=False))
 
         self.assertEqual(1, result)
         verify.assert_not_called()
@@ -2753,10 +3009,10 @@ class TestReviewVerificationGates(unittest.TestCase):
             mock.patch.object(axis, "working_tree_paths", return_value=[]),
             mock.patch.object(axis, "verify_scope_paths", return_value=("base...HEAD", ["frontend/src/App.tsx"])),
             mock.patch.object(axis, "verify", return_value=0) as verify,
-            mock.patch.object(axis, "run_ready_review_policy", return_value=(0, ["doc drift"])) as policy,
+            mock.patch.object(axis, "run_review_readiness_policy", return_value=(0, ["doc drift"])) as policy,
             contextlib.redirect_stdout(io.StringIO()),
         ):
-            result = axis.ready_review(axis.argparse.Namespace(since=None, policy_only=False))
+            result = axis.review_readiness(axis.argparse.Namespace(since=None, policy_only=False))
 
         self.assertEqual(0, result)
         verify.assert_called_once()
@@ -2772,10 +3028,10 @@ class TestReviewVerificationGates(unittest.TestCase):
             mock.patch.object(axis, "working_tree_paths", return_value=[]),
             mock.patch.object(axis, "verify_scope_paths", return_value=("base...HEAD", ["scripts/axis.py"])),
             mock.patch.object(axis, "verify") as verify,
-            mock.patch.object(axis, "run_ready_review_policy", return_value=(0, ["policy gate tests", "doc drift"])) as policy,
+            mock.patch.object(axis, "run_review_readiness_policy", return_value=(0, ["policy gate tests", "doc drift"])) as policy,
             contextlib.redirect_stdout(io.StringIO()),
         ):
-            result = axis.ready_review(axis.argparse.Namespace(since=None, policy_only=True))
+            result = axis.review_readiness(axis.argparse.Namespace(since=None, policy_only=True))
 
         self.assertEqual(0, result)
         verify.assert_not_called()
@@ -2789,7 +3045,7 @@ class TestReviewVerificationGates(unittest.TestCase):
     def test_policy_registry_routes_only_triggered_expensive_checks(self) -> None:
         names = [
             name
-            for name, _checker in axis.ready_review_policy_gates(
+            for name, _checker in axis.review_readiness_policy_gates(
                 ["scripts/axis.py", ".github/renovate.json5"]
             )
         ]
@@ -2799,14 +3055,14 @@ class TestReviewVerificationGates(unittest.TestCase):
             ["doc drift"],
             [
                 name
-                for name, _checker in axis.ready_review_policy_gates(
+                for name, _checker in axis.review_readiness_policy_gates(
                     ["frontend/src/App.tsx"],
                     policy_tests_covered=True,
                 )
             ],
         )
 
-    def test_ready_review_reuses_verify_coverage_in_doc_drift(self) -> None:
+    def test_review_readiness_reuses_verify_coverage_in_doc_drift(self) -> None:
         paths = [
             "scripts/axis.py",
             ".agents/skills/axis-script-scope/SKILL.md",
@@ -2825,11 +3081,11 @@ class TestReviewVerificationGates(unittest.TestCase):
                 "check-use-case-docs.py",
                 "check-foundation-docs.py",
             },
-            axis.ready_review_doc_drift_coverage(paths),
+            axis.review_readiness_doc_drift_coverage(paths),
         )
         self.assertIn(
             "check-theme",
-            axis.ready_review_doc_drift_coverage(["theme/axis-theme.json"]),
+            axis.review_readiness_doc_drift_coverage(["theme/axis-theme.json"]),
         )
 
     def test_doc_drift_selects_only_checkers_for_touched_surfaces(self) -> None:
@@ -2871,7 +3127,7 @@ class TestReviewVerificationGates(unittest.TestCase):
     def test_doc_drift_gate_receives_covered_checks(self) -> None:
         covered = {"check-repo-skills"}
         gates = dict(
-            axis.ready_review_policy_gates(
+            axis.review_readiness_policy_gates(
                 [".agents/skills/axis-example/SKILL.md"],
                 doc_drift_covered=covered,
                 doc_drift_range="base..HEAD",
@@ -2886,17 +3142,17 @@ class TestReviewVerificationGates(unittest.TestCase):
         self.assertEqual([".agents/skills/axis-example/SKILL.md"], args.paths)
         self.assertEqual("base..HEAD", args.range_spec)
 
-    def test_pre_push_full_delegates_to_ready_review(self) -> None:
+    def test_pre_push_full_delegates_to_review_readiness(self) -> None:
         with (
             mock.patch.dict(axis.os.environ, {"AXIS_PRE_PUSH_FULL": "1"}),
-            mock.patch.object(axis, "ready_review", return_value=0) as ready_review,
+            mock.patch.object(axis, "review_readiness", return_value=0) as review_readiness,
             contextlib.redirect_stdout(io.StringIO()),
         ):
             result = axis.pre_push(object())
 
         self.assertEqual(0, result)
-        ready_review.assert_called_once()
-        delegated = ready_review.call_args.args[0]
+        review_readiness.assert_called_once()
+        delegated = review_readiness.call_args.args[0]
         self.assertIsNone(delegated.since)
         self.assertFalse(delegated.policy_only)
 
@@ -3147,45 +3403,6 @@ class TestReviewVerificationGates(unittest.TestCase):
 
 
 
-class TestGovernanceOwnerBoundary(unittest.TestCase):
-    def issues_for_doc(self, relative_path: str, content: str) -> list[str]:
-        with tempfile.TemporaryDirectory() as temp:
-            root = Path(temp)
-            path = root / relative_path
-            path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(content, encoding="utf-8")
-            return axis.governance_owner_boundary_issues(root=root)
-
-    def test_rejects_policy_command_restatement_in_entry_docs(self) -> None:
-        issues = self.issues_for_doc(
-            "AGENTS.md",
-            "Run `python scripts/axis.py check policy-tests` before push.\n",
-        )
-
-        self.assertEqual(1, len(issues))
-        self.assertIn("governance doc restates", issues[0])
-
-    def test_rejects_design_gate_as_machine_gate_wording(self) -> None:
-        issues = self.issues_for_doc(
-            "CONTRIBUTING.md",
-            "Design Gate is a CI gate for high-risk work.\n",
-        )
-
-        self.assertEqual(1, len(issues))
-        self.assertIn("review artifact", issues[0])
-
-    def test_allows_design_gate_review_artifact_wording(self) -> None:
-        issues = self.issues_for_doc(
-            "AGENTS.md",
-            "Design Gate is a required review artifact, not a machine-enforced CI gate.\n",
-        )
-
-        self.assertEqual([], issues)
-
-    def test_current_repository_governance_owner_boundaries_still_pass(self) -> None:
-        self.assertEqual([], axis.governance_owner_boundary_issues())
-
-
 class TestEnforcementLedger(unittest.TestCase):
     def issues_for_enforcement_ledger(self, ledger_rows: str) -> list[str]:
         with tempfile.TemporaryDirectory() as temp:
@@ -3219,171 +3436,8 @@ class TestEnforcementLedger(unittest.TestCase):
 
         self.assertIn("unknown ledger status", "\n".join(issues))
 
-    def test_rejects_partial_without_known_gap(self) -> None:
-        issues = self.issues_for_enforcement_ledger(
-            "| Example finding | This file | PR scope | Diff-based check | Unchanged files are not swept | **Partial** |\n"
-        )
-
-        self.assertIn("Partial row must name a known gap", "\n".join(issues))
-
-    def test_rejects_review_only_gate_language(self) -> None:
-        issues = self.issues_for_enforcement_ledger(
-            "| Example finding | This file | PR scope | CI gate | Human review | **Review-only** |\n"
-        )
-
-        self.assertIn("must not use gate/enforced language", "\n".join(issues))
-
     def test_current_repository_enforcement_ledger_still_passes(self) -> None:
         self.assertEqual([], axis.enforcement_ledger_issues())
-
-
-class TestEnforcementTruthAudit(unittest.TestCase):
-    def write_truth_repo(self, root: Path, mutate=None) -> None:
-        files: dict[Path, str] = {}
-        for relative, requirements in axis.enforcement_truth_required_snippets():
-            files[relative] = "\n".join(snippet for snippet, _description in requirements) + "\n"
-
-        script = Path("scripts/axis.py")
-        files[script] = (
-            "def enforcement_truth_required_snippets():\n"
-            "    pass\n\n"
-            "def governance_owner_boundary_issues():\n"
-            "    pass\n\n"
-            f"{files[script]}"
-        )
-
-        workflow = Path(".github/workflows/build-and-test.yml")
-        files[workflow] += "- 'openapi.json'\n- 'openapi.json'\n"
-
-        if mutate is not None:
-            mutate(files)
-
-        for relative, content in files.items():
-            path = root / relative
-            path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(content, encoding="utf-8")
-
-    def test_rejects_ci_without_doc_drift(self) -> None:
-        def mutate(files: dict[Path, str]) -> None:
-            workflow = Path(".github/workflows/build-and-test.yml")
-            files[workflow] = files[workflow].replace(
-                "run: python scripts/axis.py ready-review --policy-only\n",
-                "",
-            )
-
-        with tempfile.TemporaryDirectory() as temp:
-            root = Path(temp)
-            self.write_truth_repo(root, mutate)
-            issues = axis.enforcement_truth_audit_issues(root=root)
-
-        self.assertIn("shared ready-review policy profile runs in CI", "\n".join(issues))
-
-    def test_lychee_ci_pin_requirement_comes_from_the_managed_tool_owner(self) -> None:
-        with mock.patch.object(axis.axis_setup, "LYCHEE_VERSION", "9.9.9"):
-            requirements = axis.enforcement_truth_required_snippets()
-
-        workflow_requirements = dict(requirements)[Path(".github/workflows/build-and-test.yml")]
-        snippets = [snippet for snippet, _description in workflow_requirements]
-        self.assertIn("lycheeVersion: v9.9.9", snippets)
-
-    def test_rejects_ci_without_frontend_vulnerability_gate(self) -> None:
-        def mutate(files: dict[Path, str]) -> None:
-            workflow = Path(".github/workflows/build-and-test.yml")
-            files[workflow] = files[workflow].replace(
-                "run: python scripts/axis.py check frontend-vulnerable-packages\n",
-                "",
-            )
-
-        with tempfile.TemporaryDirectory() as temp:
-            root = Path(temp)
-            self.write_truth_repo(root, mutate)
-            issues = axis.enforcement_truth_audit_issues(root=root)
-
-        self.assertIn("frontend dependency vulnerability gate runs in CI", "\n".join(issues))
-
-    def test_rejects_local_verify_without_markdown_links(self) -> None:
-        def mutate(files: dict[Path, str]) -> None:
-            script = Path("scripts/axis.py")
-            files[script] = files[script].replace('"markdown links (changed files)",\n', "")
-
-        with tempfile.TemporaryDirectory() as temp:
-            root = Path(temp)
-            self.write_truth_repo(root, mutate)
-            issues = axis.enforcement_truth_audit_issues(root=root)
-
-        self.assertIn("local verify runs markdown link check", "\n".join(issues))
-
-    def test_rejects_missing_doc_drift_wiring_without_matching_its_own_requirement(self) -> None:
-        with tempfile.TemporaryDirectory() as temp:
-            root = Path(temp)
-            self.write_truth_repo(root)
-            script = Path("scripts/axis.py")
-            source = axis.normalized_text(axis.ROOT / script)
-            prefix, marker, implementation = source.partition("def ready_review_policy_gates(")
-            self.assertTrue(marker)
-            implementation = implementation.replace("lambda: check_doc_drift(", "lambda: missing_doc_drift(", 1)
-            (root / script).write_text(prefix + marker + implementation, encoding="utf-8")
-
-            issues = axis.enforcement_truth_audit_issues(root=root)
-
-        self.assertIn("ready-review and CI share the doc-drift policy profile", "\n".join(issues))
-
-    def test_enforcement_truth_audit_fails_closed_when_isolation_marker_is_missing(self) -> None:
-        def mutate(files: dict[Path, str]) -> None:
-            script = Path("scripts/axis.py")
-            files[script] = files[script].replace("def governance_owner_boundary_issues():", "def renamed_owner_check():")
-
-        with tempfile.TemporaryDirectory() as temp:
-            root = Path(temp)
-            self.write_truth_repo(root, mutate)
-            issues = axis.enforcement_truth_audit_issues(root=root)
-
-        self.assertIn("ready-review and CI share the doc-drift policy profile", "\n".join(issues))
-
-    def test_rejects_missing_pre_push_quick_gate_delegate(self) -> None:
-        def mutate(files: dict[Path, str]) -> None:
-            hook = Path("scripts/hooks/pre-push")
-            files[hook] = files[hook].replace(
-                'root / "scripts" / "axis.py"), "pre-push"',
-                'root / "scripts" / "other.py"), "pre-push"',
-            )
-
-        with tempfile.TemporaryDirectory() as temp:
-            root = Path(temp)
-            self.write_truth_repo(root, mutate)
-            issues = axis.enforcement_truth_audit_issues(root=root)
-
-        self.assertIn("pre-push delegates", "\n".join(issues))
-
-    def test_rejects_missing_analyzer_warnings_as_errors(self) -> None:
-        def mutate(files: dict[Path, str]) -> None:
-            build_props = Path("Directory.Build.props")
-            files[build_props] = files[build_props].replace(
-                "<TreatWarningsAsErrors>true</TreatWarningsAsErrors>",
-                "<TreatWarningsAsErrors>false</TreatWarningsAsErrors>",
-            )
-
-        with tempfile.TemporaryDirectory() as temp:
-            root = Path(temp)
-            self.write_truth_repo(root, mutate)
-            issues = axis.enforcement_truth_audit_issues(root=root)
-
-        self.assertIn("build treats warnings as errors", "\n".join(issues))
-
-    def test_rejects_openapi_not_triggering_both_ci_filters(self) -> None:
-        def mutate(files: dict[Path, str]) -> None:
-            workflow = Path(".github/workflows/build-and-test.yml")
-            files[workflow] = files[workflow].replace("- 'openapi.json'\n- 'openapi.json'\n", "- 'openapi.json'\n")
-
-        with tempfile.TemporaryDirectory() as temp:
-            root = Path(temp)
-            self.write_truth_repo(root, mutate)
-            issues = axis.enforcement_truth_audit_issues(root=root)
-
-        self.assertIn("both backend and frontend CI filters", "\n".join(issues))
-
-    def test_current_repository_enforcement_truth_audit_still_passes(self) -> None:
-        self.assertEqual([], axis.enforcement_truth_audit_issues())
 
 
 class TestTextEncodingGate(unittest.TestCase):
@@ -3571,39 +3625,6 @@ class TestScriptsStandardGate(unittest.TestCase):
 
 
 class TestLocalDevCli(unittest.TestCase):
-    def test_local_dev_docs_service_match_requires_token_boundaries(self) -> None:
-        doc = "Mandatory services: `api`; optional service: `otel-lgtm`."
-
-        self.assertTrue(check_local_dev_docs.mentions_service(doc, "api"))
-        self.assertTrue(check_local_dev_docs.mentions_service(doc, "otel-lgtm"))
-        self.assertFalse(check_local_dev_docs.mentions_service("application apiary", "api"))
-        self.assertFalse(check_local_dev_docs.mentions_service("otel-lgtms", "otel-lgtm"))
-
-    def test_parse_compose_reports_services_without_ports(self) -> None:
-        with tempfile.TemporaryDirectory() as temp:
-            compose = Path(temp) / "docker-compose.yml"
-            compose.write_text(
-                "services:\n"
-                "  api:\n"
-                "    image: axis-api\n"
-                "    ports:\n"
-                "      - \"127.0.0.1:5281:8443\"\n"
-                "  worker:\n"
-                "    image: axis-worker\n"
-                "  e2e:\n"
-                "    profiles: [\"e2e\"]\n"
-                "    image: axis-e2e\n"
-                "volumes:\n"
-                "  data:\n",
-                encoding="utf-8",
-            )
-
-            services, optional, service_names = check_local_dev_docs.parse_compose(compose)
-
-        self.assertEqual({"api": [5281]}, services)
-        self.assertEqual({"e2e"}, optional)
-        self.assertEqual(["api", "e2e", "worker"], service_names)
-
     def test_compose_app_base_url_allows_human_local_dev_default(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             compose = Path(temp) / "docker-compose.yml"
@@ -3763,6 +3784,19 @@ class TestLocalDevCli(unittest.TestCase):
             self.assertEqual(
                 "https://localhost:3000",
                 check_local_dev_docs.api_appsettings_base_url(appsettings),
+            )
+
+    def test_api_appsettings_openiddict_issuer_reads_canonical_issuer(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            appsettings = Path(temp) / "appsettings.json"
+            appsettings.write_text(
+                '{"OpenIddict": {"Issuer": "https://localhost:5281"}}',
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                "https://localhost:5281",
+                check_local_dev_docs.api_appsettings_openiddict_issuer(appsettings),
             )
 
     def run_local_dev(
@@ -3952,10 +3986,7 @@ class TestLocalDevCli(unittest.TestCase):
 
     def test_smoke_uses_the_canonical_compose_browser_runner(self) -> None:
         calls = self.run_local_dev(
-            axis.argparse.Namespace(
-                local_dev_command="smoke",
-                smoke_args=["--", "e2e/app-frame.pw.ts", "-g", "AT-002"],
-            )
+            axis.argparse.Namespace(local_dev_command="smoke")
         )
 
         self.assertEqual(
@@ -3964,16 +3995,9 @@ class TestLocalDevCli(unittest.TestCase):
         )
         self.assertEqual(["--profile", "e2e", "build", "e2e"], calls[1][-4:])
         self.assertEqual(
-            ["e2e", "e2e/app-frame.pw.ts", "-g", "AT-002"],
-            calls[2][-4:],
+            ["e2e", "e2e/local-dev-smoke.pw.ts"],
+            calls[2][-2:],
         )
-
-    def test_smoke_defaults_to_the_local_dev_smoke_journey(self) -> None:
-        calls = self.run_local_dev(
-            axis.argparse.Namespace(local_dev_command="smoke", smoke_args=[])
-        )
-
-        self.assertEqual(["e2e", "e2e/local-dev-smoke.pw.ts"], calls[2][-2:])
 
     def test_shell_uses_service_default_inside_container(self) -> None:
         calls = self.run_local_dev(
@@ -4595,6 +4619,18 @@ class TestAxisCommandWrappers(unittest.TestCase):
 
         self.assertEqual(["npm", "install", "--package-lock-only", "--ignore-scripts"], calls[0])
 
+    def test_frontend_sync_lock_applies_compatible_audit_fixes_without_force_or_scripts(self) -> None:
+        calls = self.run_with_fake_process(
+            axis.frontend_command,
+            axis.argparse.Namespace(frontend_command="sync-lock", audit_fix=True),
+        )
+
+        self.assertEqual(
+            ["npm", "audit", "fix", "--package-lock-only", "--ignore-scripts"],
+            calls[0],
+        )
+        self.assertNotIn("--force", calls[0])
+
     def test_setup_restores_locked_dependencies_and_optional_browser(self) -> None:
         calls: list[list[str]] = []
 
@@ -4872,18 +4908,12 @@ class TestAxisCommandWrappers(unittest.TestCase):
 
         self.assertEqual(frontend_env, calls[0]["env"])
 
-    def test_frontend_ui_baseline_write_uses_deterministic_python_generator(self) -> None:
-        with (
-            mock.patch.object(axis, "write_ui_baseline") as write_baseline,
-            mock.patch.object(axis, "check_frontend_toolchain") as check_toolchain,
-        ):
-            rc = axis.frontend_command(
-                axis.argparse.Namespace(frontend_command="ui-baseline", write=True)
-            )
+    def test_generate_ui_baseline_uses_deterministic_python_generator(self) -> None:
+        with mock.patch.object(axis, "write_ui_baseline") as write_baseline:
+            rc = axis.generate_ui_baseline()
 
         self.assertEqual(0, rc)
         write_baseline.assert_called_once_with()
-        check_toolchain.assert_not_called()
 
     def test_frontend_install_browsers_installs_playwright_chromium(self) -> None:
         calls = self.run_with_fake_process(
@@ -5382,13 +5412,20 @@ class TestRepoSkillsGate(unittest.TestCase):
                 "# Contract\n\nRoute durable guidance before edit.\n\n"
                 "The entry domain owner keeps spec, status, and evidence decisions. Other durable "
                 "guidance **Requires** selecting `$axis-doc-hygiene` or entering it through a typed "
-                "handoff before edit.\n\n"
-                "## Engineering method\n\n"
-                "Minimal solution ladder. Root-cause loop. Fail-before/pass-after. "
-                "Safety floor. Communication clarity. Skill proof.\n\n"
-                "## Blocker and completion protocol\n\n"
-                "No workaround: ask before an alternate user-local route; explicit user approval is "
-                "required. Stale, missing, indirect, or blocked evidence cannot become a completion claim.\n"
+                "handoff before edit.\n"
+            ),
+            ".agents/skills/workflows.toml": (
+                "version = 1\n\n"
+                "[workflows.example]\n"
+                'initial = "start"\n'
+                'terminal_states = ["done"]\n'
+                'states = ["start", "done"]\n\n'
+                "[[workflows.example.transitions]]\n"
+                'id = "perform"\n'
+                'from = "start"\n'
+                'to = "done"\n'
+                'owner = "skill:axis-example"\n'
+                'evidence = "example-result"\n'
             ),
             ".agents/skills/axis-example/SKILL.md": (
                 "---\n"
@@ -5417,242 +5454,93 @@ class TestRepoSkillsGate(unittest.TestCase):
     def test_accepts_valid_repo_skill(self) -> None:
         self.assertEqual([], self.issues_for_skill(self.valid_skill_files()))
 
-    def test_verification_scope_consumers_must_delegate_unresolved_command_selection(self) -> None:
-        for consumer in ("axis-frontend-feature", "axis-ui-system"):
-            with self.subTest(consumer=consumer):
-                files = self.valid_skill_files()
-                self.add_skill(files, "axis-script-scope")
-                self.add_skill(files, consumer)
-                files[f".agents/skills/{consumer}/SKILL.md"] += (
-                    "\n- Documentation lookup **Delegates** to `$axis-script-scope`.\n"
-                )
-                files[".agents/skills/axis-script-scope/SKILL.md"] = files[
-                    ".agents/skills/axis-script-scope/SKILL.md"
-                ].replace(
-                    "Report the result.",
-                    "Report `Moment`, `Selected checks`, `Omitted broad checks`, `Results`, and `Next verification boundary`.",
-                )
-
-                issues = self.issues_for_skill(files)
-
-                self.assertIn(
-                    f"`{consumer}` must use **Delegates** only for unresolved verification command selection to `$axis-script-scope`",
-                    "\n".join(issues),
-                )
-
-    def test_verification_scope_consumers_accept_conditional_command_selection_handoff(self) -> None:
-        for consumer in ("axis-frontend-feature", "axis-ui-system"):
-            with self.subTest(consumer=consumer):
-                files = self.valid_skill_files()
-                self.add_skill(files, "axis-script-scope")
-                self.add_skill(files, "axis-doc-hygiene")
-                self.add_skill(files, consumer)
-                files[f".agents/skills/{consumer}/SKILL.md"] += (
-                    "\n- Unresolved verification command selection **Delegates** to "
-                    "`$axis-script-scope`.\n"
-                )
-                files[".agents/skills/axis-script-scope/SKILL.md"] = files[
-                    ".agents/skills/axis-script-scope/SKILL.md"
-                ].replace(
-                    "Report the result.",
-                    "Report `Moment`, `Selected checks`, `Omitted broad checks`, `Results`, and `Next verification boundary`.",
-                )
-                files[".agents/skills/axis-script-scope/SKILL.md"] += (
-                    "\nhost browser --trust-local-ca local-dev up readiness.\n"
-                    "Editing durable guidance **Requires** entering `$axis-doc-hygiene` before edit; "
-                    "reuse an active handoff.\n"
-                    "Classify native prerequisites from an observed failure and enforce accepted-risk policy. "
-                    "Require exact direct versions and keep the scheduled workflow.\n"
-                )
-
-                issues = self.issues_for_skill(files)
-
-                self.assertEqual([], issues)
-
-    def test_verification_scope_consumers_reject_unconditional_command_selection_handoff(self) -> None:
-        for consumer in ("axis-frontend-feature", "axis-ui-system"):
-            with self.subTest(consumer=consumer):
-                files = self.valid_skill_files()
-                self.add_skill(files, "axis-script-scope")
-                self.add_skill(files, "axis-doc-hygiene")
-                self.add_skill(files, consumer)
-                files[f".agents/skills/{consumer}/SKILL.md"] += (
-                    "\n- Unresolved verification command selection **Delegates** to "
-                    "`$axis-script-scope`.\n"
-                    "- Documentation lookup **Delegates** to `$axis-script-scope`.\n"
-                )
-                files[".agents/skills/axis-script-scope/SKILL.md"] = files[
-                    ".agents/skills/axis-script-scope/SKILL.md"
-                ].replace(
-                    "Report the result.",
-                    "Report `Moment`, `Selected checks`, `Omitted broad checks`, `Results`, and `Next verification boundary`.",
-                )
-                files[".agents/skills/axis-script-scope/SKILL.md"] += (
-                    "\nhost browser --trust-local-ca local-dev up readiness.\n"
-                    "Editing durable guidance **Requires** entering `$axis-doc-hygiene` before edit; "
-                    "reuse an active handoff.\n"
-                    "Classify native prerequisites from an observed failure and enforce accepted-risk policy. "
-                    "Require exact direct versions and keep the scheduled workflow.\n"
-                )
-
-                issues = self.issues_for_skill(files)
-
-                self.assertIn(
-                    "must use **Delegates** only for unresolved verification command selection",
-                    "\n".join(issues),
-                )
-
-    def test_script_scope_requires_the_verification_output_contract(self) -> None:
+    def test_rejects_unknown_workflow_skill_owner(self) -> None:
         files = self.valid_skill_files()
-        self.add_skill(files, "axis-script-scope")
-        files[".agents/skills/axis-script-scope/SKILL.md"] = files[
-            ".agents/skills/axis-script-scope/SKILL.md"
-        ].replace(
-            "- Example input.",
-            "- Example input with `Moment`, `Selected checks`, `Omitted broad checks`, `Results`, and `Next verification boundary`.",
+        files[".agents/skills/workflows.toml"] = files[
+            ".agents/skills/workflows.toml"
+        ].replace("skill:axis-example", "skill:axis-missing")
+
+        issues = self.issues_for_skill(files)
+
+        self.assertIn("references unknown skill owner `axis-missing`", "\n".join(issues))
+
+    def test_rejects_multiple_owners_for_one_workflow_transition(self) -> None:
+        files = self.valid_skill_files()
+        files[".agents/skills/workflows.toml"] += (
+            "\n[[workflows.example.transitions]]\n"
+            'id = "perform-again"\n'
+            'from = "start"\n'
+            'to = "done"\n'
+            'owner = "skill:axis-example"\n'
+            'evidence = "other-result"\n'
         )
 
         issues = self.issues_for_skill(files)
 
-        self.assertIn(
-            "axis-script-scope` output must include `Moment`, `Selected checks`, `Omitted broad checks`, `Results`, and `Next verification boundary`",
-            "\n".join(issues),
-        )
+        self.assertIn("transition `start -> done` has multiple owners", "\n".join(issues))
 
-    def test_script_scope_requires_local_dev_browser_and_readiness_decisions(self) -> None:
+    def test_rejects_unreachable_workflow_state(self) -> None:
         files = self.valid_skill_files()
-        self.add_skill(files, "axis-script-scope")
-        files[".agents/skills/axis-script-scope/SKILL.md"] = files[
-            ".agents/skills/axis-script-scope/SKILL.md"
-        ].replace(
-            "Report the result.",
-            "Report `Moment`, `Selected checks`, `Omitted broad checks`, `Results`, and `Next verification boundary`.",
+        files[".agents/skills/workflows.toml"] = files[
+            ".agents/skills/workflows.toml"
+        ].replace('states = ["start", "done"]', 'states = ["start", "done", "orphan"]')
+
+        issues = self.issues_for_skill(files)
+
+        self.assertIn("state `orphan` is unreachable from `start`", "\n".join(issues))
+
+    def test_rejects_workflow_state_without_terminal_path(self) -> None:
+        files = self.valid_skill_files()
+        files[".agents/skills/workflows.toml"] = (
+            "version = 1\n\n"
+            "[workflows.example]\n"
+            'initial = "start"\n'
+            'terminal_states = ["done"]\n'
+            'states = ["start", "dead-end", "done"]\n\n'
+            "[[workflows.example.transitions]]\n"
+            'id = "finish"\n'
+            'from = "start"\n'
+            'to = "done"\n'
+            'owner = "skill:axis-example"\n'
+            'evidence = "done-result"\n\n'
+            "[[workflows.example.transitions]]\n"
+            'id = "enter-dead-end"\n'
+            'from = "start"\n'
+            'to = "dead-end"\n'
+            'owner = "skill:axis-example"\n'
+            'evidence = "dead-end-result"\n\n'
+            "[[workflows.example.transitions]]\n"
+            'id = "remain-stuck"\n'
+            'from = "dead-end"\n'
+            'to = "dead-end"\n'
+            'owner = "skill:axis-example"\n'
+            'evidence = "stuck-result"\n'
         )
 
         issues = self.issues_for_skill(files)
 
-        self.assertIn(
-            "axis-script-scope` must require the local-dev host-browser trust decision and readiness proof",
-            "\n".join(issues),
-        )
+        self.assertIn("state `dead-end` cannot reach a terminal state", "\n".join(issues))
 
-    def test_script_scope_requires_native_prerequisite_and_accepted_risk_policy(self) -> None:
+    def test_accepts_semantic_role_owner_backed_by_project_agent(self) -> None:
         files = self.valid_skill_files()
-        self.add_skill(files, "axis-script-scope")
-        files[".agents/skills/axis-script-scope/SKILL.md"] = files[
-            ".agents/skills/axis-script-scope/SKILL.md"
-        ].replace(
-            "Report the result.",
-            "Report `Moment`, `Selected checks`, `Omitted broad checks`, `Results`, and `Next verification boundary`.",
-        )
-        files[".agents/skills/axis-script-scope/SKILL.md"] += (
-            "\nHost browser --trust-local-ca local-dev up readiness.\n"
-            "Editing durable guidance **Requires** entering `$axis-doc-hygiene` before edit; reuse an active handoff.\n"
-        )
-
-        issues = self.issues_for_skill(files)
-
-        self.assertIn(
-            "axis-script-scope` must classify native prerequisites and enforce accepted-risk policy",
-            "\n".join(issues),
+        files[".codex/agents/axis_reviewer.toml"] = 'name = "axis_reviewer"\n'
+        files[".agents/skills/workflows.toml"] = (
+            "version = 1\n\n"
+            "[semantic_roles]\n"
+            'independent-reviewer = "axis_reviewer"\n\n'
+            "[workflows.review]\n"
+            'initial = "ready"\n'
+            'terminal_states = ["reviewed"]\n'
+            'states = ["ready", "reviewed"]\n\n'
+            "[[workflows.review.transitions]]\n"
+            'id = "review"\n'
+            'from = "ready"\n'
+            'to = "reviewed"\n'
+            'owner = "role:independent-reviewer"\n'
+            'evidence = "review-result"\n'
         )
 
-    def test_universal_contract_routes_durable_guidance_through_doc_hygiene(self) -> None:
-        files = self.valid_skill_files()
-        files[".agents/skills/reference.md"] = "# Contract\n"
-
-        issues = self.issues_for_skill(files)
-
-        self.assertIn(
-            "universal contract must route durable guidance edits through `$axis-doc-hygiene` before edit",
-            "\n".join(issues),
-        )
-
-    def test_universal_contract_keeps_domain_decisions_with_the_entry_owner(self) -> None:
-        files = self.valid_skill_files()
-        files[".agents/skills/reference.md"] = files[
-            ".agents/skills/reference.md"
-        ].replace(
-            "The entry domain owner keeps spec, status, and evidence decisions. ",
-            "",
-        )
-
-        issues = self.issues_for_skill(files)
-
-        self.assertIn(
-            "universal contract must keep spec, status, and evidence decisions with the entry domain owner",
-            "\n".join(issues),
-        )
-
-    def test_universal_contract_requires_the_engineering_method(self) -> None:
-        files = self.valid_skill_files()
-        files[".agents/skills/reference.md"] = files[
-            ".agents/skills/reference.md"
-        ].replace(
-            "## Engineering method\n\n"
-            "Minimal solution ladder. Root-cause loop. Fail-before/pass-after. "
-            "Safety floor. Communication clarity. Skill proof.\n",
-            "",
-        )
-
-        issues = self.issues_for_skill(files)
-
-        self.assertIn(
-            "universal contract must own the engineering method",
-            "\n".join(issues),
-        )
-
-    def test_ready_review_requires_a_minimality_audit(self) -> None:
-        files = self.valid_skill_files()
-        self.add_skill(files, "axis-ready-review")
-
-        issues = self.issues_for_skill(files)
-
-        self.assertIn(
-            "axis-ready-review` must audit minimality after correctness",
-            "\n".join(issues),
-        )
-
-    def test_script_scope_requires_doc_hygiene_before_durable_guidance_edits(self) -> None:
-        files = self.valid_skill_files()
-        self.add_skill(files, "axis-script-scope")
-        self.add_skill(files, "axis-doc-hygiene")
-        files[".agents/skills/axis-script-scope/SKILL.md"] = files[
-            ".agents/skills/axis-script-scope/SKILL.md"
-        ].replace(
-            "Report the result.",
-            "Report `Moment`, `Selected checks`, `Omitted broad checks`, `Results`, and `Next verification boundary`.",
-        )
-        files[".agents/skills/axis-script-scope/SKILL.md"] += (
-            "\nHost browser --trust-local-ca local-dev up readiness.\n"
-        )
-
-        issues = self.issues_for_skill(files)
-
-        self.assertIn(
-            "axis-script-scope` must use **Requires** for `$axis-doc-hygiene` before editing durable guidance",
-            "\n".join(issues),
-        )
-
-    def test_script_scope_rejects_ambiguous_pre_edit_doc_hygiene_evidence(self) -> None:
-        files = self.valid_skill_files()
-        self.add_skill(files, "axis-script-scope")
-        self.add_skill(files, "axis-doc-hygiene")
-        script_scope = files[".agents/skills/axis-script-scope/SKILL.md"].replace(
-            "Report the result.",
-            "Report `Moment`, `Selected checks`, `Omitted broad checks`, `Results`, and `Next verification boundary`.",
-        )
-        files[".agents/skills/axis-script-scope/SKILL.md"] = script_scope + (
-            "\nHost browser --trust-local-ca local-dev up readiness.\n"
-            "Editing durable guidance **Requires** current `$axis-doc-hygiene` evidence before edit.\n"
-        )
-
-        issues = self.issues_for_skill(files)
-
-        self.assertIn(
-            "axis-script-scope` must use **Requires** for `$axis-doc-hygiene` before editing durable guidance",
-            "\n".join(issues),
-        )
+        self.assertEqual([], self.issues_for_skill(files))
 
     def test_rejects_legacy_vendor_adapter_directory(self) -> None:
         files = self.valid_skill_files()
@@ -5717,18 +5605,6 @@ class TestRepoSkillsGate(unittest.TestCase):
 
         self.assertIn("unknown skill alias `$axis-missing`", "\n".join(self.issues_for_skill(files)))
 
-    def test_rejects_untyped_skill_handoff(self) -> None:
-        files = self.valid_skill_files()
-        files[".agents/skills/axis-other/SKILL.md"] = files[
-            ".agents/skills/axis-example/SKILL.md"
-        ].replace("axis-example", "axis-other").replace("Axis Example", "Axis Other")
-        files[".agents/skills/README.md"] += (
-            "| Other | [axis-other/SKILL.md](./axis-other/SKILL.md) |\n"
-        )
-        files[".agents/skills/axis-example/SKILL.md"] += "\nDelegate to `$axis-other`.\n"
-
-        self.assertIn("type the skill handoff", "\n".join(self.issues_for_skill(files)))
-
     def test_rejects_missing_catalog_entry(self) -> None:
         files = self.valid_skill_files()
         files[".agents/skills/README.md"] = "# Skills\n"
@@ -5758,21 +5634,6 @@ class TestRepoSkillsGate(unittest.TestCase):
         ].replace("## Output", "## Result")
 
         self.assertIn("missing required section `## Output`", "\n".join(self.issues_for_skill(files)))
-
-    def test_rejects_duplicate_substantive_instruction(self) -> None:
-        files = self.valid_skill_files()
-        duplicate = (
-            "- Keep this long reusable instruction in exactly one owner and link every other skill to that owner instead.\n"
-        )
-        files[".agents/skills/axis-example/SKILL.md"] += duplicate
-        files[".agents/skills/axis-other/SKILL.md"] = files[
-            ".agents/skills/axis-example/SKILL.md"
-        ].replace("axis-example", "axis-other").replace("Axis Example", "Axis Other")
-        files[".agents/skills/README.md"] += (
-            "| Other | [axis-other/SKILL.md](./axis-other/SKILL.md) |\n"
-        )
-
-        self.assertIn("duplicate substantive instruction", "\n".join(self.issues_for_skill(files)))
 
     def test_skill_reference_target_resolves_parent_reference(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -5846,14 +5707,6 @@ class TestRepoSkillsGate(unittest.TestCase):
 
         self.assertIn("keep SKILL.md concise", "\n".join(issues))
 
-    def test_rejects_ambiguous_best_effort_wording(self) -> None:
-        files = self.valid_skill_files()
-        files[".agents/skills/axis-example/SKILL.md"] += "\nMaybe run the check if you have time.\n"
-
-        issues = self.issues_for_skill(files)
-
-        self.assertIn("replace ambiguous best-effort wording", "\n".join(issues))
-
     def test_rejects_raw_repo_workflow_commands_in_skill_instructions(self) -> None:
         files = self.valid_skill_files()
         files[".agents/skills/axis-example/SKILL.md"] += (
@@ -5893,6 +5746,52 @@ class TestRepoSkillsGate(unittest.TestCase):
             (nested / "rogue.toml").write_text('name = "rogue"\n', encoding="utf-8")
 
             self.assertEqual({"nested/rogue.toml"}, project_orchestration.project_agent_role_files(root))
+
+    def test_default_agent_fallback_is_rejected(self) -> None:
+        self.assertEqual(
+            ["default_subagent_model", "default_subagent_reasoning_effort"],
+            project_orchestration.unexpected_default_agent_keys(
+                {
+                    "enabled": True,
+                    "default_subagent_model": "generic",
+                    "default_subagent_reasoning_effort": "generic",
+                }
+            ),
+        )
+        self.assertEqual([], project_orchestration.unexpected_default_agent_keys({"enabled": True}))
+
+    def test_named_agent_hook_rejects_missing_default_and_unknown_roles(self) -> None:
+        allowed = frozenset({"axis_scout", "axis_worker"})
+        for agent_type in (None, "default", "unknown"):
+            tool_input = {} if agent_type is None else {"agent_type": agent_type}
+            decision = named_agent_hook.policy_decision(
+                {
+                    "hook_event_name": "PreToolUse",
+                    "tool_name": "Agent",
+                    "tool_input": tool_input,
+                },
+                allowed_agent_types=allowed,
+            )
+
+            self.assertEqual("deny", decision["hookSpecificOutput"]["permissionDecision"])
+
+    def test_named_agent_hook_allows_only_project_roles(self) -> None:
+        allowed = named_agent_hook.configured_agent_types()
+        for agent_type in allowed:
+            self.assertIsNone(
+                named_agent_hook.policy_decision(
+                    {
+                        "hook_event_name": "PreToolUse",
+                        "tool_name": "Agent",
+                        "tool_input": {"agent_type": agent_type},
+                    },
+                    allowed_agent_types=allowed,
+                )
+            )
+        self.assertEqual(
+            {path.removesuffix(".toml") for path in project_orchestration.project_agent_role_files()},
+            set(allowed),
+        )
 
 
 class TestDoctorPythonPackageChecks(unittest.TestCase):
@@ -5948,27 +5847,6 @@ class TestDoctorPythonPackageChecks(unittest.TestCase):
 
         self.assertEqual("FAIL", status)
         self.assertIn("tar data extraction filter", detail)
-
-    def test_python_module_version_rejects_missing_package(self) -> None:
-        with mock.patch.object(axis.importlib.util, "find_spec", return_value=None):
-            status, detail = axis._python_module_version("yaml", "PyYAML")
-
-        self.assertEqual("FAIL", status)
-        self.assertIn("PyYAML is not installed", detail)
-
-    def test_python_module_version_reports_package_version(self) -> None:
-        class Module:
-            __version__ = "6.0.3"
-
-        with (
-            mock.patch.object(axis.importlib.util, "find_spec", return_value=object()),
-            mock.patch.object(axis.importlib, "import_module", return_value=Module),
-        ):
-            status, detail = axis._python_module_version("yaml", "PyYAML")
-
-        self.assertEqual("OK", status)
-        self.assertIn("PyYAML 6.0.3", detail)
-
 
 class TestHandlerTestRatchet(unittest.TestCase):
     def test_modified_handler_requires_matching_test_file(self) -> None:
@@ -6085,27 +5963,6 @@ class TestDocDomainDiscovery(unittest.TestCase):
                     self.assertEqual(["Identity"], axis_repo.iter_module_names())
             finally:
                 axis_repo.MODULES_DIR = original_modules_dir
-
-    def test_module_code_change_alone_does_not_force_doc_activity(self) -> None:
-        self.assertEqual(
-            [],
-            doc_drift_domains.check_readme_api_status(["src/Modules/Identity/Axis.Identity.Domain/User.cs"]),
-        )
-
-
-class TestClientExperienceWorkflow(unittest.TestCase):
-    def test_frontend_lifecycle_skills_reference_single_client_experience_owner(self) -> None:
-        owner = ROOT / "docs" / "playbooks" / "client-experience.md"
-        self.assertTrue(owner.is_file())
-        self.assertFalse((ROOT / "docs" / "playbooks" / "ui-composition.md").exists())
-
-        for skill in ("axis-use-case-spec", "axis-frontend-feature", "axis-ui-system"):
-            with self.subTest(skill=skill):
-                text = (
-                    ROOT / ".agents" / "skills" / skill / "SKILL.md"
-                ).read_text(encoding="utf-8")
-                self.assertIn("docs/playbooks/client-experience.md", text)
-
 
 if __name__ == "__main__":
     unittest.main()

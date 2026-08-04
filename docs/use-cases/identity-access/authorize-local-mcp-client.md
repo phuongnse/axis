@@ -96,14 +96,19 @@ The existing sign-in labels, validation, focus, keyboard, localization, loading,
 > | Domain | N/A |
 > | Application | N/A |
 > | Infrastructure | Partial |
-> | API | Partial |
+> | API | Done |
 > | Frontend | Partial |
 > | MCP | Partial |
 >
-> **Gaps vs spec:** API and SPA continuation behavior plus expired-cache failure have focused proof, but the supported browser journey to the registered MCP loopback callback, client callback-failure injection, and app-managed MCP client reload plus authenticated read-back remain unverified.
+> **Gaps vs spec:**
+>
+> | ID | Gap |
+> |---|---|
+> | GAP-001 | Durable browser automation remains unverified. |
+> | GAP-002 | Supported client callback-failure and timeout evidence remain unverified. |
 >
 > **Deferred follow-ups:** Reauthentication semantics for `prompt=login`, replacing the fixed MCP loopback callback port with an ephemeral port, and OpenIddict package lifecycle review remain outside this checkpoint.
 >
-> **Verification:** See [authorize-local-mcp-client.evidence.md](./authorize-local-mcp-client.evidence.md). Focused API, frontend, MCP contract, and safety checks pass; supported browser/client runtime evidence is not run.
+> **Verification:** See [authorize-local-mcp-client.evidence.md](./authorize-local-mcp-client.evidence.md). Focused API, frontend, MCP contract, and safety checks pass; the supported Codex client completed browser authorization and authenticated list/read-back.
 >
 > **Decisions:** OpenIddict owns request validation and distributed caching; the SPA carries only the opaque `request_id`; MCP remains the credential-free PKCE client and does not expose account or OAuth-request tools.

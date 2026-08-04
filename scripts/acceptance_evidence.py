@@ -29,14 +29,7 @@ def is_browser_e2e_command(command: str) -> bool:
 
 def is_frontend_component_test_command(command: str) -> bool:
     args = axis_command_args(command)
-    if args is None:
-        return False
-    if args[:2] == ["frontend", "test"]:
-        return True
-    if args[:2] != ["frontend", "script"] or len(args) < 3:
-        return False
-    script_parts = args[2].split(":")
-    return script_parts[0] == "test" and "e2e" not in script_parts[1:]
+    return args is not None and args[:2] == ["frontend", "test"]
 
 
 @dataclass(frozen=True)

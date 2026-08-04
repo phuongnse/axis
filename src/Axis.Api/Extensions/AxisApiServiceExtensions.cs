@@ -101,7 +101,8 @@ internal static class AxisApiServiceExtensions
         services.AddOpenIddict()
             .AddServer(opts =>
             {
-                opts.SetAuthorizationEndpointUris("/connect/authorize")
+                opts.SetIssuer(ReadRequiredAbsoluteHttpsUri(configuration, "OpenIddict:Issuer"))
+                    .SetAuthorizationEndpointUris("/connect/authorize")
                     .SetTokenEndpointUris("/connect/token");
 
                 opts.RegisterScopes(Scopes.OpenId, Scopes.Email, Scopes.Profile);
@@ -331,4 +332,20 @@ internal static class AxisApiServiceExtensions
     private static string RequiredValue(IConfiguration configuration, string key) =>
         configuration[key]
         ?? throw new InvalidOperationException($"{key} is required");
+
+    private static Uri ReadRequiredAbsoluteHttpsUri(IConfiguration configuration, string key)
+    {
+        string value = RequiredValue(configuration, key);
+        if (!Uri.TryCreate(value, UriKind.Absolute, out Uri? uri) ||
+            uri.Scheme != Uri.UriSchemeHttps ||
+            !string.IsNullOrEmpty(uri.UserInfo) ||
+            !string.IsNullOrEmpty(uri.Query) ||
+            !string.IsNullOrEmpty(uri.Fragment))
+        {
+            throw new InvalidOperationException(
+                $"{key} must be an absolute HTTPS URL without credentials, query, or fragment.");
+        }
+
+        return uri;
+    }
 }

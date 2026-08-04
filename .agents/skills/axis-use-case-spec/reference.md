@@ -29,7 +29,7 @@ Use with [SKILL.md](./SKILL.md) when writing or refreshing use-case acceptance c
 
 ## Boundary and runner choice
 
-- Choose the lowest reliable boundary in the spec. Exact runners belong in implementation or ready-review evidence: Playwright for browser-level journeys, Vitest for focused UI states/validation, and xUnit for backend contracts, side effects, and business rules.
+- Choose the lowest reliable boundary in the spec. Exact runners belong in implementation or review-readiness evidence: Playwright for browser-level journeys, Vitest for focused UI states/validation, and xUnit for backend contracts, side effects, and business rules.
 - If the selected runner is not installed yet, record that adding the harness is a new-library Design Gate decision before implementation.
 
 ## Reusable evaluator contracts

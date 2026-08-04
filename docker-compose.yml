@@ -39,7 +39,7 @@ services:
       disable: true
 
   # Optional local observability stack (ADR-018). Start with:
-  #   docker compose --profile observability up -d
+  #   python scripts/axis.py local-dev observability up
   otel-lgtm:
     profiles: ["observability"]
     image: grafana/otel-lgtm:0.11.8
@@ -93,8 +93,9 @@ services:
       Cors__AllowedOrigins__0: "https://localhost:3000"
       RateLimiting__Auth__PermitLimit: "1000"
       # OTLP export is off in the default compose API container (no LGTM dependency).
-      # For traces in Grafana: `docker compose --profile observability up -d otel-lgtm`
-      # then `dotnet run` on the host (appsettings.json → localhost:4318) or set
+      # For traces in Grafana: `python scripts/axis.py local-dev observability up`
+      # then `python scripts/axis.py dotnet run-api` on the host
+      # (appsettings.json → localhost:4318) or set
       # OpenTelemetry__Otlp__Endpoint=http://otel-lgtm:4318 when running API in compose with the profile.
       OpenTelemetry__Otlp__Endpoint: ""
     ports:
