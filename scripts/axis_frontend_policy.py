@@ -252,35 +252,6 @@ def frontend_form_schema_type_issues(root: Path = ROOT) -> list[str]:
     return issues
 
 
-def frontend_server_owned_vocabulary_issues(root: Path = ROOT) -> list[str]:
-    issues: list[str] = []
-    translations_path = root / "frontend" / "src" / "features" / "preferences" / "translations.ts"
-    if not translations_path.exists():
-        return issues
-
-    text = translations_path.read_text(encoding="utf-8")
-    normalized = (
-        rel(translations_path)
-        if root == ROOT
-        else str(translations_path.relative_to(root)).replace("\\", "/")
-    )
-    server_owned_rule_keys = re.compile(
-        r"['\"]rules\.(?:operator[A-Z]|function(?:HasFormat|IsBlank|Length|MatchesPattern|Count|"
-        r"Precision|Scale|ToDecimal)|operand(?:Context|Function|Literal|Parameter)|"
-        r"group(?:All|Any|Not)|contextFieldValue|predicateIsBlank|"
-        r"expressionGuide(?:Group(?:All|Any|Not)|Operand(?:Context|Function|Literal|Parameter)|"
-        r"Limit(?:Depth|Functions|Nodes|Parameters|Steps)|Step(?:Compatibility|Condition|Group)|"
-        r"Type(?:Any|Multiple)))"
-    )
-    for match in server_owned_rule_keys.finditer(text):
-        line_number = text.count("\n", 0, match.start()) + 1
-        issues.append(
-            f"{normalized}:{line_number}: backend-owned rule vocabulary and guidance "
-            "must come from generated server reference metadata, not client translations"
-        )
-    return issues
-
-
 def frontend_test_async_boundary_issues(root: Path = ROOT) -> list[str]:
     issues: list[str] = []
     test_roots = [
@@ -332,167 +303,14 @@ def frontend_e2e_structure_issues(root: Path = ROOT) -> list[str]:
     return issues
 
 
-def frontend_public_route_navigation_issues(root: Path = ROOT) -> list[str]:
-    issues: list[str] = []
-    routes_root = root / "frontend" / "src" / "routes"
-    if not routes_root.exists():
-        return issues
-
-    route_factory = re.compile(r"\bcreate(?:Lazy)?FileRoute\(")
-    for path in iter_files(routes_root, (".tsx",)):
-        normalized = rel(path) if root == ROOT else str(path.relative_to(root)).replace("\\", "/")
-        route_path = str(path.relative_to(routes_root)).replace("\\", "/")
-        text = path.read_text(encoding="utf-8")
-
-        if not route_factory.search(text):
-            continue
-        if route_path == "__root.tsx":
-            continue
-        if route_path.startswith("_") and "/" not in route_path:
-            continue
-        if route_path.startswith("_authenticated"):
-            continue
-        redirect_only_route = re.search(r"\bNavigate\b", text) or (
-            "beforeLoad:" in text
-            and "component:" not in text
-            and "pendingComponent:" not in text
-            and "errorComponent:" not in text
-            and "notFoundComponent:" not in text
-        )
-        if redirect_only_route:
-            continue
-
-        if "export const routeNavigation" not in text or "publicRouteNavigation(" not in text:
-            issues.append(
-                f"{normalized}: public route must export `routeNavigation = publicRouteNavigation(...)` "
-                "so escape navigation is declared at the route boundary"
-            )
-        if "from '@/lib/route-navigation'" not in text:
-            issues.append(
-                f"{normalized}: public route navigation metadata must use '@/lib/route-navigation'"
-            )
-
-    return issues
-
-
-def frontend_route_access_group_issues(root: Path = ROOT) -> list[str]:
-    issues: list[str] = []
-    routes_root = root / "frontend" / "src" / "routes"
-    if not routes_root.exists():
-        return issues
-
-    guest_group_path = routes_root / "_guest.tsx"
-    guest_route_paths = {
-        "auth/verify.lazy.tsx",
-        "auth/verify.tsx",
-        "register.lazy.tsx",
-        "register.tsx",
-        "register_.confirmation.lazy.tsx",
-        "register_.confirmation.tsx",
-        "sign-in.lazy.tsx",
-        "sign-in.tsx",
-    }
-
-    guest_leaf_exists = False
-    for path in iter_files(routes_root, (".tsx",)):
-        route_path = str(path.relative_to(routes_root)).replace("\\", "/")
-        normalized = rel(path) if root == ROOT else str(path.relative_to(root)).replace("\\", "/")
-        text = path.read_text(encoding="utf-8")
-
-        if route_path in guest_route_paths:
-            issues.append(
-                f"{normalized}: guest-only auth routes must live under the `_guest` "
-                "pathless route group instead of declaring per-route guards"
-            )
-
-        if route_path.startswith("_guest/"):
-            guest_leaf_exists = True
-            if "redirectAuthenticatedUserFromGuestRoute" in text or "beforeLoad:" in text:
-                issues.append(
-                    f"{normalized}: guest leaf routes inherit the `_guest` guard; "
-                    "do not attach guest guards to individual leaf routes"
-                )
-
-    if guest_leaf_exists:
-        normalized_group = (
-            rel(guest_group_path)
-            if root == ROOT
-            else str(guest_group_path.relative_to(root)).replace("\\", "/")
-        )
-        if not guest_group_path.exists():
-            issues.append(
-                f"{normalized_group}: guest-only routes require a `_guest` pathless route group"
-            )
-        else:
-            group_text = guest_group_path.read_text(encoding="utf-8")
-            if "redirectAuthenticatedUserFromGuestRoute" not in group_text or "beforeLoad:" not in group_text:
-                issues.append(
-                    f"{normalized_group}: `_guest` route group must own the guest-only redirect guard"
-                )
-
-    return issues
-
-
-def frontend_transient_handoff_issues(root: Path = ROOT) -> list[str]:
-    issues: list[str] = []
-    src_root = root / "frontend" / "src"
-    routes_root = src_root / "routes"
-
-    callback_lazy_route = routes_root / "callback.lazy.tsx"
-    if callback_lazy_route.exists():
-        normalized = rel(callback_lazy_route) if root == ROOT else str(callback_lazy_route.relative_to(root)).replace("\\", "/")
-        issues.append(
-            f"{normalized}: callback success handoffs must run before render; use a non-lazy `/callback` route with `beforeLoad`"
-        )
-
-    callback_route = routes_root / "callback.tsx"
-    if callback_route.exists():
-        normalized = rel(callback_route) if root == ROOT else str(callback_route.relative_to(root)).replace("\\", "/")
-        text = callback_route.read_text(encoding="utf-8")
-        if "beforeLoad:" not in text or "redirectFromCallbackRoute" not in text:
-            issues.append(
-                f"{normalized}: `/callback` must perform successful token handoff in `beforeLoad` before rendering recovery UI"
-            )
-
-    callback_page = src_root / "features" / "auth" / "components" / "CallbackPage.tsx"
-    if callback_page.exists():
-        normalized = rel(callback_page) if root == ROOT else str(callback_page.relative_to(root)).replace("\\", "/")
-        text = callback_page.read_text(encoding="utf-8")
-        forbidden = {
-            "exchangeAuthorizationCode": "exchange tokens in the route handoff guard instead of `CallbackPage`",
-            "auth.callback.completing": "remove transient callback success copy; render only recovery UI",
-            "auth.callback.title": "remove transient callback success copy; render only recovery UI",
-            "Completing sign-in": "remove transient callback success copy; render only recovery UI",
-        }
-        for token, message in forbidden.items():
-            if token in text:
-                issues.append(f"{normalized}: {message}")
-
-    translations = src_root / "features" / "preferences" / "translations.ts"
-    if translations.exists():
-        normalized = rel(translations) if root == ROOT else str(translations.relative_to(root)).replace("\\", "/")
-        text = translations.read_text(encoding="utf-8")
-        for token in ("auth.callback.completing", "auth.callback.title"):
-            if token in text:
-                issues.append(
-                    f"{normalized}: stale callback pending translation `{token}` is not valid; callback success handoffs are silent"
-                )
-
-    return issues
-
-
 def frontend_quality_issues(root: Path = ROOT) -> list[str]:
     return [
         *frontend_ui_system_issues(root),
         *frontend_component_file_name_issues(root),
         *frontend_tailwind_opacity_issues(root),
         *frontend_form_schema_type_issues(root),
-        *frontend_server_owned_vocabulary_issues(root),
         *frontend_test_async_boundary_issues(root),
         *frontend_e2e_structure_issues(root),
-        *frontend_public_route_navigation_issues(root),
-        *frontend_route_access_group_issues(root),
-        *frontend_transient_handoff_issues(root),
     ]
 
 

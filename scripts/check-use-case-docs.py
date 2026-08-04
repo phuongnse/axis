@@ -43,23 +43,12 @@ IMPLEMENTATION_STATUS_REQUIRED_MARKERS = (
     ("> **Decisions:**", "decisions"),
 )
 IMPLEMENTATION_STATUS_VALUES = {"Done", "Partial", "Not started", "N/A"}
-PENDING_STATUS_VALUES = {"Partial", "Not started"}
-GENERIC_STATUS_PROSE = (
-    "Open work remains in layers marked pending above.",
-    "Complete the open items listed in Gaps vs spec before marking this use case complete.",
-)
 
 AC_ID_RE = re.compile(r"\bAC-\d{3}\b")
 AT_ID_RE = re.compile(r"^AT-\d{3}$")
 AC_BULLET_RE = re.compile(r"^\s*-\s+(?P<body>.+)$", re.MULTILINE)
 AC_BOLD_ID_PREFIX_RE = re.compile(r"^\*\*(AC-\d{3})\*\*\s+\S")
 H2_RE = re.compile(r"^##\s+(.+?)\s*$", re.MULTILINE)
-IMPLEMENTATION_DETAIL_MATRIX_RE = re.compile(
-    r"(?:`?(?:frontend|src|tests|scripts|[.]agents)/[^`|\s]+`?)|"
-    r"(?:\bAxis[.][A-Za-z0-9_.]*Tests\b)|"
-    r"(?:\b[A-Za-z0-9_.]+[.](?:cs|tsx?|jsx?|mjs|py)\b)|"
-    r"(?:`?(?:dotnet|npm|npx|pnpm|yarn|python|docker(?:\s+compose)?)\b[^`|]*)"
-)
 ACCEPTANCE_MATRIX_COLUMNS = [
     "ID",
     "Boundary",
@@ -96,29 +85,6 @@ USE_CASE_TAIL_SECTION_ORDER = (
     "Diagrams",
     "Implementation status",
 )
-
-# Placeholder markers that must be replaced before a use case can be considered
-# written. Listed individually so the validator can point at the missing field.
-PURPOSE_PLACEHOLDERS = (
-    "_(One sentence about user value.)_",
-    "<One sentence about user value.>",
-)
-ACTOR_PLACEHOLDERS = (
-    "- _(Actor)_",
-    "- <actor>",
-)
-TRIGGER_PLACEHOLDERS = (
-    "- _(What starts the use case.)_",
-    "- <what starts the use case>",
-)
-# The 3-line stock Main flow shipped by the migration. If a use case still has
-# this verbatim, no real flow has been written yet.
-TEMPLATE_MAIN_FLOW = (
-    "1. Actor satisfies the trigger.\n"
-    "2. System performs the happy-path steps in Acceptance Criteria.\n"
-    "3. Actor receives the expected outcome."
-)
-
 
 @dataclass(frozen=True)
 class MarkdownTable:
@@ -257,15 +223,6 @@ def implementation_status_callout(text: str) -> str:
     return ""
 
 
-def callout_has_pending_layer(table: MarkdownTable | None) -> bool:
-    if table is None:
-        return False
-    return any(
-        record_for_row(table, row).get("Status", "") in PENDING_STATUS_VALUES
-        for row in table.rows
-    )
-
-
 def callout_section_content(callout: str, marker: str) -> list[str]:
     lines = callout.splitlines()
     for idx, line in enumerate(lines):
@@ -354,16 +311,6 @@ def validate_sections(doc: UseCaseDocument) -> list[str]:
             continue
         if heading not in doc.sections:
             issues.append(f"{rel}: missing {heading.lower()} section")
-
-    for placeholder in PURPOSE_PLACEHOLDERS:
-        if placeholder in doc.text:
-            issues.append(f"{rel}: Purpose still has placeholder `{placeholder}`")
-    for placeholder in ACTOR_PLACEHOLDERS:
-        if placeholder in doc.text:
-            issues.append(f"{rel}: Primary actor still has placeholder `{placeholder.strip()}`")
-    for placeholder in TRIGGER_PLACEHOLDERS:
-        if placeholder in doc.text:
-            issues.append(f"{rel}: Trigger still has placeholder `{placeholder.strip()}`")
 
     return issues
 
@@ -455,13 +402,6 @@ def validate_acceptance_contract(doc: UseCaseDocument, *, require_matrix: bool) 
     for idx, row in enumerate(table.rows, start=1):
         record = record_for_row(table, row)
         row_label = record.get("ID") or f"row {idx}"
-        for cell in row:
-            if IMPLEMENTATION_DETAIL_MATRIX_RE.search(cell):
-                issues.append(
-                    f"{rel}: Acceptance Test Matrix {row_label} contains implementation details; "
-                    "use runner/tool names only, not file paths, class names, or commands",
-                )
-
         at_id = record.get("ID", "")
         if not AT_ID_RE.fullmatch(at_id):
             issues.append(f"{rel}: Acceptance Test Matrix row {idx} has invalid ID `{at_id}`")
@@ -702,18 +642,6 @@ def validate_implementation_status(doc: UseCaseDocument, *, strict_status: bool)
             content = callout_section_content(callout, marker)
             if not content:
                 issues.append(f"{rel}: implementation status {label} section is empty")
-            if any(generic in line for generic in GENERIC_STATUS_PROSE for line in content):
-                issues.append(f"{rel}: implementation status {label} uses generic placeholder prose")
-        if callout_has_pending_layer(status_table):
-            if any(
-                line in {
-                    "> **Gaps vs spec:** none",
-                    "> **Gaps vs spec:** none.",
-                    "> **Gaps vs spec:** none for the current documented scope.",
-                }
-                for line in callout.splitlines()
-            ):
-                issues.append(f"{rel}: pending layer cannot use `Gaps vs spec: none`")
 
     return issues
 
@@ -733,10 +661,6 @@ def check_file(
     issues.extend(validate_diagrams(doc))
     issues.extend(validate_implementation_status(doc, strict_status=strict_status))
     return issues
-
-
-def count_template_main_flow(files: list[Path]) -> int:
-    return sum(1 for p in files if TEMPLATE_MAIN_FLOW in p.read_text(encoding="utf-8"))
 
 
 def diff_range_against_base() -> str:
@@ -867,44 +791,13 @@ def changed_use_case_content_outside_status(path: Path, range_spec: str) -> bool
     return material_change_snapshot(previous) != material_change_snapshot(current)
 
 
-def check_changed_stock_main_flow(files: list[Path]) -> list[str]:
-    """Ratchet: existing stock flows are debt; content edits must replace them."""
-    range_spec = diff_range_against_base()
-    changed = set(changed_paths_against_base())
-    if not changed:
-        return []
-
-    issues: list[str] = []
-    for path in files:
-        resolved = path.resolve()
-        if resolved not in changed:
-            continue
-        if TEMPLATE_MAIN_FLOW not in path.read_text(encoding="utf-8"):
-            continue
-        if not changed_use_case_content_outside_status(path, range_spec):
-            continue
-        rel = path.relative_to(ROOT)
-        issues.append(
-            f"{rel}: changed use-case content still has the stock Main flow — replace it with the real user/system flow"
-        )
-    return issues
-
-
 # Row in a domain README that references `./README.md` from inside that same
 # README is a self-link — it resolves to the current page and conveys
 # nothing.
 SELF_LINK_RE = re.compile(r"\]\(\./README\.md(?:#[^)]*)?\)")
 
-# Suspected truncation in a `| ... | summary |` row: the summary cell ends
-# without sentence-terminating punctuation and is roughly the length of the
-# old hard 100-char cut. Tolerates legit short cells (≤80 chars), legit
-# punctuation, and lines that are not table rows.
-TABLE_ROW_RE = re.compile(r"^\|[^|]+\|\s*([^|]+?)\s*\|\s*$", re.MULTILINE)
-TRUNCATION_TERMINAL = (".", "?", "!", "…", ":")
-
-
 def check_domain_readme(path: Path) -> list[str]:
-    """Domain README-only checks (self-links + truncated table rows)."""
+    """Validate domain README link structure."""
     issues: list[str] = []
     text = path.read_text(encoding="utf-8")
     rel = path.relative_to(ROOT)
@@ -913,27 +806,6 @@ def check_domain_readme(path: Path) -> list[str]:
         line_no = text.count("\n", 0, match.start()) + 1
         issues.append(
             f"{rel}:{line_no}: self-link to ./README.md — replace with a real use-case slug or drop the link"
-        )
-
-    in_use_cases_section = False
-    for idx, line in enumerate(text.splitlines(), start=1):
-        stripped = line.strip()
-        if stripped.startswith("## Use Cases") or stripped.startswith("### "):
-            in_use_cases_section = stripped == "## Use Cases" or in_use_cases_section
-        if stripped.startswith("## ") and not stripped.startswith("## Use Cases"):
-            in_use_cases_section = False
-        if not in_use_cases_section:
-            continue
-        match = TABLE_ROW_RE.match(line)
-        if not match:
-            continue
-        summary = match.group(1).strip()
-        if len(summary) < 80:
-            continue
-        if summary.endswith(TRUNCATION_TERMINAL):
-            continue
-        issues.append(
-            f"{rel}:{idx}: suspected truncated summary row (no terminal punctuation, {len(summary)} chars): {summary[-40:]!r}"
         )
 
     return issues
@@ -981,10 +853,6 @@ def main() -> int:
                 require_acceptance_matrix=requires_matrix,
             )
         )
-    try:
-        issues.extend(check_changed_stock_main_flow(files))
-    except RuntimeError as exc:
-        issues.append(str(exc))
     for readme in iter_domain_readmes():
         issues.extend(check_domain_readme(readme))
 
@@ -994,15 +862,7 @@ def main() -> int:
             print(f"  - {issue}", file=sys.stderr)
         return 1
 
-    # Soft signal: number of use cases that still ship the stock Main flow.
-    # Tracked here so the debt is visible without blocking the build.
-    stub_count = count_template_main_flow(files)
-    if stub_count:
-        print(
-            f"check-use-case-docs: OK ({stub_count} of {len(files)} files still have the stock Main flow)"
-        )
-    else:
-        print("check-use-case-docs: OK")
+    print("check-use-case-docs: OK")
     return 0
 
 

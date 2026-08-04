@@ -82,7 +82,7 @@ The sweep must show only the intentional fail-closed API branch, fixed authoriza
 - Browser journey for MCP authorization through the real sign-in form to the loopback callback, plus the existing sign-in journey with same-origin `/connect` proof.
 - Redis-backed API fixture evidence for the distributed request cache.
 - MCP coverage, contract, and safety checks; supported client reload/reconnect and authenticated `tools/call` read-back remain required runtime evidence.
-- Before publication: `$axis-ready-review`, completed independent Sol implementation review, and a fresh supported-client runtime result. A running or timed-out reviewer is not a verdict.
+- Before publication: `$axis-review-readiness`, completed configured independent implementation review, and a fresh supported-client runtime result. A running or timed-out reviewer is not a verdict.
 
 ## Acceptance and status boundary
 

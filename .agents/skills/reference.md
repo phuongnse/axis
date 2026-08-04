@@ -1,6 +1,6 @@
 # Axis Skill Workflow Contract
 
-Universal semantics for every repo skill. Intent routing lives in [README.md](./README.md); domain decisions stay in the selected owner skill or owner document.
+Universal semantics for every repo skill. Intent routing lives in [README.md](./README.md), cross-skill topology lives in [workflows.toml](./workflows.toml), and domain decisions stay in the selected owner skill or owner document. Deterministic checks validate structure and graph integrity; realistic forward tests validate prose behavior.
 
 ## Universal gates
 

@@ -23,7 +23,7 @@ No blank in-scope rows; required AT rows name verification categories; incomplet
 
 ## Review Verification
 
-During development, run the smallest check that proves the edit. Before review, use `$axis-ready-review`.
+During development, run the smallest check that proves the edit. Before independent review, use `$axis-review-readiness`.
 
 Only claim a full local suite when full `python scripts/axis.py dotnet test` ran, including integration/API tests. CI remains authoritative before merge.
 
@@ -44,7 +44,7 @@ Pure refactor/style/test-only changes can report docs as not triggered.
 
 ## Retrospective Review
 
-Use `$axis-ready-review` and apply [`.agents/skills/reference.md § Improvement loop`](../../.agents/skills/reference.md#improvement-loop). Record one outcome instead of adding retrospective prose.
+Use `$axis-review-readiness` and apply [`.agents/skills/reference.md § Improvement loop`](../../.agents/skills/reference.md#improvement-loop). Record one outcome instead of adding retrospective prose.
 
 ## Layer Status
 

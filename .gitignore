@@ -5,6 +5,7 @@
 .codex/*
 !.codex/config.toml
 !.codex/check.py
+!.codex/orchestration.toml
 !.codex/agents/
 !.codex/hooks/
 .codex/hooks/*

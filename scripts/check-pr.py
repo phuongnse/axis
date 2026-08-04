@@ -18,8 +18,7 @@ from pathlib import Path
 COMMENT_RE = re.compile(r"<!--.*?-->", re.DOTALL)
 HEADING_RE = re.compile(r"^##\s+(.+?)\s*$", re.MULTILINE)
 CHECKBOX_RE = re.compile(r"^\s*-\s+\[(?P<state>[ xX])\]\s+(?P<label>.+)$", re.MULTILINE)
-NA_REASON_RE = re.compile(r"\bN/A\b\s*(?:[-:\u2014]|\()\s*\S+", re.IGNORECASE)
-PR_TITLE_RE = re.compile(r"^[a-z]+(?:\([a-z0-9-]+\))?!?: .{8,}$")
+PR_TITLE_RE = re.compile(r"^[a-z]+(?:\([a-z0-9-]+\))?!?: \S.*$")
 BRANCH_RE = re.compile(r"^(?:feat|fix|docs|refactor|test|chore)/[a-z0-9]+(?:-[a-z0-9]+)*$")
 RENOVATE_BRANCH_RE = re.compile(r"^renovate/[a-z0-9](?:[a-z0-9._/-]*[a-z0-9])?$")
 
@@ -52,12 +51,6 @@ def sections(body: str) -> dict[str, str]:
 
 def section_text(parts: dict[str, str], name: str) -> str:
     return strip_comments(parts.get(name, "")).strip()
-
-
-def has_na_reason(line: str) -> bool:
-    if "N/A with reason" in line:
-        return False
-    return bool(NA_REASON_RE.search(line))
 
 
 def validate_title(title: str) -> list[str]:
@@ -98,14 +91,12 @@ def validate_body(body: str) -> list[str]:
             issues.append(f"Missing section: ## {required}")
 
     summary = section_text(parts, "Summary")
-    if "Summary" in parts and len(summary) < 20:
-        issues.append("Summary must be filled in with at least 20 non-comment characters")
+    if "Summary" in parts and not summary:
+        issues.append("Summary must be filled in")
 
     linked_spec = section_text(parts, "Linked spec")
     if "Linked spec" in parts and not linked_spec:
-        issues.append("Linked spec must name the spec/doc path, or state N/A with a reason")
-    elif "Linked spec" in parts and linked_spec.upper() == "N/A":
-        issues.append("Linked spec uses N/A without a reason")
+        issues.append("Linked spec must be filled in")
 
     requirements = parts.get("Requirements & rules followed", "")
     checkboxes = list(CHECKBOX_RE.finditer(requirements))
@@ -113,13 +104,9 @@ def validate_body(body: str) -> list[str]:
         issues.append("Requirements section must include checklist items from the PR template")
 
     for match in checkboxes:
-        line = match.group(0).strip()
         state = match.group("state")
-        if "N/A with reason" in line:
-            issues.append(f"Replace placeholder `N/A with reason` with a concrete reason: {line}")
-            continue
-        if state == " " and not has_na_reason(line):
-            issues.append(f"Requirement is unchecked without N/A reason: {line}")
+        if state == " ":
+            issues.append(f"Requirement is unchecked: {match.group(0).strip()}")
 
     return issues
 

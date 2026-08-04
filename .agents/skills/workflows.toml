@@ -1,0 +1,44 @@
+version = 1
+
+[semantic_roles]
+independent-reviewer = "axis_reviewer"
+
+[workflows.review]
+initial = "checkpoint"
+terminal_states = ["review-approved", "published"]
+states = ["checkpoint", "ready-for-review", "review-approved", "changes-requested", "published"]
+
+[[workflows.review.transitions]]
+id = "verify-readiness"
+from = "checkpoint"
+to = "ready-for-review"
+owner = "skill:axis-review-readiness"
+evidence = "command:ready-review"
+
+[[workflows.review.transitions]]
+id = "approve-review"
+from = "ready-for-review"
+to = "review-approved"
+owner = "role:independent-reviewer"
+evidence = "completed-review-pass"
+
+[[workflows.review.transitions]]
+id = "request-changes"
+from = "ready-for-review"
+to = "changes-requested"
+owner = "role:independent-reviewer"
+evidence = "completed-review-findings"
+
+[[workflows.review.transitions]]
+id = "resolve-findings"
+from = "changes-requested"
+to = "checkpoint"
+owner = "skill:axis-review-feedback"
+evidence = "immutable-follow-up-checkpoint"
+
+[[workflows.review.transitions]]
+id = "publish"
+from = "review-approved"
+to = "published"
+owner = "skill:axis-pull-request"
+evidence = "validated-remote-state"

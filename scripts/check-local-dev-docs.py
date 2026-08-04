@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify docs/playbooks/local-dev.md matches local Docker Compose.
+"""Validate local-dev configuration invariants and documentation links.
 
 Usage:
   python3 scripts/check-local-dev-docs.py          # validate (exit 0/1)
@@ -21,8 +21,6 @@ MAIN_COMPOSE_FILE = ROOT / "docker-compose.yml"
 LOCAL_DEV_FILE = ROOT / "docs/playbooks/local-dev.md"
 TECH_STACK_FILE = ROOT / "docs/TECH_STACK.md"
 API_APPSETTINGS_FILE = ROOT / "src" / "Axis.Api" / "appsettings.json"
-VITE_CONFIG_FILE = ROOT / "frontend" / "vite.config.ts"
-FRONTEND_PKCE_FILE = ROOT / "frontend" / "src" / "features" / "auth" / "pkce.ts"
 LOCAL_BROWSER_APP_BASE_URL = "https://localhost:3000"
 LOCAL_OPENIDDICT_ISSUER = "https://localhost:5281"
 
@@ -33,20 +31,10 @@ SERVICE_BLOCK = re.compile(
     r"^  ([a-z0-9_-]+):\n((?:    .*\n)*)",
     re.MULTILINE,
 )
-PORT_MAPPING = re.compile(
-    r'^\s+-\s+"(?:127[.]0[.]0[.]1:)?(?:[$][{][A-Z0-9_]+:-(\d+)[}]|(\d+)):\d+"',
-    re.MULTILINE,
-)
-PROFILE_LINE = re.compile(r'^\s+profiles:\s*\[(.+)\]', re.MULTILINE)
 LOCAL_APP_BASE_URL_LINE = re.compile(
     rf'^\s+App__BaseUrl:\s+"(?:[$]{{APP_BASE_URL:-)?{re.escape(LOCAL_BROWSER_APP_BASE_URL)}(?:}})?"\s*$',
     re.MULTILINE,
 )
-
-
-def mentions_service(doc: str, service_name: str) -> bool:
-    service_pattern = re.compile(rf"(?<![a-z0-9_-]){re.escape(service_name)}(?![a-z0-9_-])")
-    return service_pattern.search(doc.lower()) is not None
 
 
 def services_section(text: str) -> str:
@@ -62,42 +50,6 @@ def services_section(text: str) -> str:
             break
         body.append(line)
     return "".join(body)
-
-
-def parse_compose(compose_file: Path) -> tuple[dict[str, list[int]], set[str], list[str]]:
-    text = compose_file.read_text(encoding="utf-8")
-    service_text = services_section(text)
-    services: dict[str, list[int]] = {}
-    optional_services: set[str] = set()
-    service_names: list[str] = []
-
-    for match in SERVICE_BLOCK.finditer(service_text):
-        name = match.group(1)
-        block = match.group(2)
-        if name == "volumes":
-            continue
-
-        service_names.append(name)
-
-        profile_match = PROFILE_LINE.search(block)
-        if profile_match:
-            optional_services.add(name)
-
-        ports = [int(default or literal) for default, literal in PORT_MAPPING.findall(block)]
-        if ports:
-            services[name] = ports
-
-    return services, optional_services, sorted(service_names)
-
-
-def mandatory_host_ports(services: dict[str, list[int]], optional: set[str]) -> set[int]:
-    ports: set[int] = set()
-    for name, mapped in services.items():
-        if name in optional:
-            continue
-        for host_port in mapped:
-            ports.add(host_port)
-    return ports
 
 
 def compose_has_local_app_base_url(compose_file: Path) -> bool:
@@ -221,34 +173,6 @@ def web_has_trusted_https_healthcheck(compose_file: Path) -> bool:
     return has_ca and has_https_probe and not disables_verification
 
 
-def web_uses_same_origin_connect(compose_file: Path) -> bool:
-    service_text = services_section(compose_file.read_text(encoding="utf-8"))
-    web_block = next(
-        (match.group(2) for match in SERVICE_BLOCK.finditer(service_text) if match.group(1) == "web"),
-        "",
-    )
-    environment = service_property(web_block, "environment")
-    return "VITE_CONNECT_URL" not in environment
-
-
-def vite_connect_proxy_preserves_browser_host(vite_config_file: Path) -> bool:
-    text = vite_config_file.read_text(encoding="utf-8")
-    return re.search(
-        r"['\"]?/connect['\"]?\s*:\s*\{[^}]*changeOrigin\s*:\s*false",
-        text,
-        re.DOTALL,
-    ) is not None
-
-
-def frontend_auth_uses_same_origin_connect(pkce_file: Path) -> bool:
-    text = pkce_file.read_text(encoding="utf-8")
-    return (
-        "VITE_CONNECT_URL" not in text
-        and "window.location.origin" in text
-        and "/connect/authorize" in text
-    )
-
-
 def api_appsettings_base_url(appsettings_file: Path) -> str | None:
     try:
         data = json.loads(appsettings_file.read_text(encoding="utf-8"))
@@ -286,26 +210,10 @@ def check_local_dev_doc() -> list[str]:
         errors.append(f"Missing {LOCAL_DEV_FILE.relative_to(ROOT)}")
     if not API_APPSETTINGS_FILE.is_file():
         errors.append(f"Missing {API_APPSETTINGS_FILE.relative_to(ROOT)}")
-    if not VITE_CONFIG_FILE.is_file():
-        errors.append(f"Missing {VITE_CONFIG_FILE.relative_to(ROOT)}")
-    if not FRONTEND_PKCE_FILE.is_file():
-        errors.append(f"Missing {FRONTEND_PKCE_FILE.relative_to(ROOT)}")
     if errors:
         return errors
 
-    main_services, main_optional, service_names = parse_compose(MAIN_COMPOSE_FILE)
     doc = LOCAL_DEV_FILE.read_text(encoding="utf-8")
-
-    doc_lower = doc.lower()
-
-    if "scripts/axis.py doctor" not in doc:
-        errors.append("local-dev.md should document the local environment doctor command")
-
-    if ".env.local" not in doc:
-        errors.append("local-dev.md should document the ignored local env file")
-
-    if "package-manager adapter" not in doc_lower or "binary/shim" not in doc_lower:
-        errors.append("local-dev.md should document the generic package-manager adapter")
 
     if not compose_has_local_app_base_url(MAIN_COMPOSE_FILE):
         errors.append(
@@ -319,23 +227,6 @@ def check_local_dev_doc() -> list[str]:
     if not web_has_trusted_https_healthcheck(MAIN_COMPOSE_FILE):
         errors.append("docker-compose.yml web service must expose a trusted HTTPS healthcheck")
 
-    if not web_uses_same_origin_connect(MAIN_COMPOSE_FILE):
-        errors.append(
-            "docker-compose.yml web service must keep browser authorization transport same-origin "
-            "without VITE_CONNECT_URL"
-        )
-
-    if not vite_connect_proxy_preserves_browser_host(VITE_CONFIG_FILE):
-        errors.append(
-            "frontend/vite.config.ts /connect proxy must preserve the browser-facing Host"
-        )
-
-    if not frontend_auth_uses_same_origin_connect(FRONTEND_PKCE_FILE):
-        errors.append(
-            "frontend auth must build /connect requests from window.location.origin without "
-            "VITE_CONNECT_URL"
-        )
-
     if api_appsettings_base_url(API_APPSETTINGS_FILE) != LOCAL_BROWSER_APP_BASE_URL:
         errors.append(
             "src/Axis.Api/appsettings.json App:BaseUrl must default to "
@@ -347,47 +238,6 @@ def check_local_dev_doc() -> list[str]:
             "src/Axis.Api/appsettings.json OpenIddict:Issuer must default to "
             f"{LOCAL_OPENIDDICT_ISSUER} for local authorization"
         )
-
-    if (
-        "App:BaseUrl" not in doc
-        or LOCAL_BROWSER_APP_BASE_URL not in doc
-        or "browser-facing origin" not in doc_lower
-    ):
-        errors.append(
-            "local-dev.md should document App:BaseUrl as the browser-facing origin "
-            "used in verification email links"
-        )
-
-    if (
-        "OpenIddict:Issuer" not in doc
-        or LOCAL_OPENIDDICT_ISSUER not in doc
-        or "/connect" not in doc
-        or "current web origin" not in doc_lower
-    ):
-        errors.append(
-            "local-dev.md should document the canonical OpenIddict issuer and same-origin "
-            "browser /connect transport"
-        )
-
-    for host_port in sorted(mandatory_host_ports(main_services, main_optional)):
-        if str(host_port) not in doc:
-            errors.append(
-                f"local-dev.md missing host port {host_port} "
-                f"(published by docker-compose.yml)"
-            )
-
-    for service_name in service_names:
-        if not mentions_service(doc, service_name):
-            errors.append(
-                f"local-dev.md missing service name '{service_name}' "
-                f"(defined in docker-compose.yml)"
-            )
-
-    if "observability" not in doc_lower:
-        errors.append("local-dev.md missing observability profile documentation")
-
-    if "MigrateAsync" not in doc:
-        errors.append("local-dev.md should document Identity MigrateAsync database startup")
 
     if TECH_STACK_FILE.is_file():
         tech_stack_text = TECH_STACK_FILE.read_text(encoding="utf-8")

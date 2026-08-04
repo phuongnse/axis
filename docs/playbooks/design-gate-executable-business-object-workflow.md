@@ -6,7 +6,7 @@
 
 This is a full Design Gate for the first executable Draft → Submitted Business Object workflow. The slice is high-risk because it spans new REST/OpenAPI operations, migration-backed persistence, optimistic concurrency, authentication/workspace isolation, MCP mutation tools, generated client contracts, and a new interactive SPA journey.
 
-The correction checkpoint covers the existing implementation and the Sol review findings. It does not expand the product into generic workflow authoring, assignments, approvals, notifications, or additional record mutations.
+The correction checkpoint covers the existing implementation and independent review findings. It does not expand the product into generic workflow authoring, assignments, approvals, notifications, or additional record mutations.
 
 ## Governing rules
 
@@ -60,7 +60,7 @@ docs/use-cases/business-objects/submit-business-object-record.evidence.md
 - API tests plus `python scripts/axis.py generate api-contracts`, `check frontend-api-contracts`, and generated-client callers for status/body/required-field parity.
 - Frontend component tests for mismatch recovery, complete evidence, choice cardinality/labels, pagination, and submitted read-only detail; focused browser recovery and success journeys.
 - MCP contract, API coverage, safety, and authenticated supported-client lifecycle evidence; protocol-only evidence remains explicitly separate from live-agent evidence.
-- Before publication: clean committed checkpoint, independent Sol review completed (not merely running or timed out), `python scripts/axis.py ready-review`, and exact PR metadata validation.
+- Before publication: clean committed checkpoint, `$axis-review-readiness`, configured independent review completed (not merely running or timed out), and exact PR metadata validation.
 
 ## Acceptance and status boundary
 

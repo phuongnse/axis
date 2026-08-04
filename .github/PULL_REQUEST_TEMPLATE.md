@@ -8,10 +8,10 @@
 
 ## Requirements & rules followed
 
-<!-- Check each item, or keep unchecked with a concrete N/A reason on the same line. -->
+<!-- Check each item after satisfying it or confirming that it does not apply. -->
 
 - [ ] **Spec/code** — matches owning acceptance criteria and current docs.
-- [ ] **Ready review** — completed before publication.
+- [ ] **Review readiness** — completed before publication.
 - [ ] **Verification** — triggered local checks ran and passed.
 - [ ] **Docs/status** — owning docs updated when behavior, status, or workflow changed.
 - [ ] **UI system** — baseline unchanged, or provenance, required sign-off/exception metadata, and baseline evidence are included.

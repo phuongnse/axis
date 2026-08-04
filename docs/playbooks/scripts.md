@@ -69,6 +69,7 @@
 - Put shared repository discovery in [scripts/axis_repo.py](../../scripts/axis_repo.py), portable setup ownership in [scripts/axis_setup.py](../../scripts/axis_setup.py), and coherent policy domains in small modules such as [scripts/axis_frontend_policy.py](../../scripts/axis_frontend_policy.py).
 - Keep top-level `scripts/*.py` files non-executable.
 - Keep [scripts/hooks/pre-push](../../scripts/hooks/pre-push) non-executable in the worktree; installation writes the executable copy under `.git/hooks`.
+- Deterministic guards must parse explicit structure, configuration, graphs, source symbols, or executable behavior. Do not infer semantic compliance from prose keywords, fragments, or wording.
 - New deterministic guards encode reusable current invariants. Keep incident details in regression fixtures, not guard rules or retired artifact names.
 - Command tests prove supported subcommands and current behavior.
 - Removed or renamed commands, markers, headings, and artifacts get a one-time `rg` sweep plus current owner links, not permanent denylist checks.
