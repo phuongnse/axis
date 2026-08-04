@@ -18,6 +18,9 @@ from pathlib import Path
 COMMENT_RE = re.compile(r"<!--.*?-->", re.DOTALL)
 HEADING_RE = re.compile(r"^##\s+(.+?)\s*$", re.MULTILINE)
 CHECKBOX_RE = re.compile(r"^\s*-\s+\[(?P<state>[ xX])\]\s+(?P<label>.+)$", re.MULTILINE)
+CHECKLIST_STATUS_RE = re.compile(r"\[status:\s*(?P<status>[a-z-]+)\]\s*$", re.IGNORECASE)
+CHECKLIST_REASON_RE = re.compile(r"\[reason:\s*(?P<reason>[^\]]*\S[^\]]*)\]", re.IGNORECASE)
+CHECKLIST_STATUSES = {"satisfied", "not-applicable", "pending"}
 PR_TITLE_RE = re.compile(r"^[a-z]+(?:\([a-z0-9-]+\))?!?: \S.*$")
 BRANCH_RE = re.compile(r"^(?:feat|fix|docs|refactor|test|chore)/[a-z0-9]+(?:-[a-z0-9]+)*$")
 RENOVATE_BRANCH_RE = re.compile(r"^renovate/[a-z0-9](?:[a-z0-9._/-]*[a-z0-9])?$")
@@ -104,9 +107,23 @@ def validate_body(body: str) -> list[str]:
         issues.append("Requirements section must include checklist items from the PR template")
 
     for match in checkboxes:
+        line = match.group(0).strip()
         state = match.group("state")
-        if state == " ":
-            issues.append(f"Requirement is unchecked: {match.group(0).strip()}")
+        status_match = CHECKLIST_STATUS_RE.search(line)
+        if status_match is None:
+            issues.append(f"Requirement is missing a structured status: {line}")
+            continue
+        status = status_match.group("status").lower()
+        if status not in CHECKLIST_STATUSES:
+            issues.append(f"Requirement has invalid status `{status}`: {line}")
+            continue
+        checked = state.lower() == "x"
+        if status == "pending" and checked:
+            issues.append(f"Pending requirement must be unchecked: {line}")
+        elif status != "pending" and not checked:
+            issues.append(f"Resolved requirement must be checked: {line}")
+        if status == "not-applicable" and CHECKLIST_REASON_RE.search(line) is None:
+            issues.append(f"Not-applicable requirement must include `[reason: ...]`: {line}")
 
     return issues
 

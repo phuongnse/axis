@@ -100,7 +100,12 @@ The existing sign-in labels, validation, focus, keyboard, localization, loading,
 > | Frontend | Partial |
 > | MCP | Partial |
 >
-> **Gaps vs spec:** The supported app-managed MCP client journey, registered loopback callback, and authenticated list/read-back now have live proof. Durable browser automation and supported client callback-failure/timeout evidence remain unverified.
+> **Gaps vs spec:**
+>
+> | ID | Gap |
+> |---|---|
+> | GAP-001 | Durable browser automation remains unverified. |
+> | GAP-002 | Supported client callback-failure and timeout evidence remain unverified. |
 >
 > **Deferred follow-ups:** Reauthentication semantics for `prompt=login`, replacing the fixed MCP loopback callback port with an ephemeral port, and OpenIddict package lifecycle review remain outside this checkpoint.
 >

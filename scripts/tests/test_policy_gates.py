@@ -188,9 +188,9 @@ This summary is long enough.
 docs/use-cases/example/README.md
 
 ## Requirements & rules followed
-- [ ] **Verification gate** - local checks
+- [ ] **Verification gate** - local checks [status: pending]
 """
-        self.assertTrue(check_pr.validate("feat(example): improve gates", body))
+        self.assertEqual([], check_pr.validate("feat(example): improve gates", body))
 
     def test_accepts_checked_requirement(self) -> None:
         body = """## Summary
@@ -200,9 +200,35 @@ This summary is long enough.
 docs/use-cases/example/README.md
 
 ## Requirements & rules followed
-- [x] **Verification gate** - local checks
+- [x] **Verification gate** - local checks [status: satisfied]
 """
         self.assertEqual([], check_pr.validate("feat(example): improve gates", body))
+
+    def test_rejects_pending_checked_requirement(self) -> None:
+        body = """## Summary
+Summary.
+
+## Linked spec
+N/A
+
+## Requirements & rules followed
+- [x] **Verification gate** - waiting for CI [status: pending]
+"""
+
+        self.assertIn("Pending requirement must be unchecked", "\n".join(check_pr.validate("fix: x", body)))
+
+    def test_rejects_not_applicable_without_structured_reason(self) -> None:
+        body = """## Summary
+Summary.
+
+## Linked spec
+N/A
+
+## Requirements & rules followed
+- [x] **Spec/code** [status: not-applicable]
+"""
+
+        self.assertIn("must include `[reason: ...]`", "\n".join(check_pr.validate("fix: x", body)))
 
 
 class TestUseCaseDocsGate(unittest.TestCase):
@@ -389,6 +415,50 @@ Ship user value.
 > | Frontend | N/A |
 >
 > **Gaps vs spec:** none.
+>
+> **Deferred follow-ups:** N/A.
+>
+> **Verification:** N/A.
+>
+> **Decisions:** N/A.
+"""
+        )
+
+        self.assertEqual([], issues)
+
+    def test_rejects_partial_status_without_structured_gap_rows(self) -> None:
+        issues = self.issues_for_use_case(
+            """> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | API | Partial |
+>
+> **Gaps vs spec:** none.
+>
+> **Deferred follow-ups:** N/A.
+>
+> **Verification:** N/A.
+>
+> **Decisions:** N/A.
+"""
+        )
+
+        self.assertIn("Gaps vs spec must contain a markdown table", "\n".join(issues))
+
+    def test_accepts_partial_status_with_structured_gap_rows(self) -> None:
+        issues = self.issues_for_use_case(
+            """> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | API | Partial |
+>
+> **Gaps vs spec:**
+>
+> | ID | Gap |
+> |---|---|
+> | GAP-001 | Runtime evidence remains pending. |
 >
 > **Deferred follow-ups:** N/A.
 >

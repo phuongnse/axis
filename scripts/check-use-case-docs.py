@@ -43,6 +43,8 @@ IMPLEMENTATION_STATUS_REQUIRED_MARKERS = (
     ("> **Decisions:**", "decisions"),
 )
 IMPLEMENTATION_STATUS_VALUES = {"Done", "Partial", "Not started", "N/A"}
+GAP_TABLE_COLUMNS = ["ID", "Gap"]
+GAP_ID_RE = re.compile(r"^GAP-\d{3}$")
 
 AC_ID_RE = re.compile(r"\bAC-\d{3}\b")
 AT_ID_RE = re.compile(r"^AT-\d{3}$")
@@ -223,7 +225,7 @@ def implementation_status_callout(text: str) -> str:
     return ""
 
 
-def callout_section_content(callout: str, marker: str) -> list[str]:
+def callout_section(callout: str, marker: str) -> str:
     lines = callout.splitlines()
     for idx, line in enumerate(lines):
         if not line.startswith(marker):
@@ -235,13 +237,15 @@ def callout_section_content(callout: str, marker: str) -> list[str]:
         for next_line in lines[idx + 1 :]:
             if next_line.startswith("> **") and ":**" in next_line:
                 break
-            if next_line.startswith("> |"):
-                break
             stripped = next_line.removeprefix(">").strip()
             if stripped:
                 content.append(stripped)
-        return content
-    return []
+        return "\n".join(content)
+    return ""
+
+
+def callout_section_content(callout: str, marker: str) -> list[str]:
+    return callout_section(callout, marker).splitlines()
 
 
 def check_use_case_inventory_layout() -> list[str]:
@@ -625,9 +629,11 @@ def validate_implementation_status(doc: UseCaseDocument, *, strict_status: bool)
             exact_columns=IMPLEMENTATION_STATUS_COLUMNS,
         )
     )
+    statuses: list[str] = []
     if status_table is not None:
         for idx, row in enumerate(status_table.rows, start=1):
             status = record_for_row(status_table, row).get("Status", "")
+            statuses.append(status)
             if status not in IMPLEMENTATION_STATUS_VALUES:
                 issues.append(
                     f"{rel}: Implementation status row {idx} has invalid Status `{status}`; "
@@ -642,6 +648,32 @@ def validate_implementation_status(doc: UseCaseDocument, *, strict_status: bool)
             content = callout_section_content(callout, marker)
             if not content:
                 issues.append(f"{rel}: implementation status {label} section is empty")
+
+        if any(status in {"Partial", "Not started"} for status in statuses):
+            gaps_table = first_markdown_table(callout_section(callout, "> **Gaps vs spec:**"))
+            issues.extend(
+                validate_table_shape(
+                    gaps_table,
+                    rel=rel,
+                    label="Gaps vs spec",
+                    exact_columns=GAP_TABLE_COLUMNS,
+                )
+            )
+            if gaps_table is not None and gaps_table.headers == GAP_TABLE_COLUMNS:
+                gap_ids: set[str] = set()
+                for idx, row in enumerate(gaps_table.rows, start=1):
+                    record = record_for_row(gaps_table, row)
+                    gap_id = record.get("ID", "")
+                    if GAP_ID_RE.fullmatch(gap_id) is None:
+                        issues.append(
+                            f"{rel}: Gaps vs spec row {idx} has invalid ID `{gap_id}`; "
+                            "use GAP-001 format",
+                        )
+                    elif gap_id in gap_ids:
+                        issues.append(f"{rel}: Gaps vs spec has duplicate ID `{gap_id}`")
+                    gap_ids.add(gap_id)
+                    if not record.get("Gap", ""):
+                        issues.append(f"{rel}: Gaps vs spec row {idx} has an empty Gap")
 
     return issues
 

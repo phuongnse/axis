@@ -8,11 +8,11 @@
 
 ## Requirements & rules followed
 
-<!-- Check each item after satisfying it or confirming that it does not apply. -->
+<!-- Use checked + satisfied/not-applicable, or unchecked + pending. N/A needs [reason: ...]. -->
 
-- [ ] **Spec/code** — matches owning acceptance criteria and current docs.
-- [ ] **Review readiness** — completed before publication.
-- [ ] **Verification** — triggered local checks ran and passed.
-- [ ] **Docs/status** — owning docs updated when behavior, status, or workflow changed.
-- [ ] **UI system** — baseline unchanged, or provenance, required sign-off/exception metadata, and baseline evidence are included.
-- [ ] **No placeholders** — no new TODO/FIXME/stub/placeholder markers.
+- [ ] **Spec/code** — matches owning acceptance criteria and current docs. [status: pending]
+- [ ] **Review readiness** — completed before publication. [status: pending]
+- [ ] **Verification** — triggered local checks ran and passed. [status: pending]
+- [ ] **Docs/status** — owning docs updated when behavior, status, or workflow changed. [status: pending]
+- [ ] **UI system** — baseline unchanged, or provenance, required sign-off/exception metadata, and baseline evidence are included. [status: pending]
+- [ ] **No placeholders** — no new TODO/FIXME/stub/placeholder markers. [status: pending]
