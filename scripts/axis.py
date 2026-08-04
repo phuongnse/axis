@@ -2172,6 +2172,43 @@ def axis_command_route_message(
     return None
 
 
+def axis_command_template_option_message(
+    args: list[str],
+    *,
+    parser: argparse.ArgumentParser,
+) -> str | None:
+    current = parser
+    route_end = 0
+    for index, token in enumerate(args):
+        subcommands = next(
+            (
+                action
+                for action in current._actions
+                if isinstance(action, argparse._SubParsersAction)
+            ),
+            None,
+        )
+        if subcommands is None:
+            route_end = index
+            break
+        child = subcommands.choices.get(token)
+        if child is None:
+            return None
+        current = child
+        route_end = index + 1
+    if any(action.nargs == argparse.REMAINDER for action in current._actions):
+        return None
+    for token in args[route_end:]:
+        if token == "--":
+            break
+        if token.startswith("[") or not token.startswith("-"):
+            continue
+        option = token.split("=", 1)[0]
+        if option not in current._option_string_actions:
+            return f"unknown option `{option}` for the documented Axis command route"
+    return None
+
+
 def axis_command_syntax_message(
     fragment: str,
     *,
@@ -2197,7 +2234,11 @@ def axis_command_syntax_message(
     route_message = axis_command_route_message(command_tokens[2:], parser=parser)
     if route_message is not None:
         return route_message
-    if "..." in normalized or re.search(r"<[^>]+>|\[[^]]+\]", normalized):
+    command_text = " ".join(command_tokens)
+    if "..." in command_text or re.search(r"<[^>]+>|\[[^]]+\]", command_text):
+        option_message = axis_command_template_option_message(command_tokens[2:], parser=parser)
+        if option_message is not None:
+            return option_message
         return None
     try:
         parser.parse_args(command_tokens[2:])

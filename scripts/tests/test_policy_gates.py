@@ -1569,11 +1569,33 @@ class TestDocDriftRatchets(unittest.TestCase):
 
         self.assertIn("unknown command route `unsupported`", issues)
 
+    def test_rejects_unknown_options_in_documented_command_templates(self) -> None:
+        issues = self.documented_issue_text(
+            {
+                "docs/playbooks/example.md": (
+                    "`python scripts/axis.py doctor --unsupported <profile>`"
+                ),
+            }
+        )
+
+        self.assertIn("unknown option `--unsupported`", issues)
+
     def test_rejects_invalid_documented_commands_before_shell_redirection(self) -> None:
         issues = self.documented_issue_text(
             {
                 "docs/playbooks/example.md": (
                     "`python scripts/axis.py doctor --unsupported > doctor.txt`"
+                ),
+            }
+        )
+
+        self.assertIn("unrecognized arguments: --unsupported", issues)
+
+    def test_redirection_target_placeholder_does_not_hide_invalid_command(self) -> None:
+        issues = self.documented_issue_text(
+            {
+                "docs/playbooks/example.md": (
+                    "`python scripts/axis.py doctor --unsupported > <doctor-output>`"
                 ),
             }
         )
