@@ -10,6 +10,7 @@ namespace Axis.Api.Middleware;
 /// </summary>
 internal sealed class CorrelationIdMiddleware(RequestDelegate next)
 {
+    internal const string HttpContextItemKey = "Axis.CorrelationId";
     private const string HeaderName = "X-Correlation-Id";
     private const string WorkspaceIdClaim = "workspace_id";
 
@@ -18,6 +19,7 @@ internal sealed class CorrelationIdMiddleware(RequestDelegate next)
         string correlationId = context.Request.Headers[HeaderName].FirstOrDefault()
             ?? Activity.Current?.TraceId.ToString()
             ?? Guid.NewGuid().ToString();
+        context.Items[HttpContextItemKey] = correlationId;
 
         context.Response.OnStarting(() =>
         {

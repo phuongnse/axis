@@ -62,9 +62,10 @@ internal sealed class RuleDefinitionConfiguration : IEntityTypeConfiguration<Rul
         builder.Property(definition => definition.Description).HasColumnName("description").HasMaxLength(1000).IsRequired();
         builder.Property(definition => definition.Origin).HasColumnName("origin").HasConversion<string>().HasMaxLength(32).IsRequired();
         builder.Property(definition => definition.ExpressionLanguageVersion).HasColumnName("expression_language_version").IsRequired();
-        builder.Property(definition => definition.Status).HasColumnName("status").HasConversion<string>().HasMaxLength(32).IsRequired();
+        builder.Ignore(definition => definition.Status);
         builder.Property(definition => definition.Revision).HasColumnName("revision").IsRequired();
         builder.Property(definition => definition.LatestPublishedVersion).HasColumnName("latest_published_version");
+        builder.Property(definition => definition.ActiveVersion).HasColumnName("active_version");
         builder.Ignore(definition => definition.Inputs);
         builder.Ignore(definition => definition.Documentation);
         builder.Property<List<RuleInputDefinition>>("_inputs")
@@ -102,7 +103,7 @@ internal sealed class RuleDefinitionConfiguration : IEntityTypeConfiguration<Rul
             .HasComputedColumnSql("to_tsvector('simple', axis_unaccent(lower(coalesce(name, '') || ' ' || coalesce(description, '') || ' ' || coalesce(definition_key, ''))))", stored: true);
 
         builder.HasIndex(definition => new { definition.WorkspaceId, definition.Key }).IsUnique();
-        builder.HasIndex(definition => new { definition.WorkspaceId, definition.Status, definition.Name });
+        builder.HasIndex(definition => new { definition.WorkspaceId, definition.ArchivedAt, definition.ActiveVersion, definition.LatestPublishedVersion, definition.Name });
         builder.HasIndex("SearchTitle").HasDatabaseName("ix_rule_definitions_search_title").HasMethod("gin").HasOperators("gin_trgm_ops");
         builder.HasIndex("SearchText").HasDatabaseName("ix_rule_definitions_search_text").HasMethod("gin").HasOperators("gin_trgm_ops");
         builder.HasIndex("SearchVector").HasDatabaseName("ix_rule_definitions_search_vector").HasMethod("gin");
@@ -110,7 +111,7 @@ internal sealed class RuleDefinitionConfiguration : IEntityTypeConfiguration<Rul
         builder.HasMany(definition => definition.Versions)
             .WithOne()
             .HasForeignKey(version => version.DefinitionId)
-            .OnDelete(DeleteBehavior.Cascade)
+            .OnDelete(DeleteBehavior.Restrict)
             .IsRequired();
         builder.Navigation(definition => definition.Versions).HasField("_versions").UsePropertyAccessMode(PropertyAccessMode.Field);
     }

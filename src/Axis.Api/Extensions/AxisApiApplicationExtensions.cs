@@ -2,6 +2,7 @@ using Axis.Api.Endpoints;
 using Axis.Api.Middleware;
 using Axis.BusinessObjects.Infrastructure.Persistence;
 using Axis.Identity.Infrastructure.Persistence;
+using Axis.Rules.Domain;
 using Axis.Rules.Infrastructure.Persistence;
 using Axis.Shared.Infrastructure.Observability;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
@@ -15,6 +16,8 @@ internal static class AxisApiApplicationExtensions
 {
     public static async Task RunAxisStartupTasksAsync(this WebApplication app)
     {
+        _ = BuiltInRuleCatalog.Definitions.Count;
+
         if (!app.Environment.IsDevelopment() || EF.IsDesignTime)
             return;
 
@@ -47,8 +50,8 @@ internal static class AxisApiApplicationExtensions
         app.UseForwardedHeaders();
         app.UseAxisOpenTelemetry();
         app.UseMiddleware<ValidationExceptionMiddleware>();
-        app.UseRateLimiter();
         app.UseAuthentication();
+        app.UseRateLimiter();
         app.UseMiddleware<AxisAntiforgeryMiddleware>();
         app.UseMiddleware<CorrelationIdMiddleware>();
         app.UseSerilogRequestLogging();

@@ -1,11 +1,13 @@
-import { createFileRoute, isRedirect, Outlet, redirect } from '@tanstack/react-router';
+import { createFileRoute, isRedirect, Outlet, redirect, useRouter } from '@tanstack/react-router';
 import { AppShell } from '@/components/shared/AppShell';
-import { restoreBrowserSession } from '@/features/auth/api';
+import { BrowserSessionUnavailableError, restoreBrowserSession } from '@/features/auth/api';
 import { getBrowserSessionStatus } from '@/features/auth/auth-store';
+import { SessionUnavailablePage } from '@/features/auth/components/SessionUnavailablePage';
 
 export const Route = createFileRoute('/_authenticated')({
   beforeLoad: ensureAuthenticatedRouteSession,
   component: AuthenticatedLayout,
+  errorComponent: AuthenticatedRouteError,
 });
 
 export async function ensureAuthenticatedRouteSession(context: { preload?: boolean } = {}) {
@@ -26,8 +28,23 @@ export async function ensureAuthenticatedRouteSession(context: { preload?: boole
     if (isRedirect(error)) {
       throw error;
     }
-    throw redirect({ to: '/sign-in' });
+    if (error instanceof BrowserSessionUnavailableError) throw error;
+    throw new BrowserSessionUnavailableError();
   }
+}
+
+function AuthenticatedRouteError({ error, reset }: { error: Error; reset: () => void }) {
+  const router = useRouter();
+  if (!(error instanceof BrowserSessionUnavailableError)) throw error;
+
+  return (
+    <SessionUnavailablePage
+      onRetry={() => {
+        reset();
+        void router.invalidate();
+      }}
+    />
+  );
 }
 
 function AuthenticatedLayout() {

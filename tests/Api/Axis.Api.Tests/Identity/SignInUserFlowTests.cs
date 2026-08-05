@@ -56,6 +56,35 @@ public sealed class SignInUserFlowTests(ApiTestFixture fixture)
     }
 
     [Fact]
+    public async Task SignInUser_WhenReauthenticated_ReplacesThePriorOpaqueSession()
+    {
+        string email = UniqueEmail();
+        await RegisterAsync(email);
+        await VerifyEmailAsync(CapturedToken(email));
+
+        HttpResponseMessage firstSignIn = await SignInAsync(email, Password);
+        firstSignIn.StatusCode.Should().Be(HttpStatusCode.OK);
+        string previousSessionCookie = ReadSessionCookie(firstSignIn);
+
+        HttpResponseMessage secondSignIn = await SignInAsync(email, Password);
+        secondSignIn.StatusCode.Should().Be(HttpStatusCode.OK);
+        string replacementSessionCookie = ReadSessionCookie(secondSignIn);
+        replacementSessionCookie.Should().NotBe(previousSessionCookie);
+
+        using HttpClient oldSessionClient = fixture.CreateAnonymousClient();
+        oldSessionClient.DefaultRequestHeaders.Add("Cookie", previousSessionCookie);
+        HttpResponseMessage oldSessionResponse = await oldSessionClient.GetAsync(
+            "/api/users/me",
+            TestContext.Current.CancellationToken);
+        oldSessionResponse.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+
+        HttpResponseMessage replacementSessionResponse = await fixture.Client.GetAsync(
+            "/api/users/me",
+            TestContext.Current.CancellationToken);
+        replacementSessionResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact]
     public async Task SignInUser_WhenFieldsAreMissing_ReturnsValidationErrors()
     {
         HttpResponseMessage response = await SignInAsync("", "");
@@ -448,6 +477,14 @@ public sealed class SignInUserFlowTests(ApiTestFixture fixture)
         string requestUri = requestUriValue.ToString();
         requestUri.Should().StartWith(RequestUris.Prefixes.Generic);
         return requestUri;
+    }
+
+    private static string ReadSessionCookie(HttpResponseMessage response)
+    {
+        response.Headers.TryGetValues("Set-Cookie", out IEnumerable<string>? cookies).Should().BeTrue();
+        return cookies!
+            .Last(cookie => cookie.StartsWith("__Host-axis-session=", StringComparison.Ordinal))
+            .Split(';', 2)[0];
     }
 
     private static string ReadClientId(Uri location)

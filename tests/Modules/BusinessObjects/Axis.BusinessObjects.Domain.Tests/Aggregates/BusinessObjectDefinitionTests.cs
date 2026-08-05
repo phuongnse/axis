@@ -28,6 +28,36 @@ public sealed class BusinessObjectDefinitionTests
     }
 
     [Fact]
+    public void CreateUnpublished_WhenNameExceedsPersistenceLimit_ReturnsInvalidInput()
+    {
+        Result<BusinessObjectDefinition> result = BusinessObjectDefinition.CreateUnpublished(
+            WorkspaceId,
+            new string('n', 201),
+            BusinessObjectDefinitionKey.Create("customer").Value,
+            Now);
+
+        result.IsFailure.Should().BeTrue();
+        result.ErrorCode.Should().Be(ErrorCodes.InvalidInput);
+    }
+
+    [Fact]
+    public void SaveUnpublished_WhenFieldLabelExceedsPersistenceLimit_ReturnsInvalidInputWithoutMutation()
+    {
+        BusinessObjectDefinition definition = CreateUnpublished();
+
+        Result result = definition.SaveUnpublished(
+            "Customer",
+            [Field("name", new string('l', 201), order: 0)],
+            expectedRevision: 1,
+            Now);
+
+        result.IsFailure.Should().BeTrue();
+        result.ErrorCode.Should().Be(ErrorCodes.InvalidInput);
+        definition.Revision.Should().Be(1);
+        definition.Fields.Should().BeEmpty();
+    }
+
+    [Fact]
     public void SaveUnpublished_WhenFieldDefinitionsAreValid_PreservesStableFieldsAndIncrementsRevision()
     {
         BusinessObjectDefinition definition = CreateUnpublished();

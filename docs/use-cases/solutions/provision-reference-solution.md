@@ -82,7 +82,7 @@ Generated IDs, workspace/actor IDs, timestamps, source IDs, and concurrency revi
 - **AC-012** A semantic-identity collision with different content fails closed and never overwrites, adopts, renames, aliases, or duplicates the existing resource.
 - **AC-013** An API failure after partial progress returns exact completed/pending state; later resume requires fresh public read-back and refuses any conflicting change.
 - **AC-014** Read-back mismatch is a failed provisioning result, and logs/errors expose no token, authorization code, secret, or another workspace's resource data.
-- **AC-015** Product authentication uses the approved same-origin ASP.NET Core BFF as a confidential Axis OAuth/OIDC client with Authorization Code + PKCE, mandatory PAR, exact deployment-configured sign-in/sign-out redirects, server-side refresh/revocation, Redis-backed opaque session, and CSRF validation. Browser code receives no client secret, access/refresh token, or post-callback authorization code; product identity and secrets remain deployment-owned outside Axis source. Any signed-in target-workspace user may provision in Wave 0, while unauthenticated and cross-workspace access is rejected.
+- **AC-015** Product authentication uses the required same-origin ASP.NET Core BFF as a confidential Axis OAuth/OIDC client with Authorization Code + PKCE, mandatory PAR, exact deployment-configured sign-in/sign-out redirects, server-side refresh/revocation, Redis-backed opaque session, and CSRF validation. Browser code receives no client secret, access/refresh token, or post-callback authorization code; product identity and secrets remain deployment-owned outside Axis source. Any signed-in target-workspace user may provision in Wave 0, while unauthenticated and cross-workspace access is rejected.
 
 *Edge cases and boundaries*
 
@@ -133,22 +133,18 @@ Required UI quality: every plan entry and outcome is programmatically labelled; 
 >
 > | Layer | Status |
 > |---|---|
-> | Reference product source | Partial |
+> | Reference product source | Done |
 > | Axis Domain | N/A |
 > | Axis Application | Done |
 > | Axis Infrastructure | N/A |
 > | API and authentication | Done |
-> | Reference product client | Partial |
+> | Reference product client | Done |
 > | Axis frontend retirement | Done |
 >
-> **Gaps vs spec:**
->
-> | ID | Gap |
-> |---|---|
-> | GAP-001 | The Axis acceptance-evidence sidecar contract cannot yet represent independently versioned consumer paths and commands, so reference product source and client status remain Partial even though immutable product checkpoint `6eb817c02fda580fc9afee0c37b2b7e0a8c4735c` passed its required checks and blank-workspace journey. |
+> **Gaps vs spec:** none.
 >
 > **Deferred follow-ups:** Persisted, signed, installable and upgradeable Solutions packages begin after this consumer boundary passes; [docs/PLATFORM_STRATEGY.md](../../PLATFORM_STRATEGY.md#delivery-sequence) owns their sequence.
 >
-> **Verification:** Reference-product checkpoint `6eb817c02fda580fc9afee0c37b2b7e0a8c4735c` passes manifest/BFF checks, unit tests, and the blank-workspace authenticated browser journey. The current Axis checkpoint passes `python scripts/axis.py verify`, including API, Business Objects, MCP, frontend, docs, and policy evidence. Axis review-readiness and independent review remain pending; no pending boundary is treated as accepted.
+> **Verification:** [provision-reference-solution.evidence.md](./provision-reference-solution.evidence.md) binds every required AT to the immutable reference-product checkpoint `6eb817c02fda580fc9afee0c37b2b7e0a8c4735c` or its Axis-owned verification source. That external checkpoint passed manifest/BFF checks, unit tests, and the blank-workspace authenticated browser journey. The current Axis checkpoint passes `python scripts/axis.py verify`, including API, Business Objects, MCP, frontend, docs, and policy evidence. Axis review-readiness and independent review remain pending; no pending boundary is treated as accepted.
 >
-> **Decisions:** Wave 0 uses existing module mutation operations, one generic authenticated Rule Binding detail read, and a product-owned manifest/provisioning client instead of inventing a Solutions runtime. The manifest contract above owns exact semantic identity and canonical comparison; runtime-generated fields never become product identity. A blank workspace is a newly available authenticated workspace with platform built-ins but no reference-solution definitions, bindings, or records; other isolated workspaces may exist. No supported production consumer or data requires overlap with the Axis-owned sample, so the independent product replaces it through a clean cutover. Product authentication follows the approved enterprise browser BFF dossier: product-owned same-origin ASP.NET Core host, confidential client with PKCE/PAR, server-side refresh/revocation and opaque Redis session, finite YARP allowlist, and no browser credential path. Any signed-in target-workspace user may provision in Wave 0, while role-separated administration, dynamic registration, service identities, and concurrent installation are separate capabilities. Partial multi-operation provisioning is explicit and resumable from public read-back rather than disguised as an atomic install or distributed transaction. Event sourcing is not introduced.
+> **Decisions:** Wave 0 uses existing module mutation operations, one generic authenticated Rule Binding detail read, and a product-owned manifest/provisioning client instead of inventing a Solutions runtime. The manifest contract above owns exact semantic identity and canonical comparison; runtime-generated fields never become product identity. A blank workspace is a newly available authenticated workspace with platform built-ins but no reference-solution definitions, bindings, or records; other isolated workspaces may exist. No supported production consumer or data requires overlap with the Axis-owned sample, so the independent product replaces it through a clean cutover. Product authentication uses a product-owned same-origin ASP.NET Core host, confidential client with PKCE/PAR, server-side refresh/revocation and opaque Redis session, finite YARP allowlist, and no browser credential path. Any signed-in target-workspace user may provision in Wave 0, while role-separated administration, dynamic registration, service identities, and concurrent installation are separate capabilities. Partial multi-operation provisioning is explicit and resumable from public read-back rather than disguised as an atomic install or distributed transaction. Event sourcing is not introduced.

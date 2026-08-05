@@ -13,7 +13,7 @@ public sealed class ArchiveRuleDefinitionHandlerTests
     [Fact]
     public async Task Archive_WhenDefinitionIsPublished_ReturnsArchived()
     {
-        Axis.Rules.Domain.RuleDefinition definition = RuleDefinitionHandlerTestContext.PublishedDefinition();
+        Axis.Rules.Domain.RuleDefinition definition = RuleDefinitionHandlerTestContext.VersionedDefinition();
         _context.Repository.GetByKeyForWorkspaceAsync(
                 definition.Key,
                 RuleDefinitionHandlerTestContext.WorkspaceId,
@@ -33,7 +33,7 @@ public sealed class ArchiveRuleDefinitionHandlerTests
     }
 
     [Fact]
-    public async Task Archive_WhenDefinitionIsDraft_ReturnsInvalidWithoutPersistence()
+    public async Task Archive_WhenDefinitionIsDraft_ReturnsArchived()
     {
         Axis.Rules.Domain.RuleDefinition definition = RuleDefinitionHandlerTestContext.DraftDefinition();
         _context.Repository.GetByKeyForWorkspaceAsync(
@@ -50,15 +50,12 @@ public sealed class ArchiveRuleDefinitionHandlerTests
             new ArchiveRuleDefinitionCommand(definition.Key.Value, definition.Revision),
             CancellationToken.None);
 
-        result.IsFailure.Should().BeTrue();
-        result.ErrorCode.Should().Be(ErrorCodes.InvalidInput);
-        result.ProblemCode.Should().Be(RulesProblemCodes.DefinitionInvalid);
-        await _context.UnitOfWork.DidNotReceive()
-            .SaveChangesAsync(Arg.Any<CancellationToken>());
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Status.Should().Be(RuleLifecycleStatus.Archived);
     }
 
     [Fact]
-    public async Task Archive_WhenDefinitionIsSystem_ReturnsNotFoundWithoutPersistence()
+    public async Task Archive_WhenDefinitionIsBuiltIn_ReturnsNotFoundWithoutPersistence()
     {
         ArchiveRuleDefinitionHandler sut = new(
             _context.CurrentUser,
@@ -81,7 +78,7 @@ public sealed class ArchiveRuleDefinitionHandlerTests
     {
         Guid otherWorkspaceId = Guid.Parse("33333333-3333-4333-8333-333333333333");
         _context.CurrentUser.workspaceId.Returns(otherWorkspaceId);
-        Axis.Rules.Domain.RuleDefinition definition = RuleDefinitionHandlerTestContext.PublishedDefinition();
+        Axis.Rules.Domain.RuleDefinition definition = RuleDefinitionHandlerTestContext.VersionedDefinition();
         ArchiveRuleDefinitionHandler sut = new(
             _context.CurrentUser,
             _context.Repository,

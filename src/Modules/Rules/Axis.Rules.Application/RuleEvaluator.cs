@@ -66,11 +66,11 @@ public sealed class RuleEvaluator(IRuleDefinitionRepository repository) : IRuleE
         RuleEvaluationReference reference,
         CancellationToken cancellationToken)
     {
-        RuleDefinition? system = SystemRuleCatalog.Find(reference.DefinitionKey, reference.DefinitionVersion);
-        if (system is not null)
-            return system.FindVersion(reference.DefinitionVersion)!;
+        RuleDefinition? builtIn = BuiltInRuleCatalog.Find(reference.DefinitionKey, reference.DefinitionVersion);
+        if (builtIn is not null)
+            return builtIn.FindVersion(reference.DefinitionVersion)!;
 
-        if (SystemRuleCatalog.Definitions.Any(definition =>
+        if (BuiltInRuleCatalog.Definitions.Any(definition =>
                 definition.Key.Value.Equals(reference.DefinitionKey, StringComparison.Ordinal)))
             return Result.Failure<RuleDefinitionVersion>("version_not_found", "Published rule version was not found.");
 
@@ -82,7 +82,7 @@ public sealed class RuleEvaluator(IRuleDefinitionRepository repository) : IRuleE
             key.Value,
             workspaceId,
             cancellationToken);
-        if (definition is null || definition.Status == DomainLifecycleStatus.Archived)
+        if (definition is null)
             return Result.Failure<RuleDefinitionVersion>("definition_not_found", "Rule definition was not found.");
 
         RuleDefinitionVersion? version = definition.FindVersion(reference.DefinitionVersion);

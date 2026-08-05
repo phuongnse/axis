@@ -37,7 +37,8 @@ internal static class RuleBindingContractMapper
             binding.UseCaseOrTrigger,
             binding.Priority,
             binding.Enabled,
-            (ContractFailureBehavior)binding.FailureBehavior);
+            (ContractFailureBehavior)binding.FailureBehavior,
+            binding.Revision);
 
     public static Result<IReadOnlyDictionary<string, RuleInputMapping>> ToDomain(
         IReadOnlyDictionary<string, RuleInputMappingDto>? mappings)
@@ -48,6 +49,8 @@ internal static class RuleBindingContractMapper
         Dictionary<string, RuleInputMapping> result = new(StringComparer.Ordinal);
         foreach ((string key, RuleInputMappingDto mapping) in mappings)
         {
+            if (string.IsNullOrWhiteSpace(key) || mapping is null)
+                return Result.Failure<IReadOnlyDictionary<string, RuleInputMapping>>("Rule binding input mappings must contain a key and value.");
             Result<RuleInputMapping> mapped = mapping.Kind switch
             {
                 ContractMappingKind.Context => RuleInputMapping.FromContext(mapping.ContextKey ?? string.Empty),

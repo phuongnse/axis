@@ -21,12 +21,6 @@ Axis is an open-source enterprise application platform engineered under the prod
 |---|---|
 | [docs/playbooks/agent-checklist.md](./playbooks/agent-checklist.md) | Review checkpoints and verification boundary. |
 | [docs/playbooks/design-gate.md](./playbooks/design-gate.md) | Required reasoning artifact before non-trivial changes. |
-| [docs/playbooks/design-gate-structural-agent-workflows.md](./playbooks/design-gate-structural-agent-workflows.md) | Corrective full dossier for structural agent workflows and policy guards. |
-| [docs/playbooks/design-gate-executable-business-object-workflow.md](./playbooks/design-gate-executable-business-object-workflow.md) | Current full dossier for the executable Business Object workflow. |
-| [docs/playbooks/design-gate-mcp-browser-authorization.md](./playbooks/design-gate-mcp-browser-authorization.md) | Current full dossier for the local MCP browser-authorization handoff. |
-| [docs/playbooks/design-gate-enterprise-production-baseline.md](./playbooks/design-gate-enterprise-production-baseline.md) | Project-wide enterprise-production decision baseline. |
-| [docs/playbooks/design-gate-browser-bff.md](./playbooks/design-gate-browser-bff.md) | Proposed enterprise browser BFF trust, session, and deployment boundary. |
-| [docs/playbooks/design-gate-reference-solution-consumer-boundary.md](./playbooks/design-gate-reference-solution-consumer-boundary.md) | Current full dossier for the Wave 0 independent-product consumer boundary. |
 | [docs/playbooks/api-patterns.md](./playbooks/api-patterns.md) | REST/OpenAPI and API-type change guidance. |
 | [docs/playbooks/frontend.md](./playbooks/frontend.md) | SPA implementation guidance. |
 | [docs/playbooks/client-experience.md](./playbooks/client-experience.md) | Self-directed client, UI, and UX decisions. |

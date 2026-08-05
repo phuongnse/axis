@@ -160,21 +160,16 @@ sequenceDiagram
 > |-------|--------|
 > | Domain | Done |
 > | Application | Done |
-> | Infrastructure | Partial |
-> | API | Partial |
-> | Frontend | Partial |
+> | Infrastructure | Done |
+> | API | Done |
+> | Frontend | Done |
 >
-> **Implemented:** Credential, account-readiness, workspace, sign-in form, verification-required, resend, error, and route-intent behavior exist. The current browser session implementation is the retired public-PKCE/memory-token path and is not acceptance evidence for the approved server-session contract.
+> **Implemented:** Credential, account-readiness, workspace, sign-in form, verification-required, resend, route-intent, opaque Redis session bootstrap/rotation, antiforgery, cookie/bearer selection, protected-route restore, and retryable unavailable-session behavior are implemented without the retired browser PKCE/memory-token path.
 >
-> **Gaps vs spec:**
->
-> | ID | Gap |
-> |---|---|
-> | GAP-001 | Redis-backed opaque Axis session, session bootstrap, explicit cookie/bearer selection, antiforgery, multi-instance key/session sharing, and fail-closed runtime evidence are not implemented. |
-> | GAP-002 | Browser callback, PKCE, and memory-token source/tests/docs must be removed in the same clean cutover. |
+> **Gaps vs spec:** None.
 >
 > **Deferred follow-ups:** N/A.
 >
-> **Verification:** Existing credential and UI behavior has evidence; revised AT-001, AT-003, AT-009, AT-013, AT-015, and AT-016 require fresh server-session evidence.
+> **Verification:** See [sign-in-user.evidence.md](./sign-in-user.evidence.md) for every required AT. Reauthentication additionally proves opaque session rotation: the prior cookie receives `401` and the replacement cookie authenticates.
 >
 > **Decisions:** This use case owns returning-user email/password sign-in and the Axis same-origin opaque server-session bootstrap. OAuth remains for native and confidential external clients, never the Axis browser. Screen flow owns the product experience; required UI quality owns accessibility. Sign-in failures remain account-enumeration-safe; unverified accounts and unavailable workspaces use specific non-sensitive states without establishing a session. Cookie and bearer authentication are explicit independent boundaries, cookie mutations require antiforgery, and no browser compatibility path survives the cutover.

@@ -12,6 +12,34 @@ namespace Axis.BusinessObjects.Application.Tests.Commands;
 public sealed class CreateBusinessObjectRecordHandlerTests
 {
     [Fact]
+    public async Task CreateRecord_WhenValueArrayIsNull_ReturnsInvalidInputBeforeRepositoryAccess()
+    {
+        IBusinessObjectDefinitionRepository definitions = Substitute.For<IBusinessObjectDefinitionRepository>();
+        IBusinessObjectRecordRepository records = Substitute.For<IBusinessObjectRecordRepository>();
+        IUnitOfWork unitOfWork = Substitute.For<IUnitOfWork>();
+        CreateBusinessObjectRecordHandler sut = new(
+            new BusinessObjectRecordHandlerTestContext.FakeCurrentUser(),
+            definitions,
+            records,
+            unitOfWork);
+
+        Result<BusinessObjectRecordDetailDto> result = await sut.Handle(
+            new CreateBusinessObjectRecordCommand(
+                "customer",
+                "record-null-values",
+                new Dictionary<string, IReadOnlyList<string>> { ["quantity"] = null! }),
+            TestContext.Current.CancellationToken);
+
+        result.IsFailure.Should().BeTrue();
+        result.ErrorCode.Should().Be(ErrorCodes.InvalidInput);
+        await records.DidNotReceive().FindByIdempotencyKeyAsync(
+            Arg.Any<Guid>(),
+            Arg.Any<Axis.BusinessObjects.Domain.ValueObjects.BusinessObjectDefinitionKey>(),
+            Arg.Any<string>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task CreateRecord_WhenDraftChangesAfterCreate_UsesOriginalIdempotencyFingerprint()
     {
         BusinessObjectDefinition definition =

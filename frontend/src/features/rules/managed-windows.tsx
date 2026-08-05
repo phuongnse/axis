@@ -1,4 +1,3 @@
-import { useQuery } from '@tanstack/react-query';
 import type {
   ManagedWindowDescriptor,
   ManagedWindowRendererProps,
@@ -6,13 +5,10 @@ import type {
 } from '@/components/shared/ManagedWindowManager';
 import { useCurrentManagedWindow } from '@/components/shared/ManagedWindowManager';
 import type { RuleDefinitionSummary } from './api';
-import { ruleDefinitionDetailQueryOptions } from './api';
 import { RuleEditorDialog } from './components/RuleEditorDialog';
-import { SystemRuleDetailsDialog } from './components/SystemRuleDetailsDialog';
 
 const RULE_CREATE_KIND = 'rules.create';
 const RULE_EDITOR_KIND = 'rules.editor';
-const RULE_SYSTEM_DETAILS_KIND = 'rules.system-details';
 
 export function ruleCreateWindowDescriptor(title: string): ManagedWindowDescriptor {
   return {
@@ -30,7 +26,7 @@ export function ruleDefinitionWindowDescriptor(
   if (!definition.definitionKey) return null;
   return {
     id: `rules:${definition.definitionKey}`,
-    kind: definition.origin === 'System' ? RULE_SYSTEM_DETAILS_KIND : RULE_EDITOR_KIND,
+    kind: RULE_EDITOR_KIND,
     resourceKey: definition.definitionKey,
     title,
     payload: { definitionKey: definition.definitionKey },
@@ -40,7 +36,6 @@ export function ruleDefinitionWindowDescriptor(
 export const rulesManagedWindowRenderers: ManagedWindowRendererRegistry = {
   [RULE_CREATE_KIND]: RuleEditorWindowRenderer,
   [RULE_EDITOR_KIND]: RuleEditorWindowRenderer,
-  [RULE_SYSTEM_DETAILS_KIND]: SystemRuleWindowRenderer,
 };
 
 function RuleEditorWindowRenderer({ descriptor }: ManagedWindowRendererProps) {
@@ -60,24 +55,6 @@ function RuleEditorWindowRenderer({ descriptor }: ManagedWindowRendererProps) {
         );
         if (nextDescriptor) replaceWindow(windowId, nextDescriptor);
         else closeWindow(windowId);
-      }}
-    />
-  );
-}
-
-function SystemRuleWindowRenderer({ descriptor }: ManagedWindowRendererProps) {
-  const { windowId, closeWindow } = useCurrentManagedWindow();
-  const definitionKey = readDefinitionKey(descriptor);
-  const definitionQuery = useQuery(ruleDefinitionDetailQueryOptions(definitionKey));
-  return (
-    <SystemRuleDetailsDialog
-      definition={definitionQuery.data ?? null}
-      fallbackTitle={descriptor.title}
-      loading={definitionQuery.isLoading}
-      unavailable={definitionQuery.isError || (!definitionQuery.isLoading && !definitionQuery.data)}
-      open
-      onOpenChange={(open) => {
-        if (!open) closeWindow(windowId);
       }}
     />
   );

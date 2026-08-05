@@ -13,6 +13,7 @@ public sealed record RuleInputDefinitionDto(
     IReadOnlyList<string> AllowedValues);
 
 public sealed record RuleDraftInputDefinitionDto(
+    string Key,
     string Label,
     IReadOnlyList<RuleValueType> Types,
     bool IsRequired,
@@ -31,10 +32,12 @@ public sealed record RuleDefinitionSummaryDto(
     RuleLifecycleStatus Status,
     int ExpressionLanguageVersion,
     int? Revision,
-    int? LatestPublishedVersion,
+    int? LatestVersion,
+    int? ActiveVersion,
     IReadOnlyList<RuleInputDefinitionDto> Inputs,
     RuleOutputContractDto Output,
     DateTime? UpdatedAt,
+    RuleDefinitionActionsDto Actions,
     RuleReferenceDocumentationDto? Documentation = null);
 
 public sealed record RuleDefinitionDetailDto(
@@ -45,7 +48,8 @@ public sealed record RuleDefinitionDetailDto(
     RuleLifecycleStatus Status,
     int ExpressionLanguageVersion,
     int? Revision,
-    int? LatestPublishedVersion,
+    int? LatestVersion,
+    int? ActiveVersion,
     IReadOnlyList<RuleInputDefinitionDto> Inputs,
     RuleOutputContractDto Output,
     RuleConditionNodeDto? Condition,
@@ -53,7 +57,15 @@ public sealed record RuleDefinitionDetailDto(
     DateTime? CreatedAt,
     DateTime? UpdatedAt,
     DateTime? ArchivedAt,
+    RuleDefinitionActionsDto Actions,
     RuleReferenceDocumentationDto? Documentation = null);
+
+public sealed record RuleDefinitionActionsDto(
+    bool CanEditDraft,
+    bool CanCreateVersion,
+    bool CanActivateVersion,
+    bool CanDeactivate,
+    bool CanArchive);
 
 public sealed record RuleDefinitionVersionDto(
     int Version,
@@ -63,8 +75,8 @@ public sealed record RuleDefinitionVersionDto(
     IReadOnlyList<RuleInputDefinitionDto> Inputs,
     RuleOutputContractDto Output,
     RuleConditionNodeDto Condition,
-    Guid PublishedByUserId,
-    DateTime PublishedAt);
+    Guid CreatedByUserId,
+    DateTime CreatedAt);
 
 public sealed record RuleConditionNodeDto(
     string NodeId,

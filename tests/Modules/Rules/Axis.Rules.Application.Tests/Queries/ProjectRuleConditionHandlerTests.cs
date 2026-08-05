@@ -10,7 +10,7 @@ public sealed class ProjectRuleConditionHandlerTests
     private readonly RuleDefinitionHandlerTestContext _context = new();
 
     [Fact]
-    public async Task Project_WhenConditionUsesInputLabels_ReturnsCanonicalKeysAndReadableLabels()
+    public async Task Project_WhenConditionUsesInputKeys_ReturnsKeysAndReadableLabels()
     {
         ProjectRuleConditionHandler sut = new(
             _context.CurrentUser,
@@ -25,8 +25,8 @@ public sealed class ProjectRuleConditionHandlerTests
             CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
-        result.Value.Condition.Left!.Reference.Should().NotBe("Value");
-        result.Value.Condition.Right!.Reference.Should().NotBe("Threshold");
+        result.Value.Condition.Left!.Reference.Should().Be("value");
+        result.Value.Condition.Right!.Reference.Should().Be("threshold");
         result.Value.Display.Tokens.Select(token => token.Text)
             .Should().Contain(["Value", "is greater than", "Threshold"]);
     }
@@ -143,7 +143,7 @@ public sealed class ProjectRuleConditionHandlerTests
             Reference: null,
             Literal: null,
             Function: RuleExpressionFunction.Length,
-            Arguments: [new(RuleOperandKind.Input, "Value", Literal: null)]);
+            Arguments: [new(RuleOperandKind.Input, "value", Literal: null)]);
         RuleConditionNodeDto condition = new(
             "length-bound",
             LogicalOperator: RuleLogicalOperator.Any,
@@ -156,7 +156,7 @@ public sealed class ProjectRuleConditionHandlerTests
                     "limit-absent",
                     LogicalOperator: null,
                     PredicateOperator: RulePredicateOperator.IsNull,
-                    Left: new(RuleOperandKind.Input, "Limit", Literal: null),
+                    Left: new(RuleOperandKind.Input, "limit", Literal: null),
                     Right: null,
                     Children: []),
                 new(
@@ -164,7 +164,7 @@ public sealed class ProjectRuleConditionHandlerTests
                     LogicalOperator: null,
                     PredicateOperator: RulePredicateOperator.GreaterThanOrEqual,
                     Left: lengthOfValue,
-                    Right: new(RuleOperandKind.Input, "Limit", Literal: null),
+                    Right: new(RuleOperandKind.Input, "limit", Literal: null),
                     Children: []),
             ]);
 
@@ -172,8 +172,8 @@ public sealed class ProjectRuleConditionHandlerTests
             new ProjectRuleConditionRequest(
                 1,
                 [
-                    new("Value", [RuleValueType.Text], true, false, []),
-                    new("Limit", [RuleValueType.Integer], false, false, []),
+                    new("value", "Value", [RuleValueType.Text], true, false, []),
+                    new("limit", "Limit", [RuleValueType.Integer], false, false, []),
                 ],
                 condition,
                 "en"));
@@ -224,7 +224,7 @@ public sealed class ProjectRuleConditionHandlerTests
                     PredicateOperator: null,
                     Left: null,
                     Right: null,
-                    Children: [OptionalBound("minimum-bound", "Minimum", RulePredicateOperator.GreaterThanOrEqual)]),
+                    Children: [OptionalBound("minimum-bound", "minimum", RulePredicateOperator.GreaterThanOrEqual)]),
                 "en"));
 
         result.IsSuccess.Should().BeTrue();
@@ -252,14 +252,14 @@ public sealed class ProjectRuleConditionHandlerTests
             "value-missing",
             LogicalOperator: null,
             PredicateOperator: RulePredicateOperator.IsNull,
-            Left: new(RuleOperandKind.Input, "Value", Literal: null),
+            Left: new(RuleOperandKind.Input, "value", Literal: null),
             Right: null,
             Children: []);
 
         Result<RuleConditionProjectionDto> result = await sut.Handle(
             new ProjectRuleConditionQuery(new ProjectRuleConditionRequest(
                 1,
-                [new("Value", [RuleValueType.Date], false, false, [])],
+                [new("value", "Value", [RuleValueType.Date], false, false, [])],
                 condition,
                 "en")),
             CancellationToken.None);
@@ -277,7 +277,7 @@ public sealed class ProjectRuleConditionHandlerTests
             new RuleConditionProjectionService());
         RuleConditionNodeDto invalid = RuleDefinitionHandlerTestContext.ConditionDto() with
         {
-            Right = new RuleOperandDto(RuleOperandKind.Input, "Limit", Literal: null),
+            Right = new RuleOperandDto(RuleOperandKind.Input, "unknown", Literal: null),
         };
 
         Result<RuleConditionProjectionDto> result = await sut.Handle(
@@ -294,9 +294,9 @@ public sealed class ProjectRuleConditionHandlerTests
 
     private static IReadOnlyList<RuleDraftInputDefinitionDto> OptionalRangeInputs() =>
     [
-        new("Value", [RuleValueType.Date], true, false, []),
-        new("Minimum", [RuleValueType.Date], false, false, []),
-        new("Maximum", [RuleValueType.Date], false, false, []),
+        new("value", "Value", [RuleValueType.Date], true, false, []),
+        new("minimum", "Minimum", [RuleValueType.Date], false, false, []),
+        new("maximum", "Maximum", [RuleValueType.Date], false, false, []),
     ];
 
     private static RuleConditionNodeDto OptionalRangeCondition() => new(
@@ -309,11 +309,11 @@ public sealed class ProjectRuleConditionHandlerTests
         [
             OptionalBound(
                 "minimum-bound",
-                "Minimum",
+                "minimum",
                 RulePredicateOperator.GreaterThanOrEqual),
             OptionalBound(
                 "maximum-bound",
-                "Maximum",
+                "maximum",
                 RulePredicateOperator.LessThanOrEqual),
         ]);
 
@@ -339,7 +339,7 @@ public sealed class ProjectRuleConditionHandlerTests
                 $"{nodeId}-satisfied",
                 LogicalOperator: null,
                 PredicateOperator: comparison,
-                Left: new(RuleOperandKind.Input, "Value", Literal: null),
+                Left: new(RuleOperandKind.Input, "value", Literal: null),
                 Right: new(RuleOperandKind.Input, bound, Literal: null),
                 Children: []),
         ]);
@@ -356,7 +356,7 @@ public sealed class ProjectRuleConditionHandlerTests
                 "minimum-absent",
                 LogicalOperator: null,
                 PredicateOperator: RulePredicateOperator.IsNull,
-                Left: new(RuleOperandKind.Input, "Minimum", Literal: null),
+                Left: new(RuleOperandKind.Input, "minimum", Literal: null),
                 Right: null,
                 Children: []),
             new(
@@ -371,15 +371,15 @@ public sealed class ProjectRuleConditionHandlerTests
                         "minimum-satisfied",
                         LogicalOperator: null,
                         PredicateOperator: RulePredicateOperator.GreaterThanOrEqual,
-                        Left: new(RuleOperandKind.Input, "Value", Literal: null),
-                        Right: new(RuleOperandKind.Input, "Minimum", Literal: null),
+                        Left: new(RuleOperandKind.Input, "value", Literal: null),
+                        Right: new(RuleOperandKind.Input, "minimum", Literal: null),
                         Children: []),
                     new(
                         "maximum-satisfied",
                         LogicalOperator: null,
                         PredicateOperator: RulePredicateOperator.LessThanOrEqual,
-                        Left: new(RuleOperandKind.Input, "Value", Literal: null),
-                        Right: new(RuleOperandKind.Input, "Maximum", Literal: null),
+                        Left: new(RuleOperandKind.Input, "value", Literal: null),
+                        Right: new(RuleOperandKind.Input, "maximum", Literal: null),
                         Children: []),
                 ]),
         ]);
@@ -396,22 +396,22 @@ public sealed class ProjectRuleConditionHandlerTests
                 "minimum-absent",
                 LogicalOperator: null,
                 PredicateOperator: RulePredicateOperator.IsNull,
-                Left: new(RuleOperandKind.Input, "Minimum", Literal: null),
+                Left: new(RuleOperandKind.Input, "minimum", Literal: null),
                 Right: null,
                 Children: []),
             new(
                 "minimum-satisfied",
                 LogicalOperator: null,
                 PredicateOperator: RulePredicateOperator.GreaterThanOrEqual,
-                Left: new(RuleOperandKind.Input, "Value", Literal: null),
-                Right: new(RuleOperandKind.Input, "Minimum", Literal: null),
+                Left: new(RuleOperandKind.Input, "value", Literal: null),
+                Right: new(RuleOperandKind.Input, "minimum", Literal: null),
                 Children: []),
             new(
                 "maximum-satisfied",
                 LogicalOperator: null,
                 PredicateOperator: RulePredicateOperator.LessThanOrEqual,
-                Left: new(RuleOperandKind.Input, "Value", Literal: null),
-                Right: new(RuleOperandKind.Input, "Maximum", Literal: null),
+                Left: new(RuleOperandKind.Input, "value", Literal: null),
+                Right: new(RuleOperandKind.Input, "maximum", Literal: null),
                 Children: []),
         ]);
 
@@ -427,14 +427,14 @@ public sealed class ProjectRuleConditionHandlerTests
                 "minimum-absent",
                 LogicalOperator: null,
                 PredicateOperator: RulePredicateOperator.IsNull,
-                Left: new(RuleOperandKind.Input, "Minimum", Literal: null),
+                Left: new(RuleOperandKind.Input, "minimum", Literal: null),
                 Right: null,
                 Children: []),
             new(
                 "maximum-absent",
                 LogicalOperator: null,
                 PredicateOperator: RulePredicateOperator.IsNull,
-                Left: new(RuleOperandKind.Input, "Maximum", Literal: null),
+                Left: new(RuleOperandKind.Input, "maximum", Literal: null),
                 Right: null,
                 Children: []),
             new(
@@ -449,15 +449,15 @@ public sealed class ProjectRuleConditionHandlerTests
                         "minimum-satisfied",
                         LogicalOperator: null,
                         PredicateOperator: RulePredicateOperator.GreaterThanOrEqual,
-                        Left: new(RuleOperandKind.Input, "Value", Literal: null),
-                        Right: new(RuleOperandKind.Input, "Minimum", Literal: null),
+                        Left: new(RuleOperandKind.Input, "value", Literal: null),
+                        Right: new(RuleOperandKind.Input, "minimum", Literal: null),
                         Children: []),
                     new(
                         "maximum-satisfied",
                         LogicalOperator: null,
                         PredicateOperator: RulePredicateOperator.LessThanOrEqual,
-                        Left: new(RuleOperandKind.Input, "Value", Literal: null),
-                        Right: new(RuleOperandKind.Input, "Maximum", Literal: null),
+                        Left: new(RuleOperandKind.Input, "value", Literal: null),
+                        Right: new(RuleOperandKind.Input, "maximum", Literal: null),
                         Children: []),
                 ]),
         ]);

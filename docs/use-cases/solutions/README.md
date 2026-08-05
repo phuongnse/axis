@@ -8,4 +8,4 @@ Solutions use cases own the boundary through which independently versioned produ
 
 | Use case | Status |
 |---|---|
-| [docs/use-cases/solutions/provision-reference-solution.md](./provision-reference-solution.md) | Partial |
+| [docs/use-cases/solutions/provision-reference-solution.md](./provision-reference-solution.md) | Done |

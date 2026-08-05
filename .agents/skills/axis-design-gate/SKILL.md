@@ -7,7 +7,7 @@ description: Execute the Axis pre-code risk dossier. Use for non-trivial source,
 
 ## Goal
 
-Produce the evidence required by [docs/playbooks/design-gate.md](../../../docs/playbooks/design-gate.md) before code, then hand the current dossier to the selected surface owner.
+Produce the evidence required by [docs/playbooks/design-gate.md](../../../docs/playbooks/design-gate.md) in the active task before code, then pass it to the selected surface owner without creating a per-change dossier file.
 
 ## Hard gates
 
@@ -33,7 +33,7 @@ Follow [reference.md](../reference.md).
 5. Apply [docs/PLATFORM_STRATEGY.md § Enterprise Production Baseline](../../../docs/PLATFORM_STRATEGY.md#enterprise-production-baseline). Classify applicable concerns, map each required concern to an owner and current evidence, and block the slice when a production requirement is missing; separately scoped capabilities may remain out of scope without lowering the implemented boundary.
 6. For a retirement, apply [docs/playbooks/design-gate.md § Dossier](../../../docs/playbooks/design-gate.md#dossier): choose clean cutover or evidence-backed compatibility, name the retired surface, and define pre/post-edit sweeps. A clean cutover backed by no supported production consumer/data forbids shims, dual paths, flags, fallbacks, preserved obsolete tests, negative assertions, deny-lists, and routine guidance that keeps the retired surface alive.
 7. Record the wire/schema contract decision or `N/A because no wire shape changes`.
-8. Name focused development checks and review-boundary verification, then route each current implementation work unit through [reference.md § Agent routing](../reference.md#agent-routing) and [README.md § Responsibility catalog](../README.md#responsibility-catalog) with the dossier attached. Re-evaluate unexecuted units when a later decision makes them bounded. Keep sign-off status in this transient handoff; durable owner docs receive the resulting decision and rationale, not actor, date, or conversation provenance.
+8. Name focused development checks and review-boundary verification, then route each current implementation work unit through [reference.md § Agent routing](../reference.md#agent-routing) and [README.md § Responsibility catalog](../README.md#responsibility-catalog) with the dossier attached. Re-evaluate unexecuted units when a later decision makes them bounded. Keep sign-off status in this transient handoff; promote only current durable decisions and rationale to their owner docs, not actor, date, conversation provenance, or a committed per-change dossier.
 9. When re-entering after a failure, record the root cause and compare the required contract with the proposed path across owner, execution/trust boundary, invariants, and evidence. Reject a path that changes those dimensions only to bypass the failure; otherwise record the explicit contract decision and the proof required for the resulting boundary.
 
 ## Output

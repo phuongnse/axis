@@ -11,7 +11,7 @@ import {
   ruleDefinitionQueryKeys,
   ruleExpressionLanguageQueryOptions,
 } from '../api';
-import { replaceConditionInputReferences, toDraftInputs } from '../condition-references';
+import { toDraftInputs } from '../condition-references';
 import { valueTypeLabel } from '../reference';
 import { RuleExpressionView } from './RuleExpressionView';
 
@@ -168,15 +168,7 @@ export function RuleLogicPreview({
     () => ({
       expressionLanguageVersion,
       inputs: toDraftInputs(inputs ?? []),
-      condition:
-        replaceConditionInputReferences(
-          condition,
-          new Map(
-            (inputs ?? []).flatMap((input) =>
-              'key' in input && input.key && input.label ? [[input.key, input.label] as const] : [],
-            ),
-          ),
-        ) ?? undefined,
+      condition: condition ?? undefined,
       language: i18n.language,
     }),
     [condition, expressionLanguageVersion, i18n.language, inputs],

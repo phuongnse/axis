@@ -1,4 +1,4 @@
-import { fetchApi } from '@/lib/api';
+import { ApiError, fetchApi } from '@/lib/api';
 import type { AxisBrowserSessionDto } from '@/lib/api-generated';
 import { applyBrowserSessionResponse, getBrowserSessionStatus, useAuthStore } from './auth-store';
 import {
@@ -13,6 +13,13 @@ import type {
   SignInUserRequest,
   VerifyEmailResponse,
 } from './types';
+
+export class BrowserSessionUnavailableError extends Error {
+  constructor() {
+    super('The browser session could not be resolved.');
+    this.name = 'BrowserSessionUnavailableError';
+  }
+}
 
 export const authKeys = {
   all: ['auth'] as const,
@@ -116,9 +123,10 @@ export async function restoreBrowserSession(
   if (!browserSessionRestoreInFlight) {
     browserSessionRestoreInFlight = fetchApi<AxisBrowserSessionDto>('/auth/session')
       .then(applyBrowserSessionResponse)
-      .catch(() => {
+      .catch((error: unknown) => {
         useAuthStore.getState().clearSession();
-        return false;
+        if (error instanceof ApiError && error.status === 401) return false;
+        throw new BrowserSessionUnavailableError();
       })
       .finally(() => {
         browserSessionRestoreInFlight = null;

@@ -1350,6 +1350,11 @@ def doc_size_budget_issues(*, root: Path = ROOT) -> list[str]:
         if not path.is_file():
             continue
         normalized = rel_from(path, root)
+        if path.parent == root / "docs" / "playbooks" and path.name.startswith("design-gate-"):
+            issues.append(
+                f"{normalized}: per-change Design Gate dossiers belong in the active task handoff, "
+                "not repository files; docs/playbooks/design-gate.md is the sole committed Design Gate playbook"
+            )
         limit = DOC_SIZE_BUDGETS.get(normalized, PLAYBOOK_DEFAULT_MAX_LINES)
         line_count = len(path.read_text(encoding="utf-8").splitlines())
         if line_count > limit:

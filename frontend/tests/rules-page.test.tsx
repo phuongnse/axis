@@ -31,9 +31,10 @@ const systemSummary = {
   definitionKey: 'field.required',
   name: 'Required value',
   description: 'Require a value.',
-  origin: 'System',
-  status: 'Published',
-  latestPublishedVersion: 1,
+  origin: 'BuiltIn',
+  status: 'Active',
+  latestVersion: 1,
+  activeVersion: 1,
   inputs: [
     {
       key: 'value',
@@ -218,6 +219,19 @@ function conditionProjectionResponse(init?: RequestInit) {
 function respondForRules(input: RequestInfo | URL, init?: RequestInit): Response {
   const url = input.toString();
   if (url.endsWith('/rules/condition/project')) return conditionProjectionResponse(init);
+  if (url.endsWith('/rules/authoring/project')) {
+    const body = init?.body ? JSON.parse(String(init.body)) : {};
+    const condition = body.source?.ast ?? thresholdCondition();
+    return jsonResponse({ condition, formattedDsl: body.source?.text ?? 'value > threshold', diagnostics: [], isValid: true });
+  }
+  if (url.endsWith('/rules/authoring/complete')) {
+    return jsonResponse([
+      { label: 'Threshold', insertText: 'threshold', kind: 'Input', start: 8, length: 2 },
+    ]);
+  }
+  if (url.endsWith('/rules/credit_threshold/draft/simulate')) {
+    return jsonResponse({ definitionKey: 'credit_threshold', definitionVersion: null, isMatch: false, diagnostics: [] });
+  }
   if (url.endsWith('/rules/expression-language')) return jsonResponse(expressionLanguage());
   if (url.includes('/rules/field.required/bindings?version=1')) {
     return jsonResponse([
@@ -231,8 +245,35 @@ function respondForRules(input: RequestInfo | URL, init?: RequestInit): Response
         priority: 0,
         enabled: true,
         failureBehavior: 'FailClosed',
+        revision: 1,
       },
     ]);
+  }
+  if (url.endsWith('/rule-bindings/88888888-8888-4888-8888-888888888888')) {
+    if (init?.method === 'DELETE') return jsonResponse(null, 204);
+    if (init?.method === 'PUT') {
+      const body = init.body ? JSON.parse(String(init.body)) : {};
+      return jsonResponse({
+        id: '88888888-8888-4888-8888-888888888888',
+        ...body,
+        revision: 2,
+      });
+    }
+    return jsonResponse({
+      id: '88888888-8888-4888-8888-888888888888',
+      revision: 1,
+      definitionKey: 'field.required',
+      definitionVersion: 1,
+      targetType: 'business-object-field',
+      targetId: 'customer.status',
+      useCaseOrTrigger: 'field-validation',
+      priority: 0,
+      enabled: true,
+      failureBehavior: 'FailClosed',
+      inputMappings: {
+        value: { kind: 'Context', contextKey: 'record.value', literalValues: [] },
+      },
+    });
   }
   if (url.endsWith('/rules/field.required')) return jsonResponse(requiredDetail());
   if (url.endsWith('/rules/credit_threshold')) return jsonResponse(workspaceDetail());
@@ -254,7 +295,7 @@ describe('RulesPage', () => {
     vi.restoreAllMocks();
   });
 
-  it('renders one catalog shape for system and workspace rules', async () => {
+  it('renders one catalog shape for built-in and workspace rules', async () => {
     vi.mocked(fetch).mockImplementation((input) => Promise.resolve(respondForRules(input)));
 
     await renderWithRouter(<RulesPage />, { path: '/rules', authenticatedPath: 'rules' });
@@ -268,7 +309,7 @@ describe('RulesPage', () => {
     expect(within(catalog).queryByText('Validation')).not.toBeInTheDocument();
   });
 
-  it('shows the platform input-logic-output contract for a system rule', async () => {
+  it('shows the platform input-logic-output contract for a built-in rule', async () => {
     const user = userEvent.setup();
     vi.mocked(fetch).mockImplementation((input, init) =>
       Promise.resolve(respondForRules(input, init)),
@@ -349,6 +390,358 @@ describe('RulesPage', () => {
     expect(within(footer as HTMLElement).getByRole('button', { name: 'Close' })).toBeVisible();
   });
 
+  it('edits a binding with its current revision', async () => {
+    const user = userEvent.setup();
+    vi.mocked(fetch).mockImplementation((input, init) => Promise.resolve(respondForRules(input, init)));
+    await renderWithRouter(<RulesPage />, { path: '/rules', authenticatedPath: 'rules' });
+    await user.click(within(await screen.findByRole('region', { name: 'Rules catalog' })).getByRole('button', { name: 'Required value' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Required value' });
+    await user.click(within(dialog).getByRole('tab', { name: 'Usage' }));
+    await user.click(await within(dialog).findByRole('button', { name: 'Edit binding' }));
+    const editor = await screen.findByRole('dialog', { name: 'Edit binding' });
+    expect(within(editor).getByLabelText('Rule key')).toHaveValue('field.required');
+    expect(within(editor).getByLabelText('Rule version')).toHaveValue(1);
+    expect(within(editor).getByLabelText('Target type')).toHaveValue('business-object-field');
+    expect(within(editor).getByLabelText('Target ID')).toHaveValue('customer.status');
+    expect(within(editor).getByLabelText('Use case or trigger')).toHaveValue('field-validation');
+    expect(within(editor).getByRole('checkbox', { name: 'Enabled' })).toBeChecked();
+    expect(within(editor).getByLabelText('value')).toHaveTextContent('Context');
+    expect(within(editor).getByLabelText('Context key')).toHaveValue('record.value');
+    await user.clear(within(editor).getByLabelText('Priority'));
+    await user.type(within(editor).getByLabelText('Priority'), '4');
+    await user.click(within(editor).getByRole('button', { name: 'Save binding' }));
+
+    await waitFor(() => {
+      const request = vi.mocked(fetch).mock.calls.find(
+        ([input, init]) =>
+          input.toString().endsWith('/rule-bindings/88888888-8888-4888-8888-888888888888') &&
+          init?.method === 'PUT',
+      );
+      expect(request).toBeDefined();
+      expect(JSON.parse(String(request?.[1]?.body))).toEqual({
+        expectedRevision: 1,
+        definitionKey: 'field.required',
+        definitionVersion: 1,
+        targetType: 'business-object-field',
+        targetId: 'customer.status',
+        useCaseOrTrigger: 'field-validation',
+        inputMappings: {
+          value: { kind: 'Context', contextKey: 'record.value', literalValues: [] },
+        },
+        priority: 4,
+        enabled: true,
+        failureBehavior: 'FailClosed',
+      });
+    });
+    expect(screen.queryByRole('dialog', { name: 'Edit binding' })).not.toBeInTheDocument();
+  });
+
+  it('uses the visible revision for binding enable, delete, and stale recovery', async () => {
+    const user = userEvent.setup();
+    let bindingReads = 0;
+    vi.mocked(fetch).mockImplementation((input, init) => {
+      const url = input.toString();
+      if (
+        url.endsWith('/rule-bindings/88888888-8888-4888-8888-888888888888') &&
+        (!init?.method || init.method === 'GET')
+      ) {
+        bindingReads += 1;
+        return Promise.resolve(
+          jsonResponse({
+            id: '88888888-8888-4888-8888-888888888888',
+            revision: bindingReads === 1 ? 1 : 2,
+            definitionKey: 'field.required',
+            definitionVersion: 1,
+            targetType: 'business-object-field',
+            targetId: 'customer.status',
+            useCaseOrTrigger: 'field-validation',
+            priority: bindingReads === 1 ? 0 : 7,
+            enabled: true,
+            failureBehavior: 'FailClosed',
+            inputMappings: {
+              value: { kind: 'Context', contextKey: 'record.value', literalValues: [] },
+            },
+          }),
+        );
+      }
+      if (
+        url.endsWith('/rule-bindings/88888888-8888-4888-8888-888888888888') &&
+        init?.method === 'PUT'
+      ) {
+        return Promise.resolve(jsonResponse({ title: 'Revision conflict' }, 409));
+      }
+      return Promise.resolve(respondForRules(input, init));
+    });
+
+    await renderWithRouter(<RulesPage />, { path: '/rules', authenticatedPath: 'rules' });
+    await user.click(
+      within(await screen.findByRole('region', { name: 'Rules catalog' })).getByRole('button', {
+        name: 'Required value',
+      }),
+    );
+    const detail = await screen.findByRole('dialog', { name: 'Required value' });
+    await user.click(within(detail).getByRole('tab', { name: 'Usage' }));
+    await user.click(await within(detail).findByRole('button', { name: 'Edit binding' }));
+    const editor = await screen.findByRole('dialog', { name: 'Edit binding' });
+    await user.clear(within(editor).getByLabelText('Priority'));
+    await user.type(within(editor).getByLabelText('Priority'), '4');
+    await user.click(within(editor).getByRole('button', { name: 'Save binding' }));
+
+    expect(await within(editor).findByText('This binding changed. Refresh it and try again.')).toBeVisible();
+    expect(within(editor).getByLabelText('Priority')).toHaveValue(4);
+    await user.click(within(editor).getByRole('button', { name: 'Refresh binding' }));
+    await waitFor(() => expect(within(editor).getByLabelText('Priority')).toHaveValue(7));
+    expect(bindingReads).toBeGreaterThanOrEqual(2);
+
+    await user.click(within(editor).getByRole('button', { name: 'Cancel' }));
+    await user.click(within(detail).getByRole('button', { name: 'Disable binding' }));
+    await waitFor(() => {
+      const toggleRequest = vi.mocked(fetch).mock.calls.find(
+        ([input, init]) =>
+          input.toString().endsWith('/rule-bindings/88888888-8888-4888-8888-888888888888') &&
+          init?.method === 'PUT' &&
+          JSON.parse(String(init.body)).enabled === false,
+      );
+      expect(JSON.parse(String(toggleRequest?.[1]?.body))).toMatchObject({
+        expectedRevision: 1,
+        definitionKey: 'field.required',
+        definitionVersion: 1,
+        enabled: false,
+      });
+    });
+
+    await user.click(within(detail).getByRole('button', { name: 'Remove binding' }));
+    const confirmation = await screen.findByRole('alertdialog', { name: 'Remove this binding?' });
+    await user.click(within(confirmation).getByRole('button', { name: 'Remove binding' }));
+    await waitFor(() => {
+      const deleteRequest = vi.mocked(fetch).mock.calls.find(
+        ([input, init]) =>
+          input.toString().endsWith('/rule-bindings/88888888-8888-4888-8888-888888888888') &&
+          init?.method === 'DELETE',
+      );
+      expect(JSON.parse(String(deleteRequest?.[1]?.body))).toEqual({ expectedRevision: 1 });
+    });
+  });
+
+  it('keeps invalid DSL edits, applies server completion ranges, and guards dirty close', async () => {
+    const user = userEvent.setup();
+    vi.mocked(fetch).mockImplementation((input, init) => {
+      const url = input.toString();
+      if (url.endsWith('/rules/authoring/project') && init?.body) {
+        const body = JSON.parse(String(init.body));
+        if (body.source?.text === 'invalid expression') {
+          return Promise.resolve(
+            jsonResponse({
+              condition: null,
+              formattedDsl: 'server replacement must not win',
+              diagnostics: [{ code: 'syntax', message: 'Invalid expression', start: 0, length: 7 }],
+              isValid: false,
+            }),
+          );
+        }
+      }
+      return Promise.resolve(respondForRules(input, init));
+    });
+
+    await renderWithRouter(<RulesPage />, { path: '/rules', authenticatedPath: 'rules' });
+    await user.click(
+      within(await screen.findByRole('region', { name: 'Rules catalog' })).getByRole('button', {
+        name: 'Credit threshold',
+      }),
+    );
+    const editor = await screen.findByRole('dialog', { name: 'Credit threshold' });
+    await user.click(within(editor).getByRole('tab', { name: 'Rule behavior' }));
+    const dsl = await within(editor).findByLabelText('Expression syntax');
+    await waitFor(() => expect(dsl).toHaveValue('value > threshold'));
+    await user.clear(dsl);
+    await user.type(dsl, 'value > th');
+    await user.click(within(editor).getByRole('button', { name: 'Show suggestions' }));
+    const suggestions = await within(editor).findByRole('listbox');
+    await user.click(within(suggestions).getByRole('option', { name: 'Threshold' }));
+    expect(dsl).toHaveValue('value > threshold');
+
+    await user.clear(dsl);
+    await user.type(dsl, 'invalid expression');
+    await user.tab();
+    expect(await within(editor).findByText('Invalid expression')).toBeVisible();
+    expect(dsl).toHaveValue('invalid expression');
+    expect(within(editor).getByText('Value is greater than Threshold')).toBeVisible();
+
+    await user.click(within(editor).getByRole('button', { name: 'Close dialog' }));
+    const discard = await screen.findByRole('alertdialog', { name: 'Discard unsaved changes?' });
+    await user.click(within(discard).getByRole('button', { name: 'Keep editing' }));
+    expect(editor).toBeVisible();
+    expect(dsl).toHaveValue('invalid expression');
+  });
+
+  it('simulates typed samples and confirms independent version activation lifecycle', async () => {
+    const user = userEvent.setup();
+    const requests: Array<{ method?: string; url: string; body?: Record<string, unknown> }> = [];
+    let simulationCalls = 0;
+    let currentDetail = workspaceDetail({
+      status: 'Active',
+      revision: 2,
+      latestVersion: 1,
+      activeVersion: 1,
+      versions: [{ version: 1, name: 'Credit threshold' }],
+      actions: {
+        canEditDraft: true,
+        canCreateVersion: true,
+        canActivateVersion: false,
+        canDeactivate: true,
+        canArchive: true,
+      },
+    });
+    vi.mocked(fetch).mockImplementation((input, init) => {
+      const url = input.toString();
+      const body = init?.body ? JSON.parse(String(init.body)) : undefined;
+      if (init?.method) requests.push({ method: init.method, url, body });
+      if (url.endsWith('/rules/credit_threshold') && (!init?.method || init.method === 'GET')) {
+        return Promise.resolve(jsonResponse(currentDetail));
+      }
+      if (url.endsWith('/rules/credit_threshold/versions/1/simulate')) {
+        simulationCalls += 1;
+        return Promise.resolve(
+          simulationCalls === 1
+            ? jsonResponse({
+                definitionKey: 'credit_threshold',
+                definitionVersion: 1,
+                isMatch: true,
+                diagnostics: [{ nodeId: 'threshold', isMatch: true }],
+              })
+            : jsonResponse({ title: 'Invalid sample' }, 400),
+        );
+      }
+      if (url.endsWith('/rules/credit_threshold/versions') && init?.method === 'POST') {
+        currentDetail = workspaceDetail({
+          ...currentDetail,
+          status: 'Active',
+          revision: 3,
+          latestVersion: 2,
+          activeVersion: 1,
+          versions: [
+            { version: 1, name: 'Credit threshold' },
+            { version: 2, name: 'Credit threshold' },
+          ],
+          actions: {
+            canEditDraft: true,
+            canCreateVersion: true,
+            canActivateVersion: true,
+            canDeactivate: true,
+            canArchive: true,
+          },
+        });
+        return Promise.resolve(jsonResponse(currentDetail));
+      }
+      if (url.endsWith('/rules/credit_threshold/active-version') && init?.method === 'PUT') {
+        currentDetail = workspaceDetail({
+          ...currentDetail,
+          status: 'Active',
+          revision: 4,
+          activeVersion: 2,
+          actions: {
+            canEditDraft: true,
+            canCreateVersion: true,
+            canActivateVersion: false,
+            canDeactivate: true,
+            canArchive: true,
+          },
+        });
+        return Promise.resolve(jsonResponse(currentDetail));
+      }
+      if (url.endsWith('/rules/credit_threshold/active-version') && init?.method === 'DELETE') {
+        currentDetail = workspaceDetail({
+          ...currentDetail,
+          status: 'Inactive',
+          revision: 5,
+          activeVersion: null,
+          actions: {
+            canEditDraft: true,
+            canCreateVersion: true,
+            canActivateVersion: true,
+            canDeactivate: false,
+            canArchive: true,
+          },
+        });
+        return Promise.resolve(jsonResponse(currentDetail));
+      }
+      return Promise.resolve(respondForRules(input, init));
+    });
+
+    await renderWithRouter(<RulesPage />, { path: '/rules', authenticatedPath: 'rules' });
+    await user.click(
+      within(await screen.findByRole('region', { name: 'Rules catalog' })).getByRole('button', {
+        name: 'Credit threshold',
+      }),
+    );
+    const editor = await screen.findByRole('dialog', { name: 'Credit threshold' });
+    await user.type(within(editor).getByLabelText('Value'), '15');
+    await user.type(within(editor).getByLabelText('Threshold'), '10');
+    await user.click(within(editor).getByRole('button', { name: 'Run simulation' }));
+    expect(await within(editor).findByText('Condition matched')).toBeVisible();
+    expect(within(editor).getAllByText(/Version 1/).length).toBeGreaterThanOrEqual(1);
+    const simulationRequest = requests.find((request) => request.url.endsWith('/versions/1/simulate'));
+    expect(simulationRequest?.body).toEqual({
+      inputs: {
+        value: { type: 'Decimal', values: ['15'] },
+        threshold: { type: 'Decimal', values: ['10'] },
+      },
+    });
+
+    await user.click(within(editor).getByRole('button', { name: 'Run simulation' }));
+    expect(
+      await within(editor).findByText(
+        'The sample values could not be evaluated. Correct them and try again.',
+      ),
+    ).toBeVisible();
+
+    await user.click(within(editor).getByRole('button', { name: 'Create version' }));
+    let confirmation = await screen.findByRole('alertdialog', {
+      name: 'Create immutable version?',
+    });
+    await user.click(within(confirmation).getByRole('button', { name: 'Create version' }));
+    await waitFor(() =>
+      expect(
+        requests.some(
+          (request) =>
+            request.url.endsWith('/rules/credit_threshold/versions') &&
+            request.method === 'POST' &&
+            request.body?.expectedRevision === 2,
+        ),
+      ).toBe(true),
+    );
+
+    await user.click(await within(editor).findByRole('button', { name: 'Activate' }));
+    confirmation = await screen.findByRole('alertdialog', { name: 'Activate this version?' });
+    await user.click(within(confirmation).getByRole('button', { name: 'Activate' }));
+    await waitFor(() =>
+      expect(
+        requests.some(
+          (request) =>
+            request.url.endsWith('/rules/credit_threshold/active-version') &&
+            request.method === 'PUT' &&
+            request.body?.version === 2 &&
+            request.body?.expectedRevision === 3,
+        ),
+      ).toBe(true),
+    );
+
+    await user.click(await within(editor).findByRole('button', { name: 'Deactivate' }));
+    confirmation = await screen.findByRole('alertdialog', { name: 'Deactivate this rule?' });
+    await user.click(within(confirmation).getByRole('button', { name: 'Deactivate' }));
+    await waitFor(() =>
+      expect(
+        requests.some(
+          (request) =>
+            request.url.endsWith('/rules/credit_threshold/active-version') &&
+            request.method === 'DELETE' &&
+            request.body?.expectedRevision === 4,
+        ),
+      ).toBe(true),
+    );
+    expect(await within(editor).findByText('Inactive')).toBeVisible();
+  });
+
   it('edits a workspace rule with inputs and condition only', async () => {
     const user = userEvent.setup();
     const saved = workspaceDetail({ name: 'Updated threshold', revision: 3 });
@@ -371,7 +764,7 @@ describe('RulesPage', () => {
       within(editor)
         .getAllByRole('heading', { level: 3 })
         .map((heading) => heading.textContent),
-    ).toEqual(['Inputs', 'Logic', 'What this means', 'Outputs']);
+    ).toEqual(['Inputs', 'Logic', 'What this means', 'Outputs', 'Simulation']);
     expect(editor.querySelector('[data-slot="rule-behavior-summary"]')).toBeNull();
     expect(within(editor).queryByLabelText('Expression')).not.toBeInTheDocument();
     expect(within(editor).getByLabelText('What to check')).toBeInTheDocument();

@@ -130,16 +130,12 @@ sequenceDiagram
 > | Layer | Status |
 > |-------|--------|
 > | Domain | Done |
-> | Application | Partial |
-> | Infrastructure | Partial |
-> | API | Partial |
-> | Frontend | Partial |
+> | Application | Done |
+> | Infrastructure | Done |
+> | API | Done |
+> | Frontend | Done |
 >
-> **Gaps vs spec:**
->
-> | ID | Gap |
-> |---|---|
-> | GAP-001 | No known gap in the implemented AC-008 search slice; Application, Infrastructure, API, and Frontend remain Partial for their existing non-search scope. |
+> **Gaps vs spec:** None.
 >
 > **Deferred follow-ups:** N/A for this use case; excluded surfaces are listed in Out Of Scope.
 >

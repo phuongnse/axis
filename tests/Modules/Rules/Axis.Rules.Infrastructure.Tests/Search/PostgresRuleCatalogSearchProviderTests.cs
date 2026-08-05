@@ -28,7 +28,7 @@ public sealed class PostgresRuleCatalogSearchProviderTests(RulesDatabaseFixture 
 
         RuleCatalogSearchPage result = await sut.SearchAsync(
             workspaceId,
-            [new RuleTextSearchDocument("field.customer", "Customer", "System customer rule.")],
+            [new RuleTextSearchDocument("field.customer", "Customer", "Built-in customer rule.")],
             includeWorkspace: true,
             workspaceStatus: null,
             skip: 0,
@@ -38,6 +38,6 @@ public sealed class PostgresRuleCatalogSearchProviderTests(RulesDatabaseFixture 
 
         result.TotalCount.Should().Be(2);
         result.Items.Should().ContainSingle()
-            .Which.Should().Be(new RuleCatalogSearchItem(RuleOrigin.System, "field.customer"));
+            .Which.Should().Be(new RuleCatalogSearchItem(RuleOrigin.BuiltIn, "field.customer"));
     }
 }

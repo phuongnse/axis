@@ -70,26 +70,47 @@ public sealed class AxisMcpBindingWriteTools(
             input,
             cancellationToken);
     }
-}
 
-// Kept out of the registration list until the binding delete contract gains
-// an expected-revision check for unattended mutation safety.
-[McpServerToolType]
-internal sealed class AxisMcpDeferredBindingTools(
-    AxisApiClient api,
-    AxisMcpMutationGuard mutationGuard)
-{
     [McpServerTool(Name = "axis_delete_rule_binding")]
-    [Description("[WRITE/DESTRUCTIVE] Delete one rule binding by UUID. This removes only the connection, not the rule definition or version.")]
+    [Description("[WRITE/DESTRUCTIVE] Delete one rule binding with the caller's expected revision. This removes only the connection, not the rule definition or version.")]
     public Task<string> DeleteRuleBindingAsync(
         Guid bindingId,
+        int expectedRevision,
         CancellationToken cancellationToken = default)
     {
         if (bindingId == Guid.Empty)
             throw new ArgumentException("bindingId must be a non-empty UUID.", nameof(bindingId));
+        if (expectedRevision < 1)
+            throw new ArgumentOutOfRangeException(nameof(expectedRevision), "expectedRevision must be greater than zero.");
         mutationGuard.EnsureEnabled("DeleteRuleBinding");
         return api.DeleteJsonAsync(
             $"api/rule-bindings/{bindingId:D}",
+            new ExpectedRevisionInput(expectedRevision),
+            cancellationToken);
+    }
+}
+
+[McpServerToolType]
+public sealed class AxisMcpBindingEvaluationTools(AxisApiClient api)
+{
+    [McpServerTool(Name = "axis_evaluate_rule_binding")]
+    [Description("[READ] Evaluate one rule binding against a transient typed consumer context. This is deterministic and does not mutate the binding or its rule.")]
+    public Task<string> EvaluateRuleBindingAsync(
+        Guid bindingId,
+        EvaluateRuleBindingInput input,
+        CancellationToken cancellationToken = default)
+    {
+        if (bindingId == Guid.Empty)
+            throw new ArgumentException("bindingId must be a non-empty UUID.", nameof(bindingId));
+        ArgumentNullException.ThrowIfNull(input);
+        ArgumentNullException.ThrowIfNull(input.Context);
+        ArgumentNullException.ThrowIfNull(input.Context.Values);
+        if (input.BindingRevision is < 1)
+            throw new ArgumentOutOfRangeException(nameof(input), "bindingRevision must be greater than zero when supplied.");
+
+        return api.PostJsonAsync(
+            $"api/rule-bindings/{bindingId:D}/evaluate",
+            input,
             cancellationToken);
     }
 }

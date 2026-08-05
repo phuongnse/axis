@@ -47,6 +47,32 @@ public sealed record SaveRuleDefinitionDraftInput(
 
 public sealed record RuleRevisionInput(int ExpectedRevision);
 
+public sealed record ActivateRuleDefinitionVersionInput(
+    int Version,
+    int ExpectedRevision);
+
+public sealed record SimulateRuleDraftInput(
+    IReadOnlyDictionary<string, RuleInputValue> Inputs);
+
+public sealed record SimulateRuleVersionInput(
+    IReadOnlyDictionary<string, RuleInputValue> Inputs);
+
+public sealed record RuleAuthoringSourceInput(
+    string? Text,
+    RuleConditionNodeInput? Ast);
+
+public sealed record ProjectRuleAuthoringInput(
+    RuleAuthoringSourceInput Source,
+    IReadOnlyList<RuleInputDefinitionInput> Inputs,
+    int ExpressionLanguageVersion,
+    string? Language);
+
+public sealed record CompleteRuleAuthoringInput(
+    string? Text,
+    int Cursor,
+    IReadOnlyList<RuleInputDefinitionInput> Inputs,
+    int ExpressionLanguageVersion);
+
 public sealed record SearchRuleExpressionGuideInput(
     int ExpressionLanguageVersion,
     string? DefinitionKey,
@@ -111,6 +137,13 @@ public sealed record SaveUnpublishedBusinessObjectDefinitionInput(
     IReadOnlyList<BusinessObjectFieldInput> Fields);
 
 public sealed record ExpectedRevisionInput(int ExpectedRevision);
+
+public sealed record RuleContextInput(
+    IReadOnlyDictionary<string, RuleInputValue> Values);
+
+public sealed record EvaluateRuleBindingInput(
+    RuleContextInput Context,
+    int? BindingRevision = null);
 
 public sealed record CreateBusinessObjectRecordInput(
     string IdempotencyKey,

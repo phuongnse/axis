@@ -23,10 +23,32 @@ public sealed class DeleteRuleBindingHandlerTests
         DeleteRuleBindingHandler handler = new(context.CurrentUser, bindings, context.UnitOfWork);
 
         Result result = await handler.Handle(
-            new DeleteRuleBindingCommand(binding.Id.Value),
+            new DeleteRuleBindingCommand(binding.Id.Value, binding.Revision),
             CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
         bindings.Received(1).Remove(binding);
+    }
+
+    [Fact]
+    public async Task Handle_WhenExpectedRevisionIsStale_ReturnsConflictWithoutRemovingBinding()
+    {
+        RuleBinding binding = RuleBindingHandlerTestData.Binding();
+        IRuleBindingRepository bindings = Substitute.For<IRuleBindingRepository>();
+        RuleDefinitionHandlerTestContext context = new();
+        bindings.GetByIdForWorkspaceAsync(
+                binding.Id,
+                RuleDefinitionHandlerTestContext.WorkspaceId,
+                Arg.Any<CancellationToken>())
+            .Returns(binding);
+        DeleteRuleBindingHandler handler = new(context.CurrentUser, bindings, context.UnitOfWork);
+
+        Result result = await handler.Handle(
+            new DeleteRuleBindingCommand(binding.Id.Value, binding.Revision + 1),
+            CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue();
+        result.ErrorCode.Should().Be(ErrorCodes.Conflict);
+        bindings.DidNotReceive().Remove(Arg.Any<RuleBinding>());
     }
 }

@@ -31,7 +31,9 @@ public sealed class CreateBusinessObjectRecordHandler(
 
         IReadOnlyDictionary<string, IReadOnlyList<string>> values = command.Values ??
             new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal);
-        string payloadHash = BusinessObjectRecordPayloadHasher.Compute(values);
+        Result<string> payloadHash = BusinessObjectRecordPayloadHasher.Compute(values);
+        if (payloadHash.IsFailure)
+            return BusinessObjectRecordFailures.Invalid<BusinessObjectRecordDetailDto>(payloadHash.Error);
         BusinessObjectRecord? existing = await recordRepository.FindByIdempotencyKeyAsync(
             workspaceId,
             key.Value,
@@ -39,7 +41,7 @@ public sealed class CreateBusinessObjectRecordHandler(
             cancellationToken);
         if (existing is not null)
         {
-            if (!StringComparer.Ordinal.Equals(existing.PayloadHash, payloadHash))
+            if (!StringComparer.Ordinal.Equals(existing.PayloadHash, payloadHash.Value))
                 return BusinessObjectRecordFailures.IdempotencyConflict<BusinessObjectRecordDetailDto>();
 
             BusinessObjectDefinitionVersion? existingDefinition = await definitionRepository
@@ -75,7 +77,7 @@ public sealed class CreateBusinessObjectRecordHandler(
             publishedVersion.VersionNumber,
             publishedVersion.Key,
             command.IdempotencyKey,
-            payloadHash,
+            payloadHash.Value,
             validValues.Value,
             userId,
             DateTime.UtcNow);
@@ -94,7 +96,7 @@ public sealed class CreateBusinessObjectRecordHandler(
                 key.Value,
                 command.IdempotencyKey.Trim(),
                 cancellationToken);
-            return concurrent is not null && StringComparer.Ordinal.Equals(concurrent.PayloadHash, payloadHash)
+            return concurrent is not null && StringComparer.Ordinal.Equals(concurrent.PayloadHash, payloadHash.Value)
                 ? BusinessObjectRecordMapper.ToDetailDto(concurrent, publishedVersion)
                 : BusinessObjectRecordFailures.IdempotencyConflict<BusinessObjectRecordDetailDto>();
         }

@@ -90,6 +90,17 @@ public sealed class SaveUnpublishedBusinessObjectDefinitionHandlerTests
         field.FieldType.Should().Be(BusinessObjectFieldType.Decimal);
         field.Rules.Should().ContainSingle();
         field.Rules[0].BindingId.Should().Be(TestBindingIds.NumericRange);
+        await _context.BindingValidator.Received(1).ValidateAsync(
+            Arg.Is<RuleBindingReferenceValidationRequest>(request =>
+                request.ExpectedTargetType == "business-object-field" &&
+                request.ExpectedTargetId == "customer.credit_limit" &&
+                request.ExpectedUseCaseOrTrigger == "field-validation" &&
+                request.ContextValues["record.value"].Type == RuleValueType.Decimal &&
+                !request.ContextValues["record.value"].AllowMultiple &&
+                request.RequiredContextKeys.Count == 1 &&
+                request.RequiredContextKeys[0] == "record.value" &&
+                request.ExpectedBindingRevision == null),
+            Arg.Any<CancellationToken>());
         await _context.UnitOfWork.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 
@@ -121,6 +132,47 @@ public sealed class SaveUnpublishedBusinessObjectDefinitionHandlerTests
                         BusinessObjectFieldType.Boolean,
                         [new(Guid.Empty)]),
                 ]),
+            CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue();
+        result.ErrorCode.Should().Be(ErrorCodes.InvalidInput);
+        result.ProblemCode.Should().Be(BusinessObjectsProblemCodes.BusinessObjectDefinitionInvalid);
+        await _context.UnitOfWork.DidNotReceiveWithAnyArgs()
+            .SaveChangesAsync(TestContext.Current.CancellationToken);
+    }
+
+    [Fact]
+    public async Task SaveUnpublished_WhenBindingContextIsIncompatible_ReturnsInvalidWithoutCommit()
+    {
+        BusinessObjectDefinition definition = BusinessObjectDefinitionHandlerTestContext.UnpublishedWithOneSave();
+        _context.Repository.GetByIdForWorkspaceAsync(
+                definition.Id,
+                BusinessObjectDefinitionHandlerTestContext.WorkspaceId,
+                Arg.Any<CancellationToken>())
+            .Returns(definition);
+        _context.BindingValidator.ValidateAsync(
+                Arg.Any<RuleBindingReferenceValidationRequest>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(RuleBindingReferenceValidationResult.Invalid(
+                "binding_context_type_mismatch",
+                "Rule binding consumer context type does not match the rule input.")));
+        SaveUnpublishedBusinessObjectDefinitionHandler sut = new(
+            _context.CurrentUser,
+            _context.Repository,
+            _context.UnitOfWork,
+            _context.InputPlanner);
+
+        Result<BusinessObjectDefinitionDetailDto> result = await sut.Handle(
+            new SaveUnpublishedBusinessObjectDefinitionCommand(
+                definition.Id.Value,
+                ExpectedRevision: 2,
+                Name: "Customer",
+                Fields:
+                [BusinessObjectDefinitionHandlerTestContext.FieldInput(
+                    "credit_limit",
+                    "Credit limit",
+                    BusinessObjectFieldType.Decimal,
+                    [new(TestBindingIds.NumericRange)])]),
             CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();

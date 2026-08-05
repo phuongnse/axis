@@ -125,20 +125,16 @@ sequenceDiagram
 > |-------|--------|
 > | Domain | Done |
 > | Application | Done |
-> | Infrastructure | Partial |
-> | API | Partial |
-> | Frontend | Partial |
+> | Infrastructure | Done |
+> | API | Done |
+> | Frontend | Done |
 >
-> **Implemented:** Account, personal-workspace, legal-acceptance, language, idempotency, verification email, verification, resend, and UI behavior exist. Post-verification currently enters the retired public-PKCE browser path and is not evidence for the approved opaque server-session handoff.
+> **Implemented:** Account, personal-workspace, legal-acceptance, language, idempotency, verification email, verification, resend, UI behavior, and the post-verification opaque Redis-backed browser-session handoff are implemented without a browser token or callback path.
 >
-> **Gaps vs spec:**
->
-> | ID | Gap |
-> |---|---|
-> | GAP-001 | Verification must establish the approved Redis-backed opaque Axis session and remove callback/token handoff source and evidence in the same clean cutover. |
+> **Gaps vs spec:** None.
 >
 > **Deferred follow-ups:** N/A.
 >
-> **Verification:** Registration and verification behavior has evidence; revised AT-001 requires fresh opaque-session browser evidence.
+> **Verification:** See [register-user.evidence.md](./register-user.evidence.md) for the browser, API, application, infrastructure, and UI proof covering every required AT.
 >
 > **Decisions:** Screen flow owns the product contract; required UI quality owns accessibility. Registration uses one user-facing full-name field end-to-end. Resend rate limiting is part of resend behavior, not token resolution. Public auth screens expose escape navigation. Successful verification reuses the sign-in use case's same-origin opaque session contract and cannot retain a separate browser-auth path.

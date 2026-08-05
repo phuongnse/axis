@@ -5,11 +5,14 @@ public sealed class AxisApiException(
     string message,
     string? problemCode = null,
     string? problemType = null,
-    IReadOnlyDictionary<string, string[]>? fieldErrors = null) : Exception(message)
+    IReadOnlyDictionary<string, string[]>? fieldErrors = null,
+    IReadOnlyDictionary<string, string[]>? errorCodes = null) : Exception(message)
 {
     public int StatusCode { get; } = statusCode;
     public string? ProblemCode { get; } = problemCode;
     public string? ProblemType { get; } = problemType;
     public IReadOnlyDictionary<string, string[]> FieldErrors { get; } =
         fieldErrors ?? new Dictionary<string, string[]>(StringComparer.Ordinal);
+    public IReadOnlyDictionary<string, string[]> ErrorCodes { get; } =
+        errorCodes ?? new Dictionary<string, string[]>(StringComparer.Ordinal);
 }

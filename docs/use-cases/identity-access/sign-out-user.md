@@ -111,21 +111,16 @@ sequenceDiagram
 > |-------|--------|
 > | Domain | N/A |
 > | Application | N/A |
-> | Infrastructure | Partial |
-> | API | Partial |
-> | Frontend | Partial |
+> | Infrastructure | Done |
+> | API | Done |
+> | Frontend | Done |
 >
-> **Implemented:** The app-shell action, pending/retry behavior, route transition, and current cookie sign-out endpoint exist. The current public-PKCE/memory-token cleanup path is retired and is not evidence for deletion of the approved Redis-backed opaque session.
+> **Implemented:** The app-shell action, pending/retry behavior, route transition, antiforgery-protected idempotent endpoint, exact opaque-cookie expiry, and Redis ticket deletion are implemented without the retired browser token/callback cleanup path.
 >
-> **Gaps vs spec:**
->
-> | ID | Gap |
-> |---|---|
-> | GAP-001 | Redis ticket deletion, exact opaque-cookie expiry, antiforgery, idempotent absent-session behavior, and multi-instance runtime evidence are not implemented. |
-> | GAP-002 | Frontend token/callback cleanup source, tests, and guidance must be removed rather than preserved as compatibility behavior. |
+> **Gaps vs spec:** None.
 >
 > **Deferred follow-ups:** N/A.
 >
-> **Verification:** Existing UI interaction evidence remains relevant; revised API and browser rows require fresh opaque-session evidence.
+> **Verification:** See [sign-out-user.evidence.md](./sign-out-user.evidence.md) for the browser, API, and UI proof covering every required AT.
 >
-> **Decisions:** This use case owns current-browser sign-out for the Axis same-origin server session. It deletes only that Redis ticket and cookie, not other devices or confidential product-BFF sessions. Product BFF logout and refresh-token revocation are owned by the reference-product use case and approved BFF dossier. Domain and Application remain N/A because no Identity domain record changes; Infrastructure owns the session store boundary.
+> **Decisions:** This use case owns current-browser sign-out for the Axis same-origin server session. It deletes only that Redis ticket and cookie, not other devices or confidential product-BFF sessions. Product BFF logout and refresh-token revocation are owned by [docs/use-cases/solutions/provision-reference-solution.md](../solutions/provision-reference-solution.md). Domain and Application remain N/A because no Identity domain record changes; Infrastructure owns the session store boundary.

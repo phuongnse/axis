@@ -30,14 +30,12 @@ internal sealed class BusinessObjectDefinitionHandlerTestContext
     public BusinessObjectDefinitionHandlerTestContext()
     {
         BindingValidator.ValidateAsync(
-                Arg.Any<Guid>(),
-                Arg.Any<Guid>(),
-                Arg.Any<CancellationToken>(),
-                Arg.Any<string?>(),
-                Arg.Any<string?>(),
-                Arg.Any<string?>())
+                Arg.Any<RuleBindingReferenceValidationRequest>(),
+                Arg.Any<CancellationToken>())
             .Returns(call => Task.FromResult(
-                RuleBindingReferenceValidationResult.Valid(call.ArgAt<Guid>(1), revision: 1)));
+                RuleBindingReferenceValidationResult.Valid(
+                    call.ArgAt<RuleBindingReferenceValidationRequest>(0).BindingId,
+                    revision: 1)));
     }
 
     public static BusinessObjectDefinition UnpublishedWithOneSave()

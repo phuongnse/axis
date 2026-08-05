@@ -23,7 +23,7 @@ public sealed class SimulateRuleDefinitionHandler(
         if (key.IsFailure)
             return RuleDefinitionFailures.NotFound<RuleSimulationResultDto>();
 
-        RuleDefinition? definition = SystemRuleCatalog.Definitions
+        RuleDefinition? definition = BuiltInRuleCatalog.Definitions
             .FirstOrDefault(candidate => candidate.Key == key.Value);
         definition ??= await repository.GetByKeyForWorkspaceAsync(key.Value, workspaceId, cancellationToken);
         if (definition is null)

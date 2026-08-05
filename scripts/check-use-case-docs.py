@@ -17,6 +17,7 @@ from pathlib import Path
 
 from acceptance_evidence import EvidenceValidationContext
 from acceptance_evidence import evidence_file_for
+from acceptance_evidence import external_reference
 from acceptance_evidence import is_browser_e2e_command
 from acceptance_evidence import is_frontend_component_test_command
 from acceptance_evidence import validate_acceptance_evidence_sidecar
@@ -507,47 +508,69 @@ def verification_evidence_issues(
     commands: list[str],
 ) -> list[str]:
     issues: list[str] = []
+    external_paths = [external_reference(path) for path in paths]
+    external_commands = [external_reference(command) for command in commands]
+    uses_external = bool(external_paths) and all(external_paths) and bool(external_commands) and all(external_commands)
+    evidence_paths = [reference.value for reference in external_paths if reference is not None] if uses_external else paths
+    evidence_commands = [reference.value for reference in external_commands if reference is not None] if uses_external else commands
     has_e2e_command = any(is_browser_e2e_command(command) for command in commands)
     has_frontend_test_command = any(is_frontend_component_test_command(command) for command in commands)
 
     if verification == "Browser automation":
-        if not any(path.startswith("frontend/e2e/") and path.endswith(".pw.ts") for path in paths):
+        browser_test = (
+            any(path.endswith(".pw.ts") for path in evidence_paths)
+            if uses_external
+            else any(path.startswith("frontend/e2e/") and path.endswith(".pw.ts") for path in paths)
+        )
+        if not browser_test:
             issues.append(
-                f"{ctx.evidence_rel}: Acceptance Evidence {at_id} Browser automation must reference a committed `frontend/e2e/*.pw.ts` test",
+                f"{ctx.evidence_rel}: Acceptance Evidence {at_id} Browser automation must reference a committed {'external `*.pw.ts`' if uses_external else '`frontend/e2e/*.pw.ts`'} test",
             )
-        if not has_e2e_command:
+        if not (any(command.startswith("npm run test:e2e") for command in evidence_commands) if uses_external else has_e2e_command):
             issues.append(
-                f"{ctx.evidence_rel}: Acceptance Evidence {at_id} Browser automation Commands must run Playwright through scripts/axis.py",
+                f"{ctx.evidence_rel}: Acceptance Evidence {at_id} Browser automation Commands must run {'the external browser command' if uses_external else 'Playwright through scripts/axis.py'}",
             )
     elif verification == "UI component test":
-        if not any(
-            path.startswith(("frontend/src/", "frontend/tests/")) and path.endswith((".test.ts", ".test.tsx"))
-            for path in paths
-        ):
+        component_test = (
+            any(path.endswith((".test.ts", ".test.tsx")) for path in evidence_paths)
+            if uses_external
+            else any(path.startswith(("frontend/src/", "frontend/tests/")) and path.endswith((".test.ts", ".test.tsx")) for path in paths)
+        )
+        if not component_test:
             issues.append(
-                f"{ctx.evidence_rel}: Acceptance Evidence {at_id} UI component test must reference a committed frontend `*.test.ts` or `*.test.tsx` file",
+                f"{ctx.evidence_rel}: Acceptance Evidence {at_id} UI component test must reference a committed {'external ' if uses_external else 'frontend '}`*.test.ts` or `*.test.tsx` file",
             )
-        if not has_frontend_test_command:
+        if not (any(command.startswith("npm run test:") for command in evidence_commands) if uses_external else has_frontend_test_command):
             issues.append(
-                f"{ctx.evidence_rel}: Acceptance Evidence {at_id} UI component test Commands must run frontend tests through scripts/axis.py",
+                f"{ctx.evidence_rel}: Acceptance Evidence {at_id} UI component test Commands must run {'the external component-test command' if uses_external else 'frontend tests through scripts/axis.py'}",
             )
     elif verification == "API integration test":
-        if not any(path.startswith("tests/Api/") and path.endswith(".cs") for path in paths):
+        api_test = (
+            any(path.endswith(".pw.ts") for path in evidence_paths)
+            if uses_external
+            else any(path.startswith("tests/Api/") and path.endswith(".cs") for path in paths)
+        )
+        if not api_test:
             issues.append(
-                f"{ctx.evidence_rel}: Acceptance Evidence {at_id} API integration test must reference a committed `tests/Api/**/*.cs` file",
+                f"{ctx.evidence_rel}: Acceptance Evidence {at_id} API integration test must reference a committed {'external browser `*.pw.ts`' if uses_external else '`tests/Api/**/*.cs`'} file",
             )
-        if not has_dotnet_test_command(commands, "tests/Api/"):
+        if not (any(command.startswith("npm run test:e2e") for command in evidence_commands) if uses_external else has_dotnet_test_command(commands, "tests/Api/")):
             issues.append(
-                f"{ctx.evidence_rel}: Acceptance Evidence {at_id} API integration test Commands must run dotnet tests through scripts/axis.py",
+                f"{ctx.evidence_rel}: Acceptance Evidence {at_id} API integration test Commands must run {'the external live API journey' if uses_external else 'dotnet tests through scripts/axis.py'}",
             )
     elif verification == "Application test":
-        if not any(path.startswith("tests/Modules/") and ".Application.Tests/" in path and path.endswith(".cs") for path in paths):
+        application_test = (
+            any(path.startswith(("src/", "scripts/")) and path.endswith((".test.ts", ".test.tsx", ".test.mjs")) for path in evidence_paths)
+            if uses_external
+            else any(path.startswith("tests/Modules/") and ".Application.Tests/" in path and path.endswith(".cs") for path in paths)
+        )
+        if not application_test:
             issues.append(
-                f"{ctx.evidence_rel}: Acceptance Evidence {at_id} Application test must reference a committed module application test file",
+                f"{ctx.evidence_rel}: Acceptance Evidence {at_id} Application test must reference a committed {'external application test' if uses_external else 'module application test file'}",
             )
-        if not has_dotnet_test_command(commands, ".Application.Tests"):
+        if not (any(command.startswith("npm run test:") for command in evidence_commands) if uses_external else has_dotnet_test_command(commands, ".Application.Tests")):
             issues.append(
-                f"{ctx.evidence_rel}: Acceptance Evidence {at_id} Application test Commands must run dotnet tests through scripts/axis.py",
+                f"{ctx.evidence_rel}: Acceptance Evidence {at_id} Application test Commands must run {'the external application-test command' if uses_external else 'dotnet tests through scripts/axis.py'}",
             )
     elif verification in {"Infrastructure test", "Infrastructure integration test"}:
         if not any(path.startswith("tests/Modules/") and ".Infrastructure.Tests/" in path and path.endswith(".cs") for path in paths):

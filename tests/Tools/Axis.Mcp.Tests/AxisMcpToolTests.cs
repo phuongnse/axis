@@ -24,7 +24,7 @@ public sealed class AxisMcpToolTests
             page: 2,
             pageSize: 10,
             origin: "workspace",
-            status: "published",
+            status: "active",
             query: "risk review",
             language: "en",
             cancellationToken: cancellationToken);
@@ -32,7 +32,7 @@ public sealed class AxisMcpToolTests
         Assert.Equal("{\"items\":[]}", result);
         Assert.Equal(HttpMethod.Get, handler.Method);
         Assert.Equal(
-            "/api/rules?page=2&pageSize=10&origin=Workspace&status=Published&query=risk%20review&language=en",
+            "/api/rules?page=2&pageSize=10&origin=Workspace&status=Active&query=risk%20review&language=en",
             handler.RequestUri!.PathAndQuery);
         Assert.Equal("Bearer", handler.Authorization!.Scheme);
         Assert.Equal("test-token", handler.Authorization.Parameter);
@@ -59,7 +59,31 @@ public sealed class AxisMcpToolTests
     }
 
     [Fact]
-    public async Task SimulateRule_WhenCorrelationIdIsOmitted_GeneratesOneWithoutWorkspaceArguments()
+    public async Task DeleteRuleBinding_WhenInvoked_SendsExpectedRevision()
+    {
+        RecordingHandler handler = new(string.Empty);
+        using HttpClient httpClient = new(handler)
+        {
+            BaseAddress = new Uri("https://localhost:5281/"),
+        };
+        AxisMcpBindingWriteTools tools = new(
+            new AxisApiClient(httpClient, new FixedAccessTokenProvider("test-token")),
+            new Axis.Mcp.Configuration.AxisMcpMutationGuard(
+                Axis.Mcp.Configuration.AxisMcpOptions.Create(
+                    new Uri("https://localhost:5281/"),
+                    ".dev-certs/rootCA.pem",
+                    "write")));
+        Guid bindingId = Guid.Parse("11111111-1111-1111-1111-111111111111");
+
+        await tools.DeleteRuleBindingAsync(bindingId, 4, TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpMethod.Delete, handler.Method);
+        Assert.Equal($"/api/rule-bindings/{bindingId:D}", handler.RequestUri!.PathAndQuery);
+        Assert.Equal("{\"expectedRevision\":4}", handler.RequestBody);
+    }
+
+    [Fact]
+    public async Task RuleLifecycleTools_WhenInvoked_UseTheCurrentVersionAndActivationRoutes()
     {
         CancellationToken cancellationToken = TestContext.Current.CancellationToken;
         RecordingHandler handler = new("{\"isMatch\":true}");
@@ -67,21 +91,81 @@ public sealed class AxisMcpToolTests
         {
             BaseAddress = new Uri("https://localhost:5281/"),
         };
-        AxisMcpTools tools = new(new AxisApiClient(httpClient, new FixedAccessTokenProvider("test-token")));
+        AxisMcpRuleLifecycleTools tools = new(
+            new AxisApiClient(httpClient, new FixedAccessTokenProvider("test-token")),
+            new Axis.Mcp.Configuration.AxisMcpMutationGuard(
+                Axis.Mcp.Configuration.AxisMcpOptions.Create(
+                    new Uri("https://localhost:5281/"),
+                    ".dev-certs/rootCA.pem",
+                    "write")));
 
-        string result = await tools.SimulateRuleAsync(
+        await tools.CreateRuleDefinitionVersionAsync(
             "risk rule",
-            definitionVersion: null,
-            inputs: new Dictionary<string, RuleInputValue>
+            new RuleRevisionInput(3),
+            cancellationToken: cancellationToken);
+        Assert.Equal(HttpMethod.Post, handler.Method);
+        Assert.Equal("/api/rules/risk%20rule/versions", handler.RequestUri!.PathAndQuery);
+        Assert.Equal("{\"expectedRevision\":3}", handler.RequestBody);
+
+        await tools.ActivateRuleDefinitionVersionAsync(
+            "risk rule",
+            new ActivateRuleDefinitionVersionInput(2, 4),
+            cancellationToken);
+        Assert.Equal(HttpMethod.Put, handler.Method);
+        Assert.Equal("/api/rules/risk%20rule/active-version", handler.RequestUri!.PathAndQuery);
+        Assert.Equal("{\"version\":2,\"expectedRevision\":4}", handler.RequestBody);
+
+        await tools.DeactivateRuleDefinitionAsync("risk rule", new RuleRevisionInput(5), cancellationToken);
+        Assert.Equal(HttpMethod.Delete, handler.Method);
+        Assert.Equal("/api/rules/risk%20rule/active-version", handler.RequestUri!.PathAndQuery);
+        Assert.Equal("{\"expectedRevision\":5}", handler.RequestBody);
+
+        await tools.ArchiveRuleDefinitionAsync("risk rule", new RuleRevisionInput(6), cancellationToken);
+        Assert.Equal(HttpMethod.Post, handler.Method);
+        Assert.Equal("/api/rules/risk%20rule/archive", handler.RequestUri!.PathAndQuery);
+        Assert.Equal("{\"expectedRevision\":6}", handler.RequestBody);
+    }
+
+    [Fact]
+    public async Task RuleReadTools_AndBindingEvaluation_UseCurrentReadOnlyRoutes()
+    {
+        RecordingHandler handler = new("{\"isMatch\":true}");
+        using HttpClient httpClient = new(handler)
+        {
+            BaseAddress = new Uri("https://localhost:5281/"),
+        };
+        AxisApiClient api = new(httpClient, new FixedAccessTokenProvider("test-token"));
+        AxisMcpRuleReadTools ruleTools = new(api);
+        AxisMcpBindingEvaluationTools bindingTools = new(api);
+
+        await ruleTools.SimulateRuleDefinitionDraftAsync(
+            "risk rule",
+            new SimulateRuleDraftInput(new Dictionary<string, RuleInputValue>
             {
                 ["amount"] = new("Decimal", ["10.00"]),
-            },
-            cancellationToken: cancellationToken);
-
-        Assert.Equal("{\"isMatch\":true}", result);
-        Assert.Equal("/api/rules/risk%20rule/simulate", handler.RequestUri!.PathAndQuery);
-        Assert.Contains("\"correlationId\":\"", handler.RequestBody, StringComparison.Ordinal);
+            }),
+            TestContext.Current.CancellationToken);
+        Assert.Equal("/api/rules/risk%20rule/draft/simulate", handler.RequestUri!.PathAndQuery);
         Assert.Contains("\"amount\":{\"type\":\"Decimal\",\"values\":[\"10.00\"]}", handler.RequestBody, StringComparison.Ordinal);
+
+        await ruleTools.SimulateRuleDefinitionVersionAsync(
+            "risk rule",
+            2,
+            new SimulateRuleVersionInput(new Dictionary<string, RuleInputValue>()),
+            TestContext.Current.CancellationToken);
+        Assert.Equal("/api/rules/risk%20rule/versions/2/simulate", handler.RequestUri!.PathAndQuery);
+
+        await bindingTools.EvaluateRuleBindingAsync(
+            Guid.Parse("11111111-1111-1111-1111-111111111111"),
+            new EvaluateRuleBindingInput(
+                new RuleContextInput(new Dictionary<string, RuleInputValue>
+                {
+                    ["amount"] = new("Decimal", ["10.00"]),
+                }),
+                BindingRevision: 4),
+            TestContext.Current.CancellationToken);
+        Assert.Equal("/api/rule-bindings/11111111-1111-1111-1111-111111111111/evaluate", handler.RequestUri!.PathAndQuery);
+        Assert.Contains("\"bindingRevision\":4", handler.RequestBody, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -170,7 +254,7 @@ public sealed class AxisMcpToolTests
             new(options);
 
         InvalidOperationException exception = Assert.Throws<InvalidOperationException>(
-            () => guard.EnsureEnabled("PublishRuleDefinition"));
+            () => guard.EnsureEnabled("CreateRuleDefinitionVersion"));
 
         Assert.Contains("AXIS_MCP_ACCESS", exception.Message, StringComparison.Ordinal);
     }
@@ -185,7 +269,7 @@ public sealed class AxisMcpToolTests
         Axis.Mcp.Configuration.AxisMcpMutationGuard guard =
             new(options);
 
-        guard.EnsureEnabled("PublishRuleDefinition");
+        guard.EnsureEnabled("CreateRuleDefinitionVersion");
     }
 
     [Fact]
@@ -207,24 +291,37 @@ public sealed class AxisMcpToolTests
     }
 
     [Fact]
-    public async Task ApiClient_WhenApiReturnsProblemDetails_PreservesStableCodeAndFieldErrors()
+    public async Task BusinessObjectRecordTools_WhenApiReturnsProblemDetails_PreservesStructuredErrors()
     {
         using HttpClient httpClient = new(new ProblemHandler())
         {
             BaseAddress = new Uri("https://localhost:5281/"),
         };
         AxisApiClient api = new(httpClient, new FixedAccessTokenProvider("test-token"));
+        AxisMcpBusinessObjectRecordWriteTools tools = new(
+            api,
+            new Axis.Mcp.Configuration.AxisMcpMutationGuard(
+                Axis.Mcp.Configuration.AxisMcpOptions.Create(
+                    new Uri("https://localhost:5281/"),
+                    ".dev-certs/rootCA.pem",
+                    "write")));
 
         AxisApiException exception = await Assert.ThrowsAsync<AxisApiException>(
-            () => api.PutJsonAsync(
-                "api/business-object-records/11111111-1111-1111-1111-111111111111",
-                new { expectedRevision = 1, values = new { amount = new[] { "invalid" } } },
+            () => tools.SaveBusinessObjectRecordAsync(
+                Guid.Parse("11111111-1111-1111-1111-111111111111"),
+                new SaveBusinessObjectRecordInput(
+                    1,
+                    new Dictionary<string, IReadOnlyList<string>>
+                    {
+                        ["amount"] = ["invalid"],
+                    }),
                 TestContext.Current.CancellationToken));
 
         Assert.Equal(422, exception.StatusCode);
         Assert.Equal("businessObjects.recordInvalid", exception.ProblemCode);
         Assert.Equal("urn:axis:problem:businessObjects.recordInvalid", exception.ProblemType);
-        Assert.Equal(["businessObjects.amountInvalid"], exception.FieldErrors["amount"]);
+        Assert.Equal(["The value is invalid."], exception.FieldErrors["amount"]);
+        Assert.Equal(["businessObjects.amountInvalid"], exception.ErrorCodes["amount"]);
     }
 
     private sealed class FixedAccessTokenProvider(string token) : IAxisAccessTokenProvider

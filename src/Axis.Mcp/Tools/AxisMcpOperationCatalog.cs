@@ -33,18 +33,23 @@ public static class AxisMcpOperationCatalog
             ["SearchRuleExpressionGuide"] = "axis_search_rule_expression_guide",
             ["GetRuleDefinition"] = "axis_get_rule",
             ["SaveRuleDefinitionDraft"] = "axis_save_rule_definition_draft",
-            ["SimulateRuleDefinition"] = "axis_simulate_rule",
+            ["CreateRuleDefinitionVersion"] = "axis_create_rule_definition_version",
+            ["ActivateRuleDefinitionVersion"] = "axis_activate_rule_definition_version",
+            ["DeactivateRuleDefinition"] = "axis_deactivate_rule_definition",
+            ["ArchiveRuleDefinition"] = "axis_archive_rule_definition",
+            ["SimulateRuleDefinitionDraft"] = "axis_simulate_rule_definition_draft",
+            ["SimulateRuleDefinitionVersion"] = "axis_simulate_rule_definition_version",
+            ["ProjectRuleAuthoring"] = "axis_project_rule_authoring",
+            ["CompleteRuleAuthoring"] = "axis_complete_rule_authoring",
             ["CreateRuleBinding"] = "axis_create_rule_binding",
             ["UpdateRuleBinding"] = "axis_update_rule_binding",
+            ["DeleteRuleBinding"] = "axis_delete_rule_binding",
+            ["EvaluateRuleBinding"] = "axis_evaluate_rule_binding",
         };
 
     public static IReadOnlySet<string> BlockedOperationIds { get; } =
         new HashSet<string>(StringComparer.Ordinal)
         {
-            "StartRuleDefinitionDraft",
-            "PublishRuleDefinition",
-            "ArchiveRuleDefinition",
-            "DeleteRuleBinding",
         };
 
     public static IReadOnlySet<string> ExcludedOperationIds { get; } =

@@ -1,6 +1,6 @@
 import { redirect } from '@tanstack/react-router';
 
-import { restoreBrowserSession } from '@/features/auth/api';
+import { BrowserSessionUnavailableError, restoreBrowserSession } from '@/features/auth/api';
 import { getBrowserSessionStatus } from '@/features/auth/auth-store';
 import { getAuthorizationRequestContinuation } from '@/features/auth/authorization-request';
 
@@ -35,7 +35,13 @@ export async function redirectAuthenticatedUserFromGuestRoute(context: RouteGuar
     throw redirect({ to: '/dashboard', replace: true });
   }
 
-  const restored = await restoreBrowserSession();
+  let restored: boolean;
+  try {
+    restored = await restoreBrowserSession();
+  } catch (error) {
+    if (error instanceof BrowserSessionUnavailableError) return;
+    throw error;
+  }
   if (restored) {
     throw redirect({ to: '/dashboard', replace: true });
   }

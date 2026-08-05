@@ -7,16 +7,16 @@ using Axis.Shared.Application.CQRS;
 using Axis.Shared.Application.Identity;
 using Axis.Shared.Domain.Primitives;
 
-namespace Axis.Rules.Application.Commands.StartRuleDefinitionDraft;
+namespace Axis.Rules.Application.Commands.CreateRuleDefinitionVersion;
 
-public sealed class StartRuleDefinitionDraftHandler(
+public sealed class CreateRuleDefinitionVersionHandler(
     ICurrentUser currentUser,
     IRuleDefinitionRepository repository,
     IUnitOfWork unitOfWork)
-    : ICommandHandler<StartRuleDefinitionDraftCommand, RuleDefinitionDetailDto>
+    : ICommandHandler<CreateRuleDefinitionVersionCommand, RuleDefinitionDetailDto>
 {
     public async Task<Result<RuleDefinitionDetailDto>> Handle(
-        StartRuleDefinitionDraftCommand command,
+        CreateRuleDefinitionVersionCommand command,
         CancellationToken cancellationToken)
     {
         if (currentUser.workspaceId is not Guid workspaceId)
@@ -28,27 +28,18 @@ public sealed class StartRuleDefinitionDraftHandler(
         if (key.IsFailure)
             return RuleDefinitionFailures.NotFound<RuleDefinitionDetailDto>();
 
-        RuleDefinition? definition = await repository.GetByKeyForWorkspaceAsync(
-            key.Value,
-            workspaceId,
-            cancellationToken);
+        RuleDefinition? definition = await repository.GetByKeyForWorkspaceAsync(key.Value, workspaceId, cancellationToken);
         if (definition is null)
             return RuleDefinitionFailures.NotFound<RuleDefinitionDetailDto>();
 
-        Result started = definition.StartNextDraft(command.ExpectedRevision, userId, DateTime.UtcNow);
-        if (started.IsFailure)
-            return started.ErrorCode == ErrorCodes.Conflict
-                ? RuleDefinitionFailures.Conflict<RuleDefinitionDetailDto>(started.Error)
-                : RuleDefinitionFailures.Invalid<RuleDefinitionDetailDto>(started.Error);
+        Result<RuleDefinitionVersion> created = definition.CreateVersion(command.ExpectedRevision, userId, DateTime.UtcNow);
+        if (created.IsFailure)
+            return created.ErrorCode == ErrorCodes.Conflict
+                ? RuleDefinitionFailures.Conflict<RuleDefinitionDetailDto>(created.Error)
+                : RuleDefinitionFailures.Invalid<RuleDefinitionDetailDto>(created.Error);
 
-        try
-        {
-            await unitOfWork.SaveChangesAsync(cancellationToken);
-        }
-        catch (ConcurrencyException)
-        {
-            return RuleDefinitionFailures.Conflict<RuleDefinitionDetailDto>("The rule definition has changed.");
-        }
+        try { await unitOfWork.SaveChangesAsync(cancellationToken); }
+        catch (ConcurrencyException) { return RuleDefinitionFailures.Conflict<RuleDefinitionDetailDto>("The rule definition has changed."); }
         return RuleContractMapper.ToDetailDto(definition);
     }
 }

@@ -295,9 +295,9 @@ function RuleStatusCell({ definition }: { definition: RuleDefinitionSummary }) {
   const { t } = useTranslation();
   const label = definition.status ? t(`rules.status${definition.status}`) : '—';
   const tone: StatusBadgeTone =
-    definition.status === 'Published'
+    definition.status === 'Active'
       ? 'success'
-      : definition.status === 'Draft'
+      : definition.status === 'Draft' || definition.status === 'Inactive'
         ? 'neutral'
         : 'muted';
   return (

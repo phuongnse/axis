@@ -34,7 +34,9 @@ namespace Axis.Api.Extensions;
 internal static class AxisApiServiceExtensions
 {
     private const string AuthRateLimiterPolicy = "auth";
+    internal const string RulesRateLimiterPolicy = "rules";
     private const string AxisAuthenticationScheme = "Axis";
+    internal const string BrowserSessionRotationScheme = "AxisBrowserSessionRotation";
 
     public static WebApplicationBuilder AddAxisApiServices(this WebApplicationBuilder builder)
     {
@@ -125,14 +127,7 @@ internal static class AxisApiServiceExtensions
             })
             .AddCookie(CookieAuthenticationDefaults.AuthenticationScheme, opts =>
             {
-                opts.Cookie.Name = "__Host-axis-session";
-                opts.Cookie.HttpOnly = true;
-                opts.Cookie.IsEssential = true;
-                opts.Cookie.Path = "/";
-                opts.Cookie.SameSite = SameSiteMode.Lax;
-                opts.Cookie.SecurePolicy = CookieSecurePolicy.Always;
-                opts.ExpireTimeSpan = sessionPolicy.IdleLifetime;
-                opts.SlidingExpiration = true;
+                ConfigureBrowserSessionCookie(opts, sessionPolicy);
                 opts.Events.OnRedirectToLogin = context =>
                 {
                     context.Response.StatusCode = StatusCodes.Status401Unauthorized;
@@ -156,9 +151,13 @@ internal static class AxisApiServiceExtensions
                     await context.HttpContext.SignOutAsync(
                         CookieAuthenticationDefaults.AuthenticationScheme);
                 };
-            });
+            })
+            .AddCookie(BrowserSessionRotationScheme, opts =>
+                ConfigureBrowserSessionCookie(opts, sessionPolicy));
         services.AddOptions<CookieAuthenticationOptions>(CookieAuthenticationDefaults.AuthenticationScheme)
-            .Configure<RedisTicketStore>((options, store) => options.SessionStore = store);
+            .Configure<RedisTicketStore, IDataProtectionProvider>(ConfigureBrowserSessionTicketStore);
+        services.AddOptions<CookieAuthenticationOptions>(BrowserSessionRotationScheme)
+            .Configure<RedisTicketStore, IDataProtectionProvider>(ConfigureBrowserSessionTicketStore);
 
         services.AddOpenIddict()
             .AddServer(opts =>
@@ -225,6 +224,30 @@ internal static class AxisApiServiceExtensions
             .AddEncryptionCertificate(encryptionThumbprint, storeName, storeLocation);
     }
 
+    private static void ConfigureBrowserSessionCookie(
+        CookieAuthenticationOptions options,
+        AxisBrowserSessionPolicy sessionPolicy)
+    {
+        options.Cookie.Name = "__Host-axis-session";
+        options.Cookie.HttpOnly = true;
+        options.Cookie.IsEssential = true;
+        options.Cookie.Path = "/";
+        options.Cookie.SameSite = SameSiteMode.Lax;
+        options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+        options.ExpireTimeSpan = sessionPolicy.IdleLifetime;
+        options.SlidingExpiration = true;
+    }
+
+    private static void ConfigureBrowserSessionTicketStore(
+        CookieAuthenticationOptions options,
+        RedisTicketStore store,
+        IDataProtectionProvider dataProtectionProvider)
+    {
+        options.SessionStore = store;
+        options.TicketDataFormat = new TicketDataFormat(
+            dataProtectionProvider.CreateProtector("Axis.Api", "BrowserSessionCookie", "v1"));
+    }
+
     private static void AddAxisAuthorization(this IServiceCollection services)
     {
         services.AddAuthorization();
@@ -247,6 +270,12 @@ internal static class AxisApiServiceExtensions
         int permitLimit = configuration.GetValue("RateLimiting:Auth:PermitLimit", defaultPermitLimit);
         TimeSpan window = TimeSpan.FromSeconds(
             configuration.GetValue("RateLimiting:Auth:WindowSeconds", 60));
+        int defaultRulesPermitLimit = environment.IsTesting() ? 1_000 : 120;
+        int rulesPermitLimit = configuration.GetValue(
+            "RateLimiting:Rules:PermitLimit",
+            defaultRulesPermitLimit);
+        TimeSpan rulesWindow = TimeSpan.FromSeconds(
+            configuration.GetValue("RateLimiting:Rules:WindowSeconds", 60));
 
         services.AddRateLimiter(opts =>
         {
@@ -261,6 +290,21 @@ internal static class AxisApiServiceExtensions
                     {
                         PermitLimit = permitLimit,
                         Window = window,
+                        QueueLimit = 0,
+                    });
+            });
+
+            opts.AddPolicy(RulesRateLimiterPolicy, context =>
+            {
+                string subject = context.User.FindFirst("sub")?.Value ?? "anonymous";
+                string workspace = context.User.FindFirst("workspace_id")?.Value ?? "no-workspace";
+
+                return RateLimitPartition.GetFixedWindowLimiter(
+                    $"{workspace}:{subject}",
+                    _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = rulesPermitLimit,
+                        Window = rulesWindow,
                         QueueLimit = 0,
                     });
             });

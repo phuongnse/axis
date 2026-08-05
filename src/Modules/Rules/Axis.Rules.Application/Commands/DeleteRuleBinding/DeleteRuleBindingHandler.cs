@@ -22,8 +22,17 @@ public sealed class DeleteRuleBindingHandler(
             RuleBindingId.From(command.BindingId), workspaceId, cancellationToken);
         if (binding is null)
             return Result.Failure(ErrorCodes.NotFound, "Rule binding was not found.");
+        if (command.ExpectedRevision != binding.Revision)
+            return Result.Failure(ErrorCodes.Conflict, "The rule binding has changed.");
         repository.Remove(binding);
-        await unitOfWork.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await unitOfWork.SaveChangesAsync(cancellationToken);
+        }
+        catch (ConcurrencyException)
+        {
+            return Result.Failure(ErrorCodes.Conflict, "The rule binding has changed.");
+        }
         return Result.Success();
     }
 }

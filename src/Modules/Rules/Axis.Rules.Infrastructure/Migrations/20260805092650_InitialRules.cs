@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using Microsoft.EntityFrameworkCore.Migrations;
 using NpgsqlTypes;
 
@@ -66,9 +66,9 @@ namespace Axis.Rules.Infrastructure.Migrations
                     description = table.Column<string>(type: "character varying(1000)", maxLength: 1000, nullable: false),
                     origin = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false),
                     expression_language_version = table.Column<int>(type: "integer", nullable: false),
-                    status = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false),
                     revision = table.Column<int>(type: "integer", nullable: false),
                     latest_published_version = table.Column<int>(type: "integer", nullable: true),
+                    active_version = table.Column<int>(type: "integer", nullable: true),
                     condition = table.Column<string>(type: "jsonb", nullable: true),
                     output = table.Column<string>(type: "jsonb", nullable: false),
                     created_by_user_id = table.Column<Guid>(type: "uuid", nullable: false),
@@ -112,7 +112,7 @@ namespace Axis.Rules.Infrastructure.Migrations
                         column: x => x.rule_definition_id,
                         principalTable: "rule_definitions",
                         principalColumn: "id",
-                        onDelete: ReferentialAction.Cascade);
+                        onDelete: ReferentialAction.Restrict);
                 });
 
             migrationBuilder.CreateIndex(
@@ -152,15 +152,15 @@ namespace Axis.Rules.Infrastructure.Migrations
                 .Annotation("Npgsql:IndexMethod", "gin");
 
             migrationBuilder.CreateIndex(
+                name: "IX_rule_definitions_workspace_id_archived_at_active_version_la~",
+                table: "rule_definitions",
+                columns: new[] { "workspace_id", "archived_at", "active_version", "latest_published_version", "name" });
+
+            migrationBuilder.CreateIndex(
                 name: "IX_rule_definitions_workspace_id_definition_key",
                 table: "rule_definitions",
                 columns: new[] { "workspace_id", "definition_key" },
                 unique: true);
-
-            migrationBuilder.CreateIndex(
-                name: "IX_rule_definitions_workspace_id_status_name",
-                table: "rule_definitions",
-                columns: new[] { "workspace_id", "status", "name" });
         }
 
         /// <inheritdoc />
@@ -174,6 +174,8 @@ namespace Axis.Rules.Infrastructure.Migrations
 
             migrationBuilder.DropTable(
                 name: "rule_definitions");
+
+            migrationBuilder.Sql("DROP FUNCTION IF EXISTS axis_unaccent(text);");
         }
     }
 }

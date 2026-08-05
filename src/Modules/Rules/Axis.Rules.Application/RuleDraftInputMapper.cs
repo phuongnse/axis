@@ -19,7 +19,8 @@ internal static class RuleDraftInputMapper
         List<RuleInputDefinition> mappedInputs = [];
         foreach (RuleDraftInputDefinitionDto inputDto in inputs)
         {
-            Result<RuleInputDefinition> input = RuleInputDefinition.CreateFromLabel(
+            Result<RuleInputDefinition> input = RuleInputDefinition.Create(
+                inputDto.Key,
                 inputDto.Label,
                 inputDto.Types.Select(type => (DomainValueType)type).ToArray(),
                 inputDto.IsRequired,
@@ -30,17 +31,12 @@ internal static class RuleDraftInputMapper
             mappedInputs.Add(input.Value);
         }
 
-        if (mappedInputs.Select(input => input.Label).Distinct(StringComparer.OrdinalIgnoreCase).Count() !=
+        if (mappedInputs.Select(input => input.Key).Distinct(StringComparer.Ordinal).Count() !=
             mappedInputs.Count)
         {
-            return Result.Failure<RuleDraftInput>("Rule input labels must be unique.");
+            return Result.Failure<RuleDraftInput>("Rule input keys must be unique.");
         }
-
-        Dictionary<string, string> keyByLabel = mappedInputs.ToDictionary(
-            input => input.Label,
-            input => input.Key,
-            StringComparer.OrdinalIgnoreCase);
-        Result<RuleConditionNodeDto> canonicalCondition = CanonicalizeCondition(condition, keyByLabel);
+        Result<RuleConditionNodeDto> canonicalCondition = CanonicalizeCondition(condition);
         if (canonicalCondition.IsFailure)
             return Result.Failure<RuleDraftInput>(canonicalCondition.Error);
 
@@ -52,8 +48,7 @@ internal static class RuleDraftInputMapper
     }
 
     private static Result<RuleConditionNodeDto> CanonicalizeCondition(
-        RuleConditionNodeDto condition,
-        IReadOnlyDictionary<string, string> keyByLabel)
+        RuleConditionNodeDto condition)
     {
         if (condition is null)
             return Result.Failure<RuleConditionNodeDto>("Rule condition is required.");
@@ -63,7 +58,7 @@ internal static class RuleDraftInputMapper
             List<RuleConditionNodeDto> children = [];
             foreach (RuleConditionNodeDto child in condition.Children ?? [])
             {
-                Result<RuleConditionNodeDto> canonicalChild = CanonicalizeCondition(child, keyByLabel);
+                Result<RuleConditionNodeDto> canonicalChild = CanonicalizeCondition(child);
                 if (canonicalChild.IsFailure)
                     return Result.Failure<RuleConditionNodeDto>(canonicalChild.Error);
                 children.Add(canonicalChild.Value);
@@ -74,12 +69,12 @@ internal static class RuleDraftInputMapper
         if (condition.Left is null)
             return Result.Failure<RuleConditionNodeDto>("Rule condition left value is required.");
 
-        Result<RuleOperandDto> left = CanonicalizeOperand(condition.Left, keyByLabel);
+        Result<RuleOperandDto> left = CanonicalizeOperand(condition.Left);
         if (left.IsFailure)
             return Result.Failure<RuleConditionNodeDto>(left.Error);
         Result<RuleOperandDto>? right = condition.Right is null
             ? null
-            : CanonicalizeOperand(condition.Right, keyByLabel);
+            : CanonicalizeOperand(condition.Right);
         if (right?.IsFailure == true)
             return Result.Failure<RuleConditionNodeDto>(right.Error);
 
@@ -87,21 +82,17 @@ internal static class RuleDraftInputMapper
     }
 
     private static Result<RuleOperandDto> CanonicalizeOperand(
-        RuleOperandDto operand,
-        IReadOnlyDictionary<string, string> keyByLabel)
+        RuleOperandDto operand)
     {
         if (operand.Kind == ContractOperandKind.Input)
         {
-            string label = operand.Reference?.Trim() ?? string.Empty;
-            return keyByLabel.TryGetValue(label, out string? key)
-                ? operand with { Reference = key }
-                : Result.Failure<RuleOperandDto>("Rule condition references an input that is not declared.");
+            return operand with { Reference = operand.Reference?.Trim() };
         }
 
         List<RuleOperandDto> arguments = [];
         foreach (RuleOperandDto argument in operand.Arguments ?? [])
         {
-            Result<RuleOperandDto> canonicalArgument = CanonicalizeOperand(argument, keyByLabel);
+            Result<RuleOperandDto> canonicalArgument = CanonicalizeOperand(argument);
             if (canonicalArgument.IsFailure)
                 return Result.Failure<RuleOperandDto>(canonicalArgument.Error);
             arguments.Add(canonicalArgument.Value);

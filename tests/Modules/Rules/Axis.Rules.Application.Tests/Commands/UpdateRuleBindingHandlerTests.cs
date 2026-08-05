@@ -13,7 +13,7 @@ public sealed class UpdateRuleBindingHandlerTests
     [Fact]
     public async Task Handle_WhenRequestIsValid_UpdatesBindingWithoutChangingDefinition()
     {
-        RuleDefinition definition = SystemRuleCatalog.Find("field.required", 1)!;
+        RuleDefinition definition = BuiltInRuleCatalog.Find("field.required", 1)!;
         int definitionRevision = definition.Revision;
         RuleBinding binding = RuleBindingHandlerTestData.Binding();
         IRuleBindingRepository bindings = Substitute.For<IRuleBindingRepository>();

@@ -2,7 +2,7 @@
 
 > **Navigation**: [docs/README.md](../README.md) · [docs/playbooks/agent-checklist.md](./agent-checklist.md) · [AGENTS.md](../../AGENTS.md)
 
-The Design Gate is a required pre-code review artifact for non-trivial changes. It is not a machine-enforced CI gate; it is evidence that the agent re-derived the rules for the exact surface before editing it.
+The Design Gate is required pre-code evidence for non-trivial changes. Produce the per-change dossier in the active task, pass it through typed owner handoffs, and retain it until the change closes. Promote only current durable decisions and rationale to owner docs; keep task progress and review context in checkpoint commits or the pull request. Do not create committed or ignored per-change dossier files. This is the sole committed Design Gate playbook, not a machine-enforced CI gate.
 
 For repeatable execution, read [`.agents/skills/axis-design-gate/SKILL.md`](../../.agents/skills/axis-design-gate/SKILL.md) (`$axis-design-gate`).
 

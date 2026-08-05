@@ -28,7 +28,7 @@ public sealed class CreateRuleDefinitionHandler(
         if (key.IsFailure)
             return RuleDefinitionFailures.Invalid<RuleDefinitionDetailDto>(key.Error);
 
-        if (SystemRuleCatalog.Definitions.Any(definition => definition.Key == key.Value) ||
+        if (BuiltInRuleCatalog.Definitions.Any(definition => definition.Key == key.Value) ||
             await repository.KeyExistsAsync(key.Value, workspaceId, cancellationToken))
         {
             return RuleDefinitionFailures.DuplicateKey<RuleDefinitionDetailDto>();

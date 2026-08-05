@@ -10,5 +10,5 @@ public interface IBusinessObjectDefinitionInputPlanner
         Guid workspaceId,
         IReadOnlyList<BusinessObjectFieldDefinitionInput> fields,
         CancellationToken cancellationToken,
-        BusinessObjectDefinitionKey? objectKey = null);
+        BusinessObjectDefinitionKey objectKey);
 }

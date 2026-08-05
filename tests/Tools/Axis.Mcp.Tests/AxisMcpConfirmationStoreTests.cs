@@ -1,3 +1,4 @@
+using System.Reflection;
 using Axis.Mcp.Tools;
 
 namespace Axis.Mcp.Tests;
@@ -74,6 +75,32 @@ public sealed class AxisMcpConfirmationStoreTests
             expectedRevision: 1,
             subject: "user:workspace",
             snapshotHash: "snapshot"));
+    }
+
+    [Fact]
+    public void ConfirmationStore_WhenAbandonedTokensExpire_PrunesOnNextCreate()
+    {
+        MutableTimeProvider clock = new(DateTimeOffset.UtcNow);
+        AxisMcpConfirmationStore store = new(clock, TimeSpan.FromMinutes(5));
+
+        store.Create(
+            Guid.NewGuid(),
+            expectedRevision: 1,
+            subject: "user:workspace",
+            snapshotHash: "abandoned");
+        clock.Advance(TimeSpan.FromMinutes(5));
+
+        store.Create(
+            Guid.NewGuid(),
+            expectedRevision: 1,
+            subject: "user:workspace",
+            snapshotHash: "current");
+
+        FieldInfo confirmations = typeof(AxisMcpConfirmationStore).GetField(
+            "_confirmations",
+            BindingFlags.Instance | BindingFlags.NonPublic)!;
+        PropertyInfo count = confirmations.FieldType.GetProperty("Count")!;
+        Assert.Equal(1, count.GetValue(confirmations.GetValue(store)));
     }
 
     private sealed class MutableTimeProvider(DateTimeOffset initial) : TimeProvider

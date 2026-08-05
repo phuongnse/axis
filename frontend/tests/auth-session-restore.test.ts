@@ -1,8 +1,17 @@
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { createElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { completePostVerifyFlow, restoreBrowserSession, signInUser } from '@/features/auth/api';
+import {
+  BrowserSessionUnavailableError,
+  completePostVerifyFlow,
+  restoreBrowserSession,
+  signInUser,
+} from '@/features/auth/api';
 import { useAuthStore } from '@/features/auth/auth-store';
 import { buildAuthorizationRequestResumeUrl } from '@/features/auth/authorization-request';
+import { SessionUnavailablePage } from '@/features/auth/components/SessionUnavailablePage';
 import {
   redirectAuthenticatedUserFromGuestRoute,
   redirectFromAppEntryRoute,
@@ -90,13 +99,36 @@ describe('browser session restore', () => {
     expect(useAuthStore.getState().browserSessionStatus).toBe('authenticated');
   });
 
-  it('redirects protected routes when session resolution fails closed', async () => {
+  it('keeps a protected route in a retryable unavailable state when session resolution is unavailable', async () => {
     vi.mocked(fetch).mockRejectedValue(new Error('session service unavailable'));
+
+    await expect(ensureAuthenticatedRouteSession()).rejects.toBeInstanceOf(
+      BrowserSessionUnavailableError,
+    );
+    expect(useAuthStore.getState().browserSessionStatus).toBe('unknown');
+  });
+
+  it('keeps unauthenticated session resolution distinct from an unavailable session service', async () => {
+    vi.mocked(fetch).mockResolvedValue(jsonResponse(guestSession));
 
     await expect(ensureAuthenticatedRouteSession()).rejects.toMatchObject({
       options: { to: '/sign-in' },
     });
-    expect(useAuthStore.getState().browserSessionStatus).toBe('unknown');
+    expect(useAuthStore.getState().browserSessionStatus).toBe('guest');
+  });
+
+  it('renders a non-sensitive retry action when the protected session bootstrap is unavailable', async () => {
+    const user = userEvent.setup();
+    const retry = vi.fn();
+
+    render(createElement(SessionUnavailablePage, { onRetry: retry }));
+
+    expect(screen.getByRole('heading', { name: 'Session unavailable' })).toBeVisible();
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'We could not restore your session. Please try again.',
+    );
+    await user.click(screen.getByRole('button', { name: 'Try again' }));
+    expect(retry).toHaveBeenCalledOnce();
   });
 
   it('force-refreshes a previously resolved guest after verification', async () => {

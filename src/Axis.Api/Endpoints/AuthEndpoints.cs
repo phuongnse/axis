@@ -150,8 +150,12 @@ public static class AuthEndpoints
         ClaimsIdentity identity = new(claimList, CookieAuthenticationDefaults.AuthenticationScheme);
         ClaimsPrincipal principal = new(identity);
 
+        // A successful reauthentication replaces, rather than merely overwrites,
+        // the opaque session identifier held by the browser. The ticket-store
+        // sign-out removes the prior Redis ticket before the new ticket is issued.
+        await httpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
         await httpContext.SignInAsync(
-            CookieAuthenticationDefaults.AuthenticationScheme,
+            AxisApiServiceExtensions.BrowserSessionRotationScheme,
             principal,
             sessionPolicy.CreateAuthenticationProperties());
     }

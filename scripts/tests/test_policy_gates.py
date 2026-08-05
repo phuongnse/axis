@@ -752,6 +752,90 @@ Ship user value.
 
         self.assertEqual([], issues)
 
+    def test_accepts_immutable_external_browser_evidence(self) -> None:
+        checkpoint = "6eb817c02fda580fc9afee0c37b2b7e0a8c4735c"
+        issues = self.issues_for_document(
+            self.complete_use_case_document(
+                """| ID | Boundary | Scenario | Covers AC | Verification | Required |
+|---|---|---|---|---|---|
+| AT-001 | Browser journey | User completes flow | AC-001 | Browser automation | Yes |"""
+            ),
+            evidence_doc=f"""# Sample Evidence
+
+## Acceptance Evidence
+
+| AT ID | Evidence | Commands |
+|---|---|---|
+| AT-001 | `external://axis-reference-product@{checkpoint}/tests/product.pw.ts` | `external://axis-reference-product@{checkpoint}/npm run test:e2e` |
+""",
+        )
+
+        self.assertEqual([], issues)
+
+    def test_rejects_floating_or_mixed_external_evidence_provenance(self) -> None:
+        checkpoint = "6eb817c02fda580fc9afee0c37b2b7e0a8c4735c"
+        issues = self.issues_for_document(
+            self.complete_use_case_document(
+                """| ID | Boundary | Scenario | Covers AC | Verification | Required |
+|---|---|---|---|---|---|
+| AT-001 | Browser journey | User completes flow | AC-001 | Browser automation | Yes |"""
+            ),
+            evidence_doc=f"""# Sample Evidence
+
+## Acceptance Evidence
+
+| AT ID | Evidence | Commands |
+|---|---|---|
+| AT-001 | `external://axis-reference-product@main/tests/product.pw.ts`, `frontend/e2e/sample.pw.ts` | `external://axis-reference-product@{checkpoint}/npm run test:e2e` |
+""",
+            evidence_files=("frontend/e2e/sample.pw.ts",),
+        )
+
+        joined = "\n".join(issues)
+        self.assertIn("must use `external://<repository>@<40-character-commit>/<path>`", joined)
+        self.assertIn("must not mix local and external provenance", joined)
+
+    def test_rejects_external_command_bound_to_a_different_checkpoint(self) -> None:
+        path_checkpoint = "6eb817c02fda580fc9afee0c37b2b7e0a8c4735c"
+        command_checkpoint = "1111111111111111111111111111111111111111"
+        issues = self.issues_for_document(
+            self.complete_use_case_document(
+                """| ID | Boundary | Scenario | Covers AC | Verification | Required |
+|---|---|---|---|---|---|
+| AT-001 | Browser journey | User completes flow | AC-001 | Browser automation | Yes |"""
+            ),
+            evidence_doc=f"""# Sample Evidence
+
+## Acceptance Evidence
+
+| AT ID | Evidence | Commands |
+|---|---|---|
+| AT-001 | `external://axis-reference-product@{path_checkpoint}/tests/product.pw.ts` | `external://axis-reference-product@{command_checkpoint}/npm run test:e2e` |
+""",
+        )
+
+        self.assertIn("must bind one repository and commit", "\n".join(issues))
+
+    def test_external_browser_evidence_keeps_browser_command_requirement(self) -> None:
+        checkpoint = "6eb817c02fda580fc9afee0c37b2b7e0a8c4735c"
+        issues = self.issues_for_document(
+            self.complete_use_case_document(
+                """| ID | Boundary | Scenario | Covers AC | Verification | Required |
+|---|---|---|---|---|---|
+| AT-001 | Browser journey | User completes flow | AC-001 | Browser automation | Yes |"""
+            ),
+            evidence_doc=f"""# Sample Evidence
+
+## Acceptance Evidence
+
+| AT ID | Evidence | Commands |
+|---|---|---|
+| AT-001 | `external://axis-reference-product@{checkpoint}/tests/product.pw.ts` | `external://axis-reference-product@{checkpoint}/npm run test:unit` |
+""",
+        )
+
+        self.assertIn("Browser automation Commands must run the external browser command", "\n".join(issues))
+
     def test_accepts_grouped_at_ids_when_evidence_and_commands_match(self) -> None:
         issues = self.issues_for_document(
             self.complete_use_case_document(
@@ -3546,6 +3630,21 @@ class TestDocSizeBudgetGate(unittest.TestCase):
         )
 
         self.assertIn("100-line docs budget", "\n".join(issues))
+
+    def test_allows_design_gate_playbook_and_rejects_per_change_dossier(self) -> None:
+        self.assertEqual(
+            [],
+            self.issues_for_files({"docs/playbooks/design-gate.md": "# Design Gate\n"}),
+        )
+
+        issues = self.issues_for_files(
+            {"docs/playbooks/design-gate-standard-work.md": "# Design Gate\n"}
+        )
+
+        self.assertIn(
+            "per-change Design Gate dossiers belong in the active task handoff",
+            "\n".join(issues),
+        )
 
     def test_current_repository_doc_size_budgets_still_pass(self) -> None:
         self.assertEqual([], axis.doc_size_budget_issues())

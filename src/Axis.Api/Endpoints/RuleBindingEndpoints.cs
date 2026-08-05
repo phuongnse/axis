@@ -1,4 +1,6 @@
 using Axis.Api.Extensions;
+using Axis.Api.Middleware;
+using Axis.Rules.Application;
 using Axis.Rules.Application.Commands.CreateRuleBinding;
 using Axis.Rules.Application.Commands.DeleteRuleBinding;
 using Axis.Rules.Application.Commands.UpdateRuleBinding;
@@ -6,8 +8,10 @@ using Axis.Rules.Application.Queries.GetRuleBinding;
 using Axis.Rules.Application.Queries.ListRuleBindingUsage;
 using Axis.Rules.Contracts;
 using Axis.Shared.Domain.Primitives;
+using Axis.Shared.Application.Identity;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace Axis.Api.Endpoints;
 
@@ -17,6 +21,7 @@ public static class RuleBindingEndpoints
     {
         RouteGroupBuilder bindings = app.MapGroup("/api/rule-bindings")
             .RequireAuthorization()
+            .RequireRateLimiting(AxisApiServiceExtensions.RulesRateLimiterPolicy)
             .WithTags("Rules");
 
         bindings.MapPost("", Create)
@@ -41,10 +46,17 @@ public static class RuleBindingEndpoints
             .WithName("DeleteRuleBinding")
             .WithSummary("Remove a rule binding without removing its rule definition")
             .Produces(StatusCodes.Status204NoContent)
-            .ProducesProblem(401).ProducesProblem(403).ProducesProblem(404);
+            .ProducesProblem(400).ProducesProblem(401).ProducesProblem(403).ProducesProblem(404).ProducesProblem(409);
+
+        bindings.MapPost("/{bindingId:guid}/evaluate", Evaluate)
+            .WithName("EvaluateRuleBinding")
+            .WithSummary("Evaluate one rule binding against a transient consumer context")
+            .Produces<RuleEvaluationResult>()
+            .ProducesProblem(400).ProducesProblem(401).ProducesProblem(403).ProducesProblem(404).ProducesProblem(422);
 
         app.MapGet("/api/rules/{definitionKey}/bindings", ListUsage)
             .RequireAuthorization()
+            .RequireRateLimiting(AxisApiServiceExtensions.RulesRateLimiterPolicy)
             .WithName("ListRuleBindingUsage")
             .WithTags("Rules")
             .WithSummary("Show where an exact rule version is currently used")
@@ -89,11 +101,38 @@ public static class RuleBindingEndpoints
 
     private static async Task<IResult> Delete(
         Guid bindingId,
+        [FromBody] DeleteRuleBindingRequest request,
         ISender mediator,
         CancellationToken cancellationToken)
     {
-        Result result = await mediator.Send(new DeleteRuleBindingCommand(bindingId), cancellationToken);
+        Result result = await mediator.Send(
+            new DeleteRuleBindingCommand(bindingId, request.ExpectedRevision), cancellationToken);
         return result.IsFailure ? result.ToProblemDetails() : Results.NoContent();
+    }
+
+    private static async Task<IResult> Evaluate(
+        Guid bindingId,
+        [FromBody] EvaluateRuleBindingRequest request,
+        ICurrentUser currentUser,
+        IRuleBindingEvaluator evaluator,
+        HttpContext context,
+        CancellationToken cancellationToken)
+    {
+        if (currentUser.workspaceId is not Guid workspaceId)
+            return Result.Failure<RuleEvaluationResult>(
+                ErrorCodes.Forbidden,
+                "Current workspace scope is required.",
+                RulesProblemCodes.WorkspaceScopeRequired).ToProblemDetails();
+
+        RuleEvaluationResult result = await evaluator.EvaluateBindingAsync(
+            new RuleBindingEvaluationRequest(
+                workspaceId,
+                bindingId,
+                request.Context,
+                CorrelationId(context),
+                request.BindingRevision),
+            cancellationToken);
+        return result.IsSuccess ? Results.Ok(result) : ToEvaluationProblem(result);
     }
 
     private static async Task<IResult> ListUsage(
@@ -106,4 +145,23 @@ public static class RuleBindingEndpoints
             new ListRuleBindingUsageQuery(definitionKey, version), cancellationToken);
         return result.IsFailure ? result.ToProblemDetails() : Results.Ok(result.Value);
     }
+
+    private static IResult ToEvaluationProblem(RuleEvaluationResult result)
+    {
+        (string errorCode, string problemCode) = result.ErrorCode switch
+        {
+            "binding_invalid" => (ErrorCodes.InvalidInput, "rules.binding_invalid"),
+            "binding_not_found" => (ErrorCodes.NotFound, "rules.binding_not_found"),
+            "binding_revision_not_found" => (ErrorCodes.NotFound, "rules.binding_revision_not_found"),
+            "binding_revision_disabled" => (ErrorCodes.BusinessRule, "rules.binding_revision_disabled"),
+            _ => (ErrorCodes.BusinessRule, RulesProblemCodes.EvaluationFailed),
+        };
+        return Result.Failure<RuleEvaluationResult>(errorCode, result.Error ?? "Rule binding evaluation failed.", problemCode)
+            .ToProblemDetails();
+    }
+
+    private static string CorrelationId(HttpContext context) =>
+        context.Items.TryGetValue(CorrelationIdMiddleware.HttpContextItemKey, out object? value) && value is string correlationId
+            ? correlationId
+            : context.TraceIdentifier;
 }

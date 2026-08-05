@@ -2,6 +2,7 @@ using Axis.Rules.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 namespace Axis.Rules.Infrastructure.Persistence.Configurations;
@@ -73,5 +74,8 @@ internal sealed class RuleDefinitionVersionConfiguration : IEntityTypeConfigurat
         builder.Property(version => version.PublishedByUserId).HasColumnName("published_by_user_id").IsRequired();
         builder.Property(version => version.PublishedAt).HasColumnName("published_at").IsRequired();
         builder.HasIndex(version => new { version.DefinitionId, version.Version }).IsUnique();
+
+        foreach (IMutableProperty property in builder.Metadata.GetProperties())
+            property.SetAfterSaveBehavior(PropertySaveBehavior.Throw);
     }
 }

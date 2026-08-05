@@ -8,6 +8,6 @@ Business Objects owns workspace-scoped business object definitions and, through 
 
 | Use case | Status |
 |---|---|
-| [docs/use-cases/business-objects/configure-field-rules.md](./configure-field-rules.md) | Partial |
-| [docs/use-cases/business-objects/define-business-object.md](./define-business-object.md) | Partial |
-| [docs/use-cases/business-objects/submit-business-object-record.md](./submit-business-object-record.md) | Partial |
+| [docs/use-cases/business-objects/configure-field-rules.md](./configure-field-rules.md) | Done |
+| [docs/use-cases/business-objects/define-business-object.md](./define-business-object.md) | Done |
+| [docs/use-cases/business-objects/submit-business-object-record.md](./submit-business-object-record.md) | Done |

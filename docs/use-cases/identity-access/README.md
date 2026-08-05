@@ -8,7 +8,7 @@ Identity Access owns account access flows for Axis Platform users.
 
 | Use case | Status |
 |---|---|
-| [docs/use-cases/identity-access/register-user.md](./register-user.md) | Partial |
-| [docs/use-cases/identity-access/sign-in-user.md](./sign-in-user.md) | Partial |
-| [docs/use-cases/identity-access/authorize-local-mcp-client.md](./authorize-local-mcp-client.md) | Partial |
-| [docs/use-cases/identity-access/sign-out-user.md](./sign-out-user.md) | Partial |
+| [docs/use-cases/identity-access/register-user.md](./register-user.md) | Done |
+| [docs/use-cases/identity-access/sign-in-user.md](./sign-in-user.md) | Done |
+| [docs/use-cases/identity-access/authorize-local-mcp-client.md](./authorize-local-mcp-client.md) | Done |
+| [docs/use-cases/identity-access/sign-out-user.md](./sign-out-user.md) | Done |

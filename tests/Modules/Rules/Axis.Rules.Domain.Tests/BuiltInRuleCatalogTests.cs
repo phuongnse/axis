@@ -3,12 +3,12 @@ using FluentAssertions;
 
 namespace Axis.Rules.Domain.Tests;
 
-public sealed class SystemRuleCatalogTests
+public sealed class BuiltInRuleCatalogTests
 {
     [Fact]
-    public void Definitions_WhenRead_ReturnEnterpriseSystemRuleCatalog()
+    public void Definitions_WhenRead_ReturnEnterpriseBuiltInRuleCatalog()
     {
-        SystemRuleCatalog.Definitions.Select(definition => definition.Key.Value)
+        BuiltInRuleCatalog.Definitions.Select(definition => definition.Key.Value)
             .Should().Equal(
                 "field.required",
                 "field.numeric_range",
@@ -24,14 +24,15 @@ public sealed class SystemRuleCatalogTests
     [Fact]
     public void Definitions_WhenRead_HaveVersionedNormalizedMetadata()
     {
-        IReadOnlyList<RuleDefinition> definitions = SystemRuleCatalog.Definitions;
+        IReadOnlyList<RuleDefinition> definitions = BuiltInRuleCatalog.Definitions;
 
         definitions.Select(definition => (definition.Key.Value, definition.LatestPublishedVersion))
             .Should().OnlyHaveUniqueItems();
         definitions.Should().OnlyContain(definition =>
             definition.LatestPublishedVersion == 1 &&
-            definition.Origin == RuleOrigin.System &&
-            definition.Status == RuleLifecycleStatus.Published);
+            definition.Origin == RuleOrigin.BuiltIn &&
+            definition.Status == RuleLifecycleStatus.Active &&
+            definition.ActiveVersion == 1);
         definitions.Should().OnlyContain(definition =>
             definition.Inputs.Select(input => input.Key).Distinct(StringComparer.Ordinal).Count() ==
             definition.Inputs.Count);
@@ -51,7 +52,7 @@ public sealed class SystemRuleCatalogTests
         string definitionKey,
         IReadOnlyDictionary<string, RuleValue> inputs)
     {
-        RuleDefinition definition = SystemRuleCatalog.Find(definitionKey, 1)!;
+        RuleDefinition definition = BuiltInRuleCatalog.Find(definitionKey, 1)!;
 
         RuleConditionEvaluator.Evaluate(
                 definition.Condition!,
@@ -65,7 +66,7 @@ public sealed class SystemRuleCatalogTests
         string definitionKey,
         IReadOnlyDictionary<string, RuleValue> inputs)
     {
-        RuleDefinition definition = SystemRuleCatalog.Find(definitionKey, 1)!;
+        RuleDefinition definition = BuiltInRuleCatalog.Find(definitionKey, 1)!;
 
         RuleConditionEvaluator.Evaluate(
                 definition.Condition!,
@@ -76,7 +77,7 @@ public sealed class SystemRuleCatalogTests
     [Fact]
     public void Required_WhenValueIsAbsent_ReturnsNonMatch()
     {
-        RuleDefinition required = SystemRuleCatalog.Find("field.required", 1)!;
+        RuleDefinition required = BuiltInRuleCatalog.Find("field.required", 1)!;
 
         required.Inputs.Single(input => input.Key == "value").IsRequired.Should().BeFalse();
         RuleConditionEvaluator.Evaluate(
@@ -93,7 +94,7 @@ public sealed class SystemRuleCatalogTests
     [InlineData("field.choice_selection_count")]
     public void RangeDefinition_WhenRead_UsesDirectPositiveBoundAssertions(string definitionKey)
     {
-        RuleConditionGroup range = SystemRuleCatalog.Find(definitionKey, 1)!.Condition!
+        RuleConditionGroup range = BuiltInRuleCatalog.Find(definitionKey, 1)!.Condition!
             .Should().BeOfType<RuleConditionGroup>().Subject;
 
         range.Operator.Should().Be(RuleLogicalOperator.All);
@@ -109,7 +110,7 @@ public sealed class SystemRuleCatalogTests
     [Fact]
     public void DecimalPrecision_WhenRead_UsesDirectPositiveLimitAssertions()
     {
-        RuleConditionGroup precision = SystemRuleCatalog.Find("field.decimal_precision", 1)!.Condition!
+        RuleConditionGroup precision = BuiltInRuleCatalog.Find("field.decimal_precision", 1)!.Condition!
             .Should().BeOfType<RuleConditionGroup>().Subject;
 
         precision.Operator.Should().Be(RuleLogicalOperator.All);
@@ -121,14 +122,14 @@ public sealed class SystemRuleCatalogTests
 
     [Fact]
     public void Find_WhenVersionIsUnknown_ReturnsNull() =>
-        SystemRuleCatalog.Find("field.required", version: 2).Should().BeNull();
+        BuiltInRuleCatalog.Find("field.required", version: 2).Should().BeNull();
 
     [Fact]
     public void Definitions_WhenCastToMutableCollections_RejectMutation()
     {
-        RuleDefinition definition = SystemRuleCatalog.Definitions[0];
+        RuleDefinition definition = BuiltInRuleCatalog.Definitions[0];
 
-        Action mutateCatalog = () => ((IList<RuleDefinition>)SystemRuleCatalog.Definitions).Clear();
+        Action mutateCatalog = () => ((IList<RuleDefinition>)BuiltInRuleCatalog.Definitions).Clear();
         Action mutateInputs = () => ((IList<RuleInputDefinition>)definition.Inputs).Clear();
 
         mutateCatalog.Should().Throw<NotSupportedException>();

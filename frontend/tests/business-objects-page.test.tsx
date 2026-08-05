@@ -33,9 +33,10 @@ const fieldRuleDefinitions = {
       definitionKey: 'field.required',
       name: 'Required',
       description: 'Future records must provide a value.',
-      origin: 'System',
-      status: 'Published',
-      latestPublishedVersion: 1,
+      origin: 'BuiltIn',
+      status: 'Active',
+      latestVersion: 1,
+      activeVersion: 1,
       output: { type: 'Boolean', cardinality: 'Scalar' },
       inputs: [{ key: 'value', types: ['Text'], isRequired: true, allowMultiple: false }],
     },
@@ -177,7 +178,8 @@ describe('BusinessObjectsPage', () => {
     ).toBeVisible();
     expect(within(readOnlyDetails as HTMLElement).getByText('Single')).toBeVisible();
     expect(within(readOnlyDetails as HTMLElement).getByText('Field rules')).toBeVisible();
-    expect(within(readOnlyDetails as HTMLElement).queryByText(bindingId)).not.toBeInTheDocument();
+    expect(within(readOnlyDetails as HTMLElement).getByText(bindingId)).toBeVisible();
+    expect(readOnlyDetails as HTMLElement).toHaveTextContent('Binding revision: 1');
     expect(within(definitionDialog).queryByRole('textbox')).not.toBeInTheDocument();
     expect(within(definitionDialog).queryByRole('combobox')).not.toBeInTheDocument();
     expect(within(definitionDialog).getByRole('tablist')).toBeInTheDocument();
@@ -411,7 +413,296 @@ describe('BusinessObjectsPage', () => {
       ],
     });
   });
+
+  it('binds the field value from context and configures only remaining rule inputs as literals', async () => {
+    const user = userEvent.setup();
+    const bindingRequests: unknown[] = [];
+    const detail = definitionDetail({
+      fields: [
+        {
+          id: fieldId,
+          fieldKey: 'name',
+          label: 'Name',
+          order: 0,
+          fieldType: 'Text',
+          rules: [],
+        },
+      ],
+    });
+    const definitions = {
+      ...fieldRuleDefinitions,
+      items: [
+        {
+          definitionKey: 'field.minimum-length',
+          name: 'Minimum length',
+          description: 'Future records must meet the minimum length.',
+          origin: 'BuiltIn',
+          status: 'Active',
+          latestVersion: 1,
+          activeVersion: 1,
+          output: { type: 'Boolean', cardinality: 'Scalar' },
+          inputs: [
+            { key: 'value', types: ['Text'], isRequired: true, allowMultiple: false },
+            { key: 'minimum', types: ['Integer'], isRequired: true, allowMultiple: false },
+          ],
+        },
+      ],
+    };
+    vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const path = requestPath(input);
+      const method = init?.method ?? 'GET';
+      if (isRulesRequest(input)) return jsonResponse(definitions);
+      if (path === '/api/business-object-definitions' && method === 'GET') {
+        return jsonResponse(pageWith(detail));
+      }
+      if (path === `/api/business-object-definitions/${definitionId}` && method === 'GET') {
+        return jsonResponse(detail);
+      }
+      if (path === '/api/rule-bindings' && method === 'POST') {
+        bindingRequests.push(JSON.parse(String(init?.body)));
+        return jsonResponse({ id: bindingId });
+      }
+      if (
+        path === `/api/business-object-definitions/${definitionId}/unpublished` &&
+        method === 'PUT'
+      ) {
+        return jsonResponse(detail);
+      }
+      throw new Error(`Unexpected fetch: ${method} ${path}`);
+    });
+
+    await renderPage(
+      `/business-objects?page=1&dialog=edit&recordId=${encodeURIComponent(definitionId)}`,
+    );
+    await user.click(await screen.findByRole('tab', { name: 'Fields' }));
+    await user.click(screen.getByRole('combobox', { name: 'Add rule' }));
+    await user.click(await screen.findByRole('option', { name: 'Minimum length' }));
+
+    expect(screen.queryByLabelText('Value')).not.toBeInTheDocument();
+    await user.type(screen.getByLabelText('Minimum (Name: Minimum length)'), '5');
+    await user.click(screen.getByRole('button', { name: 'Save changes' }));
+
+    await waitFor(() =>
+      expect(bindingRequests).toEqual([
+        expect.objectContaining({
+          inputMappings: {
+            value: { kind: 'Context', contextKey: 'record.value', literalValues: [] },
+            minimum: { kind: 'Literal', contextKey: null, literalValues: ['5'] },
+          },
+        }),
+      ]),
+    );
+  });
+
+  it('does not offer scalar-only rules for multiple-choice fields', async () => {
+    const user = userEvent.setup();
+    const detail = definitionDetail({
+      fields: [
+        {
+          id: fieldId,
+          fieldKey: 'status',
+          label: 'Status',
+          order: 0,
+          fieldType: 'Choice',
+          choiceConfiguration: {
+            selectionMode: 'Multiple',
+            options: [{ id: optionId, optionKey: 'active', label: 'Active', order: 0 }],
+          },
+          rules: [],
+        },
+      ],
+    });
+    const definitions = {
+      ...fieldRuleDefinitions,
+      items: [
+        {
+          ...fieldRuleDefinitions.items[0],
+          definitionKey: 'field.scalar-required',
+          name: 'Scalar required',
+        },
+        {
+          ...fieldRuleDefinitions.items[0],
+          definitionKey: 'field.multiple-required',
+          name: 'Multiple required',
+          inputs: [{ key: 'value', types: ['Text'], isRequired: true, allowMultiple: true }],
+        },
+      ],
+    };
+    vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL) => {
+      const path = requestPath(input);
+      if (isRulesRequest(input)) return jsonResponse(definitions);
+      if (path === '/api/business-object-definitions') return jsonResponse(pageWith(detail));
+      if (path === `/api/business-object-definitions/${definitionId}`) return jsonResponse(detail);
+      throw new Error(`Unexpected fetch: ${path}`);
+    });
+
+    await renderPage(
+      `/business-objects?page=1&dialog=edit&recordId=${encodeURIComponent(definitionId)}`,
+    );
+    await user.click(await screen.findByRole('tab', { name: 'Fields' }));
+    await user.click(screen.getByRole('combobox', { name: 'Add rule' }));
+
+    expect(await screen.findByRole('option', { name: 'Multiple required' })).toBeVisible();
+    expect(screen.queryByRole('option', { name: 'Scalar required' })).not.toBeInTheDocument();
+  });
+
+  it('preflights a changed multiple-choice rule configuration before any mutation', async () => {
+    const user = userEvent.setup();
+    const requests: string[] = [];
+    const detail = definitionDetail({
+      fields: [
+        {
+          id: fieldId,
+          fieldKey: 'status',
+          label: 'Status',
+          order: 0,
+          fieldType: 'Choice',
+          choiceConfiguration: {
+            selectionMode: 'Single',
+            options: [{ id: optionId, optionKey: 'active', label: 'Active', order: 0 }],
+          },
+          rules: [],
+        },
+      ],
+    });
+    vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL, _init?: RequestInit) => {
+      const path = requestPath(input);
+      if (isRulesRequest(input)) return jsonResponse(fieldRuleDefinitions);
+      if (path === '/api/business-object-definitions') return jsonResponse(pageWith(detail));
+      if (path === `/api/business-object-definitions/${definitionId}`) return jsonResponse(detail);
+      requests.push(path);
+      return jsonResponse({});
+    });
+
+    await renderPage(
+      `/business-objects?page=1&dialog=edit&recordId=${encodeURIComponent(definitionId)}`,
+    );
+    await user.click(await screen.findByRole('tab', { name: 'Fields' }));
+    await user.click(screen.getByRole('combobox', { name: 'Add rule' }));
+    await user.click(await screen.findByRole('option', { name: 'Required' }));
+    await user.click(screen.getByLabelText('Selection mode'));
+    await user.click(await screen.findByRole('option', { name: 'Multiple' }));
+    await user.click(screen.getByRole('button', { name: 'Save changes' }));
+
+    expect(await screen.findByText(/Required is not compatible/)).toBeVisible();
+    expect(requests).toEqual([]);
+  });
+
+  it('shows a required literal error before any binding mutation', async () => {
+    const user = userEvent.setup();
+    const requests: string[] = [];
+    const detail = definitionDetail({
+      fields: [
+        { id: fieldId, fieldKey: 'name', label: 'Name', order: 0, fieldType: 'Text', rules: [] },
+      ],
+    });
+    const definitions = ruleDefinitionsWithMinimum('Minimum characters');
+    vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL) => {
+      const path = requestPath(input);
+      if (isRulesRequest(input)) return jsonResponse(definitions);
+      if (path === '/api/business-object-definitions') return jsonResponse(pageWith(detail));
+      if (path === `/api/business-object-definitions/${definitionId}`) return jsonResponse(detail);
+      requests.push(path);
+      return jsonResponse({});
+    });
+
+    await renderPage(
+      `/business-objects?page=1&dialog=edit&recordId=${encodeURIComponent(definitionId)}`,
+    );
+    await user.click(await screen.findByRole('tab', { name: 'Fields' }));
+    await user.click(screen.getByRole('combobox', { name: 'Add rule' }));
+    await user.click(await screen.findByRole('option', { name: 'Minimum length' }));
+    await user.click(screen.getByRole('button', { name: 'Save changes' }));
+
+    const input = await screen.findByLabelText('Minimum characters (Name: Minimum length)');
+    expect(input).toHaveAttribute('aria-invalid', 'true');
+    expect(
+      screen
+        .getAllByRole('alert')
+        .some((alert) => alert.textContent?.includes('Enter a value for Minimum characters.')),
+    ).toBe(true);
+    expect(requests).toEqual([]);
+  });
+
+  it('uses server input labels and unique accessible names for repeated rule values', async () => {
+    const user = userEvent.setup();
+    const detail = definitionDetail({
+      fields: [
+        { id: fieldId, fieldKey: 'name', label: 'Name', order: 0, fieldType: 'Text', rules: [] },
+      ],
+    });
+    const definitions = {
+      ...fieldRuleDefinitions,
+      items: ['A', 'B'].map((suffix) => ({
+        definitionKey: `field.limit-${suffix.toLowerCase()}`,
+        name: `Limit ${suffix}`,
+        origin: 'BuiltIn',
+        status: 'Active',
+        latestVersion: 1,
+        activeVersion: 1,
+        output: { type: 'Boolean', cardinality: 'Scalar' },
+        inputs: [
+          { key: 'value', types: ['Text'], isRequired: true, allowMultiple: false },
+          {
+            key: 'limit',
+            label: 'Maximum characters',
+            types: ['Integer'],
+            isRequired: true,
+            allowMultiple: true,
+          },
+        ],
+      })),
+    };
+    vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL) => {
+      const path = requestPath(input);
+      if (isRulesRequest(input)) return jsonResponse(definitions);
+      if (path === '/api/business-object-definitions') return jsonResponse(pageWith(detail));
+      if (path === `/api/business-object-definitions/${definitionId}`) return jsonResponse(detail);
+      throw new Error(`Unexpected fetch: ${path}`);
+    });
+
+    await renderPage(
+      `/business-objects?page=1&dialog=edit&recordId=${encodeURIComponent(definitionId)}`,
+    );
+    await user.click(await screen.findByRole('tab', { name: 'Fields' }));
+    for (const name of ['Limit A', 'Limit B']) {
+      await user.click(screen.getByRole('combobox', { name: 'Add rule' }));
+      await user.click(await screen.findByRole('option', { name }));
+    }
+    for (const button of screen.getAllByRole('button', { name: 'Add value' })) {
+      await user.click(button);
+    }
+
+    const inputs = [
+      screen.getByLabelText('Maximum characters (Name: Limit A)'),
+      screen.getByLabelText('Maximum characters (Name: Limit B)'),
+      screen.getByLabelText('Maximum characters (Name: Limit A) 2'),
+      screen.getByLabelText('Maximum characters (Name: Limit B) 2'),
+    ];
+    expect(new Set(inputs.map((input) => input.id)).size).toBe(4);
+  });
 });
+
+function ruleDefinitionsWithMinimum(label: string) {
+  return {
+    ...fieldRuleDefinitions,
+    items: [
+      {
+        definitionKey: 'field.minimum-length',
+        name: 'Minimum length',
+        origin: 'BuiltIn',
+        status: 'Active',
+        latestVersion: 1,
+        activeVersion: 1,
+        output: { type: 'Boolean', cardinality: 'Scalar' },
+        inputs: [
+          { key: 'value', types: ['Text'], isRequired: true, allowMultiple: false },
+          { key: 'minimum', label, types: ['Integer'], isRequired: true, allowMultiple: false },
+        ],
+      },
+    ],
+  };
+}
 
 async function renderPage(path = '/business-objects?page=1') {
   const queryClient = testQueryClient();
@@ -534,6 +825,7 @@ function definitionDetail({
           {
             id: ruleId,
             bindingId,
+            bindingRevision: 1,
           },
         ],
       },

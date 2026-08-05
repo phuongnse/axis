@@ -13,7 +13,7 @@ public sealed class ListRuleBindingUsageHandlerTests
     [Fact]
     public async Task Handle_WhenDefinitionHasBindings_ReturnsUsageWithoutDefinitionMutation()
     {
-        RuleDefinition definition = SystemRuleCatalog.Find("field.required", 1)!;
+        RuleDefinition definition = BuiltInRuleCatalog.Find("field.required", 1)!;
         int definitionRevision = definition.Revision;
         RuleBinding binding = RuleBindingHandlerTestData.Binding("field-2");
         IRuleBindingRepository bindings = Substitute.For<IRuleBindingRepository>();

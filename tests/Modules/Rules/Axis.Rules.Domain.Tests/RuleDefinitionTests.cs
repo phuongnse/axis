@@ -11,18 +11,33 @@ public sealed class RuleDefinitionTests
     private static readonly DateTime Now = new(2026, 7, 10, 3, 30, 0, DateTimeKind.Utc);
 
     [Fact]
-    public void Lifecycle_WhenValid_PreservesImmutablePublishedVersions()
+    public void CreateVersion_WhenDraftChangesLater_PreservesImmutableSnapshotAndDraftEditability()
     {
         RuleDefinition definition = Draft();
         Configure(definition);
 
-        RuleDefinitionVersion versionOne = definition.Publish(definition.Revision, UserId, Now.AddMinutes(1)).Value;
-        definition.StartNextDraft(definition.Revision, UserId, Now.AddMinutes(2)).IsSuccess.Should().BeTrue();
-        Configure(definition);
-        RuleDefinitionVersion versionTwo = definition.Publish(definition.Revision, UserId, Now.AddMinutes(3)).Value;
+        RuleDefinitionVersion versionOne = definition.CreateVersion(definition.Revision, UserId, Now.AddMinutes(1)).Value;
+        definition.Status.Should().Be(RuleLifecycleStatus.Inactive);
+        definition.ActiveVersion.Should().BeNull();
+
+        definition.SaveDraft(
+                definition.Revision,
+                "Renamed amount approval",
+                definition.Description,
+                Inputs(label: "Amount to approve"),
+                Condition(),
+                UserId,
+                Now.AddMinutes(2))
+            .IsSuccess.Should().BeTrue();
+        RuleDefinitionVersion versionTwo = definition.CreateVersion(definition.Revision, UserId, Now.AddMinutes(3)).Value;
 
         versionOne.Version.Should().Be(1);
         versionTwo.Version.Should().Be(2);
+        versionOne.Name.Should().Be("Amount approval");
+        versionOne.Inputs.Single().Should().Match<RuleInputDefinition>(input =>
+            input.Key == "amount" && input.Label == "Amount");
+        versionTwo.Inputs.Single().Should().Match<RuleInputDefinition>(input =>
+            input.Key == "amount" && input.Label == "Amount to approve");
         versionOne.Condition.Should().NotBeNull();
         versionOne.Output.Should().Be(RuleOutputContract.BooleanMatch);
         definition.Output.Should().Be(RuleOutputContract.BooleanMatch);
@@ -49,16 +64,51 @@ public sealed class RuleDefinitionTests
     }
 
     [Fact]
-    public void Archive_WhenPublished_PreservesVersionResolution()
+    public void Lifecycle_WhenActivatedThenDeactivated_ChangesOnlyExactActivation()
     {
         RuleDefinition definition = Draft();
         Configure(definition);
-        RuleDefinitionVersion published = definition.Publish(definition.Revision, UserId, Now).Value;
+        RuleDefinitionVersion version = definition.CreateVersion(definition.Revision, UserId, Now).Value;
 
-        definition.Archive(definition.Revision, UserId, Now.AddMinutes(1)).IsSuccess.Should().BeTrue();
+        definition.ActivateVersion(definition.Revision, version.Version, UserId, Now.AddMinutes(1)).IsSuccess.Should().BeTrue();
+        definition.Status.Should().Be(RuleLifecycleStatus.Active);
+        definition.ActiveVersion.Should().Be(version.Version);
+
+        definition.Deactivate(definition.Revision, UserId, Now.AddMinutes(2)).IsSuccess.Should().BeTrue();
+
+        definition.Status.Should().Be(RuleLifecycleStatus.Inactive);
+        definition.ActiveVersion.Should().BeNull();
+        definition.FindVersion(1).Should().BeSameAs(version);
+    }
+
+    [Fact]
+    public void Lifecycle_WhenArchived_ClearsActivationAndPreservesVersion()
+    {
+        RuleDefinition definition = Draft();
+        Configure(definition);
+        RuleDefinitionVersion version = definition.CreateVersion(definition.Revision, UserId, Now).Value;
+        definition.ActivateVersion(definition.Revision, version.Version, UserId, Now.AddMinutes(1)).IsSuccess.Should().BeTrue();
+
+        definition.Archive(definition.Revision, UserId, Now.AddMinutes(2)).IsSuccess.Should().BeTrue();
 
         definition.Status.Should().Be(RuleLifecycleStatus.Archived);
-        definition.FindVersion(1).Should().BeSameAs(published);
+        definition.ActiveVersion.Should().BeNull();
+        definition.FindVersion(1).Should().BeSameAs(version);
+    }
+
+    [Fact]
+    public void ActivateVersion_WhenRevisionIsStaleOrVersionUnknown_DoesNotChangeActivation()
+    {
+        RuleDefinition definition = Draft();
+        Configure(definition);
+        definition.CreateVersion(definition.Revision, UserId, Now).IsSuccess.Should().BeTrue();
+
+        Result stale = definition.ActivateVersion(1, 1, UserId, Now.AddMinutes(1));
+        Result unknown = definition.ActivateVersion(definition.Revision, 2, UserId, Now.AddMinutes(1));
+
+        stale.ErrorCode.Should().Be(ErrorCodes.Conflict);
+        unknown.ErrorCode.Should().Be(ErrorCodes.InvalidInput);
+        definition.ActiveVersion.Should().BeNull();
     }
 
     [Fact]
@@ -72,11 +122,11 @@ public sealed class RuleDefinitionTests
             Now).IsFailure.Should().BeTrue();
 
     [Fact]
-    public void CreateSystem_WhenTypedKeyIsDefault_ReturnsFailure()
+    public void CreateBuiltIn_WhenTypedKeyIsDefault_ReturnsFailure()
     {
-        RuleDefinition template = SystemRuleCatalog.Definitions[0];
+        RuleDefinition template = BuiltInRuleCatalog.Definitions[0];
 
-        RuleDefinition.CreateSystem(
+        RuleDefinition.CreateBuiltIn(
             default,
             1,
             template.Name,
@@ -90,7 +140,7 @@ public sealed class RuleDefinitionTests
     [Fact]
     public void Input_WhenAllowedValuesAreEmpty_AllowsMultipleAcceptedTypes()
     {
-        Result<RuleInputDefinition> result = RuleInputDefinition.CreateSystem(
+        Result<RuleInputDefinition> result = RuleInputDefinition.CreateBuiltIn(
             "value",
             "Value",
             [RuleValueType.Integer, RuleValueType.Decimal],
@@ -104,7 +154,7 @@ public sealed class RuleDefinitionTests
 
     [Fact]
     public void Input_WhenAllowedValuesExceedDomainBound_ReturnsFailure() =>
-        RuleInputDefinition.CreateSystem(
+        RuleInputDefinition.CreateBuiltIn(
             "value",
             "Value",
             [RuleValueType.Text],
@@ -115,17 +165,21 @@ public sealed class RuleDefinitionTests
                 .ToArray()).IsFailure.Should().BeTrue();
 
     [Fact]
-    public void Input_WhenCreatedFromBusinessLabel_DerivesStableTechnicalKey()
+    public void Input_WhenLabelChanges_KeepsStableKey()
     {
-        RuleInputDefinition input = RuleInputDefinition.CreateFromLabel(
+        RuleInputDefinition original = RuleInputDefinition.Create(
+            "input_0123456789abcdef0123456789abcdef",
             "Ngày bắt đầu",
             RuleValueType.Date,
             isRequired: true).Value;
+        RuleInputDefinition renamed = RuleInputDefinition.Create(
+            original.Key,
+            "Start date",
+            RuleValueType.Date,
+            isRequired: true).Value;
 
-        input.Label.Should().Be("Ngày bắt đầu");
-        input.Key.Should().MatchRegex("^ngay_bat_dau_[a-f0-9]{8}$");
-        RuleInputDefinition.CreateFromLabel("Ngày bắt đầu", RuleValueType.Date, true)
-            .Value.Key.Should().Be(input.Key);
+        renamed.Key.Should().Be(original.Key);
+        renamed.Label.Should().Be("Start date");
     }
 
     private static RuleDefinition Draft() => RuleDefinition.CreateDraft(
@@ -147,8 +201,8 @@ public sealed class RuleDefinitionTests
                 Now)
             .IsSuccess.Should().BeTrue();
 
-    private static IReadOnlyList<RuleInputDefinition> Inputs() =>
-        [RuleInputDefinition.Create("amount", RuleValueType.Decimal, true).Value];
+    private static IReadOnlyList<RuleInputDefinition> Inputs(string label = "Amount") =>
+        [RuleInputDefinition.Create("amount", label, RuleValueType.Decimal, true).Value];
 
     private static RuleConditionNode Condition() => RulePredicateCondition.Create(
         "amount-check",

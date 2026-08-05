@@ -2,15 +2,16 @@ namespace Axis.Rules.Contracts;
 
 public enum RuleOrigin
 {
-    System = 0,
+    BuiltIn = 0,
     Workspace = 1,
 }
 
 public enum RuleLifecycleStatus
 {
     Draft = 0,
-    Published = 1,
-    Archived = 2,
+    Inactive = 1,
+    Active = 2,
+    Archived = 3,
 }
 
 public enum RuleValueType

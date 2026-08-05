@@ -13,6 +13,6 @@ Rule definition, application, and execution stay distinct. The definition declar
 | [docs/use-cases/rules/manage-workspace-rule-definitions.md](./manage-workspace-rule-definitions.md) | Partial |
 | [docs/use-cases/rules/manage-rule-bindings.md](./manage-rule-bindings.md) | Partial |
 | [docs/use-cases/rules/evaluate-published-rules.md](./evaluate-published-rules.md) | Partial |
-| [docs/use-cases/rules/provide-system-field-rule-definitions.md](./provide-system-field-rule-definitions.md) | Partial |
+| [docs/use-cases/rules/provide-built-in-rule-definitions.md](./provide-built-in-rule-definitions.md) | Partial |
 
 Built-in and workspace origins use one semantic definition, version, binding, and evaluation contract. Business Objects is the first consumer, not an owner or dependency of Rules.

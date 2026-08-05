@@ -2,7 +2,7 @@ using Axis.Shared.Domain.Primitives;
 
 namespace Axis.Rules.Domain;
 
-public static class SystemRuleCatalog
+public static class BuiltInRuleCatalog
 {
     public static IReadOnlyList<RuleDefinition> Definitions { get; } = Array.AsReadOnly<RuleDefinition>(
     [
@@ -109,7 +109,7 @@ public static class SystemRuleCatalog
         if (definitionKey.IsFailure)
             throw new InvalidOperationException(definitionKey.Error);
 
-        Result<RuleDefinition> definition = RuleDefinition.CreateSystem(
+        Result<RuleDefinition> definition = RuleDefinition.CreateBuiltIn(
             definitionKey.Value,
             version: 1,
             displayName,
@@ -146,7 +146,7 @@ public static class SystemRuleCatalog
                 "field.text_pattern" => ("Mẫu văn bản", "Bắt buộc văn bản khớp pattern đã cấu hình.", "Configure the required regular-expression pattern.", "Cấu hình pattern biểu thức chính quy bắt buộc.", "An order code must match the configured code pattern.", "Mã đơn hàng phải khớp mẫu mã đã cấu hình."),
                 "field.text_format" => ("Định dạng văn bản", "Bắt buộc văn bản dùng định dạng email, URL hoặc UUID được hỗ trợ.", "Choose a supported text format.", "Chọn một định dạng văn bản được hỗ trợ.", "A contact address must use a valid email format.", "Địa chỉ liên hệ phải dùng định dạng email hợp lệ."),
                 "field.choice_selection_count" => ("Số lượng lựa chọn", "Giới hạn số lựa chọn của trường chọn nhiều.", "Configure optional minimum and maximum selections.", "Cấu hình số lựa chọn tối thiểu và tối đa tùy chọn.", "A preference field requires one to three selections.", "Trường sở thích yêu cầu từ một đến ba lựa chọn."),
-                _ => throw new InvalidOperationException($"System rule documentation is missing for '{key}'."),
+                _ => throw new InvalidOperationException($"Built-in rule documentation is missing for '{key}'."),
             };
 
         return RuleReferenceDocumentation.Bilingual(
@@ -166,7 +166,7 @@ public static class SystemRuleCatalog
         bool isRequired,
         bool allowMultiple = false,
         IReadOnlyList<string>? allowedValues = null) =>
-        RuleInputDefinition.CreateSystem(
+        RuleInputDefinition.CreateBuiltIn(
             key,
             InputLabel(key),
             types,
@@ -191,7 +191,7 @@ public static class SystemRuleCatalog
         "scale" => "Decimal places",
         "pattern" => "Required pattern",
         "format" => "Required format",
-        _ => throw new InvalidOperationException($"System rule input label is missing for '{key}'."),
+        _ => throw new InvalidOperationException($"Built-in rule input label is missing for '{key}'."),
     };
 
     private static RuleConditionGroup Range(string prefix, RuleOperand value) =>
