@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.7
 
 # ── build ──────────────────────────────────────────────────────────────────
-FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
 # Restore against the full solution so CPM (Directory.Packages.props) resolves.
@@ -16,7 +16,7 @@ RUN dotnet publish src/Axis.Api/Axis.Api.csproj \
     /p:UseAppHost=false
 
 # ── runtime ────────────────────────────────────────────────────────────────
-FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
 
 # curl is used by the docker-compose healthcheck.
@@ -31,7 +31,7 @@ EXPOSE 8080
 COPY --from=build /app/publish ./
 
 # Drop privileges — APP_UID is the unprivileged 'app' user baked into the
-# mcr.microsoft.com/dotnet/aspnet:8.0 image (uid 1654).
+# mcr.microsoft.com/dotnet/aspnet:10.0 image (uid 1654).
 USER $APP_UID
 
 ENTRYPOINT ["dotnet", "Axis.Api.dll"]

@@ -11,6 +11,7 @@ Review checklist only. Workflow lives in repo skills ([`.agents/skills/README.md
 - Confirm the routing checkpoint covers current independently ownable work units; re-evaluate unexecuted units after decisions resolve ambiguity or change their scope, ownership, or verification boundary.
 - Read the owning use-case, foundation, or domain docs and same-module code.
 - Map in-scope ACs before behavior work.
+- Map applicable enterprise-production concerns to an owning contract and current proof; a required security, isolation, data, recovery, deployment, operability, capacity, accessibility, maintenance, or compatibility concern cannot be deferred as incremental delivery.
 - Resolve or explicitly defer lower-layer gaps before API work.
 - For a retirement, confirm the Design Gate chose clean cutover or named a real compatibility constraint; do not infer compatibility.
 
@@ -21,6 +22,8 @@ Use [`.agents/skills/axis-use-case-spec/reference.md`](../../.agents/skills/axis
 AC map: `AC | kind | surface | proving test or exact deferral`.
 
 No blank in-scope rows; required AT rows name verification categories; incomplete in-scope ACs block `Done`.
+
+Acceptance evidence proves the production semantics of the implemented slice. Local/test adapters may change infrastructure values, but evidence that bypasses or substitutes the required trust, persistence, concurrency, failure, or recovery boundary is invalid.
 
 ## Review Verification
 

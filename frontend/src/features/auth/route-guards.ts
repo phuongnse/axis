@@ -1,12 +1,8 @@
 import { redirect } from '@tanstack/react-router';
 
-import { exchangeAuthorizationCode, restoreSessionFromBrowserAuth } from '@/features/auth/api';
-import { getAccessToken } from '@/features/auth/auth-store';
-import {
-  clearPkceSession,
-  isAuthorizationRequestHandle,
-  loadPkceSession,
-} from '@/features/auth/pkce';
+import { BrowserSessionUnavailableError, restoreBrowserSession } from '@/features/auth/api';
+import { getBrowserSessionStatus } from '@/features/auth/auth-store';
+import { getAuthorizationRequestContinuation } from '@/features/auth/authorization-request';
 
 interface RouteGuardContext {
   preload?: boolean;
@@ -17,8 +13,12 @@ function hasPendingAuthorizationRequest(): boolean {
     return false;
   }
 
-  return isAuthorizationRequestHandle(
-    new URLSearchParams(window.location.search).get('authorization_request') ?? undefined,
+  const search = new URLSearchParams(window.location.search);
+  return Boolean(
+    getAuthorizationRequestContinuation(
+      search.get('authorization_request') ?? undefined,
+      search.get('authorization_client') ?? undefined,
+    ),
   );
 }
 
@@ -31,11 +31,17 @@ export async function redirectAuthenticatedUserFromGuestRoute(context: RouteGuar
     return;
   }
 
-  if (getAccessToken()) {
+  if (getBrowserSessionStatus() === 'authenticated') {
     throw redirect({ to: '/dashboard', replace: true });
   }
 
-  const restored = await restoreSessionFromBrowserAuth();
+  let restored: boolean;
+  try {
+    restored = await restoreBrowserSession();
+  } catch (error) {
+    if (error instanceof BrowserSessionUnavailableError) return;
+    throw error;
+  }
   if (restored) {
     throw redirect({ to: '/dashboard', replace: true });
   }
@@ -46,45 +52,10 @@ export async function redirectFromAppEntryRoute(context: RouteGuardContext = {})
     return;
   }
 
-  if (getAccessToken()) {
+  if (getBrowserSessionStatus() === 'authenticated') {
     throw redirect({ to: '/dashboard', replace: true });
   }
 
-  const restored = await restoreSessionFromBrowserAuth();
+  const restored = await restoreBrowserSession();
   throw redirect({ to: restored ? '/dashboard' : '/sign-in', replace: true });
-}
-
-export async function redirectFromCallbackRoute() {
-  if (getAccessToken()) {
-    throw redirect({ to: '/dashboard', replace: true });
-  }
-
-  const params = new URLSearchParams(window.location.search);
-  if (params.get('error')) {
-    clearPkceSession();
-    return;
-  }
-
-  const code = params.get('code');
-  const state = params.get('state');
-  const pkce = loadPkceSession();
-
-  if (!code || !pkce || state !== pkce.state) {
-    clearPkceSession();
-    return;
-  }
-
-  try {
-    await exchangeAuthorizationCode(code);
-  } catch {
-    clearPkceSession();
-    throw redirect({
-      to: '/callback',
-      search: { error: 'tokenFailed' },
-      replace: true,
-    });
-  }
-
-  clearPkceSession();
-  throw redirect({ to: '/dashboard', replace: true });
 }

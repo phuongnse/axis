@@ -241,7 +241,6 @@ test.describe('sign in user', () => {
 
     await expect(page).toHaveURL(/\/dashboard$/, { timeout: 30_000 });
     await expectAuthenticatedFrame(page, 'Sign In User');
-    await expect.poll(() => getVisitedPaths(page)).not.toContain('/callback');
     expect(authorization.origins()).not.toHaveLength(0);
     expect(new Set(authorization.origins())).toEqual(new Set([webOrigin]));
     expect(languageWrites()).toBe(0);

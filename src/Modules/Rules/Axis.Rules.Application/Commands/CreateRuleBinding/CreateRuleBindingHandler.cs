@@ -7,7 +7,6 @@ using Axis.Shared.Application.CQRS;
 using Axis.Shared.Application.Identity;
 using Axis.Shared.Domain.Primitives;
 using DomainFailureBehavior = Axis.Rules.Domain.RuleBindingFailureBehavior;
-using DomainLifecycleStatus = Axis.Rules.Domain.RuleLifecycleStatus;
 
 namespace Axis.Rules.Application.Commands.CreateRuleBinding;
 
@@ -81,17 +80,18 @@ public sealed class CreateRuleBindingHandler(
         RuleDefinitionKey key,
         int versionNumber,
         IRuleDefinitionRepository repository,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool requireActive = true)
     {
-        RuleDefinition? system = SystemRuleCatalog.Find(key.Value, versionNumber);
-        if (system is not null)
-            return system.FindVersion(versionNumber)!;
+        RuleDefinition? builtIn = BuiltInRuleCatalog.Find(key.Value, versionNumber);
+        if (builtIn is not null)
+            return builtIn.FindVersion(versionNumber)!;
         RuleDefinition? definition = await repository.GetByKeyForWorkspaceAsync(key, workspaceId, cancellationToken);
-        if (definition is null || definition.Status == DomainLifecycleStatus.Archived)
+        if (definition is null)
             return Result.Failure<RuleDefinitionVersion>(ErrorCodes.NotFound, "Rule definition was not found.");
         RuleDefinitionVersion? version = definition.FindVersion(versionNumber);
-        return version is null || versionNumber != definition.LatestPublishedVersion
-            ? Result.Failure<RuleDefinitionVersion>(ErrorCodes.NotFound, "Published rule version was not found.")
+        return version is null || (requireActive && definition.ActiveVersion != versionNumber)
+            ? Result.Failure<RuleDefinitionVersion>(ErrorCodes.NotFound, "Active rule version was not found.")
             : version;
     }
 }

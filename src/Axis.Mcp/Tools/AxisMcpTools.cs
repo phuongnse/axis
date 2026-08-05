@@ -8,21 +8,21 @@ namespace Axis.Mcp.Tools;
 [McpServerToolType]
 public sealed class AxisMcpTools(AxisApiClient api)
 {
-    private static readonly string[] RuleOrigins = ["System", "Workspace"];
-    private static readonly string[] RuleStatuses = ["Draft", "Published", "Archived"];
+    private static readonly string[] RuleOrigins = ["BuiltIn", "Workspace"];
+    private static readonly string[] RuleStatuses = ["Draft", "Inactive", "Active", "Archived"];
 
     [McpServerTool(Name = "axis_get_current_user")]
-    [Description("Get the authenticated Axis user and current workspace context from the server.")]
+    [Description("[READ] Get the authenticated Axis user and current workspace context from the server.")]
     public Task<string> GetCurrentUserAsync(CancellationToken cancellationToken = default) =>
         api.GetJsonAsync("api/users/me", cancellationToken);
 
     [McpServerTool(Name = "axis_list_rules")]
-    [Description("List system and workspace rule definitions visible to the authenticated Axis workspace.")]
+    [Description("[READ] List built-in and workspace rule definitions visible to the authenticated Axis workspace.")]
     public Task<string> ListRulesAsync(
         [Description("One-based result page.")] int page = 1,
         [Description("Number of rules to return, from 1 to 100.")] int pageSize = 20,
-        [Description("Optional rule origin: System or Workspace.")] string? origin = null,
-        [Description("Optional lifecycle status: Draft, Published, or Archived.")] string? status = null,
+        [Description("Optional rule origin: BuiltIn or Workspace.")] string? origin = null,
+        [Description("Optional lifecycle status: Draft, Inactive, Active, or Archived.")] string? status = null,
         [Description("Optional name or description search text.")] string? query = null,
         [Description("Optional response language, such as en.")] string? language = null,
         CancellationToken cancellationToken = default)
@@ -42,7 +42,7 @@ public sealed class AxisMcpTools(AxisApiClient api)
     }
 
     [McpServerTool(Name = "axis_get_rule")]
-    [Description("Get one system or workspace rule definition, including its condition, inputs, output contract, and versions.")]
+    [Description("[READ] Get one built-in or workspace rule definition, including its condition, inputs, output contract, and versions.")]
     public Task<string> GetRuleAsync(
         [Description("Stable Axis definition key.")] string definitionKey,
         CancellationToken cancellationToken = default)
@@ -52,7 +52,7 @@ public sealed class AxisMcpTools(AxisApiClient api)
     }
 
     [McpServerTool(Name = "axis_project_rule_condition")]
-    [Description("Validate a typed rule condition and return the server-owned visual and textual projection. This does not persist anything.")]
+    [Description("[READ] Validate a typed rule condition and return the server-owned visual and textual projection. This does not persist anything.")]
     public Task<string> ProjectRuleConditionAsync(
         [Description("Version of the typed expression language used by the condition.")] int expressionLanguageVersion,
         [Description("Declared rule inputs used by condition references.")] IReadOnlyList<RuleDraftInput> inputs,
@@ -69,28 +69,6 @@ public sealed class AxisMcpTools(AxisApiClient api)
             condition,
             language);
         return api.PostJsonAsync("api/rules/condition/project", request, cancellationToken);
-    }
-
-    [McpServerTool(Name = "axis_simulate_rule")]
-    [Description("Simulate a rule draft or exact published version with typed inputs. This is deterministic and side-effect-free.")]
-    public Task<string> SimulateRuleAsync(
-        [Description("Stable Axis definition key.")] string definitionKey,
-        [Description("Typed rule input values keyed by the rule input key.")] IReadOnlyDictionary<string, RuleInputValue> inputs,
-        [Description("Optional exact published version; omit to simulate the current draft or default version.")] int? definitionVersion = null,
-        [Description("Optional correlation id for the simulation response.")] string? correlationId = null,
-        CancellationToken cancellationToken = default)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(definitionKey);
-        ArgumentNullException.ThrowIfNull(inputs);
-
-        SimulateRuleRequest request = new(
-            definitionVersion,
-            inputs,
-            correlationId ?? Guid.NewGuid().ToString("N"));
-        return api.PostJsonAsync(
-            $"api/rules/{Uri.EscapeDataString(definitionKey)}/simulate",
-            request,
-            cancellationToken);
     }
 
     [McpServerTool(Name = "axis_list_business_object_definitions")]
@@ -155,8 +133,4 @@ public sealed class AxisMcpTools(AxisApiClient api)
         RuleConditionNodeInput Condition,
         string Language);
 
-    private sealed record SimulateRuleRequest(
-        int? DefinitionVersion,
-        IReadOnlyDictionary<string, RuleInputValue> Inputs,
-        string CorrelationId);
 }

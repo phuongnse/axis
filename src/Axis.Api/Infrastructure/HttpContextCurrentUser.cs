@@ -12,8 +12,7 @@ public sealed class HttpContextCurrentUser(IHttpContextAccessor accessor) : ICur
     {
         get
         {
-            string? sub = Principal?.GetClaim(OpenIddictConstants.Claims.Subject)
-                ?? Principal?.FindFirstValue(ClaimTypes.NameIdentifier);
+            string? sub = Principal?.GetClaim(OpenIddictConstants.Claims.Subject);
             return Guid.TryParse(sub, out Guid id) ? id : null;
         }
     }

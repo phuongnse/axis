@@ -18,13 +18,14 @@ internal sealed class BusinessObjectRecordRuleContextAdapter
         if (consumerContext.Values.Count == 0)
             return new RuleContext(new Dictionary<string, RuleContextValue>(StringComparer.Ordinal));
 
-        RuleValueType type = consumerContext.FieldType == BusinessObjectFieldType.Choice
-            ? RuleValueType.Text
-            : (RuleValueType)consumerContext.FieldType;
+        RuleBindingContextValueSchema schema = BusinessObjectRuleBindingContextSchema.For(
+            consumerContext.FieldType)[BusinessObjectRuleBindingContextSchema.RecordValueKey];
         return new RuleContext(
             new Dictionary<string, RuleContextValue>(StringComparer.Ordinal)
             {
-                ["record.value"] = new RuleContextValue(type, consumerContext.Values),
+                [BusinessObjectRuleBindingContextSchema.RecordValueKey] = new RuleContextValue(
+                    schema.Type,
+                    consumerContext.Values),
             });
     }
 }

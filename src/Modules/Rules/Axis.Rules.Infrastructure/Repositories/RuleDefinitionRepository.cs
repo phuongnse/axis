@@ -36,6 +36,7 @@ internal sealed class RuleDefinitionRepository(RulesDbContext context) : IRuleDe
             .Where(definition =>
                 definition.WorkspaceId == workspaceId &&
                 keys.Contains(definition.Key))
+            .OrderBy(definition => definition.Key)
             .ToListAsync(cancellationToken);
     }
 
@@ -78,9 +79,19 @@ internal sealed class RuleDefinitionRepository(RulesDbContext context) : IRuleDe
         RuleLifecycleStatus? status)
     {
         query = query.Where(definition => definition.WorkspaceId == workspaceId);
-        if (status is not null)
-            query = query.Where(definition => definition.Status == status.Value);
-        return query;
+        return status switch
+        {
+            RuleLifecycleStatus.Draft => query.Where(definition =>
+                definition.ArchivedAt == null && definition.LatestPublishedVersion == null),
+            RuleLifecycleStatus.Inactive => query.Where(definition =>
+                definition.ArchivedAt == null &&
+                definition.LatestPublishedVersion != null &&
+                definition.ActiveVersion == null),
+            RuleLifecycleStatus.Active => query.Where(definition =>
+                definition.ArchivedAt == null && definition.ActiveVersion != null),
+            RuleLifecycleStatus.Archived => query.Where(definition => definition.ArchivedAt != null),
+            _ => query,
+        };
     }
 
     private static IQueryable<RuleDefinition> Search(
@@ -110,7 +121,8 @@ internal sealed class RuleDefinitionRepository(RulesDbContext context) : IRuleDe
         {
             return definitions
                 .OrderBy(definition => definition.Name)
-                .ThenBy(definition => definition.Key);
+                .ThenBy(definition => definition.Key)
+                .ThenBy(definition => definition.Id);
         }
 
         string query = searchQuery.Trim().ToLowerInvariant();
@@ -128,6 +140,7 @@ internal sealed class RuleDefinitionRepository(RulesDbContext context) : IRuleDe
                     EF.Functions.Unaccent(query),
                     EF.Property<string>(definition, "SearchText")))
             .ThenBy(definition => definition.Name)
-            .ThenBy(definition => definition.Key);
+            .ThenBy(definition => definition.Key)
+            .ThenBy(definition => definition.Id);
     }
 }

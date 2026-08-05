@@ -130,12 +130,12 @@ sequenceDiagram
 > | Layer | Status |
 > |-------|--------|
 > | Domain | Done |
-> | Application | Partial |
-> | Infrastructure | Partial |
-> | API | Partial |
-> | Frontend | Partial |
+> | Application | Done |
+> | Infrastructure | Done |
+> | API | Done |
+> | Frontend | Done |
 >
-> **Gaps vs spec:** No known gap in the implemented AC-008 search slice; remaining partial layers retain their existing non-search scope.
+> **Gaps vs spec:** None.
 >
 > **Deferred follow-ups:** N/A for this use case; excluded surfaces are listed in Out Of Scope.
 >

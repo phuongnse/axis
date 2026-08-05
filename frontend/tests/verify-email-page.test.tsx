@@ -3,7 +3,8 @@ import userEvent from '@testing-library/user-event';
 import { StrictMode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { completePostVerifyPkceFlow } from '@/features/auth/api';
+import { completePostVerifyFlow } from '@/features/auth/api';
+import { useAuthStore } from '@/features/auth/auth-store';
 import { VerifyEmailPage, verifySuccessHoldMs } from '@/features/auth/components/VerifyEmailPage';
 import { changeSiteLanguage } from '@/features/preferences';
 import { renderWithRouter } from './render-with-router';
@@ -23,7 +24,7 @@ vi.mock('@/features/auth/api', async () => {
   const actual = await vi.importActual<typeof import('@/features/auth/api')>('@/features/auth/api');
   return {
     ...actual,
-    completePostVerifyPkceFlow: vi.fn(() => Promise.resolve(true)),
+    completePostVerifyFlow: vi.fn(() => Promise.resolve(true)),
   };
 });
 
@@ -32,8 +33,9 @@ describe('VerifyEmailPage', () => {
     await changeSiteLanguage('en', { persist: false });
     vi.stubGlobal('fetch', vi.fn());
     navigateMock.mockReset();
-    vi.mocked(completePostVerifyPkceFlow).mockClear();
-    vi.mocked(completePostVerifyPkceFlow).mockResolvedValue(true);
+    vi.mocked(completePostVerifyFlow).mockClear();
+    vi.mocked(completePostVerifyFlow).mockResolvedValue(true);
+    useAuthStore.getState().markBrowserSessionGuest('test-csrf-token');
   });
 
   afterEach(() => {
@@ -41,7 +43,7 @@ describe('VerifyEmailPage', () => {
     vi.restoreAllMocks();
   });
 
-  it('shows a readable verified state before starting PKCE after user verification', async () => {
+  it('shows a readable verified state before opening the authenticated workspace', async () => {
     vi.mocked(fetch).mockResolvedValueOnce({
       ok: true,
       status: 200,
@@ -53,6 +55,7 @@ describe('VerifyEmailPage', () => {
           }),
         ),
     } as unknown as Response);
+    vi.mocked(fetch).mockResolvedValueOnce(authenticatedSessionResponse());
 
     const { unmount } = await renderWithRouter(<VerifyEmailPage />, {
       path: '/auth/verify?token=valid-token',
@@ -66,7 +69,7 @@ describe('VerifyEmailPage', () => {
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /continue to dashboard/i })).toBeInTheDocument();
     expect(verifySuccessHoldMs).toBeGreaterThanOrEqual(5_000);
-    expect(completePostVerifyPkceFlow).not.toHaveBeenCalled();
+    expect(completePostVerifyFlow).not.toHaveBeenCalled();
     expect(navigateMock).not.toHaveBeenCalled();
     unmount();
   });
@@ -84,20 +87,21 @@ describe('VerifyEmailPage', () => {
           }),
         ),
     } as unknown as Response);
+    vi.mocked(fetch).mockResolvedValueOnce(authenticatedSessionResponse());
 
     await renderWithRouter(<VerifyEmailPage />, { path: '/auth/verify?token=manual-token' });
 
     const continueButton = await screen.findByRole('button', {
       name: /continue to dashboard/i,
     });
-    expect(completePostVerifyPkceFlow).not.toHaveBeenCalled();
+    expect(completePostVerifyFlow).not.toHaveBeenCalled();
 
     await user.click(continueButton);
 
     await waitFor(() => {
-      expect(completePostVerifyPkceFlow).toHaveBeenCalledWith();
+      expect(completePostVerifyFlow).toHaveBeenCalledWith();
     });
-    expect(completePostVerifyPkceFlow).toHaveBeenCalledTimes(1);
+    expect(completePostVerifyFlow).toHaveBeenCalledTimes(1);
     expect(continueButton).toBeDisabled();
     expect(continueButton).toHaveTextContent('Opening dashboard...');
     expect(navigateMock).toHaveBeenCalledWith({ to: '/dashboard', replace: true });
@@ -115,6 +119,7 @@ describe('VerifyEmailPage', () => {
           }),
         ),
     } as unknown as Response);
+    vi.mocked(fetch).mockResolvedValueOnce(authenticatedSessionResponse());
     await changeSiteLanguage('vi', { persist: false });
 
     await renderWithRouter(<VerifyEmailPage />, { path: '/auth/verify?token=valid-token' });
@@ -144,6 +149,7 @@ describe('VerifyEmailPage', () => {
           }),
         ),
     } as unknown as Response);
+    vi.mocked(fetch).mockResolvedValueOnce(authenticatedSessionResponse());
 
     await renderWithRouter(
       <StrictMode>
@@ -153,7 +159,7 @@ describe('VerifyEmailPage', () => {
     );
 
     expect(await screen.findByRole('heading', { name: /email verified/i })).toBeInTheDocument();
-    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(fetch).toHaveBeenCalledTimes(2);
   });
 
   it('shows expired message when verification token expired', async () => {
@@ -234,3 +240,23 @@ describe('VerifyEmailPage', () => {
     );
   });
 });
+
+function authenticatedSessionResponse(): Response {
+  return {
+    ok: true,
+    status: 200,
+    text: () =>
+      Promise.resolve(
+        JSON.stringify({
+          authenticated: true,
+          csrfToken: 'authenticated-csrf-token',
+          user: {
+            userId: 'user-1',
+            workspaceId: 'workspace-1',
+            email: 'alex@example.com',
+            name: 'Alex Morgan',
+          },
+        }),
+      ),
+  } as unknown as Response;
+}

@@ -22,6 +22,7 @@ Follow [reference.md](../reference.md).
 - General shell access remains inspection-only unless the exact rare-mutation exception above is approved.
 - Apply the blocker protocol to every missing or unusable command/runtime prerequisite. Report the required prerequisite, dependent check, and exact host action needed; keep that evidence blocked until the required route succeeds. Approval of an alternate action does not change its evidence status. Never install, extract, symlink, prepend, substitute a user-local runtime/tool, change `PATH`, or use an alternate environment to make a check pass.
 - Keep dependency changes controlled: exact direct versions, generated lockfiles, repository vulnerability gates, and Renovate-owned proposals. Do not use ranges, manual lockfile edits, compatibility shims, or risk acceptance as an update mechanism.
+- When a command fails, classify any proposed substitute against the owning contract using [reference.md § Universal gates](../reference.md#universal-gates). A substitute that changes the required execution or evidence boundary to keep progressing returns to `$axis-design-gate` and cannot turn the original boundary green.
 
 ## Inputs
 

@@ -1,4 +1,3 @@
-import { Buffer } from 'node:buffer';
 import { expect, type Page, test } from '@playwright/test';
 import type * as ApiTypes from '../src/lib/api-generated';
 
@@ -35,7 +34,7 @@ const input = (key: string, label: string, types: string[], isRequired = true) =
   allowedValues: [],
 });
 
-const systemRules = [
+const builtInRules = [
   [
     'field.required',
     'Required value',
@@ -53,10 +52,11 @@ const systemRules = [
   definitionKey,
   name,
   description: `${name} validation.`,
-  origin: 'System',
-  status: 'Published',
+  origin: 'BuiltIn',
+  status: 'Active',
   expressionLanguageVersion: 1,
-  latestPublishedVersion: 1,
+  latestVersion: 1,
+  activeVersion: 1,
   inputs:
     definitionKey === 'field.date_range'
       ? [
@@ -139,40 +139,35 @@ function dateRangeCondition(): ApiTypes.RuleConditionNodeDto {
   ]);
 }
 
-function systemDetail(definitionKey: string): MockRuleDetail | null {
-  const summary = systemRules.find((rule) => rule.definitionKey === definitionKey);
+function builtInDetail(definitionKey: string): MockRuleDetail | null {
+  const summary = builtInRules.find((rule) => rule.definitionKey === definitionKey);
   if (!summary) return null;
+  const condition =
+    definitionKey === 'field.required'
+      ? requiredCondition()
+      : definitionKey === 'field.date_range'
+        ? dateRangeCondition()
+        : undefined;
   return {
     ...summary,
     revision: null,
-    condition:
-      definitionKey === 'field.required'
-        ? requiredCondition()
-        : definitionKey === 'field.date_range'
-          ? dateRangeCondition()
-          : undefined,
-    versions: [],
+    condition,
+    versions: [
+      {
+        version: summary.latestVersion,
+        name: summary.name,
+        description: summary.description,
+        expressionLanguageVersion: summary.expressionLanguageVersion,
+        inputs: summary.inputs,
+        output: summary.output,
+        condition,
+        createdAt: now,
+      },
+    ],
     createdAt: null,
     updatedAt: null,
     archivedAt: null,
   } as MockRuleDetail;
-}
-
-function conditionProjection(
-  body: ApiTypes.ProjectRuleConditionRequest,
-): ApiTypes.RuleConditionProjectionDto {
-  const condition = body.condition ?? {
-    nodeId: 'threshold-check',
-    logicalOperator: undefined,
-    predicateOperator: 'GreaterThan',
-    left: { kind: 'Input', reference: 'Value', arguments: [] },
-    right: { kind: 'Input', reference: 'Threshold', arguments: [] },
-    children: [],
-  };
-  return {
-    condition,
-    display: conditionDisplay(condition),
-  };
 }
 
 function conditionDisplay(
@@ -308,18 +303,6 @@ function expressionLanguage() {
   };
 }
 
-function base64UrlJson(value: unknown): string {
-  return Buffer.from(JSON.stringify(value), 'utf8').toString('base64url');
-}
-
-function accessToken(): string {
-  return [
-    base64UrlJson({ alg: 'none', typ: 'JWT' }),
-    base64UrlJson({ sub: profile.id, email: profile.email, name: profile.fullName }),
-    'signature',
-  ].join('.');
-}
-
 async function mockAuthenticatedSession(page: Page): Promise<void> {
   await page.addInitScript(() => {
     (window as Window & { __AXIS_DISABLE_DEVTOOLS__?: boolean }).__AXIS_DISABLE_DEVTOOLS__ = true;
@@ -327,18 +310,20 @@ async function mockAuthenticatedSession(page: Page): Promise<void> {
     localStorage.setItem('axis.theme', 'light');
   });
 
-  await page.route('**/connect/authorize**', async (route) => {
-    const requestUrl = new URL(route.request().url());
-    const callbackUrl = new URL('/callback', requestUrl.origin);
-    callbackUrl.searchParams.set('code', 'rules-code');
-    callbackUrl.searchParams.set('state', requestUrl.searchParams.get('state') ?? '');
-    await route.fulfill({ status: 302, headers: { location: callbackUrl.toString() } });
-  });
-  await page.route('**/connect/token', async (route) => {
+  await page.route('**/api/auth/session', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify({ access_token: accessToken() }),
+      body: JSON.stringify({
+        authenticated: true,
+        csrfToken: 'rules-csrf-token',
+        user: {
+          userId: profile.id,
+          workspaceId: profile.workspaceId,
+          email: profile.email,
+          name: profile.fullName,
+        },
+      }),
     });
   });
   await page.route('**/api/users/me', async (route) => {
@@ -352,6 +337,21 @@ async function mockAuthenticatedSession(page: Page): Promise<void> {
 
 async function mockRulesApi(page: Page): Promise<CapturedRequest[]> {
   let detail: MockRuleDetail | null = null;
+  let binding: ApiTypes.RuleBindingDto = {
+    id: '88888888-8888-4888-8888-888888888888',
+    workspaceId: profile.workspaceId,
+    definitionKey: 'field.required',
+    definitionVersion: 1,
+    targetType: 'business-object-field',
+    targetId: 'customer.status',
+    useCaseOrTrigger: 'field-validation',
+    priority: 0,
+    enabled: true,
+    failureBehavior: 'FailClosed',
+    revision: 1,
+    createdAt: now,
+    updatedAt: now,
+  };
   const requests: CapturedRequest[] = [];
 
   await page.route('**/api/rules**', async (route) => {
@@ -371,12 +371,41 @@ async function mockRulesApi(page: Page): Promise<CapturedRequest[]> {
     }
     if (request.method() === 'POST' && path === '/api/rules/condition/project') {
       captured.body = request.postDataJSON() as JsonObject;
+      const condition = captured.body.condition as ApiTypes.RuleConditionNodeDto;
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify(
-          conditionProjection(captured.body as ApiTypes.ProjectRuleConditionRequest),
-        ),
+        body: JSON.stringify({ condition, display: conditionDisplay(condition) }),
+      });
+      return;
+    }
+    if (request.method() === 'POST' && path === '/api/rules/authoring/project') {
+      captured.body = request.postDataJSON() as JsonObject;
+      const source = captured.body.source as
+        | { ast?: ApiTypes.RuleConditionNodeDto; text?: string }
+        | undefined;
+      const condition = source?.ast ?? requiredCondition();
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          condition,
+          formattedDsl: source?.text ?? 'value == false',
+          explanation: conditionDisplay(condition),
+          diagnostics: [],
+          isValid: true,
+        }),
+      });
+      return;
+    }
+    if (request.method() === 'POST' && path === '/api/rules/authoring/complete') {
+      captured.body = request.postDataJSON() as JsonObject;
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify([
+          { label: 'value', insertText: 'value', kind: 'Input', start: 0, length: 0 },
+        ]),
       });
       return;
     }
@@ -390,7 +419,7 @@ async function mockRulesApi(page: Page): Promise<CapturedRequest[]> {
     }
     if (request.method() === 'GET' && path === '/api/rules') {
       const query = url.searchParams.get('query')?.toLowerCase() ?? '';
-      const candidates = detail ? [...systemRules, detail] : systemRules;
+      const candidates = detail ? [...builtInRules, detail] : builtInRules;
       const items = candidates.filter((candidate) =>
         `${candidate.name} ${candidate.description} ${candidate.definitionKey}`
           .toLowerCase()
@@ -422,13 +451,14 @@ async function mockRulesApi(page: Page): Promise<CapturedRequest[]> {
             priority: 0,
             enabled: true,
             failureBehavior: 'FailClosed',
+            revision: 1,
           },
         ]),
       });
       return;
     }
     if (request.method() === 'GET' && path.startsWith('/api/rules/field.')) {
-      const system = systemDetail(path.slice('/api/rules/'.length));
+      const system = builtInDetail(path.slice('/api/rules/'.length));
       await route.fulfill({
         status: system ? 200 : 404,
         contentType: 'application/json',
@@ -459,11 +489,19 @@ async function mockRulesApi(page: Page): Promise<CapturedRequest[]> {
         status: 'Draft',
         expressionLanguageVersion: 1,
         revision: 1,
-        latestPublishedVersion: null,
+        latestVersion: null,
+        activeVersion: null,
         inputs: [],
         output: { type: 'Boolean', cardinality: 'Scalar' },
         condition: undefined,
         versions: [],
+        actions: {
+          canEditDraft: true,
+          canCreateVersion: true,
+          canActivateVersion: false,
+          canDeactivate: false,
+          canArchive: true,
+        },
         createdAt: now,
         updatedAt: now,
         archivedAt: null,
@@ -472,6 +510,142 @@ async function mockRulesApi(page: Page): Promise<CapturedRequest[]> {
         status: 201,
         contentType: 'application/json',
         body: JSON.stringify(detail),
+      });
+      return;
+    }
+
+    if (
+      request.method() === 'POST' &&
+      detail &&
+      path === `/api/rules/${detail.definitionKey}/versions`
+    ) {
+      detail = {
+        ...detail,
+        latestVersion: (detail.latestVersion ?? 0) + 1,
+        revision: (detail.revision ?? 0) + 1,
+        versions: [
+          ...(detail.versions ?? []),
+          {
+            version: (detail.latestVersion ?? 0) + 1,
+            name: detail.name,
+            description: detail.description,
+            expressionLanguageVersion: 1,
+            inputs: detail.inputs,
+            output: detail.output,
+            condition: detail.condition,
+            createdAt: now,
+          },
+        ],
+        actions: {
+          canEditDraft: true,
+          canCreateVersion: true,
+          canActivateVersion: true,
+          canDeactivate: false,
+          canArchive: true,
+        },
+      };
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(detail),
+      });
+      return;
+    }
+    if (
+      request.method() === 'PUT' &&
+      detail &&
+      path === `/api/rules/${detail.definitionKey}/active-version`
+    ) {
+      detail = {
+        ...detail,
+        activeVersion: detail.latestVersion,
+        status: 'Active',
+        revision: (detail.revision ?? 0) + 1,
+        actions: {
+          canEditDraft: true,
+          canCreateVersion: true,
+          canActivateVersion: false,
+          canDeactivate: true,
+          canArchive: true,
+        },
+      };
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(detail),
+      });
+      return;
+    }
+    if (
+      request.method() === 'DELETE' &&
+      detail &&
+      path === `/api/rules/${detail.definitionKey}/active-version`
+    ) {
+      detail = {
+        ...detail,
+        activeVersion: null,
+        status: 'Inactive',
+        revision: (detail.revision ?? 0) + 1,
+        actions: {
+          canEditDraft: true,
+          canCreateVersion: true,
+          canActivateVersion: true,
+          canDeactivate: false,
+          canArchive: true,
+        },
+      };
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(detail),
+      });
+      return;
+    }
+    if (
+      request.method() === 'POST' &&
+      detail &&
+      path === `/api/rules/${detail.definitionKey}/archive`
+    ) {
+      detail = {
+        ...detail,
+        activeVersion: null,
+        status: 'Archived',
+        revision: (detail.revision ?? 0) + 1,
+        archivedAt: now,
+        actions: {
+          canEditDraft: false,
+          canCreateVersion: false,
+          canActivateVersion: false,
+          canDeactivate: false,
+          canArchive: false,
+        },
+      };
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(detail),
+      });
+      return;
+    }
+    if (
+      request.method() === 'POST' &&
+      detail &&
+      (path === `/api/rules/${detail.definitionKey}/draft/simulate` ||
+        /\/versions\/\d+\/simulate$/.test(path))
+    ) {
+      captured.body = request.postDataJSON() as JsonObject;
+      const sample = captured.body.inputs as Record<string, { values?: string[] }> | undefined;
+      const isMatch = sample?.value?.values?.[0] !== 'no';
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          definitionKey: detail.definitionKey,
+          definitionVersion: path.includes('/versions/') ? detail.activeVersion : null,
+          isMatch,
+          diagnostics: [],
+          correlationId: 'rules-e2e',
+        }),
       });
       return;
     }
@@ -503,10 +677,47 @@ async function mockRulesApi(page: Page): Promise<CapturedRequest[]> {
     await route.fulfill({ status: 404, contentType: 'application/json', body: '{}' });
   });
 
+  await page.route('**/api/rule-bindings/**', async (route) => {
+    const request = route.request();
+    const path = new URL(request.url()).pathname;
+    requests.push({
+      method: request.method(),
+      path,
+      body: request.postDataJSON?.() as JsonObject,
+    });
+    if (request.method() === 'GET') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(binding),
+      });
+      return;
+    }
+    if (request.method() === 'PUT') {
+      binding = {
+        ...binding,
+        ...(request.postDataJSON() as JsonObject),
+        revision: (binding.revision ?? 0) + 1,
+        updatedAt: now,
+      };
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(binding),
+      });
+      return;
+    }
+    if (request.method() === 'DELETE') {
+      await route.fulfill({ status: 204 });
+      return;
+    }
+    await route.fulfill({ status: 404, contentType: 'application/json', body: '{}' });
+  });
+
   return requests;
 }
 
-test('rule catalog exposes inputs and pure system details', async ({ page }) => {
+test('rule catalog exposes inputs and read-only built-in details', async ({ page }) => {
   await mockAuthenticatedSession(page);
   await mockRulesApi(page);
   await page.goto('/rules');
@@ -518,7 +729,7 @@ test('rule catalog exposes inputs and pure system details', async ({ page }) => 
   await expect(page.getByText('Applies to')).toHaveCount(0);
 
   await page.getByRole('button', { name: 'Required value' }).click();
-  const details = page.locator('[data-slot="system-rule-details"]');
+  const details = page.locator('[data-slot="managed-dialog-window"]');
   await expect(details.getByRole('tab')).toHaveText([
     'General',
     'Rule behavior',
@@ -591,7 +802,7 @@ test('rule catalog exposes inputs and pure system details', async ({ page }) => 
   await expect(behavior).not.toContainText('Single value');
   await expect(behavior).not.toContainText('isMatch');
   await expect(behavior).not.toContainText('Scalar');
-  await expect(details).toContainText('Published');
+  await expect(details).toContainText('Active');
   await expect(details).not.toContainText('Validation');
   await details.getByRole('tab', { name: 'Usage' }).click();
   await expect(details.getByText('customer.status')).toBeVisible();
@@ -604,32 +815,34 @@ test('rule catalog exposes inputs and pure system details', async ({ page }) => 
   await expect(details.getByText('Expression language')).toBeVisible();
 });
 
-test('date range presents optional bounds as conditional assertions', async ({ page }) => {
+test('built-in date range presents optional bounds as conditional assertions', async ({ page }) => {
   await mockAuthenticatedSession(page);
   await mockRulesApi(page);
   await page.goto('/rules');
 
   await page.getByRole('button', { name: 'Date range' }).click();
-  const details = page.locator('[data-slot="system-rule-details"]');
+  const details = page.locator('[data-slot="managed-dialog-window"]');
   await details.getByRole('tab', { name: 'Rule behavior' }).click();
   const logic = details.locator('[data-slot="rule-behavior-flow"]');
+  const expression = logic.locator('[data-slot="rule-expression"]');
 
-  await expect(
-    logic.getByText('Value is greater than or equal to Minimum when Minimum is specified'),
-  ).toBeVisible();
-  await expect(
-    logic.getByText('Value is less than or equal to Maximum when Maximum is specified'),
-  ).toBeVisible();
+  await expect(expression).toContainText(
+    'Value is greater than or equal to Minimum when Minimum is specified',
+  );
+  await expect(expression).toContainText(
+    'Value is less than or equal to Maximum when Maximum is specified',
+  );
   await expect(logic.locator('[data-slot="rule-expression-operator"]')).toHaveText(['and']);
   await expect(logic.getByRole('button')).toHaveCount(0);
   await expect(logic.locator('[data-slot^="rule-condition-"]')).toHaveCount(0);
-  const expression = logic.locator('[data-slot="rule-expression"]');
   await expect
     .poll(async () => (await expression.boundingBox())?.height ?? Number.POSITIVE_INFINITY)
     .toBeLessThan(80);
 });
 
-test('workspace rule authoring saves one inputs-condition contract', async ({ page }) => {
+test('workspace rule authoring projects, simulates, and manages immutable lifecycle', async ({
+  page,
+}) => {
   await mockAuthenticatedSession(page);
   const requests = await mockRulesApi(page);
   await page.goto('/rules');
@@ -640,9 +853,10 @@ test('workspace rule authoring saves one inputs-condition contract', async ({ pa
   await page.getByRole('tab', { name: 'Rule behavior' }).click();
   await page.getByRole('button', { name: 'Add input' }).click();
   await page.getByRole('button', { name: 'Add input' }).click();
+  await page.getByLabel('Key').nth(0).fill('value');
+  await page.getByLabel('Key').nth(1).fill('threshold');
   await page.getByLabel('Input name').nth(0).fill('Value');
   await page.getByLabel('Input name').nth(1).fill('Threshold');
-  await expect(page.getByLabel('Expression')).toHaveCount(0);
   await page.getByRole('button', { name: 'Add condition' }).click();
   await page.getByLabel('How to compare').click();
   await page.getByRole('option', { name: 'Equals' }).click();
@@ -657,14 +871,56 @@ test('workspace rule authoring saves one inputs-condition contract', async ({ pa
     (request) => request.method === 'PUT' && request.path.endsWith('/draft'),
   );
   const saveBody = save?.body as ApiTypes.SaveRuleDefinitionDraftRequest;
-  expect(saveBody.inputs?.map((candidate) => candidate.label)).toEqual(['Value', 'Threshold']);
+  expect(saveBody.inputs?.map(({ key, label }) => ({ key, label }))).toEqual([
+    { key: 'value', label: 'Value' },
+    { key: 'threshold', label: 'Threshold' },
+  ]);
   expect(saveBody.condition?.predicateOperator).toBe('Equal');
   expect(saveBody.condition?.left?.kind).toBe('Input');
-  expect(save?.body).not.toHaveProperty('scope');
-  expect(save?.body).not.toHaveProperty('outcome');
   await expect(
     page.getByLabel('Credit threshold').getByText('Draft', { exact: true }),
   ).toBeVisible();
+
+  const editor = page.locator('[data-slot="managed-dialog-window"]');
+  await editor.getByRole('tab', { name: 'Rule behavior' }).click();
+  await editor.getByLabel('Expression syntax').fill('value');
+  await editor.getByLabel('Expression syntax').blur();
+  await editor.getByRole('button', { name: 'Show suggestions' }).click();
+  await expect(editor.getByRole('option', { name: 'value' })).toBeVisible();
+  await editor.getByRole('option', { name: 'value' }).click();
+  await editor.getByRole('button', { name: 'Save draft' }).click();
+  await expect(page.getByText('Draft saved').last()).toBeVisible();
+  const simulation = editor.getByRole('region', { name: 'Simulation' });
+  await simulation.getByLabel('Value').fill('yes');
+  await simulation.getByRole('button', { name: 'Run simulation' }).click();
+  await expect(simulation.getByText('Condition matched')).toBeVisible();
+  await simulation.getByLabel('Value').fill('no');
+  await simulation.getByRole('button', { name: 'Run simulation' }).click();
+  await expect(simulation.getByText('No match')).toBeVisible();
+
+  await editor.getByRole('button', { name: 'Create version' }).click();
+  await page.getByRole('button', { name: 'Create version' }).last().click();
+  await expect(editor.getByLabel('Version history').getByText('Version 1')).toBeVisible();
+  await editor.getByRole('button', { name: 'Activate version' }).click();
+  await page.getByRole('button', { name: 'Activate version' }).last().click();
+  await expect(editor.getByText('Active', { exact: true })).toBeVisible();
+  await editor.getByRole('button', { name: 'Deactivate' }).click();
+  await page.getByRole('button', { name: 'Deactivate' }).last().click();
+  await expect(editor.getByText('Inactive', { exact: true })).toBeVisible();
+  expect(requests.some((request) => request.path.endsWith('/authoring/project'))).toBe(true);
+  expect(requests.some((request) => request.path.endsWith('/authoring/complete'))).toBe(true);
+  expect(requests.some((request) => request.path.endsWith('/draft/simulate'))).toBe(true);
+  expect(requests.some((request) => request.path.endsWith('/versions'))).toBe(true);
+  expect(
+    requests.some(
+      (request) => request.path.endsWith('/active-version') && request.method === 'PUT',
+    ),
+  ).toBe(true);
+  expect(
+    requests.some(
+      (request) => request.path.endsWith('/active-version') && request.method === 'DELETE',
+    ),
+  ).toBe(true);
 });
 
 test('rule catalog remains usable on a narrow viewport', async ({ page }) => {
@@ -679,7 +935,7 @@ test('rule catalog remains usable on a narrow viewport', async ({ page }) => {
     .toBe(true);
 
   await page.getByRole('button', { name: 'Required value' }).click();
-  const details = page.locator('[data-slot="system-rule-details"]');
+  const details = page.locator('[data-slot="managed-dialog-window"]');
   await details.getByRole('tab', { name: 'Rule behavior' }).click();
   const behavior = details.locator('[data-slot="rule-behavior-summary"]');
   await expect(behavior.getByRole('heading')).toHaveText(['Inputs', 'Logic', 'Outputs']);

@@ -55,7 +55,7 @@ class TestSetupPlatform(unittest.TestCase):
         linux_arm = axis_setup.SetupPlatform("linux", "arm64")
         mac_arm = axis_setup.SetupPlatform("darwin", "arm64")
 
-        self.assertEqual("dotnet-sdk-8.0.423-win-x64.zip", axis_setup.asset_name("dotnet", windows))
+        self.assertEqual("dotnet-sdk-10.0.302-win-x64.zip", axis_setup.asset_name("dotnet", windows))
         self.assertEqual("node-v24.18.0-win-x64.zip", axis_setup.asset_name("node", windows))
         self.assertEqual("gh_2.96.0_linux_arm64.tar.gz", axis_setup.asset_name("gh", linux_arm))
         self.assertEqual("lychee-arm64-macos.tar.gz", axis_setup.asset_name("lychee", mac_arm))
@@ -151,7 +151,24 @@ class TestManagedToolPaths(unittest.TestCase):
         )
 
         self.assertEqual(root / "node" / "24.18.0" / "bin" / "node", node)
-        self.assertEqual(root / "dotnet" / "8.0.423" / "dotnet.exe", dotnet)
+        self.assertEqual(root / "dotnet" / "10.0.302" / "dotnet.exe", dotnet)
+
+    def test_managed_npm_command_uses_the_node_distribution(self) -> None:
+        root = Path("/tools")
+
+        linux = axis_setup.managed_command_executable(
+            "npm",
+            platform_spec=axis_setup.SetupPlatform("linux", "x64"),
+            root=root,
+        )
+        windows = axis_setup.managed_command_executable(
+            "npm",
+            platform_spec=axis_setup.SetupPlatform("windows", "x64"),
+            root=root,
+        )
+
+        self.assertEqual(root / "node" / "24.18.0" / "bin" / "npm", linux)
+        self.assertEqual(root / "node" / "24.18.0" / "npm.cmd", windows)
 
     def test_user_command_dir_uses_the_native_user_location(self) -> None:
         home = Path("/users/alice")
@@ -189,6 +206,68 @@ class TestManagedToolPaths(unittest.TestCase):
             self.assertTrue(exposed.is_symlink())
             self.assertEqual(managed, exposed.resolve())
 
+    def test_exposes_node_and_npm_only_after_validating_both_targets(self) -> None:
+        platform_spec = axis_setup.SetupPlatform("linux", "x64")
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / "tools"
+            command_dir = Path(temp) / "bin"
+            node = axis_setup.managed_command_executable(
+                "node",
+                platform_spec=platform_spec,
+                root=root,
+            )
+            npm = axis_setup.managed_command_executable(
+                "npm",
+                platform_spec=platform_spec,
+                root=root,
+            )
+            node.parent.mkdir(parents=True)
+            node.write_text("node", encoding="utf-8")
+            npm.write_text("npm", encoding="utf-8")
+
+            exposed = axis_setup.expose_managed_commands(
+                ("node", "npm"),
+                platform_spec=platform_spec,
+                root=root,
+                command_dir=command_dir,
+            )
+
+            self.assertEqual((command_dir / "node", command_dir / "npm"), exposed)
+            self.assertEqual(node, exposed[0].resolve())
+            self.assertEqual(npm, exposed[1].resolve())
+
+    def test_node_command_group_refuses_an_unmanaged_target_before_exposure(self) -> None:
+        platform_spec = axis_setup.SetupPlatform("linux", "x64")
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / "tools"
+            command_dir = Path(temp) / "bin"
+            node = axis_setup.managed_command_executable(
+                "node",
+                platform_spec=platform_spec,
+                root=root,
+            )
+            npm = axis_setup.managed_command_executable(
+                "npm",
+                platform_spec=platform_spec,
+                root=root,
+            )
+            node.parent.mkdir(parents=True)
+            node.write_text("node", encoding="utf-8")
+            npm.write_text("npm", encoding="utf-8")
+            command_dir.mkdir()
+            (command_dir / "npm").write_text("user-owned", encoding="utf-8")
+
+            with self.assertRaisesRegex(axis_setup.SetupError, "refusing to replace unmanaged command"):
+                axis_setup.expose_managed_commands(
+                    ("node", "npm"),
+                    platform_spec=platform_spec,
+                    root=root,
+                    command_dir=command_dir,
+                )
+
+            self.assertFalse((command_dir / "node").exists())
+            self.assertEqual("user-owned", (command_dir / "npm").read_text(encoding="utf-8"))
+
     def test_exposes_dotnet_with_its_portable_runtime_root(self) -> None:
         platform_spec = axis_setup.SetupPlatform("linux", "x64")
         with tempfile.TemporaryDirectory() as temp:
@@ -215,6 +294,54 @@ class TestManagedToolPaths(unittest.TestCase):
                 exposed.read_text(encoding="utf-8"),
             )
             self.assertTrue(exposed.stat().st_mode & 0o100)
+
+    def test_dotnet_command_exposure_is_idempotent(self) -> None:
+        platform_spec = axis_setup.SetupPlatform("linux", "x64")
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / "tools"
+            command_dir = Path(temp) / "bin"
+            managed = axis_setup.managed_executable("dotnet", platform_spec=platform_spec, root=root)
+            managed.parent.mkdir(parents=True)
+            managed.write_text("", encoding="utf-8")
+
+            first = axis_setup.expose_managed_command(
+                "dotnet",
+                platform_spec=platform_spec,
+                root=root,
+                command_dir=command_dir,
+            )
+            first_content = first.read_bytes()
+            second = axis_setup.expose_managed_command(
+                "dotnet",
+                platform_spec=platform_spec,
+                root=root,
+                command_dir=command_dir,
+            )
+
+            self.assertEqual(first, second)
+            self.assertEqual(first_content, second.read_bytes())
+
+    def test_dotnet_command_refuses_to_replace_an_unmanaged_user_command(self) -> None:
+        platform_spec = axis_setup.SetupPlatform("linux", "x64")
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / "tools"
+            command_dir = Path(temp) / "bin"
+            managed = axis_setup.managed_executable("dotnet", platform_spec=platform_spec, root=root)
+            managed.parent.mkdir(parents=True)
+            managed.write_text("", encoding="utf-8")
+            command_dir.mkdir()
+            destination = command_dir / "dotnet"
+            destination.write_text("user-owned", encoding="utf-8")
+
+            with self.assertRaisesRegex(axis_setup.SetupError, "refusing to replace unmanaged command"):
+                axis_setup.expose_managed_command(
+                    "dotnet",
+                    platform_spec=platform_spec,
+                    root=root,
+                    command_dir=command_dir,
+                )
+
+            self.assertEqual("user-owned", destination.read_text(encoding="utf-8"))
 
     def test_exposes_a_managed_windows_command_with_a_stable_launcher(self) -> None:
         platform_spec = axis_setup.SetupPlatform("windows", "x64")
@@ -373,18 +500,18 @@ class TestVerifiedArtifacts(unittest.TestCase):
             "releases": [
                 {
                     "sdk": {
-                        "version": "8.0.423",
+                        "version": "10.0.302",
                         "files": [
                             {
                                 "name": "dotnet-sdk-win-x64.exe",
                                 "rid": "win-x64",
-                                "url": "https://example.invalid/dotnet-sdk-8.0.423-win-x64.exe",
+                                "url": "https://example.invalid/dotnet-sdk-10.0.302-win-x64.exe",
                                 "hash": "1" * 128,
                             },
                             {
                                 "name": "dotnet-sdk-win-x64.zip",
                                 "rid": "win-x64",
-                                "url": "https://example.invalid/dotnet-sdk-8.0.423-win-x64.zip",
+                                "url": "https://example.invalid/dotnet-sdk-10.0.302-win-x64.zip",
                                 "hash": "2" * 128,
                             },
                         ],
@@ -395,7 +522,7 @@ class TestVerifiedArtifacts(unittest.TestCase):
 
         artifact = axis_setup.resolve_dotnet_artifact(platform_spec, fetch_json=lambda _url: metadata)
 
-        self.assertEqual("dotnet-sdk-8.0.423-win-x64.zip", artifact.name)
+        self.assertEqual("dotnet-sdk-10.0.302-win-x64.zip", artifact.name)
         self.assertEqual("sha512", artifact.checksum_algorithm)
         self.assertEqual("2" * 128, artifact.checksum)
 
@@ -660,7 +787,9 @@ class TestSetupProfiles(unittest.TestCase):
             platform_spec=axis_setup.SetupPlatform("windows", "x64"),
         )
 
-        self.assertIn("install missing pinned user-local tools: .NET SDK 8.0.423, Node.js 24.18.0", plan)
+        self.assertIn("install missing pinned user-local tools: .NET SDK 10.0.302, Node.js 24.18.0", plan)
+        self.assertIn("expose managed .NET SDK through a stable dotnet command when PATH is missing or invalid", plan)
+        self.assertIn("expose managed Node.js and npm through stable user commands when PATH pins differ", plan)
         self.assertNotIn("install Playwright Chromium", plan)
         self.assertIn("generate local HTTPS certificates", plan)
         self.assertIn("install repository pre-push hook", plan)
@@ -671,7 +800,7 @@ class TestSetupProfiles(unittest.TestCase):
         )
         self.assertLess(
             plan.index("diagnose Docker Engine, Compose, and OpenSSL without changing OS services"),
-            plan.index("install missing pinned user-local tools: .NET SDK 8.0.423, Node.js 24.18.0"),
+            plan.index("install missing pinned user-local tools: .NET SDK 10.0.302, Node.js 24.18.0"),
         )
 
     def test_plan_installs_host_playwright_only_when_explicitly_requested(self) -> None:

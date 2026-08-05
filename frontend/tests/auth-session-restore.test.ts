@@ -1,71 +1,54 @@
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { createElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
-  completePostSignInPkceFlow,
-  completePostVerifyPkceFlow,
-  restoreSessionFromBrowserAuth,
+  BrowserSessionUnavailableError,
+  completePostVerifyFlow,
+  restoreBrowserSession,
+  signInUser,
 } from '@/features/auth/api';
-import { getAccessToken, useAuthStore } from '@/features/auth/auth-store';
-import { buildAuthorizationRequestResumeUrl } from '@/features/auth/pkce';
+import { useAuthStore } from '@/features/auth/auth-store';
+import { buildAuthorizationRequestResumeUrl } from '@/features/auth/authorization-request';
+import { SessionUnavailablePage } from '@/features/auth/components/SessionUnavailablePage';
 import {
   redirectAuthenticatedUserFromGuestRoute,
   redirectFromAppEntryRoute,
-  redirectFromCallbackRoute,
 } from '@/features/auth/route-guards';
 import { ensureAuthenticatedRouteSession } from '@/routes/_authenticated';
 
-function authResponse(state: string): Response {
+const authenticatedSession = {
+  authenticated: true,
+  csrfToken: 'authenticated-csrf',
+  user: {
+    userId: '11111111-1111-4111-8111-111111111111',
+    workspaceId: '22222222-2222-4222-8222-222222222222',
+    email: 'ada@example.com',
+    name: 'Ada Lovelace',
+  },
+};
+
+const guestSession = {
+  authenticated: false,
+  csrfToken: 'guest-csrf',
+  user: undefined,
+};
+
+function jsonResponse(body: unknown, status = 200): Response {
   return {
-    ok: true,
-    status: 200,
-    url: `${window.location.origin}/callback?code=auth-code&state=${state}`,
+    ok: status >= 200 && status < 300,
+    status,
+    statusText: status === 200 ? 'OK' : 'Error',
+    json: () => Promise.resolve(body),
+    text: () => Promise.resolve(JSON.stringify(body)),
   } as unknown as Response;
 }
 
-function tokenResponse(token = 'restored-access-token'): Response {
-  return {
-    ok: true,
-    status: 200,
-    json: () => Promise.resolve({ access_token: token }),
-  } as unknown as Response;
-}
-
-function unauthenticatedResponse(): Response {
-  return {
-    ok: false,
-    status: 401,
-    url: '',
-  } as unknown as Response;
-}
-
-function loginRequiredResponse(state: string): Response {
-  return {
-    ok: true,
-    status: 200,
-    url: `${window.location.origin}/callback?error=login_required&state=${state}`,
-  } as unknown as Response;
-}
-
-function tokenFailureResponse(): Response {
-  return {
-    ok: false,
-    status: 400,
-  } as unknown as Response;
-}
-
-function setWindowPath(path: string): void {
-  window.history.pushState({}, '', path);
-}
-
-function localStorageValues(): string[] {
-  return Array.from({ length: localStorage.length }, (_, index) => localStorage.key(index))
-    .filter((key): key is string => key !== null)
-    .map((key) => localStorage.getItem(key) ?? '');
-}
-
-describe('auth session restore', () => {
+describe('browser session restore', () => {
   beforeEach(() => {
     vi.stubGlobal('fetch', vi.fn());
+    localStorage.clear();
     sessionStorage.clear();
     useAuthStore.getState().clearSession();
   });
@@ -73,398 +56,131 @@ describe('auth session restore', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
-    sessionStorage.clear();
-    setWindowPath('/');
+    window.history.pushState({}, '', '/');
   });
 
-  it('restores an in-memory access token from the browser auth session without localStorage', async () => {
-    vi.mocked(fetch).mockImplementation((input: RequestInfo | URL) => {
-      const url = new URL(String(input), window.location.origin);
-      if (url.pathname === '/connect/authorize') {
-        return Promise.resolve(authResponse(url.searchParams.get('state') ?? ''));
-      }
-      if (url.pathname === '/connect/token') {
-        return Promise.resolve(tokenResponse());
-      }
-      return Promise.reject(new Error(`Unexpected fetch: ${url.toString()}`));
+  it('restores the authenticated user and CSRF token from the same-origin session endpoint', async () => {
+    vi.mocked(fetch).mockResolvedValue(jsonResponse(authenticatedSession));
+
+    await expect(restoreBrowserSession()).resolves.toBe(true);
+
+    expect(useAuthStore.getState()).toMatchObject({
+      browserSessionStatus: 'authenticated',
+      csrfToken: 'authenticated-csrf',
+      user: authenticatedSession.user,
+      userLabel: 'Ada Lovelace',
+      userInitials: 'AL',
     });
-
-    await expect(restoreSessionFromBrowserAuth()).resolves.toBe(true);
-
-    expect(getAccessToken()).toBe('restored-access-token');
-    expect(sessionStorage.getItem('pkce_verifier')).toBeNull();
-    expect(sessionStorage.getItem('pkce_state')).toBeNull();
-    expect(localStorageValues()).not.toContain('restored-access-token');
+    expect(fetch).toHaveBeenCalledWith(
+      '/api/auth/session',
+      expect.objectContaining({ credentials: 'include' }),
+    );
+    expect(localStorage).toHaveLength(0);
+    expect(sessionStorage).toHaveLength(0);
   });
 
-  it('lets the authenticated route continue after browser session restore', async () => {
-    vi.mocked(fetch).mockImplementation((input: RequestInfo | URL) => {
-      const url = new URL(String(input), window.location.origin);
-      if (url.pathname === '/connect/authorize') {
-        return Promise.resolve(authResponse(url.searchParams.get('state') ?? ''));
-      }
-      if (url.pathname === '/connect/token') {
-        return Promise.resolve(tokenResponse());
-      }
-      return Promise.reject(new Error(`Unexpected fetch: ${url.toString()}`));
-    });
-
-    await expect(ensureAuthenticatedRouteSession()).resolves.toBeUndefined();
-    expect(getAccessToken()).toBe('restored-access-token');
-  });
-
-  it('completes post-verification sign-in through browser session restore', async () => {
-    vi.mocked(fetch).mockImplementation((input: RequestInfo | URL) => {
-      const url = new URL(String(input), window.location.origin);
-      if (url.pathname === '/connect/authorize') {
-        return Promise.resolve(authResponse(url.searchParams.get('state') ?? ''));
-      }
-      if (url.pathname === '/connect/token') {
-        return Promise.resolve(tokenResponse('verified-access-token'));
-      }
-      return Promise.reject(new Error(`Unexpected fetch: ${url.toString()}`));
-    });
-
-    await expect(completePostVerifyPkceFlow()).resolves.toBe(true);
-
-    expect(getAccessToken()).toBe('verified-access-token');
-  });
-
-  it('completes post-sign-in through browser session restore without opening the callback route', async () => {
-    vi.mocked(fetch).mockImplementation((input: RequestInfo | URL) => {
-      const url = new URL(String(input), window.location.origin);
-      if (url.pathname === '/connect/authorize') {
-        return Promise.resolve(authResponse(url.searchParams.get('state') ?? ''));
-      }
-      if (url.pathname === '/connect/token') {
-        return Promise.resolve(tokenResponse('sign-in-access-token'));
-      }
-      return Promise.reject(new Error(`Unexpected fetch: ${url.toString()}`));
-    });
-
-    await expect(completePostSignInPkceFlow()).resolves.toBe(true);
-
-    expect(getAccessToken()).toBe('sign-in-access-token');
-    expect(window.location.pathname).toBe('/');
-  });
-
-  it('resumes cached authorization with OpenIddict request_id only', () => {
-    const url = new URL(buildAuthorizationRequestResumeUrl('opaque-request-id'));
-
-    expect(url.pathname).toBe('/connect/authorize');
-    expect(url.searchParams.get('request_id')).toBe('opaque-request-id');
-    expect(url.searchParams.get('request_uri')).toBeNull();
-  });
-
-  it('redirects the authenticated route when no browser auth session exists', async () => {
-    vi.mocked(fetch).mockResolvedValue(unauthenticatedResponse());
-
-    await expect(ensureAuthenticatedRouteSession()).rejects.toMatchObject({
-      options: { to: '/sign-in' },
-    });
-    expect(getAccessToken()).toBeNull();
-    expect(sessionStorage.getItem('pkce_verifier')).toBeNull();
-    expect(sessionStorage.getItem('pkce_state')).toBeNull();
-  });
-
-  it('redirects public auth routes when an access token already exists in memory', async () => {
-    useAuthStore.getState().setSession('existing-token');
-
-    await expect(redirectAuthenticatedUserFromGuestRoute()).rejects.toMatchObject({
-      options: { to: '/dashboard', replace: true },
-    });
-
-    expect(fetch).not.toHaveBeenCalled();
-    expect(getAccessToken()).toBe('existing-token');
-  });
-
-  it('redirects public auth routes after restoring a browser auth session', async () => {
-    vi.mocked(fetch).mockImplementation((input: RequestInfo | URL) => {
-      const url = new URL(String(input), window.location.origin);
-      if (url.pathname === '/connect/authorize') {
-        return Promise.resolve(authResponse(url.searchParams.get('state') ?? ''));
-      }
-      if (url.pathname === '/connect/token') {
-        return Promise.resolve(tokenResponse('public-route-token'));
-      }
-      return Promise.reject(new Error(`Unexpected fetch: ${url.toString()}`));
-    });
-
-    await expect(redirectAuthenticatedUserFromGuestRoute()).rejects.toMatchObject({
-      options: { to: '/dashboard', replace: true },
-    });
-
-    expect(getAccessToken()).toBe('public-route-token');
-  });
-
-  it('lets public auth routes render when no browser auth session exists', async () => {
-    vi.mocked(fetch).mockResolvedValue(unauthenticatedResponse());
-
-    await expect(redirectAuthenticatedUserFromGuestRoute()).resolves.toBeUndefined();
-
-    expect(getAccessToken()).toBeNull();
-    expect(sessionStorage.getItem('pkce_verifier')).toBeNull();
-    expect(sessionStorage.getItem('pkce_state')).toBeNull();
-  });
-
-  it('uses prompt none for silent browser session restoration', async () => {
-    let prompt: string | null = null;
-    vi.mocked(fetch).mockImplementation((input: RequestInfo | URL) => {
-      const url = new URL(String(input), window.location.origin);
-      prompt = url.searchParams.get('prompt');
-      return Promise.resolve(loginRequiredResponse(url.searchParams.get('state') ?? ''));
-    });
-
-    await expect(restoreSessionFromBrowserAuth()).resolves.toBe(false);
-
-    expect(prompt).toBe('none');
-  });
-
-  it('shares one unauthenticated session resolution between app entry and its guest destination', async () => {
-    let authorizeRequests = 0;
-    vi.mocked(fetch).mockImplementation((input: RequestInfo | URL) => {
-      const url = new URL(String(input), window.location.origin);
-      authorizeRequests += 1;
-      return Promise.resolve(loginRequiredResponse(url.searchParams.get('state') ?? ''));
-    });
+  it('shares one guest resolution between app entry and the guest destination', async () => {
+    vi.mocked(fetch).mockResolvedValue(jsonResponse(guestSession));
 
     await expect(redirectFromAppEntryRoute()).rejects.toMatchObject({
       options: { to: '/sign-in', replace: true },
     });
     await expect(redirectAuthenticatedUserFromGuestRoute()).resolves.toBeUndefined();
 
-    expect(authorizeRequests).toBe(1);
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(useAuthStore.getState().browserSessionStatus).toBe('guest');
   });
 
-  it('does not cache a silent authorization error whose state does not match', async () => {
-    let authorizeRequests = 0;
-    vi.mocked(fetch).mockImplementation(() => {
-      authorizeRequests += 1;
-      return Promise.resolve(loginRequiredResponse('wrong-state'));
+  it('lets protected routes continue when the opaque browser session is authenticated', async () => {
+    vi.mocked(fetch).mockResolvedValue(jsonResponse(authenticatedSession));
+
+    await expect(ensureAuthenticatedRouteSession()).resolves.toBeUndefined();
+
+    expect(useAuthStore.getState().browserSessionStatus).toBe('authenticated');
+  });
+
+  it('keeps a protected route in a retryable unavailable state when session resolution is unavailable', async () => {
+    vi.mocked(fetch).mockRejectedValue(new Error('session service unavailable'));
+
+    await expect(ensureAuthenticatedRouteSession()).rejects.toBeInstanceOf(
+      BrowserSessionUnavailableError,
+    );
+    expect(useAuthStore.getState().browserSessionStatus).toBe('unknown');
+  });
+
+  it('keeps unauthenticated session resolution distinct from an unavailable session service', async () => {
+    vi.mocked(fetch).mockResolvedValue(jsonResponse(guestSession));
+
+    await expect(ensureAuthenticatedRouteSession()).rejects.toMatchObject({
+      options: { to: '/sign-in' },
     });
-
-    await expect(restoreSessionFromBrowserAuth()).resolves.toBe(false);
-    await expect(restoreSessionFromBrowserAuth()).resolves.toBe(false);
-
-    expect(authorizeRequests).toBe(2);
+    expect(useAuthStore.getState().browserSessionStatus).toBe('guest');
   });
 
-  it('keeps auth route preloads free of browser session requests', async () => {
+  it('renders a non-sensitive retry action when the protected session bootstrap is unavailable', async () => {
+    const user = userEvent.setup();
+    const retry = vi.fn();
+
+    render(createElement(SessionUnavailablePage, { onRetry: retry }));
+
+    expect(screen.getByRole('heading', { name: 'Session unavailable' })).toBeVisible();
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'We could not restore your session. Please try again.',
+    );
+    await user.click(screen.getByRole('button', { name: 'Try again' }));
+    expect(retry).toHaveBeenCalledOnce();
+  });
+
+  it('force-refreshes a previously resolved guest after verification', async () => {
+    useAuthStore.getState().setBrowserSession(guestSession);
+    vi.mocked(fetch).mockResolvedValue(jsonResponse(authenticatedSession));
+
+    await expect(completePostVerifyFlow()).resolves.toBe(true);
+
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(useAuthStore.getState().browserSessionStatus).toBe('authenticated');
+  });
+
+  it('signs in with CSRF and refreshes identity-bound session state', async () => {
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(jsonResponse(guestSession))
+      .mockResolvedValueOnce(jsonResponse({ sessionEstablished: true, nextStep: 'Dashboard' }))
+      .mockResolvedValueOnce(jsonResponse(authenticatedSession));
+
+    await expect(
+      signInUser({ email: 'ada@example.com', password: 'correct horse battery staple' }),
+    ).resolves.toMatchObject({ sessionEstablished: true });
+
+    const calls = vi.mocked(fetch).mock.calls;
+    expect(calls.map(([input]) => new URL(String(input), window.location.origin).pathname)).toEqual(
+      ['/api/auth/session', '/api/auth/sign-in', '/api/auth/session'],
+    );
+    const signInHeaders = calls[1][1]?.headers as Headers;
+    expect(signInHeaders.get('X-CSRF-TOKEN')).toBe('guest-csrf');
+    expect(useAuthStore.getState().csrfToken).toBe('authenticated-csrf');
+  });
+
+  it('resumes an external authorization request with its public client ID and opaque request URI', () => {
+    const url = new URL(
+      buildAuthorizationRequestResumeUrl({
+        clientId: 'local-mcp-client',
+        requestUri: 'urn:ietf:params:oauth:request_uri:opaque',
+      }),
+    );
+
+    expect(url.pathname).toBe('/connect/authorize');
+    expect(url.searchParams.get('client_id')).toBe('local-mcp-client');
+    expect(url.searchParams.get('request_uri')).toBe('urn:ietf:params:oauth:request_uri:opaque');
+    expect([...url.searchParams.keys()]).toEqual(['client_id', 'request_uri']);
+  });
+
+  it('keeps route preloads free of session requests', async () => {
     const asPreloadGuard = (guard: unknown) =>
       (guard as (context: { preload: boolean }) => Promise<void>)({ preload: true });
 
     await expect(asPreloadGuard(redirectAuthenticatedUserFromGuestRoute)).resolves.toBeUndefined();
     await expect(asPreloadGuard(redirectFromAppEntryRoute)).resolves.toBeUndefined();
     await expect(asPreloadGuard(ensureAuthenticatedRouteSession)).resolves.toBeUndefined();
-
     expect(fetch).not.toHaveBeenCalled();
-  });
-
-  it('rechecks the browser session after sign-in resolves a previous guest bootstrap', async () => {
-    let signedIn = false;
-    vi.mocked(fetch).mockImplementation((input: RequestInfo | URL) => {
-      const url = new URL(String(input), window.location.origin);
-      if (url.pathname === '/connect/authorize') {
-        return Promise.resolve(
-          signedIn
-            ? authResponse(url.searchParams.get('state') ?? '')
-            : loginRequiredResponse(url.searchParams.get('state') ?? ''),
-        );
-      }
-      if (url.pathname === '/connect/token') {
-        return Promise.resolve(tokenResponse('post-sign-in-token'));
-      }
-      return Promise.reject(new Error(`Unexpected fetch: ${url.toString()}`));
-    });
-
-    await expect(redirectAuthenticatedUserFromGuestRoute()).resolves.toBeUndefined();
-    signedIn = true;
-
-    await expect(completePostSignInPkceFlow()).resolves.toBe(true);
-    expect(getAccessToken()).toBe('post-sign-in-token');
-  });
-
-  it('routes the app entry directly to the dashboard when an access token already exists in memory', async () => {
-    useAuthStore.getState().setSession('existing-token');
-
-    await expect(redirectFromAppEntryRoute()).rejects.toMatchObject({
-      options: { to: '/dashboard', replace: true },
-    });
-
-    expect(fetch).not.toHaveBeenCalled();
-    expect(getAccessToken()).toBe('existing-token');
-  });
-
-  it('routes the app entry directly to the dashboard after restoring a browser auth session', async () => {
-    vi.mocked(fetch).mockImplementation((input: RequestInfo | URL) => {
-      const url = new URL(String(input), window.location.origin);
-      if (url.pathname === '/connect/authorize') {
-        return Promise.resolve(authResponse(url.searchParams.get('state') ?? ''));
-      }
-      if (url.pathname === '/connect/token') {
-        return Promise.resolve(tokenResponse('entry-route-token'));
-      }
-      return Promise.reject(new Error(`Unexpected fetch: ${url.toString()}`));
-    });
-
-    await expect(redirectFromAppEntryRoute()).rejects.toMatchObject({
-      options: { to: '/dashboard', replace: true },
-    });
-
-    expect(getAccessToken()).toBe('entry-route-token');
-  });
-
-  it('routes the app entry directly to sign-in when no browser auth session exists', async () => {
-    vi.mocked(fetch).mockResolvedValue(unauthenticatedResponse());
-
-    await expect(redirectFromAppEntryRoute()).rejects.toMatchObject({
-      options: { to: '/sign-in', replace: true },
-    });
-
-    expect(getAccessToken()).toBeNull();
-    expect(sessionStorage.getItem('pkce_verifier')).toBeNull();
-    expect(sessionStorage.getItem('pkce_state')).toBeNull();
-  });
-
-  it('routes the callback directly to the dashboard after exchanging a valid authorization code', async () => {
-    sessionStorage.setItem('pkce_verifier', 'verifier');
-    sessionStorage.setItem('pkce_state', 'state');
-    setWindowPath('/callback?code=auth-code&state=state');
-    vi.mocked(fetch).mockImplementation((input: RequestInfo | URL) => {
-      const url = new URL(String(input), window.location.origin);
-      if (url.pathname === '/connect/token') {
-        return Promise.resolve(tokenResponse('callback-access-token'));
-      }
-      return Promise.reject(new Error(`Unexpected fetch: ${url.toString()}`));
-    });
-
-    await expect(redirectFromCallbackRoute()).rejects.toMatchObject({
-      options: { to: '/dashboard', replace: true },
-    });
-
-    expect(getAccessToken()).toBe('callback-access-token');
-    expect(sessionStorage.getItem('pkce_verifier')).toBeNull();
-    expect(sessionStorage.getItem('pkce_state')).toBeNull();
-  });
-
-  it('routes the callback directly to the dashboard when an access token already exists in memory', async () => {
-    useAuthStore.getState().setSession('existing-token');
-    sessionStorage.setItem('pkce_verifier', 'verifier');
-    sessionStorage.setItem('pkce_state', 'state');
-    setWindowPath('/callback?code=auth-code&state=state');
-
-    await expect(redirectFromCallbackRoute()).rejects.toMatchObject({
-      options: { to: '/dashboard', replace: true },
-    });
-
-    expect(fetch).not.toHaveBeenCalled();
-    expect(getAccessToken()).toBe('existing-token');
-  });
-
-  it('lets the callback recovery page render when the callback state is invalid', async () => {
-    setWindowPath('/callback?code=auth-code&state=wrong-state');
-
-    await expect(redirectFromCallbackRoute()).resolves.toBeUndefined();
-
-    expect(fetch).not.toHaveBeenCalled();
-    expect(getAccessToken()).toBeNull();
-    expect(sessionStorage.getItem('pkce_verifier')).toBeNull();
-    expect(sessionStorage.getItem('pkce_state')).toBeNull();
-  });
-
-  it('clears PKCE state when the callback has an error query parameter', async () => {
-    sessionStorage.setItem('pkce_verifier', 'verifier');
-    sessionStorage.setItem('pkce_state', 'state');
-    setWindowPath('/callback?error=access_denied');
-
-    await expect(redirectFromCallbackRoute()).resolves.toBeUndefined();
-
-    expect(fetch).not.toHaveBeenCalled();
-    expect(getAccessToken()).toBeNull();
-    expect(sessionStorage.getItem('pkce_verifier')).toBeNull();
-    expect(sessionStorage.getItem('pkce_state')).toBeNull();
-  });
-
-  it('routes the callback to recovery when token exchange fails', async () => {
-    sessionStorage.setItem('pkce_verifier', 'verifier');
-    sessionStorage.setItem('pkce_state', 'state');
-    setWindowPath('/callback?code=auth-code&state=state');
-    vi.mocked(fetch).mockImplementation((input: RequestInfo | URL) => {
-      const url = new URL(String(input), window.location.origin);
-      if (url.pathname === '/connect/token') {
-        return Promise.resolve(tokenFailureResponse());
-      }
-      return Promise.reject(new Error(`Unexpected fetch: ${url.toString()}`));
-    });
-
-    await expect(redirectFromCallbackRoute()).rejects.toMatchObject({
-      options: { to: '/callback', search: { error: 'tokenFailed' }, replace: true },
-    });
-
-    expect(getAccessToken()).toBeNull();
-    expect(sessionStorage.getItem('pkce_verifier')).toBeNull();
-    expect(sessionStorage.getItem('pkce_state')).toBeNull();
-  });
-
-  it('redirects the authenticated route when browser session restore fails unexpectedly', async () => {
-    vi.mocked(fetch).mockRejectedValue(new Error('identity server unavailable'));
-
-    await expect(ensureAuthenticatedRouteSession()).rejects.toMatchObject({
-      options: { to: '/sign-in' },
-    });
-    expect(getAccessToken()).toBeNull();
-    expect(sessionStorage.getItem('pkce_verifier')).toBeNull();
-    expect(sessionStorage.getItem('pkce_state')).toBeNull();
-  });
-
-  it('returns true immediately when an access token is already in memory', async () => {
-    useAuthStore.getState().setSession('existing-token');
-
-    await expect(restoreSessionFromBrowserAuth()).resolves.toBe(true);
-
-    expect(fetch).not.toHaveBeenCalled();
-    expect(getAccessToken()).toBe('existing-token');
-  });
-
-  it('returns false when the callback state does not match', async () => {
-    vi.mocked(fetch).mockImplementation((input: RequestInfo | URL) => {
-      const url = new URL(String(input), window.location.origin);
-      if (url.pathname === '/connect/authorize') {
-        return Promise.resolve(authResponse('wrong-state'));
-      }
-      return Promise.reject(new Error(`Unexpected fetch: ${url.toString()}`));
-    });
-
-    await expect(restoreSessionFromBrowserAuth()).resolves.toBe(false);
-
-    expect(getAccessToken()).toBeNull();
-    expect(sessionStorage.getItem('pkce_verifier')).toBeNull();
-    expect(sessionStorage.getItem('pkce_state')).toBeNull();
-  });
-
-  it('returns false and skips network when PKCE setup fails', async () => {
-    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
-      throw new Error('storage unavailable');
-    });
-
-    await expect(restoreSessionFromBrowserAuth()).resolves.toBe(false);
-
-    expect(fetch).not.toHaveBeenCalled();
-    expect(getAccessToken()).toBeNull();
-  });
-
-  it('uses a timeout signal for the browser authorization restore request', async () => {
-    vi.mocked(fetch).mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
-      const url = new URL(String(input), window.location.origin);
-      if (url.pathname === '/connect/authorize') {
-        expect(init?.signal).toBeInstanceOf(AbortSignal);
-        return Promise.resolve(unauthenticatedResponse());
-      }
-      return Promise.reject(new Error(`Unexpected fetch: ${url.toString()}`));
-    });
-
-    await expect(restoreSessionFromBrowserAuth()).resolves.toBe(false);
-
-    expect(fetch).toHaveBeenCalledTimes(1);
   });
 });

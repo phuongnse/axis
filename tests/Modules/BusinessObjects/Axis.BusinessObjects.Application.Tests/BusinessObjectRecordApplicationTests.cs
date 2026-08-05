@@ -26,7 +26,7 @@ public sealed class BusinessObjectRecordApplicationTests
     {
         CancellationToken cancellationToken = TestContext.Current.CancellationToken;
         BusinessObjectDefinitionVersion definition = PublishedDefinition(BusinessObjectFieldType.Integer);
-        BusinessObjectRecord record = DraftRecord(definition, ["requested_amount"]);
+        BusinessObjectRecord record = DraftRecord(definition, ["quantity"]);
         IBusinessObjectRecordRepository records = Substitute.For<IBusinessObjectRecordRepository>();
         IBusinessObjectDefinitionRepository definitions = Substitute.For<IBusinessObjectDefinitionRepository>();
         IUnitOfWork unitOfWork = Substitute.For<IUnitOfWork>();
@@ -49,13 +49,13 @@ public sealed class BusinessObjectRecordApplicationTests
                 ExpectedRevision: 1,
                 new Dictionary<string, IReadOnlyList<string>>
                 {
-                    ["requested_amount"] = ["not-a-number"],
+                    ["quantity"] = ["not-a-number"],
                 }),
             cancellationToken);
 
         result.IsFailure.Should().BeTrue();
         result.ErrorCode.Should().Be(ErrorCodes.FieldValidation);
-        result.FieldErrors.Should().ContainKey("requested_amount");
+        result.FieldErrors.Should().ContainKey("quantity");
         await unitOfWork.DidNotReceiveWithAnyArgs().SaveChangesAsync(TestContext.Current.CancellationToken);
         record.Revision.Should().Be(1);
     }
@@ -65,7 +65,7 @@ public sealed class BusinessObjectRecordApplicationTests
     {
         CancellationToken cancellationToken = TestContext.Current.CancellationToken;
         BusinessObjectDefinitionVersion definition = PublishedDefinition(BusinessObjectFieldType.Text, includeRule: true);
-        BusinessObjectRecord record = DraftRecord(definition, ["applicant_name"]);
+        BusinessObjectRecord record = DraftRecord(definition, ["display_name"]);
         IRuleBindingEvaluator bindingEvaluator = Substitute.For<IRuleBindingEvaluator>();
         bindingEvaluator.EvaluateBindingAsync(
                 Arg.Any<RuleBindingEvaluationRequest>(),
@@ -102,7 +102,7 @@ public sealed class BusinessObjectRecordApplicationTests
     {
         CancellationToken cancellationToken = TestContext.Current.CancellationToken;
         BusinessObjectDefinitionVersion definition = PublishedDefinition(BusinessObjectFieldType.Text, includeRule: true, bindingRevision: 3);
-        BusinessObjectRecord record = DraftRecord(definition, ["applicant_name"]);
+        BusinessObjectRecord record = DraftRecord(definition, ["display_name"]);
         IRuleBindingEvaluator bindingEvaluator = Substitute.For<IRuleBindingEvaluator>();
         bindingEvaluator.EvaluateBindingAsync(
                 Arg.Any<RuleBindingEvaluationRequest>(),
@@ -141,7 +141,7 @@ public sealed class BusinessObjectRecordApplicationTests
     {
         CancellationToken cancellationToken = TestContext.Current.CancellationToken;
         BusinessObjectDefinitionVersion definition = PublishedDefinition(BusinessObjectFieldType.Text, includeRule: true);
-        BusinessObjectRecord record = DraftRecord(definition, ["applicant_name"]);
+        BusinessObjectRecord record = DraftRecord(definition, ["display_name"]);
         IRuleBindingEvaluator bindingEvaluator = Substitute.For<IRuleBindingEvaluator>();
         bindingEvaluator.EvaluateBindingAsync(
                 Arg.Any<RuleBindingEvaluationRequest>(),
@@ -198,7 +198,7 @@ public sealed class BusinessObjectRecordApplicationTests
     {
         Dictionary<string, IReadOnlyList<string>> values = keys.ToDictionary(
             key => key,
-            key => (IReadOnlyList<string>)(key == "applicant_name" ? ["Ada Lovelace"] : ["1000"]),
+            key => (IReadOnlyList<string>)(key == "display_name" ? ["Ada Lovelace"] : ["1000"]),
             StringComparer.Ordinal);
         Result<BusinessObjectRecord> result = BusinessObjectRecord.CreateDraft(
             WorkspaceId,
@@ -220,16 +220,16 @@ public sealed class BusinessObjectRecordApplicationTests
         int bindingRevision = 1)
     {
         BusinessObjectDefinition definition = BusinessObjectDefinitionHandlerTestContext.CreateUnpublished(
-            "Loan application",
-            "loan_application");
+            "Business record",
+            "business_record");
         BusinessObjectFieldRuleSpec[] rules = includeRule
             ? [new(BindingId, BindingRevision: bindingRevision)]
             : [];
         definition.SaveUnpublished(
-            "Loan application",
+            "Business record",
             [new BusinessObjectFieldDefinitionSpec(
-                fieldType == BusinessObjectFieldType.Integer ? "requested_amount" : "applicant_name",
-                fieldType == BusinessObjectFieldType.Integer ? "Requested amount" : "Applicant name",
+                fieldType == BusinessObjectFieldType.Integer ? "quantity" : "display_name",
+                fieldType == BusinessObjectFieldType.Integer ? "Quantity" : "Display name",
                 0,
                 fieldType,
                 rules)],

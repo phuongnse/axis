@@ -13,9 +13,9 @@ internal sealed class PostgresRuleCatalogSearchProvider(RulesDbContext context)
 {
     public async Task<RuleCatalogSearchPage> SearchAsync(
         Guid workspaceId,
-        IReadOnlyList<RuleTextSearchDocument> systemDocuments,
+        IReadOnlyList<RuleTextSearchDocument> builtInDocuments,
         bool includeWorkspace,
-        RuleLifecycleStatus? workspaceStatus,
+        RuleLifecycleStatus? lifecycleStatus,
         int skip,
         int take,
         string query,
@@ -31,13 +31,13 @@ internal sealed class PostgresRuleCatalogSearchProvider(RulesDbContext context)
                 ((NpgsqlConnection)context.Database.GetDbConnection()).CreateCommand();
             command.CommandText =
                 """
-                WITH system_documents AS (
+                WITH built_in_documents AS (
                     SELECT
-                        'System'::text AS origin,
+                        'BuiltIn'::text AS origin,
                         document.key,
                         axis_unaccent(lower(document.title)) AS title,
                         axis_unaccent(lower(document.title || ' ' || document.content)) AS content
-                    FROM unnest(@system_keys::text[], @system_titles::text[], @system_contents::text[])
+                    FROM unnest(@built_in_keys::text[], @built_in_titles::text[], @built_in_contents::text[])
                         AS document(key, title, content)
                 ),
                 workspace_documents AS (
@@ -50,10 +50,24 @@ internal sealed class PostgresRuleCatalogSearchProvider(RulesDbContext context)
                     WHERE
                         @include_workspace
                         AND workspace_id = @workspace_id
-                        AND (@status IS NULL OR status = @status)
+                        AND (
+                            @lifecycle_status IS NULL
+                            OR (@lifecycle_status = 'Draft'
+                                AND archived_at IS NULL
+                                AND latest_published_version IS NULL)
+                            OR (@lifecycle_status = 'Inactive'
+                                AND archived_at IS NULL
+                                AND latest_published_version IS NOT NULL
+                                AND active_version IS NULL)
+                            OR (@lifecycle_status = 'Active'
+                                AND archived_at IS NULL
+                                AND active_version IS NOT NULL)
+                            OR (@lifecycle_status = 'Archived'
+                                AND archived_at IS NOT NULL)
+                        )
                 ),
                 documents AS (
-                    SELECT * FROM system_documents
+                    SELECT * FROM built_in_documents
                     UNION ALL
                     SELECT * FROM workspace_documents
                 ),
@@ -101,26 +115,26 @@ internal sealed class PostgresRuleCatalogSearchProvider(RulesDbContext context)
                 ORDER BY page.relevance DESC, page.origin ASC, page.key ASC;
                 """;
             command.Parameters.Add(
-                new NpgsqlParameter<string[]>("system_keys", NpgsqlDbType.Array | NpgsqlDbType.Text)
+                new NpgsqlParameter<string[]>("built_in_keys", NpgsqlDbType.Array | NpgsqlDbType.Text)
                 {
-                    TypedValue = systemDocuments.Select(document => document.Key).ToArray(),
+                    TypedValue = builtInDocuments.Select(document => document.Key).ToArray(),
                 });
             command.Parameters.Add(
-                new NpgsqlParameter<string[]>("system_titles", NpgsqlDbType.Array | NpgsqlDbType.Text)
+                new NpgsqlParameter<string[]>("built_in_titles", NpgsqlDbType.Array | NpgsqlDbType.Text)
                 {
-                    TypedValue = systemDocuments.Select(document => document.Title).ToArray(),
+                    TypedValue = builtInDocuments.Select(document => document.Title).ToArray(),
                 });
             command.Parameters.Add(
-                new NpgsqlParameter<string[]>("system_contents", NpgsqlDbType.Array | NpgsqlDbType.Text)
+                new NpgsqlParameter<string[]>("built_in_contents", NpgsqlDbType.Array | NpgsqlDbType.Text)
                 {
-                    TypedValue = systemDocuments.Select(document => document.Content).ToArray(),
+                    TypedValue = builtInDocuments.Select(document => document.Content).ToArray(),
                 });
             command.Parameters.AddWithValue("include_workspace", NpgsqlDbType.Boolean, includeWorkspace);
             command.Parameters.AddWithValue("workspace_id", NpgsqlDbType.Uuid, workspaceId);
             command.Parameters.Add(
-                new NpgsqlParameter<string?>("status", NpgsqlDbType.Text)
+                new NpgsqlParameter<string?>("lifecycle_status", NpgsqlDbType.Text)
                 {
-                    TypedValue = workspaceStatus?.ToString(),
+                    TypedValue = lifecycleStatus?.ToString(),
                 });
             command.Parameters.AddWithValue("skip", NpgsqlDbType.Integer, skip);
             command.Parameters.AddWithValue("take", NpgsqlDbType.Integer, take);

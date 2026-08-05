@@ -35,7 +35,7 @@ sys.dont_write_bytecode = True
 
 ROOT = Path(__file__).resolve().parent.parent
 SCRIPTS = ROOT / "scripts"
-REQUIRED_DOTNET_SDK_MAJOR = "8"
+REQUIRED_DOTNET_SDK_MAJOR = "10"
 REQUIRED_RENOVATE_VALIDATOR_VERSION = "43.280.5"
 VERSION_PROBE_TIMEOUT_SECONDS = 15
 PLAYWRIGHT_BROWSER_PROBE_TIMEOUT_SECONDS = 20
@@ -1350,6 +1350,11 @@ def doc_size_budget_issues(*, root: Path = ROOT) -> list[str]:
         if not path.is_file():
             continue
         normalized = rel_from(path, root)
+        if path.parent == root / "docs" / "playbooks" and path.name.startswith("design-gate-"):
+            issues.append(
+                f"{normalized}: per-change Design Gate dossiers belong in the active task handoff, "
+                "not repository files; docs/playbooks/design-gate.md is the sole committed Design Gate playbook"
+            )
         limit = DOC_SIZE_BUDGETS.get(normalized, PLAYBOOK_DEFAULT_MAX_LINES)
         line_count = len(path.read_text(encoding="utf-8").splitlines())
         if line_count > limit:
@@ -3825,7 +3830,7 @@ def generate_api_contracts(_args: argparse.Namespace | None = None) -> int:
                 "tofile",
                 "--output",
                 str(ROOT / "openapi.json"),
-                "bin/Debug/net8.0/Axis.Api.dll",
+                "bin/Debug/net10.0/Axis.Api.dll",
                 "v1",
             ],
             ROOT / "src" / "Axis.Api",
@@ -3976,16 +3981,46 @@ def _docker_compose_ok() -> bool:
     return result is not None and result.returncode == 0
 
 
-def compose_args(project_name: str, compose_file: Path, *args: str) -> list[str]:
-    return [
+def compose_args(
+    project_name: str,
+    compose_file: Path,
+    *args: str,
+    additional_files: Iterable[Path] = (),
+) -> list[str]:
+    command = [
         exe("docker"),
         "compose",
         "-p",
         project_name,
         "-f",
         str(compose_file),
-        *args,
     ]
+    for additional_file in additional_files:
+        command.extend(["-f", str(additional_file)])
+    command.extend(args)
+    return command
+
+
+def resolve_local_dev_compose_overlays(values: Iterable[str]) -> tuple[Path, ...]:
+    overlays: list[Path] = []
+    seen: set[Path] = set()
+    for value in values:
+        candidate = Path(value).expanduser()
+        if not candidate.is_absolute():
+            candidate = Path.cwd() / candidate
+        try:
+            resolved = candidate.resolve(strict=True)
+        except OSError as exc:
+            raise CheckError(f"local-dev compose overlay does not exist: {candidate}") from exc
+        if not resolved.is_file():
+            raise CheckError(f"local-dev compose overlay is not a file: {resolved}")
+        if resolved.suffix.lower() not in {".yml", ".yaml"}:
+            raise CheckError(f"local-dev compose overlay must be a .yml or .yaml file: {resolved}")
+        if resolved in seen:
+            raise CheckError(f"local-dev compose overlay is duplicated: {resolved}")
+        seen.add(resolved)
+        overlays.append(resolved)
+    return tuple(overlays)
 
 
 def local_dev_env_args() -> list[str]:
@@ -3994,12 +4029,16 @@ def local_dev_env_args() -> list[str]:
     return []
 
 
-def local_dev_compose_args(*args: str) -> list[str]:
+def local_dev_compose_args(
+    *args: str,
+    overlays: Iterable[Path] = (),
+) -> list[str]:
     return compose_args(
         LOCAL_DEV_PROJECT_NAME,
         LOCAL_DEV_COMPOSE_FILE,
         *local_dev_env_args(),
         *args,
+        additional_files=overlays,
     )
 
 
@@ -4007,6 +4046,7 @@ def local_dev_up_args(
     *services: str,
     build: bool = False,
     force_recreate: bool = False,
+    overlays: Iterable[Path] = (),
 ) -> list[str]:
     args = [
         "up",
@@ -4020,7 +4060,7 @@ def local_dev_up_args(
     if force_recreate:
         args.append("--force-recreate")
     args.extend(services)
-    return local_dev_compose_args(*args)
+    return local_dev_compose_args(*args, overlays=overlays)
 
 
 def local_dev_shell_argv(service: str, exec_command: list[str]) -> list[str]:
@@ -4030,11 +4070,43 @@ def local_dev_shell_argv(service: str, exec_command: list[str]) -> list[str]:
     return [LOCAL_DEV_SERVICE_SHELL.get(service, LOCAL_DEV_DEFAULT_SHELL)]
 
 
-def run_local_dev_browser(playwright_args: list[str]) -> int:
-    up = run(local_dev_up_args(), check=False)
+def compose_service_name(value: str) -> str:
+    if re.fullmatch(r"[a-z0-9][a-z0-9_.-]*", value) is None:
+        raise argparse.ArgumentTypeError(
+            "Compose service name must start with a lower-case letter or digit and "
+            "contain only lower-case letters, digits, dot, underscore, or hyphen"
+        )
+    return value
+
+
+def run_local_dev_browser(
+    playwright_args: list[str],
+    *,
+    overlays: Iterable[Path] = (),
+    service: str = "e2e",
+    build_services: Iterable[str] = (),
+) -> int:
+    runtime_services = list(build_services)
+    if runtime_services:
+        runtime_build = run(
+            local_dev_compose_args("build", *runtime_services, overlays=overlays),
+            check=False,
+        )
+        if runtime_build.returncode != 0:
+            return runtime_build.returncode
+    up = run(local_dev_up_args(overlays=overlays), check=False)
     if up.returncode != 0:
         return up.returncode
-    build = run(local_dev_compose_args("--profile", "e2e", "build", "e2e"), check=False)
+    build = run(
+        local_dev_compose_args(
+            "--profile",
+            "e2e",
+            "build",
+            service,
+            overlays=overlays,
+        ),
+        check=False,
+    )
     if build.returncode != 0:
         return build.returncode
     return run(
@@ -4044,15 +4116,24 @@ def run_local_dev_browser(playwright_args: list[str]) -> int:
             "run",
             "--rm",
             "--no-deps",
-            "e2e",
+            service,
             *playwright_args,
+            overlays=overlays,
         ),
         check=False,
     ).returncode
 
 
-def local_dev_smoke(_args: argparse.Namespace) -> int:
-    return run_local_dev_browser(["e2e/local-dev-smoke.pw.ts"])
+def local_dev_smoke(
+    _args: argparse.Namespace,
+    *,
+    overlays: Iterable[Path] = (),
+) -> int:
+    return run_local_dev_browser(
+        ["e2e/local-dev-smoke.pw.ts"],
+        overlays=overlays,
+        service="e2e",
+    )
 
 
 def require_docker_compose(label: str) -> int:
@@ -4468,12 +4549,19 @@ def local_dev_certs(args: argparse.Namespace | None = None) -> int:
 
 
 def local_dev(args: argparse.Namespace) -> int:
+    overlay_values = getattr(args, "compose_overlays", [])
+    if args.local_dev_command in {"certs", "trust-certs", "untrust-certs"} and overlay_values:
+        raise CheckError(
+            f"local-dev --compose-overlay is not valid for {args.local_dev_command}"
+        )
     if args.local_dev_command == "certs":
         return local_dev_certs(args)
     if args.local_dev_command == "trust-certs":
         return local_dev_trust_certs(args)
     if args.local_dev_command == "untrust-certs":
         return local_dev_untrust_certs(args)
+
+    overlays = resolve_local_dev_compose_overlays(overlay_values)
 
     rc = require_docker_compose("local-dev")
     if rc != 0:
@@ -4482,7 +4570,7 @@ def local_dev(args: argparse.Namespace) -> int:
     command = args.local_dev_command
     if command == "up":
         result = run(
-            local_dev_up_args(*args.services, build=args.build),
+            local_dev_up_args(*args.services, build=args.build, overlays=overlays),
             check=False,
         )
         if result.returncode != 0:
@@ -4506,64 +4594,122 @@ def local_dev(args: argparse.Namespace) -> int:
             ):
                 return 1
             compose.append("--volumes")
-        return run(local_dev_compose_args(*compose), check=False).returncode
+        return run(local_dev_compose_args(*compose, overlays=overlays), check=False).returncode
 
     if command in {"start", "stop", "restart"}:
-        return run(local_dev_compose_args(command, *args.services), check=False).returncode
+        return run(
+            local_dev_compose_args(command, *args.services, overlays=overlays),
+            check=False,
+        ).returncode
 
     if command == "recreate":
         if not args.services:
             print("local-dev recreate: name at least one service", file=sys.stderr)
             return 1
         return run(
-            local_dev_up_args(*args.services, force_recreate=True),
+            local_dev_up_args(
+                *args.services,
+                force_recreate=True,
+                overlays=overlays,
+            ),
             check=False,
         ).returncode
 
     if command == "status":
-        return run(local_dev_compose_args("ps"), check=False).returncode
+        return run(local_dev_compose_args("ps", overlays=overlays), check=False).returncode
 
     if command == "logs":
         compose = ["logs"]
         if args.follow:
             compose.append("-f")
         compose.extend(args.services)
-        return run(local_dev_compose_args(*compose), check=False).returncode
+        return run(local_dev_compose_args(*compose, overlays=overlays), check=False).returncode
 
     if command == "shell":
         shell_command = local_dev_shell_argv(args.service, args.exec_command)
         return run(
-            local_dev_compose_args("exec", "-it", args.service, *shell_command),
+            local_dev_compose_args(
+                "exec",
+                "-it",
+                args.service,
+                *shell_command,
+                overlays=overlays,
+            ),
             check=False,
         ).returncode
 
     if command == "psql":
         return run(
-            local_dev_compose_args("exec", "postgres", "psql", "-U", "axis", "-d", args.database),
+            local_dev_compose_args(
+                "exec",
+                "postgres",
+                "psql",
+                "-U",
+                "axis",
+                "-d",
+                args.database,
+                overlays=overlays,
+            ),
             check=False,
         ).returncode
 
     if command == "e2e":
         e2e_args = passthrough_args(getattr(args, "e2e_args", []))
-        return run_local_dev_browser(e2e_args)
+        return run_local_dev_browser(
+            e2e_args,
+            overlays=overlays,
+            service=getattr(args, "service", "e2e"),
+            build_services=getattr(args, "build_services", []),
+        )
 
     if command == "smoke":
-        return local_dev_smoke(args)
+        return local_dev_smoke(args, overlays=overlays)
 
     if command == "observability":
         obs_command = args.observability_command
         if obs_command == "up":
-            return run(local_dev_compose_args("--profile", "observability", "up", "-d", "otel-lgtm"), check=False).returncode
+            return run(
+                local_dev_compose_args(
+                    "--profile",
+                    "observability",
+                    "up",
+                    "-d",
+                    "otel-lgtm",
+                    overlays=overlays,
+                ),
+                check=False,
+            ).returncode
         if obs_command == "stop":
-            return run(local_dev_compose_args("--profile", "observability", "stop", "otel-lgtm"), check=False).returncode
+            return run(
+                local_dev_compose_args(
+                    "--profile",
+                    "observability",
+                    "stop",
+                    "otel-lgtm",
+                    overlays=overlays,
+                ),
+                check=False,
+            ).returncode
         if obs_command == "status":
-            return run(local_dev_compose_args("--profile", "observability", "ps", "otel-lgtm"), check=False).returncode
+            return run(
+                local_dev_compose_args(
+                    "--profile",
+                    "observability",
+                    "ps",
+                    "otel-lgtm",
+                    overlays=overlays,
+                ),
+                check=False,
+            ).returncode
         if obs_command == "logs":
             compose = ["--profile", "observability", "logs"]
             if args.follow:
                 compose.append("-f")
             compose.append("otel-lgtm")
-            return run(local_dev_compose_args(*compose), check=False).returncode
+            return run(
+                local_dev_compose_args(*compose, overlays=overlays),
+                check=False,
+            ).returncode
 
     if command == "reset-db":
         if not explicit_confirmation(
@@ -4572,7 +4718,7 @@ def local_dev(args: argparse.Namespace) -> int:
             target=f"the {LOCAL_DEV_POSTGRES_VOLUME} volume",
         ):
             return 1
-        down = run(local_dev_compose_args("down"), check=False)
+        down = run(local_dev_compose_args("down", overlays=overlays), check=False)
         if down.returncode != 0:
             return down.returncode
         remove = run([exe("docker"), "volume", "rm", LOCAL_DEV_POSTGRES_VOLUME], check=False, capture=True)
@@ -4581,7 +4727,7 @@ def local_dev(args: argparse.Namespace) -> int:
             if remove_output:
                 print(remove_output, file=sys.stderr)
             return remove.returncode
-        return run(local_dev_up_args(), check=False).returncode
+        return run(local_dev_up_args(overlays=overlays), check=False).returncode
 
     if command == "reset-all":
         if not explicit_confirmation(
@@ -4590,10 +4736,13 @@ def local_dev(args: argparse.Namespace) -> int:
             target="all Axis local-development volumes",
         ):
             return 1
-        down = run(local_dev_compose_args("down", "--volumes"), check=False)
+        down = run(
+            local_dev_compose_args("down", "--volumes", overlays=overlays),
+            check=False,
+        )
         if down.returncode != 0:
             return down.returncode
-        return run(local_dev_up_args(), check=False).returncode
+        return run(local_dev_up_args(overlays=overlays), check=False).returncode
 
     raise CheckError(f"Unknown local-dev command: {command}")
 
@@ -4638,6 +4787,59 @@ def _docker_group_session_hint(
             "start a new login shell or restart WSL, then rerun the command"
         )
     return None
+
+
+def path_node_toolchain_ready() -> bool:
+    node = shutil.which("node")
+    npm = shutil.which("npm") or shutil.which("npm.cmd")
+    if node is None or npm is None:
+        return False
+    if Path(node).parent.resolve() != Path(npm).parent.resolve():
+        return False
+
+    expected_node_ok, expected_node = required_node_version()
+    if not expected_node_ok:
+        return False
+    try:
+        package = json.loads((FRONTEND_DIR / "package.json").read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return False
+    package_manager = package.get("packageManager")
+    npm_match = re.fullmatch(
+        r"npm@((?:0|[1-9]\d*)[.](?:0|[1-9]\d*)[.](?:0|[1-9]\d*))",
+        package_manager or "",
+    )
+    if npm_match is None:
+        return False
+
+    node_result = run_optional([node, "--version"], timeout=VERSION_PROBE_TIMEOUT_SECONDS)
+    npm_result = run_optional([npm, "--version"], timeout=VERSION_PROBE_TIMEOUT_SECONDS)
+    if node_result is None or npm_result is None:
+        return False
+    if node_result.returncode != 0 or npm_result.returncode != 0:
+        return False
+    return (
+        (node_result.stdout or "").strip().removeprefix("v") == expected_node
+        and (npm_result.stdout or "").strip() == npm_match.group(1)
+    )
+
+
+def path_dotnet_sdk_ready() -> bool:
+    source_ok, source_major_or_error = global_json_sdk_major()
+    if not source_ok or source_major_or_error != REQUIRED_DOTNET_SDK_MAJOR:
+        return False
+    if version_major(axis_setup.DOTNET_SDK_VERSION) != source_major_or_error:
+        return False
+
+    dotnet = shutil.which("dotnet")
+    if dotnet is None:
+        return False
+    result = run_optional([dotnet, "--version"], timeout=VERSION_PROBE_TIMEOUT_SECONDS)
+    return (
+        result is not None
+        and result.returncode == 0
+        and version_major(result.stdout or result.stderr or "") == source_major_or_error
+    )
 
 
 def setup_tool_ready(tool: str) -> bool:
@@ -4753,6 +4955,8 @@ def setup(args: argparse.Namespace) -> int:
             print("setup plan: host browser trust is opt-in; add --trust-local-ca when required")
         return 0
 
+    expose_dotnet_command = install_user_tools and not path_dotnet_sdk_ready()
+    expose_node_commands = install_user_tools and not path_node_toolchain_ready()
     missing: tuple[str, ...] = ()
     if install_user_tools:
         managed_tools = axis_setup.managed_tools_for_profile(profile)
@@ -4775,6 +4979,7 @@ def setup(args: argparse.Namespace) -> int:
 
     if install_user_tools:
         try:
+            exposed_commands: list[Path] = []
             axis_setup.confirm_install(
                 missing,
                 assume_yes=getattr(args, "yes", False),
@@ -4784,17 +4989,30 @@ def setup(args: argparse.Namespace) -> int:
                 print(f"> install pinned user-local {tool} {axis_setup.tool_version(tool)}", flush=True)
                 installed = axis_setup.install_tool(tool, platform_spec=platform_spec)
                 print(f"  installed: {installed}")
+            if expose_dotnet_command:
+                exposed = axis_setup.expose_managed_command("dotnet", platform_spec=platform_spec)
+                exposed_commands.append(exposed)
+                print(f"  exposed: {exposed}")
+            if expose_node_commands:
+                for exposed in axis_setup.expose_managed_commands(
+                    ("node", "npm"),
+                    platform_spec=platform_spec,
+                ):
+                    exposed_commands.append(exposed)
+                    print(f"  exposed: {exposed}")
             if profile == "review" and ("gh" in missing or shutil.which("gh") is None):
                 exposed = axis_setup.expose_managed_command("gh", platform_spec=platform_spec)
+                exposed_commands.append(exposed)
                 print(f"  exposed: {exposed}")
-                active_dirs = {
-                    os.path.normcase(os.path.abspath(entry))
-                    for entry in os.environ.get("PATH", "").split(os.pathsep)
-                    if entry
-                }
-                if os.path.normcase(os.path.abspath(exposed.parent)) not in active_dirs:
+            active_dirs = {
+                os.path.normcase(os.path.abspath(entry))
+                for entry in os.environ.get("PATH", "").split(os.pathsep)
+                if entry
+            }
+            for command_dir in sorted({path.parent for path in exposed_commands}):
+                if os.path.normcase(os.path.abspath(command_dir)) not in active_dirs:
                     print(
-                        f"setup: user command directory `{exposed.parent}` is not active in this shell; "
+                        f"setup: user command directory `{command_dir}` is not active in this shell; "
                         "add it to PATH and start a new shell"
                     )
         except (OSError, axis_setup.SetupError) as exc:
@@ -5198,6 +5416,17 @@ def build_parser(
     frontend_gen_api.add_argument("--check", action="store_true", help="Fail if generated frontend API types are stale")
     frontend_gen_api.set_defaults(func=frontend_command)
     local_dev_parser = sub.add_parser("local-dev", help="Manage the Docker Compose local-development stack")
+    local_dev_parser.add_argument(
+        "--compose-overlay",
+        dest="compose_overlays",
+        action="append",
+        default=[],
+        metavar="PATH",
+        help=(
+            "Apply an explicit external Compose YAML overlay; repeat to preserve "
+            "deployment-defined order"
+        ),
+    )
     local_dev_sub = local_dev_parser.add_subparsers(dest="local_dev_command", required=True)
     local_certs = local_dev_sub.add_parser("certs", help="Create or reuse local HTTPS certificates")
     local_certs.add_argument("--renew", action="store_true", help="Replace existing local HTTPS certificates")
@@ -5239,6 +5468,21 @@ def build_parser(
     local_psql.add_argument("--database", default="axis")
     local_psql.set_defaults(func=local_dev)
     local_e2e = local_dev_sub.add_parser("e2e", help="Run end-to-end tests against the local stack")
+    local_e2e.add_argument(
+        "--service",
+        default="e2e",
+        type=compose_service_name,
+        help="Trusted Compose verification service to build and run (default: e2e)",
+    )
+    local_e2e.add_argument(
+        "--build-service",
+        dest="build_services",
+        action="append",
+        default=[],
+        type=compose_service_name,
+        metavar="compose-service",
+        help="Build this changed runtime service before E2E; repeat for each service",
+    )
     local_e2e.add_argument("e2e_args", nargs=argparse.REMAINDER)
     local_e2e.set_defaults(func=local_dev)
     local_smoke = local_dev_sub.add_parser("smoke", help="Run local stack smoke checks")

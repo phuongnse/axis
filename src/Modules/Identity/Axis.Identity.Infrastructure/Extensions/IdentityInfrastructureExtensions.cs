@@ -6,19 +6,17 @@ using Axis.Identity.Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 
 namespace Axis.Identity.Infrastructure.Extensions;
 
 public static class IdentityInfrastructureExtensions
 {
-    private const string TestingEnvironmentName = "Testing";
-
     public static IServiceCollection AddIdentityInfrastructure(
         this IServiceCollection services,
-        IConfiguration configuration,
-        IHostEnvironment environment)
+        IConfiguration configuration)
     {
+        OpenIddictClientCatalog clientCatalog = OpenIddictClientCatalog.Load(configuration);
+
         services.AddDbContext<IdentityDbContext>(opts =>
             opts.UseNpgsql(configuration.GetConnectionString("Identity"))
                 // Required by OpenIddict EF Core — stores must be able to resolve
@@ -42,9 +40,8 @@ public static class IdentityInfrastructureExtensions
         services.AddSingleton<IResendVerificationRateLimiter, RedisResendVerificationRateLimiter>();
         services.AddScoped<IEmailVerificationTokenStore, EmailVerificationTokenStore>();
         services.AddScoped<IWorkspaceSlugGenerator, WorkspaceSlugGenerator>();
-
-        if (environment.IsDevelopment() || environment.IsEnvironment(TestingEnvironmentName))
-            services.AddHostedService<OpenIddictSeeder>();
+        services.AddSingleton(clientCatalog);
+        services.AddHostedService<OpenIddictSeeder>();
 
         return services;
     }

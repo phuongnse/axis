@@ -21,7 +21,8 @@ public sealed class BusinessObjectRecordEndpointTests(ApiTestFixture fixture)
     [Fact]
     public async Task BusinessObjectRecordEndpoints_WhenAnonymous_ReturnUnauthorized()
     {
-        HttpResponseMessage response = await fixture.Client.GetAsync(
+        using HttpClient anonymousClient = fixture.CreateAnonymousClient();
+        HttpResponseMessage response = await anonymousClient.GetAsync(
             "/api/business-object-records",
             TestContext.Current.CancellationToken);
 
@@ -43,8 +44,8 @@ public sealed class BusinessObjectRecordEndpointTests(ApiTestFixture fixture)
                 idempotencyKey = Guid.NewGuid().ToString("N"),
                 values = new Dictionary<string, string[]>
                 {
-                    ["applicant_name"] = ["Alice Smith"],
-                    ["requested_amount"] = ["25000"],
+                    ["display_name"] = ["Alice Smith"],
+                    ["quantity"] = ["25000"],
                 },
             });
 
@@ -88,7 +89,7 @@ public sealed class BusinessObjectRecordEndpointTests(ApiTestFixture fixture)
         getResponse.StatusCode.Should().Be(HttpStatusCode.OK);
         JsonElement persisted = await ReadJsonAsync(getResponse);
         persisted.GetProperty("status").GetString().Should().Be("Submitted");
-        persisted.GetProperty("values").GetProperty("requested_amount")[0].GetString().Should().Be("25000");
+        persisted.GetProperty("values").GetProperty("quantity")[0].GetString().Should().Be("25000");
         persisted.GetProperty("ruleEvaluations").GetArrayLength().Should().Be(2);
 
         HttpResponseMessage listResponse = await SendWithBearerAsync(
@@ -117,8 +118,8 @@ public sealed class BusinessObjectRecordEndpointTests(ApiTestFixture fixture)
                 idempotencyKey = Guid.NewGuid().ToString("N"),
                 values = new Dictionary<string, string[]>
                 {
-                    ["applicant_name"] = ["Alice Smith"],
-                    ["requested_amount"] = ["50"],
+                    ["display_name"] = ["Alice Smith"],
+                    ["quantity"] = ["50"],
                 },
             });
         createResponse.StatusCode.Should().Be(HttpStatusCode.Created);
@@ -137,7 +138,7 @@ public sealed class BusinessObjectRecordEndpointTests(ApiTestFixture fixture)
         rejected.GetProperty("record").GetProperty("status").GetString().Should().Be("Draft");
         rejected.GetProperty("record").GetProperty("revision").GetInt32().Should().Be(1);
         rejected.GetProperty("ruleEvaluations").EnumerateArray()
-            .Single(evaluation => evaluation.GetProperty("fieldKey").GetString() == "requested_amount")
+            .Single(evaluation => evaluation.GetProperty("fieldKey").GetString() == "quantity")
             .GetProperty("isMatch").GetBoolean()
             .Should().BeFalse();
 
@@ -150,8 +151,8 @@ public sealed class BusinessObjectRecordEndpointTests(ApiTestFixture fixture)
                 expectedRevision = 1,
                 values = new Dictionary<string, string[]>
                 {
-                    ["applicant_name"] = ["Alice Smith"],
-                    ["requested_amount"] = ["25000"],
+                    ["display_name"] = ["Alice Smith"],
+                    ["quantity"] = ["25000"],
                 },
             });
         saveResponse.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -185,7 +186,7 @@ public sealed class BusinessObjectRecordEndpointTests(ApiTestFixture fixture)
                 definitionKey = RuleDefinitionKeys.NumericRange,
                 definitionVersion = 1,
                 targetType = "business-object-field",
-                targetId = $"{workflow.ObjectKey}.requested_amount",
+                targetId = $"{workflow.ObjectKey}.quantity",
                 useCaseOrTrigger = "field-validation",
                 inputMappings = new
                 {
@@ -207,8 +208,8 @@ public sealed class BusinessObjectRecordEndpointTests(ApiTestFixture fixture)
                 idempotencyKey = Guid.NewGuid().ToString("N"),
                 values = new Dictionary<string, string[]>
                 {
-                    ["applicant_name"] = ["Alice Smith"],
-                    ["requested_amount"] = ["1500"],
+                    ["display_name"] = ["Alice Smith"],
+                    ["quantity"] = ["1500"],
                 },
             });
         createResponse.StatusCode.Should().Be(HttpStatusCode.Created);
@@ -223,7 +224,7 @@ public sealed class BusinessObjectRecordEndpointTests(ApiTestFixture fixture)
         JsonElement submitted = await ReadJsonAsync(submitResponse);
         submitted.GetProperty("isSubmitted").GetBoolean().Should().BeTrue();
         submitted.GetProperty("ruleEvaluations").EnumerateArray()
-            .Single(evaluation => evaluation.GetProperty("fieldKey").GetString() == "requested_amount")
+            .Single(evaluation => evaluation.GetProperty("fieldKey").GetString() == "quantity")
             .GetProperty("bindingRevision").GetInt32()
             .Should().Be(workflow.AmountBindingRevision);
     }
@@ -244,8 +245,8 @@ public sealed class BusinessObjectRecordEndpointTests(ApiTestFixture fixture)
                 idempotencyKey = Guid.NewGuid().ToString("N"),
                 values = new Dictionary<string, string[]>
                 {
-                    ["applicant_name"] = ["Alice Smith"],
-                    ["requested_amount"] = ["25000"],
+                    ["display_name"] = ["Alice Smith"],
+                    ["quantity"] = ["25000"],
                 },
             });
         createResponse.StatusCode.Should().Be(HttpStatusCode.Created);
@@ -261,7 +262,7 @@ public sealed class BusinessObjectRecordEndpointTests(ApiTestFixture fixture)
 
     private async Task<Workflow> CreateWorkflowAsync(string accessToken)
     {
-        string name = $"Loan Application {Guid.NewGuid():N}";
+        string name = $"Business Record {Guid.NewGuid():N}";
         HttpResponseMessage createDefinitionResponse = await SendWithBearerAsync(
             HttpMethod.Post,
             "/api/business-object-definitions",
@@ -275,7 +276,7 @@ public sealed class BusinessObjectRecordEndpointTests(ApiTestFixture fixture)
         (Guid requiredBindingId, _) = await CreateRuleBindingAsync(
             accessToken,
             objectKey,
-            "applicant_name",
+            "display_name",
             RuleDefinitionKeys.Required,
             new
             {
@@ -284,7 +285,7 @@ public sealed class BusinessObjectRecordEndpointTests(ApiTestFixture fixture)
         (Guid amountBindingId, int amountBindingRevision) = await CreateRuleBindingAsync(
             accessToken,
             objectKey,
-            "requested_amount",
+            "quantity",
             RuleDefinitionKeys.NumericRange,
             new
             {
@@ -305,15 +306,15 @@ public sealed class BusinessObjectRecordEndpointTests(ApiTestFixture fixture)
                 {
                     new
                     {
-                        fieldKey = "applicant_name",
-                        label = "Applicant name",
+                        fieldKey = "display_name",
+                        label = "Display name",
                         fieldType = "Text",
                         rules = new[] { new { bindingId = requiredBindingId } },
                     },
                     new
                     {
-                        fieldKey = "requested_amount",
-                        label = "Requested amount",
+                        fieldKey = "quantity",
+                        label = "Quantity",
                         fieldType = "Integer",
                         rules = new[] { new { bindingId = amountBindingId } },
                     },
@@ -359,10 +360,9 @@ public sealed class BusinessObjectRecordEndpointTests(ApiTestFixture fixture)
     private async Task<string> CreateVerifiedSessionTokenAsync(string email)
     {
         await RegisterAsync(email);
-        HttpResponseMessage verifyResponse = await fixture.Client.PostAsJsonAsync(
+        HttpResponseMessage verifyResponse = await fixture.PostBrowserJsonAsync(
             "/api/auth/verify-email",
             new { token = fixture.EmailCapture.GetVerificationToken(email) },
-            Json,
             TestContext.Current.CancellationToken);
         verifyResponse.StatusCode.Should().Be(HttpStatusCode.OK);
 
@@ -371,8 +371,8 @@ public sealed class BusinessObjectRecordEndpointTests(ApiTestFixture fixture)
         Dictionary<string, string?> authorizeQuery = new()
         {
             ["response_type"] = "code",
-            ["client_id"] = "axis_spa",
-            ["redirect_uri"] = "https://localhost/callback",
+            ["client_id"] = "axis_mcp",
+            ["redirect_uri"] = "http://127.0.0.1:48123/callback",
             ["code_challenge"] = CreateCodeChallenge(verifier),
             ["code_challenge_method"] = "S256",
             ["scope"] = "openid email profile",
@@ -403,8 +403,8 @@ public sealed class BusinessObjectRecordEndpointTests(ApiTestFixture fixture)
         using FormUrlEncodedContent tokenRequest = new(new Dictionary<string, string>
         {
             ["grant_type"] = "authorization_code",
-            ["client_id"] = "axis_spa",
-            ["redirect_uri"] = "https://localhost/callback",
+            ["client_id"] = "axis_mcp",
+            ["redirect_uri"] = "http://127.0.0.1:48123/callback",
             ["code"] = callbackQuery["code"].ToString(),
             ["code_verifier"] = verifier,
         });
@@ -446,7 +446,7 @@ public sealed class BusinessObjectRecordEndpointTests(ApiTestFixture fixture)
                 options: Json),
         };
         request.Headers.Add("Idempotency-Key", Guid.NewGuid().ToString("N"));
-        HttpResponseMessage response = await fixture.Client.SendAsync(
+        HttpResponseMessage response = await fixture.SendBrowserMutationAsync(
             request,
             TestContext.Current.CancellationToken);
         response.StatusCode.Should().BeOneOf(HttpStatusCode.OK, HttpStatusCode.Created);

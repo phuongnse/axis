@@ -7,5 +7,5 @@
 | AT ID | Evidence | Commands |
 |---|---|---|
 | AT-001, AT-006 | `frontend/e2e/sign-out-user.pw.ts` | `python scripts/axis.py local-dev e2e -- e2e/sign-out-user.pw.ts` |
-| AT-002 | `tests/Api/Axis.Api.Tests/Identity/SignInUserFlowTests.cs` | `python scripts/axis.py dotnet test` |
+| AT-002 | `tests/Api/Axis.Api.Tests/Identity/SignInUserFlowTests.cs` | `python scripts/axis.py dotnet test tests/Api/Axis.Api.Tests/Axis.Api.Tests.csproj --filter FullyQualifiedName~SignInUserFlowTests` |
 | AT-003, AT-004, AT-005 | `frontend/tests/app-shell.test.tsx` | `python scripts/axis.py frontend test tests/app-shell.test.tsx` |

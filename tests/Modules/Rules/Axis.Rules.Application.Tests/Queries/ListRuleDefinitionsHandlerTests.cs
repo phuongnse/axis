@@ -41,12 +41,12 @@ public sealed class ListRuleDefinitionsHandlerTests
             _context.CatalogSearch);
 
         Result<PagedResult<RuleDefinitionSummaryDto>> result = await sut.Handle(
-            new ListRuleDefinitionsQuery(Page: 1, PageSize: 20, Origin: RuleOrigin.System),
+            new ListRuleDefinitionsQuery(Page: 1, PageSize: 20, Origin: RuleOrigin.BuiltIn),
             CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
         result.Value.Items.Should().NotBeEmpty()
-            .And.OnlyContain(definition => definition.Origin == RuleOrigin.System);
+            .And.OnlyContain(definition => definition.Origin == RuleOrigin.BuiltIn);
     }
 
     [Fact]
@@ -65,7 +65,7 @@ public sealed class ListRuleDefinitionsHandlerTests
             .Returns(new RuleCatalogSearchPage(
                 [
                     new RuleCatalogSearchItem(Axis.Rules.Domain.RuleOrigin.Workspace, workspaceDefinition.Key.Value),
-                    new RuleCatalogSearchItem(Axis.Rules.Domain.RuleOrigin.System, "field.required"),
+                    new RuleCatalogSearchItem(Axis.Rules.Domain.RuleOrigin.BuiltIn, "field.required"),
                 ],
                 2));
         _context.Repository.ListByKeysForWorkspaceAsync(
@@ -90,6 +90,6 @@ public sealed class ListRuleDefinitionsHandlerTests
         result.Value.TotalCount.Should().Be(2);
         result.Value.Items.Select(item => item.Origin).Should().Equal(
             RuleOrigin.Workspace,
-            RuleOrigin.System);
+            RuleOrigin.BuiltIn);
     }
 }

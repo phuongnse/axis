@@ -4,7 +4,7 @@ import { StatusBadge, type StatusBadgeTone } from '@/components/shared/StatusBad
 import type { RuleOrigin } from '../api';
 
 const originPresentation = {
-  System: { labelKey: 'rules.builtIn', tone: 'info' },
+  BuiltIn: { labelKey: 'rules.builtIn', tone: 'info' },
   Workspace: { labelKey: 'rules.originWorkspace', tone: 'brand' },
 } as const satisfies Record<
   RuleOrigin,

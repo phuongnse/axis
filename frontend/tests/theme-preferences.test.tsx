@@ -30,6 +30,19 @@ function deferredResponse() {
   return { promise, resolve };
 }
 
+function setAuthenticatedSession() {
+  useAuthStore.getState().setBrowserSession({
+    authenticated: true,
+    csrfToken: 'test-csrf-token',
+    user: {
+      userId: '9fc0f6c1-24f6-4e66-a50f-3f742ad10b1a',
+      workspaceId: null,
+      email: 'admin@example.com',
+      name: 'Admin User',
+    },
+  });
+}
+
 function TranslatedFormHarness() {
   const { t } = useTranslation();
 
@@ -188,7 +201,7 @@ describe('theme preferences', () => {
   it('persists authenticated theme selection through the API', async () => {
     const user = userEvent.setup();
     const themeSave = deferredResponse();
-    useAuthStore.getState().setSession('header.payload.signature');
+    setAuthenticatedSession();
     vi.mocked(fetch).mockReturnValue(themeSave.promise);
 
     await renderWithRouter(<ThemeControl authenticated variant="menu" />, {
@@ -210,7 +223,7 @@ describe('theme preferences', () => {
   });
 
   it('applies authenticated server theme as source of truth and mirrors it to storage', async () => {
-    useAuthStore.getState().setSession('header.payload.signature');
+    setAuthenticatedSession();
     vi.mocked(fetch).mockImplementation((input: RequestInfo | URL) => {
       const url = typeof input === 'string' ? input : input.toString();
       if (url.includes('/api/users/me')) {
@@ -240,7 +253,7 @@ describe('theme preferences', () => {
 
   it('keeps selected authenticated theme usable and shows retry state when persistence fails', async () => {
     const user = userEvent.setup();
-    useAuthStore.getState().setSession('header.payload.signature');
+    setAuthenticatedSession();
     vi.mocked(fetch).mockResolvedValue({
       ok: false,
       status: 500,

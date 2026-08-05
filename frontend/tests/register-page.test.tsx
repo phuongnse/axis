@@ -2,6 +2,7 @@ import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { useAuthStore } from '../src/features/auth/auth-store';
 import { RegisterPage } from '../src/features/auth/components/RegisterPage';
 import { changeSiteLanguage } from '../src/features/preferences';
 import { renderWithRouter } from './render-with-router';
@@ -49,10 +50,12 @@ describe('RegisterPage', () => {
     vi.stubGlobal('fetch', vi.fn());
     navigateMock.mockReset();
     sessionStorage.clear();
+    useAuthStore.getState().markBrowserSessionGuest('test-csrf-token');
     mockLegalVersionsFetch();
   });
 
   afterEach(() => {
+    useAuthStore.getState().clearSession();
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
   });

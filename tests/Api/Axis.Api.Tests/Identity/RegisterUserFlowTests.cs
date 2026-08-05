@@ -223,21 +223,19 @@ public sealed class RegisterUserFlowTests(ApiTestFixture fixture)
         };
         request.Headers.Add("Idempotency-Key", Guid.NewGuid().ToString("N"));
 
-        return await fixture.Client.SendAsync(request, TestContext.Current.CancellationToken);
+        return await fixture.SendBrowserMutationAsync(request, TestContext.Current.CancellationToken);
     }
 
     private async Task<HttpResponseMessage> VerifyEmailAsync(string token) =>
-        await fixture.Client.PostAsJsonAsync(
+        await fixture.PostBrowserJsonAsync(
             "/api/auth/verify-email",
             new { token },
-            Json,
             TestContext.Current.CancellationToken);
 
     private async Task<HttpResponseMessage> ResendVerificationAsync(string email) =>
-        await fixture.Client.PostAsJsonAsync(
+        await fixture.PostBrowserJsonAsync(
             "/api/auth/resend-verification",
             new { email },
-            Json,
             TestContext.Current.CancellationToken);
 
     private async Task ExpireTokenAsync(string rawToken)

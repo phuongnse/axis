@@ -198,7 +198,7 @@ public sealed class RuleConditionEvaluatorTests
     }
 
     private static RuleInputDefinition Input(string key, RuleValueType type, bool required) =>
-        RuleInputDefinition.Create(key, type, required).Value;
+        RuleInputDefinition.Create(key, key, type, required).Value;
 
     private static RulePredicateCondition Predicate(
         string nodeId,

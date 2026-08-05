@@ -5,6 +5,10 @@ using Axis.Mcp.Authentication;
 
 namespace Axis.Mcp.Tests;
 
+[CollectionDefinition(nameof(OAuthLoopbackCollection), DisableParallelization = true)]
+public sealed class OAuthLoopbackCollection;
+
+[Collection(nameof(OAuthLoopbackCollection))]
 public sealed class LoopbackAuthorizationListenerTests
 {
     [Fact]

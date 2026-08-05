@@ -27,13 +27,15 @@ internal static class RuleContractMapper
             definition.Name,
             definition.Description,
             (ContractOrigin)definition.Origin,
-            (ContractLifecycleStatus)definition.Status,
+            ToLifecycleStatus(definition),
             definition.ExpressionLanguageVersion,
-            definition.Origin == DomainOrigin.System ? null : definition.Revision,
+            definition.Origin == DomainOrigin.BuiltIn ? null : definition.Revision,
             definition.LatestPublishedVersion,
+            definition.ActiveVersion,
             definition.Inputs.Select(ToDto).ToArray(),
             ToDto(definition.Output),
-            definition.Origin == DomainOrigin.System ? null : definition.UpdatedAt,
+            definition.Origin == DomainOrigin.BuiltIn ? null : definition.UpdatedAt,
+            ToActions(definition),
             definition.Documentation is null ? null : ToDto(definition.Documentation));
 
     public static RuleDefinitionDetailDto ToDetailDto(RuleDefinition definition) =>
@@ -42,17 +44,19 @@ internal static class RuleContractMapper
             definition.Name,
             definition.Description,
             (ContractOrigin)definition.Origin,
-            (ContractLifecycleStatus)definition.Status,
+            ToLifecycleStatus(definition),
             definition.ExpressionLanguageVersion,
-            definition.Origin == DomainOrigin.System ? null : definition.Revision,
+            definition.Origin == DomainOrigin.BuiltIn ? null : definition.Revision,
             definition.LatestPublishedVersion,
+            definition.ActiveVersion,
             definition.Inputs.Select(ToDto).ToArray(),
             ToDto(definition.Output),
             definition.Condition is null ? null : ToDto(definition.Condition),
             definition.Versions.OrderBy(version => version.Version).Select(ToDto).ToArray(),
-            definition.Origin == DomainOrigin.System ? null : definition.CreatedAt,
-            definition.Origin == DomainOrigin.System ? null : definition.UpdatedAt,
+            definition.Origin == DomainOrigin.BuiltIn ? null : definition.CreatedAt,
+            definition.Origin == DomainOrigin.BuiltIn ? null : definition.UpdatedAt,
             definition.ArchivedAt,
+            ToActions(definition),
             definition.Documentation is null ? null : ToDto(definition.Documentation));
 
     public static RuleDefinitionVersionDto ToDto(RuleDefinitionVersion version) =>
@@ -66,6 +70,26 @@ internal static class RuleContractMapper
             ToDto(version.Condition),
             version.PublishedByUserId,
             version.PublishedAt);
+
+    private static ContractLifecycleStatus ToLifecycleStatus(RuleDefinition definition) =>
+        definition.ArchivedAt is not null
+            ? ContractLifecycleStatus.Archived
+            : definition.ActiveVersion is not null
+                ? ContractLifecycleStatus.Active
+                : definition.LatestPublishedVersion is not null
+                    ? ContractLifecycleStatus.Inactive
+                    : ContractLifecycleStatus.Draft;
+
+    private static RuleDefinitionActionsDto ToActions(RuleDefinition definition)
+    {
+        bool mutable = definition.Origin == DomainOrigin.Workspace && definition.ArchivedAt is null;
+        return new RuleDefinitionActionsDto(
+            CanEditDraft: mutable,
+            CanCreateVersion: mutable && definition.Condition is not null,
+            CanActivateVersion: mutable && definition.LatestPublishedVersion is not null,
+            CanDeactivate: mutable && definition.ActiveVersion is not null,
+            CanArchive: mutable);
+    }
 
     public static RuleExpressionLanguageDto ToExpressionLanguageDto() =>
         new(

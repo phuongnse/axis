@@ -48,19 +48,28 @@ internal sealed class RuleDefinitionHandlerTestContext
         return definition;
     }
 
-    public static RuleDefinition PublishedDefinition()
+    public static RuleDefinition VersionedDefinition()
     {
         RuleDefinition definition = DraftDefinition(configured: true);
-        definition.Publish(definition.Revision, UserId, DateTime.UtcNow).IsSuccess.Should().BeTrue();
+        definition.CreateVersion(definition.Revision, UserId, DateTime.UtcNow).IsSuccess.Should().BeTrue();
         return definition;
     }
+
+    public static RuleDefinition ActiveDefinition()
+    {
+        RuleDefinition definition = VersionedDefinition();
+        definition.ActivateVersion(definition.Revision, 1, UserId, DateTime.UtcNow).IsSuccess.Should().BeTrue();
+        return definition;
+    }
+
+    public static RuleDefinition ConfiguredDraft() => DraftDefinition(configured: true);
 
     public static void Configure(RuleDefinition definition)
     {
         RuleInputDefinition value = RuleInputDefinition.Create(
-            "value", DomainValueType.Decimal, isRequired: true).Value;
+            "value", "Value", DomainValueType.Decimal, isRequired: true).Value;
         RuleInputDefinition threshold = RuleInputDefinition.Create(
-            "threshold", DomainValueType.Decimal, isRequired: true).Value;
+            "threshold", "Threshold", DomainValueType.Decimal, isRequired: true).Value;
         RulePredicateCondition condition = RulePredicateCondition.Create(
             "threshold_check",
             DomainPredicateOperator.GreaterThan,
@@ -80,15 +89,15 @@ internal sealed class RuleDefinitionHandlerTestContext
 
     public static IReadOnlyList<RuleDraftInputDefinitionDto> DraftInputsDto() =>
     [
-        new("Value", [ContractValueType.Decimal], true, false, []),
-        new("Threshold", [ContractValueType.Decimal], true, false, []),
+        new("value", "Value", [ContractValueType.Decimal], true, false, []),
+        new("threshold", "Threshold", [ContractValueType.Decimal], true, false, []),
     ];
 
     public static RuleConditionNodeDto ConditionDto() => new(
         "threshold_check",
         LogicalOperator: null,
         ContractPredicateOperator.GreaterThan,
-        new RuleOperandDto(ContractOperandKind.Input, "Value", Literal: null),
-        new RuleOperandDto(ContractOperandKind.Input, "Threshold", Literal: null),
+        new RuleOperandDto(ContractOperandKind.Input, "value", Literal: null),
+        new RuleOperandDto(ContractOperandKind.Input, "threshold", Literal: null),
         []);
 }

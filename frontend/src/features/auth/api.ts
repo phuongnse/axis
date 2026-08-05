@@ -1,15 +1,10 @@
-import { fetchApi } from '@/lib/api';
-import { getAccessToken, getBrowserSessionStatus, useAuthStore } from './auth-store';
+import { ApiError, fetchApi } from '@/lib/api';
+import type { AxisBrowserSessionDto } from '@/lib/api-generated';
+import { applyBrowserSessionResponse, getBrowserSessionStatus, useAuthStore } from './auth-store';
 import {
+  type AuthorizationRequestContinuation,
   buildAuthorizationRequestResumeUrl,
-  buildAuthorizeUrl,
-  CLIENT_ID,
-  clearPkceSession,
-  connectEndpoint,
-  createPkceSession,
-  loadPkceSession,
-  REDIRECT_URI,
-} from './pkce';
+} from './authorization-request';
 import type {
   LegalVersionsResponse,
   MessageResponse,
@@ -18,6 +13,13 @@ import type {
   SignInUserRequest,
   VerifyEmailResponse,
 } from './types';
+
+export class BrowserSessionUnavailableError extends Error {
+  constructor() {
+    super('The browser session could not be resolved.');
+    this.name = 'BrowserSessionUnavailableError';
+  }
+}
 
 export const authKeys = {
   all: ['auth'] as const,
@@ -45,9 +47,7 @@ interface BrowserSessionRestoreOptions {
 
 function pruneVerifyEmailSuccessCache(now: number): void {
   for (const [token, entry] of verifyEmailSuccessCache.entries()) {
-    if (entry.expiresAt <= now) {
-      verifyEmailSuccessCache.delete(token);
-    }
+    if (entry.expiresAt <= now) verifyEmailSuccessCache.delete(token);
   }
 }
 
@@ -57,60 +57,29 @@ export async function registerUser(
 ): Promise<MessageResponse> {
   return fetchApi<MessageResponse>('/users/register', {
     method: 'POST',
-    headers: {
-      'Idempotency-Key': idempotencyKey,
-    },
+    headers: { 'Idempotency-Key': idempotencyKey },
     body: JSON.stringify(payload),
   });
 }
 
 export async function signInUser(payload: SignInUserRequest): Promise<SignInResponse> {
-  return fetchApi<SignInResponse>('/auth/sign-in', {
+  const response = await fetchApi<SignInResponse>('/auth/sign-in', {
     method: 'POST',
     body: JSON.stringify(payload),
   });
+  if (response.sessionEstablished && !(await restoreBrowserSession({ force: true }))) {
+    throw new Error('The browser session was not established after sign-in.');
+  }
+  return response;
 }
 
 export async function signOutUser(): Promise<void> {
-  await fetchApi<null>('/auth/sign-out', {
-    method: 'POST',
-  });
+  await fetchApi<null>('/auth/sign-out', { method: 'POST' });
+  useAuthStore.getState().markBrowserSessionGuest();
 }
 
 export async function getLegalVersions(): Promise<LegalVersionsResponse> {
   return fetchApi<LegalVersionsResponse>('/legal/versions');
-}
-
-export async function exchangeAuthorizationCode(code: string): Promise<string> {
-  const pkce = loadPkceSession();
-  if (!pkce) {
-    throw new Error('Missing PKCE session. Please sign in again.');
-  }
-
-  const body = new URLSearchParams({
-    grant_type: 'authorization_code',
-    code,
-    redirect_uri: REDIRECT_URI,
-    client_id: CLIENT_ID,
-    code_verifier: pkce.verifier,
-  });
-
-  const response = await fetch(connectEndpoint('/connect/token'), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body,
-    credentials: 'include',
-  });
-
-  if (!response.ok) {
-    throw new Error('Token exchange failed');
-  }
-
-  const data = await response.json();
-  const accessToken = readAccessToken(data);
-  clearPkceSession();
-  useAuthStore.getState().setSession(accessToken);
-  return accessToken;
 }
 
 export async function verifyEmail(token: string): Promise<VerifyEmailResponse> {
@@ -118,20 +87,19 @@ export async function verifyEmail(token: string): Promise<VerifyEmailResponse> {
   pruneVerifyEmailSuccessCache(now);
 
   const cached = verifyEmailSuccessCache.get(token);
-  if (cached) {
-    return cached.response;
-  }
+  if (cached) return cached.response;
 
   const inFlight = verifyEmailInFlight.get(token);
-  if (inFlight) {
-    return inFlight;
-  }
+  if (inFlight) return inFlight;
 
   const request = fetchApi<VerifyEmailResponse>('/auth/verify-email', {
     method: 'POST',
     body: JSON.stringify({ token }),
   })
-    .then((response) => {
+    .then(async (response) => {
+      if (response.sessionEstablished && !(await restoreBrowserSession({ force: true }))) {
+        throw new Error('The browser session was not established after email verification.');
+      }
       verifyEmailSuccessCache.set(token, {
         response,
         expiresAt: Date.now() + verifyEmailSuccessCacheTtlMs,
@@ -146,118 +114,39 @@ export async function verifyEmail(token: string): Promise<VerifyEmailResponse> {
   return request;
 }
 
-export async function completePostVerifyPkceFlow(): Promise<boolean> {
-  const restored = await restoreSessionFromBrowserAuth({ force: true });
-  if (restored) {
-    return true;
-  }
-
-  await startBrowserAuthorizationRedirect();
-  return false;
-}
-
-export async function restoreSessionFromBrowserAuth(
+export async function restoreBrowserSession(
   options: BrowserSessionRestoreOptions = {},
 ): Promise<boolean> {
-  if (getAccessToken()) {
-    return true;
-  }
-  if (!options.force && getBrowserSessionStatus() === 'guest') {
-    return false;
-  }
+  const status = getBrowserSessionStatus();
+  if (!options.force && status !== 'unknown') return status === 'authenticated';
 
   if (!browserSessionRestoreInFlight) {
-    browserSessionRestoreInFlight = restoreSessionFromBrowserAuthOnce().finally(() => {
-      browserSessionRestoreInFlight = null;
-    });
+    browserSessionRestoreInFlight = fetchApi<AxisBrowserSessionDto>('/auth/session')
+      .then(applyBrowserSessionResponse)
+      .catch((error: unknown) => {
+        useAuthStore.getState().clearSession();
+        if (error instanceof ApiError && error.status === 401) return false;
+        throw new BrowserSessionUnavailableError();
+      })
+      .finally(() => {
+        browserSessionRestoreInFlight = null;
+      });
   }
-
   return browserSessionRestoreInFlight;
 }
 
-async function restoreSessionFromBrowserAuthOnce(): Promise<boolean> {
-  try {
-    const pkce = createPkceSession();
-    const authorizeUrl = await buildAuthorizeUrl(pkce.state, pkce.verifier, { prompt: 'none' });
-
-    const response = await fetch(authorizeUrl, {
-      credentials: 'include',
-      redirect: 'follow',
-      signal: AbortSignal.timeout(10_000),
-    });
-
-    if (!response.ok || !response.url) {
-      if (response.status === 401) {
-        useAuthStore.getState().markBrowserSessionGuest();
-      }
-      clearPkceSession();
-      return false;
-    }
-
-    const finalUrl = new URL(response.url, window.location.origin);
-    if (finalUrl.pathname !== '/callback') {
-      clearPkceSession();
-      return false;
-    }
-
-    const state = finalUrl.searchParams.get('state');
-    if (state !== pkce.state) {
-      clearPkceSession();
-      return false;
-    }
-
-    if (finalUrl.searchParams.get('error') === 'login_required') {
-      useAuthStore.getState().markBrowserSessionGuest();
-      clearPkceSession();
-      return false;
-    }
-
-    const code = finalUrl.searchParams.get('code');
-    if (!code) {
-      clearPkceSession();
-      return false;
-    }
-
-    await exchangeAuthorizationCode(code);
-    return true;
-  } catch {
-    clearPkceSession();
-    return false;
-  }
+export async function completePostVerifyFlow(): Promise<boolean> {
+  return restoreBrowserSession({ force: true });
 }
 
-export async function completePostSignInPkceFlow(authorizationRequest?: string): Promise<boolean> {
+export async function completePostSignInFlow(
+  authorizationRequest?: AuthorizationRequestContinuation,
+): Promise<boolean> {
   if (authorizationRequest) {
     window.location.assign(buildAuthorizationRequestResumeUrl(authorizationRequest));
     return false;
   }
-
-  const restored = await restoreSessionFromBrowserAuth({ force: true });
-  if (restored) {
-    return true;
-  }
-
-  await startBrowserAuthorizationRedirect();
-  return false;
-}
-
-async function startBrowserAuthorizationRedirect(): Promise<void> {
-  const pkce = createPkceSession();
-  const authorizeUrl = await buildAuthorizeUrl(pkce.state, pkce.verifier);
-  window.location.assign(authorizeUrl);
-}
-
-function readAccessToken(data: unknown): string {
-  if (!data || typeof data !== 'object') {
-    throw new Error('Token exchange returned an invalid response');
-  }
-
-  const accessToken = (data as Record<string, unknown>).access_token;
-  if (typeof accessToken !== 'string' || accessToken.length === 0) {
-    throw new Error('Token exchange returned an invalid response');
-  }
-
-  return accessToken;
+  return getBrowserSessionStatus() === 'authenticated';
 }
 
 export async function resendVerificationEmail(email: string): Promise<void> {

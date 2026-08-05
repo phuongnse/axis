@@ -11,14 +11,12 @@
 import { createFileRoute } from '@tanstack/react-router'
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as CallbackRouteImport } from './routes/callback'
 import { Route as GuestRouteImport } from './routes/_guest'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as GuestSignInRouteImport } from './routes/_guest/sign-in'
 import { Route as AuthenticatedRulesRouteImport } from './routes/_authenticated/rules'
 import { Route as AuthenticatedBusinessObjectsRouteImport } from './routes/_authenticated/business-objects'
-import { Route as AuthenticatedApplicationsRouteImport } from './routes/_authenticated/applications'
 
 const GuestRegisterLazyRouteImport = createFileRoute('/_guest/register')()
 const AuthenticatedDashboardLazyRouteImport = createFileRoute(
@@ -29,11 +27,6 @@ const GuestRegisterConfirmationLazyRouteImport = createFileRoute(
 )()
 const GuestAuthVerifyLazyRouteImport = createFileRoute('/_guest/auth/verify')()
 
-const CallbackRoute = CallbackRouteImport.update({
-  id: '/callback',
-  path: '/callback',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const GuestRoute = GuestRouteImport.update({
   id: '/_guest',
   getParentRoute: () => rootRouteImport,
@@ -86,14 +79,6 @@ const AuthenticatedBusinessObjectsRoute =
       (d) => d.Route,
     ),
   )
-const AuthenticatedApplicationsRoute =
-  AuthenticatedApplicationsRouteImport.update({
-    id: '/applications',
-    path: '/applications',
-    getParentRoute: () => AuthenticatedRoute,
-  } as any).lazy(() =>
-    import('./routes/_authenticated/applications.lazy').then((d) => d.Route),
-  )
 const GuestRegisterConfirmationLazyRoute =
   GuestRegisterConfirmationLazyRouteImport.update({
     id: '/register_/confirmation',
@@ -112,8 +97,6 @@ const GuestAuthVerifyLazyRoute = GuestAuthVerifyLazyRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/callback': typeof CallbackRoute
-  '/applications': typeof AuthenticatedApplicationsRoute
   '/business-objects': typeof AuthenticatedBusinessObjectsRoute
   '/rules': typeof AuthenticatedRulesRoute
   '/sign-in': typeof GuestSignInRoute
@@ -124,8 +107,6 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/callback': typeof CallbackRoute
-  '/applications': typeof AuthenticatedApplicationsRoute
   '/business-objects': typeof AuthenticatedBusinessObjectsRoute
   '/rules': typeof AuthenticatedRulesRoute
   '/sign-in': typeof GuestSignInRoute
@@ -139,8 +120,6 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteWithChildren
   '/_guest': typeof GuestRouteWithChildren
-  '/callback': typeof CallbackRoute
-  '/_authenticated/applications': typeof AuthenticatedApplicationsRoute
   '/_authenticated/business-objects': typeof AuthenticatedBusinessObjectsRoute
   '/_authenticated/rules': typeof AuthenticatedRulesRoute
   '/_guest/sign-in': typeof GuestSignInRoute
@@ -153,8 +132,6 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
-    | '/callback'
-    | '/applications'
     | '/business-objects'
     | '/rules'
     | '/sign-in'
@@ -165,8 +142,6 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
-    | '/callback'
-    | '/applications'
     | '/business-objects'
     | '/rules'
     | '/sign-in'
@@ -179,8 +154,6 @@ export interface FileRouteTypes {
     | '/'
     | '/_authenticated'
     | '/_guest'
-    | '/callback'
-    | '/_authenticated/applications'
     | '/_authenticated/business-objects'
     | '/_authenticated/rules'
     | '/_guest/sign-in'
@@ -194,18 +167,10 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
   GuestRoute: typeof GuestRouteWithChildren
-  CallbackRoute: typeof CallbackRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/callback': {
-      id: '/callback'
-      path: '/callback'
-      fullPath: '/callback'
-      preLoaderRoute: typeof CallbackRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/_guest': {
       id: '/_guest'
       path: ''
@@ -262,13 +227,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedBusinessObjectsRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
-    '/_authenticated/applications': {
-      id: '/_authenticated/applications'
-      path: '/applications'
-      fullPath: '/applications'
-      preLoaderRoute: typeof AuthenticatedApplicationsRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
     '/_guest/register_/confirmation': {
       id: '/_guest/register_/confirmation'
       path: '/register/confirmation'
@@ -287,14 +245,12 @@ declare module '@tanstack/react-router' {
 }
 
 interface AuthenticatedRouteChildren {
-  AuthenticatedApplicationsRoute: typeof AuthenticatedApplicationsRoute
   AuthenticatedBusinessObjectsRoute: typeof AuthenticatedBusinessObjectsRoute
   AuthenticatedRulesRoute: typeof AuthenticatedRulesRoute
   AuthenticatedDashboardLazyRoute: typeof AuthenticatedDashboardLazyRoute
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
-  AuthenticatedApplicationsRoute: AuthenticatedApplicationsRoute,
   AuthenticatedBusinessObjectsRoute: AuthenticatedBusinessObjectsRoute,
   AuthenticatedRulesRoute: AuthenticatedRulesRoute,
   AuthenticatedDashboardLazyRoute: AuthenticatedDashboardLazyRoute,
@@ -324,7 +280,6 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
   GuestRoute: GuestRouteWithChildren,
-  CallbackRoute: CallbackRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

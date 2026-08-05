@@ -10,6 +10,18 @@ ACCEPTANCE_EVIDENCE_COLUMNS = ["AT ID", "Evidence", "Commands"]
 AT_ID_RE = re.compile(r"^AT-\d{3}$")
 H2_RE = re.compile(r"^##\s+(.+?)\s*$", re.MULTILINE)
 INLINE_CODE_RE = re.compile(r"`([^`]+)`")
+EXTERNAL_REFERENCE_RE = re.compile(
+    r"^external://(?P<repository>[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?)@"
+    r"(?P<commit>[0-9a-f]{40})/(?P<value>[^\r\n]+)$"
+)
+EXTERNAL_COMMAND_RE = re.compile(r"^(?:npm|npx|node|python3?|dotnet|go|cargo|make)\b")
+
+
+@dataclass(frozen=True)
+class ExternalReference:
+    repository: str
+    commit: str
+    value: str
 
 
 def axis_command_args(command: str) -> list[str] | None:
@@ -102,6 +114,56 @@ def inline_code_values(text: str) -> list[str]:
     return [match.group(1).strip() for match in INLINE_CODE_RE.finditer(text)]
 
 
+def external_reference(value: str) -> ExternalReference | None:
+    match = EXTERNAL_REFERENCE_RE.fullmatch(value)
+    if match is None:
+        return None
+    return ExternalReference(**match.groupdict())
+
+
+def is_external_reference(value: str) -> bool:
+    return value.startswith("external://")
+
+
+def external_reference_issue(value: str, *, kind: str) -> str | None:
+    reference = external_reference(value)
+    if reference is None:
+        return (
+            f"{kind} must use `external://<repository>@<40-character-commit>/<{'path' if kind == 'Evidence' else 'command'}>`: `{value}`"
+        )
+    path = Path(reference.value)
+    if path.is_absolute() or ".." in path.parts:
+        return f"{kind} external value must be relative and cannot traverse: `{value}`"
+    if kind == "Evidence" and EXTERNAL_COMMAND_RE.match(reference.value):
+        return f"Evidence external value must be a path, not a command: `{value}`"
+    if kind == "Commands" and not EXTERNAL_COMMAND_RE.match(reference.value):
+        return f"Commands external value must begin with a command: `{value}`"
+    return None
+
+
+def external_provenance_issues(
+    *,
+    ctx: EvidenceValidationContext,
+    at_id: str,
+    paths: list[str],
+    commands: list[str],
+) -> list[str]:
+    path_external = [external_reference(path) for path in paths]
+    command_external = [external_reference(command) for command in commands]
+    has_external = any(is_external_reference(value) for value in [*paths, *commands])
+    has_local = any(not is_external_reference(value) for value in [*paths, *commands])
+    if has_external and has_local:
+        return [
+            f"{ctx.evidence_rel}: Acceptance Evidence {at_id} must not mix local and external provenance"
+        ]
+    references = [reference for reference in [*path_external, *command_external] if reference is not None]
+    if references and len({(reference.repository, reference.commit) for reference in references}) != 1:
+        return [
+            f"{ctx.evidence_rel}: Acceptance Evidence {at_id} external Evidence and Commands must bind one repository and commit"
+        ]
+    return []
+
+
 def evidence_file_for(owner_path: Path) -> Path:
     return owner_path.with_name(f"{owner_path.stem}.evidence.md")
 
@@ -135,6 +197,10 @@ def evidence_path_issues(ctx: EvidenceValidationContext, at_id: str, evidence: s
         return [f"{ctx.evidence_rel}: Acceptance Evidence {at_id} must list at least one backticked repo path"], []
 
     for path_text in paths:
+        if is_external_reference(path_text):
+            if issue := external_reference_issue(path_text, kind="Evidence"):
+                issues.append(f"{ctx.evidence_rel}: Acceptance Evidence {at_id} {issue}")
+            continue
         if path_text.startswith(("python ", "npm ", "npx ", "dotnet ", "docker ")):
             issues.append(
                 f"{ctx.evidence_rel}: Acceptance Evidence {at_id} Evidence must list files, not commands: `{path_text}`"
@@ -158,6 +224,10 @@ def command_issues(ctx: EvidenceValidationContext, at_id: str, commands_text: st
 
     issues: list[str] = []
     for command in commands:
+        if is_external_reference(command):
+            if issue := external_reference_issue(command, kind="Commands"):
+                issues.append(f"{ctx.evidence_rel}: Acceptance Evidence {at_id} {issue}")
+            continue
         if not command.startswith("python scripts/axis.py "):
             issues.append(f"{ctx.evidence_rel}: Acceptance Evidence {at_id} Commands must use the Axis wrapper")
     return issues, commands
@@ -208,6 +278,7 @@ def validate_acceptance_evidence_sidecar(
         issues.extend(path_issues)
         command_errors, commands = command_issues(ctx, at_id_cell, record.get("Commands", ""))
         issues.extend(command_errors)
+        issues.extend(external_provenance_issues(ctx=ctx, at_id=at_id_cell, paths=paths, commands=commands))
         for at_id in at_ids:
             if at_id in seen:
                 issues.append(f"{ctx.evidence_rel}: duplicate Acceptance Evidence AT ID `{at_id}`")

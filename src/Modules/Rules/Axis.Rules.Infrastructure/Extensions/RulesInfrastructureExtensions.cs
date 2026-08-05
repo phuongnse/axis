@@ -26,6 +26,7 @@ public static class RulesInfrastructureExtensions
         services.AddScoped<IRuleTextSearchProvider, PostgresRuleTextSearchProvider>();
         services.AddScoped<IUnitOfWork, RulesUnitOfWork>();
         services.AddScoped<RuleConditionProjectionService>();
+        services.AddScoped<RuleAuthoringLanguageService>();
         services.AddScoped<RuleExpressionGuideService>();
         services.AddScoped<IRuleApplicationValidator, RuleApplicationValidator>();
         services.AddScoped<IRuleEvaluator, RuleEvaluator>();

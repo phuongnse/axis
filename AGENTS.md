@@ -14,13 +14,15 @@ Do not invent IDs, endpoints, tables, or product behavior. If code and docs conf
 
 ## Critical Rules
 
+- Axis targets enterprise production. Delivery may be incremental, but every implemented slice must be production-grade within its declared scope under [docs/PLATFORM_STRATEGY.md](./docs/PLATFORM_STRATEGY.md#enterprise-production-baseline); a required production concern cannot be deferred or replaced by a temporary foundation.
 - Spec -> code only; no intentional shortcuts.
 - Keep tests and acceptance evidence honest; do not skip, weaken, bypass, or mark incomplete work done.
 - Domain projects have zero external dependencies.
 - Non-trivial changes need a [docs/playbooks/design-gate.md](./docs/playbooks/design-gate.md) dossier; high-risk surfaces need user sign-off before code.
 - Keep database schema changes migration-backed and reviewable.
 - Tech-stack changes need explicit approval and a [docs/TECH_STACK.md](./docs/TECH_STACK.md) update.
-- Compatibility is a product constraint, not an automatic implementation goal. When the owning contract and current product phase require no compatibility, replace the old surface cleanly; do not add shims, dual paths, flags, or fallback behavior.
+- Before taking an alternate path after a failure, compare it with the owning contract's owner, required boundary, invariants, and evidence. If the path changes any of them merely to keep progressing instead of repairing the root cause, it is a workaround: stop and reopen the Design Gate rather than implement it.
+- Compatibility is a product constraint, not an automatic implementation goal. When the owning contract and current product phase require no compatibility, replace the old surface cleanly; do not add shims, dual paths, flags, fallback behavior, or ongoing tests and guidance that keep retired identifiers or concepts alive.
 
 ## Operating Rules
 
@@ -29,8 +31,7 @@ Do not invent IDs, endpoints, tables, or product behavior. If code and docs conf
 - Keep tests behavior-focused and proportional to risk.
 - Repeatable workflows live in [`.agents/skills/`](./.agents/skills/README.md).
 - Before non-trivial work, read the matching `SKILL.md` and [`.agents/skills/reference.md`](./.agents/skills/reference.md), then follow numbered steps in order.
-- After selecting the workflow owner, apply [`.agents/skills/reference.md` § Agent routing](./.agents/skills/reference.md#agent-routing) to independently ownable work units before execution and whenever a routing re-evaluation trigger occurs; model choice never changes skill ownership or gates.
-- Project role, model, reasoning, and optional minimality/compression profiles are structured in [`.codex/orchestration.toml`](./.codex/orchestration.toml); delegated agents apply their named profile without weakening Axis contracts or defaulting to Ultra.
+- After selecting the workflow owner, proactively delegate eligible independently ownable work units under [`.agents/skills/reference.md` § Agent routing](./.agents/skills/reference.md#agent-routing) before execution and whenever a routing re-evaluation trigger occurs; model choice never changes skill ownership or gates.
 - `$axis-*` aliases in docs map to `.agents/skills/<name>/SKILL.md`. Do not skip workflow gates or defer them into PR follow-ups unless the user explicitly approved that deferral.
 - When a required action is outside the repository or user-controlled (for example authentication, consent, client reload/restart, host prerequisites, permissions, approval, or a destructive operation), stop at that boundary, preserve the exact evidence, and ask the user for the action or decision. Do not silently bypass the boundary with disabled security, injected credentials, direct database changes, killed app-managed processes, ad hoc proxies, or indirect evidence. Follow the [blocker and completion protocol](./.agents/skills/reference.md#blocker-and-completion-protocol).
 - Before claiming a slice complete, map its acceptance criteria to current source, test, and runtime evidence. Missing, stale, indirect, or blocked evidence stays `not run` or `blocked`; it is not converted into a pass. MCP runtime work additionally requires the supported client registry and authenticated operation/read-back boundary described in [the MCP playbook](./docs/playbooks/mcp.md#runtime-lifecycle-and-blocker-protocol).
@@ -41,4 +42,4 @@ Axis repository skills own the development lifecycle. External skills may supple
 
 ## Verification
 
-During development, run the narrow check that proves the surface changed. Before review, run triggered verification from [docs/playbooks/agent-checklist.md](./docs/playbooks/agent-checklist.md).
+Select development and review verification under [`.agents/skills/reference.md` § Change-driven scope](./.agents/skills/reference.md#change-driven-scope); before review, apply [docs/playbooks/agent-checklist.md](./docs/playbooks/agent-checklist.md).

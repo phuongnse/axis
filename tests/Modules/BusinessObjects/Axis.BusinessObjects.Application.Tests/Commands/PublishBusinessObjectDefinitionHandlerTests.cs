@@ -63,4 +63,89 @@ public sealed class PublishBusinessObjectDefinitionHandlerTests
         await _context.UnitOfWork.DidNotReceiveWithAnyArgs()
             .SaveChangesAsync(TestContext.Current.CancellationToken);
     }
+
+    [Fact]
+    public async Task Publish_WhenBindingRevisionChanged_ReturnsConflictWithoutCommit()
+    {
+        BusinessObjectDefinition definition = BusinessObjectDefinitionHandlerTestContext.CreateUnpublished("Customer", "customer");
+        definition.SaveUnpublished(
+            "Customer",
+            [new BusinessObjectFieldDefinitionSpec(
+                "name",
+                "Name",
+                0,
+                BusinessObjectFieldType.Text,
+                [new BusinessObjectFieldRuleSpec(TestBindingIds.TextLength, null, 1)])],
+            expectedRevision: 1,
+            DateTime.UtcNow).IsSuccess.Should().BeTrue();
+        _context.Repository.GetByIdForWorkspaceAsync(
+                definition.Id,
+                BusinessObjectDefinitionHandlerTestContext.WorkspaceId,
+                Arg.Any<CancellationToken>())
+            .Returns(definition);
+        _context.BindingValidator.ValidateAsync(
+                Arg.Any<Axis.Rules.Contracts.RuleBindingReferenceValidationRequest>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(Axis.Rules.Contracts.RuleBindingReferenceValidationResult.Invalid(
+                "binding_revision_conflict",
+                "Rule binding has changed.")));
+        PublishBusinessObjectDefinitionHandler sut = new(
+            _context.CurrentUser,
+            _context.Repository,
+            _context.UnitOfWork,
+            _context.BindingValidator);
+
+        Result<BusinessObjectDefinitionDetailDto> result = await sut.Handle(
+            new PublishBusinessObjectDefinitionCommand(definition.Id.Value, ExpectedRevision: 2),
+            CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue();
+        result.ErrorCode.Should().Be(ErrorCodes.Conflict);
+        result.ProblemCode.Should().Be(BusinessObjectsProblemCodes.BusinessObjectDefinitionConflict);
+        await _context.UnitOfWork.DidNotReceiveWithAnyArgs()
+            .SaveChangesAsync(TestContext.Current.CancellationToken);
+    }
+
+    [Fact]
+    public async Task Publish_WhenBindingContextIsIncompatible_ReturnsInvalidWithoutCommit()
+    {
+        BusinessObjectDefinition definition = BusinessObjectDefinitionHandlerTestContext.CreateUnpublished("Customer", "customer");
+        definition.SaveUnpublished(
+            "Customer",
+            [new BusinessObjectFieldDefinitionSpec(
+                "name",
+                "Name",
+                0,
+                BusinessObjectFieldType.Text,
+                [new BusinessObjectFieldRuleSpec(TestBindingIds.TextLength, null, 1)])],
+            expectedRevision: 1,
+            DateTime.UtcNow).IsSuccess.Should().BeTrue();
+        _context.Repository.GetByIdForWorkspaceAsync(
+                definition.Id,
+                BusinessObjectDefinitionHandlerTestContext.WorkspaceId,
+                Arg.Any<CancellationToken>())
+            .Returns(definition);
+        _context.BindingValidator.ValidateAsync(
+                Arg.Any<Axis.Rules.Contracts.RuleBindingReferenceValidationRequest>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(Axis.Rules.Contracts.RuleBindingReferenceValidationResult.Invalid(
+                "binding_context_type_mismatch",
+                "Rule binding consumer context type does not match the rule input.")));
+        PublishBusinessObjectDefinitionHandler sut = new(
+            _context.CurrentUser,
+            _context.Repository,
+            _context.UnitOfWork,
+            _context.BindingValidator);
+
+        Result<BusinessObjectDefinitionDetailDto> result = await sut.Handle(
+            new PublishBusinessObjectDefinitionCommand(definition.Id.Value, ExpectedRevision: 2),
+            CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue();
+        result.ErrorCode.Should().Be(ErrorCodes.InvalidInput);
+        result.ProblemCode.Should().Be(BusinessObjectsProblemCodes.BusinessObjectDefinitionInvalid);
+        definition.Status.Should().Be(BusinessObjectDefinitionStatus.Unpublished);
+        await _context.UnitOfWork.DidNotReceiveWithAnyArgs()
+            .SaveChangesAsync(TestContext.Current.CancellationToken);
+    }
 }

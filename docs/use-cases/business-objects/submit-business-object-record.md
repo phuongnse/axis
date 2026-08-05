@@ -4,29 +4,29 @@
 
 ## Purpose
 
-Create, edit, and submit a workspace-scoped business object record against an immutable published definition version. Submission validates the typed record values, executes the exact rules attached to that published version, and persists the submitted record together with deterministic rule evidence.
+Create, edit, and submit a workspace-scoped business object record against an immutable published definition version. Submission validates typed record values, executes the exact rules attached to that published version, and persists the submitted record with deterministic rule evidence.
 
-The first product demonstration uses a published `loan_application` definition and presents it as an Applications experience. `Application` is presentation vocabulary for that configured business object; this slice does not introduce an application-specific bounded context or a generic workflow engine.
+Axis owns the generic Draft → Submitted record lifecycle and its REST/MCP contracts. Product-owned consumers own their routes, presentation vocabulary, record setup, and end-to-end journeys.
 
 ## Primary actor
 
-- Signed-in workspace user submitting a business object record
+- Signed-in workspace user, or an authenticated product/agent consumer, submitting a business object record
 
 ## Trigger
 
-- User starts a new record from a published business object definition.
-- User saves a draft or submits the completed record.
+- A consumer starts a record from a published business object definition.
+- A consumer saves a draft or submits its completed values.
 
 ## Main flow
 
-1. User opens the Applications collection and starts a new application from a published definition.
-2. System creates a persisted Draft record tied to the exact immutable published definition version.
-3. User enters values using controls derived from the published field contract and saves the draft with the current revision.
-4. User submits the draft.
-5. Business Objects validates the submitted values against the exact published field contract and builds a typed consumer context for each attached rule binding.
-6. Rules resolves each binding's exact immutable binding revision and published rule version, then evaluates the positive Boolean assertion through the pure evaluator.
+1. A consumer resolves a published business object definition and creates a persisted Draft record.
+2. Business Objects ties that record to the exact immutable published definition version.
+3. The consumer saves typed values with the current draft revision.
+4. The consumer submits the draft.
+5. Business Objects validates values against the exact published field contract and builds a typed consumer context for each attached rule binding.
+6. Rules resolves each binding's exact immutable binding revision and exact Rule version, including an archived version that was valid when attached, then evaluates the positive Boolean assertion through the pure evaluator.
 7. If every applicable rule matches, Business Objects atomically changes the record to Submitted and stores exact rule-evaluation evidence.
-8. If a rule returns a valid non-match, the record remains Draft, no submission mutation is committed, and the UI shows the field-level diagnostics so the user can recover the input.
+8. If a rule returns a valid non-match, the record remains Draft, no submission mutation is committed, and the caller receives recoverable field-level diagnostics.
 9. If input validation or rule evaluation fails, the record remains Draft and the system returns a stable failure without treating an error as a successful match.
 10. Submitted records are read-only in this slice and remain tied to the definition version and binding revisions used at submission.
 
@@ -58,17 +58,17 @@ The first product demonstration uses a published `loan_application` definition a
 
 - **AC-009** Unknown, duplicate, malformed, or unsupported field values fail before persistence; optional fields may be absent, while requiredness is enforced by the attached published rule contract.
 - **AC-010** Choice fields enforce the published selection mode and option keys; Date and DateTime preserve the distinct published semantics.
-- **AC-011** A binding revision mismatch, disabled binding, missing binding, unresolved exact rule version, or evaluator error fails closed without changing the record.
+- **AC-011** A binding revision mismatch, disabled binding revision, missing binding revision, unresolved exact rule version, or evaluator error fails closed without changing the record; an archived exact Rule version remains resolvable for an already published snapshot.
 - **AC-012** Create-record idempotency keys are scoped to workspace and published object key; an exact retry is safe and a conflicting payload is rejected.
 - **AC-013** Missing workspace/user scope and cross-workspace access are rejected without mutation or disclosure.
-- **AC-014** Published field-rule snapshots retain a binding revision; later binding edits cannot silently change an already published record contract.
+- **AC-014** Published field-rule snapshots retain a binding revision; later binding edits or Rule archival cannot silently change an already published record contract, while new attachment/save/publish operations reject archived definitions.
 
 *Edge cases and boundaries*
 
 - **AC-015** Business Objects owns record lifecycle, values, transaction, and evidence; Rules owns reusable definitions, binding revisions, exact rule versions, and pure evaluation.
 - **AC-016** The consumer uses a typed `IRuleContextAdapter<TConsumerContext>` and maps only explicit record field data into rule inputs; Rules has no dependency on Business Objects.
 - **AC-017** The record store uses a module-owned migration, workspace/object/version/idempotency indexes, and concurrency protection; runtime table generation and event sourcing remain out of scope.
-- **AC-018** The Applications UI is a workflow interaction surface: collection, persisted draft, dynamic published-contract form, save, submit, recoverable rule diagnostics, and read-only submitted detail.
+- **AC-018** Axis public REST/OpenAPI and MCP contracts expose the generic definition, record, diagnostics, and rule-evidence behavior required by independently owned consumers. Axis contains no product route, copy, setup behavior, or browser journey for a configured record type.
 
 ## Acceptance Test Matrix
 
@@ -80,61 +80,49 @@ The first product demonstration uses a published `loan_application` definition a
 | AT-004 | Application boundary | Rule non-match keeps a draft unchanged and returns field-level diagnostics; evaluator failure is not a submission decision | AC-006, AC-007, AC-011 | Application test | Yes |
 | AT-005 | Infrastructure boundary | Records and rule evidence persist through the Business Objects migration with workspace/version/idempotency indexes and optimistic concurrency | AC-005, AC-012, AC-017 | Infrastructure integration test | Yes |
 | AT-006 | API boundary | Create, save, submit, list, and get endpoints enforce auth, workspace isolation, stable errors, idempotency, and generated OpenAPI/frontend parity | AC-001, AC-003, AC-005, AC-007, AC-012, AC-013 | API integration test | Yes |
-| AT-007 | API/Application boundaries | Published business-object field snapshots carry binding revisions; updating a binding cannot change the exact published contract used by a later submission | AC-011, AC-014, AC-015 | API integration test + Application test | Yes |
-| AT-008 | UI component | Applications collection and managed record window render dynamic field controls, save state, submit state, success detail, and rule mismatch recovery without losing input | AC-002, AC-006, AC-018 | UI component test | Yes |
-| AT-009 | Browser journey | User creates an application draft, saves it, submits valid values, sees Submitted evidence, and can recover from a failed rule without console errors or document overflow | AC-001, AC-005, AC-006, AC-018 | Browser automation | Yes |
-| AT-010 | API boundary | An authenticated agent using the platform API provisions or discovers the sample contract, submits a record, reads the persisted object, and observes the exact rule result | AC-004, AC-005, AC-015 | API integration test | Yes |
+| AT-007 | API/Application boundaries | Published field snapshots carry binding revisions; binding edits cannot change later submission, archived exact Rule versions still execute historically, and new attachment rejects archived definitions | AC-011, AC-014, AC-015 | API integration test + Application test | Yes |
+| AT-008 | API boundary | REST/OpenAPI and MCP record operations expose the generic created, draft, submitted, diagnostic, and rule-evidence projections without a product-specific Axis UI | AC-002, AC-005, AC-006, AC-018 | API integration test | Yes |
+| AT-009 | API boundary | A consumer uses generic definition and record operations to create, save, submit, and read a record with diagnostics and rule evidence | AC-018 | API integration test | Yes |
+| AT-010 | API boundary | An authenticated agent using platform operations creates or discovers a published contract, submits a record, reads the persisted object, and observes exact rule results | AC-004, AC-005, AC-015, AC-018 | API integration test | Yes |
 
 ## Out Of Scope
 
+- Product-specific record setup, routes, copy, UI components, and browser journeys.
 - Generic workflow-definition authoring, arbitrary states/transitions, assignments, approvals, SLA timers, notifications, webhooks, or automation orchestration.
 - Editing or deleting Submitted records.
 - Runtime table generation per business object.
 - Event sourcing, outbox/inbox, distributed transactions, or cross-database dual writes.
-- Application-specific loan underwriting, credit scoring, financial advice, or production decision policy; the sample rule is a platform demonstration only.
+- Product-specific decision policy, financial advice, or underwriting behavior.
 
 ## Screen flow
 
-| Screen | Required contract |
-|---|---|
-| Applications collection | Keep one primary table for persisted records with object name/key, status, definition version, updated time, and consumer actions; preserve search/page state while windows open. |
-| New application window | Create a persisted Draft first, show the immutable definition/version, render controls from the published field contract, and keep Save draft and Submit application actions explicit. |
-| Draft application window | Keep field values recoverable across validation failures, expose current revision, show save/submission pending and failure states, and focus the first invalid field after a failed submit. |
-| Rule validation section | Show valid non-match and evaluation-failure states separately; associate safe diagnostics with the affected field and never expose stack traces. |
-| Submitted application detail | Render the immutable values, definition version, submitted actor/time, status badge, and exact rule evidence as read-only content. |
-
-Required UI quality: every generated control has a programmatic label and visible invalid/focus state; dynamic controls remain keyboard reachable; window content scrolls internally; submit does not silently discard input; field errors remain near their controls; success and failure states are distinguishable; supported mobile and desktop widths have no document overflow.
+Axis does not own a record-product screen in this slice. A consumer-owned client may present collection, draft, diagnostics, and submitted-detail modes, but it must use the public contract above and owns its accessibility, responsive layout, recovery, and journey evidence.
 
 ## Diagrams
 
-### application-submission
+### business-object-record-submission
 
 ```mermaid
 sequenceDiagram
-  actor User
-  participant Web as Applications UI
+  actor Consumer
   participant API as Axis API
   participant BO as Business Objects
   participant Rules as Rules
   participant Store as Business Objects Store
 
-  User->>Web: Start application
-  Web->>API: Create draft from published object key
+  Consumer->>API: Create draft from published object key
   API->>BO: Resolve immutable published definition version
   BO->>Store: Persist Draft
-  User->>Web: Save values
-  Web->>API: Save draft with revision
+  Consumer->>API: Save values with revision
   API->>BO: Validate typed values and revision
   BO->>Store: Persist canonical draft values
-  User->>Web: Submit application
-  Web->>API: Submit draft with idempotency key
+  Consumer->>API: Submit draft with idempotency key
   API->>BO: Build typed field contexts
   BO->>Rules: Evaluate exact binding revisions
   Rules-->>BO: Boolean match and diagnostics
   BO->>Store: Commit Submitted record and evidence atomically
   BO-->>API: Read-only submitted detail
-  API-->>Web: Status and rule evidence
-  Web-->>User: Show submitted application
+  API-->>Consumer: Status and rule evidence
 ```
 
 > **Implementation status**
@@ -145,13 +133,15 @@ sequenceDiagram
 > | Application | Done |
 > | Infrastructure | Done |
 > | API | Done |
-> | Frontend | Done |
-> | MCP | Partial |
+> | Frontend | N/A |
+> | MCP | Done |
 >
-> **Gaps vs spec:** Product behavior evidence through the API, browser, and protocol boundaries is complete for this slice. Supported MCP host-client reload, current `tools/list`, authenticated `tools/call`, and client-session read-back remain unverified; the use case stays `Partial` until that runtime boundary is proven.
+> **Gaps vs spec:**
 >
-> **Deferred follow-ups:** Generic workflow-definition authoring, approval/assignment lifecycle, and additional record mutations remain explicitly out of scope for this first executable slice.
+> None.
 >
-> **Verification:** See [submit-business-object-record.evidence.md](./submit-business-object-record.evidence.md) for the exact commands and runtime evidence.
+> **Deferred follow-ups:** N/A. Generic workflow-definition authoring, approval/assignment lifecycle, and additional record mutations remain out of scope for this lifecycle.
 >
-> **Decisions:** Business Objects is extended with `BusinessObjectRecord` because existing product contracts explicitly reserve that ownership. The first lifecycle is Draft → Submitted; a valid rule non-match leaves the Draft recoverable instead of inventing a `Rejected` lifecycle state. Rules remain pure and consumer-neutral. Published field snapshots include exact binding revisions so later binding edits cannot rewrite an immutable record contract. The sample “loan application” is a configured business object and presentation route, not a new Applications bounded context. Generic workflow authoring and event-driven orchestration are deliberately deferred until a real product contract requires them.
+> **Verification:** See [submit-business-object-record.evidence.md](./submit-business-object-record.evidence.md) for exact proof paths, Axis wrapper commands, and supported-client runtime evidence.
+>
+> **Decisions:** Business Objects owns `BusinessObjectRecord` because existing product contracts reserve that ownership. The first lifecycle is Draft → Submitted; a valid rule non-match leaves the Draft recoverable rather than inventing a `Rejected` state. Rules remain pure and consumer-neutral. Published field snapshots include exact binding revisions and retain historical archived-version execution; new attachments reject archived definitions under [docs/use-cases/rules/manage-rule-bindings.md](../rules/manage-rule-bindings.md). Product consumers own presentation and setup; Axis keeps only generic public operations. Generic workflow authoring and event-driven orchestration remain out of scope until a product contract requires them.

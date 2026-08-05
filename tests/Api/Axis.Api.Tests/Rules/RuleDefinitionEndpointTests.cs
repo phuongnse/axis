@@ -21,9 +21,172 @@ public sealed class RuleDefinitionEndpointTests(ApiTestFixture fixture)
     [Fact]
     public async Task RuleDefinitionEndpoints_WhenAnonymous_ReturnUnauthorized()
     {
-        HttpResponseMessage response = await fixture.Client.GetAsync("/api/rules", TestContext.Current.CancellationToken);
+        using HttpClient anonymousClient = fixture.CreateAnonymousClient();
+        HttpResponseMessage response = await anonymousClient.GetAsync("/api/rules", TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task RuleBindingDetail_WhenAnonymous_ReturnsUnauthorized()
+    {
+        using HttpClient anonymousClient = fixture.CreateAnonymousClient();
+        HttpResponseMessage response = await anonymousClient.GetAsync(
+            $"/api/rule-bindings/{Guid.NewGuid():D}",
+            TestContext.Current.CancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task RuleBindingDetail_WhenOwned_ReturnsFullBinding()
+    {
+        string ownerToken = await CreateVerifiedSessionTokenAsync(UniqueEmail());
+        HttpResponseMessage createResponse = await SendWithBearerAsync(
+            HttpMethod.Post,
+            "/api/rule-bindings",
+            ownerToken,
+            new
+            {
+                definitionKey = RuleDefinitionKeys.Required,
+                definitionVersion = 1,
+                targetType = "neutral-consumer",
+                targetId = "consumer-1",
+                useCaseOrTrigger = "validate",
+                inputMappings = new
+                {
+                    value = new
+                    {
+                        kind = "Literal",
+                        contextKey = (string?)null,
+                        literalValues = new[] { "Approved" },
+                    },
+                },
+                priority = 4,
+                enabled = false,
+                failureBehavior = "FailOpen",
+            });
+        createResponse.StatusCode.Should().Be(HttpStatusCode.Created);
+        JsonElement created = await createResponse.Content.ReadFromJsonAsync<JsonElement>(Json, TestContext.Current.CancellationToken);
+        string bindingId = created.GetProperty("id").GetString()!;
+
+        HttpResponseMessage response = await SendWithBearerAsync(
+            HttpMethod.Get,
+            $"/api/rule-bindings/{bindingId}",
+            ownerToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        JsonElement binding = await response.Content.ReadFromJsonAsync<JsonElement>(Json, TestContext.Current.CancellationToken);
+        binding.GetProperty("id").GetString().Should().Be(bindingId);
+        binding.GetProperty("workspaceId").GetString().Should().NotBeNullOrWhiteSpace();
+        binding.GetProperty("definitionKey").GetString().Should().Be(RuleDefinitionKeys.Required);
+        binding.GetProperty("definitionVersion").GetInt32().Should().Be(1);
+        binding.GetProperty("targetType").GetString().Should().Be("neutral-consumer");
+        binding.GetProperty("targetId").GetString().Should().Be("consumer-1");
+        binding.GetProperty("useCaseOrTrigger").GetString().Should().Be("validate");
+        JsonElement mapping = binding.GetProperty("inputMappings").GetProperty("value");
+        mapping.GetProperty("kind").GetString().Should().Be("Literal");
+        mapping.GetProperty("contextKey").ValueKind.Should().Be(JsonValueKind.Null);
+        mapping.GetProperty("literalValues").EnumerateArray().Select(value => value.GetString())
+            .Should().Equal("Approved");
+        binding.GetProperty("priority").GetInt32().Should().Be(4);
+        binding.GetProperty("enabled").GetBoolean().Should().BeFalse();
+        binding.GetProperty("failureBehavior").GetString().Should().Be("FailOpen");
+        binding.GetProperty("revision").GetInt32().Should().Be(1);
+        binding.GetProperty("createdAt").GetDateTime().Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromMinutes(1));
+        binding.GetProperty("updatedAt").GetDateTime().Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromMinutes(1));
+    }
+
+    [Fact]
+    public async Task RuleBindingDetail_WhenAccessedFromAnotherWorkspace_ReturnsNotFound()
+    {
+        string ownerToken = await CreateVerifiedSessionTokenAsync(UniqueEmail());
+        HttpResponseMessage createResponse = await SendWithBearerAsync(
+            HttpMethod.Post,
+            "/api/rule-bindings",
+            ownerToken,
+            new
+            {
+                definitionKey = RuleDefinitionKeys.Required,
+                definitionVersion = 1,
+                targetType = "neutral-consumer",
+                targetId = "consumer-1",
+                useCaseOrTrigger = "validate",
+                inputMappings = new
+                {
+                    value = new
+                    {
+                        kind = "Literal",
+                        contextKey = (string?)null,
+                        literalValues = new[] { "Approved" },
+                    },
+                },
+            });
+        createResponse.StatusCode.Should().Be(HttpStatusCode.Created);
+        JsonElement created = await createResponse.Content.ReadFromJsonAsync<JsonElement>(Json, TestContext.Current.CancellationToken);
+
+        string otherWorkspaceToken = await CreateVerifiedSessionTokenAsync(UniqueEmail());
+        HttpResponseMessage response = await SendWithBearerAsync(
+            HttpMethod.Get,
+            $"/api/rule-bindings/{created.GetProperty("id").GetString()}",
+            otherWorkspaceToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task RuleBindingEvaluation_AuthenticatedRequest_DerivesWorkspaceAndCorrelation()
+    {
+        string accessToken = await CreateVerifiedSessionTokenAsync(UniqueEmail());
+        HttpResponseMessage createResponse = await SendWithBearerAsync(
+            HttpMethod.Post,
+            "/api/rule-bindings",
+            accessToken,
+            new
+            {
+                definitionKey = RuleDefinitionKeys.Required,
+                definitionVersion = 1,
+                targetType = "neutral-consumer",
+                targetId = "consumer-evaluate",
+                useCaseOrTrigger = "validate",
+                inputMappings = new
+                {
+                    value = new
+                    {
+                        kind = "Literal",
+                        contextKey = (string?)null,
+                        literalValues = new[] { "Approved" },
+                    },
+                },
+            });
+        createResponse.StatusCode.Should().Be(HttpStatusCode.Created);
+        JsonElement binding = await createResponse.Content.ReadFromJsonAsync<JsonElement>(Json, TestContext.Current.CancellationToken);
+
+        using HttpRequestMessage request = new(HttpMethod.Post, $"/api/rule-bindings/{binding.GetProperty("id").GetString()}/evaluate")
+        {
+            Content = JsonContent.Create(new { context = new { values = new { } } }, options: Json),
+        };
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+        request.Headers.Add("X-Correlation-Id", "rules-binding-evaluate");
+        HttpResponseMessage response = await fixture.Client.SendAsync(request, TestContext.Current.CancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        JsonElement evaluation = await response.Content.ReadFromJsonAsync<JsonElement>(Json, TestContext.Current.CancellationToken);
+        evaluation.GetProperty("isSuccess").GetBoolean().Should().BeTrue();
+        evaluation.GetProperty("correlationId").GetString().Should().Be("rules-binding-evaluate");
+    }
+
+    [Fact]
+    public async Task RuleBindingDetail_WhenMissing_ReturnsNotFound()
+    {
+        string accessToken = await CreateVerifiedSessionTokenAsync(UniqueEmail());
+
+        HttpResponseMessage response = await SendWithBearerAsync(
+            HttpMethod.Get,
+            $"/api/rule-bindings/{Guid.NewGuid():D}",
+            accessToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
     [Fact]
@@ -105,7 +268,8 @@ public sealed class RuleDefinitionEndpointTests(ApiTestFixture fixture)
         HttpResponseMessage deleteResponse = await SendWithBearerAsync(
             HttpMethod.Delete,
             $"/api/rule-bindings/{firstBindingId}",
-            accessToken);
+            accessToken,
+            new { expectedRevision = updatedBinding.GetProperty("revision").GetInt32() });
         deleteResponse.StatusCode.Should().Be(HttpStatusCode.NoContent);
 
         HttpResponseMessage ruleResponse = await SendWithBearerAsync(
@@ -122,7 +286,78 @@ public sealed class RuleDefinitionEndpointTests(ApiTestFixture fixture)
     }
 
     [Fact]
-    public async Task ListRuleDefinitions_WhenAuthenticated_ReturnsGeneralSystemCatalog()
+    public async Task RuleBindingDelete_WhenExpectedRevisionIsStale_ReturnsConflictAndRetainsBinding()
+    {
+        string accessToken = await CreateVerifiedSessionTokenAsync(UniqueEmail());
+        HttpResponseMessage createResponse = await SendWithBearerAsync(
+            HttpMethod.Post,
+            "/api/rule-bindings",
+            accessToken,
+            new
+            {
+                definitionKey = RuleDefinitionKeys.Required,
+                definitionVersion = 1,
+                targetType = "neutral-consumer",
+                targetId = "consumer-stale-delete",
+                useCaseOrTrigger = "validate",
+                inputMappings = new
+                {
+                    value = new
+                    {
+                        kind = "Literal",
+                        contextKey = (string?)null,
+                        literalValues = new[] { "Approved" },
+                    },
+                },
+            });
+        createResponse.StatusCode.Should().Be(HttpStatusCode.Created);
+        JsonElement binding = await createResponse.Content.ReadFromJsonAsync<JsonElement>(Json, TestContext.Current.CancellationToken);
+        string bindingId = binding.GetProperty("id").GetString()!;
+
+        HttpResponseMessage deleteResponse = await SendWithBearerAsync(
+            HttpMethod.Delete,
+            $"/api/rule-bindings/{bindingId}",
+            accessToken,
+            new { expectedRevision = binding.GetProperty("revision").GetInt32() + 1 });
+
+        deleteResponse.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        JsonElement problem = await deleteResponse.Content.ReadFromJsonAsync<JsonElement>(Json, TestContext.Current.CancellationToken);
+        problem.GetProperty("code").GetString().Should().Be("common.conflict");
+
+        HttpResponseMessage retainedResponse = await SendWithBearerAsync(
+            HttpMethod.Get,
+            $"/api/rule-bindings/{bindingId}",
+            accessToken);
+        retainedResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task RuleBindingCreate_WhenMappingValueIsNull_ReturnsBoundedBadRequest()
+    {
+        string accessToken = await CreateVerifiedSessionTokenAsync(UniqueEmail());
+
+        HttpResponseMessage response = await SendWithBearerAsync(
+            HttpMethod.Post,
+            "/api/rule-bindings",
+            accessToken,
+            new
+            {
+                definitionKey = RuleDefinitionKeys.Required,
+                definitionVersion = 1,
+                targetType = "neutral-consumer",
+                targetId = "consumer-null-mapping",
+                useCaseOrTrigger = "validate",
+                inputMappings = new Dictionary<string, object?> { ["value"] = null },
+            });
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        JsonElement problem = await response.Content.ReadFromJsonAsync<JsonElement>(Json, TestContext.Current.CancellationToken);
+        problem.GetProperty("code").GetString().Should().Be("rules.definition_invalid");
+        problem.GetProperty("detail").GetString().Should().NotBeNullOrWhiteSpace();
+    }
+
+    [Fact]
+    public async Task ListRuleDefinitions_WhenAuthenticated_ReturnsBuiltInCatalog()
     {
         string accessToken = await CreateVerifiedSessionTokenAsync(UniqueEmail());
 
@@ -198,7 +433,7 @@ public sealed class RuleDefinitionEndpointTests(ApiTestFixture fixture)
     }
 
     [Fact]
-    public async Task RuleAuthoringContracts_WhenAuthenticated_ReturnCapabilitiesAndExecutableSystemDetail()
+    public async Task RuleAuthoringContracts_WhenAuthenticated_ReturnCapabilitiesAndExecutableBuiltInDetail()
     {
         string accessToken = await CreateVerifiedSessionTokenAsync(UniqueEmail());
 
@@ -230,6 +465,58 @@ public sealed class RuleDefinitionEndpointTests(ApiTestFixture fixture)
                 definition.GetProperty("documentation").GetProperty("locales")
                     .TryGetProperty("vi", out _))
             .Should().BeTrue();
+
+        HttpResponseMessage projectResponse = await SendWithBearerAsync(
+            HttpMethod.Post,
+            "/api/rules/authoring/project",
+            accessToken,
+            new
+            {
+                source = new { text = "greaterThan(input(\"value\"), decimal(1))", ast = (object?)null },
+                inputs = new[]
+                {
+                    new
+                    {
+                        key = "value",
+                        label = "Value",
+                        types = new[] { "Decimal" },
+                        isRequired = true,
+                        allowMultiple = false,
+                        allowedValues = Array.Empty<string>(),
+                    },
+                },
+                expressionLanguageVersion = 1,
+                language = "en",
+            });
+        projectResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        JsonElement projection = await projectResponse.Content.ReadFromJsonAsync<JsonElement>(Json, TestContext.Current.CancellationToken);
+        projection.GetProperty("isValid").GetBoolean().Should().BeTrue();
+
+        HttpResponseMessage completionResponse = await SendWithBearerAsync(
+            HttpMethod.Post,
+            "/api/rules/authoring/complete",
+            accessToken,
+            new
+            {
+                text = "gre",
+                cursor = 3,
+                inputs = new[]
+                {
+                    new
+                    {
+                        key = "value",
+                        label = "Value",
+                        types = new[] { "Decimal" },
+                        isRequired = true,
+                        allowMultiple = false,
+                        allowedValues = Array.Empty<string>(),
+                    },
+                },
+                expressionLanguageVersion = 1,
+            });
+        completionResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        JsonElement[] completions = (await completionResponse.Content.ReadFromJsonAsync<JsonElement[]>(Json, TestContext.Current.CancellationToken))!;
+        completions.Select(completion => completion.GetProperty("label").GetString()).Should().Contain("greaterThan");
 
         HttpResponseMessage guideResponse = await SendWithBearerAsync(
             HttpMethod.Post,
@@ -279,8 +566,8 @@ public sealed class RuleDefinitionEndpointTests(ApiTestFixture fixture)
 
         detailResponse.StatusCode.Should().Be(HttpStatusCode.OK);
         JsonElement detail = await detailResponse.Content.ReadFromJsonAsync<JsonElement>(Json, TestContext.Current.CancellationToken);
-        detail.GetProperty("origin").GetString().Should().Be("System");
-        detail.GetProperty("status").GetString().Should().Be("Published");
+        detail.GetProperty("origin").GetString().Should().Be("BuiltIn");
+        detail.GetProperty("status").GetString().Should().Be("Active");
         detail.GetProperty("expressionLanguageVersion").GetInt32().Should().Be(1);
         detail.GetProperty("output").GetProperty("type").GetString().Should().Be("Boolean");
         detail.GetProperty("output").GetProperty("cardinality").GetString().Should().Be("Scalar");
@@ -291,12 +578,10 @@ public sealed class RuleDefinitionEndpointTests(ApiTestFixture fixture)
             .Should().Be("IsBlank");
         detail.GetProperty("condition").GetProperty("right").GetProperty("literal")
             .GetProperty("values").EnumerateArray().Single().GetString().Should().Be("false");
-        detail.TryGetProperty("outcome", out _).Should().BeFalse();
-        detail.TryGetProperty("contextKey", out _).Should().BeFalse();
     }
 
     [Fact]
-    public async Task ManageWorkspaceRule_WhenAuthenticated_SavesSimulatesAndPublishesExactVersion()
+    public async Task ManageWorkspaceRule_WhenAuthenticated_SavesSimulatesVersionsAndActivatesExactVersion()
     {
         string accessToken = await CreateVerifiedSessionTokenAsync(UniqueEmail());
         string name = $"Credit threshold {Guid.NewGuid():N}"[..32];
@@ -312,6 +597,7 @@ public sealed class RuleDefinitionEndpointTests(ApiTestFixture fixture)
                 {
                     new
                     {
+                        key = "value",
                         label = "Value",
                         types = new[] { "Decimal" },
                         isRequired = true,
@@ -320,6 +606,7 @@ public sealed class RuleDefinitionEndpointTests(ApiTestFixture fixture)
                     },
                     new
                     {
+                        key = "threshold",
                         label = "Threshold",
                         types = new[] { "Decimal" },
                         isRequired = true,
@@ -332,8 +619,8 @@ public sealed class RuleDefinitionEndpointTests(ApiTestFixture fixture)
                     nodeId = "threshold_check",
                     logicalOperator = (string?)null,
                     predicateOperator = "GreaterThan",
-                    left = new { kind = "Input", reference = "Value", literal = (object?)null },
-                    right = new { kind = "Input", reference = "Threshold", literal = (object?)null },
+                    left = new { kind = "Input", reference = "value", literal = (object?)null },
+                    right = new { kind = "Input", reference = "threshold", literal = (object?)null },
                     children = Array.Empty<object>(),
                 },
                 language = "vi",
@@ -352,7 +639,7 @@ public sealed class RuleDefinitionEndpointTests(ApiTestFixture fixture)
             .GetProperty("referenceKey").GetString()
             .Should().Be("GreaterThan");
         projected.GetProperty("condition").GetProperty("left").GetProperty("reference").GetString()
-            .Should().NotBe("Value");
+            .Should().Be("value");
 
         HttpResponseMessage createResponse = await SendWithBearerAsync(
             HttpMethod.Post,
@@ -376,6 +663,7 @@ public sealed class RuleDefinitionEndpointTests(ApiTestFixture fixture)
         {
             new
             {
+                key = "value",
                 label = "Value",
                 types = new[] { "Decimal" },
                 isRequired = true,
@@ -384,6 +672,7 @@ public sealed class RuleDefinitionEndpointTests(ApiTestFixture fixture)
             },
             new
             {
+                key = "threshold",
                 label = "Threshold",
                 types = new[] { "Decimal" },
                 isRequired = true,
@@ -407,8 +696,8 @@ public sealed class RuleDefinitionEndpointTests(ApiTestFixture fixture)
                     nodeId = "threshold_check",
                     logicalOperator = (string?)null,
                     predicateOperator = "GreaterThan",
-                    left = new { kind = "Input", reference = "Value", literal = (object?)null },
-                    right = new { kind = "Input", reference = "Threshold", literal = (object?)null },
+                    left = new { kind = "Input", reference = "value", literal = (object?)null },
+                    right = new { kind = "Input", reference = "threshold", literal = (object?)null },
                     children = Array.Empty<object>(),
                 },
             });
@@ -422,40 +711,39 @@ public sealed class RuleDefinitionEndpointTests(ApiTestFixture fixture)
             .ToDictionary(
                 input => input.GetProperty("label").GetString()!,
                 input => input.GetProperty("key").GetString()!);
-        Dictionary<string, object?> simulationBody = new()
+        inputKeys["Value"].Should().Be("value");
+        inputKeys["Threshold"].Should().Be("threshold");
+        object simulationBody = new
         {
-            ["definitionVersion"] = null,
-            ["inputs"] = new Dictionary<string, object?>
+            inputs = new Dictionary<string, object?>
             {
                 [inputKeys["Value"]] = new { type = "Decimal", values = new[] { "150" } },
                 [inputKeys["Threshold"]] = new { type = "Decimal", values = new[] { "100" } },
             },
-            ["correlationId"] = "rules-api-test",
         };
 
         HttpResponseMessage draftSimulationResponse = await SendWithBearerAsync(
             HttpMethod.Post,
-            $"/api/rules/{definitionKey}/simulate",
+            $"/api/rules/{definitionKey}/draft/simulate",
             accessToken,
             simulationBody);
         draftSimulationResponse.StatusCode.Should().Be(HttpStatusCode.OK);
         JsonElement draftSimulation = await draftSimulationResponse.Content.ReadFromJsonAsync<JsonElement>(Json, TestContext.Current.CancellationToken);
         draftSimulation.GetProperty("isMatch").GetBoolean().Should().BeTrue();
 
-        HttpResponseMessage publishResponse = await SendWithBearerAsync(
+        HttpResponseMessage createVersionResponse = await SendWithBearerAsync(
             HttpMethod.Post,
-            $"/api/rules/{definitionKey}/publish",
+            $"/api/rules/{definitionKey}/versions",
             accessToken,
             new { expectedRevision = 2 });
-        publishResponse.StatusCode.Should().Be(HttpStatusCode.OK);
-        JsonElement published = await publishResponse.Content.ReadFromJsonAsync<JsonElement>(Json, TestContext.Current.CancellationToken);
-        published.GetProperty("status").GetString().Should().Be("Published");
-        published.GetProperty("latestPublishedVersion").GetInt32().Should().Be(1);
+        createVersionResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        JsonElement inactive = await createVersionResponse.Content.ReadFromJsonAsync<JsonElement>(Json, TestContext.Current.CancellationToken);
+        inactive.GetProperty("status").GetString().Should().Be("Inactive");
+        inactive.GetProperty("latestVersion").GetInt32().Should().Be(1);
 
-        simulationBody["definitionVersion"] = 1;
         HttpResponseMessage versionSimulationResponse = await SendWithBearerAsync(
             HttpMethod.Post,
-            $"/api/rules/{definitionKey}/simulate",
+            $"/api/rules/{definitionKey}/versions/1/simulate",
             accessToken,
             simulationBody);
         versionSimulationResponse.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -463,21 +751,30 @@ public sealed class RuleDefinitionEndpointTests(ApiTestFixture fixture)
         versionSimulation.GetProperty("definitionVersion").GetInt32().Should().Be(1);
         versionSimulation.GetProperty("isMatch").GetBoolean().Should().BeTrue();
 
-        HttpResponseMessage startRevisionResponse = await SendWithBearerAsync(
-            HttpMethod.Post,
-            $"/api/rules/{definitionKey}/draft",
+        HttpResponseMessage activateResponse = await SendWithBearerAsync(
+            HttpMethod.Put,
+            $"/api/rules/{definitionKey}/active-version",
             accessToken,
-            new { expectedRevision = 3 });
-        startRevisionResponse.StatusCode.Should().Be(HttpStatusCode.OK);
-        JsonElement revision = await startRevisionResponse.Content.ReadFromJsonAsync<JsonElement>(Json, TestContext.Current.CancellationToken);
-        revision.GetProperty("status").GetString().Should().Be("Draft");
-        revision.GetProperty("revision").GetInt32().Should().Be(4);
+            new { version = 1, expectedRevision = 3 });
+        activateResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        JsonElement active = await activateResponse.Content.ReadFromJsonAsync<JsonElement>(Json, TestContext.Current.CancellationToken);
+        active.GetProperty("status").GetString().Should().Be("Active");
+        active.GetProperty("activeVersion").GetInt32().Should().Be(1);
+
+        HttpResponseMessage deactivateResponse = await SendWithBearerAsync(
+            HttpMethod.Delete,
+            $"/api/rules/{definitionKey}/active-version",
+            accessToken,
+            new { expectedRevision = 4 });
+        deactivateResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        JsonElement deactivated = await deactivateResponse.Content.ReadFromJsonAsync<JsonElement>(Json, TestContext.Current.CancellationToken);
+        deactivated.GetProperty("status").GetString().Should().Be("Inactive");
 
         HttpResponseMessage archiveResponse = await SendWithBearerAsync(
             HttpMethod.Post,
             $"/api/rules/{definitionKey}/archive",
             accessToken,
-            new { expectedRevision = 4 });
+            new { expectedRevision = 5 });
         archiveResponse.StatusCode.Should().Be(HttpStatusCode.OK);
         JsonElement archived = await archiveResponse.Content.ReadFromJsonAsync<JsonElement>(Json, TestContext.Current.CancellationToken);
         archived.GetProperty("status").GetString().Should().Be("Archived");
@@ -485,7 +782,7 @@ public sealed class RuleDefinitionEndpointTests(ApiTestFixture fixture)
 
         HttpResponseMessage archivedSimulationResponse = await SendWithBearerAsync(
             HttpMethod.Post,
-            $"/api/rules/{definitionKey}/simulate",
+            $"/api/rules/{definitionKey}/versions/1/simulate",
             accessToken,
             simulationBody);
         archivedSimulationResponse.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -509,8 +806,8 @@ public sealed class RuleDefinitionEndpointTests(ApiTestFixture fixture)
         string authorizeUrl = QueryHelpers.AddQueryString("/connect/authorize", new Dictionary<string, string?>
         {
             ["response_type"] = "code",
-            ["client_id"] = "axis_spa",
-            ["redirect_uri"] = "https://localhost/callback",
+            ["client_id"] = "axis_mcp",
+            ["redirect_uri"] = "http://127.0.0.1:48123/callback",
             ["code_challenge"] = CreateCodeChallenge(verifier),
             ["code_challenge_method"] = "S256",
             ["scope"] = "openid email profile",
@@ -546,8 +843,8 @@ public sealed class RuleDefinitionEndpointTests(ApiTestFixture fixture)
         using FormUrlEncodedContent tokenRequest = new(new Dictionary<string, string>
         {
             ["grant_type"] = "authorization_code",
-            ["client_id"] = "axis_spa",
-            ["redirect_uri"] = "https://localhost/callback",
+            ["client_id"] = "axis_mcp",
+            ["redirect_uri"] = "http://127.0.0.1:48123/callback",
             ["code"] = code,
             ["code_verifier"] = verifier,
         });
@@ -584,14 +881,13 @@ public sealed class RuleDefinitionEndpointTests(ApiTestFixture fixture)
         };
         request.Headers.Add("Idempotency-Key", Guid.NewGuid().ToString("N"));
 
-        return await fixture.Client.SendAsync(request, TestContext.Current.CancellationToken);
+        return await fixture.SendBrowserMutationAsync(request, TestContext.Current.CancellationToken);
     }
 
     private async Task<HttpResponseMessage> VerifyEmailAsync(string token) =>
-        await fixture.Client.PostAsJsonAsync(
+        await fixture.PostBrowserJsonAsync(
             "/api/auth/verify-email",
             new { token },
-            Json,
             TestContext.Current.CancellationToken);
 
     private string CapturedToken(string email) =>

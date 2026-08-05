@@ -3,7 +3,7 @@ namespace Axis.Mcp.Tools;
 /// <summary>
 /// The explicit MCP-to-OpenAPI coverage contract. Every authenticated product
 /// operation is either exposed as one semantic MCP tool, intentionally blocked
-/// pending its owning product contract, or kept internal to the OAuth client.
+/// pending its owning product contract, or kept internal to browser/OAuth bootstrap.
 /// </summary>
 public static class AxisMcpOperationCatalog
 {
@@ -24,6 +24,7 @@ public static class AxisMcpOperationCatalog
             ["GetMe"] = "axis_get_current_user",
             ["UpdateLanguagePreference"] = "axis_update_language_preference",
             ["UpdateThemePreference"] = "axis_update_theme_preference",
+            ["GetRuleBinding"] = "axis_get_rule_binding",
             ["ListRuleBindingUsage"] = "axis_list_rule_binding_usage",
             ["ListRuleDefinitions"] = "axis_list_rules",
             ["CreateRuleDefinition"] = "axis_create_rule_definition",
@@ -32,18 +33,23 @@ public static class AxisMcpOperationCatalog
             ["SearchRuleExpressionGuide"] = "axis_search_rule_expression_guide",
             ["GetRuleDefinition"] = "axis_get_rule",
             ["SaveRuleDefinitionDraft"] = "axis_save_rule_definition_draft",
-            ["SimulateRuleDefinition"] = "axis_simulate_rule",
+            ["CreateRuleDefinitionVersion"] = "axis_create_rule_definition_version",
+            ["ActivateRuleDefinitionVersion"] = "axis_activate_rule_definition_version",
+            ["DeactivateRuleDefinition"] = "axis_deactivate_rule_definition",
+            ["ArchiveRuleDefinition"] = "axis_archive_rule_definition",
+            ["SimulateRuleDefinitionDraft"] = "axis_simulate_rule_definition_draft",
+            ["SimulateRuleDefinitionVersion"] = "axis_simulate_rule_definition_version",
+            ["ProjectRuleAuthoring"] = "axis_project_rule_authoring",
+            ["CompleteRuleAuthoring"] = "axis_complete_rule_authoring",
             ["CreateRuleBinding"] = "axis_create_rule_binding",
             ["UpdateRuleBinding"] = "axis_update_rule_binding",
+            ["DeleteRuleBinding"] = "axis_delete_rule_binding",
+            ["EvaluateRuleBinding"] = "axis_evaluate_rule_binding",
         };
 
     public static IReadOnlySet<string> BlockedOperationIds { get; } =
         new HashSet<string>(StringComparer.Ordinal)
         {
-            "StartRuleDefinitionDraft",
-            "PublishRuleDefinition",
-            "ArchiveRuleDefinition",
-            "DeleteRuleBinding",
         };
 
     public static IReadOnlySet<string> ExcludedOperationIds { get; } =
@@ -54,5 +60,6 @@ public static class AxisMcpOperationCatalog
             "ResendEmailVerification",
             "SignOutUser",
             "RegisterUser",
+            "GetBrowserSession",
         };
 }

@@ -40,8 +40,8 @@ public sealed class GetRuleDefinitionHandlerTests
             CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
-        result.Value.Origin.Should().Be(RuleOrigin.System);
-        result.Value.Status.Should().Be(RuleLifecycleStatus.Published);
+        result.Value.Origin.Should().Be(RuleOrigin.BuiltIn);
+        result.Value.Status.Should().Be(RuleLifecycleStatus.Active);
         result.Value.ExpressionLanguageVersion.Should().Be(DomainExpressionLanguage.Version);
         result.Value.Condition.Should().NotBeNull();
         result.Value.Condition!.Left!.Kind.Should().Be(RuleOperandKind.Function);

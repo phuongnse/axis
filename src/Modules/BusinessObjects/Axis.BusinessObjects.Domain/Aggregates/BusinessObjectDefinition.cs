@@ -47,7 +47,9 @@ public sealed class BusinessObjectDefinition : AggregateRoot<BusinessObjectDefin
 
         Result normalizedName = ValidateName(name);
         if (normalizedName.IsFailure)
-            return Result.Failure<BusinessObjectDefinition>(normalizedName.Error);
+            return Result.Failure<BusinessObjectDefinition>(
+                normalizedName.ErrorCode ?? ErrorCodes.InvalidInput,
+                normalizedName.Error);
 
         return new BusinessObjectDefinition(
             BusinessObjectDefinitionId.New(),
@@ -211,7 +213,7 @@ public sealed class BusinessObjectDefinition : AggregateRoot<BusinessObjectDefin
     }
 
     private static Result ValidateName(string name) =>
-        string.IsNullOrWhiteSpace(name)
+        string.IsNullOrWhiteSpace(name) || name.Trim().Length > 200
             ? Result.Failure(ErrorCodes.InvalidInput, "Object definition name is required.")
             : Result.Success();
 }

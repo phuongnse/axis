@@ -36,7 +36,7 @@ Do not add reference-owner sections or bottom reference lists for repo docs.
 
 ## Size
 
-`AGENTS.md`, [docs/ARCHITECTURE.md](../ARCHITECTURE.md), playbooks, and pattern routers stay under 100 lines. Move workflow into skills before adding prose.
+`AGENTS.md`, [docs/ARCHITECTURE.md](../ARCHITECTURE.md), playbooks, and pattern routers stay at most 100 lines. Move workflow into skills before adding prose.
 
 ## Use-Case Files
 

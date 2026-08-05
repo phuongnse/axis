@@ -16,5 +16,5 @@ statusMessage = "Checking Axis delegation role"
 
 [mcp_servers.axis]
 command = "python"
-args = ["scripts/axis.py", "mcp", "serve"]
+args = ["scripts/axis.py", "mcp", "serve", "--access", "write"]
 startup_timeout_sec = 120

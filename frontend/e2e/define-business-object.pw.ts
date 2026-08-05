@@ -1,4 +1,3 @@
-import { Buffer } from 'node:buffer';
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
 const profile = {
@@ -22,15 +21,17 @@ const profile = {
 const definitionId = '33333333-3333-4333-8333-333333333333';
 const fieldId = '44444444-4444-4444-8444-444444444444';
 const versionId = '55555555-5555-4555-8555-555555555555';
+const bindingId = '66666666-6666-4666-8666-666666666666';
 const now = '2026-07-07T00:00:00Z';
-const systemRule = (definitionKey: string, name: string, targetTypeKeys: string[]) => ({
+const builtInRule = (definitionKey: string, name: string, targetTypeKeys: string[]) => ({
   definitionKey,
   name,
   description: `${name} validation.`,
-  origin: 'System',
-  status: 'Published',
+  origin: 'BuiltIn',
+  status: 'Active',
   expressionLanguageVersion: 1,
-  latestPublishedVersion: 1,
+  latestVersion: 1,
+  activeVersion: 1,
   output: { type: 'Boolean', cardinality: 'Scalar' },
   inputs: [
     {
@@ -44,7 +45,7 @@ const systemRule = (definitionKey: string, name: string, targetTypeKeys: string[
 });
 const fieldRuleDefinitions = {
   items: [
-    systemRule('field.required', 'Required value', [
+    builtInRule('field.required', 'Required value', [
       'Text',
       'Integer',
       'Decimal',
@@ -53,14 +54,14 @@ const fieldRuleDefinitions = {
       'Boolean',
       'Choice',
     ]),
-    systemRule('field.numeric_range', 'Numeric range', ['Integer', 'Decimal']),
-    systemRule('field.date_range', 'Date range', ['Date']),
-    systemRule('field.datetime_range', 'Date and time range', ['DateTime']),
-    systemRule('field.text_length', 'Text length', ['Text']),
-    systemRule('field.text_pattern', 'Text pattern', ['Text']),
-    systemRule('field.text_format', 'Text format', ['Text']),
-    systemRule('field.decimal_precision', 'Decimal precision', ['Decimal']),
-    systemRule('field.choice_selection_count', 'Choice selection count', ['Choice']),
+    builtInRule('field.numeric_range', 'Numeric range', ['Integer', 'Decimal']),
+    builtInRule('field.date_range', 'Date range', ['Date']),
+    builtInRule('field.datetime_range', 'Date and time range', ['DateTime']),
+    builtInRule('field.text_length', 'Text length', ['Text']),
+    builtInRule('field.text_pattern', 'Text pattern', ['Text']),
+    builtInRule('field.text_format', 'Text format', ['Text']),
+    builtInRule('field.decimal_precision', 'Decimal precision', ['Decimal']),
+    builtInRule('field.choice_selection_count', 'Choice selection count', ['Choice']),
   ],
   totalCount: 9,
   page: 1,
@@ -77,9 +78,8 @@ type BusinessObjectFieldType =
   | 'Choice';
 
 interface BusinessObjectFieldRuleRequest {
-  definitionKey: string;
-  definitionVersion?: number;
-  inputs?: Record<string, string[]>;
+  bindingId: string;
+  bindingRevision?: number;
 }
 
 interface BusinessObjectFieldRequest {
@@ -117,22 +117,6 @@ interface MockBusinessObjectDefinitionRequest {
 type BusinessObjectDefinitionRequests = (() => string[]) & {
   details: () => readonly MockBusinessObjectDefinitionRequest[];
 };
-
-function base64UrlJson(value: unknown): string {
-  return Buffer.from(JSON.stringify(value), 'utf8').toString('base64url');
-}
-
-function accessToken(): string {
-  return [
-    base64UrlJson({ alg: 'none', typ: 'JWT' }),
-    base64UrlJson({
-      sub: profile.id,
-      email: profile.email,
-      name: profile.fullName,
-    }),
-    'signature',
-  ].join('.');
-}
 
 function unpublishedDetail({
   name,
@@ -229,24 +213,20 @@ async function mockAuthenticatedSession(
     localStorage.setItem('axis.theme', selectedTheme);
   }, theme);
 
-  await page.route('**/connect/authorize**', async (route) => {
-    const requestUrl = new URL(route.request().url());
-    const state = requestUrl.searchParams.get('state') ?? '';
-    const callbackUrl = new URL('/callback', requestUrl.origin);
-    callbackUrl.searchParams.set('code', 'objects-code');
-    callbackUrl.searchParams.set('state', state);
-
-    await route.fulfill({
-      status: 302,
-      headers: { location: callbackUrl.toString() },
-    });
-  });
-
-  await page.route('**/connect/token', async (route) => {
+  await page.route('**/api/auth/session', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify({ access_token: accessToken() }),
+      body: JSON.stringify({
+        authenticated: true,
+        csrfToken: 'objects-csrf-token',
+        user: {
+          userId: sessionProfile.id,
+          workspaceId: sessionProfile.workspaceId,
+          email: sessionProfile.email,
+          name: sessionProfile.fullName,
+        },
+      }),
     });
   });
 
@@ -281,6 +261,26 @@ async function mockBusinessObjectDefinitionApi(
       contentType: 'application/json',
       body: JSON.stringify(fieldRuleDefinitions),
     });
+  });
+
+  await page.route('**/api/rule-bindings', async (route) => {
+    const request = route.request();
+    const url = new URL(request.url());
+    const method = request.method();
+    const requestEntry: MockBusinessObjectDefinitionRequest = { method, path: url.pathname };
+    requests.push(requestEntry);
+
+    if (method === 'POST') {
+      requestEntry.body = request.postDataJSON();
+      await route.fulfill({
+        status: 201,
+        contentType: 'application/json',
+        body: JSON.stringify({ id: bindingId, revision: 1 }),
+      });
+      return;
+    }
+
+    await route.fulfill({ status: 404, body: `${method} ${url.pathname}` });
   });
 
   await page.route('**/api/business-object-definitions**', async (route) => {
@@ -366,7 +366,10 @@ async function mockBusinessObjectDefinitionApi(
         name: body.name,
         objectKey: currentDefinition.objectKey,
         revision: 2,
-        fields: body.fields,
+        fields: body.fields?.map((field) => ({
+          ...field,
+          rules: field.rules?.map((rule) => ({ ...rule, bindingRevision: 1 })),
+        })),
       });
       await route.fulfill({
         status: 200,
@@ -835,12 +838,28 @@ test.describe('define business object', () => {
         () =>
           objectRequests
             .details()
+            .find((request) => request.method === 'POST' && request.path === '/api/rule-bindings')
+            ?.body,
+      )
+      .toMatchObject({
+        definitionKey: 'field.required',
+        definitionVersion: 1,
+        targetType: 'business-object-field',
+        targetId: 'application.status',
+        useCaseOrTrigger: 'field-validation',
+        inputMappings: {
+          value: { kind: 'Context', contextKey: 'record.value', literalValues: [] },
+        },
+      });
+    await expect
+      .poll(
+        () =>
+          objectRequests
+            .details()
             .find(
               (request) =>
                 request.method === 'PUT' &&
-                request.path === `/api/business-object-definitions/${definitionId}/unpublished` &&
-                JSON.stringify(request.body).includes('field.required') &&
-                JSON.stringify(request.body).includes('choiceConfiguration'),
+                request.path === `/api/business-object-definitions/${definitionId}/unpublished`,
             )?.body,
       )
       .toMatchObject({
@@ -858,10 +877,18 @@ test.describe('define business object', () => {
                 { optionKey: 'approved', label: 'Approved' },
               ],
             },
-            rules: [{ definitionKey: 'field.required', definitionVersion: 1, inputs: {} }],
+            rules: [{ bindingId }],
           },
         ],
       });
+    const savedDefinition = objectRequests
+      .details()
+      .find(
+        (request) =>
+          request.method === 'PUT' &&
+          request.path === `/api/business-object-definitions/${definitionId}/unpublished`,
+      )?.body as BusinessObjectDefinitionRequest;
+    expect(savedDefinition.fields?.[0]?.rules).toEqual([{ bindingId }]);
     await expect(dialog.getByRole('button', { name: 'Publish', exact: true })).toBeEnabled();
 
     await dialog.getByRole('button', { name: 'Publish', exact: true }).click();
@@ -881,7 +908,8 @@ test.describe('define business object', () => {
     await expect(publishedDetails.getByText('Choice', { exact: true })).toBeVisible();
     await expect(publishedDetails.getByText('Single', { exact: true })).toBeVisible();
     await expect(publishedDetails.getByText('Approved', { exact: false })).toBeVisible();
-    await expect(publishedDetails.getByText('Required value', { exact: true })).toBeVisible();
+    await expect(publishedDetails.getByText(bindingId, { exact: true })).toBeVisible();
+    await expect(publishedDetails).toContainText('Binding revision: 1');
     await expectNoDesktopDocumentScroll(page);
     await expectNoPageOverflow(page);
 

@@ -18,7 +18,7 @@ public sealed class RuleApplicationValidator(IRuleDefinitionRepository repositor
         if (request.WorkspaceId == Guid.Empty)
             return Invalid("workspace_required", "Workspace scope is required.");
 
-        RuleDefinition? definition = SystemRuleCatalog.Find(request.DefinitionKey, request.DefinitionVersion);
+        RuleDefinition? definition = BuiltInRuleCatalog.Find(request.DefinitionKey, request.DefinitionVersion);
         if (definition is null)
         {
             Result<RuleDefinitionKey> key = RuleDefinitionKey.Create(request.DefinitionKey);
@@ -29,7 +29,7 @@ public sealed class RuleApplicationValidator(IRuleDefinitionRepository repositor
                 key.Value,
                 request.WorkspaceId,
                 cancellationToken);
-            if (definition is null || definition.Status == DomainLifecycleStatus.Archived)
+            if (definition is null)
                 return Invalid("definition_not_found", "Rule definition was not found.");
         }
 

@@ -39,6 +39,35 @@ public sealed class McpApiCoverageTests
                 StringComparer.Ordinal));
     }
 
+    [Fact]
+    public void RuleOperationCatalog_CurrentCutover_UsesExpectedOperationIds()
+    {
+        Assert.Equal(
+            new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["CreateRuleDefinitionVersion"] = "axis_create_rule_definition_version",
+                ["ActivateRuleDefinitionVersion"] = "axis_activate_rule_definition_version",
+                ["DeactivateRuleDefinition"] = "axis_deactivate_rule_definition",
+                ["ArchiveRuleDefinition"] = "axis_archive_rule_definition",
+                ["SimulateRuleDefinitionDraft"] = "axis_simulate_rule_definition_draft",
+                ["SimulateRuleDefinitionVersion"] = "axis_simulate_rule_definition_version",
+                ["ProjectRuleAuthoring"] = "axis_project_rule_authoring",
+                ["CompleteRuleAuthoring"] = "axis_complete_rule_authoring",
+                ["EvaluateRuleBinding"] = "axis_evaluate_rule_binding",
+            },
+            AxisMcpOperationCatalog.OperationToTool
+                .Where(pair => pair.Key is "CreateRuleDefinitionVersion"
+                    or "ActivateRuleDefinitionVersion"
+                    or "DeactivateRuleDefinition"
+                    or "ArchiveRuleDefinition"
+                    or "SimulateRuleDefinitionDraft"
+                    or "SimulateRuleDefinitionVersion"
+                    or "ProjectRuleAuthoring"
+                    or "CompleteRuleAuthoring"
+                    or "EvaluateRuleBinding")
+                .ToDictionary());
+    }
+
     private static string FindRepoRoot()
     {
         DirectoryInfo? current = new(AppContext.BaseDirectory);

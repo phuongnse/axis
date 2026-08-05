@@ -13,7 +13,7 @@ public sealed class BusinessObjectDefinitionInputPlanner(IRuleBindingReferenceVa
         Guid workspaceId,
         IReadOnlyList<BusinessObjectFieldDefinitionInput> fields,
         CancellationToken cancellationToken,
-        BusinessObjectDefinitionKey? objectKey = null)
+        BusinessObjectDefinitionKey objectKey)
     {
         List<BusinessObjectFieldDefinitionSpec> specs = [];
         for (int index = 0; index < fields.Count; index++)
@@ -46,7 +46,7 @@ public sealed class BusinessObjectDefinitionInputPlanner(IRuleBindingReferenceVa
 
     private async Task<Result<IReadOnlyList<BusinessObjectFieldRuleSpec>>> PlanRulesAsync(
         Guid workspaceId,
-        BusinessObjectDefinitionKey? objectKey,
+        BusinessObjectDefinitionKey objectKey,
         BusinessObjectFieldDefinitionInput field,
         CancellationToken cancellationToken)
     {
@@ -57,12 +57,17 @@ public sealed class BusinessObjectDefinitionInputPlanner(IRuleBindingReferenceVa
         foreach (BusinessObjectFieldRuleInput rule in field.Rules)
         {
             RuleBindingReferenceValidationResult validation = await bindingValidator.ValidateAsync(
-                workspaceId,
-                rule.BindingId,
-                cancellationToken,
-                expectedTargetType: objectKey is null ? null : BusinessObjectRecordRuleBindingContract.TargetType,
-                expectedTargetId: objectKey is null ? null : BusinessObjectRecordRuleBindingContract.TargetId(objectKey, field.FieldKey),
-                expectedUseCaseOrTrigger: objectKey is null ? null : BusinessObjectRecordRuleBindingContract.UseCaseOrTrigger);
+                new RuleBindingReferenceValidationRequest(
+                    workspaceId,
+                    rule.BindingId,
+                    BusinessObjectRecordRuleBindingContract.TargetType,
+                    BusinessObjectRecordRuleBindingContract.TargetId(objectKey, field.FieldKey),
+                    BusinessObjectRecordRuleBindingContract.UseCaseOrTrigger,
+                    BusinessObjectRuleBindingContextSchema.For(
+                        field.FieldType,
+                        field.ChoiceConfiguration?.SelectionMode),
+                    BusinessObjectRuleBindingContextSchema.RequiredKeys),
+                cancellationToken);
             if (!validation.IsValid)
                 return Result.Failure<IReadOnlyList<BusinessObjectFieldRuleSpec>>(validation.Error!);
 

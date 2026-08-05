@@ -14,7 +14,7 @@ public sealed class AxisMcpBusinessObjectRecordReadTools(AxisApiClient api)
     public Task<string> ListBusinessObjectRecordsAsync(
         [Description("One-based result page.")] int page = 1,
         [Description("Number of records to return, from 1 to 100.")] int pageSize = 20,
-        [Description("Optional business-object key, such as loan_application.")] string? objectKey = null,
+        [Description("Optional business-object key, such as business_record.")] string? objectKey = null,
         CancellationToken cancellationToken = default)
     {
         ValidatePage(page, pageSize);
@@ -53,7 +53,7 @@ public sealed class AxisMcpBusinessObjectRecordWriteTools(
     [McpServerTool(Name = "axis_create_business_object_record")]
     [Description("[WRITE] Create a persisted Draft record from the latest published business-object version. The idempotency key is owned by the API contract.")]
     public Task<string> CreateBusinessObjectRecordAsync(
-        [Description("Stable business-object key, such as loan_application.")] string objectKey,
+        [Description("Stable business-object key, such as business_record.")] string objectKey,
         CreateBusinessObjectRecordInput input,
         CancellationToken cancellationToken = default)
     {

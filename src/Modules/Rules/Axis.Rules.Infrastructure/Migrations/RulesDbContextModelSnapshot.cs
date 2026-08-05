@@ -18,7 +18,7 @@ namespace Axis.Rules.Infrastructure.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "9.0.16")
+                .HasAnnotation("ProductVersion", "10.0.10")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -126,6 +126,10 @@ namespace Axis.Rules.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<int?>("ActiveVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("active_version");
+
                     b.Property<DateTime?>("ArchivedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("archived_at");
@@ -205,12 +209,6 @@ namespace Axis.Rules.Infrastructure.Migrations
                         .HasColumnName("search_vector")
                         .HasComputedColumnSql("to_tsvector('simple', axis_unaccent(lower(coalesce(name, '') || ' ' || coalesce(description, '') || ' ' || coalesce(definition_key, ''))))", true);
 
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)")
-                        .HasColumnName("status");
-
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
@@ -256,7 +254,7 @@ namespace Axis.Rules.Infrastructure.Migrations
                     b.HasIndex("WorkspaceId", "Key")
                         .IsUnique();
 
-                    b.HasIndex("WorkspaceId", "Status", "Name");
+                    b.HasIndex("WorkspaceId", "ArchivedAt", "ActiveVersion", "LatestPublishedVersion", "Name");
 
                     b.ToTable("rule_definitions", (string)null);
                 });
@@ -327,7 +325,7 @@ namespace Axis.Rules.Infrastructure.Migrations
                     b.HasOne("Axis.Rules.Domain.RuleDefinition", null)
                         .WithMany("Versions")
                         .HasForeignKey("DefinitionId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
 

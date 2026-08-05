@@ -21,6 +21,8 @@ This file owns durable source and runtime boundaries. Current behavior lives in 
 - Module-owned data changes use EF Core migrations.
 - Event sourcing is opt-in and requires an approved event store, replay, projection, and versioning design before source changes.
 - New product behavior starts in an owning use-case spec before source changes.
+- Development and test composition may replace infrastructure adapters, addresses, credentials, certificates, and data only; it preserves production authentication, authorization, isolation, TLS validation, migration, concurrency, failure, and recovery semantics.
+- Every runtime boundary derives its deployment configuration, secret ownership, observable failure behavior, and recovery evidence from an owning production-grade contract; local-only behavior cannot become an application dependency.
 
 ## Dependency Direction
 

@@ -16,6 +16,7 @@ Follow [reference.md](../reference.md).
 - **Blocked** readiness forbids module implementation.
 - Event sourcing requires explicit user sign-off and complete operational/replay decisions.
 - Product behavior stays out of `Axis.Shared.*`; modules do not depend on another module's internals.
+- A Ready decision must satisfy the applicable enterprise-production concerns for its implemented boundary; an unimplemented separate capability cannot justify a temporary module foundation.
 
 ## Inputs
 
@@ -25,7 +26,7 @@ Follow [reference.md](../reference.md).
 ## Workflow
 
 1. Classify existing slice, new bounded context, foundational pattern, or event-sourcing decision.
-2. Define ubiquitous language, owned lifecycle/data, mutation authority, upstream inputs, downstream contracts/events, and composition-root boundary from the owning product and architecture contracts.
+2. Define ubiquitous language, owned lifecycle/data, mutation authority, upstream inputs, downstream contracts/events, composition-root boundary, and applicable enterprise-production obligations from the owning product and architecture contracts.
 3. Decide aggregates/invariants, CQRS requests/handlers, validation, idempotency, authorization/workspace scope, and business-failure mapping.
 4. Decide module-owned persistence, migrations, transaction/repository boundary, read models, concurrency, and rollback needs.
 5. Decide domain/integration/event-sourcing semantics, including delivery, idempotency, versioning, replay, retention, and rebuild concerns only when those patterns are in scope.

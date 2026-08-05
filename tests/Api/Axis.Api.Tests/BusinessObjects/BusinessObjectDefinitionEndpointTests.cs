@@ -23,7 +23,8 @@ public sealed class BusinessObjectDefinitionEndpointTests(ApiTestFixture fixture
     [Fact]
     public async Task BusinessObjectDefinitionEndpoints_WhenAnonymous_ReturnUnauthorized()
     {
-        HttpResponseMessage response = await fixture.Client.GetAsync("/api/business-object-definitions", TestContext.Current.CancellationToken);
+        using HttpClient anonymousClient = fixture.CreateAnonymousClient();
+        HttpResponseMessage response = await anonymousClient.GetAsync("/api/business-object-definitions", TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
@@ -245,6 +246,97 @@ public sealed class BusinessObjectDefinitionEndpointTests(ApiTestFixture fixture
     }
 
     [Fact]
+    public async Task SaveUnpublished_WhenRuleBindingContextIsIncompatible_RejectsImmutableDefinitionWhileCompatibleBindingSucceeds()
+    {
+        string accessToken = await CreateVerifiedSessionTokenAsync(UniqueEmail());
+        string objectKey = UniqueKey("invoice");
+        Guid definitionId = await CreateUnpublishedAsync(accessToken, ObjectNameFromKey(objectKey));
+        Guid incompatibleBindingId = await CreateRuleBindingAsync(
+            accessToken,
+            objectKey,
+            "amount",
+            RuleDefinitionKeys.NumericRange,
+            new
+            {
+                value = new
+                {
+                    kind = "Context",
+                    contextKey = "record.value",
+                    literalValues = Array.Empty<string>(),
+                },
+            });
+
+        HttpResponseMessage incompatibleSave = await SendWithBearerAsync(
+            HttpMethod.Put,
+            $"/api/business-object-definitions/{definitionId}/unpublished",
+            accessToken,
+            new
+            {
+                expectedRevision = 1,
+                name = ObjectNameFromKey(objectKey),
+                fields = new object[]
+                {
+                    new
+                    {
+                        fieldKey = "amount",
+                        label = "Amount",
+                        fieldType = "Text",
+                        rules = new[] { new { bindingId = incompatibleBindingId } },
+                    },
+                },
+            });
+
+        incompatibleSave.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        ApiProblem problem = await ReadProblemAsync(incompatibleSave);
+        problem.Code.Should().Be(BusinessObjectsProblemCodes.BusinessObjectDefinitionInvalid);
+
+        HttpResponseMessage detailResponse = await SendWithBearerAsync(
+            HttpMethod.Get,
+            $"/api/business-object-definitions/{definitionId}",
+            accessToken);
+        JsonElement detail = await detailResponse.Content.ReadFromJsonAsync<JsonElement>(Json, TestContext.Current.CancellationToken);
+        detail.GetProperty("status").GetString().Should().Be(nameof(BusinessObjectDefinitionStatus.Unpublished));
+        detail.GetProperty("revision").GetInt32().Should().Be(1);
+        detail.GetProperty("fields").GetArrayLength().Should().Be(0);
+
+        Guid compatibleBindingId = await CreateRuleBindingAsync(
+            accessToken,
+            objectKey,
+            "amount",
+            RuleDefinitionKeys.TextLength,
+            new
+            {
+                value = new
+                {
+                    kind = "Context",
+                    contextKey = "record.value",
+                    literalValues = Array.Empty<string>(),
+                },
+            });
+        HttpResponseMessage compatibleSave = await SendWithBearerAsync(
+            HttpMethod.Put,
+            $"/api/business-object-definitions/{definitionId}/unpublished",
+            accessToken,
+            new
+            {
+                expectedRevision = 1,
+                name = ObjectNameFromKey(objectKey),
+                fields = new object[]
+                {
+                    new
+                    {
+                        fieldKey = "amount",
+                        label = "Amount",
+                        fieldType = "Text",
+                        rules = new[] { new { bindingId = compatibleBindingId } },
+                    },
+                },
+            });
+
+        compatibleSave.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact]
     public async Task GetBusinessObjectDefinition_WhenDefinitionBelongsToAnotherWorkspace_ReturnsNotFound()
     {
         string ownerToken = await CreateVerifiedSessionTokenAsync(UniqueEmail());
@@ -352,8 +444,8 @@ public sealed class BusinessObjectDefinitionEndpointTests(ApiTestFixture fixture
         Dictionary<string, string?> authorizeQuery = new()
         {
             ["response_type"] = "code",
-            ["client_id"] = "axis_spa",
-            ["redirect_uri"] = "https://localhost/callback",
+            ["client_id"] = "axis_mcp",
+            ["redirect_uri"] = "http://127.0.0.1:48123/callback",
             ["code_challenge"] = CreateCodeChallenge(verifier),
             ["code_challenge_method"] = "S256",
             ["scope"] = "openid email profile",
@@ -390,8 +482,8 @@ public sealed class BusinessObjectDefinitionEndpointTests(ApiTestFixture fixture
         using FormUrlEncodedContent tokenRequest = new(new Dictionary<string, string>
         {
             ["grant_type"] = "authorization_code",
-            ["client_id"] = "axis_spa",
-            ["redirect_uri"] = "https://localhost/callback",
+            ["client_id"] = "axis_mcp",
+            ["redirect_uri"] = "http://127.0.0.1:48123/callback",
             ["code"] = code,
             ["code_verifier"] = verifier,
         });
@@ -428,14 +520,13 @@ public sealed class BusinessObjectDefinitionEndpointTests(ApiTestFixture fixture
         };
         request.Headers.Add("Idempotency-Key", Guid.NewGuid().ToString("N"));
 
-        return await fixture.Client.SendAsync(request, TestContext.Current.CancellationToken);
+        return await fixture.SendBrowserMutationAsync(request, TestContext.Current.CancellationToken);
     }
 
     private async Task<HttpResponseMessage> VerifyEmailAsync(string token) =>
-        await fixture.Client.PostAsJsonAsync(
+        await fixture.PostBrowserJsonAsync(
             "/api/auth/verify-email",
             new { token },
-            Json,
             TestContext.Current.CancellationToken);
 
     private string CapturedToken(string email) =>

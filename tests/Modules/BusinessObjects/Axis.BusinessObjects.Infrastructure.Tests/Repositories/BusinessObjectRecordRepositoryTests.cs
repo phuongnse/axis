@@ -34,13 +34,13 @@ public sealed class BusinessObjectRecordRepositoryTests(BusinessObjectsDatabaseF
         Guid workspaceId = Guid.NewGuid();
         Guid userId = Guid.NewGuid();
         BusinessObjectDefinitionKey objectKey = BusinessObjectDefinitionKey.Create(
-            UniqueKey("loan_application")).Value;
+            UniqueKey("business_record")).Value;
         BusinessObjectRecord record = CreateRecord(workspaceId, userId, objectKey, "record-1");
         record.Submit(
             expectedRevision: 1,
             values: record.Values,
             [new(
-                "applicant_name",
+                "display_name",
                 Guid.NewGuid(),
                 2,
                 "field.required",
@@ -62,7 +62,7 @@ public sealed class BusinessObjectRecordRepositoryTests(BusinessObjectsDatabaseF
 
         loaded.Should().NotBeNull();
         loaded!.Status.Should().Be(BusinessObjectRecordStatus.Submitted);
-        loaded.Values["applicant_name"].Should().Equal("Ada Lovelace");
+        loaded.Values["display_name"].Should().Equal("Ada Lovelace");
         loaded.RuleEvaluations.Should().ContainSingle(evaluation => evaluation.BindingRevision == 2);
         (await reloadRepository.FindByIdempotencyKeyAsync(
             workspaceId,
@@ -96,7 +96,7 @@ public sealed class BusinessObjectRecordRepositoryTests(BusinessObjectsDatabaseF
             "hash-1",
             new Dictionary<string, IReadOnlyList<string>>
             {
-                ["applicant_name"] = ["Ada Lovelace"],
+                ["display_name"] = ["Ada Lovelace"],
             },
             userId,
             DateTime.UtcNow);

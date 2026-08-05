@@ -79,16 +79,16 @@ Required UI quality: input controls are labelled and keyboard reachable, values 
 >
 > | Layer | Status |
 > |---|---|
-> | Domain | Partial |
-> | Application | Partial |
-> | Infrastructure | Partial |
-> | API | Partial |
-> | Frontend | Partial |
+> | Domain | Done |
+> | Application | Done |
+> | Infrastructure | N/A |
+> | API | Done |
+> | Frontend | Done |
 >
-> **Gaps vs spec:** Binding evaluation and the neutral adapter proof are implemented. A dedicated consumer evaluation endpoint and the full simulation UI/browser journey remain follow-up work.
+> **Gaps vs spec:** N/A.
 >
-> **Deferred follow-ups:** Consumer result handling remains outside Rules and is owned by each consumer use case.
+> **Deferred follow-ups:** N/A. Consumer result handling remains outside Rules and is owned by each consumer use case.
 >
-> **Verification:** The sibling evidence sidecar defines the required checks; final evidence is pending implementation.
+> **Verification:** AT-001 through AT-007 are mapped to current source and passing domain, application, API, contract, focused frontend, and browser evidence in the sibling sidecar.
 >
-> **Decisions:** The evaluator returns a positive-assertion Boolean match, not Validation or Decision behavior. `true` always means the rule's stated assertion is satisfied; consumers must not redefine polarity and instead decide what satisfied or unsatisfied means inside their own transaction. The old purpose/scope/context/outcome evaluation contract is retired without compatibility shims.
+> **Decisions:** The evaluator returns a positive-assertion Boolean match, not Validation or Decision behavior. `true` always means the rule's stated assertion is satisfied; consumers decide the transaction response. The authenticated public evaluation boundary accepts one exact binding plus typed context while deriving workspace, actor, and correlation from server request state; it never evaluates caller-selected raw definition references as a consumer operation. Draft and exact-version simulation share the same evaluator and distinguish non-match, invalid sample, and evaluator failure. The old purpose/scope/context/outcome contract is retired without compatibility shims.

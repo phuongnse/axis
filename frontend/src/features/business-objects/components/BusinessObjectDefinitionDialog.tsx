@@ -139,6 +139,7 @@ type EditableField = DefinitionFormValues['fields'][number];
 type EditableOption = EditableField['options'][number];
 type AppliedRule = EditableField['rules'][number];
 type DialogMode = 'create' | 'edit' | 'view';
+type RuleInputErrors = Record<string, string>;
 
 interface BusinessObjectDefinitionDialogProps {
   mode?: DialogMode;
@@ -161,13 +162,14 @@ export function BusinessObjectDefinitionDialog({
   onCreated,
   onClose,
 }: BusinessObjectDefinitionDialogProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const formId = useId();
   const queryClient = useQueryClient();
   const [requestError, setRequestError] = useState<string | null>(null);
   const [discardOpen, setDiscardOpen] = useState(false);
   const [publishOpen, setPublishOpen] = useState(false);
   const [activeSection, setActiveSection] = useState('general');
+  const [ruleInputErrors, setRuleInputErrors] = useState<RuleInputErrors>({});
   const form = useForm<DefinitionFormValues>({
     resolver: zodResolver(definitionSchema),
     defaultValues: emptyDefinition,
@@ -186,6 +188,7 @@ export function BusinessObjectDefinitionDialog({
 
   useEffect(() => {
     setRequestError(null);
+    setRuleInputErrors({});
     if (mode === 'create') {
       form.reset(emptyDefinition);
       return;
@@ -284,6 +287,13 @@ export function BusinessObjectDefinitionDialog({
         return;
       }
       if (definition?.id && definition.revision != null) {
+        const ruleIssues = validateRuleBindings(values.fields, ruleDefinitions);
+        setRuleInputErrors(toRuleInputErrors(ruleIssues, i18n.language, t));
+        if (ruleIssues.length > 0) {
+          setActiveSection('fields');
+          setRequestError(formatRuleIssue(ruleIssues[0], i18n.language, t));
+          return;
+        }
         saveMutation.mutate({ id: definition.id, values, revision: definition.revision });
       }
     },
@@ -404,7 +414,16 @@ export function BusinessObjectDefinitionDialog({
                               ruleDefinitions={ruleDefinitions}
                               ruleCatalogLoading={ruleCatalogLoading}
                               ruleCatalogUnavailable={ruleCatalogUnavailable}
+                              ruleInputErrors={ruleInputErrors}
                               onChange={updateField}
+                              onRuleInputChange={(ruleId, inputKey) =>
+                                setRuleInputErrors((current) => {
+                                  const key = ruleInputErrorKey(ruleId, inputKey);
+                                  if (!current[key]) return current;
+                                  const { [key]: _, ...next } = current;
+                                  return next;
+                                })
+                              }
                               onMove={moveField}
                               onRemove={(index) =>
                                 updateFields(fields.filter((_, fieldIndex) => fieldIndex !== index))
@@ -631,9 +650,25 @@ function BusinessObjectReadOnlyDetails({
                         {(field.rules ?? []).length > 0 ? (
                           <ReadOnlyFact
                             label={t('businessObjects.fieldRulesTitle')}
-                            value={t('businessObjects.configuredRulesCount', {
-                              count: field.rules?.length ?? 0,
-                            })}
+                            value={
+                              <ul className="space-y-2 font-normal">
+                                {(field.rules ?? []).map((rule, ruleIndex) => (
+                                  <li key={rule.id ?? rule.bindingId ?? ruleIndex}>
+                                    <span className="font-medium">
+                                      {t('businessObjects.bindingId')}:{' '}
+                                    </span>
+                                    <span>
+                                      {rule.bindingId ?? t('businessObjects.notAvailable')}
+                                    </span>
+                                    <span className="text-muted-foreground">
+                                      {` · ${t('businessObjects.bindingRevision')}: ${
+                                        rule.bindingRevision ?? t('businessObjects.notAvailable')
+                                      }`}
+                                    </span>
+                                  </li>
+                                ))}
+                              </ul>
+                            }
                           />
                         ) : null}
                       </li>
@@ -760,7 +795,9 @@ function FieldsEditor({
   ruleDefinitions,
   ruleCatalogLoading,
   ruleCatalogUnavailable,
+  ruleInputErrors,
   onChange,
+  onRuleInputChange,
   onMove,
   onRemove,
   onAdd,
@@ -771,7 +808,9 @@ function FieldsEditor({
   ruleDefinitions: RuleDefinitionSummary[];
   ruleCatalogLoading: boolean;
   ruleCatalogUnavailable: boolean;
+  ruleInputErrors: RuleInputErrors;
   onChange: (index: number, patch: Partial<EditableField>) => void;
+  onRuleInputChange: (ruleId: string, inputKey: string) => void;
   onMove: (index: number, direction: -1 | 1) => void;
   onRemove: (index: number) => void;
   onAdd: () => void;
@@ -907,7 +946,9 @@ function FieldsEditor({
                 loading={ruleCatalogLoading}
                 unavailable={ruleCatalogUnavailable}
                 readOnly={readOnly}
+                inputErrors={ruleInputErrors}
                 onChange={onChange}
+                onInputChange={onRuleInputChange}
               />
             </ItemContent>
           </Item>
@@ -1062,7 +1103,9 @@ function RulesEditor({
   loading,
   unavailable,
   readOnly,
+  inputErrors,
   onChange,
+  onInputChange,
 }: {
   field: EditableField;
   index: number;
@@ -1070,7 +1113,9 @@ function RulesEditor({
   loading: boolean;
   unavailable: boolean;
   readOnly: boolean;
+  inputErrors: RuleInputErrors;
   onChange: (index: number, patch: Partial<EditableField>) => void;
+  onInputChange: (ruleId: string, inputKey: string) => void;
 }) {
   const { t, i18n } = useTranslation();
   const compatible = definitions.filter(
@@ -1105,7 +1150,7 @@ function RulesEditor({
               const definition = compatible.find(
                 (candidate) => candidate.definitionKey === definitionKey,
               );
-              if (!definition?.definitionKey || !definition.latestPublishedVersion) return;
+              if (!definition?.definitionKey || !definition.activeVersion) return;
               onChange(index, {
                 rules: [...field.rules, newAppliedRule(definition)],
               });
@@ -1178,19 +1223,29 @@ function RulesEditor({
                 </ItemActions>
               </ItemHeader>
               <ItemContent>
-                {(definition?.inputs ?? []).map((input) => (
-                  <RuleInputEditor
-                    key={input.key}
-                    input={input}
-                    values={rule.inputs[input.key ?? ''] ?? []}
-                    readOnly={readOnly}
-                    onChange={(values) =>
-                      updateRule(ruleIndex, {
-                        inputs: { ...rule.inputs, [input.key ?? '']: values },
-                      })
-                    }
-                  />
-                ))}
+                {(definition?.inputs ?? [])
+                  .filter((input) => input.key !== 'value')
+                  .map((input) => (
+                    <RuleInputEditor
+                      key={input.key}
+                      input={input}
+                      idPrefix={`${field.clientId}-${rule.clientId}`}
+                      contextLabel={`${field.label || field.fieldKey}: ${
+                        definition
+                          ? ruleDisplayName(definition, i18n.language, t)
+                          : (rule.definitionKey ?? t('businessObjects.unknownRule'))
+                      }`}
+                      values={rule.inputs[input.key ?? ''] ?? []}
+                      readOnly={readOnly}
+                      error={inputErrors[ruleInputErrorKey(rule.clientId, input.key ?? '')]}
+                      onChange={(values) => {
+                        onInputChange(rule.clientId, input.key ?? '');
+                        updateRule(ruleIndex, {
+                          inputs: { ...rule.inputs, [input.key ?? '']: values },
+                        });
+                      }}
+                    />
+                  ))}
               </ItemContent>
             </Item>
           );
@@ -1210,17 +1265,26 @@ type RuleInputValueType = NonNullable<RuleInput['types']>[number];
 
 function RuleInputEditor({
   input,
+  idPrefix,
+  contextLabel,
   values,
   readOnly,
+  error,
   onChange,
 }: {
   input: RuleInput;
+  idPrefix: string;
+  contextLabel: string;
   values: string[];
   readOnly: boolean;
+  error?: string;
   onChange: (values: string[]) => void;
 }) {
   const { t } = useTranslation();
   const key = input.key ?? '';
+  const label = ruleInputLabel(input, t);
+  const accessibleLabel = `${label} (${contextLabel})`;
+  const inputId = `rule-input-${idPrefix}-${key}`;
   const currentValues = input.allowMultiple
     ? values.length > 0
       ? values
@@ -1239,16 +1303,25 @@ function RuleInputEditor({
   }
 
   return (
-    <Field>
-      <FieldLabel htmlFor={`rule-input-${key}`}>{humanize(key)}</FieldLabel>
+    <Field data-invalid={Boolean(error)}>
+      <FieldLabel htmlFor={`${inputId}-0`}>
+        {label}
+        <span className="sr-only">{` (${contextLabel})`}</span>
+      </FieldLabel>
       <div className="flex flex-col gap-2">
         {currentValues.map((value, valueIndex) => (
           <div key={valueIds[valueIndex]} className="flex items-center gap-2">
+            {valueIndex > 0 ? (
+              <FieldLabel className="sr-only" htmlFor={`${inputId}-${valueIndex}`}>
+                {`${accessibleLabel} ${valueIndex + 1}`}
+              </FieldLabel>
+            ) : null}
             <RuleInputValue
-              id={`rule-input-${key}-${valueIndex}`}
+              id={`${inputId}-${valueIndex}`}
               input={input}
               value={value}
               readOnly={readOnly}
+              invalid={Boolean(error)}
               onChange={(nextValue) =>
                 onChange(
                   currentValues.map((current, index) =>
@@ -1277,6 +1350,7 @@ function RuleInputEditor({
           {t('businessObjects.addParameterValue')}
         </Button>
       ) : null}
+      <FieldError>{error}</FieldError>
     </Field>
   );
 }
@@ -1286,12 +1360,14 @@ function RuleInputValue({
   input,
   value,
   readOnly,
+  invalid,
   onChange,
 }: {
   id: string;
   input: RuleInput;
   value: string;
   readOnly: boolean;
+  invalid: boolean;
   onChange: (value: string) => void;
 }) {
   const { t } = useTranslation();
@@ -1312,7 +1388,7 @@ function RuleInputValue({
           if (nextValue !== null) onChange(nextValue);
         }}
       >
-        <SelectTrigger id={id}>
+        <SelectTrigger id={id} aria-invalid={invalid}>
           <SelectValue>
             {options.find((option) => option.value === value)?.label ?? value}
           </SelectValue>
@@ -1333,6 +1409,7 @@ function RuleInputValue({
       type={parameterInputType(input.types?.[0])}
       value={value}
       readOnly={readOnly}
+      aria-invalid={invalid}
       onChange={(event) => onChange(event.target.value)}
     />
   );
@@ -1390,9 +1467,11 @@ function newAppliedRule(definition: RuleDefinitionSummary): AppliedRule {
     clientId: crypto.randomUUID(),
     bindingId: undefined,
     definitionKey: definition.definitionKey ?? '',
-    definitionVersion: definition.latestPublishedVersion ?? 1,
+    definitionVersion: definition.activeVersion ?? 1,
     inputs: Object.fromEntries(
-      (definition.inputs ?? []).map((input) => [input.key ?? '', input.isRequired ? [''] : []]),
+      (definition.inputs ?? [])
+        .filter((input) => input.key !== 'value')
+        .map((input) => [input.key ?? '', input.isRequired ? [''] : []]),
     ),
   };
 }
@@ -1465,6 +1544,9 @@ async function ensureRuleBindings(
   ruleDefinitions: RuleDefinitionSummary[],
   objectName: string,
 ): Promise<EditableField[]> {
+  if (validateRuleBindings(fields, ruleDefinitions).length > 0) {
+    throw new Error('Rule bindings must be valid before they are created.');
+  }
   const objectKey = deriveKey(objectName);
   const definitionsByKey = new Map(
     ruleDefinitions.map((definition) => [definition.definitionKey, definition] as const),
@@ -1482,10 +1564,19 @@ async function ensureRuleBindings(
       }
       const inputMappings: Record<
         string,
-        { kind: 'Literal'; contextKey: null; literalValues: string[] }
+        | { kind: 'Context'; contextKey: 'record.value'; literalValues: [] }
+        | { kind: 'Literal'; contextKey: null; literalValues: string[] }
       > = {};
       const definition = definitionsByKey.get(rule.definitionKey);
+      if (definition?.inputs?.some((input) => input.key === 'value')) {
+        inputMappings.value = {
+          kind: 'Context',
+          contextKey: 'record.value',
+          literalValues: [],
+        };
+      }
       for (const [key, values] of Object.entries(rule.inputs)) {
+        if (key === 'value') continue;
         const type = definition?.inputs?.find((input) => input.key === key)?.types?.[0];
         const literalValues = values
           .filter((value) => value.trim())
@@ -1514,11 +1605,93 @@ async function ensureRuleBindings(
 }
 
 function isCompatibleRule(definition: RuleDefinitionSummary, field: EditableField): boolean {
-  if (!definition.definitionKey || !definition.latestPublishedVersion) return false;
-  if (definition.origin === 'Workspace' && definition.status !== 'Published') return false;
+  if (!definition.definitionKey || !definition.activeVersion) return false;
   const valueInput = definition.inputs?.find((input) => input.key === 'value');
   const valueType = field.fieldType === 'Choice' ? 'Text' : field.fieldType;
-  return valueInput?.types?.includes(valueType) ?? false;
+  return (
+    valueInput?.types?.includes(valueType) === true &&
+    (field.fieldType !== 'Choice' ||
+      field.choiceSelectionMode !== 'Multiple' ||
+      valueInput.allowMultiple === true)
+  );
+}
+
+type RuleBindingIssue =
+  | { kind: 'incompatible'; rule: AppliedRule; definition?: RuleDefinitionSummary }
+  | { kind: 'requiredLiteral'; rule: AppliedRule; input: RuleInput };
+
+function validateRuleBindings(
+  fields: EditableField[],
+  ruleDefinitions: RuleDefinitionSummary[],
+): RuleBindingIssue[] {
+  const definitionsByKey = new Map(
+    ruleDefinitions.map((definition) => [definition.definitionKey, definition] as const),
+  );
+  const issues: RuleBindingIssue[] = [];
+  for (const field of fields) {
+    for (const rule of field.rules) {
+      if (rule.bindingId) continue;
+      const definition = definitionsByKey.get(rule.definitionKey);
+      if (!definition || !isCompatibleRule(definition, field)) {
+        issues.push({ kind: 'incompatible', rule, definition });
+        continue;
+      }
+      for (const input of definition.inputs ?? []) {
+        if (
+          input.key !== 'value' &&
+          input.isRequired &&
+          !(rule.inputs[input.key ?? ''] ?? []).some((value) => value.trim())
+        ) {
+          issues.push({ kind: 'requiredLiteral', rule, input });
+        }
+      }
+    }
+  }
+  return issues;
+}
+
+function ruleInputErrorKey(ruleId: string, inputKey: string): string {
+  return `${ruleId}:${inputKey}`;
+}
+
+function toRuleInputErrors(
+  issues: RuleBindingIssue[],
+  locale: string,
+  t: ReturnType<typeof useTranslation>['t'],
+): RuleInputErrors {
+  return Object.fromEntries(
+    issues.flatMap((issue) =>
+      issue.kind === 'requiredLiteral'
+        ? [
+            [
+              ruleInputErrorKey(issue.rule.clientId, issue.input.key ?? ''),
+              formatRuleIssue(issue, locale, t),
+            ],
+          ]
+        : [],
+    ),
+  );
+}
+
+function formatRuleIssue(
+  issue: RuleBindingIssue,
+  locale: string,
+  t: ReturnType<typeof useTranslation>['t'],
+): string {
+  if (issue.kind === 'requiredLiteral') {
+    return t('businessObjects.ruleInputRequired', { input: ruleInputLabel(issue.input, t) });
+  }
+  return t('businessObjects.ruleNoLongerCompatible', {
+    rule: ruleDisplayName(
+      issue.definition ?? { definitionKey: issue.rule.definitionKey },
+      locale,
+      t,
+    ),
+  });
+}
+
+function ruleInputLabel(input: RuleInput, t: ReturnType<typeof useTranslation>['t']): string {
+  return input.label?.trim() || humanize(input.key ?? '') || t('rules.unnamedParameter');
 }
 
 function toRuleContractValue(value: string, type?: RuleInputValueType): string {

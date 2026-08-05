@@ -10,7 +10,7 @@ public sealed class RuleEvaluatorTests
     private static readonly Guid WorkspaceId = RuleDefinitionHandlerTestContext.WorkspaceId;
 
     [Fact]
-    public async Task EvaluateAsync_WhenSystemRuleAssertionIsSatisfied_ReturnsMatchDiagnostics()
+    public async Task EvaluateAsync_WhenBuiltInRuleAssertionIsSatisfied_ReturnsMatchDiagnostics()
     {
         RuleEvaluator sut = new(Substitute.For<IRuleDefinitionRepository>());
 
@@ -83,7 +83,7 @@ public sealed class RuleEvaluatorTests
     [Fact]
     public async Task EvaluateAsync_WhenWorkspaceRuleIsPublished_ResolvesExactVersion()
     {
-        Axis.Rules.Domain.RuleDefinition definition = RuleDefinitionHandlerTestContext.PublishedDefinition();
+        Axis.Rules.Domain.RuleDefinition definition = RuleDefinitionHandlerTestContext.VersionedDefinition();
         IRuleDefinitionRepository repository = Substitute.For<IRuleDefinitionRepository>();
         repository.GetByKeyForWorkspaceAsync(
                 definition.Key,
@@ -99,6 +99,33 @@ public sealed class RuleEvaluatorTests
                 1,
                 Inputs(("value", ["15"]), ("threshold", ["10"])))],
             "workspace-test"),
+            TestContext.Current.CancellationToken);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Items.Should().ContainSingle(item => item.IsMatch);
+    }
+
+    [Fact]
+    public async Task EvaluateAsync_WhenWorkspaceRuleIsArchived_ResolvesItsExactPublishedVersion()
+    {
+        Axis.Rules.Domain.RuleDefinition definition = RuleDefinitionHandlerTestContext.VersionedDefinition();
+        definition.Archive(definition.Revision, RuleDefinitionHandlerTestContext.UserId, DateTime.UtcNow)
+            .IsSuccess.Should().BeTrue();
+        IRuleDefinitionRepository repository = Substitute.For<IRuleDefinitionRepository>();
+        repository.GetByKeyForWorkspaceAsync(
+                definition.Key,
+                WorkspaceId,
+                Arg.Any<CancellationToken>())
+            .Returns(definition);
+        RuleEvaluator sut = new(repository);
+
+        RuleEvaluationResult result = await sut.EvaluateAsync(new RuleEvaluationRequest(
+            WorkspaceId,
+            [new RuleEvaluationReference(
+                definition.Key.Value,
+                1,
+                Inputs(("value", ["15"]), ("threshold", ["10"])))],
+            "archived-workspace-test"),
             TestContext.Current.CancellationToken);
 
         result.IsSuccess.Should().BeTrue();

@@ -39,18 +39,22 @@ public sealed class PublishBusinessObjectDefinitionHandler(
             foreach (BusinessObjectFieldRule rule in field.Rules)
             {
                 RuleBindingReferenceValidationResult validation = await bindingReferenceValidator.ValidateAsync(
-                    workspaceId,
-                    rule.BindingId,
-                    cancellationToken,
-                    expectedTargetType: BusinessObjectRecordRuleBindingContract.TargetType,
-                    expectedTargetId: BusinessObjectRecordRuleBindingContract.TargetId(definition.Key, field.Key.Value),
-                    expectedUseCaseOrTrigger: BusinessObjectRecordRuleBindingContract.UseCaseOrTrigger);
+                    new RuleBindingReferenceValidationRequest(
+                        workspaceId,
+                        rule.BindingId,
+                        BusinessObjectRecordRuleBindingContract.TargetType,
+                        BusinessObjectRecordRuleBindingContract.TargetId(definition.Key, field.Key.Value),
+                        BusinessObjectRecordRuleBindingContract.UseCaseOrTrigger,
+                        BusinessObjectRuleBindingContextSchema.For(
+                            field.FieldType,
+                            field.ChoiceSelectionMode),
+                        BusinessObjectRuleBindingContextSchema.RequiredKeys,
+                        rule.BindingRevision),
+                    cancellationToken);
                 if (!validation.IsValid)
-                    return BusinessObjectDefinitionFailures.Invalid<BusinessObjectDefinitionDetailDto>(
-                        validation.Error!);
-                if (validation.Revision != rule.BindingRevision)
-                    return BusinessObjectDefinitionFailures.Conflict<BusinessObjectDefinitionDetailDto>(
-                        "A field rule binding has changed. Save the object definition again before publishing.");
+                    return validation.ErrorCode == "binding_revision_conflict"
+                        ? BusinessObjectDefinitionFailures.Conflict<BusinessObjectDefinitionDetailDto>(validation.Error!)
+                        : BusinessObjectDefinitionFailures.Invalid<BusinessObjectDefinitionDetailDto>(validation.Error!);
             }
         }
 

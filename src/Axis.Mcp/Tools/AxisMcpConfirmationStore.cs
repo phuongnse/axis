@@ -46,7 +46,9 @@ public sealed class AxisMcpConfirmationStore
         ArgumentException.ThrowIfNullOrWhiteSpace(subject);
         ArgumentException.ThrowIfNullOrWhiteSpace(snapshotHash);
 
-        DateTimeOffset expiresAt = _timeProvider.GetUtcNow().Add(_lifetime);
+        DateTimeOffset now = _timeProvider.GetUtcNow();
+        PruneExpired(now);
+        DateTimeOffset expiresAt = now.Add(_lifetime);
         string token = CreateToken();
         _confirmations[token] = new ConfirmationRecord(
             businessObjectDefinitionId,
@@ -100,6 +102,15 @@ public sealed class AxisMcpConfirmationStore
     {
         ArgumentNullException.ThrowIfNull(snapshotJson);
         return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(snapshotJson)));
+    }
+
+    private void PruneExpired(DateTimeOffset now)
+    {
+        foreach ((string token, ConfirmationRecord confirmation) in _confirmations)
+        {
+            if (confirmation.ExpiresAt <= now)
+                _confirmations.TryRemove(token, out _);
+        }
     }
 
     private static string CreateToken()

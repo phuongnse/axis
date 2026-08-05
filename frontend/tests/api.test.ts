@@ -1,9 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { useAuthStore } from '../src/features/auth/auth-store';
 import { ApiError, fetchApi } from '../src/lib/api';
 
 describe('fetchApi', () => {
   beforeEach(() => {
     vi.stubGlobal('fetch', vi.fn());
+    useAuthStore.getState().setBrowserSession({
+      authenticated: false,
+      csrfToken: 'test-csrf-token',
+    });
   });
 
   afterEach(() => {
@@ -66,6 +71,7 @@ describe('fetchApi', () => {
     expect(fetchCallArgs?.headers).toBeDefined();
     const headers = fetchCallArgs?.headers as Headers;
     expect(headers.has('Content-Type')).toBe(false);
+    expect(headers.get('X-CSRF-TOKEN')).toBe('test-csrf-token');
   });
 
   it('should normalize Content-Type casing before deciding request headers', async () => {
@@ -87,6 +93,7 @@ describe('fetchApi', () => {
     const fetchCallArgs = vi.mocked(fetch).mock.calls[0][1];
     const headers = fetchCallArgs?.headers as Headers;
     expect(headers.has('Content-Type')).toBe(false);
+    expect(headers.get('X-CSRF-TOKEN')).toBe('test-csrf-token');
   });
 
   it('should throw ApiError on non-2xx responses', async () => {

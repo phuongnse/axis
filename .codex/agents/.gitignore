@@ -1,7 +1,0 @@
-*
-!.gitignore
-!axis_scout.toml
-!axis_investigator.toml
-!axis_planner.toml
-!axis_worker.toml
-!axis_reviewer.toml

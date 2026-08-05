@@ -36,4 +36,84 @@ public sealed class SimulateRuleDefinitionHandlerTests
         result.IsSuccess.Should().BeTrue();
         result.Value.IsMatch.Should().BeTrue();
     }
+
+    [Fact]
+    public async Task Simulate_WhenDraftConditionDoesNotMatch_ReturnsNonMatchDiagnostics()
+    {
+        Axis.Rules.Domain.RuleDefinition definition = RuleDefinitionHandlerTestContext.DraftDefinition(configured: true);
+        _context.Repository.GetByKeyForWorkspaceAsync(
+                definition.Key,
+                RuleDefinitionHandlerTestContext.WorkspaceId,
+                Arg.Any<CancellationToken>())
+            .Returns(definition);
+        SimulateRuleDefinitionHandler sut = new(_context.CurrentUser, _context.Repository);
+
+        Result<RuleSimulationResultDto> result = await sut.Handle(
+            new SimulateRuleDefinitionQuery(
+                definition.Key.Value,
+                DefinitionVersion: null,
+                new Dictionary<string, RuleValueDto>(StringComparer.Ordinal)
+                {
+                    ["value"] = new(RuleValueType.Decimal, ["5"]),
+                    ["threshold"] = new(RuleValueType.Decimal, ["10"]),
+                },
+                "simulation-non-match"),
+            CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.IsMatch.Should().BeFalse();
+        result.Value.Diagnostics.Should().ContainSingle(diagnostic => !diagnostic.IsMatch);
+    }
+
+    [Fact]
+    public async Task Simulate_WhenTypedSampleIsMalformed_ReturnsInvalidWithoutOutcome()
+    {
+        Axis.Rules.Domain.RuleDefinition definition = RuleDefinitionHandlerTestContext.DraftDefinition(configured: true);
+        _context.Repository.GetByKeyForWorkspaceAsync(
+                definition.Key,
+                RuleDefinitionHandlerTestContext.WorkspaceId,
+                Arg.Any<CancellationToken>())
+            .Returns(definition);
+        SimulateRuleDefinitionHandler sut = new(_context.CurrentUser, _context.Repository);
+
+        Result<RuleSimulationResultDto> result = await sut.Handle(
+            new SimulateRuleDefinitionQuery(
+                definition.Key.Value,
+                DefinitionVersion: null,
+                new Dictionary<string, RuleValueDto>(StringComparer.Ordinal)
+                {
+                    ["value"] = new(RuleValueType.Decimal, ["not-a-decimal"]),
+                    ["threshold"] = new(RuleValueType.Decimal, ["10"]),
+                },
+                "simulation-invalid"),
+            CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue();
+        result.ErrorCode.Should().Be(ErrorCodes.InvalidInput);
+        result.ProblemCode.Should().Be(RulesProblemCodes.DefinitionInvalid);
+    }
+
+    [Fact]
+    public async Task Simulate_WhenExactVersionDoesNotExist_ReturnsInvalidWithoutFallback()
+    {
+        Axis.Rules.Domain.RuleDefinition definition = RuleDefinitionHandlerTestContext.VersionedDefinition();
+        _context.Repository.GetByKeyForWorkspaceAsync(
+                definition.Key,
+                RuleDefinitionHandlerTestContext.WorkspaceId,
+                Arg.Any<CancellationToken>())
+            .Returns(definition);
+        SimulateRuleDefinitionHandler sut = new(_context.CurrentUser, _context.Repository);
+
+        Result<RuleSimulationResultDto> result = await sut.Handle(
+            new SimulateRuleDefinitionQuery(
+                definition.Key.Value,
+                DefinitionVersion: 99,
+                new Dictionary<string, RuleValueDto>(StringComparer.Ordinal),
+                "simulation-missing-version"),
+            CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue();
+        result.ErrorCode.Should().Be(ErrorCodes.InvalidInput);
+        result.ProblemCode.Should().Be(RulesProblemCodes.DefinitionInvalid);
+    }
 }

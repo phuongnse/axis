@@ -2,7 +2,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { AnchorHTMLAttributes, ReactNode } from 'react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { toast } from 'sonner';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { signOutUser } from '@/features/auth/api';
 import { useAuthStore } from '@/features/auth/auth-store';
 import { getCurrentUserProfile } from '@/features/dashboard/api';
@@ -66,11 +67,23 @@ vi.mock('@/features/dashboard/api', () => ({
 
 describe('AppShell', () => {
   beforeEach(() => {
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn().mockReturnValue({
+        matches: false,
+        media: '',
+        onchange: null,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      }),
+    );
     routerState.location.pathname = '/dashboard';
     navigateMock.mockClear();
     vi.mocked(signOutUser).mockReset();
     vi.mocked(signOutUser).mockResolvedValue();
-    sessionStorage.clear();
     vi.mocked(getCurrentUserProfile).mockResolvedValue({
       id: '11111111-1111-4111-8111-111111111111',
       email: 'ada@example.com',
@@ -81,11 +94,21 @@ describe('AppShell', () => {
       workspaceId: '22222222-2222-4222-8222-222222222222',
       workspaces: [],
     });
-    useAuthStore.setState({
-      accessToken: 'token',
-      userLabel: 'User',
-      userInitials: '?',
+    useAuthStore.getState().setBrowserSession({
+      authenticated: true,
+      csrfToken: 'csrf-token',
+      user: {
+        userId: '11111111-1111-4111-8111-111111111111',
+        workspaceId: '22222222-2222-4222-8222-222222222222',
+        email: 'ada@example.com',
+        name: 'Ada Lovelace',
+      },
     });
+  });
+
+  afterEach(() => {
+    toast.dismiss();
+    vi.unstubAllGlobals();
   });
 
   it('renders the authenticated app frame around page content', async () => {
@@ -181,6 +204,8 @@ describe('AppShell', () => {
 
     view.rerender(shell(<section>Another authenticated route</section>));
     expect(screen.getByRole('dialog', { name: 'Persistent test window' })).toBeVisible();
+    toast.success('Persistent window saved');
+    expect(await screen.findByText('Persistent window saved')).toBeVisible();
 
     await user.click(screen.getByRole('button', { name: 'Account menu' }));
     await user.click(screen.getByRole('button', { name: 'Sign out' }));
@@ -346,8 +371,6 @@ describe('AppShell', () => {
       },
     });
     queryClient.setQueryData(['dashboard', 'current-user'], { fullName: 'Ada Lovelace' });
-    sessionStorage.setItem('pkce_verifier', 'verifier');
-    sessionStorage.setItem('pkce_state', 'state');
 
     render(
       <QueryClientProvider client={queryClient}>
@@ -361,10 +384,7 @@ describe('AppShell', () => {
     await user.click(screen.getByRole('button', { name: 'Sign out' }));
 
     await waitFor(() => expect(signOutUser).toHaveBeenCalledTimes(1));
-    expect(useAuthStore.getState().accessToken).toBeNull();
     expect(useAuthStore.getState().browserSessionStatus).toBe('guest');
-    expect(sessionStorage.getItem('pkce_verifier')).toBeNull();
-    expect(sessionStorage.getItem('pkce_state')).toBeNull();
     expect(queryClient.getQueryData(['dashboard', 'current-user'])).toBeUndefined();
     expect(navigateMock).toHaveBeenCalledWith({ to: '/sign-in', replace: true });
   });
@@ -433,7 +453,7 @@ describe('AppShell', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Sign out did not complete. Try again.',
     );
-    expect(useAuthStore.getState().accessToken).toBe('token');
+    expect(useAuthStore.getState().browserSessionStatus).toBe('authenticated');
     expect(navigateMock).not.toHaveBeenCalled();
     expect(screen.getByRole('button', { name: 'Sign out' })).toBeEnabled();
   });

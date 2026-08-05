@@ -23,11 +23,11 @@ public sealed class GetRuleDefinitionHandler(
         if (key.IsFailure)
             return RuleDefinitionFailures.NotFound<RuleDefinitionDetailDto>();
 
-        RuleDefinition? system = SystemRuleCatalog.Definitions
+        RuleDefinition? builtIn = BuiltInRuleCatalog.Definitions
             .Where(definition => definition.Key == key.Value)
             .FirstOrDefault();
-        if (system is not null)
-            return RuleContractMapper.ToDetailDto(system);
+        if (builtIn is not null)
+            return RuleContractMapper.ToDetailDto(builtIn);
 
         RuleDefinition? definition = await repository.GetByKeyForWorkspaceAsync(
             key.Value,

@@ -1,3 +1,4 @@
+using System.Net.Http.Json;
 using System.Text.Json;
 using Axis.BusinessObjects.Infrastructure.Persistence;
 using Axis.Identity.Application.Services;
@@ -10,7 +11,6 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Caching.StackExchangeRedis;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using OpenIddict.Abstractions;
 using StackExchange.Redis;
@@ -36,6 +36,7 @@ public sealed class ApiTestFixture : IAsyncLifetime
     private string? _previousIdentityConnectionStringEnv;
     private string? _previousBusinessObjectsConnectionStringEnv;
     private string? _previousRulesConnectionStringEnv;
+    private string? _previousRedisConnectionStringEnv;
     private WebApplicationFactory<Program> _factory = null!;
     private string _identityConnectionString = null!;
     private string _businessObjectsConnectionString = null!;
@@ -44,6 +45,7 @@ public sealed class ApiTestFixture : IAsyncLifetime
     private readonly CapturingEmailSender _emailCapture = new();
 
     public HttpClient Client { get; private set; } = null!;
+    public string CsrfToken { get; private set; } = null!;
     public CapturingEmailSender EmailCapture => _emailCapture;
 
     public static readonly JsonSerializerOptions JsonOptions = new()
@@ -68,9 +70,11 @@ public sealed class ApiTestFixture : IAsyncLifetime
         _previousIdentityConnectionStringEnv = Environment.GetEnvironmentVariable("ConnectionStrings__Identity");
         _previousBusinessObjectsConnectionStringEnv = Environment.GetEnvironmentVariable("ConnectionStrings__BusinessObjects");
         _previousRulesConnectionStringEnv = Environment.GetEnvironmentVariable("ConnectionStrings__Rules");
+        _previousRedisConnectionStringEnv = Environment.GetEnvironmentVariable("Redis__ConnectionString");
         Environment.SetEnvironmentVariable("ConnectionStrings__Identity", _identityConnectionString);
         Environment.SetEnvironmentVariable("ConnectionStrings__BusinessObjects", _businessObjectsConnectionString);
         Environment.SetEnvironmentVariable("ConnectionStrings__Rules", _rulesConnectionString);
+        Environment.SetEnvironmentVariable("Redis__ConnectionString", _redis.GetConnectionString());
 
         DbContextOptions<IdentityDbContext> identityOptions = new DbContextOptionsBuilder<IdentityDbContext>()
             .UseNpgsql(_identityConnectionString)
@@ -137,9 +141,6 @@ public sealed class ApiTestFixture : IAsyncLifetime
                 services.RemoveAll<IConnectionMultiplexer>();
                 services.AddSingleton<IConnectionMultiplexer>(_ =>
                     ConnectionMultiplexer.Connect(_redis.GetConnectionString()));
-                services.Configure<RedisCacheOptions>(options =>
-                    options.Configuration = _redis.GetConnectionString());
-
                 services.RemoveAll<IEmailSender>();
                 services.AddSingleton(_emailCapture);
                 services.AddSingleton<IEmailSender>(_emailCapture);
@@ -163,6 +164,8 @@ public sealed class ApiTestFixture : IAsyncLifetime
             AllowAutoRedirect = false,
             BaseAddress = new Uri("https://localhost"),
         });
+
+        await RefreshBrowserSecurityContextAsync();
     }
 
     public async ValueTask DisposeAsync()
@@ -179,43 +182,62 @@ public sealed class ApiTestFixture : IAsyncLifetime
         Environment.SetEnvironmentVariable("ConnectionStrings__Identity", _previousIdentityConnectionStringEnv);
         Environment.SetEnvironmentVariable("ConnectionStrings__BusinessObjects", _previousBusinessObjectsConnectionStringEnv);
         Environment.SetEnvironmentVariable("ConnectionStrings__Rules", _previousRulesConnectionStringEnv);
+        Environment.SetEnvironmentVariable("Redis__ConnectionString", _previousRedisConnectionStringEnv);
     }
 
     public IServiceScope CreateScope() => _factory.Services.CreateScope();
+
+    public HttpClient CreateAnonymousClient() =>
+        _factory.CreateClient(new WebApplicationFactoryClientOptions
+        {
+            AllowAutoRedirect = false,
+            BaseAddress = new Uri("https://localhost"),
+        });
+
+    public async Task<JsonElement> RefreshBrowserSecurityContextAsync(
+        CancellationToken cancellationToken = default)
+    {
+        JsonElement browserSession = await Client.GetFromJsonAsync<JsonElement>(
+            "/api/auth/session",
+            JsonOptions,
+            cancellationToken);
+        CsrfToken = browserSession.GetProperty("csrfToken").GetString()
+            ?? throw new InvalidOperationException("The browser session did not return an antiforgery token.");
+        Client.DefaultRequestHeaders.Remove("X-CSRF-TOKEN");
+        Client.DefaultRequestHeaders.Add("X-CSRF-TOKEN", CsrfToken);
+        return browserSession;
+    }
+
+    public async Task<HttpResponseMessage> SendBrowserMutationAsync(
+        HttpRequestMessage request,
+        CancellationToken cancellationToken = default)
+    {
+        await RefreshBrowserSecurityContextAsync(cancellationToken);
+        return await Client.SendAsync(request, cancellationToken);
+    }
+
+    public async Task<HttpResponseMessage> PostBrowserJsonAsync<TValue>(
+        string requestUri,
+        TValue value,
+        CancellationToken cancellationToken = default)
+    {
+        await RefreshBrowserSecurityContextAsync(cancellationToken);
+        return await Client.PostAsJsonAsync(requestUri, value, JsonOptions, cancellationToken);
+    }
+
+    public async Task<HttpResponseMessage> PostBrowserAsync(
+        string requestUri,
+        HttpContent? content = null,
+        CancellationToken cancellationToken = default)
+    {
+        await RefreshBrowserSecurityContextAsync(cancellationToken);
+        return await Client.PostAsync(requestUri, content, cancellationToken);
+    }
 
     private static async Task SeedTestOpenIddictClientAsync(IServiceProvider services)
     {
         IOpenIddictApplicationManager appManager =
             services.GetRequiredService<IOpenIddictApplicationManager>();
-
-        if (await appManager.FindByClientIdAsync("axis_spa") is null)
-        {
-            await appManager.CreateAsync(new OpenIddictApplicationDescriptor
-            {
-                ClientId = "axis_spa",
-                ClientType = ClientTypes.Public,
-                DisplayName = "Axis Platform Web (Test)",
-                Permissions =
-                {
-                    Permissions.Endpoints.Authorization,
-                    Permissions.Endpoints.Token,
-                    Permissions.GrantTypes.AuthorizationCode,
-                    Permissions.ResponseTypes.Code,
-                    Permissions.Prefixes.Scope + Scopes.OpenId,
-                    Permissions.Prefixes.Scope + Scopes.Email,
-                    Permissions.Prefixes.Scope + Scopes.Profile,
-                },
-                RedirectUris =
-                {
-                    new Uri("https://localhost:3000/callback"),
-                    new Uri("https://localhost/callback"),
-                },
-                Requirements =
-                {
-                    Requirements.Features.ProofKeyForCodeExchange,
-                },
-            });
-        }
 
         if (await appManager.FindByClientIdAsync("axis_mcp") is null)
         {

@@ -24,8 +24,8 @@ public sealed class AxisApiClient(
     public Task<string> PutJsonAsync(string path, object body, CancellationToken cancellationToken) =>
         SendJsonAsync(HttpMethod.Put, path, body, cancellationToken);
 
-    public Task<string> DeleteJsonAsync(string path, CancellationToken cancellationToken) =>
-        SendJsonAsync(HttpMethod.Delete, path, body: null, cancellationToken);
+    public Task<string> DeleteJsonAsync(string path, object body, CancellationToken cancellationToken) =>
+        SendJsonAsync(HttpMethod.Delete, path, body, cancellationToken);
 
     private async Task<string> SendJsonAsync(
         HttpMethod method,
@@ -82,6 +82,7 @@ public sealed class AxisApiClient(
         string? problemCode = null;
         string? problemType = null;
         Dictionary<string, string[]> fieldErrors = new(StringComparer.Ordinal);
+        Dictionary<string, string[]> errorCodes = new(StringComparer.Ordinal);
 
         if (!string.IsNullOrWhiteSpace(responseBody) && responseBody.Length <= 64_000)
         {
@@ -104,7 +105,7 @@ public sealed class AxisApiClient(
                     message = $"{message} {description}";
 
                 ReadStringArrays(root, "errors", fieldErrors);
-                ReadStringArrays(root, "errorCodes", fieldErrors);
+                ReadStringArrays(root, "errorCodes", errorCodes);
             }
             catch (JsonException)
             {
@@ -117,7 +118,8 @@ public sealed class AxisApiClient(
             message,
             problemCode,
             problemType,
-            fieldErrors);
+            fieldErrors,
+            errorCodes);
     }
 
     private static string? ReadString(JsonElement root, string propertyName) =>

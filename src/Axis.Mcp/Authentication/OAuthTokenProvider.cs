@@ -46,8 +46,11 @@ public sealed class OAuthTokenProvider(
         string codeChallenge = CreateCodeChallenge(codeVerifier);
 
         Uri authorizationUri = BuildAuthorizationUri(state, codeChallenge);
+        using CancellationTokenSource authorizationCancellation =
+            CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        authorizationCancellation.CancelAfter(options.AuthorizationTimeout);
         LoopbackAuthorizationListener listener = new(AxisMcpOptions.CallbackPort);
-        Task<string> callbackTask = listener.WaitForCodeAsync(state, cancellationToken);
+        Task<string> callbackTask = listener.WaitForCodeAsync(state, authorizationCancellation.Token);
 
         if (!browserLauncher.TryOpen(authorizationUri))
         {
@@ -59,9 +62,11 @@ public sealed class OAuthTokenProvider(
         string authorizationCode;
         try
         {
-            authorizationCode = await callbackTask.WaitAsync(options.AuthorizationTimeout, cancellationToken);
+            authorizationCode = await callbackTask;
         }
-        catch (TimeoutException ex)
+        catch (OperationCanceledException ex) when (
+            authorizationCancellation.IsCancellationRequested &&
+            !cancellationToken.IsCancellationRequested)
         {
             throw new InvalidOperationException("Axis MCP authorization timed out.", ex);
         }

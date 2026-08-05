@@ -13,6 +13,8 @@ public sealed class IdentityDatabaseFixture : IAsyncLifetime
 
     private string _connectionString = null!;
 
+    public string ConnectionString => _connectionString;
+
     public IdentityDbContext CreateContext()
     {
         DbContextOptions<IdentityDbContext> options = new DbContextOptionsBuilder<IdentityDbContext>()

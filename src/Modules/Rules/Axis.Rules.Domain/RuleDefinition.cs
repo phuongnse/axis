@@ -13,9 +13,16 @@ public sealed class RuleDefinition : AggregateRoot<RuleDefinitionId>
     public string Description { get; private set; }
     public RuleOrigin Origin { get; private set; }
     public int ExpressionLanguageVersion { get; private set; }
-    public RuleLifecycleStatus Status { get; private set; }
+    public RuleLifecycleStatus Status => ArchivedAt is not null
+        ? RuleLifecycleStatus.Archived
+        : ActiveVersion is not null
+            ? RuleLifecycleStatus.Active
+            : LatestPublishedVersion is not null
+                ? RuleLifecycleStatus.Inactive
+                : RuleLifecycleStatus.Draft;
     public int Revision { get; private set; }
     public int? LatestPublishedVersion { get; private set; }
+    public int? ActiveVersion { get; private set; }
     public RuleConditionNode? Condition { get; private set; }
     public RuleOutputContract Output { get; private set; }
     public IReadOnlyList<RuleInputDefinition> Inputs => _inputs.AsReadOnly();
@@ -55,7 +62,6 @@ public sealed class RuleDefinition : AggregateRoot<RuleDefinitionId>
         Origin = origin;
         ExpressionLanguageVersion = RuleExpressionLanguage.Version;
         Output = RuleOutputContract.BooleanMatch;
-        Status = RuleLifecycleStatus.Draft;
         Revision = 1;
         CreatedByUserId = createdByUserId;
         UpdatedByUserId = createdByUserId;
@@ -96,7 +102,7 @@ public sealed class RuleDefinition : AggregateRoot<RuleDefinitionId>
             createdAt);
     }
 
-    public static Result<RuleDefinition> CreateSystem(
+    public static Result<RuleDefinition> CreateBuiltIn(
         RuleDefinitionKey key,
         int version,
         string name,
@@ -115,10 +121,10 @@ public sealed class RuleDefinition : AggregateRoot<RuleDefinitionId>
             return Result.Failure<RuleDefinition>(canonicalKey.Error);
 
         if (version <= 0)
-            return Result.Failure<RuleDefinition>("System rule version must be positive.");
+            return Result.Failure<RuleDefinition>("Built-in rule version must be positive.");
 
         if (documentation is null || !documentation.IsComplete("en", "vi"))
-            return Result.Failure<RuleDefinition>("System rule documentation is incomplete.");
+            return Result.Failure<RuleDefinition>("Built-in rule documentation is incomplete.");
 
         Result semantic = RuleDefinitionValidator.Validate(inputs, condition, output);
         if (semantic.IsFailure)
@@ -130,14 +136,14 @@ public sealed class RuleDefinition : AggregateRoot<RuleDefinitionId>
             canonicalKey.Value,
             name.Trim(),
             description.Trim(),
-            RuleOrigin.System,
+            RuleOrigin.BuiltIn,
             Guid.Empty,
             default)
         {
             Documentation = documentation,
-            Status = RuleLifecycleStatus.Published,
             Revision = 0,
             LatestPublishedVersion = version,
+            ActiveVersion = version,
             Condition = condition,
             Output = output,
         };
@@ -156,10 +162,10 @@ public sealed class RuleDefinition : AggregateRoot<RuleDefinitionId>
         DateTime updatedAt)
     {
         if (Origin != RuleOrigin.Workspace)
-            return Result.Failure(ErrorCodes.Conflict, "System rules are read-only.");
+            return Result.Failure(ErrorCodes.Conflict, "Built-in rules are read-only.");
 
-        if (Status != RuleLifecycleStatus.Draft)
-            return Result.Failure(ErrorCodes.Conflict, "Only a draft rule can be edited.");
+        if (ArchivedAt is not null)
+            return Result.Failure(ErrorCodes.Conflict, "Archived rules are read-only.");
 
         Result concurrency = ValidateMutation(expectedRevision, updatedByUserId);
         if (concurrency.IsFailure)
@@ -184,67 +190,91 @@ public sealed class RuleDefinition : AggregateRoot<RuleDefinitionId>
         return Result.Success();
     }
 
-    public Result<RuleDefinitionVersion> Publish(
+    public Result<RuleDefinitionVersion> CreateVersion(
         int expectedRevision,
-        Guid publishedByUserId,
-        DateTime publishedAt)
+        Guid createdByUserId,
+        DateTime createdAt)
     {
         if (Origin != RuleOrigin.Workspace)
-            return Result.Failure<RuleDefinitionVersion>(ErrorCodes.Conflict, "System rules are read-only.");
+            return Result.Failure<RuleDefinitionVersion>(ErrorCodes.Conflict, "Built-in rules are read-only.");
 
-        if (Status != RuleLifecycleStatus.Draft)
-            return Result.Failure<RuleDefinitionVersion>(ErrorCodes.Conflict, "Only a draft rule can be published.");
+        if (ArchivedAt is not null)
+            return Result.Failure<RuleDefinitionVersion>(ErrorCodes.Conflict, "Archived rules cannot create versions.");
 
-        Result concurrency = ValidateMutation(expectedRevision, publishedByUserId);
+        Result concurrency = ValidateMutation(expectedRevision, createdByUserId);
         if (concurrency.IsFailure)
             return Result.Failure<RuleDefinitionVersion>(concurrency.ErrorCode ?? ErrorCodes.InvalidInput, concurrency.Error);
 
         if (Condition is null)
-            return Result.Failure<RuleDefinitionVersion>(ErrorCodes.InvalidInput, "Rule draft must be configured before publication.");
+            return Result.Failure<RuleDefinitionVersion>(ErrorCodes.InvalidInput, "Rule draft must be configured before versioning.");
 
         int versionNumber = (LatestPublishedVersion ?? 0) + 1;
-        RuleDefinitionVersion version = RuleDefinitionVersion.Create(this, versionNumber, publishedByUserId, publishedAt);
+        RuleDefinitionVersion version = RuleDefinitionVersion.Create(this, versionNumber, createdByUserId, createdAt);
         _versions.Add(version);
         LatestPublishedVersion = versionNumber;
-        Status = RuleLifecycleStatus.Published;
         Revision += 1;
-        UpdatedByUserId = publishedByUserId;
-        UpdatedAt = publishedAt;
+        UpdatedByUserId = createdByUserId;
+        UpdatedAt = createdAt;
         return version;
     }
 
-    public Result StartNextDraft(int expectedRevision, Guid updatedByUserId, DateTime updatedAt)
+    public Result ActivateVersion(int expectedRevision, int version, Guid activatedByUserId, DateTime activatedAt)
     {
-        if (Origin != RuleOrigin.Workspace || Status != RuleLifecycleStatus.Published)
-            return Result.Failure(ErrorCodes.Conflict, "Only a published workspace rule can start a new draft.");
+        if (Origin != RuleOrigin.Workspace)
+            return Result.Failure(ErrorCodes.Conflict, "Built-in rules are read-only.");
 
-        Result concurrency = ValidateMutation(expectedRevision, updatedByUserId);
+        if (ArchivedAt is not null)
+            return Result.Failure(ErrorCodes.Conflict, "Archived rules cannot be activated.");
+
+        Result concurrency = ValidateMutation(expectedRevision, activatedByUserId);
         if (concurrency.IsFailure)
             return concurrency;
 
-        Status = RuleLifecycleStatus.Draft;
+        if (FindVersion(version) is null)
+            return Result.Failure(ErrorCodes.InvalidInput, "The rule version does not exist.");
+
+        ActiveVersion = version;
         Revision += 1;
-        UpdatedByUserId = updatedByUserId;
-        UpdatedAt = updatedAt;
+        UpdatedByUserId = activatedByUserId;
+        UpdatedAt = activatedAt;
+        return Result.Success();
+    }
+
+    public Result Deactivate(int expectedRevision, Guid deactivatedByUserId, DateTime deactivatedAt)
+    {
+        if (Origin != RuleOrigin.Workspace)
+            return Result.Failure(ErrorCodes.Conflict, "Built-in rules are read-only.");
+
+        if (ArchivedAt is not null)
+            return Result.Failure(ErrorCodes.Conflict, "Archived rules cannot be deactivated.");
+
+        Result concurrency = ValidateMutation(expectedRevision, deactivatedByUserId);
+        if (concurrency.IsFailure)
+            return concurrency;
+
+        if (ActiveVersion is null)
+            return Result.Failure(ErrorCodes.Conflict, "No rule version is active.");
+
+        ActiveVersion = null;
+        Revision += 1;
+        UpdatedByUserId = deactivatedByUserId;
+        UpdatedAt = deactivatedAt;
         return Result.Success();
     }
 
     public Result Archive(int expectedRevision, Guid archivedByUserId, DateTime archivedAt)
     {
         if (Origin != RuleOrigin.Workspace)
-            return Result.Failure(ErrorCodes.Conflict, "System rules are read-only.");
+            return Result.Failure(ErrorCodes.Conflict, "Built-in rules are read-only.");
 
-        if (Status == RuleLifecycleStatus.Archived)
+        if (ArchivedAt is not null)
             return Result.Success();
-
-        if (LatestPublishedVersion is null)
-            return Result.Failure(ErrorCodes.InvalidInput, "A rule must be published before it can be archived.");
 
         Result concurrency = ValidateMutation(expectedRevision, archivedByUserId);
         if (concurrency.IsFailure)
             return concurrency;
 
-        Status = RuleLifecycleStatus.Archived;
+        ActiveVersion = null;
         Revision += 1;
         UpdatedByUserId = archivedByUserId;
         UpdatedAt = archivedAt;

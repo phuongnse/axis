@@ -20,25 +20,25 @@ internal static class BusinessObjectRecordHandlerTestContext
         BusinessObjectFieldType fieldType = BusinessObjectFieldType.Text,
         bool includeRule = false,
         int bindingRevision = 1,
-        string objectKey = "loan_application")
+        string objectKey = "business_record")
         => CreatePublishedDefinition(fieldType, includeRule, bindingRevision, objectKey).Versions.Single();
 
     public static BusinessObjectDefinition CreatePublishedDefinition(
         BusinessObjectFieldType fieldType = BusinessObjectFieldType.Text,
         bool includeRule = false,
         int bindingRevision = 1,
-        string objectKey = "loan_application")
+        string objectKey = "business_record")
     {
         BusinessObjectDefinition definition = BusinessObjectDefinitionHandlerTestContext.CreateUnpublished(
-            "Loan application",
+            "Business record",
             objectKey);
         BusinessObjectFieldRuleSpec[] rules = includeRule
             ? [new(BindingId, BindingRevision: bindingRevision)]
             : [];
-        string fieldKey = fieldType == BusinessObjectFieldType.Integer ? "requested_amount" : "applicant_name";
-        string fieldLabel = fieldType == BusinessObjectFieldType.Integer ? "Requested amount" : "Applicant name";
+        string fieldKey = fieldType == BusinessObjectFieldType.Integer ? "quantity" : "display_name";
+        string fieldLabel = fieldType == BusinessObjectFieldType.Integer ? "Quantity" : "Display name";
         definition.SaveUnpublished(
-            "Loan application",
+            "Business record",
             [new BusinessObjectFieldDefinitionSpec(fieldKey, fieldLabel, 0, fieldType, rules)],
             expectedRevision: 1,
             Now).IsSuccess.Should().BeTrue();

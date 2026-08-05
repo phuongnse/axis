@@ -42,7 +42,8 @@ public sealed record RuleBindingUsageDto(
     string UseCaseOrTrigger,
     int Priority,
     bool Enabled,
-    RuleBindingFailureBehavior FailureBehavior);
+    RuleBindingFailureBehavior FailureBehavior,
+    int Revision);
 
 public sealed record CreateRuleBindingRequest(
     string DefinitionKey,
@@ -67,6 +68,12 @@ public sealed record UpdateRuleBindingRequest(
     bool Enabled = true,
     RuleBindingFailureBehavior FailureBehavior = RuleBindingFailureBehavior.FailClosed);
 
+public sealed record DeleteRuleBindingRequest(int ExpectedRevision);
+
+public sealed record EvaluateRuleBindingRequest(
+    RuleContext Context,
+    int? BindingRevision = null);
+
 public sealed record RuleBindingReferenceValidationResult(
     bool IsValid,
     Guid? BindingId,
@@ -81,13 +88,21 @@ public sealed record RuleBindingReferenceValidationResult(
         new(false, null, null, errorCode, error);
 }
 
+public sealed record RuleBindingContextValueSchema(RuleValueType Type, bool AllowMultiple);
+
+public sealed record RuleBindingReferenceValidationRequest(
+    Guid WorkspaceId,
+    Guid BindingId,
+    string ExpectedTargetType,
+    string ExpectedTargetId,
+    string ExpectedUseCaseOrTrigger,
+    IReadOnlyDictionary<string, RuleBindingContextValueSchema> ContextValues,
+    IReadOnlyList<string> RequiredContextKeys,
+    int? ExpectedBindingRevision = null);
+
 public interface IRuleBindingReferenceValidator
 {
     Task<RuleBindingReferenceValidationResult> ValidateAsync(
-        Guid workspaceId,
-        Guid bindingId,
-        CancellationToken cancellationToken = default,
-        string? expectedTargetType = null,
-        string? expectedTargetId = null,
-        string? expectedUseCaseOrTrigger = null);
+        RuleBindingReferenceValidationRequest request,
+        CancellationToken cancellationToken = default);
 }

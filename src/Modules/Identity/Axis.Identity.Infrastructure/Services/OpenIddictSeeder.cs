@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using OpenIddict.Abstractions;
@@ -5,98 +6,132 @@ using static OpenIddict.Abstractions.OpenIddictConstants;
 
 namespace Axis.Identity.Infrastructure.Services;
 
-/// <summary>
-/// Seeds the first-party OAuth2 clients on startup.
-/// Idempotent: creates the built-in clients and updates them so local
-/// redirect URI changes are applied without wiping the development database.
-/// </summary>
-public sealed class OpenIddictSeeder(IServiceProvider services) : IHostedService
+/// <summary>Reconciles deployment-owned OAuth/OIDC clients on every startup.</summary>
+public sealed class OpenIddictSeeder(
+    IServiceProvider services,
+    OpenIddictClientCatalog catalog) : IHostedService
 {
+    internal const string ManagedOwnerProperty = "axis:client-catalog:owner";
+    internal const string ManagedSchemaProperty = "axis:client-catalog:schema";
+    internal const string ManagedProfileProperty = "axis:client-catalog:profile";
+    internal const string ManagedOwner = "axis";
+
+    private static readonly string[] NativePermissions =
+    [
+        Permissions.Endpoints.Authorization,
+        Permissions.Endpoints.Token,
+        Permissions.GrantTypes.AuthorizationCode,
+        Permissions.ResponseTypes.Code,
+        Permissions.Prefixes.Scope + Scopes.OpenId,
+        Permissions.Scopes.Email,
+        Permissions.Scopes.Profile,
+    ];
+
+    private static readonly string[] BffPermissions =
+    [
+        Permissions.Endpoints.Authorization,
+        Permissions.Endpoints.EndSession,
+        Permissions.Endpoints.PushedAuthorization,
+        Permissions.Endpoints.Revocation,
+        Permissions.Endpoints.Token,
+        Permissions.GrantTypes.AuthorizationCode,
+        Permissions.GrantTypes.RefreshToken,
+        Permissions.ResponseTypes.Code,
+        Permissions.Prefixes.Scope + Scopes.OpenId,
+        Permissions.Prefixes.Scope + Scopes.OfflineAccess,
+        Permissions.Scopes.Email,
+        Permissions.Scopes.Profile,
+    ];
+
     public async Task StartAsync(CancellationToken cancellationToken)
     {
         using IServiceScope scope = services.CreateScope();
-
-        IOpenIddictApplicationManager appManager =
+        IOpenIddictApplicationManager manager =
             scope.ServiceProvider.GetRequiredService<IOpenIddictApplicationManager>();
 
-        await SeedSpaClientAsync(appManager, cancellationToken);
-        await SeedMcpClientAsync(appManager, cancellationToken);
+        List<ExistingApplication> existing = [];
+        await foreach (object application in manager.ListAsync(cancellationToken: cancellationToken))
+        {
+            string clientId = await manager.GetClientIdAsync(application, cancellationToken)
+                ?? throw new InvalidOperationException("An OpenIddict application has no client ID.");
+            existing.Add(new ExistingApplication(
+                clientId,
+                application,
+                await IsManagedAsync(manager, application, cancellationToken)));
+        }
+
+        Dictionary<string, ExistingApplication> byClientId = existing.ToDictionary(
+            application => application.ClientId,
+            StringComparer.Ordinal);
+
+        foreach (OpenIddictClientRegistration registration in catalog.Clients)
+        {
+            if (byClientId.TryGetValue(registration.ClientId, out ExistingApplication? current) &&
+                !current.Managed)
+            {
+                throw new InvalidOperationException(
+                    $"Configured client '{registration.ClientId}' collides with an application not owned by the client catalog.");
+            }
+        }
+
+        foreach (OpenIddictClientRegistration registration in catalog.Clients)
+        {
+            OpenIddictApplicationDescriptor descriptor = CreateDescriptor(registration, catalog.SchemaVersion);
+            if (byClientId.TryGetValue(registration.ClientId, out ExistingApplication? current))
+                await manager.UpdateAsync(current.Application, descriptor, cancellationToken);
+            else
+                await manager.CreateAsync(descriptor, cancellationToken);
+        }
+
+        HashSet<string> configuredClientIds = catalog.Clients
+            .Select(client => client.ClientId)
+            .ToHashSet(StringComparer.Ordinal);
+        foreach (ExistingApplication application in existing)
+        {
+            if (application.Managed && !configuredClientIds.Contains(application.ClientId))
+                await manager.DeleteAsync(application.Application, cancellationToken);
+        }
     }
 
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
-    private static async Task SeedSpaClientAsync(
-        IOpenIddictApplicationManager appManager, CancellationToken ct)
+    internal static OpenIddictApplicationDescriptor CreateDescriptor(
+        OpenIddictClientRegistration registration,
+        int schemaVersion)
     {
-        object? application = await appManager.FindByClientIdAsync("axis_spa", ct);
+        bool confidential = registration.Profile == OpenIddictClientProfile.WebBffConfidential;
         OpenIddictApplicationDescriptor descriptor = new()
         {
-            ClientId = "axis_spa",
-            // Public PKCE client; no client secret.
-            ClientType = ClientTypes.Public,
-            DisplayName = "Axis Platform Web",
-            Permissions =
-            {
-                Permissions.Endpoints.Authorization,
-                Permissions.Endpoints.Token,
-                Permissions.GrantTypes.AuthorizationCode,
-                Permissions.ResponseTypes.Code,
-                Permissions.Prefixes.Scope + Scopes.OpenId,
-                Permissions.Scopes.Email,
-                Permissions.Scopes.Profile,
-            },
-            // Local SPA dev ports.
-            RedirectUris =
-            {
-                new Uri("https://localhost:3000/callback"),
-                new Uri("https://localhost:5173/callback"),
-                new Uri("https://web:3000/callback"),
-            },
-            Requirements =
-            {
-                Requirements.Features.ProofKeyForCodeExchange,
-            },
+            ClientId = registration.ClientId,
+            ClientSecret = confidential ? registration.ClientSecret : null,
+            ClientType = confidential ? ClientTypes.Confidential : ClientTypes.Public,
+            DisplayName = registration.DisplayName,
         };
 
-        if (application is null)
-            await appManager.CreateAsync(descriptor, ct);
-        else
-            await appManager.UpdateAsync(application, descriptor, ct);
+        descriptor.Permissions.UnionWith(confidential ? BffPermissions : NativePermissions);
+        descriptor.Requirements.Add(Requirements.Features.ProofKeyForCodeExchange);
+        if (confidential)
+            descriptor.Requirements.Add(Requirements.Features.PushedAuthorizationRequests);
+        descriptor.RedirectUris.UnionWith(registration.RedirectUris);
+        descriptor.PostLogoutRedirectUris.UnionWith(registration.PostLogoutRedirectUris);
+        descriptor.Properties[ManagedOwnerProperty] = JsonSerializer.SerializeToElement(ManagedOwner);
+        descriptor.Properties[ManagedSchemaProperty] = JsonSerializer.SerializeToElement(schemaVersion);
+        descriptor.Properties[ManagedProfileProperty] = JsonSerializer.SerializeToElement(
+            registration.Profile.ToString());
+        return descriptor;
     }
 
-    private static async Task SeedMcpClientAsync(
-        IOpenIddictApplicationManager appManager, CancellationToken ct)
+    private static async ValueTask<bool> IsManagedAsync(
+        IOpenIddictApplicationManager manager,
+        object application,
+        CancellationToken cancellationToken)
     {
-        object? application = await appManager.FindByClientIdAsync("axis_mcp", ct);
-        OpenIddictApplicationDescriptor descriptor = new()
-        {
-            ClientId = "axis_mcp",
-            // Public local client; the authorization code is protected by PKCE.
-            ClientType = ClientTypes.Public,
-            DisplayName = "Axis MCP local client",
-            Permissions =
-            {
-                Permissions.Endpoints.Authorization,
-                Permissions.Endpoints.Token,
-                Permissions.GrantTypes.AuthorizationCode,
-                Permissions.ResponseTypes.Code,
-                Permissions.Prefixes.Scope + Scopes.OpenId,
-                Permissions.Scopes.Email,
-                Permissions.Scopes.Profile,
-            },
-            RedirectUris =
-            {
-                new Uri("http://127.0.0.1:48123/callback"),
-            },
-            Requirements =
-            {
-                Requirements.Features.ProofKeyForCodeExchange,
-            },
-        };
-
-        if (application is null)
-            await appManager.CreateAsync(descriptor, ct);
-        else
-            await appManager.UpdateAsync(application, descriptor, ct);
+        IReadOnlyDictionary<string, JsonElement> properties =
+            await manager.GetPropertiesAsync(application, cancellationToken);
+        return properties.TryGetValue(ManagedOwnerProperty, out JsonElement owner) &&
+            owner.ValueKind == JsonValueKind.String &&
+            string.Equals(owner.GetString(), ManagedOwner, StringComparison.Ordinal);
     }
+
+    private sealed record ExistingApplication(string ClientId, object Application, bool Managed);
 }

@@ -1,5 +1,5 @@
 import { Link } from '@tanstack/react-router';
-import { Blocks, ClipboardPenLine, ListChecks } from 'lucide-react';
+import { Blocks, ListChecks } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { buttonVariants } from '@/components/ui/button';
 import type {
@@ -16,7 +16,6 @@ interface ModuleNavigationProps {
 }
 
 const iconByToken: Record<ModuleNavigationIcon, typeof Blocks> = {
-  applications: ClipboardPenLine,
   businessObjects: Blocks,
   rules: ListChecks,
 };

@@ -36,8 +36,11 @@ public sealed class UpdateRuleBindingHandler(
         Result<IReadOnlyDictionary<string, RuleInputMapping>> mappings = RuleBindingContractMapper.ToDomain(command.Request.InputMappings);
         if (key.IsFailure || mappings.IsFailure)
             return RuleDefinitionFailures.Invalid<RuleBindingDto>(key.IsFailure ? key.Error : mappings.Error);
+        bool retargetsVersion = binding.DefinitionKey != key.Value ||
+            binding.DefinitionVersion != command.Request.DefinitionVersion;
         Result<RuleDefinitionVersion> version = await CreateRuleBindingHandler.ResolveVersionAsync(
-            workspaceId, key.Value, command.Request.DefinitionVersion, definitionRepository, cancellationToken);
+            workspaceId, key.Value, command.Request.DefinitionVersion, definitionRepository, cancellationToken,
+            requireActive: retargetsVersion);
         if (version.IsFailure)
             return RuleDefinitionFailures.NotFound<RuleBindingDto>();
         Result valid = RuleBindingValidator.Validate(version.Value, mappings.Value);

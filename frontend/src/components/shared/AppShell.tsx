@@ -12,9 +12,9 @@ import {
   useManagedWindowActions,
 } from '@/components/shared/ManagedWindowManager';
 import { ModuleNavigation } from '@/components/shared/ModuleNavigation';
+import { Toaster } from '@/components/ui/sonner';
 import { signOutUser } from '@/features/auth/api';
 import { useAuthStore } from '@/features/auth/auth-store';
-import { clearPkceSession } from '@/features/auth/pkce';
 import { PreferencesProfileSync } from '@/features/preferences';
 import { managedWindowRenderers } from '@/lib/managed-window-registry';
 import type { ModuleNavigationContribution } from '@/lib/module-navigation';
@@ -78,7 +78,6 @@ function AppShellContent({
       return;
     }
 
-    clearPkceSession();
     clearWindows();
     markBrowserSessionGuest();
     queryClient.clear();
@@ -97,6 +96,7 @@ function AppShellContent({
           </main>
         </div>
         <ManagedWindowHost />
+        <Toaster />
       </div>
       <AppFooter />
     </div>
