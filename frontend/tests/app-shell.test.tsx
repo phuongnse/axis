@@ -2,7 +2,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { AnchorHTMLAttributes, ReactNode } from 'react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { toast } from 'sonner';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { signOutUser } from '@/features/auth/api';
 import { useAuthStore } from '@/features/auth/auth-store';
 import { getCurrentUserProfile } from '@/features/dashboard/api';
@@ -66,6 +67,19 @@ vi.mock('@/features/dashboard/api', () => ({
 
 describe('AppShell', () => {
   beforeEach(() => {
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn().mockReturnValue({
+        matches: false,
+        media: '',
+        onchange: null,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      }),
+    );
     routerState.location.pathname = '/dashboard';
     navigateMock.mockClear();
     vi.mocked(signOutUser).mockReset();
@@ -90,6 +104,11 @@ describe('AppShell', () => {
         name: 'Ada Lovelace',
       },
     });
+  });
+
+  afterEach(() => {
+    toast.dismiss();
+    vi.unstubAllGlobals();
   });
 
   it('renders the authenticated app frame around page content', async () => {
@@ -185,6 +204,8 @@ describe('AppShell', () => {
 
     view.rerender(shell(<section>Another authenticated route</section>));
     expect(screen.getByRole('dialog', { name: 'Persistent test window' })).toBeVisible();
+    toast.success('Persistent window saved');
+    expect(await screen.findByText('Persistent window saved')).toBeVisible();
 
     await user.click(screen.getByRole('button', { name: 'Account menu' }));
     await user.click(screen.getByRole('button', { name: 'Sign out' }));

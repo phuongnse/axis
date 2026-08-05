@@ -201,10 +201,59 @@ export function RuleEditorDialog({
     projectMutation.mutate({ ast: hydrationCondition });
   }, [hydrationCondition, projectMutation.mutate]);
 
+  const refreshMutation = useMutation({
+    mutationFn: async () => {
+      const current = detailQuery.data ?? createdDraft;
+      if (!current?.definitionKey) throw new Error(t('rules.loadErrorTitle'));
+      return getRuleDefinition(current.definitionKey);
+    },
+    onSuccess: (refreshed) => {
+      const definitionKey = refreshed.definitionKey ?? '';
+      queryClient.setQueryData(ruleDefinitionQueryKeys.detail(definitionKey), refreshed);
+      if (creating) setCreatedDraft(refreshed);
+      hydratedKeyRef.current = definitionKey;
+      setName(refreshed.name ?? '');
+      setDescription(refreshed.description ?? '');
+      const nextInputs = toDraftInputs(refreshed.inputs ?? []);
+      setInputs(
+        nextInputs.map((input) => ({ ...input, clientId: crypto.randomUUID(), keyLocked: true })),
+      );
+      setCondition(refreshed.condition ?? null);
+      setDsl('');
+      setDiagnostics([]);
+      setCompletions([]);
+      setSampleValues({});
+      setSimulation(null);
+      setSimulationFailure(null);
+      setError(null);
+      setUsageVersion(refreshed.activeVersion ?? refreshed.latestVersion ?? null);
+      snapshotRef.current = draftSnapshot({
+        name: refreshed.name ?? '',
+        description: refreshed.description ?? '',
+        inputs: nextInputs,
+        condition: refreshed.condition ?? null,
+        dsl: '',
+      });
+      hydratingProjectionRef.current = Boolean(refreshed.condition);
+      setHydrationCondition(refreshed.condition ?? null);
+      setStale(false);
+    },
+    onError: (cause) => {
+      setError(cause instanceof Error ? cause.message : t('rules.loadErrorTitle'));
+    },
+  });
+
   const saveMutation = useMutation({
     mutationFn: async () => {
       setError(null);
-      if (!condition || diagnostics.length > 0 || projectMutation.isPending) {
+      if (
+        stale ||
+        refreshMutation.isPending ||
+        hydrationCondition != null ||
+        !condition ||
+        diagnostics.length > 0 ||
+        projectMutation.isPending
+      ) {
         setActiveSection('behavior');
         throw new Error(t('rules.conditionRequired'));
       }
@@ -263,8 +312,12 @@ export function RuleEditorDialog({
       const current = detailQuery.data ?? createdDraft;
       if (!current?.definitionKey) throw new Error(t('rules.simulationError'));
       if (authoringBlocked) throw new Error(t('rules.conditionRequired'));
+      const immutableVersion = current.activeVersion ?? current.latestVersion;
+      const simulationInputs = canEditDraft
+        ? inputContract
+        : (current.versions?.find((version) => version.version === immutableVersion)?.inputs ?? []);
       const inputs = Object.fromEntries(
-        inputContract.filter(hasInputKey).map((input) => [
+        simulationInputs.filter(hasInputKey).map((input) => [
           input.key,
           {
             type: input.types?.[0],
@@ -272,7 +325,6 @@ export function RuleEditorDialog({
           },
         ]),
       );
-      const immutableVersion = current.activeVersion ?? current.latestVersion;
       return canEditDraft
         ? simulateRuleDefinitionDraft(current.definitionKey, { inputs })
         : immutableVersion != null
@@ -294,6 +346,8 @@ export function RuleEditorDialog({
       const current = detailQuery.data ?? createdDraft;
       if (!current?.definitionKey || current.revision == null)
         throw new Error(t('rules.lifecycleError'));
+      if (stale || refreshMutation.isPending || hydrationCondition != null)
+        throw new Error(t('rules.staleChanges'));
       if ((action === 'version' || action === 'activate') && authoringBlocked)
         throw new Error(t('rules.conditionRequired'));
       if (action === 'version')
@@ -332,7 +386,20 @@ export function RuleEditorDialog({
       draftSnapshot({ name, description, inputs: inputContract, condition, dsl });
   const authoringBlocked =
     canEditDraft &&
-    (dirty || projectMutation.isPending || diagnostics.length > 0 || condition == null);
+    (stale ||
+      refreshMutation.isPending ||
+      hydrationCondition != null ||
+      dirty ||
+      projectMutation.isPending ||
+      diagnostics.length > 0 ||
+      condition == null);
+  const simulationVersion = canEditDraft
+    ? null
+    : (detail?.activeVersion ?? detail?.latestVersion ?? null);
+  const simulationSnapshot = detail?.versions?.find(
+    (version) => version.version === simulationVersion,
+  );
+  const simulationInputs = canEditDraft ? inputContract : (simulationSnapshot?.inputs ?? []);
   const selectedUsageVersion = detail?.versions?.find(
     (version) => version.version === (usageVersion ?? detail.activeVersion ?? detail.latestVersion),
   );
@@ -378,6 +445,9 @@ export function RuleEditorDialog({
             onClick={() => saveMutation.mutate()}
             disabled={
               saveMutation.isPending ||
+              stale ||
+              refreshMutation.isPending ||
+              hydrationCondition != null ||
               projectMutation.isPending ||
               diagnostics.length > 0 ||
               !name.trim()
@@ -408,7 +478,7 @@ export function RuleEditorDialog({
                   <RuleDetail label={t('rules.name')} value={detail.name ?? name} />
                   <RuleDetail
                     label={t('rules.latestVersion')}
-                    value={String(detail.latestVersion ?? 1)}
+                    value={detail.latestVersion == null ? '—' : String(detail.latestVersion)}
                   />
                   <div className="sm:col-span-2">
                     <RuleDetail
@@ -678,9 +748,9 @@ export function RuleEditorDialog({
             }
           />
         ) : null}
-        {detail?.definitionKey ? (
+        {detail?.definitionKey && (canEditDraft || simulationSnapshot) ? (
           <RuleSimulationPanel
-            inputs={inputContract}
+            inputs={simulationInputs}
             values={sampleValues}
             onChange={(key, value) => setSampleValues((current) => ({ ...current, [key]: value }))}
             onSimulate={() => simulationMutation.mutate()}
@@ -688,7 +758,7 @@ export function RuleEditorDialog({
             disabled={authoringBlocked}
             simulation={simulation}
             failure={simulationFailure}
-            version={canEditDraft ? null : (detail.activeVersion ?? detail.latestVersion)}
+            version={simulationVersion}
           />
         ) : null}
         {stale ? (
@@ -697,10 +767,8 @@ export function RuleEditorDialog({
             <Button
               type="button"
               variant="link"
-              onClick={() => {
-                setStale(false);
-                void detailQuery.refetch();
-              }}
+              disabled={refreshMutation.isPending}
+              onClick={() => refreshMutation.mutate()}
             >
               {t('rules.refetch')}
             </Button>
@@ -733,13 +801,19 @@ export function RuleEditorDialog({
                 <Button
                   type="button"
                   variant="outline"
+                  disabled={stale || refreshMutation.isPending || hydrationCondition != null}
                   onClick={() => setLifecycleAction('deactivate')}
                 >
                   {t('rules.deactivate')}
                 </Button>
               ) : null}
               {detail.actions?.canArchive ? (
-                <Button type="button" variant="destructive" onClick={() => setArchiveOpen(true)}>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  disabled={stale || refreshMutation.isPending || hydrationCondition != null}
+                  onClick={() => setArchiveOpen(true)}
+                >
                   <Archive aria-hidden />
                   {t('rules.archive')}
                 </Button>

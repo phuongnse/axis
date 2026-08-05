@@ -11,6 +11,7 @@ import { act, type RenderOptions, type RenderResult, render } from '@testing-lib
 import type { ReactElement } from 'react';
 import { ManagedWindowHost } from '@/components/shared/ManagedWindowHost';
 import { ManagedWindowProvider } from '@/components/shared/ManagedWindowManager';
+import { Toaster } from '@/components/ui/sonner';
 import { managedWindowRenderers } from '@/lib/managed-window-registry';
 
 interface RenderWithRouterOptions extends Omit<RenderOptions, 'wrapper'> {
@@ -67,6 +68,7 @@ export async function renderWithRouter(
         <div className="relative h-dvh w-dvw">
           <RouterProvider router={router} />
           <ManagedWindowHost />
+          <Toaster />
         </div>
       </ManagedWindowProvider>
     </QueryClientProvider>,

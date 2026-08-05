@@ -15,7 +15,6 @@ import {
 import { useManagedWindowActions } from '@/components/shared/ManagedWindowManager';
 import { StatusBadge, type StatusBadgeTone } from '@/components/shared/StatusBadge';
 import { Button } from '@/components/ui/button';
-import { Toaster } from '@/components/ui/sonner';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { referenceContent } from '@/lib/reference-metadata';
 import { type RuleDefinitionSummary, ruleDefinitionsListQueryOptions } from '../api';
@@ -216,25 +215,22 @@ export function RulesPage() {
   ]);
 
   return (
-    <>
-      <div className="flex h-full min-h-0 w-full min-w-0 flex-col gap-4 overflow-hidden p-4 sm:p-6 lg:p-8">
-        <header className="min-w-0 shrink-0">
-          <div className="min-w-0">
-            <h1 className="font-heading text-2xl font-semibold text-foreground">
-              {t('rules.title')}
-            </h1>
-            <p className="mt-1 max-w-3xl text-sm leading-6 text-muted-foreground">
-              {t('rules.pageDescription')}
-            </p>
-          </div>
-        </header>
-
-        <div className="min-h-0 flex-1">
-          <DataTable definition={tableDefinition} />
+    <div className="flex h-full min-h-0 w-full min-w-0 flex-col gap-4 overflow-hidden p-4 sm:p-6 lg:p-8">
+      <header className="min-w-0 shrink-0">
+        <div className="min-w-0">
+          <h1 className="font-heading text-2xl font-semibold text-foreground">
+            {t('rules.title')}
+          </h1>
+          <p className="mt-1 max-w-3xl text-sm leading-6 text-muted-foreground">
+            {t('rules.pageDescription')}
+          </p>
         </div>
+      </header>
+
+      <div className="min-h-0 flex-1">
+        <DataTable definition={tableDefinition} />
       </div>
-      <Toaster />
-    </>
+    </div>
   );
 }
 
