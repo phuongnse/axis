@@ -222,7 +222,12 @@ function respondForRules(input: RequestInfo | URL, init?: RequestInit): Response
   if (url.endsWith('/rules/authoring/project')) {
     const body = init?.body ? JSON.parse(String(init.body)) : {};
     const condition = body.source?.ast ?? thresholdCondition();
-    return jsonResponse({ condition, formattedDsl: body.source?.text ?? 'value > threshold', diagnostics: [], isValid: true });
+    return jsonResponse({
+      condition,
+      formattedDsl: body.source?.text ?? 'value > threshold',
+      diagnostics: [],
+      isValid: true,
+    });
   }
   if (url.endsWith('/rules/authoring/complete')) {
     return jsonResponse([
@@ -230,7 +235,12 @@ function respondForRules(input: RequestInfo | URL, init?: RequestInit): Response
     ]);
   }
   if (url.endsWith('/rules/credit_threshold/draft/simulate')) {
-    return jsonResponse({ definitionKey: 'credit_threshold', definitionVersion: null, isMatch: false, diagnostics: [] });
+    return jsonResponse({
+      definitionKey: 'credit_threshold',
+      definitionVersion: null,
+      isMatch: false,
+      diagnostics: [],
+    });
   }
   if (url.endsWith('/rules/expression-language')) return jsonResponse(expressionLanguage());
   if (url.includes('/rules/field.required/bindings?version=1')) {
@@ -392,9 +402,15 @@ describe('RulesPage', () => {
 
   it('edits a binding with its current revision', async () => {
     const user = userEvent.setup();
-    vi.mocked(fetch).mockImplementation((input, init) => Promise.resolve(respondForRules(input, init)));
+    vi.mocked(fetch).mockImplementation((input, init) =>
+      Promise.resolve(respondForRules(input, init)),
+    );
     await renderWithRouter(<RulesPage />, { path: '/rules', authenticatedPath: 'rules' });
-    await user.click(within(await screen.findByRole('region', { name: 'Rules catalog' })).getByRole('button', { name: 'Required value' }));
+    await user.click(
+      within(await screen.findByRole('region', { name: 'Rules catalog' })).getByRole('button', {
+        name: 'Required value',
+      }),
+    );
     const dialog = await screen.findByRole('dialog', { name: 'Required value' });
     await user.click(within(dialog).getByRole('tab', { name: 'Usage' }));
     await user.click(await within(dialog).findByRole('button', { name: 'Edit binding' }));
@@ -412,11 +428,13 @@ describe('RulesPage', () => {
     await user.click(within(editor).getByRole('button', { name: 'Save binding' }));
 
     await waitFor(() => {
-      const request = vi.mocked(fetch).mock.calls.find(
-        ([input, init]) =>
-          input.toString().endsWith('/rule-bindings/88888888-8888-4888-8888-888888888888') &&
-          init?.method === 'PUT',
-      );
+      const request = vi
+        .mocked(fetch)
+        .mock.calls.find(
+          ([input, init]) =>
+            input.toString().endsWith('/rule-bindings/88888888-8888-4888-8888-888888888888') &&
+            init?.method === 'PUT',
+        );
       expect(request).toBeDefined();
       expect(JSON.parse(String(request?.[1]?.body))).toEqual({
         expectedRevision: 1,
@@ -487,7 +505,9 @@ describe('RulesPage', () => {
     await user.type(within(editor).getByLabelText('Priority'), '4');
     await user.click(within(editor).getByRole('button', { name: 'Save binding' }));
 
-    expect(await within(editor).findByText('This binding changed. Refresh it and try again.')).toBeVisible();
+    expect(
+      await within(editor).findByText('This binding changed. Refresh it and try again.'),
+    ).toBeVisible();
     expect(within(editor).getByLabelText('Priority')).toHaveValue(4);
     await user.click(within(editor).getByRole('button', { name: 'Refresh binding' }));
     await waitFor(() => expect(within(editor).getByLabelText('Priority')).toHaveValue(7));
@@ -496,12 +516,14 @@ describe('RulesPage', () => {
     await user.click(within(editor).getByRole('button', { name: 'Cancel' }));
     await user.click(within(detail).getByRole('button', { name: 'Disable binding' }));
     await waitFor(() => {
-      const toggleRequest = vi.mocked(fetch).mock.calls.find(
-        ([input, init]) =>
-          input.toString().endsWith('/rule-bindings/88888888-8888-4888-8888-888888888888') &&
-          init?.method === 'PUT' &&
-          JSON.parse(String(init.body)).enabled === false,
-      );
+      const toggleRequest = vi
+        .mocked(fetch)
+        .mock.calls.find(
+          ([input, init]) =>
+            input.toString().endsWith('/rule-bindings/88888888-8888-4888-8888-888888888888') &&
+            init?.method === 'PUT' &&
+            JSON.parse(String(init.body)).enabled === false,
+        );
       expect(JSON.parse(String(toggleRequest?.[1]?.body))).toMatchObject({
         expectedRevision: 1,
         definitionKey: 'field.required',
@@ -514,11 +536,13 @@ describe('RulesPage', () => {
     const confirmation = await screen.findByRole('alertdialog', { name: 'Remove this binding?' });
     await user.click(within(confirmation).getByRole('button', { name: 'Remove binding' }));
     await waitFor(() => {
-      const deleteRequest = vi.mocked(fetch).mock.calls.find(
-        ([input, init]) =>
-          input.toString().endsWith('/rule-bindings/88888888-8888-4888-8888-888888888888') &&
-          init?.method === 'DELETE',
-      );
+      const deleteRequest = vi
+        .mocked(fetch)
+        .mock.calls.find(
+          ([input, init]) =>
+            input.toString().endsWith('/rule-bindings/88888888-8888-4888-8888-888888888888') &&
+            init?.method === 'DELETE',
+        );
       expect(JSON.parse(String(deleteRequest?.[1]?.body))).toEqual({ expectedRevision: 1 });
     });
   });
@@ -682,7 +706,9 @@ describe('RulesPage', () => {
     await user.click(within(editor).getByRole('button', { name: 'Run simulation' }));
     expect(await within(editor).findByText('Condition matched')).toBeVisible();
     expect(within(editor).getAllByText(/Version 1/).length).toBeGreaterThanOrEqual(1);
-    const simulationRequest = requests.find((request) => request.url.endsWith('/versions/1/simulate'));
+    const simulationRequest = requests.find((request) =>
+      request.url.endsWith('/versions/1/simulate'),
+    );
     expect(simulationRequest?.body).toEqual({
       inputs: {
         value: { type: 'Decimal', values: ['15'] },

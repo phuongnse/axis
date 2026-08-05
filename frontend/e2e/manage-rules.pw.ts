@@ -326,10 +326,19 @@ async function mockAuthenticatedSession(page: Page): Promise<void> {
 async function mockRulesApi(page: Page): Promise<CapturedRequest[]> {
   let detail: MockRuleDetail | null = null;
   let binding: ApiTypes.RuleBindingDto = {
-    id: '88888888-8888-4888-8888-888888888888', workspaceId: profile.workspaceId,
-    definitionKey: 'field.required', definitionVersion: 1, targetType: 'business-object-field',
-    targetId: 'customer.status', useCaseOrTrigger: 'field-validation', priority: 0,
-    enabled: true, failureBehavior: 'FailClosed', revision: 1, createdAt: now, updatedAt: now,
+    id: '88888888-8888-4888-8888-888888888888',
+    workspaceId: profile.workspaceId,
+    definitionKey: 'field.required',
+    definitionVersion: 1,
+    targetType: 'business-object-field',
+    targetId: 'customer.status',
+    useCaseOrTrigger: 'field-validation',
+    priority: 0,
+    enabled: true,
+    failureBehavior: 'FailClosed',
+    revision: 1,
+    createdAt: now,
+    updatedAt: now,
   };
   const requests: CapturedRequest[] = [];
 
@@ -360,14 +369,32 @@ async function mockRulesApi(page: Page): Promise<CapturedRequest[]> {
     }
     if (request.method() === 'POST' && path === '/api/rules/authoring/project') {
       captured.body = request.postDataJSON() as JsonObject;
-      const source = captured.body.source as { ast?: ApiTypes.RuleConditionNodeDto; text?: string } | undefined;
+      const source = captured.body.source as
+        | { ast?: ApiTypes.RuleConditionNodeDto; text?: string }
+        | undefined;
       const condition = source?.ast ?? requiredCondition();
-      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ condition, formattedDsl: source?.text ?? 'value == false', explanation: conditionDisplay(condition), diagnostics: [], isValid: true }) });
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          condition,
+          formattedDsl: source?.text ?? 'value == false',
+          explanation: conditionDisplay(condition),
+          diagnostics: [],
+          isValid: true,
+        }),
+      });
       return;
     }
     if (request.method() === 'POST' && path === '/api/rules/authoring/complete') {
       captured.body = request.postDataJSON() as JsonObject;
-      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([{ label: 'value', insertText: 'value', kind: 'Input', start: 0, length: 0 }]) });
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify([
+          { label: 'value', insertText: 'value', kind: 'Input', start: 0, length: 0 },
+        ]),
+      });
       return;
     }
     if (request.method() === 'POST' && path === '/api/rules/expression-language/guide') {
@@ -456,7 +483,13 @@ async function mockRulesApi(page: Page): Promise<CapturedRequest[]> {
         output: { type: 'Boolean', cardinality: 'Scalar' },
         condition: undefined,
         versions: [],
-        actions: { canEditDraft: true, canCreateVersion: true, canActivateVersion: false, canDeactivate: false, canArchive: true },
+        actions: {
+          canEditDraft: true,
+          canCreateVersion: true,
+          canActivateVersion: false,
+          canDeactivate: false,
+          canArchive: true,
+        },
         createdAt: now,
         updatedAt: now,
         archivedAt: null,
@@ -469,27 +502,140 @@ async function mockRulesApi(page: Page): Promise<CapturedRequest[]> {
       return;
     }
 
-    if (request.method() === 'POST' && detail && path === `/api/rules/${detail.definitionKey}/versions`) {
-      detail = { ...detail, latestVersion: (detail.latestVersion ?? 0) + 1, revision: (detail.revision ?? 0) + 1, versions: [...(detail.versions ?? []), { version: (detail.latestVersion ?? 0) + 1, name: detail.name, description: detail.description, expressionLanguageVersion: 1, inputs: detail.inputs, output: detail.output, condition: detail.condition, createdAt: now }], actions: { canEditDraft: true, canCreateVersion: true, canActivateVersion: true, canDeactivate: false, canArchive: true } };
-      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(detail) }); return;
+    if (
+      request.method() === 'POST' &&
+      detail &&
+      path === `/api/rules/${detail.definitionKey}/versions`
+    ) {
+      detail = {
+        ...detail,
+        latestVersion: (detail.latestVersion ?? 0) + 1,
+        revision: (detail.revision ?? 0) + 1,
+        versions: [
+          ...(detail.versions ?? []),
+          {
+            version: (detail.latestVersion ?? 0) + 1,
+            name: detail.name,
+            description: detail.description,
+            expressionLanguageVersion: 1,
+            inputs: detail.inputs,
+            output: detail.output,
+            condition: detail.condition,
+            createdAt: now,
+          },
+        ],
+        actions: {
+          canEditDraft: true,
+          canCreateVersion: true,
+          canActivateVersion: true,
+          canDeactivate: false,
+          canArchive: true,
+        },
+      };
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(detail),
+      });
+      return;
     }
-    if (request.method() === 'PUT' && detail && path === `/api/rules/${detail.definitionKey}/active-version`) {
-      detail = { ...detail, activeVersion: detail.latestVersion, status: 'Active', revision: (detail.revision ?? 0) + 1, actions: { canEditDraft: true, canCreateVersion: true, canActivateVersion: false, canDeactivate: true, canArchive: true } };
-      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(detail) }); return;
+    if (
+      request.method() === 'PUT' &&
+      detail &&
+      path === `/api/rules/${detail.definitionKey}/active-version`
+    ) {
+      detail = {
+        ...detail,
+        activeVersion: detail.latestVersion,
+        status: 'Active',
+        revision: (detail.revision ?? 0) + 1,
+        actions: {
+          canEditDraft: true,
+          canCreateVersion: true,
+          canActivateVersion: false,
+          canDeactivate: true,
+          canArchive: true,
+        },
+      };
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(detail),
+      });
+      return;
     }
-    if (request.method() === 'DELETE' && detail && path === `/api/rules/${detail.definitionKey}/active-version`) {
-      detail = { ...detail, activeVersion: null, status: 'Inactive', revision: (detail.revision ?? 0) + 1, actions: { canEditDraft: true, canCreateVersion: true, canActivateVersion: true, canDeactivate: false, canArchive: true } };
-      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(detail) }); return;
+    if (
+      request.method() === 'DELETE' &&
+      detail &&
+      path === `/api/rules/${detail.definitionKey}/active-version`
+    ) {
+      detail = {
+        ...detail,
+        activeVersion: null,
+        status: 'Inactive',
+        revision: (detail.revision ?? 0) + 1,
+        actions: {
+          canEditDraft: true,
+          canCreateVersion: true,
+          canActivateVersion: true,
+          canDeactivate: false,
+          canArchive: true,
+        },
+      };
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(detail),
+      });
+      return;
     }
-    if (request.method() === 'POST' && detail && path === `/api/rules/${detail.definitionKey}/archive`) {
-      detail = { ...detail, activeVersion: null, status: 'Archived', revision: (detail.revision ?? 0) + 1, archivedAt: now, actions: { canEditDraft: false, canCreateVersion: false, canActivateVersion: false, canDeactivate: false, canArchive: false } };
-      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(detail) }); return;
+    if (
+      request.method() === 'POST' &&
+      detail &&
+      path === `/api/rules/${detail.definitionKey}/archive`
+    ) {
+      detail = {
+        ...detail,
+        activeVersion: null,
+        status: 'Archived',
+        revision: (detail.revision ?? 0) + 1,
+        archivedAt: now,
+        actions: {
+          canEditDraft: false,
+          canCreateVersion: false,
+          canActivateVersion: false,
+          canDeactivate: false,
+          canArchive: false,
+        },
+      };
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(detail),
+      });
+      return;
     }
-    if (request.method() === 'POST' && detail && (path === `/api/rules/${detail.definitionKey}/draft/simulate` || /\/versions\/\d+\/simulate$/.test(path))) {
+    if (
+      request.method() === 'POST' &&
+      detail &&
+      (path === `/api/rules/${detail.definitionKey}/draft/simulate` ||
+        /\/versions\/\d+\/simulate$/.test(path))
+    ) {
       captured.body = request.postDataJSON() as JsonObject;
       const sample = captured.body.inputs as Record<string, { values?: string[] }> | undefined;
       const isMatch = sample?.value?.values?.[0] !== 'no';
-      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ definitionKey: detail.definitionKey, definitionVersion: path.includes('/versions/') ? detail.activeVersion : null, isMatch, diagnostics: [], correlationId: 'rules-e2e' }) }); return;
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          definitionKey: detail.definitionKey,
+          definitionVersion: path.includes('/versions/') ? detail.activeVersion : null,
+          isMatch,
+          diagnostics: [],
+          correlationId: 'rules-e2e',
+        }),
+      });
+      return;
     }
 
     if (
@@ -520,11 +666,39 @@ async function mockRulesApi(page: Page): Promise<CapturedRequest[]> {
   });
 
   await page.route('**/api/rule-bindings/**', async (route) => {
-    const request = route.request(); const path = new URL(request.url()).pathname;
-    requests.push({ method: request.method(), path, body: request.postDataJSON?.() as JsonObject });
-    if (request.method() === 'GET') { await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(binding) }); return; }
-    if (request.method() === 'PUT') { binding = { ...binding, ...(request.postDataJSON() as JsonObject), revision: (binding.revision ?? 0) + 1, updatedAt: now }; await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(binding) }); return; }
-    if (request.method() === 'DELETE') { await route.fulfill({ status: 204 }); return; }
+    const request = route.request();
+    const path = new URL(request.url()).pathname;
+    requests.push({
+      method: request.method(),
+      path,
+      body: request.postDataJSON?.() as JsonObject,
+    });
+    if (request.method() === 'GET') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(binding),
+      });
+      return;
+    }
+    if (request.method() === 'PUT') {
+      binding = {
+        ...binding,
+        ...(request.postDataJSON() as JsonObject),
+        revision: (binding.revision ?? 0) + 1,
+        updatedAt: now,
+      };
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(binding),
+      });
+      return;
+    }
+    if (request.method() === 'DELETE') {
+      await route.fulfill({ status: 204 });
+      return;
+    }
     await route.fulfill({ status: 404, contentType: 'application/json', body: '{}' });
   });
 
@@ -640,12 +814,12 @@ test('built-in date range presents optional bounds as conditional assertions', a
   const logic = details.locator('[data-slot="rule-behavior-flow"]');
   const expression = logic.locator('[data-slot="rule-expression"]');
 
-  await expect(
-    expression,
-  ).toContainText('Value is greater than or equal to Minimum when Minimum is specified');
-  await expect(
-    expression,
-  ).toContainText('Value is less than or equal to Maximum when Maximum is specified');
+  await expect(expression).toContainText(
+    'Value is greater than or equal to Minimum when Minimum is specified',
+  );
+  await expect(expression).toContainText(
+    'Value is less than or equal to Maximum when Maximum is specified',
+  );
   await expect(logic.locator('[data-slot="rule-expression-operator"]')).toHaveText(['and']);
   await expect(logic.getByRole('button')).toHaveCount(0);
   await expect(logic.locator('[data-slot^="rule-condition-"]')).toHaveCount(0);
@@ -654,7 +828,9 @@ test('built-in date range presents optional bounds as conditional assertions', a
     .toBeLessThan(80);
 });
 
-test('workspace rule authoring projects, simulates, and manages immutable lifecycle', async ({ page }) => {
+test('workspace rule authoring projects, simulates, and manages immutable lifecycle', async ({
+  page,
+}) => {
   await mockAuthenticatedSession(page);
   const requests = await mockRulesApi(page);
   await page.goto('/rules');
@@ -723,8 +899,16 @@ test('workspace rule authoring projects, simulates, and manages immutable lifecy
   expect(requests.some((request) => request.path.endsWith('/authoring/complete'))).toBe(true);
   expect(requests.some((request) => request.path.endsWith('/draft/simulate'))).toBe(true);
   expect(requests.some((request) => request.path.endsWith('/versions'))).toBe(true);
-  expect(requests.some((request) => request.path.endsWith('/active-version') && request.method === 'PUT')).toBe(true);
-  expect(requests.some((request) => request.path.endsWith('/active-version') && request.method === 'DELETE')).toBe(true);
+  expect(
+    requests.some(
+      (request) => request.path.endsWith('/active-version') && request.method === 'PUT',
+    ),
+  ).toBe(true);
+  expect(
+    requests.some(
+      (request) => request.path.endsWith('/active-version') && request.method === 'DELETE',
+    ),
+  ).toBe(true);
 });
 
 test('rule catalog remains usable on a narrow viewport', async ({ page }) => {

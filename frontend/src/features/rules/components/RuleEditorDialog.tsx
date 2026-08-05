@@ -4,14 +4,22 @@ import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ManagedDialog, ManagedDialogBody } from '@/components/shared/ManagedDialog';
 import { ManagedDialogTabs } from '@/components/shared/ManagedDialogTabs';
-import { StatusNotice } from '@/components/shared/StatusNotice';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { StatusBadge } from '@/components/shared/StatusBadge';
+import { StatusNotice } from '@/components/shared/StatusNotice';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Field, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import {
   Select,
   SelectContent,
@@ -19,23 +27,24 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import type * as ApiTypes from '@/lib/api-generated';
+import { Textarea } from '@/components/ui/textarea';
 import { ApiError } from '@/lib/api';
+import type * as ApiTypes from '@/lib/api-generated';
 import {
-  createRuleDefinition,
-  createRuleDefinitionVersion,
   activateRuleDefinitionVersion,
   archiveRuleDefinition,
   completeRuleAuthoring,
-  projectRuleAuthoring,
-  simulateRuleDefinitionDraft,
-  simulateRuleDefinitionVersion,
+  createRuleDefinition,
+  createRuleDefinitionVersion,
   deactivateRuleDefinition,
   getRuleDefinition,
+  projectRuleAuthoring,
   type RuleDefinitionDetail,
   ruleDefinitionQueryKeys,
   ruleExpressionLanguageQueryOptions,
   saveRuleDefinitionDraft,
+  simulateRuleDefinitionDraft,
+  simulateRuleDefinitionVersion,
 } from '../api';
 import { toDraftInputs } from '../condition-references';
 import { valueTypeLabel } from '../reference';
@@ -49,6 +58,20 @@ type EditableInput = InputDefinition & { clientId: string };
 type ValueType = ApiTypes.RuleValueType;
 
 const valueTypes: ValueType[] = ['Text', 'Integer', 'Decimal', 'Date', 'DateTime', 'Boolean'];
+
+function draftSnapshot(next: {
+  name: string;
+  description: string;
+  inputs: InputDefinition[];
+  condition: ApiTypes.RuleConditionNodeDto | null;
+  dsl: string;
+}) {
+  return JSON.stringify(next);
+}
+
+function hasInputKey(input: InputDefinition): input is InputDefinition & { key: string } {
+  return Boolean(input.key);
+}
 
 export function RuleEditorDialog({
   definitionKey,
@@ -78,7 +101,9 @@ export function RuleEditorDialog({
   const [activeSection, setActiveSection] = useState('general');
   const [discardOpen, setDiscardOpen] = useState(false);
   const [archiveOpen, setArchiveOpen] = useState(false);
-  const [lifecycleAction, setLifecycleAction] = useState<'version' | 'activate' | 'deactivate' | null>(null);
+  const [lifecycleAction, setLifecycleAction] = useState<
+    'version' | 'activate' | 'deactivate' | null
+  >(null);
   const [dsl, setDsl] = useState('');
   const [diagnostics, setDiagnostics] = useState<string[]>([]);
   const [simulation, setSimulation] = useState<ApiTypes.RuleSimulationResultDto | null>(null);
@@ -90,26 +115,26 @@ export function RuleEditorDialog({
   const snapshotRef = useRef('');
   const hydratedKeyRef = useRef<string | null>(null);
   const hydratingProjectionRef = useRef(false);
-  const hydrationConditionRef = useRef<ApiTypes.RuleConditionNodeDto | null>(null);
+  const [hydrationCondition, setHydrationCondition] =
+    useState<ApiTypes.RuleConditionNodeDto | null>(null);
   const dslRef = useRef<HTMLTextAreaElement>(null);
   const inputContract = inputs.map(({ clientId: _clientId, ...input }) => input);
 
-  const draftSnapshot = (next: {
-    name: string;
-    description: string;
-    inputs: InputDefinition[];
-    condition: ApiTypes.RuleConditionNodeDto | null;
-    dsl: string;
-  }) => JSON.stringify(next);
-
   const projectMutation = useMutation({
-    mutationFn: (source: ApiTypes.RuleAuthoringSourceDto) => projectRuleAuthoring({ source, inputs: inputContract, expressionLanguageVersion: languageQuery.data?.version }),
+    mutationFn: (source: ApiTypes.RuleAuthoringSourceDto) =>
+      projectRuleAuthoring({
+        source,
+        inputs: inputContract,
+        expressionLanguageVersion: languageQuery.data?.version,
+      }),
     onSuccess: (projection) => {
       if (projection.isValid) {
         if (projection.condition) setCondition(projection.condition);
         if (projection.formattedDsl != null) setDsl(projection.formattedDsl);
       }
-      setDiagnostics((projection.diagnostics ?? []).map((item) => item.message ?? t('rules.expressionInvalid')));
+      setDiagnostics(
+        (projection.diagnostics ?? []).map((item) => item.message ?? t('rules.expressionInvalid')),
+      );
       if (hydratingProjectionRef.current) {
         hydratingProjectionRef.current = false;
         snapshotRef.current = draftSnapshot({
@@ -130,6 +155,7 @@ export function RuleEditorDialog({
   useEffect(() => {
     if (!open) {
       hydratedKeyRef.current = null;
+      setHydrationCondition(null);
       return;
     }
     const detail = detailQuery.data;
@@ -149,19 +175,22 @@ export function RuleEditorDialog({
     setSimulationFailure(null);
     setStale(false);
     setError(null);
-    snapshotRef.current = draftSnapshot({ name: detail?.name ?? '', description: detail?.description ?? '', inputs: nextInputs, condition: detail?.condition ?? null, dsl: '' });
-    if (detail?.condition) {
-      hydratingProjectionRef.current = true;
-      hydrationConditionRef.current = detail.condition;
-    }
-  }, [open, detailQuery.data]);
+    snapshotRef.current = draftSnapshot({
+      name: detail?.name ?? '',
+      description: detail?.description ?? '',
+      inputs: nextInputs,
+      condition: detail?.condition ?? null,
+      dsl: '',
+    });
+    hydratingProjectionRef.current = Boolean(detail?.condition);
+    setHydrationCondition(detail?.condition ?? null);
+  }, [open, detailQuery.data, creating]);
 
   useEffect(() => {
-    const conditionToFormat = hydrationConditionRef.current;
-    if (!conditionToFormat) return;
-    hydrationConditionRef.current = null;
-    projectMutation.mutate({ ast: conditionToFormat });
-  }, [inputs]);
+    if (!hydrationCondition) return;
+    setHydrationCondition(null);
+    projectMutation.mutate({ ast: hydrationCondition });
+  }, [hydrationCondition, projectMutation.mutate]);
 
   const saveMutation = useMutation({
     mutationFn: async () => {
@@ -196,7 +225,13 @@ export function RuleEditorDialog({
   });
 
   const completionMutation = useMutation({
-    mutationFn: () => completeRuleAuthoring({ text: dsl, cursor, inputs: inputContract, expressionLanguageVersion: languageQuery.data?.version }),
+    mutationFn: () =>
+      completeRuleAuthoring({
+        text: dsl,
+        cursor,
+        inputs: inputContract,
+        expressionLanguageVersion: languageQuery.data?.version,
+      }),
     onSuccess: setCompletions,
     onError: () => setError(t('rules.completionError')),
   });
@@ -204,10 +239,23 @@ export function RuleEditorDialog({
     mutationFn: () => {
       const current = detailQuery.data;
       if (!current?.definitionKey) throw new Error(t('rules.simulationError'));
-      const inputs = Object.fromEntries(inputContract.filter((input) => input.key).map((input) => [input.key!, { type: input.types?.[0], values: sampleValues[input.key!] ? [sampleValues[input.key!]] : [] }]));
-      return current.activeVersion != null ? simulateRuleDefinitionVersion(current.definitionKey, current.activeVersion, { inputs }) : simulateRuleDefinitionDraft(current.definitionKey, { inputs });
+      const inputs = Object.fromEntries(
+        inputContract.filter(hasInputKey).map((input) => [
+          input.key,
+          {
+            type: input.types?.[0],
+            values: sampleValues[input.key] ? [sampleValues[input.key]] : [],
+          },
+        ]),
+      );
+      return current.activeVersion != null
+        ? simulateRuleDefinitionVersion(current.definitionKey, current.activeVersion, { inputs })
+        : simulateRuleDefinitionDraft(current.definitionKey, { inputs });
     },
-    onSuccess: (result) => { setSimulationFailure(null); setSimulation(result); },
+    onSuccess: (result) => {
+      setSimulationFailure(null);
+      setSimulation(result);
+    },
     onError: (cause) => {
       setSimulation(null);
       setSimulationFailure(cause instanceof ApiError && cause.status === 400 ? 'invalid' : 'error');
@@ -217,13 +265,20 @@ export function RuleEditorDialog({
   const lifecycleMutation = useMutation({
     mutationFn: (action: 'version' | 'activate' | 'deactivate' | 'archive') => {
       const current = detailQuery.data;
-      if (!current?.definitionKey || current.revision == null) throw new Error(t('rules.lifecycleError'));
-      if (action === 'version') return createRuleDefinitionVersion(current.definitionKey, current.revision);
+      if (!current?.definitionKey || current.revision == null)
+        throw new Error(t('rules.lifecycleError'));
+      if (action === 'version')
+        return createRuleDefinitionVersion(current.definitionKey, current.revision);
       if (action === 'activate') {
         if (current.latestVersion == null) throw new Error(t('rules.lifecycleError'));
-        return activateRuleDefinitionVersion(current.definitionKey, current.latestVersion, current.revision);
+        return activateRuleDefinitionVersion(
+          current.definitionKey,
+          current.latestVersion,
+          current.revision,
+        );
       }
-      if (action === 'deactivate') return deactivateRuleDefinition(current.definitionKey, current.revision);
+      if (action === 'deactivate')
+        return deactivateRuleDefinition(current.definitionKey, current.revision);
       return archiveRuleDefinition(current.definitionKey, current.revision);
     },
     onSuccess: (saved) => {
@@ -239,12 +294,20 @@ export function RuleEditorDialog({
 
   const detail = detailQuery.data;
   const readOnly = Boolean(detail && detail.origin === 'BuiltIn');
-  const dirty = !readOnly && snapshotRef.current !== draftSnapshot({ name, description, inputs: inputContract, condition, dsl });
-  const requestClose = () => { if (dirty) setDiscardOpen(true); else onOpenChange(false); };
+  const dirty =
+    !readOnly &&
+    snapshotRef.current !==
+      draftSnapshot({ name, description, inputs: inputContract, condition, dsl });
+  const requestClose = () => {
+    if (dirty) setDiscardOpen(true);
+    else onOpenChange(false);
+  };
   return (
     <ManagedDialog
       open={open}
-      onOpenChange={(nextOpen) => { if (!nextOpen) requestClose(); }}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen) requestClose();
+      }}
       dirty={dirty}
       closeDisabled={saveMutation.isPending || lifecycleMutation.isPending}
       title={detail?.name ?? (creating ? t('rules.createTitle') : t('rules.editorTitle'))}
@@ -252,7 +315,15 @@ export function RuleEditorDialog({
         detail?.origin ? (
           <>
             <RuleOriginBadge origin={detail.origin} />
-            <StatusBadge tone={detail.status === 'Active' ? 'success' : detail.status === 'Archived' ? 'muted' : 'neutral'}>
+            <StatusBadge
+              tone={
+                detail.status === 'Active'
+                  ? 'success'
+                  : detail.status === 'Archived'
+                    ? 'muted'
+                    : 'neutral'
+              }
+            >
               {detail.status}
             </StatusBadge>
           </>
@@ -397,7 +468,10 @@ export function RuleEditorDialog({
                         condition={condition}
                         inputs={inputContract}
                         language={languageQuery.data}
-                        onChange={(next) => { setCondition(next); projectMutation.mutate({ ast: next ?? undefined }); }}
+                        onChange={(next) => {
+                          setCondition(next);
+                          projectMutation.mutate({ ast: next ?? undefined });
+                        }}
                       />
                       <Field>
                         <div className="flex items-center justify-between gap-3">
@@ -417,23 +491,36 @@ export function RuleEditorDialog({
                           ref={dslRef}
                           id="rule-dsl"
                           value={dsl}
-                          onChange={(event) => { setDsl(event.target.value); setCursor(event.currentTarget.selectionStart); setCompletions([]); }}
+                          onChange={(event) => {
+                            setDsl(event.target.value);
+                            setCursor(event.currentTarget.selectionStart);
+                            setCompletions([]);
+                          }}
                           onSelect={(event) => setCursor(event.currentTarget.selectionStart)}
                           onBlur={() => projectMutation.mutate({ text: dsl })}
                         />
                       </Field>
                       {completions.length ? (
-                        <section aria-label={t('rules.expressionSuggestions')} className="space-y-2">
-                          <h4 className="text-sm font-medium">{t('rules.expressionSuggestions')}</h4>
+                        <section
+                          aria-label={t('rules.expressionSuggestions')}
+                          className="space-y-2"
+                        >
+                          <h4 className="text-sm font-medium">
+                            {t('rules.expressionSuggestions')}
+                          </h4>
                           <div role="listbox" className="flex flex-wrap gap-2">
-                            {completions.map((completion, index) => (
+                            {completions.map((completion) => (
                               <Button
-                                key={`${completion.start}-${completion.length}-${completion.insertText}-${index}`}
+                                key={completion.label}
                                 type="button"
                                 variant="outline"
                                 size="sm"
                                 role="option"
-                                aria-label={completion.label ?? completion.insertText ?? t('rules.applySuggestion')}
+                                aria-label={
+                                  completion.label ??
+                                  completion.insertText ??
+                                  t('rules.applySuggestion')
+                                }
                                 onClick={() => {
                                   const start = completion.start ?? cursor;
                                   const length = completion.length ?? 0;
@@ -444,7 +531,10 @@ export function RuleEditorDialog({
                                   projectMutation.mutate({ text: nextDsl });
                                   requestAnimationFrame(() => {
                                     dslRef.current?.focus();
-                                    dslRef.current?.setSelectionRange(start + (completion.insertText?.length ?? 0), start + (completion.insertText?.length ?? 0));
+                                    dslRef.current?.setSelectionRange(
+                                      start + (completion.insertText?.length ?? 0),
+                                      start + (completion.insertText?.length ?? 0),
+                                    );
                                   });
                                 }}
                               >
@@ -454,7 +544,11 @@ export function RuleEditorDialog({
                           </div>
                         </section>
                       ) : null}
-                      {diagnostics.map((diagnostic) => <StatusNotice key={diagnostic} tone="destructive">{diagnostic}</StatusNotice>)}
+                      {diagnostics.map((diagnostic) => (
+                        <StatusNotice key={diagnostic} tone="destructive">
+                          {diagnostic}
+                        </StatusNotice>
+                      ))}
                       {condition ? (
                         <section className="space-y-1.5 border-t pt-4">
                           <h3 className="text-sm font-semibold">{t('rules.expressionPreview')}</h3>
@@ -522,20 +616,136 @@ export function RuleEditorDialog({
             version={detail.activeVersion}
           />
         ) : null}
-        {stale ? <StatusNotice tone="warning">{t('rules.staleChanges')} <Button type="button" variant="link" onClick={() => { setStale(false); void detailQuery.refetch(); }}>{t('rules.refetch')}</Button></StatusNotice> : null}
-        {detail && !readOnly ? <div className="space-y-3 border-t pt-4">
-          <VersionHistory versions={detail.versions ?? []} activeVersion={detail.activeVersion} />
-          <div className="flex flex-wrap gap-2">
-          {detail.actions?.canCreateVersion ? <Button type="button" variant="secondary" onClick={() => setLifecycleAction('version')}>{t('rules.createVersion')}</Button> : null}
-          {detail.actions?.canActivateVersion ? <Button type="button" onClick={() => setLifecycleAction('activate')}>{t('rules.activate')}</Button> : null}
-          {detail.actions?.canDeactivate ? <Button type="button" variant="outline" onClick={() => setLifecycleAction('deactivate')}>{t('rules.deactivate')}</Button> : null}
-          {detail.actions?.canArchive ? <Button type="button" variant="destructive" onClick={() => setArchiveOpen(true)}><Archive aria-hidden />{t('rules.archive')}</Button> : null}
+        {stale ? (
+          <StatusNotice tone="warning">
+            {t('rules.staleChanges')}{' '}
+            <Button
+              type="button"
+              variant="link"
+              onClick={() => {
+                setStale(false);
+                void detailQuery.refetch();
+              }}
+            >
+              {t('rules.refetch')}
+            </Button>
+          </StatusNotice>
+        ) : null}
+        {detail && !readOnly ? (
+          <div className="space-y-3 border-t pt-4">
+            <VersionHistory versions={detail.versions ?? []} activeVersion={detail.activeVersion} />
+            <div className="flex flex-wrap gap-2">
+              {detail.actions?.canCreateVersion ? (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => setLifecycleAction('version')}
+                >
+                  {t('rules.createVersion')}
+                </Button>
+              ) : null}
+              {detail.actions?.canActivateVersion ? (
+                <Button type="button" onClick={() => setLifecycleAction('activate')}>
+                  {t('rules.activate')}
+                </Button>
+              ) : null}
+              {detail.actions?.canDeactivate ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setLifecycleAction('deactivate')}
+                >
+                  {t('rules.deactivate')}
+                </Button>
+              ) : null}
+              {detail.actions?.canArchive ? (
+                <Button type="button" variant="destructive" onClick={() => setArchiveOpen(true)}>
+                  <Archive aria-hidden />
+                  {t('rules.archive')}
+                </Button>
+              ) : null}
+            </div>
           </div>
-        </div> : null}
+        ) : null}
       </ManagedDialogBody>
-      <AlertDialog open={discardOpen} onOpenChange={setDiscardOpen}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>{t('rules.discardTitle')}</AlertDialogTitle><AlertDialogDescription>{t('rules.discardDescription')}</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>{t('rules.keepEditing')}</AlertDialogCancel><AlertDialogAction variant="destructive" onClick={() => { setDiscardOpen(false); onOpenChange(false); }}>{t('rules.discard')}</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
-      <AlertDialog open={lifecycleAction !== null} onOpenChange={(nextOpen) => { if (!nextOpen) setLifecycleAction(null); }}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>{lifecycleAction === 'version' ? t('rules.createVersionTitle') : lifecycleAction === 'activate' ? t('rules.activateTitle') : t('rules.deactivateTitle')}</AlertDialogTitle><AlertDialogDescription>{lifecycleAction === 'version' ? t('rules.createVersionDescription') : lifecycleAction === 'activate' ? t('rules.activateDescription') : t('rules.deactivateDescription')}</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>{t('app.cancel')}</AlertDialogCancel><AlertDialogAction variant={lifecycleAction === 'deactivate' ? 'destructive' : 'default'} onClick={() => { if (lifecycleAction) lifecycleMutation.mutate(lifecycleAction); setLifecycleAction(null); }}>{lifecycleAction === 'version' ? t('rules.createVersion') : lifecycleAction === 'activate' ? t('rules.activate') : t('rules.deactivate')}</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
-      <AlertDialog open={archiveOpen} onOpenChange={setArchiveOpen}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>{t('rules.archiveTitle')}</AlertDialogTitle><AlertDialogDescription>{t('rules.archiveDescription')}</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>{t('app.cancel')}</AlertDialogCancel><AlertDialogAction variant="destructive" onClick={() => lifecycleMutation.mutate('archive')}>{t('rules.archive')}</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
+      <AlertDialog open={discardOpen} onOpenChange={setDiscardOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('rules.discardTitle')}</AlertDialogTitle>
+            <AlertDialogDescription>{t('rules.discardDescription')}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t('rules.keepEditing')}</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              onClick={() => {
+                setDiscardOpen(false);
+                onOpenChange(false);
+              }}
+            >
+              {t('rules.discard')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      <AlertDialog
+        open={lifecycleAction !== null}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen) setLifecycleAction(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {lifecycleAction === 'version'
+                ? t('rules.createVersionTitle')
+                : lifecycleAction === 'activate'
+                  ? t('rules.activateTitle')
+                  : t('rules.deactivateTitle')}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {lifecycleAction === 'version'
+                ? t('rules.createVersionDescription')
+                : lifecycleAction === 'activate'
+                  ? t('rules.activateDescription')
+                  : t('rules.deactivateDescription')}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t('app.cancel')}</AlertDialogCancel>
+            <AlertDialogAction
+              variant={lifecycleAction === 'deactivate' ? 'destructive' : 'default'}
+              onClick={() => {
+                if (lifecycleAction) lifecycleMutation.mutate(lifecycleAction);
+                setLifecycleAction(null);
+              }}
+            >
+              {lifecycleAction === 'version'
+                ? t('rules.createVersion')
+                : lifecycleAction === 'activate'
+                  ? t('rules.activate')
+                  : t('rules.deactivate')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      <AlertDialog open={archiveOpen} onOpenChange={setArchiveOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('rules.archiveTitle')}</AlertDialogTitle>
+            <AlertDialogDescription>{t('rules.archiveDescription')}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t('app.cancel')}</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              onClick={() => lifecycleMutation.mutate('archive')}
+            >
+              {t('rules.archive')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </ManagedDialog>
   );
 }
@@ -549,7 +759,13 @@ function RuleDetail({ label, value }: { label: string; value: string }) {
   );
 }
 
-function VersionHistory({ versions, activeVersion }: { versions: ApiTypes.RuleDefinitionVersionDto[]; activeVersion?: number | null }) {
+function VersionHistory({
+  versions,
+  activeVersion,
+}: {
+  versions: ApiTypes.RuleDefinitionVersionDto[];
+  activeVersion?: number | null;
+}) {
   const { t } = useTranslation();
   if (!versions.length) return null;
   return (
@@ -559,7 +775,9 @@ function VersionHistory({ versions, activeVersion }: { versions: ApiTypes.RuleDe
         {versions.map((version) => (
           <li key={version.version} className="flex items-center justify-between gap-3">
             <span>{t('rules.version', { version: version.version })}</span>
-            <span className="text-muted-foreground">{version.version === activeVersion ? t('rules.activeVersion') : t('rules.immutable')}</span>
+            <span className="text-muted-foreground">
+              {version.version === activeVersion ? t('rules.activeVersion') : t('rules.immutable')}
+            </span>
           </li>
         ))}
       </ul>
@@ -598,32 +816,104 @@ function RuleSimulationPanel({
           {t('rules.runSimulation')}
         </Button>
       </div>
-      {inputs.length ? <div className="grid gap-3 sm:grid-cols-2">
-        {inputs.filter((input) => input.key).map((input) => (
-          <SampleInput key={input.key} input={input} value={values[input.key! ] ?? ''} onChange={(value) => onChange(input.key!, value)} />
-        ))}
-      </div> : <p className="text-sm text-muted-foreground">{t('rules.noParameters')}</p>}
-      {failure ? <StatusNotice tone="destructive">{failure === 'invalid' ? t('rules.simulationInvalid') : t('rules.simulationError')}</StatusNotice> : null}
+      {inputs.length ? (
+        <div className="grid gap-3 sm:grid-cols-2">
+          {inputs.filter(hasInputKey).map((input) => (
+            <SampleInput
+              key={input.key}
+              input={input}
+              value={values[input.key] ?? ''}
+              onChange={(value) => onChange(input.key, value)}
+            />
+          ))}
+        </div>
+      ) : (
+        <p className="text-sm text-muted-foreground">{t('rules.noParameters')}</p>
+      )}
+      {failure ? (
+        <StatusNotice tone="destructive">
+          {failure === 'invalid' ? t('rules.simulationInvalid') : t('rules.simulationError')}
+        </StatusNotice>
+      ) : null}
       {simulation ? (
         <StatusNotice tone={simulation.isMatch ? 'success' : 'warning'}>
-          <strong>{simulation.isMatch ? t('rules.simulationMatched') : t('rules.simulationNotMatched')}</strong>
-          {' · '}{simulation.definitionVersion == null ? t('rules.simulationDraft') : t('rules.version', { version: simulation.definitionVersion ?? version })}
-          {simulation.diagnostics?.length ? <span>{' · '}{t('rules.simulationDiagnostics', { count: simulation.diagnostics.length })}</span> : null}
+          <strong>
+            {simulation.isMatch ? t('rules.simulationMatched') : t('rules.simulationNotMatched')}
+          </strong>
+          {' · '}
+          {simulation.definitionVersion == null
+            ? t('rules.simulationDraft')
+            : t('rules.version', { version: simulation.definitionVersion ?? version })}
+          {simulation.diagnostics?.length ? (
+            <span>
+              {' · '}
+              {t('rules.simulationDiagnostics', { count: simulation.diagnostics.length })}
+            </span>
+          ) : null}
         </StatusNotice>
       ) : null}
     </section>
   );
 }
 
-function SampleInput({ input, value, onChange }: { input: InputDefinition; value: string; onChange: (value: string) => void }) {
+function SampleInput({
+  input,
+  value,
+  onChange,
+}: {
+  input: InputDefinition;
+  value: string;
+  onChange: (value: string) => void;
+}) {
   const { t } = useTranslation();
   const type = input.types?.[0] ?? 'Text';
   const id = `rule-sample-${input.key}`;
   if (type === 'Boolean') {
-    return <Field><FieldLabel htmlFor={id}>{input.label ?? input.key}</FieldLabel><Select value={value} onValueChange={(next) => { if (next != null) onChange(next); }}><SelectTrigger id={id}><SelectValue placeholder={t('rules.selectValue')}>{value === 'true' ? t('rules.booleanTrue') : value === 'false' ? t('rules.booleanFalse') : undefined}</SelectValue></SelectTrigger><SelectContent><SelectItem value="true">{t('rules.booleanTrue')}</SelectItem><SelectItem value="false">{t('rules.booleanFalse')}</SelectItem></SelectContent></Select></Field>;
+    return (
+      <Field>
+        <FieldLabel htmlFor={id}>{input.label ?? input.key}</FieldLabel>
+        <Select
+          value={value}
+          onValueChange={(next) => {
+            if (next != null) onChange(next);
+          }}
+        >
+          <SelectTrigger id={id}>
+            <SelectValue placeholder={t('rules.selectValue')}>
+              {value === 'true'
+                ? t('rules.booleanTrue')
+                : value === 'false'
+                  ? t('rules.booleanFalse')
+                  : undefined}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="true">{t('rules.booleanTrue')}</SelectItem>
+            <SelectItem value="false">{t('rules.booleanFalse')}</SelectItem>
+          </SelectContent>
+        </Select>
+      </Field>
+    );
   }
-  const htmlType = type === 'Integer' || type === 'Decimal' ? 'number' : type === 'Date' ? 'date' : type === 'DateTime' ? 'datetime-local' : 'text';
-  return <Field><FieldLabel htmlFor={id}>{input.label ?? input.key}</FieldLabel><Input id={id} type={htmlType} value={value} onChange={(event) => onChange(event.target.value)} /></Field>;
+  const htmlType =
+    type === 'Integer' || type === 'Decimal'
+      ? 'number'
+      : type === 'Date'
+        ? 'date'
+        : type === 'DateTime'
+          ? 'datetime-local'
+          : 'text';
+  return (
+    <Field>
+      <FieldLabel htmlFor={id}>{input.label ?? input.key}</FieldLabel>
+      <Input
+        id={id}
+        type={htmlType}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+      />
+    </Field>
+  );
 }
 
 function InputRow({

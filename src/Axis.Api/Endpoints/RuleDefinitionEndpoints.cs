@@ -1,8 +1,8 @@
 using Axis.Api.Extensions;
 using Axis.Api.Middleware;
 using Axis.Rules.Application;
-using Axis.Rules.Application.Commands.ArchiveRuleDefinition;
 using Axis.Rules.Application.Commands.ActivateRuleDefinitionVersion;
+using Axis.Rules.Application.Commands.ArchiveRuleDefinition;
 using Axis.Rules.Application.Commands.CreateRuleDefinition;
 using Axis.Rules.Application.Commands.CreateRuleDefinitionVersion;
 using Axis.Rules.Application.Commands.DeactivateRuleDefinition;

@@ -16,7 +16,7 @@ public sealed class DeactivateRuleDefinitionHandlerTests
             .Returns(definition);
         DeactivateRuleDefinitionHandler sut = new(context.CurrentUser, context.Repository, context.UnitOfWork);
 
-        var result = await sut.Handle(new DeactivateRuleDefinitionCommand(definition.Key.Value, definition.Revision), CancellationToken.None);
+        Result<RuleDefinitionDetailDto> result = await sut.Handle(new DeactivateRuleDefinitionCommand(definition.Key.Value, definition.Revision), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
         result.Value.Status.Should().Be(RuleLifecycleStatus.Inactive);

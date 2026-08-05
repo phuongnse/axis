@@ -125,10 +125,7 @@ export function RuleBindingUsagePanel({
       (updated.definitionKey !== definitionKey || updated.definitionVersion !== version)
     ) {
       await queryClient.invalidateQueries({
-        queryKey: ruleDefinitionQueryKeys.usage(
-          updated.definitionKey,
-          updated.definitionVersion,
-        ),
+        queryKey: ruleDefinitionQueryKeys.usage(updated.definitionKey, updated.definitionVersion),
       });
     }
   }
@@ -558,12 +555,7 @@ function BindingTextField({
   return (
     <Field>
       <FieldLabel htmlFor={id}>{label}</FieldLabel>
-      <Input
-        id={id}
-        type={type}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-      />
+      <Input id={id} type={type} value={value} onChange={(event) => onChange(event.target.value)} />
     </Field>
   );
 }

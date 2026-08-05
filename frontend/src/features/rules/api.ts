@@ -225,10 +225,13 @@ export async function deactivateRuleDefinition(
   definitionKey: string,
   expectedRevision: number,
 ): Promise<RuleDefinitionDetail> {
-  return fetchApi<RuleDefinitionDetail>(`/rules/${encodeURIComponent(definitionKey)}/active-version`, {
-    method: 'DELETE',
-    body: JSON.stringify({ expectedRevision }),
-  });
+  return fetchApi<RuleDefinitionDetail>(
+    `/rules/${encodeURIComponent(definitionKey)}/active-version`,
+    {
+      method: 'DELETE',
+      body: JSON.stringify({ expectedRevision }),
+    },
+  );
 }
 
 export async function activateRuleDefinitionVersion(
@@ -236,10 +239,13 @@ export async function activateRuleDefinitionVersion(
   version: number,
   expectedRevision: number,
 ): Promise<RuleDefinitionDetail> {
-  return fetchApi<RuleDefinitionDetail>(`/rules/${encodeURIComponent(definitionKey)}/active-version`, {
-    method: 'PUT',
-    body: JSON.stringify({ version, expectedRevision }),
-  });
+  return fetchApi<RuleDefinitionDetail>(
+    `/rules/${encodeURIComponent(definitionKey)}/active-version`,
+    {
+      method: 'PUT',
+      body: JSON.stringify({ version, expectedRevision }),
+    },
+  );
 }
 
 export async function archiveRuleDefinition(
@@ -256,10 +262,13 @@ export async function simulateRuleDefinitionDraft(
   definitionKey: string,
   request: ApiTypes.SimulateRuleDraftRequest,
 ): Promise<RuleSimulationResult> {
-  return fetchApi<RuleSimulationResult>(`/rules/${encodeURIComponent(definitionKey)}/draft/simulate`, {
-    method: 'POST',
-    body: JSON.stringify(request),
-  });
+  return fetchApi<RuleSimulationResult>(
+    `/rules/${encodeURIComponent(definitionKey)}/draft/simulate`,
+    {
+      method: 'POST',
+      body: JSON.stringify(request),
+    },
+  );
 }
 
 export async function simulateRuleDefinitionVersion(
@@ -270,7 +279,7 @@ export async function simulateRuleDefinitionVersion(
   return fetchApi<RuleSimulationResult>(
     `/rules/${encodeURIComponent(definitionKey)}/versions/${version}/simulate`,
     {
-    method: 'POST',
+      method: 'POST',
       body: JSON.stringify(request),
     },
   );

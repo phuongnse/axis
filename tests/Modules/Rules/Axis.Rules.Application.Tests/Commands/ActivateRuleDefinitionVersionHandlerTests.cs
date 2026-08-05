@@ -16,7 +16,7 @@ public sealed class ActivateRuleDefinitionVersionHandlerTests
             .Returns(definition);
         ActivateRuleDefinitionVersionHandler sut = new(context.CurrentUser, context.Repository, context.UnitOfWork);
 
-        var result = await sut.Handle(new ActivateRuleDefinitionVersionCommand(definition.Key.Value, 1, definition.Revision), CancellationToken.None);
+        Result<RuleDefinitionDetailDto> result = await sut.Handle(new ActivateRuleDefinitionVersionCommand(definition.Key.Value, 1, definition.Revision), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
         result.Value.Status.Should().Be(RuleLifecycleStatus.Active);

@@ -510,7 +510,8 @@ export const translations = {
     'rules.keepEditing': 'Keep editing',
     'rules.lifecycleError': 'Unable to update rule lifecycle',
     'rules.lifecycleUpdated': 'Rule lifecycle updated',
-    'rules.staleChanges': 'This rule changed elsewhere. Your edits are preserved; refresh before retrying.',
+    'rules.staleChanges':
+      'This rule changed elsewhere. Your edits are preserved; refresh before retrying.',
     'rules.refetch': 'Refresh current rule',
     'rules.literal': 'Literal value',
     'rules.loadingRule': 'Loading rule',
@@ -526,11 +527,14 @@ export const translations = {
     'rules.createVersion': 'Create version',
     'rules.latestVersion': 'Latest version',
     'rules.createVersionTitle': 'Create immutable version?',
-    'rules.createVersionDescription': 'The current valid draft will become a new immutable version. This does not activate it.',
+    'rules.createVersionDescription':
+      'The current valid draft will become a new immutable version. This does not activate it.',
     'rules.activateTitle': 'Activate this version?',
-    'rules.activateDescription': 'The latest immutable version becomes available for new bindings. Existing bindings are unchanged.',
+    'rules.activateDescription':
+      'The latest immutable version becomes available for new bindings. Existing bindings are unchanged.',
     'rules.deactivateTitle': 'Deactivate this rule?',
-    'rules.deactivateDescription': 'The rule will not be available for new bindings. Existing bindings remain unchanged.',
+    'rules.deactivateDescription':
+      'The rule will not be available for new bindings. Existing bindings remain unchanged.',
     'rules.inputs': 'Inputs',
     'rules.logic': 'Logic',
     'rules.ruleInputs': 'Inputs',
@@ -551,7 +555,8 @@ export const translations = {
     'rules.searchPlaceholder': 'Search rules',
     'rules.simulation': 'Simulation',
     'rules.simulationError': 'Simulation failed',
-    'rules.simulationInvalid': 'The sample values could not be evaluated. Correct them and try again.',
+    'rules.simulationInvalid':
+      'The sample values could not be evaluated. Correct them and try again.',
     'rules.simulationDraft': 'Draft',
     'rules.simulationDiagnostics': '{count} diagnostic entries',
     'rules.simulationHelp':
@@ -619,7 +624,8 @@ export const translations = {
     'rules.bindingConflict': 'This binding changed. Refresh it and try again.',
     'rules.bindingEdit': 'Edit binding',
     'rules.bindingSave': 'Save binding',
-    'rules.bindingEditDescription': 'Update binding-owned target, trigger, mapping, priority, enabled state, and failure behavior without changing its exact rule version.',
+    'rules.bindingEditDescription':
+      'Update binding-owned target, trigger, mapping, priority, enabled state, and failure behavior without changing its exact rule version.',
     'rules.bindingTarget': 'Target',
     'rules.bindingTrigger': 'Use case or trigger',
     'rules.bindingPriority': 'Priority',
@@ -948,7 +954,8 @@ export const translations = {
     'businessObjects.validationTitle': 'Định nghĩa này cần kiểm tra lại',
     'businessObjects.compatibleRules': 'Quy tắc tích hợp sẵn tương thích',
     'businessObjects.configuredRulesCount': '{count}',
-    'businessObjects.fieldRulesDescription': 'Quy tắc tích hợp sẵn tương thích với trường {fieldType}.',
+    'businessObjects.fieldRulesDescription':
+      'Quy tắc tích hợp sẵn tương thích với trường {fieldType}.',
     'businessObjects.fieldRulesTitle': 'Quy tắc trường',
     'businessObjects.rulesCatalogLoading': 'Đang tải catalog quy tắc',
     'businessObjects.rulesCatalogUnavailableDescription':
@@ -1171,7 +1178,8 @@ export const translations = {
     'rules.keepEditing': 'Tiếp tục chỉnh sửa',
     'rules.lifecycleError': 'Không cập nhật được vòng đời rule',
     'rules.lifecycleUpdated': 'Đã cập nhật vòng đời rule',
-    'rules.staleChanges': 'Rule đã thay đổi ở nơi khác. Các chỉnh sửa của bạn vẫn được giữ; hãy tải lại trước khi thử lại.',
+    'rules.staleChanges':
+      'Rule đã thay đổi ở nơi khác. Các chỉnh sửa của bạn vẫn được giữ; hãy tải lại trước khi thử lại.',
     'rules.refetch': 'Tải lại rule hiện tại',
     'rules.literal': 'Giá trị cố định',
     'rules.loadingRule': 'Đang tải rule',
@@ -1187,11 +1195,14 @@ export const translations = {
     'rules.createVersion': 'Tạo phiên bản',
     'rules.latestVersion': 'Phiên bản mới nhất',
     'rules.createVersionTitle': 'Tạo phiên bản bất biến?',
-    'rules.createVersionDescription': 'Bản nháp hợp lệ hiện tại sẽ thành một phiên bản bất biến mới. Thao tác này không kích hoạt phiên bản.',
+    'rules.createVersionDescription':
+      'Bản nháp hợp lệ hiện tại sẽ thành một phiên bản bất biến mới. Thao tác này không kích hoạt phiên bản.',
     'rules.activateTitle': 'Kích hoạt phiên bản này?',
-    'rules.activateDescription': 'Phiên bản bất biến mới nhất sẽ dùng được cho binding mới. Binding hiện có không thay đổi.',
+    'rules.activateDescription':
+      'Phiên bản bất biến mới nhất sẽ dùng được cho binding mới. Binding hiện có không thay đổi.',
     'rules.deactivateTitle': 'Ngừng kích hoạt rule này?',
-    'rules.deactivateDescription': 'Rule sẽ không còn dùng được cho binding mới. Binding hiện có không thay đổi.',
+    'rules.deactivateDescription':
+      'Rule sẽ không còn dùng được cho binding mới. Binding hiện có không thay đổi.',
     'rules.inputs': 'Inputs',
     'rules.logic': 'Logic',
     'rules.ruleInputs': 'Inputs',
@@ -1279,7 +1290,8 @@ export const translations = {
     'rules.bindingConflict': 'Binding này đã thay đổi. Hãy làm mới và thử lại.',
     'rules.bindingEdit': 'Sửa binding',
     'rules.bindingSave': 'Lưu binding',
-    'rules.bindingEditDescription': 'Cập nhật target, trigger, ánh xạ, mức ưu tiên, trạng thái bật và hành vi lỗi do binding sở hữu mà không đổi đúng phiên bản rule.',
+    'rules.bindingEditDescription':
+      'Cập nhật target, trigger, ánh xạ, mức ưu tiên, trạng thái bật và hành vi lỗi do binding sở hữu mà không đổi đúng phiên bản rule.',
     'rules.bindingTarget': 'Target',
     'rules.bindingTrigger': 'Use case hoặc trigger',
     'rules.bindingPriority': 'Priority',
