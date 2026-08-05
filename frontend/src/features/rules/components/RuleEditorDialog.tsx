@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Archive, Lightbulb, Plus, Save, Trash2 } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { ManagedDialog, ManagedDialogBody } from '@/components/shared/ManagedDialog';
@@ -125,6 +125,7 @@ export function RuleEditorDialog({
     'version' | 'activate' | 'deactivate' | null
   >(null);
   const [dsl, setDsl] = useState('');
+  const dslValueRef = useRef('');
   const [diagnostics, setDiagnostics] = useState<string[]>([]);
   const [simulation, setSimulation] = useState<ApiTypes.RuleSimulationResultDto | null>(null);
   const [simulationFailure, setSimulationFailure] = useState<'invalid' | 'error' | null>(null);
@@ -146,6 +147,17 @@ export function RuleEditorDialog({
     ({ clientId: _clientId, keyLocked: _keyLocked, ...input }) => input,
   );
 
+  const setDslValue = useCallback((value: string) => {
+    dslValueRef.current = value;
+    setDsl(value);
+  }, []);
+
+  const advanceProjectionFence = () => {
+    const requestId = ++projectionRequestRef.current;
+    latestProjectionRequestRef.current = requestId;
+    return requestId;
+  };
+
   const projectMutation = useMutation({
     mutationFn: ({ source }: ProjectionRun) =>
       projectRuleAuthoring({
@@ -161,7 +173,14 @@ export function RuleEditorDialog({
         return;
       if (projection.isValid) {
         if (projection.condition) setCondition(projection.condition);
-        if (projection.formattedDsl != null) setDsl(projection.formattedDsl);
+        if (projection.formattedDsl != null) {
+          const displayChanged = projection.formattedDsl !== dslValueRef.current;
+          setDslValue(projection.formattedDsl);
+          if (displayChanged) {
+            advanceProjectionFence();
+            setCompletions([]);
+          }
+        }
       }
       setDiagnostics(
         (projection.diagnostics ?? []).map((item) => item.message ?? t('rules.expressionInvalid')),
@@ -188,12 +207,6 @@ export function RuleEditorDialog({
       setDiagnostics([t('rules.expressionInvalid')]);
     },
   });
-
-  const advanceProjectionFence = () => {
-    const requestId = ++projectionRequestRef.current;
-    latestProjectionRequestRef.current = requestId;
-    return requestId;
-  };
 
   const projectAuthoring = (source: ApiTypes.RuleAuthoringSourceDto) => {
     const requestId = advanceProjectionFence();
@@ -226,7 +239,7 @@ export function RuleEditorDialog({
       nextInputs.map((input) => ({ ...input, clientId: crypto.randomUUID(), keyLocked: true })),
     );
     setCondition(detail?.condition ?? null);
-    setDsl('');
+    setDslValue('');
     setDiagnostics([]);
     setCompletions([]);
     setSampleValues({});
@@ -243,7 +256,7 @@ export function RuleEditorDialog({
       dsl: '',
     });
     setHydrationCondition(detail?.condition ?? null);
-  }, [open, detailQuery.data, creating]);
+  }, [open, detailQuery.data, creating, setDslValue]);
 
   useEffect(() => {
     if (!hydrationCondition) return;
@@ -283,7 +296,7 @@ export function RuleEditorDialog({
         nextInputs.map((input) => ({ ...input, clientId: crypto.randomUUID(), keyLocked: true })),
       );
       setCondition(refreshed.condition ?? null);
-      setDsl('');
+      setDslValue('');
       setDiagnostics([]);
       setCompletions([]);
       setSampleValues({});
@@ -701,7 +714,7 @@ export function RuleEditorDialog({
                           value={dsl}
                           onChange={(event) => {
                             advanceProjectionFence();
-                            setDsl(event.target.value);
+                            setDslValue(event.target.value);
                             setCursor(event.currentTarget.selectionStart);
                             setCompletions([]);
                           }}
@@ -734,7 +747,7 @@ export function RuleEditorDialog({
                                   const start = completion.start ?? cursor;
                                   const length = completion.length ?? 0;
                                   const nextDsl = `${dsl.slice(0, start)}${completion.insertText ?? ''}${dsl.slice(start + length)}`;
-                                  setDsl(nextDsl);
+                                  setDslValue(nextDsl);
                                   setCursor(start + (completion.insertText?.length ?? 0));
                                   setCompletions([]);
                                   projectAuthoring({ text: nextDsl });

@@ -1386,6 +1386,79 @@ describe('RulesPage', () => {
     ).not.toBeInTheDocument();
   });
 
+  it.each([
+    'completion-first',
+    'projection-first',
+  ] as const)('invalidates completion ranges when formatting projection resolves %s', async (ordering) => {
+    const user = userEvent.setup();
+    const formattingProjection = deferred<Response>();
+    const unformattedCompletion = deferred<Response>();
+    let authoringProjectionCalls = 0;
+    let completionCalls = 0;
+    vi.mocked(fetch).mockImplementation((input, init) => {
+      const url = input.toString();
+      if (url.endsWith('/rules/authoring/project')) {
+        authoringProjectionCalls += 1;
+        return authoringProjectionCalls === 2
+          ? formattingProjection.promise
+          : Promise.resolve(respondForRules(input, init));
+      }
+      if (url.endsWith('/rules/authoring/complete')) {
+        completionCalls += 1;
+        return unformattedCompletion.promise;
+      }
+      return Promise.resolve(respondForRules(input, init));
+    });
+
+    await renderWithRouter(<RulesPage />, { path: '/rules', authenticatedPath: 'rules' });
+    await user.click(
+      within(await screen.findByRole('region', { name: 'Rules catalog' })).getByRole('button', {
+        name: 'Credit threshold',
+      }),
+    );
+    const editor = await screen.findByRole('dialog', { name: 'Credit threshold' });
+    await user.click(within(editor).getByRole('tab', { name: 'Rule behavior' }));
+    const expression = within(editor).getByLabelText('Expression syntax');
+    await waitFor(() => expect(expression).toHaveValue('value > threshold'));
+    await user.clear(expression);
+    await user.type(expression, 'integer("1")');
+
+    const showSuggestions = within(editor).getByRole('button', { name: 'Show suggestions' });
+    await user.click(showSuggestions);
+    await waitFor(() => expect(authoringProjectionCalls).toBe(2));
+    await waitFor(() => expect(completionCalls).toBe(1));
+
+    const staleSuggestion = [
+      { label: 'Unformatted range', insertText: 'value', kind: 'Input', start: 9, length: 3 },
+    ];
+    const formattedProjection = {
+      condition: thresholdCondition(),
+      formattedDsl: 'integer(1)',
+      diagnostics: [],
+      isValid: true,
+    };
+    if (ordering === 'completion-first') {
+      unformattedCompletion.resolve(jsonResponse(staleSuggestion));
+      expect(
+        await within(editor).findByRole('option', { name: 'Unformatted range' }),
+      ).toBeVisible();
+      formattingProjection.resolve(jsonResponse(formattedProjection));
+    } else {
+      formattingProjection.resolve(jsonResponse(formattedProjection));
+      await waitFor(() => expect(expression).toHaveValue('integer(1)'));
+      unformattedCompletion.resolve(jsonResponse(staleSuggestion));
+    }
+
+    await waitFor(() => expect(showSuggestions).toBeEnabled());
+    await waitFor(() =>
+      expect(within(editor).getByRole('button', { name: 'Save draft' })).toBeEnabled(),
+    );
+    expect(expression).toHaveValue('integer(1)');
+    expect(
+      within(editor).queryByRole('option', { name: 'Unformatted range' }),
+    ).not.toBeInTheDocument();
+  });
+
   it('refreshes a post-create conflict by its persisted key without another POST', async () => {
     const user = userEvent.setup();
     const created = workspaceDetail({
