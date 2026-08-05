@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Axis.Api.Extensions;
+using Axis.Api.Infrastructure;
 using Axis.Identity.Application.Commands.ResendVerificationEmail;
 using Axis.Identity.Application.Commands.SignInUser;
 using Axis.Identity.Application.Commands.VerifyEmail;
@@ -8,7 +9,10 @@ using Axis.Shared.Domain.Primitives;
 using MediatR;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Mvc;
+using OpenIddict.Abstractions;
+using static OpenIddict.Abstractions.OpenIddictConstants;
 
 namespace Axis.Api.Endpoints;
 
@@ -17,6 +21,13 @@ public static class AuthEndpoints
     public static IEndpointRouteBuilder MapAuthEndpoints(this IEndpointRouteBuilder app)
     {
         RouteGroupBuilder group = app.MapGroup("/api/auth");
+
+        group.MapGet("/session", GetSession)
+            .AllowAnonymous()
+            .WithName("GetBrowserSession")
+            .WithSummary("Resolve the current same-origin browser session")
+            .WithTags("Identity")
+            .Produces<AxisBrowserSessionDto>();
 
         group.MapPost("/sign-in", SignIn)
             .AllowAnonymous()
@@ -59,6 +70,7 @@ public static class AuthEndpoints
     private static async Task<IResult> SignIn(
         [FromBody] SignInUserRequest request,
         ISender mediator,
+        AxisBrowserSessionPolicy sessionPolicy,
         HttpContext httpContext,
         CancellationToken ct)
     {
@@ -67,7 +79,7 @@ public static class AuthEndpoints
         if (result.IsFailure)
             return result.ToProblemDetails();
 
-        await SignInPkceSessionAsync(httpContext, result.Value);
+        await SignInBrowserSessionAsync(httpContext, sessionPolicy, result.Value);
 
         return Results.Ok(SignInSessionEstablishedDto.From(result.Value));
     }
@@ -75,6 +87,7 @@ public static class AuthEndpoints
     private static async Task<IResult> VerifyEmail(
         [FromBody] VerifyEmailRequest request,
         ISender mediator,
+        AxisBrowserSessionPolicy sessionPolicy,
         HttpContext httpContext,
         CancellationToken ct)
     {
@@ -84,33 +97,42 @@ public static class AuthEndpoints
             return result.ToProblemDetails();
 
         if (result.Value.SessionEstablished)
-            await SignInPkceSessionAsync(httpContext, result.Value);
+            await SignInBrowserSessionAsync(httpContext, sessionPolicy, result.Value);
 
         return Results.Ok(VerifyEmailSessionEstablishedDto.From(result.Value));
     }
 
-    private static async Task SignInPkceSessionAsync(HttpContext httpContext, SignInSuccessDto claims)
+    private static async Task SignInBrowserSessionAsync(
+        HttpContext httpContext,
+        AxisBrowserSessionPolicy sessionPolicy,
+        SignInSuccessDto claims)
     {
-        await SignInPkceSessionAsync(
+        await SignInBrowserSessionAsync(
             httpContext,
+            sessionPolicy,
             claims.UserId,
             claims.workspaceId,
             claims.Email,
             claims.FullName);
     }
 
-    private static async Task SignInPkceSessionAsync(HttpContext httpContext, VerifyEmailSuccessDto claims)
+    private static async Task SignInBrowserSessionAsync(
+        HttpContext httpContext,
+        AxisBrowserSessionPolicy sessionPolicy,
+        VerifyEmailSuccessDto claims)
     {
-        await SignInPkceSessionAsync(
+        await SignInBrowserSessionAsync(
             httpContext,
+            sessionPolicy,
             claims.UserId!.Value,
             claims.workspaceId,
             claims.Email,
             claims.FullName);
     }
 
-    private static async Task SignInPkceSessionAsync(
+    private static async Task SignInBrowserSessionAsync(
         HttpContext httpContext,
+        AxisBrowserSessionPolicy sessionPolicy,
         Guid userId,
         Guid? workspaceId,
         string email,
@@ -118,9 +140,9 @@ public static class AuthEndpoints
     {
         List<Claim> claimList =
         [
-            new(ClaimTypes.NameIdentifier, userId.ToString()),
-            new(ClaimTypes.Email, email),
-            new("name", fullName),
+            new(Claims.Subject, userId.ToString()),
+            new(Claims.Email, email),
+            new(Claims.Name, fullName),
         ];
         if (workspaceId is Guid resolvedWorkspaceId)
             claimList.Add(new Claim("workspace_id", resolvedWorkspaceId.ToString()));
@@ -128,16 +150,45 @@ public static class AuthEndpoints
         ClaimsIdentity identity = new(claimList, CookieAuthenticationDefaults.AuthenticationScheme);
         ClaimsPrincipal principal = new(identity);
 
-        AuthenticationProperties props = new()
-        {
-            IsPersistent = false,
-            ExpiresUtc = DateTimeOffset.UtcNow.AddMinutes(5),
-        };
-
         await httpContext.SignInAsync(
             CookieAuthenticationDefaults.AuthenticationScheme,
             principal,
-            props);
+            sessionPolicy.CreateAuthenticationProperties());
+    }
+
+    private static async Task<IResult> GetSession(
+        HttpContext httpContext,
+        IAntiforgery antiforgery)
+    {
+        AntiforgeryTokenSet tokens = antiforgery.GetAndStoreTokens(httpContext);
+        string requestToken = tokens.RequestToken
+            ?? throw new InvalidOperationException("The antiforgery request token was not generated.");
+        AuthenticateResult result = await httpContext.AuthenticateAsync(
+            CookieAuthenticationDefaults.AuthenticationScheme);
+        if (!result.Succeeded || result.Principal is null)
+            return Results.Ok(new AxisBrowserSessionDto(false, requestToken, null));
+
+        ClaimsPrincipal principal = result.Principal;
+        string? subject = principal.GetClaim(Claims.Subject);
+        string? email = principal.GetClaim(Claims.Email);
+        string? name = principal.GetClaim(Claims.Name);
+        if (!Guid.TryParse(subject, out Guid userId) ||
+            string.IsNullOrEmpty(email) ||
+            string.IsNullOrEmpty(name))
+        {
+            await httpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+            return Results.Ok(new AxisBrowserSessionDto(false, requestToken, null));
+        }
+
+        Guid? workspaceId = Guid.TryParse(
+            principal.FindFirstValue("workspace_id"),
+            out Guid parsedWorkspaceId)
+            ? parsedWorkspaceId
+            : null;
+        return Results.Ok(new AxisBrowserSessionDto(
+            true,
+            requestToken,
+            new AxisBrowserSessionUserDto(userId, workspaceId, email, name)));
     }
 
     private static async Task<IResult> ResendVerification(
@@ -158,3 +209,14 @@ public static class AuthEndpoints
         return Results.NoContent();
     }
 }
+
+public sealed record AxisBrowserSessionDto(
+    bool Authenticated,
+    string CsrfToken,
+    AxisBrowserSessionUserDto? User);
+
+public sealed record AxisBrowserSessionUserDto(
+    Guid UserId,
+    Guid? WorkspaceId,
+    string Email,
+    string Name);

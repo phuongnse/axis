@@ -13,15 +13,15 @@ using NpgsqlTypes;
 namespace Axis.Rules.Infrastructure.Migrations
 {
     [DbContext(typeof(RulesDbContext))]
-    [Migration("20260731100254_AddRuleBindings")]
-    partial class AddRuleBindings
+    [Migration("20260804091815_InitialRules")]
+    partial class InitialRules
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "9.0.16")
+                .HasAnnotation("ProductVersion", "10.0.10")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -102,6 +102,11 @@ namespace Axis.Rules.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("jsonb")
                         .HasColumnName("input_mappings");
+
+                    b.Property<string>("_revisionHistory")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("revision_history");
 
                     b.Property<uint>("xmin")
                         .IsConcurrencyToken()

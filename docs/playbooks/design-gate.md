@@ -31,13 +31,14 @@ Every non-trivial dossier covers:
 
 1. **Governing rules** — quote the owner rules with `file:section`; do not rely on memory.
 2. **Blast radius** — paste the `rg` search that lists affected callers, consumers, tests, docs, and generated artifacts.
-3. **Retirement and compatibility contract** — for removals, renames, replacements, drops, disables, deprecations, or other retirements, name the product phase, known consumers/data, and one explicit decision:
+3. **Enterprise production fitness** — apply [docs/PLATFORM_STRATEGY.md § Enterprise Production Baseline](../PLATFORM_STRATEGY.md#enterprise-production-baseline) to the slice. Classify every applicable concern, name its owning contract and evidence, and give an owner-backed reason for `N/A`. A required concern without current proof blocks implementation; it cannot be moved to a follow-up merely because the capability is being delivered incrementally.
+4. **Retirement and compatibility contract** — for removals, renames, replacements, drops, disables, deprecations, or other retirements, name the product phase, known consumers/data, and one explicit decision:
    - `Clean cutover`: compatibility is not required; remove the old implementation, wire shape, callers, generated artifacts, tests, docs, flags, and fallbacks in the same slice.
    - `Compatibility required`: name the exact consumer/data constraint, supported overlap, owner, removal condition, and proving tests.
 
    In both cases list retired identifiers and the post-edit `rg` sweep. Do not add compatibility “just in case.” Otherwise write `N/A because no supported surface is retired`.
-4. **Contract decision** — name request/response shape, schema, casing, FE/BE type parity, or write `N/A because no wire shape changes`.
-5. **Verification plan** — list exact development checks and review-readiness checks. Do not call review-only artifacts gates.
+5. **Contract decision** — name request/response shape, schema, casing, FE/BE type parity, or write `N/A because no wire shape changes`.
+6. **Verification plan** — list exact development checks and review-readiness checks. Do not call review-only artifacts gates.
 
 Skip a row only with an explicit `N/A because ...`.
 

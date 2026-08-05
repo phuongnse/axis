@@ -106,9 +106,6 @@ export const translations = {
 
     'auth.alreadyHaveAccount': 'Already have an account?',
     'auth.backToRegistration': 'Back to registration',
-    'auth.callback.invalid': 'Invalid authorization response. Please try signing in again.',
-    'auth.callback.retryTitle': 'Sign-in interrupted',
-    'auth.callback.tokenFailed': 'Token exchange failed. Please try signing in again.',
     'auth.confirm.body1':
       'If an account exists for this email, you will receive a verification link shortly.',
     'auth.confirm.body2': 'Open that link to finish registration and enter the dashboard.',
@@ -878,9 +875,6 @@ export const translations = {
 
     'auth.alreadyHaveAccount': 'Bạn đã có tài khoản?',
     'auth.backToRegistration': 'Quay lại đăng ký',
-    'auth.callback.invalid': 'Phản hồi xác thực không hợp lệ. Vui lòng đăng nhập lại.',
-    'auth.callback.retryTitle': 'Đăng nhập bị gián đoạn',
-    'auth.callback.tokenFailed': 'Không đổi được mã đăng nhập. Vui lòng đăng nhập lại.',
     'auth.confirm.body1': 'Nếu email này có tài khoản, bạn sẽ sớm nhận được liên kết xác minh.',
     'auth.confirm.body2': 'Mở liên kết đó để hoàn tất đăng ký và vào bảng điều khiển.',
     'auth.confirm.didNotReceive': 'Chưa nhận được email?',

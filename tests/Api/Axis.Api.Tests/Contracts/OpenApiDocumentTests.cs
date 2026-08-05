@@ -2,8 +2,6 @@ using Axis.Api.Tests.Helpers;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.OpenApi;
-using Microsoft.OpenApi.Extensions;
-using Microsoft.OpenApi.Models;
 using Swashbuckle.AspNetCore.Swagger;
 
 namespace Axis.Api.Tests.Contracts;
@@ -17,13 +15,15 @@ public class OpenApiDocumentTests(ApiTestFixture fixture)
     /// so the FE types can never silently diverge from the real API contract.
     /// </summary>
     [Fact]
-    public void OpenApiDocument_WhenGeneratedFromRunningApi_MatchesCommittedSnapshot()
+    public async Task OpenApiDocument_WhenGeneratedFromRunningApi_MatchesCommittedSnapshot()
     {
         using IServiceScope scope = fixture.CreateScope();
         ISwaggerProvider provider = scope.ServiceProvider.GetRequiredService<ISwaggerProvider>();
 
         OpenApiDocument doc = provider.GetSwagger("v1");
-        string fresh = doc.SerializeAsJson(OpenApiSpecVersion.OpenApi3_0).ReplaceLineEndings("\n");
+        string fresh = (await doc.SerializeAsJsonAsync(
+            OpenApiSpecVersion.OpenApi3_0,
+            TestContext.Current.CancellationToken)).ReplaceLineEndings("\n");
 
         string path = Path.Combine(RepoRoot(), "openapi.json");
         string? committed = File.Exists(path) ? File.ReadAllText(path).ReplaceLineEndings("\n") : null;

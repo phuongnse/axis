@@ -39,6 +39,26 @@ public sealed class AxisMcpToolTests
     }
 
     [Fact]
+    public async Task GetRuleBinding_WhenInvoked_UsesAuthenticatedDetailRoute()
+    {
+        RecordingHandler handler = new("{\"id\":\"binding\"}");
+        using HttpClient httpClient = new(handler)
+        {
+            BaseAddress = new Uri("https://localhost:5281/"),
+        };
+        AxisMcpBindingReadTools tools = new(
+            new AxisApiClient(httpClient, new FixedAccessTokenProvider("test-token")));
+        Guid bindingId = Guid.Parse("11111111-1111-1111-1111-111111111111");
+
+        string result = await tools.GetRuleBindingAsync(bindingId, TestContext.Current.CancellationToken);
+
+        Assert.Equal("{\"id\":\"binding\"}", result);
+        Assert.Equal(HttpMethod.Get, handler.Method);
+        Assert.Equal($"/api/rule-bindings/{bindingId:D}", handler.RequestUri!.PathAndQuery);
+        Assert.Equal("Bearer", handler.Authorization!.Scheme);
+    }
+
+    [Fact]
     public async Task SimulateRule_WhenCorrelationIdIsOmitted_GeneratesOneWithoutWorkspaceArguments()
     {
         CancellationToken cancellationToken = TestContext.Current.CancellationToken;

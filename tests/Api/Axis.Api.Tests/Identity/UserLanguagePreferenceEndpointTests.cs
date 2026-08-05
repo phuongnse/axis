@@ -164,8 +164,8 @@ public sealed class UserLanguagePreferenceEndpointTests(ApiTestFixture fixture)
         Dictionary<string, string?> authorizeQuery = new()
         {
             ["response_type"] = "code",
-            ["client_id"] = "axis_spa",
-            ["redirect_uri"] = "https://localhost/callback",
+            ["client_id"] = "axis_mcp",
+            ["redirect_uri"] = "http://127.0.0.1:48123/callback",
             ["code_challenge"] = CreateCodeChallenge(verifier),
             ["code_challenge_method"] = "S256",
             ["scope"] = "openid email profile",
@@ -202,8 +202,8 @@ public sealed class UserLanguagePreferenceEndpointTests(ApiTestFixture fixture)
         using FormUrlEncodedContent tokenRequest = new(new Dictionary<string, string>
         {
             ["grant_type"] = "authorization_code",
-            ["client_id"] = "axis_spa",
-            ["redirect_uri"] = "https://localhost/callback",
+            ["client_id"] = "axis_mcp",
+            ["redirect_uri"] = "http://127.0.0.1:48123/callback",
             ["code"] = code,
             ["code_verifier"] = verifier,
         });
@@ -240,14 +240,13 @@ public sealed class UserLanguagePreferenceEndpointTests(ApiTestFixture fixture)
         };
         request.Headers.Add("Idempotency-Key", Guid.NewGuid().ToString("N"));
 
-        return await fixture.Client.SendAsync(request, TestContext.Current.CancellationToken);
+        return await fixture.SendBrowserMutationAsync(request, TestContext.Current.CancellationToken);
     }
 
     private async Task<HttpResponseMessage> VerifyEmailAsync(string token) =>
-        await fixture.Client.PostAsJsonAsync(
+        await fixture.PostBrowserJsonAsync(
             "/api/auth/verify-email",
             new { token },
-            Json,
             TestContext.Current.CancellationToken);
 
     private string CapturedToken(string email) =>

@@ -21,7 +21,7 @@ Register a standalone Axis Platform user with email/password so the user can ver
 3. System verifies email uniqueness and password policy.
 4. System creates the account, creates the user's personal workspace, records legal acceptance, and sends an email verification link.
 5. User opens the verification link.
-6. System verifies the email token, signs the user in, completes the browser callback, and routes the user to the dashboard.
+6. System verifies the email token, rotates and establishes the same opaque Axis server session as returning-user sign-in, and routes the user to the dashboard without an OAuth browser callback.
 
 ## Alternate / error flows
 
@@ -37,7 +37,7 @@ Register a standalone Axis Platform user with email/password so the user can ver
 - **AC-002** User can register with full name, email/password, password confirmation, and current user-level legal acceptance.
 - **AC-003** Registration creates the standalone account, personal workspace, and legal acceptance without requiring team/setup context.
 - **AC-004** Registration sends an Axis Platform-branded verification email in the account's initial supported language preference with the current brand palette, email-safe typography, HTML and plain-text bodies, a prominent verification action, a fallback URL, expiry and security context, recipient context, and footer metadata.
-- **AC-005** After successful email verification, the user is signed in and routed to the dashboard.
+- **AC-005** After successful email verification, the user receives only the opaque Axis session cookie, resolves session identity and CSRF material through the same server-session bootstrap as returning sign-in, and reaches the dashboard without browser OAuth artifacts.
 
 *Validation & errors*
 - **AC-006** Email is required, must be a valid email format, and must be unique across Axis Platform users.
@@ -54,12 +54,13 @@ Register a standalone Axis Platform user with email/password so the user can ver
 - **AC-015** Standalone registration leaves the account independent of team/setup context.
 - **AC-016** Registration, confirmation, and verification journeys provide a recoverable path when the user cannot complete the current step.
 - **AC-017** Registration captures the selected supported site language as the account's initial user-level language preference; missing language input uses the product fallback language, and unsupported language input is rejected.
+- **AC-018** Verification session establishment preserves the cookie flags, Redis ticket, rotation, antiforgery, idle/absolute lifetime, fail-closed, and no-browser-token invariants owned by sign-in.
 
 ## Acceptance Test Matrix
 
 | ID | Boundary | Scenario | Covers AC | Verification | Required |
 |---|---|---|---|---|---|
-| AT-001 | Browser journey | User registers, opens verification email, sees a readable verified handoff, completes browser sign-in, and reaches the dashboard | AC-001, AC-002, AC-004, AC-005, AC-009 | Browser automation | Yes |
+| AT-001 | Browser journey | User registers, opens verification email, receives the opaque server session, and reaches the dashboard without a callback, token exchange, or browser credential | AC-001, AC-002, AC-004, AC-005, AC-009, AC-018 | Browser automation | Yes |
 | AT-002 | Browser journey | Duplicate email shows the exact inline email-field error | AC-006, AC-010 | Browser automation | Yes |
 | AT-003 | API boundary | Registration persists account data, personal workspace, legal acceptance, verification token, and no team/setup dependency | AC-003, AC-004, AC-009, AC-015 | API integration test | Yes |
 | AT-004 | UI component | Empty form, invalid email, password confirmation, and backend field errors render inline | AC-006, AC-008, AC-010 | UI component test | Yes |
@@ -83,7 +84,7 @@ Register a standalone Axis Platform user with email/password so the user can ver
 | `/register` validation | Show required-field, invalid-email, duplicate-email, password-policy, password-confirmation, legal-acceptance, backend field, and generic 5xx errors inline or in the form alert described by the relevant AC. Keep the submit button disabled only while submission or legal-version loading is pending. |
 | `/register/confirmation` | Show the submitted email when available, explain that the verification link is required to finish registration, provide resend, show resend success/error/rate-limited states, keep account-enumeration-safe copy, and include a route back to registration. |
 | `/auth/verify` | Submit the token once, show loading while verification is pending, show a verified handoff state that remains readable for at least 5 seconds before auto-continuing unless the user chooses the manual continue action, show expired, invalid, and already-used verification states, show the resend rate-limited state when resend is limited, and include sign-in or registration escape navigation in every visible state. |
-| Callback/dashboard handoff | The callback and dashboard experience are owned outside this use case; this use case only requires that successful verification completes browser sign-in and routes to dashboard without introducing another transient informational screen in the normal post-verification path. |
+| Session/dashboard handoff | Successful verification establishes the same opaque server session as returning sign-in and routes to dashboard without a callback, token exchange, or transient technical screen. |
 
 Required UI quality: labels must be programmatic, invalid fields must expose invalid state, error/help text must remain associated with the field it describes, recovery actions must be visible and keyboard-reachable, and the screens must use existing auth components and theme tokens.
 
@@ -98,7 +99,7 @@ sequenceDiagram
   participant API as API
   participant Identity as Identity
   participant Mail as SMTP / Maildev
-  participant OIDC as OpenIddict
+  participant Session as Redis session store
 
   User->>Web: Open /register
   User->>Web: Submit registration form
@@ -110,12 +111,11 @@ sequenceDiagram
   User->>Web: Open verification link
   Web->>API: POST /api/auth/verify-email
   API->>Identity: Verify token and prepare dashboard access
-  API->>OIDC: Create short-lived browser session
-  API-->>Web: Session established
-  Web->>OIDC: GET /connect/authorize
-  OIDC-->>Web: Redirect /callback?code=...
-  Web->>OIDC: POST /connect/token
-  OIDC-->>Web: Access token
+  API->>Session: Rotate and store opaque session ticket
+  API-->>Web: Secure HttpOnly session cookie
+  Web->>API: Resolve session identity and CSRF
+  API->>Session: Load ticket
+  API-->>Web: Minimal authenticated session
   Web-->>User: Open dashboard
 ```
 
@@ -125,16 +125,20 @@ sequenceDiagram
 > |-------|--------|
 > | Domain | Done |
 > | Application | Done |
-> | Infrastructure | Done |
-> | API | Done |
-> | Frontend | Done |
+> | Infrastructure | Partial |
+> | API | Partial |
+> | Frontend | Partial |
 >
-> **Implemented:** The standalone registration backend, API, and frontend screens are in place. `POST /api/users/register` owns submission, account creation, personal workspace creation, initial language preference capture, legal acceptance, idempotency, and verification email creation; the use case also covers localized standards-complete verification email content, email verification, resend states, post-verification PKCE, and dashboard routing.
+> **Implemented:** Account, personal-workspace, legal-acceptance, language, idempotency, verification email, verification, resend, and UI behavior exist. Post-verification currently enters the retired public-PKCE browser path and is not evidence for the approved opaque server-session handoff.
 >
-> **Gaps vs spec:** N/A.
+> **Gaps vs spec:**
+>
+> | ID | Gap |
+> |---|---|
+> | GAP-001 | Verification must establish the approved Redis-backed opaque Axis session and remove callback/token handoff source and evidence in the same clean cutover. |
 >
 > **Deferred follow-ups:** N/A.
 >
-> **Verification:** Required AT rows are covered by browser automation, UI component tests, API integration tests, application tests, and infrastructure tests.
+> **Verification:** Registration and verification behavior has evidence; revised AT-001 requires fresh opaque-session browser evidence.
 >
-> **Decisions:** Screen flow owns the product screen contract; Required UI quality owns accessibility and interaction expectations. Registration uses one user-facing full-name field end-to-end. Resend rate limiting is part of resend behavior, not verification-token resolution. Public auth screens must expose an escape navigation link instead of relying on browser history.
+> **Decisions:** Screen flow owns the product contract; required UI quality owns accessibility. Registration uses one user-facing full-name field end-to-end. Resend rate limiting is part of resend behavior, not token resolution. Public auth screens expose escape navigation. Successful verification reuses the sign-in use case's same-origin opaque session contract and cannot retain a separate browser-auth path.

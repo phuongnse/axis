@@ -345,6 +345,8 @@ class TestPortableSetupCli(unittest.TestCase):
 
         with (
             mock.patch.object(axis.axis_setup, "detect_platform", return_value=axis_setup.SetupPlatform("linux", "x64")),
+            mock.patch.object(axis, "path_dotnet_sdk_ready", return_value=True),
+            mock.patch.object(axis, "path_node_toolchain_ready", return_value=True),
             mock.patch.object(axis, "setup_tool_ready", side_effect=lambda tool: ready[tool]),
             mock.patch.object(axis, "setup_external_preflight", return_value=0),
             mock.patch.object(axis.axis_setup, "confirm_install") as confirm,
@@ -359,11 +361,74 @@ class TestPortableSetupCli(unittest.TestCase):
         confirm.assert_called_once()
         self.assertEqual(["dotnet"], installed)
 
+    def test_path_dotnet_sdk_ready_rejects_a_missing_or_wrong_major_path_sdk(self) -> None:
+        with mock.patch.object(axis, "global_json_sdk_major", return_value=(True, "10")):
+            with mock.patch.object(axis.shutil, "which", return_value=None):
+                self.assertFalse(axis.path_dotnet_sdk_ready())
+            with (
+                mock.patch.object(axis.shutil, "which", return_value="/usr/bin/dotnet"),
+                mock.patch.object(
+                    axis,
+                    "run_optional",
+                    return_value=axis.subprocess.CompletedProcess([], 0, stdout="9.0.9"),
+                ),
+            ):
+                self.assertFalse(axis.path_dotnet_sdk_ready())
+
+    def test_setup_exposes_existing_managed_dotnet_when_path_dotnet_is_missing_or_invalid(self) -> None:
+        platform_spec = axis_setup.SetupPlatform("linux", "x64")
+        exposed = Path("/users/alice/.local/bin/dotnet")
+        with (
+            mock.patch.object(axis.axis_setup, "detect_platform", return_value=platform_spec),
+            mock.patch.object(axis, "path_dotnet_sdk_ready", return_value=False),
+            mock.patch.object(axis, "path_node_toolchain_ready", return_value=True),
+            mock.patch.object(axis, "setup_tool_ready", return_value=True),
+            mock.patch.object(axis, "setup_external_preflight", return_value=0),
+            mock.patch.object(axis.axis_setup, "confirm_install") as confirm,
+            mock.patch.object(axis.axis_setup, "install_tool") as install_tool,
+            mock.patch.object(axis.axis_setup, "expose_managed_command", return_value=exposed) as expose,
+            mock.patch.object(axis, "setup_preflight", return_value=0),
+            mock.patch.object(axis, "run", return_value=axis.subprocess.CompletedProcess([], 0)),
+            mock.patch.object(axis, "run_frontend_npm", return_value=axis.subprocess.CompletedProcess([], 0)),
+            contextlib.redirect_stdout(io.StringIO()) as stdout,
+        ):
+            self.assertEqual(0, axis.setup(setup_args(install_user_tools=True, yes=True)))
+
+        confirm.assert_called_once_with((), assume_yes=True, stdin=sys.stdin)
+        install_tool.assert_not_called()
+        expose.assert_called_once_with("dotnet", platform_spec=platform_spec)
+        self.assertIn("exposed: /users/alice/.local/bin/dotnet", stdout.getvalue())
+
+    def test_setup_installs_then_exposes_managed_dotnet_when_path_dotnet_is_missing_or_invalid(self) -> None:
+        platform_spec = axis_setup.SetupPlatform("linux", "x64")
+        exposed = Path("/users/alice/.local/bin/dotnet")
+        with (
+            mock.patch.object(axis.axis_setup, "detect_platform", return_value=platform_spec),
+            mock.patch.object(axis, "path_dotnet_sdk_ready", return_value=False),
+            mock.patch.object(axis, "path_node_toolchain_ready", return_value=True),
+            mock.patch.object(axis, "setup_tool_ready", side_effect=lambda tool: tool != "dotnet"),
+            mock.patch.object(axis, "setup_external_preflight", return_value=0),
+            mock.patch.object(axis.axis_setup, "confirm_install") as confirm,
+            mock.patch.object(axis.axis_setup, "install_tool", return_value=Path("/managed/dotnet")) as install_tool,
+            mock.patch.object(axis.axis_setup, "expose_managed_command", return_value=exposed) as expose,
+            mock.patch.object(axis, "setup_preflight", return_value=0),
+            mock.patch.object(axis, "run", return_value=axis.subprocess.CompletedProcess([], 0)),
+            mock.patch.object(axis, "run_frontend_npm", return_value=axis.subprocess.CompletedProcess([], 0)),
+            contextlib.redirect_stdout(io.StringIO()),
+        ):
+            self.assertEqual(0, axis.setup(setup_args(install_user_tools=True, yes=True)))
+
+        confirm.assert_called_once_with(("dotnet",), assume_yes=True, stdin=sys.stdin)
+        install_tool.assert_called_once_with("dotnet", platform_spec=platform_spec)
+        expose.assert_called_once_with("dotnet", platform_spec=platform_spec)
+
     def test_review_setup_exposes_an_existing_managed_gh_command(self) -> None:
         managed = Path("/managed/gh")
         exposed = Path("/users/alice/.local/bin/gh")
         with (
             mock.patch.object(axis.axis_setup, "detect_platform", return_value=axis_setup.SetupPlatform("linux", "x64")),
+            mock.patch.object(axis, "path_dotnet_sdk_ready", return_value=True),
+            mock.patch.object(axis, "path_node_toolchain_ready", return_value=True),
             mock.patch.object(axis, "setup_tool_ready", return_value=True),
             mock.patch.object(axis, "setup_external_preflight", return_value=0),
             mock.patch.object(axis.axis_setup, "managed_executable", return_value=managed),
@@ -389,6 +454,8 @@ class TestPortableSetupCli(unittest.TestCase):
         events: list[str] = []
         with (
             mock.patch.object(axis.axis_setup, "detect_platform", return_value=axis_setup.SetupPlatform("linux", "x64")),
+            mock.patch.object(axis, "path_dotnet_sdk_ready", return_value=True),
+            mock.patch.object(axis, "path_node_toolchain_ready", return_value=True),
             mock.patch.object(axis, "setup_tool_ready", return_value=False),
             mock.patch.object(axis, "setup_external_preflight", side_effect=lambda _profile: events.append("external") or 0),
             mock.patch.object(axis.axis_setup, "confirm_install"),
@@ -406,6 +473,8 @@ class TestPortableSetupCli(unittest.TestCase):
     def test_external_preflight_failure_stops_before_confirmation_and_download(self) -> None:
         with (
             mock.patch.object(axis.axis_setup, "detect_platform", return_value=axis_setup.SetupPlatform("linux", "x64")),
+            mock.patch.object(axis, "path_dotnet_sdk_ready", return_value=True),
+            mock.patch.object(axis, "path_node_toolchain_ready", return_value=True),
             mock.patch.object(axis, "setup_tool_ready", return_value=False),
             mock.patch.object(axis, "setup_external_preflight", return_value=1),
             mock.patch.object(axis.axis_setup, "confirm_install") as confirm,
@@ -420,6 +489,8 @@ class TestPortableSetupCli(unittest.TestCase):
     def test_install_stops_before_download_when_a_missing_tool_has_no_verified_artifact(self) -> None:
         with (
             mock.patch.object(axis.axis_setup, "detect_platform", return_value=axis_setup.SetupPlatform("windows", "arm64")),
+            mock.patch.object(axis, "path_dotnet_sdk_ready", return_value=True),
+            mock.patch.object(axis, "path_node_toolchain_ready", return_value=True),
             mock.patch.object(axis, "setup_tool_ready", return_value=False),
             mock.patch.object(axis.axis_setup, "install_tool") as install_tool,
             contextlib.redirect_stdout(io.StringIO()),

@@ -14,13 +14,15 @@ Do not invent IDs, endpoints, tables, or product behavior. If code and docs conf
 
 ## Critical Rules
 
+- Axis targets enterprise production. Delivery may be incremental, but every implemented slice must be production-grade within its declared scope under [docs/PLATFORM_STRATEGY.md](./docs/PLATFORM_STRATEGY.md#enterprise-production-baseline); a required production concern cannot be deferred or replaced by a temporary foundation.
 - Spec -> code only; no intentional shortcuts.
 - Keep tests and acceptance evidence honest; do not skip, weaken, bypass, or mark incomplete work done.
 - Domain projects have zero external dependencies.
 - Non-trivial changes need a [docs/playbooks/design-gate.md](./docs/playbooks/design-gate.md) dossier; high-risk surfaces need user sign-off before code.
 - Keep database schema changes migration-backed and reviewable.
 - Tech-stack changes need explicit approval and a [docs/TECH_STACK.md](./docs/TECH_STACK.md) update.
-- Compatibility is a product constraint, not an automatic implementation goal. When the owning contract and current product phase require no compatibility, replace the old surface cleanly; do not add shims, dual paths, flags, or fallback behavior.
+- Before taking an alternate path after a failure, compare it with the owning contract's owner, required boundary, invariants, and evidence. If the path changes any of them merely to keep progressing instead of repairing the root cause, it is a workaround: stop and reopen the Design Gate rather than implement it.
+- Compatibility is a product constraint, not an automatic implementation goal. When the owning contract and current product phase require no compatibility, replace the old surface cleanly; do not add shims, dual paths, flags, fallback behavior, or ongoing tests and guidance that keep retired identifiers or concepts alive.
 
 ## Operating Rules
 
@@ -41,4 +43,4 @@ Axis repository skills own the development lifecycle. External skills may supple
 
 ## Verification
 
-During development, run the narrow check that proves the surface changed. Before review, run triggered verification from [docs/playbooks/agent-checklist.md](./docs/playbooks/agent-checklist.md).
+Select development and review verification under [`.agents/skills/reference.md` § Change-driven scope](./.agents/skills/reference.md#change-driven-scope); before review, apply [docs/playbooks/agent-checklist.md](./docs/playbooks/agent-checklist.md).

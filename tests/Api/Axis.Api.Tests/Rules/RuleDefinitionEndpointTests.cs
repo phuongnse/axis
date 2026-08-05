@@ -21,9 +21,130 @@ public sealed class RuleDefinitionEndpointTests(ApiTestFixture fixture)
     [Fact]
     public async Task RuleDefinitionEndpoints_WhenAnonymous_ReturnUnauthorized()
     {
-        HttpResponseMessage response = await fixture.Client.GetAsync("/api/rules", TestContext.Current.CancellationToken);
+        using HttpClient anonymousClient = fixture.CreateAnonymousClient();
+        HttpResponseMessage response = await anonymousClient.GetAsync("/api/rules", TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task RuleBindingDetail_WhenAnonymous_ReturnsUnauthorized()
+    {
+        using HttpClient anonymousClient = fixture.CreateAnonymousClient();
+        HttpResponseMessage response = await anonymousClient.GetAsync(
+            $"/api/rule-bindings/{Guid.NewGuid():D}",
+            TestContext.Current.CancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task RuleBindingDetail_WhenOwned_ReturnsFullBinding()
+    {
+        string ownerToken = await CreateVerifiedSessionTokenAsync(UniqueEmail());
+        HttpResponseMessage createResponse = await SendWithBearerAsync(
+            HttpMethod.Post,
+            "/api/rule-bindings",
+            ownerToken,
+            new
+            {
+                definitionKey = RuleDefinitionKeys.Required,
+                definitionVersion = 1,
+                targetType = "neutral-consumer",
+                targetId = "consumer-1",
+                useCaseOrTrigger = "validate",
+                inputMappings = new
+                {
+                    value = new
+                    {
+                        kind = "Literal",
+                        contextKey = (string?)null,
+                        literalValues = new[] { "Approved" },
+                    },
+                },
+                priority = 4,
+                enabled = false,
+                failureBehavior = "FailOpen",
+            });
+        createResponse.StatusCode.Should().Be(HttpStatusCode.Created);
+        JsonElement created = await createResponse.Content.ReadFromJsonAsync<JsonElement>(Json, TestContext.Current.CancellationToken);
+        string bindingId = created.GetProperty("id").GetString()!;
+
+        HttpResponseMessage response = await SendWithBearerAsync(
+            HttpMethod.Get,
+            $"/api/rule-bindings/{bindingId}",
+            ownerToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        JsonElement binding = await response.Content.ReadFromJsonAsync<JsonElement>(Json, TestContext.Current.CancellationToken);
+        binding.GetProperty("id").GetString().Should().Be(bindingId);
+        binding.GetProperty("workspaceId").GetString().Should().NotBeNullOrWhiteSpace();
+        binding.GetProperty("definitionKey").GetString().Should().Be(RuleDefinitionKeys.Required);
+        binding.GetProperty("definitionVersion").GetInt32().Should().Be(1);
+        binding.GetProperty("targetType").GetString().Should().Be("neutral-consumer");
+        binding.GetProperty("targetId").GetString().Should().Be("consumer-1");
+        binding.GetProperty("useCaseOrTrigger").GetString().Should().Be("validate");
+        JsonElement mapping = binding.GetProperty("inputMappings").GetProperty("value");
+        mapping.GetProperty("kind").GetString().Should().Be("Literal");
+        mapping.GetProperty("contextKey").ValueKind.Should().Be(JsonValueKind.Null);
+        mapping.GetProperty("literalValues").EnumerateArray().Select(value => value.GetString())
+            .Should().Equal("Approved");
+        binding.GetProperty("priority").GetInt32().Should().Be(4);
+        binding.GetProperty("enabled").GetBoolean().Should().BeFalse();
+        binding.GetProperty("failureBehavior").GetString().Should().Be("FailOpen");
+        binding.GetProperty("revision").GetInt32().Should().Be(1);
+        binding.GetProperty("createdAt").GetDateTime().Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromMinutes(1));
+        binding.GetProperty("updatedAt").GetDateTime().Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromMinutes(1));
+    }
+
+    [Fact]
+    public async Task RuleBindingDetail_WhenAccessedFromAnotherWorkspace_ReturnsNotFound()
+    {
+        string ownerToken = await CreateVerifiedSessionTokenAsync(UniqueEmail());
+        HttpResponseMessage createResponse = await SendWithBearerAsync(
+            HttpMethod.Post,
+            "/api/rule-bindings",
+            ownerToken,
+            new
+            {
+                definitionKey = RuleDefinitionKeys.Required,
+                definitionVersion = 1,
+                targetType = "neutral-consumer",
+                targetId = "consumer-1",
+                useCaseOrTrigger = "validate",
+                inputMappings = new
+                {
+                    value = new
+                    {
+                        kind = "Literal",
+                        contextKey = (string?)null,
+                        literalValues = new[] { "Approved" },
+                    },
+                },
+            });
+        createResponse.StatusCode.Should().Be(HttpStatusCode.Created);
+        JsonElement created = await createResponse.Content.ReadFromJsonAsync<JsonElement>(Json, TestContext.Current.CancellationToken);
+
+        string otherWorkspaceToken = await CreateVerifiedSessionTokenAsync(UniqueEmail());
+        HttpResponseMessage response = await SendWithBearerAsync(
+            HttpMethod.Get,
+            $"/api/rule-bindings/{created.GetProperty("id").GetString()}",
+            otherWorkspaceToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task RuleBindingDetail_WhenMissing_ReturnsNotFound()
+    {
+        string accessToken = await CreateVerifiedSessionTokenAsync(UniqueEmail());
+
+        HttpResponseMessage response = await SendWithBearerAsync(
+            HttpMethod.Get,
+            $"/api/rule-bindings/{Guid.NewGuid():D}",
+            accessToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
     [Fact]
@@ -509,8 +630,8 @@ public sealed class RuleDefinitionEndpointTests(ApiTestFixture fixture)
         string authorizeUrl = QueryHelpers.AddQueryString("/connect/authorize", new Dictionary<string, string?>
         {
             ["response_type"] = "code",
-            ["client_id"] = "axis_spa",
-            ["redirect_uri"] = "https://localhost/callback",
+            ["client_id"] = "axis_mcp",
+            ["redirect_uri"] = "http://127.0.0.1:48123/callback",
             ["code_challenge"] = CreateCodeChallenge(verifier),
             ["code_challenge_method"] = "S256",
             ["scope"] = "openid email profile",
@@ -546,8 +667,8 @@ public sealed class RuleDefinitionEndpointTests(ApiTestFixture fixture)
         using FormUrlEncodedContent tokenRequest = new(new Dictionary<string, string>
         {
             ["grant_type"] = "authorization_code",
-            ["client_id"] = "axis_spa",
-            ["redirect_uri"] = "https://localhost/callback",
+            ["client_id"] = "axis_mcp",
+            ["redirect_uri"] = "http://127.0.0.1:48123/callback",
             ["code"] = code,
             ["code_verifier"] = verifier,
         });
@@ -584,14 +705,13 @@ public sealed class RuleDefinitionEndpointTests(ApiTestFixture fixture)
         };
         request.Headers.Add("Idempotency-Key", Guid.NewGuid().ToString("N"));
 
-        return await fixture.Client.SendAsync(request, TestContext.Current.CancellationToken);
+        return await fixture.SendBrowserMutationAsync(request, TestContext.Current.CancellationToken);
     }
 
     private async Task<HttpResponseMessage> VerifyEmailAsync(string token) =>
-        await fixture.Client.PostAsJsonAsync(
+        await fixture.PostBrowserJsonAsync(
             "/api/auth/verify-email",
             new { token },
-            Json,
             TestContext.Current.CancellationToken);
 
     private string CapturedToken(string email) =>

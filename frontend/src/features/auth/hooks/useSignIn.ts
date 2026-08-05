@@ -4,9 +4,9 @@ import { useNavigate } from '@tanstack/react-router';
 import { useMemo, useState } from 'react';
 import { type FieldPath, type UseFormReturn, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
-import { completePostSignInPkceFlow, signInUser } from '@/features/auth/api';
+import { completePostSignInFlow, signInUser } from '@/features/auth/api';
+import { isAuthorizationRequestHandle } from '@/features/auth/authorization-request';
 import { useRefreshClientValidationErrors } from '@/features/auth/hooks/useRefreshClientValidationErrors';
-import { isAuthorizationRequestHandle } from '@/features/auth/pkce';
 import {
   classifySignInError,
   getFirstFieldError,
@@ -107,12 +107,12 @@ export function useSignIn() {
 
         setDashboardHandoffPending(true);
         if (authorizationRequest) {
-          await completePostSignInPkceFlow(authorizationRequest);
+          await completePostSignInFlow(authorizationRequest);
           return;
         }
 
         try {
-          const completed = await completePostSignInPkceFlow();
+          const completed = await completePostSignInFlow();
           if (completed) {
             await navigate({ to: '/dashboard', replace: true });
           }

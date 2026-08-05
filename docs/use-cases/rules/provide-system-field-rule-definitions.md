@@ -76,10 +76,14 @@ Provide a code-owned catalog of reusable built-in rules using the same semantic 
 > | API | Partial |
 > | Frontend | Partial |
 >
-> **Gaps vs spec:** `SystemRuleDefinition` is retired and the system detail surface now renders the shared semantic contract. Remaining partial status reflects browser and architecture evidence, not a second Rule model.
+> **Gaps vs spec:**
+>
+> | ID | Gap |
+> |---|---|
+> | GAP-001 | `SystemRuleDefinition` is retired and the system detail surface now renders the shared semantic contract; remaining partial status reflects browser and architecture evidence, not a second Rule model. |
 >
 > **Deferred follow-ups:** None. Consumer input binding remains owned by each consumer use case.
 >
 > **Verification:** The sibling evidence sidecar defines the required checks; final evidence is pending implementation.
 >
-> **Decisions:** `SystemRuleDefinition` is retired. Built-in and workspace definitions use one semantic type and one public positive-assertion contract; origin and capabilities remain metadata. The product is pre-production, so corrected built-in polarity replaces violation-predicate behavior through a clean cutover with no compatibility alias or dual view.
+> **Decisions:** `SystemRuleDefinition` is retired. Built-in and workspace definitions use one semantic type and one public positive-assertion contract; origin and capabilities remain metadata. No supported production consumer or data requires the replaced polarity, so corrected built-in behavior uses a clean cutover with no compatibility alias or dual view and no reduction in production quality.

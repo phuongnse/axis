@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { OptionList, OptionListItem } from '@/components/shared/OptionList';
 import { Button } from '@/components/ui/button';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
-import { getAccessToken } from '@/features/auth/auth-store';
+import { getBrowserSessionStatus } from '@/features/auth/auth-store';
 import { type CurrentUserProfile, dashboardQueryKeys } from '@/features/dashboard/api';
 import { updateThemePreference } from '@/features/preferences/api';
 import {
@@ -71,7 +71,7 @@ export function ThemeControl({
     },
   });
 
-  const shouldPersistToServer = authenticated && Boolean(getAccessToken());
+  const shouldPersistToServer = authenticated && getBrowserSessionStatus() === 'authenticated';
   const showSaveStatus = authenticated && (mutation.isPending || mutation.isError);
   const statusId = showSaveStatus ? 'theme-save-status' : undefined;
 

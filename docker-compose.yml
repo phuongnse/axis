@@ -55,7 +55,7 @@ services:
       start_period: 20s
 
   api:
-    image: mcr.microsoft.com/dotnet/sdk:8.0
+    image: mcr.microsoft.com/dotnet/sdk:10.0
     container_name: axis_api
     working_dir: /src
     command:
@@ -90,7 +90,6 @@ services:
       Email__Port: "1025"
       Email__FromAddress: "${EMAIL_FROM_ADDRESS:-noreply@axis.localhost}"
       Email__FromName: "${EMAIL_FROM_NAME:-Axis Platform}"
-      Cors__AllowedOrigins__0: "https://localhost:3000"
       RateLimiting__Auth__PermitLimit: "1000"
       # OTLP export is off in the default compose API container (no LGTM dependency).
       # For traces in Grafana: `python scripts/axis.py local-dev observability up`

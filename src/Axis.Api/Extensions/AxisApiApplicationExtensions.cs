@@ -47,9 +47,9 @@ internal static class AxisApiApplicationExtensions
         app.UseForwardedHeaders();
         app.UseAxisOpenTelemetry();
         app.UseMiddleware<ValidationExceptionMiddleware>();
-        app.UseCors("SpaOrigin");
         app.UseRateLimiter();
         app.UseAuthentication();
+        app.UseMiddleware<AxisAntiforgeryMiddleware>();
         app.UseMiddleware<CorrelationIdMiddleware>();
         app.UseSerilogRequestLogging();
         app.UseAuthorization();

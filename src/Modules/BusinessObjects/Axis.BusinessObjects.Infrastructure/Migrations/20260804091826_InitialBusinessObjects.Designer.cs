@@ -13,15 +13,15 @@ using NpgsqlTypes;
 namespace Axis.BusinessObjects.Infrastructure.Migrations
 {
     [DbContext(typeof(BusinessObjectsDbContext))]
-    [Migration("20260731100652_AddRuleBindingReferences")]
-    partial class AddRuleBindingReferences
+    [Migration("20260804091826_InitialBusinessObjects")]
+    partial class InitialBusinessObjects
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "9.0.16")
+                .HasAnnotation("ProductVersion", "10.0.10")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -318,6 +318,10 @@ namespace Axis.BusinessObjects.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("binding_id");
 
+                    b.Property<int>("BindingRevision")
+                        .HasColumnType("integer")
+                        .HasColumnName("binding_revision");
+
                     b.Property<Guid>("BusinessObjectDefinitionVersionFieldId")
                         .HasColumnType("uuid")
                         .HasColumnName("business_object_definition_version_field_id");
@@ -403,6 +407,10 @@ namespace Axis.BusinessObjects.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("binding_id");
 
+                    b.Property<int>("BindingRevision")
+                        .HasColumnType("integer")
+                        .HasColumnName("binding_revision");
+
                     b.Property<Guid>("BusinessObjectFieldDefinitionId")
                         .HasColumnType("uuid")
                         .HasColumnName("business_object_field_definition_id");
@@ -420,6 +428,104 @@ namespace Axis.BusinessObjects.Infrastructure.Migrations
                         .HasDatabaseName("IX_business_object_definition_field_rules_business_object_fie~1");
 
                     b.ToTable("business_object_definition_field_rules", (string)null);
+                });
+
+            modelBuilder.Entity("Axis.BusinessObjects.Domain.Aggregates.BusinessObjectRecord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("CreatedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<Guid>("DefinitionVersionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("definition_version_id");
+
+                    b.Property<int>("DefinitionVersionNumber")
+                        .HasColumnType("integer")
+                        .HasColumnName("definition_version_number");
+
+                    b.Property<string>("IdempotencyKey")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("idempotency_key");
+
+                    b.Property<string>("ObjectKey")
+                        .IsRequired()
+                        .HasMaxLength(63)
+                        .HasColumnType("character varying(63)")
+                        .HasColumnName("object_key");
+
+                    b.Property<string>("PayloadHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("payload_hash");
+
+                    b.Property<int>("Revision")
+                        .HasColumnType("integer")
+                        .HasColumnName("revision");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("status");
+
+                    b.Property<DateTime?>("SubmittedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("submitted_at");
+
+                    b.Property<Guid?>("SubmittedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("submitted_by_user_id");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid>("UpdatedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by_user_id");
+
+                    b.Property<Guid>("WorkspaceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("workspace_id");
+
+                    b.Property<string>("_ruleEvaluations")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("rule_evaluations");
+
+                    b.Property<string>("_values")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("values");
+
+                    b.Property<uint>("xmin")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("WorkspaceId", "DefinitionVersionId");
+
+                    b.HasIndex("WorkspaceId", "ObjectKey", "IdempotencyKey")
+                        .IsUnique();
+
+                    b.HasIndex("WorkspaceId", "ObjectKey", "UpdatedAt");
+
+                    b.ToTable("business_object_records", (string)null);
                 });
 
             modelBuilder.Entity("Axis.BusinessObjects.Domain.Aggregates.BusinessObjectChoiceOption", b =>

@@ -14,7 +14,12 @@ Universal semantics for every repo skill. Intent routing lives in [README.md](./
 8. **Report honestly.** Missing or stale evidence is `not run` or `blocked`, never pass.
 9. **Keep current contracts only.** Remove superseded guidance instead of documenting incident history or retired names.
 10. **Route durable guidance before edit.** The entry domain owner keeps spec, status, and evidence decisions. Other durable guidance **Requires** selecting `$axis-doc-hygiene` or entering it through a typed handoff before edit.
-11. **Compatibility is explicit.** Derive compatibility from the owning contract, real consumers/data, and current product phase. An approved pre-production clean cutover removes the old path completely; it does not preserve shims, dual contracts, feature flags, fallback parsing, or duplicate tests.
+11. **Compatibility is explicit.** Derive compatibility from the owning contract and real consumers/data. A clean cutover approved because no supported production consumer/data exists removes the old path completely; it does not preserve shims, dual contracts, feature flags, fallback parsing, negative assertions, deny-lists, duplicate tests, or routine guidance that keeps retired identifiers or concepts alive. This lifecycle fact never lowers the production quality of the replacement.
+12. **Classify workarounds by contract.** Before taking an alternate path after a failure, name the owning contract, root cause, required owner, execution/trust boundary, invariants, and evidence boundary. If the proposal changes any of them merely to continue instead of repairing the root cause, it is a workaround: stop and re-enter `$axis-design-gate`. Only an explicit owning-contract change plus its own complete evidence can establish a new valid path.
+
+## Change-driven scope
+
+Before building, starting, recreating, testing, verifying, or reviewing, map touched paths, known affected consumers, and evidence-required dependencies to exact work units. Run each selected work unit once per valid checkpoint, reusing its evidence until a later edit or concrete finding invalidates it; leave untouched and unaffected units unrun. Use broad or full scope only when cross-cutting invalidation, inseparable dependency evidence, or an explicit immutable-review or CI contract requires it, and record that reason. This is semantic agent judgment, not brittle identifier lists or automatic diff inference.
 
 ## Agent routing
 
@@ -76,7 +81,7 @@ Delegated skills do not auto-route back, commit, publish, or invoke another work
 
 1. **Understand before simplifying.** Read the governing contract and trace the real flow, callers, and dependencies before choosing a smaller design. A small change in the wrong owner is not minimal.
 2. **Minimal solution ladder.** Stop at the first valid rung: no change; reuse existing code; use the standard library; use a native platform capability; use an installed dependency; then write the minimum custom code. Do not add speculative abstractions, dependencies, flags, or files.
-3. **Root-cause loop.** For a failure, reproduce it, read exact diagnostics and recent changes, trace the source, state one hypothesis, and test one variable. Do not stack unproven fixes; after three failed fix attempts, stop and reassess the architecture with the user.
+3. **Root-cause loop.** For a failure, reproduce it, read exact diagnostics and recent changes, trace the source, state one hypothesis, and test one variable. Before changing approach, apply the workaround classification in the universal gates; a proposal that changes the required contract boundary returns to the Design Gate. Do not stack unproven fixes; after three failed fix attempts, stop and reassess the architecture with the user.
 4. **Fail-before/pass-after.** For a bug or logic change, first prove the smallest reliable check fails for the intended reason, then make it pass. If no automated boundary exists, record why and use the smallest reproducible check.
 5. **Safety floor.** Minimality never removes required acceptance behavior, trust-boundary validation, security, data-loss protection, error behavior, or accessibility.
 6. **Clean replacement.** When compatibility is not required, update spec, implementation, callers, generated artifacts, tests, and guidance as one cutover, then prove the retired identifiers are gone. Keeping both paths is additional product behavior, not a safety default.

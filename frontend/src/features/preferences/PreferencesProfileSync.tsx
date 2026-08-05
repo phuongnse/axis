@@ -12,11 +12,11 @@ import {
 } from '@/features/preferences/theme-store';
 
 export function PreferencesProfileSync() {
-  const accessToken = useAuthStore((state) => state.accessToken);
+  const authenticated = useAuthStore((state) => state.browserSessionStatus === 'authenticated');
   const profileQuery = useQuery({
     queryKey: dashboardQueryKeys.currentUser(),
     queryFn: getCurrentUserProfile,
-    enabled: Boolean(accessToken),
+    enabled: authenticated,
   });
 
   useEffect(() => {

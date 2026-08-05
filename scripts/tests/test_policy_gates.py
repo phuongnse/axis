@@ -2429,7 +2429,7 @@ class TestToolVersionGates(unittest.TestCase):
 
         self.assertFalse(ok)
         self.assertIn("selects .NET SDK 9.x", detail)
-        self.assertIn("expected 8.x", detail)
+        self.assertIn("expected 10.x", detail)
 
     def test_dotnet_sdk_rejects_portable_setup_major_drift_before_runtime_probe(self) -> None:
         with (
@@ -2451,7 +2451,7 @@ class TestToolVersionGates(unittest.TestCase):
             ok, detail = axis.dotnet_sdk_status()
 
         self.assertFalse(ok)
-        self.assertIn("expected .NET SDK 8.x", detail)
+        self.assertIn("expected .NET SDK 10.x", detail)
         self.assertIn("docs/TECH_STACK.md", detail)
         self.assertIn("axis.py setup --profile build --install-user-tools", detail)
 
@@ -2533,11 +2533,37 @@ class TestToolVersionGates(unittest.TestCase):
         self.assertFalse(ok)
         self.assertIn("axis.py setup --profile build --install-user-tools", detail)
 
+    def test_path_node_toolchain_requires_exact_colocated_node_and_npm(self) -> None:
+        node = "/tools/node/bin/node"
+        npm = "/tools/node/bin/npm"
+
+        def which(name: str, *_args, **_kwargs):
+            return {"node": node, "npm": npm}.get(name)
+
+        def probe(command: list[str], **_kwargs):
+            output = "v24.18.0\n" if command[0] == node else "11.16.0\n"
+            return axis.subprocess.CompletedProcess(command, 0, stdout=output, stderr="")
+
+        with (
+            mock.patch.object(axis.shutil, "which", side_effect=which),
+            mock.patch.object(axis, "required_node_version", return_value=(True, "24.18.0")),
+            mock.patch.object(axis, "run_optional", side_effect=probe),
+        ):
+            self.assertTrue(axis.path_node_toolchain_ready())
+
+    def test_path_node_toolchain_rejects_windows_npm_without_linux_node(self) -> None:
+        with mock.patch.object(
+            axis.shutil,
+            "which",
+            side_effect=lambda name, *_args, **_kwargs: "/mnt/c/Program Files/nodejs/npm" if name == "npm" else None,
+        ):
+            self.assertFalse(axis.path_node_toolchain_ready())
+
     def test_build_doctor_rejects_wrong_npm_version(self) -> None:
         with (
             mock.patch.object(axis, "python_launcher_status", return_value=("OK", "Python 3.12.3")),
             mock.patch.object(axis, "_command_version", return_value=("OK", "git version 2.43.0")),
-            mock.patch.object(axis, "dotnet_sdk_status", return_value=(True, "8.0.423")),
+            mock.patch.object(axis, "dotnet_sdk_status", return_value=(True, "10.0.302")),
             mock.patch.object(axis, "frontend_toolchain_env", return_value={"PATH": "/managed/node"}),
             mock.patch.object(axis, "node_version_status", return_value=(True, "v24.18.0")),
             mock.patch.object(
@@ -2670,7 +2696,7 @@ class TestToolVersionGates(unittest.TestCase):
         with (
             mock.patch.object(axis, "find_lychee", return_value="/usr/bin/lychee"),
             mock.patch.object(axis, "lychee_version_status", return_value=(True, "lychee 0.23.0")),
-            mock.patch.object(axis, "dotnet_sdk_status", return_value=(True, "8.0.100")),
+            mock.patch.object(axis, "dotnet_sdk_status", return_value=(True, "10.0.302")),
             mock.patch.object(axis, "frontend_toolchain_env", return_value={}),
             mock.patch.object(axis, "node_version_status", return_value=(True, "v24.18.0")),
             mock.patch.object(axis, "playwright_chromium_status", playwright_status),
@@ -3854,6 +3880,71 @@ class TestLocalDevCli(unittest.TestCase):
             calls[0][1:],
         )
 
+    def test_up_applies_explicit_compose_overlays_in_order(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            first = Path(temp) / "product.yml"
+            second = Path(temp) / "environment.yaml"
+            first.write_text("services: {}\n", encoding="utf-8")
+            second.write_text("services: {}\n", encoding="utf-8")
+
+            calls = self.run_local_dev(
+                axis.argparse.Namespace(
+                    local_dev_command="up",
+                    build=False,
+                    services=[],
+                    compose_overlays=[str(first), str(second)],
+                )
+            )
+
+        self.assertEqual(
+            [
+                "compose",
+                "-p",
+                "axis",
+                "-f",
+                str(axis.LOCAL_DEV_COMPOSE_FILE),
+                "-f",
+                str(first),
+                "-f",
+                str(second),
+                "up",
+                "-d",
+                "--wait",
+                "--wait-timeout",
+                "300",
+            ],
+            calls[0][1:],
+        )
+
+    def test_compose_overlay_rejects_missing_non_yaml_and_duplicate_paths(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            text_file = root / "overlay.txt"
+            text_file.write_text("services: {}\n", encoding="utf-8")
+            yaml_file = root / "overlay.yml"
+            yaml_file.write_text("services: {}\n", encoding="utf-8")
+
+            with self.assertRaisesRegex(axis.CheckError, "does not exist"):
+                axis.resolve_local_dev_compose_overlays([str(root / "missing.yml")])
+            with self.assertRaisesRegex(axis.CheckError, "must be a .yml or .yaml file"):
+                axis.resolve_local_dev_compose_overlays([str(text_file)])
+            with self.assertRaisesRegex(axis.CheckError, "is duplicated"):
+                axis.resolve_local_dev_compose_overlays([str(yaml_file), str(yaml_file)])
+
+    def test_invalid_compose_overlay_fails_before_docker_is_invoked(self) -> None:
+        with mock.patch.object(axis, "_docker_compose_ok") as docker_compose_ok:
+            with self.assertRaisesRegex(axis.CheckError, "does not exist"):
+                axis.local_dev(
+                    axis.argparse.Namespace(
+                        local_dev_command="up",
+                        build=False,
+                        services=[],
+                        compose_overlays=["missing.yml"],
+                    )
+                )
+
+        docker_compose_ok.assert_not_called()
+
     def test_up_reports_ready_urls_and_host_trust_followup(self) -> None:
         with (
             tempfile.TemporaryDirectory() as temp,
@@ -3956,6 +4047,20 @@ class TestLocalDevCli(unittest.TestCase):
             calls[2][1:],
         )
 
+    def test_e2e_builds_only_named_runtime_service_before_reconciling_and_running(self) -> None:
+        calls = self.run_local_dev(
+            axis.argparse.Namespace(
+                local_dev_command="e2e",
+                build_services=["api"],
+                e2e_args=[],
+            )
+        )
+
+        self.assertEqual(["build", "api"], calls[0][-2:])
+        self.assertEqual(["up", "-d", "--wait", "--wait-timeout", "300"], calls[1][-5:])
+        self.assertEqual(["--profile", "e2e", "build", "e2e"], calls[2][-4:])
+        self.assertEqual(["--no-deps", "e2e"], calls[3][-2:])
+
     def test_e2e_forwards_playwright_args(self) -> None:
         calls = self.run_local_dev(
             axis.argparse.Namespace(
@@ -3983,6 +4088,36 @@ class TestLocalDevCli(unittest.TestCase):
             ],
             calls[2][1:],
         )
+
+    def test_e2e_builds_and_runs_an_overlay_owned_verification_service(self) -> None:
+        calls = self.run_local_dev(
+            axis.argparse.Namespace(
+                local_dev_command="e2e",
+                service="reference-product-e2e",
+                e2e_args=["--", "tests/product.pw.ts"],
+            )
+        )
+
+        self.assertEqual(
+            [
+                "--profile",
+                "e2e",
+                "build",
+                "reference-product-e2e",
+            ],
+            calls[1][-4:],
+        )
+        self.assertEqual(
+            ["reference-product-e2e", "tests/product.pw.ts"],
+            calls[2][-2:],
+        )
+
+    def test_compose_service_name_rejects_shell_or_option_syntax(self) -> None:
+        self.assertEqual("reference-product-e2e", axis.compose_service_name("reference-product-e2e"))
+        for invalid in ("ReferenceProduct", "--profile", "product e2e", "product/e2e"):
+            with self.subTest(invalid=invalid):
+                with self.assertRaises(axis.argparse.ArgumentTypeError):
+                    axis.compose_service_name(invalid)
 
     def test_smoke_uses_the_canonical_compose_browser_runner(self) -> None:
         calls = self.run_local_dev(
@@ -4500,7 +4635,7 @@ class TestAxisCommandWrappers(unittest.TestCase):
             root_ca.write_text("test", encoding="utf-8")
             with (
                 mock.patch.object(axis, "LOCAL_ROOT_CA_PEM", root_ca),
-                mock.patch.object(axis, "dotnet_sdk_status", return_value=(True, "8.0.423")),
+                mock.patch.object(axis, "dotnet_sdk_status", return_value=(True, "10.0.302")),
                 mock.patch.object(axis, "mcp_api_health_ok", return_value=True),
                 mock.patch.object(axis, "run", side_effect=fake_run),
                 mock.patch.object(axis, "exe", side_effect=lambda name: name),
@@ -4546,7 +4681,7 @@ class TestAxisCommandWrappers(unittest.TestCase):
             root_ca.write_text("test", encoding="utf-8")
             with (
                 mock.patch.object(axis, "LOCAL_ROOT_CA_PEM", root_ca),
-                mock.patch.object(axis, "dotnet_sdk_status", return_value=(True, "8.0.423")),
+                mock.patch.object(axis, "dotnet_sdk_status", return_value=(True, "10.0.302")),
                 mock.patch.object(axis, "mcp_api_health_ok", side_effect=[False, True]),
                 mock.patch.object(axis, "require_docker_compose", return_value=0),
                 mock.patch.object(axis, "local_dev_up_args", return_value=["docker", "compose", "up"]),
@@ -4583,7 +4718,7 @@ class TestAxisCommandWrappers(unittest.TestCase):
             root_ca.write_text("test", encoding="utf-8")
             with (
                 mock.patch.object(axis, "LOCAL_ROOT_CA_PEM", root_ca),
-                mock.patch.object(axis, "dotnet_sdk_status", return_value=(True, "8.0.423")),
+                mock.patch.object(axis, "dotnet_sdk_status", return_value=(True, "10.0.302")),
                 mock.patch.object(axis, "mcp_api_health_ok", return_value=True),
                 mock.patch.object(axis, "run", side_effect=fake_run),
                 mock.patch.object(axis, "exe", side_effect=lambda name: name),
@@ -4660,6 +4795,33 @@ class TestAxisCommandWrappers(unittest.TestCase):
             ],
             calls,
         )
+
+    def test_setup_exposes_managed_node_commands_when_path_toolchain_is_not_ready(self) -> None:
+        exposed = (Path("/users/alice/.local/bin/node"), Path("/users/alice/.local/bin/npm"))
+        with (
+            mock.patch.object(axis, "path_node_toolchain_ready", return_value=False),
+            mock.patch.object(axis, "setup_tool_ready", return_value=True),
+            mock.patch.object(axis, "setup_external_preflight", return_value=0),
+            mock.patch.object(axis, "setup_preflight", return_value=0),
+            mock.patch.object(axis.axis_setup, "confirm_install"),
+            mock.patch.object(axis.axis_setup, "expose_managed_commands", return_value=exposed) as expose,
+            mock.patch.object(axis, "run", return_value=axis.subprocess.CompletedProcess([], 0)),
+            mock.patch.object(axis, "run_frontend_npm", return_value=axis.subprocess.CompletedProcess([], 0)),
+            contextlib.redirect_stdout(io.StringIO()),
+        ):
+            rc = axis.setup(
+                axis.argparse.Namespace(
+                    profile="build",
+                    browsers=False,
+                    install_user_tools=True,
+                    plan_only=False,
+                    trust_local_ca=False,
+                    yes=True,
+                )
+            )
+
+        self.assertEqual(0, rc)
+        expose.assert_called_once_with(("node", "npm"), platform_spec=mock.ANY)
 
     def test_setup_fails_before_mutating_when_a_toolchain_is_missing(self) -> None:
         with (

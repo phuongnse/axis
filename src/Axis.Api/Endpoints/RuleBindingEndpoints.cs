@@ -2,6 +2,7 @@ using Axis.Api.Extensions;
 using Axis.Rules.Application.Commands.CreateRuleBinding;
 using Axis.Rules.Application.Commands.DeleteRuleBinding;
 using Axis.Rules.Application.Commands.UpdateRuleBinding;
+using Axis.Rules.Application.Queries.GetRuleBinding;
 using Axis.Rules.Application.Queries.ListRuleBindingUsage;
 using Axis.Rules.Contracts;
 using Axis.Shared.Domain.Primitives;
@@ -23,6 +24,12 @@ public static class RuleBindingEndpoints
             .WithSummary("Bind an exact rule version to a consumer target")
             .Produces<RuleBindingDto>(StatusCodes.Status201Created)
             .ProducesProblem(400).ProducesProblem(401).ProducesProblem(403).ProducesProblem(404).ProducesProblem(409);
+
+        bindings.MapGet("/{bindingId:guid}", Get)
+            .WithName("GetRuleBinding")
+            .WithSummary("Get a rule binding")
+            .Produces<RuleBindingDto>()
+            .ProducesProblem(401).ProducesProblem(403).ProducesProblem(404);
 
         bindings.MapPut("/{bindingId:guid}", Update)
             .WithName("UpdateRuleBinding")
@@ -67,6 +74,16 @@ public static class RuleBindingEndpoints
     {
         Result<RuleBindingDto> result = await mediator.Send(
             new UpdateRuleBindingCommand(bindingId, request), cancellationToken);
+        return result.IsFailure ? result.ToProblemDetails() : Results.Ok(result.Value);
+    }
+
+    private static async Task<IResult> Get(
+        Guid bindingId,
+        ISender mediator,
+        CancellationToken cancellationToken)
+    {
+        Result<RuleBindingDto> result = await mediator.Send(
+            new GetRuleBindingQuery(bindingId), cancellationToken);
         return result.IsFailure ? result.ToProblemDetails() : Results.Ok(result.Value);
     }
 

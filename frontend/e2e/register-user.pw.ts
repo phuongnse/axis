@@ -238,15 +238,6 @@ test.describe('register user', () => {
     const email = uniqueEmail('reg001');
     const languageWrites = watchLanguagePreferenceWrites(page);
     const themeWrites = watchThemePreferenceWrites(page);
-    const mainFramePaths: string[] = [];
-    page.on('framenavigated', (frame) => {
-      if (frame !== page.mainFrame()) return;
-      try {
-        mainFramePaths.push(new URL(frame.url()).pathname);
-      } catch {
-        // Ignore initial browser URLs that are not valid absolute URLs.
-      }
-    });
 
     await page.goto('/register');
     await fillRegisterForm(page, email);
@@ -266,7 +257,6 @@ test.describe('register user', () => {
     ).toBeVisible();
     await expect(page.getByRole('button', { name: 'Continue to dashboard' })).toBeVisible();
     await expect(page).toHaveURL(/\/dashboard$/, { timeout: 30_000 });
-    expect(mainFramePaths).not.toContain('/callback');
     await expectAuthenticatedFrame(page, 'Alex Rivers');
     expect(await readDestructiveNoticeRecords(page)).toEqual([]);
     expect(languageWrites()).toBe(0);

@@ -33,6 +33,13 @@ public static class ConnectEndpoints
             .DisableAntiforgery()
             .ExcludeFromDescription();
 
+        app.MapMethods("/connect/logout", ["GET", "POST"], (Delegate)EndSession)
+            .WithName("EndSession")
+            .WithSummary("End the current Axis browser authorization session")
+            .WithTags("OpenIddict")
+            .DisableAntiforgery()
+            .ExcludeFromDescription();
+
         return app;
     }
 
@@ -46,7 +53,7 @@ public static class ConnectEndpoints
 
         if (!cookieResult.Succeeded)
         {
-            if (request.HasPrompt(Prompts.None))
+            if (request.HasPromptValue(PromptValues.None))
             {
                 return Results.Forbid(
                     new AuthenticationProperties(new Dictionary<string, string?>
@@ -59,16 +66,15 @@ public static class ConnectEndpoints
                     [OpenIddictServerAspNetCoreDefaults.AuthenticationScheme]);
             }
 
-            string? requestId = httpContext.Request.Query["request_id"].FirstOrDefault()
-                ?? request.RequestId;
-            if (string.IsNullOrWhiteSpace(requestId))
+            string? requestUri = request.RequestUri;
+            if (string.IsNullOrWhiteSpace(requestUri))
             {
                 return Results.Problem(
                     detail: "The authorization request could not be resumed.",
                     statusCode: StatusCodes.Status400BadRequest);
             }
 
-            return Results.Redirect(BuildSignInRedirectUri(configuration, requestId));
+            return Results.Redirect(BuildSignInRedirectUri(configuration, requestUri));
         }
 
         ClaimsPrincipal cookiePrincipal = cookieResult.Principal!;
@@ -81,7 +87,7 @@ public static class ConnectEndpoints
             OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
     }
 
-    private static string BuildSignInRedirectUri(IConfiguration configuration, string requestId)
+    private static string BuildSignInRedirectUri(IConfiguration configuration, string requestUri)
     {
         string baseUrl = configuration["App:BaseUrl"]
             ?? throw new InvalidOperationException("App:BaseUrl is required for browser authorization.");
@@ -93,7 +99,7 @@ public static class ConnectEndpoints
         }
 
         Uri signInUri = new(baseUri, "/sign-in");
-        return QueryHelpers.AddQueryString(signInUri.ToString(), "authorization_request", requestId);
+        return QueryHelpers.AddQueryString(signInUri.ToString(), "authorization_request", requestUri);
     }
 
     private static async Task<IResult> Token(
@@ -104,7 +110,7 @@ public static class ConnectEndpoints
         OpenIddictRequest request = httpContext.GetOpenIddictServerRequest()
             ?? throw new InvalidOperationException("OpenIddict server request not found.");
 
-        if (request.IsAuthorizationCodeGrantType())
+        if (request.IsAuthorizationCodeGrantType() || request.IsRefreshTokenGrantType())
         {
             AuthenticateResult result = await httpContext.AuthenticateAsync(
                 OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
@@ -175,14 +181,22 @@ public static class ConnectEndpoints
             statusCode: StatusCodes.Status400BadRequest);
     }
 
+    private static async Task<IResult> EndSession(HttpContext httpContext)
+    {
+        await httpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+        return Results.SignOut(
+            properties: null,
+            authenticationSchemes: [OpenIddictServerAspNetCoreDefaults.AuthenticationScheme]);
+    }
+
     private static ClaimsPrincipal BuildOpenIddictPrincipal(
         ClaimsPrincipal cookiePrincipal,
         IEnumerable<string> scopes)
     {
-        string sub = cookiePrincipal.FindFirstValue(ClaimTypes.NameIdentifier)!;
+        string sub = cookiePrincipal.GetClaim(Claims.Subject)!;
         string? WorkspaceId = cookiePrincipal.FindFirstValue("workspace_id");
-        string? email = cookiePrincipal.FindFirstValue(ClaimTypes.Email);
-        string? name = cookiePrincipal.FindFirstValue("name");
+        string? email = cookiePrincipal.GetClaim(Claims.Email);
+        string? name = cookiePrincipal.GetClaim(Claims.Name);
 
         return BuildUserPrincipal(
             Guid.Parse(sub),

@@ -111,10 +111,14 @@ Required UI quality: use the existing shadcn and Tailwind system only; keep labe
 > | API | Partial |
 > | Frontend | Partial |
 >
-> **Gaps vs spec:** Current definition, immutable-version, canonical-condition, evaluator, persistence, and catalog primitives are reusable. Stable input identity across label edits, separate activation, safe DSL parsing/autocomplete, generated explanation ownership, complete lifecycle dialogs, usage discovery, and targeted refresh remain incomplete.
+> **Gaps vs spec:**
+>
+> | ID | Gap |
+> |---|---|
+> | GAP-001 | Stable input identity across label edits, separate activation, safe DSL parsing/autocomplete, generated explanation ownership, complete lifecycle dialogs, usage discovery, and targeted refresh remain incomplete; current definition, immutable-version, canonical-condition, evaluator, persistence, and catalog primitives are reusable. |
 >
 > **Deferred follow-ups:** N/A. Binding lifecycle and runtime consumption are separate in-scope Rules use cases, not deferred definition behavior.
 >
 > **Verification:** Existing evidence is recorded in the sibling sidecar; refreshed acceptance evidence is required after the clean refactor.
 >
-> **Decisions:** The product is pre-production and uses a clean cutover. `Inputs -> Logic -> Outputs` is the durable Rule contract; the current language capability remains a bounded positive-assertion Boolean predicate until a use case approves additional typed-output authoring. `true` means the stated assertion is satisfied. Canonical logic is authoritative and every editor or explanation is a projection. Version creation and activation are separate. Activation controls eligibility for new bindings and never retargets existing exact-version bindings. Retired consumer-specific rule models, alternate semantic views, syntax persistence, and compatibility aliases are not retained.
+> **Decisions:** No supported production consumer or data requires compatibility for the replaced Rule surfaces, so the current contract uses a clean cutover without lowering production quality. `Inputs -> Logic -> Outputs` is the durable Rule contract; the current language capability remains a bounded positive-assertion Boolean predicate until a use case approves an additional typed-output capability. `true` means the stated assertion is satisfied. Canonical logic is authoritative and every editor or explanation is a projection. Version creation and activation are separate. Activation controls eligibility for new bindings and never retargets existing exact-version bindings. Retired consumer-specific rule models, alternate semantic views, syntax persistence, and compatibility aliases are not retained.

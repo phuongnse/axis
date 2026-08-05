@@ -51,6 +51,34 @@ namespace Axis.BusinessObjects.Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "business_object_records",
+                columns: table => new
+                {
+                    id = table.Column<Guid>(type: "uuid", nullable: false),
+                    workspace_id = table.Column<Guid>(type: "uuid", nullable: false),
+                    definition_version_id = table.Column<Guid>(type: "uuid", nullable: false),
+                    definition_version_number = table.Column<int>(type: "integer", nullable: false),
+                    object_key = table.Column<string>(type: "character varying(63)", maxLength: 63, nullable: false),
+                    idempotency_key = table.Column<string>(type: "character varying(120)", maxLength: 120, nullable: false),
+                    payload_hash = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
+                    status = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false),
+                    revision = table.Column<int>(type: "integer", nullable: false),
+                    created_by_user_id = table.Column<Guid>(type: "uuid", nullable: false),
+                    updated_by_user_id = table.Column<Guid>(type: "uuid", nullable: false),
+                    submitted_by_user_id = table.Column<Guid>(type: "uuid", nullable: true),
+                    created_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    updated_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    submitted_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    rule_evaluations = table.Column<string>(type: "jsonb", nullable: false),
+                    values = table.Column<string>(type: "jsonb", nullable: false),
+                    xmin = table.Column<uint>(type: "xid", rowVersion: true, nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_business_object_records", x => x.id);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "business_object_definition_fields",
                 columns: table => new
                 {
@@ -123,11 +151,10 @@ namespace Axis.BusinessObjects.Infrastructure.Migrations
                 columns: table => new
                 {
                     id = table.Column<Guid>(type: "uuid", nullable: false),
-                    definition_key = table.Column<string>(type: "character varying(120)", maxLength: 120, nullable: false),
-                    definition_version = table.Column<int>(type: "integer", nullable: false),
+                    binding_id = table.Column<Guid>(type: "uuid", nullable: false),
+                    binding_revision = table.Column<int>(type: "integer", nullable: false),
                     sort_order = table.Column<int>(type: "integer", nullable: false),
-                    business_object_field_definition_id = table.Column<Guid>(type: "uuid", nullable: false),
-                    inputs = table.Column<string>(type: "jsonb", nullable: false)
+                    business_object_field_definition_id = table.Column<Guid>(type: "uuid", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -192,11 +219,10 @@ namespace Axis.BusinessObjects.Infrastructure.Migrations
                 {
                     id = table.Column<Guid>(type: "uuid", nullable: false),
                     source_field_rule_id = table.Column<Guid>(type: "uuid", nullable: false),
-                    definition_key = table.Column<string>(type: "character varying(120)", maxLength: 120, nullable: false),
-                    definition_version = table.Column<int>(type: "integer", nullable: false),
+                    binding_id = table.Column<Guid>(type: "uuid", nullable: false),
+                    binding_revision = table.Column<int>(type: "integer", nullable: false),
                     sort_order = table.Column<int>(type: "integer", nullable: false),
-                    business_object_definition_version_field_id = table.Column<Guid>(type: "uuid", nullable: false),
-                    inputs = table.Column<string>(type: "jsonb", nullable: false)
+                    business_object_definition_version_field_id = table.Column<Guid>(type: "uuid", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -229,7 +255,7 @@ namespace Axis.BusinessObjects.Infrastructure.Migrations
             migrationBuilder.CreateIndex(
                 name: "IX_business_object_definition_field_rules_business_object_fiel~",
                 table: "business_object_definition_field_rules",
-                columns: new[] { "business_object_field_definition_id", "definition_key" },
+                columns: new[] { "business_object_field_definition_id", "binding_id" },
                 unique: true);
 
             migrationBuilder.CreateIndex(
@@ -275,7 +301,7 @@ namespace Axis.BusinessObjects.Infrastructure.Migrations
             migrationBuilder.CreateIndex(
                 name: "IX_business_object_definition_version_field_rules_business_obj~",
                 table: "business_object_definition_version_field_rules",
-                columns: new[] { "business_object_definition_version_field_id", "definition_key" },
+                columns: new[] { "business_object_definition_version_field_id", "binding_id" },
                 unique: true);
 
             migrationBuilder.CreateIndex(
@@ -332,6 +358,22 @@ namespace Axis.BusinessObjects.Infrastructure.Migrations
                 table: "business_object_definitions",
                 columns: new[] { "workspace_id", "object_key" },
                 unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_business_object_records_workspace_id_definition_version_id",
+                table: "business_object_records",
+                columns: new[] { "workspace_id", "definition_version_id" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_business_object_records_workspace_id_object_key_idempotency~",
+                table: "business_object_records",
+                columns: new[] { "workspace_id", "object_key", "idempotency_key" },
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_business_object_records_workspace_id_object_key_updated_at",
+                table: "business_object_records",
+                columns: new[] { "workspace_id", "object_key", "updated_at" });
         }
 
         /// <inheritdoc />
@@ -348,6 +390,9 @@ namespace Axis.BusinessObjects.Infrastructure.Migrations
 
             migrationBuilder.DropTable(
                 name: "business_object_definition_version_field_rules");
+
+            migrationBuilder.DropTable(
+                name: "business_object_records");
 
             migrationBuilder.DropTable(
                 name: "business_object_definition_fields");

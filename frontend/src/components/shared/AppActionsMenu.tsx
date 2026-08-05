@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Separator } from '@/components/ui/separator';
 import { useAuthStore } from '@/features/auth/auth-store';
-import { sessionDisplayFromLabel } from '@/features/auth/session-from-token';
+import { sessionDisplayFromLabel } from '@/features/auth/session-display';
 import { dashboardQueryKeys, getCurrentUserProfile } from '@/features/dashboard/api';
 import { LanguageControl, ThemeControl } from '@/features/preferences';
 
@@ -31,13 +31,13 @@ export function AppActionsMenu({
   signingOut = false,
 }: AppActionsMenuProps) {
   const { t } = useTranslation();
-  const accessToken = useAuthStore((state) => state.accessToken);
+  const authenticated = useAuthStore((state) => state.browserSessionStatus === 'authenticated');
   const userLabel = useAuthStore((state) => state.userLabel);
   const userInitials = useAuthStore((state) => state.userInitials);
   const profileQuery = useQuery({
     queryKey: dashboardQueryKeys.currentUser(),
     queryFn: getCurrentUserProfile,
-    enabled: Boolean(accessToken),
+    enabled: authenticated,
   });
   const profileLabel = firstNonEmpty(profileQuery.data?.fullName, profileQuery.data?.email);
   const profileDisplay = profileLabel ? sessionDisplayFromLabel(profileLabel) : null;

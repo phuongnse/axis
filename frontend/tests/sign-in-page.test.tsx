@@ -2,7 +2,8 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { completePostSignInPkceFlow } from '@/features/auth/api';
+import { completePostSignInFlow } from '@/features/auth/api';
+import { useAuthStore } from '@/features/auth/auth-store';
 import { SignInPage } from '@/features/auth/components/SignInPage';
 import { renderWithRouter } from './render-with-router';
 
@@ -21,7 +22,7 @@ vi.mock('@/features/auth/api', async () => {
   const actual = await vi.importActual<typeof import('@/features/auth/api')>('@/features/auth/api');
   return {
     ...actual,
-    completePostSignInPkceFlow: vi.fn(() => Promise.resolve(true)),
+    completePostSignInFlow: vi.fn(() => Promise.resolve(true)),
   };
 });
 
@@ -39,7 +40,8 @@ describe('SignInPage', () => {
   beforeEach(() => {
     vi.stubGlobal('fetch', vi.fn());
     navigateMock.mockReset();
-    vi.mocked(completePostSignInPkceFlow).mockClear();
+    vi.mocked(completePostSignInFlow).mockClear();
+    useAuthStore.getState().markBrowserSessionGuest('test-csrf-token');
   });
 
   afterEach(() => {
@@ -78,7 +80,7 @@ describe('SignInPage', () => {
     expect(screen.getByLabelText('Địa chỉ email')).toHaveAttribute('aria-invalid', 'true');
   });
 
-  it('submits trimmed email and exact password then starts PKCE', async () => {
+  it('submits trimmed email and exact password then opens the authenticated workspace', async () => {
     const user = userEvent.setup();
     let signInBody: Record<string, unknown> | undefined;
     vi.mocked(fetch).mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
@@ -97,6 +99,9 @@ describe('SignInPage', () => {
             ),
         } as unknown as Response);
       }
+      if (url.includes('/api/auth/session') && init?.method === undefined) {
+        return Promise.resolve(authenticatedSessionResponse());
+      }
       return Promise.reject(new Error(`Unexpected fetch: ${url}`));
     });
 
@@ -105,7 +110,7 @@ describe('SignInPage', () => {
     await fillSignInForm(user);
     await user.click(screen.getByRole('button', { name: /sign in/i }));
 
-    await waitFor(() => expect(completePostSignInPkceFlow).toHaveBeenCalledWith());
+    await waitFor(() => expect(completePostSignInFlow).toHaveBeenCalledWith());
     expect(navigateMock).toHaveBeenCalledWith({ to: '/dashboard', replace: true });
     expect(screen.getByRole('button', { name: /signing in/i })).toBeDisabled();
     expect(signInBody?.email).toBe('alex@example.com');
@@ -144,6 +149,9 @@ describe('SignInPage', () => {
             ),
         } as unknown as Response);
       }
+      if (url.includes('/api/auth/session') && init?.method === undefined) {
+        return Promise.resolve(authenticatedSessionResponse());
+      }
       return Promise.reject(new Error(`Unexpected fetch: ${url}`));
     });
 
@@ -158,7 +166,7 @@ describe('SignInPage', () => {
     await user.click(screen.getByRole('button', { name: /sign in/i }));
 
     await waitFor(() =>
-      expect(completePostSignInPkceFlow).toHaveBeenCalledWith('opaque-request-handle'),
+      expect(completePostSignInFlow).toHaveBeenCalledWith('opaque-request-handle'),
     );
     expect(navigateMock).not.toHaveBeenCalled();
   });
@@ -438,3 +446,23 @@ describe('SignInPage', () => {
     expect(screen.getByRole('button', { name: /sign in/i })).toBeDisabled();
   });
 });
+
+function authenticatedSessionResponse(): Response {
+  return {
+    ok: true,
+    status: 200,
+    text: () =>
+      Promise.resolve(
+        JSON.stringify({
+          authenticated: true,
+          csrfToken: 'authenticated-csrf-token',
+          user: {
+            userId: 'user-1',
+            workspaceId: 'workspace-1',
+            email: 'alex@example.com',
+            name: 'Alex Morgan',
+          },
+        }),
+      ),
+  } as unknown as Response;
+}

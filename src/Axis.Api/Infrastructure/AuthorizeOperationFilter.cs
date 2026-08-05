@@ -1,5 +1,5 @@
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.OpenApi.Models;
+using Microsoft.OpenApi;
 using Swashbuckle.AspNetCore.SwaggerGen;
 
 namespace Axis.Api.Infrastructure;
@@ -19,14 +19,7 @@ internal sealed class AuthorizeOperationFilter : IOperationFilter
         operation.Security.Add(new OpenApiSecurityRequirement
         {
             {
-                new OpenApiSecurityScheme
-                {
-                    Reference = new OpenApiReference
-                    {
-                        Type = ReferenceType.SecurityScheme,
-                        Id = "Bearer",
-                    },
-                },
+                new OpenApiSecuritySchemeReference("Bearer", context.Document),
                 []
             },
         });

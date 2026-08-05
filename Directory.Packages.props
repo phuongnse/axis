@@ -14,28 +14,15 @@
     <PackageVersion Include="Microsoft.VisualStudio.Threading.Analyzers" Version="17.14.15" />
   </ItemGroup>
 
-  <ItemGroup Label="Security-driven explicit pins">
-    <!--
-      System.Formats.Asn1 below 8.0.1 has a High-severity advisory
-      (https://github.com/advisories/GHSA-447r-wph3-92pm). Surfaced by the
-      vulnerable-packages CI check. Pulled transitively via
-      OpenIddict + ASP.NET cryptography stack. When the check flags a new
-      project, add an explicit PackageReference to System.Formats.Asn1 in
-      that project (or the closest shared csproj on its dependency chain).
-      Note: XML comments forbid the two-hyphen sequence, so the prose here
-      spells out flags rather than writing them with leading dashes.
-    -->
-    <PackageVersion Include="System.Formats.Asn1" Version="8.0.1" />
-  </ItemGroup>
   <ItemGroup Label="Application">
     <PackageVersion Include="MediatR" Version="12.5.0" />
     <PackageVersion Include="FluentValidation" Version="12.1.1" />
     <PackageVersion Include="FluentValidation.DependencyInjectionExtensions" Version="12.1.1" />
-    <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.8" />
+    <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.10" />
   </ItemGroup>
 
   <ItemGroup Label="Agent integration">
-    <PackageVersion Include="Microsoft.Extensions.Hosting" Version="8.0.1" />
+    <PackageVersion Include="Microsoft.Extensions.Hosting" Version="10.0.10" />
     <PackageVersion Include="ModelContextProtocol" Version="1.4.1" />
   </ItemGroup>
 
@@ -49,14 +36,13 @@
   </ItemGroup>
   <ItemGroup Label="Infrastructure">
     <!-- EF Core trio aligned; mismatched majors/minors here trigger NU1605 downgrade warnings -->
-    <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="9.0.16" />
-    <PackageVersion Include="Microsoft.EntityFrameworkCore.Relational" Version="9.0.16" />
-    <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.16" />
-    <!-- Npgsql + provider aligned on 9.0.4 (provider has no 9.0.5 yet) -->
-    <PackageVersion Include="Npgsql" Version="9.0.5" />
-    <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="9.0.4" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="10.0.10" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.10" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.10" />
+    <!-- Npgsql and its EF Core provider ship as one aligned release. -->
+    <PackageVersion Include="Npgsql" Version="10.0.3" />
+    <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
     <PackageVersion Include="StackExchange.Redis" Version="2.13.17" />
-    <PackageVersion Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="8.0.29" />
     <PackageVersion Include="BCrypt.Net-Next" Version="4.2.0" />
     <PackageVersion Include="MailKit" Version="4.17.0" />
     <PackageVersion Include="Serilog.AspNetCore" Version="9.0.0" />
@@ -64,12 +50,13 @@
     <PackageVersion Include="Serilog.Sinks.Seq" Version="8.0.0" />
   </ItemGroup>
   <ItemGroup Label="API">
-    <PackageVersion Include="Swashbuckle.AspNetCore" Version="6.9.0" />
+    <PackageVersion Include="Swashbuckle.AspNetCore" Version="10.2.3" />
     <PackageVersion Include="Scalar.AspNetCore" Version="2.14.14" />
   </ItemGroup>
   <ItemGroup Label="Auth">
-    <PackageVersion Include="OpenIddict.AspNetCore" Version="5.8.0" />
-    <PackageVersion Include="OpenIddict.EntityFrameworkCore" Version="5.8.0" />
+    <PackageVersion Include="Microsoft.AspNetCore.DataProtection.StackExchangeRedis" Version="10.0.10" />
+    <PackageVersion Include="OpenIddict.AspNetCore" Version="7.6.0" />
+    <PackageVersion Include="OpenIddict.EntityFrameworkCore" Version="7.6.0" />
   </ItemGroup>
   <ItemGroup Label="Testing">
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.6.0" />
@@ -81,7 +68,7 @@
     <PackageVersion Include="NSubstitute.Analyzers.CSharp" Version="1.0.17" />
     <PackageVersion Include="Testcontainers.PostgreSql" Version="3.10.0" />
     <PackageVersion Include="Testcontainers.Redis" Version="3.10.0" />
-    <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="8.0.27" />
+    <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.10" />
     <PackageVersion Include="Bogus" Version="35.6.5" />
     <PackageVersion Include="NetArchTest.Rules" Version="1.3.2" />
   </ItemGroup>

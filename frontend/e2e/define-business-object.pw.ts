@@ -1,4 +1,3 @@
-import { Buffer } from 'node:buffer';
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
 const profile = {
@@ -118,22 +117,6 @@ type BusinessObjectDefinitionRequests = (() => string[]) & {
   details: () => readonly MockBusinessObjectDefinitionRequest[];
 };
 
-function base64UrlJson(value: unknown): string {
-  return Buffer.from(JSON.stringify(value), 'utf8').toString('base64url');
-}
-
-function accessToken(): string {
-  return [
-    base64UrlJson({ alg: 'none', typ: 'JWT' }),
-    base64UrlJson({
-      sub: profile.id,
-      email: profile.email,
-      name: profile.fullName,
-    }),
-    'signature',
-  ].join('.');
-}
-
 function unpublishedDetail({
   name,
   objectKey,
@@ -229,24 +212,20 @@ async function mockAuthenticatedSession(
     localStorage.setItem('axis.theme', selectedTheme);
   }, theme);
 
-  await page.route('**/connect/authorize**', async (route) => {
-    const requestUrl = new URL(route.request().url());
-    const state = requestUrl.searchParams.get('state') ?? '';
-    const callbackUrl = new URL('/callback', requestUrl.origin);
-    callbackUrl.searchParams.set('code', 'objects-code');
-    callbackUrl.searchParams.set('state', state);
-
-    await route.fulfill({
-      status: 302,
-      headers: { location: callbackUrl.toString() },
-    });
-  });
-
-  await page.route('**/connect/token', async (route) => {
+  await page.route('**/api/auth/session', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify({ access_token: accessToken() }),
+      body: JSON.stringify({
+        authenticated: true,
+        csrfToken: 'objects-csrf-token',
+        user: {
+          userId: sessionProfile.id,
+          workspaceId: sessionProfile.workspaceId,
+          email: sessionProfile.email,
+          name: sessionProfile.fullName,
+        },
+      }),
     });
   });
 

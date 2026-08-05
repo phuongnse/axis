@@ -1,7 +1,7 @@
 import { createFileRoute, isRedirect, Outlet, redirect } from '@tanstack/react-router';
 import { AppShell } from '@/components/shared/AppShell';
-import { restoreSessionFromBrowserAuth } from '@/features/auth/api';
-import { getAccessToken } from '@/features/auth/auth-store';
+import { restoreBrowserSession } from '@/features/auth/api';
+import { getBrowserSessionStatus } from '@/features/auth/auth-store';
 
 export const Route = createFileRoute('/_authenticated')({
   beforeLoad: ensureAuthenticatedRouteSession,
@@ -13,12 +13,12 @@ export async function ensureAuthenticatedRouteSession(context: { preload?: boole
     return;
   }
 
-  if (getAccessToken()) {
+  if (getBrowserSessionStatus() === 'authenticated') {
     return;
   }
 
   try {
-    const restored = await restoreSessionFromBrowserAuth();
+    const restored = await restoreBrowserSession();
     if (!restored) {
       throw redirect({ to: '/sign-in' });
     }

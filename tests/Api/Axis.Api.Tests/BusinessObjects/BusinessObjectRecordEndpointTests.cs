@@ -21,7 +21,8 @@ public sealed class BusinessObjectRecordEndpointTests(ApiTestFixture fixture)
     [Fact]
     public async Task BusinessObjectRecordEndpoints_WhenAnonymous_ReturnUnauthorized()
     {
-        HttpResponseMessage response = await fixture.Client.GetAsync(
+        using HttpClient anonymousClient = fixture.CreateAnonymousClient();
+        HttpResponseMessage response = await anonymousClient.GetAsync(
             "/api/business-object-records",
             TestContext.Current.CancellationToken);
 
@@ -359,10 +360,9 @@ public sealed class BusinessObjectRecordEndpointTests(ApiTestFixture fixture)
     private async Task<string> CreateVerifiedSessionTokenAsync(string email)
     {
         await RegisterAsync(email);
-        HttpResponseMessage verifyResponse = await fixture.Client.PostAsJsonAsync(
+        HttpResponseMessage verifyResponse = await fixture.PostBrowserJsonAsync(
             "/api/auth/verify-email",
             new { token = fixture.EmailCapture.GetVerificationToken(email) },
-            Json,
             TestContext.Current.CancellationToken);
         verifyResponse.StatusCode.Should().Be(HttpStatusCode.OK);
 
@@ -371,8 +371,8 @@ public sealed class BusinessObjectRecordEndpointTests(ApiTestFixture fixture)
         Dictionary<string, string?> authorizeQuery = new()
         {
             ["response_type"] = "code",
-            ["client_id"] = "axis_spa",
-            ["redirect_uri"] = "https://localhost/callback",
+            ["client_id"] = "axis_mcp",
+            ["redirect_uri"] = "http://127.0.0.1:48123/callback",
             ["code_challenge"] = CreateCodeChallenge(verifier),
             ["code_challenge_method"] = "S256",
             ["scope"] = "openid email profile",
@@ -403,8 +403,8 @@ public sealed class BusinessObjectRecordEndpointTests(ApiTestFixture fixture)
         using FormUrlEncodedContent tokenRequest = new(new Dictionary<string, string>
         {
             ["grant_type"] = "authorization_code",
-            ["client_id"] = "axis_spa",
-            ["redirect_uri"] = "https://localhost/callback",
+            ["client_id"] = "axis_mcp",
+            ["redirect_uri"] = "http://127.0.0.1:48123/callback",
             ["code"] = callbackQuery["code"].ToString(),
             ["code_verifier"] = verifier,
         });
@@ -446,7 +446,7 @@ public sealed class BusinessObjectRecordEndpointTests(ApiTestFixture fixture)
                 options: Json),
         };
         request.Headers.Add("Idempotency-Key", Guid.NewGuid().ToString("N"));
-        HttpResponseMessage response = await fixture.Client.SendAsync(
+        HttpResponseMessage response = await fixture.SendBrowserMutationAsync(
             request,
             TestContext.Current.CancellationToken);
         response.StatusCode.Should().BeOneOf(HttpStatusCode.OK, HttpStatusCode.Created);

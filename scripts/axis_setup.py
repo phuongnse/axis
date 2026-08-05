@@ -18,10 +18,17 @@ from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Callable, Mapping, TextIO
 
-DOTNET_SDK_VERSION = "8.0.423"
+DOTNET_SDK_VERSION = "10.0.302"
 NODE_VERSION = "24.18.0"
 LYCHEE_VERSION = "0.23.0"
 GH_VERSION = "2.96.0"
+MANAGED_COMMAND_OWNERS = {
+    "dotnet": "dotnet",
+    "node": "node",
+    "npm": "node",
+    "lychee": "lychee",
+    "gh": "gh",
+}
 SETUP_PROFILES = ("build", "local-dev", "review")
 DOCTOR_PROFILES = ("core", *SETUP_PROFILES)
 DOWNLOAD_TIMEOUT_SECONDS = 60
@@ -229,6 +236,27 @@ def managed_executable(
     return install_root / relative
 
 
+def managed_command_executable(
+    command: str,
+    *,
+    platform_spec: SetupPlatform | None = None,
+    root: Path | None = None,
+) -> Path:
+    platform_spec = platform_spec or detect_platform()
+    try:
+        owner = MANAGED_COMMAND_OWNERS[command]
+    except KeyError as exc:
+        raise SetupError(f"unknown managed command `{command}`") from exc
+    if command == owner:
+        return managed_executable(owner, platform_spec=platform_spec, root=root)
+
+    root = managed_tools_root(platform_spec=platform_spec) if root is None else root
+    install_root = root / owner / tool_version(owner)
+    if command == "npm":
+        return install_root / ("npm.cmd" if platform_spec.os == "windows" else "bin/npm")
+    raise SetupError(f"unknown managed command `{command}`")
+
+
 def managed_bin_dir(tool: str, *, platform_spec: SetupPlatform | None = None) -> Path:
     return managed_executable(tool, platform_spec=platform_spec).parent
 
@@ -249,7 +277,7 @@ def user_command_dir(
     return home / ".local" / "bin"
 
 
-def _managed_command_owned(destination: Path, *, tool: str, root: Path, windows: bool) -> bool:
+def _managed_command_owned(destination: Path, *, command: str, root: Path, windows: bool) -> bool:
     if windows:
         if not destination.is_file():
             return False
@@ -258,7 +286,7 @@ def _managed_command_owned(destination: Path, *, tool: str, root: Path, windows:
         except (IndexError, OSError, UnicodeError):
             return False
         return first_line == "@rem Managed by Axis portable setup"
-    if tool == "dotnet" and destination.is_file() and not destination.is_symlink():
+    if command == "dotnet" and destination.is_file() and not destination.is_symlink():
         try:
             lines = destination.read_text(encoding="utf-8").splitlines()
         except (OSError, UnicodeError):
@@ -267,14 +295,15 @@ def _managed_command_owned(destination: Path, *, tool: str, root: Path, windows:
     if not destination.is_symlink():
         return False
     try:
-        destination.resolve(strict=False).relative_to((root / tool).resolve(strict=False))
+        owner = MANAGED_COMMAND_OWNERS[command]
+        destination.resolve(strict=False).relative_to((root / owner).resolve(strict=False))
     except (OSError, ValueError):
         return False
     return True
 
 
 def expose_managed_command(
-    tool: str,
+    command: str,
     *,
     platform_spec: SetupPlatform | None = None,
     root: Path | None = None,
@@ -282,22 +311,27 @@ def expose_managed_command(
 ) -> Path:
     platform_spec = platform_spec or detect_platform()
     root = managed_tools_root(platform_spec=platform_spec) if root is None else root
-    managed = managed_executable(tool, platform_spec=platform_spec, root=root)
+    managed = managed_command_executable(command, platform_spec=platform_spec, root=root)
     if not managed.is_file():
-        raise SetupError(f"managed `{tool}` executable does not exist at `{managed}`")
+        raise SetupError(f"managed `{command}` executable does not exist at `{managed}`")
 
     command_dir = user_command_dir(platform_spec=platform_spec) if command_dir is None else command_dir
     command_dir.mkdir(parents=True, exist_ok=True)
     windows = platform_spec.os == "windows"
-    destination = command_dir / (f"{tool}.cmd" if windows else tool)
+    destination = command_dir / (f"{command}.cmd" if windows else command)
     destination_exists = os.path.lexists(destination)
-    if destination_exists and not _managed_command_owned(destination, tool=tool, root=root, windows=windows):
+    if destination_exists and not _managed_command_owned(
+        destination,
+        command=command,
+        root=root,
+        windows=windows,
+    ):
         raise SetupError(f"refusing to replace unmanaged command `{destination}`")
 
     if windows:
         escaped = str(managed).replace("%", "%%")
         dotnet_root = ""
-        if tool == "dotnet":
+        if command == "dotnet":
             escaped_root = str(managed.parent).replace("%", "%%")
             dotnet_root = f'@set "DOTNET_ROOT={escaped_root}"\r\n'
         content = (
@@ -308,14 +342,14 @@ def expose_managed_command(
         if destination_exists and destination.read_bytes() == content:
             return destination
         with tempfile.NamedTemporaryFile(
-            prefix=f".{tool}.axis-",
+            prefix=f".{command}.axis-",
             suffix=".cmd",
             dir=command_dir,
             delete=False,
         ) as handle:
             handle.write(content)
             staged = Path(handle.name)
-    elif tool == "dotnet":
+    elif command == "dotnet":
         content = (
             "#!/bin/sh\n"
             "# Managed by Axis portable setup\n"
@@ -325,7 +359,7 @@ def expose_managed_command(
         if destination_exists and destination.is_file() and destination.read_bytes() == content:
             return destination
         with tempfile.NamedTemporaryFile(
-            prefix=f".{tool}.axis-",
+            prefix=f".{command}.axis-",
             dir=command_dir,
             delete=False,
         ) as handle:
@@ -334,19 +368,55 @@ def expose_managed_command(
     else:
         if destination_exists and destination.resolve(strict=False) == managed.resolve(strict=False):
             return destination
-        with tempfile.NamedTemporaryFile(prefix=f".{tool}.axis-", dir=command_dir, delete=False) as handle:
+        with tempfile.NamedTemporaryFile(prefix=f".{command}.axis-", dir=command_dir, delete=False) as handle:
             staged = Path(handle.name)
         staged.unlink()
         staged.symlink_to(managed)
 
     try:
-        if not windows and tool == "dotnet":
+        if not windows and command == "dotnet":
             staged.chmod(0o755)
         os.replace(staged, destination)
     finally:
         if os.path.lexists(staged):
             staged.unlink()
     return destination
+
+
+def expose_managed_commands(
+    commands: tuple[str, ...],
+    *,
+    platform_spec: SetupPlatform | None = None,
+    root: Path | None = None,
+    command_dir: Path | None = None,
+) -> tuple[Path, ...]:
+    platform_spec = platform_spec or detect_platform()
+    root = managed_tools_root(platform_spec=platform_spec) if root is None else root
+    command_dir = user_command_dir(platform_spec=platform_spec) if command_dir is None else command_dir
+    windows = platform_spec.os == "windows"
+
+    for command in commands:
+        managed = managed_command_executable(command, platform_spec=platform_spec, root=root)
+        if not managed.is_file():
+            raise SetupError(f"managed `{command}` executable does not exist at `{managed}`")
+        destination = command_dir / (f"{command}.cmd" if windows else command)
+        if os.path.lexists(destination) and not _managed_command_owned(
+            destination,
+            command=command,
+            root=root,
+            windows=windows,
+        ):
+            raise SetupError(f"refusing to replace unmanaged command `{destination}`")
+
+    return tuple(
+        expose_managed_command(
+            command,
+            platform_spec=platform_spec,
+            root=root,
+            command_dir=command_dir,
+        )
+        for command in commands
+    )
 
 
 def managed_tools_for_profile(profile: str) -> tuple[str, ...]:
@@ -399,6 +469,10 @@ def setup_plan(
                 labels.append(label)
         if labels:
             steps.append(f"install missing pinned user-local tools: {', '.join(labels)}")
+            if "dotnet" in managed_tools:
+                steps.append("expose managed .NET SDK through a stable dotnet command when PATH is missing or invalid")
+            if "node" in managed_tools:
+                steps.append("expose managed Node.js and npm through stable user commands when PATH pins differ")
             if profile == "review":
                 steps.append("expose the managed GitHub CLI through a stable user command")
         if external:
@@ -464,7 +538,7 @@ def resolve_dotnet_artifact(
     fetch_json: Callable[[str], dict[str, object]] = fetch_json,
 ) -> Artifact:
     name = asset_name("dotnet", platform_spec)
-    metadata_url = "https://dotnetcli.blob.core.windows.net/dotnet/release-metadata/8.0/releases.json"
+    metadata_url = "https://dotnetcli.blob.core.windows.net/dotnet/release-metadata/10.0/releases.json"
     metadata = fetch_json(metadata_url)
     rid_os = {"linux": "linux", "darwin": "osx", "windows": "win"}[platform_spec.os]
     expected_rid = f"{rid_os}-{platform_spec.arch}"

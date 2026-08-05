@@ -70,7 +70,6 @@ describe('AppShell', () => {
     navigateMock.mockClear();
     vi.mocked(signOutUser).mockReset();
     vi.mocked(signOutUser).mockResolvedValue();
-    sessionStorage.clear();
     vi.mocked(getCurrentUserProfile).mockResolvedValue({
       id: '11111111-1111-4111-8111-111111111111',
       email: 'ada@example.com',
@@ -81,10 +80,15 @@ describe('AppShell', () => {
       workspaceId: '22222222-2222-4222-8222-222222222222',
       workspaces: [],
     });
-    useAuthStore.setState({
-      accessToken: 'token',
-      userLabel: 'User',
-      userInitials: '?',
+    useAuthStore.getState().setBrowserSession({
+      authenticated: true,
+      csrfToken: 'csrf-token',
+      user: {
+        userId: '11111111-1111-4111-8111-111111111111',
+        workspaceId: '22222222-2222-4222-8222-222222222222',
+        email: 'ada@example.com',
+        name: 'Ada Lovelace',
+      },
     });
   });
 
@@ -346,8 +350,6 @@ describe('AppShell', () => {
       },
     });
     queryClient.setQueryData(['dashboard', 'current-user'], { fullName: 'Ada Lovelace' });
-    sessionStorage.setItem('pkce_verifier', 'verifier');
-    sessionStorage.setItem('pkce_state', 'state');
 
     render(
       <QueryClientProvider client={queryClient}>
@@ -361,10 +363,7 @@ describe('AppShell', () => {
     await user.click(screen.getByRole('button', { name: 'Sign out' }));
 
     await waitFor(() => expect(signOutUser).toHaveBeenCalledTimes(1));
-    expect(useAuthStore.getState().accessToken).toBeNull();
     expect(useAuthStore.getState().browserSessionStatus).toBe('guest');
-    expect(sessionStorage.getItem('pkce_verifier')).toBeNull();
-    expect(sessionStorage.getItem('pkce_state')).toBeNull();
     expect(queryClient.getQueryData(['dashboard', 'current-user'])).toBeUndefined();
     expect(navigateMock).toHaveBeenCalledWith({ to: '/sign-in', replace: true });
   });
@@ -433,7 +432,7 @@ describe('AppShell', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Sign out did not complete. Try again.',
     );
-    expect(useAuthStore.getState().accessToken).toBe('token');
+    expect(useAuthStore.getState().browserSessionStatus).toBe('authenticated');
     expect(navigateMock).not.toHaveBeenCalled();
     expect(screen.getByRole('button', { name: 'Sign out' })).toBeEnabled();
   });

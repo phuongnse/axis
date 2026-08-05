@@ -175,7 +175,7 @@ namespace Axis.Identity.Infrastructure.Migrations
                     ReferenceId = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: true),
                     Status = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: true),
                     Subject = table.Column<string>(type: "character varying(400)", maxLength: 400, nullable: true),
-                    Type = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: true)
+                    Type = table.Column<string>(type: "character varying(150)", maxLength: 150, nullable: true)
                 },
                 constraints: table =>
                 {

@@ -11,6 +11,7 @@ Use with [SKILL.md](./SKILL.md) when writing or refreshing use-case acceptance c
 - Format ACs as plain contract bullets: `- **AC-001** Requirement text.`
 - Keep progress in implementation status.
 - Include enough validation, isolation, authorization, dependency-failure, rollback, and empty-state ACs for the layer that will be implemented.
+- Cover the applicable enterprise-production outcomes from [docs/PLATFORM_STRATEGY.md § Enterprise Production Baseline](../../../docs/PLATFORM_STRATEGY.md#enterprise-production-baseline). Put a separate capability in Out Of Scope; do not label a required production property as a deferred follow-up.
 
 ## Acceptance Test Matrix
 

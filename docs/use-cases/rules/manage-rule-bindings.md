@@ -84,10 +84,14 @@ Required UI quality: use existing shadcn/Tailwind primitives, preserve filters, 
 > | API | Done |
 > | Frontend | Partial |
 >
-> **Gaps vs spec:** Rules usage discovery and Object-side binding creation are implemented; a dedicated full binding edit/delete dialog and focused frontend binding component test remain partial.
+> **Gaps vs spec:**
+>
+> | ID | Gap |
+> |---|---|
+> | GAP-001 | Rules usage discovery and Object-side binding creation are implemented; a dedicated full binding edit/delete dialog and focused frontend binding component test remain partial. |
 >
 > **Deferred follow-ups:** Add a dedicated binding edit form in the Rules collection after the current usage dialog slice; retain the existing Object-side creation path and backend CRUD contracts.
 >
 > **Verification:** Rules domain, application, infrastructure, API, architecture, and focused frontend checks are recorded in the sibling evidence sidecar and must pass before review.
 >
-> **Decisions:** Bindings are first-class Rules data. They reference exact published versions, keep consumer targets opaque, allow omitted optional inputs, and do not create foreign keys into consumer modules. The pre-production product phase uses clean cutover with no compatibility paths.
+> **Decisions:** Bindings are first-class Rules data. They reference exact published versions, keep consumer targets opaque, allow omitted optional inputs, and do not create foreign keys into consumer modules. No supported production consumer or data requires compatibility for the replaced binding surface, so it uses a clean cutover with no compatibility paths and no reduction in production quality.

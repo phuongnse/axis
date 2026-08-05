@@ -11,6 +11,7 @@ public sealed class McpProtocolTests
             "read",
             [
                 "axis_get_business_object_definition",
+                "axis_get_rule_binding",
                 "axis_get_current_user",
                 "axis_get_legal_versions",
                 "axis_get_rule",
@@ -36,6 +37,7 @@ public sealed class McpProtocolTests
                 "axis_create_rule_definition",
                 "axis_get_business_object_definition",
                 "axis_get_business_object_record",
+                "axis_get_rule_binding",
                 "axis_get_current_user",
                 "axis_get_legal_versions",
                 "axis_get_rule",

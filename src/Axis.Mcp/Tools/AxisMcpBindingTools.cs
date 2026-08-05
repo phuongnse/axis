@@ -9,6 +9,18 @@ namespace Axis.Mcp.Tools;
 [McpServerToolType]
 public sealed class AxisMcpBindingReadTools(AxisApiClient api)
 {
+    [McpServerTool(Name = "axis_get_rule_binding")]
+    [Description("[READ] Get one rule binding with its full mappings and revision in the authenticated workspace.")]
+    public Task<string> GetRuleBindingAsync(
+        [Description("Rule binding UUID.")] Guid bindingId,
+        CancellationToken cancellationToken = default)
+    {
+        if (bindingId == Guid.Empty)
+            throw new ArgumentException("bindingId must be a non-empty UUID.", nameof(bindingId));
+
+        return api.GetJsonAsync($"api/rule-bindings/{bindingId:D}", cancellationToken);
+    }
+
     [McpServerTool(Name = "axis_list_rule_binding_usage")]
     [Description("[READ] List bindings that use one exact rule definition version in the authenticated workspace.")]
     public Task<string> ListRuleBindingUsageAsync(

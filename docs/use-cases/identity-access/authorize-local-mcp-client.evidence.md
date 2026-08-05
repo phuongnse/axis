@@ -11,22 +11,24 @@
 | AT-004 | `frontend/tests/sign-in-page.test.tsx`, `frontend/tests/auth-session-restore.test.ts` | `python scripts/axis.py frontend test tests/sign-in-page.test.tsx tests/auth-session-restore.test.ts` |
 | AT-005 | `tests/Api/Axis.Api.Tests/Identity/SignInUserFlowTests.cs` | `python scripts/axis.py dotnet test tests/Api/Axis.Api.Tests/Axis.Api.Tests.csproj --filter FullyQualifiedName~SignInUserFlowTests` |
 | AT-006 | `tests/Api/Axis.Api.Tests/Identity/SignInUserFlowTests.cs` (missing, tampered, expired, and replayed handles) | `python scripts/axis.py dotnet test tests/Api/Axis.Api.Tests/Axis.Api.Tests.csproj --filter FullyQualifiedName~SignInUserFlowTests` |
-| AT-007 | `tests/Api/Axis.Api.Tests/Identity/SignInUserFlowTests.cs` (expired distributed-cache request does not produce callback code; client callback failure remains not run) | `python scripts/axis.py dotnet test tests/Api/Axis.Api.Tests/Axis.Api.Tests.csproj --filter FullyQualifiedName~SignInUserFlowTests` |
+| AT-007 | `tests/Api/Axis.Api.Tests/Identity/SignInUserFlowTests.cs` (expired request token does not produce callback code; client callback failure remains not run) | `python scripts/axis.py dotnet test tests/Api/Axis.Api.Tests/Axis.Api.Tests.csproj --filter FullyQualifiedName~SignInUserFlowTests` |
 | AT-008 | `frontend/tests/sign-in-page.test.tsx`, `tests/Api/Axis.Api.Tests/Identity/OpenIddictMcpClientTests.cs`, `tests/Tools/Axis.Mcp.Tests/McpProtocolTests.cs` | `python scripts/axis.py frontend test tests/sign-in-page.test.tsx`; `python scripts/axis.py dotnet test tests/Api/Axis.Api.Tests/Axis.Api.Tests.csproj --filter FullyQualifiedName~OpenIddictMcpClientTests`; `python scripts/axis.py dotnet test tests/Tools/Axis.Mcp.Tests/Axis.Mcp.Tests.csproj` |
 
 ## Current notes
 
-- `request_id` is the OpenIddict 5.8 authorization-cache handle; the continuation URL carries no raw OAuth request fields.
-- The supported client runtime journey covered by AT-003 passed manually: Codex loaded the current 13-tool registry, the browser completed the registered loopback flow, `axis_get_current_user` returned the authenticated user/workspace context, and `axis_list_rules` plus `axis_get_rule` agreed on the selected rule key and published version. AT-003 acceptance evidence remains incomplete because the required committed browser automation is not run.
-- AT-007 cache-failure evidence is limited to an expired distributed-cache request returning `400` without a callback code; supported client callback-failure/timeout evidence is not run.
-- MCP gates were run through the Axis routes: `python scripts/axis.py check mcp-api-coverage`, `python scripts/axis.py check mcp-contracts`, and `python scripts/axis.py check mcp-tool-safety` all passed.
+- `request_uri` is the OpenIddict-owned opaque request-token reference; the continuation URL carries no raw OAuth request fields.
+- API integration proves request-token creation, opaque SPA handoff, five-minute configuration behavior, manager-owned expiry mutation for the failure scenario, registered callback completion, and replay rejection against the new initial PostgreSQL schema.
+- AT-007 request-token-expiry evidence passes; supported client callback-failure/timeout evidence remains not run.
+- MCP protocol tests, API coverage, and tool-safety gates pass on the current .NET 10 target.
 - MCP protocol, coverage, and safety gates are protocol-boundary evidence only. They do not substitute for a supported client reload, current tool registry, and authenticated `tools/call` read-back.
-- Local authorization uses the canonical OpenIddict issuer `https://localhost:5281`; browser transport stays same-origin through `/connect`, and the supported client flow completed without weakening request-handle, state, PKCE, callback, or token validation.
+- Browser automation and the supported app-managed client flow have not run after the `request_uri` cutover.
 
-## Verification summary
+## Current verification
 
-- API `SignInUserFlowTests`: 11 passed, including the signed-out handoff/sign-in resume, silent `login_required`, missing/tampered/expired/replayed handle fail-closed behavior, and the registered `axis_mcp` loopback callback.
-- Frontend auth tests: 41 passed across the pending sign-in continuation, session-restore, and callback suites.
-- Compose browser regression: the focused `sign-in-user` AT-001 journey passed and verified `/connect/authorize` stayed on the browser-facing web origin before the dashboard handoff.
-- MCP contract tests: 17 passed; API coverage and tool-safety checks passed.
-- Supported browser/client runtime: passed against the app-managed Codex client; MCP loopback browser automation and callback-failure/timeout evidence remain not run, so the use case remains Partial.
+- API `SignInUserFlowTests`: 11 passed, including signed-out handoff/sign-in resume, silent `login_required`, missing/tampered/expired/replayed request URI fail-closed behavior, and the registered `axis_mcp` loopback callback.
+- Frontend auth tests: 39 passed across pending sign-in continuation and session restore; continuation generation uses only `request_uri`.
+- MCP contract tests: 18 passed on `net10.0`.
+- Identity Infrastructure: 55 passed, including public-client catalog deletion through `IOpenIddictApplicationManager` with fresh-scope read-back.
+- Business Objects Infrastructure: 10 passed; Rules Infrastructure: 12 passed. Both applied their new initial migrations from an empty PostgreSQL database.
+- Full API project: 52 passed on the new initial migrations.
+- Browser automation, supported client reload/read-back, and callback-failure/timeout evidence remain not run, so the use case remains Partial.

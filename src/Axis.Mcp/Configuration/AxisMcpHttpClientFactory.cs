@@ -53,9 +53,6 @@ public static class AxisMcpHttpClientFactory
         if (!File.Exists(path))
             return null;
 
-        // The local root CA is intentionally distributed as a certificate-only
-        // PEM. CreateFromPemFile(path) assumes the same file also contains a
-        // private key and therefore throws before the first MCP API request.
-        return new X509Certificate2(path);
+        return X509CertificateLoader.LoadCertificateFromFile(path);
     }
 }

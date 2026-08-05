@@ -2,12 +2,13 @@
 
 > **Navigation**: [AGENTS.md](../AGENTS.md)
 
-Axis is an open-source platform being built for adaptable, workflow-driven business applications.
+Axis is an open-source enterprise application platform engineered under the production baseline owned by [docs/PLATFORM_STRATEGY.md](./PLATFORM_STRATEGY.md#enterprise-production-baseline).
 
 ## Primary Docs
 
 | Doc | Use |
 |---|---|
+| [docs/PLATFORM_STRATEGY.md](./PLATFORM_STRATEGY.md) | Target platform capability map, product boundary, and delivery sequence. |
 | [docs/ARCHITECTURE.md](./ARCHITECTURE.md) | Current runtime shape and boundaries. |
 | [docs/TECH_STACK.md](./TECH_STACK.md) | Approved stack baseline and version owners. |
 | [docs/use-cases/README.md](./use-cases/README.md) | Implemented or actively specified use cases only. |
@@ -23,6 +24,9 @@ Axis is an open-source platform being built for adaptable, workflow-driven busin
 | [docs/playbooks/design-gate-structural-agent-workflows.md](./playbooks/design-gate-structural-agent-workflows.md) | Corrective full dossier for structural agent workflows and policy guards. |
 | [docs/playbooks/design-gate-executable-business-object-workflow.md](./playbooks/design-gate-executable-business-object-workflow.md) | Current full dossier for the executable Business Object workflow. |
 | [docs/playbooks/design-gate-mcp-browser-authorization.md](./playbooks/design-gate-mcp-browser-authorization.md) | Current full dossier for the local MCP browser-authorization handoff. |
+| [docs/playbooks/design-gate-enterprise-production-baseline.md](./playbooks/design-gate-enterprise-production-baseline.md) | Project-wide enterprise-production decision baseline. |
+| [docs/playbooks/design-gate-browser-bff.md](./playbooks/design-gate-browser-bff.md) | Proposed enterprise browser BFF trust, session, and deployment boundary. |
+| [docs/playbooks/design-gate-reference-solution-consumer-boundary.md](./playbooks/design-gate-reference-solution-consumer-boundary.md) | Current full dossier for the Wave 0 independent-product consumer boundary. |
 | [docs/playbooks/api-patterns.md](./playbooks/api-patterns.md) | REST/OpenAPI and API-type change guidance. |
 | [docs/playbooks/frontend.md](./playbooks/frontend.md) | SPA implementation guidance. |
 | [docs/playbooks/client-experience.md](./playbooks/client-experience.md) | Self-directed client, UI, and UX decisions. |

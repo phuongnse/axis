@@ -1,5 +1,5 @@
 {
-  "openapi": "3.0.1",
+  "openapi": "3.0.4",
   "info": {
     "title": "Axis Platform API",
     "version": "v1"
@@ -912,6 +912,27 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/LegalVersionsDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/session": {
+      "get": {
+        "tags": [
+          "Identity"
+        ],
+        "summary": "Resolve the current same-origin browser session",
+        "operationId": "GetBrowserSession",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AxisBrowserSessionDto"
                 }
               }
             }
@@ -2353,6 +2374,71 @@
       }
     },
     "/api/rule-bindings/{bindingId}": {
+      "get": {
+        "tags": [
+          "Rules"
+        ],
+        "summary": "Get a rule binding",
+        "operationId": "GetRuleBinding",
+        "parameters": [
+          {
+            "name": "bindingId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuleBindingDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      },
       "put": {
         "tags": [
           "Rules"
@@ -2510,6 +2596,42 @@
   },
   "components": {
     "schemas": {
+      "AxisBrowserSessionDto": {
+        "type": "object",
+        "properties": {
+          "authenticated": {
+            "type": "boolean"
+          },
+          "csrfToken": {
+            "type": "string"
+          },
+          "user": {
+            "$ref": "#/components/schemas/AxisBrowserSessionUserDto"
+          }
+        },
+        "additionalProperties": false
+      },
+      "AxisBrowserSessionUserDto": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "workspaceId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "email": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
       "BusinessObjectChoiceFieldConfigurationDto": {
         "type": "object",
         "properties": {
@@ -4851,5 +4973,19 @@
         "bearerFormat": "JWT"
       }
     }
-  }
+  },
+  "tags": [
+    {
+      "name": "Business Object Records"
+    },
+    {
+      "name": "Business Objects"
+    },
+    {
+      "name": "Identity"
+    },
+    {
+      "name": "Rules"
+    }
+  ]
 }

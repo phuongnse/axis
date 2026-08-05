@@ -9,18 +9,21 @@ using Axis.BusinessObjects.Application.Commands.CreateBusinessObjectRecord;
 using Axis.BusinessObjects.Infrastructure.Extensions;
 using Axis.Identity.Application.Commands.RegisterUser;
 using Axis.Identity.Infrastructure.Extensions;
+using Axis.Identity.Infrastructure.Services;
 using Axis.Rules.Application.Queries.ListRuleDefinitions;
 using Axis.Rules.Infrastructure.Extensions;
 using Axis.Shared.Application.Behaviors;
 using Axis.Shared.Application.Identity;
 using Axis.Shared.Infrastructure.Observability;
 using FluentValidation;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
-using Microsoft.Extensions.Caching.Distributed;
-using Microsoft.OpenApi.Models;
+using Microsoft.OpenApi;
+using OpenIddict.Server;
 using OpenIddict.Validation.AspNetCore;
 using Serilog;
 using StackExchange.Redis;
@@ -31,6 +34,7 @@ namespace Axis.Api.Extensions;
 internal static class AxisApiServiceExtensions
 {
     private const string AuthRateLimiterPolicy = "auth";
+    private const string AxisAuthenticationScheme = "Axis";
 
     public static WebApplicationBuilder AddAxisApiServices(this WebApplicationBuilder builder)
     {
@@ -38,14 +42,15 @@ internal static class AxisApiServiceExtensions
         builder.AddAxisLogging();
 
         builder.Services.AddAxisMediatR();
+        IConnectionMultiplexer redis = builder.Services.AddAxisRedis(builder.Configuration);
+        builder.Services.AddAxisDataProtection(builder.Configuration, builder.Environment, redis);
         builder.Services.AddAxisAuthentication(builder.Configuration, builder.Environment);
         builder.Services.AddAxisAuthorization();
         builder.Services.AddAxisForwardedHeaders();
         builder.Services.AddAxisRateLimiting(builder.Configuration, builder.Environment);
         builder.Services.AddAxisModules(builder.Configuration, builder.Environment);
-        builder.Services.AddAxisRedis(builder.Configuration);
         builder.Services.AddAxisRequestContext();
-        builder.Services.AddAxisCors(builder.Configuration);
+        builder.Services.AddAxisAntiforgery();
         builder.Services.AddAxisJson();
         builder.Services.AddAxisOpenApi();
         builder.Services.AddAxisHealthChecks();
@@ -90,47 +95,109 @@ internal static class AxisApiServiceExtensions
         IConfiguration configuration,
         IHostEnvironment environment)
     {
-        services.AddAuthentication(OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme)
+        AxisBrowserSessionPolicy sessionPolicy = AxisBrowserSessionPolicy.Load(configuration);
+        TimeSpan refreshTokenLifetime = ReadPositiveTimeSpan(
+            configuration,
+            "Jwt:RefreshTokenTtlHours",
+            defaultValue: 8,
+            value => TimeSpan.FromHours(value));
+        if (refreshTokenLifetime < sessionPolicy.AbsoluteLifetime)
+        {
+            throw new InvalidOperationException(
+                "Jwt:RefreshTokenTtlHours cannot be shorter than BrowserSession:AbsoluteHours.");
+        }
+
+        services.AddSingleton(sessionPolicy);
+        services.AddSingleton<RedisTicketStore>();
+
+        services.AddAuthentication(options =>
+            {
+                options.DefaultAuthenticateScheme = AxisAuthenticationScheme;
+                options.DefaultChallengeScheme = AxisAuthenticationScheme;
+                options.DefaultForbidScheme = AxisAuthenticationScheme;
+            })
+            .AddPolicyScheme(AxisAuthenticationScheme, AxisAuthenticationScheme, options =>
+            {
+                options.ForwardDefaultSelector = context =>
+                    context.Request.Headers.ContainsKey("Authorization")
+                        ? OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme
+                        : CookieAuthenticationDefaults.AuthenticationScheme;
+            })
             .AddCookie(CookieAuthenticationDefaults.AuthenticationScheme, opts =>
             {
-                opts.ExpireTimeSpan = TimeSpan.FromMinutes(5);
-                opts.SlidingExpiration = false;
-                opts.LoginPath = "/register";
+                opts.Cookie.Name = "__Host-axis-session";
+                opts.Cookie.HttpOnly = true;
+                opts.Cookie.IsEssential = true;
+                opts.Cookie.Path = "/";
+                opts.Cookie.SameSite = SameSiteMode.Lax;
+                opts.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+                opts.ExpireTimeSpan = sessionPolicy.IdleLifetime;
+                opts.SlidingExpiration = true;
+                opts.Events.OnRedirectToLogin = context =>
+                {
+                    context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                    return Task.CompletedTask;
+                };
+                opts.Events.OnRedirectToAccessDenied = context =>
+                {
+                    context.Response.StatusCode = StatusCodes.Status403Forbidden;
+                    return Task.CompletedTask;
+                };
+                opts.Events.OnValidatePrincipal = async context =>
+                {
+                    if (!AxisBrowserSessionPolicy.IsPastAbsoluteExpiry(
+                            context.Properties,
+                            DateTimeOffset.UtcNow))
+                    {
+                        return;
+                    }
+
+                    context.RejectPrincipal();
+                    await context.HttpContext.SignOutAsync(
+                        CookieAuthenticationDefaults.AuthenticationScheme);
+                };
             });
+        services.AddOptions<CookieAuthenticationOptions>(CookieAuthenticationDefaults.AuthenticationScheme)
+            .Configure<RedisTicketStore>((options, store) => options.SessionStore = store);
 
         services.AddOpenIddict()
             .AddServer(opts =>
             {
                 opts.SetIssuer(ReadRequiredAbsoluteHttpsUri(configuration, "OpenIddict:Issuer"))
                     .SetAuthorizationEndpointUris("/connect/authorize")
+                    .SetEndSessionEndpointUris("/connect/logout")
+                    .SetPushedAuthorizationEndpointUris("/connect/par")
+                    .SetRevocationEndpointUris("/connect/revoke")
                     .SetTokenEndpointUris("/connect/token");
 
-                opts.RegisterScopes(Scopes.OpenId, Scopes.Email, Scopes.Profile);
+                opts.RegisterScopes(Scopes.OpenId, Scopes.Email, Scopes.Profile, Scopes.OfflineAccess);
 
                 opts.AllowAuthorizationCodeFlow()
-                    .RequireProofKeyForCodeExchange();
+                    .AllowRefreshTokenFlow()
+                    .RequireProofKeyForCodeExchange()
+                    .EnableAuthorizationRequestCaching();
 
                 opts.SetAccessTokenLifetime(ReadPositiveTimeSpan(
                     configuration,
                     "Jwt:AccessTokenTtlMinutes",
                     defaultValue: 15,
                     value => TimeSpan.FromMinutes(value)));
+                opts.SetRefreshTokenLifetime(refreshTokenLifetime);
                 ConfigureOpenIddictCertificates(opts, configuration, environment);
 
                 opts.UseAspNetCore()
                     .EnableAuthorizationEndpointPassthrough()
-                    .EnableTokenEndpointPassthrough()
-                    .EnableAuthorizationRequestCaching()
-                    .SetAuthorizationRequestCachingPolicy(new DistributedCacheEntryOptions
-                    {
-                        AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(5),
-                    });
+                    .EnableEndSessionEndpointPassthrough()
+                    .EnableTokenEndpointPassthrough();
             })
             .AddValidation(opts =>
             {
                 opts.UseLocalServer();
                 opts.UseAspNetCore();
             });
+
+        services.Configure<OpenIddictServerOptions>(opts =>
+            opts.RequestTokenLifetime = TimeSpan.FromMinutes(5));
     }
 
     private static void ConfigureOpenIddictCertificates(
@@ -220,21 +287,52 @@ internal static class AxisApiServiceExtensions
         IConfiguration configuration,
         IHostEnvironment environment)
     {
-        services.AddIdentityInfrastructure(configuration, environment);
+        services.AddIdentityInfrastructure(configuration);
         services.AddRulesInfrastructure(configuration);
         services.AddBusinessObjectsInfrastructure(configuration);
     }
 
-    private static void AddAxisRedis(
+    private static IConnectionMultiplexer AddAxisRedis(
         this IServiceCollection services,
         IConfiguration configuration)
     {
         string connectionString = configuration["Redis:ConnectionString"]
             ?? throw new InvalidOperationException("Redis:ConnectionString is required");
 
-        services.AddSingleton<IConnectionMultiplexer>(_ =>
-            ConnectionMultiplexer.Connect(connectionString));
-        services.AddStackExchangeRedisCache(options => options.Configuration = connectionString);
+        IConnectionMultiplexer redis = ConnectionMultiplexer.Connect(connectionString);
+        services.AddSingleton(redis);
+        return redis;
+    }
+
+    private static void AddAxisDataProtection(
+        this IServiceCollection services,
+        IConfiguration configuration,
+        IHostEnvironment environment,
+        IConnectionMultiplexer redis)
+    {
+        IDataProtectionBuilder dataProtection = services.AddDataProtection()
+            .SetApplicationName("Axis.Api.BrowserSession")
+            .PersistKeysToStackExchangeRedis(redis, "axis:data-protection:browser-session");
+
+        if (!environment.IsDevelopmentOrTesting())
+        {
+            dataProtection.ProtectKeysWithCertificate(LoadCertificate(
+                configuration,
+                "DataProtection:CertificateThumbprint"));
+        }
+    }
+
+    private static void AddAxisAntiforgery(this IServiceCollection services)
+    {
+        services.AddAntiforgery(options =>
+        {
+            options.Cookie.Name = "__Host-axis-antiforgery";
+            options.Cookie.HttpOnly = true;
+            options.Cookie.Path = "/";
+            options.Cookie.SameSite = SameSiteMode.Strict;
+            options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+            options.HeaderName = "X-CSRF-TOKEN";
+        });
     }
 
     private static void AddAxisRequestContext(this IServiceCollection services)
@@ -242,21 +340,6 @@ internal static class AxisApiServiceExtensions
         services.AddHttpContextAccessor();
         services.AddScoped<CurrentUser>();
         services.AddScoped<ICurrentUser, HttpContextCurrentUser>();
-    }
-
-    private static void AddAxisCors(
-        this IServiceCollection services,
-        IConfiguration configuration)
-    {
-        string[] allowedOrigins = configuration
-            .GetSection("Cors:AllowedOrigins")
-            .Get<string[]>() ?? [];
-
-        services.AddCors(opts => opts.AddPolicy("SpaOrigin", policy =>
-            policy.WithOrigins(allowedOrigins)
-                .AllowAnyHeader()
-                .AllowAnyMethod()
-                .AllowCredentials()));
     }
 
     private static void AddAxisJson(this IServiceCollection services)
@@ -347,5 +430,24 @@ internal static class AxisApiServiceExtensions
         }
 
         return uri;
+    }
+
+    private static X509Certificate2 LoadCertificate(IConfiguration configuration, string key)
+    {
+        string thumbprint = RequiredValue(configuration, key);
+        StoreName storeName = ReadEnum(configuration, "OpenIddict:Certificates:StoreName", StoreName.My);
+        StoreLocation storeLocation = ReadEnum(
+            configuration,
+            "OpenIddict:Certificates:StoreLocation",
+            StoreLocation.LocalMachine);
+        using X509Store store = new(storeName, storeLocation);
+        store.Open(OpenFlags.ReadOnly);
+        X509Certificate2Collection matches = store.Certificates.Find(
+            X509FindType.FindByThumbprint,
+            thumbprint,
+            validOnly: true);
+        return matches.Count == 1
+            ? matches[0]
+            : throw new InvalidOperationException($"{key} must identify exactly one valid certificate.");
     }
 }

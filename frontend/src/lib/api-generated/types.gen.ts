@@ -4,6 +4,19 @@ export type ClientOptions = {
     baseUrl: `${string}://${string}` | (string & {});
 };
 
+export type AxisBrowserSessionDto = {
+    authenticated?: boolean;
+    csrfToken?: string;
+    user?: AxisBrowserSessionUserDto;
+};
+
+export type AxisBrowserSessionUserDto = {
+    userId?: string;
+    workspaceId?: string | null;
+    email?: string;
+    name?: string;
+};
+
 export type BusinessObjectChoiceFieldConfigurationDto = {
     selectionMode?: BusinessObjectChoiceSelectionMode;
     options?: Array<BusinessObjectChoiceOptionDto>;
@@ -1161,6 +1174,22 @@ export type GetLegalVersionsResponses = {
 
 export type GetLegalVersionsResponse = GetLegalVersionsResponses[keyof GetLegalVersionsResponses];
 
+export type GetBrowserSessionData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/auth/session';
+};
+
+export type GetBrowserSessionResponses = {
+    /**
+     * OK
+     */
+    200: AxisBrowserSessionDto;
+};
+
+export type GetBrowserSessionResponse = GetBrowserSessionResponses[keyof GetBrowserSessionResponses];
+
 export type SignInUserData = {
     body: SignInUserRequest;
     path?: never;
@@ -1914,6 +1943,41 @@ export type DeleteRuleBindingResponses = {
 };
 
 export type DeleteRuleBindingResponse = DeleteRuleBindingResponses[keyof DeleteRuleBindingResponses];
+
+export type GetRuleBindingData = {
+    body?: never;
+    path: {
+        bindingId: string;
+    };
+    query?: never;
+    url: '/api/rule-bindings/{bindingId}';
+};
+
+export type GetRuleBindingErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type GetRuleBindingError = GetRuleBindingErrors[keyof GetRuleBindingErrors];
+
+export type GetRuleBindingResponses = {
+    /**
+     * OK
+     */
+    200: RuleBindingDto;
+};
+
+export type GetRuleBindingResponse = GetRuleBindingResponses[keyof GetRuleBindingResponses];
 
 export type UpdateRuleBindingData = {
     body: UpdateRuleBindingRequest;

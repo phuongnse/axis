@@ -1,4 +1,9 @@
-import { getAccessToken, useAuthStore } from '@/features/auth/auth-store';
+import {
+  applyBrowserSessionResponse,
+  getCsrfToken,
+  useAuthStore,
+} from '@/features/auth/auth-store';
+import type { AxisBrowserSessionDto } from '@/lib/api-generated';
 import { queryClient } from '@/lib/query-client';
 
 export class ApiError extends Error {
@@ -19,6 +24,9 @@ interface FetchApiOptions extends RequestInit {
   timeout?: number;
 }
 
+const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS', 'TRACE']);
+let csrfBootstrapInFlight: Promise<string> | null = null;
+
 export async function fetchApi<T>(endpoint: string, options: FetchApiOptions = {}): Promise<T> {
   const url = `${BASE_URL}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
 
@@ -27,15 +35,15 @@ export async function fetchApi<T>(endpoint: string, options: FetchApiOptions = {
     headers.set('Accept', 'application/json');
   }
 
-  const accessToken = getAccessToken();
-  if (accessToken && !headers.has('Authorization')) {
-    headers.set('Authorization', `Bearer ${accessToken}`);
+  const method = (options.method ?? 'GET').toUpperCase();
+  if (!SAFE_METHODS.has(method) && !headers.has('Authorization')) {
+    headers.set('X-CSRF-TOKEN', await ensureCsrfToken());
   }
 
   if (options.body instanceof FormData) {
     // Let the browser set the multipart boundary.
     headers.delete('Content-Type');
-  } else if (!headers.has('Content-Type')) {
+  } else if (options.body !== undefined && !headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json');
   }
 
@@ -62,7 +70,7 @@ export async function fetchApi<T>(endpoint: string, options: FetchApiOptions = {
       }
 
       if (response.status === 401) {
-        useAuthStore.getState().clearSession();
+        useAuthStore.getState().markBrowserSessionGuest();
         queryClient.clear();
         if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/sign-in')) {
           window.location.href = '/sign-in';
@@ -88,5 +96,42 @@ export async function fetchApi<T>(endpoint: string, options: FetchApiOptions = {
       throw new Error('The operation was aborted');
     }
     throw error;
+  }
+}
+
+async function ensureCsrfToken(): Promise<string> {
+  const current = getCsrfToken();
+  if (current) return current;
+
+  if (!csrfBootstrapInFlight) {
+    csrfBootstrapInFlight = fetchBrowserSessionForCsrf().finally(() => {
+      csrfBootstrapInFlight = null;
+    });
+  }
+  return csrfBootstrapInFlight;
+}
+
+async function fetchBrowserSessionForCsrf(): Promise<string> {
+  const response = await fetch(`${BASE_URL}/auth/session`, {
+    method: 'GET',
+    headers: { Accept: 'application/json' },
+    credentials: 'include',
+  });
+  if (!response.ok) {
+    throw new ApiError(response.status, await readErrorData(response));
+  }
+
+  const session = (await response.json()) as AxisBrowserSessionDto;
+  applyBrowserSessionResponse(session);
+  const csrfToken = getCsrfToken();
+  if (!csrfToken) throw new Error('Browser session response did not provide a CSRF token.');
+  return csrfToken;
+}
+
+async function readErrorData(response: Response): Promise<unknown> {
+  try {
+    return await response.json();
+  } catch {
+    return { message: response.statusText };
   }
 }
