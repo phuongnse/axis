@@ -40,8 +40,9 @@ Generated product contracts and runtime application code are outside the slice. 
 - Review readiness and independent review are separate states. Review findings and approval are distinct graph edges; publication requires approval.
 - Each repository workflow purpose has one public Axis command, one profile/state term, and one evidence vocabulary. Internal checker modules do not retain no-op mode flags.
 - Executable Axis command examples are validated by the CLI parser that owns those commands; the repository does not maintain a second command-name catalog.
-- Project orchestration has named roles and no default delegate. Model, reasoning, minimality, and compression profiles live once in the manifest; `ultra` is not applied mechanically.
+- Project orchestration has named roles and no unnamed/default role; proactive routing selects the matching named role. Model, reasoning, minimality, and compression profiles live once in the manifest; `ultra` is not applied mechanically.
 - Routing is evaluated per independently ownable work unit and re-evaluated when decisions change ambiguity, scope, ownership, or verification. Bounded implementation may belong to source, tests, tooling, or guidance; retaining an eligible unit on the primary requires a concrete boundary or lower total execution cost.
+- Proactive delegation is a lifecycle obligation: eligibility triggers routing, and retaining a unit on the primary requires a concrete boundary or lower total execution cost.
 - `Partial` and `Not started` use-case states require typed, unique GAP-ID rows. The gap description remains owner-reviewed prose.
 - PR requirements use explicit statuses with checkbox consistency. Supported automation branches may leave requirements pending; human publication branches must resolve every requirement and may not pre-claim future review or verification.
 
