@@ -67,14 +67,15 @@ public static class ConnectEndpoints
             }
 
             string? requestUri = request.RequestUri;
-            if (string.IsNullOrWhiteSpace(requestUri))
+            string? clientId = request.ClientId;
+            if (string.IsNullOrWhiteSpace(requestUri) || string.IsNullOrWhiteSpace(clientId))
             {
                 return Results.Problem(
                     detail: "The authorization request could not be resumed.",
                     statusCode: StatusCodes.Status400BadRequest);
             }
 
-            return Results.Redirect(BuildSignInRedirectUri(configuration, requestUri));
+            return Results.Redirect(BuildSignInRedirectUri(configuration, requestUri, clientId));
         }
 
         ClaimsPrincipal cookiePrincipal = cookieResult.Principal!;
@@ -87,7 +88,10 @@ public static class ConnectEndpoints
             OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
     }
 
-    private static string BuildSignInRedirectUri(IConfiguration configuration, string requestUri)
+    private static string BuildSignInRedirectUri(
+        IConfiguration configuration,
+        string requestUri,
+        string clientId)
     {
         string baseUrl = configuration["App:BaseUrl"]
             ?? throw new InvalidOperationException("App:BaseUrl is required for browser authorization.");
@@ -99,7 +103,13 @@ public static class ConnectEndpoints
         }
 
         Uri signInUri = new(baseUri, "/sign-in");
-        return QueryHelpers.AddQueryString(signInUri.ToString(), "authorization_request", requestUri);
+        return QueryHelpers.AddQueryString(
+            signInUri.ToString(),
+            new Dictionary<string, string?>
+            {
+                ["authorization_request"] = requestUri,
+                ["authorization_client"] = clientId,
+            });
     }
 
     private static async Task<IResult> Token(

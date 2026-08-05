@@ -181,8 +181,9 @@ public sealed class SignInUserFlowTests(ApiTestFixture fixture)
         location.AbsoluteUri.Should().StartWith("https://localhost:3000/sign-in?");
         Dictionary<string, Microsoft.Extensions.Primitives.StringValues> query =
             QueryHelpers.ParseQuery(location.Query);
-        query.Keys.Should().BeEquivalentTo(["authorization_request"]);
+        query.Keys.Should().BeEquivalentTo(["authorization_request", "authorization_client"]);
         query["authorization_request"].ToString().Should().Be(requestUri);
+        query["authorization_client"].ToString().Should().Be("axis_mcp");
     }
 
     [Fact]
@@ -205,6 +206,7 @@ public sealed class SignInUserFlowTests(ApiTestFixture fixture)
         cachedResponse.StatusCode.Should().Be(HttpStatusCode.Redirect);
         Uri cachedLocation = ResolveLocation(cachedResponse);
         string requestUri = ReadRequestUri(cachedLocation);
+        string clientId = ReadClientId(cachedLocation);
         requestUri.Should().NotBeNullOrWhiteSpace();
 
         HttpResponseMessage signInRedirect = await GetWithHostAsync(
@@ -216,14 +218,27 @@ public sealed class SignInUserFlowTests(ApiTestFixture fixture)
         signInLocation.AbsoluteUri.Should().StartWith("https://localhost:3000/sign-in?");
         Dictionary<string, Microsoft.Extensions.Primitives.StringValues> signInQuery =
             QueryHelpers.ParseQuery(signInLocation.Query);
-        signInQuery.Keys.Should().BeEquivalentTo(["authorization_request"]);
+        signInQuery.Keys.Should().BeEquivalentTo(["authorization_request", "authorization_client"]);
         signInQuery["authorization_request"].ToString().Should().Be(requestUri);
+        signInQuery["authorization_client"].ToString().Should().Be(clientId);
+
+        HttpResponseMessage missingClientResponse = await GetWithHostAsync(
+            BuildAuthorizeResumeUrl(requestUri),
+            "web:3000");
+        missingClientResponse.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        missingClientResponse.Headers.Location.Should().BeNull();
+
+        HttpResponseMessage mismatchedClientResponse = await GetWithHostAsync(
+            BuildAuthorizeResumeUrl(requestUri, "not_axis_mcp"),
+            "web:3000");
+        mismatchedClientResponse.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        mismatchedClientResponse.Headers.Location.Should().BeNull();
 
         HttpResponseMessage signInResponse = await SignInAsync(email, Password);
         signInResponse.StatusCode.Should().Be(HttpStatusCode.OK);
 
         HttpResponseMessage callbackResponse = await GetWithHostAsync(
-            cachedLocation.PathAndQuery,
+            BuildAuthorizeResumeUrl(requestUri, clientId),
             "web:3000");
 
         callbackResponse.StatusCode.Should().Be(HttpStatusCode.Redirect);
@@ -433,6 +448,28 @@ public sealed class SignInUserFlowTests(ApiTestFixture fixture)
         string requestUri = requestUriValue.ToString();
         requestUri.Should().StartWith(RequestUris.Prefixes.Generic);
         return requestUri;
+    }
+
+    private static string ReadClientId(Uri location)
+    {
+        Dictionary<string, Microsoft.Extensions.Primitives.StringValues> query =
+            QueryHelpers.ParseQuery(location.Query);
+        query.TryGetValue("client_id", out Microsoft.Extensions.Primitives.StringValues clientIdValue)
+            .Should().BeTrue($"authorization request-token location was `{location}`");
+        string clientId = clientIdValue.ToString();
+        clientId.Should().NotBeNullOrWhiteSpace();
+        return clientId;
+    }
+
+    private static string BuildAuthorizeResumeUrl(string requestUri, string? clientId = null)
+    {
+        Dictionary<string, string?> query = new()
+        {
+            ["request_uri"] = requestUri,
+            ["client_id"] = clientId,
+        };
+
+        return QueryHelpers.AddQueryString("/connect/authorize", query);
     }
 
     private async Task<(int UserCount, int WorkspaceCount, int TokenCount)> CountRegistrationArtifactsAsync()

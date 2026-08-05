@@ -156,7 +156,7 @@ describe('SignInPage', () => {
     });
 
     await renderWithRouter(<SignInPage />, {
-      path: '/sign-in?authorization_request=opaque-request-handle',
+      path: '/sign-in?authorization_request=opaque-request-handle&authorization_client=local-mcp-client',
     });
 
     await fillSignInForm(user);
@@ -166,9 +166,51 @@ describe('SignInPage', () => {
     await user.click(screen.getByRole('button', { name: /sign in/i }));
 
     await waitFor(() =>
-      expect(completePostSignInFlow).toHaveBeenCalledWith('opaque-request-handle'),
+      expect(completePostSignInFlow).toHaveBeenCalledWith({
+        clientId: 'local-mcp-client',
+        requestUri: 'opaque-request-handle',
+      }),
     );
     expect(navigateMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects an incomplete authorization continuation without losing sign-in recovery', async () => {
+    const user = userEvent.setup();
+    vi.mocked(fetch).mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input.toString();
+      if (url.includes('/api/auth/sign-in') && init?.method === 'POST') {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          text: () =>
+            Promise.resolve(
+              JSON.stringify({
+                sessionEstablished: true,
+                nextStep: 'Dashboard',
+              }),
+            ),
+        } as unknown as Response);
+      }
+      if (url.includes('/api/auth/session') && init?.method === undefined) {
+        return Promise.resolve(authenticatedSessionResponse());
+      }
+      return Promise.reject(new Error(`Unexpected fetch: ${url}`));
+    });
+
+    await renderWithRouter(<SignInPage />, {
+      path: '/sign-in?authorization_request=opaque-request-handle',
+    });
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'This authorization request is no longer valid. Start the MCP connection again.',
+    );
+
+    await fillSignInForm(user);
+    await user.click(screen.getByRole('button', { name: /sign in/i }));
+
+    await waitFor(() => expect(completePostSignInFlow).not.toHaveBeenCalled());
+    expect(navigateMock).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: /sign in/i })).toBeEnabled();
   });
 
   it('shows generic credential errors without field enumeration', async () => {

@@ -5,7 +5,7 @@ import { useMemo, useState } from 'react';
 import { type FieldPath, type UseFormReturn, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { completePostSignInFlow, signInUser } from '@/features/auth/api';
-import { isAuthorizationRequestHandle } from '@/features/auth/authorization-request';
+import { getAuthorizationRequestContinuation } from '@/features/auth/authorization-request';
 import { useRefreshClientValidationErrors } from '@/features/auth/hooks/useRefreshClientValidationErrors';
 import {
   classifySignInError,
@@ -63,11 +63,14 @@ export function useSignIn() {
   const { t } = useTranslation();
   const language = currentSiteLanguage();
   const rawAuthorizationRequest = useQueryParam('authorization_request');
-  const authorizationRequest = isAuthorizationRequestHandle(rawAuthorizationRequest)
-    ? rawAuthorizationRequest
-    : undefined;
+  const rawAuthorizationClient = useQueryParam('authorization_client');
+  const authorizationRequest = getAuthorizationRequestContinuation(
+    rawAuthorizationRequest,
+    rawAuthorizationClient,
+  );
   const invalidAuthorizationRequest =
-    rawAuthorizationRequest !== undefined && authorizationRequest === undefined;
+    (rawAuthorizationRequest !== undefined || rawAuthorizationClient !== undefined) &&
+    authorizationRequest === undefined;
   const [submitErrorKind, setSubmitErrorKind] = useState<SignInSubmitErrorKind | null>(null);
   const [dashboardHandoffPending, setDashboardHandoffPending] = useState(false);
   const [authorizationRequestError, setAuthorizationRequestError] = useState(

@@ -128,14 +128,18 @@ describe('browser session restore', () => {
     expect(useAuthStore.getState().csrfToken).toBe('authenticated-csrf');
   });
 
-  it('resumes an external authorization request with its opaque request URI', () => {
+  it('resumes an external authorization request with its public client ID and opaque request URI', () => {
     const url = new URL(
-      buildAuthorizationRequestResumeUrl('urn:ietf:params:oauth:request_uri:opaque'),
+      buildAuthorizationRequestResumeUrl({
+        clientId: 'local-mcp-client',
+        requestUri: 'urn:ietf:params:oauth:request_uri:opaque',
+      }),
     );
 
     expect(url.pathname).toBe('/connect/authorize');
+    expect(url.searchParams.get('client_id')).toBe('local-mcp-client');
     expect(url.searchParams.get('request_uri')).toBe('urn:ietf:params:oauth:request_uri:opaque');
-    expect([...url.searchParams.keys()]).toEqual(['request_uri']);
+    expect([...url.searchParams.keys()]).toEqual(['client_id', 'request_uri']);
   });
 
   it('keeps route preloads free of session requests', async () => {

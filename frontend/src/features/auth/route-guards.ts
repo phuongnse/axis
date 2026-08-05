@@ -2,7 +2,7 @@ import { redirect } from '@tanstack/react-router';
 
 import { restoreBrowserSession } from '@/features/auth/api';
 import { getBrowserSessionStatus } from '@/features/auth/auth-store';
-import { isAuthorizationRequestHandle } from '@/features/auth/authorization-request';
+import { getAuthorizationRequestContinuation } from '@/features/auth/authorization-request';
 
 interface RouteGuardContext {
   preload?: boolean;
@@ -13,8 +13,12 @@ function hasPendingAuthorizationRequest(): boolean {
     return false;
   }
 
-  return isAuthorizationRequestHandle(
-    new URLSearchParams(window.location.search).get('authorization_request') ?? undefined,
+  const search = new URLSearchParams(window.location.search);
+  return Boolean(
+    getAuthorizationRequestContinuation(
+      search.get('authorization_request') ?? undefined,
+      search.get('authorization_client') ?? undefined,
+    ),
   );
 }
 

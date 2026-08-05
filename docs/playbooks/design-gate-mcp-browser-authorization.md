@@ -50,11 +50,11 @@ docs/TECH_STACK.md
 
 ## Contract and invariant decisions
 
-- OpenIddict's built-in authorization-request caching stores the validated request as a request token in its token store and exposes only its opaque OAuth `request_uri` across the browser handoff.
+- OpenIddict's built-in authorization-request caching stores the validated request as a request token in its token store and exposes its opaque OAuth `request_uri` together with the regular public `client_id` required by the protocol.
 - Request tokens use an absolute five-minute lifetime, matching the MCP authorization wait window. Missing, expired, tampered, or already-redeemed request URIs fail closed through the authorization server.
-- An unauthenticated interactive authorization request redirects only to the configured `App:BaseUrl` `/sign-in` route with the opaque handle. The raw client ID, redirect URI, state, code challenge, scopes, and arbitrary return URLs are not copied into SPA state.
+- An unauthenticated interactive authorization request redirects only to the configured `App:BaseUrl` `/sign-in` route with the opaque handle and server-validated public client identifier. Redirect URI, state, code challenge, scopes, and arbitrary return URLs are not copied into SPA state.
 - `prompt=none` remains a non-interactive flow and returns `login_required` to the registered callback when the browser session is absent.
-- After successful sign-in, the SPA navigates only to the fixed API `/connect/authorize?request_uri=...` endpoint. It does not begin a second SPA PKCE transaction and does not accept an arbitrary redirect target.
+- After successful sign-in, the SPA navigates only to the fixed API `/connect/authorize?client_id=...&request_uri=...` endpoint. It does not infer or default either value, begin a second SPA PKCE transaction, or accept an arbitrary redirect target. OpenIddict verifies that the regular client identifier matches the cached request before restoring it.
 - OpenIddict uses the required canonical `OpenIddict:Issuer`; local development sets it to the host-reachable API origin `https://localhost:5281`. Request-cache validation therefore does not depend on whether transport reached the API directly or through the SPA proxy.
 - SPA authorization and token requests stay on `window.location.origin` and use the `/connect` proxy, which preserves the browser-facing Host when forwarding so OpenIddict redirects remain on that origin. Host and Compose browsers use the same client behavior; no browser-context override, forwarded-host alias, or E2E-only path is supported.
 - The MCP client keeps its existing PKCE verifier, state validation, loopback listener, token exchange, and bounded timeout. No credential or auth tool is added.
@@ -65,7 +65,7 @@ Clean cutover for interactive unauthenticated authorization: replace the current
 
 Retire `VITE_CONNECT_URL` in the same cutover. The authorization server issuer is an API protocol contract, not a browser transport selection; no compatibility alias or fallback remains.
 
-Preserve `prompt=none` callback behavior and the normal SPA sign-in/dashboard handoff. No public REST DTO, OpenAPI operation, generated API type, or MCP product-tool shape changes.
+Preserve `prompt=none` callback behavior and the normal SPA sign-in/dashboard handoff. Replace the invalid request-URI-only continuation cleanly; no shim, inferred client identifier, validation bypass, public REST DTO, OpenAPI operation, generated API type, or MCP product-tool shape is introduced.
 
 Post-edit sweep:
 
@@ -77,8 +77,8 @@ The sweep must show only the intentional fail-closed API branch, fixed authoriza
 
 ## Verification plan
 
-- API integration tests for interactive redirect target, opaque-only query, prompt-none behavior, direct-to-proxy issuer-stable resume, invalid/expired/replayed handles, and unchanged sign-in/sign-out behavior.
-- Frontend component/session tests for pending authorization retention through credential errors, fixed continuation after sign-in, no second SPA PKCE transaction, invalid continuation recovery, and normal dashboard sign-in.
+- API integration tests for interactive redirect target, bounded handle/client query, prompt-none behavior, exact handle/client binding, missing or mismatched client rejection, direct-to-proxy issuer-stable resume, invalid/expired/replayed handles, and unchanged sign-in/sign-out behavior.
+- Frontend component/session tests for pending handle/client retention through credential errors, fixed continuation after sign-in, no inferred/default client, no second SPA PKCE transaction, invalid continuation recovery, and normal dashboard sign-in.
 - Browser journey for MCP authorization through the real sign-in form to the loopback callback, plus the existing sign-in journey with same-origin `/connect` proof.
 - PostgreSQL-backed API fixture evidence for request-token creation, expiry, redemption, and replay rejection through OpenIddict.
 - MCP coverage, contract, and safety checks; supported client reload/reconnect and authenticated `tools/call` read-back remain required runtime evidence.

@@ -134,16 +134,12 @@ sequenceDiagram
 > | Infrastructure | Done |
 > | API | Done |
 > | Frontend | N/A |
-> | MCP | Partial |
+> | MCP | Done |
 >
-> **Gaps vs spec:**
->
-> | ID | Gap |
-> |---|---|
-> | GAP-003 | Prove supported MCP host-client reload, current `tools/list`, authenticated `tools/call`, and same-session read-back. |
+> **Gaps vs spec:** None.
 >
 > **Deferred follow-ups:** Generic workflow-definition authoring, approval/assignment lifecycle, and additional record mutations remain out of scope for this lifecycle.
 >
-> **Verification:** See [submit-business-object-record.evidence.md](./submit-business-object-record.evidence.md) for exact proof paths, Axis wrapper commands, and current evidence gaps.
+> **Verification:** See [submit-business-object-record.evidence.md](./submit-business-object-record.evidence.md) for exact proof paths, Axis wrapper commands, and supported-client runtime evidence.
 >
 > **Decisions:** Business Objects owns `BusinessObjectRecord` because existing product contracts reserve that ownership. The first lifecycle is Draft → Submitted; a valid rule non-match leaves the Draft recoverable rather than inventing a `Rejected` state. Rules remain pure and consumer-neutral. Published field snapshots include exact binding revisions so later binding edits cannot rewrite an immutable record contract. Product consumers own presentation and setup; Axis keeps only generic public operations. Generic workflow authoring and event-driven orchestration remain out of scope until a product contract requires them.

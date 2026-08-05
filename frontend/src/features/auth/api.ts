@@ -1,7 +1,10 @@
 import { fetchApi } from '@/lib/api';
 import type { AxisBrowserSessionDto } from '@/lib/api-generated';
 import { applyBrowserSessionResponse, getBrowserSessionStatus, useAuthStore } from './auth-store';
-import { buildAuthorizationRequestResumeUrl } from './authorization-request';
+import {
+  type AuthorizationRequestContinuation,
+  buildAuthorizationRequestResumeUrl,
+} from './authorization-request';
 import type {
   LegalVersionsResponse,
   MessageResponse,
@@ -128,7 +131,9 @@ export async function completePostVerifyFlow(): Promise<boolean> {
   return restoreBrowserSession({ force: true });
 }
 
-export async function completePostSignInFlow(authorizationRequest?: string): Promise<boolean> {
+export async function completePostSignInFlow(
+  authorizationRequest?: AuthorizationRequestContinuation,
+): Promise<boolean> {
   if (authorizationRequest) {
     window.location.assign(buildAuthorizationRequestResumeUrl(authorizationRequest));
     return false;
