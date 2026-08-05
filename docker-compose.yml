@@ -152,6 +152,7 @@ services:
 
   e2e:
     profiles: ["e2e"]
+    network_mode: "service:web"
     build:
       context: ./frontend
       dockerfile: Dockerfile.e2e
@@ -167,7 +168,7 @@ services:
     environment:
       CI: "1"
       NODE_EXTRA_CA_CERTS: "/https/rootCA.pem"
-      E2E_BASE_URL: "https://web:3000"
+      E2E_BASE_URL: "https://localhost:3000"
       E2E_API_URL: "https://api:8443"
       E2E_MAILDEV_URL: "http://maildev:1080"
       E2E_VERIFY_ORIGIN: "${APP_BASE_URL:-https://localhost:3000}"
