@@ -57,6 +57,17 @@ import { RuleOriginBadge } from './RuleOriginBadge';
 type InputDefinition = ApiTypes.RuleDraftInputDefinitionDto;
 type EditableInput = InputDefinition & { clientId: string; keyLocked: boolean };
 type ValueType = ApiTypes.RuleValueType;
+type ProjectionRequest = {
+  source: ApiTypes.RuleAuthoringSourceDto;
+  generation: number;
+  requestId: number;
+  hydrationSnapshot?: {
+    name: string;
+    description: string;
+    inputs: InputDefinition[];
+    condition: ApiTypes.RuleConditionNodeDto;
+  };
+};
 
 const valueTypes: ValueType[] = ['Text', 'Integer', 'Decimal', 'Date', 'DateTime', 'Boolean'];
 
@@ -117,7 +128,9 @@ export function RuleEditorDialog({
   const [usageVersion, setUsageVersion] = useState<number | null>(null);
   const snapshotRef = useRef('');
   const hydratedKeyRef = useRef<string | null>(null);
-  const hydratingProjectionRef = useRef(false);
+  const projectionGenerationRef = useRef(0);
+  const projectionRequestRef = useRef(0);
+  const latestProjectionRequestRef = useRef(0);
   const [hydrationCondition, setHydrationCondition] =
     useState<ApiTypes.RuleConditionNodeDto | null>(null);
   const dslRef = useRef<HTMLTextAreaElement>(null);
@@ -126,13 +139,18 @@ export function RuleEditorDialog({
   );
 
   const projectMutation = useMutation({
-    mutationFn: (source: ApiTypes.RuleAuthoringSourceDto) =>
+    mutationFn: ({ source }: ProjectionRequest) =>
       projectRuleAuthoring({
         source,
         inputs: inputContract,
         expressionLanguageVersion: languageQuery.data?.version,
       }),
-    onSuccess: (projection) => {
+    onSuccess: (projection, request) => {
+      if (
+        request.generation !== projectionGenerationRef.current ||
+        request.requestId !== latestProjectionRequestRef.current
+      )
+        return;
       if (projection.isValid) {
         if (projection.condition) setCondition(projection.condition);
         if (projection.formattedDsl != null) setDsl(projection.formattedDsl);
@@ -140,25 +158,43 @@ export function RuleEditorDialog({
       setDiagnostics(
         (projection.diagnostics ?? []).map((item) => item.message ?? t('rules.expressionInvalid')),
       );
-      if (hydratingProjectionRef.current) {
-        hydratingProjectionRef.current = false;
+      if (request.hydrationSnapshot) {
         snapshotRef.current = draftSnapshot({
-          name,
-          description,
-          inputs: inputContract,
-          condition: projection.isValid && projection.condition ? projection.condition : condition,
-          dsl: projection.formattedDsl ?? dsl,
+          name: request.hydrationSnapshot.name,
+          description: request.hydrationSnapshot.description,
+          inputs: request.hydrationSnapshot.inputs,
+          condition:
+            projection.isValid && projection.condition
+              ? projection.condition
+              : request.hydrationSnapshot.condition,
+          dsl: projection.formattedDsl ?? '',
         });
       }
     },
-    onError: () => {
-      hydratingProjectionRef.current = false;
+    onError: (_cause, request) => {
+      if (
+        request.generation !== projectionGenerationRef.current ||
+        request.requestId !== latestProjectionRequestRef.current
+      )
+        return;
       setDiagnostics([t('rules.expressionInvalid')]);
     },
   });
 
+  const projectAuthoring = (source: ApiTypes.RuleAuthoringSourceDto) => {
+    const requestId = ++projectionRequestRef.current;
+    latestProjectionRequestRef.current = requestId;
+    projectMutation.mutate({
+      source,
+      generation: projectionGenerationRef.current,
+      requestId,
+    });
+  };
+
   useEffect(() => {
     if (!open) {
+      projectionGenerationRef.current += 1;
+      latestProjectionRequestRef.current = 0;
       hydratedKeyRef.current = null;
       setCreatedDraft(null);
       setHydrationCondition(null);
@@ -167,6 +203,8 @@ export function RuleEditorDialog({
     const detail = detailQuery.data;
     const hydrateKey = creating ? '__new__' : detail?.definitionKey;
     if (!hydrateKey || hydratedKeyRef.current === hydrateKey) return;
+    projectionGenerationRef.current += 1;
+    latestProjectionRequestRef.current = 0;
     hydratedKeyRef.current = hydrateKey;
     setName(detail?.name ?? '');
     setDescription(detail?.description ?? '');
@@ -191,18 +229,31 @@ export function RuleEditorDialog({
       condition: detail?.condition ?? null,
       dsl: '',
     });
-    hydratingProjectionRef.current = Boolean(detail?.condition);
     setHydrationCondition(detail?.condition ?? null);
   }, [open, detailQuery.data, creating]);
 
   useEffect(() => {
     if (!hydrationCondition) return;
     setHydrationCondition(null);
-    projectMutation.mutate({ ast: hydrationCondition });
-  }, [hydrationCondition, projectMutation.mutate]);
+    const requestId = ++projectionRequestRef.current;
+    latestProjectionRequestRef.current = requestId;
+    projectMutation.mutate({
+      source: { ast: hydrationCondition },
+      generation: projectionGenerationRef.current,
+      requestId,
+      hydrationSnapshot: {
+        name,
+        description,
+        inputs: inputContract,
+        condition: hydrationCondition,
+      },
+    });
+  }, [hydrationCondition, projectMutation.mutate, name, description, inputContract]);
 
   const refreshMutation = useMutation({
     mutationFn: async () => {
+      projectionGenerationRef.current += 1;
+      latestProjectionRequestRef.current = 0;
       const current = detailQuery.data ?? createdDraft;
       if (!current?.definitionKey) throw new Error(t('rules.loadErrorTitle'));
       return getRuleDefinition(current.definitionKey);
@@ -234,7 +285,6 @@ export function RuleEditorDialog({
         condition: refreshed.condition ?? null,
         dsl: '',
       });
-      hydratingProjectionRef.current = Boolean(refreshed.condition);
       setHydrationCondition(refreshed.condition ?? null);
       setStale(false);
     },
@@ -378,7 +428,7 @@ export function RuleEditorDialog({
   });
 
   const detail = detailQuery.data ?? createdDraft;
-  const canEditDraft = creating || detail?.actions?.canEditDraft === true;
+  const canEditDraft = detail ? detail.actions?.canEditDraft === true : creating;
   const readOnly = Boolean(detail && !canEditDraft);
   const dirty =
     canEditDraft &&
@@ -585,7 +635,7 @@ export function RuleEditorDialog({
                         language={languageQuery.data}
                         onChange={(next) => {
                           setCondition(next);
-                          projectMutation.mutate({ ast: next ?? undefined });
+                          projectAuthoring({ ast: next ?? undefined });
                         }}
                       />
                       <Field>
@@ -612,7 +662,7 @@ export function RuleEditorDialog({
                             setCompletions([]);
                           }}
                           onSelect={(event) => setCursor(event.currentTarget.selectionStart)}
-                          onBlur={() => projectMutation.mutate({ text: dsl })}
+                          onBlur={() => projectAuthoring({ text: dsl })}
                         />
                       </Field>
                       {completions.length ? (
@@ -643,7 +693,7 @@ export function RuleEditorDialog({
                                   setDsl(nextDsl);
                                   setCursor(start + (completion.insertText?.length ?? 0));
                                   setCompletions([]);
-                                  projectMutation.mutate({ text: nextDsl });
+                                  projectAuthoring({ text: nextDsl });
                                   requestAnimationFrame(() => {
                                     dslRef.current?.focus();
                                     dslRef.current?.setSelectionRange(

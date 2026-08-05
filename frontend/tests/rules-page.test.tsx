@@ -14,6 +14,14 @@ function jsonResponse(data: unknown, status = 200): Response {
   } as unknown as Response;
 }
 
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((next) => {
+    resolve = next;
+  });
+  return { promise, resolve };
+}
+
 function documentation(displayName: string, summary: string) {
   return {
     locales: {
@@ -1171,6 +1179,126 @@ describe('RulesPage', () => {
     expect(draftBodies[1]).toMatchObject({ expectedRevision: 8, name: 'Reconciled threshold' });
   });
 
+  it.each([
+    'before',
+    'after',
+  ])('ignores stale projection responses that resolve %s refresh hydration', async (timing) => {
+    const user = userEvent.setup();
+    const staleProjection = deferred<Response>();
+    const refreshedDetail = deferred<Response>();
+    const concurrentCondition = { ...thresholdCondition(), nodeId: 'concurrent-condition' };
+    const staleCondition = { ...thresholdCondition(), nodeId: 'stale-condition' };
+    const concurrent = workspaceDetail({
+      name: 'Concurrent threshold',
+      revision: 8,
+      condition: concurrentCondition,
+    });
+    const saved = workspaceDetail({
+      ...concurrent,
+      name: 'Reconciled threshold',
+      revision: 9,
+    });
+    let detailReads = 0;
+    let staleProjectionCalls = 0;
+    let putCount = 0;
+    const draftBodies: Record<string, unknown>[] = [];
+    vi.mocked(fetch).mockImplementation((input, init) => {
+      const url = input.toString();
+      if (url.endsWith('/rules/authoring/project')) {
+        const body = JSON.parse(String(init?.body));
+        if (body.source?.text === 'stale expression') {
+          staleProjectionCalls += 1;
+          return staleProjection.promise;
+        }
+        const projectedCondition = body.source?.ast ?? thresholdCondition();
+        return Promise.resolve(
+          jsonResponse({
+            condition: projectedCondition,
+            formattedDsl:
+              projectedCondition.nodeId === 'concurrent-condition'
+                ? 'canonical expression'
+                : 'value > threshold',
+            diagnostics: [],
+            isValid: true,
+          }),
+        );
+      }
+      if (url.endsWith('/rules/credit_threshold') && !init?.method) {
+        detailReads += 1;
+        if (detailReads === 1) return Promise.resolve(jsonResponse(workspaceDetail()));
+        return timing === 'before'
+          ? refreshedDetail.promise
+          : Promise.resolve(jsonResponse(concurrent));
+      }
+      if (url.endsWith('/rules/credit_threshold/draft') && init?.method === 'PUT') {
+        putCount += 1;
+        draftBodies.push(JSON.parse(String(init.body)));
+        return Promise.resolve(
+          putCount === 1 ? jsonResponse({ title: 'Revision conflict' }, 409) : jsonResponse(saved),
+        );
+      }
+      return Promise.resolve(respondForRules(input, init));
+    });
+
+    await renderWithRouter(<RulesPage />, { path: '/rules', authenticatedPath: 'rules' });
+    await user.click(
+      within(await screen.findByRole('region', { name: 'Rules catalog' })).getByRole('button', {
+        name: 'Credit threshold',
+      }),
+    );
+    const editor = await screen.findByRole('dialog', { name: 'Credit threshold' });
+    const name = within(editor).getByLabelText('Name');
+    await user.clear(name);
+    await user.type(name, 'Local stale change');
+    await user.click(within(editor).getByRole('button', { name: 'Save draft' }));
+    expect(await within(editor).findByText(/changed elsewhere/i)).toBeVisible();
+
+    await user.click(within(editor).getByRole('tab', { name: 'Rule behavior' }));
+    const expression = within(editor).getByLabelText('Expression syntax');
+    await user.clear(expression);
+    await user.type(expression, 'stale expression');
+    await user.click(within(editor).getByRole('button', { name: 'Refresh current rule' }));
+    await waitFor(() => expect(staleProjectionCalls).toBe(1));
+    await waitFor(() => expect(detailReads).toBe(2));
+
+    if (timing === 'before') {
+      staleProjection.resolve(
+        jsonResponse({
+          condition: staleCondition,
+          formattedDsl: 'stale formatted expression',
+          diagnostics: [],
+          isValid: true,
+        }),
+      );
+      refreshedDetail.resolve(jsonResponse(concurrent));
+    }
+
+    await waitFor(() => expect(expression).toHaveValue('canonical expression'));
+    if (timing === 'after') {
+      staleProjection.resolve(
+        jsonResponse({
+          condition: staleCondition,
+          formattedDsl: 'stale formatted expression',
+          diagnostics: [],
+          isValid: true,
+        }),
+      );
+    }
+    await waitFor(() => expect(expression).toHaveValue('canonical expression'));
+
+    await user.click(within(editor).getByRole('tab', { name: 'General' }));
+    const refreshedName = within(editor).getByLabelText('Name');
+    expect(refreshedName).toHaveValue('Concurrent threshold');
+    await user.clear(refreshedName);
+    await user.type(refreshedName, 'Reconciled threshold');
+    await user.click(within(editor).getByRole('button', { name: 'Save draft' }));
+    expect(await screen.findByText('Draft saved')).toBeVisible();
+    expect(draftBodies[1]).toMatchObject({
+      expectedRevision: 8,
+      condition: { nodeId: 'concurrent-condition' },
+    });
+  });
+
   it('refreshes a post-create conflict by its persisted key without another POST', async () => {
     const user = userEvent.setup();
     const created = workspaceDetail({
@@ -1235,6 +1363,72 @@ describe('RulesPage', () => {
     expect(postCount).toBe(1);
     expect(draftBodies).toHaveLength(2);
     expect(draftBodies[1]).toMatchObject({ expectedRevision: 5, name: 'Recovered rule' });
+  });
+
+  it('honors read-only capabilities returned while refreshing a post-create conflict', async () => {
+    const user = userEvent.setup();
+    const created = workspaceDetail({
+      definitionKey: 'archived_during_create',
+      name: 'Archived during create',
+      revision: 1,
+      inputs: [],
+      condition: null,
+    });
+    const archived = workspaceDetail({
+      definitionKey: 'archived_during_create',
+      name: 'Archived server copy',
+      status: 'Archived',
+      revision: 3,
+      latestVersion: null,
+      activeVersion: null,
+      versions: [],
+      archivedAt: '2026-01-02T00:00:00Z',
+      actions: {
+        canEditDraft: false,
+        canCreateVersion: false,
+        canActivateVersion: false,
+        canDeactivate: false,
+        canArchive: false,
+      },
+    });
+    let postCount = 0;
+    let refreshCount = 0;
+    vi.mocked(fetch).mockImplementation((input, init) => {
+      const url = input.toString();
+      if (url.endsWith('/rules') && init?.method === 'POST') {
+        postCount += 1;
+        return Promise.resolve(jsonResponse(created, 201));
+      }
+      if (url.endsWith('/rules/archived_during_create') && !init?.method) {
+        refreshCount += 1;
+        return Promise.resolve(jsonResponse(archived));
+      }
+      if (url.endsWith('/rules/archived_during_create/draft') && init?.method === 'PUT') {
+        return Promise.resolve(jsonResponse({ title: 'Revision conflict' }, 409));
+      }
+      return Promise.resolve(respondForRules(input, init));
+    });
+
+    await renderWithRouter(<RulesPage />, { path: '/rules', authenticatedPath: 'rules' });
+    await user.click(await screen.findByRole('button', { name: 'New rule' }));
+    const editor = await screen.findByRole('dialog', { name: 'New workspace rule' });
+    await user.type(within(editor).getByLabelText('Name'), 'Archived during create');
+    await user.click(within(editor).getByRole('tab', { name: 'Rule behavior' }));
+    await user.click(within(editor).getByRole('button', { name: 'Add input' }));
+    await user.type(within(editor).getByLabelText('Key'), 'value');
+    await user.type(within(editor).getByLabelText('Input name'), 'Value');
+    await user.click(within(editor).getByRole('button', { name: 'Add condition' }));
+    await user.click(within(editor).getByRole('button', { name: 'Save draft' }));
+
+    expect(await within(editor).findByText(/changed elsewhere/i)).toBeVisible();
+    await user.click(within(editor).getByRole('button', { name: 'Refresh current rule' }));
+    await screen.findByRole('dialog', { name: 'Archived server copy' });
+    expect(within(editor).queryByLabelText('Name')).not.toBeInTheDocument();
+    expect(within(editor).queryByRole('button', { name: 'Save draft' })).not.toBeInTheDocument();
+    expect(within(editor).queryByRole('region', { name: 'Simulation' })).not.toBeInTheDocument();
+    expect(within(editor).getByText('Latest version').nextElementSibling).toHaveTextContent('—');
+    expect(postCount).toBe(1);
+    expect(refreshCount).toBe(1);
   });
 
   it('uses server capabilities to keep archived workspace rules read-only', async () => {
