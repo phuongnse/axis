@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Archive, Lightbulb, Plus, Save, Trash2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { toast } from 'sonner';
 import { ManagedDialog, ManagedDialogBody } from '@/components/shared/ManagedDialog';
 import { ManagedDialogTabs } from '@/components/shared/ManagedDialogTabs';
 import { StatusBadge } from '@/components/shared/StatusBadge';
@@ -54,7 +55,7 @@ import { RuleConditionComposer } from './RuleConditionComposer';
 import { RuleOriginBadge } from './RuleOriginBadge';
 
 type InputDefinition = ApiTypes.RuleDraftInputDefinitionDto;
-type EditableInput = InputDefinition & { clientId: string };
+type EditableInput = InputDefinition & { clientId: string; keyLocked: boolean };
 type ValueType = ApiTypes.RuleValueType;
 
 const valueTypes: ValueType[] = ['Text', 'Integer', 'Decimal', 'Date', 'DateTime', 'Boolean'];
@@ -112,13 +113,17 @@ export function RuleEditorDialog({
   const [completions, setCompletions] = useState<ApiTypes.RuleAuthoringCompletionDto[]>([]);
   const [cursor, setCursor] = useState(0);
   const [stale, setStale] = useState(false);
+  const [createdDraft, setCreatedDraft] = useState<RuleDefinitionDetail | null>(null);
+  const [usageVersion, setUsageVersion] = useState<number | null>(null);
   const snapshotRef = useRef('');
   const hydratedKeyRef = useRef<string | null>(null);
   const hydratingProjectionRef = useRef(false);
   const [hydrationCondition, setHydrationCondition] =
     useState<ApiTypes.RuleConditionNodeDto | null>(null);
   const dslRef = useRef<HTMLTextAreaElement>(null);
-  const inputContract = inputs.map(({ clientId: _clientId, ...input }) => input);
+  const inputContract = inputs.map(
+    ({ clientId: _clientId, keyLocked: _keyLocked, ...input }) => input,
+  );
 
   const projectMutation = useMutation({
     mutationFn: (source: ApiTypes.RuleAuthoringSourceDto) =>
@@ -155,6 +160,7 @@ export function RuleEditorDialog({
   useEffect(() => {
     if (!open) {
       hydratedKeyRef.current = null;
+      setCreatedDraft(null);
       setHydrationCondition(null);
       return;
     }
@@ -165,7 +171,9 @@ export function RuleEditorDialog({
     setName(detail?.name ?? '');
     setDescription(detail?.description ?? '');
     const nextInputs = toDraftInputs(detail?.inputs ?? []);
-    setInputs(nextInputs.map((input) => ({ ...input, clientId: crypto.randomUUID() })));
+    setInputs(
+      nextInputs.map((input) => ({ ...input, clientId: crypto.randomUUID(), keyLocked: true })),
+    );
     setCondition(detail?.condition ?? null);
     setDsl('');
     setDiagnostics([]);
@@ -175,6 +183,7 @@ export function RuleEditorDialog({
     setSimulationFailure(null);
     setStale(false);
     setError(null);
+    setUsageVersion(detail?.activeVersion ?? detail?.latestVersion ?? null);
     snapshotRef.current = draftSnapshot({
       name: detail?.name ?? '',
       description: detail?.description ?? '',
@@ -195,16 +204,21 @@ export function RuleEditorDialog({
   const saveMutation = useMutation({
     mutationFn: async () => {
       setError(null);
-      let detail = detailQuery.data;
-      if (!detail) {
-        detail = await createRuleDefinition({ name, description });
-      }
-      if (!condition) {
+      if (!condition || diagnostics.length > 0 || projectMutation.isPending) {
         setActiveSection('behavior');
         throw new Error(t('rules.conditionRequired'));
       }
-      const saved = await saveRuleDefinitionDraft(detail.definitionKey ?? '', {
-        expectedRevision: detail.revision ?? 1,
+      let current = detailQuery.data ?? createdDraft;
+      if (!current) {
+        current = await createRuleDefinition({ name, description });
+        setCreatedDraft(current);
+        if (current.definitionKey) {
+          queryClient.setQueryData(ruleDefinitionQueryKeys.detail(current.definitionKey), current);
+        }
+        await queryClient.invalidateQueries({ queryKey: ruleDefinitionQueryKeys.lists() });
+      }
+      const saved = await saveRuleDefinitionDraft(current.definitionKey ?? '', {
+        expectedRevision: current.revision ?? 1,
         name,
         description,
         inputs: inputContract,
@@ -213,8 +227,17 @@ export function RuleEditorDialog({
       return saved;
     },
     onSuccess: (saved) => {
-      void queryClient.invalidateQueries({ queryKey: ruleDefinitionQueryKeys.all });
+      setInputs((current) => current.map((input) => ({ ...input, keyLocked: true })));
+      snapshotRef.current = draftSnapshot({
+        name,
+        description,
+        inputs: inputContract,
+        condition,
+        dsl,
+      });
+      void queryClient.invalidateQueries({ queryKey: ruleDefinitionQueryKeys.lists() });
       queryClient.setQueryData(ruleDefinitionQueryKeys.detail(saved.definitionKey ?? ''), saved);
+      toast.success(t('rules.saved'));
       onCreated?.(saved);
       if (!onCreated) onOpenChange(false);
     },
@@ -237,8 +260,9 @@ export function RuleEditorDialog({
   });
   const simulationMutation = useMutation({
     mutationFn: () => {
-      const current = detailQuery.data;
+      const current = detailQuery.data ?? createdDraft;
       if (!current?.definitionKey) throw new Error(t('rules.simulationError'));
+      if (authoringBlocked) throw new Error(t('rules.conditionRequired'));
       const inputs = Object.fromEntries(
         inputContract.filter(hasInputKey).map((input) => [
           input.key,
@@ -248,9 +272,12 @@ export function RuleEditorDialog({
           },
         ]),
       );
-      return current.activeVersion != null
-        ? simulateRuleDefinitionVersion(current.definitionKey, current.activeVersion, { inputs })
-        : simulateRuleDefinitionDraft(current.definitionKey, { inputs });
+      const immutableVersion = current.activeVersion ?? current.latestVersion;
+      return canEditDraft
+        ? simulateRuleDefinitionDraft(current.definitionKey, { inputs })
+        : immutableVersion != null
+          ? simulateRuleDefinitionVersion(current.definitionKey, immutableVersion, { inputs })
+          : Promise.reject(new Error(t('rules.simulationError')));
     },
     onSuccess: (result) => {
       setSimulationFailure(null);
@@ -264,9 +291,11 @@ export function RuleEditorDialog({
 
   const lifecycleMutation = useMutation({
     mutationFn: (action: 'version' | 'activate' | 'deactivate' | 'archive') => {
-      const current = detailQuery.data;
+      const current = detailQuery.data ?? createdDraft;
       if (!current?.definitionKey || current.revision == null)
         throw new Error(t('rules.lifecycleError'));
+      if ((action === 'version' || action === 'activate') && authoringBlocked)
+        throw new Error(t('rules.conditionRequired'));
       if (action === 'version')
         return createRuleDefinitionVersion(current.definitionKey, current.revision);
       if (action === 'activate') {
@@ -283,7 +312,9 @@ export function RuleEditorDialog({
     },
     onSuccess: (saved) => {
       queryClient.setQueryData(ruleDefinitionQueryKeys.detail(saved.definitionKey ?? ''), saved);
-      void queryClient.invalidateQueries({ queryKey: ruleDefinitionQueryKeys.all });
+      void queryClient.invalidateQueries({ queryKey: ruleDefinitionQueryKeys.lists() });
+      setUsageVersion(saved.activeVersion ?? saved.latestVersion ?? null);
+      toast.success(t('rules.lifecycleUpdated'));
       setArchiveOpen(false);
     },
     onError: (cause) => {
@@ -292,12 +323,19 @@ export function RuleEditorDialog({
     },
   });
 
-  const detail = detailQuery.data;
-  const readOnly = Boolean(detail && detail.origin === 'BuiltIn');
+  const detail = detailQuery.data ?? createdDraft;
+  const canEditDraft = creating || detail?.actions?.canEditDraft === true;
+  const readOnly = Boolean(detail && !canEditDraft);
   const dirty =
-    !readOnly &&
+    canEditDraft &&
     snapshotRef.current !==
       draftSnapshot({ name, description, inputs: inputContract, condition, dsl });
+  const authoringBlocked =
+    canEditDraft &&
+    (dirty || projectMutation.isPending || diagnostics.length > 0 || condition == null);
+  const selectedUsageVersion = detail?.versions?.find(
+    (version) => version.version === (usageVersion ?? detail.activeVersion ?? detail.latestVersion),
+  );
   const requestClose = () => {
     if (dirty) setDiscardOpen(true);
     else onOpenChange(false);
@@ -338,7 +376,12 @@ export function RuleEditorDialog({
           <Button
             type="button"
             onClick={() => saveMutation.mutate()}
-            disabled={saveMutation.isPending || !name.trim()}
+            disabled={
+              saveMutation.isPending ||
+              projectMutation.isPending ||
+              diagnostics.length > 0 ||
+              !name.trim()
+            }
           >
             <Save data-icon="inline-start" />
             {t('rules.save')}
@@ -431,6 +474,7 @@ export function RuleEditorDialog({
                                 ...inputs,
                                 {
                                   clientId: crypto.randomUUID(),
+                                  keyLocked: false,
                                   key: '',
                                   label: '',
                                   types: ['Text'],
@@ -451,6 +495,7 @@ export function RuleEditorDialog({
                               key={input.clientId}
                               input={input}
                               inputId={input.clientId}
+                              keyLocked={input.keyLocked}
                               language={languageQuery.data}
                               onChange={(next) =>
                                 updateInput(inputs, index, input, next, setInputs, setCondition)
@@ -566,18 +611,47 @@ export function RuleEditorDialog({
                     </div>
                   ),
               },
-              ...(detail?.definitionKey && detail.latestVersion
+              ...(detail?.definitionKey && selectedUsageVersion?.version != null
                 ? [
                     {
                       id: 'usage',
                       label: t('rules.usage'),
                       content: (
-                        <RuleBindingUsagePanel
-                          definitionKey={detail.definitionKey}
-                          version={detail.activeVersion ?? detail.latestVersion}
-                          active={activeSection === 'usage'}
-                          inputs={detail.inputs}
-                        />
+                        <div className="space-y-4">
+                          <Field>
+                            <FieldLabel htmlFor="rule-usage-version">
+                              {t('rules.usageVersion')}
+                            </FieldLabel>
+                            <Select
+                              value={String(selectedUsageVersion.version)}
+                              onValueChange={(value) => setUsageVersion(Number(value))}
+                            >
+                              <SelectTrigger id="rule-usage-version">
+                                <SelectValue>
+                                  {t('rules.version', { version: selectedUsageVersion.version })}
+                                </SelectValue>
+                              </SelectTrigger>
+                              <SelectContent>
+                                {(detail.versions ?? []).map((version) =>
+                                  version.version != null ? (
+                                    <SelectItem
+                                      key={version.version}
+                                      value={String(version.version)}
+                                    >
+                                      {t('rules.version', { version: version.version })}
+                                    </SelectItem>
+                                  ) : null,
+                                )}
+                              </SelectContent>
+                            </Select>
+                          </Field>
+                          <RuleBindingUsagePanel
+                            definitionKey={detail.definitionKey}
+                            version={selectedUsageVersion.version}
+                            active={activeSection === 'usage'}
+                            inputs={selectedUsageVersion.inputs}
+                          />
+                        </div>
                       ),
                     },
                   ]
@@ -611,9 +685,10 @@ export function RuleEditorDialog({
             onChange={(key, value) => setSampleValues((current) => ({ ...current, [key]: value }))}
             onSimulate={() => simulationMutation.mutate()}
             pending={simulationMutation.isPending}
+            disabled={authoringBlocked}
             simulation={simulation}
             failure={simulationFailure}
-            version={detail.activeVersion}
+            version={canEditDraft ? null : (detail.activeVersion ?? detail.latestVersion)}
           />
         ) : null}
         {stale ? (
@@ -639,13 +714,18 @@ export function RuleEditorDialog({
                 <Button
                   type="button"
                   variant="secondary"
+                  disabled={authoringBlocked}
                   onClick={() => setLifecycleAction('version')}
                 >
                   {t('rules.createVersion')}
                 </Button>
               ) : null}
               {detail.actions?.canActivateVersion ? (
-                <Button type="button" onClick={() => setLifecycleAction('activate')}>
+                <Button
+                  type="button"
+                  disabled={authoringBlocked}
+                  onClick={() => setLifecycleAction('activate')}
+                >
                   {t('rules.activate')}
                 </Button>
               ) : null}
@@ -791,6 +871,7 @@ function RuleSimulationPanel({
   onChange,
   onSimulate,
   pending,
+  disabled,
   simulation,
   failure,
   version,
@@ -800,6 +881,7 @@ function RuleSimulationPanel({
   onChange: (key: string, value: string) => void;
   onSimulate: () => void;
   pending: boolean;
+  disabled: boolean;
   simulation: ApiTypes.RuleSimulationResultDto | null;
   failure: 'invalid' | 'error' | null;
   version?: number | null;
@@ -812,7 +894,7 @@ function RuleSimulationPanel({
           <h3 className="text-sm font-semibold">{t('rules.simulation')}</h3>
           <p className="text-sm text-muted-foreground">{t('rules.simulationHelp')}</p>
         </div>
-        <Button type="button" variant="outline" onClick={onSimulate} disabled={pending}>
+        <Button type="button" variant="outline" onClick={onSimulate} disabled={pending || disabled}>
           {t('rules.runSimulation')}
         </Button>
       </div>
@@ -919,12 +1001,14 @@ function SampleInput({
 function InputRow({
   input,
   inputId,
+  keyLocked,
   language,
   onChange,
   onRemove,
 }: {
   input: InputDefinition;
   inputId: string;
+  keyLocked: boolean;
   language: ApiTypes.RuleExpressionLanguageDto | undefined;
   onChange: (input: InputDefinition) => void;
   onRemove: () => void;
@@ -937,7 +1021,7 @@ function InputRow({
         <Input
           id={`${inputId}-key`}
           value={input.key ?? ''}
-          disabled={Boolean(input.key)}
+          disabled={keyLocked}
           onChange={(event) => onChange({ ...input, key: event.target.value })}
         />
       </Field>
@@ -1028,7 +1112,9 @@ function updateInput(
 ) {
   setInputs(
     inputs.map((candidate, candidateIndex) =>
-      candidateIndex === index ? { ...next, clientId: current.clientId } : candidate,
+      candidateIndex === index
+        ? { ...next, clientId: current.clientId, keyLocked: current.keyLocked }
+        : candidate,
     ),
   );
 }

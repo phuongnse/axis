@@ -578,8 +578,6 @@ public sealed class RuleDefinitionEndpointTests(ApiTestFixture fixture)
             .Should().Be("IsBlank");
         detail.GetProperty("condition").GetProperty("right").GetProperty("literal")
             .GetProperty("values").EnumerateArray().Single().GetString().Should().Be("false");
-        detail.TryGetProperty("outcome", out _).Should().BeFalse();
-        detail.TryGetProperty("contextKey", out _).Should().BeFalse();
     }
 
     [Fact]

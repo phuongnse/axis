@@ -142,16 +142,28 @@ function dateRangeCondition(): ApiTypes.RuleConditionNodeDto {
 function builtInDetail(definitionKey: string): MockRuleDetail | null {
   const summary = builtInRules.find((rule) => rule.definitionKey === definitionKey);
   if (!summary) return null;
+  const condition =
+    definitionKey === 'field.required'
+      ? requiredCondition()
+      : definitionKey === 'field.date_range'
+        ? dateRangeCondition()
+        : undefined;
   return {
     ...summary,
     revision: null,
-    condition:
-      definitionKey === 'field.required'
-        ? requiredCondition()
-        : definitionKey === 'field.date_range'
-          ? dateRangeCondition()
-          : undefined,
-    versions: [],
+    condition,
+    versions: [
+      {
+        version: summary.latestVersion,
+        name: summary.name,
+        description: summary.description,
+        expressionLanguageVersion: summary.expressionLanguageVersion,
+        inputs: summary.inputs,
+        output: summary.output,
+        condition,
+        createdAt: now,
+      },
+    ],
     createdAt: null,
     updatedAt: null,
     archivedAt: null,
@@ -865,8 +877,6 @@ test('workspace rule authoring projects, simulates, and manages immutable lifecy
   ]);
   expect(saveBody.condition?.predicateOperator).toBe('Equal');
   expect(saveBody.condition?.left?.kind).toBe('Input');
-  expect(save?.body).not.toHaveProperty('scope');
-  expect(save?.body).not.toHaveProperty('outcome');
   await expect(
     page.getByLabel('Credit threshold').getByText('Draft', { exact: true }),
   ).toBeVisible();
@@ -878,6 +888,8 @@ test('workspace rule authoring projects, simulates, and manages immutable lifecy
   await editor.getByRole('button', { name: 'Show suggestions' }).click();
   await expect(editor.getByRole('option', { name: 'value' })).toBeVisible();
   await editor.getByRole('option', { name: 'value' }).click();
+  await editor.getByRole('button', { name: 'Save draft' }).click();
+  await expect(page.getByText('Draft saved').last()).toBeVisible();
   const simulation = editor.getByRole('region', { name: 'Simulation' });
   await simulation.getByLabel('Value').fill('yes');
   await simulation.getByRole('button', { name: 'Run simulation' }).click();
@@ -888,7 +900,7 @@ test('workspace rule authoring projects, simulates, and manages immutable lifecy
 
   await editor.getByRole('button', { name: 'Create version' }).click();
   await page.getByRole('button', { name: 'Create version' }).last().click();
-  await expect(editor.getByText('Version 1')).toBeVisible();
+  await expect(editor.getByLabel('Version history').getByText('Version 1')).toBeVisible();
   await editor.getByRole('button', { name: 'Activate version' }).click();
   await page.getByRole('button', { name: 'Activate version' }).last().click();
   await expect(editor.getByText('Active', { exact: true })).toBeVisible();

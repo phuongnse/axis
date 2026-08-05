@@ -47,8 +47,9 @@ export const ruleDefinitionStaleTimeMs = 1000 * 60 * 5;
 
 export const ruleDefinitionQueryKeys = {
   all: ['rule-definitions'] as const,
+  lists: () => [...ruleDefinitionQueryKeys.all, 'list'] as const,
   list: (filters: RuleDefinitionFilters = defaultFilters) =>
-    [...ruleDefinitionQueryKeys.all, 'list', filters] as const,
+    [...ruleDefinitionQueryKeys.lists(), filters] as const,
   detail: (definitionKey: string) =>
     [...ruleDefinitionQueryKeys.all, 'detail', definitionKey] as const,
   usage: (definitionKey: string, version: number) =>

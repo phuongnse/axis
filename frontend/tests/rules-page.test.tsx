@@ -46,6 +46,13 @@ const systemSummary = {
     },
   ],
   output: { type: 'Boolean', cardinality: 'Scalar' },
+  actions: {
+    canEditDraft: false,
+    canCreateVersion: false,
+    canActivateVersion: false,
+    canDeactivate: false,
+    canArchive: false,
+  },
   documentation: documentation('Required value', 'Require a value.'),
 };
 
@@ -75,6 +82,13 @@ const workspaceSummary = {
     },
   ],
   output: { type: 'Boolean', cardinality: 'Scalar' },
+  actions: {
+    canEditDraft: true,
+    canCreateVersion: true,
+    canActivateVersion: false,
+    canDeactivate: false,
+    canArchive: true,
+  },
   documentation: documentation('Credit threshold', 'Compare a value with a workspace threshold.'),
 };
 
@@ -91,7 +105,15 @@ function requiredDetail() {
     expressionLanguageVersion: 1,
     revision: null,
     condition: requiredCondition(),
-    versions: [],
+    versions: [
+      {
+        version: 1,
+        name: systemSummary.name,
+        inputs: systemSummary.inputs,
+        output: systemSummary.output,
+        condition: requiredCondition(),
+      },
+    ],
     createdAt: null,
     updatedAt: null,
     archivedAt: null,
@@ -293,6 +315,19 @@ function respondForRules(input: RequestInfo | URL, init?: RequestInit): Response
 describe('RulesPage', () => {
   beforeEach(() => {
     vi.stubGlobal('fetch', vi.fn());
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn().mockReturnValue({
+        matches: false,
+        media: '',
+        onchange: null,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      }),
+    );
     useAuthStore.getState().setBrowserSession({
       authenticated: false,
       csrfToken: 'test-csrf-token',
@@ -547,10 +582,117 @@ describe('RulesPage', () => {
     });
   });
 
+  it('selects historical exact-version usage with that immutable input contract', async () => {
+    const user = userEvent.setup();
+    const detail = {
+      ...requiredDetail(),
+      latestVersion: 2,
+      activeVersion: 2,
+      versions: [
+        {
+          version: 1,
+          name: 'Required value',
+          inputs: [{ key: 'legacy', label: 'Legacy value', types: ['Text'] }],
+          condition: requiredCondition(),
+        },
+        {
+          version: 2,
+          name: 'Required value',
+          inputs: [{ key: 'value', label: 'Current value', types: ['Text'] }],
+          condition: requiredCondition(),
+        },
+      ],
+    };
+    vi.mocked(fetch).mockImplementation((input, init) => {
+      const url = input.toString();
+      if (url.endsWith('/rules/field.required')) return Promise.resolve(jsonResponse(detail));
+      if (url.includes('/rules/field.required/bindings?version=')) {
+        const version = Number(new URL(url, 'https://axis.test').searchParams.get('version'));
+        return Promise.resolve(
+          jsonResponse([
+            {
+              bindingId: '88888888-8888-4888-8888-888888888888',
+              definitionKey: 'field.required',
+              definitionVersion: version,
+              targetType: 'business-object-field',
+              targetId: version === 1 ? 'customer.legacy' : 'customer.current',
+              useCaseOrTrigger: 'field-validation',
+              priority: 0,
+              enabled: true,
+              failureBehavior: 'FailClosed',
+              revision: 1,
+            },
+          ]),
+        );
+      }
+      if (url.endsWith('/rule-bindings/88888888-8888-4888-8888-888888888888')) {
+        return Promise.resolve(
+          jsonResponse({
+            id: '88888888-8888-4888-8888-888888888888',
+            revision: 1,
+            definitionKey: 'field.required',
+            definitionVersion: 1,
+            targetType: 'business-object-field',
+            targetId: 'customer.legacy',
+            useCaseOrTrigger: 'field-validation',
+            priority: 0,
+            enabled: true,
+            failureBehavior: 'FailClosed',
+            inputMappings: {
+              legacy: { kind: 'Context', contextKey: 'record.legacy', literalValues: [] },
+            },
+          }),
+        );
+      }
+      return Promise.resolve(respondForRules(input, init));
+    });
+
+    await renderWithRouter(<RulesPage />, { path: '/rules', authenticatedPath: 'rules' });
+    await user.click(
+      within(await screen.findByRole('region', { name: 'Rules catalog' })).getByRole('button', {
+        name: 'Required value',
+      }),
+    );
+    const ruleDialog = await screen.findByRole('dialog', { name: 'Required value' });
+    await user.click(within(ruleDialog).getByRole('tab', { name: 'Usage' }));
+    await user.click(within(ruleDialog).getByLabelText('Usage version'));
+    await user.click(await screen.findByRole('option', { name: 'Version 1' }));
+    expect(await within(ruleDialog).findByText('customer.legacy')).toBeVisible();
+    await user.click(within(ruleDialog).getByRole('button', { name: 'Edit binding' }));
+    const bindingDialog = await screen.findByRole('dialog', { name: 'Edit binding' });
+    expect(within(bindingDialog).getByLabelText('legacy')).toHaveTextContent('Context');
+    expect(within(bindingDialog).queryByLabelText('value')).not.toBeInTheDocument();
+  });
+
   it('keeps invalid DSL edits, applies server completion ranges, and guards dirty close', async () => {
     const user = userEvent.setup();
     vi.mocked(fetch).mockImplementation((input, init) => {
       const url = input.toString();
+      if (url.endsWith('/rules/credit_threshold') && (!init?.method || init.method === 'GET')) {
+        return Promise.resolve(
+          jsonResponse(
+            workspaceDetail({
+              latestVersion: 1,
+              activeVersion: null,
+              versions: [
+                {
+                  version: 1,
+                  name: 'Credit threshold',
+                  inputs: workspaceSummary.inputs,
+                  condition: thresholdCondition(),
+                },
+              ],
+              actions: {
+                canEditDraft: true,
+                canCreateVersion: true,
+                canActivateVersion: true,
+                canDeactivate: false,
+                canArchive: true,
+              },
+            }),
+          ),
+        );
+      }
       if (url.endsWith('/rules/authoring/project') && init?.body) {
         const body = JSON.parse(String(init.body));
         if (body.source?.text === 'invalid expression') {
@@ -592,6 +734,20 @@ describe('RulesPage', () => {
     expect(editor.querySelector('[data-slot="rule-expression"]')).toHaveTextContent(
       'Value is greater than Threshold',
     );
+    expect(within(editor).getByRole('button', { name: 'Run simulation' })).toBeDisabled();
+    expect(within(editor).getByRole('button', { name: 'Create version' })).toBeDisabled();
+    expect(within(editor).getByRole('button', { name: 'Activate version' })).toBeDisabled();
+    expect(
+      vi
+        .mocked(fetch)
+        .mock.calls.some(
+          ([request, requestInit]) =>
+            requestInit?.method === 'POST' &&
+            (request.toString().endsWith('/draft/simulate') ||
+              request.toString().endsWith('/versions') ||
+              request.toString().endsWith('/active-version')),
+        ),
+    ).toBe(false);
 
     await user.click(within(editor).getByRole('button', { name: 'Close dialog' }));
     const discard = await screen.findByRole('alertdialog', { name: 'Discard unsaved changes?' });
@@ -625,13 +781,13 @@ describe('RulesPage', () => {
       if (url.endsWith('/rules/credit_threshold') && (!init?.method || init.method === 'GET')) {
         return Promise.resolve(jsonResponse(currentDetail));
       }
-      if (url.endsWith('/rules/credit_threshold/versions/1/simulate')) {
+      if (url.endsWith('/rules/credit_threshold/draft/simulate')) {
         simulationCalls += 1;
         return Promise.resolve(
           simulationCalls === 1
             ? jsonResponse({
                 definitionKey: 'credit_threshold',
-                definitionVersion: 1,
+                definitionVersion: null,
                 isMatch: true,
                 diagnostics: [{ nodeId: 'threshold', isMatch: true }],
               })
@@ -706,9 +862,7 @@ describe('RulesPage', () => {
     await user.click(within(editor).getByRole('button', { name: 'Run simulation' }));
     expect(await within(editor).findByText('Condition matched')).toBeVisible();
     expect(within(editor).getAllByText(/Version 1/).length).toBeGreaterThanOrEqual(1);
-    const simulationRequest = requests.find((request) =>
-      request.url.endsWith('/versions/1/simulate'),
-    );
+    const simulationRequest = requests.find((request) => request.url.endsWith('/draft/simulate'));
     expect(simulationRequest?.body).toEqual({
       inputs: {
         value: { type: 'Decimal', values: ['15'] },
@@ -738,6 +892,7 @@ describe('RulesPage', () => {
         ),
       ).toBe(true),
     );
+    expect(await screen.findByText('Rule lifecycle updated')).toBeVisible();
 
     await within(editor).findByText('Version 2');
     await user.click(within(editor).getByRole('button', { name: 'Activate version' }));
@@ -774,8 +929,10 @@ describe('RulesPage', () => {
   it('edits a workspace rule with inputs and condition only', async () => {
     const user = userEvent.setup();
     const saved = workspaceDetail({ name: 'Updated threshold', revision: 3 });
+    let expressionLanguageReads = 0;
     vi.mocked(fetch).mockImplementation((input, init) => {
       const url = input.toString();
+      if (url.endsWith('/rules/expression-language')) expressionLanguageReads += 1;
       if (url.endsWith('/rules/credit_threshold/draft') && init?.method === 'PUT') {
         return Promise.resolve(jsonResponse(saved));
       }
@@ -821,10 +978,9 @@ describe('RulesPage', () => {
         ],
       });
       expect(body.condition).toMatchObject({ predicateOperator: 'GreaterThan' });
-      expect(body).not.toHaveProperty('scope');
-      expect(body).not.toHaveProperty('outcome');
-      expect(body).not.toHaveProperty('parameters');
     });
+    expect(await screen.findByText('Draft saved')).toBeVisible();
+    expect(expressionLanguageReads).toBe(1);
   });
 
   it('creates a workspace rule using the same input and condition contract', async () => {
@@ -850,7 +1006,12 @@ describe('RulesPage', () => {
     await user.click(within(editor).getByRole('tab', { name: 'Rule behavior' }));
     await user.click(within(editor).getByRole('button', { name: 'Add input' }));
     await user.click(within(editor).getByRole('button', { name: 'Add input' }));
+    const inputKeys = within(editor).getAllByLabelText('Key');
     const inputLabels = within(editor).getAllByLabelText('Input name');
+    await user.type(inputKeys[0], 'value');
+    await user.type(inputKeys[1], 'threshold');
+    expect(inputKeys[0]).toHaveValue('value');
+    expect(inputKeys[1]).toHaveValue('threshold');
     await user.type(inputLabels[0], 'Value');
     await user.type(inputLabels[1], 'Threshold');
     await user.click(within(editor).getByRole('button', { name: 'Add condition' }));
@@ -874,9 +1035,127 @@ describe('RulesPage', () => {
       ),
     );
     expect(JSON.parse(String(draft?.init?.body))).toMatchObject({
-      inputs: [{ label: 'Value' }, { label: 'Threshold' }],
+      inputs: [
+        { key: 'value', label: 'Value' },
+        { key: 'threshold', label: 'Threshold' },
+      ],
       condition: expect.any(Object),
     });
+  });
+
+  it('retries draft save without duplicating a definition after POST succeeds', async () => {
+    const user = userEvent.setup();
+    const created = workspaceDetail({
+      definitionKey: 'recoverable_rule',
+      name: 'Recoverable rule',
+      description: 'Still editable after failure.',
+      revision: 1,
+      inputs: [],
+      condition: null,
+    });
+    const saved = workspaceDetail({
+      ...created,
+      revision: 2,
+      inputs: [
+        {
+          key: 'value',
+          label: 'Value',
+          types: ['Text'],
+          isRequired: false,
+          allowMultiple: false,
+          allowedValues: [],
+        },
+      ],
+      condition: thresholdCondition(),
+    });
+    let postCount = 0;
+    let putCount = 0;
+    vi.mocked(fetch).mockImplementation((input, init) => {
+      const url = input.toString();
+      if (url.endsWith('/rules') && init?.method === 'POST') {
+        postCount += 1;
+        return Promise.resolve(jsonResponse(created, 201));
+      }
+      if (url.endsWith('/rules/recoverable_rule/draft') && init?.method === 'PUT') {
+        putCount += 1;
+        return Promise.resolve(
+          putCount === 1
+            ? jsonResponse({ title: 'Temporary save failure' }, 500)
+            : jsonResponse(saved),
+        );
+      }
+      return Promise.resolve(respondForRules(input, init));
+    });
+
+    await renderWithRouter(<RulesPage />, { path: '/rules', authenticatedPath: 'rules' });
+    await user.click(await screen.findByRole('button', { name: 'New rule' }));
+    const editor = await screen.findByRole('dialog', { name: 'New workspace rule' });
+    await user.type(within(editor).getByLabelText('Name'), 'Recoverable rule');
+    await user.type(within(editor).getByLabelText('Description'), 'Still editable after failure.');
+    await user.click(within(editor).getByRole('tab', { name: 'Rule behavior' }));
+    await user.click(within(editor).getByRole('button', { name: 'Add input' }));
+    await user.type(within(editor).getByLabelText('Key'), 'value');
+    await user.type(within(editor).getByLabelText('Input name'), 'Value');
+    await user.click(within(editor).getByRole('button', { name: 'Add condition' }));
+    await user.click(within(editor).getByRole('button', { name: 'Save draft' }));
+
+    expect(await within(editor).findByRole('alert')).toHaveTextContent('API Error: 500');
+    expect(within(editor).getByLabelText('Key')).toHaveValue('value');
+    expect(within(editor).getByLabelText('Input name')).toHaveValue('Value');
+    expect(postCount).toBe(1);
+    expect(putCount).toBe(1);
+
+    await user.click(within(editor).getByRole('button', { name: 'Save draft' }));
+    expect(await screen.findByText('Draft saved')).toBeVisible();
+    expect(postCount).toBe(1);
+    expect(putCount).toBe(2);
+  });
+
+  it('uses server capabilities to keep archived workspace rules read-only', async () => {
+    const user = userEvent.setup();
+    const archived = workspaceDetail({
+      status: 'Archived',
+      archivedAt: '2026-01-02T00:00:00Z',
+      latestVersion: 1,
+      activeVersion: null,
+      versions: [
+        {
+          version: 1,
+          name: 'Credit threshold',
+          inputs: workspaceSummary.inputs,
+          condition: thresholdCondition(),
+        },
+      ],
+      actions: {
+        canEditDraft: false,
+        canCreateVersion: false,
+        canActivateVersion: false,
+        canDeactivate: false,
+        canArchive: false,
+      },
+    });
+    vi.mocked(fetch).mockImplementation((input, init) =>
+      Promise.resolve(
+        input.toString().endsWith('/rules/credit_threshold')
+          ? jsonResponse(archived)
+          : respondForRules(input, init),
+      ),
+    );
+
+    await renderWithRouter(<RulesPage />, { path: '/rules', authenticatedPath: 'rules' });
+    await user.click(
+      within(await screen.findByRole('region', { name: 'Rules catalog' })).getByRole('button', {
+        name: 'Credit threshold',
+      }),
+    );
+    const editor = await screen.findByRole('dialog', { name: 'Credit threshold' });
+    expect(within(editor).queryByLabelText('Name')).not.toBeInTheDocument();
+    expect(within(editor).queryByRole('button', { name: 'Save draft' })).not.toBeInTheDocument();
+    await user.click(within(editor).getByRole('tab', { name: 'Rule behavior' }));
+    expect(editor.querySelector('[data-slot="rule-behavior-summary"]')).not.toBeNull();
+    expect(within(editor).queryByRole('button', { name: 'Add input' })).not.toBeInTheDocument();
+    const footer = editor.querySelector('[data-slot="managed-dialog-footer"]');
+    expect(within(footer as HTMLElement).getByRole('button', { name: 'Close' })).toBeVisible();
   });
 
   it('builds functions and logical groups from the server language contract', async () => {
