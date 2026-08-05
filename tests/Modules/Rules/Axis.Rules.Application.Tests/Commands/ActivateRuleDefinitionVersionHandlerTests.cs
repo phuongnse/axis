@@ -1,5 +1,6 @@
 using Axis.Rules.Application.Commands.ActivateRuleDefinitionVersion;
 using Axis.Rules.Contracts;
+using Axis.Shared.Domain.Primitives;
 using FluentAssertions;
 using NSubstitute;
 
