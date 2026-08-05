@@ -74,7 +74,7 @@ Use MCP for product state and product operations:
 
 1. Read current user/workspace, definitions, versions, bindings, server-owned authoring metadata, draft/exact-version simulations, and binding evaluation through MCP.
 2. For a source change, use the MCP product tools to inspect and exercise the running API; use `scripts/axis.py` and the repository skills for source edits, builds, migrations, tests, and documentation.
-3. Select `--access write` only when the task explicitly includes the relevant mutation; pass the latest server revision. Lifecycle archive and binding deletion are destructive operations; use the business-object prepare/confirm flow only where that API workflow requires it.
+3. The repository Codex registration exposes write tools during active development; invoke one only when the task explicitly includes the relevant mutation, and pass the latest server revision. Other clients select `--access write` only for the same authorized scope. Lifecycle archive and binding deletion are destructive operations; use the business-object prepare/confirm flow only where that API workflow requires it.
 4. For a business-object workflow, create a Draft record from the published object, save values with the latest revision, submit it, and treat a non-match as an expected recoverable Draft rather than a transport failure.
 5. Re-read the affected resource and report the API response/problem code.
 
