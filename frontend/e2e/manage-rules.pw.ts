@@ -348,6 +348,16 @@ async function mockRulesApi(page: Page): Promise<CapturedRequest[]> {
       });
       return;
     }
+    if (request.method() === 'POST' && path === '/api/rules/condition/project') {
+      captured.body = request.postDataJSON() as JsonObject;
+      const condition = captured.body.condition as ApiTypes.RuleConditionNodeDto;
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ condition, display: conditionDisplay(condition) }),
+      });
+      return;
+    }
     if (request.method() === 'POST' && path === '/api/rules/authoring/project') {
       captured.body = request.postDataJSON() as JsonObject;
       const source = captured.body.source as { ast?: ApiTypes.RuleConditionNodeDto; text?: string } | undefined;
@@ -628,17 +638,17 @@ test('built-in date range presents optional bounds as conditional assertions', a
   const details = page.locator('[data-slot="managed-dialog-window"]');
   await details.getByRole('tab', { name: 'Rule behavior' }).click();
   const logic = details.locator('[data-slot="rule-behavior-flow"]');
+  const expression = logic.locator('[data-slot="rule-expression"]');
 
   await expect(
-    logic.getByText('Value is greater than or equal to Minimum when Minimum is specified'),
-  ).toBeVisible();
+    expression,
+  ).toContainText('Value is greater than or equal to Minimum when Minimum is specified');
   await expect(
-    logic.getByText('Value is less than or equal to Maximum when Maximum is specified'),
-  ).toBeVisible();
+    expression,
+  ).toContainText('Value is less than or equal to Maximum when Maximum is specified');
   await expect(logic.locator('[data-slot="rule-expression-operator"]')).toHaveText(['and']);
   await expect(logic.getByRole('button')).toHaveCount(0);
   await expect(logic.locator('[data-slot^="rule-condition-"]')).toHaveCount(0);
-  const expression = logic.locator('[data-slot="rule-expression"]');
   await expect
     .poll(async () => (await expression.boundingBox())?.height ?? Number.POSITIVE_INFINITY)
     .toBeLessThan(80);
@@ -655,9 +665,10 @@ test('workspace rule authoring projects, simulates, and manages immutable lifecy
   await page.getByRole('tab', { name: 'Rule behavior' }).click();
   await page.getByRole('button', { name: 'Add input' }).click();
   await page.getByRole('button', { name: 'Add input' }).click();
+  await page.getByLabel('Key').nth(0).fill('value');
+  await page.getByLabel('Key').nth(1).fill('threshold');
   await page.getByLabel('Input name').nth(0).fill('Value');
   await page.getByLabel('Input name').nth(1).fill('Threshold');
-  await expect(page.getByLabel('Expression')).toHaveCount(0);
   await page.getByRole('button', { name: 'Add condition' }).click();
   await page.getByLabel('How to compare').click();
   await page.getByRole('option', { name: 'Equals' }).click();
@@ -672,7 +683,10 @@ test('workspace rule authoring projects, simulates, and manages immutable lifecy
     (request) => request.method === 'PUT' && request.path.endsWith('/draft'),
   );
   const saveBody = save?.body as ApiTypes.SaveRuleDefinitionDraftRequest;
-  expect(saveBody.inputs?.map((candidate) => candidate.label)).toEqual(['Value', 'Threshold']);
+  expect(saveBody.inputs?.map(({ key, label }) => ({ key, label }))).toEqual([
+    { key: 'value', label: 'Value' },
+    { key: 'threshold', label: 'Threshold' },
+  ]);
   expect(saveBody.condition?.predicateOperator).toBe('Equal');
   expect(saveBody.condition?.left?.kind).toBe('Input');
   expect(save?.body).not.toHaveProperty('scope');
@@ -682,17 +696,19 @@ test('workspace rule authoring projects, simulates, and manages immutable lifecy
   ).toBeVisible();
 
   const editor = page.locator('[data-slot="managed-dialog-window"]');
+  await editor.getByRole('tab', { name: 'Rule behavior' }).click();
   await editor.getByLabel('Expression syntax').fill('value');
   await editor.getByLabel('Expression syntax').blur();
   await editor.getByRole('button', { name: 'Show suggestions' }).click();
   await expect(editor.getByRole('option', { name: 'value' })).toBeVisible();
   await editor.getByRole('option', { name: 'value' }).click();
-  await editor.getByLabel('Value').fill('yes');
-  await editor.getByRole('button', { name: 'Run simulation' }).click();
-  await expect(editor.getByText('Condition matched')).toBeVisible();
-  await editor.getByLabel('Value').fill('no');
-  await editor.getByRole('button', { name: 'Run simulation' }).click();
-  await expect(editor.getByText('No match')).toBeVisible();
+  const simulation = editor.getByRole('region', { name: 'Simulation' });
+  await simulation.getByLabel('Value').fill('yes');
+  await simulation.getByRole('button', { name: 'Run simulation' }).click();
+  await expect(simulation.getByText('Condition matched')).toBeVisible();
+  await simulation.getByLabel('Value').fill('no');
+  await simulation.getByRole('button', { name: 'Run simulation' }).click();
+  await expect(simulation.getByText('No match')).toBeVisible();
 
   await editor.getByRole('button', { name: 'Create version' }).click();
   await page.getByRole('button', { name: 'Create version' }).last().click();

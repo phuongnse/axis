@@ -82,16 +82,12 @@ Required UI quality: use existing shadcn/Tailwind primitives, preserve filters, 
 > | Application | Done |
 > | Infrastructure | Done |
 > | API | Done |
-> | Frontend | Partial |
+> | Frontend | Done |
 >
-> **Gaps vs spec:**
+> **Gaps vs spec:** N/A.
 >
-> | ID | Gap |
-> |---|---|
-> | GAP-001 | Rules usage discovery and Object-side binding creation are implemented; a dedicated full binding edit/delete dialog and focused frontend binding component test remain partial. |
+> **Deferred follow-ups:** N/A.
 >
-> **Deferred follow-ups:** N/A. GAP-001 remains active and will be removed only after its required evidence passes.
->
-> **Verification:** Rules domain, application, infrastructure, API, architecture, and focused frontend checks are recorded in the sibling evidence sidecar and must pass before review.
+> **Verification:** AT-001 through AT-007 are mapped to current domain, application, infrastructure, API, architecture, and focused frontend evidence in the sibling sidecar; the recorded suites pass at the current checkpoint.
 >
 > **Decisions:** Bindings are first-class Rules data. They reference exact immutable versions, keep consumer targets opaque, allow omitted optional inputs, and do not create foreign keys into consumer modules. New or retargeted bindings require the exact active version; binding-owned maintenance that preserves the exact version remains independent after deactivation, and historical revisions remain evaluable for published consumer snapshots. Consumers supply transient context schemas for attachment validation; Rules never persists them. No supported production consumer or data requires compatibility for the replaced binding surface, so it uses a clean cutover with no compatibility paths and no reduction in production quality.

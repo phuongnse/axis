@@ -318,7 +318,7 @@ export function RuleBindingUsagePanel({
           }
         }}
       >
-        <DialogContent className="max-h-[calc(100vh-2rem)] overflow-y-auto sm:max-w-2xl">
+        <DialogContent className="max-h-screen overflow-y-auto sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>{t('rules.bindingEdit')}</DialogTitle>
             <DialogDescription>{t('rules.bindingEditDescription')}</DialogDescription>
@@ -453,7 +453,11 @@ function BindingEditForm({
             }
           >
             <SelectTrigger id="binding-failure-behavior">
-              <SelectValue />
+              <SelectValue>
+                {form.failureBehavior === 'FailClosed'
+                  ? t('rules.bindingFailClosed')
+                  : t('rules.bindingFailOpen')}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="FailClosed">{t('rules.bindingFailClosed')}</SelectItem>
@@ -495,7 +499,13 @@ function BindingEditForm({
                   }
                 >
                   <SelectTrigger id={`binding-mapping-${key}`}>
-                    <SelectValue />
+                    <SelectValue>
+                      {mapping.kind === 'Context'
+                        ? t('rules.bindingMappingContext')
+                        : mapping.kind === 'Literal'
+                          ? t('rules.bindingMappingLiteral')
+                          : t('rules.bindingMappingUnmapped')}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="Unmapped">{t('rules.bindingMappingUnmapped')}</SelectItem>

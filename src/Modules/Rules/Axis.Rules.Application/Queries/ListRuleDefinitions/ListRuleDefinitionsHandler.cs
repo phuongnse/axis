@@ -9,6 +9,7 @@ using Axis.Shared.Domain.Primitives;
 using ContractLifecycleStatus = Axis.Rules.Contracts.RuleLifecycleStatus;
 using ContractOrigin = Axis.Rules.Contracts.RuleOrigin;
 using DomainLifecycleStatus = Axis.Rules.Domain.RuleLifecycleStatus;
+using DomainOrigin = Axis.Rules.Domain.RuleOrigin;
 
 namespace Axis.Rules.Application.Queries.ListRuleDefinitions;
 
@@ -135,7 +136,7 @@ public sealed class ListRuleDefinitionsHandler(
         Dictionary<string, RuleDefinition> builtInByKey = builtInCandidates
             .ToDictionary(definition => definition.Key.Value, StringComparer.Ordinal);
         IReadOnlyList<RuleDefinitionKey> workspaceKeys = searchItems
-            .Where(item => item.Origin == Axis.Rules.Domain.RuleOrigin.Workspace)
+            .Where(item => item.Origin == DomainOrigin.Workspace)
             .Select(item => RuleDefinitionKey.Create(item.Key))
             .Where(result => result.IsSuccess)
             .Select(result => result.Value)
@@ -151,12 +152,12 @@ public sealed class ListRuleDefinitionsHandler(
         List<RuleDefinitionSummaryDto> definitions = [];
         foreach (RuleCatalogSearchItem item in searchItems)
         {
-            if (item.Origin == Axis.Rules.Domain.RuleOrigin.BuiltIn &&
+            if (item.Origin == DomainOrigin.BuiltIn &&
                 builtInByKey.TryGetValue(item.Key, out RuleDefinition? builtInDefinition))
             {
                 definitions.Add(RuleContractMapper.ToSummaryDto(builtInDefinition));
             }
-            else if (item.Origin == Axis.Rules.Domain.RuleOrigin.Workspace &&
+            else if (item.Origin == DomainOrigin.Workspace &&
                      workspaceByKey.TryGetValue(item.Key, out RuleDefinition? workspaceDefinition))
             {
                 definitions.Add(RuleContractMapper.ToSummaryDto(workspaceDefinition));

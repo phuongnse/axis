@@ -105,20 +105,16 @@ Required UI quality: use the existing shadcn and Tailwind system only; keep labe
 >
 > | Layer | Status |
 > |---|---|
-> | Domain | Partial |
-> | Application | Partial |
-> | Infrastructure | Partial |
-> | API | Partial |
-> | Frontend | Partial |
+> | Domain | Done |
+> | Application | Done |
+> | Infrastructure | Done |
+> | API | Done |
+> | Frontend | Done |
 >
-> **Gaps vs spec:**
+> **Gaps vs spec:** N/A.
 >
-> | ID | Gap |
-> |---|---|
-> | GAP-001 | Stable input identity across label edits, separate activation, safe DSL parsing/autocomplete, generated explanation ownership, complete lifecycle dialogs, usage discovery, and targeted refresh remain incomplete; current definition, immutable-version, canonical-condition, evaluator, persistence, and catalog primitives are reusable. |
+> **Deferred follow-ups:** N/A. Binding lifecycle and runtime consumption are separate Rules use cases, not deferred definition behavior.
 >
-> **Deferred follow-ups:** N/A. Binding lifecycle and runtime consumption are separate in-scope Rules use cases, not deferred definition behavior.
->
-> **Verification:** Existing evidence is recorded in the sibling sidecar; refreshed acceptance evidence is required after the clean refactor.
+> **Verification:** AT-001 through AT-007 are mapped to current source and passing domain, application, infrastructure, API, architecture, contract, focused frontend, and browser evidence in the sibling sidecar.
 >
 > **Decisions:** No supported production consumer or data requires compatibility for the replaced Rule surfaces, so the current contract uses a clean cutover without lowering production quality. `Inputs -> Logic -> Outputs` is the durable Rule contract; the current language capability remains a bounded positive-assertion Boolean predicate until a use case approves an additional typed-output capability. An input key is immutable while its label remains editable. The mutable draft stays independent from immutable versions; creating a version never activates it, one exact version may be active, deactivation changes only new-binding eligibility, and terminal archive preserves historical exact evaluation. Canonical AST is the only stored behavior; the safe textual DSL, visual composer, formatter, autocomplete, and localized explanation share one server-owned versioned language projection. Retired consumer-specific rule models, conflated publish/activation state, syntax persistence, alternate semantic views, and compatibility aliases are not retained.

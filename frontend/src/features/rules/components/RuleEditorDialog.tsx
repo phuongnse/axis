@@ -620,7 +620,7 @@ function SampleInput({ input, value, onChange }: { input: InputDefinition; value
   const type = input.types?.[0] ?? 'Text';
   const id = `rule-sample-${input.key}`;
   if (type === 'Boolean') {
-    return <Field><FieldLabel htmlFor={id}>{input.label ?? input.key}</FieldLabel><Select value={value} onValueChange={(next) => { if (next != null) onChange(next); }}><SelectTrigger id={id}><SelectValue placeholder={t('rules.selectValue')} /></SelectTrigger><SelectContent><SelectItem value="true">{t('rules.booleanTrue')}</SelectItem><SelectItem value="false">{t('rules.booleanFalse')}</SelectItem></SelectContent></Select></Field>;
+    return <Field><FieldLabel htmlFor={id}>{input.label ?? input.key}</FieldLabel><Select value={value} onValueChange={(next) => { if (next != null) onChange(next); }}><SelectTrigger id={id}><SelectValue placeholder={t('rules.selectValue')}>{value === 'true' ? t('rules.booleanTrue') : value === 'false' ? t('rules.booleanFalse') : undefined}</SelectValue></SelectTrigger><SelectContent><SelectItem value="true">{t('rules.booleanTrue')}</SelectItem><SelectItem value="false">{t('rules.booleanFalse')}</SelectItem></SelectContent></Select></Field>;
   }
   const htmlType = type === 'Integer' || type === 'Decimal' ? 'number' : type === 'Date' ? 'date' : type === 'DateTime' ? 'datetime-local' : 'text';
   return <Field><FieldLabel htmlFor={id}>{input.label ?? input.key}</FieldLabel><Input id={id} type={htmlType} value={value} onChange={(event) => onChange(event.target.value)} /></Field>;

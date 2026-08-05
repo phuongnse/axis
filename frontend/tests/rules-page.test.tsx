@@ -565,7 +565,9 @@ describe('RulesPage', () => {
     await user.tab();
     expect(await within(editor).findByText('Invalid expression')).toBeVisible();
     expect(dsl).toHaveValue('invalid expression');
-    expect(within(editor).getByText('Value is greater than Threshold')).toBeVisible();
+    expect(editor.querySelector('[data-slot="rule-expression"]')).toHaveTextContent(
+      'Value is greater than Threshold',
+    );
 
     await user.click(within(editor).getByRole('button', { name: 'Close dialog' }));
     const discard = await screen.findByRole('alertdialog', { name: 'Discard unsaved changes?' });
@@ -711,9 +713,10 @@ describe('RulesPage', () => {
       ).toBe(true),
     );
 
-    await user.click(await within(editor).findByRole('button', { name: 'Activate' }));
+    await within(editor).findByText('Version 2');
+    await user.click(within(editor).getByRole('button', { name: 'Activate version' }));
     confirmation = await screen.findByRole('alertdialog', { name: 'Activate this version?' });
-    await user.click(within(confirmation).getByRole('button', { name: 'Activate' }));
+    await user.click(within(confirmation).getByRole('button', { name: 'Activate version' }));
     await waitFor(() =>
       expect(
         requests.some(

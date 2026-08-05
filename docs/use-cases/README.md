@@ -15,10 +15,10 @@ Use cases are the product source of truth. One use case is a complete end-to-end
 | [docs/use-cases/business-objects/README.md](./business-objects/README.md) | [docs/use-cases/business-objects/configure-field-rules.md](./business-objects/configure-field-rules.md) | Done |
 | [docs/use-cases/business-objects/README.md](./business-objects/README.md) | [docs/use-cases/business-objects/define-business-object.md](./business-objects/define-business-object.md) | Done |
 | [docs/use-cases/business-objects/README.md](./business-objects/README.md) | [docs/use-cases/business-objects/submit-business-object-record.md](./business-objects/submit-business-object-record.md) | Done |
-| [docs/use-cases/rules/README.md](./rules/README.md) | [docs/use-cases/rules/evaluate-published-rules.md](./rules/evaluate-published-rules.md) | Partial |
-| [docs/use-cases/rules/README.md](./rules/README.md) | [docs/use-cases/rules/manage-rule-bindings.md](./rules/manage-rule-bindings.md) | Partial |
-| [docs/use-cases/rules/README.md](./rules/README.md) | [docs/use-cases/rules/manage-workspace-rule-definitions.md](./rules/manage-workspace-rule-definitions.md) | Partial |
-| [docs/use-cases/rules/README.md](./rules/README.md) | [docs/use-cases/rules/provide-built-in-rule-definitions.md](./rules/provide-built-in-rule-definitions.md) | Partial |
+| [docs/use-cases/rules/README.md](./rules/README.md) | [docs/use-cases/rules/evaluate-published-rules.md](./rules/evaluate-published-rules.md) | Done |
+| [docs/use-cases/rules/README.md](./rules/README.md) | [docs/use-cases/rules/manage-rule-bindings.md](./rules/manage-rule-bindings.md) | Done |
+| [docs/use-cases/rules/README.md](./rules/README.md) | [docs/use-cases/rules/manage-workspace-rule-definitions.md](./rules/manage-workspace-rule-definitions.md) | Done |
+| [docs/use-cases/rules/README.md](./rules/README.md) | [docs/use-cases/rules/provide-built-in-rule-definitions.md](./rules/provide-built-in-rule-definitions.md) | Done |
 | [docs/use-cases/solutions/README.md](./solutions/README.md) | [docs/use-cases/solutions/provision-reference-solution.md](./solutions/provision-reference-solution.md) | Done |
 | [docs/use-cases/site-experience/README.md](./site-experience/README.md) | [docs/use-cases/site-experience/select-site-language.md](./site-experience/select-site-language.md) | Done |
 | [docs/use-cases/site-experience/README.md](./site-experience/README.md) | [docs/use-cases/site-experience/select-site-theme.md](./site-experience/select-site-theme.md) | Done |

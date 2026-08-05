@@ -70,20 +70,16 @@ Provide a code-owned catalog of reusable built-in rules using the same semantic 
 >
 > | Layer | Status |
 > |---|---|
-> | Domain | Partial |
-> | Application | Partial |
+> | Domain | Done |
+> | Application | Done |
 > | Infrastructure | N/A |
-> | API | Partial |
-> | Frontend | Partial |
+> | API | Done |
+> | Frontend | Done |
 >
-> **Gaps vs spec:**
+> **Gaps vs spec:** N/A.
 >
-> | ID | Gap |
-> |---|---|
-> | GAP-001 | `SystemRuleDefinition` is retired and the system detail surface now renders the shared semantic contract; remaining partial status reflects browser and architecture evidence, not a second Rule model. |
+> **Deferred follow-ups:** N/A. Consumer input binding remains owned by each consumer use case.
 >
-> **Deferred follow-ups:** None. Consumer input binding remains owned by each consumer use case.
+> **Verification:** AT-001 through AT-005 are mapped to current domain, application, API, architecture, and focused frontend evidence in the sibling sidecar; the recorded suites pass at the current checkpoint.
 >
-> **Verification:** The sibling evidence sidecar defines the required checks; final evidence is pending implementation.
->
-> **Decisions:** `SystemRuleDefinition` and the public `System` origin vocabulary are retired. Built-in and workspace definitions use one semantic type and one public positive-assertion contract; `BuiltIn` origin and server-owned capabilities only remove mutation actions. The code-owned catalog is validated eagerly in every environment before endpoints serve traffic. No supported production consumer or data requires the replaced polarity, so corrected built-in behavior uses a clean cutover with no compatibility alias or dual view and no reduction in production quality.
+> **Decisions:** Built-in and workspace definitions use one semantic type and one public positive-assertion contract; `BuiltIn` origin and server-owned capabilities only remove mutation actions. The code-owned catalog is validated eagerly in every environment before endpoints serve traffic. No supported production consumer or data requires the replaced polarity, so corrected built-in behavior uses a clean cutover with no compatibility alias or dual view and no reduction in production quality.
