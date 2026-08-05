@@ -22,7 +22,7 @@ python scripts/axis.py mcp serve
 
 The wrapper checks the local root CA, reuses a healthy `local-dev` stack or starts it when necessary, builds `Axis.Mcp` with diagnostics redirected to stderr, and then hands stdin/stdout to the stdio bridge. The MCP protocol owns stdout; no detached or background bridge is supported. On first use, the bridge opens the Axis authorization URL in a browser and uses OAuth Authorization Code + PKCE with client `axis_mcp` and the fixed loopback callback `http://127.0.0.1:48123/callback`.
 
-The bridge defaults to `read` access. Use `--access write` only for a task that is explicitly allowed to mutate product state:
+The bridge defaults to `read` access. The repository Codex registration explicitly selects `write` during active development so its live registry supports approved mutation tasks without registration churn; registration never authorizes an agent to mutate product state without task-level approval:
 
 ```text
 python scripts/axis.py mcp serve --access read

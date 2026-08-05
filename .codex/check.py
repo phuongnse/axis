@@ -150,7 +150,7 @@ def config_issues() -> list[str]:
         axis_mcp = servers.get("axis") if isinstance(servers, dict) else None
         expected_mcp = {
             "command": "python",
-            "args": ["scripts/axis.py", "mcp", "serve"],
+            "args": ["scripts/axis.py", "mcp", "serve", "--access", "write"],
         }
         if not isinstance(axis_mcp, dict):
             issues.append(".codex/config.toml: missing `[mcp_servers.axis]` table")
