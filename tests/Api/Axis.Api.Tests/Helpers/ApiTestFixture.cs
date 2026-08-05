@@ -36,6 +36,7 @@ public sealed class ApiTestFixture : IAsyncLifetime
     private string? _previousIdentityConnectionStringEnv;
     private string? _previousBusinessObjectsConnectionStringEnv;
     private string? _previousRulesConnectionStringEnv;
+    private string? _previousRedisConnectionStringEnv;
     private WebApplicationFactory<Program> _factory = null!;
     private string _identityConnectionString = null!;
     private string _businessObjectsConnectionString = null!;
@@ -69,9 +70,11 @@ public sealed class ApiTestFixture : IAsyncLifetime
         _previousIdentityConnectionStringEnv = Environment.GetEnvironmentVariable("ConnectionStrings__Identity");
         _previousBusinessObjectsConnectionStringEnv = Environment.GetEnvironmentVariable("ConnectionStrings__BusinessObjects");
         _previousRulesConnectionStringEnv = Environment.GetEnvironmentVariable("ConnectionStrings__Rules");
+        _previousRedisConnectionStringEnv = Environment.GetEnvironmentVariable("Redis__ConnectionString");
         Environment.SetEnvironmentVariable("ConnectionStrings__Identity", _identityConnectionString);
         Environment.SetEnvironmentVariable("ConnectionStrings__BusinessObjects", _businessObjectsConnectionString);
         Environment.SetEnvironmentVariable("ConnectionStrings__Rules", _rulesConnectionString);
+        Environment.SetEnvironmentVariable("Redis__ConnectionString", _redis.GetConnectionString());
 
         DbContextOptions<IdentityDbContext> identityOptions = new DbContextOptionsBuilder<IdentityDbContext>()
             .UseNpgsql(_identityConnectionString)
@@ -179,6 +182,7 @@ public sealed class ApiTestFixture : IAsyncLifetime
         Environment.SetEnvironmentVariable("ConnectionStrings__Identity", _previousIdentityConnectionStringEnv);
         Environment.SetEnvironmentVariable("ConnectionStrings__BusinessObjects", _previousBusinessObjectsConnectionStringEnv);
         Environment.SetEnvironmentVariable("ConnectionStrings__Rules", _previousRulesConnectionStringEnv);
+        Environment.SetEnvironmentVariable("Redis__ConnectionString", _previousRedisConnectionStringEnv);
     }
 
     public IServiceScope CreateScope() => _factory.Services.CreateScope();

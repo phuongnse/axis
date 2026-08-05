@@ -4899,6 +4899,7 @@ class TestAxisCommandWrappers(unittest.TestCase):
         exposed = (Path("/users/alice/.local/bin/node"), Path("/users/alice/.local/bin/npm"))
         with (
             mock.patch.object(axis, "path_node_toolchain_ready", return_value=False),
+            mock.patch.object(axis, "path_dotnet_sdk_ready", return_value=True),
             mock.patch.object(axis, "setup_tool_ready", return_value=True),
             mock.patch.object(axis, "setup_external_preflight", return_value=0),
             mock.patch.object(axis, "setup_preflight", return_value=0),
