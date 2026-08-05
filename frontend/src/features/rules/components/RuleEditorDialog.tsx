@@ -57,7 +57,7 @@ import { RuleOriginBadge } from './RuleOriginBadge';
 type InputDefinition = ApiTypes.RuleDraftInputDefinitionDto;
 type EditableInput = InputDefinition & { clientId: string; keyLocked: boolean };
 type ValueType = ApiTypes.RuleValueType;
-type ProjectionRequest = {
+type ProjectionRun = {
   source: ApiTypes.RuleAuthoringSourceDto;
   generation: number;
   requestId: number;
@@ -139,7 +139,7 @@ export function RuleEditorDialog({
   );
 
   const projectMutation = useMutation({
-    mutationFn: ({ source }: ProjectionRequest) =>
+    mutationFn: ({ source }: ProjectionRun) =>
       projectRuleAuthoring({
         source,
         inputs: inputContract,
