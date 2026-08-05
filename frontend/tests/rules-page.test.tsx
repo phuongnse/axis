@@ -1299,6 +1299,46 @@ describe('RulesPage', () => {
     });
   });
 
+  it('keeps newer unblurred authoring when an older projection resolves', async () => {
+    const user = userEvent.setup();
+    const olderProjection = deferred<Response>();
+    let authoringProjectionCalls = 0;
+    vi.mocked(fetch).mockImplementation((input, init) => {
+      if (input.toString().endsWith('/rules/authoring/project')) {
+        authoringProjectionCalls += 1;
+        return authoringProjectionCalls === 1
+          ? olderProjection.promise
+          : Promise.resolve(respondForRules(input, init));
+      }
+      return Promise.resolve(respondForRules(input, init));
+    });
+
+    await renderWithRouter(<RulesPage />, { path: '/rules', authenticatedPath: 'rules' });
+    await user.click(
+      within(await screen.findByRole('region', { name: 'Rules catalog' })).getByRole('button', {
+        name: 'Credit threshold',
+      }),
+    );
+    const editor = await screen.findByRole('dialog', { name: 'Credit threshold' });
+    await user.click(within(editor).getByRole('tab', { name: 'Rule behavior' }));
+    const expression = within(editor).getByLabelText('Expression syntax');
+    await waitFor(() => expect(authoringProjectionCalls).toBe(1));
+    await user.type(expression, 'newer unblurred expression');
+
+    olderProjection.resolve(
+      jsonResponse({
+        condition: requiredCondition(),
+        formattedDsl: 'older projected expression',
+        diagnostics: [],
+        isValid: true,
+      }),
+    );
+
+    await waitFor(() => expect(expression).toHaveValue('newer unblurred expression'));
+    expect(await within(editor).findByText('is greater than')).toBeVisible();
+    expect(within(editor).queryByText('is provided')).not.toBeInTheDocument();
+  });
+
   it('refreshes a post-create conflict by its persisted key without another POST', async () => {
     const user = userEvent.setup();
     const created = workspaceDetail({

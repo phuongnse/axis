@@ -181,9 +181,14 @@ export function RuleEditorDialog({
     },
   });
 
-  const projectAuthoring = (source: ApiTypes.RuleAuthoringSourceDto) => {
+  const advanceProjectionFence = () => {
     const requestId = ++projectionRequestRef.current;
     latestProjectionRequestRef.current = requestId;
+    return requestId;
+  };
+
+  const projectAuthoring = (source: ApiTypes.RuleAuthoringSourceDto) => {
+    const requestId = advanceProjectionFence();
     projectMutation.mutate({
       source,
       generation: projectionGenerationRef.current,
@@ -589,7 +594,8 @@ export function RuleEditorDialog({
                             type="button"
                             variant="outline"
                             size="sm"
-                            onClick={() =>
+                            onClick={() => {
+                              advanceProjectionFence();
                               setInputs([
                                 ...inputs,
                                 {
@@ -602,8 +608,8 @@ export function RuleEditorDialog({
                                   allowMultiple: false,
                                   allowedValues: [],
                                 },
-                              ])
-                            }
+                              ]);
+                            }}
                           >
                             <Plus data-icon="inline-start" />
                             {t('rules.addInput')}
@@ -617,14 +623,16 @@ export function RuleEditorDialog({
                               inputId={input.clientId}
                               keyLocked={input.keyLocked}
                               language={languageQuery.data}
-                              onChange={(next) =>
-                                updateInput(inputs, index, input, next, setInputs, setCondition)
-                              }
-                              onRemove={() =>
+                              onChange={(next) => {
+                                advanceProjectionFence();
+                                updateInput(inputs, index, input, next, setInputs, setCondition);
+                              }}
+                              onRemove={() => {
+                                advanceProjectionFence();
                                 setInputs(
                                   inputs.filter((_, candidateIndex) => candidateIndex !== index),
-                                )
-                              }
+                                );
+                              }}
                             />
                           ))}
                         </div>
@@ -657,6 +665,7 @@ export function RuleEditorDialog({
                           id="rule-dsl"
                           value={dsl}
                           onChange={(event) => {
+                            advanceProjectionFence();
                             setDsl(event.target.value);
                             setCursor(event.currentTarget.selectionStart);
                             setCompletions([]);
