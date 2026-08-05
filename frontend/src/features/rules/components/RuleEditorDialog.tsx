@@ -68,6 +68,14 @@ type ProjectionRun = {
     condition: ApiTypes.RuleConditionNodeDto;
   };
 };
+type CompletionRun = {
+  generation: number;
+  fence: number;
+  text: string;
+  cursor: number;
+  inputs: InputDefinition[];
+  expressionLanguageVersion?: number;
+};
 
 const valueTypes: ValueType[] = ['Text', 'Integer', 'Decimal', 'Date', 'DateTime', 'Boolean'];
 
@@ -352,15 +360,29 @@ export function RuleEditorDialog({
   });
 
   const completionMutation = useMutation({
-    mutationFn: () =>
+    mutationFn: (run: CompletionRun) =>
       completeRuleAuthoring({
-        text: dsl,
-        cursor,
-        inputs: inputContract,
-        expressionLanguageVersion: languageQuery.data?.version,
+        text: run.text,
+        cursor: run.cursor,
+        inputs: run.inputs,
+        expressionLanguageVersion: run.expressionLanguageVersion,
       }),
-    onSuccess: setCompletions,
-    onError: () => setError(t('rules.completionError')),
+    onSuccess: (result, run) => {
+      if (
+        run.generation !== projectionGenerationRef.current ||
+        run.fence !== latestProjectionRequestRef.current
+      )
+        return;
+      setCompletions(result);
+    },
+    onError: (_cause, run) => {
+      if (
+        run.generation !== projectionGenerationRef.current ||
+        run.fence !== latestProjectionRequestRef.current
+      )
+        return;
+      setError(t('rules.completionError'));
+    },
   });
   const simulationMutation = useMutation({
     mutationFn: () => {
@@ -596,6 +618,7 @@ export function RuleEditorDialog({
                             size="sm"
                             onClick={() => {
                               advanceProjectionFence();
+                              setCompletions([]);
                               setInputs([
                                 ...inputs,
                                 {
@@ -625,10 +648,12 @@ export function RuleEditorDialog({
                               language={languageQuery.data}
                               onChange={(next) => {
                                 advanceProjectionFence();
+                                setCompletions([]);
                                 updateInput(inputs, index, input, next, setInputs, setCondition);
                               }}
                               onRemove={() => {
                                 advanceProjectionFence();
+                                setCompletions([]);
                                 setInputs(
                                   inputs.filter((_, candidateIndex) => candidateIndex !== index),
                                 );
@@ -642,6 +667,7 @@ export function RuleEditorDialog({
                         inputs={inputContract}
                         language={languageQuery.data}
                         onChange={(next) => {
+                          setCompletions([]);
                           setCondition(next);
                           projectAuthoring({ ast: next ?? undefined });
                         }}
@@ -654,7 +680,16 @@ export function RuleEditorDialog({
                             variant="outline"
                             size="sm"
                             disabled={completionMutation.isPending || !dsl}
-                            onClick={() => completionMutation.mutate()}
+                            onClick={() =>
+                              completionMutation.mutate({
+                                generation: projectionGenerationRef.current,
+                                fence: latestProjectionRequestRef.current,
+                                text: dsl,
+                                cursor,
+                                inputs: inputContract,
+                                expressionLanguageVersion: languageQuery.data?.version,
+                              })
+                            }
                           >
                             <Lightbulb data-icon="inline-start" />
                             {t('rules.showSuggestions')}

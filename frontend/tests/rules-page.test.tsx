@@ -1334,9 +1334,56 @@ describe('RulesPage', () => {
       }),
     );
 
+    await waitFor(() =>
+      expect(within(editor).getByRole('button', { name: 'Save draft' })).toBeEnabled(),
+    );
     await waitFor(() => expect(expression).toHaveValue('newer unblurred expression'));
-    expect(await within(editor).findByText('is greater than')).toBeVisible();
-    expect(within(editor).queryByText('is provided')).not.toBeInTheDocument();
+    const logic = editor.querySelector<HTMLElement>('[data-slot="rule-expression"]');
+    expect(logic).not.toBeNull();
+    expect(within(logic as HTMLElement).getByText('is greater than')).toBeVisible();
+    expect(within(logic as HTMLElement).queryByText('is provided')).not.toBeInTheDocument();
+  });
+
+  it('ignores completion suggestions that resolve after a newer authoring edit', async () => {
+    const user = userEvent.setup();
+    const olderCompletion = deferred<Response>();
+    let completionCalls = 0;
+    vi.mocked(fetch).mockImplementation((input, init) => {
+      if (input.toString().endsWith('/rules/authoring/complete')) {
+        completionCalls += 1;
+        return olderCompletion.promise;
+      }
+      return Promise.resolve(respondForRules(input, init));
+    });
+
+    await renderWithRouter(<RulesPage />, { path: '/rules', authenticatedPath: 'rules' });
+    await user.click(
+      within(await screen.findByRole('region', { name: 'Rules catalog' })).getByRole('button', {
+        name: 'Credit threshold',
+      }),
+    );
+    const editor = await screen.findByRole('dialog', { name: 'Credit threshold' });
+    await user.click(within(editor).getByRole('tab', { name: 'Rule behavior' }));
+    const expression = within(editor).getByLabelText('Expression syntax');
+    await waitFor(() => expect(expression).toHaveValue('value > threshold'));
+
+    const showSuggestions = within(editor).getByRole('button', { name: 'Show suggestions' });
+    await user.click(showSuggestions);
+    await waitFor(() => expect(completionCalls).toBe(1));
+    await user.click(expression);
+    await user.type(expression, ' newer');
+
+    olderCompletion.resolve(
+      jsonResponse([
+        { label: 'Stale suggestion', insertText: 'stale', kind: 'Input', start: 0, length: 5 },
+      ]),
+    );
+
+    await waitFor(() => expect(showSuggestions).toBeEnabled());
+    expect(expression).toHaveValue('value > threshold newer');
+    expect(
+      within(editor).queryByRole('option', { name: 'Stale suggestion' }),
+    ).not.toBeInTheDocument();
   });
 
   it('refreshes a post-create conflict by its persisted key without another POST', async () => {
