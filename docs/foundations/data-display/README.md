@@ -9,4 +9,4 @@ Data Display foundations own reusable, typed presentation and interaction contra
 | Foundation | Status |
 |---|---|
 | [docs/foundations/data-display/collection-page.md](./collection-page.md) | Done |
-| [docs/foundations/data-display/data-table.md](./data-table.md) | Partial |
+| [docs/foundations/data-display/data-table.md](./data-table.md) | Done |
