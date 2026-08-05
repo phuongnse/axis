@@ -17,7 +17,6 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as GuestSignInRouteImport } from './routes/_guest/sign-in'
 import { Route as AuthenticatedRulesRouteImport } from './routes/_authenticated/rules'
 import { Route as AuthenticatedBusinessObjectsRouteImport } from './routes/_authenticated/business-objects'
-import { Route as AuthenticatedApplicationsRouteImport } from './routes/_authenticated/applications'
 
 const GuestRegisterLazyRouteImport = createFileRoute('/_guest/register')()
 const AuthenticatedDashboardLazyRouteImport = createFileRoute(
@@ -80,14 +79,6 @@ const AuthenticatedBusinessObjectsRoute =
       (d) => d.Route,
     ),
   )
-const AuthenticatedApplicationsRoute =
-  AuthenticatedApplicationsRouteImport.update({
-    id: '/applications',
-    path: '/applications',
-    getParentRoute: () => AuthenticatedRoute,
-  } as any).lazy(() =>
-    import('./routes/_authenticated/applications.lazy').then((d) => d.Route),
-  )
 const GuestRegisterConfirmationLazyRoute =
   GuestRegisterConfirmationLazyRouteImport.update({
     id: '/register_/confirmation',
@@ -106,7 +97,6 @@ const GuestAuthVerifyLazyRoute = GuestAuthVerifyLazyRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/applications': typeof AuthenticatedApplicationsRoute
   '/business-objects': typeof AuthenticatedBusinessObjectsRoute
   '/rules': typeof AuthenticatedRulesRoute
   '/sign-in': typeof GuestSignInRoute
@@ -117,7 +107,6 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/applications': typeof AuthenticatedApplicationsRoute
   '/business-objects': typeof AuthenticatedBusinessObjectsRoute
   '/rules': typeof AuthenticatedRulesRoute
   '/sign-in': typeof GuestSignInRoute
@@ -131,7 +120,6 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteWithChildren
   '/_guest': typeof GuestRouteWithChildren
-  '/_authenticated/applications': typeof AuthenticatedApplicationsRoute
   '/_authenticated/business-objects': typeof AuthenticatedBusinessObjectsRoute
   '/_authenticated/rules': typeof AuthenticatedRulesRoute
   '/_guest/sign-in': typeof GuestSignInRoute
@@ -144,7 +132,6 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
-    | '/applications'
     | '/business-objects'
     | '/rules'
     | '/sign-in'
@@ -155,7 +142,6 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
-    | '/applications'
     | '/business-objects'
     | '/rules'
     | '/sign-in'
@@ -168,7 +154,6 @@ export interface FileRouteTypes {
     | '/'
     | '/_authenticated'
     | '/_guest'
-    | '/_authenticated/applications'
     | '/_authenticated/business-objects'
     | '/_authenticated/rules'
     | '/_guest/sign-in'
@@ -242,13 +227,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedBusinessObjectsRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
-    '/_authenticated/applications': {
-      id: '/_authenticated/applications'
-      path: '/applications'
-      fullPath: '/applications'
-      preLoaderRoute: typeof AuthenticatedApplicationsRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
     '/_guest/register_/confirmation': {
       id: '/_guest/register_/confirmation'
       path: '/register/confirmation'
@@ -267,14 +245,12 @@ declare module '@tanstack/react-router' {
 }
 
 interface AuthenticatedRouteChildren {
-  AuthenticatedApplicationsRoute: typeof AuthenticatedApplicationsRoute
   AuthenticatedBusinessObjectsRoute: typeof AuthenticatedBusinessObjectsRoute
   AuthenticatedRulesRoute: typeof AuthenticatedRulesRoute
   AuthenticatedDashboardLazyRoute: typeof AuthenticatedDashboardLazyRoute
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
-  AuthenticatedApplicationsRoute: AuthenticatedApplicationsRoute,
   AuthenticatedBusinessObjectsRoute: AuthenticatedBusinessObjectsRoute,
   AuthenticatedRulesRoute: AuthenticatedRulesRoute,
   AuthenticatedDashboardLazyRoute: AuthenticatedDashboardLazyRoute,

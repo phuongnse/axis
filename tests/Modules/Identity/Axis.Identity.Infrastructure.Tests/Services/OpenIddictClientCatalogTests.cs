@@ -18,7 +18,7 @@ public sealed class OpenIddictClientCatalogTests
         native.Profile.Should().Be(OpenIddictClientProfile.NativePublic);
         native.ClientSecret.Should().BeNull();
         OpenIddictClientRegistration bff = catalog.Clients.Single(
-            client => client.ClientId == "reference_product");
+            client => client.ClientId == "enterprise_bff");
         bff.Profile.Should().Be(OpenIddictClientProfile.WebBffConfidential);
         bff.ClientSecret.Should().Be(DevSecret);
         bff.PostLogoutRedirectUris.Should().ContainSingle();
@@ -85,7 +85,7 @@ public sealed class OpenIddictClientCatalogTests
     [InlineData("OpenIddict:ClientCatalog:Clients:1:ClientSecret", null, "*ClientSecret*required*")]
     [InlineData("OpenIddict:ClientCatalog:Clients:1:ClientSecret", "too-short", "*at least 32*")]
     [InlineData("OpenIddict:ClientCatalog:Clients:1:PostLogoutRedirectUris:0", null, "*PostLogoutRedirectUris*")]
-    [InlineData("OpenIddict:ClientCatalog:Clients:1:RedirectUris:0", "http://product.example/signin-oidc", "*must use HTTPS*")]
+    [InlineData("OpenIddict:ClientCatalog:Clients:1:RedirectUris:0", "http://enterprise.example/signin-oidc", "*must use HTTPS*")]
     public void Load_WhenConfidentialClientBoundaryIsInvalid_FailsClosed(
         string key,
         string? value,
@@ -114,7 +114,7 @@ public sealed class OpenIddictClientCatalogTests
         act.Should().Throw<InvalidOperationException>().WithMessage("*without wildcard*");
     }
 
-    private const string DevSecret = "reference-product-development-secret-0001";
+    private const string DevSecret = "enterprise-bff-development-secret-0001";
 
     private static IConfiguration BuildConfiguration(IEnumerable<KeyValuePair<string, string?>> values) =>
         new ConfigurationBuilder().AddInMemoryCollection(values).Build();
@@ -127,13 +127,13 @@ public sealed class OpenIddictClientCatalogTests
         ["OpenIddict:ClientCatalog:Clients:0:Profile"] = "NativePublic",
         ["OpenIddict:ClientCatalog:Clients:0:RedirectUris:0"] =
             "http://127.0.0.1:48123/callback",
-        ["OpenIddict:ClientCatalog:Clients:1:ClientId"] = "reference_product",
-        ["OpenIddict:ClientCatalog:Clients:1:DisplayName"] = "Reference product",
+        ["OpenIddict:ClientCatalog:Clients:1:ClientId"] = "enterprise_bff",
+        ["OpenIddict:ClientCatalog:Clients:1:DisplayName"] = "Enterprise BFF",
         ["OpenIddict:ClientCatalog:Clients:1:Profile"] = "WebBffConfidential",
         ["OpenIddict:ClientCatalog:Clients:1:ClientSecret"] = DevSecret,
         ["OpenIddict:ClientCatalog:Clients:1:RedirectUris:0"] =
-            "https://product.example/signin-oidc",
+            "https://enterprise.example/signin-oidc",
         ["OpenIddict:ClientCatalog:Clients:1:PostLogoutRedirectUris:0"] =
-            "https://product.example/signout-callback-oidc",
+            "https://enterprise.example/signout-callback-oidc",
     };
 }

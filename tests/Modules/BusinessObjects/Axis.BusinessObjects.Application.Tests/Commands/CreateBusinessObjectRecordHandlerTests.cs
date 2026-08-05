@@ -38,7 +38,7 @@ public sealed class CreateBusinessObjectRecordHandlerTests
         records.FindByIdempotencyKeyAsync(
                 BusinessObjectRecordHandlerTestContext.WorkspaceId,
                 definition.Key,
-                "application-1",
+                "record-1",
                 Arg.Any<CancellationToken>())
             .Returns((BusinessObjectRecord?)null, null, null);
 
@@ -50,10 +50,10 @@ public sealed class CreateBusinessObjectRecordHandlerTests
         Result<BusinessObjectRecordDetailDto> created = await sut.Handle(
             new CreateBusinessObjectRecordCommand(
                 definition.Key.Value,
-                "application-1",
+                "record-1",
                 new Dictionary<string, IReadOnlyList<string>>
                 {
-                    ["requested_amount"] = ["0012"],
+                    ["quantity"] = ["0012"],
                 }),
             TestContext.Current.CancellationToken);
 
@@ -64,7 +64,7 @@ public sealed class CreateBusinessObjectRecordHandlerTests
             expectedRevision: 1,
             new Dictionary<string, IReadOnlyList<string>>
             {
-                ["requested_amount"] = ["13"],
+                ["quantity"] = ["13"],
             },
             BusinessObjectRecordHandlerTestContext.UserId,
             BusinessObjectRecordHandlerTestContext.Now.AddMinutes(1)).IsSuccess.Should().BeTrue();
@@ -72,26 +72,26 @@ public sealed class CreateBusinessObjectRecordHandlerTests
         records.FindByIdempotencyKeyAsync(
                 BusinessObjectRecordHandlerTestContext.WorkspaceId,
                 definition.Key,
-                "application-1",
+                "record-1",
                 Arg.Any<CancellationToken>())
             .Returns(savedRecord, savedRecord);
 
         Result<BusinessObjectRecordDetailDto> retry = await sut.Handle(
             new CreateBusinessObjectRecordCommand(
                 definition.Key.Value,
-                "application-1",
+                "record-1",
                 new Dictionary<string, IReadOnlyList<string>>
                 {
-                    ["requested_amount"] = ["0012"],
+                    ["quantity"] = ["0012"],
                 }),
             TestContext.Current.CancellationToken);
         Result<BusinessObjectRecordDetailDto> conflict = await sut.Handle(
             new CreateBusinessObjectRecordCommand(
                 definition.Key.Value,
-                "application-1",
+                "record-1",
                 new Dictionary<string, IReadOnlyList<string>>
                 {
-                    ["requested_amount"] = ["0013"],
+                    ["quantity"] = ["0013"],
                 }),
             TestContext.Current.CancellationToken);
 

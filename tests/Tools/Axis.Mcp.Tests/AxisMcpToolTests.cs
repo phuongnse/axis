@@ -106,23 +106,23 @@ public sealed class AxisMcpToolTests
         await readTools.ListBusinessObjectRecordsAsync(
             page: 2,
             pageSize: 10,
-            objectKey: "loan application",
+            objectKey: "business record",
             cancellationToken: cancellationToken);
         Assert.Equal(
-            "/api/business-object-records?page=2&pageSize=10&objectKey=loan%20application",
+            "/api/business-object-records?page=2&pageSize=10&objectKey=business%20record",
             handler.RequestUri!.PathAndQuery);
 
         await writeTools.CreateBusinessObjectRecordAsync(
-            "loan_application",
+            "business_record",
             new CreateBusinessObjectRecordInput(
                 "record-1",
                 new Dictionary<string, IReadOnlyList<string>>
                 {
-                    ["applicant_name"] = ["Ada Lovelace"],
+                    ["display_name"] = ["Ada Lovelace"],
                 }),
             cancellationToken);
         Assert.Equal("POST", handler.Method!.Method);
-        Assert.Equal("/api/business-object-records/loan_application", handler.RequestUri!.PathAndQuery);
+        Assert.Equal("/api/business-object-records/business_record", handler.RequestUri!.PathAndQuery);
         Assert.Contains("\"idempotencyKey\":\"record-1\"", handler.RequestBody, StringComparison.Ordinal);
 
         await writeTools.SaveBusinessObjectRecordAsync(
@@ -131,7 +131,7 @@ public sealed class AxisMcpToolTests
                 4,
                 new Dictionary<string, IReadOnlyList<string>>
                 {
-                    ["applicant_name"] = ["Ada Lovelace"],
+                    ["display_name"] = ["Ada Lovelace"],
                 }),
             cancellationToken);
         Assert.Equal("PUT", handler.Method!.Method);

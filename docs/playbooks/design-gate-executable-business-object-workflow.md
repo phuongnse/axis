@@ -4,7 +4,7 @@
 
 ## Risk and scope
 
-This is a full Design Gate for the first executable Draft → Submitted Business Object workflow. The slice is high-risk because it spans new REST/OpenAPI operations, migration-backed persistence, optimistic concurrency, authentication/workspace isolation, MCP mutation tools, generated client contracts, and a new interactive SPA journey.
+This is a full Design Gate for the first executable Draft → Submitted Business Object workflow. The slice is high-risk because it spans new REST/OpenAPI operations, migration-backed persistence, optimistic concurrency, authentication/workspace isolation, MCP mutation tools, and generated client contracts.
 
 The correction checkpoint covers the existing implementation and independent review findings. It does not expand the product into generic workflow authoring, assignments, approvals, notifications, or additional record mutations.
 
@@ -30,12 +30,10 @@ tests/Modules/BusinessObjects/
 tests/Modules/Rules/
 tests/Api/
 tests/Tools/
-frontend/src/features/applications/
-frontend/tests/applications-page.test.tsx
-frontend/e2e/submit-business-object-record.pw.ts
 openapi.json
 docs/use-cases/business-objects/submit-business-object-record.md
 docs/use-cases/business-objects/submit-business-object-record.evidence.md
+docs/playbooks/design-gate-reference-solution-consumer-boundary.md
 ```
 
 ## Contract and invariant decisions
@@ -47,18 +45,18 @@ docs/use-cases/business-objects/submit-business-object-record.evidence.md
 - Record validation rejects null collections/elements, unknown/duplicate values, invalid cardinality, and malformed typed values with stable field errors. Canonical typed strings are persisted consistently, including explicit DateTime offset semantics.
 - Rule mismatch evidence remains available in the response/UI cache and submitted detail renders every exact evaluation, including binding ID/revision, rule key/version, Boolean result, diagnostics, actor, and timestamp where the contract exposes them.
 - REST error responses and required request/response fields match runtime status/body behavior; OpenAPI and generated frontend types are regenerated through the owning wrapper. MCP preserves problem codes and field errors while forwarding the API's revision/idempotency contract.
-- Applications collection state remains paginated and queryable, and the record form uses interaction-consistent shadcn controls. Native fallback usage is removed from the feature path; multi-choice controls expose a real labelled group and single-choice controls preserve an explicit empty state.
+- Axis owns the generic record lifecycle and its REST/OpenAPI/MCP contract. Consumer-owned products own their collection and record interactions, including browser acceptance evidence.
 
 ## Retirement and compatibility
 
-`N/A because no supported product surface is retired.` The native select feature import is a clean replacement of an invalid implementation choice, not a compatibility surface; the post-edit sweep must find no feature import of `components/ui/native-select`.
+The current consumer-product clean cutover, including retired UI and browser surfaces, is owned by the [reference-solution consumer-boundary dossier](./design-gate-reference-solution-consumer-boundary.md#retirement-and-compatibility). This dossier retains only the product-neutral record lifecycle contract; it does not define a consumer UI or compatibility path.
 
 ## Verification plan
 
 - Focused domain/application tests for stale submission, idempotency, exact binding revisions, null/malformed values, canonicalization, and every required handler.
 - Infrastructure migration/repository tests for historical binding backfill and concurrency/index behavior.
 - API tests plus `python scripts/axis.py generate api-contracts`, `check frontend-api-contracts`, and generated-client callers for status/body/required-field parity.
-- Frontend component tests for mismatch recovery, complete evidence, choice cardinality/labels, pagination, and submitted read-only detail; focused browser recovery and success journeys.
+- Consumer-owned component and browser journeys are verified in independently versioned product source under the reference-solution consumer-boundary dossier; Axis verifies its generic contract and focused module behavior here.
 - MCP contract, API coverage, safety, and authenticated supported-client lifecycle evidence; protocol-only evidence remains explicitly separate from live-agent evidence.
 - Before publication: clean committed checkpoint, `$axis-review-readiness`, configured independent review completed (not merely running or timed out), and exact PR metadata validation.
 

@@ -85,7 +85,12 @@ Required UI quality: input controls are labelled and keyboard reachable, values 
 > | API | Partial |
 > | Frontend | Partial |
 >
-> **Gaps vs spec:** Binding evaluation and the neutral adapter proof are implemented. A dedicated consumer evaluation endpoint and the full simulation UI/browser journey remain follow-up work.
+> **Gaps vs spec:**
+>
+> | ID | Gap |
+> |---|---|
+> | GAP-001 | Binding evaluation and the neutral adapter proof are implemented; a dedicated consumer evaluation endpoint remains follow-up work. |
+> | GAP-002 | The full simulation UI/browser journey remains follow-up work. |
 >
 > **Deferred follow-ups:** Consumer result handling remains outside Rules and is owned by each consumer use case.
 >

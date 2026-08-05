@@ -2,6 +2,7 @@ import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { useAuthStore } from '@/features/auth/auth-store';
 import { EmailConfirmationPage } from '@/features/auth/components/EmailConfirmationPage';
 import { saveRegistrationContext } from '@/features/auth/registration-context';
 import { renderWithRouter } from './render-with-router';
@@ -9,12 +10,14 @@ import { renderWithRouter } from './render-with-router';
 describe('EmailConfirmationPage', () => {
   beforeEach(() => {
     vi.stubGlobal('fetch', vi.fn());
+    useAuthStore.getState().markBrowserSessionGuest('test-csrf-token');
     saveRegistrationContext({
       email: 'alex@example.com',
     });
   });
 
   afterEach(() => {
+    useAuthStore.getState().clearSession();
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
     sessionStorage.clear();

@@ -3,7 +3,7 @@ namespace Axis.Mcp.Tools;
 /// <summary>
 /// The explicit MCP-to-OpenAPI coverage contract. Every authenticated product
 /// operation is either exposed as one semantic MCP tool, intentionally blocked
-/// pending its owning product contract, or kept internal to the OAuth client.
+/// pending its owning product contract, or kept internal to browser/OAuth bootstrap.
 /// </summary>
 public static class AxisMcpOperationCatalog
 {
@@ -55,5 +55,6 @@ public static class AxisMcpOperationCatalog
             "ResendEmailVerification",
             "SignOutUser",
             "RegisterUser",
+            "GetBrowserSession",
         };
 }

@@ -4093,7 +4093,7 @@ class TestLocalDevCli(unittest.TestCase):
         calls = self.run_local_dev(
             axis.argparse.Namespace(
                 local_dev_command="e2e",
-                service="reference-product-e2e",
+                service="consumer-e2e",
                 e2e_args=["--", "tests/product.pw.ts"],
             )
         )
@@ -4103,18 +4103,18 @@ class TestLocalDevCli(unittest.TestCase):
                 "--profile",
                 "e2e",
                 "build",
-                "reference-product-e2e",
+                "consumer-e2e",
             ],
             calls[1][-4:],
         )
         self.assertEqual(
-            ["reference-product-e2e", "tests/product.pw.ts"],
+            ["consumer-e2e", "tests/product.pw.ts"],
             calls[2][-2:],
         )
 
     def test_compose_service_name_rejects_shell_or_option_syntax(self) -> None:
-        self.assertEqual("reference-product-e2e", axis.compose_service_name("reference-product-e2e"))
-        for invalid in ("ReferenceProduct", "--profile", "product e2e", "product/e2e"):
+        self.assertEqual("consumer-e2e", axis.compose_service_name("consumer-e2e"))
+        for invalid in ("ConsumerE2e", "--profile", "consumer e2e", "consumer/e2e"):
             with self.subTest(invalid=invalid):
                 with self.assertRaises(axis.argparse.ArgumentTypeError):
                     axis.compose_service_name(invalid)

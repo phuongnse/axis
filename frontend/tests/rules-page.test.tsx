@@ -1,6 +1,7 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { useAuthStore } from '@/features/auth/auth-store';
 import { RulesPage } from '@/features/rules';
 import { renderWithRouter } from './render-with-router';
 
@@ -239,9 +240,16 @@ function respondForRules(input: RequestInfo | URL, init?: RequestInit): Response
 }
 
 describe('RulesPage', () => {
-  beforeEach(() => vi.stubGlobal('fetch', vi.fn()));
+  beforeEach(() => {
+    vi.stubGlobal('fetch', vi.fn());
+    useAuthStore.getState().setBrowserSession({
+      authenticated: false,
+      csrfToken: 'test-csrf-token',
+    });
+  });
 
   afterEach(() => {
+    useAuthStore.getState().clearSession();
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
   });

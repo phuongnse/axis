@@ -12,6 +12,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ManagedWindowHost } from '@/components/shared/ManagedWindowHost';
 import { ManagedWindowProvider } from '@/components/shared/ManagedWindowManager';
+import { useAuthStore } from '@/features/auth/auth-store';
 import { businessObjectDefinitionQueryKeys } from '@/features/business-objects/api';
 import { BusinessObjectsPage } from '@/features/business-objects/components/BusinessObjectsPage';
 import { ruleDefinitionQueryKeys } from '@/features/rules';
@@ -45,9 +46,16 @@ const fieldRuleDefinitions = {
 };
 
 describe('BusinessObjectsPage', () => {
-  beforeEach(() => vi.stubGlobal('fetch', vi.fn()));
+  beforeEach(() => {
+    vi.stubGlobal('fetch', vi.fn());
+    useAuthStore.getState().setBrowserSession({
+      authenticated: false,
+      csrfToken: 'test-csrf-token',
+    });
+  });
 
   afterEach(() => {
+    useAuthStore.getState().clearSession();
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
   });

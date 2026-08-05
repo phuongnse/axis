@@ -20,17 +20,17 @@ public sealed class ListBusinessObjectRecordsHandlerTests
             definition,
             new Dictionary<string, IReadOnlyList<string>>
             {
-                ["applicant_name"] = ["Ada Lovelace"],
+                ["display_name"] = ["Ada Lovelace"],
             },
             idempotencyKey: "record-1");
         BusinessObjectRecord second = BusinessObjectRecordHandlerTestContext.DraftRecord(
             definition,
             new Dictionary<string, IReadOnlyList<string>>
             {
-                ["applicant_name"] = ["Grace Hopper"],
+                ["display_name"] = ["Grace Hopper"],
             },
             idempotencyKey: "record-2");
-        BusinessObjectDefinitionKey objectKey = BusinessObjectDefinitionKey.Create("loan_application").Value;
+        BusinessObjectDefinitionKey objectKey = BusinessObjectDefinitionKey.Create("business_record").Value;
         IBusinessObjectRecordRepository records = Substitute.For<IBusinessObjectRecordRepository>();
         records.CountForWorkspaceAsync(
                 BusinessObjectRecordHandlerTestContext.WorkspaceId,

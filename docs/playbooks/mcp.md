@@ -34,15 +34,15 @@ The wrapper passes the selected mode as `AXIS_MCP_ACCESS` and keeps its own diag
 
 ## Operation coverage
 
-The committed `openapi.json` currently contains 34 operations. The coverage catalog classifies all of them:
+The committed `openapi.json` currently contains 36 operations. The coverage catalog classifies all of them:
 
-- 25 authenticated product operations are exposed as typed tools now, plus one MCP-only prepare helper for safe business-object publication.
+- 26 operations are exposed as typed tools now, plus one MCP-only prepare helper for safe business-object publication.
 - 4 authenticated operations are explicitly blocked until their owning product contracts are repaired: `StartRuleDefinitionDraft`, `PublishRuleDefinition`, `ArchiveRuleDefinition`, and `DeleteRuleBinding`.
-- 5 account/browser-bootstrap operations remain internal to OAuth.
+- 6 account/browser-bootstrap operations remain internal to browser/OAuth session handling.
 
 The typed tool names and schemas are owned by `AxisMcpOperationCatalog` and its coverage tests; the catalog includes the business-object record workflow tools.
 
-The five account/browser-session operations (`RegisterUser`, `SignInUser`, `VerifyEmail`, `ResendEmailVerification`, and `SignOutUser`) are classified in the coverage catalog but are not exposed as product-work tools. OAuth browser bootstrap already owns that session, and passing passwords or email tokens through an agent tool would create a separate credential workflow. `/connect/*` is MCP's internal OAuth transport.
+The six account/browser-session operations (`RegisterUser`, `SignInUser`, `VerifyEmail`, `ResendEmailVerification`, `SignOutUser`, and `GetBrowserSession`) are classified in the coverage catalog but are not exposed as product-work tools. Browser/OAuth bootstrap owns those session concerns, and passing credentials, email tokens, or a browser-session projection through an agent tool would create a separate session workflow. `/connect/*` is MCP's internal OAuth transport.
 
 Workspace and user identity are always derived from the access token. MCP arguments never accept `userId` or `workspaceId`.
 

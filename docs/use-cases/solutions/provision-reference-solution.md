@@ -135,25 +135,20 @@ Required UI quality: every plan entry and outcome is programmatically labelled; 
 > |---|---|
 > | Reference product source | Partial |
 > | Axis Domain | N/A |
-> | Axis Application | Partial |
+> | Axis Application | Done |
 > | Axis Infrastructure | N/A |
-> | API and authentication | Partial |
+> | API and authentication | Done |
 > | Reference product client | Partial |
-> | Axis frontend retirement | Not started |
+> | Axis frontend retirement | Done |
 >
 > **Gaps vs spec:**
 >
 > | ID | Gap |
 > |---|---|
-> | GAP-001 | The independently versioned reference-product source, manifest, planner, generated API client, and local deployment exist, but the production-approved authentication boundary and complete acceptance journey are not implemented. |
-> | GAP-002 | The generic Rule Binding detail read and product read-back logic exist in the working implementation, but their integrated blank-workspace acceptance evidence is incomplete. |
-> | GAP-003 | Deterministic manifest planning, canonical read-back, no-op reapply, and resumable partial progress have focused component evidence but not the required authenticated runtime journey. |
-> | GAP-004 | The approved BFF contract is Ready, but the current public-browser PKCE/session-storage implementation has not yet been cleanly replaced or proven at runtime. |
-> | GAP-005 | Axis frontend still owns the `loan_application` identity, provisioning, route, product copy, record components, and product-specific tests. |
-> | GAP-006 | External-product acceptance evidence is not represented by the current repository evidence tooling. |
+> | GAP-001 | The Axis acceptance-evidence sidecar contract cannot yet represent independently versioned consumer paths and commands, so reference product source and client status remain Partial even though immutable product checkpoint `6eb817c02fda580fc9afee0c37b2b7e0a8c4735c` passed its required checks and blank-workspace journey. |
 >
 > **Deferred follow-ups:** Persisted, signed, installable and upgradeable Solutions packages begin after this consumer boundary passes; [docs/PLATFORM_STRATEGY.md](../../PLATFORM_STRATEGY.md#delivery-sequence) owns their sequence.
 >
-> **Verification:** Focused Axis and reference-product checks have run, but the required blank-workspace authenticated browser journey has not passed; no incomplete AT row is treated as accepted. Exact completion evidence belongs in the sibling sidecar.
+> **Verification:** Reference-product checkpoint `6eb817c02fda580fc9afee0c37b2b7e0a8c4735c` passes manifest/BFF checks, unit tests, and the blank-workspace authenticated browser journey. The current Axis checkpoint passes `python scripts/axis.py verify`, including API, Business Objects, MCP, frontend, docs, and policy evidence. Axis review-readiness and independent review remain pending; no pending boundary is treated as accepted.
 >
 > **Decisions:** Wave 0 uses existing module mutation operations, one generic authenticated Rule Binding detail read, and a product-owned manifest/provisioning client instead of inventing a Solutions runtime. The manifest contract above owns exact semantic identity and canonical comparison; runtime-generated fields never become product identity. A blank workspace is a newly available authenticated workspace with platform built-ins but no reference-solution definitions, bindings, or records; other isolated workspaces may exist. No supported production consumer or data requires overlap with the Axis-owned sample, so the independent product replaces it through a clean cutover. Product authentication follows the approved enterprise browser BFF dossier: product-owned same-origin ASP.NET Core host, confidential client with PKCE/PAR, server-side refresh/revocation and opaque Redis session, finite YARP allowlist, and no browser credential path. Any signed-in target-workspace user may provision in Wave 0, while role-separated administration, dynamic registration, service identities, and concurrent installation are separate capabilities. Partial multi-operation provisioning is explicit and resumable from public read-back rather than disguised as an atomic install or distributed transaction. Event sourcing is not introduced.

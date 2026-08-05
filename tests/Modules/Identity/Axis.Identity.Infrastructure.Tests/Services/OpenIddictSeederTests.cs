@@ -14,7 +14,7 @@ namespace Axis.Identity.Infrastructure.Tests.Services;
 [Collection("IdentityDb")]
 public sealed class OpenIddictSeederTests(IdentityDatabaseFixture database) : IAsyncLifetime
 {
-    private const string DevSecret = "reference-product-development-secret-0001";
+    private const string DevSecret = "enterprise-bff-development-secret-0001";
 
     public async ValueTask InitializeAsync() => await DeleteAllApplicationsAsync();
     public async ValueTask DisposeAsync() => await DeleteAllApplicationsAsync();
@@ -36,7 +36,7 @@ public sealed class OpenIddictSeederTests(IdentityDatabaseFixture database) : IA
             .Should().BeEquivalentTo([Requirements.Features.ProofKeyForCodeExchange]);
 
         object bff = (await manager.FindByClientIdAsync(
-            "reference_product",
+            "enterprise_bff",
             TestContext.Current.CancellationToken))!;
         (await manager.GetClientTypeAsync(bff, TestContext.Current.CancellationToken))
             .Should().Be(ClientTypes.Confidential);
@@ -45,7 +45,7 @@ public sealed class OpenIddictSeederTests(IdentityDatabaseFixture database) : IA
             DevSecret,
             TestContext.Current.CancellationToken)).Should().BeTrue();
         (await manager.GetPostLogoutRedirectUrisAsync(bff, TestContext.Current.CancellationToken))
-            .Should().Equal("https://product.example/signout-callback-oidc");
+            .Should().Equal("https://enterprise.example/signout-callback-oidc");
         (await manager.GetPermissionsAsync(bff, TestContext.Current.CancellationToken)).Should().Contain(
             Permissions.Endpoints.PushedAuthorization,
             Permissions.Endpoints.Revocation,
@@ -67,14 +67,14 @@ public sealed class OpenIddictSeederTests(IdentityDatabaseFixture database) : IA
         await using ServiceProvider provider = BuildProvider(Catalog(includeNative: true, includeBff: true));
         IOpenIddictApplicationManager manager = provider.GetRequiredService<IOpenIddictApplicationManager>();
         await manager.CreateAsync(PublicDescriptor(
-            "reference_product",
+            "enterprise_bff",
             "External owner",
             "http://127.0.0.1:9000/callback"), TestContext.Current.CancellationToken);
 
         Func<Task> act = () => Seeder(provider).StartAsync(TestContext.Current.CancellationToken);
 
         await act.Should().ThrowAsync<InvalidOperationException>()
-            .WithMessage("*reference_product*not owned*");
+            .WithMessage("*enterprise_bff*not owned*");
         (await manager.FindByClientIdAsync(
             "axis_mcp",
             TestContext.Current.CancellationToken)).Should().BeNull();
@@ -172,13 +172,13 @@ public sealed class OpenIddictSeederTests(IdentityDatabaseFixture database) : IA
         if (includeBff)
         {
             string path = $"OpenIddict:ClientCatalog:Clients:{index}";
-            values[$"{path}:ClientId"] = "reference_product";
-            values[$"{path}:DisplayName"] = "Reference product";
+            values[$"{path}:ClientId"] = "enterprise_bff";
+            values[$"{path}:DisplayName"] = "Enterprise BFF";
             values[$"{path}:Profile"] = "WebBffConfidential";
             values[$"{path}:ClientSecret"] = DevSecret;
-            values[$"{path}:RedirectUris:0"] = "https://product.example/signin-oidc";
+            values[$"{path}:RedirectUris:0"] = "https://enterprise.example/signin-oidc";
             values[$"{path}:PostLogoutRedirectUris:0"] =
-                "https://product.example/signout-callback-oidc";
+                "https://enterprise.example/signout-callback-oidc";
         }
 
         return values;

@@ -18,7 +18,7 @@ Use cases are the product source of truth. One use case is a complete end-to-end
 | [docs/use-cases/rules/README.md](./rules/README.md) | [docs/use-cases/rules/evaluate-published-rules.md](./rules/evaluate-published-rules.md) | Done |
 | [docs/use-cases/rules/README.md](./rules/README.md) | [docs/use-cases/rules/manage-workspace-rule-definitions.md](./rules/manage-workspace-rule-definitions.md) | Done |
 | [docs/use-cases/rules/README.md](./rules/README.md) | [docs/use-cases/rules/provide-system-field-rule-definitions.md](./rules/provide-system-field-rule-definitions.md) | Done |
-| [docs/use-cases/solutions/README.md](./solutions/README.md) | [docs/use-cases/solutions/provision-reference-solution.md](./solutions/provision-reference-solution.md) | Not started |
+| [docs/use-cases/solutions/README.md](./solutions/README.md) | [docs/use-cases/solutions/provision-reference-solution.md](./solutions/provision-reference-solution.md) | Partial |
 | [docs/use-cases/site-experience/README.md](./site-experience/README.md) | [docs/use-cases/site-experience/select-site-language.md](./site-experience/select-site-language.md) | Done |
 | [docs/use-cases/site-experience/README.md](./site-experience/README.md) | [docs/use-cases/site-experience/select-site-theme.md](./site-experience/select-site-theme.md) | Done |
 

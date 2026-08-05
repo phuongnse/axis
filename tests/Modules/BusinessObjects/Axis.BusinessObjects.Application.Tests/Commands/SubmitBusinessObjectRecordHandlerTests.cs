@@ -20,7 +20,7 @@ public sealed class SubmitBusinessObjectRecordHandlerTests
             definition,
             new Dictionary<string, IReadOnlyList<string>>
             {
-                ["applicant_name"] = ["Ada Lovelace"],
+                ["display_name"] = ["Ada Lovelace"],
             });
         IBusinessObjectRecordRepository records = Substitute.For<IBusinessObjectRecordRepository>();
         IBusinessObjectDefinitionRepository definitions = Substitute.For<IBusinessObjectDefinitionRepository>();

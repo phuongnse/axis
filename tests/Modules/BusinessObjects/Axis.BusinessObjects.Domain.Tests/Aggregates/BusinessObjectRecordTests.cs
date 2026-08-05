@@ -20,8 +20,8 @@ public sealed class BusinessObjectRecordTests
         record.Status.Should().Be(BusinessObjectRecordStatus.Draft);
         record.Revision.Should().Be(1);
         record.DefinitionVersionNumber.Should().Be(1);
-        record.ObjectKey.Value.Should().Be("loan_application");
-        record.Values.Should().ContainKey("applicant_name")
+        record.ObjectKey.Value.Should().Be("business_record");
+        record.Values.Should().ContainKey("display_name")
             .WhoseValue.Should().Equal("Ada Lovelace");
     }
 
@@ -34,8 +34,8 @@ public sealed class BusinessObjectRecordTests
             expectedRevision: 1,
             values: new Dictionary<string, IReadOnlyList<string>>
             {
-                ["applicant_name"] = ["Grace Hopper"],
-                ["requested_amount"] = ["12000"],
+                ["display_name"] = ["Grace Hopper"],
+                ["quantity"] = ["12000"],
             },
             updatedByUserId: OtherUserId,
             updatedAt: Now.AddMinutes(1));
@@ -44,7 +44,7 @@ public sealed class BusinessObjectRecordTests
         record.Revision.Should().Be(2);
         record.UpdatedByUserId.Should().Be(OtherUserId);
         record.PayloadHash.Should().Be("hash-1");
-        record.Values["applicant_name"].Should().Equal("Grace Hopper");
+        record.Values["display_name"].Should().Equal("Grace Hopper");
     }
 
     [Fact]
@@ -57,7 +57,7 @@ public sealed class BusinessObjectRecordTests
             expectedRevision: 0,
             values: new Dictionary<string, IReadOnlyList<string>>
             {
-                ["applicant_name"] = ["Grace Hopper"],
+                ["display_name"] = ["Grace Hopper"],
             },
             updatedByUserId: OtherUserId,
             updatedAt: Now.AddMinutes(1));
@@ -80,7 +80,7 @@ public sealed class BusinessObjectRecordTests
             evaluations:
             [
                 new(
-                    "applicant_name",
+                    "display_name",
                     Guid.Parse("44444444-4444-4444-8444-444444444444"),
                     1,
                     "field.required",
@@ -115,7 +115,7 @@ public sealed class BusinessObjectRecordTests
             WorkspaceId,
             BusinessObjectDefinitionVersionId.New(),
             1,
-            BusinessObjectDefinitionKey.Create("loan_application").Value,
+            BusinessObjectDefinitionKey.Create("business_record").Value,
             "record-1",
             "hash-1",
             new Dictionary<string, IReadOnlyList<string>>
@@ -135,12 +135,12 @@ public sealed class BusinessObjectRecordTests
             WorkspaceId,
             BusinessObjectDefinitionVersionId.New(),
             1,
-            BusinessObjectDefinitionKey.Create("loan_application").Value,
+            BusinessObjectDefinitionKey.Create("business_record").Value,
             "record-1",
             "hash-1",
             new Dictionary<string, IReadOnlyList<string>>
             {
-                ["applicant_name"] = ["Ada Lovelace"],
+                ["display_name"] = ["Ada Lovelace"],
             },
             UserId,
             Now);

@@ -135,7 +135,11 @@ sequenceDiagram
 > | API | Partial |
 > | Frontend | Partial |
 >
-> **Gaps vs spec:** No known gap in the implemented AC-008 search slice; remaining partial layers retain their existing non-search scope.
+> **Gaps vs spec:**
+>
+> | ID | Gap |
+> |---|---|
+> | GAP-001 | No known gap in the implemented AC-008 search slice; Application, Infrastructure, API, and Frontend remain Partial for their existing non-search scope. |
 >
 > **Deferred follow-ups:** N/A for this use case; excluded surfaces are listed in Out Of Scope.
 >
