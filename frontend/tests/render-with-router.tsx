@@ -68,7 +68,7 @@ export async function renderWithRouter(
         <div className="relative h-dvh w-dvw">
           <RouterProvider router={router} />
           <ManagedWindowHost />
-          <Toaster />
+          {authenticatedPath === 'rules' ? <Toaster /> : null}
         </div>
       </ManagedWindowProvider>
     </QueryClientProvider>,
