@@ -385,10 +385,16 @@ public sealed class TransitionReadRaceGate
 {
     private readonly TaskCompletionSource _bothReadsObserved = new(
         TaskCreationOptions.RunContinuationsAsynchronously);
+    private int _armed;
     private int _pendingReads;
+
+    public void Arm() => Volatile.Write(ref _armed, 1);
 
     internal Task WaitForBothInitialReadsAsync()
     {
+        if (Volatile.Read(ref _armed) == 0)
+            return Task.CompletedTask;
+
         if (Interlocked.Increment(ref _pendingReads) == 2)
             _bothReadsObserved.TrySetResult();
         return _bothReadsObserved.Task;

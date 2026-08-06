@@ -310,6 +310,7 @@ public sealed class WorkspaceContextEndpointTests(ApiTestFixture fixture)
             Json,
             TestContext.Current.CancellationToken);
         begin.StatusCode.Should().Be(HttpStatusCode.OK);
+        raceGate.Arm();
         Guid transitionId = (await begin.Content.ReadFromJsonAsync<JsonElement>(
             Json,
             TestContext.Current.CancellationToken)).GetProperty("transitionId").GetGuid();
@@ -344,8 +345,8 @@ public sealed class WorkspaceContextEndpointTests(ApiTestFixture fixture)
         HttpStatusCode[] candidateReadStatuses = await Task.WhenAll(candidateSessionCookies.Select(cookie =>
             ScopedReadStatusForSessionAsync(host, cookie)));
         candidateReadStatuses.Should().OnlyContain(status => status == HttpStatusCode.OK);
-        (await ScopedReadStatusForSessionAsync(host, sourceSessionCookie)).Should().Be(
-            terminalStatus == "Completed" ? HttpStatusCode.Unauthorized : HttpStatusCode.OK);
+        (await ScopedReadStatusForSessionAsync(host, sourceSessionCookie))
+            .Should().Be(HttpStatusCode.Unauthorized);
         (await TerminalAuditCountAsync(transitionId)).Should().Be(1);
     }
 
