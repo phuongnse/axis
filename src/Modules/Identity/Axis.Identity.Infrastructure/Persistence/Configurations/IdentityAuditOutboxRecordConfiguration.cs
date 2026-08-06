@@ -10,7 +10,9 @@ internal sealed class IdentityAuditOutboxRecordConfiguration
 {
     public void Configure(EntityTypeBuilder<IdentityAuditOutboxRecord> builder)
     {
-        builder.ToTable("identity_audit_outbox");
+        builder.ToTable("identity_audit_outbox", table => table.HasCheckConstraint(
+            "CK_identity_audit_outbox_scope",
+            "actor_kind IN ('System', 'Anonymous') OR workspace_id IS NOT NULL"));
         builder.HasKey(x => x.EventId);
         builder.Property(x => x.EventId).HasColumnName("event_id").ValueGeneratedNever();
         builder.Property(x => x.ActorKind).HasColumnName("actor_kind").HasConversion<string>();

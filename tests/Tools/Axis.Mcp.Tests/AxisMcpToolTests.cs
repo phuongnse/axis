@@ -66,8 +66,9 @@ public sealed class AxisMcpToolTests
         {
             BaseAddress = new Uri("https://localhost:5281/"),
         };
+        AxisApiClient api = new(httpClient, new FixedAccessTokenProvider("test-token"));
         AxisMcpIdentityTools tools = new(
-            new AxisApiClient(httpClient, new FixedAccessTokenProvider("test-token")),
+            api,
             new Axis.Mcp.Configuration.AxisMcpMutationGuard(
                 Axis.Mcp.Configuration.AxisMcpOptions.Create(
                     new Uri("https://localhost:5281/"),
@@ -85,6 +86,58 @@ public sealed class AxisMcpToolTests
         Assert.DoesNotContain("userId", handler.RequestBody, StringComparison.Ordinal);
         Assert.DoesNotContain("workspaceId", handler.RequestBody, StringComparison.Ordinal);
         Assert.DoesNotContain("idempotencyKey", handler.RequestBody, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task IdentityTools_WhenInvitationIsManaged_DerivesAuthorityFromAuthentication()
+    {
+        RecordingHandler handler = new("{\"status\":\"Pending\"}");
+        using HttpClient httpClient = new(handler)
+        {
+            BaseAddress = new Uri("https://localhost:5281/"),
+        };
+        AxisApiClient api = new(httpClient, new FixedAccessTokenProvider("test-token"));
+        AxisMcpIdentityTools tools = new(
+            api,
+            new Axis.Mcp.Configuration.AxisMcpMutationGuard(
+                Axis.Mcp.Configuration.AxisMcpOptions.Create(
+                    new Uri("https://localhost:5281/"),
+                    ".dev-certs/rootCA.pem",
+                    "write")));
+        Guid invitationId = Guid.Parse("11111111-1111-1111-1111-111111111111");
+
+        await tools.InviteWorkspaceMemberAsync(
+            new InviteWorkspaceMemberInput("member@example.com", "Member"),
+            TestContext.Current.CancellationToken);
+        Assert.Equal(HttpMethod.Post, handler.Method);
+        Assert.Equal("/api/workspace-invitations", handler.RequestUri!.PathAndQuery);
+        Assert.Equal(
+            "{\"email\":\"member@example.com\",\"requestedRole\":\"Member\"}",
+            handler.RequestBody);
+        Assert.DoesNotContain("userId", handler.RequestBody, StringComparison.Ordinal);
+        Assert.DoesNotContain("workspaceId", handler.RequestBody, StringComparison.Ordinal);
+
+        await tools.ResendWorkspaceInvitationAsync(
+            invitationId,
+            new ChangeWorkspaceInvitationInput(2),
+            TestContext.Current.CancellationToken);
+        Assert.Equal($"/api/workspace-invitations/{invitationId:D}/resend", handler.RequestUri!.PathAndQuery);
+        Assert.Equal("{\"expectedRevision\":2}", handler.RequestBody);
+
+        await tools.RevokeWorkspaceInvitationAsync(
+            invitationId,
+            new ChangeWorkspaceInvitationInput(3),
+            TestContext.Current.CancellationToken);
+        Assert.Equal($"/api/workspace-invitations/{invitationId:D}/revoke", handler.RequestUri!.PathAndQuery);
+        Assert.Equal("{\"expectedRevision\":3}", handler.RequestBody);
+
+        AxisMcpIdentityReadTools readTools = new(api);
+        await readTools.ListWorkspaceInvitationsAsync(
+            page: 2,
+            pageSize: 10,
+            cancellationToken: TestContext.Current.CancellationToken);
+        Assert.Equal(HttpMethod.Get, handler.Method);
+        Assert.Equal("/api/workspace-invitations?page=2&pageSize=10", handler.RequestUri!.PathAndQuery);
     }
 
     [Fact]

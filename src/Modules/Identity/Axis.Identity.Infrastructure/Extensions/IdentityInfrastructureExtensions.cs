@@ -36,6 +36,7 @@ public static class IdentityInfrastructureExtensions
         services.AddScoped<IOrganizationMembershipRepository, OrganizationMembershipRepository>();
         services.AddScoped<IWorkspaceMembershipRepository, WorkspaceMembershipRepository>();
         services.AddScoped<IWorkspaceContextTransitionRepository, WorkspaceContextTransitionRepository>();
+        services.AddScoped<IWorkspaceInvitationRepository, WorkspaceInvitationRepository>();
         services.AddScoped<ICreateOrganizationIdempotencyRepository, CreateOrganizationIdempotencyRepository>();
         services.AddScoped<IIdentityAuditOutbox, IdentityAuditOutbox>();
         services.AddScoped<IIdentityAuditDispatchStore, IdentityAuditDispatchStore>();
@@ -49,12 +50,22 @@ public static class IdentityInfrastructureExtensions
         services.AddScoped<IPasswordHasher, BCryptPasswordHasher>();
         services.AddScoped<IEmailSender, MailKitEmailSender>();
         services.AddSingleton<IResendVerificationRateLimiter, RedisResendVerificationRateLimiter>();
+        services.AddSingleton<IWorkspaceInvitationRateLimiter, RedisWorkspaceInvitationRateLimiter>();
+        services.AddSingleton<IInvitationDeliveryEnvelopeProtector,
+            DataProtectionInvitationDeliveryEnvelopeProtector>();
         services.AddScoped<IEmailVerificationTokenStore, EmailVerificationTokenStore>();
         services.AddScoped<IWorkspaceSlugGenerator, WorkspaceSlugGenerator>();
         services.AddSingleton(clientCatalog);
+        services.AddSingleton(new WorkspaceInvitationPolicy(
+            TimeSpan.FromHours(configuration.GetValue("Identity:Invitations:LifetimeHours", 168)),
+            TimeSpan.FromMinutes(configuration.GetValue("Identity:Invitations:HandoffLifetimeMinutes", 120)),
+            configuration.GetValue("Identity:Invitations:DefaultPageSize", 20),
+            configuration.GetValue("Identity:Invitations:MaximumPageSize", 100)).Validate());
         services.TryAddSingleton(TimeProvider.System);
         services.AddHostedService<OpenIddictSeeder>();
         services.AddHostedService<IdentityAuditDispatcher>();
+        services.AddHostedService<WorkspaceInvitationDeliveryDispatcher>();
+        services.AddHostedService<WorkspaceInvitationLifecycleWorker>();
 
         return services;
     }

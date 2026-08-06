@@ -139,6 +139,15 @@ export async function completePostVerifyFlow(): Promise<boolean> {
   return restoreBrowserSession({ force: true });
 }
 
+export async function hasPendingWorkspaceInvitation(): Promise<boolean> {
+  try {
+    const state = await fetchApi<{ active: boolean }>('/internal/workspace-invitations/handoff');
+    return state.active;
+  } catch {
+    return false;
+  }
+}
+
 export async function completePostSignInFlow(
   authorizationRequest?: AuthorizationRequestContinuation,
 ): Promise<boolean> {

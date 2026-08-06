@@ -70,4 +70,36 @@ public sealed class AuditRecordTests
         if (!expectedCreated)
             rejectionCode.Should().Be("audit.actor_invalid");
     }
+
+    [Theory]
+    [InlineData(AuditActorKind.Anonymous)]
+    [InlineData(AuditActorKind.System)]
+    public void TryCreate_WhenPreResolutionActorHasNoWorkspace_CreatesPlatformScopedRecord(
+        AuditActorKind actorKind)
+    {
+        bool created = AuditRecord.TryCreate(
+            Guid.NewGuid(), actorKind, null, null, null,
+            "workspace.invitation.exchange_rejected", "WorkspaceInvitationAccessAttempt", Guid.NewGuid(),
+            "invalid", DateTimeOffset.UtcNow, "correlation-1", null,
+            out AuditRecord? record, out string? rejectionCode);
+
+        created.Should().BeTrue();
+        rejectionCode.Should().BeNull();
+        record!.WorkspaceId.Should().BeNull();
+    }
+
+    [Theory]
+    [InlineData(AuditActorKind.Human)]
+    [InlineData(AuditActorKind.ServiceIdentity)]
+    public void TryCreate_WhenResolvedActorHasNoWorkspace_RejectsScope(AuditActorKind actorKind)
+    {
+        bool created = AuditRecord.TryCreate(
+            Guid.NewGuid(), actorKind, Guid.NewGuid(), null, null,
+            "workspace.invitation.exchange_rejected", "WorkspaceInvitationAccessAttempt", Guid.NewGuid(),
+            "invalid", DateTimeOffset.UtcNow, "correlation-1", null,
+            out _, out string? rejectionCode);
+
+        created.Should().BeFalse();
+        rejectionCode.Should().Be("audit.scope_invalid");
+    }
 }

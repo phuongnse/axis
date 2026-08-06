@@ -30,6 +30,8 @@ public static class AuditEventV1Validator
             return Invalid("audit.identifier_invalid");
         if (!HasValidActor(auditEvent.ActorKind, auditEvent.ActorId))
             return Invalid("audit.actor_invalid");
+        if (!HasValidScope(auditEvent.ActorKind, auditEvent.WorkspaceId))
+            return Invalid("audit.scope_invalid");
         if (auditEvent.SubjectId == Guid.Empty)
             return Invalid("audit.subject_invalid");
         if (!IsCategory(auditEvent.Action, MaximumCategoryLength) ||
@@ -70,6 +72,13 @@ public static class AuditEventV1Validator
         _ => false,
     };
 
+    private static bool HasValidScope(AuditActorKindV1 actorKind, Guid? workspaceId) => actorKind switch
+    {
+        AuditActorKindV1.Human or AuditActorKindV1.ServiceIdentity => workspaceId is Guid id && id != Guid.Empty,
+        AuditActorKindV1.System or AuditActorKindV1.Anonymous => workspaceId != Guid.Empty,
+        _ => false,
+    };
+
     private static bool IsCategory(string? value, int maximumLength) =>
         !string.IsNullOrWhiteSpace(value) &&
         value == value.Trim() &&
@@ -93,7 +102,7 @@ public sealed record AuditEventV1(
     AuditActorKindV1 ActorKind,
     Guid? ActorId,
     Guid? SubjectId,
-    Guid WorkspaceId,
+    Guid? WorkspaceId,
     string Action,
     string TargetType,
     Guid TargetId,
@@ -107,7 +116,7 @@ public sealed record AuditEventReadBackV1(
     AuditActorKindV1 ActorKind,
     Guid? ActorId,
     Guid? SubjectId,
-    Guid WorkspaceId,
+    Guid? WorkspaceId,
     string Action,
     string TargetType,
     Guid TargetId,

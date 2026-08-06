@@ -33,6 +33,7 @@ IMcpServerBuilder mcpServer = builder.Services
     .WithTools<AxisMcpBindingReadTools>()
     .WithTools<AxisMcpBindingEvaluationTools>()
     .WithTools<AxisMcpRuleReadTools>()
+    .WithTools<AxisMcpIdentityReadTools>()
     .WithTools<AxisMcpBusinessObjectRecordReadTools>();
 
 if (options.MutationsEnabled)

@@ -54,6 +54,20 @@ public sealed class WorkspaceMembership : AggregateRoot<Guid>
         Revision++;
     }
 
+    public void RestoreFromInvitation(WorkspaceMembershipRole role, int expectedRevision)
+    {
+        EnsureOrganizationMembership();
+        EnsureRevision(expectedRevision);
+        if (Status != MembershipStatus.Removed)
+            throw new InvalidOperationException("Only a removed Workspace membership can be restored by invitation.");
+        if (role is not (WorkspaceMembershipRole.Administrator or WorkspaceMembershipRole.Member))
+            throw new ArgumentOutOfRangeException(nameof(role));
+
+        Role = role;
+        Status = MembershipStatus.Active;
+        Revision++;
+    }
+
     public void Remove(int expectedRevision)
     {
         EnsureOrganizationMembership();

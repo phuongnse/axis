@@ -15,17 +15,23 @@ internal sealed class AuditRecordConfiguration : IEntityTypeConfiguration<AuditR
 
     public void Configure(EntityTypeBuilder<AuditRecord> builder)
     {
-        builder.ToTable("audit_records", table => table.HasCheckConstraint(
-            "CK_audit_records_actor",
-            "(actor_kind IN ('Human', 'ServiceIdentity') AND actor_id IS NOT NULL) OR " +
-            "(actor_kind IN ('System', 'Anonymous') AND actor_id IS NULL)"));
+        builder.ToTable("audit_records", table =>
+        {
+            table.HasCheckConstraint(
+                "CK_audit_records_actor",
+                "(actor_kind IN ('Human', 'ServiceIdentity') AND actor_id IS NOT NULL) OR " +
+                "(actor_kind IN ('System', 'Anonymous') AND actor_id IS NULL)");
+            table.HasCheckConstraint(
+                "CK_audit_records_scope",
+                "actor_kind IN ('System', 'Anonymous') OR workspace_id IS NOT NULL");
+        });
         builder.HasKey(record => record.Id);
         builder.Property(record => record.Id).HasColumnName("id").ValueGeneratedNever();
         builder.Property(record => record.EventId).HasColumnName("event_id").IsRequired();
         builder.Property(record => record.ActorKind).HasColumnName("actor_kind").HasConversion<string>().HasMaxLength(32).IsRequired();
         builder.Property(record => record.ActorId).HasColumnName("actor_id");
         builder.Property(record => record.SubjectId).HasColumnName("subject_id");
-        builder.Property(record => record.WorkspaceId).HasColumnName("workspace_id").IsRequired();
+        builder.Property(record => record.WorkspaceId).HasColumnName("workspace_id");
         builder.Property(record => record.Action).HasColumnName("action").HasMaxLength(64).IsRequired();
         builder.Property(record => record.TargetType).HasColumnName("target_type").HasMaxLength(64).IsRequired();
         builder.Property(record => record.TargetId).HasColumnName("target_id").IsRequired();

@@ -224,6 +224,10 @@ export type BusinessObjectRecordSubmitResultDto = {
     ruleEvaluations: Array<BusinessObjectRecordRuleEvaluationDto>;
 };
 
+export type ChangeWorkspaceInvitationRequest = {
+    expectedRevision?: number;
+};
+
 export type CompleteRuleAuthoringRequest = {
     text?: string | null;
     cursor?: number;
@@ -313,6 +317,17 @@ export type HttpValidationProblemDetails = {
         [key: string]: Array<string>;
     } | null;
     [key: string]: unknown;
+};
+
+export type InviteWorkspaceMemberDto = {
+    outcome?: string;
+    requestedRole?: string;
+    invitation?: WorkspaceInvitationLifecycleDto;
+};
+
+export type InviteWorkspaceMemberRequest = {
+    email?: string;
+    requestedRole?: string;
 };
 
 export type LanguagePreferenceDto = {
@@ -859,6 +874,24 @@ export type VerifyEmailRequest = {
 export type VerifyEmailSessionEstablishedDto = {
     sessionEstablished?: boolean;
     nextStep?: VerifyEmailNextStep;
+};
+
+export type WorkspaceInvitationLifecycleDto = {
+    invitationId?: string;
+    recipientEmail?: string | null;
+    requestedRole?: string;
+    status?: string;
+    deliveryStatus?: string;
+    createdAt?: string;
+    expiresAt?: string;
+    revision?: number;
+};
+
+export type WorkspaceInvitationPageDto = {
+    items?: Array<WorkspaceInvitationLifecycleDto>;
+    page?: number;
+    pageSize?: number;
+    totalCount?: number;
 };
 
 export type RuleAuthoringProjectionDtoWritable = {
@@ -1579,6 +1612,177 @@ export type CreateOrganizationWorkspaceResponses = {
 };
 
 export type CreateOrganizationWorkspaceResponse = CreateOrganizationWorkspaceResponses[keyof CreateOrganizationWorkspaceResponses];
+
+export type ListWorkspaceInvitationsData = {
+    body?: never;
+    path?: never;
+    query: {
+        page: number;
+        pageSize: number;
+    };
+    url: '/api/workspace-invitations';
+};
+
+export type ListWorkspaceInvitationsErrors = {
+    /**
+     * Bad Request
+     */
+    400: ProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type ListWorkspaceInvitationsError = ListWorkspaceInvitationsErrors[keyof ListWorkspaceInvitationsErrors];
+
+export type ListWorkspaceInvitationsResponses = {
+    /**
+     * OK
+     */
+    200: WorkspaceInvitationPageDto;
+};
+
+export type ListWorkspaceInvitationsResponse = ListWorkspaceInvitationsResponses[keyof ListWorkspaceInvitationsResponses];
+
+export type InviteWorkspaceMemberData = {
+    body: InviteWorkspaceMemberRequest;
+    path?: never;
+    query?: never;
+    url: '/api/workspace-invitations';
+};
+
+export type InviteWorkspaceMemberErrors = {
+    /**
+     * Bad Request
+     */
+    400: HttpValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+    /**
+     * Unprocessable Content
+     */
+    422: ProblemDetails;
+    /**
+     * Too Many Requests
+     */
+    429: ProblemDetails;
+};
+
+export type InviteWorkspaceMemberError = InviteWorkspaceMemberErrors[keyof InviteWorkspaceMemberErrors];
+
+export type InviteWorkspaceMemberResponses = {
+    /**
+     * OK
+     */
+    200: InviteWorkspaceMemberDto;
+    /**
+     * Created
+     */
+    201: InviteWorkspaceMemberDto;
+};
+
+export type InviteWorkspaceMemberResponse = InviteWorkspaceMemberResponses[keyof InviteWorkspaceMemberResponses];
+
+export type ResendWorkspaceInvitationData = {
+    body: ChangeWorkspaceInvitationRequest;
+    path: {
+        invitationId: string;
+    };
+    query?: never;
+    url: '/api/workspace-invitations/{invitationId}/resend';
+};
+
+export type ResendWorkspaceInvitationErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+    /**
+     * Too Many Requests
+     */
+    429: ProblemDetails;
+};
+
+export type ResendWorkspaceInvitationError = ResendWorkspaceInvitationErrors[keyof ResendWorkspaceInvitationErrors];
+
+export type ResendWorkspaceInvitationResponses = {
+    /**
+     * OK
+     */
+    200: WorkspaceInvitationLifecycleDto;
+};
+
+export type ResendWorkspaceInvitationResponse = ResendWorkspaceInvitationResponses[keyof ResendWorkspaceInvitationResponses];
+
+export type RevokeWorkspaceInvitationData = {
+    body: ChangeWorkspaceInvitationRequest;
+    path: {
+        invitationId: string;
+    };
+    query?: never;
+    url: '/api/workspace-invitations/{invitationId}/revoke';
+};
+
+export type RevokeWorkspaceInvitationErrors = {
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+};
+
+export type RevokeWorkspaceInvitationError = RevokeWorkspaceInvitationErrors[keyof RevokeWorkspaceInvitationErrors];
+
+export type RevokeWorkspaceInvitationResponses = {
+    /**
+     * OK
+     */
+    200: WorkspaceInvitationLifecycleDto;
+};
+
+export type RevokeWorkspaceInvitationResponse = RevokeWorkspaceInvitationResponses[keyof RevokeWorkspaceInvitationResponses];
 
 export type ListRuleBindingUsageData = {
     body?: never;

@@ -1,5 +1,5 @@
-export type ModuleNavigationIcon = 'businessObjects' | 'rules';
-export type ModuleNavigationRouteTarget = '/business-objects' | '/rules';
+export type ModuleNavigationIcon = 'businessObjects' | 'memberships' | 'rules';
+export type ModuleNavigationRouteTarget = '/business-objects' | '/memberships' | '/rules';
 
 export interface ModuleNavigationGroup {
   id: string;

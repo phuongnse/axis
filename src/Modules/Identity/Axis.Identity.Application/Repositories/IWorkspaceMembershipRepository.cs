@@ -9,6 +9,10 @@ public interface IWorkspaceMembershipRepository
         Guid workspaceId,
         Guid userId,
         CancellationToken ct = default);
+    Task<WorkspaceMembership?> GetAsync(
+        Guid workspaceId,
+        Guid userId,
+        CancellationToken ct = default);
     Task<IReadOnlyList<WorkspaceMembership>> ListActiveForUserAsync(
         Guid userId,
         CancellationToken ct = default);

@@ -45,6 +45,17 @@ public sealed class OrganizationMembership : AggregateRoot<Guid>
         Revision++;
     }
 
+    public void RestoreBaselineFromInvitation(int expectedRevision)
+    {
+        EnsureRevision(expectedRevision);
+        if (Status != MembershipStatus.Removed)
+            throw new InvalidOperationException("Only a removed Organization membership can be restored by invitation.");
+
+        Role = OrganizationMembershipRole.Member;
+        Status = MembershipStatus.Active;
+        Revision++;
+    }
+
     public void Remove(int expectedRevision)
     {
         EnsureActive(expectedRevision);

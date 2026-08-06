@@ -2,7 +2,11 @@ import { useMutation } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { useCallback } from 'react';
 
-import { completePostVerifyFlow, verifyEmail } from '@/features/auth/api';
+import {
+  completePostVerifyFlow,
+  hasPendingWorkspaceInvitation,
+  verifyEmail,
+} from '@/features/auth/api';
 import { classifyVerifyEmailError } from '@/features/auth/problem-details';
 import { ApiError } from '@/lib/api';
 
@@ -20,6 +24,10 @@ export function useVerifyEmail() {
     try {
       const completed = await completePostVerifyFlow();
       if (completed) {
+        if (await hasPendingWorkspaceInvitation()) {
+          void navigate({ to: '/invitations/accept', replace: true });
+          return;
+        }
         void navigate({ to: '/dashboard', replace: true });
         return;
       }

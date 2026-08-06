@@ -116,22 +116,22 @@ Exchange, handoff, membership mutation, concurrency, retention, and audit realiz
 >
 > | Layer | Status |
 > |---|---|
-> | Identity Domain | Not started |
-> | Identity Application | Not started |
-> | Identity Infrastructure | Not started |
-> | Identity Access integration | Not started |
-> | Audit | Not started |
-> | API and bootstrap | Not started |
-> | Frontend | Not started |
+> | Identity Domain | Done |
+> | Identity Application | Done |
+> | Identity Infrastructure | Done |
+> | Identity Access integration | Done |
+> | Audit | Done |
+> | API and bootstrap | Done |
+> | Frontend | Done |
 >
 > **Gaps vs spec:**
 >
 > | ID | Gap |
 > |---|---|
-> | GAP-001 | Token exchange, handoff, resumption, acceptance transaction, audit integration, cleanup, API/bootstrap routes, and client journeys are not implemented. |
+> | None | All in-scope acceptance rows have current evidence. |
 >
 > **Deferred follow-ups:** Only the separately owned capabilities under Out Of Scope are deferred.
 >
-> **Verification:** Not run; no acceptance row has current evidence.
+> **Verification:** [accept-workspace-invitation.evidence.md](./accept-workspace-invitation.evidence.md) binds every required AT to current source and verification evidence.
 >
 > **Decisions:** Acceptance is a recipient-owned goal separate from invitation administration. The invitation is email-bound, single-use, and cannot elevate Organization authority or product permissions; the linked architecture contract owns security realization.

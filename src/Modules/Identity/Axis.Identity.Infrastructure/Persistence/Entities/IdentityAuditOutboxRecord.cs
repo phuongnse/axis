@@ -9,7 +9,7 @@ internal sealed class IdentityAuditOutboxRecord
     public AuditActorKindV1 ActorKind { get; set; }
     public Guid? ActorId { get; set; }
     public Guid? SubjectId { get; set; }
-    public Guid WorkspaceId { get; set; }
+    public Guid? WorkspaceId { get; set; }
     public string Action { get; set; } = null!;
     public string TargetType { get; set; } = null!;
     public Guid TargetId { get; set; }

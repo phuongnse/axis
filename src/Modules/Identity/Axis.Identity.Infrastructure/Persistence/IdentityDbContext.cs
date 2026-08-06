@@ -13,6 +13,7 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
     public DbSet<OrganizationMembership> OrganizationMemberships => Set<OrganizationMembership>();
     public DbSet<WorkspaceMembership> WorkspaceMemberships => Set<WorkspaceMembership>();
     public DbSet<WorkspaceContextTransition> WorkspaceContextTransitions => Set<WorkspaceContextTransition>();
+    public DbSet<WorkspaceInvitation> WorkspaceInvitations => Set<WorkspaceInvitation>();
     internal DbSet<EmailVerificationToken> EmailVerificationTokens => Set<EmailVerificationToken>();
     internal DbSet<RegistrationIdempotencyRecord> RegistrationIdempotencyRecords =>
         Set<RegistrationIdempotencyRecord>();
@@ -27,6 +28,7 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
         modelBuilder.ApplyConfiguration(new OrganizationMembershipConfiguration());
         modelBuilder.ApplyConfiguration(new WorkspaceMembershipConfiguration());
         modelBuilder.ApplyConfiguration(new WorkspaceContextTransitionConfiguration());
+        modelBuilder.ApplyConfiguration(new WorkspaceInvitationConfiguration());
         modelBuilder.ApplyConfiguration(new CreateOrganizationIdempotencyRecordConfiguration());
         modelBuilder.ApplyConfiguration(new IdentityAuditOutboxRecordConfiguration());
         modelBuilder.ApplyConfiguration(new RegistrationIdempotencyRecordConfiguration());

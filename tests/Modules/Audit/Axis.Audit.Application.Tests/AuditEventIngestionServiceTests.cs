@@ -78,6 +78,64 @@ public sealed class AuditEventIngestionServiceTests
             result.Event.ActorId.Should().BeNull();
     }
 
+    [Theory]
+    [InlineData(AuditActorKindV1.Anonymous)]
+    [InlineData(AuditActorKindV1.System)]
+    public async Task IngestAsync_WhenPreResolutionEventHasNoWorkspace_StoresPlatformScopedReadBack(
+        AuditActorKindV1 actorKind)
+    {
+        InMemoryAuditStore store = new();
+        AuditEventIngestionService service = new(store, store);
+
+        AuditIngestionResult result = await service.IngestAsync(
+            Event() with
+            {
+                ActorKind = actorKind,
+                ActorId = null,
+                SubjectId = null,
+                WorkspaceId = null,
+                Action = "workspace.invitation.exchange_rejected",
+                TargetType = "WorkspaceInvitationAccessAttempt",
+                Metadata = null,
+            },
+            TestContext.Current.CancellationToken);
+
+        result.Disposition.Should().Be(AuditIngestionDisposition.Stored);
+        result.Event!.WorkspaceId.Should().BeNull();
+        AuditEventV1ReadBack.Matches(
+            Event() with
+            {
+                EventId = result.Event.EventId,
+                ActorKind = actorKind,
+                ActorId = null,
+                SubjectId = null,
+                WorkspaceId = null,
+                Action = result.Event.Action,
+                TargetType = result.Event.TargetType,
+                TargetId = result.Event.TargetId,
+                OccurredAt = result.Event.OccurredAt,
+                CorrelationId = result.Event.CorrelationId,
+                Metadata = null,
+            },
+            result.Event).Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData(AuditActorKindV1.Human)]
+    [InlineData(AuditActorKindV1.ServiceIdentity)]
+    public async Task IngestAsync_WhenResolvedActorHasNoWorkspace_RejectsScope(AuditActorKindV1 actorKind)
+    {
+        InMemoryAuditStore store = new();
+        AuditEventIngestionService service = new(store, store);
+
+        AuditIngestionResult result = await service.IngestAsync(
+            Event() with { ActorKind = actorKind, ActorId = Guid.NewGuid(), WorkspaceId = null },
+            TestContext.Current.CancellationToken);
+
+        result.Disposition.Should().Be(AuditIngestionDisposition.Rejected);
+        result.RejectionCode.Should().Be("audit.scope_invalid");
+    }
+
     private static AuditEventV1 Event() => new(
         Guid.NewGuid(), AuditActorKindV1.Human, Guid.NewGuid(), null, Guid.NewGuid(), "workspace.created", "workspace",
         Guid.NewGuid(), "succeeded", DateTimeOffset.UtcNow, "correlation-1",

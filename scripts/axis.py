@@ -3078,7 +3078,12 @@ def dotnet_command(args: argparse.Namespace) -> int:
     if command == "restore-tools":
         return run([exe("dotnet"), "tool", "restore", *dotnet_args], check=False).returncode
     if command == "build":
-        return run([exe("dotnet"), "build", "Axis.sln", "--nologo", *dotnet_args], check=False).returncode
+        target = "Axis.sln"
+        if dotnet_args and Path(dotnet_args[0]).suffix.lower() in {".csproj", ".sln"}:
+            target = dotnet_args.pop(0)
+            if dotnet_args and dotnet_args[0] == "--":
+                dotnet_args = dotnet_args[1:]
+        return run([exe("dotnet"), "build", target, "--nologo", *dotnet_args], check=False).returncode
     if command == "test":
         target = "Axis.sln"
         if dotnet_args and Path(dotnet_args[0]).suffix.lower() in {".csproj", ".sln"}:

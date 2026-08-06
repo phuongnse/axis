@@ -1,5 +1,5 @@
 import { Link } from '@tanstack/react-router';
-import { Blocks, ListChecks } from 'lucide-react';
+import { Blocks, ListChecks, Users } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { buttonVariants } from '@/components/ui/button';
 import type {
@@ -17,6 +17,7 @@ interface ModuleNavigationProps {
 
 const iconByToken: Record<ModuleNavigationIcon, typeof Blocks> = {
   businessObjects: Blocks,
+  memberships: Users,
   rules: ListChecks,
 };
 

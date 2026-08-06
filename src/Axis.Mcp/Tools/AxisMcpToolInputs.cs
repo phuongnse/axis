@@ -4,6 +4,12 @@ public sealed record CreateOrganizationWorkspaceInput(
     string Name,
     string IdempotencyKey);
 
+public sealed record InviteWorkspaceMemberInput(
+    string Email,
+    string RequestedRole);
+
+public sealed record ChangeWorkspaceInvitationInput(int ExpectedRevision);
+
 public sealed record RuleDraftInput(
     string Label,
     IReadOnlyList<string> Types,

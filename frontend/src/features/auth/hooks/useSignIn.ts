@@ -4,7 +4,11 @@ import { useNavigate } from '@tanstack/react-router';
 import { useMemo, useState } from 'react';
 import { type FieldPath, type UseFormReturn, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
-import { completePostSignInFlow, signInUser } from '@/features/auth/api';
+import {
+  completePostSignInFlow,
+  hasPendingWorkspaceInvitation,
+  signInUser,
+} from '@/features/auth/api';
 import { getAuthorizationRequestContinuation } from '@/features/auth/authorization-request';
 import { useRefreshClientValidationErrors } from '@/features/auth/hooks/useRefreshClientValidationErrors';
 import {
@@ -111,6 +115,11 @@ export function useSignIn() {
         setDashboardHandoffPending(true);
         if (authorizationRequest) {
           await completePostSignInFlow(authorizationRequest);
+          return;
+        }
+
+        if (await hasPendingWorkspaceInvitation()) {
+          await navigate({ to: '/invitations/accept', replace: true });
           return;
         }
 

@@ -115,22 +115,22 @@ Token storage, delivery retry, resend, concurrency, audit, and cleanup realizati
 >
 > | Layer | Status |
 > |---|---|
-> | Identity Domain | Not started |
-> | Identity Application | Not started |
-> | Identity Infrastructure | Not started |
-> | Audit | Not started |
-> | API | Not started |
-> | MCP | Not started |
-> | Frontend | Not started |
+> | Identity Domain | Done |
+> | Identity Application | Done |
+> | Identity Infrastructure | Done |
+> | Audit | Done |
+> | API | Done |
+> | MCP | Done |
+> | Frontend | Done |
 >
 > **Gaps vs spec:**
 >
 > | ID | Gap |
 > |---|---|
-> | GAP-001 | Invitation lifecycle, authorization, delivery, audit integration, REST/OpenAPI, MCP, and the client journey are not implemented. |
+> | None | All in-scope acceptance rows have current evidence. |
 >
 > **Deferred follow-ups:** Only the separately owned capabilities under Out Of Scope are deferred.
 >
-> **Verification:** Not run; no acceptance row has current evidence.
+> **Verification:** [invite-workspace-member.evidence.md](./invite-workspace-member.evidence.md) binds every required AT to current source and verification evidence.
 >
 > **Decisions:** Invitation grants one explicit Workspace lifecycle role only. One canonical pending acceptance link remains valid; resend invalidates it, and revocation applies only while pending. Technical realization is owned by the linked architecture contract.

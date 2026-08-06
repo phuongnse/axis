@@ -5241,6 +5241,21 @@ class TestAxisCommandWrappers(unittest.TestCase):
 
         self.assertEqual(["dotnet", "build", "Axis.sln", "--nologo", "--no-restore"], calls[0])
 
+    def test_dotnet_build_accepts_project_target(self) -> None:
+        project = "src/Modules/Identity/Axis.Identity.Domain/Axis.Identity.Domain.csproj"
+        calls = self.run_with_fake_process(
+            axis.dotnet_command,
+            axis.argparse.Namespace(
+                dotnet_command="build",
+                dotnet_args=[project, "--", "--no-restore"],
+            ),
+        )
+
+        self.assertEqual(
+            ["dotnet", "build", project, "--nologo", "--no-restore"],
+            calls[0],
+        )
+
     def test_mcp_serve_keeps_wrapper_diagnostics_off_protocol_stdout(self) -> None:
         calls: list[list[str]] = []
         environments: list[dict[str, str]] = []

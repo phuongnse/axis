@@ -88,6 +88,37 @@ public sealed class AuditPersistenceIntegrationTests(AuditDatabaseFixture db)
             .Should().NotBeNull();
     }
 
+    [Fact]
+    public async Task WhenInvitationAccessCannotResolveWorkspace_PersistsPlatformScopedAudit()
+    {
+        AuditEventV1 auditEvent = new(
+            Guid.NewGuid(),
+            AuditActorKindV1.Anonymous,
+            null,
+            null,
+            null,
+            "workspace.invitation.exchange_rejected",
+            "WorkspaceInvitationAccessAttempt",
+            Guid.NewGuid(),
+            "invalid",
+            DateTimeOffset.UtcNow,
+            $"correlation-{Guid.NewGuid():N}");
+        await using ServiceProvider provider = CreateProvider();
+        using IServiceScope scope = provider.CreateScope();
+        IAuditEventSink sink = scope.ServiceProvider.GetRequiredService<IAuditEventSink>();
+
+        AuditIngestionResult result = await sink.IngestAsync(
+            auditEvent,
+            TestContext.Current.CancellationToken);
+        AuditEventReadBackV1? readBack = await sink.ReadBackAsync(
+            auditEvent.EventId,
+            TestContext.Current.CancellationToken);
+
+        result.Disposition.Should().Be(AuditIngestionDisposition.Stored);
+        readBack!.WorkspaceId.Should().BeNull();
+        AuditEventV1ReadBack.Matches(auditEvent, readBack).Should().BeTrue();
+    }
+
     private ServiceProvider CreateProvider()
     {
         IConfiguration configuration = new ConfigurationBuilder()

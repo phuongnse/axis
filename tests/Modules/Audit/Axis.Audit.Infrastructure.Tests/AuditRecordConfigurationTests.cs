@@ -18,6 +18,7 @@ public sealed class AuditRecordConfigurationTests
 
         entity.FindProperty(nameof(AuditRecord.ActorKind))!.GetColumnName().Should().Be("actor_kind");
         entity.FindProperty(nameof(AuditRecord.ActorId))!.IsNullable.Should().BeTrue();
+        entity.FindProperty(nameof(AuditRecord.WorkspaceId))!.IsNullable.Should().BeTrue();
         entity.FindProperty(nameof(AuditRecord.EventId))!.GetColumnName().Should().Be("event_id");
         entity.GetIndexes().Should().ContainSingle(index =>
             index.IsUnique && index.Properties.Count == 1 && index.Properties[0].Name == nameof(AuditRecord.EventId));

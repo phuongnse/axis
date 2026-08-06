@@ -10,6 +10,14 @@ internal sealed class WorkspaceMembershipRepository(IdentityDbContext context)
     public async Task AddAsync(WorkspaceMembership membership, CancellationToken ct = default) =>
         await context.WorkspaceMemberships.AddAsync(membership, ct);
 
+    public Task<WorkspaceMembership?> GetAsync(
+        Guid workspaceId,
+        Guid userId,
+        CancellationToken ct = default) =>
+        context.WorkspaceMemberships.FirstOrDefaultAsync(
+            x => x.WorkspaceId == workspaceId && x.UserId == userId,
+            ct);
+
     public Task<WorkspaceMembership?> GetActiveAsync(
         Guid workspaceId,
         Guid userId,

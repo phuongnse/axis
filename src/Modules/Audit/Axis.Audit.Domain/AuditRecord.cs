@@ -23,7 +23,7 @@ public sealed class AuditRecord
     public AuditActorKind ActorKind { get; private set; }
     public Guid? ActorId { get; private set; }
     public Guid? SubjectId { get; private set; }
-    public Guid WorkspaceId { get; private set; }
+    public Guid? WorkspaceId { get; private set; }
     public string Action { get; private set; } = string.Empty;
     public string TargetType { get; private set; } = string.Empty;
     public Guid TargetId { get; private set; }
@@ -41,7 +41,7 @@ public sealed class AuditRecord
         AuditActorKind actorKind,
         Guid? actorId,
         Guid? subjectId,
-        Guid workspaceId,
+        Guid? workspaceId,
         string action,
         string targetType,
         Guid targetId,
@@ -70,7 +70,7 @@ public sealed class AuditRecord
         AuditActorKind actorKind,
         Guid? actorId,
         Guid? subjectId,
-        Guid workspaceId,
+        Guid? workspaceId,
         string? action,
         string? targetType,
         Guid targetId,
@@ -106,7 +106,7 @@ public sealed class AuditRecord
         AuditActorKind actorKind,
         Guid? actorId,
         Guid? subjectId,
-        Guid workspaceId,
+        Guid? workspaceId,
         string action,
         string targetType,
         Guid targetId,
@@ -132,7 +132,7 @@ public sealed class AuditRecord
         AuditActorKind actorKind,
         Guid? actorId,
         Guid? subjectId,
-        Guid workspaceId,
+        Guid? workspaceId,
         string? action,
         string? targetType,
         Guid targetId,
@@ -145,6 +145,8 @@ public sealed class AuditRecord
             return "audit.identifier_invalid";
         if (!HasValidActor(actorKind, actorId))
             return "audit.actor_invalid";
+        if (!HasValidScope(actorKind, workspaceId))
+            return "audit.scope_invalid";
         if (subjectId == Guid.Empty)
             return "audit.subject_invalid";
         if (!IsCategory(action, 64) || !IsCategory(targetType, 64) || !IsCategory(outcome, 64))
@@ -158,6 +160,13 @@ public sealed class AuditRecord
     {
         AuditActorKind.Human or AuditActorKind.ServiceIdentity => actorId is Guid id && id != Guid.Empty,
         AuditActorKind.System or AuditActorKind.Anonymous => actorId is null,
+        _ => false,
+    };
+
+    private static bool HasValidScope(AuditActorKind actorKind, Guid? workspaceId) => actorKind switch
+    {
+        AuditActorKind.Human or AuditActorKind.ServiceIdentity => workspaceId is Guid id && id != Guid.Empty,
+        AuditActorKind.System or AuditActorKind.Anonymous => workspaceId != Guid.Empty,
         _ => false,
     };
 

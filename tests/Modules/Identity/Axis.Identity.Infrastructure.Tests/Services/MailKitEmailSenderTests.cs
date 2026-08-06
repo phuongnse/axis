@@ -1,4 +1,5 @@
 using System.Net;
+using Axis.Identity.Application.Services;
 using FluentAssertions;
 using Microsoft.Extensions.Configuration;
 
@@ -6,6 +7,51 @@ namespace Axis.Identity.Infrastructure.Tests.Services;
 
 public class MailKitEmailSenderTests
 {
+    [Theory]
+    [InlineData("en", "Invitation to join Claims Operations", "Workspace administrator", "Review and accept invitation")]
+    [InlineData("vi-VN", "Lời mời tham gia Claims Operations", "Quản trị viên Workspace", "Xem và chấp nhận lời mời")]
+    public void BuildWorkspaceInvitationEmail_UsesLocalizedGovernanceContextAndFragmentLink(
+        string language,
+        string expectedSubject,
+        string expectedRole,
+        string expectedAction)
+    {
+        IConfiguration configuration = ConfigurationWith(("App:BaseUrl", "https://axis.example/"));
+        string rawToken = new('a', 64);
+        InvitationDeliveryMessage message = new(
+            Guid.NewGuid(),
+            3,
+            "recipient@example.com",
+            rawToken,
+            "Acme Group",
+            "Claims Operations",
+            "Ada Administrator",
+            "Administrator",
+            new DateTime(2026, 8, 13, 12, 30, 0, DateTimeKind.Utc),
+            language,
+            "delivery-correlation");
+
+        VerificationEmailContent content = MailKitEmailSender.BuildWorkspaceInvitationEmail(
+            configuration,
+            message);
+
+        content.Subject.Should().Be(expectedSubject);
+        content.PlainText.Should().Contain("Acme Group");
+        content.PlainText.Should().Contain("Claims Operations");
+        content.PlainText.Should().Contain("Ada Administrator");
+        content.PlainText.Should().Contain(expectedRole);
+        content.PlainText.Should().Contain(expectedAction);
+        content.PlainText.Should().Contain("2026-08-13 12:30 UTC");
+        content.PlainText.Should().Contain(
+            $"https://axis.example/invitations/accept#token={rawToken}");
+        content.Html.Should().Contain(
+            $"href=\"https://axis.example/invitations/accept#token={rawToken}\"");
+        content.PlainText.Should().NotContain(message.InvitationId.ToString());
+        content.Html.Should().NotContain(message.InvitationId.ToString());
+        content.PlainText.Should().NotContain(message.DeliveryCorrelation);
+        content.Html.Should().NotContain(message.DeliveryCorrelation);
+    }
+
     [Fact]
     public void BuildVerificationEmail_WhenBaseUrlIsConfigured_IncludesCompleteVerificationContent()
     {

@@ -14,8 +14,8 @@ Use cases are the product source of truth. Each use case owns one independently 
 | [docs/use-cases/identity-access/README.md](./identity-access/README.md) | [docs/use-cases/identity-access/sign-out-user.md](./identity-access/sign-out-user.md) | Done |
 | [docs/use-cases/identity-governance/README.md](./identity-governance/README.md) | [docs/use-cases/identity-governance/create-organization-workspace.md](./identity-governance/create-organization-workspace.md) | Done |
 | [docs/use-cases/identity-governance/README.md](./identity-governance/README.md) | [docs/use-cases/identity-governance/switch-active-workspace.md](./identity-governance/switch-active-workspace.md) | Done |
-| [docs/use-cases/identity-governance/README.md](./identity-governance/README.md) | [docs/use-cases/identity-governance/invite-workspace-member.md](./identity-governance/invite-workspace-member.md) | Not started |
-| [docs/use-cases/identity-governance/README.md](./identity-governance/README.md) | [docs/use-cases/identity-governance/accept-workspace-invitation.md](./identity-governance/accept-workspace-invitation.md) | Not started |
+| [docs/use-cases/identity-governance/README.md](./identity-governance/README.md) | [docs/use-cases/identity-governance/invite-workspace-member.md](./identity-governance/invite-workspace-member.md) | Done |
+| [docs/use-cases/identity-governance/README.md](./identity-governance/README.md) | [docs/use-cases/identity-governance/accept-workspace-invitation.md](./identity-governance/accept-workspace-invitation.md) | Done |
 | [docs/use-cases/business-objects/README.md](./business-objects/README.md) | [docs/use-cases/business-objects/configure-field-rules.md](./business-objects/configure-field-rules.md) | Done |
 | [docs/use-cases/business-objects/README.md](./business-objects/README.md) | [docs/use-cases/business-objects/define-business-object.md](./business-objects/define-business-object.md) | Done |
 | [docs/use-cases/business-objects/README.md](./business-objects/README.md) | [docs/use-cases/business-objects/submit-business-object-record.md](./business-objects/submit-business-object-record.md) | Done |
