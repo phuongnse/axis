@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { restoreBrowserSession, signOutUser } from '@/features/auth/api';
 import { useAuthStore } from '@/features/auth/auth-store';
 import { getCurrentUserProfile } from '@/features/dashboard/api';
+import { invalidateClientRequestSession } from '@/lib/api';
 import { AppShell } from '../src/components/shared/AppShell';
 import { ManagedDialog, ManagedDialogBody } from '../src/components/shared/ManagedDialog';
 import {
@@ -48,6 +49,11 @@ vi.mock('@/features/auth/api', () => ({
   signOutUser: vi.fn(() => Promise.resolve()),
   restoreBrowserSession: vi.fn(() => Promise.resolve(true)),
 }));
+
+vi.mock('@/lib/api', async (importActual) => {
+  const actual = await importActual<typeof import('@/lib/api')>();
+  return { ...actual, invalidateClientRequestSession: vi.fn() };
+});
 
 vi.mock('@/features/workspaces/WorkspaceControl', () => ({
   WorkspaceControl: ({ onWorkspaceChanged }: { onWorkspaceChanged: () => Promise<void> }) => (
@@ -98,6 +104,7 @@ describe('AppShell', () => {
     vi.mocked(signOutUser).mockResolvedValue();
     vi.mocked(restoreBrowserSession).mockReset();
     vi.mocked(restoreBrowserSession).mockResolvedValue(true);
+    vi.mocked(invalidateClientRequestSession).mockReset();
     vi.mocked(getCurrentUserProfile).mockResolvedValue({
       id: '11111111-1111-4111-8111-111111111111',
       email: 'ada@example.com',
@@ -261,6 +268,10 @@ describe('AppShell', () => {
     await user.click(screen.getByRole('button', { name: 'Simulate Workspace change' }));
 
     expect(await screen.findByText('Refreshing Workspace')).toBeVisible();
+    expect(invalidateClientRequestSession).toHaveBeenCalledOnce();
+    expect(vi.mocked(invalidateClientRequestSession).mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(restoreBrowserSession).mock.invocationCallOrder[0] ?? Number.MAX_SAFE_INTEGER,
+    );
     expect(
       screen.queryByRole('dialog', { name: 'Persistent test window' }),
     ).not.toBeInTheDocument();
@@ -439,6 +450,10 @@ describe('AppShell', () => {
     await user.click(screen.getByRole('button', { name: 'Sign out' }));
 
     await waitFor(() => expect(signOutUser).toHaveBeenCalledTimes(1));
+    expect(invalidateClientRequestSession).toHaveBeenCalledOnce();
+    expect(vi.mocked(signOutUser).mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(invalidateClientRequestSession).mock.invocationCallOrder[0] ?? 0,
+    );
     expect(useAuthStore.getState().browserSessionStatus).toBe('guest');
     expect(queryClient.getQueryData(['dashboard', 'current-user'])).toBeUndefined();
     expect(navigateMock).toHaveBeenCalledWith({ to: '/sign-in', replace: true });

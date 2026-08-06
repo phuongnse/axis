@@ -236,6 +236,21 @@ test.describe('organization creation and Workspace switching', () => {
     expect(await switchWorkspace(page, personalWorkspaceName)).toBe(personalWorkspaceId);
     await expectWorkspaceDefinitions(page, personalDefinitionName, organizationDefinitionName);
 
+    const sourceSearchKey = personalDefinitionName;
+    let releaseBegin!: () => void;
+    const beginReleased = new Promise<void>((resolve) => {
+      releaseBegin = resolve;
+    });
+    let beginCaptured!: () => void;
+    const beginIsHeld = new Promise<void>((resolve) => {
+      beginCaptured = resolve;
+    });
+    await page.route('**/api/workspace-context/begin', async (route) => {
+      beginCaptured();
+      await beginReleased;
+      await route.continue();
+    });
+
     let releaseHeldSourceResponse!: () => void;
     const heldSourceResponseReleased = new Promise<void>((resolve) => {
       releaseHeldSourceResponse = resolve;
@@ -255,24 +270,47 @@ test.describe('organization creation and Workspace switching', () => {
         return;
       }
 
+      expect(new URL(route.request().url()).searchParams.get('query')).toBe(sourceSearchKey);
       sourceResponseCaptured = true;
       const sourceResponse = await route.fetch();
+      const sourcePayload = (await sourceResponse.json()) as {
+        items?: Array<{ name?: string }>;
+      };
+      expect(
+        sourcePayload.items?.some((definition) => definition.name === personalDefinitionName),
+      ).toBe(true);
       sourceResponseHeld();
       await heldSourceResponseReleased;
       await route.fulfill({ response: sourceResponse });
       sourceResponseDelivered();
     });
 
-    await page.getByLabel('Search business objects').fill(personalDefinitionName);
+    await page.getByRole('button', { name: 'Workspace control' }).click();
+    await page.getByRole('button', { name: organizationName, exact: true }).click();
+    await beginIsHeld;
+
+    await page.getByLabel('Search business objects').fill(sourceSearchKey);
     await sourceResponseIsHeld;
 
-    expect(await switchWorkspace(page, organizationName)).toBe(organizationWorkspaceId);
+    releaseBegin();
+    await expect(page).toHaveURL(/\/dashboard$/);
+    await expectControlLabel(page, organizationName);
+    expect(await activeWorkspaceId(page)).toBe(organizationWorkspaceId);
     releaseHeldSourceResponse();
     await sourceResponseIsDelivered;
 
-    await page.goto('/business-objects');
-    await expectWorkspaceDefinitions(page, organizationDefinitionName, personalDefinitionName);
+    await page.goto(`/business-objects?page=1&query=${encodeURIComponent(sourceSearchKey)}`);
+    await expect(page).toHaveURL(/\/business-objects\?page=1&query=/);
+    const organizationDefinitions = page.getByLabel('Definitions');
+    await expect(
+      organizationDefinitions.getByText(organizationDefinitionName, { exact: true }),
+    ).toHaveCount(0);
+    await expect(
+      organizationDefinitions.getByText(personalDefinitionName, { exact: true }),
+    ).toHaveCount(0);
+    await expect(page.getByLabel('Search business objects')).toHaveValue(sourceSearchKey);
     await page.unroute('**/api/business-object-definitions?*');
+    await page.unroute('**/api/workspace-context/begin');
 
     expect(await switchWorkspace(page, personalWorkspaceName)).toBe(personalWorkspaceId);
     await expectWorkspaceDefinitions(page, personalDefinitionName, organizationDefinitionName);

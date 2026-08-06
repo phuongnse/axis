@@ -19,6 +19,7 @@ import { Toaster } from '@/components/ui/sonner';
 import { restoreBrowserSession, signOutUser } from '@/features/auth/api';
 import { useAuthStore } from '@/features/auth/auth-store';
 import { PreferencesProfileSync } from '@/features/preferences';
+import { invalidateClientRequestSession } from '@/lib/api';
 import { managedWindowRenderers } from '@/lib/managed-window-registry';
 import type { ModuleNavigationContribution } from '@/lib/module-navigation';
 import { visibleModuleNavigationContributions } from '@/lib/module-navigation';
@@ -84,6 +85,7 @@ function AppShellContent({
       return;
     }
 
+    invalidateClientRequestSession();
     clearWindows();
     markBrowserSessionGuest();
     queryClient.clear();
@@ -105,6 +107,7 @@ function AppShellContent({
   }
 
   async function handleWorkspaceChanged() {
+    invalidateClientRequestSession();
     setWorkspaceRefresh('pending');
     clearWindows();
     queryClient.clear();

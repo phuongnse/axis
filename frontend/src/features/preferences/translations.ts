@@ -147,7 +147,7 @@ export const translations = {
     'workspace.switchFailed':
       'The Workspace did not change. Choose an available Workspace or retry recovery.',
     'workspace.switchOutcomeUnknown':
-      'The Workspace change could not be confirmed. Axis refreshed the authoritative Workspace; verify the current context before retrying.',
+      'The Workspace change could not be confirmed. Verify the current context before trying again.',
     'workspace.switching': 'Switching Workspace...',
     'workspace.unavailable': 'Eligible Workspaces are unavailable. Retry or sign out.',
 
@@ -854,7 +854,7 @@ export const translations = {
     'workspace.switchFailed':
       'Workspace chưa thay đổi. Hãy chọn Workspace có thể dùng hoặc thử phục hồi lại.',
     'workspace.switchOutcomeUnknown':
-      'Không thể xác nhận kết quả chuyển Workspace. Axis đã tải lại Workspace có thẩm quyền; hãy kiểm tra ngữ cảnh hiện tại trước khi thử lại.',
+      'Không thể xác nhận kết quả chuyển Workspace. Hãy kiểm tra ngữ cảnh hiện tại trước khi thử lại.',
     'workspace.switching': 'Đang chuyển Workspace...',
     'workspace.unavailable': 'Không thể tải Workspace có thể dùng. Hãy thử lại hoặc đăng xuất.',
 
