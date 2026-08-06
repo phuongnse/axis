@@ -1,3 +1,6 @@
+using Axis.Identity.Application.Services;
+using Axis.Identity.Domain.Aggregates;
+using Axis.Identity.Domain.ValueObjects;
 using Axis.Identity.Infrastructure.Persistence;
 using Axis.Testing;
 using FluentAssertions;
@@ -11,6 +14,9 @@ public sealed class IdentityGovernanceMigrationTests : IAsyncLifetime
 {
     private const string InitialIdentityMigration = "20260804091803_InitialIdentity";
     private const string GovernanceMigration = "20260806070458_AddIdentityGovernance";
+    private const string PlatformAuditMigration = "20260806150336_AllowPlatformScopedAuditEvents";
+    private const string SinglePendingInvitationMigration =
+        "20260806154703_EnforceSinglePendingWorkspaceInvitationRecipient";
 
     private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder()
         .WithImage("postgres:16-alpine")
@@ -186,6 +192,84 @@ public sealed class IdentityGovernanceMigrationTests : IAsyncLifetime
                 "SELECT owner_user_id FROM \"Workspaces\" WHERE id = @workspaceId",
                 ("workspaceId", workspaceId))).Should().Be(ownerId);
         }
+    }
+
+    [Fact]
+    public async Task MigrateAsync_WhenConflictingPendingInvitationsExist_RejectsWithoutChangingIndex()
+    {
+        string databaseName = $"axis_identity_invitation_migration_{Guid.NewGuid():N}";
+        string connectionString = await PostgresModuleTestDatabase.CreateAsync(
+            _postgres.GetConnectionString(),
+            databaseName);
+        User inviter = User.Create(
+            "Invitation Administrator",
+            Email.Create($"migration-admin-{Guid.NewGuid():N}@example.com").Value);
+        inviter.VerifyEmail();
+        Organization organization = Organization.Create("Invitation Migration Organization");
+        Workspace workspace = Workspace.CreateOrganization(
+            "Invitation Migration Workspace",
+            WorkspaceSlug.Create($"invitation-migration-{Guid.NewGuid():N}").Value,
+            organization.Id);
+        DateTime now = DateTime.UtcNow;
+
+        await using (IdentityDbContext seed = CreateContext(connectionString))
+        {
+            await seed.Database.MigrateAsync(
+                PlatformAuditMigration,
+                TestContext.Current.CancellationToken);
+            seed.Users.Add(inviter);
+            seed.Organizations.Add(organization);
+            seed.Workspaces.Add(workspace);
+            seed.OrganizationMemberships.Add(OrganizationMembership.Create(
+                organization.Id,
+                inviter.Id,
+                OrganizationMembershipRole.Administrator));
+            seed.WorkspaceMemberships.Add(WorkspaceMembership.CreateOrganizationMember(
+                workspace.Id,
+                inviter.Id,
+                WorkspaceMembershipRole.Administrator));
+            seed.WorkspaceInvitations.AddRange(
+                WorkspaceInvitation.Create(
+                    organization.Id,
+                    workspace.Id,
+                    inviter.Id,
+                    "conflicting-recipient@example.com",
+                    WorkspaceMembershipRole.Member,
+                    now,
+                    now.AddDays(7),
+                    OpaqueTokenGenerator.Create().TokenHash,
+                    "member-envelope",
+                    "member-delivery"),
+                WorkspaceInvitation.Create(
+                    organization.Id,
+                    workspace.Id,
+                    inviter.Id,
+                    "conflicting-recipient@example.com",
+                    WorkspaceMembershipRole.Administrator,
+                    now,
+                    now.AddDays(7),
+                    OpaqueTokenGenerator.Create().TokenHash,
+                    "administrator-envelope",
+                    "administrator-delivery"));
+            await seed.SaveChangesAsync(TestContext.Current.CancellationToken);
+        }
+
+        Func<Task> act = () => MigrateToLatestAsync(connectionString);
+
+        await act.Should().ThrowAsync<PostgresException>()
+            .WithMessage("*conflicting pending invitations exist*");
+        (await MigrationIsAppliedAsync(connectionString, PlatformAuditMigration)).Should().BeTrue();
+        (await MigrationIsAppliedAsync(connectionString, SinglePendingInvitationMigration)).Should().BeFalse();
+        (await IndexExistsAsync(
+            connectionString,
+            "\"IX_workspace_invitations_workspace_id_normalized_email_request~\"")).Should().BeTrue();
+        (await IndexExistsAsync(
+            connectionString,
+            "\"IX_workspace_invitations_workspace_id_normalized_email\"")).Should().BeFalse();
+        (await ScalarAsync(
+            connectionString,
+            "SELECT count(*) FROM workspace_invitations WHERE workspace_id = @workspaceId",
+            ("workspaceId", workspace.Id))).Should().Be(2L);
     }
 
     private async Task<string> CreateLegacyDatabaseAsync()

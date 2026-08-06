@@ -109,6 +109,19 @@ public sealed class AcceptWorkspaceInvitationHandler(
                 IdentityProblemCodes.InvitationMembershipSuspended);
         }
 
+        if (workspaceMembership is { Status: MembershipStatus.Active }
+            && workspaceMembership.Role != invitation.RequestedRole)
+        {
+            return await PersistRejected(
+                invitation,
+                command,
+                InvitationAcceptanceOutcome.Unknown,
+                now,
+                ct,
+                IdentityProblemCodes.InvitationConflict,
+                "membership_role_conflict");
+        }
+
         organizationMembership = await EstablishOrganizationMembership(
             invitation,
             command.UserId,
@@ -213,6 +226,9 @@ public sealed class AcceptWorkspaceInvitationHandler(
             ct,
             outcome == InvitationAcceptanceOutcome.Unknown
                 ? IdentityProblemCodes.InvitationConflict
+                : null,
+            outcome == InvitationAcceptanceOutcome.Unknown
+                ? "concurrency_conflict"
                 : null);
     }
 
@@ -266,7 +282,8 @@ public sealed class AcceptWorkspaceInvitationHandler(
         InvitationAcceptanceOutcome outcome,
         DateTime now,
         CancellationToken ct,
-        string? problemCode = null)
+        string? problemCode = null,
+        string? auditOutcome = null)
     {
         Guid auditEventId = Guid.NewGuid();
         await auditOutbox.EnqueueAsync(
@@ -277,7 +294,7 @@ public sealed class AcceptWorkspaceInvitationHandler(
                 command.UserId,
                 invitation,
                 "workspace.invitation.accept_rejected",
-                outcome.ToString().ToLowerInvariant(),
+                RejectionAuditOutcome(outcome, problemCode, auditOutcome),
                 command.CorrelationId,
                 now),
             ct);
@@ -302,6 +319,18 @@ public sealed class AcceptWorkspaceInvitationHandler(
             "Invitation access is invalid or no longer available.",
             problemCode ?? IdentityProblemCodes.InvitationAccessInvalid);
     }
+
+    private static string RejectionAuditOutcome(
+        InvitationAcceptanceOutcome outcome,
+        string? problemCode,
+        string? auditOutcome) =>
+        auditOutcome ?? problemCode switch
+        {
+            IdentityProblemCodes.InvitationAccountMismatch => "account_mismatch",
+            IdentityProblemCodes.InvitationAuthorityStale => "authority_stale",
+            IdentityProblemCodes.InvitationMembershipSuspended => "membership_suspended",
+            _ => outcome.ToString().ToLowerInvariant(),
+        };
 
     private static Result<WorkspaceInvitationAcceptanceDto> Invalid() =>
         Result.Failure<WorkspaceInvitationAcceptanceDto>(

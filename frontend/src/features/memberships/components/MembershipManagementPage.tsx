@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { MailPlus, RefreshCw, UserMinus } from 'lucide-react';
+import { ChevronLeft, ChevronRight, MailPlus, RefreshCw, UserMinus } from 'lucide-react';
 import { type FormEvent, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { StatusBadge, type StatusBadgeTone } from '@/components/shared/StatusBadge';
@@ -42,8 +42,14 @@ export function MembershipManagementPage() {
   const [role, setRole] = useState<WorkspaceRole>('Member');
   const [emailError, setEmailError] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
-  const invitationsQuery = useQuery(workspaceInvitationsQueryOptions());
+  const [invitationPage, setInvitationPage] = useState(1);
+  const invitationsQuery = useQuery(workspaceInvitationsQueryOptions(invitationPage));
   const invitations = invitationsQuery.data?.items ?? [];
+  const invitationPageSize = invitationsQuery.data?.pageSize ?? 20;
+  const invitationPageCount = Math.max(
+    Math.ceil((invitationsQuery.data?.totalCount ?? 0) / invitationPageSize),
+    1,
+  );
   const dateFormatter = useMemo(
     () => new Intl.DateTimeFormat(i18n.language, { dateStyle: 'medium', timeStyle: 'short' }),
     [i18n.language],
@@ -206,34 +212,66 @@ export function MembershipManagementPage() {
         ) : invitations.length === 0 ? (
           <p className="text-sm text-muted-foreground">{t('memberships.empty')}</p>
         ) : (
-          <Table aria-label={t('memberships.tableLabel')}>
-            <TableHeader>
-              <TableRow>
-                <TableHead>{t('memberships.email')}</TableHead>
-                <TableHead>{t('memberships.role')}</TableHead>
-                <TableHead>{t('memberships.status')}</TableHead>
-                <TableHead>{t('memberships.delivery')}</TableHead>
-                <TableHead>{t('memberships.expires')}</TableHead>
-                <TableHead>{t('memberships.actions')}</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {invitations.map((invitation) => (
-                <InvitationRow
-                  key={invitation.invitationId}
-                  invitation={invitation}
-                  dateFormatter={dateFormatter}
-                  disabled={mutationPending}
-                  onResend={(invitationId, revision) =>
-                    resendMutation.mutate({ invitationId, revision })
-                  }
-                  onRevoke={(invitationId, revision) =>
-                    revokeMutation.mutate({ invitationId, revision })
-                  }
-                />
-              ))}
-            </TableBody>
-          </Table>
+          <>
+            <Table aria-label={t('memberships.tableLabel')}>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>{t('memberships.email')}</TableHead>
+                  <TableHead>{t('memberships.role')}</TableHead>
+                  <TableHead>{t('memberships.status')}</TableHead>
+                  <TableHead>{t('memberships.delivery')}</TableHead>
+                  <TableHead>{t('memberships.expires')}</TableHead>
+                  <TableHead>{t('memberships.actions')}</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {invitations.map((invitation) => (
+                  <InvitationRow
+                    key={invitation.invitationId}
+                    invitation={invitation}
+                    dateFormatter={dateFormatter}
+                    disabled={mutationPending}
+                    onResend={(invitationId, revision) =>
+                      resendMutation.mutate({ invitationId, revision })
+                    }
+                    onRevoke={(invitationId, revision) =>
+                      revokeMutation.mutate({ invitationId, revision })
+                    }
+                  />
+                ))}
+              </TableBody>
+            </Table>
+            {invitationPageCount > 1 ? (
+              <nav
+                className="flex items-center justify-end gap-2 py-3"
+                aria-label={t('memberships.tableLabel')}
+              >
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label={t('table.previousPage')}
+                  disabled={invitationPage === 1 || invitationsQuery.isFetching}
+                  onClick={() => setInvitationPage((current) => current - 1)}
+                >
+                  <ChevronLeft aria-hidden />
+                </Button>
+                <span className="text-xs text-muted-foreground" aria-live="polite">
+                  {t('table.pageStatus', { page: invitationPage, pageCount: invitationPageCount })}
+                </span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label={t('table.nextPage')}
+                  disabled={invitationPage === invitationPageCount || invitationsQuery.isFetching}
+                  onClick={() => setInvitationPage((current) => current + 1)}
+                >
+                  <ChevronRight aria-hidden />
+                </Button>
+              </nav>
+            ) : null}
+          </>
         )}
       </div>
     </section>

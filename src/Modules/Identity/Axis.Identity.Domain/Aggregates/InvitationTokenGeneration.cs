@@ -85,6 +85,7 @@ public sealed class InvitationTokenGeneration : Entity<Guid>
             throw new ArgumentException("Delivery error code is required.", nameof(errorCode));
 
         DeliveryStatus = InvitationDeliveryStatus.Failed;
+        DeliveryEnvelope = null;
         NextDeliveryAttemptAt = null;
         LastDeliveryErrorCode = errorCode.Trim();
     }

@@ -18,9 +18,9 @@ const api = vi.hoisted(() => ({
 
 vi.mock('../api', () => ({
   workspaceInvitationKeys: { all: ['workspace-invitations'] },
-  workspaceInvitationsQueryOptions: () => ({
-    queryKey: ['workspace-invitations', 'list', 1, 20],
-    queryFn: api.list,
+  workspaceInvitationsQueryOptions: (page = 1, pageSize = 20) => ({
+    queryKey: ['workspace-invitations', 'list', page, pageSize],
+    queryFn: () => api.list(page, pageSize),
   }),
   inviteWorkspaceMember: api.invite,
   resendWorkspaceInvitation: api.resend,
@@ -124,6 +124,25 @@ describe('MembershipManagementPage', () => {
 
     expect(await screen.findByText('No Workspace invitations yet.')).toBeInTheDocument();
     expect(api.list).toHaveBeenCalledTimes(2);
+  });
+
+  it('requests and displays a later invitation page through accessible pagination', async () => {
+    const user = userEvent.setup();
+    api.list.mockImplementation((page: number) =>
+      Promise.resolve({
+        items: [{ ...pendingInvitation(), recipientEmail: `member-${page}@example.com` }],
+        page,
+        pageSize: 20,
+        totalCount: 21,
+      }),
+    );
+    renderPage();
+
+    expect(await screen.findByRole('cell', { name: 'member-1@example.com' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Next page' }));
+
+    expect(await screen.findByRole('cell', { name: 'member-2@example.com' })).toBeInTheDocument();
+    expect(api.list).toHaveBeenLastCalledWith(2, 20);
   });
 });
 

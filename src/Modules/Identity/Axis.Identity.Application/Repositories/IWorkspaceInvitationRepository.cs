@@ -9,10 +9,9 @@ public interface IWorkspaceInvitationRepository
         Guid workspaceId,
         Guid invitationId,
         CancellationToken ct = default);
-    Task<WorkspaceInvitation?> GetCanonicalPendingAsync(
+    Task<WorkspaceInvitation?> GetPendingForRecipientAsync(
         Guid workspaceId,
         string normalizedEmail,
-        WorkspaceMembershipRole role,
         CancellationToken ct = default);
     Task<WorkspaceInvitation?> GetByTokenHashAsync(string tokenHash, CancellationToken ct = default);
     Task<WorkspaceInvitation?> GetByHandoffHashAsync(string handoffHash, CancellationToken ct = default);

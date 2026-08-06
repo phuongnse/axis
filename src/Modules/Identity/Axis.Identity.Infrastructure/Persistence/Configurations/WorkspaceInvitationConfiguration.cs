@@ -25,7 +25,7 @@ internal sealed class WorkspaceInvitationConfiguration : IEntityTypeConfiguratio
         builder.Property(x => x.Revision).HasColumnName("revision").IsConcurrencyToken();
 
         builder.HasIndex(x => new { x.WorkspaceId, x.Status, x.CreatedAt });
-        builder.HasIndex(x => new { x.WorkspaceId, x.NormalizedEmail, x.RequestedRole })
+        builder.HasIndex(x => new { x.WorkspaceId, x.NormalizedEmail })
             .IsUnique()
             .HasFilter("status = 'Pending' AND normalized_email IS NOT NULL");
 

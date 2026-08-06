@@ -162,6 +162,75 @@ public sealed class WorkspaceInvitationIntegrationTests(IdentityDatabaseFixture 
     }
 
     [Fact]
+    public async Task AT004_WhenDeliveryRetriesAreExhausted_ClearsTheProtectedEnvelope()
+    {
+        (Guid _, Guid workspaceId) = await SeedAdministratorAsync();
+        DateTimeOffset current = DateTimeOffset.UtcNow;
+        string rawToken = OpaqueTokenGenerator.Create().RawToken;
+        Guid invitationId;
+
+        await using (IdentityDbContext seed = database.CreateContext())
+        {
+            Workspace workspace = await seed.Workspaces.SingleAsync(
+                candidate => candidate.Id == workspaceId,
+                TestContext.Current.CancellationToken);
+            Guid inviterId = await seed.WorkspaceMemberships
+                .Where(membership => membership.WorkspaceId == workspaceId)
+                .Select(membership => membership.UserId)
+                .SingleAsync(TestContext.Current.CancellationToken);
+            WorkspaceInvitation invitation = WorkspaceInvitation.Create(
+                workspace.OrganizationId!.Value,
+                workspaceId,
+                inviterId,
+                "delivery-exhausted@example.com",
+                WorkspaceMembershipRole.Member,
+                current.UtcDateTime,
+                current.UtcDateTime.AddDays(7),
+                OpaqueTokenGenerator.Hash(rawToken),
+                "protected:delivery",
+                "exhausted-delivery-correlation");
+            invitationId = invitation.Id;
+            seed.WorkspaceInvitations.Add(invitation);
+            await seed.SaveChangesAsync(TestContext.Current.CancellationToken);
+        }
+
+        InvitationDeliveryMessage message = new(
+            invitationId,
+            1,
+            "delivery-exhausted@example.com",
+            rawToken,
+            "Invitation Organization",
+            "Invitation Workspace",
+            "Invitation Administrator",
+            "Member",
+            current.UtcDateTime.AddDays(7),
+            "en",
+            "exhausted-delivery-correlation");
+        AlwaysFailingEmailSender emailSender = new();
+        using ServiceProvider services = CreateDeliveryServices(message, emailSender);
+        for (int attempt = 0; attempt < 8; attempt++)
+        {
+            WorkspaceInvitationDeliveryDispatcher dispatcher = new(
+                services.GetRequiredService<IServiceScopeFactory>(),
+                new FixedTimeProvider(current.AddMinutes(attempt * 5)),
+                NullLogger<WorkspaceInvitationDeliveryDispatcher>.Instance);
+            await dispatcher.DispatchBatch(TestContext.Current.CancellationToken);
+        }
+
+        emailSender.Messages.Should().HaveCount(8);
+        await using IdentityDbContext observer = database.CreateContext();
+        WorkspaceInvitation persisted = await observer.WorkspaceInvitations
+            .Include(invitation => invitation.TokenGenerations)
+            .SingleAsync(
+                invitation => invitation.Id == invitationId,
+                TestContext.Current.CancellationToken);
+        persisted.CurrentToken.DeliveryStatus.Should().Be(InvitationDeliveryStatus.Failed);
+        persisted.CurrentToken.DeliveryEnvelope.Should().BeNull();
+        persisted.CurrentToken.NextDeliveryAttemptAt.Should().BeNull();
+        persisted.CurrentToken.LastDeliveryErrorCode.Should().Be("delivery.retry_exhausted");
+    }
+
+    [Fact]
     public async Task AT007_WhenAuditIsDelivered_PurgesTerminalRecipient()
     {
         (Guid _, Guid workspaceId) = await SeedAdministratorAsync();
@@ -298,6 +367,131 @@ public sealed class WorkspaceInvitationIntegrationTests(IdentityDatabaseFixture 
     }
 
     [Fact]
+    public async Task AT004_WhenRecipientAlreadyHasDifferentActiveRole_DoesNotConsumeInvitation()
+    {
+        (Guid recipientId, Guid _, Guid workspaceId, string handoffHash) =
+            await SeedAcceptanceAsync(WorkspaceMembershipRole.Administrator);
+
+        await using (IdentityDbContext seed = database.CreateContext())
+        {
+            seed.WorkspaceMemberships.Add(WorkspaceMembership.CreateOrganizationMember(
+                workspaceId,
+                recipientId,
+                WorkspaceMembershipRole.Member));
+            await seed.SaveChangesAsync(TestContext.Current.CancellationToken);
+        }
+
+        Result<WorkspaceInvitationAcceptanceDto> result = await AcceptOnceAsync(
+            recipientId,
+            handoffHash,
+            "role-conflict");
+
+        result.IsFailure.Should().BeTrue();
+        result.ProblemCode.Should().Be(IdentityProblemCodes.InvitationConflict);
+        await using IdentityDbContext observer = database.CreateContext();
+        WorkspaceInvitation invitation = await observer.WorkspaceInvitations
+            .Include(row => row.TokenGenerations)
+            .Include(row => row.Handoffs)
+            .SingleAsync(
+                row => row.WorkspaceId == workspaceId,
+                TestContext.Current.CancellationToken);
+        invitation.Status.Should().Be(WorkspaceInvitationStatus.Pending);
+        (await observer.WorkspaceMemberships.SingleAsync(
+            membership => membership.WorkspaceId == workspaceId
+                && membership.UserId == recipientId,
+            TestContext.Current.CancellationToken)).Role.Should().Be(WorkspaceMembershipRole.Member);
+        (await observer.Set<IdentityAuditOutboxRecord>().SingleAsync(
+            row => row.TargetId == invitation.Id
+                && row.Action == "workspace.invitation.accept_rejected",
+            TestContext.Current.CancellationToken)).Outcome.Should().Be("membership_role_conflict");
+    }
+
+    [Fact]
+    public async Task AT003_WhenInviterAuthorityIsStale_DoesNotConsumeInvitationAndPersistsAudit()
+    {
+        (Guid recipientId, Guid _, Guid workspaceId, string handoffHash) =
+            await SeedAcceptanceAsync();
+
+        await using (IdentityDbContext revokeAuthority = database.CreateContext())
+        {
+            WorkspaceMembership inviterMembership = await revokeAuthority.WorkspaceMemberships
+                .SingleAsync(
+                    membership => membership.WorkspaceId == workspaceId,
+                    TestContext.Current.CancellationToken);
+            inviterMembership.Remove(inviterMembership.Revision);
+            await revokeAuthority.SaveChangesAsync(TestContext.Current.CancellationToken);
+        }
+
+        Result<WorkspaceInvitationAcceptanceDto> result = await AcceptOnceAsync(
+            recipientId,
+            handoffHash,
+            "stale-authority");
+
+        result.IsFailure.Should().BeTrue();
+        result.ProblemCode.Should().Be(IdentityProblemCodes.InvitationAuthorityStale);
+        await using IdentityDbContext observer = database.CreateContext();
+        WorkspaceInvitation invitation = await observer.WorkspaceInvitations
+            .Include(row => row.TokenGenerations)
+            .Include(row => row.Handoffs)
+            .SingleAsync(
+                row => row.WorkspaceId == workspaceId,
+                TestContext.Current.CancellationToken);
+        invitation.Status.Should().Be(WorkspaceInvitationStatus.Pending);
+        (await observer.WorkspaceMemberships.CountAsync(
+            membership => membership.WorkspaceId == workspaceId
+                && membership.UserId == recipientId,
+            TestContext.Current.CancellationToken)).Should().Be(0);
+        (await observer.Set<IdentityAuditOutboxRecord>().SingleAsync(
+            row => row.TargetId == invitation.Id
+                && row.Action == "workspace.invitation.accept_rejected",
+            TestContext.Current.CancellationToken)).Outcome.Should().Be("authority_stale");
+    }
+
+    [Fact]
+    public async Task AT004_WhenAcceptancePersistenceFails_DoesNotPersistMembershipOrAudit()
+    {
+        (Guid recipientId, Guid organizationId, Guid workspaceId, string handoffHash) =
+            await SeedAcceptanceAsync();
+
+        Func<Task> act = async () =>
+        {
+            await using IdentityDbContext context = database.CreateContext();
+            AcceptWorkspaceInvitationHandler handler = CreateAcceptanceHandler(
+                context,
+                new FailingUnitOfWork(context));
+            await handler.Handle(
+                new AcceptWorkspaceInvitationCommand(
+                    handoffHash,
+                    recipientId,
+                    "persistence-failure"),
+                TestContext.Current.CancellationToken);
+        };
+
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("Injected acceptance persistence failure.");
+
+        await using IdentityDbContext observer = database.CreateContext();
+        (await observer.OrganizationMemberships.CountAsync(
+            membership => membership.OrganizationId == organizationId
+                && membership.UserId == recipientId,
+            TestContext.Current.CancellationToken)).Should().Be(0);
+        (await observer.WorkspaceMemberships.CountAsync(
+            membership => membership.WorkspaceId == workspaceId
+                && membership.UserId == recipientId,
+            TestContext.Current.CancellationToken)).Should().Be(0);
+        WorkspaceInvitation invitation = await observer.WorkspaceInvitations
+            .Include(row => row.TokenGenerations)
+            .Include(row => row.Handoffs)
+            .SingleAsync(
+                row => row.WorkspaceId == workspaceId,
+                TestContext.Current.CancellationToken);
+        invitation.Status.Should().Be(WorkspaceInvitationStatus.Pending);
+        (await observer.Set<IdentityAuditOutboxRecord>().CountAsync(
+            row => row.TargetId == invitation.Id,
+            TestContext.Current.CancellationToken)).Should().Be(0);
+    }
+
+    [Fact]
     public async Task AT002_WhenEquivalentCreatesRace_PersistsOneInvitationTokenDeliveryAndAudit()
     {
         (Guid userId, Guid workspaceId) = await SeedAdministratorAsync();
@@ -356,6 +550,56 @@ public sealed class WorkspaceInvitationIntegrationTests(IdentityDatabaseFixture 
         audit.WorkspaceId.Should().Be(workspaceId);
         audit.MetadataJson.Should().NotContain("recipient@example.com");
         audit.MetadataJson.ToLowerInvariant().Should().NotContain("token");
+        List<IdentityAuditOutboxRecord> attemptAudits = await observer.Set<IdentityAuditOutboxRecord>()
+            .Where(row => row.TargetId == invitation.Id)
+            .ToListAsync(TestContext.Current.CancellationToken);
+        attemptAudits.Should().ContainSingle(row =>
+            row.Action == "workspace.invitation.create_noop"
+                && row.Outcome == "canonical_pending");
+        attemptAudits.Select(row => row.CorrelationId).Should().BeEquivalentTo(
+            "first-correlation",
+            "second-correlation");
+    }
+
+    [Fact]
+    public async Task AT002_WhenPendingRoleDiffers_RejectsAndPersistsOneCanonicalInvitation()
+    {
+        (Guid userId, Guid workspaceId) = await SeedAdministratorAsync();
+        CapturingEnvelopeProtector envelopes = new();
+
+        Result<InviteWorkspaceMemberDto> first = await HandleAsync(
+            userId,
+            workspaceId,
+            "role-conflict@example.com",
+            "Member",
+            "member-invitation",
+            new PassThroughRateLimiter(),
+            envelopes);
+        Result<InviteWorkspaceMemberDto> second = await HandleAsync(
+            userId,
+            workspaceId,
+            "ROLE-CONFLICT@example.com",
+            "Administrator",
+            "administrator-invitation",
+            new PassThroughRateLimiter(),
+            envelopes);
+
+        first.IsSuccess.Should().BeTrue();
+        second.IsFailure.Should().BeTrue();
+        second.ProblemCode.Should().Be(IdentityProblemCodes.InvitationConflict);
+        await using IdentityDbContext observer = database.CreateContext();
+        WorkspaceInvitation invitation = await observer.WorkspaceInvitations
+            .Include(row => row.TokenGenerations)
+            .SingleAsync(
+                row => row.WorkspaceId == workspaceId
+                    && row.NormalizedEmail == "role-conflict@example.com",
+                TestContext.Current.CancellationToken);
+        invitation.RequestedRole.Should().Be(WorkspaceMembershipRole.Member);
+        invitation.TokenGenerations.Should().ContainSingle();
+        (await observer.Set<IdentityAuditOutboxRecord>().SingleAsync(
+            row => row.TargetId == invitation.Id
+                && row.Action == "workspace.invitation.create_rejected",
+            TestContext.Current.CancellationToken)).Outcome.Should().Be("pending_role_conflict");
     }
 
     private async Task<(Guid UserId, Guid WorkspaceId)> SeedAdministratorAsync()
@@ -389,7 +633,7 @@ public sealed class WorkspaceInvitationIntegrationTests(IdentityDatabaseFixture 
     }
 
     private async Task<(Guid RecipientId, Guid OrganizationId, Guid WorkspaceId, string HandoffHash)>
-        SeedAcceptanceAsync()
+        SeedAcceptanceAsync(WorkspaceMembershipRole requestedRole = WorkspaceMembershipRole.Member)
     {
         (Guid _, Guid workspaceId) = await SeedAdministratorAsync();
         string recipientEmail = $"invite-recipient-{Guid.NewGuid():N}@example.com";
@@ -410,7 +654,7 @@ public sealed class WorkspaceInvitationIntegrationTests(IdentityDatabaseFixture 
                 membership => membership.WorkspaceId == workspaceId,
                 TestContext.Current.CancellationToken)).UserId,
             recipientEmail,
-            WorkspaceMembershipRole.Member,
+            requestedRole,
             now,
             now.AddDays(7),
             tokenHash,
@@ -528,6 +772,34 @@ public sealed class WorkspaceInvitationIntegrationTests(IdentityDatabaseFixture 
             TestContext.Current.CancellationToken);
     }
 
+    private async Task<Result<WorkspaceInvitationAcceptanceDto>> AcceptOnceAsync(
+        Guid recipientId,
+        string handoffHash,
+        string correlationId)
+    {
+        await using IdentityDbContext context = database.CreateContext();
+        AcceptWorkspaceInvitationHandler handler = CreateAcceptanceHandler(
+            context,
+            new IdentityUnitOfWork(context));
+        return await handler.Handle(
+            new AcceptWorkspaceInvitationCommand(handoffHash, recipientId, correlationId),
+            TestContext.Current.CancellationToken);
+    }
+
+    private static AcceptWorkspaceInvitationHandler CreateAcceptanceHandler(
+        IdentityDbContext context,
+        IUnitOfWork unitOfWork) =>
+        new(
+            new UserRepository(context),
+            new OrganizationRepository(context),
+            new OrganizationMembershipRepository(context),
+            new WorkspaceRepository(context),
+            new WorkspaceMembershipRepository(context),
+            new WorkspaceInvitationRepository(context),
+            new IdentityAuditOutbox(context),
+            TimeProvider.System,
+            unitOfWork);
+
     private async Task<Result<InviteWorkspaceMemberDto>> HandleAsync(
         Guid userId,
         Guid workspaceId,
@@ -574,7 +846,7 @@ public sealed class WorkspaceInvitationIntegrationTests(IdentityDatabaseFixture 
 
     private ServiceProvider CreateDeliveryServices(
         InvitationDeliveryMessage message,
-        AmbiguousEmailSender emailSender)
+        IEmailSender emailSender)
     {
         ServiceCollection services = new();
         services.AddDbContext<IdentityDbContext>(options =>
@@ -644,12 +916,11 @@ public sealed class WorkspaceInvitationIntegrationTests(IdentityDatabaseFixture 
             CancellationToken ct = default) =>
             inner.GetByIdAsync(workspaceId, invitationId, ct);
 
-        public Task<WorkspaceInvitation?> GetCanonicalPendingAsync(
+        public Task<WorkspaceInvitation?> GetPendingForRecipientAsync(
             Guid workspaceId,
             string normalizedEmail,
-            WorkspaceMembershipRole role,
             CancellationToken ct = default) =>
-            inner.GetCanonicalPendingAsync(workspaceId, normalizedEmail, role, ct);
+            inner.GetPendingForRecipientAsync(workspaceId, normalizedEmail, ct);
 
         public Task<WorkspaceInvitation?> GetByTokenHashAsync(
             string tokenHash,
@@ -719,12 +990,11 @@ public sealed class WorkspaceInvitationIntegrationTests(IdentityDatabaseFixture 
             return invitation;
         }
 
-        public Task<WorkspaceInvitation?> GetCanonicalPendingAsync(
+        public Task<WorkspaceInvitation?> GetPendingForRecipientAsync(
             Guid workspaceId,
             string normalizedEmail,
-            WorkspaceMembershipRole role,
             CancellationToken ct = default) =>
-            inner.GetCanonicalPendingAsync(workspaceId, normalizedEmail, role, ct);
+            inner.GetPendingForRecipientAsync(workspaceId, normalizedEmail, ct);
 
         public async Task<WorkspaceInvitation?> GetByTokenHashAsync(
             string tokenHash,
@@ -787,6 +1057,14 @@ public sealed class WorkspaceInvitationIntegrationTests(IdentityDatabaseFixture 
             CancellationToken ct = default) => Task.FromResult(Result.Success());
     }
 
+    private sealed class FailingUnitOfWork(IdentityDbContext context) : IUnitOfWork
+    {
+        public Task<int> SaveChangesAsync(CancellationToken ct = default) =>
+            throw new InvalidOperationException("Injected acceptance persistence failure.");
+
+        public void ClearTracking() => context.ChangeTracker.Clear();
+    }
+
     private sealed class FixedTimeProvider(DateTimeOffset current) : TimeProvider
     {
         public override DateTimeOffset GetUtcNow() => current;
@@ -829,6 +1107,26 @@ public sealed class WorkspaceInvitationIntegrationTests(IdentityDatabaseFixture 
             }
 
             return Task.CompletedTask;
+        }
+    }
+
+    private sealed class AlwaysFailingEmailSender : IEmailSender
+    {
+        public List<InvitationDeliveryMessage> Messages { get; } = [];
+
+        public Task SendVerificationEmailAsync(
+            string toEmail,
+            string verificationToken,
+            string language,
+            CancellationToken ct = default) =>
+            throw new NotSupportedException();
+
+        public Task SendWorkspaceInvitationEmailAsync(
+            InvitationDeliveryMessage message,
+            CancellationToken ct = default)
+        {
+            Messages.Add(message);
+            throw new InvalidOperationException("Provider rejected the message.");
         }
     }
 }

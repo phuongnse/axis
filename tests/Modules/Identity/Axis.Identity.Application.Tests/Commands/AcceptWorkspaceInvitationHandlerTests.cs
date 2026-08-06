@@ -67,6 +67,22 @@ public sealed class AcceptWorkspaceInvitationHandlerTests
     }
 
     [Fact]
+    public async Task Accept_WhenActiveWorkspaceRoleDiffers_DeniesWithoutConsumingInvitation()
+    {
+        Fixture fixture = new(WorkspaceMembershipRole.Administrator);
+        fixture.WithActiveWorkspaceMembership(WorkspaceMembershipRole.Member);
+
+        Result<WorkspaceInvitationAcceptanceDto> result = await fixture.Handle();
+
+        result.IsFailure.Should().BeTrue();
+        result.ProblemCode.Should().Be(IdentityProblemCodes.InvitationConflict);
+        fixture.Invitation.Status.Should().Be(WorkspaceInvitationStatus.Pending);
+        fixture.RecipientWorkspaceMembership!.Role.Should().Be(WorkspaceMembershipRole.Member);
+        fixture.Audits.Should().ContainSingle(audit =>
+            audit.Action == "workspace.invitation.accept_rejected");
+    }
+
+    [Fact]
     public async Task Accept_WhenAuthenticatedEmailDiffers_DeniesWithoutDisclosingOrMutatingMembership()
     {
         Fixture fixture = new(WorkspaceMembershipRole.Member, recipientEmail: "other@example.com");
@@ -260,6 +276,12 @@ public sealed class AcceptWorkspaceInvitationHandlerTests
                 role);
             RecipientWorkspaceMembership.Remove(RecipientWorkspaceMembership.Revision);
         }
+
+        public void WithActiveWorkspaceMembership(WorkspaceMembershipRole role) =>
+            RecipientWorkspaceMembership = WorkspaceMembership.CreateOrganizationMember(
+                Workspace.Id,
+                Recipient.Id,
+                role);
 
         public void WithSuspendedOrganizationMembership()
         {

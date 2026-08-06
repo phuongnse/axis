@@ -49,9 +49,9 @@ This file owns durable Identity Governance invariants and technical realization.
 
 ## Invitation delivery realization
 
-- Invitation creation is scoped to the authenticated Organization and Workspace authority, rate-limited and idempotent. An equivalent pending invitation has one canonical outcome and never leaves parallel valid tokens.
+- Invitation creation is scoped to the authenticated Organization and Workspace authority, rate-limited and idempotent. A filtered database uniqueness constraint permits at most one pending invitation for each `(Workspace, normalized recipient email)`. An equivalent role request returns that canonical invitation; a different-role request conflicts without replacing it or creating another valid token.
 - Validation stores only a token hash. Transactional delivery state may hold the sole authenticated-encrypted, access-controlled, expiring envelope needed for crash-safe email retry.
-- Delivery uses one stable correlation key per token generation. Accepted provider delivery deletes the envelope; an ambiguous outcome retries the same generation. Only explicit authorized resend supersedes the generation and invalidates its token and handoff.
+- Delivery uses one stable correlation key per token generation. Accepted provider delivery deletes the envelope; an ambiguous outcome retries the same generation. Retry exhaustion also deletes the envelope because no further automatic delivery may use its recoverable token material. Only explicit authorized resend supersedes the generation and invalidates its token and handoff.
 - Invitation creation, resend, and pending revocation persist their lifecycle change, delivery state when applicable, and required audit outbox in one Identity transaction. Optimistic concurrency permits one terminal outcome when revocation races exchange or acceptance.
 
 ## Invitation exchange and acceptance realization
@@ -61,6 +61,7 @@ This file owns durable Identity Governance invariants and technical realization.
 - Valid-looking unknown-token and rate-limited exchange attempts persist a platform-scoped, metadata-free anonymous audit event before returning their generic failure. Token values, hashes, request partitions, network identifiers, email data, and handoff data are never written to that event; inability to confirm its outbox record fails closed.
 - The handoff preserves invitation intent through sign-in or standalone registration and email verification. Invitation metadata is disclosed only after the authenticated normalized email matches the intended recipient.
 - Acceptance revalidates inviter authority, Organization and Workspace eligibility, invitation status, target email, and requested Workspace role. It atomically consumes the invitation, creates or reactivates only the allowed memberships, and persists required audit outbox state.
+- An active recipient Workspace membership must already have the requested role; a different active role conflicts without consuming the invitation or changing authority.
 - An absent or removed Organization membership becomes baseline `Member`; any active Organization role is preserved. Suspended Organization or Workspace membership blocks acceptance and is never reactivated implicitly.
 - Concurrent acceptance and replay produce at most one Organization membership and one Workspace membership. Later requests receive the canonical terminal classification without duplicate mutation.
 - Terminal acceptance, revocation, or expiry deletes reversible token, handoff, envelope, and normalized-recipient material after required delivery and audit work. Only non-reversible replay digests/generations and the approved non-secret lifecycle record remain.

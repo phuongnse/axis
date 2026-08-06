@@ -47,7 +47,8 @@ Token storage, delivery retry, resend, concurrency, audit, and cleanup realizati
 
 - Invalid email, unsupported role, personal Workspace, or cross-Organization target: reject before mutation.
 - Missing authority: deny without disclosing unrelated membership data and persist the required attempted-action audit outcome.
-- Equivalent pending invitation: return the canonical pending outcome without another valid token.
+- Equivalent pending invitation for the same role: return the canonical pending outcome and persist the correlated no-mutation audit without another valid token.
+- Pending invitation for the same recipient with a different role: reject the role conflict without replacing it or creating another valid token.
 - Existing active Workspace membership: return an existing-member outcome and create no invitation.
 - Delivery interruption or ambiguous provider outcome: retry delivery without creating a second valid acceptance link.
 - Terminal delivery failure: keep the invitation pending and allow an authorized rate-limited resend that supersedes the old generation.
@@ -69,7 +70,7 @@ Token storage, delivery retry, resend, concurrency, audit, and cleanup realizati
 
 - **AC-007** Invalid email, unsupported Workspace role, personal Workspace target, and cross-Organization target fail before invitation creation with non-disclosing diagnostics.
 - **AC-008** Missing Organization membership or target-Workspace administrator authority denies creation and durably records the required redacted attempt outcome.
-- **AC-009** An equivalent pending request returns one canonical outcome and never leaves multiple valid tokens.
+- **AC-009** At most one pending invitation exists per Workspace and normalized recipient email; an equivalent role request returns its canonical audited outcome, while a different-role request conflicts without replacement or another valid token.
 - **AC-010** Existing active membership returns an existing-member outcome without an invitation or duplicate membership.
 - **AC-011** Crash and ambiguous provider recovery never create a second valid acceptance link for the pending invitation.
 - **AC-012** Revocation, exchange, and acceptance concurrency permits one terminal outcome; revocation never removes an accepted membership.
@@ -87,7 +88,7 @@ Token storage, delivery retry, resend, concurrency, audit, and cleanup realizati
 | ID | Boundary | Scenario | Covers AC | Verification | Required |
 |---|---|---|---|---|---|
 | AT-001 | Browser journey | Administrator creates an invitation and reads its pending delivery outcome accessibly | AC-001, AC-003, AC-004, AC-017 | Browser automation | Yes |
-| AT-002 | Application/Infrastructure boundaries | Creation persists one canonical pending invitation with durable delivery and required redacted audit outcomes | AC-002, AC-009, AC-015 | Application test + Infrastructure integration test | Yes |
+| AT-002 | Application/Infrastructure boundaries | Creation, equivalent retry, different-role request, and concurrent retry persist one canonical pending invitation with durable delivery and a correlated redacted audit outcome for every attempt | AC-002, AC-009, AC-015 | Application test + Infrastructure integration test | Yes |
 | AT-003 | UI/API boundaries | Invalid target, role, email, authority, and existing membership return non-disclosing outcomes without invitation mutation | AC-007, AC-008, AC-010, AC-014 | UI component test + API integration test | Yes |
 | AT-004 | Infrastructure boundary | Crash and ambiguous provider outcomes retry localized delivery without creating a second valid link or exposing internal or secret material | AC-003, AC-011 | Infrastructure integration test | Yes |
 | AT-005 | Application/Infrastructure boundaries | Authorized resend invalidates prior links and concurrent revoke, exchange, or acceptance produces one terminal lifecycle outcome | AC-005, AC-006, AC-012 | Application test + Infrastructure integration test | Yes |

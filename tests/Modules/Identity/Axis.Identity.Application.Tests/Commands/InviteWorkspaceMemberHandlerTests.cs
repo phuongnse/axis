@@ -91,10 +91,9 @@ public sealed class InviteWorkspaceMemberHandlerTests
             "existing-hash",
             "existing-envelope",
             "existing-correlation");
-        fixture.Invitations.GetCanonicalPendingAsync(
+        fixture.Invitations.GetPendingForRecipientAsync(
                 fixture.Workspace.Id,
                 "recipient@example.com",
-                WorkspaceMembershipRole.Member,
                 Arg.Any<CancellationToken>())
             .Returns(canonical);
 
@@ -105,6 +104,11 @@ public sealed class InviteWorkspaceMemberHandlerTests
         result.IsSuccess.Should().BeTrue();
         result.Value.Outcome.Should().Be("CanonicalPending");
         result.Value.Invitation!.InvitationId.Should().Be(canonical.Id);
+        fixture.CreatedAudit.Should().NotBeNull();
+        fixture.CreatedAudit!.Action.Should().Be("workspace.invitation.create_noop");
+        fixture.CreatedAudit.Outcome.Should().Be("canonical_pending");
+        fixture.CreatedAudit.CorrelationId.Should().Be("correlation");
+        await fixture.UnitOfWork.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
         await fixture.RateLimiter.DidNotReceive().AcquireCreateAsync(
             Arg.Any<Guid>(),
             Arg.Any<Guid>(),
@@ -137,6 +141,45 @@ public sealed class InviteWorkspaceMemberHandlerTests
         result.IsSuccess.Should().BeTrue();
         result.Value.Outcome.Should().Be("ExistingMember");
         result.Value.Invitation.Should().BeNull();
+        fixture.CreatedAudit.Should().NotBeNull();
+        fixture.CreatedAudit!.Action.Should().Be("workspace.invitation.create_noop");
+        fixture.CreatedAudit.Outcome.Should().Be("existing_member");
+        fixture.CreatedAudit.CorrelationId.Should().Be("correlation");
+        await fixture.UnitOfWork.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
+        await fixture.Invitations.DidNotReceive().AddAsync(
+            Arg.Any<WorkspaceInvitation>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task InviteWorkspaceMember_WhenPendingRoleDiffers_RejectsWithoutAnotherToken()
+    {
+        Fixture fixture = new();
+        DateTime now = DateTime.UtcNow;
+        WorkspaceInvitation canonical = WorkspaceInvitation.Create(
+            fixture.Organization.Id,
+            fixture.Workspace.Id,
+            fixture.Inviter.Id,
+            "recipient@example.com",
+            WorkspaceMembershipRole.Member,
+            now,
+            now.AddDays(7),
+            "existing-hash",
+            "existing-envelope",
+            "existing-correlation");
+        fixture.Invitations.GetPendingForRecipientAsync(
+                fixture.Workspace.Id,
+                "recipient@example.com",
+                Arg.Any<CancellationToken>())
+            .Returns(canonical);
+
+        Result<InviteWorkspaceMemberDto> result = await fixture.Handle(
+            "recipient@example.com",
+            "Administrator");
+
+        result.IsFailure.Should().BeTrue();
+        result.ProblemCode.Should().Be(IdentityProblemCodes.InvitationConflict);
+        canonical.CurrentToken.TokenHash.Should().Be("existing-hash");
         await fixture.Invitations.DidNotReceive().AddAsync(
             Arg.Any<WorkspaceInvitation>(),
             Arg.Any<CancellationToken>());

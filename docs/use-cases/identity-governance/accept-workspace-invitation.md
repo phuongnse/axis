@@ -48,6 +48,7 @@ Exchange, handoff, membership mutation, concurrency, retention, and audit realiz
 - Unknown, expired, used, revoked, superseded, or rate-limited token or handoff: fail closed without Workspace metadata and show applicable recovery.
 - Authenticated email differs from the target: preserve the invitation and require the intended account.
 - Inviter authority, Organization membership, Workspace eligibility, or requested role changed: reject without membership mutation.
+- An active Workspace membership with a different role: reject without consuming the invitation or changing the membership.
 - Suspended Organization or Workspace membership: reject rather than reactivate implicitly.
 - Concurrent acceptance or replay: exactly one request mutates memberships; later requests return the canonical terminal classification.
 - Required membership or audit persistence fails: roll back consumption and membership changes so a valid invitation remains retryable.
@@ -61,7 +62,7 @@ Exchange, handoff, membership mutation, concurrency, retention, and audit realiz
 - **AC-002** A new target user can complete standalone registration and email verification, resume the invitation intent, and reach the same atomic acceptance outcome.
 - **AC-003** Review discloses Organization, Workspace, inviter, requested Workspace role, and expiry only after handoff and authenticated-email validation.
 - **AC-004** Acceptance preserves an active Organization role or establishes only baseline Organization `Member` when membership is absent or removed.
-- **AC-005** Acceptance creates or reactivates only the invited Workspace membership and requested role.
+- **AC-005** Acceptance creates or reactivates only the invited Workspace membership and requested role; a different active role conflicts without consuming the invitation or changing authority.
 - **AC-006** Success requires read-back of the consumed invitation and active memberships before the Workspace becomes an eligible switch target.
 
 *Validation and recovery*
@@ -90,7 +91,7 @@ Exchange, handoff, membership mutation, concurrency, retention, and audit realiz
 | AT-001 | Browser journey | Existing verified recipient exchanges, authenticates, reviews, accepts, and receives an explicit Workspace-entry action | AC-001, AC-003, AC-006, AC-013, AC-019 | Browser automation | Yes |
 | AT-002 | Browser journey | New recipient registers, verifies, resumes the browser-bound handoff, and accepts without browser token storage | AC-002, AC-013, AC-014, AC-019 | Browser automation | Yes |
 | AT-003 | API/Application boundaries | Wrong-account, invalid-token, expired, revoked, superseded, used, throttled, stale-authority, and suspended-membership attempts fail before mutation with non-disclosing outcomes | AC-007, AC-008, AC-009, AC-010 | API integration test + Application test | Yes |
-| AT-004 | Application/Infrastructure boundaries | Acceptance preserves or establishes only the allowed Organization role, creates the invited Workspace role, reads back, and remains atomic on failure | AC-004, AC-005, AC-006, AC-012, AC-015 | Application test + Infrastructure integration test | Yes |
+| AT-004 | Application/Infrastructure boundaries | Acceptance preserves or establishes only the allowed Organization role, creates the invited Workspace role, rejects a different active role, reads back, and leaves invitation, memberships, and audit unmodified on persistence failure | AC-004, AC-005, AC-006, AC-012, AC-015 | Application test + Infrastructure integration test | Yes |
 | AT-005 | Application/Infrastructure boundaries | Concurrent acceptance and replay create at most one membership result and return the canonical terminal classification | AC-011 | Application test + Infrastructure integration test | Yes |
 | AT-006 | Infrastructure boundary | Exchange and handoff state are browser-bound, expiring, hashed or opaque as required, and absent from browser storage and logs | AC-013, AC-014 | Infrastructure integration test | Yes |
 | AT-007 | Infrastructure boundary | Success and rejected outcomes persist correlated redacted audit state and terminal cleanup retains only approved non-secret lifecycle material | AC-016, AC-017 | Infrastructure integration test | Yes |

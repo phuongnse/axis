@@ -20,15 +20,13 @@ internal sealed class WorkspaceInvitationRepository(IdentityDbContext context)
             invitation => invitation.WorkspaceId == workspaceId && invitation.Id == invitationId,
             ct);
 
-    public Task<WorkspaceInvitation?> GetCanonicalPendingAsync(
+    public Task<WorkspaceInvitation?> GetPendingForRecipientAsync(
         Guid workspaceId,
         string normalizedEmail,
-        WorkspaceMembershipRole role,
         CancellationToken ct = default) =>
         Query().SingleOrDefaultAsync(
             invitation => invitation.WorkspaceId == workspaceId
                 && invitation.NormalizedEmail == normalizedEmail
-                && invitation.RequestedRole == role
                 && invitation.Status == WorkspaceInvitationStatus.Pending,
             ct);
 

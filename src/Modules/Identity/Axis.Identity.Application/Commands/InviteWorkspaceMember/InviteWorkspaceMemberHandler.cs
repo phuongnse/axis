@@ -92,19 +92,30 @@ public sealed class InviteWorkspaceMemberHandler(
         if (existingUser is not null
             && await workspaceMemberships.GetActiveAsync(command.WorkspaceId, existingUser.Id, ct) is not null)
         {
+            Result auditResult = await PersistNoMutationAudit(
+                command,
+                organizationId,
+                "WorkspaceInvitationAttempt",
+                Guid.NewGuid(),
+                "workspace.invitation.create_noop",
+                "existing_member",
+                requestedRole,
+                ct);
+            if (auditResult.IsFailure)
+                return AuditUnavailable();
+
             return Result.Success(new InviteWorkspaceMemberDto(
                 "ExistingMember",
                 requestedRole.ToString(),
                 null));
         }
 
-        WorkspaceInvitation? canonical = await invitations.GetCanonicalPendingAsync(
+        WorkspaceInvitation? canonical = await invitations.GetPendingForRecipientAsync(
             command.WorkspaceId,
             email.Value,
-            requestedRole,
             ct);
         if (canonical is not null)
-            return Result.Success(ToDto(canonical, "CanonicalPending"));
+            return await ReturnPendingOutcome(command, organizationId, requestedRole, canonical, ct);
 
         Result limit = await rateLimiter.AcquireCreateAsync(
             command.InviterUserId,
@@ -178,17 +189,24 @@ public sealed class InviteWorkspaceMemberHandler(
         catch (UniqueConstraintException)
         {
             uow.ClearTracking();
-            WorkspaceInvitation? concurrent = await invitations.GetCanonicalPendingAsync(
+            WorkspaceInvitation? concurrent = await invitations.GetPendingForRecipientAsync(
                 command.WorkspaceId,
                 email.Value,
-                requestedRole,
                 ct);
-            return concurrent is null
-                ? Result.Failure<InviteWorkspaceMemberDto>(
+            if (concurrent is null)
+            {
+                return Result.Failure<InviteWorkspaceMemberDto>(
                     ErrorCodes.Conflict,
                     "Invitation creation conflicted with another request.",
-                    IdentityProblemCodes.InvitationConflict)
-                : Result.Success(ToDto(concurrent, "CanonicalPending"));
+                    IdentityProblemCodes.InvitationConflict);
+            }
+
+            return await ReturnPendingOutcome(
+                command,
+                organizationId,
+                requestedRole,
+                concurrent,
+                ct);
         }
 
         WorkspaceInvitation? persisted = await invitations.GetByIdAsync(
@@ -212,31 +230,92 @@ public sealed class InviteWorkspaceMemberHandler(
         Guid organizationId,
         string outcome,
         CancellationToken ct)
+        => await PersistNoMutationAudit(
+            command,
+            organizationId,
+            "WorkspaceInvitationAttempt",
+            Guid.NewGuid(),
+            "workspace.invitation.create_denied",
+            outcome,
+            null,
+            ct);
+
+    private async Task<Result<InviteWorkspaceMemberDto>> ReturnPendingOutcome(
+        InviteWorkspaceMemberCommand command,
+        Guid organizationId,
+        WorkspaceMembershipRole requestedRole,
+        WorkspaceInvitation canonical,
+        CancellationToken ct)
     {
+        bool sameRole = canonical.RequestedRole == requestedRole;
+        Result auditResult = await PersistNoMutationAudit(
+            command,
+            organizationId,
+            TargetType,
+            canonical.Id,
+            sameRole
+                ? "workspace.invitation.create_noop"
+                : "workspace.invitation.create_rejected",
+            sameRole ? "canonical_pending" : "pending_role_conflict",
+            requestedRole,
+            ct);
+        if (auditResult.IsFailure)
+            return AuditUnavailable();
+
+        return sameRole
+            ? Result.Success(ToDto(canonical, "CanonicalPending"))
+            : Result.Failure<InviteWorkspaceMemberDto>(
+                ErrorCodes.Conflict,
+                "A pending invitation already exists for this recipient with a different role.",
+                IdentityProblemCodes.InvitationConflict);
+    }
+
+    private async Task<Result> PersistNoMutationAudit(
+        InviteWorkspaceMemberCommand command,
+        Guid organizationId,
+        string targetType,
+        Guid targetId,
+        string action,
+        string outcome,
+        WorkspaceMembershipRole? requestedRole,
+        CancellationToken ct)
+    {
+        Guid eventId = Guid.NewGuid();
+        Dictionary<string, string> metadata = new()
+        {
+            ["organizationId"] = organizationId.ToString(),
+            ["workspaceId"] = command.WorkspaceId.ToString(),
+        };
+        if (requestedRole is not null)
+            metadata["requestedRole"] = requestedRole.Value.ToString();
+
         await auditOutbox.EnqueueAsync(
             InvitationAudit(
-                Guid.NewGuid(),
+                eventId,
                 command.InviterUserId,
                 command.WorkspaceId,
-                "workspace.invitation.create_denied",
+                action,
                 outcome,
                 command.CorrelationId,
-                new Dictionary<string, string>
-                {
-                    ["organizationId"] = organizationId.ToString(),
-                    ["workspaceId"] = command.WorkspaceId.ToString(),
-                }),
+                metadata,
+                targetType,
+                targetId),
             ct);
         try
         {
             await uow.SaveChangesAsync(ct);
-            return Result.Success();
+            uow.ClearTracking();
         }
         catch (Exception)
         {
             uow.ClearTracking();
-            return Result.Failure(ErrorCodes.BusinessRule, "Denied invitation audit persistence failed.");
+            return Result.Failure(ErrorCodes.BusinessRule, "Invitation audit persistence failed.");
         }
+
+        IdentityAuditOutboxEntry? audit = await auditOutbox.GetAsync(eventId, ct);
+        return audit is null || audit.State == IdentityAuditOutboxState.Poisoned
+            ? Result.Failure(ErrorCodes.BusinessRule, "Invitation audit read-back failed.")
+            : Result.Success();
     }
 
     private static AuditEventV1 InvitationAudit(
@@ -246,7 +325,9 @@ public sealed class InviteWorkspaceMemberHandler(
         string action,
         string outcome,
         string correlationId,
-        IReadOnlyDictionary<string, string> metadata) =>
+        IReadOnlyDictionary<string, string> metadata,
+        string targetType = TargetType,
+        Guid? targetId = null) =>
         new(
             eventId,
             AuditActorKindV1.Human,
@@ -254,12 +335,18 @@ public sealed class InviteWorkspaceMemberHandler(
             actorId,
             workspaceId,
             action,
-            TargetType,
-            eventId,
+            targetType,
+            targetId ?? eventId,
             outcome,
             DateTimeOffset.UtcNow,
             correlationId.Trim(),
             metadata);
+
+    private static Result<InviteWorkspaceMemberDto> AuditUnavailable() =>
+        Result.Failure<InviteWorkspaceMemberDto>(
+            ErrorCodes.BusinessRule,
+            "The invitation outcome could not be confirmed.",
+            IdentityProblemCodes.InvitationAuditUnavailable);
 
     private static InviteWorkspaceMemberDto ToDto(WorkspaceInvitation invitation, string outcome) =>
         new(
