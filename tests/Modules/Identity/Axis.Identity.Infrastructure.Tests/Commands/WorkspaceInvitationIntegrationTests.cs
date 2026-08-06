@@ -18,6 +18,7 @@ using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
+using Npgsql;
 
 namespace Axis.Identity.Infrastructure.Tests.Commands;
 
@@ -448,47 +449,82 @@ public sealed class WorkspaceInvitationIntegrationTests(IdentityDatabaseFixture 
     }
 
     [Fact]
-    public async Task AT004_WhenAcceptancePersistenceFails_DoesNotPersistMembershipOrAudit()
+    public async Task AT004_WhenPostgresRejectsAcceptanceAudit_RollsBackAndRemainsRetryable()
     {
         (Guid recipientId, Guid organizationId, Guid workspaceId, string handoffHash) =
             await SeedAcceptanceAsync();
-
-        Func<Task> act = async () =>
+        await SetAcceptanceAuditFailureTriggerAsync(enabled: true);
+        try
         {
-            await using IdentityDbContext context = database.CreateContext();
-            AcceptWorkspaceInvitationHandler handler = CreateAcceptanceHandler(
-                context,
-                new FailingUnitOfWork(context));
-            await handler.Handle(
-                new AcceptWorkspaceInvitationCommand(
-                    handoffHash,
-                    recipientId,
-                    "persistence-failure"),
-                TestContext.Current.CancellationToken);
-        };
+            Func<Task> act = async () =>
+            {
+                await using IdentityDbContext context = database.CreateContext();
+                AcceptWorkspaceInvitationHandler handler = CreateAcceptanceHandler(
+                    context,
+                    new IdentityUnitOfWork(context));
+                await handler.Handle(
+                    new AcceptWorkspaceInvitationCommand(
+                        handoffHash,
+                        recipientId,
+                        "persistence-failure"),
+                    TestContext.Current.CancellationToken);
+            };
 
-        await act.Should().ThrowAsync<InvalidOperationException>()
-            .WithMessage("Injected acceptance persistence failure.");
+            DbUpdateException exception = (await act.Should().ThrowAsync<DbUpdateException>()).Which;
+            exception.InnerException.Should().BeOfType<PostgresException>()
+                .Which.MessageText.Should().Be("Injected acceptance audit persistence failure");
 
-        await using IdentityDbContext observer = database.CreateContext();
-        (await observer.OrganizationMemberships.CountAsync(
+            await using IdentityDbContext observer = database.CreateContext();
+            (await observer.OrganizationMemberships.CountAsync(
+                membership => membership.OrganizationId == organizationId
+                    && membership.UserId == recipientId,
+                TestContext.Current.CancellationToken)).Should().Be(0);
+            (await observer.WorkspaceMemberships.CountAsync(
+                membership => membership.WorkspaceId == workspaceId
+                    && membership.UserId == recipientId,
+                TestContext.Current.CancellationToken)).Should().Be(0);
+            WorkspaceInvitation invitation = await observer.WorkspaceInvitations
+                .Include(row => row.TokenGenerations)
+                .Include(row => row.Handoffs)
+                .SingleAsync(
+                    row => row.WorkspaceId == workspaceId,
+                    TestContext.Current.CancellationToken);
+            invitation.Status.Should().Be(WorkspaceInvitationStatus.Pending);
+            (await observer.Set<IdentityAuditOutboxRecord>().CountAsync(
+                row => row.TargetId == invitation.Id,
+                TestContext.Current.CancellationToken)).Should().Be(0);
+        }
+        finally
+        {
+            await SetAcceptanceAuditFailureTriggerAsync(enabled: false);
+        }
+
+        Result<WorkspaceInvitationAcceptanceDto> retry = await AcceptOnceAsync(
+            recipientId,
+            handoffHash,
+            "persistence-retry");
+
+        retry.IsSuccess.Should().BeTrue();
+        await using IdentityDbContext retryObserver = database.CreateContext();
+        (await retryObserver.OrganizationMemberships.CountAsync(
             membership => membership.OrganizationId == organizationId
-                && membership.UserId == recipientId,
-            TestContext.Current.CancellationToken)).Should().Be(0);
-        (await observer.WorkspaceMemberships.CountAsync(
+                && membership.UserId == recipientId
+                && membership.Status == MembershipStatus.Active,
+            TestContext.Current.CancellationToken)).Should().Be(1);
+        (await retryObserver.WorkspaceMemberships.CountAsync(
             membership => membership.WorkspaceId == workspaceId
-                && membership.UserId == recipientId,
-            TestContext.Current.CancellationToken)).Should().Be(0);
-        WorkspaceInvitation invitation = await observer.WorkspaceInvitations
-            .Include(row => row.TokenGenerations)
-            .Include(row => row.Handoffs)
+                && membership.UserId == recipientId
+                && membership.Status == MembershipStatus.Active,
+            TestContext.Current.CancellationToken)).Should().Be(1);
+        WorkspaceInvitation accepted = await retryObserver.WorkspaceInvitations
             .SingleAsync(
                 row => row.WorkspaceId == workspaceId,
                 TestContext.Current.CancellationToken);
-        invitation.Status.Should().Be(WorkspaceInvitationStatus.Pending);
-        (await observer.Set<IdentityAuditOutboxRecord>().CountAsync(
-            row => row.TargetId == invitation.Id,
-            TestContext.Current.CancellationToken)).Should().Be(0);
+        accepted.Status.Should().Be(WorkspaceInvitationStatus.Accepted);
+        (await retryObserver.Set<IdentityAuditOutboxRecord>().SingleAsync(
+            row => row.TargetId == accepted.Id
+                && row.Action == "workspace.invitation.accepted",
+            TestContext.Current.CancellationToken)).CorrelationId.Should().Be("persistence-retry");
     }
 
     [Fact]
@@ -600,6 +636,59 @@ public sealed class WorkspaceInvitationIntegrationTests(IdentityDatabaseFixture 
             row => row.TargetId == invitation.Id
                 && row.Action == "workspace.invitation.create_rejected",
             TestContext.Current.CancellationToken)).Outcome.Should().Be("pending_role_conflict");
+    }
+
+    [Fact]
+    public async Task AT007_WhenRecipientIsExistingMember_PersistsCorrelatedRedactedNoopAudit()
+    {
+        (Guid administratorId, Guid workspaceId) = await SeedAdministratorAsync();
+        User recipient = User.Create(
+            "Existing Workspace Member",
+            Email.Create($"existing-member-{Guid.NewGuid():N}@example.com").Value);
+        recipient.VerifyEmail();
+
+        await using (IdentityDbContext seed = database.CreateContext())
+        {
+            Guid organizationId = (await seed.Workspaces.SingleAsync(
+                workspace => workspace.Id == workspaceId,
+                TestContext.Current.CancellationToken)).OrganizationId!.Value;
+            seed.Users.Add(recipient);
+            seed.OrganizationMemberships.Add(OrganizationMembership.Create(
+                organizationId,
+                recipient.Id,
+                OrganizationMembershipRole.Member));
+            seed.WorkspaceMemberships.Add(WorkspaceMembership.CreateOrganizationMember(
+                workspaceId,
+                recipient.Id,
+                WorkspaceMembershipRole.Member));
+            await seed.SaveChangesAsync(TestContext.Current.CancellationToken);
+        }
+
+        Result<InviteWorkspaceMemberDto> result = await HandleAsync(
+            administratorId,
+            workspaceId,
+            recipient.Email.Value,
+            "Member",
+            "existing-member-noop",
+            new PassThroughRateLimiter(),
+            new CapturingEnvelopeProtector());
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Outcome.Should().Be("ExistingMember");
+        await using IdentityDbContext observer = database.CreateContext();
+        (await observer.WorkspaceInvitations.CountAsync(
+            invitation => invitation.WorkspaceId == workspaceId,
+            TestContext.Current.CancellationToken)).Should().Be(0);
+        IdentityAuditOutboxRecord audit = await observer.Set<IdentityAuditOutboxRecord>()
+            .SingleAsync(
+                row => row.WorkspaceId == workspaceId
+                    && row.CorrelationId == "existing-member-noop",
+                TestContext.Current.CancellationToken);
+        audit.Action.Should().Be("workspace.invitation.create_noop");
+        audit.Outcome.Should().Be("existing_member");
+        audit.TargetType.Should().Be("WorkspaceInvitationAttempt");
+        audit.MetadataJson.Should().NotContain(recipient.Email.Value);
+        audit.MetadataJson.ToLowerInvariant().Should().NotContain("token");
     }
 
     private async Task<(Guid UserId, Guid WorkspaceId)> SeedAdministratorAsync()
@@ -844,6 +933,43 @@ public sealed class WorkspaceInvitationIntegrationTests(IdentityDatabaseFixture 
         return services.BuildServiceProvider();
     }
 
+    private async Task SetAcceptanceAuditFailureTriggerAsync(bool enabled)
+    {
+        await using IdentityDbContext context = database.CreateContext();
+        if (enabled)
+        {
+            await context.Database.ExecuteSqlRawAsync(
+                """
+                CREATE OR REPLACE FUNCTION fail_invitation_acceptance_audit()
+                RETURNS trigger
+                LANGUAGE plpgsql
+                AS $$
+                BEGIN
+                    IF NEW.correlation_id = 'persistence-failure' THEN
+                        RAISE EXCEPTION 'Injected acceptance audit persistence failure';
+                    END IF;
+                    RETURN NEW;
+                END;
+                $$;
+
+                CREATE TRIGGER fail_invitation_acceptance_audit_trigger
+                BEFORE INSERT ON identity_audit_outbox
+                FOR EACH ROW
+                EXECUTE FUNCTION fail_invitation_acceptance_audit();
+                """,
+                TestContext.Current.CancellationToken);
+            return;
+        }
+
+        await context.Database.ExecuteSqlRawAsync(
+            """
+            DROP TRIGGER IF EXISTS fail_invitation_acceptance_audit_trigger
+            ON identity_audit_outbox;
+            DROP FUNCTION IF EXISTS fail_invitation_acceptance_audit();
+            """,
+            TestContext.Current.CancellationToken);
+    }
+
     private ServiceProvider CreateDeliveryServices(
         InvitationDeliveryMessage message,
         IEmailSender emailSender)
@@ -1055,14 +1181,6 @@ public sealed class WorkspaceInvitationIntegrationTests(IdentityDatabaseFixture 
             string requestPartition,
             string tokenHash,
             CancellationToken ct = default) => Task.FromResult(Result.Success());
-    }
-
-    private sealed class FailingUnitOfWork(IdentityDbContext context) : IUnitOfWork
-    {
-        public Task<int> SaveChangesAsync(CancellationToken ct = default) =>
-            throw new InvalidOperationException("Injected acceptance persistence failure.");
-
-        public void ClearTracking() => context.ChangeTracker.Clear();
     }
 
     private sealed class FixedTimeProvider(DateTimeOffset current) : TimeProvider

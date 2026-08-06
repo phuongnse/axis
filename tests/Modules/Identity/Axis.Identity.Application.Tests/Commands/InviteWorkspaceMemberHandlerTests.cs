@@ -151,6 +151,63 @@ public sealed class InviteWorkspaceMemberHandlerTests
             Arg.Any<CancellationToken>());
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task InviteWorkspaceMember_WhenNoMutationAuditSaveFails_FailsClosed(
+        bool existingMember)
+    {
+        Fixture fixture = new();
+        if (existingMember)
+            fixture.ConfigureExistingMember();
+        else
+            fixture.ConfigureCanonicalPending();
+        fixture.UnitOfWork.SaveChangesAsync(Arg.Any<CancellationToken>())
+            .Returns<Task<int>>(_ => throw new InvalidOperationException("audit unavailable"));
+
+        Result<InviteWorkspaceMemberDto> result = await fixture.Handle(
+            "recipient@example.com",
+            "Member");
+
+        result.IsFailure.Should().BeTrue();
+        result.ErrorCode.Should().Be(ErrorCodes.BusinessRule);
+        result.ProblemCode.Should().Be(IdentityProblemCodes.InvitationAuditUnavailable);
+    }
+
+    [Fact]
+    public async Task InviteWorkspaceMember_WhenCanonicalAuditReadBackIsMissing_FailsClosed()
+    {
+        Fixture fixture = new();
+        fixture.ConfigureCanonicalPending();
+        fixture.Audit.GetAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns((IdentityAuditOutboxEntry?)null);
+
+        Result<InviteWorkspaceMemberDto> result = await fixture.Handle(
+            "recipient@example.com",
+            "Member");
+
+        result.IsFailure.Should().BeTrue();
+        result.ErrorCode.Should().Be(ErrorCodes.BusinessRule);
+        result.ProblemCode.Should().Be(IdentityProblemCodes.InvitationAuditUnavailable);
+    }
+
+    [Fact]
+    public async Task InviteWorkspaceMember_WhenExistingMemberAuditReadBackIsPoisoned_FailsClosed()
+    {
+        Fixture fixture = new();
+        fixture.ConfigureExistingMember();
+        fixture.Audit.GetAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(_ =>
+            new IdentityAuditOutboxEntry(fixture.CreatedAudit!, IdentityAuditOutboxState.Poisoned));
+
+        Result<InviteWorkspaceMemberDto> result = await fixture.Handle(
+            "recipient@example.com",
+            "Member");
+
+        result.IsFailure.Should().BeTrue();
+        result.ErrorCode.Should().Be(ErrorCodes.BusinessRule);
+        result.ProblemCode.Should().Be(IdentityProblemCodes.InvitationAuditUnavailable);
+    }
+
     [Fact]
     public async Task InviteWorkspaceMember_WhenPendingRoleDiffers_RejectsWithoutAnotherToken()
     {
@@ -275,6 +332,45 @@ public sealed class InviteWorkspaceMemberHandlerTests
         public WorkspaceInvitation? CreatedInvitation { get; private set; }
         public InvitationDeliveryMessage? DeliveryMessage { get; private set; }
         public AuditEventV1? CreatedAudit { get; private set; }
+
+        public WorkspaceInvitation ConfigureCanonicalPending()
+        {
+            DateTime now = DateTime.UtcNow;
+            WorkspaceInvitation canonical = WorkspaceInvitation.Create(
+                Organization.Id,
+                Workspace.Id,
+                Inviter.Id,
+                "recipient@example.com",
+                WorkspaceMembershipRole.Member,
+                now,
+                now.AddDays(7),
+                "existing-hash",
+                "existing-envelope",
+                "existing-correlation");
+            Invitations.GetPendingForRecipientAsync(
+                    Workspace.Id,
+                    "recipient@example.com",
+                    Arg.Any<CancellationToken>())
+                .Returns(canonical);
+            return canonical;
+        }
+
+        public void ConfigureExistingMember()
+        {
+            User recipient = User.Create("Recipient", Email.Create("recipient@example.com").Value);
+            Users.FindByEmailGloballyAsync(
+                    Email.Create("recipient@example.com").Value,
+                    Arg.Any<CancellationToken>())
+                .Returns(recipient);
+            WorkspaceMemberships.GetActiveAsync(
+                    Workspace.Id,
+                    recipient.Id,
+                    Arg.Any<CancellationToken>())
+                .Returns(WorkspaceMembership.CreateOrganizationMember(
+                    Workspace.Id,
+                    recipient.Id,
+                    WorkspaceMembershipRole.Member));
+        }
 
         public Task<Result<InviteWorkspaceMemberDto>> Handle(string email, string role) =>
             new InviteWorkspaceMemberHandler(
