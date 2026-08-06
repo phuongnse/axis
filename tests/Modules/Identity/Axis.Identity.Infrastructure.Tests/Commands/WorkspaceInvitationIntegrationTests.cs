@@ -79,7 +79,7 @@ public sealed class WorkspaceInvitationIntegrationTests(IdentityDatabaseFixture 
     }
 
     [Fact]
-    public async Task AT004_AmbiguousDeliveryRetriesSameGenerationAndAcceptanceLink()
+    public async Task AT004_WhenDeliveryIsAmbiguous_RetriesSameLink()
     {
         (Guid _, Guid workspaceId) = await SeedAdministratorAsync();
         DateTimeOffset current = DateTimeOffset.UtcNow;
@@ -162,7 +162,7 @@ public sealed class WorkspaceInvitationIntegrationTests(IdentityDatabaseFixture 
     }
 
     [Fact]
-    public async Task AT007_LifecycleExpiresThenPurgesRecipientOnlyAfterAuditDelivery()
+    public async Task AT007_WhenAuditIsDelivered_PurgesTerminalRecipient()
     {
         (Guid _, Guid workspaceId) = await SeedAdministratorAsync();
         DateTimeOffset current = DateTimeOffset.UtcNow;

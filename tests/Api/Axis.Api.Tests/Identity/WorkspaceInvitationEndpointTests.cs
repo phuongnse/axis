@@ -75,7 +75,7 @@ public sealed class WorkspaceInvitationEndpointTests(ApiTestFixture fixture)
     }
 
     [Fact]
-    public async Task AcceptJourney_ExchangesIntoHttpOnlyHandoff_ReviewsAfterEmailMatch_AndAccepts()
+    public async Task AcceptJourney_WithMatchedRecipient_CompletesInvitation()
     {
         await CreateVerifiedBrowserSessionAsync(UniqueEmail());
         Guid workspaceId = await CreateOrganizationWorkspaceAsync();
@@ -154,7 +154,7 @@ public sealed class WorkspaceInvitationEndpointTests(ApiTestFixture fixture)
     }
 
     [Fact]
-    public void AcceptanceBootstrapRoutes_AreAbsentFromOpenApi()
+    public void AcceptanceBootstrapRoutes_WhenOpenApiGenerated_RemainAbsent()
     {
         using IServiceScope scope = fixture.CreateScope();
         ISwaggerProvider provider = scope.ServiceProvider.GetRequiredService<ISwaggerProvider>();

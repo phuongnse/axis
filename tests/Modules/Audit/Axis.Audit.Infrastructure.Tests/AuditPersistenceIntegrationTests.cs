@@ -89,7 +89,7 @@ public sealed class AuditPersistenceIntegrationTests(AuditDatabaseFixture db)
     }
 
     [Fact]
-    public async Task WhenInvitationAccessCannotResolveWorkspace_PersistsPlatformScopedAudit()
+    public async Task InvitationAccess_WhenWorkspaceUnresolved_PersistsPlatformAudit()
     {
         AuditEventV1 auditEvent = new(
             Guid.NewGuid(),

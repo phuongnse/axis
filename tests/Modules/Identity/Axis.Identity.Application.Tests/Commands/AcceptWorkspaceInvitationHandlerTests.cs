@@ -82,7 +82,7 @@ public sealed class AcceptWorkspaceInvitationHandlerTests
     }
 
     [Fact]
-    public async Task Accept_ReplayReturnsCanonicalTerminalFailureWithoutDuplicateMemberships()
+    public async Task Accept_WhenReplayed_ReturnsCanonicalFailure()
     {
         Fixture fixture = new(WorkspaceMembershipRole.Member);
 

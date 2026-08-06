@@ -10,7 +10,7 @@ public class MailKitEmailSenderTests
     [Theory]
     [InlineData("en", "Invitation to join Claims Operations", "Workspace administrator", "Review and accept invitation")]
     [InlineData("vi-VN", "Lời mời tham gia Claims Operations", "Quản trị viên Workspace", "Xem và chấp nhận lời mời")]
-    public void BuildWorkspaceInvitationEmail_UsesLocalizedGovernanceContextAndFragmentLink(
+    public void BuildWorkspaceInvitationEmail_WhenLocaleSelected_UsesGovernanceContext(
         string language,
         string expectedSubject,
         string expectedRole,
