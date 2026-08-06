@@ -12,12 +12,14 @@ public sealed class GetCurrentUserProfileHandlerTests
 {
     private readonly IUserRepository _userRepo = Substitute.For<IUserRepository>();
     private readonly IWorkspaceRepository _workspaceRepo = Substitute.For<IWorkspaceRepository>();
+    private readonly IWorkspaceMembershipRepository _workspaceMembershipRepo = Substitute.For<IWorkspaceMembershipRepository>();
 
     private static readonly Guid WorkspaceId = Guid.NewGuid();
 
     private GetCurrentUserProfileHandler CreateHandler() => new(
         _userRepo,
-        _workspaceRepo);
+        _workspaceRepo,
+        _workspaceMembershipRepo);
 
     [Fact]
     public async Task Handle_WhenUserNotFound_ReturnsNull()
@@ -38,16 +40,12 @@ public sealed class GetCurrentUserProfileHandlerTests
         User user = User.Create("Ada Lovelace", Email.Create("ada@acme.com").Value);
         user.SetLanguagePreference(UserLanguage.Create("vi").Value);
         user.SetThemePreference(UserTheme.Create("dark").Value);
-        Workspace workspace = Workspace.CreatePersonal(
-            "Ada Lovelace",
-            WorkspaceSlug.Create("ada-lovelace").Value,
-            user.Email,
-            user.Id);
+        Workspace workspace = Workspace.CreatePersonal("Ada Lovelace", WorkspaceSlug.Create("ada-lovelace").Value);
         workspace.ActivateAfterOwnerVerification();
 
         _userRepo.GetByIdPlatformWideAsync(user.Id, Arg.Any<CancellationToken>()).Returns(user);
-        _workspaceRepo.GetPersonalByOwnerUserIdAsync(user.Id, Arg.Any<CancellationToken>())
-            .Returns(workspace);
+        _workspaceMembershipRepo.ListActiveForUserAsync(user.Id, Arg.Any<CancellationToken>()).Returns([WorkspaceMembership.CreatePersonalOwner(workspace.Id, user.Id)]);
+        _workspaceRepo.GetByIdAsync(workspace.Id, Arg.Any<CancellationToken>()).Returns(workspace);
         CurrentUserProfileDto? dto = await CreateHandler().Handle(
             new GetCurrentUserProfileQuery(user.Id, workspace.Id),
             CancellationToken.None);

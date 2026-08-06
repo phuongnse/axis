@@ -1,5 +1,6 @@
 using System.Net.Http.Json;
 using System.Text.Json;
+using Axis.Audit.Infrastructure.Persistence;
 using Axis.BusinessObjects.Infrastructure.Persistence;
 using Axis.Identity.Application.Services;
 using Axis.Identity.Infrastructure.Persistence;
@@ -34,11 +35,13 @@ public sealed class ApiTestFixture : IAsyncLifetime
         Path.Combine(Path.GetTempPath(), "axis-api-tests", Guid.NewGuid().ToString("N"), "data-protection-keys"));
 
     private string? _previousIdentityConnectionStringEnv;
+    private string? _previousAuditConnectionStringEnv;
     private string? _previousBusinessObjectsConnectionStringEnv;
     private string? _previousRulesConnectionStringEnv;
     private string? _previousRedisConnectionStringEnv;
     private WebApplicationFactory<Program> _factory = null!;
     private string _identityConnectionString = null!;
+    private string _auditConnectionString = null!;
     private string _businessObjectsConnectionString = null!;
     private string _rulesConnectionString = null!;
 
@@ -62,16 +65,20 @@ public sealed class ApiTestFixture : IAsyncLifetime
         string postgresAdminConnectionString = _postgres.GetConnectionString();
         _identityConnectionString =
             await PostgresModuleTestDatabase.CreateAsync(postgresAdminConnectionString, "axis_identity_test");
+        _auditConnectionString =
+            await PostgresModuleTestDatabase.CreateAsync(postgresAdminConnectionString, "axis_audit_test");
         _businessObjectsConnectionString =
             await PostgresModuleTestDatabase.CreateAsync(postgresAdminConnectionString, "axis_business_objects_test");
         _rulesConnectionString =
             await PostgresModuleTestDatabase.CreateAsync(postgresAdminConnectionString, "axis_rules_test");
 
         _previousIdentityConnectionStringEnv = Environment.GetEnvironmentVariable("ConnectionStrings__Identity");
+        _previousAuditConnectionStringEnv = Environment.GetEnvironmentVariable("ConnectionStrings__Audit");
         _previousBusinessObjectsConnectionStringEnv = Environment.GetEnvironmentVariable("ConnectionStrings__BusinessObjects");
         _previousRulesConnectionStringEnv = Environment.GetEnvironmentVariable("ConnectionStrings__Rules");
         _previousRedisConnectionStringEnv = Environment.GetEnvironmentVariable("Redis__ConnectionString");
         Environment.SetEnvironmentVariable("ConnectionStrings__Identity", _identityConnectionString);
+        Environment.SetEnvironmentVariable("ConnectionStrings__Audit", _auditConnectionString);
         Environment.SetEnvironmentVariable("ConnectionStrings__BusinessObjects", _businessObjectsConnectionString);
         Environment.SetEnvironmentVariable("ConnectionStrings__Rules", _rulesConnectionString);
         Environment.SetEnvironmentVariable("Redis__ConnectionString", _redis.GetConnectionString());
@@ -83,6 +90,13 @@ public sealed class ApiTestFixture : IAsyncLifetime
         await using (IdentityDbContext identityCtx = new(identityOptions))
         {
             await identityCtx.Database.MigrateAsync();
+        }
+        DbContextOptions<AuditDbContext> auditOptions = new DbContextOptionsBuilder<AuditDbContext>()
+            .UseNpgsql(_auditConnectionString)
+            .Options;
+        await using (AuditDbContext auditCtx = new(auditOptions))
+        {
+            await auditCtx.Database.MigrateAsync();
         }
         DbContextOptions<BusinessObjectsDbContext> objectsOptions = new DbContextOptionsBuilder<BusinessObjectsDbContext>()
             .UseNpgsql(_businessObjectsConnectionString)
@@ -110,6 +124,7 @@ public sealed class ApiTestFixture : IAsyncLifetime
                 configBuilder.AddInMemoryCollection(new Dictionary<string, string?>
                 {
                     ["ConnectionStrings:Identity"] = _identityConnectionString,
+                    ["ConnectionStrings:Audit"] = _auditConnectionString,
                     ["ConnectionStrings:BusinessObjects"] = _businessObjectsConnectionString,
                     ["ConnectionStrings:Rules"] = _rulesConnectionString,
                     ["Redis:ConnectionString"] = _redis.GetConnectionString(),
@@ -127,6 +142,11 @@ public sealed class ApiTestFixture : IAsyncLifetime
                 services.AddDbContext<IdentityDbContext>(opts =>
                     opts.UseNpgsql(_identityConnectionString)
                         .UseOpenIddict());
+
+                services.RemoveAll<DbContextOptions<AuditDbContext>>();
+                services.RemoveAll<AuditDbContext>();
+                services.AddDbContext<AuditDbContext>(opts =>
+                    opts.UseNpgsql(_auditConnectionString));
 
                 services.RemoveAll<DbContextOptions<BusinessObjectsDbContext>>();
                 services.RemoveAll<BusinessObjectsDbContext>();
@@ -180,6 +200,7 @@ public sealed class ApiTestFixture : IAsyncLifetime
         await _postgres.DisposeAsync();
 
         Environment.SetEnvironmentVariable("ConnectionStrings__Identity", _previousIdentityConnectionStringEnv);
+        Environment.SetEnvironmentVariable("ConnectionStrings__Audit", _previousAuditConnectionStringEnv);
         Environment.SetEnvironmentVariable("ConnectionStrings__BusinessObjects", _previousBusinessObjectsConnectionStringEnv);
         Environment.SetEnvironmentVariable("ConnectionStrings__Rules", _previousRulesConnectionStringEnv);
         Environment.SetEnvironmentVariable("Redis__ConnectionString", _previousRedisConnectionStringEnv);

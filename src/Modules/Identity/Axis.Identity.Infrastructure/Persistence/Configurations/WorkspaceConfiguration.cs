@@ -10,13 +10,16 @@ internal sealed class WorkspaceConfiguration : IEntityTypeConfiguration<Workspac
 {
     public void Configure(EntityTypeBuilder<Workspace> builder)
     {
-        builder.ToTable("Workspaces");
+        builder.ToTable("workspaces", table => table.HasCheckConstraint(
+            "CK_workspaces_type_organization",
+            "(type = 'Personal' AND organization_id IS NULL) OR " +
+            "(type = 'Organization' AND organization_id IS NOT NULL)"));
         builder.HasKey(o => o.Id);
         builder.Property(o => o.Id).HasColumnName("id");
 
         builder.Property(o => o.Name)
             .HasColumnName("name")
-            .HasMaxLength(200)
+            .HasMaxLength(Workspace.MaxNameLength)
             .IsRequired();
 
         builder.Property(o => o.Slug)
@@ -29,25 +32,18 @@ internal sealed class WorkspaceConfiguration : IEntityTypeConfiguration<Workspac
 
         builder.HasIndex(o => o.Slug).IsUnique();
 
-        builder.Property(o => o.OwnerEmail)
-            .HasColumnName("owner_email")
-            .HasMaxLength(320)
-            .IsRequired()
-            .HasConversion(new ValueConverter<Email, string>(
-                e => e.Value,
-                s => Email.Create(s).Value!));
-
-        builder.Property(o => o.OwnerUserId)
-            .HasColumnName("owner_user_id");
+        builder.Property(o => o.OrganizationId).HasColumnName("organization_id");
 
         builder.Property(o => o.Type)
             .HasColumnName("type")
             .HasConversion<string>()
             .IsRequired();
 
-        builder.HasIndex(o => new { o.OwnerUserId, o.Type })
-            .IsUnique()
-            .HasFilter("owner_user_id IS NOT NULL AND type = 'Personal'");
+        builder.HasIndex(o => o.OrganizationId);
+        builder.HasOne<Organization>()
+            .WithMany()
+            .HasForeignKey(o => o.OrganizationId)
+            .OnDelete(DeleteBehavior.Restrict);
 
         builder.Property(o => o.Status)
             .HasColumnName("status")
@@ -69,5 +65,6 @@ internal sealed class WorkspaceConfiguration : IEntityTypeConfiguration<Workspac
         builder.Property(o => o.LegalAcceptedAt)
             .HasColumnName("legal_accepted_at");
 
+        builder.Property(o => o.Revision).HasColumnName("revision").IsConcurrencyToken();
     }
 }

@@ -6,7 +6,8 @@ namespace Axis.Identity.Application.Queries.GetCurrentUserProfile;
 
 public sealed class GetCurrentUserProfileHandler(
     IUserRepository userRepository,
-    IWorkspaceRepository workspaceRepository)
+    IWorkspaceRepository workspaceRepository,
+    IWorkspaceMembershipRepository workspaceMemberships)
     : IQueryHandler<GetCurrentUserProfileQuery, CurrentUserProfileDto?>
 {
     public async Task<CurrentUserProfileDto?> Handle(
@@ -18,10 +19,11 @@ public sealed class GetCurrentUserProfileHandler(
             return null;
 
         List<UserWorkspaceDto> workspaces = [];
-        Workspace? personalWorkspace =
-            await workspaceRepository.GetPersonalByOwnerUserIdAsync(user.Id, cancellationToken);
-        if (personalWorkspace is not null && personalWorkspace.AllowsSignIn())
+        foreach (WorkspaceMembership membership in await workspaceMemberships.ListActiveForUserAsync(user.Id, cancellationToken))
         {
+            Workspace? personalWorkspace = await workspaceRepository.GetByIdAsync(membership.WorkspaceId, cancellationToken);
+            if (personalWorkspace is null || !personalWorkspace.AllowsSignIn())
+                continue;
             workspaces.Add(new UserWorkspaceDto(
                 personalWorkspace.Id,
                 personalWorkspace.Name,

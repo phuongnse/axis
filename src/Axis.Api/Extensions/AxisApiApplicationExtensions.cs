@@ -1,5 +1,6 @@
 using Axis.Api.Endpoints;
 using Axis.Api.Middleware;
+using Axis.Audit.Infrastructure.Persistence;
 using Axis.BusinessObjects.Infrastructure.Persistence;
 using Axis.Identity.Infrastructure.Persistence;
 using Axis.Rules.Domain;
@@ -27,6 +28,12 @@ internal static class AxisApiApplicationExtensions
             .Options;
         await using IdentityDbContext identityDb = new(identityOptions);
         await identityDb.Database.MigrateAsync();
+
+        DbContextOptions<AuditDbContext> auditOptions = new DbContextOptionsBuilder<AuditDbContext>()
+            .UseNpgsql(RequiredConnectionString(app.Configuration, "Audit"))
+            .Options;
+        await using AuditDbContext auditDb = new(auditOptions);
+        await auditDb.Database.MigrateAsync();
 
         DbContextOptions<BusinessObjectsDbContext> businessObjectsOptions = new DbContextOptionsBuilder<BusinessObjectsDbContext>()
             .UseNpgsql(RequiredConnectionString(app.Configuration, "BusinessObjects"))

@@ -54,6 +54,16 @@ API_PROJECT = ROOT / "src" / "Axis.Api" / "Axis.Api.csproj"
 MCP_PROJECT = ROOT / "src" / "Axis.Mcp" / "Axis.Mcp.csproj"
 FRONTEND_DIR = ROOT / "frontend"
 MIGRATION_TARGETS: dict[str, tuple[Path, str, str]] = {
+    "audit": (
+        ROOT
+        / "src"
+        / "Modules"
+        / "Audit"
+        / "Axis.Audit.Infrastructure"
+        / "Axis.Audit.Infrastructure.csproj",
+        "AuditDbContext",
+        "ConnectionStrings__Audit",
+    ),
     "business-objects": (
         ROOT
         / "src"

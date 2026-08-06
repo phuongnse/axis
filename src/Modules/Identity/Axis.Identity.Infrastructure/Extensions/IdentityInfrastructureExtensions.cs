@@ -31,6 +31,12 @@ public static class IdentityInfrastructureExtensions
             });
 
         services.AddScoped<IWorkspaceRepository, WorkspaceRepository>();
+        services.AddScoped<IOrganizationRepository, OrganizationRepository>();
+        services.AddScoped<IOrganizationMembershipRepository, OrganizationMembershipRepository>();
+        services.AddScoped<IWorkspaceMembershipRepository, WorkspaceMembershipRepository>();
+        services.AddScoped<IWorkspaceContextTransitionRepository, WorkspaceContextTransitionRepository>();
+        services.AddScoped<ICreateOrganizationIdempotencyRepository, CreateOrganizationIdempotencyRepository>();
+        services.AddScoped<IIdentityAuditOutbox, IdentityAuditOutbox>();
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<IRegistrationIdempotencyRepository, RegistrationIdempotencyRepository>();
 

@@ -1,65 +1,35 @@
 using Axis.Identity.Domain.Aggregates;
-using Axis.Identity.Domain.Legal;
 using Axis.Identity.Domain.ValueObjects;
 using FluentAssertions;
 
 namespace Axis.Identity.Domain.Tests.Aggregates;
 
-public class WorkspaceTests
+public sealed class WorkspaceTests
 {
-    private static WorkspaceSlug ValidSlug => WorkspaceSlug.Create("alice-smith").Value;
-    private static Email ValidEmail => Email.Create("alice@example.com").Value;
-
     [Fact]
-    public void CreatePersonal_WhenCalled_CreatesPendingPersonalWorkspace()
+    public void CreatePersonal_WhenCreated_HasNoOrganizationAndAwaitsVerification()
     {
-        Guid ownerUserId = Guid.NewGuid();
-
-        Workspace workspace = Workspace.CreatePersonal(
-            "Alice Smith",
-            ValidSlug,
-            ValidEmail,
-            ownerUserId);
-
-        workspace.Name.Should().Be("Alice Smith");
-        workspace.Slug.Should().Be(ValidSlug);
-        workspace.OwnerEmail.Should().Be(ValidEmail);
-        workspace.OwnerUserId.Should().Be(ownerUserId);
+        Workspace workspace = Workspace.CreatePersonal("Ada Workspace", WorkspaceSlug.Create("ada").Value);
         workspace.Type.Should().Be(WorkspaceType.Personal);
+        workspace.OrganizationId.Should().BeNull();
         workspace.Status.Should().Be(WorkspaceStatus.PendingVerification);
-        workspace.AllowsSignIn().Should().BeFalse();
+        workspace.Revision.Should().Be(1);
     }
 
     [Fact]
-    public void ActivateAfterOwnerVerification_WhenPending_ActivatesWorkspace()
+    public void CreateOrganization_WhenCreated_BindsExactlyOneOrganization()
     {
-        Workspace workspace = Workspace.CreatePersonal(
-            "Alice Smith",
-            ValidSlug,
-            ValidEmail,
-            Guid.NewGuid());
-
-        workspace.ActivateAfterOwnerVerification();
-
-        workspace.Status.Should().Be(WorkspaceStatus.Active);
-        workspace.AllowsSignIn().Should().BeTrue();
+        Guid organizationId = Guid.NewGuid();
+        Workspace workspace = Workspace.CreateOrganization("Acme", WorkspaceSlug.Create("acme").Value, organizationId);
+        workspace.Type.Should().Be(WorkspaceType.Organization);
+        workspace.OrganizationId.Should().Be(organizationId);
     }
 
     [Fact]
-    public void RecordLegalAcceptance_WhenCalled_StoresCurrentVersions()
+    public void SetStatus_WithStaleRevision_RejectsUpdate()
     {
-        Workspace workspace = Workspace.CreatePersonal(
-            "Alice Smith",
-            ValidSlug,
-            ValidEmail,
-            Guid.NewGuid());
-
-        workspace.RecordLegalAcceptance(
-            WellKnownLegalDocuments.TermsVersion,
-            WellKnownLegalDocuments.PrivacyVersion);
-
-        workspace.AcceptedTermsVersion.Should().Be(WellKnownLegalDocuments.TermsVersion);
-        workspace.AcceptedPrivacyVersion.Should().Be(WellKnownLegalDocuments.PrivacyVersion);
-        workspace.LegalAcceptedAt.Should().NotBeNull();
+        Workspace workspace = Workspace.CreatePersonal("Ada Workspace", WorkspaceSlug.Create("ada").Value);
+        Action act = () => workspace.SetStatus(WorkspaceStatus.Active, 0);
+        act.Should().Throw<InvalidOperationException>();
     }
 }

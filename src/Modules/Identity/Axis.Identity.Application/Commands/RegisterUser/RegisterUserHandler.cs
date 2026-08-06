@@ -11,6 +11,7 @@ namespace Axis.Identity.Application.Commands.RegisterUser;
 public sealed class RegisterUserHandler(
     IUserRepository userRepo,
     IWorkspaceRepository workspaceRepo,
+    IWorkspaceMembershipRepository workspaceMembershipRepo,
     IRegistrationIdempotencyRepository idempotencyRepo,
     IEmailVerificationTokenStore verificationTokenStore,
     IWorkspaceSlugGenerator slugGenerator,
@@ -129,15 +130,14 @@ public sealed class RegisterUserHandler(
         WorkspaceSlug slug = await slugGenerator.GenerateUniqueSlugAsync(
             user.FullName,
             cancellationToken);
-        Workspace personalWorkspace = Workspace.CreatePersonal(
-            user.FullName,
-            slug,
-            user.Email,
-            user.Id);
+        Workspace personalWorkspace = Workspace.CreatePersonal(user.FullName, slug);
         personalWorkspace.RecordLegalAcceptance(
             command.AcceptedTermsVersion,
             command.AcceptedPrivacyVersion);
 
         await workspaceRepo.AddAsync(personalWorkspace, cancellationToken);
+        await workspaceMembershipRepo.AddAsync(
+            WorkspaceMembership.CreatePersonalOwner(personalWorkspace.Id, user.Id),
+            cancellationToken);
     }
 }

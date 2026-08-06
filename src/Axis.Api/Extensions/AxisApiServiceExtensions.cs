@@ -4,6 +4,7 @@ using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
 using Axis.Api.HealthChecks;
 using Axis.Api.Infrastructure;
+using Axis.Audit.Infrastructure.Extensions;
 using Axis.BusinessObjects.Application.Commands.CreateBusinessObjectDefinition;
 using Axis.BusinessObjects.Application.Commands.CreateBusinessObjectRecord;
 using Axis.BusinessObjects.Infrastructure.Extensions;
@@ -331,6 +332,7 @@ internal static class AxisApiServiceExtensions
         IConfiguration configuration,
         IHostEnvironment environment)
     {
+        services.AddAuditInfrastructure(configuration);
         services.AddIdentityInfrastructure(configuration);
         services.AddRulesInfrastructure(configuration);
         services.AddBusinessObjectsInfrastructure(configuration);

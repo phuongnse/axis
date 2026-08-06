@@ -5034,6 +5034,11 @@ class TestAxisCommandWrappers(unittest.TestCase):
 
     def test_migration_add_uses_owned_module_contracts(self) -> None:
         targets = {
+            "audit": (
+                "Audit/Axis.Audit.Infrastructure/"
+                "Axis.Audit.Infrastructure.csproj",
+                "AuditDbContext",
+            ),
             "business-objects": (
                 "BusinessObjects/Axis.BusinessObjects.Infrastructure/"
                 "Axis.BusinessObjects.Infrastructure.csproj",
