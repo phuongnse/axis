@@ -20,11 +20,13 @@ Let a verified Axis user create an organization with its initial governed worksp
 2. User chooses to create an organization, enters its name, and confirms creation of its initial workspace with the same display name.
 3. System validates and normalizes the name, then atomically creates the Organization, active Organization owner membership, active organization Workspace, active Workspace administrator membership, and durable audit outbox records.
 4. System reads the created organization, workspace, and memberships back before reporting creation success.
-5. Client requests entry into the created workspace. Server validates the active Workspace membership, persists a durable context-transition intent and requested audit outcome, rotates the opaque browser session and antiforgery context, then durably finalizes the transition outcome from session read-back without claiming a transaction across stores.
-6. After the finalized transition confirms the new active workspace, client closes workspace-bound managed windows, clears workspace-scoped server state, refreshes the eligible workspace projection, and opens the safe dashboard in the new context.
-7. Workspace control lists only active eligible workspaces, groups the personal workspace separately from organization workspaces, and marks the active workspace.
-8. User selects the personal workspace or another eligible organization workspace and the same validated rotation and cleanup flow repeats.
-9. Every authenticated API operation validates the active Workspace membership before using the workspace context; reads and mutations remain isolated to the selected workspace.
+5. Client requests entry into the created workspace. Server validates the active Workspace membership and atomically persists a pending context transition, its source and target session correlations, expiry, and requested audit outbox record.
+6. Server stages a new opaque Redis ticket bound to the pending transition and returns it in the browser cookie. While the transition is pending, both the source and target tickets are recovery-only and cannot authorize workspace data.
+7. Browser confirms receipt through an antiforgery-protected request authenticated by the staged target ticket. Server revalidates membership and session correlation, atomically marks the transition completed with its audit outbox record, and idempotently revokes the source ticket. This durable completion is the authoritative commit point.
+8. After confirmation, or after a lost confirmation response is resolved by reading the completed transition through the target ticket, client closes workspace-bound managed windows, clears workspace-scoped server state, refreshes the eligible workspace projection and antiforgery request token, and opens the safe dashboard in the new context.
+9. Workspace control lists only active eligible workspaces, groups the personal workspace separately from organization workspaces, and marks the active workspace.
+10. User selects the personal workspace or another eligible organization workspace and the same validated transition, confirmation, and cleanup flow repeats.
+11. Every authenticated API operation validates the active Workspace membership and any associated transition state before using the workspace context; reads and mutations remain isolated to the selected workspace.
 
 ## Alternate / error flows
 
@@ -32,8 +34,11 @@ Let a verified Axis user create an organization with its initial governed worksp
 - Repeated creation with the same idempotency key and payload: return the original completed outcome; the same key with different content fails closed.
 - Concurrent creation or persistence conflict: create at most one complete organization/workspace graph and return a recoverable conflict without partial membership state.
 - Audit outbox persistence failure: roll back the organization/workspace mutation and report a retryable failure.
-- Session-store failure after committed creation: durably fail the context transition, keep the new workspace available in the eligible list, retain the previous active context, and offer an explicit retry to enter the new workspace.
-- Transition finalization or read-back failure after session rotation: keep the transition unresolved, deny workspace data through that context, and reconcile or compensate from durable transition state before reporting a usable active workspace.
+- Session-store failure before a target ticket is staged: durably fail the transition, keep the new workspace available in the eligible list, retain the previous active context, and offer an explicit retry to enter the new workspace.
+- Target-ticket response is lost before browser confirmation: the browser's source ticket enters recovery-only state; it may explicitly cancel the pending transition, invalidating the orphan target ticket and restoring the source context. An expired transition is compensated the same way by the reconciler.
+- Confirmation response is lost after durable completion: a session read through the target ticket returns the completed target context so the client can finish cleanup without repeating the transition.
+- Source-ticket revocation or other Redis cleanup fails after durable completion: the completed database state denies the source correlation before workspace data access and cleanup retries idempotently; it does not roll authority back to the source context.
+- Confirmation and source-session recovery race: transition concurrency permits one terminal result. Completion keeps only the target context; compensation invalidates the target and restores only the still-valid source context.
 - Inactive, removed, unknown, or otherwise ineligible target membership: keep the previous valid context, disclose no target resource data, and show a recoverable unavailable result.
 - Current membership becomes invalid before a later request or reload: fail closed before module data access and present workspace recovery without silently selecting another workspace.
 - Profile or workspace-list refresh failure after a successful switch: the rotated server session remains authoritative; clear workspace-bound client state and offer a retry without reverting locally to the old context.
@@ -47,7 +52,7 @@ Let a verified Axis user create an organization with its initial governed worksp
 - **AC-002** Creation atomically establishes the creator's active Organization owner membership and active Workspace administrator membership without relying on legacy owner columns.
 - **AC-003** Creation success requires persisted read-back of the Organization, Workspace, memberships, and durable audit outbox state.
 - **AC-004** The user's eligible workspace projection includes the active personal workspace and every active organization Workspace for which the user has an active Workspace membership.
-- **AC-005** The user can switch in both directions between personal and organization workspaces; each successful switch durably completes one context transition, rotates the opaque browser session and antiforgery context, and exposes no token, code, secret, or ticket identifier.
+- **AC-005** The user can switch in both directions between personal and organization workspaces; each successful switch reaches durable completion only after browser confirmation with the staged target ticket, rotates the opaque browser session and antiforgery request token, and exposes no token, code, secret, ticket identifier, or session correlation.
 - **AC-006** A successful switch closes workspace-bound managed windows, clears workspace-scoped client cache, refreshes workspace identity, and opens a safe route without rendering prior-workspace data.
 - **AC-007** Every cookie- or bearer-authenticated workspace operation validates current active membership server-side; a workspace claim is context input rather than proof of authority.
 - **AC-008** Organization creation and every active-context change produce durable append-only audit records with actor, subject, workspace, action, target, outcome, timestamp, and correlation identity without credentials or raw security tokens.
@@ -57,7 +62,7 @@ Let a verified Axis user create an organization with its initial governed worksp
 - **AC-009** Organization names are trimmed, Unicode-normalized, required, and bounded; invalid input performs no mutation and returns actionable field-local diagnostics.
 - **AC-010** Creation is idempotent for one key and canonical request, while key reuse with different content and concurrent conflicting creation fail closed without duplicate or partial Organization, Workspace, membership, or audit state.
 - **AC-011** Organization/workspace persistence and audit-outbox persistence share one transaction; any failure before commit leaves no partial graph.
-- **AC-012** A session-store failure after committed creation preserves the prior active session, exposes the created workspace through fresh read-back, and supports retrying only the switch.
+- **AC-012** A session-store failure before target-ticket staging preserves the prior active session; a lost target-ticket response leaves both tickets recovery-only until explicit or expiry-driven compensation restores the still-valid source session and removes the orphan target ticket.
 - **AC-013** Switching to an inactive, removed, unknown, or otherwise ineligible membership leaves the prior valid context unchanged and exposes no target workspace or resource data.
 - **AC-014** A stale or revoked current membership fails closed before workspace data access and presents a recoverable context-selection state rather than silently repairing authority.
 - **AC-015** A post-switch profile refresh failure never causes the client to reuse or display cached data from the prior workspace.
@@ -71,8 +76,10 @@ Let a verified Axis user create an organization with its initial governed worksp
 - **AC-020** Resource-specific cross-workspace access returns a non-disclosing not-found outcome, while a known forbidden lifecycle action returns permission denied; the UI never substitutes for server authorization.
 - **AC-021** Switching preserves no dirty form or managed-window state across workspaces, remains keyboard and screen-reader operable, and does not overflow compact or desktop layouts.
 - **AC-022** Personal and organization workspace source data, records, Rules, audit context, and server caches remain isolated through repeated switching and concurrent requests.
-- **AC-023** Context switching uses durable transition state and explicit session read-back rather than claiming atomicity across PostgreSQL, Redis, and the HTTP response; unresolved transitions fail closed and are idempotently reconciled or compensated.
-- **AC-024** Audit records contain only stable identifiers, categorical action/outcome, timestamp, correlation identity, and bounded non-sensitive metadata; this slice exposes no update/delete operation and retains records indefinitely until an owning retention contract replaces that policy.
+- **AC-023** Context switching uses `Pending`, `Completed`, `Compensated`, and `Failed` durable transition states with optimistic concurrency and expiry; PostgreSQL completion after target-ticket confirmation is authoritative, every Redis operation is idempotent, and no pending or stale source correlation authorizes workspace data.
+- **AC-024** Audit records contain only stable identifiers, categorical action/outcome, timestamp, correlation identity, and bounded non-sensitive metadata; indefinite append-only retention with no update/delete operation is the explicit policy of this slice, and any future change requires a new owning contract and migration.
+- **AC-025** Every terminal transition path records one correlated requested and terminal audit outcome; failure to persist a required audit outbox state fails closed without inventing a cross-store transaction.
+- **AC-026** Pending transitions reconcile by expiry. A terminal transition retains no ticket secret and is purged only after source and target absolute session lifetimes have elapsed, terminal audit projection is confirmed, and Redis cleanup has completed.
 
 ## Acceptance Test Matrix
 
@@ -82,12 +89,13 @@ Let a verified Axis user create an organization with its initial governed worksp
 | AT-002 | Application/Infrastructure boundaries | Creation commits Organization, Workspace, owner/admin memberships, audit outbox, and read-back atomically | AC-002, AC-003, AC-011 | Application test + Infrastructure integration test | Yes |
 | AT-003 | UI/API boundaries | Invalid names and idempotency-key reuse return field or conflict diagnostics with no partial mutation | AC-009, AC-010 | UI component test + API integration test | Yes |
 | AT-004 | Application/Infrastructure boundaries | Concurrent identical and conflicting creation attempts produce one canonical graph or a recoverable conflict | AC-010, AC-011 | Application test + Infrastructure integration test | Yes |
-| AT-005 | API boundary | Eligible switch completes durable transition/read-back and rotates session context; ineligible targets preserve prior context, while unresolved cross-store outcomes fail closed and reconcile idempotently | AC-005, AC-007, AC-013, AC-014, AC-023 | API integration test | Yes |
-| AT-006 | UI component | Workspace control covers loading, grouped eligible list, current selection, empty/recovery, pending, success, and failure with focus and keyboard behavior | AC-004, AC-006, AC-012, AC-013, AC-015, AC-021 | UI component test | Yes |
+| AT-005 | API/Application boundaries | Eligible switch stages a target ticket, confirms browser receipt, durably completes, and revokes the source; lost staging/confirmation responses, expiry, concurrent confirm/recover, Redis cleanup failure, and ineligible targets preserve exactly one usable context or fail closed and reconcile idempotently | AC-005, AC-007, AC-012, AC-013, AC-014, AC-023, AC-025 | API integration test + Infrastructure integration test | Yes |
+| AT-006 | UI component | Workspace control covers loading, grouped eligible list, current selection, empty/recovery, pending, confirmation read-back, success, and failure with focus and keyboard behavior | AC-004, AC-006, AC-012, AC-013, AC-015, AC-021 | UI component test | Yes |
 | AT-007 | Infrastructure boundary | Existing personal owners migrate to one active membership, personal constraints hold, and legacy owner authorization is absent | AC-016, AC-017 | Infrastructure integration test + Architecture test | Yes |
 | AT-008 | API/Application boundaries | Organization membership alone grants no workspace data access and lifecycle roles remain separate from product-policy roles | AC-007, AC-018, AC-019, AC-020 | Application test + API integration test | Yes |
 | AT-009 | Infrastructure boundary | Creation and switch audit events are durable, append-only, correlated, idempotently projected, retention-bound, and limited to the approved redacted schema | AC-008, AC-011, AC-024 | Infrastructure integration test | Yes |
 | AT-010 | Browser journey | Repeated switching while reading and mutating workspace resources proves server, client cache, managed-window, and audit isolation | AC-006, AC-007, AC-015, AC-022 | Browser automation | Yes |
+| AT-011 | Infrastructure boundary | Transition expiry and terminal cleanup retain no ticket secret, reconcile pending state, wait for both session lifetimes plus audit/Redis completion, and then purge operational state | AC-023, AC-025, AC-026 | Infrastructure integration test | Yes |
 
 ## Out Of Scope
 
@@ -111,6 +119,11 @@ Let a verified Axis user create an organization with its initial governed worksp
 
 Required UI quality: workspace labels and current state are programmatic; controls are keyboard reachable; selected/current state is not color-only; focus enters and returns from the create surface predictably; pending and result feedback is announced; compact layouts do not overflow; localized interface copy distinguishes Organization from Workspace; raw IDs, claims, tokens, secrets, and another workspace's metadata never render.
 
+## API and MCP classification
+
+- Organization/workspace creation and the subject-scoped eligible-workspace read are authenticated product operations exposed through REST/OpenAPI and typed `[WRITE]`/`[READ]` MCP tools. They derive user and current workspace authority from the access token and accept no `userId` or authority-bearing `workspaceId` argument.
+- Browser switch, confirmation, compensation, session read, and antiforgery operations are intentionally internal/bootstrap. MCP changes workspace only through its OAuth authorization lifecycle; it never calls the browser ticket-transition protocol.
+
 > **Implementation status**
 >
 > | Layer | Status |
@@ -132,4 +145,4 @@ Required UI quality: workspace labels and current state are programmatic; contro
 >
 > **Verification:** Not run; implementation has not started and no acceptance row has current evidence.
 >
-> **Decisions:** Organization is the governance container; Workspace is the active data/isolation context. Personal Workspaces have no Organization parent and use the same membership authorization model. Team is reserved for collaboration/assignment and Group for IdP or authorization grouping. Existing personal ownership is migrated in one clean cutover. Membership is validated server-side for cookie and bearer access. Browser switching uses durable transition state, explicit session read-back, and fail-closed reconciliation because PostgreSQL, Redis, and the HTTP response do not share a transaction; client state clears only after confirmed success. Identity lifecycle roles do not encode product roles. Security mutations write a transactional outbox that Audit projects idempotently into append-only records; the approved minimal audit schema is retained indefinitely without product update/delete operations until a separate retention contract replaces that policy. Event sourcing is not introduced.
+> **Decisions:** Organization is the governance container; Workspace is the active data/isolation context. Personal Workspaces have no Organization parent and use the same membership authorization model. Team is reserved for collaboration/assignment and Group for IdP or authorization grouping. Existing personal ownership is migrated in one clean cutover. Membership is validated server-side for cookie and bearer access. Browser switching is a two-request state machine: a recovery-only target ticket is staged, browser receipt is confirmed, and PostgreSQL completion becomes authoritative; response loss, concurrent recovery, Redis cleanup, and bounded operational-state purge are reconciled idempotently because PostgreSQL, Redis, and HTTP do not share a transaction. Client state clears only after confirmed completion. Identity lifecycle roles do not encode product roles. Security mutations write a transactional outbox that Audit projects idempotently into append-only records; indefinite retention of the approved minimal audit schema without product update/delete operations is the explicit policy of this slice. Event sourcing is not introduced.
