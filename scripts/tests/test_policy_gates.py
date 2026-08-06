@@ -395,6 +395,58 @@ class TestUseCaseDocsGate(unittest.TestCase):
         self.assertIn("is missing `./example/sample.md`", joined)
         self.assertIn("references non-spec `./example/wrong.md`", joined)
 
+    def test_supporting_domain_status_is_derived_from_owning_use_case_layer(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            use_cases = root / "docs" / "use-cases"
+            owner_dir = use_cases / "identity-governance"
+            support_dir = use_cases / "audit"
+            owner_dir.mkdir(parents=True)
+            support_dir.mkdir(parents=True)
+            (use_cases / "README.md").write_text(
+                """## Supporting Domains
+
+| Domain | Responsibilities |
+|---|---|
+| [Audit](./audit/README.md) | Audit projection. |
+""",
+                encoding="utf-8",
+            )
+            owner = owner_dir / "create-workspace.md"
+            owner.write_text(
+                """> **Implementation status**
+>
+> | Layer | Status |
+> |---|---|
+> | Audit | Partial |
+""",
+                encoding="utf-8",
+            )
+            (support_dir / "README.md").write_text(
+                """## Supporting Responsibilities
+
+| Owning use case | Layer | Responsibility | Status |
+|---|---|---|---|
+| [Create](../identity-governance/create-workspace.md) | Audit | Project creation outcome. | Not started |
+""",
+                encoding="utf-8",
+            )
+
+            original_root = check_use_case_docs.ROOT
+            original_use_cases = check_use_case_docs.USE_CASES
+            check_use_case_docs.ROOT = root
+            check_use_case_docs.USE_CASES = use_cases
+            try:
+                issues = check_use_case_docs.validate_supporting_domain_inventories([owner])
+            finally:
+                check_use_case_docs.ROOT = original_root
+                check_use_case_docs.USE_CASES = original_use_cases
+
+        self.assertIn(
+            "status for `../identity-governance/create-workspace.md` layer `Audit` must be `Partial`, found `Not started`",
+            "\n".join(issues),
+        )
+
     def issues_for_use_case(self, callout: str, ac_line: str = "- **AC-001** Works.") -> list[str]:
         if "## Acceptance Test Matrix" in callout:
             matrix, status = callout.split("> **Implementation status**", maxsplit=1)

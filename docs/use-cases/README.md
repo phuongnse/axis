@@ -27,8 +27,14 @@ Use cases are the product source of truth. Each use case owns one independently 
 | [docs/use-cases/site-experience/README.md](./site-experience/README.md) | [docs/use-cases/site-experience/select-site-language.md](./site-experience/select-site-language.md) | Done |
 | [docs/use-cases/site-experience/README.md](./site-experience/README.md) | [docs/use-cases/site-experience/select-site-theme.md](./site-experience/select-site-theme.md) | Done |
 
+## Supporting Domains
+
+| Domain | Responsibilities |
+|---|---|
+| [docs/use-cases/audit/README.md](./audit/README.md) | Audit supports the actor-visible security outcomes owned by Identity Governance use cases. |
+
 ## Rule
 
-Each use case lives as a single Markdown file at `docs/use-cases/{domain}/{slug}.md`. Complete use cases keep exact proof in `docs/use-cases/{domain}/{slug}.evidence.md`. Domain folders contain their `README.md` hub, use-case files, and matching evidence sidecars only.
+Each use case lives as a single Markdown file at `docs/use-cases/{domain}/{slug}.md`. Complete use cases keep exact proof in `docs/use-cases/{domain}/{slug}.evidence.md`. Journey-domain folders contain their `README.md` hub, use-case files, and matching evidence sidecars only. A module with no independent actor journey keeps one explicitly listed supporting-domain hub whose responsibility status is derived from named layers in its owning use cases.
 
 Do not add placeholder use-case files.
