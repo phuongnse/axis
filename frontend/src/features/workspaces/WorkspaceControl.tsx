@@ -67,11 +67,18 @@ export function WorkspaceControl({ onWorkspaceChanged }: WorkspaceControlProps) 
     setSwitchError(false);
     try {
       let transition: WorkspaceContextTransition;
+      let confirmationAttempted = false;
       try {
         await beginWorkspaceTransition(target.workspaceId);
+        confirmationAttempted = true;
         transition = await confirmWorkspaceTransition();
       } catch {
-        transition = await recoverWorkspaceTransition();
+        try {
+          transition = await recoverWorkspaceTransition();
+        } catch (error) {
+          if (confirmationAttempted) await onWorkspaceChanged();
+          throw error;
+        }
       }
 
       const enteredTarget =

@@ -65,13 +65,6 @@ internal sealed class WorkspaceTransitionCleanupBatch(
                 if (now < item.ExpiresAt)
                     continue;
             }
-            else
-            {
-                await tickets.RemoveByCorrelationDigestAsync(
-                    item.SourceCorrelationDigest,
-                    transition: false,
-                    ct);
-            }
             await tickets.RemoveByCorrelationDigestAsync(
                 item.TargetCorrelationDigest,
                 transition: true,

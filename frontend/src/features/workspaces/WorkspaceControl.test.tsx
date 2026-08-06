@@ -165,6 +165,19 @@ describe('WorkspaceControl', () => {
     expect(onWorkspaceChanged).toHaveBeenCalledOnce();
   });
 
+  it('clears Workspace-scoped client state when confirmation and recovery both fail', async () => {
+    const user = userEvent.setup();
+    vi.mocked(confirmWorkspaceTransition).mockRejectedValue(new TypeError('Lost response'));
+    vi.mocked(recoverWorkspaceTransition).mockRejectedValue(new TypeError('Recovery unavailable'));
+    const onWorkspaceChanged = renderControl();
+
+    await user.click(await screen.findByRole('button', { name: 'Workspace control' }));
+    await user.click(screen.getByRole('button', { name: 'Acme Operations' }));
+
+    await waitFor(() => expect(onWorkspaceChanged).toHaveBeenCalledOnce());
+    expect(await screen.findByText(/Workspace did not change/i)).toBeInTheDocument();
+  });
+
   it('refreshes the authoritative source session after compensation and keeps recovery choices open', async () => {
     const user = userEvent.setup();
     vi.mocked(confirmWorkspaceTransition).mockResolvedValue({

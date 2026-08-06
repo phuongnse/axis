@@ -108,6 +108,56 @@ async function activeWorkspaceId(page: Page): Promise<string> {
   return session.user.workspaceId;
 }
 
+async function switchWorkspace(page: Page, workspaceName: string): Promise<string> {
+  await page.getByRole('button', { name: 'Workspace control' }).click();
+  await page.getByRole('button', { name: workspaceName, exact: true }).click();
+  await expect(page).toHaveURL(/\/dashboard$/);
+  await expectControlLabel(page, workspaceName);
+  return activeWorkspaceId(page);
+}
+
+async function createOrganizationAndEnter(page: Page, organizationName: string): Promise<string> {
+  await page.getByRole('button', { name: 'Workspace control' }).click();
+  await page.getByRole('button', { name: 'Create Organization' }).click();
+
+  const createDialog = page.getByRole('dialog', { name: 'Create Organization' });
+  await createDialog.getByRole('textbox', { name: 'Organization name' }).fill(organizationName);
+  await createDialog.getByRole('button', { name: 'Create Organization' }).click();
+
+  const resultDialog = page.getByRole('dialog', { name: 'Organization created' });
+  await expect(resultDialog.getByRole('heading', { name: 'Organization created' })).toBeVisible();
+  await resultDialog.getByRole('button', { name: 'Enter Workspace' }).click();
+  await expect(page).toHaveURL(/\/dashboard$/);
+  await expectControlLabel(page, organizationName);
+  return activeWorkspaceId(page);
+}
+
+async function createWorkspaceDefinition(page: Page, name: string): Promise<void> {
+  await page.goto('/business-objects');
+  await expect(page).toHaveURL(/\/business-objects\?page=1$/);
+
+  await page.getByRole('button', { name: 'New definition' }).click();
+  const dialog = page.locator('[data-slot="dialog-content"]');
+  await dialog.getByLabel('Name', { exact: true }).fill(name);
+  await dialog.getByRole('button', { name: 'Start definition' }).click();
+  await expect(dialog.getByRole('heading', { name, exact: true })).toBeVisible();
+  await dialog.getByRole('button', { name: 'Close dialog' }).click();
+
+  await expect(page.getByLabel('Definitions').getByText(name, { exact: true })).toBeVisible();
+}
+
+async function expectWorkspaceDefinitions(
+  page: Page,
+  expectedName: string,
+  priorWorkspaceName: string,
+): Promise<void> {
+  await page.goto('/business-objects');
+  await expect(page).toHaveURL(/\/business-objects\?page=1$/);
+  const definitions = page.getByLabel('Definitions');
+  await expect(definitions.getByText(expectedName, { exact: true })).toBeVisible();
+  await expect(definitions.getByText(priorWorkspaceName, { exact: true })).toHaveCount(0);
+}
+
 test.describe('organization creation and Workspace switching', () => {
   test.skip(!apiURL || !maildevURL, 'Set E2E_API_URL and E2E_MAILDEV_URL for Workspace evidence.');
 
@@ -157,5 +207,39 @@ test.describe('organization creation and Workspace switching', () => {
         page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1),
       )
       .toBe(true);
+  });
+
+  test('AT-007 repeatedly switches Workspace-scoped reads and mutations without context leakage', async ({
+    page,
+    request,
+  }) => {
+    const suffix = `${Date.now()}.${Math.random().toString(36).slice(2, 8)}`;
+    const email = `workspace.isolation.${suffix}@test.com`;
+    const organizationName = `Isolation Operations ${suffix}`;
+    const personalDefinitionName = `Personal definition ${suffix}`;
+    const organizationDefinitionName = `Organization definition ${suffix}`;
+
+    await createVerifiedUser(request, email);
+    await signIn(page, email);
+    const personalWorkspaceId = await activeWorkspaceId(page);
+
+    await createWorkspaceDefinition(page, personalDefinitionName);
+
+    const organizationWorkspaceId = await createOrganizationAndEnter(page, organizationName);
+    expect(organizationWorkspaceId).not.toBe(personalWorkspaceId);
+    await page.goto('/business-objects');
+    await expect(
+      page.getByLabel('Definitions').getByText(personalDefinitionName, { exact: true }),
+    ).toHaveCount(0);
+    await createWorkspaceDefinition(page, organizationDefinitionName);
+
+    expect(await switchWorkspace(page, personalWorkspaceName)).toBe(personalWorkspaceId);
+    await expectWorkspaceDefinitions(page, personalDefinitionName, organizationDefinitionName);
+
+    expect(await switchWorkspace(page, organizationName)).toBe(organizationWorkspaceId);
+    await expectWorkspaceDefinitions(page, organizationDefinitionName, personalDefinitionName);
+
+    expect(await switchWorkspace(page, personalWorkspaceName)).toBe(personalWorkspaceId);
+    await expectWorkspaceDefinitions(page, personalDefinitionName, organizationDefinitionName);
   });
 });

@@ -50,7 +50,7 @@ public sealed class CompleteWorkspaceContextTransitionHandler(
             await uow.SaveChangesAsync(ct);
             uow.ClearTracking();
         }
-        catch (ConcurrencyException)
+        catch (Exception ex) when (ex is ConcurrencyException or UniqueConstraintException)
         {
             uow.ClearTracking();
         }

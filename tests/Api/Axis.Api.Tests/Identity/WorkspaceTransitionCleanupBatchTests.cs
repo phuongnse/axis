@@ -44,7 +44,7 @@ public sealed class WorkspaceTransitionCleanupBatchTests
     [Theory]
     [InlineData(WorkspaceContextTransitionStatus.Compensated)]
     [InlineData(WorkspaceContextTransitionStatus.Failed)]
-    public async Task ExecuteAsync_WhenTransitionDidNotComplete_RemovesBothTicketsImmediately(
+    public async Task ExecuteAsync_WhenTransitionDidNotComplete_PreservesSourceAndRemovesTargetTicket(
         WorkspaceContextTransitionStatus status)
     {
         DateTimeOffset now = DateTimeOffset.Parse("2026-08-06T08:00:00Z");
@@ -55,7 +55,7 @@ public sealed class WorkspaceTransitionCleanupBatchTests
 
         await cleanup.ExecuteAsync(store, 32, TestContext.Current.CancellationToken);
 
-        tickets.Removals.Should().HaveCount(2);
+        tickets.Removals.Should().Equal((item.TargetCorrelationDigest, true));
         store.Marked.Should().ContainSingle();
     }
 

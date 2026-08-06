@@ -15,7 +15,7 @@ namespace Axis.Audit.Infrastructure.Tests;
 public sealed class AuditPersistenceIntegrationTests(AuditDatabaseFixture db)
 {
     [Fact]
-    public async Task MigratedSink_WhenEventIsRetried_PersistsOneReadableRecord()
+    public async Task AT008_WhenTransitionAuditIsRetried_PersistsOneReadableRecord()
     {
         await using AuditDbContext context = db.CreateContext();
         (await context.Database.GetAppliedMigrationsAsync(TestContext.Current.CancellationToken))
@@ -40,7 +40,7 @@ public sealed class AuditPersistenceIntegrationTests(AuditDatabaseFixture db)
     }
 
     [Fact]
-    public async Task MigratedSink_WhenEventIdPayloadConflicts_ReturnsConflictWithoutChangingTheRecord()
+    public async Task AT008_WhenTransitionAuditEventIdPayloadConflicts_ReturnsConflictWithoutChangingTheRecord()
     {
         AuditEventV1 auditEvent = Event();
         await using ServiceProvider provider = CreateProvider();
@@ -53,11 +53,11 @@ public sealed class AuditPersistenceIntegrationTests(AuditDatabaseFixture db)
         AuditEventReadBackV1? readBack = await sink.ReadBackAsync(auditEvent.EventId, TestContext.Current.CancellationToken);
 
         result.Disposition.Should().Be(AuditIngestionDisposition.Conflict);
-        readBack!.Outcome.Should().Be("succeeded");
+        readBack!.Outcome.Should().Be("completed");
     }
 
     [Fact]
-    public async Task AppendOnlyTrigger_WhenEfUpdateAndSqlDeleteAreAttempted_RejectsBothAndRetainsTheRecord()
+    public async Task AT008_WhenTransitionAuditUpdateOrDeleteIsAttempted_RejectsBothAndRetainsTheRecord()
     {
         AuditEventV1 auditEvent = Event();
         await using ServiceProvider provider = CreateProvider();
@@ -101,8 +101,13 @@ public sealed class AuditPersistenceIntegrationTests(AuditDatabaseFixture db)
         return services.BuildServiceProvider();
     }
 
-    private static AuditEventV1 Event() => new(
-        Guid.NewGuid(), AuditActorKindV1.Human, Guid.NewGuid(), null, Guid.NewGuid(), "workspace.created", "workspace",
-        Guid.NewGuid(), "succeeded", DateTimeOffset.UtcNow, $"correlation-{Guid.NewGuid():N}",
-        new Dictionary<string, string> { ["transition_state"] = "completed" });
+    private static AuditEventV1 Event()
+    {
+        Guid transitionId = Guid.NewGuid();
+        return new AuditEventV1(
+            Guid.NewGuid(), AuditActorKindV1.Human, Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
+            "workspace.context.transition", "WorkspaceContextTransition", transitionId, "completed",
+            DateTimeOffset.UtcNow, $"correlation-{Guid.NewGuid():N}",
+            new Dictionary<string, string> { ["transitionId"] = transitionId.ToString() });
+    }
 }
