@@ -18,6 +18,13 @@ export class ApiError extends Error {
   }
 }
 
+export class ClientRequestSessionChangedError extends Error {
+  constructor() {
+    super('The client request session changed.');
+    this.name = 'ClientRequestSessionChangedError';
+  }
+}
+
 const BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
 interface FetchApiOptions extends RequestInit {
@@ -26,8 +33,14 @@ interface FetchApiOptions extends RequestInit {
 
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS', 'TRACE']);
 let csrfBootstrapInFlight: Promise<string> | null = null;
+let clientRequestSessionGeneration = 0;
+
+export function invalidateClientRequestSession(): void {
+  clientRequestSessionGeneration += 1;
+}
 
 export async function fetchApi<T>(endpoint: string, options: FetchApiOptions = {}): Promise<T> {
+  const requestSessionGeneration = clientRequestSessionGeneration;
   const url = `${BASE_URL}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
 
   const headers = new Headers(options.headers);
@@ -47,6 +60,8 @@ export async function fetchApi<T>(endpoint: string, options: FetchApiOptions = {
     headers.set('Content-Type', 'application/json');
   }
 
+  assertCurrentClientRequestSession(requestSessionGeneration);
+
   const timeoutMs = options.timeout || 30000;
   const controller = new AbortController();
   const id = setTimeout(() => controller.abort(), timeoutMs);
@@ -60,6 +75,7 @@ export async function fetchApi<T>(endpoint: string, options: FetchApiOptions = {
     });
 
     clearTimeout(id);
+    assertCurrentClientRequestSession(requestSessionGeneration);
 
     if (!response.ok) {
       let errorData: unknown;
@@ -68,6 +84,8 @@ export async function fetchApi<T>(endpoint: string, options: FetchApiOptions = {
       } catch {
         errorData = { message: response.statusText };
       }
+
+      assertCurrentClientRequestSession(requestSessionGeneration);
 
       if (response.status === 401) {
         useAuthStore.getState().markBrowserSessionGuest();
@@ -85,6 +103,7 @@ export async function fetchApi<T>(endpoint: string, options: FetchApiOptions = {
     }
 
     const text = await response.text();
+    assertCurrentClientRequestSession(requestSessionGeneration);
     if (!text) {
       return null as T;
     }
@@ -96,6 +115,12 @@ export async function fetchApi<T>(endpoint: string, options: FetchApiOptions = {
       throw new Error('The operation was aborted');
     }
     throw error;
+  }
+}
+
+function assertCurrentClientRequestSession(requestSessionGeneration: number): void {
+  if (requestSessionGeneration !== clientRequestSessionGeneration) {
+    throw new ClientRequestSessionChangedError();
   }
 }
 

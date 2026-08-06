@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import type { AnchorHTMLAttributes, ReactNode } from 'react';
 import { toast } from 'sonner';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { signOutUser } from '@/features/auth/api';
+import { restoreBrowserSession, signOutUser } from '@/features/auth/api';
 import { useAuthStore } from '@/features/auth/auth-store';
 import { getCurrentUserProfile } from '@/features/dashboard/api';
 import { AppShell } from '../src/components/shared/AppShell';
@@ -46,6 +46,15 @@ vi.mock('@tanstack/react-router', () => ({
 
 vi.mock('@/features/auth/api', () => ({
   signOutUser: vi.fn(() => Promise.resolve()),
+  restoreBrowserSession: vi.fn(() => Promise.resolve(true)),
+}));
+
+vi.mock('@/features/workspaces/WorkspaceControl', () => ({
+  WorkspaceControl: ({ onWorkspaceChanged }: { onWorkspaceChanged: () => Promise<void> }) => (
+    <button type="button" onClick={onWorkspaceChanged}>
+      Simulate Workspace change
+    </button>
+  ),
 }));
 
 vi.mock('@/features/preferences', async (importActual) => {
@@ -87,6 +96,8 @@ describe('AppShell', () => {
     routerInvalidateMock.mockClear();
     vi.mocked(signOutUser).mockReset();
     vi.mocked(signOutUser).mockResolvedValue();
+    vi.mocked(restoreBrowserSession).mockReset();
+    vi.mocked(restoreBrowserSession).mockResolvedValue(true);
     vi.mocked(getCurrentUserProfile).mockResolvedValue({
       id: '11111111-1111-4111-8111-111111111111',
       email: 'ada@example.com',
@@ -219,6 +230,47 @@ describe('AppShell', () => {
       ).not.toBeInTheDocument(),
     );
     expect(screen.queryByRole('button', { name: 'Windows (1)' })).not.toBeInTheDocument();
+  });
+
+  it('purges managed windows and cached Workspace state before a held session restore completes', async () => {
+    const user = userEvent.setup();
+    let resolveSessionRestore!: (authenticated: boolean) => void;
+    vi.mocked(restoreBrowserSession).mockReturnValue(
+      new Promise<boolean>((resolve) => {
+        resolveSessionRestore = resolve;
+      }),
+    );
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    queryClient.setQueryData(['business-objects', 'workspace-source'], {
+      name: 'Source definition',
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <AppShell navigationContributions={[]} windowRenderers={testWindowRenderers}>
+          <TestWindowLauncher />
+        </AppShell>
+      </QueryClientProvider>,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Open test window' }));
+    expect(await screen.findByRole('dialog', { name: 'Persistent test window' })).toBeVisible();
+
+    await user.click(screen.getByRole('button', { name: 'Simulate Workspace change' }));
+
+    expect(await screen.findByText('Refreshing Workspace')).toBeVisible();
+    expect(
+      screen.queryByRole('dialog', { name: 'Persistent test window' }),
+    ).not.toBeInTheDocument();
+    expect(queryClient.getQueryData(['business-objects', 'workspace-source'])).toBeUndefined();
+    expect(restoreBrowserSession).toHaveBeenCalledWith({ force: true });
+
+    resolveSessionRestore(true);
+    await waitFor(() =>
+      expect(navigateMock).toHaveBeenCalledWith({ to: '/dashboard', replace: true }),
+    );
   });
 
   it('renders managed windows with restrained elevation', async () => {

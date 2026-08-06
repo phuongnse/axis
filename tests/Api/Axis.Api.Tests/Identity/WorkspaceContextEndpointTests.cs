@@ -4,12 +4,14 @@ using System.Net.Http.Json;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using Axis.Api.Infrastructure;
 using Axis.Api.Tests.Helpers;
 using Axis.Audit.Infrastructure.Persistence;
 using Axis.Identity.Domain.Aggregates;
 using Axis.Identity.Domain.Legal;
 using Axis.Identity.Domain.ValueObjects;
 using Axis.Identity.Infrastructure.Persistence;
+using Axis.Identity.Infrastructure.Persistence.Entities;
 using FluentAssertions;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.EntityFrameworkCore;
@@ -181,6 +183,173 @@ public sealed class WorkspaceContextEndpointTests(ApiTestFixture fixture)
     }
 
     [Fact]
+    public async Task AT003_WhenRedisStagingStoreFails_SourceAuthorityIsPreserved()
+    {
+        string email = UniqueEmail();
+        string sourceSessionCookie = await CreateVerifiedBrowserSessionAsync(email);
+        Guid sourceWorkspaceId = await CurrentWorkspaceIdAsync();
+        Guid targetWorkspaceId = await CreateOrganizationWorkspaceAsync();
+        RedisTicketStoreFailurePlan failures = new();
+        failures.FailNextTicketStoreWrite();
+        await using ApiTestHost host = fixture.CreateTestHost(redisFailurePlan: failures);
+        using HttpClient browser = host.CreateRawClient();
+        await BootstrapRawBrowserAsync(browser, sourceSessionCookie);
+
+        HttpResponseMessage begin = await browser.PostAsJsonAsync(
+            "/api/workspace-context/begin",
+            new { targetWorkspaceId },
+            Json,
+            TestContext.Current.CancellationToken);
+
+        begin.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
+        failures.TicketStoreFailures.Should().Be(0);
+        (await RawCurrentWorkspaceIdAsync(browser)).Should().Be(sourceWorkspaceId);
+        (await ScopedReadStatusAsync(browser)).Should().Be(HttpStatusCode.OK);
+        (await TransitionStatusAsync(targetWorkspaceId)).Should().Be("Failed");
+    }
+
+    [Fact]
+    public async Task AT003_WhenTransitionTicketIsLost_RecoveryCompensatesAndPreservesSourceAuthority()
+    {
+        string sourceSessionCookie = await CreateVerifiedBrowserSessionAsync(UniqueEmail());
+        Guid sourceWorkspaceId = await CurrentWorkspaceIdAsync();
+        Guid targetWorkspaceId = await CreateOrganizationWorkspaceAsync();
+        await using ApiTestHost host = fixture.CreateTestHost();
+        using HttpClient browser = host.CreateRawClient();
+        RawBrowserSecurity security = await BootstrapRawBrowserAsync(browser, sourceSessionCookie);
+
+        HttpResponseMessage begin = await browser.PostAsJsonAsync(
+            "/api/workspace-context/begin",
+            new { targetWorkspaceId },
+            Json,
+            TestContext.Current.CancellationToken);
+        begin.StatusCode.Should().Be(HttpStatusCode.OK);
+        Guid transitionId = (await begin.Content.ReadFromJsonAsync<JsonElement>(
+            Json,
+            TestContext.Current.CancellationToken)).GetProperty("transitionId").GetGuid();
+        string transitionCookie = ReadCookie(begin, "__Host-axis-workspace-transition");
+        string targetDigest = await TransitionTargetDigestAsync(transitionId);
+        using (IServiceScope scope = host.CreateScope())
+        {
+            IWorkspaceTransitionTicketCleanup tickets = scope.ServiceProvider
+                .GetRequiredService<IWorkspaceTransitionTicketCleanup>();
+            await tickets.RemoveByCorrelationDigestAsync(
+                targetDigest,
+                transition: true,
+                TestContext.Current.CancellationToken);
+        }
+        SetCookies(browser, $"{sourceSessionCookie}; {security.AntiforgeryCookie}; {transitionCookie}");
+
+        HttpResponseMessage recovery = await browser.PostAsync(
+            "/api/workspace-context/recover",
+            content: null,
+            TestContext.Current.CancellationToken);
+
+        recovery.StatusCode.Should().Be(HttpStatusCode.OK);
+        JsonElement body = await recovery.Content.ReadFromJsonAsync<JsonElement>(
+            Json,
+            TestContext.Current.CancellationToken);
+        body.GetProperty("status").GetString().Should().Be("Compensated");
+        body.GetProperty("authoritativeWorkspaceId").GetGuid().Should().Be(sourceWorkspaceId);
+        (await WorkspaceIdForSessionAsync(host, ReadSessionCookie(recovery))).Should().Be(sourceWorkspaceId);
+        (await ScopedReadStatusForSessionAsync(host, ReadSessionCookie(recovery))).Should().Be(HttpStatusCode.OK);
+        (await TransitionStatusAsync(targetWorkspaceId)).Should().Be("Compensated");
+    }
+
+    [Fact]
+    public async Task AT003_WhenUnconfirmedStagingExpires_ExpiryCompensatesAndPreservesSourceAuthority()
+    {
+        string sourceSessionCookie = await CreateVerifiedBrowserSessionAsync(UniqueEmail());
+        Guid sourceWorkspaceId = await CurrentWorkspaceIdAsync();
+        Guid targetWorkspaceId = await CreateOrganizationWorkspaceAsync();
+        MutableTimeProvider clock = new(DateTimeOffset.UtcNow);
+        await using ApiTestHost host = fixture.CreateTestHost(clock: clock);
+        using HttpClient browser = host.CreateRawClient();
+        RawBrowserSecurity security = await BootstrapRawBrowserAsync(browser, sourceSessionCookie);
+
+        HttpResponseMessage begin = await browser.PostAsJsonAsync(
+            "/api/workspace-context/begin",
+            new { targetWorkspaceId },
+            Json,
+            TestContext.Current.CancellationToken);
+        begin.StatusCode.Should().Be(HttpStatusCode.OK);
+        string transitionCookie = ReadCookie(begin, "__Host-axis-workspace-transition");
+        clock.Advance(TimeSpan.FromMinutes(6));
+
+        (await host.ExpireWorkspaceTransitionsAsync(TestContext.Current.CancellationToken)).Should().Be(1);
+        SetCookies(browser, $"{sourceSessionCookie}; {security.AntiforgeryCookie}; {transitionCookie}");
+        HttpResponseMessage recovery = await browser.PostAsync(
+            "/api/workspace-context/recover",
+            content: null,
+            TestContext.Current.CancellationToken);
+
+        recovery.StatusCode.Should().Be(HttpStatusCode.OK);
+        JsonElement body = await recovery.Content.ReadFromJsonAsync<JsonElement>(
+            Json,
+            TestContext.Current.CancellationToken);
+        body.GetProperty("status").GetString().Should().Be("Compensated");
+        body.GetProperty("authoritativeWorkspaceId").GetGuid().Should().Be(sourceWorkspaceId);
+        (await WorkspaceIdForSessionAsync(host, ReadSessionCookie(recovery))).Should().Be(sourceWorkspaceId);
+        (await ScopedReadStatusForSessionAsync(host, ReadSessionCookie(recovery))).Should().Be(HttpStatusCode.OK);
+        (await TransitionStatusAsync(targetWorkspaceId)).Should().Be("Compensated");
+    }
+
+    [Fact]
+    public async Task AT003_WhenConfirmAndRecoverRace_CandidateSessionsHaveOneAuthoritativeWorkspace()
+    {
+        string sourceSessionCookie = await CreateVerifiedBrowserSessionAsync(UniqueEmail());
+        Guid sourceWorkspaceId = await CurrentWorkspaceIdAsync();
+        Guid targetWorkspaceId = await CreateOrganizationWorkspaceAsync();
+        TransitionReadRaceGate raceGate = new();
+        await using ApiTestHost host = fixture.CreateTestHost(transitionReadRaceGate: raceGate);
+        using HttpClient stagingBrowser = host.CreateRawClient();
+        RawBrowserSecurity security = await BootstrapRawBrowserAsync(stagingBrowser, sourceSessionCookie);
+        HttpResponseMessage begin = await stagingBrowser.PostAsJsonAsync(
+            "/api/workspace-context/begin",
+            new { targetWorkspaceId },
+            Json,
+            TestContext.Current.CancellationToken);
+        begin.StatusCode.Should().Be(HttpStatusCode.OK);
+        Guid transitionId = (await begin.Content.ReadFromJsonAsync<JsonElement>(
+            Json,
+            TestContext.Current.CancellationToken)).GetProperty("transitionId").GetGuid();
+        string transitionCookie = ReadCookie(begin, "__Host-axis-workspace-transition");
+        string cookies = $"{sourceSessionCookie}; {security.AntiforgeryCookie}; {transitionCookie}";
+        using HttpClient confirmBrowser = host.CreateRawClient();
+        using HttpClient recoverBrowser = host.CreateRawClient();
+        SetCookies(confirmBrowser, cookies);
+        SetCookies(recoverBrowser, cookies);
+        confirmBrowser.DefaultRequestHeaders.Add("X-CSRF-TOKEN", security.CsrfToken);
+        recoverBrowser.DefaultRequestHeaders.Add("X-CSRF-TOKEN", security.CsrfToken);
+
+        Task<HttpResponseMessage> confirm = confirmBrowser.PostAsync(
+            "/api/workspace-context/confirm",
+            content: null,
+            TestContext.Current.CancellationToken);
+        Task<HttpResponseMessage> recover = recoverBrowser.PostAsync(
+            "/api/workspace-context/recover",
+            content: null,
+            TestContext.Current.CancellationToken);
+        HttpResponseMessage[] responses = await Task.WhenAll(confirm, recover);
+
+        responses.Should().OnlyContain(response => response.StatusCode == HttpStatusCode.OK);
+        string[] candidateSessionCookies = responses.Select(ReadSessionCookie).ToArray();
+        Guid[] authoritativeWorkspaces = await Task.WhenAll(candidateSessionCookies.Select(async cookie =>
+            await WorkspaceIdForSessionAsync(host, cookie)));
+        authoritativeWorkspaces.Distinct().Should().ContainSingle();
+        string terminalStatus = await TransitionStatusAsync(targetWorkspaceId);
+        terminalStatus.Should().BeOneOf("Completed", "Compensated");
+        authoritativeWorkspaces.Should().OnlyContain(workspaceId => workspaceId ==
+            (terminalStatus == "Completed" ? targetWorkspaceId : sourceWorkspaceId));
+        HttpStatusCode[] candidateReadStatuses = await Task.WhenAll(candidateSessionCookies.Select(cookie =>
+            ScopedReadStatusForSessionAsync(host, cookie)));
+        candidateReadStatuses.Should().OnlyContain(status => status == HttpStatusCode.OK);
+        (await ScopedReadStatusForSessionAsync(host, sourceSessionCookie)).Should().Be(
+            terminalStatus == "Completed" ? HttpStatusCode.Unauthorized : HttpStatusCode.OK);
+        (await TerminalAuditCountAsync(transitionId)).Should().Be(1);
+    }
+
+    [Fact]
     public async Task SwitchWorkspace_WhenTargetIsUnknown_PreservesSourceWithoutStagingAuthority()
     {
         await CreateVerifiedBrowserSessionAsync(UniqueEmail());
@@ -311,6 +480,92 @@ public sealed class WorkspaceContextEndpointTests(ApiTestFixture fixture)
         JsonElement session = await fixture.RefreshBrowserSecurityContextAsync(
             TestContext.Current.CancellationToken);
         return session.GetProperty("user").GetProperty("workspaceId").GetGuid();
+    }
+
+    private static async Task<RawBrowserSecurity> BootstrapRawBrowserAsync(
+        HttpClient browser,
+        string sessionCookie)
+    {
+        SetCookies(browser, sessionCookie);
+        HttpResponseMessage response = await browser.GetAsync(
+            "/api/auth/session",
+            TestContext.Current.CancellationToken);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        JsonElement session = await response.Content.ReadFromJsonAsync<JsonElement>(
+            Json,
+            TestContext.Current.CancellationToken);
+        string antiforgeryCookie = ReadCookie(response, "__Host-axis-antiforgery");
+        string csrfToken = session.GetProperty("csrfToken").GetString()
+            ?? throw new InvalidOperationException("The browser session did not return an antiforgery token.");
+        SetCookies(browser, $"{sessionCookie}; {antiforgeryCookie}");
+        browser.DefaultRequestHeaders.Add("X-CSRF-TOKEN", csrfToken);
+        return new RawBrowserSecurity(antiforgeryCookie, csrfToken);
+    }
+
+    private static async Task<Guid> RawCurrentWorkspaceIdAsync(HttpClient browser)
+    {
+        JsonElement session = await browser.GetFromJsonAsync<JsonElement>(
+            "/api/auth/session",
+            Json,
+            TestContext.Current.CancellationToken);
+        return session.GetProperty("user").GetProperty("workspaceId").GetGuid();
+    }
+
+    private static async Task<Guid> WorkspaceIdForSessionAsync(ApiTestHost host, string sessionCookie)
+    {
+        using HttpClient browser = host.CreateRawClient();
+        SetCookies(browser, sessionCookie);
+        return await RawCurrentWorkspaceIdAsync(browser);
+    }
+
+    private static async Task<HttpStatusCode> ScopedReadStatusForSessionAsync(
+        ApiTestHost host,
+        string sessionCookie)
+    {
+        using HttpClient browser = host.CreateRawClient();
+        SetCookies(browser, sessionCookie);
+        return await ScopedReadStatusAsync(browser);
+    }
+
+    private static async Task<HttpStatusCode> ScopedReadStatusAsync(HttpClient browser) =>
+        (await browser.GetAsync(
+            "/api/rules?page=1&pageSize=20",
+            TestContext.Current.CancellationToken)).StatusCode;
+
+    private async Task<string> TransitionStatusAsync(Guid targetWorkspaceId)
+    {
+        using IServiceScope scope = fixture.CreateScope();
+        IdentityDbContext db = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
+        return (await db.WorkspaceContextTransitions.SingleAsync(
+            transition => transition.TargetWorkspaceId == targetWorkspaceId,
+            TestContext.Current.CancellationToken)).Status.ToString();
+    }
+
+    private async Task<string> TransitionTargetDigestAsync(Guid transitionId)
+    {
+        using IServiceScope scope = fixture.CreateScope();
+        IdentityDbContext db = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
+        return (await db.WorkspaceContextTransitions.SingleAsync(
+            transition => transition.Id == transitionId,
+            TestContext.Current.CancellationToken)).TargetCorrelationDigest;
+    }
+
+    private async Task<int> TerminalAuditCountAsync(Guid transitionId)
+    {
+        using IServiceScope scope = fixture.CreateScope();
+        IdentityDbContext db = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
+        Guid terminalAuditId = (await db.WorkspaceContextTransitions.SingleAsync(
+            transition => transition.Id == transitionId,
+            TestContext.Current.CancellationToken)).TerminalAuditEventId;
+        return await db.Set<IdentityAuditOutboxRecord>().CountAsync(
+            record => record.EventId == terminalAuditId,
+            TestContext.Current.CancellationToken);
+    }
+
+    private static void SetCookies(HttpClient browser, string cookies)
+    {
+        browser.DefaultRequestHeaders.Remove("Cookie");
+        browser.DefaultRequestHeaders.Add("Cookie", cookies);
     }
 
     private async Task<string> IssueAccessTokenForCurrentBrowserSessionAsync()
@@ -450,4 +705,6 @@ public sealed class WorkspaceContextEndpointTests(ApiTestFixture fixture)
         WebEncoders.Base64UrlEncode(SHA256.HashData(Encoding.ASCII.GetBytes(verifier)));
 
     private static string UniqueEmail() => $"workspace-switch-{Guid.NewGuid():N}@example.com";
+
+    private sealed record RawBrowserSecurity(string AntiforgeryCookie, string CsrfToken);
 }

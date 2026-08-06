@@ -3,6 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { invalidateClientRequestSession } from '@/lib/api';
 import {
   beginWorkspaceTransition,
   confirmWorkspaceTransition,
@@ -11,6 +12,11 @@ import {
   recoverWorkspaceTransition,
 } from './api';
 import { WorkspaceControl } from './WorkspaceControl';
+
+vi.mock('@/lib/api', async (importActual) => {
+  const actual = await importActual<typeof import('@/lib/api')>();
+  return { ...actual, invalidateClientRequestSession: vi.fn() };
+});
 
 vi.mock('./api', () => ({
   workspaceKeys: { all: ['workspaces'], eligible: ['workspaces', 'eligible'] },
@@ -111,6 +117,10 @@ describe('WorkspaceControl', () => {
 
     releaseBegin?.();
     await waitFor(() => expect(onWorkspaceChanged).toHaveBeenCalledOnce());
+    expect(invalidateClientRequestSession).toHaveBeenCalledOnce();
+    expect(vi.mocked(invalidateClientRequestSession).mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(beginWorkspaceTransition).mock.invocationCallOrder[0] ?? Number.MAX_SAFE_INTEGER,
+    );
     expect(beginWorkspaceTransition).toHaveBeenCalledWith(organizationWorkspace.workspaceId);
     expect(confirmWorkspaceTransition).toHaveBeenCalledOnce();
   });
@@ -165,7 +175,7 @@ describe('WorkspaceControl', () => {
     expect(onWorkspaceChanged).toHaveBeenCalledOnce();
   });
 
-  it('clears Workspace-scoped client state when confirmation and recovery both fail', async () => {
+  it('clears Workspace-scoped client state and reports an unknown outcome when recovery fails', async () => {
     const user = userEvent.setup();
     vi.mocked(confirmWorkspaceTransition).mockRejectedValue(new TypeError('Lost response'));
     vi.mocked(recoverWorkspaceTransition).mockRejectedValue(new TypeError('Recovery unavailable'));
@@ -175,7 +185,8 @@ describe('WorkspaceControl', () => {
     await user.click(screen.getByRole('button', { name: 'Acme Operations' }));
 
     await waitFor(() => expect(onWorkspaceChanged).toHaveBeenCalledOnce());
-    expect(await screen.findByText(/Workspace did not change/i)).toBeInTheDocument();
+    expect(await screen.findByText(/could not be confirmed/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Workspace did not change/i)).not.toBeInTheDocument();
   });
 
   it('refreshes the authoritative source session after compensation and keeps recovery choices open', async () => {

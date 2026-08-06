@@ -23,7 +23,7 @@ import {
   PopoverTitle,
   PopoverTrigger,
 } from '@/components/ui/popover';
-import { ApiError } from '@/lib/api';
+import { ApiError, invalidateClientRequestSession } from '@/lib/api';
 import {
   beginWorkspaceTransition,
   type CreatedOrganizationWorkspace,
@@ -52,6 +52,7 @@ export function WorkspaceControl({ onWorkspaceChanged }: WorkspaceControlProps) 
   const [createOpen, setCreateOpen] = useState(false);
   const [switchingWorkspaceId, setSwitchingWorkspaceId] = useState<string | null>(null);
   const [switchError, setSwitchError] = useState(false);
+  const [switchOutcomeUnknown, setSwitchOutcomeUnknown] = useState(false);
   const eligibleQuery = useQuery({
     queryKey: workspaceKeys.eligible,
     queryFn: listEligibleWorkspaces,
@@ -65,10 +66,12 @@ export function WorkspaceControl({ onWorkspaceChanged }: WorkspaceControlProps) 
 
     setSwitchingWorkspaceId(target.workspaceId);
     setSwitchError(false);
+    setSwitchOutcomeUnknown(false);
     try {
       let transition: WorkspaceContextTransition;
       let confirmationAttempted = false;
       try {
+        invalidateClientRequestSession();
         await beginWorkspaceTransition(target.workspaceId);
         confirmationAttempted = true;
         transition = await confirmWorkspaceTransition();
@@ -76,7 +79,12 @@ export function WorkspaceControl({ onWorkspaceChanged }: WorkspaceControlProps) 
         try {
           transition = await recoverWorkspaceTransition();
         } catch (error) {
-          if (confirmationAttempted) await onWorkspaceChanged();
+          if (confirmationAttempted) {
+            setSwitchOutcomeUnknown(true);
+            await onWorkspaceChanged().catch(() => undefined);
+            await eligibleQuery.refetch().catch(() => undefined);
+            return;
+          }
           throw error;
         }
       }
@@ -175,6 +183,7 @@ export function WorkspaceControl({ onWorkspaceChanged }: WorkspaceControlProps) 
             disabled={Boolean(switchingWorkspaceId)}
             onClick={() => {
               setSwitchError(false);
+              setSwitchOutcomeUnknown(false);
               setCreateOpen(true);
             }}
           >
@@ -186,7 +195,9 @@ export function WorkspaceControl({ onWorkspaceChanged }: WorkspaceControlProps) 
             {switchingWorkspaceId ? (
               <StatusNotice tone="info">{t('workspace.switching')}</StatusNotice>
             ) : null}
-            {switchError ? (
+            {switchOutcomeUnknown ? (
+              <StatusNotice tone="warning">{t('workspace.switchOutcomeUnknown')}</StatusNotice>
+            ) : switchError ? (
               <StatusNotice tone="destructive">{t('workspace.switchFailed')}</StatusNotice>
             ) : null}
           </div>
@@ -196,6 +207,7 @@ export function WorkspaceControl({ onWorkspaceChanged }: WorkspaceControlProps) 
       <CreateOrganizationDialog
         open={createOpen}
         switchError={switchError}
+        switchOutcomeUnknown={switchOutcomeUnknown}
         switching={Boolean(switchingWorkspaceId)}
         onOpenChange={setCreateOpen}
         onEnter={switchWorkspace}
@@ -285,12 +297,14 @@ function WorkspaceGroup({
 function CreateOrganizationDialog({
   open,
   switchError,
+  switchOutcomeUnknown,
   switching,
   onOpenChange,
   onEnter,
 }: {
   open: boolean;
   switchError: boolean;
+  switchOutcomeUnknown: boolean;
   switching: boolean;
   onOpenChange: (open: boolean) => void;
   onEnter: (workspace: CreatedOrganizationWorkspace) => void;
@@ -369,7 +383,9 @@ function CreateOrganizationDialog({
               {t('workspace.initialWorkspace', { name: created.workspaceName })}
             </StatusNotice>
             <p className="text-sm text-muted-foreground">{t('workspace.enterIsSeparate')}</p>
-            {switchError ? (
+            {switchOutcomeUnknown ? (
+              <StatusNotice tone="warning">{t('workspace.switchOutcomeUnknown')}</StatusNotice>
+            ) : switchError ? (
               <StatusNotice tone="destructive">{t('workspace.switchFailed')}</StatusNotice>
             ) : null}
           </div>

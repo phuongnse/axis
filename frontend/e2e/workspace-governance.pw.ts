@@ -236,8 +236,43 @@ test.describe('organization creation and Workspace switching', () => {
     expect(await switchWorkspace(page, personalWorkspaceName)).toBe(personalWorkspaceId);
     await expectWorkspaceDefinitions(page, personalDefinitionName, organizationDefinitionName);
 
+    let releaseHeldSourceResponse!: () => void;
+    const heldSourceResponseReleased = new Promise<void>((resolve) => {
+      releaseHeldSourceResponse = resolve;
+    });
+    let sourceResponseHeld!: () => void;
+    const sourceResponseIsHeld = new Promise<void>((resolve) => {
+      sourceResponseHeld = resolve;
+    });
+    let sourceResponseDelivered!: () => void;
+    const sourceResponseIsDelivered = new Promise<void>((resolve) => {
+      sourceResponseDelivered = resolve;
+    });
+    let sourceResponseCaptured = false;
+    await page.route('**/api/business-object-definitions?*', async (route) => {
+      if (sourceResponseCaptured) {
+        await route.continue();
+        return;
+      }
+
+      sourceResponseCaptured = true;
+      const sourceResponse = await route.fetch();
+      sourceResponseHeld();
+      await heldSourceResponseReleased;
+      await route.fulfill({ response: sourceResponse });
+      sourceResponseDelivered();
+    });
+
+    await page.getByLabel('Search business objects').fill(personalDefinitionName);
+    await sourceResponseIsHeld;
+
     expect(await switchWorkspace(page, organizationName)).toBe(organizationWorkspaceId);
+    releaseHeldSourceResponse();
+    await sourceResponseIsDelivered;
+
+    await page.goto('/business-objects');
     await expectWorkspaceDefinitions(page, organizationDefinitionName, personalDefinitionName);
+    await page.unroute('**/api/business-object-definitions?*');
 
     expect(await switchWorkspace(page, personalWorkspaceName)).toBe(personalWorkspaceId);
     await expectWorkspaceDefinitions(page, personalDefinitionName, organizationDefinitionName);

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useAuthStore } from '../src/features/auth/auth-store';
-import { ApiError, fetchApi } from '../src/lib/api';
+import { ApiError, fetchApi, invalidateClientRequestSession } from '../src/lib/api';
 
 describe('fetchApi', () => {
   beforeEach(() => {
@@ -53,6 +53,70 @@ describe('fetchApi', () => {
 
     const result = await fetchApi('/test-205');
     expect(result).toBeNull();
+  });
+
+  it('rejects a successful response from a retired client request session', async () => {
+    let resolveResponse!: (response: Response) => void;
+    vi.mocked(fetch).mockReturnValueOnce(
+      new Promise<Response>((resolve) => {
+        resolveResponse = resolve;
+      }),
+    );
+
+    const request = fetchApi('/workspace-scoped-read');
+    invalidateClientRequestSession();
+    resolveResponse(
+      new Response(JSON.stringify({ workspace: 'retired' }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+
+    await expect(request).rejects.toThrow('The client request session changed.');
+  });
+
+  it('rejects a mutation response from a retired client request session', async () => {
+    let resolveResponse!: (response: Response) => void;
+    vi.mocked(fetch).mockReturnValueOnce(
+      new Promise<Response>((resolve) => {
+        resolveResponse = resolve;
+      }),
+    );
+
+    const mutation = fetchApi('/workspace-scoped-mutation', {
+      method: 'POST',
+      body: JSON.stringify({ name: 'retired mutation' }),
+    });
+    await vi.waitFor(() => expect(fetch).toHaveBeenCalledOnce());
+    invalidateClientRequestSession();
+    resolveResponse(new Response(JSON.stringify({ created: true }), { status: 201 }));
+
+    await expect(mutation).rejects.toThrow('The client request session changed.');
+  });
+
+  it('does not issue a mutation after its CSRF bootstrap enters a retired client request session', async () => {
+    let resolveSession!: (response: Response) => void;
+    useAuthStore.getState().clearSession();
+    vi.mocked(fetch).mockReturnValueOnce(
+      new Promise<Response>((resolve) => {
+        resolveSession = resolve;
+      }),
+    );
+
+    const mutation = fetchApi('/workspace-scoped-mutation', {
+      method: 'POST',
+      body: JSON.stringify({ name: 'retired mutation' }),
+    });
+    await vi.waitFor(() => expect(fetch).toHaveBeenCalledOnce());
+    invalidateClientRequestSession();
+    resolveSession(
+      new Response(JSON.stringify({ authenticated: false, csrfToken: 'renewed-csrf-token' }), {
+        status: 200,
+      }),
+    );
+
+    await expect(mutation).rejects.toThrow('The client request session changed.');
+    expect(fetch).toHaveBeenCalledOnce();
   });
 
   it('should not set Content-Type header when body is FormData', async () => {

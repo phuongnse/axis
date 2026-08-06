@@ -1,9 +1,15 @@
 using System.Net.Http.Json;
+using System.Reflection;
+using System.Runtime.ExceptionServices;
 using System.Text.Json;
+using Axis.Api.Infrastructure;
 using Axis.Audit.Infrastructure.Persistence;
 using Axis.BusinessObjects.Infrastructure.Persistence;
+using Axis.Identity.Application.Repositories;
 using Axis.Identity.Application.Services;
+using Axis.Identity.Domain.Aggregates;
 using Axis.Identity.Infrastructure.Persistence;
+using Axis.Identity.Infrastructure.Repositories;
 using Axis.Identity.Infrastructure.Services;
 using Axis.Rules.Infrastructure.Persistence;
 using Axis.Testing;
@@ -13,6 +19,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Hosting;
 using OpenIddict.Abstractions;
 using StackExchange.Redis;
 using Testcontainers.PostgreSql;
@@ -165,10 +172,6 @@ public sealed class ApiTestFixture : IAsyncLifetime
                 services.AddSingleton(_emailCapture);
                 services.AddSingleton<IEmailSender>(_emailCapture);
 
-                services.RemoveAll<IUnitOfWork>();
-                services.AddScoped<IUnitOfWork>(sp =>
-                    new NullUnitOfWork(sp.GetRequiredService<IdentityDbContext>()));
-
                 ServiceDescriptor? openIddictSeederDescriptor = services.FirstOrDefault(
                     d => d.ImplementationType == typeof(OpenIddictSeeder));
                 if (openIddictSeederDescriptor is not null)
@@ -219,6 +222,43 @@ public sealed class ApiTestFixture : IAsyncLifetime
     {
         BaseAddress = new Uri("https://localhost"),
     };
+
+    public ApiTestHost CreateTestHost(
+        RedisTicketStoreFailurePlan? redisFailurePlan = null,
+        MutableTimeProvider? clock = null,
+        TransitionReadRaceGate? transitionReadRaceGate = null)
+    {
+        WebApplicationFactory<Program> factory = _factory.WithWebHostBuilder(builder =>
+        {
+            builder.ConfigureTestServices(services =>
+            {
+                if (clock is not null)
+                {
+                    services.RemoveAll<TimeProvider>();
+                    services.AddSingleton<TimeProvider>(clock);
+                }
+
+                if (redisFailurePlan is not null)
+                {
+                    services.RemoveAll<IConnectionMultiplexer>();
+                    services.AddSingleton<IConnectionMultiplexer>(_ =>
+                        FaultingRedisMultiplexer.Create(_redis.GetConnectionString(), redisFailurePlan));
+                }
+
+                if (transitionReadRaceGate is not null)
+                {
+                    services.RemoveAll<IWorkspaceContextTransitionRepository>();
+                    services.AddScoped<IWorkspaceContextTransitionRepository>(sp =>
+                        new RacingWorkspaceContextTransitionRepository(
+                            new WorkspaceContextTransitionRepository(
+                                sp.GetRequiredService<IdentityDbContext>()),
+                            transitionReadRaceGate));
+                }
+            });
+        });
+
+        return new ApiTestHost(factory);
+    }
 
     public async Task<JsonElement> RefreshBrowserSecurityContextAsync(
         CancellationToken cancellationToken = default)
@@ -297,3 +337,164 @@ public sealed class ApiTestFixture : IAsyncLifetime
 
 [CollectionDefinition("Api")]
 public sealed class ApiTestCollection : ICollectionFixture<ApiTestFixture>;
+
+public sealed class ApiTestHost(WebApplicationFactory<Program> factory) : IAsyncDisposable
+{
+    public HttpClient CreateRawClient() => new(factory.Server.CreateHandler())
+    {
+        BaseAddress = new Uri("https://localhost"),
+    };
+
+    public IServiceScope CreateScope() => factory.Services.CreateScope();
+
+    public async Task<int> ExpireWorkspaceTransitionsAsync(CancellationToken cancellationToken)
+    {
+        WorkspaceTransitionExpiryService service = factory.Services
+            .GetServices<IHostedService>()
+            .OfType<WorkspaceTransitionExpiryService>()
+            .Single();
+        return await service.ExpireBatchAsync(cancellationToken);
+    }
+
+    public ValueTask DisposeAsync() => factory.DisposeAsync();
+}
+
+public sealed class MutableTimeProvider(DateTimeOffset now) : TimeProvider
+{
+    private DateTimeOffset _now = now;
+
+    public override DateTimeOffset GetUtcNow() => _now;
+
+    public void Advance(TimeSpan duration) => _now = _now.Add(duration);
+}
+
+public sealed class RedisTicketStoreFailurePlan
+{
+    private int _remainingTicketStoreFailures;
+
+    public int TicketStoreFailures => Volatile.Read(ref _remainingTicketStoreFailures);
+
+    public void FailNextTicketStoreWrite() => Interlocked.Increment(ref _remainingTicketStoreFailures);
+
+    internal bool TryFailTicketStoreWrite(RedisKey key) =>
+        key.ToString().StartsWith("axis:browser-session:", StringComparison.Ordinal)
+        && Interlocked.CompareExchange(ref _remainingTicketStoreFailures, 0, 1) == 1;
+}
+
+public sealed class TransitionReadRaceGate
+{
+    private readonly TaskCompletionSource _bothReadsObserved = new(
+        TaskCreationOptions.RunContinuationsAsynchronously);
+    private int _pendingReads;
+
+    internal Task WaitForBothInitialReadsAsync()
+    {
+        if (Interlocked.Increment(ref _pendingReads) == 2)
+            _bothReadsObserved.TrySetResult();
+        return _bothReadsObserved.Task;
+    }
+}
+
+internal sealed class RacingWorkspaceContextTransitionRepository(
+    IWorkspaceContextTransitionRepository inner,
+    TransitionReadRaceGate gate) : IWorkspaceContextTransitionRepository
+{
+    private int _initialReads;
+
+    public Task AddAsync(WorkspaceContextTransition transition, CancellationToken ct = default) =>
+        inner.AddAsync(transition, ct);
+
+    public async Task<WorkspaceContextTransition?> GetByIdAsync(
+        Guid id,
+        CancellationToken ct = default)
+    {
+        WorkspaceContextTransition? transition = await inner.GetByIdAsync(id, ct);
+        if (Interlocked.Increment(ref _initialReads) <= 2)
+            await gate.WaitForBothInitialReadsAsync();
+        return transition;
+    }
+
+    public Task<WorkspaceContextTransition?> GetBySourceCorrelationDigestAsync(
+        Guid userId,
+        string sourceCorrelationDigest,
+        CancellationToken ct = default) =>
+        inner.GetBySourceCorrelationDigestAsync(userId, sourceCorrelationDigest, ct);
+
+    public Task<WorkspaceContextTransition?> GetByTargetCorrelationDigestAsync(
+        Guid userId,
+        string targetCorrelationDigest,
+        CancellationToken ct = default) =>
+        inner.GetByTargetCorrelationDigestAsync(userId, targetCorrelationDigest, ct);
+}
+
+internal static class FaultingRedisMultiplexer
+{
+    public static IConnectionMultiplexer Create(
+        string connectionString,
+        RedisTicketStoreFailurePlan failures)
+    {
+        IConnectionMultiplexer inner = ConnectionMultiplexer.Connect(connectionString);
+        IDatabase database = DispatchProxy.Create<IDatabase, FaultingDatabaseProxy>();
+        ((FaultingDatabaseProxy)(object)database).Initialize(inner.GetDatabase(), failures);
+        IConnectionMultiplexer multiplexer =
+            DispatchProxy.Create<IConnectionMultiplexer, FaultingMultiplexerProxy>();
+        ((FaultingMultiplexerProxy)(object)multiplexer).Initialize(inner, database);
+        return multiplexer;
+    }
+
+    private class FaultingMultiplexerProxy : DispatchProxy
+    {
+        private IConnectionMultiplexer _inner = null!;
+        private IDatabase _database = null!;
+
+        public void Initialize(IConnectionMultiplexer inner, IDatabase database)
+        {
+            _inner = inner;
+            _database = database;
+        }
+
+        protected override object? Invoke(MethodInfo? targetMethod, object?[]? args) =>
+            targetMethod?.Name == nameof(IConnectionMultiplexer.GetDatabase)
+                ? _database
+                : InvokeInner(_inner, targetMethod, args);
+    }
+
+    private class FaultingDatabaseProxy : DispatchProxy
+    {
+        private IDatabase _inner = null!;
+        private RedisTicketStoreFailurePlan _failures = null!;
+
+        public void Initialize(IDatabase inner, RedisTicketStoreFailurePlan failures)
+        {
+            _inner = inner;
+            _failures = failures;
+        }
+
+        protected override object? Invoke(MethodInfo? targetMethod, object?[]? args)
+        {
+            if (targetMethod?.Name == nameof(IDatabase.StringSetAsync)
+                && args is not null
+                && args[0] is RedisKey key
+                && _failures.TryFailTicketStoreWrite(key))
+            {
+                return Task.FromException<bool>(
+                    new InvalidOperationException("Injected Redis ticket-store write failure."));
+            }
+
+            return InvokeInner(_inner, targetMethod, args);
+        }
+    }
+
+    private static object? InvokeInner(object inner, MethodInfo? method, object?[]? args)
+    {
+        try
+        {
+            return method!.Invoke(inner, args);
+        }
+        catch (TargetInvocationException exception) when (exception.InnerException is not null)
+        {
+            ExceptionDispatchInfo.Capture(exception.InnerException).Throw();
+            throw;
+        }
+    }
+}
