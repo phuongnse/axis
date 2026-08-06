@@ -128,11 +128,11 @@ export function MembershipManagementPage() {
       </header>
 
       <form
-        className="grid shrink-0 gap-4 border-b border-border pb-5 lg:grid-cols-[minmax(16rem,1fr)_16rem_auto] lg:items-end"
+        className="grid shrink-0 gap-4 border-b border-border pb-5 lg:grid-cols-12 lg:items-end"
         onSubmit={submit}
         noValidate
       >
-        <Field data-invalid={Boolean(emailError)}>
+        <Field className="lg:col-span-6" data-invalid={Boolean(emailError)}>
           <FieldLabel htmlFor="invitation-email">{t('memberships.email')}</FieldLabel>
           <Input
             id="invitation-email"
@@ -155,7 +155,7 @@ export function MembershipManagementPage() {
             </FieldDescription>
           )}
         </Field>
-        <Field>
+        <Field className="lg:col-span-4">
           <FieldLabel htmlFor="invitation-role">{t('memberships.role')}</FieldLabel>
           <Select
             value={role}
@@ -172,7 +172,7 @@ export function MembershipManagementPage() {
           </Select>
           <FieldDescription>{t('memberships.roleHelp')}</FieldDescription>
         </Field>
-        <Button type="submit" disabled={mutationPending || !email.trim()}>
+        <Button type="submit" className="lg:col-span-2" disabled={mutationPending || !email.trim()}>
           <MailPlus aria-hidden />
           {inviteMutation.isPending ? t('memberships.inviting') : t('memberships.invite')}
         </Button>

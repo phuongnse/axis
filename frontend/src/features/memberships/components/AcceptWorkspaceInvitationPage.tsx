@@ -196,7 +196,7 @@ export function AcceptWorkspaceInvitationPage() {
   return (
     <AuthCard title={t('invitationAccept.reviewTitle')}>
       <div className="space-y-5">
-        <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-3 text-sm">
+        <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
           <dt className="text-muted-foreground">{t('invitationAccept.organization')}</dt>
           <dd className="font-medium">{state.invitation.organizationName}</dd>
           <dt className="text-muted-foreground">{t('invitationAccept.workspace')}</dt>
