@@ -97,7 +97,7 @@ Let a verified Axis user create an organization with its initial governed worksp
 | AT-009 | Infrastructure boundary | Creation and switch audit events are durable, append-only, correlated, idempotently projected, retention-bound, and limited to the approved redacted schema | AC-008, AC-011, AC-024 | Infrastructure integration test | Yes |
 | AT-010 | Browser journey | Repeated switching while reading and mutating workspace resources proves server, client cache, managed-window, and audit isolation | AC-006, AC-007, AC-015, AC-022 | Browser automation | Yes |
 | AT-011 | Infrastructure boundary | Transition expiry and terminal cleanup retain no ticket secret, reconcile pending state, wait for both session lifetimes plus audit/Redis completion, and then purge operational state | AC-023, AC-025, AC-026 | Infrastructure integration test | Yes |
-| AT-012 | API boundary | REST/OpenAPI and MCP coverage expose typed create/list operations without caller identity/scope arguments and classify switch/confirm/recover/session operations as internal/bootstrap | AC-001, AC-004, AC-007, AC-027 | API integration test | Yes |
+| AT-012 | API/MCP boundaries | REST/OpenAPI and MCP coverage expose typed create/list operations without caller identity/scope arguments and classify switch/confirm/recover/session operations as internal/bootstrap | AC-001, AC-004, AC-007, AC-027 | API integration test + MCP contract test | Yes |
 
 ## Out Of Scope
 

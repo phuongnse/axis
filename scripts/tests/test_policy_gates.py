@@ -752,6 +752,55 @@ Ship user value.
 
         self.assertEqual([], issues)
 
+    def test_accepts_mcp_boundary_with_contract_evidence(self) -> None:
+        issues = self.issues_for_document(
+            self.complete_use_case_document(
+                """| ID | Boundary | Scenario | Covers AC | Verification | Required |
+|---|---|---|---|---|---|
+| AT-001 | API/MCP boundaries | API and typed MCP stay aligned | AC-001 | API integration test + MCP contract test | Yes |"""
+            ),
+            evidence_doc="""# Sample Evidence
+
+> **Navigation**: [docs/use-cases/example/sample.md](./sample.md)
+
+## Acceptance Evidence
+
+| AT ID | Evidence | Commands |
+|---|---|---|
+| AT-001 | `tests/Api/Axis.Api.Tests/Identity/SampleTests.cs`, `tests/Tools/Axis.Mcp.Tests/McpApiCoverageTests.cs` | `python scripts/axis.py dotnet test tests/Api/Axis.Api.Tests/Axis.Api.Tests.csproj`, `python scripts/axis.py check mcp-api-coverage`, `python scripts/axis.py check mcp-contracts`, `python scripts/axis.py check mcp-tool-safety` |
+""",
+            evidence_files=(
+                "tests/Api/Axis.Api.Tests/Identity/SampleTests.cs",
+                "tests/Tools/Axis.Mcp.Tests/McpApiCoverageTests.cs",
+            ),
+        )
+
+        self.assertEqual([], issues)
+
+    def test_mcp_contract_evidence_requires_all_mcp_gates(self) -> None:
+        issues = self.issues_for_document(
+            self.complete_use_case_document(
+                """| ID | Boundary | Scenario | Covers AC | Verification | Required |
+|---|---|---|---|---|---|
+| AT-001 | API/MCP boundaries | API and typed MCP stay aligned | AC-001 | MCP contract test | Yes |"""
+            ),
+            evidence_doc="""# Sample Evidence
+
+> **Navigation**: [docs/use-cases/example/sample.md](./sample.md)
+
+## Acceptance Evidence
+
+| AT ID | Evidence | Commands |
+|---|---|---|
+| AT-001 | `tests/Tools/Axis.Mcp.Tests/McpApiCoverageTests.cs` | `python scripts/axis.py check mcp-api-coverage` |
+""",
+            evidence_files=("tests/Tools/Axis.Mcp.Tests/McpApiCoverageTests.cs",),
+        )
+
+        joined = "\n".join(issues)
+        self.assertIn("python scripts/axis.py check mcp-contracts", joined)
+        self.assertIn("python scripts/axis.py check mcp-tool-safety", joined)
+
     def test_accepts_immutable_external_browser_evidence(self) -> None:
         checkpoint = "6eb817c02fda580fc9afee0c37b2b7e0a8c4735c"
         issues = self.issues_for_document(

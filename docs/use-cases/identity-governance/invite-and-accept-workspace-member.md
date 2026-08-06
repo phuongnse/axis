@@ -73,7 +73,7 @@ Let an authorized Workspace administrator invite a real user into one governed w
 
 - **AC-017** Personal Workspaces reject invitations and additional memberships by domain invariant.
 - **AC-018** Organization membership alone does not grant Workspace access; acceptance may establish the baseline Organization `Member` prerequisite but creates or reactivates access only for the explicitly invited Workspace.
-- **AC-019** Workspace invitation roles govern membership lifecycle only and cannot assign an Organization role or product-specific applicant, caseworker, row, field, record, or workflow permission.
+- **AC-019** Workspace invitation roles govern membership lifecycle only; acceptance may establish baseline Organization `Member` but cannot assign/elevate `Owner` or `Administrator` or any product-specific applicant, caseworker, row, field, record, or workflow permission.
 - **AC-020** Removal or suspension after acceptance invalidates later workspace authorization even while an older cookie or bearer token still contains the workspace claim.
 - **AC-021** Invitation, authentication, registration, review, acceptance, and workspace-entry screens preserve intent without placing token material in application-managed browser storage or logs; the navigation fragment is transient and removed before application routing.
 - **AC-022** Invitation review and result states are keyboard and screen-reader operable, localized, compact-layout safe, and expose a recovery action for every terminal failure.
@@ -99,7 +99,7 @@ Let an authorized Workspace administrator invite a real user into one governed w
 | AT-010 | UI component | Invitation exchange, review, wrong-account, expired, already-accepted, unavailable, pending, revoked, success, and recovery states preserve focus and intent without browser token storage | AC-011, AC-012, AC-021, AC-022, AC-023, AC-024 | UI component test | Yes |
 | AT-011 | API/Application boundaries | Active Organization roles are preserved, absent/removed Organization membership becomes `Member`, suspended Organization/Workspace membership blocks acceptance, and Workspace role delegation never elevates Organization authority | AC-001, AC-004, AC-008, AC-013, AC-018, AC-019 | Application test + API integration test | Yes |
 | AT-012 | Infrastructure boundary | Terminal acceptance, revocation, and expiry remove reversible token, handoff, delivery, and target-email material only after required audit/delivery work, while retaining replay digests and the approved non-secret lifecycle record | AC-002, AC-007, AC-016, AC-024, AC-026 | Infrastructure integration test | Yes |
-| AT-013 | API boundary | REST/OpenAPI and MCP coverage expose typed membership/invite/resend/revoke operations without caller authority arguments and classify token/handoff/account-resumption/acceptance operations as internal/bootstrap | AC-001, AC-007, AC-008, AC-027 | API integration test | Yes |
+| AT-013 | API/MCP boundaries | REST/OpenAPI and MCP coverage expose typed membership/invite/resend/revoke operations without caller authority arguments and classify token/handoff/account-resumption/acceptance operations as internal/bootstrap | AC-001, AC-007, AC-008, AC-027 | API integration test + MCP contract test | Yes |
 
 ## Out Of Scope
 

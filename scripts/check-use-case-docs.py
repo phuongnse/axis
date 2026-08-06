@@ -69,6 +69,7 @@ ACCEPTANCE_MATRIX_BOUNDARIES = {
     "Domain boundary",
     "UI/API boundaries",
     "API/Application boundaries",
+    "API/MCP boundaries",
     "Application/Infrastructure boundaries",
 }
 VERIFICATION_VALUES = {
@@ -80,6 +81,7 @@ VERIFICATION_VALUES = {
     "Infrastructure integration test",
     "Domain test",
     "Architecture test",
+    "MCP contract test",
 }
 IMPLEMENTATION_STATUS_COLUMNS = ["Layer", "Status"]
 USE_CASE_TAIL_SECTION_ORDER = (
@@ -603,6 +605,24 @@ def verification_evidence_issues(
         if not has_dotnet_test_command(commands, "tests/Architecture/"):
             issues.append(
                 f"{ctx.evidence_rel}: Acceptance Evidence {at_id} Architecture test Commands must run dotnet tests through scripts/axis.py",
+            )
+    elif verification == "MCP contract test":
+        if not any(
+            path.startswith("tests/Tools/Axis.Mcp.Tests/") and path.endswith(".cs")
+            for path in paths
+        ):
+            issues.append(
+                f"{ctx.evidence_rel}: Acceptance Evidence {at_id} MCP contract test must reference a committed `tests/Tools/Axis.Mcp.Tests/**/*.cs` file",
+            )
+        required_commands = {
+            "python scripts/axis.py check mcp-api-coverage",
+            "python scripts/axis.py check mcp-contracts",
+            "python scripts/axis.py check mcp-tool-safety",
+        }
+        missing_commands = sorted(required_commands.difference(commands))
+        if missing_commands:
+            issues.append(
+                f"{ctx.evidence_rel}: Acceptance Evidence {at_id} MCP contract test Commands must run: {', '.join(missing_commands)}",
             )
     return issues
 
