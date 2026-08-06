@@ -80,6 +80,7 @@ The cross-store state machine, recovery, cleanup, authorization, and audit reali
 - **AC-015** Each transition records correlated requested and terminal redacted audit outcomes; required audit persistence failure fails closed.
 - **AC-016** Browser transition operations remain internal/bootstrap; MCP changes Workspace only through its OAuth authorization lifecycle.
 - **AC-017** Workspace control and recovery states are keyboard and screen-reader operable, compact-layout safe, and never expose unavailable Workspace metadata.
+- **AC-018** Identity audit outcomes are retained indefinitely with no product update or delete operation; any expiry, purge, mutation, or retention change requires a new owning contract and migration.
 
 ## Acceptance Test Matrix
 
@@ -92,7 +93,7 @@ The cross-store state machine, recovery, cleanup, authorization, and audit reali
 | AT-005 | Application/Infrastructure boundaries | Lost completion and session-store cleanup failure recover from durable completion without restoring source authority | AC-011 | Application test + Infrastructure integration test | Yes |
 | AT-006 | UI component | Workspace control covers eligible, current, pending, success, refresh-failure, unavailable, and recovery states accessibly | AC-001, AC-005, AC-012, AC-017 | UI component test | Yes |
 | AT-007 | Browser journey | Repeated switching during reads and mutations proves client and server isolation | AC-013 | Browser automation | Yes |
-| AT-008 | Infrastructure boundary | Requested and terminal transition audit outcomes remain correlated, redacted, durable, and fail closed on required persistence failure | AC-015 | Infrastructure integration test | Yes |
+| AT-008 | Infrastructure boundary | Requested and terminal transition audit outcomes remain correlated, redacted, durable, immutable, unavailable to product update/delete operations, and retained under the current indefinite policy | AC-015, AC-018 | Infrastructure integration test | Yes |
 | AT-009 | API/MCP boundaries | Browser transition routes remain internal and MCP changes context only through OAuth lifecycle | AC-016 | API integration test + MCP contract test | Yes |
 
 ## Out Of Scope

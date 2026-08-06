@@ -50,7 +50,7 @@ Exchange, handoff, membership mutation, concurrency, retention, and audit realiz
 - Inviter authority, Organization membership, Workspace eligibility, or requested role changed: reject without membership mutation.
 - Suspended Organization or Workspace membership: reject rather than reactivate implicitly.
 - Concurrent acceptance or replay: exactly one request mutates memberships; later requests return the canonical terminal classification.
-- Membership or audit-outbox persistence fails: roll back consumption and membership changes so a valid invitation remains retryable.
+- Required membership or audit persistence fails: roll back consumption and membership changes so a valid invitation remains retryable.
 - Required denied, replayed, or stale-authority audit persistence fails: return a generic retryable failure rather than an unaudited lifecycle outcome.
 
 ## Acceptance Criteria
@@ -58,7 +58,7 @@ Exchange, handoff, membership mutation, concurrency, retention, and audit realiz
 *Happy path*
 
 - **AC-001** An existing verified target user can authenticate, review the invitation, and accept it once.
-- **AC-002** A new target user can complete standalone registration and email verification, resume the invitation intent, and accept through the same membership transaction.
+- **AC-002** A new target user can complete standalone registration and email verification, resume the invitation intent, and reach the same atomic acceptance outcome.
 - **AC-003** Review discloses Organization, Workspace, inviter, requested Workspace role, and expiry only after handoff and authenticated-email validation.
 - **AC-004** Acceptance preserves an active Organization role or establishes only baseline Organization `Member` when membership is absent or removed.
 - **AC-005** Acceptance creates or reactivates only the invited Workspace membership and requested role.
@@ -71,7 +71,7 @@ Exchange, handoff, membership mutation, concurrency, retention, and audit realiz
 - **AC-009** Acceptance revalidates inviter authority, target Organization and Workspace eligibility, invitation status, and requested Workspace role.
 - **AC-010** Suspended Organization or Workspace membership blocks acceptance and is not reactivated implicitly.
 - **AC-011** Concurrent acceptance and replay create at most one Organization membership and one Workspace membership and then return the canonical terminal classification.
-- **AC-012** Invitation consumption, membership changes, and required audit-outbox persistence are atomic; failure leaves a still-valid invitation retryable.
+- **AC-012** Invitation consumption, membership changes, and the required auditable outcome are atomic; failure leaves a still-valid invitation retryable.
 
 *Boundaries*
 
@@ -79,7 +79,7 @@ Exchange, handoff, membership mutation, concurrency, retention, and audit realiz
 - **AC-014** The handoff is short-lived, bound to one browser, represented by a secure opaque cookie, and survives only the required sign-in or registration journey.
 - **AC-015** Acceptance cannot assign or elevate Organization `Owner` or `Administrator` and cannot grant product permissions.
 - **AC-016** Acceptance, replay, invalid-token, wrong-account, and stale-authority outcomes produce correlated append-only redacted audit records.
-- **AC-017** Terminal cleanup removes reversible token, handoff, delivery-envelope, and target-email material after required work while retaining only approved non-secret replay and lifecycle state.
+- **AC-017** Terminal cleanup removes reversible invitation-access and target-email material after required work while retaining only approved non-secret replay and lifecycle state.
 - **AC-018** Token exchange, browser handoff, account resumption, and recipient acceptance remain internal/bootstrap rather than MCP operations.
 - **AC-019** Exchange, review, acceptance, result, and recovery states are keyboard and screen-reader operable, localized, compact-layout safe, and expose a concrete recovery action.
 

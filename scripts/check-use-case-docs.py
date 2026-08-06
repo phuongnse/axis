@@ -56,7 +56,7 @@ AC_BULLET_RE = re.compile(r"^\s*-\s+(?P<body>.+)$", re.MULTILINE)
 AC_BOLD_ID_PREFIX_RE = re.compile(r"^\*\*(AC-\d{3})\*\*\s+\S")
 H2_RE = re.compile(r"^##\s+(.+?)\s*$", re.MULTILINE)
 APPROVAL_PROVENANCE_RE = re.compile(
-    r"(?im)^(?=.*\b(?:approval|approved|sign[- ]?off|signed off)\b)(?=.*(?:\b\d{4}-\d{2}-\d{2}\b|\b(?:approved|approval|sign[- ]?off|signed off)\s+by\s+@?[A-Za-z0-9_.-]+|\b(?:requester|user)\s*[:=]\s*\S)).+$"
+    r"(?im)^(?=.*\b(?:approval|approved|sign[- ]?off|signed off)\b)(?=.*(?:\b(?:approved|approval|sign[- ]?off|signed off)\s+by\s+@?[A-Za-z0-9_.-]+|\b(?:requester|user)\s*[:=]\s*\S)).+$"
 )
 ACCEPTANCE_MATRIX_COLUMNS = [
     "ID",
@@ -289,6 +289,17 @@ def check_use_case_inventory_layout() -> list[str]:
 
         if not (domain_dir / "README.md").is_file():
             issues.append(f"{rel}: missing domain README.md hub")
+
+        direct_specs = [
+            child
+            for child in domain_dir.glob("*.md")
+            if child.name != "README.md" and not child.name.endswith(".evidence.md")
+        ]
+        if not direct_specs:
+            issues.append(
+                f"{rel}: domain hub must own at least one direct use-case spec; "
+                "move non-journey ownership to a focused architecture owner",
+            )
 
         for child in sorted(domain_dir.iterdir()):
             child_rel = child.relative_to(ROOT)

@@ -74,7 +74,7 @@ SECTION_ORDER = (
 
 H2_RE = re.compile(r"^##\s+(.+?)\s*$", re.MULTILINE)
 APPROVAL_PROVENANCE_RE = re.compile(
-    r"(?im)^(?=.*\b(?:approval|approved|sign[- ]?off|signed off)\b)(?=.*(?:\b\d{4}-\d{2}-\d{2}\b|\b(?:approved|approval|sign[- ]?off|signed off)\s+by\s+@?[A-Za-z0-9_.-]+|\b(?:requester|user)\s*[:=]\s*\S)).+$"
+    r"(?im)^(?=.*\b(?:approval|approved|sign[- ]?off|signed off)\b)(?=.*(?:\b(?:approved|approval|sign[- ]?off|signed off)\s+by\s+@?[A-Za-z0-9_.-]+|\b(?:requester|user)\s*[:=]\s*\S)).+$"
 )
 AC_ID_RE = re.compile(r"\bAC-\d{3}\b")
 AT_ID_RE = re.compile(r"^AT-\d{3}$")

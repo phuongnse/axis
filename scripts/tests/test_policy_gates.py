@@ -325,6 +325,27 @@ class TestUseCaseDocsGate(unittest.TestCase):
             "\n".join(issues).replace("\\", "/"),
         )
 
+    def test_use_case_inventory_layout_rejects_hub_without_a_direct_spec(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            use_cases = root / "docs" / "use-cases"
+            domain = use_cases / "supporting-domain"
+            domain.mkdir(parents=True)
+            (use_cases / "README.md").write_text("# Use Cases\n", encoding="utf-8")
+            (domain / "README.md").write_text("# Supporting Domain\n", encoding="utf-8")
+
+            original_root = check_use_case_docs.ROOT
+            original_use_cases = check_use_case_docs.USE_CASES
+            check_use_case_docs.ROOT = root
+            check_use_case_docs.USE_CASES = use_cases
+            try:
+                issues = check_use_case_docs.check_use_case_inventory_layout()
+            finally:
+                check_use_case_docs.ROOT = original_root
+                check_use_case_docs.USE_CASES = original_use_cases
+
+        self.assertIn("domain hub must own at least one direct use-case spec", "\n".join(issues))
+
     def test_use_case_inventories_require_exact_links_and_derived_status(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
@@ -563,6 +584,11 @@ Ship user value.
 
     def test_allows_contract_language_without_approval_provenance(self) -> None:
         issues = self.issues_for_use_case("", ac_line="- **AC-001** Approval is required before a system mutation.")
+
+        self.assertNotIn("durable approval/sign-off provenance", "\n".join(issues))
+
+    def test_allows_dated_approval_behavior_without_session_provenance(self) -> None:
+        issues = self.issues_for_use_case("", ac_line="- **AC-001** Approval expires on 2026-08-06.")
 
         self.assertNotIn("durable approval/sign-off provenance", "\n".join(issues))
 
@@ -1745,6 +1771,14 @@ Provide an app frame.
         )
 
         self.assertIn("durable approval/sign-off provenance", "\n".join(issues))
+
+    def test_foundation_allows_dated_approval_behavior_without_session_provenance(self) -> None:
+        issues = self.issues_for_foundation(
+            inline_evidence="Approval expires on 2026-08-06.",
+            status_rows=(("Contract", "Partial"), ("Frontend", "Not started")),
+        )
+
+        self.assertNotIn("durable approval/sign-off provenance", "\n".join(issues))
 
     def test_foundation_inventories_require_exact_links_and_derived_status(self) -> None:
         with tempfile.TemporaryDirectory() as temp:

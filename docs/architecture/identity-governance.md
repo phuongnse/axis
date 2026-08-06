@@ -44,6 +44,7 @@ This file owns durable Identity Governance invariants and technical realization.
 - Unsupported or invalid envelopes retain bounded non-sensitive attempt history as `Poisoned`; a compatible deployment or reviewed data migration may requeue named IDs.
 - Dedicated audit-ingestion health and telemetry report poison immediately and overdue pending age against a required configured threshold without failing global API readiness.
 - Audit contains stable identifiers, categorical action/outcome, timestamp, correlation identity, and bounded non-sensitive metadata only. Tokens, credentials, secrets, delivery envelopes, handoff identifiers, and sensitive payloads are forbidden. Audit is not a business-state replay source or event-sourcing mechanism.
+- The current audit policy retains the approved immutable records indefinitely and exposes no product update or delete operation. Any future expiry, purge, mutation, or retention change requires a new owning contract and a reviewable migration.
 
 ## Invitation delivery realization
 
