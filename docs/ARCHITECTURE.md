@@ -58,6 +58,17 @@ Rules persists definitions, immutable definition versions, and bindings in the R
 
 `Axis.Api` composes consumer adapters and exposes REST/OpenAPI surfaces. Cross-database Object and Rules mutations remain explicit operations; no hidden dual write or distributed transaction is introduced.
 
+## Identity, authorization, and audit boundaries
+
+- `Organization` is the enterprise governance container. `Workspace` is the active data and isolation context; a personal Workspace has no Organization, while an organization Workspace belongs to exactly one Organization.
+- `OrganizationMembership` governs organization lifecycle. `WorkspaceMembership` is the single access relationship for personal and organization Workspaces; Organization membership never implies Workspace access.
+- Existing personal owners migrate to one active owner membership, after which `OwnerUserId` and `OwnerEmail` are not authorization inputs. Personal Workspaces admit no additional memberships or invitations.
+- Identity lifecycle roles cover owner, administrator, and member authority only. Product roles and action/resource decisions belong to versioned Authorization policies; Team is reserved for collaboration/assignment and Group for IdP or authorization grouping.
+- A selected `workspace_id` is context, not authority. Cookie and bearer requests validate active Workspace membership before module data access. Browser context changes rotate the opaque session and antiforgery state; clients clear all workspace-bound cache and managed state only after server confirmation.
+- Identity persists security mutation and audit-outbox state in one module transaction. Audit consumes the versioned event idempotently into an append-only store; raw tokens, credentials, secrets, and sensitive payloads never enter audit records.
+- Session context transitions span Identity persistence, Redis tickets, and an HTTP response without a distributed transaction. Durable transition intent, idempotent steps, session read-back, and fail-closed reconciliation or compensation own that boundary; no unresolved transition authorizes workspace data.
+- Outbox delivery is durable asynchronous integration, not event sourcing. Module data remains authoritative; Audit records explain actions and outcomes without becoming a replay source for Identity state.
+
 ## Ownership
 
 - Use-case docs own behavior, flows, acceptance criteria, and implementation status.
