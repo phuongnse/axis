@@ -80,6 +80,7 @@ Let a verified Axis user create an organization with its initial governed worksp
 - **AC-024** Audit records contain only stable identifiers, categorical action/outcome, timestamp, correlation identity, and bounded non-sensitive metadata; indefinite append-only retention with no update/delete operation is the explicit policy of this slice, and any future change requires a new owning contract and migration.
 - **AC-025** Every terminal transition path records one correlated requested and terminal audit outcome; failure to persist a required audit outbox state fails closed without inventing a cross-store transaction.
 - **AC-026** Pending transitions reconcile by expiry. A terminal transition retains no ticket secret and is purged only after source and target absolute session lifetimes have elapsed, terminal audit projection is confirmed, and Redis cleanup has completed.
+- **AC-027** REST/OpenAPI and typed MCP operations expose Organization/workspace creation and subject-scoped eligible-workspace reads with server-derived identity/authority, while browser ticket-transition operations remain explicitly internal/bootstrap.
 
 ## Acceptance Test Matrix
 
@@ -96,6 +97,7 @@ Let a verified Axis user create an organization with its initial governed worksp
 | AT-009 | Infrastructure boundary | Creation and switch audit events are durable, append-only, correlated, idempotently projected, retention-bound, and limited to the approved redacted schema | AC-008, AC-011, AC-024 | Infrastructure integration test | Yes |
 | AT-010 | Browser journey | Repeated switching while reading and mutating workspace resources proves server, client cache, managed-window, and audit isolation | AC-006, AC-007, AC-015, AC-022 | Browser automation | Yes |
 | AT-011 | Infrastructure boundary | Transition expiry and terminal cleanup retain no ticket secret, reconcile pending state, wait for both session lifetimes plus audit/Redis completion, and then purge operational state | AC-023, AC-025, AC-026 | Infrastructure integration test | Yes |
+| AT-012 | API boundary | REST/OpenAPI and MCP coverage expose typed create/list operations without caller identity/scope arguments and classify switch/confirm/recover/session operations as internal/bootstrap | AC-001, AC-004, AC-007, AC-027 | API integration test | Yes |
 
 ## Out Of Scope
 
@@ -133,13 +135,14 @@ Required UI quality: workspace labels and current state are programmatic; contro
 > | Identity Infrastructure | Not started |
 > | Audit | Not started |
 > | API and session | Not started |
+> | MCP | Not started |
 > | Frontend | Not started |
 >
 > **Gaps vs spec:**
 >
 > | ID | Gap |
 > |---|---|
-> | GAP-001 | Organization, unified Workspace memberships, migration, active-context rotation, durable audit, public operations, and client experience are not implemented. |
+> | GAP-001 | Organization, unified Workspace memberships, migration, active-context rotation, durable audit, REST/OpenAPI and MCP operations, and client experience are not implemented. |
 >
 > **Deferred follow-ups:** Only the separately owned capabilities listed under Out Of Scope are deferred; no required production property of creation or switching is deferred.
 >

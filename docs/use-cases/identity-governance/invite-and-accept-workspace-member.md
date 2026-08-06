@@ -18,7 +18,7 @@ Let an authorized Workspace administrator invite a real user into one governed w
 ## Main flow
 
 1. Administrator opens membership management in an active organization Workspace and starts an invitation.
-2. Administrator enters the recipient email, selects `Workspace administrator` or `Workspace member`, reviews the target Organization and Workspace, and confirms. This operation cannot select or change an Organization role.
+2. Administrator enters the recipient email, selects `Workspace administrator` or `Workspace member`, reviews the target Organization and Workspace, and confirms. This operation cannot select or elevate an Organization role; acceptance may establish only the baseline Organization `Member` prerequisite.
 3. System verifies the inviter's active Organization membership and active administrator membership in the target Workspace, validates the target email and Workspace role, rate-limits and idempotently creates one pending invitation, stores the opaque token hash, and persists audit and durable email-delivery outbox records in the same transaction.
 4. The delivery record holds the token only as an access-controlled, authenticated-encrypted envelope with expiry no later than the invitation. A worker sends a localized email using one stable delivery correlation key; after provider acceptance it deletes the envelope irreversibly. Ambiguous delivery retries the same generation and may produce duplicate messages, but never another valid token.
 5. Recipient opens a product-owned link whose token is in the URL fragment. Before analytics, third-party content, or application routing, the client removes the fragment with history replacement and posts the token from memory for a single-use exchange under `Referrer-Policy: no-referrer` and explicit client/server log redaction.
@@ -49,7 +49,7 @@ Let an authorized Workspace administrator invite a real user into one governed w
 
 *Happy path*
 
-- **AC-001** A user with active Organization membership and active administrator membership in the target organization Workspace can invite one email address with `Workspace administrator` or `Workspace member`; the operation cannot grant or change an Organization role.
+- **AC-001** A user with active Organization membership and active administrator membership in the target organization Workspace can invite one email address with `Workspace administrator` or `Workspace member`; the operation cannot select or elevate an Organization role, while acceptance may establish only baseline Organization `Member` when absent/removed.
 - **AC-002** Invitation creation stores a hashed opaque single-use token, explicit expiry, normalized target email, inviter, Organization, Workspace, requested Workspace role, status, and concurrency state. The only reversible token representation is an access-controlled authenticated-encrypted delivery envelope with bounded lifetime in the durable email outbox.
 - **AC-003** Invitation email is localized and identifies the Organization, Workspace, inviter, requested Workspace role, expiry, security context, and acceptance action without internal IDs, credentials, or another member's data.
 - **AC-004** An existing verified target user can authenticate, review the invitation, accept once, preserve any active Organization role or receive Organization `Member` when absent or previously removed, and receive only the invited Workspace role.
@@ -72,7 +72,7 @@ Let an authorized Workspace administrator invite a real user into one governed w
 *Edge cases and boundaries*
 
 - **AC-017** Personal Workspaces reject invitations and additional memberships by domain invariant.
-- **AC-018** Organization membership alone does not grant Workspace access; acceptance creates only the explicitly invited Workspace membership.
+- **AC-018** Organization membership alone does not grant Workspace access; acceptance may establish the baseline Organization `Member` prerequisite but creates or reactivates access only for the explicitly invited Workspace.
 - **AC-019** Workspace invitation roles govern membership lifecycle only and cannot assign an Organization role or product-specific applicant, caseworker, row, field, record, or workflow permission.
 - **AC-020** Removal or suspension after acceptance invalidates later workspace authorization even while an older cookie or bearer token still contains the workspace claim.
 - **AC-021** Invitation, authentication, registration, review, acceptance, and workspace-entry screens preserve intent without placing token material in application-managed browser storage or logs; the navigation fragment is transient and removed before application routing.
@@ -81,6 +81,7 @@ Let an authorized Workspace administrator invite a real user into one governed w
 - **AC-024** A target-Workspace administrator can idempotently revoke only a pending invitation; revocation, exchange, and acceptance use concurrency so exactly one terminal outcome wins, and revocation never removes an accepted membership.
 - **AC-025** Required audit outcomes without a business mutation persist through an Identity audit-outbox transaction; audit failure returns a generic retryable failure and never permits the attempted lifecycle action.
 - **AC-026** After acceptance, revocation, or expiry becomes terminal and required audit/delivery work completes, the system deletes delivery envelopes, handoffs, and normalized target email; it retains only non-reversible token digests/generations needed for replay classification plus non-secret lifecycle identifiers, status, role, timestamps, and accepted user identity when applicable.
+- **AC-027** REST/OpenAPI and typed MCP operations expose current-workspace membership reads plus invite, resend, and revoke with server-derived Organization/Workspace authority; token exchange, browser handoff, account resumption, and recipient acceptance remain explicitly internal/bootstrap.
 
 ## Acceptance Test Matrix
 
@@ -98,6 +99,7 @@ Let an authorized Workspace administrator invite a real user into one governed w
 | AT-010 | UI component | Invitation exchange, review, wrong-account, expired, already-accepted, unavailable, pending, revoked, success, and recovery states preserve focus and intent without browser token storage | AC-011, AC-012, AC-021, AC-022, AC-023, AC-024 | UI component test | Yes |
 | AT-011 | API/Application boundaries | Active Organization roles are preserved, absent/removed Organization membership becomes `Member`, suspended Organization/Workspace membership blocks acceptance, and Workspace role delegation never elevates Organization authority | AC-001, AC-004, AC-008, AC-013, AC-018, AC-019 | Application test + API integration test | Yes |
 | AT-012 | Infrastructure boundary | Terminal acceptance, revocation, and expiry remove reversible token, handoff, delivery, and target-email material only after required audit/delivery work, while retaining replay digests and the approved non-secret lifecycle record | AC-002, AC-007, AC-016, AC-024, AC-026 | Infrastructure integration test | Yes |
+| AT-013 | API boundary | REST/OpenAPI and MCP coverage expose typed membership/invite/resend/revoke operations without caller authority arguments and classify token/handoff/account-resumption/acceptance operations as internal/bootstrap | AC-001, AC-007, AC-008, AC-027 | API integration test | Yes |
 
 ## Out Of Scope
 
@@ -125,7 +127,7 @@ Required UI quality: forms and invitation facts are programmatically labelled; r
 
 | Scope | Roles | Invitation effect |
 |---|---|---|
-| Organization membership | `Owner`, `Administrator`, `Member` | Not selectable here. Preserve an active role; create/reactivate only `Member` when absent/removed; never reactivate a suspended membership or promote implicitly. |
+| Organization membership | `Owner`, `Administrator`, `Member` | Not selectable here. Preserve an active role; establish only baseline `Member` when absent/removed; never reactivate a suspended membership or promote to `Owner`/`Administrator`. |
 | Organization Workspace membership | `Administrator`, `Member` | An active Workspace `Administrator` may grant either role only in that Workspace. |
 | Personal Workspace membership | `Owner` | Exactly one owner; invitations are rejected. |
 
@@ -143,16 +145,17 @@ Required UI quality: forms and invitation facts are programmatically labelled; r
 > | Identity Infrastructure | Not started |
 > | Audit | Not started |
 > | API and authentication | Not started |
+> | MCP | Not started |
 > | Frontend | Not started |
 >
 > **Gaps vs spec:**
 >
 > | ID | Gap |
 > |---|---|
-> | GAP-001 | Invitations, lifecycle authorization, email delivery, acceptance, membership mutation, durable audit, public operations, and client journeys are not implemented. |
+> | GAP-001 | Invitations, lifecycle authorization, email delivery, acceptance, membership mutation, durable audit, REST/OpenAPI and MCP operations, and client journeys are not implemented. |
 >
 > **Deferred follow-ups:** Only the separately owned capabilities listed under Out Of Scope are deferred; no required production property of invitation or acceptance is deferred.
 >
 > **Verification:** Not run; implementation has not started and no acceptance row has current evidence.
 >
-> **Decisions:** Invitations target normalized email and one explicit organization Workspace role. Organization roles are never grantable here: acceptance preserves an active role, creates/reactivates only `Member` when absent/removed, and rejects suspended Organization or Workspace membership. Email tokens are hashed for validation; only the durable delivery outbox may hold an authenticated-encrypted, access-controlled, expiring envelope, deleted after accepted delivery or expiry. Ambiguous delivery retries the same generation; explicit resend supersedes it. A fragment-to-POST exchange removes token material before routing, telemetry, referrers, or logs and replaces it with a short-lived browser-bound handoff. Pending revocation is owned here. Required mutation and no-mutation audit outcomes fail closed if their outbox cannot persist. Terminal cleanup removes recipient email and all reversible token/handoff/delivery material after required work while preserving replay digests and the approved non-secret lifecycle record. Event sourcing is not introduced.
+> **Decisions:** Invitations target normalized email and one explicit organization Workspace role. Organization roles are never selectable or elevatable here: acceptance preserves an active role, establishes only baseline `Member` when absent/removed, and rejects suspended Organization or Workspace membership. Email tokens are hashed for validation; only the durable delivery outbox may hold an authenticated-encrypted, access-controlled, expiring envelope, deleted after accepted delivery or expiry. Ambiguous delivery retries the same generation; explicit resend supersedes it. A fragment-to-POST exchange removes token material before routing, telemetry, referrers, or logs and replaces it with a short-lived browser-bound handoff. Pending revocation is owned here. Required mutation and no-mutation audit outcomes fail closed if their outbox cannot persist. Terminal cleanup removes recipient email and all reversible token/handoff/delivery material after required work while preserving replay digests and the approved non-secret lifecycle record. Event sourcing is not introduced.
