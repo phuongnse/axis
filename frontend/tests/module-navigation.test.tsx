@@ -131,8 +131,9 @@ describe('module navigation', () => {
     expect(rulesLink).toHaveAttribute('aria-current', 'page');
   });
 
-  it('registers Business Objects and Rules as workspace navigation contributions', () => {
+  it('registers Identity, Business Objects, and Rules as workspace navigation contributions', () => {
     expect(moduleNavigationContributions.map((item) => item.id)).toEqual([
+      'identity.memberships',
       'businessObjects.definitions',
       'rules.fieldDefinitions',
     ]);
