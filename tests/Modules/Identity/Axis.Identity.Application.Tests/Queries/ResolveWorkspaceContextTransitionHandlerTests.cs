@@ -1,7 +1,9 @@
+using Axis.Identity.Application.Commands.BeginWorkspaceContextTransition;
 using Axis.Identity.Application.Queries.ResolveWorkspaceContextTransition;
 using Axis.Identity.Application.Repositories;
 using Axis.Identity.Application.Tests.Commands;
 using Axis.Identity.Domain.Aggregates;
+using Axis.Shared.Domain.Primitives;
 using FluentAssertions;
 using NSubstitute;
 
@@ -20,7 +22,7 @@ public sealed class ResolveWorkspaceContextTransitionHandlerTests
                 Arg.Any<CancellationToken>())
             .Returns(transition);
 
-        var result = await new ResolveWorkspaceContextTransitionHandler(transitions).Handle(
+        Result<WorkspaceContextTransitionDto> result = await new ResolveWorkspaceContextTransitionHandler(transitions).Handle(
             new ResolveWorkspaceContextTransitionQuery(
                 transition.UserId,
                 WorkspaceContextTransitionHandlerTestData.TargetDigest,

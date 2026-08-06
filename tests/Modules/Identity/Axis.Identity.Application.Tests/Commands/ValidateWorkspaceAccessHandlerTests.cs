@@ -2,6 +2,7 @@ using Axis.Identity.Application.Commands.ValidateWorkspaceAccess;
 using Axis.Identity.Application.Repositories;
 using Axis.Identity.Domain.Aggregates;
 using Axis.Identity.Domain.ValueObjects;
+using Axis.Shared.Domain.Primitives;
 using FluentAssertions;
 using NSubstitute;
 
@@ -26,7 +27,7 @@ public sealed class ValidateWorkspaceAccessHandlerTests
         workspaces.GetByIdAsync(workspace.Id, Arg.Any<CancellationToken>()).Returns(workspace);
         memberships.GetActiveAsync(workspace.Id, userId, Arg.Any<CancellationToken>()).Returns(membership);
 
-        var result = await new ValidateWorkspaceAccessHandler(workspaces, memberships).Handle(
+        Result<WorkspaceAccessDto> result = await new ValidateWorkspaceAccessHandler(workspaces, memberships).Handle(
             new ValidateWorkspaceAccessCommand(userId, workspace.Id),
             TestContext.Current.CancellationToken);
 

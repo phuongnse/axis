@@ -1,7 +1,9 @@
+using Axis.Identity.Application.Commands.BeginWorkspaceContextTransition;
 using Axis.Identity.Application.Commands.FailWorkspaceContextTransition;
 using Axis.Identity.Application.Repositories;
 using Axis.Identity.Application.Services;
 using Axis.Identity.Domain.Aggregates;
+using Axis.Shared.Domain.Primitives;
 using FluentAssertions;
 using NSubstitute;
 
@@ -18,7 +20,7 @@ public sealed class FailWorkspaceContextTransitionHandlerTests
         IUnitOfWork uow = Substitute.For<IUnitOfWork>();
         WorkspaceContextTransitionHandlerTestData.ConfigureReadBack(transitions, audit, transition);
 
-        var result = await new FailWorkspaceContextTransitionHandler(
+        Result<WorkspaceContextTransitionDto> result = await new FailWorkspaceContextTransitionHandler(
             transitions,
             audit,
             uow,

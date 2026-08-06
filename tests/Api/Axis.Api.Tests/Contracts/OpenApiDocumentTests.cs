@@ -38,7 +38,7 @@ public class OpenApiDocumentTests(ApiTestFixture fixture)
     }
 
     [Fact]
-    public void OpenApiDocument_DoesNotPublishBrowserWorkspaceTransitionOperations()
+    public void OpenApiDocument_WhenGenerated_DoesNotPublishBrowserWorkspaceTransitionOperations()
     {
         using IServiceScope scope = fixture.CreateScope();
         ISwaggerProvider provider = scope.ServiceProvider.GetRequiredService<ISwaggerProvider>();

@@ -1,7 +1,9 @@
+using Axis.Identity.Application.Commands.BeginWorkspaceContextTransition;
 using Axis.Identity.Application.Commands.CompleteWorkspaceContextTransition;
 using Axis.Identity.Application.Repositories;
 using Axis.Identity.Application.Services;
 using Axis.Identity.Domain.Aggregates;
+using Axis.Shared.Domain.Primitives;
 using FluentAssertions;
 using NSubstitute;
 
@@ -24,7 +26,7 @@ public sealed class CompleteWorkspaceContextTransitionHandlerTests
                 Arg.Any<CancellationToken>())
             .Returns(true);
 
-        var result = await new CompleteWorkspaceContextTransitionHandler(
+        Result<WorkspaceContextTransitionDto> result = await new CompleteWorkspaceContextTransitionHandler(
             transitions,
             memberships,
             audit,
