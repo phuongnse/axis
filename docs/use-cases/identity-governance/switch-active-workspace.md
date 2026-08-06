@@ -1,6 +1,6 @@
 # Switch Active Workspace
 
-> **Navigation**: [docs/use-cases/identity-governance/README.md](./README.md) · [docs/use-cases/README.md](../README.md) · [Identity Governance architecture](../../architecture/identity-governance.md) · [AGENTS.md](../../../AGENTS.md)
+> **Navigation**: [docs/use-cases/identity-governance/README.md](./README.md) · [docs/use-cases/README.md](../README.md) · [docs/architecture/identity-governance.md](../../architecture/identity-governance.md) · [AGENTS.md](../../../AGENTS.md)
 
 ## Purpose
 

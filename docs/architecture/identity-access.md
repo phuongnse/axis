@@ -1,6 +1,6 @@
 # Identity Access Architecture
 
-> **Navigation**: [docs/ARCHITECTURE.md](../ARCHITECTURE.md) · [Identity Access use cases](../use-cases/identity-access/README.md) · [docs/TECH_STACK.md](../TECH_STACK.md) · [AGENTS.md](../../AGENTS.md)
+> **Navigation**: [docs/ARCHITECTURE.md](../ARCHITECTURE.md) · [docs/use-cases/identity-access/README.md](../use-cases/identity-access/README.md) · [docs/TECH_STACK.md](../TECH_STACK.md) · [AGENTS.md](../../AGENTS.md)
 
 This file owns durable Identity Access session and authorization realization. Use cases own account-owner goals and observable outcomes; [docs/TECH_STACK.md](../TECH_STACK.md) owns the approved providers and libraries.
 

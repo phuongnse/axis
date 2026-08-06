@@ -1,6 +1,6 @@
 # Business Objects Architecture
 
-> **Navigation**: [docs/ARCHITECTURE.md](../ARCHITECTURE.md) · [Business Objects use cases](../use-cases/business-objects/README.md) · [Rules boundary](../ARCHITECTURE.md#rules-boundary) · [AGENTS.md](../../AGENTS.md)
+> **Navigation**: [docs/ARCHITECTURE.md](../ARCHITECTURE.md) · [docs/use-cases/business-objects/README.md](../use-cases/business-objects/README.md) · [docs/ARCHITECTURE.md](../ARCHITECTURE.md#rules-boundary) · [AGENTS.md](../../AGENTS.md)
 
 This file owns durable Business Objects model and module realization. Use cases own author and submitter goals, observable record contracts, and acceptance evidence.
 
