@@ -6,21 +6,19 @@
 
 Provide a reusable, typed data-table foundation that lets product features define data semantics once and obtain consistent search, filtering, sorting, grouping, paging, selection, and large-dataset behavior without owning a local table interaction system.
 
-## Primary actor
+## Consumers
 
-- Signed-in Axis Platform user working with a structured list or table.
+- Product surfaces that render structured collections from typed definitions.
 
-## Trigger
+## Activation
 
-- A product surface renders a collection through a typed data-table definition.
+- A product surface supplies a typed data-table definition.
 
-## Main flow
+## Guarantees
 
-1. The consumer supplies a typed data source, stable row identity, localized messages, and column definitions.
-2. The table renders visible columns, emits controlled server-search intent, derives typed filter fields, sorting, grouping, and visibility controls from column capabilities, and composes consumer-defined actions into its toolbar.
-3. The user searches, filters, sorts, groups, expands, selects, or changes visible columns without losing table layout stability.
-4. The configured data mode applies client processing, numbered paging, or progressive infinite loading consistently.
-5. The table renders loading, error, empty, no-result, and pagination states inside its owned region.
+- Accepts a typed data source, stable row identity, localized messages, and semantic column definitions.
+- Provides configured discovery, query-state, data-mode, and toolbar behavior without feature-local table interaction systems.
+- Keeps loading, error, empty, no-result, and pagination states inside a stable table region.
 
 ## Alternate / error flows
 
@@ -56,9 +54,9 @@ Provide a reusable, typed data-table foundation that lets product features defin
 - **AC-016** Consumers can render domain actions in a stable toolbar slot above the column header without adding an action column or coupling the foundation to feature commands.
 
 *Quality*
-- **AC-013** Table controls use approved shared UI primitives, localized consumer copy, keyboard interaction, labels, and visible focus states.
+- **AC-013** Table controls use localized consumer copy, keyboard interaction, labels, and visible focus states.
 - **AC-014** The table fits supported desktop and mobile widths without document-level overflow, aligns body cells to the row start, and keeps header, body, and footer regions visually coherent.
-- **AC-015** The foundation API does not depend on TanStack Query, Router, a product API contract, or feature-specific data types.
+- **AC-015** The foundation API does not require a particular client data or navigation library, product API contract, or feature-specific data type.
 
 ## Acceptance Test Matrix
 
@@ -101,12 +99,12 @@ Required UI quality: controls must be keyboard-reachable, visible copy must come
 > | Frontend | Done |
 > | Tests | Done |
 >
-> **Implemented:** A typed TanStack Table and TanStack Virtual based foundation owns client, manual page, and infinite data modes; a nested typed filter builder; sorting; numbered paging; grouping; expansion; selection; virtualization; stable table scrolling; consumer-defined toolbar actions; and shadcn-owned controls.
+> **Implemented:** The typed data-table foundation owns client, manual-page, and infinite data modes; a nested typed filter builder; sorting; numbered paging; grouping; expansion; selection; virtualization; stable table scrolling; and consumer-defined toolbar actions.
 >
 > **Gaps vs spec:** None. Generic client mode still supports structured filtering over a complete in-memory dataset, but free-text matching is always emitted as controlled server intent.
 >
 > **Deferred follow-ups:** Backend-owned grouping, aggregate, cursor, export, and persisted preference contracts remain with future consuming use cases.
 >
-> **Verification:** `python scripts/axis.py frontend ci`; `python scripts/axis.py frontend test tests/data-table.test.tsx tests/rules-page.test.tsx`; `python scripts/axis.py local-dev e2e -- e2e/manage-rules.pw.ts -g "catalog table"`.
+> **Verification:** Acceptance proof is tracked in [docs/foundations/data-display/data-table.evidence.md](./data-table.evidence.md).
 >
-> **Decisions:** One typed definition packages data and semantic column metadata; raw data reflection is rejected. Client, manual page, and infinite modes are explicit. Manual modes own whole-dataset processing on the server. Filter fields follow visible columns, use an Axis-owned serializable expression instead of a library-owned wire contract, and clear hidden-field conditions. Header and body share one native table layout and one scroll viewport; virtualization changes row rendering without introducing a second table layout. Advanced capabilities are opt-in so simple consumers do not inherit unused controls.
+> **Decisions:** One typed definition packages data and semantic column metadata; raw data reflection is rejected. Client, manual-page, and infinite modes are explicit. Manual modes keep whole-dataset processing on the server. Filter fields follow visible columns, use a product-neutral serializable expression, and clear hidden-field conditions. Advanced capabilities are opt-in so simple consumers do not inherit unused controls.

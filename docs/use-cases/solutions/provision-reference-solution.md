@@ -16,10 +16,23 @@ This is the Wave 0 consumer-boundary slice from [docs/PLATFORM_STRATEGY.md](../.
 
 - The same or another signed-in workspace user completing the provisioned record journey
 
+## Preconditions
+
+- The target is a blank authorized Workspace.
+- The release manifest, matching generated public client, approved product origin, and required built-in Rule versions are available.
+
 ## Trigger
 
 - A release operator needs to reproduce an exact reference-solution release in a blank Axis workspace.
 - A product team needs to prove that its client and product source consume Axis without an Axis fork or product-specific platform code.
+
+## Success guarantee
+
+- The exact reference-solution release is reproducibly provisioned and read back through authenticated public contracts, and its product-owned client completes the existing record journey.
+
+## Minimal guarantee
+
+- Validation, compatibility, conflict, interruption, or read-back failure never claims success or creates unverifiable product state; exact matching work remains safely resumable.
 
 ## Main flow
 
@@ -82,7 +95,7 @@ Generated IDs, workspace/actor IDs, timestamps, source IDs, and concurrency revi
 - **AC-012** A semantic-identity collision with different content fails closed and never overwrites, adopts, renames, aliases, or duplicates the existing resource.
 - **AC-013** An API failure after partial progress returns exact completed/pending state; later resume requires fresh public read-back and refuses any conflicting change.
 - **AC-014** Read-back mismatch is a failed provisioning result, and logs/errors expose no token, authorization code, secret, or another workspace's resource data.
-- **AC-015** Product authentication uses the required same-origin ASP.NET Core BFF as a confidential Axis OAuth/OIDC client with Authorization Code + PKCE, mandatory PAR, exact deployment-configured sign-in/sign-out redirects, server-side refresh/revocation, Redis-backed opaque session, and CSRF validation. Browser code receives no client secret, access/refresh token, or post-callback authorization code; product identity and secrets remain deployment-owned outside Axis source. Any signed-in target-workspace user may provision in Wave 0, while unauthenticated and cross-workspace access is rejected.
+- **AC-015** Product authentication uses the required same-origin confidential BFF as an Axis OAuth/OIDC client with Authorization Code + PKCE, mandatory PAR, exact deployment-configured sign-in/sign-out redirects, server-side refresh/revocation, a distributed opaque session, and CSRF validation. Browser code receives no client secret, access/refresh token, or post-callback authorization code; product identity and secrets remain deployment-owned outside Axis source. Any signed-in target-Workspace user may provision in Wave 0, while unauthenticated and cross-Workspace access is rejected.
 
 *Edge cases and boundaries*
 
@@ -147,4 +160,4 @@ Required UI quality: every plan entry and outcome is programmatically labelled; 
 >
 > **Verification:** [provision-reference-solution.evidence.md](./provision-reference-solution.evidence.md) binds every required AT to the reachable reference-product checkpoint `2b32616923ff9bb33b50013700b92ace1c5be15e` or its Axis-owned verification source. That checkpoint pins the current Axis OpenAPI digest and passed dependency audit, manifest/BFF checks, unit tests, the blank-workspace authenticated browser journey, and independent review. The published Wave 0 Axis range passes review-readiness; no missing boundary is treated as accepted.
 >
-> **Decisions:** Wave 0 uses existing module mutation operations, one generic authenticated Rule Binding detail read, and a product-owned manifest/provisioning client instead of inventing a Solutions runtime. The manifest contract above owns exact semantic identity and canonical comparison; runtime-generated fields never become product identity. A blank workspace is a newly available authenticated workspace with platform built-ins but no reference-solution definitions, bindings, or records; other isolated workspaces may exist. No supported production consumer or data requires overlap with the Axis-owned sample, so the independent product replaces it through a clean cutover. Product authentication uses a product-owned same-origin ASP.NET Core host, confidential client with PKCE/PAR, server-side refresh/revocation and opaque Redis session, finite YARP allowlist, and no browser credential path. Any signed-in target-workspace user may provision in Wave 0, while role-separated administration, dynamic registration, service identities, and concurrent installation are separate capabilities. Partial multi-operation provisioning is explicit and resumable from public read-back rather than disguised as an atomic install or distributed transaction. Event sourcing is not introduced.
+> **Decisions:** Wave 0 uses existing module operations and a product-owned manifest/provisioning client instead of inventing a Solutions runtime. The manifest owns exact semantic identity and canonical comparison; runtime-generated fields never become product identity. A blank Workspace has platform built-ins but no reference-solution definitions, bindings, or records. The independent product replaces the retired Axis-owned sample through a clean cutover. Product authentication uses a same-origin confidential BFF with server-side credentials, bounded forwarding, and no browser credential path; [docs/TECH_STACK.md](../../TECH_STACK.md) owns its approved implementation stack. Any signed-in target-Workspace user may provision in Wave 0. Partial multi-operation provisioning is explicit and resumable from public read-back rather than presented as an atomic install.

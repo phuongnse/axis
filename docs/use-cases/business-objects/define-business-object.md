@@ -10,9 +10,21 @@ Define and publish a workspace-scoped business object definition so published ve
 
 - Signed-in workspace user
 
+## Preconditions
+
+- The user has an active, authorized current Workspace.
+
 ## Trigger
 
 - User starts defining a new business object in the current workspace.
+
+## Success guarantee
+
+- One immutable published Business Object definition version exists with stable object and field identity and is readable in the current Workspace.
+
+## Minimal guarantee
+
+- Invalid or stale work remains recoverable as unpublished state and never becomes a partial or cross-Workspace record contract.
 
 ## Main flow
 
@@ -93,7 +105,7 @@ Define and publish a workspace-scoped business object definition so published ve
 |---|---|
 | Authenticated navigation | Expose a visible Business Objects navigation contribution when the current workspace can use the module; global navigation rendering remains owned by the module-navigation foundation. |
 | Business object collection | Render one primary table with name, key, unpublished/published availability, latest version context, paging, and consumer-defined actions without an action column. |
-| Definition window | Open or focus stable create/view/edit identities through [docs/foundations/data-display/collection-page.md](../../foundations/data-display/collection-page.md), consume the managed-dialog record-tab contract with General first and definition-owned sections after it, capture the definition name, display a read-only derived stable business object key, and keep revision state in sync after saves. |
+| Definition window | Open or focus stable create/view/edit identities through [Collection Page](../../foundations/data-display/collection-page.md), consume [Detail Sections](../../foundations/data-display/detail-sections.md) with General first and definition-owned sections after it, capture the definition name, display a read-only derived stable business object key, and keep revision state in sync after saves. |
 | Field definition editor | Let the user add, order, remove, and rename text fields while keeping stable field keys visible, validated, and saved against the current revision. |
 | Publish review | Before mutation, summarize the stable object key, field count, configured-rule count, and immutable-version consequence; keep publication blocked until required definition and field identity rules pass. |
 | Definition detail | Render identity, availability, version/date facts, fields, type configuration, and applied rule versions as semantic read-only content rather than disabled authoring controls. Make clear that unpublished definitions are unavailable for record creation and that future records use the immutable published version. |
@@ -141,4 +153,4 @@ sequenceDiagram
 >
 > **Verification:** Acceptance proof is tracked in the sibling evidence sidecar.
 >
-> **Decisions:** Business Objects is the modular-monolith bounded context for business object definitions, immutable published versions, and later records. Code uses the complete ubiquitous language `BusinessObjectDefinition`, `BusinessObjectDefinitionVersion`, `BusinessObjectFieldDefinition`, and future `BusinessObjectRecord`; API, persistence, configuration, frontend, tests, and docs use the same context name without compatibility aliases. Identity owns workspace lifecycle; Business Objects stores `workspaceId` only as an external scope identifier. Mutable fields keep stable IDs and immutable persisted keys. Published field snapshots have their own IDs and retain explicit source-field IDs. Unpublished definitions use an application-visible revision for optimistic concurrency; publish creates immutable version 1, while version 2 or later remains a separate use case. [docs/use-cases/business-objects/configure-field-rules.md](./configure-field-rules.md) owns additional field types, type configuration, and applied rule snapshots. Event sourcing, outbox/inbox, integration events, saga/process manager, projection rebuild, and runtime table generation are rejected. The frontend follows the collection-page foundation rather than hard-coding module navigation or a feature-local page layout.
+> **Decisions:** This use case owns creation and first publication of a definition with stable object and field identity. [Configure Field Types And Rules](./configure-field-rules.md) owns advanced field configuration; later published versions require a separate use case. [Business Objects architecture](../../architecture/business-objects.md) owns the model, revision, snapshot, isolation, and persistence realization.

@@ -10,9 +10,21 @@ Let a verified standalone Axis Platform user sign in with email/password and rea
 
 - Returning standalone user
 
+## Preconditions
+
+- A standalone account exists and the public sign-in route is available.
+
 ## Trigger
 
 - User opens `/`, opens `/sign-in`, or an unauthenticated user attempts to open an authenticated Axis Platform route.
+
+## Success guarantee
+
+- A verified, active, eligible account receives one rotated opaque server session and reaches the dashboard without browser bearer or OAuth artifacts.
+
+## Minimal guarantee
+
+- Invalid credentials, account state, Workspace state, throttling, or session-store failure creates no session and discloses no sensitive account or ticket data.
 
 ## Main flow
 
@@ -21,7 +33,7 @@ Let a verified standalone Axis Platform user sign in with email/password and rea
 3. System validates required fields and email format.
 4. System verifies the credentials against the stored password hash.
 5. System verifies the account is active, email verified, and has a sign-in-eligible personal workspace.
-6. System rotates and establishes an opaque same-origin server session whose identity and ticket remain in the Axis Redis session store.
+6. System rotates and establishes an opaque same-origin server session whose identity and ticket remain in the distributed server session store.
 7. Browser receives only the Secure, HttpOnly, host-only session cookie; the frontend resolves authenticated identity and CSRF material through the session bootstrap and reaches the dashboard without an OAuth callback or bearer token.
 8. On a later route load, system resolves the same server session once and either restores the authenticated route or routes the unauthenticated user to sign-in without creating browser auth artifacts.
 
@@ -36,7 +48,7 @@ Let a verified standalone Axis Platform user sign in with email/password and rea
 - Missing, expired, invalid, or unavailable server session: fail closed, clear the opaque cookie when possible, and route to `/sign-in` without stale authenticated cache state.
 - Already-authenticated user opens a public Identity Access auth or registration route: route the user to `/dashboard` without showing the public auth or registration screen.
 - User opens `/` while no public landing page exists: route by current session state; authenticated or restorable sessions go to `/dashboard`, and unauthenticated sessions go to `/sign-in`.
-- Redis or session-store failure: do not create or infer a session; expose a generic retryable unavailable state without credentials, ticket identifiers, or account data.
+- Session-store failure: do not create or infer a session; expose a generic retryable unavailable state without credentials, ticket identifiers, or account data.
 
 ## Acceptance Criteria
 
@@ -46,7 +58,7 @@ Let a verified standalone Axis Platform user sign in with email/password and rea
 - **AC-003** Sign-in verifies the submitted password against the stored password hash for an active standalone account.
 - **AC-004** Sign-in requires the account email to already be verified.
 - **AC-005** Sign-in selects the user's active personal workspace as the current workspace for the session.
-- **AC-006** Successful sign-in rotates and establishes an opaque Redis-backed same-origin server session, returns no OAuth token or authorization artifact to browser code, resolves authenticated identity plus CSRF material through session bootstrap, and routes the user to the dashboard.
+- **AC-006** Successful sign-in rotates and establishes an opaque same-origin server session, returns no OAuth token or authorization artifact to browser code, resolves authenticated identity plus CSRF material through session bootstrap, and routes the user to the dashboard.
 - **AC-007** Unauthenticated access to authenticated Axis Platform routes sends the user to `/sign-in`, while registration remains reachable from the sign-in page.
 
 *Validation & errors*
@@ -88,7 +100,7 @@ Let a verified standalone Axis Platform user sign in with email/password and rea
 | AT-006 | UI/API boundaries | Unverified account with correct credentials shows one verification-required warning followed by a separate inline resend prompt and action, with clear success, failure, and rate-limited feedback directly below the action row | AC-012, AC-013 | Browser automation + UI component test + API integration test | Yes |
 | AT-007 | API boundary | Missing or unavailable personal workspace prevents session establishment with a non-sensitive account-unavailable error | AC-014 | Application test + API integration test | Yes |
 | AT-008 | UI component | 5xx and rate-limited sign-in responses show retry/wait states and restore or disable submit appropriately | AC-015, AC-016 | UI component test | Yes |
-| AT-009 | UI/API boundaries | Missing, expired, invalid, and unavailable Redis sessions fail closed, clear stale authenticated state, and expose only recoverable non-sensitive errors | AC-017, AC-030 | UI component test + API integration test | Yes |
+| AT-009 | UI/API boundaries | Missing, expired, invalid, and unavailable server sessions fail closed, clear stale authenticated state, and expose only recoverable non-sensitive errors | AC-017, AC-030 | UI component test + API integration test | Yes |
 | AT-010 | UI component | Rapid submissions are deduplicated through sign-in and successful dashboard handoff, email is trimmed, and password whitespace is preserved | AC-018, AC-019, AC-020 | UI component test + Application test | Yes |
 | AT-011 | Application boundary | Sign-in does not create accounts, workspaces, legal acceptances, or verification tokens unless resend is explicitly requested | AC-021 | Application test | Yes |
 | AT-012 | UI component | Sign-in and callback states expose registration or sign-in escape navigation | AC-022 | UI component test | Yes |
@@ -128,7 +140,7 @@ sequenceDiagram
   participant Web as Web App
   participant API as API
   participant Identity as Identity
-  participant Session as Redis session store
+  participant Session as Server session store
 
   User->>Web: Open /sign-in
   User->>Web: Submit email and password
@@ -172,4 +184,4 @@ sequenceDiagram
 >
 > **Verification:** See [sign-in-user.evidence.md](./sign-in-user.evidence.md) for every required AT. Reauthentication additionally proves opaque session rotation: the prior cookie receives `401` and the replacement cookie authenticates.
 >
-> **Decisions:** This use case owns returning-user email/password sign-in and the Axis same-origin opaque server-session bootstrap. OAuth remains for native and confidential external clients, never the Axis browser. Screen flow owns the product experience; required UI quality owns accessibility. Sign-in failures remain account-enumeration-safe; unverified accounts and unavailable workspaces use specific non-sensitive states without establishing a session. Cookie and bearer authentication are explicit independent boundaries, cookie mutations require antiforgery, and no browser compatibility path survives the cutover.
+> **Decisions:** This use case owns returning-user email/password sign-in and the observable same-origin session journey. [Identity Access architecture](../../architecture/identity-access.md#browser-session-realization) owns session realization and its security invariants. OAuth remains for native and confidential external clients, never the Axis browser; no browser compatibility path survives the cutover.

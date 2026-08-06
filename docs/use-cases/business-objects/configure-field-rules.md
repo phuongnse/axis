@@ -10,10 +10,23 @@ Let a signed-in workspace user configure enterprise field types, type-specific f
 
 - Signed-in workspace user
 
+## Preconditions
+
+- An unpublished Business Object definition exists in the current Workspace and the user can edit it.
+- Any reusable Rule version selected for binding is discoverable to the current Workspace.
+
 ## Trigger
 
 - User edits fields on an unpublished business object definition in the current workspace.
 - User prepares to publish an unpublished definition that contains typed field configuration or applied rules.
+
+## Success guarantee
+
+- The saved or published definition carries canonical typed field configuration and exact Rule-binding snapshots at the accepted revision.
+
+## Minimal guarantee
+
+- Invalid, stale, incompatible, or cross-Workspace input changes no definition or published version and exposes no foreign resource.
 
 ## Main flow
 
@@ -145,4 +158,4 @@ sequenceDiagram
 >
 > **Verification:** Acceptance proof is tracked in the sibling evidence sidecar.
 >
-> **Decisions:** The cross-module handshake follows [docs/use-cases/rules/manage-rule-bindings.md](../rules/manage-rule-bindings.md): Business Objects supplies the transient field-context schema and required `record.value` coverage while Rules validates exact version, mapping, type, and cardinality. Date remains a calendar-only type and DateTime is additive with explicit-offset semantics. `Choice` plus immutable `Single` or `Multiple` selection mode is the only initial selection contract. Static options are field type configuration, not a rule. No compatibility migration is retained because no production data exists; the module receives one clean initial migration after restructuring. Applied rules reference immutable published versions and the frontend renders their input contract from Rules metadata rather than a hard-coded catalog. Rules remain pure and side-effect free; consumers own target context, business state, and enforcement transactions. Event sourcing, integration events, inbox/outbox, and workflow automation are rejected.
+> **Decisions:** Date is calendar-only; DateTime requires explicit-offset semantics. `Choice` with immutable `Single` or `Multiple` selection mode is the initial selection contract, and static options remain field configuration rather than Rules. Applied Rules use exact immutable versions and metadata-driven input contracts. [Business Objects architecture](../../architecture/business-objects.md#rules-integration) and [Rules architecture](../../ARCHITECTURE.md#rules-boundary) own the cross-module realization.

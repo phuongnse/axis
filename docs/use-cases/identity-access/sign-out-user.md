@@ -10,9 +10,21 @@ Let an authenticated standalone Axis Platform user delete the current opaque ser
 
 - Authenticated standalone user
 
+## Preconditions
+
+- The browser has an authenticated Axis session or a stale session cookie requiring cleanup.
+
 ## Trigger
 
 - User chooses Sign out from the authenticated app shell account menu.
+
+## Success guarantee
+
+- The current server-session ticket and browser cookie are invalidated, authenticated client state is cleared, and later bootstrap remains unauthenticated.
+
+## Minimal guarantee
+
+- A failure before server deletion preserves the current authenticated session and reports retryable failure instead of presenting a false sign-out.
 
 ## Main flow
 
@@ -89,7 +101,7 @@ sequenceDiagram
   actor User
   participant Web as Web App
   participant API as API
-  participant Session as Redis session store
+  participant Session as Server session store
 
   User->>Web: Choose Sign out
   Web->>API: Request current-browser sign-out
@@ -123,4 +135,4 @@ sequenceDiagram
 >
 > **Verification:** See [sign-out-user.evidence.md](./sign-out-user.evidence.md) for the browser, API, and UI proof covering every required AT.
 >
-> **Decisions:** This use case owns current-browser sign-out for the Axis same-origin server session. It deletes only that Redis ticket and cookie, not other devices or confidential product-BFF sessions. Product BFF logout and refresh-token revocation are owned by [docs/use-cases/solutions/provision-reference-solution.md](../solutions/provision-reference-solution.md). Domain and Application remain N/A because no Identity domain record changes; Infrastructure owns the session store boundary.
+> **Decisions:** This use case owns current-browser sign-out behavior. [Identity Access architecture](../../architecture/identity-access.md#browser-session-realization) owns session realization. The action affects only the current ticket and cookie, not other devices or confidential product-BFF sessions; Product BFF logout and refresh-token revocation are owned by [docs/use-cases/solutions/provision-reference-solution.md](../solutions/provision-reference-solution.md).

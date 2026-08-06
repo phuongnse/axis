@@ -325,18 +325,67 @@ class TestUseCaseDocsGate(unittest.TestCase):
             "\n".join(issues).replace("\\", "/"),
         )
 
+    def test_use_case_inventories_require_exact_links_and_derived_status(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            use_cases = root / "docs" / "use-cases"
+            domain = use_cases / "example"
+            domain.mkdir(parents=True)
+            (use_cases / "README.md").write_text(
+                """## Current Use Cases
+
+| Domain | Use case | Status |
+|---|---|---|
+| [Example](./example/README.md) | [Wrong](./example/wrong.md) | Not started |
+""",
+                encoding="utf-8",
+            )
+            (domain / "README.md").write_text(
+                """## Current Use Cases
+
+| Use case | Status |
+|---|---|
+| [Sample](./sample.md) | Not started |
+""",
+                encoding="utf-8",
+            )
+            sample = domain / "sample.md"
+            sample.write_text(
+                """> **Implementation status**
+>
+> | Layer | Status |
+> |---|---|
+> | Application | Done |
+""",
+                encoding="utf-8",
+            )
+            original_root = check_use_case_docs.ROOT
+            original_use_cases = check_use_case_docs.USE_CASES
+            check_use_case_docs.ROOT = root
+            check_use_case_docs.USE_CASES = use_cases
+            try:
+                issues = check_use_case_docs.validate_use_case_inventories([sample])
+            finally:
+                check_use_case_docs.ROOT = original_root
+                check_use_case_docs.USE_CASES = original_use_cases
+
+        joined = "\n".join(issues)
+        self.assertIn("status for `./sample.md` must be `Done`", joined)
+        self.assertIn("is missing `./example/sample.md`", joined)
+        self.assertIn("references non-spec `./example/wrong.md`", joined)
+
     def issues_for_use_case(self, callout: str, ac_line: str = "- **AC-001** Works.") -> list[str]:
-        matrix = (
-            ""
-            if "## Acceptance Test Matrix" in callout
-            else """## Acceptance Test Matrix
+        if "## Acceptance Test Matrix" in callout:
+            matrix, status = callout.split("> **Implementation status**", maxsplit=1)
+            callout = "> **Implementation status**" + status
+        else:
+            matrix = """## Acceptance Test Matrix
 
 | ID | Boundary | Scenario | Covers AC | Verification | Required |
 |---|---|---|---|---|---|
 | AT-001 | Browser journey | User completes flow | AC-001 | Browser automation | Yes |
 
 """
-        )
         return self.issues_for_document(
             f"""# Sample use case
 
@@ -348,9 +397,21 @@ Ship user value.
 
 - User
 
+## Preconditions
+
+- User can start the flow.
+
 ## Trigger
 
 - User starts the flow.
+
+## Success guarantee
+
+- The requested outcome is durable.
+
+## Minimal guarantee
+
+- Failure leaves the current state safe.
 
 ## Main flow
 
@@ -397,6 +458,113 @@ Ship user value.
         )
 
         self.assertIn("missing implementation status deferred follow-ups section", "\n".join(issues))
+
+    def test_rejects_missing_use_case_guarantee_sections(self) -> None:
+        content = """# Sample use case
+
+## Purpose
+
+Ship user value.
+
+## Primary actor
+
+- User
+
+## Trigger
+
+- User starts the flow.
+
+## Main flow
+
+1. User starts.
+
+## Alternate / error flows
+
+- None.
+
+## Acceptance Criteria
+
+- **AC-001** Works.
+
+## Acceptance Test Matrix
+
+| ID | Boundary | Scenario | Covers AC | Verification | Required |
+|---|---|---|---|---|---|
+| AT-001 | Browser journey | User completes flow | AC-001 | Browser automation | Yes |
+
+## Out Of Scope
+
+- N/A.
+"""
+        issues = self.issues_for_document(content)
+
+        joined = "\n".join(issues)
+        self.assertIn("missing preconditions section", joined)
+        self.assertIn("missing success guarantee section", joined)
+        self.assertIn("missing minimal guarantee section", joined)
+
+    def test_rejects_use_case_sections_out_of_order(self) -> None:
+        content = """# Sample use case
+
+## Purpose
+
+Ship user value.
+
+## Preconditions
+
+- User can start.
+
+## Primary actor
+
+- User
+
+## Trigger
+
+- User starts.
+
+## Success guarantee
+
+- Outcome is durable.
+
+## Minimal guarantee
+
+- Failure is safe.
+
+## Main flow
+
+1. User completes the goal.
+
+## Alternate / error flows
+
+- Failure stays safe.
+
+## Acceptance Criteria
+
+- **AC-001** Works.
+
+## Acceptance Test Matrix
+
+| ID | Boundary | Scenario | Covers AC | Verification | Required |
+|---|---|---|---|---|---|
+| AT-001 | Browser journey | User completes flow | AC-001 | Browser automation | Yes |
+
+## Out Of Scope
+
+- N/A.
+"""
+        issues = self.issues_for_document(content)
+
+        self.assertIn("canonical use-case order", "\n".join(issues))
+
+    def test_rejects_durable_approval_provenance(self) -> None:
+        issues = self.issues_for_use_case("", ac_line="- **AC-001** Works. Approved by @alice on 2026-08-06.")
+
+        self.assertIn("durable approval/sign-off provenance", "\n".join(issues))
+
+    def test_allows_contract_language_without_approval_provenance(self) -> None:
+        issues = self.issues_for_use_case("", ac_line="- **AC-001** Approval is required before a system mutation.")
+
+        self.assertNotIn("durable approval/sign-off provenance", "\n".join(issues))
 
     def test_rejects_empty_status_sections(self) -> None:
         issues = self.issues_for_use_case(
@@ -640,9 +808,21 @@ Ship user value.
 
 - User
 
+## Preconditions
+
+- User can start the flow.
+
 ## Trigger
 
 - User starts the flow.
+
+## Success guarantee
+
+- The requested outcome is durable.
+
+## Minimal guarantee
+
+- Failure leaves the current state safe.
 
 ## Main flow
 
@@ -1273,18 +1453,17 @@ class TestFoundationDocsGate(unittest.TestCase):
 
 Provide an app frame.
 
-## Primary actor
+## Consumers
 
-- Signed-in user
+- Authenticated routes
 
-## Trigger
+## Activation
 
-- User opens an authenticated route.
+- An authenticated route renders.
 
-## Main flow
+## Guarantees
 
-1. System renders the route.
-2. System renders the frame.
+- The frame renders the route safely.
 
 ## Alternate / error flows
 
@@ -1334,6 +1513,7 @@ Provide an app frame.
                 doc = check_foundation_docs.foundation_document(path)
                 issues: list[str] = []
                 issues.extend(check_foundation_docs.validate_sections(doc))
+                issues.extend(check_foundation_docs.validate_no_durable_provenance(doc))
                 issues.extend(check_foundation_docs.validate_acceptance_contract(doc))
                 issues.extend(check_foundation_docs.validate_acceptance_evidence(doc))
                 issues.extend(check_foundation_docs.validate_implementation_status(doc))
@@ -1448,6 +1628,192 @@ Provide an app frame.
         )
 
         self.assertNotIn("complete foundation docs must include acceptance evidence sidecar", "\n".join(issues))
+
+    def test_rejects_legacy_foundation_flow_sections(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            path = root / "docs" / "foundations" / "app-shell" / "app-frame.md"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(
+                """# App Frame
+
+## Purpose
+
+Provide an app frame.
+
+## Primary actor
+
+- User
+
+## Trigger
+
+- User opens a route.
+
+## Main flow
+
+1. System renders the frame.
+
+## Alternate / error flows
+
+- None.
+
+## Acceptance Criteria
+
+- **AC-001** Frame renders.
+
+## Acceptance Test Matrix
+
+| ID | Boundary | Scenario | Covers AC | Verification | Required |
+|---|---|---|---|---|---|
+| AT-001 | UI component | Frame renders. | AC-001 | UI component test | Yes |
+
+## Out Of Scope
+
+- N/A.
+""",
+                encoding="utf-8",
+            )
+            original_root = check_foundation_docs.ROOT
+            check_foundation_docs.ROOT = root
+            try:
+                issues = check_foundation_docs.validate_sections(check_foundation_docs.foundation_document(path))
+            finally:
+                check_foundation_docs.ROOT = original_root
+
+        joined = "\n".join(issues)
+        self.assertIn("missing consumers section", joined)
+        self.assertIn("missing activation section", joined)
+        self.assertIn("missing guarantees section", joined)
+
+    def test_rejects_foundation_sections_out_of_order(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            path = root / "docs" / "foundations" / "app-shell" / "app-frame.md"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(
+                """# App Frame
+
+## Purpose
+
+Provide an app frame.
+
+## Activation
+
+- An authenticated route renders.
+
+## Consumers
+
+- Authenticated routes
+
+## Guarantees
+
+- The frame renders safely.
+
+## Alternate / error flows
+
+- None.
+
+## Acceptance Criteria
+
+- **AC-001** Frame renders.
+
+## Acceptance Test Matrix
+
+| ID | Boundary | Scenario | Covers AC | Verification | Required |
+|---|---|---|---|---|---|
+| AT-001 | UI component | Frame renders. | AC-001 | UI component test | Yes |
+
+## Out Of Scope
+
+- N/A.
+""",
+                encoding="utf-8",
+            )
+            original_root = check_foundation_docs.ROOT
+            check_foundation_docs.ROOT = root
+            try:
+                issues = check_foundation_docs.validate_sections(check_foundation_docs.foundation_document(path))
+            finally:
+                check_foundation_docs.ROOT = original_root
+
+        self.assertIn("canonical foundation order", "\n".join(issues))
+
+    def test_rejects_durable_signoff_provenance(self) -> None:
+        issues = self.issues_for_foundation(
+            inline_evidence="Approved by @alice on 2026-08-06.",
+            status_rows=(("Contract", "Partial"), ("Frontend", "Not started")),
+        )
+
+        self.assertIn("durable approval/sign-off provenance", "\n".join(issues))
+
+    def test_foundation_inventories_require_exact_links_and_derived_status(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            foundations = root / "docs" / "foundations"
+            surface = foundations / "app-shell"
+            surface.mkdir(parents=True)
+            (foundations / "README.md").write_text(
+                """## Current Foundations
+
+| Surface | Foundation | Status |
+|---|---|---|
+| [App Shell](./app-shell/README.md) | [Wrong](./app-shell/wrong.md) | Not started |
+""",
+                encoding="utf-8",
+            )
+            (surface / "README.md").write_text(
+                """## Foundations
+
+| Foundation | Status |
+|---|---|
+| [App Frame](./app-frame.md) | Not started |
+""",
+                encoding="utf-8",
+            )
+            app_frame = surface / "app-frame.md"
+            app_frame.write_text(
+                """> **Implementation status**
+>
+> | Layer | Status |
+> |---|---|
+> | Frontend | Done |
+""",
+                encoding="utf-8",
+            )
+            original_root = check_foundation_docs.ROOT
+            original_foundations = check_foundation_docs.FOUNDATIONS
+            check_foundation_docs.ROOT = root
+            check_foundation_docs.FOUNDATIONS = foundations
+            try:
+                issues = check_foundation_docs.validate_foundation_inventories([app_frame])
+            finally:
+                check_foundation_docs.ROOT = original_root
+                check_foundation_docs.FOUNDATIONS = original_foundations
+
+        joined = "\n".join(issues)
+        self.assertIn("status for `./app-frame.md` must be `Done`", joined)
+        self.assertIn("is missing `./app-shell/app-frame.md`", joined)
+        self.assertIn("references non-spec `./app-shell/wrong.md`", joined)
+
+    def test_foundation_status_details_are_strict_only_for_changed_paths(self) -> None:
+        content = """> **Implementation status**
+>
+> | Layer | Status |
+> |---|---|
+> | Frontend | Done |
+"""
+        doc = check_foundation_docs.FoundationDocument(
+            path=ROOT / "docs" / "foundations" / "app-shell" / "sample.md",
+            text=content,
+            sections={},
+            h2_headings=[],
+        )
+
+        self.assertEqual([], check_foundation_docs.validate_implementation_status(doc, strict_status=False))
+        self.assertIn(
+            "missing implementation status gaps vs spec section",
+            "\n".join(check_foundation_docs.validate_implementation_status(doc, strict_status=True)),
+        )
 
 
 class TestDocDriftRatchets(unittest.TestCase):

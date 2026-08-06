@@ -10,12 +10,25 @@ Axis owns the generic Draft → Submitted record lifecycle and its REST/MCP cont
 
 ## Primary actor
 
-- Signed-in workspace user, or an authenticated product/agent consumer, submitting a business object record
+- Authenticated Business Objects consumer submitting a record for an authorized Workspace
+
+## Preconditions
+
+- An exact immutable published Business Object definition version is available in the current Workspace.
+- The consumer is authorized to create or change the target record.
 
 ## Trigger
 
 - A consumer starts a record from a published business object definition.
 - A consumer saves a draft or submits its completed values.
+
+## Success guarantee
+
+- The record is submitted once against its exact definition and Rule-binding revisions with deterministic evidence, then remains read-only for this lifecycle slice.
+
+## Minimal guarantee
+
+- Failed validation, Rule non-match, evaluator failure, stale revision, or dependency failure leaves the record recoverable as Draft without partial submission evidence.
 
 ## Main flow
 
@@ -144,4 +157,4 @@ sequenceDiagram
 >
 > **Verification:** See [submit-business-object-record.evidence.md](./submit-business-object-record.evidence.md) for exact proof paths, Axis wrapper commands, and supported-client runtime evidence.
 >
-> **Decisions:** Business Objects owns `BusinessObjectRecord` because existing product contracts reserve that ownership. The first lifecycle is Draft → Submitted; a valid rule non-match leaves the Draft recoverable rather than inventing a `Rejected` state. Rules remain pure and consumer-neutral. Published field snapshots include exact binding revisions and retain historical archived-version execution; new attachments reject archived definitions under [docs/use-cases/rules/manage-rule-bindings.md](../rules/manage-rule-bindings.md). Product consumers own presentation and setup; Axis keeps only generic public operations. Generic workflow authoring and event-driven orchestration remain out of scope until a product contract requires them.
+> **Decisions:** The first observable lifecycle is Draft to Submitted; a valid Rule non-match leaves the Draft recoverable instead of inventing a Rejected state. Product consumers own presentation and setup. [Business Objects architecture](../../architecture/business-objects.md#record-realization) owns record, transaction, exact-version, and evidence realization.

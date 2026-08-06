@@ -6,22 +6,20 @@
 
 Provide the global authenticated sidebar navigation contract for Axis Platform modules without owning module product behavior or extension lifecycle behavior.
 
-## Primary actor
+## Consumers
 
-- Signed-in Axis Platform user
+- Authenticated routes and module-owned navigation contributions.
 
-## Trigger
+## Activation
 
-- User opens an authenticated Axis Platform route after at least one visible module navigation contribution is available.
+- At least one visible module navigation contribution is available for an authenticated route.
 
-## Main flow
+## Guarantees
 
-1. Module-owned code supplies navigation contributions through the module navigation contribution contract.
-2. System filters contributions by visibility, permission, and availability rules supplied by the contribution owner.
-3. System renders a global navigation sidebar only when at least one visible contribution remains.
-4. System groups, orders, labels, and marks active contributions consistently across authenticated routes.
-5. User selects a contribution and system routes to that module-owned destination.
-6. System preserves the owning route content region without imposing module-specific page layout.
+- Accepts module-owned contributions with their destinations and visibility rules.
+- Renders only visible, navigable contributions.
+- Renders global navigation only when one or more contributions remain.
+- Applies consistent grouping, ordering, labels, icons, and active state without imposing module-specific route layout.
 
 ## Alternate / error flows
 
@@ -33,8 +31,8 @@ Provide the global authenticated sidebar navigation contract for Axis Platform m
 ## Acceptance Criteria
 
 *Contribution contract*
-- **AC-001** Module navigation contributions declare a stable module or feature identity, localized label key, icon token, route target, grouping, ordering, active matching rule, and visibility metadata.
-- **AC-002** App Shell consumes module navigation contributions through a shared registry or equivalent extension point instead of hard-coding module-specific sidebar items.
+- **AC-001** Module navigation contributions declare a stable identity, localized label, recognizable icon, route target, grouping, ordering, active matching rule, and visibility metadata.
+- **AC-002** App Shell consumes module navigation contributions through a shared extension point instead of hard-coding module-specific sidebar items.
 - **AC-003** Contribution owners define route targets and visibility rules; App Shell only renders contributions that are visible and navigable for the current user and route context.
 
 *Frame behavior*
@@ -81,7 +79,7 @@ Required UI quality: navigation controls must be keyboard-reachable, labels must
 > | Frontend | Done |
 > | Tests | Done |
 >
-> **Implemented:** Shared module navigation contribution contract, registry, App Shell renderer, empty-contribution behavior, Business Objects and Rules module contributions, localized labels, active route state, and desktop/mobile browser coverage.
+> **Implemented:** Shared module-navigation contribution contract, renderer, empty-contribution behavior, localized labels, active route state, and desktop/mobile browser coverage.
 >
 > **Gaps vs spec:** None for the initial module-navigation foundation contract.
 >
@@ -89,4 +87,4 @@ Required UI quality: navigation controls must be keyboard-reachable, labels must
 >
 > **Verification:** Acceptance proof is tracked in the sibling evidence sidecar; foundation status is checked by the foundation docs gate.
 >
-> **Decisions:** Module Navigation is an App Shell foundation, not a use case. App Shell owns the global navigation renderer and empty behavior; modules own the contributed items, labels, routes, ordering hints, and visibility rules. The sidebar must not render when there are no visible contributions. User-created extension mechanics are future platform extensibility contracts; this foundation only defines the navigation boundary they will contribute into.
+> **Decisions:** Module Navigation is an App Shell foundation, not a use case. App Shell owns the global navigation renderer and empty behavior; modules own their contributions, labels, routes, ordering hints, and visibility rules. The sidebar does not render when there are no visible contributions. User-created extension mechanics remain separate platform extensibility contracts.

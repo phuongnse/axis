@@ -8,7 +8,9 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import os
 import re
+import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -24,9 +26,9 @@ FOUNDATIONS = ROOT / "docs" / "foundations"
 
 REQUIRED_SECTIONS = (
     "Purpose",
-    "Primary actor",
-    "Trigger",
-    "Main flow",
+    "Consumers",
+    "Activation",
+    "Guarantees",
     "Alternate / error flows",
     "Acceptance Criteria",
     "Acceptance Test Matrix",
@@ -54,7 +56,15 @@ VERIFICATION_VALUES = {
     "Browser-capable visual smoke",
 }
 IMPLEMENTATION_STATUS_COLUMNS = ["Layer", "Status"]
-TAIL_SECTION_ORDER = (
+ROOT_INVENTORY_COLUMNS = ["Surface", "Foundation", "Status"]
+SURFACE_INVENTORY_COLUMNS = ["Foundation", "Status"]
+SECTION_ORDER = (
+    "Purpose",
+    "Consumers",
+    "Activation",
+    "Guarantees",
+    "Alternate / error flows",
+    "Acceptance Criteria",
     "Acceptance Test Matrix",
     "Out Of Scope",
     "Screen flow",
@@ -63,6 +73,9 @@ TAIL_SECTION_ORDER = (
 )
 
 H2_RE = re.compile(r"^##\s+(.+?)\s*$", re.MULTILINE)
+APPROVAL_PROVENANCE_RE = re.compile(
+    r"(?im)^(?=.*\b(?:approval|approved|sign[- ]?off|signed off)\b)(?=.*(?:\b\d{4}-\d{2}-\d{2}\b|\b(?:approved|approval|sign[- ]?off|signed off)\s+by\s+@?[A-Za-z0-9_.-]+|\b(?:requester|user)\s*[:=]\s*\S)).+$"
+)
 AC_ID_RE = re.compile(r"\bAC-\d{3}\b")
 AT_ID_RE = re.compile(r"^AT-\d{3}$")
 AC_BULLET_RE = re.compile(r"^\s*-\s+(?P<body>.+)$", re.MULTILINE)
@@ -193,6 +206,25 @@ def implementation_status_callout(text: str) -> str:
     return ""
 
 
+def callout_section(callout: str, marker: str) -> str:
+    lines = callout.splitlines()
+    for idx, line in enumerate(lines):
+        if not line.startswith(marker):
+            continue
+        content: list[str] = []
+        inline = line.removeprefix(marker).strip()
+        if inline:
+            content.append(inline)
+        for next_line in lines[idx + 1 :]:
+            if next_line.startswith("> **") and ":**" in next_line:
+                break
+            stripped = next_line.removeprefix(">").strip()
+            if stripped:
+                content.append(stripped)
+        return "\n".join(content)
+    return ""
+
+
 def check_foundation_inventory_layout() -> list[str]:
     issues: list[str] = []
     if not FOUNDATIONS.is_dir():
@@ -240,6 +272,83 @@ def iter_foundation_files() -> list[Path]:
     return files
 
 
+def inventory_link_target(value: str) -> str | None:
+    match = re.fullmatch(r"\[[^]]+\]\(([^)]+)\)", value.strip())
+    return match.group(1) if match else None
+
+
+def overall_status(doc: FoundationDocument) -> str | None:
+    table = implementation_status_table(doc)
+    if table is None or table.headers != IMPLEMENTATION_STATUS_COLUMNS:
+        return None
+    statuses = [record_for_row(table, row).get("Status", "") for row in table.rows]
+    if not statuses or any(status not in IMPLEMENTATION_STATUS_VALUES for status in statuses):
+        return None
+    if any(status == "Done" for status in statuses) and all(status in {"Done", "N/A"} for status in statuses):
+        return "Done"
+    if any(status == "Not started" for status in statuses) and all(status in {"Not started", "N/A"} for status in statuses):
+        return "Not started"
+    return "Partial"
+
+
+def validate_inventory_table(
+    path: Path,
+    *,
+    columns: list[str],
+    expected: dict[tuple[str, ...], str],
+) -> list[str]:
+    rel = path.relative_to(ROOT)
+    headings, sections = split_h2_sections(path.read_text(encoding="utf-8"))
+    if "Current Foundations" not in headings and "Foundations" not in headings:
+        return [f"{rel}: missing foundation inventory"]
+    section = sections.get("Current Foundations", sections.get("Foundations", ""))
+    table = first_markdown_table(section)
+    if table is None or table.headers != columns:
+        return [f"{rel}: foundation inventory columns must be exactly `{' | '.join(columns)}`"]
+
+    actual: dict[tuple[str, ...], str] = {}
+    issues: list[str] = []
+    for idx, row in enumerate(table.rows, start=1):
+        if len(row) != len(columns):
+            issues.append(f"{rel}: foundation inventory row {idx} has an invalid column count")
+            continue
+        links = tuple(inventory_link_target(value) or "" for value in row[:-1])
+        if not all(links):
+            issues.append(f"{rel}: foundation inventory row {idx} must use exact Markdown links")
+            continue
+        if links in actual:
+            issues.append(f"{rel}: foundation inventory has duplicate entry `{links[-1]}`")
+        actual[links] = row[-1]
+    for links, status in sorted(expected.items()):
+        if links not in actual:
+            issues.append(f"{rel}: foundation inventory is missing `{links[-1]}`")
+        elif actual[links] != status:
+            issues.append(f"{rel}: foundation inventory status for `{links[-1]}` must be `{status}`, found `{actual[links]}`")
+    for links in sorted(set(actual).difference(expected)):
+        issues.append(f"{rel}: foundation inventory references non-spec `{links[-1]}`")
+    return issues
+
+
+def validate_foundation_inventories(files: list[Path]) -> list[str]:
+    expected_by_surface: dict[str, dict[tuple[str, ...], str]] = {}
+    issues: list[str] = []
+    for path in files:
+        status = overall_status(foundation_document(path))
+        if status is None:
+            issues.append(f"{path.relative_to(ROOT)}: cannot derive overall status from Implementation status layer rows")
+            continue
+        surface = path.parent.name
+        expected_by_surface.setdefault(surface, {})[(f"./{path.name}",)] = status
+    root_expected: dict[tuple[str, ...], str] = {}
+    for surface, expected in expected_by_surface.items():
+        surface_readme = FOUNDATIONS / surface / "README.md"
+        issues.extend(validate_inventory_table(surface_readme, columns=SURFACE_INVENTORY_COLUMNS, expected=expected))
+        for (foundation_link,), status in expected.items():
+            root_expected[(f"./{surface}/README.md", f"./{surface}/{foundation_link.removeprefix('./')}")] = status
+    issues.extend(validate_inventory_table(FOUNDATIONS / "README.md", columns=ROOT_INVENTORY_COLUMNS, expected=root_expected))
+    return issues
+
+
 def section_position(doc: FoundationDocument, heading: str) -> int | None:
     if heading == "Implementation status":
         idx = doc.text.find(IMPLEMENTATION_STATUS_HEADING)
@@ -256,12 +365,24 @@ def validate_sections(doc: FoundationDocument) -> list[str]:
     for heading in REQUIRED_SECTIONS:
         if heading not in doc.sections:
             issues.append(f"{doc.rel}: missing {heading.lower()} section")
-    positions = [(heading, pos) for heading in TAIL_SECTION_ORDER if (pos := section_position(doc, heading)) is not None]
+    positions = [(heading, pos) for heading in SECTION_ORDER if (pos := section_position(doc, heading)) is not None]
     for (previous_heading, previous_position), (current_heading, current_position) in zip(positions, positions[1:], strict=False):
         if previous_position > current_position:
-            issues.append(f"{doc.rel}: section order must place `{current_heading}` after `{previous_heading}`")
+            issues.append(
+                f"{doc.rel}: sections must follow the canonical foundation order from Purpose through implementation status "
+                f"(`{current_heading}` appears before `{previous_heading}`)",
+            )
             break
     return issues
+
+
+def validate_no_durable_provenance(doc: FoundationDocument) -> list[str]:
+    for match in APPROVAL_PROVENANCE_RE.finditer(doc.text):
+        line_no = doc.text.count("\n", 0, match.start()) + 1
+        return [
+            f"{doc.rel}:{line_no}: durable approval/sign-off provenance is transient; keep only the current contract and rationale",
+        ]
+    return []
 
 
 def validate_acceptance_contract(doc: FoundationDocument) -> list[str]:
@@ -381,7 +502,7 @@ def validate_acceptance_evidence(doc: FoundationDocument) -> list[str]:
     return validate_acceptance_evidence_sidecar(ctx, verification_evidence_issues)
 
 
-def validate_implementation_status(doc: FoundationDocument) -> list[str]:
+def validate_implementation_status(doc: FoundationDocument, *, strict_status: bool = True) -> list[str]:
     issues: list[str] = []
     callout = implementation_status_callout(doc.text)
     if not callout:
@@ -393,22 +514,87 @@ def validate_implementation_status(doc: FoundationDocument) -> list[str]:
             status = record_for_row(status_table, row).get("Status", "")
             if status not in IMPLEMENTATION_STATUS_VALUES:
                 issues.append(f"{doc.rel}: Implementation status row {idx} has invalid Status `{status}`")
-    for marker, label in IMPLEMENTATION_STATUS_REQUIRED_MARKERS:
-        if marker not in callout:
-            issues.append(f"{doc.rel}: missing implementation status {label} section")
+    if strict_status:
+        for marker, label in IMPLEMENTATION_STATUS_REQUIRED_MARKERS:
+            if marker not in callout:
+                issues.append(f"{doc.rel}: missing implementation status {label} section")
+        for marker, label in IMPLEMENTATION_STATUS_REQUIRED_MARKERS:
+            if not callout_section(callout, marker).strip():
+                issues.append(f"{doc.rel}: implementation status {label} section is empty")
     return issues
+
+
+def check_file(path: Path, *, strict_status: bool = True) -> list[str]:
+    doc = foundation_document(path)
+    issues: list[str] = []
+    issues.extend(validate_sections(doc))
+    issues.extend(validate_no_durable_provenance(doc))
+    issues.extend(validate_acceptance_contract(doc))
+    issues.extend(validate_acceptance_evidence(doc))
+    issues.extend(validate_implementation_status(doc, strict_status=strict_status))
+    return issues
+
+
+def diff_range_against_base() -> str:
+    base = os.environ.get("BASE_BRANCH", "main")
+    for candidate in (f"origin/{base}", base, "HEAD~1"):
+        result = subprocess.run(
+            ["git", "rev-parse", "--verify", candidate],
+            cwd=ROOT,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            check=False,
+        )
+        if result.returncode == 0:
+            return f"{candidate}...HEAD"
+    raise RuntimeError(
+        "check-foundation-docs: failed to find a git diff base "
+        f"(tried origin/{base}, {base}, and HEAD~1)",
+    )
+
+
+def changed_paths_against_base() -> list[Path]:
+    range_spec = diff_range_against_base()
+    paths: list[Path] = []
+    seen: set[Path] = set()
+    for args, label in (
+        (["diff", "--name-only", range_spec], range_spec),
+        (["diff", "--name-only", "--cached"], "staged changes"),
+        (["diff", "--name-only"], "unstaged changes"),
+        (["ls-files", "--others", "--exclude-standard"], "untracked files"),
+    ):
+        result = subprocess.run(
+            ["git", *args],
+            cwd=ROOT,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            check=False,
+        )
+        if result.returncode != 0:
+            raise RuntimeError(f"check-foundation-docs: failed to diff {label}")
+        for line in result.stdout.splitlines():
+            if line.strip():
+                path = (ROOT / line.strip()).resolve()
+                if path not in seen:
+                    seen.add(path)
+                    paths.append(path)
+    return paths
 
 
 def main() -> int:
     argparse.ArgumentParser(description=__doc__).parse_args()
     issues: list[str] = []
     issues.extend(check_foundation_inventory_layout())
-    for path in iter_foundation_files():
-        doc = foundation_document(path)
-        issues.extend(validate_sections(doc))
-        issues.extend(validate_acceptance_contract(doc))
-        issues.extend(validate_acceptance_evidence(doc))
-        issues.extend(validate_implementation_status(doc))
+    files = iter_foundation_files()
+    issues.extend(validate_foundation_inventories(files))
+    changed_paths: set[Path] = set()
+    try:
+        changed_paths = set(changed_paths_against_base())
+    except RuntimeError as exc:
+        issues.append(str(exc))
+    for path in files:
+        issues.extend(check_file(path, strict_status=path.resolve() in changed_paths))
 
     if issues:
         print("Foundation docs validation failed:", file=sys.stderr)

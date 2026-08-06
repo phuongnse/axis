@@ -6,22 +6,20 @@
 
 Provide the shared frame for authenticated Axis Platform routes without owning dashboard content, account profile behavior, or session lifecycle behavior.
 
-## Primary actor
+## Consumers
 
-- Signed-in Axis Platform user
+- Authenticated routes that need shared page chrome.
 
-## Trigger
+## Activation
 
-- User opens an authenticated Axis Platform route.
+- An authenticated route renders inside the application frame.
 
-## Main flow
+## Guarantees
 
-1. System renders the authenticated route inside the shared app frame.
-2. System shows the Axis Platform brand mark and the current page context in the top bar.
-3. System exposes profile context in the top-bar account trigger.
-4. System groups preferences and sign-out inside the top-bar account actions menu panel.
-5. System renders the route content in a full-width main content region.
-6. System shows app version and Axis Platform copyright metadata in the footer.
+- Renders authenticated route content within shared top-bar, main-content, and footer regions.
+- Presents product identity, page context, profile context, preferences, and sign-out entry points without taking ownership of their workflows.
+- Keeps route content full-width and leaves route-specific layout decisions to the consuming route.
+- Presents version and copyright metadata in the footer.
 
 ## Alternate / error flows
 
@@ -32,9 +30,8 @@ Provide the shared frame for authenticated Axis Platform routes without owning d
 
 ## Acceptance Criteria
 
-*Frame structure*
 - **AC-001** Authenticated routes render page content inside the shared app frame.
-- **AC-002** The frame exposes a top bar with the Axis Platform brand mark, page context, and one account actions menu whose trigger shows profile context and whose panel groups preferences and sign-out.
+- **AC-002** The frame exposes a top bar with product identity, page context, profile context, and one account-actions entry point that groups preferences and sign-out.
 - **AC-003** The frame exposes footer app metadata with version information and Axis Platform copyright.
 
 *Quality*
@@ -45,7 +42,7 @@ Provide the shared frame for authenticated Axis Platform routes without owning d
 
 | ID | Boundary | Scenario | Covers AC | Verification | Required |
 |---|---|---|---|---|---|
-| AT-001 | UI component | App frame renders banner, main content, footer metadata, and grouped account actions without a placeholder route navigation bar. | AC-001, AC-002, AC-003, AC-006 | UI component test | Yes |
+| AT-001 | UI component | App frame renders top bar, main content, footer metadata, and grouped account actions without a placeholder route navigation bar. | AC-001, AC-002, AC-003, AC-006 | UI component test | Yes |
 | AT-002 | Browser journey | Desktop and mobile frame render an empty route surface, footer metadata, and account actions without a placeholder route navigation bar, console errors, document-level overflow, or shell-level content width caps. | AC-001, AC-002, AC-003, AC-005 | Browser automation | Yes |
 | AT-003 | Static frontend | Frame code typechecks, lints, and keeps localized copy keys valid. | AC-006 | Frontend CI | Yes |
 
@@ -79,7 +76,7 @@ Required UI quality: frame landmarks and controls must be keyboard-reachable, vi
 > | Frontend | Done |
 > | Tests | Done |
 >
-> **Implemented:** Authenticated routes render inside the shared App Frame with top bar, full-width main content, and footer. The frame exposes profile context in a compact account trigger, groups preferences and sign-out in its menu panel, keeps visible copy localized, preserves an empty dashboard route surface, contains document-level overflow, does not impose route content width caps, and shows footer version/copyright metadata. Placeholder route navigation is intentionally absent until the app has meaningful authenticated destinations.
+> **Implemented:** Authenticated routes render inside the shared App Frame with top bar, full-width main content, and footer. The frame exposes profile context, groups preferences and sign-out, keeps visible copy localized, preserves an empty route surface, contains document-level overflow, does not impose route-content width caps, and shows footer version and copyright metadata. Placeholder route navigation remains absent until visible contributions exist.
 >
 > **Gaps vs spec:** N/A.
 >
@@ -87,4 +84,4 @@ Required UI quality: frame landmarks and controls must be keyboard-reachable, vi
 >
 > **Verification:** Required AT rows are covered by UI component test, Playwright browser automation, and frontend CI.
 >
-> **Decisions:** App Frame is a foundation contract, not a use case. Future authenticated use cases may rely on its page chrome, frame structure, and document-scroll containment; dashboard content, route-specific contained/fluid/canvas layout, profile behavior, sign-out session lifecycle, and global module navigation remain owned elsewhere. Account display context comes from the current-user profile when available; the frame must not assume access tokens are frontend-decodable. Global sidebar behavior is owned by [docs/foundations/app-shell/module-navigation.md](./module-navigation.md) and must not render before visible contributions exist; canvas-specific side panels are owned by the canvas workspace feature.
+> **Decisions:** App Frame is a foundation contract, not a use case. Authenticated use cases may rely on its page chrome, frame structure, and document-scroll containment; route-specific layout, profile behavior, sign-out lifecycle, and global module navigation remain owned elsewhere. Global sidebar behavior is owned by [docs/foundations/app-shell/module-navigation.md](./module-navigation.md) and does not render before visible contributions exist.

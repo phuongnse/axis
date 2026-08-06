@@ -26,8 +26,8 @@ Follow [reference.md](../reference.md).
 
 1. Locate the owner under [docs/foundations/README.md](../../../docs/foundations/README.md); do not create placeholders or an unapproved new surface.
 2. Read [docs/playbooks/docs-style.md](../../../docs/playbooks/docs-style.md), related foundation code/tests, and dependent use cases only to preserve boundaries.
-3. Define purpose, consumers, activation, guarantees/main flow, alternate/error behavior, ACs, Acceptance Test Matrix, out of scope, implementation status, and decisions. Keep product outcomes in their use cases.
-4. Name consuming routes/components and the reusable accessibility, responsiveness, localization, navigation, and interaction guarantees.
+3. Define purpose, consumers, activation, guarantees, alternate/error behavior, cohesive ACs, Acceptance Test Matrix, out of scope, implementation status, and decisions. Keep product outcomes in their use cases and implementation libraries or provider mechanics in their stack/UI owner.
+4. Name consuming surfaces and the reusable accessibility, responsiveness, localization, navigation, and interaction guarantees. Describe generic extension points rather than embedding one consumer's identifiers, lifecycle, DTOs, or copy.
 5. This workflow **Delegates** implementation slices to `$axis-frontend-feature` with this contract and current Design Gate evidence.
 6. Reconcile status with required AT rows and the sibling evidence sidecar; temporary smoke or screenshots do not replace committed acceptance evidence.
 7. Run `python scripts/axis.py check foundation-docs` and return the updated contract/evidence to the caller.

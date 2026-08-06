@@ -6,24 +6,20 @@
 
 Provide a consistent enterprise collection workspace in which one primary data table owns page context and record workflows launch into app-scoped managed windows without discarding collection or draft state.
 
-## Primary actor
+## Consumers
 
-- Signed-in Axis Platform user managing records in a structured collection.
+- Product routes that present one structured collection and launch record workflows.
 
-## Trigger
+## Activation
 
-- A product route exposes a collection and one or more record create, view, or edit workflows.
-- A direct URL contains a valid record-window launch intent.
+- A product route exposes a collection and one or more record workflows, or a valid direct URL supplies a record-window launch intent.
 
-## Main flow
+## Guarantees
 
-1. The route renders one primary data table for its resource.
-2. Shareable search, filter, sort, grouping, visible-column, selection, and paging state remain owned by route search state where the consuming collection supports them.
-3. The user creates a record or opens an existing record link.
-4. The collection requests a stable managed-window identity through [docs/foundations/overlays/managed-dialog.md](../overlays/managed-dialog.md); an existing identity focuses or restores, while a new identity opens without replacing other windows.
-5. The user views or edits record content, using window tabs only when the record has multiple coherent sections.
-6. On save or close, the table keeps its prior query state, refreshed data is reconciled without a page reset, and focus returns through the managed-window lifecycle.
-7. Authenticated navigation may replace the visible collection route while open record windows and drafts remain available through the app-scoped switcher.
+- Renders one primary table for the collection resource.
+- Preserves enabled route-owned query and table state while record workflows open, focus, minimize, save, close, or survive authenticated navigation.
+- Uses [docs/foundations/overlays/managed-dialog.md](../overlays/managed-dialog.md) for stable record-workflow identities and lifecycle.
+- Keeps record sections within one record workflow rather than creating a second collection workspace.
 
 ## Alternate / error flows
 
@@ -67,7 +63,7 @@ Provide a consistent enterprise collection workspace in which one primary data t
 - Multi-record comparison workspaces, dashboards, kanban boards, timelines, spreadsheet editing, or native window pop-outs.
 - Persisting collection state to a user profile before an owning preference contract exists.
 
-## Screen Flow
+## Screen flow
 
 | Surface | Required contract |
 |---|---|
@@ -88,7 +84,7 @@ Required UI quality: collection and record-window controls must be keyboard-reac
 > | Frontend | Done |
 > | Tests | Done |
 >
-> **Implemented:** Shared `DataTable` provides one primary collection workspace with internal scrolling and toolbar action composition. Rules and Business Objects consume URL parameters as one-time launch intents, request stable app-scoped window identities, preserve route-owned collection state, retain independent drafts across authenticated navigation, and guard dirty closure without replacing sibling records.
+> **Implemented:** The shared data table provides one primary collection workspace with internal scrolling and toolbar action composition. Current collection consumers use URL parameters as one-time launch intents, request stable app-scoped window identities, preserve route-owned collection state, retain independent drafts across authenticated navigation, and guard dirty closure without replacing sibling records.
 >
 > **Gaps vs spec:** None.
 >
@@ -96,4 +92,4 @@ Required UI quality: collection and record-window controls must be keyboard-reac
 >
 > **Verification:** Acceptance proof is tracked in [docs/foundations/data-display/collection-page.evidence.md](./collection-page.evidence.md).
 >
-> **Decisions:** One route retains one primary collection table. Route search owns shareable collection state and may carry one validated record-window launch intent, but the app-scoped manager owns live window lifecycle, geometry, active state, and drafts. Launch parameters are consumed without clearing unrelated collection state. Browser history controls routes and collection state rather than destructively dismissing record windows. Record-window mechanics are owned once by [docs/foundations/overlays/managed-dialog.md](../overlays/managed-dialog.md); consumers retain product data, forms, mutations, authorization, dirty policy, and copy. Dedicated detail routes require a documented workflow need rather than feature preference.
+> **Decisions:** One route retains one primary collection table. Route search owns shareable collection state and may carry one validated record-window launch intent, but the app-scoped manager owns live window lifecycle, geometry, active state, and drafts. Launch parameters are consumed without clearing unrelated collection state. Browser history controls routes and collection state rather than destructively dismissing record windows. Record-window mechanics are owned once by [docs/foundations/overlays/managed-dialog.md](../overlays/managed-dialog.md); consumers retain product data, forms, mutations, authorization, dirty policy, and copy. Dedicated detail routes require a documented workflow need.

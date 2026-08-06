@@ -1,6 +1,6 @@
 # Identity Access
 
-> **Navigation**: [docs/use-cases/README.md](../README.md) · [docs/README.md](../../README.md) · [AGENTS.md](../../../AGENTS.md)
+> **Navigation**: [docs/use-cases/README.md](../README.md) · [Identity Access architecture](../../architecture/identity-access.md) · [docs/README.md](../../README.md) · [AGENTS.md](../../../AGENTS.md)
 
 Identity Access owns account access flows for Axis Platform users.
 

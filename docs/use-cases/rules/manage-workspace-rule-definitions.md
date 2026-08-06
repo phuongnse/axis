@@ -10,10 +10,22 @@ Let a signed-in workspace user create, validate, test, version, activate, deacti
 
 - Signed-in workspace user
 
+## Preconditions
+
+- The user has an authorized current Workspace and access to the Rules collection.
+
 ## Trigger
 
 - User needs reusable deterministic logic that is not supplied by the built-in catalog.
 - User needs to revise, test, version, activate, deactivate, or inspect an existing definition.
+
+## Success guarantee
+
+- The Workspace has a validated reusable Rule definition whose immutable versions, activation state, explanations, and usage are readable without a consumer dependency.
+
+## Minimal guarantee
+
+- Invalid projections, stale revisions, authorization failures, or lifecycle conflicts preserve the last valid canonical state and every immutable version.
 
 ## Main flow
 
@@ -93,7 +105,7 @@ Let a signed-in workspace user create, validate, test, version, activate, deacti
 | Surface | Required contract |
 |---|---|
 | Rules collection | Render one primary `DataTable` with definition identity, origin, active version, activation state, usage count, and contextual actions. |
-| Create, view, and edit | Consume the managed-dialog record-tab contract with General first, Behavior as the primary business section, Usage for published-version relationships, and optional user-relevant system information last. Behavior presents one compact semantic `Inputs -> Logic -> Outputs` sequence with consistent markers, connectors, and alignment. View expressions are static read-only content; explicit authoring help opens the canonical guide where functions and logical operators use one reference interaction. Create and edit use form controls without changing the sequence. |
+| Create, view, and edit | Consume [Detail Sections](../../foundations/data-display/detail-sections.md) with General first, Behavior as the primary business section, Usage for published-version relationships, and optional user-relevant system information last. Behavior presents one compact semantic `Inputs -> Logic -> Outputs` sequence with consistent markers, connectors, and alignment. View expressions are static read-only content; explicit authoring help opens the canonical guide where functions and logical operators use one reference interaction. Create and edit use form controls without changing the sequence. |
 | Authoring | Keep every supported authoring projection synchronized through canonical logic; syntax text and visual composition are never separate stored truths. |
 | Test | Open a dialog with typed sample inputs and distinct match, non-match, invalid-input, and evaluation-failure states. |
 | Versions and activation | Open dialogs for history, version creation, activation, and deactivation; use `AlertDialog` when confirmation is destructive. |
@@ -117,4 +129,4 @@ Required UI quality: use the existing shadcn and Tailwind system only; keep labe
 >
 > **Verification:** AT-001 through AT-007 are mapped to current source and passing domain, application, infrastructure, API, architecture, contract, focused frontend, and browser evidence in the sibling sidecar.
 >
-> **Decisions:** No supported production consumer or data requires compatibility for the replaced Rule surfaces, so the current contract uses a clean cutover without lowering production quality. `Inputs -> Logic -> Outputs` is the durable Rule contract; the current language capability remains a bounded positive-assertion Boolean predicate until a use case approves an additional typed-output capability. An input key is immutable while its label remains editable. The mutable draft stays independent from immutable versions; creating a version never activates it, one exact version may be active, deactivation changes only new-binding eligibility, and terminal archive preserves historical exact evaluation. Canonical AST is the only stored behavior; the safe textual DSL, visual composer, formatter, autocomplete, and localized explanation share one server-owned versioned language projection. Retired consumer-specific rule models, conflated publish/activation state, syntax persistence, alternate semantic views, and compatibility aliases are not retained.
+> **Decisions:** The current authoring capability is a bounded positive-assertion Boolean Rule. Version creation, activation, deactivation, and archive remain distinct user actions, and input keys stay stable while labels remain editable. [Rules architecture](../../ARCHITECTURE.md#rules-boundary) owns the canonical logic, version, projection, and consumer-neutral realization; retired alternate semantic surfaces are not retained.

@@ -8,14 +8,16 @@ Audit owns the versioned redacted ingestion envelope and its immutable append-on
 
 | Owning use case | Audit responsibility | Status |
 |---|---|---|
-| [docs/use-cases/identity-governance/create-and-switch-workspace.md](../identity-governance/create-and-switch-workspace.md) | Ingest Identity's durable audit-outbox events idempotently into redacted append-only records and read them back by event ID. | In progress |
-| [docs/use-cases/identity-governance/invite-and-accept-workspace-member.md](../identity-governance/invite-and-accept-workspace-member.md) | Ingest invitation lifecycle, replay/invalid-token, anonymous, and system-delivery audit outcomes through the same contract. | In progress |
+| [docs/use-cases/identity-governance/create-organization-workspace.md](../identity-governance/create-organization-workspace.md) | Ingest Organization-creation audit-outbox events idempotently and read them back by event ID. | Partial |
+| [docs/use-cases/identity-governance/switch-active-workspace.md](../identity-governance/switch-active-workspace.md) | Ingest requested and terminal Workspace-transition outcomes through the same redacted envelope. | Partial |
+| [docs/use-cases/identity-governance/invite-workspace-member.md](../identity-governance/invite-workspace-member.md) | Ingest invitation administration and delivery outcomes, including denied lifecycle actions. | Partial |
+| [docs/use-cases/identity-governance/accept-workspace-invitation.md](../identity-governance/accept-workspace-invitation.md) | Ingest exchange, replay, invalid-token, wrong-account, stale-authority, and acceptance outcomes. | Partial |
 
 > **Implementation status**
 >
 > | Layer | Status |
 > |---|---|
-> | Audit Contracts, Domain, Application, and Infrastructure foundation | In progress |
-> | Identity audit-outbox production and delivery integration | In progress |
+> | Audit Contracts, Domain, Application, and Infrastructure foundation | Partial |
+> | Identity audit-outbox production and delivery integration | Partial |
 >
 > **Verification:** Focused Audit domain, application, model, migration, persistence, idempotency, and append-only-trigger evidence exists for the current foundation. End-to-end Identity Governance acceptance evidence remains in progress.

@@ -6,21 +6,19 @@
 
 Provide one accessible search interaction for collection grids and reference documents while the owning server query retains matching, ranking, scope, and storage decisions.
 
-## Primary actor
+## Consumers
 
-- Signed-in Axis Platform user locating records or server-owned reference content.
+- Collection grids and reference documents that expose free-text search.
 
-## Trigger
+## Activation
 
-- A collection grid or reference document exposes free-text search.
+- A consumer exposes free-text search.
 
-## Main flow
+## Guarantees
 
-1. The user enters search text.
-2. The client keeps the text in controlled, shareable surface state and debounces the owning server query.
-3. A newer query cancels or supersedes the prior request and resets collection paging to the first page.
-4. The server returns authoritative ordered results and optional structured highlight segments.
-5. The surface renders results, semantic highlights, and stable loading, empty, no-result, error, or success states without matching locally.
+- Keeps search text in controlled, shareable surface state and debounces the owning server query.
+- Prevents superseded responses from replacing current results and resets collection paging when text changes.
+- Renders authoritative results, optional structured highlights, and stable loading, empty, no-result, error, or success states without local matching.
 
 ## Alternate / error flows
 
@@ -38,11 +36,11 @@ Provide one accessible search interaction for collection grids and reference doc
 - **AC-003** Collection search is controlled, debounced, shareable, resets to page one when text changes, and never presents partial client filtering as whole-dataset results.
 - **AC-004** Newer search text cancels or supersedes older work, and stale responses cannot replace current results.
 - **AC-005** Structured highlights preserve original text, render with a clearly distinguishable semantic `mark` treatment in light and dark modes, and do not change the result's accessible name.
-- **AC-006** The canonical expression reference document searches current server metadata, context fields, and parameters while preserving grouped sections; an exact deep-link target remains visibly current and programmatically identified after focus moves to it.
-- **AC-007** Edit-only insertion remains an action on the canonical document item and is absent in read-only mode.
+- **AC-006** A searchable reference document preserves consumer-owned structure, and an exact deep-link target remains visibly current and programmatically identified after focus moves to it.
+- **AC-007** A consumer-owned item action that is available only in editable mode remains absent in read-only mode.
 - **AC-008** Search controls and results provide localized labels, keyboard access, visible focus, busy state, and result-count or no-result feedback.
 - **AC-009** The foundation does not contain searchable business copy, field weights, matching algorithms, authorization, API routes, or read-store behavior.
-- **AC-010** Rules, Business Objects, and future consumers use the same search interaction contract without feature-local search implementations.
+- **AC-010** Consumers use the same search interaction contract without feature-local search implementations.
 
 ## Acceptance Test Matrix
 
@@ -51,7 +49,7 @@ Provide one accessible search interaction for collection grids and reference doc
 | AT-001 | UI component | Shared search state debounces controlled server intent, resets paging, cancels or supersedes stale requests, and restores default results for an empty query. | AC-001, AC-002, AC-003, AC-004, AC-009 | UI component test | Yes |
 | AT-002 | UI component | Grid consumers render authoritative server pages with localized loading, retry, empty, and no-result behavior without local text matching. | AC-001, AC-003, AC-008, AC-010 | UI component test | Yes |
 | AT-003 | UI component | The canonical reference document preserves groups and targets, renders structured highlights, and exposes insertion only in edit mode. | AC-005, AC-006, AC-007, AC-008 | UI component test | Yes |
-| AT-004 | Browser journey | Rules, Business Objects, and expression-reference search remain keyboard-operable and current during rapid input without console errors. | AC-001, AC-003, AC-004, AC-005, AC-006, AC-008, AC-010 | Browser automation | Yes |
+| AT-004 | Browser journey | Collection and reference-document consumers remain keyboard-operable and current during rapid input without console errors. | AC-001, AC-003, AC-004, AC-005, AC-006, AC-008, AC-010 | Browser automation | Yes |
 | AT-005 | Static frontend | Shared and consuming code typechecks and lints without client matcher, searchable business metadata, feature DTO, or storage imports in the foundation. | AC-001, AC-002, AC-009, AC-010 | Frontend CI | Yes |
 
 ## Out Of Scope
@@ -62,7 +60,7 @@ Provide one accessible search interaction for collection grids and reference doc
 - Semantic, vector, hybrid, recommendation, or generative search.
 - A cross-module global-search route.
 
-## Screen Flow
+## Screen flow
 
 | Surface | Required contract |
 |---|---|
@@ -81,7 +79,7 @@ Required UI quality: searches must remain responsive during rapid input, stale r
 > | Frontend | Done |
 > | Tests | Done |
 >
-> **Implemented:** Rules, Business Objects, and the canonical expression guide use controlled, debounced server search with authoritative paging, cancellation, grouped structured highlights, exact deep-link targets, localized states, and no client matcher.
+> **Implemented:** Current collection and reference-document consumers use controlled, debounced server search with authoritative paging, cancellation, grouped structured highlights, exact deep-link targets, localized states, and no client matcher.
 >
 > **Gaps vs spec:** None.
 >
@@ -89,4 +87,4 @@ Required UI quality: searches must remain responsive during rapid input, stale r
 >
 > **Verification:** Acceptance proof is tracked in the sibling evidence sidecar.
 >
-> **Decisions:** Every current product grid and the expression document cut over to server-owned search without a client fallback. Search matching is owned by [docs/playbooks/search.md](../../playbooks/search.md). The user approved this high-risk direction on 2026-07-25.
+> **Decisions:** Current consumers use server-owned search without a client fallback. Search matching is owned by [docs/playbooks/search.md](../../playbooks/search.md) so matching, ranking, scope, and storage decisions remain outside this foundation.
