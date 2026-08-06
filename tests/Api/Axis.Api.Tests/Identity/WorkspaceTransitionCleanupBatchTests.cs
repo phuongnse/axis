@@ -1,7 +1,10 @@
 using Axis.Api.Infrastructure;
-using Axis.Identity.Application.Services;
-using Axis.Identity.Domain.Aggregates;
+using Axis.Identity.Application.Commands.MarkWorkspaceTransitionRedisCleanupCompleted;
+using Axis.Identity.Application.Queries.ListWorkspaceTransitionCleanupItems;
+using Axis.Shared.Domain.Primitives;
 using FluentAssertions;
+using MediatR;
+using NSubstitute;
 
 namespace Axis.Api.Tests.Identity;
 
@@ -11,79 +14,84 @@ public sealed class WorkspaceTransitionCleanupBatchTests
     public async Task ExecuteAsync_WhenCompletedRecoveryWindowIsOpen_RemovesOnlySourceTicket()
     {
         DateTimeOffset now = DateTimeOffset.Parse("2026-08-06T08:00:00Z");
-        WorkspaceTransitionCleanupItem item = CompletedItem(now.AddMinutes(1));
-        CleanupStore store = new(item);
+        WorkspaceTransitionCleanupItemDto item = CompletedItem(now.AddMinutes(1));
+        ISender sender = CreateSender([item], []);
         TicketCleanup tickets = new();
         WorkspaceTransitionCleanupBatch cleanup = new(tickets, new FixedTimeProvider(now));
 
-        int inspected = await cleanup.ExecuteAsync(store, 32, TestContext.Current.CancellationToken);
+        int inspected = await cleanup.ExecuteAsync(sender, 32, TestContext.Current.CancellationToken);
 
         inspected.Should().Be(1);
         tickets.Removals.Should().Equal((item.SourceCorrelationDigest, false));
-        store.Marked.Should().BeEmpty();
+        await sender.DidNotReceive().Send(
+            Arg.Any<MarkWorkspaceTransitionRedisCleanupCompletedCommand>(),
+            Arg.Any<CancellationToken>());
     }
 
     [Fact]
     public async Task ExecuteAsync_WhenCompletedRecoveryWindowExpired_RemovesBothTicketsAndMarksCleanup()
     {
         DateTimeOffset now = DateTimeOffset.Parse("2026-08-06T08:00:00Z");
-        WorkspaceTransitionCleanupItem item = CompletedItem(now);
-        CleanupStore store = new(item);
+        WorkspaceTransitionCleanupItemDto item = CompletedItem(now);
+        List<MarkWorkspaceTransitionRedisCleanupCompletedCommand> marked = [];
+        ISender sender = CreateSender([item], marked);
         TicketCleanup tickets = new();
         WorkspaceTransitionCleanupBatch cleanup = new(tickets, new FixedTimeProvider(now));
 
-        int inspected = await cleanup.ExecuteAsync(store, 32, TestContext.Current.CancellationToken);
+        int inspected = await cleanup.ExecuteAsync(sender, 32, TestContext.Current.CancellationToken);
 
         inspected.Should().Be(1);
         tickets.Removals.Should().Equal(
             (item.SourceCorrelationDigest, false),
             (item.TargetCorrelationDigest, true));
-        store.Marked.Should().ContainSingle().Which.Should().Be((item.TransitionId, now));
+        marked.Should().ContainSingle().Which.Should().Be(
+            new MarkWorkspaceTransitionRedisCleanupCompletedCommand(item.TransitionId, now));
     }
 
-    [Theory]
-    [InlineData(WorkspaceContextTransitionStatus.Compensated)]
-    [InlineData(WorkspaceContextTransitionStatus.Failed)]
-    public async Task ExecuteAsync_WhenTransitionDidNotComplete_PreservesSourceAndRemovesTargetTicket(
-        WorkspaceContextTransitionStatus status)
+    [Fact]
+    public async Task ExecuteAsync_WhenTransitionDidNotComplete_PreservesSourceAndRemovesTargetTicket()
     {
         DateTimeOffset now = DateTimeOffset.Parse("2026-08-06T08:00:00Z");
-        WorkspaceTransitionCleanupItem item = CompletedItem(now.AddMinutes(1)) with { Status = status };
-        CleanupStore store = new(item);
+        WorkspaceTransitionCleanupItemDto item = CompletedItem(now.AddMinutes(1)) with
+        {
+            IsCompleted = false,
+        };
+        List<MarkWorkspaceTransitionRedisCleanupCompletedCommand> marked = [];
+        ISender sender = CreateSender([item], marked);
         TicketCleanup tickets = new();
         WorkspaceTransitionCleanupBatch cleanup = new(tickets, new FixedTimeProvider(now));
 
-        await cleanup.ExecuteAsync(store, 32, TestContext.Current.CancellationToken);
+        await cleanup.ExecuteAsync(sender, 32, TestContext.Current.CancellationToken);
 
         tickets.Removals.Should().Equal((item.TargetCorrelationDigest, true));
-        store.Marked.Should().ContainSingle();
+        marked.Should().ContainSingle();
     }
 
-    private static WorkspaceTransitionCleanupItem CompletedItem(DateTimeOffset expiresAt) => new(
+    private static WorkspaceTransitionCleanupItemDto CompletedItem(DateTimeOffset expiresAt) => new(
         Guid.NewGuid(),
         new string('a', 64),
         new string('b', 64),
-        WorkspaceContextTransitionStatus.Completed,
+        true,
         expiresAt);
 
-    private sealed class CleanupStore(params WorkspaceTransitionCleanupItem[] items)
-        : IWorkspaceTransitionCleanupStore
+    private static ISender CreateSender(
+        IReadOnlyList<WorkspaceTransitionCleanupItemDto> items,
+        List<MarkWorkspaceTransitionRedisCleanupCompletedCommand> marked)
     {
-        public List<(Guid TransitionId, DateTimeOffset Now)> Marked { get; } = [];
-
-        public Task<IReadOnlyList<WorkspaceTransitionCleanupItem>> ListTerminalWithoutRedisCleanupAsync(
-            int batchSize,
-            CancellationToken ct = default) =>
-            Task.FromResult<IReadOnlyList<WorkspaceTransitionCleanupItem>>([.. items.Take(batchSize)]);
-
-        public Task<bool> MarkRedisCleanupCompletedAsync(
-            Guid transitionId,
-            DateTimeOffset now,
-            CancellationToken ct = default)
-        {
-            Marked.Add((transitionId, now));
-            return Task.FromResult(true);
-        }
+        ISender sender = Substitute.For<ISender>();
+        sender.Send(
+                Arg.Any<ListWorkspaceTransitionCleanupItemsQuery>(),
+                Arg.Any<CancellationToken>())
+            .Returns(items);
+        sender.Send(
+                Arg.Any<MarkWorkspaceTransitionRedisCleanupCompletedCommand>(),
+                Arg.Any<CancellationToken>())
+            .Returns(call =>
+            {
+                marked.Add(call.Arg<MarkWorkspaceTransitionRedisCleanupCompletedCommand>());
+                return Result.Success(true);
+            });
+        return sender;
     }
 
     private sealed class TicketCleanup : IWorkspaceTransitionTicketCleanup

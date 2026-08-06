@@ -1,5 +1,5 @@
 using Axis.Identity.Application.Commands.ExpireWorkspaceContextTransition;
-using Axis.Identity.Application.Services;
+using Axis.Identity.Application.Queries.ListExpiredWorkspaceContextTransitions;
 using MediatR;
 
 namespace Axis.Api.Infrastructure;
@@ -36,14 +36,11 @@ internal sealed class WorkspaceTransitionExpiryService(
     internal async Task<int> ExpireBatchAsync(CancellationToken ct)
     {
         using IServiceScope scope = scopeFactory.CreateScope();
-        IWorkspaceTransitionExpiryStore store =
-            scope.ServiceProvider.GetRequiredService<IWorkspaceTransitionExpiryStore>();
         ISender mediator = scope.ServiceProvider.GetRequiredService<ISender>();
-        IReadOnlyList<WorkspaceTransitionExpiryItem> items = await store.ListExpiredPendingAsync(
-            clock.GetUtcNow(),
-            BatchSize,
+        IReadOnlyList<ExpiredWorkspaceContextTransitionDto> items = await mediator.Send(
+            new ListExpiredWorkspaceContextTransitionsQuery(clock.GetUtcNow(), BatchSize),
             ct);
-        foreach (WorkspaceTransitionExpiryItem item in items)
+        foreach (ExpiredWorkspaceContextTransitionDto item in items)
         {
             await mediator.Send(
                 new ExpireWorkspaceContextTransitionCommand(

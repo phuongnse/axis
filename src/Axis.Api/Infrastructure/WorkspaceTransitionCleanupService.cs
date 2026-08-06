@@ -1,5 +1,6 @@
-using Axis.Identity.Application.Services;
-using Axis.Identity.Domain.Aggregates;
+using Axis.Identity.Application.Commands.MarkWorkspaceTransitionRedisCleanupCompleted;
+using Axis.Identity.Application.Queries.ListWorkspaceTransitionCleanupItems;
+using MediatR;
 
 namespace Axis.Api.Infrastructure;
 
@@ -36,9 +37,8 @@ internal sealed class WorkspaceTransitionCleanupService(
     internal async Task<int> CleanupBatchAsync(CancellationToken ct)
     {
         using IServiceScope scope = scopeFactory.CreateScope();
-        IWorkspaceTransitionCleanupStore store =
-            scope.ServiceProvider.GetRequiredService<IWorkspaceTransitionCleanupStore>();
-        return await cleanupBatch.ExecuteAsync(store, BatchSize, ct);
+        ISender sender = scope.ServiceProvider.GetRequiredService<ISender>();
+        return await cleanupBatch.ExecuteAsync(sender, BatchSize, ct);
     }
 }
 
@@ -47,16 +47,17 @@ internal sealed class WorkspaceTransitionCleanupBatch(
     TimeProvider clock)
 {
     public async Task<int> ExecuteAsync(
-        IWorkspaceTransitionCleanupStore store,
+        ISender sender,
         int batchSize,
         CancellationToken ct)
     {
-        IReadOnlyList<WorkspaceTransitionCleanupItem> items =
-            await store.ListTerminalWithoutRedisCleanupAsync(batchSize, ct);
-        foreach (WorkspaceTransitionCleanupItem item in items)
+        IReadOnlyList<WorkspaceTransitionCleanupItemDto> items = await sender.Send(
+            new ListWorkspaceTransitionCleanupItemsQuery(batchSize),
+            ct);
+        foreach (WorkspaceTransitionCleanupItemDto item in items)
         {
             DateTimeOffset now = clock.GetUtcNow();
-            if (item.Status == WorkspaceContextTransitionStatus.Completed)
+            if (item.IsCompleted)
             {
                 await tickets.RemoveByCorrelationDigestAsync(
                     item.SourceCorrelationDigest,
@@ -69,7 +70,9 @@ internal sealed class WorkspaceTransitionCleanupBatch(
                 item.TargetCorrelationDigest,
                 transition: true,
                 ct);
-            await store.MarkRedisCleanupCompletedAsync(item.TransitionId, now, ct);
+            await sender.Send(
+                new MarkWorkspaceTransitionRedisCleanupCompletedCommand(item.TransitionId, now),
+                ct);
         }
 
         return items.Count;
