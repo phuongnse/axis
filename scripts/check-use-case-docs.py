@@ -56,7 +56,7 @@ AC_BULLET_RE = re.compile(r"^\s*-\s+(?P<body>.+)$", re.MULTILINE)
 AC_BOLD_ID_PREFIX_RE = re.compile(r"^\*\*(AC-\d{3})\*\*\s+\S")
 H2_RE = re.compile(r"^##\s+(.+?)\s*$", re.MULTILINE)
 APPROVAL_PROVENANCE_RE = re.compile(
-    r"(?im)^(?=.*\b(?:approval|approved|sign[- ]?off|signed off)\b)(?=.*(?:\b(?:approved|approval|sign[- ]?off|signed off)\s+by\s+@?[A-Za-z0-9_.-]+|\b(?:requester|user)\s*[:=]\s*\S)).+$"
+    r"(?im)^(?=.*\b(?:approval|approved|sign[- ]?off|signed off)\s+by\s+@[A-Za-z0-9_.-]+\b)(?=.*\b\d{4}-\d{2}-\d{2}\b).+$"
 )
 ACCEPTANCE_MATRIX_COLUMNS = [
     "ID",
@@ -92,7 +92,7 @@ VERIFICATION_VALUES = {
 IMPLEMENTATION_STATUS_COLUMNS = ["Layer", "Status"]
 ROOT_INVENTORY_COLUMNS = ["Domain", "Use case", "Status"]
 DOMAIN_INVENTORY_COLUMNS = ["Use case", "Status"]
-ROOT_SUPPORTING_DOMAIN_COLUMNS = ["Domain", "Responsibilities"]
+ROOT_SUPPORTING_DOMAIN_COLUMNS = ["Domain", "Layer", "Responsibilities"]
 SUPPORTING_RESPONSIBILITY_COLUMNS = ["Owning use case", "Layer", "Responsibility", "Status"]
 USE_CASE_SECTION_ORDER = (
     "Purpose",
@@ -424,6 +424,7 @@ def validate_supporting_domain_inventories(files: list[Path]) -> list[str]:
     issues: list[str] = []
     known_docs = {path.resolve(): use_case_document(path) for path in files}
     supporting_hubs: list[Path] = []
+    declared_by_hub: dict[Path, set[tuple[Path, str]]] = {}
 
     for domain_dir in sorted(USE_CASES.iterdir()):
         if not domain_dir.is_dir() or domain_dir.name.startswith("_"):
@@ -440,6 +441,7 @@ def validate_supporting_domain_inventories(files: list[Path]) -> list[str]:
         if not hub.is_file():
             continue
         supporting_hubs.append(hub)
+        declared_by_hub[hub] = set()
         rel = hub.relative_to(ROOT)
         headings, sections = split_h2_sections(hub.read_text(encoding="utf-8"))
         if "Supporting Responsibilities" not in headings:
@@ -493,6 +495,7 @@ def validate_supporting_domain_inventories(files: list[Path]) -> list[str]:
                     f"{rel}: Supporting Responsibilities status for `{target_link}` layer `{layer}` must be "
                     f"`{layer_statuses[layer]}`, found `{status}`",
                 )
+        declared_by_hub[hub] = seen
 
     root = USE_CASES / "README.md"
     root_rel = root.relative_to(ROOT)
@@ -509,7 +512,7 @@ def validate_supporting_domain_inventories(files: list[Path]) -> list[str]:
         )
         return issues
 
-    actual: dict[str, str] = {}
+    actual: dict[str, tuple[str, str]] = {}
     for idx, row in enumerate(table.rows, start=1):
         if len(row) != len(ROOT_SUPPORTING_DOMAIN_COLUMNS):
             issues.append(f"{root_rel}: Supporting Domains row {idx} has an invalid column count")
@@ -520,16 +523,58 @@ def validate_supporting_domain_inventories(files: list[Path]) -> list[str]:
             continue
         if target in actual:
             issues.append(f"{root_rel}: Supporting Domains has duplicate entry `{target}`")
-        actual[target] = row[1]
+        actual[target] = (row[1], row[2])
 
     expected = {f"./{hub.parent.name}/README.md" for hub in supporting_hubs}
     for target in sorted(expected.difference(actual)):
         issues.append(f"{root_rel}: Supporting Domains is missing `{target}`")
     for target in sorted(set(actual).difference(expected)):
         issues.append(f"{root_rel}: Supporting Domains references non-supporting hub `{target}`")
-    for target, responsibility in actual.items():
-        if target in expected and not responsibility.strip():
+    for target, (layer, responsibility) in actual.items():
+        if target not in expected:
+            continue
+        if not layer.strip():
+            issues.append(f"{root_rel}: Supporting Domains layer for `{target}` is empty")
+        if not responsibility.strip():
             issues.append(f"{root_rel}: Supporting Domains responsibility for `{target}` is empty")
+
+    for hub in supporting_hubs:
+        root_target = f"./{hub.parent.name}/README.md"
+        root_record = actual.get(root_target)
+        if root_record is None:
+            continue
+        owned_layer = root_record[0]
+        if not owned_layer.strip():
+            continue
+
+        expected_responsibilities: set[tuple[Path, str]] = set()
+        for owner_path, owner in known_docs.items():
+            status_table = implementation_status_table(owner)
+            if status_table is None or status_table.headers != IMPLEMENTATION_STATUS_COLUMNS:
+                continue
+            owner_layers = {
+                record_for_row(status_table, status_row).get("Layer", "")
+                for status_row in status_table.rows
+            }
+            if owned_layer in owner_layers:
+                expected_responsibilities.add((owner_path, owned_layer))
+
+        hub_rel = hub.relative_to(ROOT)
+        if not expected_responsibilities:
+            issues.append(
+                f"{hub_rel}: supporting layer `{owned_layer}` is not declared by any owning use case",
+            )
+        declared_responsibilities = declared_by_hub.get(hub, set())
+        for owner_path, layer in sorted(expected_responsibilities.difference(declared_responsibilities)):
+            owner_link = os.path.relpath(owner_path, hub.parent)
+            issues.append(
+                f"{hub_rel}: missing supporting responsibility for `{owner_link}` layer `{layer}`",
+            )
+        for owner_path, layer in sorted(declared_responsibilities.difference(expected_responsibilities)):
+            owner_link = os.path.relpath(owner_path, hub.parent)
+            issues.append(
+                f"{hub_rel}: unexpected supporting responsibility for `{owner_link}` layer `{layer}`",
+            )
     return issues
 
 

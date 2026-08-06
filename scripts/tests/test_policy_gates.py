@@ -406,9 +406,9 @@ class TestUseCaseDocsGate(unittest.TestCase):
             (use_cases / "README.md").write_text(
                 """## Supporting Domains
 
-| Domain | Responsibilities |
-|---|---|
-| [Audit](./audit/README.md) | Audit projection. |
+| Domain | Layer | Responsibilities |
+|---|---|---|
+| [Audit](./audit/README.md) | Audit | Audit projection. |
 """,
                 encoding="utf-8",
             )
@@ -444,6 +444,58 @@ class TestUseCaseDocsGate(unittest.TestCase):
 
         self.assertIn(
             "status for `../identity-governance/create-workspace.md` layer `Audit` must be `Partial`, found `Not started`",
+            "\n".join(issues),
+        )
+
+    def test_supporting_domain_requires_every_owner_of_its_declared_layer(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            use_cases = root / "docs" / "use-cases"
+            owner_dir = use_cases / "identity-governance"
+            support_dir = use_cases / "audit"
+            owner_dir.mkdir(parents=True)
+            support_dir.mkdir(parents=True)
+            (use_cases / "README.md").write_text(
+                """## Supporting Domains
+
+| Domain | Layer | Responsibilities |
+|---|---|---|
+| [Audit](./audit/README.md) | Audit | Audit projection. |
+""",
+                encoding="utf-8",
+            )
+            owner_template = """> **Implementation status**
+>
+> | Layer | Status |
+> |---|---|
+> | Audit | Partial |
+"""
+            first_owner = owner_dir / "create-workspace.md"
+            second_owner = owner_dir / "switch-workspace.md"
+            first_owner.write_text(owner_template, encoding="utf-8")
+            second_owner.write_text(owner_template, encoding="utf-8")
+            (support_dir / "README.md").write_text(
+                """## Supporting Responsibilities
+
+| Owning use case | Layer | Responsibility | Status |
+|---|---|---|---|
+| [Create](../identity-governance/create-workspace.md) | Audit | Project creation outcome. | Partial |
+""",
+                encoding="utf-8",
+            )
+
+            original_root = check_use_case_docs.ROOT
+            original_use_cases = check_use_case_docs.USE_CASES
+            check_use_case_docs.ROOT = root
+            check_use_case_docs.USE_CASES = use_cases
+            try:
+                issues = check_use_case_docs.validate_supporting_domain_inventories([first_owner, second_owner])
+            finally:
+                check_use_case_docs.ROOT = original_root
+                check_use_case_docs.USE_CASES = original_use_cases
+
+        self.assertIn(
+            "missing supporting responsibility for `../identity-governance/switch-workspace.md` layer `Audit`",
             "\n".join(issues),
         )
 
@@ -634,6 +686,11 @@ Ship user value.
 
         self.assertIn("durable approval/sign-off provenance", "\n".join(issues))
 
+    def test_rejects_durable_approval_noun_provenance(self) -> None:
+        issues = self.issues_for_use_case("", ac_line="- **AC-001** Approval by @alice on 2026-08-06.")
+
+        self.assertIn("durable approval/sign-off provenance", "\n".join(issues))
+
     def test_allows_contract_language_without_approval_provenance(self) -> None:
         issues = self.issues_for_use_case("", ac_line="- **AC-001** Approval is required before a system mutation.")
 
@@ -641,6 +698,14 @@ Ship user value.
 
     def test_allows_dated_approval_behavior_without_session_provenance(self) -> None:
         issues = self.issues_for_use_case("", ac_line="- **AC-001** Approval expires on 2026-08-06.")
+
+        self.assertNotIn("durable approval/sign-off provenance", "\n".join(issues))
+
+    def test_allows_approval_actor_behavior_without_session_provenance(self) -> None:
+        issues = self.issues_for_use_case(
+            "",
+            ac_line="- **AC-001** A request is approved by the Workspace administrator before mutation.",
+        )
 
         self.assertNotIn("durable approval/sign-off provenance", "\n".join(issues))
 
@@ -1824,9 +1889,25 @@ Provide an app frame.
 
         self.assertIn("durable approval/sign-off provenance", "\n".join(issues))
 
+    def test_foundation_rejects_durable_approval_noun_provenance(self) -> None:
+        issues = self.issues_for_foundation(
+            inline_evidence="Approval by @alice on 2026-08-06.",
+            status_rows=(("Contract", "Partial"), ("Frontend", "Not started")),
+        )
+
+        self.assertIn("durable approval/sign-off provenance", "\n".join(issues))
+
     def test_foundation_allows_dated_approval_behavior_without_session_provenance(self) -> None:
         issues = self.issues_for_foundation(
             inline_evidence="Approval expires on 2026-08-06.",
+            status_rows=(("Contract", "Partial"), ("Frontend", "Not started")),
+        )
+
+        self.assertNotIn("durable approval/sign-off provenance", "\n".join(issues))
+
+    def test_foundation_allows_approval_actor_behavior_without_session_provenance(self) -> None:
+        issues = self.issues_for_foundation(
+            inline_evidence="A request is approved by the Workspace administrator before mutation.",
             status_rows=(("Contract", "Partial"), ("Frontend", "Not started")),
         )
 

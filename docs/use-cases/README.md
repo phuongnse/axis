@@ -29,9 +29,9 @@ Use cases are the product source of truth. Each use case owns one independently 
 
 ## Supporting Domains
 
-| Domain | Responsibilities |
-|---|---|
-| [docs/use-cases/audit/README.md](./audit/README.md) | Audit supports the actor-visible security outcomes owned by Identity Governance use cases. |
+| Domain | Layer | Responsibilities |
+|---|---|---|
+| [docs/use-cases/audit/README.md](./audit/README.md) | Audit | Audit supports every use case whose implementation status declares the Audit layer. |
 
 ## Rule
 
