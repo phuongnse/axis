@@ -2,6 +2,7 @@ using System.Security.Cryptography.X509Certificates;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
+using Axis.Api.Authorization;
 using Axis.Api.HealthChecks;
 using Axis.Api.Infrastructure;
 using Axis.Audit.Infrastructure.Extensions;
@@ -9,6 +10,7 @@ using Axis.BusinessObjects.Application.Commands.CreateBusinessObjectDefinition;
 using Axis.BusinessObjects.Application.Commands.CreateBusinessObjectRecord;
 using Axis.BusinessObjects.Infrastructure.Extensions;
 using Axis.Identity.Application.Commands.RegisterUser;
+using Axis.Identity.Application.Services;
 using Axis.Identity.Infrastructure.Extensions;
 using Axis.Identity.Infrastructure.Services;
 using Axis.Rules.Application.Queries.ListRuleDefinitions;
@@ -38,6 +40,8 @@ internal static class AxisApiServiceExtensions
     internal const string RulesRateLimiterPolicy = "rules";
     private const string AxisAuthenticationScheme = "Axis";
     internal const string BrowserSessionRotationScheme = "AxisBrowserSessionRotation";
+    internal const string WorkspaceTransitionScheme = "AxisWorkspaceTransition";
+    internal const string WorkspaceAccessPolicy = "WorkspaceAccess";
 
     public static WebApplicationBuilder AddAxisApiServices(this WebApplicationBuilder builder)
     {
@@ -111,7 +115,18 @@ internal static class AxisApiServiceExtensions
         }
 
         services.AddSingleton(sessionPolicy);
+        services.AddSingleton(new WorkspaceContextTransitionPolicy(
+            TimeSpan.FromMinutes(5),
+            sessionPolicy.AbsoluteLifetime + sessionPolicy.AbsoluteLifetime + TimeSpan.FromMinutes(5))
+            .Validate());
         services.AddSingleton<RedisTicketStore>();
+        services.AddSingleton<IWorkspaceTransitionTicketCleanup>(services =>
+            services.GetRequiredService<RedisTicketStore>());
+        services.AddSingleton<WorkspaceTransitionCleanupBatch>();
+        services.AddScoped<AxisBrowserSessionIssuer>();
+        services.AddScoped<WorkspaceContextTransitionSaga>();
+        services.AddHostedService<WorkspaceTransitionCleanupService>();
+        services.AddHostedService<WorkspaceTransitionExpiryService>();
 
         services.AddAuthentication(options =>
             {
@@ -154,10 +169,13 @@ internal static class AxisApiServiceExtensions
                 };
             })
             .AddCookie(BrowserSessionRotationScheme, opts =>
-                ConfigureBrowserSessionCookie(opts, sessionPolicy));
+                ConfigureBrowserSessionCookie(opts, sessionPolicy))
+            .AddCookie(WorkspaceTransitionScheme, ConfigureWorkspaceTransitionCookie);
         services.AddOptions<CookieAuthenticationOptions>(CookieAuthenticationDefaults.AuthenticationScheme)
             .Configure<RedisTicketStore, IDataProtectionProvider>(ConfigureBrowserSessionTicketStore);
         services.AddOptions<CookieAuthenticationOptions>(BrowserSessionRotationScheme)
+            .Configure<RedisTicketStore, IDataProtectionProvider>(ConfigureBrowserSessionTicketStore);
+        services.AddOptions<CookieAuthenticationOptions>(WorkspaceTransitionScheme)
             .Configure<RedisTicketStore, IDataProtectionProvider>(ConfigureBrowserSessionTicketStore);
 
         services.AddOpenIddict()
@@ -239,6 +257,18 @@ internal static class AxisApiServiceExtensions
         options.SlidingExpiration = true;
     }
 
+    private static void ConfigureWorkspaceTransitionCookie(CookieAuthenticationOptions options)
+    {
+        options.Cookie.Name = "__Host-axis-workspace-transition";
+        options.Cookie.HttpOnly = true;
+        options.Cookie.IsEssential = true;
+        options.Cookie.Path = "/";
+        options.Cookie.SameSite = SameSiteMode.Strict;
+        options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+        options.ExpireTimeSpan = TimeSpan.FromMinutes(5);
+        options.SlidingExpiration = false;
+    }
+
     private static void ConfigureBrowserSessionTicketStore(
         CookieAuthenticationOptions options,
         RedisTicketStore store,
@@ -251,7 +281,13 @@ internal static class AxisApiServiceExtensions
 
     private static void AddAxisAuthorization(this IServiceCollection services)
     {
-        services.AddAuthorization();
+        services.AddScoped<Microsoft.AspNetCore.Authorization.IAuthorizationHandler,
+            WorkspaceAccessAuthorizationHandler>();
+        services.AddAuthorization(options => options.AddPolicy(
+            WorkspaceAccessPolicy,
+            policy => policy
+                .RequireAuthenticatedUser()
+                .AddRequirements(new WorkspaceAccessRequirement())));
     }
 
     private static void AddAxisForwardedHeaders(this IServiceCollection services)
@@ -370,6 +406,8 @@ internal static class AxisApiServiceExtensions
 
     private static void AddAxisAntiforgery(this IServiceCollection services)
     {
+        services.AddSingleton<Microsoft.AspNetCore.Antiforgery.IAntiforgeryAdditionalDataProvider,
+            BrowserSessionAntiforgeryAdditionalDataProvider>();
         services.AddAntiforgery(options =>
         {
             options.Cookie.Name = "__Host-axis-antiforgery";
@@ -418,6 +456,7 @@ internal static class AxisApiServiceExtensions
                 BearerFormat = "JWT",
             });
             opts.OperationFilter<AuthorizeOperationFilter>();
+            opts.OperationFilter<RequiredIdempotencyKeyOperationFilter>();
             opts.SchemaFilter<ProblemDetailsSchemaFilter>();
         });
     }
@@ -426,7 +465,8 @@ internal static class AxisApiServiceExtensions
     {
         services.AddHealthChecks()
             .AddCheck<PostgreSqlHealthCheck>("postgresql", tags: ["ready"])
-            .AddCheck<RedisHealthCheck>("redis", tags: ["ready"]);
+            .AddCheck<RedisHealthCheck>("redis", tags: ["ready"])
+            .AddCheck<IdentityAuditHealthCheck>("identity-audit");
     }
 
     private static TimeSpan ReadPositiveTimeSpan(

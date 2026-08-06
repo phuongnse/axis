@@ -27,7 +27,7 @@ public static class RuleDefinitionEndpoints
     public static IEndpointRouteBuilder MapRuleDefinitionEndpoints(this IEndpointRouteBuilder app)
     {
         RouteGroupBuilder group = app.MapGroup("/api/rules")
-            .RequireAuthorization()
+            .RequireAuthorization(AxisApiServiceExtensions.WorkspaceAccessPolicy)
             .RequireRateLimiting(AxisApiServiceExtensions.RulesRateLimiterPolicy)
             .WithTags("Rules");
 

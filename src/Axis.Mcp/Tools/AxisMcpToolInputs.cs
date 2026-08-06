@@ -1,5 +1,9 @@
 namespace Axis.Mcp.Tools;
 
+public sealed record CreateOrganizationWorkspaceInput(
+    string Name,
+    string IdempotencyKey);
+
 public sealed record RuleDraftInput(
     string Label,
     IReadOnlyList<string> Types,

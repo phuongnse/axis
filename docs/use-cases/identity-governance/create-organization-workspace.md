@@ -104,22 +104,20 @@ The transaction, idempotency, membership, isolation, and audit realization is ow
 >
 > | Layer | Status |
 > |---|---|
-> | Identity Domain | Partial |
-> | Identity Application | Partial |
-> | Identity Infrastructure | Partial |
-> | Audit | Partial |
-> | API | Not started |
-> | MCP | Not started |
-> | Frontend | Not started |
+> | Identity Domain | Done |
+> | Identity Application | Done |
+> | Identity Infrastructure | Done |
+> | Audit | Done |
+> | API | Done |
+> | MCP | Done |
+> | Frontend | Done |
 >
-> **Gaps vs spec:**
+> **Implemented:** Atomic Organization graph creation, scoped canonical idempotency, concurrency recovery, required audit outbox and read-back, REST/OpenAPI and typed MCP boundaries, and the accessible create-result-enter client journey are implemented. Entering the created Workspace remains an explicit invocation of Switch Active Workspace.
 >
-> | ID | Gap |
-> |---|---|
-> | GAP-001 | Complete transaction/read-back and audit delivery evidence, REST/OpenAPI, MCP, and the client journey remain incomplete. |
+> **Gaps vs spec:** N/A.
 >
 > **Deferred follow-ups:** Only the separately owned capabilities under Out Of Scope are deferred.
 >
-> **Verification:** Focused Domain, Application, migration, and PostgreSQL persistence evidence exists for the current partial implementation; full acceptance evidence has not run.
+> **Verification:** Every required AT is mapped to current passing browser, UI component, application, PostgreSQL infrastructure, API/OpenAPI, and MCP evidence in [create-organization-workspace.evidence.md](./create-organization-workspace.evidence.md).
 >
 > **Decisions:** Creation ends with a readable committed graph and a separate explicit enter action. The durable realization and shared security invariants are owned by the linked Identity Governance architecture contract.

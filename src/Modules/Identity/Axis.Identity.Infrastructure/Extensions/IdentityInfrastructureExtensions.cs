@@ -6,6 +6,7 @@ using Axis.Identity.Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Axis.Identity.Infrastructure.Extensions;
 
@@ -37,6 +38,10 @@ public static class IdentityInfrastructureExtensions
         services.AddScoped<IWorkspaceContextTransitionRepository, WorkspaceContextTransitionRepository>();
         services.AddScoped<ICreateOrganizationIdempotencyRepository, CreateOrganizationIdempotencyRepository>();
         services.AddScoped<IIdentityAuditOutbox, IdentityAuditOutbox>();
+        services.AddScoped<IIdentityAuditDispatchStore, IdentityAuditDispatchStore>();
+        services.AddScoped<IIdentityAuditHealthReader, IdentityAuditHealthReader>();
+        services.AddScoped<IWorkspaceTransitionCleanupStore, WorkspaceTransitionCleanupStore>();
+        services.AddScoped<IWorkspaceTransitionExpiryStore, WorkspaceTransitionExpiryStore>();
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<IRegistrationIdempotencyRepository, RegistrationIdempotencyRepository>();
 
@@ -47,7 +52,9 @@ public static class IdentityInfrastructureExtensions
         services.AddScoped<IEmailVerificationTokenStore, EmailVerificationTokenStore>();
         services.AddScoped<IWorkspaceSlugGenerator, WorkspaceSlugGenerator>();
         services.AddSingleton(clientCatalog);
+        services.TryAddSingleton(TimeProvider.System);
         services.AddHostedService<OpenIddictSeeder>();
+        services.AddHostedService<IdentityAuditDispatcher>();
 
         return services;
     }

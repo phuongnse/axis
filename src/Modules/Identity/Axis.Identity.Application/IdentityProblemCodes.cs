@@ -36,4 +36,9 @@ public static class IdentityProblemCodes
     public const string PreferenceLanguageUnsupported = "identity.preferences.languageUnsupported";
     public const string PreferenceThemeRequired = "identity.preferences.themeRequired";
     public const string PreferenceThemeUnsupported = "identity.preferences.themeUnsupported";
+
+    public const string CreateOrganizationNameRequired =
+        "identity.createOrganization.nameRequired";
+    public const string CreateOrganizationNameLength =
+        "identity.createOrganization.nameLength";
 }

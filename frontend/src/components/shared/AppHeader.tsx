@@ -1,9 +1,11 @@
 import { Link, useRouterState } from '@tanstack/react-router';
 import { useTranslation } from 'react-i18next';
 import { AppActionsMenu } from '@/components/shared/AppActionsMenu';
+import { WorkspaceControl } from '@/features/workspaces/WorkspaceControl';
 
 interface AppHeaderProps {
   onSignOut: () => void;
+  onWorkspaceChanged: () => Promise<void>;
   signOutError?: boolean;
   signingOut?: boolean;
 }
@@ -14,7 +16,12 @@ function pageTitleKeyForPath(pathname: string) {
   return pathname.startsWith('/dashboard') ? 'app.dashboard' : 'app.account';
 }
 
-export function AppHeader({ onSignOut, signOutError = false, signingOut = false }: AppHeaderProps) {
+export function AppHeader({
+  onSignOut,
+  onWorkspaceChanged,
+  signOutError = false,
+  signingOut = false,
+}: AppHeaderProps) {
   const { t } = useTranslation();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const pageTitle = t(pageTitleKeyForPath(pathname));
@@ -29,7 +36,8 @@ export function AppHeader({ onSignOut, signOutError = false, signingOut = false 
           </span>
         </Link>
 
-        <div className="ml-auto flex shrink-0 items-center">
+        <div className="ml-auto flex min-w-0 shrink items-center gap-2">
+          <WorkspaceControl onWorkspaceChanged={onWorkspaceChanged} />
           <AppActionsMenu
             onSignOut={onSignOut}
             signOutError={signOutError}

@@ -20,7 +20,7 @@ public static class RuleBindingEndpoints
     public static IEndpointRouteBuilder MapRuleBindingEndpoints(this IEndpointRouteBuilder app)
     {
         RouteGroupBuilder bindings = app.MapGroup("/api/rule-bindings")
-            .RequireAuthorization()
+            .RequireAuthorization(AxisApiServiceExtensions.WorkspaceAccessPolicy)
             .RequireRateLimiting(AxisApiServiceExtensions.RulesRateLimiterPolicy)
             .WithTags("Rules");
 
@@ -55,7 +55,7 @@ public static class RuleBindingEndpoints
             .ProducesProblem(400).ProducesProblem(401).ProducesProblem(403).ProducesProblem(404).ProducesProblem(422);
 
         app.MapGet("/api/rules/{definitionKey}/bindings", ListUsage)
-            .RequireAuthorization()
+            .RequireAuthorization(AxisApiServiceExtensions.WorkspaceAccessPolicy)
             .RequireRateLimiting(AxisApiServiceExtensions.RulesRateLimiterPolicy)
             .WithName("ListRuleBindingUsage")
             .WithTags("Rules")

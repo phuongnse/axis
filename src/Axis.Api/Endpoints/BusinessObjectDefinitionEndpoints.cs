@@ -17,7 +17,7 @@ public static class BusinessObjectDefinitionEndpoints
     public static IEndpointRouteBuilder MapBusinessObjectDefinitionEndpoints(this IEndpointRouteBuilder app)
     {
         RouteGroupBuilder group = app.MapGroup("/api/business-object-definitions")
-            .RequireAuthorization()
+            .RequireAuthorization(AxisApiServiceExtensions.WorkspaceAccessPolicy)
             .WithTags("Business Objects");
 
         group.MapGet("", List)

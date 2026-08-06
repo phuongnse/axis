@@ -16,21 +16,32 @@ public sealed class AxisApiClient(
     };
 
     public Task<string> GetJsonAsync(string path, CancellationToken cancellationToken) =>
-        SendJsonAsync(HttpMethod.Get, path, body: null, cancellationToken);
+        SendJsonAsync(HttpMethod.Get, path, body: null, idempotencyKey: null, cancellationToken);
 
     public Task<string> PostJsonAsync(string path, object body, CancellationToken cancellationToken) =>
-        SendJsonAsync(HttpMethod.Post, path, body, cancellationToken);
+        SendJsonAsync(HttpMethod.Post, path, body, idempotencyKey: null, cancellationToken);
+
+    public Task<string> PostIdempotentJsonAsync(
+        string path,
+        object body,
+        string idempotencyKey,
+        CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(idempotencyKey);
+        return SendJsonAsync(HttpMethod.Post, path, body, idempotencyKey.Trim(), cancellationToken);
+    }
 
     public Task<string> PutJsonAsync(string path, object body, CancellationToken cancellationToken) =>
-        SendJsonAsync(HttpMethod.Put, path, body, cancellationToken);
+        SendJsonAsync(HttpMethod.Put, path, body, idempotencyKey: null, cancellationToken);
 
     public Task<string> DeleteJsonAsync(string path, object body, CancellationToken cancellationToken) =>
-        SendJsonAsync(HttpMethod.Delete, path, body, cancellationToken);
+        SendJsonAsync(HttpMethod.Delete, path, body, idempotencyKey: null, cancellationToken);
 
     private async Task<string> SendJsonAsync(
         HttpMethod method,
         string path,
         object? body,
+        string? idempotencyKey,
         CancellationToken cancellationToken)
     {
         Uri requestUri = BuildRelativeUri(path);
@@ -41,6 +52,8 @@ public sealed class AxisApiClient(
             using HttpRequestMessage request = new(method, requestUri);
             request.Headers.Authorization = new("Bearer", accessToken);
             request.Headers.Accept.ParseAdd("application/json");
+            if (idempotencyKey is not null)
+                request.Headers.Add("Idempotency-Key", idempotencyKey);
             if (body is not null)
                 request.Content = JsonContent.Create(body, options: JsonOptions);
 

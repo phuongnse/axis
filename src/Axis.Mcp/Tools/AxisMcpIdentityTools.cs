@@ -10,6 +10,23 @@ public sealed class AxisMcpIdentityTools(
     AxisApiClient api,
     AxisMcpMutationGuard mutationGuard)
 {
+    [McpServerTool(Name = "axis_create_organization_workspace")]
+    [Description("[WRITE] Create an Organization and its initial Workspace for the authenticated user. The user and authority are derived from OAuth claims; the idempotency key is forwarded to the API contract.")]
+    public Task<string> CreateOrganizationWorkspaceAsync(
+        CreateOrganizationWorkspaceInput input,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(input);
+        ArgumentException.ThrowIfNullOrWhiteSpace(input.Name);
+        ArgumentException.ThrowIfNullOrWhiteSpace(input.IdempotencyKey);
+        mutationGuard.EnsureEnabled("CreateOrganizationWorkspace");
+        return api.PostIdempotentJsonAsync(
+            "api/organizations",
+            new CreateOrganizationWorkspaceRequest(input.Name),
+            input.IdempotencyKey,
+            cancellationToken);
+    }
+
     [McpServerTool(Name = "axis_update_language_preference")]
     [Description("[WRITE] Update the authenticated user's language preference. The user and workspace are derived from OAuth claims.")]
     public Task<string> UpdateLanguagePreferenceAsync(
@@ -40,4 +57,5 @@ public sealed class AxisMcpIdentityTools(
 
     private sealed record LanguagePreferenceRequest(string Language);
     private sealed record ThemePreferenceRequest(string Theme);
+    private sealed record CreateOrganizationWorkspaceRequest(string Name);
 }

@@ -14,10 +14,17 @@ internal sealed class WorkspaceContextTransitionRepository(IdentityDbContext con
     public Task<WorkspaceContextTransition?> GetByIdAsync(Guid id, CancellationToken ct = default) =>
         context.WorkspaceContextTransitions.FirstOrDefaultAsync(x => x.Id == id, ct);
 
-    public Task<WorkspaceContextTransition?> GetForRecoveryAsync(
+    public Task<WorkspaceContextTransition?> GetBySourceCorrelationDigestAsync(
         Guid userId,
-        string sourceCorrelation,
+        string sourceCorrelationDigest,
         CancellationToken ct = default) =>
         context.WorkspaceContextTransitions.FirstOrDefaultAsync(
-            x => x.UserId == userId && x.SourceCorrelation == sourceCorrelation.Trim(), ct);
+            x => x.UserId == userId && x.SourceCorrelationDigest == sourceCorrelationDigest, ct);
+
+    public Task<WorkspaceContextTransition?> GetByTargetCorrelationDigestAsync(
+        Guid userId,
+        string targetCorrelationDigest,
+        CancellationToken ct = default) =>
+        context.WorkspaceContextTransitions.FirstOrDefaultAsync(
+            x => x.UserId == userId && x.TargetCorrelationDigest == targetCorrelationDigest, ct);
 }

@@ -18,6 +18,7 @@ import {
 
 const routerState = { location: { pathname: '/dashboard' } };
 const navigateMock = vi.fn();
+const routerInvalidateMock = vi.fn(() => Promise.resolve());
 const testWindowRenderers: ManagedWindowRendererRegistry = {
   test: TestWindowRenderer,
   'sizing-test': SizingTestWindowRenderer,
@@ -36,6 +37,7 @@ vi.mock('@tanstack/react-router', () => ({
   useRouterState: ({ select }: { select?: (state: typeof routerState) => unknown } = {}) =>
     select ? select(routerState) : routerState,
   useNavigate: () => navigateMock,
+  useRouter: () => ({ invalidate: routerInvalidateMock }),
   getRouteApi: () => ({
     useSearch: () => ({}),
     useNavigate: () => navigateMock,
@@ -82,6 +84,7 @@ describe('AppShell', () => {
     );
     routerState.location.pathname = '/dashboard';
     navigateMock.mockClear();
+    routerInvalidateMock.mockClear();
     vi.mocked(signOutUser).mockReset();
     vi.mocked(signOutUser).mockResolvedValue();
     vi.mocked(getCurrentUserProfile).mockResolvedValue({

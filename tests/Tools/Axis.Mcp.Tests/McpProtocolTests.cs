@@ -37,6 +37,7 @@ public sealed class McpProtocolTests
             [
                 "axis_create_business_object_definition",
                 "axis_create_business_object_record",
+                "axis_create_organization_workspace",
                 "axis_create_rule_binding",
                 "axis_create_rule_definition",
                 "axis_create_rule_definition_version",

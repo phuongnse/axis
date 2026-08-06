@@ -116,6 +116,28 @@ public sealed record AuditEventReadBackV1(
     string CorrelationId,
     IReadOnlyDictionary<string, string> Metadata);
 
+public static class AuditEventV1ReadBack
+{
+    public static bool Matches(AuditEventV1 expected, AuditEventReadBackV1 actual) =>
+        expected.EventId == actual.EventId
+        && expected.ActorKind == actual.ActorKind
+        && expected.ActorId == actual.ActorId
+        && expected.SubjectId == actual.SubjectId
+        && expected.WorkspaceId == actual.WorkspaceId
+        && StringComparer.Ordinal.Equals(expected.Action.Trim(), actual.Action)
+        && StringComparer.Ordinal.Equals(expected.TargetType.Trim(), actual.TargetType)
+        && expected.TargetId == actual.TargetId
+        && StringComparer.Ordinal.Equals(expected.Outcome.Trim(), actual.Outcome)
+        && NormalizeOccurredAt(expected.OccurredAt) == actual.OccurredAt
+        && StringComparer.Ordinal.Equals(expected.CorrelationId.Trim(), actual.CorrelationId)
+        && (expected.Metadata ?? new Dictionary<string, string>())
+            .OrderBy(pair => pair.Key, StringComparer.Ordinal)
+            .SequenceEqual(actual.Metadata.OrderBy(pair => pair.Key, StringComparer.Ordinal));
+
+    private static DateTimeOffset NormalizeOccurredAt(DateTimeOffset occurredAt) =>
+        occurredAt.AddTicks(-(occurredAt.Ticks % 10));
+}
+
 public enum AuditIngestionDisposition
 {
     Stored = 0,

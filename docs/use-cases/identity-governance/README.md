@@ -8,7 +8,7 @@ Identity Governance owns organizations, workspace access, memberships, invitatio
 
 | Use case | Status |
 |---|---|
-| [docs/use-cases/identity-governance/create-organization-workspace.md](./create-organization-workspace.md) | Partial |
+| [docs/use-cases/identity-governance/create-organization-workspace.md](./create-organization-workspace.md) | Done |
 | [docs/use-cases/identity-governance/switch-active-workspace.md](./switch-active-workspace.md) | Partial |
 | [docs/use-cases/identity-governance/invite-workspace-member.md](./invite-workspace-member.md) | Not started |
 | [docs/use-cases/identity-governance/accept-workspace-invitation.md](./accept-workspace-invitation.md) | Not started |

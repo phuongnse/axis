@@ -17,7 +17,7 @@ public static class BusinessObjectRecordEndpoints
     public static IEndpointRouteBuilder MapBusinessObjectRecordEndpoints(this IEndpointRouteBuilder app)
     {
         RouteGroupBuilder group = app.MapGroup("/api/business-object-records")
-            .RequireAuthorization()
+            .RequireAuthorization(AxisApiServiceExtensions.WorkspaceAccessPolicy)
             .WithTags("Business Object Records");
 
         group.MapGet("", List)

@@ -35,8 +35,12 @@ internal sealed class IdentityAuditOutboxRecordConfiguration
         builder.Property(x => x.Status).HasColumnName("status").HasConversion<string>();
         builder.Property(x => x.AttemptCount).HasColumnName("attempt_count");
         builder.Property(x => x.LastAttemptAt).HasColumnName("last_attempt_at");
+        builder.Property(x => x.NextAttemptAt).HasColumnName("next_attempt_at");
+        builder.Property(x => x.LeaseId).HasColumnName("lease_id");
+        builder.Property(x => x.LeaseUntil).HasColumnName("lease_until");
         builder.Property(x => x.FailureReason).HasColumnName("failure_reason").HasMaxLength(256);
         builder.Property(x => x.CreatedAt).HasColumnName("created_at");
-        builder.HasIndex(x => new { x.Status, x.CreatedAt });
+        builder.Property(x => x.Revision).HasColumnName("revision").IsConcurrencyToken();
+        builder.HasIndex(x => new { x.Status, x.NextAttemptAt });
     }
 }

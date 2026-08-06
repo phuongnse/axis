@@ -59,6 +59,35 @@ public sealed class AxisMcpToolTests
     }
 
     [Fact]
+    public async Task IdentityTools_WhenOrganizationIsCreated_ForwardsOnlyNameAndIdempotencyHeader()
+    {
+        RecordingHandler handler = new("{\"organizationName\":\"Acme\"}");
+        using HttpClient httpClient = new(handler)
+        {
+            BaseAddress = new Uri("https://localhost:5281/"),
+        };
+        AxisMcpIdentityTools tools = new(
+            new AxisApiClient(httpClient, new FixedAccessTokenProvider("test-token")),
+            new Axis.Mcp.Configuration.AxisMcpMutationGuard(
+                Axis.Mcp.Configuration.AxisMcpOptions.Create(
+                    new Uri("https://localhost:5281/"),
+                    ".dev-certs/rootCA.pem",
+                    "write")));
+
+        await tools.CreateOrganizationWorkspaceAsync(
+            new CreateOrganizationWorkspaceInput("Acme", "organization-1"),
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpMethod.Post, handler.Method);
+        Assert.Equal("/api/organizations", handler.RequestUri!.PathAndQuery);
+        Assert.Equal("organization-1", handler.IdempotencyKey);
+        Assert.Equal("{\"name\":\"Acme\"}", handler.RequestBody);
+        Assert.DoesNotContain("userId", handler.RequestBody, StringComparison.Ordinal);
+        Assert.DoesNotContain("workspaceId", handler.RequestBody, StringComparison.Ordinal);
+        Assert.DoesNotContain("idempotencyKey", handler.RequestBody, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task DeleteRuleBinding_WhenInvoked_SendsExpectedRevision()
     {
         RecordingHandler handler = new(string.Empty);
@@ -353,6 +382,7 @@ public sealed class AxisMcpToolTests
         public HttpMethod? Method { get; private set; }
         public Uri? RequestUri { get; private set; }
         public AuthenticationHeaderValue? Authorization { get; private set; }
+        public string? IdempotencyKey { get; private set; }
         public string RequestBody { get; private set; } = string.Empty;
 
         protected override async Task<HttpResponseMessage> SendAsync(
@@ -362,6 +392,9 @@ public sealed class AxisMcpToolTests
             Method = request.Method;
             RequestUri = request.RequestUri;
             Authorization = request.Headers.Authorization;
+            IdempotencyKey = request.Headers.TryGetValues("Idempotency-Key", out IEnumerable<string>? values)
+                ? values.Single()
+                : null;
             RequestBody = request.Content is null
                 ? string.Empty
                 : await request.Content.ReadAsStringAsync(cancellationToken);

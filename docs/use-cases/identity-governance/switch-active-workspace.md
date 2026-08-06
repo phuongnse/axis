@@ -116,22 +116,24 @@ The cross-store state machine, recovery, cleanup, authorization, and audit reali
 >
 > | Layer | Status |
 > |---|---|
-> | Identity Domain | Partial |
-> | Identity Application | Not started |
+> | Identity Domain | Done |
+> | Identity Application | Partial |
 > | Identity Infrastructure | Partial |
 > | Audit | Partial |
-> | API and session | Not started |
-> | MCP | Not started |
-> | Frontend | Not started |
+> | API and session | Done |
+> | MCP | Done |
+> | Frontend | Done |
 >
 > **Gaps vs spec:**
 >
 > | ID | Gap |
 > |---|---|
-> | GAP-001 | The context-transition application protocol, session integration, audit delivery, API/bootstrap routes, MCP lifecycle evidence, and client experience remain incomplete. |
+> | GAP-001 | AT-003 still needs application and PostgreSQL evidence for staging failure, expiry, and confirm-versus-recover races across the durable transition boundary. |
+> | GAP-002 | AT-007 still needs a browser journey that repeats switching while performing Workspace-scoped reads and mutations. |
+> | GAP-003 | AT-008 still needs one consolidated transition-specific audit test that proves requested/terminal correlation and redaction together with durable append-only retention. |
 >
 > **Deferred follow-ups:** Only the separately owned capabilities under Out Of Scope are deferred.
 >
-> **Verification:** Membership and migration foundation evidence exists; no complete context-transition acceptance row has current evidence.
+> **Verification:** AT-001, AT-002, AT-004 through AT-006, and AT-009 have current browser, UI component, API, Application, Infrastructure, OpenAPI, and MCP evidence. AT-003, AT-007, and AT-008 remain incomplete as recorded above, so this use case remains Partial.
 >
 > **Decisions:** Context change is a recoverable two-request protocol whose durable completion is authoritative. The linked Identity Governance architecture contract owns its cross-store realization and threat model.

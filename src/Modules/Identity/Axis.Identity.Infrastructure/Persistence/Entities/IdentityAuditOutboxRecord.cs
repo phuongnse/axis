@@ -20,8 +20,12 @@ internal sealed class IdentityAuditOutboxRecord
     public IdentityAuditOutboxStatus Status { get; set; }
     public int AttemptCount { get; set; }
     public DateTimeOffset? LastAttemptAt { get; set; }
+    public DateTimeOffset? NextAttemptAt { get; set; }
+    public Guid? LeaseId { get; set; }
+    public DateTimeOffset? LeaseUntil { get; set; }
     public string? FailureReason { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
+    public int Revision { get; set; }
 
     public AuditEventV1 ToAuditEvent() => new(
         EventId,

@@ -9,14 +9,23 @@ internal sealed class WorkspaceContextTransitionConfiguration
 {
     public void Configure(EntityTypeBuilder<WorkspaceContextTransition> builder)
     {
-        builder.ToTable("workspace_context_transitions");
+        builder.ToTable("workspace_context_transitions", table =>
+        {
+            table.HasCheckConstraint(
+                "CK_transition_source_digest",
+                "source_correlation_digest ~ '^[0-9a-f]{64}$'");
+            table.HasCheckConstraint(
+                "CK_transition_target_digest",
+                "target_correlation_digest ~ '^[0-9a-f]{64}$'");
+        });
         builder.HasKey(x => x.Id);
         builder.Property(x => x.Id).HasColumnName("id").ValueGeneratedNever();
         builder.Property(x => x.UserId).HasColumnName("user_id");
         builder.Property(x => x.SourceWorkspaceId).HasColumnName("source_workspace_id");
         builder.Property(x => x.TargetWorkspaceId).HasColumnName("target_workspace_id");
-        builder.Property(x => x.SourceCorrelation).HasColumnName("source_correlation").HasMaxLength(WorkspaceContextTransition.CorrelationMaximumLength);
-        builder.Property(x => x.TargetCorrelation).HasColumnName("target_correlation").HasMaxLength(WorkspaceContextTransition.CorrelationMaximumLength);
+        builder.Property(x => x.TerminalAuditEventId).HasColumnName("terminal_audit_event_id");
+        builder.Property(x => x.SourceCorrelationDigest).HasColumnName("source_correlation_digest").HasMaxLength(WorkspaceContextTransition.CorrelationDigestLength);
+        builder.Property(x => x.TargetCorrelationDigest).HasColumnName("target_correlation_digest").HasMaxLength(WorkspaceContextTransition.CorrelationDigestLength);
         builder.Property(x => x.CreatedAt).HasColumnName("created_at");
         builder.Property(x => x.ExpiresAt).HasColumnName("expires_at");
         builder.Property(x => x.RetainUntil).HasColumnName("retain_until");
@@ -26,9 +35,9 @@ internal sealed class WorkspaceContextTransitionConfiguration
         builder.Property(x => x.Status).HasColumnName("status").HasConversion<string>();
         builder.Property(x => x.Revision).HasColumnName("revision").IsConcurrencyToken();
 
-        builder.HasIndex(x => x.SourceCorrelation).IsUnique();
-        builder.HasIndex(x => x.TargetCorrelation).IsUnique();
-        builder.HasIndex(x => new { x.UserId, x.SourceCorrelation });
+        builder.HasIndex(x => x.SourceCorrelationDigest).IsUnique();
+        builder.HasIndex(x => x.TargetCorrelationDigest).IsUnique();
+        builder.HasIndex(x => x.TerminalAuditEventId).IsUnique();
         builder.HasIndex(x => new { x.Status, x.ExpiresAt });
 
         builder.HasOne<User>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Restrict);

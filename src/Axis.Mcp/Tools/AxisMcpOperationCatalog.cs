@@ -24,6 +24,7 @@ public static class AxisMcpOperationCatalog
             ["GetMe"] = "axis_get_current_user",
             ["UpdateLanguagePreference"] = "axis_update_language_preference",
             ["UpdateThemePreference"] = "axis_update_theme_preference",
+            ["CreateOrganizationWorkspace"] = "axis_create_organization_workspace",
             ["GetRuleBinding"] = "axis_get_rule_binding",
             ["ListRuleBindingUsage"] = "axis_list_rule_binding_usage",
             ["ListRuleDefinitions"] = "axis_list_rules",

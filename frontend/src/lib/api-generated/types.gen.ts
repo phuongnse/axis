@@ -242,6 +242,18 @@ export type CreateBusinessObjectRecordRequest = {
     } | null;
 };
 
+export type CreateOrganizationWorkspaceDto = {
+    organizationId?: string;
+    organizationName?: string;
+    workspaceId?: string;
+    workspaceName?: string;
+    workspaceSlug?: string;
+};
+
+export type CreateOrganizationWorkspaceRequest = {
+    name?: string;
+};
+
 export type CreateRuleBindingRequest = {
     definitionKey?: string;
     definitionVersion?: number;
@@ -1519,6 +1531,54 @@ export type UpdateThemePreferenceResponses = {
 };
 
 export type UpdateThemePreferenceResponse = UpdateThemePreferenceResponses[keyof UpdateThemePreferenceResponses];
+
+export type CreateOrganizationWorkspaceData = {
+    body: CreateOrganizationWorkspaceRequest;
+    headers: {
+        'Idempotency-Key': string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/organizations';
+};
+
+export type CreateOrganizationWorkspaceErrors = {
+    /**
+     * Bad Request
+     */
+    400: HttpValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Forbidden
+     */
+    403: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+    /**
+     * Conflict
+     */
+    409: ProblemDetails;
+    /**
+     * Unprocessable Content
+     */
+    422: ProblemDetails;
+};
+
+export type CreateOrganizationWorkspaceError = CreateOrganizationWorkspaceErrors[keyof CreateOrganizationWorkspaceErrors];
+
+export type CreateOrganizationWorkspaceResponses = {
+    /**
+     * Created
+     */
+    201: CreateOrganizationWorkspaceDto;
+};
+
+export type CreateOrganizationWorkspaceResponse = CreateOrganizationWorkspaceResponses[keyof CreateOrganizationWorkspaceResponses];
 
 export type ListRuleBindingUsageData = {
     body?: never;

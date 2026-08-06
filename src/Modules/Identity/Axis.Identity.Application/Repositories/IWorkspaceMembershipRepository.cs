@@ -1,4 +1,32 @@
 using Axis.Identity.Domain.Aggregates;
+using Axis.Identity.Domain.ValueObjects;
 namespace Axis.Identity.Application.Repositories;
 
-public interface IWorkspaceMembershipRepository { Task AddAsync(WorkspaceMembership membership, CancellationToken ct = default); Task<WorkspaceMembership?> GetActiveAsync(Guid workspaceId, Guid userId, CancellationToken ct = default); Task<IReadOnlyList<WorkspaceMembership>> ListActiveForUserAsync(Guid userId, CancellationToken ct = default); }
+public interface IWorkspaceMembershipRepository
+{
+    Task AddAsync(WorkspaceMembership membership, CancellationToken ct = default);
+    Task<WorkspaceMembership?> GetActiveAsync(
+        Guid workspaceId,
+        Guid userId,
+        CancellationToken ct = default);
+    Task<IReadOnlyList<WorkspaceMembership>> ListActiveForUserAsync(
+        Guid userId,
+        CancellationToken ct = default);
+    Task<bool> HasActivePersonalOwnerWorkspaceAsync(
+        Guid userId,
+        CancellationToken ct = default);
+    Task<bool> HasActiveWorkspaceAccessAsync(
+        Guid workspaceId,
+        Guid userId,
+        CancellationToken ct = default);
+    Task<IReadOnlyList<EligibleWorkspaceProjection>> ListEligibleWorkspacesAsync(
+        Guid userId,
+        CancellationToken ct = default);
+}
+
+public sealed record EligibleWorkspaceProjection(
+    Guid WorkspaceId,
+    string Name,
+    WorkspaceSlug Slug,
+    WorkspaceType Type,
+    Guid? OrganizationId);

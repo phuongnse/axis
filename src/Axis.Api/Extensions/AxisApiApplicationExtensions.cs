@@ -89,8 +89,10 @@ internal static class AxisApiApplicationExtensions
         app.MapConnectEndpoints();
 
         app.MapAuthEndpoints();
+        app.MapWorkspaceContextEndpoints();
         app.MapLegalEndpoints();
         app.MapUserEndpoints();
+        app.MapOrganizationEndpoints();
         app.MapRuleDefinitionEndpoints();
         app.MapRuleBindingEndpoints();
         app.MapBusinessObjectDefinitionEndpoints();

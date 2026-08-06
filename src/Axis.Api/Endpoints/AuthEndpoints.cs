@@ -70,7 +70,7 @@ public static class AuthEndpoints
     private static async Task<IResult> SignIn(
         [FromBody] SignInUserRequest request,
         ISender mediator,
-        AxisBrowserSessionPolicy sessionPolicy,
+        AxisBrowserSessionIssuer sessionIssuer,
         HttpContext httpContext,
         CancellationToken ct)
     {
@@ -79,7 +79,12 @@ public static class AuthEndpoints
         if (result.IsFailure)
             return result.ToProblemDetails();
 
-        await SignInBrowserSessionAsync(httpContext, sessionPolicy, result.Value);
+        await sessionIssuer.RotateAsync(
+            httpContext,
+            result.Value.UserId,
+            result.Value.workspaceId,
+            result.Value.Email,
+            result.Value.FullName);
 
         return Results.Ok(SignInSessionEstablishedDto.From(result.Value));
     }
@@ -87,7 +92,7 @@ public static class AuthEndpoints
     private static async Task<IResult> VerifyEmail(
         [FromBody] VerifyEmailRequest request,
         ISender mediator,
-        AxisBrowserSessionPolicy sessionPolicy,
+        AxisBrowserSessionIssuer sessionIssuer,
         HttpContext httpContext,
         CancellationToken ct)
     {
@@ -97,67 +102,16 @@ public static class AuthEndpoints
             return result.ToProblemDetails();
 
         if (result.Value.SessionEstablished)
-            await SignInBrowserSessionAsync(httpContext, sessionPolicy, result.Value);
+        {
+            await sessionIssuer.RotateAsync(
+                httpContext,
+                result.Value.UserId!.Value,
+                result.Value.workspaceId,
+                result.Value.Email,
+                result.Value.FullName);
+        }
 
         return Results.Ok(VerifyEmailSessionEstablishedDto.From(result.Value));
-    }
-
-    private static async Task SignInBrowserSessionAsync(
-        HttpContext httpContext,
-        AxisBrowserSessionPolicy sessionPolicy,
-        SignInSuccessDto claims)
-    {
-        await SignInBrowserSessionAsync(
-            httpContext,
-            sessionPolicy,
-            claims.UserId,
-            claims.workspaceId,
-            claims.Email,
-            claims.FullName);
-    }
-
-    private static async Task SignInBrowserSessionAsync(
-        HttpContext httpContext,
-        AxisBrowserSessionPolicy sessionPolicy,
-        VerifyEmailSuccessDto claims)
-    {
-        await SignInBrowserSessionAsync(
-            httpContext,
-            sessionPolicy,
-            claims.UserId!.Value,
-            claims.workspaceId,
-            claims.Email,
-            claims.FullName);
-    }
-
-    private static async Task SignInBrowserSessionAsync(
-        HttpContext httpContext,
-        AxisBrowserSessionPolicy sessionPolicy,
-        Guid userId,
-        Guid? workspaceId,
-        string email,
-        string fullName)
-    {
-        List<Claim> claimList =
-        [
-            new(Claims.Subject, userId.ToString()),
-            new(Claims.Email, email),
-            new(Claims.Name, fullName),
-        ];
-        if (workspaceId is Guid resolvedWorkspaceId)
-            claimList.Add(new Claim("workspace_id", resolvedWorkspaceId.ToString()));
-
-        ClaimsIdentity identity = new(claimList, CookieAuthenticationDefaults.AuthenticationScheme);
-        ClaimsPrincipal principal = new(identity);
-
-        // A successful reauthentication replaces, rather than merely overwrites,
-        // the opaque session identifier held by the browser. The ticket-store
-        // sign-out removes the prior Redis ticket before the new ticket is issued.
-        await httpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
-        await httpContext.SignInAsync(
-            AxisApiServiceExtensions.BrowserSessionRotationScheme,
-            principal,
-            sessionPolicy.CreateAuthenticationProperties());
     }
 
     private static async Task<IResult> GetSession(

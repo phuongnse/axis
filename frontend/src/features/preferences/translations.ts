@@ -113,6 +113,42 @@ export const translations = {
     'nav.version': 'Version {version}',
     'nav.verifiedAccount': 'Verified account',
 
+    'workspace.choose': 'Choose Workspace',
+    'workspace.chooseDescription': 'Only Workspaces available to your account are shown.',
+    'workspace.control': 'Workspace control',
+    'workspace.create': 'Create Organization',
+    'workspace.createFailed': 'The Organization could not be created. Retry this request.',
+    'workspace.createOrganization': 'Create Organization',
+    'workspace.createOrganizationDescription':
+      'The initial Workspace will use the same display name. Entering it is a separate step.',
+    'workspace.creating': 'Creating Organization and initial Workspace...',
+    'workspace.eligible': 'Eligible Workspaces',
+    'workspace.enterIsSeparate':
+      'Creation is complete. Your current Workspace stays active until you choose Enter Workspace.',
+    'workspace.enterWorkspace': 'Enter Workspace',
+    'workspace.initialWorkspace': 'Initial Workspace: {name}',
+    'workspace.loading': 'Loading eligible Workspaces...',
+    'workspace.organizationCreated': 'Organization created',
+    'workspace.organizationCreatedDescription':
+      'The Organization and its initial Workspace are ready.',
+    'workspace.organizationName': 'Organization name',
+    'workspace.organizationNameHelp': 'Use a name people will recognize. 2–100 characters.',
+    'workspace.organizationNameLength': 'Enter an Organization name between 2 and 100 characters.',
+    'workspace.organizationNameRequired': 'Organization name is required.',
+    'workspace.organizations': 'Organizations',
+    'workspace.personal': 'Personal',
+    'workspace.refreshFailedDescription':
+      'Prior Workspace state remains cleared. Retry the target session refresh or sign out.',
+    'workspace.refreshFailedTitle': 'Workspace refresh needs attention',
+    'workspace.refreshingDescription':
+      'The prior Workspace state has been cleared. Loading the selected Workspace.',
+    'workspace.refreshingTitle': 'Refreshing Workspace',
+    'workspace.retryRefresh': 'Retry refresh',
+    'workspace.switchFailed':
+      'The Workspace did not change. Choose an available Workspace or retry recovery.',
+    'workspace.switching': 'Switching Workspace...',
+    'workspace.unavailable': 'Eligible Workspaces are unavailable. Retry or sign out.',
+
     'notice.resendError': 'Please try again.',
     'notice.resendErrorTitle': 'Unable to resend email',
     'notice.resendLimited': 'Too many requests. Try again shortly.',
@@ -782,6 +818,41 @@ export const translations = {
     'nav.user': 'Người dùng',
     'nav.version': 'Phiên bản {version}',
     'nav.verifiedAccount': 'Tài khoản đã xác minh',
+
+    'workspace.choose': 'Chọn Workspace',
+    'workspace.chooseDescription': 'Chỉ hiển thị những Workspace tài khoản của bạn có thể dùng.',
+    'workspace.control': 'Điều khiển Workspace',
+    'workspace.create': 'Tạo Organization',
+    'workspace.createFailed': 'Không thể tạo Organization. Hãy thử lại yêu cầu này.',
+    'workspace.createOrganization': 'Tạo Organization',
+    'workspace.createOrganizationDescription':
+      'Workspace ban đầu sẽ dùng cùng tên hiển thị. Việc vào Workspace là một bước riêng.',
+    'workspace.creating': 'Đang tạo Organization và Workspace ban đầu...',
+    'workspace.eligible': 'Workspace có thể dùng',
+    'workspace.enterIsSeparate':
+      'Đã tạo xong. Workspace hiện tại vẫn hoạt động cho đến khi bạn chọn Vào Workspace.',
+    'workspace.enterWorkspace': 'Vào Workspace',
+    'workspace.initialWorkspace': 'Workspace ban đầu: {name}',
+    'workspace.loading': 'Đang tải Workspace có thể dùng...',
+    'workspace.organizationCreated': 'Đã tạo Organization',
+    'workspace.organizationCreatedDescription': 'Organization và Workspace ban đầu đã sẵn sàng.',
+    'workspace.organizationName': 'Tên Organization',
+    'workspace.organizationNameHelp': 'Dùng tên mọi người dễ nhận biết, từ 2–100 ký tự.',
+    'workspace.organizationNameLength': 'Nhập tên Organization từ 2 đến 100 ký tự.',
+    'workspace.organizationNameRequired': 'Tên Organization là bắt buộc.',
+    'workspace.organizations': 'Organizations',
+    'workspace.personal': 'Cá nhân',
+    'workspace.refreshFailedDescription':
+      'Trạng thái Workspace trước vẫn được xóa. Hãy tải lại session đích hoặc đăng xuất.',
+    'workspace.refreshFailedTitle': 'Cần xử lý việc tải lại Workspace',
+    'workspace.refreshingDescription':
+      'Trạng thái Workspace trước đã được xóa. Đang tải Workspace đã chọn.',
+    'workspace.refreshingTitle': 'Đang tải lại Workspace',
+    'workspace.retryRefresh': 'Thử tải lại',
+    'workspace.switchFailed':
+      'Workspace chưa thay đổi. Hãy chọn Workspace có thể dùng hoặc thử phục hồi lại.',
+    'workspace.switching': 'Đang chuyển Workspace...',
+    'workspace.unavailable': 'Không thể tải Workspace có thể dùng. Hãy thử lại hoặc đăng xuất.',
 
     'notice.resendError': 'Vui lòng thử lại.',
     'notice.resendErrorTitle': 'Không gửi lại được email',

@@ -4,14 +4,14 @@ namespace Axis.Identity.Domain.Aggregates;
 
 public sealed class WorkspaceContextTransition : AggregateRoot<Guid>
 {
-    public const int CorrelationMaximumLength = 128;
+    public const int CorrelationDigestLength = 64;
 
     private WorkspaceContextTransition(
         Guid userId,
         Guid sourceWorkspaceId,
         Guid targetWorkspaceId,
-        string sourceCorrelation,
-        string targetCorrelation,
+        string sourceCorrelationDigest,
+        string targetCorrelationDigest,
         DateTime createdAt,
         DateTime expiresAt,
         DateTime retainUntil) : base(Guid.NewGuid())
@@ -24,10 +24,11 @@ public sealed class WorkspaceContextTransition : AggregateRoot<Guid>
         UserId = userId;
         SourceWorkspaceId = sourceWorkspaceId;
         TargetWorkspaceId = targetWorkspaceId;
-        SourceCorrelation = NormalizeCorrelation(sourceCorrelation, nameof(sourceCorrelation));
-        TargetCorrelation = NormalizeCorrelation(targetCorrelation, nameof(targetCorrelation));
-        if (StringComparer.Ordinal.Equals(SourceCorrelation, TargetCorrelation))
-            throw new ArgumentException("Source and target correlations must be distinct.");
+        TerminalAuditEventId = Guid.NewGuid();
+        SourceCorrelationDigest = ValidateCorrelationDigest(sourceCorrelationDigest, nameof(sourceCorrelationDigest));
+        TargetCorrelationDigest = ValidateCorrelationDigest(targetCorrelationDigest, nameof(targetCorrelationDigest));
+        if (StringComparer.Ordinal.Equals(SourceCorrelationDigest, TargetCorrelationDigest))
+            throw new ArgumentException("Source and target correlation digests must be distinct.");
 
         CreatedAt = createdAt;
         ExpiresAt = expiresAt;
@@ -39,8 +40,9 @@ public sealed class WorkspaceContextTransition : AggregateRoot<Guid>
     public Guid UserId { get; private set; }
     public Guid SourceWorkspaceId { get; private set; }
     public Guid TargetWorkspaceId { get; private set; }
-    public string SourceCorrelation { get; private set; }
-    public string TargetCorrelation { get; private set; }
+    public Guid TerminalAuditEventId { get; private set; }
+    public string SourceCorrelationDigest { get; private set; }
+    public string TargetCorrelationDigest { get; private set; }
     public DateTime CreatedAt { get; private set; }
     public DateTime ExpiresAt { get; private set; }
     public DateTime RetainUntil { get; private set; }
@@ -54,11 +56,11 @@ public sealed class WorkspaceContextTransition : AggregateRoot<Guid>
         Guid userId,
         Guid sourceWorkspaceId,
         Guid targetWorkspaceId,
-        string sourceCorrelation,
-        string targetCorrelation,
+        string sourceCorrelationDigest,
+        string targetCorrelationDigest,
         DateTime createdAt,
         DateTime expiresAt,
-        DateTime retainUntil) => new(userId, sourceWorkspaceId, targetWorkspaceId, sourceCorrelation, targetCorrelation, createdAt, expiresAt, retainUntil);
+        DateTime retainUntil) => new(userId, sourceWorkspaceId, targetWorkspaceId, sourceCorrelationDigest, targetCorrelationDigest, createdAt, expiresAt, retainUntil);
 
     public void Complete(int expectedRevision, DateTime now) => Transition(WorkspaceContextTransitionStatus.Completed, expectedRevision, now);
     public void Compensate(int expectedRevision, DateTime now) => Transition(WorkspaceContextTransitionStatus.Compensated, expectedRevision, now);
@@ -95,18 +97,19 @@ public sealed class WorkspaceContextTransition : AggregateRoot<Guid>
 
     private void MarkTerminalCompletion(int expectedRevision, DateTime now, bool auditProjection)
     {
-        EnsureRevision(expectedRevision);
         if (Status == WorkspaceContextTransitionStatus.Pending)
             throw new InvalidOperationException("Only terminal transitions can record cleanup completion.");
 
         if (auditProjection)
         {
             if (AuditProjectionConfirmedAt.HasValue) return;
+            EnsureRevision(expectedRevision);
             AuditProjectionConfirmedAt = now;
         }
         else
         {
             if (RedisCleanupCompletedAt.HasValue) return;
+            EnsureRevision(expectedRevision);
             RedisCleanupCompletedAt = now;
         }
         Revision++;
@@ -118,11 +121,15 @@ public sealed class WorkspaceContextTransition : AggregateRoot<Guid>
             throw new InvalidOperationException("Workspace context transition revision is stale.");
     }
 
-    private static string NormalizeCorrelation(string value, string parameterName)
+    private static string ValidateCorrelationDigest(string value, string parameterName)
     {
-        string normalized = value?.Trim() ?? string.Empty;
-        if (normalized.Length is 0 or > CorrelationMaximumLength)
-            throw new ArgumentException("Transition correlation is required and bounded.", parameterName);
-        return normalized;
+        if (value is null
+            || value.Length != CorrelationDigestLength
+            || value.Any(character => character is not (>= '0' and <= '9') and not (>= 'a' and <= 'f')))
+        {
+            throw new ArgumentException("Transition correlation digest must be lowercase SHA-256 hex.", parameterName);
+        }
+
+        return value;
     }
 }

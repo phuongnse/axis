@@ -37,7 +37,7 @@ public class WorkspaceRepositoryTests(IdentityDatabaseFixture db) : IAsyncLifeti
         loaded.Should().NotBeNull();
         loaded!.Name.Should().Be(workspace.Name);
         loaded.Slug.Value.Should().Be("workspace-add-get");
-        loaded.Status.Should().Be(WorkspaceStatus.Active);
+        loaded.Status.Should().Be(WorkspaceStatus.PendingVerification);
     }
 
     [Fact]
@@ -58,8 +58,14 @@ public class WorkspaceRepositoryTests(IdentityDatabaseFixture db) : IAsyncLifeti
     [Fact]
     public async Task GetByIdAsync_WhenOrganizationWorkspaceExists_RetainsOrganizationParent()
     {
-        Guid organizationId = Guid.NewGuid();
-        Workspace workspace = Workspace.CreateOrganization("Acme", WorkspaceSlug.Create("acme").Value, organizationId);
+        Organization organization = Organization.Create("Acme");
+        _ctx.Organizations.Add(organization);
+        await _ctx.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        Workspace workspace = Workspace.CreateOrganization(
+            "Acme",
+            WorkspaceSlug.Create($"organization-parent-{Guid.NewGuid():N}").Value,
+            organization.Id);
         await _sut.AddAsync(workspace, TestContext.Current.CancellationToken);
         await _ctx.SaveChangesAsync(TestContext.Current.CancellationToken);
 
@@ -69,7 +75,7 @@ public class WorkspaceRepositoryTests(IdentityDatabaseFixture db) : IAsyncLifeti
 
         loaded.Should().NotBeNull();
         loaded!.Id.Should().Be(workspace.Id);
-        loaded.OrganizationId.Should().Be(organizationId);
+        loaded.OrganizationId.Should().Be(organization.Id);
     }
 
     [Fact]

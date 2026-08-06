@@ -215,6 +215,11 @@ public sealed class ApiTestFixture : IAsyncLifetime
             BaseAddress = new Uri("https://localhost"),
         });
 
+    public HttpClient CreateRawClient() => new(_factory.Server.CreateHandler())
+    {
+        BaseAddress = new Uri("https://localhost"),
+    };
+
     public async Task<JsonElement> RefreshBrowserSecurityContextAsync(
         CancellationToken cancellationToken = default)
     {

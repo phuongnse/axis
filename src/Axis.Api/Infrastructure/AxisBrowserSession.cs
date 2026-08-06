@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Security.Cryptography;
+using Axis.Api.Extensions;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.DataProtection;
@@ -56,11 +57,22 @@ internal sealed record AxisBrowserSessionPolicy(TimeSpan IdleLifetime, TimeSpan 
         absoluteExpiresAt <= now;
 }
 
+internal interface IWorkspaceTransitionTicketCleanup
+{
+    Task RemoveByCorrelationDigestAsync(
+        string correlationDigest,
+        bool transition,
+        CancellationToken cancellationToken);
+}
+
 internal sealed class RedisTicketStore(
     IConnectionMultiplexer redis,
-    IDataProtectionProvider dataProtectionProvider) : ITicketStore
+    IDataProtectionProvider dataProtectionProvider)
+    : ITicketStore, IWorkspaceTransitionTicketCleanup
 {
     private const string KeyPrefix = "axis:browser-session:";
+    private const string SessionCorrelationIndexPrefix = "axis:browser-session-correlation:";
+    private const string TransitionCorrelationIndexPrefix = "axis:workspace-transition-correlation:";
     private readonly IDataProtector protector = dataProtectionProvider.CreateProtector(
         "Axis.Api",
         "BrowserSessionTicket",
@@ -87,7 +99,14 @@ internal sealed class RedisTicketStore(
                     When.NotExists)
                 .WaitAsync(cancellationToken);
             if (stored)
-                return key;
+            {
+                return await StoreCorrelationIndexAsync(
+                    database,
+                    ticket,
+                    key,
+                    lifetime,
+                    cancellationToken);
+            }
         }
 
         throw new InvalidOperationException("Could not allocate a unique browser session identifier.");
@@ -115,6 +134,14 @@ internal sealed class RedisTicketStore(
             .WaitAsync(cancellationToken);
         if (!renewed)
             throw new InvalidOperationException("The browser session no longer exists.");
+
+        await StoreCorrelationIndexAsync(
+            redis.GetDatabase(),
+            ticket,
+            key,
+            RemainingLifetime(ticket),
+            cancellationToken,
+            replace: true);
     }
 
     public Task RenewAsync(
@@ -157,7 +184,14 @@ internal sealed class RedisTicketStore(
 
     public async Task RemoveAsync(string key, CancellationToken cancellationToken)
     {
-        await redis.GetDatabase().KeyDeleteAsync(KeyPrefix + key).WaitAsync(cancellationToken);
+        IDatabase database = redis.GetDatabase();
+        RedisValue value = await database.StringGetAsync(KeyPrefix + key)
+            .WaitAsync(cancellationToken);
+        string? indexKey = CorrelationIndexKey(value);
+        RedisKey[] keys = indexKey is null
+            ? [KeyPrefix + key]
+            : [KeyPrefix + key, indexKey];
+        await database.KeyDeleteAsync(keys).WaitAsync(cancellationToken);
     }
 
     public Task RemoveAsync(
@@ -166,8 +200,139 @@ internal sealed class RedisTicketStore(
         CancellationToken cancellationToken) =>
         RemoveAsync(key, cancellationToken);
 
+    public async Task RemoveByCorrelationDigestAsync(
+        string correlationDigest,
+        bool transition,
+        CancellationToken cancellationToken)
+    {
+        string indexKey = (transition
+            ? TransitionCorrelationIndexPrefix
+            : SessionCorrelationIndexPrefix) + correlationDigest;
+        IDatabase database = redis.GetDatabase();
+        RedisValue ticketKey = await database.StringGetAsync(indexKey)
+            .WaitAsync(cancellationToken);
+        RedisKey[] keys = ticketKey.IsNull
+            ? [indexKey]
+            : [indexKey, KeyPrefix + ticketKey.ToString()];
+        await database.KeyDeleteAsync(keys).WaitAsync(cancellationToken);
+    }
+
     private byte[] Protect(AuthenticationTicket ticket) =>
         protector.Protect(TicketSerializer.Default.Serialize(ticket));
+
+    private async Task<string> StoreCorrelationIndexAsync(
+        IDatabase database,
+        AuthenticationTicket ticket,
+        string ticketKey,
+        TimeSpan lifetime,
+        CancellationToken cancellationToken,
+        bool replace = false)
+    {
+        string? indexKey = CorrelationIndexKey(ticket);
+        if (indexKey is null)
+            return ticketKey;
+
+        bool stored = await database.StringSetAsync(
+                indexKey,
+                ticketKey,
+                lifetime,
+                replace ? When.Always : When.NotExists)
+            .WaitAsync(cancellationToken);
+        if (stored)
+            return ticketKey;
+
+        RedisValue existingTicketKey = await database.StringGetAsync(indexKey)
+            .WaitAsync(cancellationToken);
+        RedisValue existingPayload = existingTicketKey.IsNull
+            ? RedisValue.Null
+            : await database.StringGetAsync(KeyPrefix + existingTicketKey.ToString())
+                .WaitAsync(cancellationToken);
+        AuthenticationTicket? existingTicket = TryUnprotect(existingPayload);
+        if (existingTicket is not null
+            && HasSameIdentity(ticket, existingTicket))
+        {
+            await database.KeyDeleteAsync(KeyPrefix + ticketKey).WaitAsync(cancellationToken);
+            return existingTicketKey.ToString();
+        }
+
+        await database.KeyDeleteAsync(KeyPrefix + ticketKey).WaitAsync(cancellationToken);
+        throw new InvalidOperationException("The browser session correlation already exists.");
+    }
+
+    private AuthenticationTicket? TryUnprotect(RedisValue payload)
+    {
+        if (payload.IsNull)
+            return null;
+
+        try
+        {
+            return TicketSerializer.Default.Deserialize(protector.Unprotect((byte[])payload!));
+        }
+        catch (CryptographicException)
+        {
+            return null;
+        }
+    }
+
+    private static bool HasSameIdentity(
+        AuthenticationTicket expected,
+        AuthenticationTicket actual) =>
+        StringComparer.Ordinal.Equals(expected.AuthenticationScheme, actual.AuthenticationScheme)
+        && expected.Principal.Claims
+            .Select(claim => (claim.Type, claim.Value, claim.ValueType, claim.Issuer))
+            .OrderBy(claim => claim.Type, StringComparer.Ordinal)
+            .ThenBy(claim => claim.Value, StringComparer.Ordinal)
+            .ThenBy(claim => claim.ValueType, StringComparer.Ordinal)
+            .ThenBy(claim => claim.Issuer, StringComparer.Ordinal)
+            .SequenceEqual(actual.Principal.Claims
+                .Select(claim => (claim.Type, claim.Value, claim.ValueType, claim.Issuer))
+                .OrderBy(claim => claim.Type, StringComparer.Ordinal)
+                .ThenBy(claim => claim.Value, StringComparer.Ordinal)
+                .ThenBy(claim => claim.ValueType, StringComparer.Ordinal)
+                .ThenBy(claim => claim.Issuer, StringComparer.Ordinal));
+
+    private string? CorrelationIndexKey(RedisValue protectedTicket)
+    {
+        if (protectedTicket.IsNull)
+            return null;
+
+        try
+        {
+            return CorrelationIndexKey(
+                TicketSerializer.Default.Deserialize(
+                    protector.Unprotect((byte[])protectedTicket!)));
+        }
+        catch (CryptographicException)
+        {
+            return null;
+        }
+    }
+
+    private static string? CorrelationIndexKey(AuthenticationTicket? ticket)
+    {
+        if (ticket is null)
+            return null;
+
+        string? correlation;
+        string prefix;
+        if (StringComparer.Ordinal.Equals(
+                ticket.AuthenticationScheme,
+                AxisApiServiceExtensions.WorkspaceTransitionScheme))
+        {
+            correlation = ticket.Principal.FindFirst(
+                WorkspaceTransitionTicket.TargetCorrelationClaim)?.Value;
+            prefix = TransitionCorrelationIndexPrefix;
+        }
+        else
+        {
+            correlation = ticket.Principal.FindFirst(BrowserSessionCorrelation.ClaimType)?.Value;
+            prefix = SessionCorrelationIndexPrefix;
+        }
+
+        return string.IsNullOrWhiteSpace(correlation)
+            ? null
+            : prefix + BrowserSessionCorrelation.Digest(correlation);
+    }
 
     private static TimeSpan RemainingLifetime(AuthenticationTicket ticket)
     {
