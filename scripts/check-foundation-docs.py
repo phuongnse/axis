@@ -73,9 +73,6 @@ SECTION_ORDER = (
 )
 
 H2_RE = re.compile(r"^##\s+(.+?)\s*$", re.MULTILINE)
-APPROVAL_PROVENANCE_RE = re.compile(
-    r"(?im)^(?=.*\b(?:approval|approved|sign[- ]?off|signed off)\s+by\s+@[A-Za-z0-9_.-]+\b)(?=.*\b\d{4}-\d{2}-\d{2}\b).+$"
-)
 AC_ID_RE = re.compile(r"\bAC-\d{3}\b")
 AT_ID_RE = re.compile(r"^AT-\d{3}$")
 AC_BULLET_RE = re.compile(r"^\s*-\s+(?P<body>.+)$", re.MULTILINE)
@@ -376,15 +373,6 @@ def validate_sections(doc: FoundationDocument) -> list[str]:
     return issues
 
 
-def validate_no_durable_provenance(doc: FoundationDocument) -> list[str]:
-    for match in APPROVAL_PROVENANCE_RE.finditer(doc.text):
-        line_no = doc.text.count("\n", 0, match.start()) + 1
-        return [
-            f"{doc.rel}:{line_no}: durable approval/sign-off provenance is transient; keep only the current contract and rationale",
-        ]
-    return []
-
-
 def validate_acceptance_contract(doc: FoundationDocument) -> list[str]:
     issues: list[str] = []
     ac_ids: list[str] = []
@@ -528,7 +516,6 @@ def check_file(path: Path, *, strict_status: bool = True) -> list[str]:
     doc = foundation_document(path)
     issues: list[str] = []
     issues.extend(validate_sections(doc))
-    issues.extend(validate_no_durable_provenance(doc))
     issues.extend(validate_acceptance_contract(doc))
     issues.extend(validate_acceptance_evidence(doc))
     issues.extend(validate_implementation_status(doc, strict_status=strict_status))

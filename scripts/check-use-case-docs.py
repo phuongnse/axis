@@ -55,9 +55,6 @@ AT_ID_RE = re.compile(r"^AT-\d{3}$")
 AC_BULLET_RE = re.compile(r"^\s*-\s+(?P<body>.+)$", re.MULTILINE)
 AC_BOLD_ID_PREFIX_RE = re.compile(r"^\*\*(AC-\d{3})\*\*\s+\S")
 H2_RE = re.compile(r"^##\s+(.+?)\s*$", re.MULTILINE)
-APPROVAL_PROVENANCE_RE = re.compile(
-    r"(?im)^(?=.*\b(?:approval|approved|sign[- ]?off|signed off)\s+by\s+@[A-Za-z0-9_.-]+\b)(?=.*\b\d{4}-\d{2}-\d{2}\b).+$"
-)
 ACCEPTANCE_MATRIX_COLUMNS = [
     "ID",
     "Boundary",
@@ -598,15 +595,6 @@ def validate_sections(doc: UseCaseDocument) -> list[str]:
     return issues
 
 
-def validate_no_durable_provenance(doc: UseCaseDocument) -> list[str]:
-    for match in APPROVAL_PROVENANCE_RE.finditer(doc.text):
-        line_no = doc.text.count("\n", 0, match.start()) + 1
-        return [
-            f"{doc.rel}:{line_no}: durable approval/sign-off provenance is transient; keep only the current contract and rationale",
-        ]
-    return []
-
-
 def section_position(doc: UseCaseDocument, heading: str) -> int | None:
     if heading == "Implementation status":
         idx = doc.text.find(IMPLEMENTATION_STATUS_HEADING)
@@ -1019,7 +1007,6 @@ def check_file(
     doc = use_case_document(path)
     issues: list[str] = []
     issues.extend(validate_sections(doc))
-    issues.extend(validate_no_durable_provenance(doc))
     issues.extend(validate_section_order(doc))
     issues.extend(validate_acceptance_contract(doc, require_matrix=require_acceptance_matrix))
     issues.extend(validate_acceptance_evidence(doc))

@@ -681,34 +681,6 @@ Ship user value.
 
         self.assertIn("canonical use-case order", "\n".join(issues))
 
-    def test_rejects_durable_approval_provenance(self) -> None:
-        issues = self.issues_for_use_case("", ac_line="- **AC-001** Works. Approved by @alice on 2026-08-06.")
-
-        self.assertIn("durable approval/sign-off provenance", "\n".join(issues))
-
-    def test_rejects_durable_approval_noun_provenance(self) -> None:
-        issues = self.issues_for_use_case("", ac_line="- **AC-001** Approval by @alice on 2026-08-06.")
-
-        self.assertIn("durable approval/sign-off provenance", "\n".join(issues))
-
-    def test_allows_contract_language_without_approval_provenance(self) -> None:
-        issues = self.issues_for_use_case("", ac_line="- **AC-001** Approval is required before a system mutation.")
-
-        self.assertNotIn("durable approval/sign-off provenance", "\n".join(issues))
-
-    def test_allows_dated_approval_behavior_without_session_provenance(self) -> None:
-        issues = self.issues_for_use_case("", ac_line="- **AC-001** Approval expires on 2026-08-06.")
-
-        self.assertNotIn("durable approval/sign-off provenance", "\n".join(issues))
-
-    def test_allows_approval_actor_behavior_without_session_provenance(self) -> None:
-        issues = self.issues_for_use_case(
-            "",
-            ac_line="- **AC-001** A request is approved by the Workspace administrator before mutation.",
-        )
-
-        self.assertNotIn("durable approval/sign-off provenance", "\n".join(issues))
-
     def test_rejects_empty_status_sections(self) -> None:
         issues = self.issues_for_use_case(
             """> **Implementation status**
@@ -1656,7 +1628,6 @@ Provide an app frame.
                 doc = check_foundation_docs.foundation_document(path)
                 issues: list[str] = []
                 issues.extend(check_foundation_docs.validate_sections(doc))
-                issues.extend(check_foundation_docs.validate_no_durable_provenance(doc))
                 issues.extend(check_foundation_docs.validate_acceptance_contract(doc))
                 issues.extend(check_foundation_docs.validate_acceptance_evidence(doc))
                 issues.extend(check_foundation_docs.validate_implementation_status(doc))
@@ -1880,38 +1851,6 @@ Provide an app frame.
                 check_foundation_docs.ROOT = original_root
 
         self.assertIn("canonical foundation order", "\n".join(issues))
-
-    def test_rejects_durable_signoff_provenance(self) -> None:
-        issues = self.issues_for_foundation(
-            inline_evidence="Approved by @alice on 2026-08-06.",
-            status_rows=(("Contract", "Partial"), ("Frontend", "Not started")),
-        )
-
-        self.assertIn("durable approval/sign-off provenance", "\n".join(issues))
-
-    def test_foundation_rejects_durable_approval_noun_provenance(self) -> None:
-        issues = self.issues_for_foundation(
-            inline_evidence="Approval by @alice on 2026-08-06.",
-            status_rows=(("Contract", "Partial"), ("Frontend", "Not started")),
-        )
-
-        self.assertIn("durable approval/sign-off provenance", "\n".join(issues))
-
-    def test_foundation_allows_dated_approval_behavior_without_session_provenance(self) -> None:
-        issues = self.issues_for_foundation(
-            inline_evidence="Approval expires on 2026-08-06.",
-            status_rows=(("Contract", "Partial"), ("Frontend", "Not started")),
-        )
-
-        self.assertNotIn("durable approval/sign-off provenance", "\n".join(issues))
-
-    def test_foundation_allows_approval_actor_behavior_without_session_provenance(self) -> None:
-        issues = self.issues_for_foundation(
-            inline_evidence="A request is approved by the Workspace administrator before mutation.",
-            status_rows=(("Contract", "Partial"), ("Frontend", "Not started")),
-        )
-
-        self.assertNotIn("durable approval/sign-off provenance", "\n".join(issues))
 
     def test_foundation_inventories_require_exact_links_and_derived_status(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
