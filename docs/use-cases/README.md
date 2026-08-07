@@ -30,6 +30,7 @@ Use cases are the product source of truth. Each use case owns one independently 
 | [docs/use-cases/solutions/README.md](./solutions/README.md) | [docs/use-cases/solutions/provision-reference-solution.md](./solutions/provision-reference-solution.md) | Done |
 | [docs/use-cases/solutions/README.md](./solutions/README.md) | [docs/use-cases/solutions/publish-signed-solution-version.md](./solutions/publish-signed-solution-version.md) | Not started |
 | [docs/use-cases/solutions/README.md](./solutions/README.md) | [docs/use-cases/solutions/install-solution-version.md](./solutions/install-solution-version.md) | Not started |
+| [docs/use-cases/solutions/README.md](./solutions/README.md) | [docs/use-cases/solutions/migrate-reference-product-to-signed-solution.md](./solutions/migrate-reference-product-to-signed-solution.md) | Not started |
 | [docs/use-cases/site-experience/README.md](./site-experience/README.md) | [docs/use-cases/site-experience/select-site-language.md](./site-experience/select-site-language.md) | Done |
 | [docs/use-cases/site-experience/README.md](./site-experience/README.md) | [docs/use-cases/site-experience/select-site-theme.md](./site-experience/select-site-theme.md) | Done |
 

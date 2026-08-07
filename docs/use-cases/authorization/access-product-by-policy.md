@@ -19,6 +19,7 @@ Let an active human or service subject access a product capability only when an 
 
 - The subject is authenticated and has active Workspace access through the shared Identity policy.
 - The current Workspace has an installed current Solution policy and any required active exact product-role assignment.
+- A record's owner is a product-module-owned discriminated subject reference, while every product mutation actor is a discriminated subject reference.
 
 ## Trigger
 
@@ -37,9 +38,10 @@ Let an active human or service subject access a product capability only when an 
 1. Subject requests a product operation in its current Workspace.
 2. System authenticates the subject and passes the shared Workspace-access policy before product data access.
 3. Product operation asks Authorization to evaluate the exact installed policy/version, subject's active assignments, action key, resource/object key, and record scope.
-4. Authorization permits only an exact matching grant. For a record operation, `Own` resolves ownership to the evaluated subject; `All` resolves any matching record in the same Workspace.
-5. Before returning the decision, Authorization commits and reads back the required redacted allow or deny audit outcome. Audit failure denies without product data access.
-6. Product operation performs the allowed read or mutation and returns its normal result. Client projections may show the resulting affordance but do not replace this check.
+4. Authorization permits only an exact matching grant. For a record operation, `Own` resolves the module-owned persisted owner to the evaluated subject; `All` resolves any matching record in the same Workspace.
+5. The owning product module filters collections before materialization and enforces record ownership for get, save, and submit inside its boundary. Creation stamps the authenticated subject server-side and never accepts caller-provided owner data.
+6. Before returning the decision, Authorization commits and reads back the required redacted allow or deny audit outcome. Audit failure denies without product data access.
+7. Product operation performs the allowed read or mutation and returns its normal result. Client projections may show the resulting affordance but do not replace this check.
 
 Policy evaluation and product-boundary realization is owned by [Authorization architecture](../../architecture/authorization.md#evaluation-and-enforcement).
 
@@ -47,6 +49,7 @@ Policy evaluation and product-boundary realization is owned by [Authorization ar
 
 - Missing Workspace access, unknown subject kind, inactive membership/grant, absent assignment, unknown/stale policy/version, unknown role, action, resource, or object key denies by default before resource disclosure or mutation.
 - A non-matching `Own` record denies; it never broadens to `All`. A missing scope or resource key never implies a broader grant.
+- Forged or caller-supplied record ownership denies; service-created records are owned by the authenticated service subject. Existing product mutation actor metadata migrates as `Human` with the same identifier and does not retain a parallel user-only path.
 - Cross-Workspace lookup and policy evaluation return a non-disclosing not-found style outcome.
 - A role assignment, service grant, service identity, or key revoked while a client holds stale state denies at the server immediately.
 - Authorization, policy-resolution, or required audit dependency failure fails closed. The client exposes a stable recovery state and does not retry a mutation as allowed without a fresh authoritative response.
@@ -58,7 +61,7 @@ Policy evaluation and product-boundary realization is owned by [Authorization ar
 - **AC-001** Server enforcement evaluates active human membership or active service grant through the shared Workspace-access policy before any policy-governed product data access; unknown subject kinds deny.
 - **AC-002** An active assigned product role can perform only the exact installed policy action and optional exact resource/object-key grant for the current Workspace.
 - **AC-003** Record policy distinguishes `Own` from `All`: `Own` permits only the evaluated subject's matching current-Workspace records, while `All` permits all matching records in that Workspace.
-- **AC-004** The Wave 1 reference policy permits product `Administrator` to manage definitions and read all records; permits `Applicant` to create, read, save, and submit own records; and permits `Caseworker` to list and read all records but not mutate records.
+- **AC-004** The Wave 1 reference policy permits product `Administrator` the exact Business Object definition read/manage, Rules definition/binding manage, and read-all-record actions; permits `Applicant` the exact published-definition read and create/read/save/submit-own-record actions; and permits `Caseworker` the exact published-definition read and list/read-all-record actions but no record-mutation action.
 
 *Validation and recovery*
 
@@ -72,6 +75,9 @@ Policy evaluation and product-boundary realization is owned by [Authorization ar
 
 - **AC-010** Product clients present only server-reported action affordances and provide accessible forbidden, non-disclosing-not-found, unavailable, and retryable-recovery states without revealing policy internals or cross-Workspace resources.
 - **AC-011** Policies are immutable versioned Solution components installed only through the Solutions adapter; no policy-authoring API or UI exists in this slice.
+- **AC-012** `Own` record ownership is a product-module-owned discriminated `Human`/`Service` subject reference stamped from authenticated server context. Business Objects migrates existing Created/Updated/Submitted user IDs to `Human` without changing their IDs; all product mutation actor metadata performs the same clean migration from `*ByUserId`/`ICurrentUser` semantics without a parallel path.
+- **AC-013** Record collections filter `Own` in the owning module query/store before materialization; get/save/submit enforce owner in that module, creation ignores caller-supplied owner input, and a service subject owns a record it creates.
+- **AC-014** A service subject is denied by every current product endpoint that composes only baseline WorkspaceAccess, including when it has no product-role assignment; it is admitted only when that endpoint/application composes an exact Authorization product action. Human baseline behavior is unchanged.
 
 ## Acceptance Test Matrix
 
@@ -84,6 +90,8 @@ Policy evaluation and product-boundary realization is owned by [Authorization ar
 | AT-005 | API boundary | Forged or stale client affordances cannot bypass server enforcement; client exposes accessible denial/not-found/unavailable recovery without policy disclosure | AC-008, AC-010 | API integration test + UI component test | Yes |
 | AT-006 | Infrastructure boundary | Policy-governed allows, denies, and dependency failures have correlated redacted audit read-back and fail closed when audit persistence is unavailable | AC-009 | Infrastructure integration test | Yes |
 | AT-007 | Application boundary | Only the Solutions adapter installs immutable versioned policies; policy-authoring operations and UI are absent | AC-011 | Application test + API integration test | Yes |
+| AT-008 | Application/Infrastructure boundaries | The clean discriminated-subject migration preserves existing Created/Updated/Submitted and other product mutation actor IDs as `Human`; service-created records retain a `Service` owner and forged owner input cannot override server stamping | AC-012, AC-013 | Application test + Infrastructure integration test | Yes |
+| AT-009 | API/Application boundaries | `Own` collection filtering occurs before materialization and get/save/submit deny foreign owner access; all current product endpoints deny an unassigned service subject when only baseline WorkspaceAccess is composed, while an exact assigned action admits it without changing human baseline access | AC-003, AC-005, AC-013, AC-014 | API integration test + Application test | Yes |
 
 ## Out Of Scope
 

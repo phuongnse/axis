@@ -11,3 +11,4 @@ Solutions owns the boundary through which independently versioned products are v
 | [docs/use-cases/solutions/provision-reference-solution.md](./provision-reference-solution.md) | Done |
 | [docs/use-cases/solutions/publish-signed-solution-version.md](./publish-signed-solution-version.md) | Not started |
 | [docs/use-cases/solutions/install-solution-version.md](./install-solution-version.md) | Not started |
+| [docs/use-cases/solutions/migrate-reference-product-to-signed-solution.md](./migrate-reference-product-to-signed-solution.md) | Not started |

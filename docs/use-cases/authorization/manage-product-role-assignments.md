@@ -13,6 +13,7 @@ Let an active Workspace administrator assign or revoke one or more exact install
 ## Supporting actors
 
 - Solutions supplies installed immutable product policies.
+- Existing human-administrator OAuth authorizes typed MCP role-assignment tools.
 - Audit receives durable redacted assignment and decision outcomes.
 
 ## Preconditions
@@ -37,7 +38,7 @@ Let an active Workspace administrator assign or revoke one or more exact install
 
 1. Lifecycle administrator bootstrap installs the applicable Solution policy and assigns initial product roles; it does not convert any Identity lifecycle role into a product role.
 2. An active Workspace administrator opens product-role assignment management for the current Workspace.
-3. System shows only active current-Workspace human and service subjects and installed product roles with server-reported assignment state.
+3. System shows only active current-Workspace human and service subjects and installed product roles with server-projected product-owned localized presentation for the exact current UI language or `en` fallback.
 4. Administrator selects one or more exact product roles for one subject and confirms assignment or revocation.
 5. System revalidates actor authority, current Workspace, subject activity, installed policy version, exact role keys, and concurrency state.
 6. System commits the assignment lifecycle and required redacted audit outcome, then reads back the canonical result.
@@ -73,6 +74,8 @@ Policy and assignment realization is owned by [Authorization architecture](../..
 
 - **AC-010** The assignment UI is a convenience projection only: it shows server-reported authority/state and cannot make a product operation succeed without server policy enforcement.
 - **AC-011** Assignment screens support keyboard and screen-reader operation, clear pending/success/conflict/recovery states, compact layouts, and explicit selection of exact roles without presenting lifecycle roles as product roles.
+- **AC-012** Each `authorization.policy.v1` role supplies product-owned BCP 47 language-tagged presentation entries with NFC-normalized bounded display name and optional description, includes at least `en`, and projects the exact current UI language or `en` fallback; neither the platform nor the client keeps a global/hardcoded role catalog.
+- **AC-013** Product-role assignment administration is exposed through typed MCP tools authorized by the existing human administrator OAuth boundary; no service credential or token is accepted by or exposed through those tools.
 
 ## Acceptance Test Matrix
 
@@ -84,6 +87,8 @@ Policy and assignment realization is owned by [Authorization architecture](../..
 | AT-004 | API/Application boundaries | Revoked assignments deny the formerly permitted product operation immediately despite stale client state or projected UI affordance | AC-003, AC-010 | API integration test + Application test | Yes |
 | AT-005 | Browser journey | Administrator assigns and revokes exact roles with accessible selection, pending, conflict, and recovery states | AC-004, AC-010, AC-011 | Browser automation | Yes |
 | AT-006 | Infrastructure boundary | Assignment, revocation, denial, and failure audit outcomes are correlated, append-only, and redacted | AC-009 | Infrastructure integration test | Yes |
+| AT-007 | API/Application boundaries | Invalid BCP 47 tags, missing `en`, non-NFC or over-bound presentation values reject policy installation; current-language projection follows the explicit fallback without platform/client role copy | AC-012 | Application test + API integration test | Yes |
+| AT-008 | API/MCP boundaries | Typed product-role assignment tools use existing human-administrator OAuth and never accept or reveal service credentials or tokens | AC-005, AC-013 | API integration test + MCP contract test | Yes |
 
 ## Out Of Scope
 
@@ -109,6 +114,7 @@ Policy and assignment realization is owned by [Authorization architecture](../..
 > | Audit | Not started |
 > | Solutions adapter | Not started |
 > | API | Not started |
+> | MCP | Not started |
 > | Frontend | Not started |
 >
 > **Gaps vs spec:**

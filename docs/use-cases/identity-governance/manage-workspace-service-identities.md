@@ -13,6 +13,7 @@ Let an active Workspace administrator create and irrevocably revoke a non-human 
 ## Supporting actors
 
 - A service operator supplies public signing-key material for a service identity.
+- Existing human-administrator OAuth authorizes the typed MCP administration tools.
 - Audit receives durable redacted lifecycle outcomes.
 
 ## Preconditions
@@ -37,7 +38,7 @@ Let an active Workspace administrator create and irrevocably revoke a non-human 
 1. Administrator opens service-identity management for the current Workspace.
 2. Administrator creates a service identity and records its client identifier for the service operator.
 3. Administrator adds an ES256 public JWK with a unique `kid`; the service operator retains the corresponding private key.
-4. System validates current Workspace authority, exact Workspace scope, JWK public-key suitability, and unique active `kid`.
+4. System validates current Workspace authority, exact Workspace scope, JWK public-key suitability, and that neither the `kid` nor RFC 7638 public-JWK thumbprint was ever revoked for this identity.
 5. System commits the identity, active Workspace grant, key lifecycle state, and required redacted audit outcome, then reads back the non-secret result.
 6. Administrator can add another public JWK for overlap, revoke an individual key, or irrevocably revoke the service identity and its intrinsic Workspace grant.
 
@@ -47,7 +48,7 @@ Shared lifecycle, assertion, immediate-revocation, concurrency, and audit realiz
 
 - Inactive or non-administrator Workspace membership denies every lifecycle action without disclosing a foreign identity or key.
 - A missing, private, malformed, unsupported, or non-ES256 JWK is rejected before lifecycle mutation; private key material and shared secrets are never accepted.
-- A duplicate active `kid` for the identity conflicts without replacing the existing key. A key may be added for overlap only under the same identity and Workspace.
+- A duplicate or revoked `kid`, or key material matching a revoked RFC 7638 public-JWK thumbprint under any `kid`, conflicts without replacing the existing key. A key may be added for overlap only under the same identity and Workspace.
 - A stale lifecycle revision or concurrent add/revoke returns a recoverable conflict or canonical terminal result; no revoked key, identity, or grant becomes active again.
 - Revoking a key or identity is irreversible. Identity revocation also revokes its intrinsic Workspace grant; the administrator must create a new current-authority identity or key to recover service access.
 - Audit persistence, audit-delivery setup, or read-back failure fails closed and does not report the lifecycle change as successful.
@@ -74,6 +75,8 @@ Shared lifecycle, assertion, immediate-revocation, concurrency, and audit realiz
 - **AC-010** The journey never accepts, stores, renders, or returns a shared secret, private key, client assertion, service access token, refresh token, or browser authorization artifact.
 - **AC-011** Service identity creation and management use server-derived subject and current Workspace scope; cross-Workspace lookup is non-disclosing.
 - **AC-012** Management UI exposes lifecycle state and recoverable errors accessibly, prevents duplicate submission while pending, supports keyboard key-management actions, and remains usable on compact layouts without secret-bearing fields.
+- **AC-013** Key revocation retains immutable `kid` and RFC 7638 public-JWK-thumbprint tombstones; neither a revoked `kid` nor its public key material under a renamed `kid` can be added or authenticate again.
+- **AC-014** Service-identity lifecycle administration is exposed through typed MCP tools authorized by the existing human administrator OAuth boundary; no service credential or token is accepted by or exposed through those tools.
 
 ## Acceptance Test Matrix
 
@@ -85,6 +88,8 @@ Shared lifecycle, assertion, immediate-revocation, concurrency, and audit realiz
 | AT-004 | API/Application boundaries | Revoked key or identity, including its intrinsic grant, immediately removes service authority and cannot be reactivated by retry or concurrency | AC-004, AC-008 | API integration test + Application test | Yes |
 | AT-005 | Infrastructure boundary | Lifecycle successes, denials, and failures are redacted, correlated, append-only, and readable without credentials or key material | AC-009, AC-010 | Infrastructure integration test | Yes |
 | AT-006 | Browser journey | Administrator manages keys and revocation with accessible pending, success, conflict, and recovery states | AC-003, AC-012 | Browser automation | Yes |
+| AT-007 | Application/Infrastructure boundaries | Attempts to reuse a revoked `kid` or revoked public-key thumbprint under another `kid` fail, while overlap with a distinct active key remains valid | AC-002, AC-006, AC-013 | Application test + Infrastructure integration test | Yes |
+| AT-008 | API/MCP boundaries | Typed service-identity lifecycle tools use existing human-administrator OAuth and never accept or reveal service credentials or tokens | AC-005, AC-010, AC-014 | API integration test + MCP contract test | Yes |
 
 ## Out Of Scope
 
@@ -109,6 +114,7 @@ Shared lifecycle, assertion, immediate-revocation, concurrency, and audit realiz
 > | Identity Infrastructure | Not started |
 > | Audit | Not started |
 > | API | Not started |
+> | MCP | Not started |
 > | Frontend | Not started |
 >
 > **Gaps vs spec:**
