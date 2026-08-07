@@ -5526,6 +5526,11 @@ class TestAxisCommandWrappers(unittest.TestCase):
                 "Axis.Audit.Infrastructure.csproj",
                 "AuditDbContext",
             ),
+            "authorization": (
+                "Authorization/Axis.Authorization.Infrastructure/"
+                "Axis.Authorization.Infrastructure.csproj",
+                "AuthorizationDbContext",
+            ),
             "business-objects": (
                 "BusinessObjects/Axis.BusinessObjects.Infrastructure/"
                 "Axis.BusinessObjects.Infrastructure.csproj",
@@ -5540,6 +5545,11 @@ class TestAxisCommandWrappers(unittest.TestCase):
                 "Rules/Axis.Rules.Infrastructure/"
                 "Axis.Rules.Infrastructure.csproj",
                 "RulesDbContext",
+            ),
+            "solutions": (
+                "Solutions/Axis.Solutions.Infrastructure/"
+                "Axis.Solutions.Infrastructure.csproj",
+                "SolutionsDbContext",
             ),
         }
         for module, (project_suffix, context) in targets.items():
@@ -5557,6 +5567,16 @@ class TestAxisCommandWrappers(unittest.TestCase):
                 self.assertEqual(
                     [
                         "dotnet",
+                        "build",
+                        project,
+                        "--nologo",
+                        "-m:1",
+                    ],
+                    calls[0],
+                )
+                self.assertEqual(
+                    [
+                        "dotnet",
                         "ef",
                         "migrations",
                         "add",
@@ -5569,8 +5589,9 @@ class TestAxisCommandWrappers(unittest.TestCase):
                         context,
                         "--output-dir",
                         "Migrations",
+                        "--no-build",
                     ],
-                    calls[0],
+                    calls[1],
                 )
 
     def test_cli_routes_finite_migration_add(self) -> None:

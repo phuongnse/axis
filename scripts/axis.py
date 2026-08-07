@@ -64,6 +64,16 @@ MIGRATION_TARGETS: dict[str, tuple[Path, str, str]] = {
         "AuditDbContext",
         "ConnectionStrings__Audit",
     ),
+    "authorization": (
+        ROOT
+        / "src"
+        / "Modules"
+        / "Authorization"
+        / "Axis.Authorization.Infrastructure"
+        / "Axis.Authorization.Infrastructure.csproj",
+        "AuthorizationDbContext",
+        "ConnectionStrings__Authorization",
+    ),
     "business-objects": (
         ROOT
         / "src"
@@ -93,6 +103,16 @@ MIGRATION_TARGETS: dict[str, tuple[Path, str, str]] = {
         / "Axis.Rules.Infrastructure.csproj",
         "RulesDbContext",
         "ConnectionStrings__Rules",
+    ),
+    "solutions": (
+        ROOT
+        / "src"
+        / "Modules"
+        / "Solutions"
+        / "Axis.Solutions.Infrastructure"
+        / "Axis.Solutions.Infrastructure.csproj",
+        "SolutionsDbContext",
+        "ConnectionStrings__Solutions",
     ),
 }
 DESIGN_TIME_CONNECTION_STRING = (
@@ -3187,6 +3207,19 @@ def migration_command(args: argparse.Namespace) -> int:
         raise CheckError("migration add: name must be PascalCase letters and digits")
 
     project, context, connection_key = MIGRATION_TARGETS[args.module]
+    build = run(
+        [
+            exe("dotnet"),
+            "build",
+            str(project),
+            "--nologo",
+            "-m:1",
+        ],
+        check=False,
+    )
+    if build.returncode != 0:
+        return build.returncode
+
     return run(
         [
             exe("dotnet"),
@@ -3202,6 +3235,7 @@ def migration_command(args: argparse.Namespace) -> int:
             context,
             "--output-dir",
             "Migrations",
+            "--no-build",
         ],
         check=False,
         env={connection_key: DESIGN_TIME_CONNECTION_STRING},

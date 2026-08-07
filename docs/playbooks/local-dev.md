@@ -73,7 +73,7 @@ Run unit or focused frontend tests while iterating. Integration/API tests need D
 
 ## Database
 
-Create migrations through `python scripts/axis.py migration add <identity|business-objects|rules|audit> <PascalCaseName>`. Axis fixes the Infrastructure project, startup project, `DbContext`, output directory, and isolated design-time connection string for the selected module.
+Create migrations through `python scripts/axis.py migration add <identity|business-objects|rules|audit|authorization|solutions> <PascalCaseName>`. Axis builds only the selected Infrastructure project serially, then scaffolds with `--no-build` while fixing the startup project, `DbContext`, output directory, and isolated design-time connection string for that module.
 
 Identity and Audit dev database startup use `MigrateAsync`. Audit uses the `Audit`/`ConnectionStrings__Audit` connection targeting `axis_audit`. Compose mounts [infra/postgres/init.d](../../infra/postgres/init.d) read-only at PostgreSQL's first-initialization directory; [01-create-databases.sql](../../infra/postgres/init.d/01-create-databases.sql) creates `axis_audit` only when the Postgres data volume is first initialized. Use reset paths only for disposable local data; do not use schema initialization shortcuts.
 
