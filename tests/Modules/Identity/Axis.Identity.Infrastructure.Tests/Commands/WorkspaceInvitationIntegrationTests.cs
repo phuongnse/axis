@@ -470,9 +470,8 @@ public sealed class WorkspaceInvitationIntegrationTests(IdentityDatabaseFixture 
                     TestContext.Current.CancellationToken);
             };
 
-            DbUpdateException exception = (await act.Should().ThrowAsync<DbUpdateException>()).Which;
-            exception.InnerException.Should().BeOfType<PostgresException>()
-                .Which.MessageText.Should().Be("Injected acceptance audit persistence failure");
+            PostgresException exception = (await act.Should().ThrowAsync<PostgresException>()).Which;
+            exception.MessageText.Should().Be("Injected acceptance audit persistence failure");
 
             await using IdentityDbContext observer = database.CreateContext();
             (await observer.OrganizationMemberships.CountAsync(
@@ -946,14 +945,36 @@ public sealed class WorkspaceInvitationIntegrationTests(IdentityDatabaseFixture 
                 AS $$
                 BEGIN
                     IF NEW.correlation_id = 'persistence-failure' THEN
+                        IF NOT EXISTS (
+                            SELECT 1
+                            FROM workspace_invitations invitation
+                            WHERE invitation.id = NEW.target_id
+                                AND invitation.status = 'Accepted')
+                            OR NOT EXISTS (
+                                SELECT 1
+                                FROM workspace_memberships membership
+                                WHERE membership.workspace_id = NEW.workspace_id
+                                    AND membership.user_id = NEW.actor_id
+                                    AND membership.status = 'Active')
+                            OR NOT EXISTS (
+                                SELECT 1
+                                FROM organization_memberships membership
+                                INNER JOIN workspace_invitations invitation
+                                    ON invitation.organization_id = membership.organization_id
+                                WHERE invitation.id = NEW.target_id
+                                    AND membership.user_id = NEW.actor_id
+                                    AND membership.status = 'Active') THEN
+                            RAISE EXCEPTION 'Acceptance mutations were not staged before audit commit';
+                        END IF;
                         RAISE EXCEPTION 'Injected acceptance audit persistence failure';
                     END IF;
                     RETURN NEW;
                 END;
                 $$;
 
-                CREATE TRIGGER fail_invitation_acceptance_audit_trigger
-                BEFORE INSERT ON identity_audit_outbox
+                CREATE CONSTRAINT TRIGGER fail_invitation_acceptance_audit_trigger
+                AFTER INSERT ON identity_audit_outbox
+                DEFERRABLE INITIALLY DEFERRED
                 FOR EACH ROW
                 EXECUTE FUNCTION fail_invitation_acceptance_audit();
                 """,
