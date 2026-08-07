@@ -60,7 +60,11 @@ Rules persists definitions, immutable definition versions, and bindings in the R
 
 ## Identity, authorization, and audit boundaries
 
-[docs/architecture/identity-access.md](./architecture/identity-access.md) owns browser-session and local-client authorization realization. [docs/architecture/identity-governance.md](./architecture/identity-governance.md) owns the Organization, Workspace, membership, subject-authority, context-transition, audit-delivery, invitation-delivery, migration, and threat-model contracts. Product journeys reference those invariants rather than copying their technical realization.
+[docs/architecture/identity-access.md](./architecture/identity-access.md) owns browser-session and local-client authorization realization. [docs/architecture/identity-governance.md](./architecture/identity-governance.md) owns the Organization, Workspace, membership, service-identity, subject-authority, context-transition, audit-delivery, invitation-delivery, migration, and threat-model contracts. [docs/architecture/authorization.md](./architecture/authorization.md) owns immutable product policies, product-role assignments, server-side decisions, and `Own`/`All` resource scope. Product journeys reference those invariants rather than copying their technical realization.
+
+## Solutions boundary
+
+[docs/architecture/solutions.md](./architecture/solutions.md) owns signed immutable solution versions, deployment-global publisher trust, workspace-scoped durable installation operations, and the public adapter boundary through which consuming modules validate, apply, and read back their own typed components. Solutions never writes a consuming module store or creates a hidden distributed transaction.
 
 ## Business Objects boundary
 
