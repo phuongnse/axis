@@ -1,11 +1,13 @@
 using Axis.Api.Endpoints;
 using Axis.Api.Middleware;
 using Axis.Audit.Infrastructure.Persistence;
+using Axis.Authorization.Infrastructure.Persistence;
 using Axis.BusinessObjects.Infrastructure.Persistence;
 using Axis.Identity.Infrastructure.Persistence;
 using Axis.Rules.Domain;
 using Axis.Rules.Infrastructure.Persistence;
 using Axis.Shared.Infrastructure.Observability;
+using Axis.Solutions.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
 using Scalar.AspNetCore;
@@ -41,11 +43,23 @@ internal static class AxisApiApplicationExtensions
         await using BusinessObjectsDbContext businessObjectsDb = new(businessObjectsOptions);
         await businessObjectsDb.Database.MigrateAsync();
 
+        DbContextOptions<AuthorizationDbContext> authorizationOptions = new DbContextOptionsBuilder<AuthorizationDbContext>()
+            .UseNpgsql(RequiredConnectionString(app.Configuration, "Authorization"))
+            .Options;
+        await using AuthorizationDbContext authorizationDb = new(authorizationOptions);
+        await authorizationDb.Database.MigrateAsync();
+
         DbContextOptions<RulesDbContext> rulesOptions = new DbContextOptionsBuilder<RulesDbContext>()
             .UseNpgsql(RequiredConnectionString(app.Configuration, "Rules"))
             .Options;
         await using RulesDbContext rulesDb = new(rulesOptions);
         await rulesDb.Database.MigrateAsync();
+
+        DbContextOptions<SolutionsDbContext> solutionsOptions = new DbContextOptionsBuilder<SolutionsDbContext>()
+            .UseNpgsql(RequiredConnectionString(app.Configuration, "Solutions"))
+            .Options;
+        await using SolutionsDbContext solutionsDb = new(solutionsOptions);
+        await solutionsDb.Database.MigrateAsync();
     }
 
     private static string RequiredConnectionString(IConfiguration configuration, string name) =>
@@ -95,6 +109,9 @@ internal static class AxisApiApplicationExtensions
         app.MapOrganizationEndpoints();
         app.MapWorkspaceInvitationAcceptanceEndpoints();
         app.MapWorkspaceInvitationEndpoints();
+        app.MapServiceIdentityEndpoints();
+        app.MapProductRoleAssignmentEndpoints();
+        app.MapSolutionEndpoints();
         app.MapRuleDefinitionEndpoints();
         app.MapRuleBindingEndpoints();
         app.MapBusinessObjectDefinitionEndpoints();

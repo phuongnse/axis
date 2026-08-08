@@ -34,12 +34,18 @@ IMcpServerBuilder mcpServer = builder.Services
     .WithTools<AxisMcpBindingEvaluationTools>()
     .WithTools<AxisMcpRuleReadTools>()
     .WithTools<AxisMcpIdentityReadTools>()
+    .WithTools<AxisMcpServiceIdentityReadTools>()
+    .WithTools<AxisMcpAuthorizationReadTools>()
+    .WithTools<AxisMcpSolutionReadTools>()
     .WithTools<AxisMcpBusinessObjectRecordReadTools>();
 
 if (options.MutationsEnabled)
 {
     mcpServer
         .WithTools<AxisMcpIdentityTools>()
+        .WithTools<AxisMcpServiceIdentityWriteTools>()
+        .WithTools<AxisMcpAuthorizationTools>()
+        .WithTools<AxisMcpSolutionWriteTools>()
         .WithTools<AxisMcpRuleLifecycleTools>()
         .WithTools<AxisMcpBindingWriteTools>()
         .WithTools<AxisMcpBusinessObjectTools>()

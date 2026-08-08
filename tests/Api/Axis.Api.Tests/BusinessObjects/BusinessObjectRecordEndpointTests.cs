@@ -365,6 +365,8 @@ public sealed class BusinessObjectRecordEndpointTests(ApiTestFixture fixture)
             new { token = fixture.EmailCapture.GetVerificationToken(email) },
             TestContext.Current.CancellationToken);
         verifyResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        await fixture.EnableProductAuthorizationTestAccessAsync(
+            TestContext.Current.CancellationToken);
 
         string verifier = CreateCodeVerifier();
         string state = Guid.NewGuid().ToString("N");

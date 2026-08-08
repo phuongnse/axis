@@ -2,7 +2,7 @@
 
 > **Navigation**: [docs/use-cases/solutions/README.md](./README.md) · [docs/architecture/solutions.md](../../architecture/solutions.md) · [docs/PLATFORM_STRATEGY.md](../../PLATFORM_STRATEGY.md) · [AGENTS.md](../../../AGENTS.md)
 
-> **Contract status:** Ready for implementation. Implementation layers and acceptance evidence are not started.
+> **Contract status:** Implementation is complete outside the pending browser acceptance evidence below.
 
 ## Purpose
 
@@ -73,8 +73,8 @@ Allow a Workspace Administrator to publish one trusted, immutable signed solutio
 *Boundaries*
 
 - **AC-015** The publish journey owns immutable package availability only; installing components, upgrade, rollback, uninstall, marketplace, overlays, workspace trust, package dependencies, and product data migrations are out of scope.
-- **AC-016** Package dependencies are unsupported in Wave 1, and Solutions accepts only typed module-owned component documents rather than opaque generic JSON.
-- **AC-017** The existing Wave 0 reference-product provisioning contract remains unchanged until its implementation and external-product evidence permit one clean cutover; Wave 1 adds no compatibility or dual runtime path.
+- **AC-016** Package dependencies are unsupported by this contract, and Solutions accepts only typed module-owned component documents rather than opaque generic JSON.
+- **AC-017** Signed publication is the only release-availability path; no compatibility, fallback, flag, or alternate publication path exists.
 
 ## Acceptance Test Matrix
 
@@ -91,7 +91,6 @@ Allow a Workspace Administrator to publish one trusted, immutable signed solutio
 
 - Installation, upgrade, rollback, uninstall, marketplace, overlays, promotion, workspace trust management, package dependencies, product data migrations, drift detection, and raw-package download.
 - Trusted-publisher management by an API or UI.
-- Any replacement of the Wave 0 reference-product provisioning path before its clean-cutover evidence is ready.
 
 ## Screen flow
 
@@ -109,23 +108,22 @@ Required UI quality: status and result information are programmatically labelled
 >
 > | Layer | Status |
 > |---|---|
-> | Domain | Not started |
-> | Application | Not started |
-> | Infrastructure | Not started |
-> | API | Not started |
-> | Frontend | Not started |
-> | MCP | Not started |
-> | Audit | Not started |
+> | Domain | Done |
+> | Application | Done |
+> | Infrastructure | Done |
+> | API | Done |
+> | Frontend | Partial |
+> | MCP | Done |
+> | Audit | Done |
 >
 > **Gaps vs spec:**
 >
 > | ID | Gap |
 > |---|---|
-> | GAP-001 | Domain, application, infrastructure, API, frontend, MCP, and Audit implementation are not started. |
-> | GAP-002 | No acceptance evidence exists. |
+> | GAP-001 | The publish component journey passes, but required Playwright AT-005 remains pending against the current checkpoint. |
 >
 > **Deferred follow-ups:** The explicitly out-of-scope lifecycle capabilities above require their own use cases.
 >
-> **Verification:** Not run; implementation evidence does not exist yet.
+> **Verification:** Package verification, trusted-ledger reconciliation, immutable persistence, durable audit, API, MCP, and frontend component evidence passes. Browser evidence remains tracked by GAP-001.
 >
 > **Decisions:** [docs/architecture/solutions.md](../../architecture/solutions.md) owns signature, publisher trust, immutable persistence, audit-outbox, and safe-readback realization.

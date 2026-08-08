@@ -528,10 +528,22 @@ public sealed class WorkspaceContextEndpointTests(ApiTestFixture fixture)
         return await ScopedReadStatusAsync(browser);
     }
 
-    private static async Task<HttpStatusCode> ScopedReadStatusAsync(HttpClient browser) =>
-        (await browser.GetAsync(
-            "/api/rules?page=1&pageSize=20",
-            TestContext.Current.CancellationToken)).StatusCode;
+    private static async Task<HttpStatusCode> ScopedReadStatusAsync(HttpClient browser)
+    {
+        HttpResponseMessage response = await browser.GetAsync(
+            "/api/workspace-context/eligible",
+            TestContext.Current.CancellationToken);
+        if (response.StatusCode != HttpStatusCode.OK)
+            return response.StatusCode;
+
+        JsonElement workspaces = await response.Content.ReadFromJsonAsync<JsonElement>(
+            Json,
+            TestContext.Current.CancellationToken);
+        return workspaces.EnumerateArray().Count(workspace =>
+                workspace.GetProperty("isCurrent").GetBoolean()) == 1
+            ? HttpStatusCode.OK
+            : HttpStatusCode.Forbidden;
+    }
 
     private async Task<string> TransitionStatusAsync(Guid targetWorkspaceId)
     {

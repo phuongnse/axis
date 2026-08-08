@@ -5,19 +5,28 @@ using System.Threading.RateLimiting;
 using Axis.Api.Authorization;
 using Axis.Api.HealthChecks;
 using Axis.Api.Infrastructure;
+using Axis.Api.Solutions;
 using Axis.Audit.Infrastructure.Extensions;
+using Axis.Authorization.Application;
+using Axis.Authorization.Contracts;
+using Axis.Authorization.Infrastructure.Extensions;
+using Axis.BusinessObjects.Application;
 using Axis.BusinessObjects.Application.Commands.CreateBusinessObjectDefinition;
 using Axis.BusinessObjects.Application.Commands.CreateBusinessObjectRecord;
 using Axis.BusinessObjects.Infrastructure.Extensions;
 using Axis.Identity.Application.Commands.RegisterUser;
 using Axis.Identity.Application.Services;
+using Axis.Identity.Contracts;
 using Axis.Identity.Infrastructure.Extensions;
 using Axis.Identity.Infrastructure.Services;
+using Axis.Rules.Application;
 using Axis.Rules.Application.Queries.ListRuleDefinitions;
 using Axis.Rules.Infrastructure.Extensions;
 using Axis.Shared.Application.Behaviors;
 using Axis.Shared.Application.Identity;
 using Axis.Shared.Infrastructure.Observability;
+using Axis.Solutions.Application;
+using Axis.Solutions.Infrastructure.Extensions;
 using FluentValidation;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -192,8 +201,16 @@ internal static class AxisApiServiceExtensions
 
                 opts.AllowAuthorizationCodeFlow()
                     .AllowRefreshTokenFlow()
+                    .AllowClientCredentialsFlow()
                     .RequireProofKeyForCodeExchange()
                     .EnableAuthorizationRequestCaching();
+                opts.UseReferenceAccessTokens();
+
+                opts.RemoveEventHandler(
+                    OpenIddictServerHandlers.ValidateClientAssertionAudience.Descriptor);
+                opts.AddEventHandler<OpenIddictServerEvents.ProcessAuthenticationContext>(builder =>
+                    builder.UseScopedHandler<ExactClientAssertionAudienceValidationHandler>()
+                        .SetOrder(OpenIddictServerHandlers.ValidateClientAssertionAudience.Descriptor.Order));
 
                 opts.SetAccessTokenLifetime(ReadPositiveTimeSpan(
                     configuration,
@@ -211,6 +228,10 @@ internal static class AxisApiServiceExtensions
             .AddValidation(opts =>
             {
                 opts.UseLocalServer();
+                opts.EnableTokenEntryValidation();
+                opts.AddEventHandler<OpenIddict.Validation.OpenIddictValidationEvents.ProcessAuthenticationContext>(builder =>
+                    builder.UseScopedHandler<ServiceTokenAuthorityValidationHandler>()
+                        .SetOrder(OpenIddict.Validation.OpenIddictValidationHandlers.ValidateAccessToken.Descriptor.Order + 1_000));
                 opts.UseAspNetCore();
             });
 
@@ -368,10 +389,23 @@ internal static class AxisApiServiceExtensions
         IConfiguration configuration,
         IHostEnvironment environment)
     {
+        foreach (ProductActionDescriptor descriptor in
+                 BusinessObjectProductActions.Descriptors.Concat(RuleProductActions.Descriptors))
+        {
+            services.AddSingleton(descriptor);
+        }
         services.AddAuditInfrastructure(configuration);
         services.AddIdentityInfrastructure(configuration);
+        services.AddAuthorizationInfrastructure(configuration);
         services.AddRulesInfrastructure(configuration);
         services.AddBusinessObjectsInfrastructure(configuration);
+        services.AddSolutionsInfrastructure(configuration);
+        services.AddScoped<IAuthorizationSubjectActivity, IdentityAuthorizationSubjectActivity>();
+        services.AddScoped<IAuthorizationAdministratorAuthority, IdentityAuthorizationAdministratorAuthority>();
+        services.AddScoped<ISolutionAuthority, IdentitySolutionAuthority>();
+        services.AddScoped<ISolutionComponentAdapter, AuthorizationPolicySolutionAdapter>();
+        services.AddScoped<ISolutionComponentAdapter, BusinessObjectDefinitionSolutionAdapter>();
+        services.AddScoped<ISolutionComponentAdapter, RuleBindingSolutionAdapter>();
     }
 
     private static IConnectionMultiplexer AddAxisRedis(
@@ -424,6 +458,7 @@ internal static class AxisApiServiceExtensions
         services.AddHttpContextAccessor();
         services.AddScoped<CurrentUser>();
         services.AddScoped<ICurrentUser, HttpContextCurrentUser>();
+        services.AddScoped<ICurrentSubject, HttpContextCurrentSubject>();
     }
 
     private static void AddAxisJson(this IServiceCollection services)
@@ -466,7 +501,9 @@ internal static class AxisApiServiceExtensions
         services.AddHealthChecks()
             .AddCheck<PostgreSqlHealthCheck>("postgresql", tags: ["ready"])
             .AddCheck<RedisHealthCheck>("redis", tags: ["ready"])
-            .AddCheck<IdentityAuditHealthCheck>("identity-audit");
+            .AddCheck<IdentityAuditHealthCheck>("identity-audit")
+            .AddCheck<AuthorizationAuditHealthCheck>("authorization-audit")
+            .AddCheck<SolutionsAuditHealthCheck>("solutions-audit");
     }
 
     private static TimeSpan ReadPositiveTimeSpan(

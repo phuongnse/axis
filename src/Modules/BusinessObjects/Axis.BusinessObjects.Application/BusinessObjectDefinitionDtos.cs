@@ -1,4 +1,5 @@
 using Axis.BusinessObjects.Domain.Aggregates;
+using Axis.Identity.Contracts;
 
 namespace Axis.BusinessObjects.Application;
 
@@ -31,7 +32,7 @@ public sealed record BusinessObjectDefinitionVersionDto(
     Guid Id,
     Guid SourceDefinitionId,
     int VersionNumber,
-    Guid PublishedByUserId,
+    SubjectReferenceDto PublishedBySubject,
     DateTime PublishedAt,
     IReadOnlyList<BusinessObjectDefinitionVersionFieldDto> Fields);
 
@@ -74,7 +75,14 @@ public sealed record BusinessObjectDefinitionDetailDto(
     DateTime CreatedAt,
     DateTime UpdatedAt,
     IReadOnlyList<BusinessObjectFieldDefinitionDto> Fields,
-    BusinessObjectDefinitionVersionDto? LatestPublishedVersion);
+    BusinessObjectDefinitionVersionDto? LatestPublishedVersion,
+    BusinessObjectDefinitionActionsDto Actions);
+
+public sealed record BusinessObjectDefinitionActionsDto(
+    bool CanSave,
+    bool CanPublish);
+
+public sealed record BusinessObjectDefinitionCollectionActionsDto(bool CanStartCreate);
 
 public sealed record BusinessObjectDefinitionListItemDto(
     Guid Id,

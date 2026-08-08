@@ -1,3 +1,5 @@
+using Axis.Identity.Contracts;
+
 namespace Axis.Rules.Contracts;
 
 public enum RuleInputMappingKind
@@ -104,5 +106,58 @@ public interface IRuleBindingReferenceValidator
 {
     Task<RuleBindingReferenceValidationResult> ValidateAsync(
         RuleBindingReferenceValidationRequest request,
+        CancellationToken cancellationToken = default);
+}
+
+public sealed record RuleBindingSolutionComponent(
+    string ComponentKey,
+    string DefinitionKey,
+    int DefinitionVersion,
+    string TargetType,
+    string TargetId,
+    string UseCaseOrTrigger,
+    IReadOnlyDictionary<string, RuleInputMappingDto> InputMappings,
+    int Priority,
+    bool Enabled,
+    RuleBindingFailureBehavior FailureBehavior);
+
+public sealed record RuleBindingInstallationReceipt(
+    Guid SolutionVersionId,
+    SubjectReference Actor,
+    string ComponentHash,
+    Guid OperationId,
+    Guid StepId,
+    long LeaseEpoch);
+
+public sealed record RuleBindingInstallationResult(bool IsSuccess, string? ProblemCode = null);
+
+public sealed record RuleBindingInstallationReadBack(
+    Guid WorkspaceId,
+    Guid BindingId,
+    int BindingRevision,
+    string ComponentKey,
+    RuleBindingSolutionComponent Component,
+    Guid SolutionVersionId,
+    string ComponentHash,
+    Guid OperationId,
+    Guid StepId,
+    long LeaseEpoch);
+
+public interface IRuleBindingSolutionInstaller
+{
+    Task<RuleBindingInstallationResult> ValidateAsync(
+        Guid workspaceId,
+        RuleBindingSolutionComponent component,
+        CancellationToken cancellationToken = default);
+
+    Task<RuleBindingInstallationResult> InstallAsync(
+        Guid workspaceId,
+        RuleBindingSolutionComponent component,
+        RuleBindingInstallationReceipt receipt,
+        CancellationToken cancellationToken = default);
+
+    Task<RuleBindingInstallationReadBack?> ReadBackAsync(
+        Guid workspaceId,
+        string componentKey,
         CancellationToken cancellationToken = default);
 }

@@ -32,9 +32,10 @@ public sealed class RuleDefinitionRepositoryTests(RulesDatabaseFixture db) : IAs
     public async Task AddAsync_WhenDefinitionTransitionsLifecycle_PersistsDerivedStateAndArchiveData()
     {
         Guid workspaceId = Guid.NewGuid();
+        RuleSubjectReference serviceActor = RuleSubjectReference.Service(Guid.NewGuid());
         RuleDefinition definition = ConfiguredDraft(workspaceId, UniqueKey("credit_threshold"), "Credit threshold");
-        CreateVersion(definition);
-        definition.ActivateVersion(definition.Revision, 1, Guid.NewGuid(), DateTime.UtcNow).IsSuccess.Should().BeTrue();
+        CreateVersion(definition, serviceActor);
+        definition.ActivateVersion(definition.Revision, 1, serviceActor, DateTime.UtcNow).IsSuccess.Should().BeTrue();
 
         await _repository.AddAsync(definition, TestContext.Current.CancellationToken);
         await _unitOfWork.SaveChangesAsync(TestContext.Current.CancellationToken);
@@ -49,7 +50,8 @@ public sealed class RuleDefinitionRepositoryTests(RulesDatabaseFixture db) : IAs
         active.ActiveVersion.Should().Be(1);
         active.Versions.Should().ContainSingle().Which.Condition.Should().BeOfType<RulePredicateCondition>();
 
-        active.Archive(active.Revision, Guid.NewGuid(), DateTime.UtcNow).IsSuccess.Should().BeTrue();
+        active.Versions.Single().PublishedBySubject.Should().Be(serviceActor);
+        active.Archive(active.Revision, serviceActor, DateTime.UtcNow).IsSuccess.Should().BeTrue();
         await new RulesUnitOfWork(activeReloadContext).SaveChangesAsync(TestContext.Current.CancellationToken);
 
         await using RulesDbContext archivedReloadContext = db.CreateContext();
@@ -60,7 +62,7 @@ public sealed class RuleDefinitionRepositoryTests(RulesDatabaseFixture db) : IAs
 
         archived.Status.Should().Be(RuleLifecycleStatus.Archived);
         archived.ActiveVersion.Should().BeNull();
-        archived.ArchivedByUserId.Should().NotBeNull();
+        archived.ArchivedBySubject.Should().Be(serviceActor);
         archived.ArchivedAt.Should().NotBeNull();
         archived.FindVersion(1).Should().NotBeNull();
     }
@@ -89,11 +91,11 @@ public sealed class RuleDefinitionRepositoryTests(RulesDatabaseFixture db) : IAs
         CreateVersion(inactive);
         RuleDefinition active = ConfiguredDraft(workspaceId, UniqueKey("active"), "Same name");
         CreateVersion(active);
-        active.ActivateVersion(active.Revision, 1, Guid.NewGuid(), DateTime.UtcNow).IsSuccess.Should().BeTrue();
+        active.ActivateVersion(active.Revision, 1, RuleSubjectReference.Human(Guid.NewGuid()), DateTime.UtcNow).IsSuccess.Should().BeTrue();
         RuleDefinition archived = ConfiguredDraft(workspaceId, UniqueKey("archived"), "Same name");
         CreateVersion(archived);
-        archived.ActivateVersion(archived.Revision, 1, Guid.NewGuid(), DateTime.UtcNow).IsSuccess.Should().BeTrue();
-        archived.Archive(archived.Revision, Guid.NewGuid(), DateTime.UtcNow).IsSuccess.Should().BeTrue();
+        archived.ActivateVersion(archived.Revision, 1, RuleSubjectReference.Human(Guid.NewGuid()), DateTime.UtcNow).IsSuccess.Should().BeTrue();
+        archived.Archive(archived.Revision, RuleSubjectReference.Human(Guid.NewGuid()), DateTime.UtcNow).IsSuccess.Should().BeTrue();
 
         await _repository.AddAsync(draft, TestContext.Current.CancellationToken);
         await _repository.AddAsync(inactive, TestContext.Current.CancellationToken);
@@ -140,7 +142,7 @@ public sealed class RuleDefinitionRepositoryTests(RulesDatabaseFixture db) : IAs
             "Revised description.",
             [Input("threshold"), Input("value")],
             Condition(),
-            Guid.NewGuid(),
+            RuleSubjectReference.Human(Guid.NewGuid()),
             DateTime.UtcNow).IsSuccess.Should().BeTrue();
 
         await _repository.AddAsync(definition, TestContext.Current.CancellationToken);
@@ -178,7 +180,7 @@ public sealed class RuleDefinitionRepositoryTests(RulesDatabaseFixture db) : IAs
             RuleDefinitionKey.Create(key).Value,
             name,
             $"Search document for {name}.",
-            Guid.NewGuid(),
+            RuleSubjectReference.Human(Guid.NewGuid()),
             DateTime.UtcNow).Value;
         definition.SaveDraft(
             definition.Revision,
@@ -186,13 +188,16 @@ public sealed class RuleDefinitionRepositoryTests(RulesDatabaseFixture db) : IAs
             definition.Description,
             [Input("value"), Input("threshold")],
             Condition(),
-            Guid.NewGuid(),
+            RuleSubjectReference.Human(Guid.NewGuid()),
             DateTime.UtcNow).IsSuccess.Should().BeTrue();
         return definition;
     }
 
-    private static void CreateVersion(RuleDefinition definition) =>
-        definition.CreateVersion(definition.Revision, Guid.NewGuid(), DateTime.UtcNow).IsSuccess.Should().BeTrue();
+    private static void CreateVersion(RuleDefinition definition, RuleSubjectReference? actor = null) =>
+        definition.CreateVersion(
+            definition.Revision,
+            actor ?? RuleSubjectReference.Human(Guid.NewGuid()),
+            DateTime.UtcNow).IsSuccess.Should().BeTrue();
 
     private static RuleInputDefinition Input(string key) =>
         RuleInputDefinition.Create(key, key, RuleValueType.Decimal, true).Value;

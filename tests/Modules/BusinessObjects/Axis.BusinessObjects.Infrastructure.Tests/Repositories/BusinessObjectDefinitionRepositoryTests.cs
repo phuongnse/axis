@@ -12,6 +12,8 @@ using Axis.Shared.Application;
 using Axis.Shared.Domain.Primitives;
 using FluentAssertions;
 using FluentAssertions.Specialized;
+using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace Axis.BusinessObjects.Infrastructure.Tests.Repositories;
 
@@ -43,7 +45,7 @@ public sealed class BusinessObjectDefinitionRepositoryTests(BusinessObjectsDatab
             [Field("name", "Name", 0), Field("status", "Status", 1)],
             expectedRevision: 1,
             DateTime.UtcNow).IsSuccess.Should().BeTrue();
-        definition.Publish(2, Guid.NewGuid(), DateTime.UtcNow).IsSuccess.Should().BeTrue();
+        definition.Publish(2, SubjectReference.Human(Guid.NewGuid()), DateTime.UtcNow).IsSuccess.Should().BeTrue();
 
         await _repository.AddAsync(definition, TestContext.Current.CancellationToken);
         await _unitOfWork.SaveChangesAsync(TestContext.Current.CancellationToken);
@@ -96,7 +98,7 @@ public sealed class BusinessObjectDefinitionRepositoryTests(BusinessObjectsDatab
             ],
             expectedRevision: 1,
             DateTime.UtcNow).IsSuccess.Should().BeTrue();
-        definition.Publish(2, Guid.NewGuid(), DateTime.UtcNow).IsSuccess.Should().BeTrue();
+        definition.Publish(2, SubjectReference.Human(Guid.NewGuid()), DateTime.UtcNow).IsSuccess.Should().BeTrue();
 
         await _repository.AddAsync(definition, TestContext.Current.CancellationToken);
         await _unitOfWork.SaveChangesAsync(TestContext.Current.CancellationToken);
@@ -122,6 +124,97 @@ public sealed class BusinessObjectDefinitionRepositoryTests(BusinessObjectsDatab
         statusVersionField.SourceFieldDefinitionId.Should().Be(status.Id);
         statusVersionField.ChoiceOptions.Select(option => option.SourceChoiceOptionId)
             .Should().Equal(status.ChoiceOptions.Select(option => option.Id));
+    }
+
+    [Fact]
+    public async Task AddAsync_WhenInstalledDefinitionIsPersisted_RoundTripsExactContentAndMonotonicReceipt()
+    {
+        Guid workspaceId = Guid.NewGuid();
+        string objectKey = UniqueKey("installed");
+        string bindingKey = $"field.required@1:business-object-field:{objectKey}.amount:record-save";
+        BusinessObjectDefinition definition = CreateUnpublished(workspaceId, "Installed", objectKey);
+        definition.SaveUnpublished(
+            "Installed",
+            [
+                Field(
+                    "amount",
+                    "Amount",
+                    0,
+                    BusinessObjectFieldType.Decimal,
+                    [new(Guid.NewGuid(), BindingRevision: 7, BindingKey: bindingKey)]),
+            ],
+            expectedRevision: 1,
+            DateTime.UtcNow).IsSuccess.Should().BeTrue();
+        definition.Publish(2, SubjectReference.Human(Guid.NewGuid()), DateTime.UtcNow)
+            .IsSuccess.Should().BeTrue();
+        Guid solutionVersionId = Guid.NewGuid();
+        Guid operationId = Guid.NewGuid();
+        Guid stepId = Guid.NewGuid();
+        definition.AdvanceInstallationReceipt(
+            solutionVersionId,
+            objectKey,
+            new string('a', 64),
+            operationId,
+            stepId,
+            3).IsSuccess.Should().BeTrue();
+
+        await _repository.AddAsync(definition, TestContext.Current.CancellationToken);
+        await _unitOfWork.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        await using BusinessObjectsDbContext reloadContext = db.CreateContext();
+        IBusinessObjectDefinitionRepository reloadRepository = new BusinessObjectDefinitionRepository(reloadContext);
+        IUnitOfWork reloadUnitOfWork = new BusinessObjectsUnitOfWork(reloadContext);
+        BusinessObjectDefinition loaded = (await reloadRepository.GetInstalledByComponentKeyAsync(
+            workspaceId,
+            objectKey,
+            TestContext.Current.CancellationToken))!;
+
+        loaded.InstalledSolutionVersionId.Should().Be(solutionVersionId);
+        loaded.InstalledComponentHash.Should().Be(new string('a', 64));
+        loaded.InstalledOperationId.Should().Be(operationId);
+        loaded.InstalledStepId.Should().Be(stepId);
+        loaded.InstalledLeaseEpoch.Should().Be(3);
+        loaded.Fields.Single().Rules.Single().BindingKey.Should().Be(bindingKey);
+        loaded.Versions.Single().Fields.Single().Rules.Single().BindingKey.Should().Be(bindingKey);
+        loaded.AdvanceInstallationReceipt(
+            solutionVersionId,
+            objectKey,
+            new string('a', 64),
+            operationId,
+            stepId,
+            4).IsSuccess.Should().BeTrue();
+        await reloadUnitOfWork.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        await using BusinessObjectsDbContext observer = db.CreateContext();
+        BusinessObjectDefinitionRepository observerRepository = new(observer);
+        BusinessObjectDefinition advanced = (await observerRepository.GetInstalledByComponentKeyAsync(
+            workspaceId,
+            objectKey,
+            TestContext.Current.CancellationToken))!;
+        advanced.InstalledLeaseEpoch.Should().Be(4);
+        advanced.Fields.Single().Rules.Single().BindingRevision.Should().Be(7);
+    }
+
+    [Fact]
+    public async Task SaveChangesAsync_WhenInstalledProvenanceIsPartial_DatabaseRejectsRow()
+    {
+        Guid id = Guid.NewGuid();
+        Guid workspaceId = Guid.NewGuid();
+        string objectKey = UniqueKey("partial");
+        DateTime now = DateTime.UtcNow;
+
+        Func<Task> act = () => _ctx.Database.ExecuteSqlInterpolatedAsync($"""
+            INSERT INTO business_object_definitions
+                (id, workspace_id, name, object_key, status, revision, created_at, updated_at,
+                 installed_component_key)
+            VALUES
+                ({id}, {workspaceId}, {"Partial"}, {objectKey}, {"Published"}, {3}, {now}, {now},
+                 {objectKey})
+            """, TestContext.Current.CancellationToken);
+
+        ExceptionAssertions<PostgresException> exception = await act.Should().ThrowAsync<PostgresException>();
+        exception.Which.SqlState.Should().Be(PostgresErrorCodes.CheckViolation);
+        exception.Which.ConstraintName.Should().Be("CK_business_object_definitions_installed_provenance");
     }
 
     [Fact]
@@ -332,6 +425,7 @@ public sealed class BusinessObjectDefinitionRepositoryTests(BusinessObjectsDatab
                 1,
                 10,
                 "customer",
+                false,
                 TestContext.Current.CancellationToken);
         IReadOnlyList<BusinessObjectDefinition> accentAndOrder =
             await _repository.ListForWorkspaceAsync(
@@ -339,6 +433,7 @@ public sealed class BusinessObjectDefinitionRepositoryTests(BusinessObjectsDatab
                 1,
                 10,
                 "uu tien hoa don",
+                false,
                 TestContext.Current.CancellationToken);
         IReadOnlyList<BusinessObjectDefinition> typoMatch =
             await _repository.ListForWorkspaceAsync(
@@ -346,6 +441,7 @@ public sealed class BusinessObjectDefinitionRepositoryTests(BusinessObjectsDatab
                 1,
                 10,
                 "inovice",
+                false,
                 TestContext.Current.CancellationToken);
 
         ranked.Select(definition => definition.Id).Should().Equal(exact.Id, prefix.Id);
@@ -354,14 +450,17 @@ public sealed class BusinessObjectDefinitionRepositoryTests(BusinessObjectsDatab
         (await _repository.CountForWorkspaceAsync(
             workspaceId,
             "customer",
+            false,
             TestContext.Current.CancellationToken)).Should().Be(2);
         (await _repository.CountForWorkspaceAsync(
             workspaceId,
             "uu tien hoa don",
+            false,
             TestContext.Current.CancellationToken)).Should().Be(1);
         (await _repository.CountForWorkspaceAsync(
             workspaceId,
             "inovice",
+            false,
             TestContext.Current.CancellationToken)).Should().Be(1);
     }
 

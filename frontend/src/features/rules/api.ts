@@ -3,6 +3,7 @@ import { fetchApi } from '@/lib/api';
 import type * as ApiTypes from '@/lib/api-generated';
 
 export type RuleDefinitionSummary = ApiTypes.RuleDefinitionSummaryDto;
+export type RuleDefinitionCollectionActions = ApiTypes.RuleDefinitionCollectionActionsDto;
 export type RuleDefinitionsPage = ApiTypes.RuleDefinitionSummaryDtoPagedResult;
 export type RuleDefinitionDetail = ApiTypes.RuleDefinitionDetailDto;
 export type RuleInputDefinition = ApiTypes.RuleInputDefinitionDto;
@@ -47,6 +48,7 @@ export const ruleDefinitionStaleTimeMs = 1000 * 60 * 5;
 
 export const ruleDefinitionQueryKeys = {
   all: ['rule-definitions'] as const,
+  actions: () => [...ruleDefinitionQueryKeys.all, 'actions'] as const,
   lists: () => [...ruleDefinitionQueryKeys.all, 'list'] as const,
   list: (filters: RuleDefinitionFilters = defaultFilters) =>
     [...ruleDefinitionQueryKeys.lists(), filters] as const,
@@ -60,6 +62,14 @@ export const ruleDefinitionQueryKeys = {
   expressionGuide: (request: SearchRuleExpressionGuideRequest) =>
     [...ruleDefinitionQueryKeys.all, 'expression-guide', request] as const,
 };
+
+export function ruleDefinitionCollectionActionsQueryOptions() {
+  return queryOptions({
+    queryKey: ruleDefinitionQueryKeys.actions(),
+    queryFn: getRuleDefinitionCollectionActions,
+    staleTime: ruleDefinitionStaleTimeMs,
+  });
+}
 
 export function ruleDefinitionsListQueryOptions(filters: RuleDefinitionFilters = defaultFilters) {
   return queryOptions({
@@ -98,6 +108,10 @@ export async function listRuleDefinitions(
   if (filters.query?.trim()) search.set('query', filters.query.trim());
   if (filters.language) search.set('language', filters.language);
   return fetchApi<RuleDefinitionsPage>(`/rules?${search.toString()}`, { signal });
+}
+
+export async function getRuleDefinitionCollectionActions(): Promise<RuleDefinitionCollectionActions> {
+  return fetchApi<RuleDefinitionCollectionActions>('/rules/actions');
 }
 
 export async function getRuleExpressionLanguage(): Promise<RuleExpressionLanguage> {

@@ -131,11 +131,14 @@ describe('module navigation', () => {
     expect(rulesLink).toHaveAttribute('aria-current', 'page');
   });
 
-  it('registers Identity, Business Objects, and Rules as workspace navigation contributions', () => {
+  it('registers all workspace module navigation contributions in registry order', () => {
     expect(moduleNavigationContributions.map((item) => item.id)).toEqual([
       'identity.memberships',
+      'identity.service-identities',
+      'authorization.product-roles',
       'businessObjects.definitions',
       'rules.fieldDefinitions',
+      'solutions.management',
     ]);
   });
 });

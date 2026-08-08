@@ -15,7 +15,7 @@ public sealed class ActivateRuleDefinitionVersionHandlerTests
         Axis.Rules.Domain.RuleDefinition definition = RuleDefinitionHandlerTestContext.VersionedDefinition();
         context.Repository.GetByKeyForWorkspaceAsync(definition.Key, RuleDefinitionHandlerTestContext.WorkspaceId, Arg.Any<CancellationToken>())
             .Returns(definition);
-        ActivateRuleDefinitionVersionHandler sut = new(context.CurrentUser, context.Repository, context.UnitOfWork);
+        ActivateRuleDefinitionVersionHandler sut = new(context.CurrentUser, context.CurrentSubject, context.Authorization, context.Repository, context.UnitOfWork);
 
         Result<RuleDefinitionDetailDto> result = await sut.Handle(new ActivateRuleDefinitionVersionCommand(definition.Key.Value, 1, definition.Revision), CancellationToken.None);
 

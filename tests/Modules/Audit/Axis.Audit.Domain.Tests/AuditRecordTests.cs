@@ -9,7 +9,7 @@ public sealed class AuditRecordTests
     public void TryCreate_WhenMetadataContainsSensitiveKey_RejectsTheEvent()
     {
         bool created = AuditRecord.TryCreate(
-            Guid.NewGuid(), AuditActorKind.Human, Guid.NewGuid(), null, Guid.NewGuid(), "workspace.created", "workspace",
+            Guid.NewGuid(), AuditActorKind.Human, Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "workspace.created", "workspace",
             Guid.NewGuid(), "succeeded", DateTimeOffset.UtcNow, "correlation-1",
             new Dictionary<string, string> { ["session_token"] = "redacted" }, out _, out string? rejectionCode);
 
@@ -23,13 +23,13 @@ public sealed class AuditRecordTests
         Dictionary<string, string> metadata = new() { ["transition_state"] = "completed" };
 
         bool created = AuditRecord.TryCreate(
-            Guid.NewGuid(), AuditActorKind.Human, Guid.NewGuid(), null, Guid.NewGuid(), "workspace.created", "workspace",
+            Guid.NewGuid(), AuditActorKind.Human, Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "workspace.created", "workspace",
             Guid.NewGuid(), "succeeded", DateTimeOffset.UtcNow, "correlation-1", metadata, out AuditRecord? record, out _);
         metadata["transition_state"] = "tampered";
 
         created.Should().BeTrue();
         record!.Metadata["transition_state"].Should().Be("completed");
-        record.Matches(record.ActorKind, record.ActorId, null, record.WorkspaceId, record.Action, record.TargetType,
+        record.Matches(record.ActorKind, record.ActorId, record.SubjectId, record.WorkspaceId, record.Action, record.TargetType,
             record.TargetId, record.Outcome, record.OccurredAt, record.CorrelationId,
             new Dictionary<string, string> { ["transition_state"] = "completed" }).Should().BeTrue();
     }
@@ -40,12 +40,12 @@ public sealed class AuditRecordTests
         DateTimeOffset occurredAt = new DateTimeOffset(2026, 8, 6, 0, 0, 0, TimeSpan.Zero).AddTicks(7);
 
         AuditRecord.TryCreate(
-            Guid.NewGuid(), AuditActorKind.Human, Guid.NewGuid(), null, Guid.NewGuid(), "workspace.created", "workspace",
+            Guid.NewGuid(), AuditActorKind.Human, Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "workspace.created", "workspace",
             Guid.NewGuid(), "succeeded", occurredAt, "correlation-1", null, out AuditRecord? record, out _)
             .Should().BeTrue();
 
         record!.OccurredAt.Ticks.Should().Be(occurredAt.Ticks - 7);
-        record.Matches(record.ActorKind, record.ActorId, null, record.WorkspaceId, record.Action, record.TargetType,
+        record.Matches(record.ActorKind, record.ActorId, record.SubjectId, record.WorkspaceId, record.Action, record.TargetType,
             record.TargetId, record.Outcome, occurredAt, record.CorrelationId, null).Should().BeTrue();
     }
 
@@ -61,14 +61,31 @@ public sealed class AuditRecordTests
         bool hasActorId,
         bool expectedCreated)
     {
+        Guid? subjectId = actorKind is AuditActorKind.Human or AuditActorKind.ServiceIdentity && hasActorId
+            ? Guid.NewGuid()
+            : null;
         bool created = AuditRecord.TryCreate(
-            Guid.NewGuid(), actorKind, hasActorId ? Guid.NewGuid() : null, null, Guid.NewGuid(),
+            Guid.NewGuid(), actorKind, hasActorId ? Guid.NewGuid() : null, subjectId, Guid.NewGuid(),
             "invitation.replayed", "invitation", Guid.NewGuid(), "denied", DateTimeOffset.UtcNow,
             "correlation-1", null, out _, out string? rejectionCode);
 
         created.Should().Be(expectedCreated);
         if (!expectedCreated)
             rejectionCode.Should().Be("audit.actor_invalid");
+    }
+
+    [Theory]
+    [InlineData(AuditActorKind.Human)]
+    [InlineData(AuditActorKind.ServiceIdentity)]
+    public void TryCreate_WhenResolvedActorHasNoSubject_RejectsSubject(AuditActorKind actorKind)
+    {
+        bool created = AuditRecord.TryCreate(
+            Guid.NewGuid(), actorKind, Guid.NewGuid(), null, Guid.NewGuid(),
+            "invitation.replayed", "invitation", Guid.NewGuid(), "denied", DateTimeOffset.UtcNow,
+            "correlation-1", null, out _, out string? rejectionCode);
+
+        created.Should().BeFalse();
+        rejectionCode.Should().Be("audit.subject_invalid");
     }
 
     [Theory]
@@ -94,7 +111,7 @@ public sealed class AuditRecordTests
     public void TryCreate_WhenResolvedActorHasNoWorkspace_RejectsScope(AuditActorKind actorKind)
     {
         bool created = AuditRecord.TryCreate(
-            Guid.NewGuid(), actorKind, Guid.NewGuid(), null, null,
+            Guid.NewGuid(), actorKind, Guid.NewGuid(), Guid.NewGuid(), null,
             "workspace.invitation.exchange_rejected", "WorkspaceInvitationAccessAttempt", Guid.NewGuid(),
             "invalid", DateTimeOffset.UtcNow, "correlation-1", null,
             out _, out string? rejectionCode);

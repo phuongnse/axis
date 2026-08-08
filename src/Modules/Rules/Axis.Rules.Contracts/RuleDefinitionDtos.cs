@@ -1,3 +1,5 @@
+using Axis.Identity.Contracts;
+
 namespace Axis.Rules.Contracts;
 
 public sealed record RuleValueDto(
@@ -67,6 +69,8 @@ public sealed record RuleDefinitionActionsDto(
     bool CanDeactivate,
     bool CanArchive);
 
+public sealed record RuleDefinitionCollectionActionsDto(bool CanStartCreate);
+
 public sealed record RuleDefinitionVersionDto(
     int Version,
     string Name,
@@ -75,7 +79,7 @@ public sealed record RuleDefinitionVersionDto(
     IReadOnlyList<RuleInputDefinitionDto> Inputs,
     RuleOutputContractDto Output,
     RuleConditionNodeDto Condition,
-    Guid CreatedByUserId,
+    SubjectReferenceDto? PublishedBySubject,
     DateTime CreatedAt);
 
 public sealed record RuleConditionNodeDto(

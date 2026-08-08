@@ -135,7 +135,7 @@ public sealed class RuleBindingReferenceValidatorTests
             binding.Priority,
             enabled: false,
             failureBehavior: binding.FailureBehavior,
-            updatedByUserId: Guid.NewGuid(),
+            updatedBySubject: RuleSubjectReference.Human(Guid.NewGuid()),
             updatedAt: DateTime.UtcNow).IsSuccess.Should().BeTrue();
         RuleBindingReferenceValidator sut = CreateValidator(workspaceId, binding);
 
@@ -151,7 +151,7 @@ public sealed class RuleBindingReferenceValidatorTests
     public async Task ValidateAsync_WhenWorkspaceDefinitionIsArchived_RejectsAttach()
     {
         RuleDefinition definition = RuleDefinitionHandlerTestContext.VersionedDefinition();
-        definition.Archive(definition.Revision, RuleDefinitionHandlerTestContext.UserId, DateTime.UtcNow)
+        definition.Archive(definition.Revision, RuleSubjectReference.Human(RuleDefinitionHandlerTestContext.UserId), DateTime.UtcNow)
             .IsSuccess.Should().BeTrue();
         RuleBinding binding = CreateBinding(
             RuleDefinitionHandlerTestContext.WorkspaceId,
@@ -270,6 +270,6 @@ public sealed class RuleBindingReferenceValidatorTests
             priority: 0,
             enabled: true,
             DomainFailureBehavior.FailClosed,
-            Guid.NewGuid(),
+            RuleSubjectReference.Human(Guid.NewGuid()),
             DateTime.UtcNow).Value;
 }

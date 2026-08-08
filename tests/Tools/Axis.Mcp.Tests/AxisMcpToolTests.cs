@@ -9,6 +9,32 @@ namespace Axis.Mcp.Tests;
 public sealed class AxisMcpToolTests
 {
     [Fact]
+    public async Task DefinitionCollectionActionTools_WhenInvoked_UseAuthenticatedReadRoutes()
+    {
+        RecordingHandler handler = new("{\"canStartCreate\":true}");
+        using HttpClient httpClient = new(handler)
+        {
+            BaseAddress = new Uri("https://localhost:5281/"),
+        };
+        AxisMcpTools tools = new(
+            new AxisApiClient(httpClient, new FixedAccessTokenProvider("test-token")));
+
+        string businessObjectActions = await tools.GetBusinessObjectDefinitionCollectionActionsAsync(
+            TestContext.Current.CancellationToken);
+        Assert.Equal("{\"canStartCreate\":true}", businessObjectActions);
+        Assert.Equal(HttpMethod.Get, handler.Method);
+        Assert.Equal("/api/business-object-definitions/actions", handler.RequestUri!.PathAndQuery);
+        Assert.Equal("Bearer", handler.Authorization!.Scheme);
+
+        string ruleActions = await tools.GetRuleDefinitionCollectionActionsAsync(
+            TestContext.Current.CancellationToken);
+        Assert.Equal("{\"canStartCreate\":true}", ruleActions);
+        Assert.Equal(HttpMethod.Get, handler.Method);
+        Assert.Equal("/api/rules/actions", handler.RequestUri!.PathAndQuery);
+        Assert.Equal("Bearer", handler.Authorization!.Scheme);
+    }
+
+    [Fact]
     public async Task ListRules_WhenFiltersContainSpaces_EncodesTheRequestAndUsesBearerAuth()
     {
         CancellationToken cancellationToken = TestContext.Current.CancellationToken;

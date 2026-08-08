@@ -147,7 +147,7 @@ public sealed class AuditRecord
             return "audit.actor_invalid";
         if (!HasValidScope(actorKind, workspaceId))
             return "audit.scope_invalid";
-        if (subjectId == Guid.Empty)
+        if (!HasValidSubject(actorKind, subjectId))
             return "audit.subject_invalid";
         if (!IsCategory(action, 64) || !IsCategory(targetType, 64) || !IsCategory(outcome, 64))
             return "audit.category_invalid";
@@ -167,6 +167,14 @@ public sealed class AuditRecord
     {
         AuditActorKind.Human or AuditActorKind.ServiceIdentity => workspaceId is Guid id && id != Guid.Empty,
         AuditActorKind.System or AuditActorKind.Anonymous => workspaceId != Guid.Empty,
+        _ => false,
+    };
+
+    private static bool HasValidSubject(AuditActorKind actorKind, Guid? subjectId) => actorKind switch
+    {
+        AuditActorKind.Human or AuditActorKind.ServiceIdentity =>
+            subjectId is Guid id && id != Guid.Empty,
+        AuditActorKind.System or AuditActorKind.Anonymous => subjectId != Guid.Empty,
         _ => false,
     };
 

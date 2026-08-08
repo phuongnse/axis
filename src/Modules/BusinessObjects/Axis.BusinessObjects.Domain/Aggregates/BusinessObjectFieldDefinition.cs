@@ -56,8 +56,8 @@ public sealed class BusinessObjectFieldDefinition : Entity<BusinessObjectFieldDe
         if (key.IsFailure)
             return Result.Failure<BusinessObjectFieldDefinition>(key.Error);
 
-        if (string.IsNullOrWhiteSpace(spec.Label) || spec.Label.Trim().Length > 200)
-            return Result.Failure<BusinessObjectFieldDefinition>("Field label is required and cannot exceed 200 characters.");
+        if (string.IsNullOrWhiteSpace(spec.Label) || spec.Label.Trim().Length > 256)
+            return Result.Failure<BusinessObjectFieldDefinition>("Field label is required and cannot exceed 256 characters.");
 
         if (!Enum.IsDefined(spec.FieldType))
             return Result.Failure<BusinessObjectFieldDefinition>("Field type is not supported.");

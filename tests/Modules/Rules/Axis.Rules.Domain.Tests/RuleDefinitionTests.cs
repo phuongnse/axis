@@ -8,6 +8,7 @@ public sealed class RuleDefinitionTests
 {
     private static readonly Guid WorkspaceId = Guid.Parse("11111111-1111-1111-1111-111111111111");
     private static readonly Guid UserId = Guid.Parse("22222222-2222-2222-2222-222222222222");
+    private static readonly RuleSubjectReference Actor = RuleSubjectReference.Human(UserId);
     private static readonly DateTime Now = new(2026, 7, 10, 3, 30, 0, DateTimeKind.Utc);
 
     [Fact]
@@ -16,7 +17,7 @@ public sealed class RuleDefinitionTests
         RuleDefinition definition = Draft();
         Configure(definition);
 
-        RuleDefinitionVersion versionOne = definition.CreateVersion(definition.Revision, UserId, Now.AddMinutes(1)).Value;
+        RuleDefinitionVersion versionOne = definition.CreateVersion(definition.Revision, Actor, Now.AddMinutes(1)).Value;
         definition.Status.Should().Be(RuleLifecycleStatus.Inactive);
         definition.ActiveVersion.Should().BeNull();
 
@@ -26,10 +27,10 @@ public sealed class RuleDefinitionTests
                 definition.Description,
                 Inputs(label: "Amount to approve"),
                 Condition(),
-                UserId,
+                Actor,
                 Now.AddMinutes(2))
             .IsSuccess.Should().BeTrue();
-        RuleDefinitionVersion versionTwo = definition.CreateVersion(definition.Revision, UserId, Now.AddMinutes(3)).Value;
+        RuleDefinitionVersion versionTwo = definition.CreateVersion(definition.Revision, Actor, Now.AddMinutes(3)).Value;
 
         versionOne.Version.Should().Be(1);
         versionTwo.Version.Should().Be(2);
@@ -55,7 +56,7 @@ public sealed class RuleDefinitionTests
             definition.Description,
             Inputs(),
             Condition(),
-            UserId,
+            Actor,
             Now);
 
         result.IsFailure.Should().BeTrue();
@@ -68,13 +69,13 @@ public sealed class RuleDefinitionTests
     {
         RuleDefinition definition = Draft();
         Configure(definition);
-        RuleDefinitionVersion version = definition.CreateVersion(definition.Revision, UserId, Now).Value;
+        RuleDefinitionVersion version = definition.CreateVersion(definition.Revision, Actor, Now).Value;
 
-        definition.ActivateVersion(definition.Revision, version.Version, UserId, Now.AddMinutes(1)).IsSuccess.Should().BeTrue();
+        definition.ActivateVersion(definition.Revision, version.Version, Actor, Now.AddMinutes(1)).IsSuccess.Should().BeTrue();
         definition.Status.Should().Be(RuleLifecycleStatus.Active);
         definition.ActiveVersion.Should().Be(version.Version);
 
-        definition.Deactivate(definition.Revision, UserId, Now.AddMinutes(2)).IsSuccess.Should().BeTrue();
+        definition.Deactivate(definition.Revision, Actor, Now.AddMinutes(2)).IsSuccess.Should().BeTrue();
 
         definition.Status.Should().Be(RuleLifecycleStatus.Inactive);
         definition.ActiveVersion.Should().BeNull();
@@ -86,10 +87,10 @@ public sealed class RuleDefinitionTests
     {
         RuleDefinition definition = Draft();
         Configure(definition);
-        RuleDefinitionVersion version = definition.CreateVersion(definition.Revision, UserId, Now).Value;
-        definition.ActivateVersion(definition.Revision, version.Version, UserId, Now.AddMinutes(1)).IsSuccess.Should().BeTrue();
+        RuleDefinitionVersion version = definition.CreateVersion(definition.Revision, Actor, Now).Value;
+        definition.ActivateVersion(definition.Revision, version.Version, Actor, Now.AddMinutes(1)).IsSuccess.Should().BeTrue();
 
-        definition.Archive(definition.Revision, UserId, Now.AddMinutes(2)).IsSuccess.Should().BeTrue();
+        definition.Archive(definition.Revision, Actor, Now.AddMinutes(2)).IsSuccess.Should().BeTrue();
 
         definition.Status.Should().Be(RuleLifecycleStatus.Archived);
         definition.ActiveVersion.Should().BeNull();
@@ -101,10 +102,10 @@ public sealed class RuleDefinitionTests
     {
         RuleDefinition definition = Draft();
         Configure(definition);
-        definition.CreateVersion(definition.Revision, UserId, Now).IsSuccess.Should().BeTrue();
+        definition.CreateVersion(definition.Revision, Actor, Now).IsSuccess.Should().BeTrue();
 
-        Result stale = definition.ActivateVersion(1, 1, UserId, Now.AddMinutes(1));
-        Result unknown = definition.ActivateVersion(definition.Revision, 2, UserId, Now.AddMinutes(1));
+        Result stale = definition.ActivateVersion(1, 1, Actor, Now.AddMinutes(1));
+        Result unknown = definition.ActivateVersion(definition.Revision, 2, Actor, Now.AddMinutes(1));
 
         stale.ErrorCode.Should().Be(ErrorCodes.Conflict);
         unknown.ErrorCode.Should().Be(ErrorCodes.InvalidInput);
@@ -118,7 +119,7 @@ public sealed class RuleDefinitionTests
             default,
             "Amount approval",
             "Requires approval for high-value records.",
-            UserId,
+            Actor,
             Now).IsFailure.Should().BeTrue();
 
     [Fact]
@@ -187,7 +188,7 @@ public sealed class RuleDefinitionTests
         RuleDefinitionKey.Create("amount_approval").Value,
         "Amount approval",
         "Requires approval for high-value records.",
-        UserId,
+        Actor,
         Now).Value;
 
     private static void Configure(RuleDefinition definition) =>
@@ -197,7 +198,7 @@ public sealed class RuleDefinitionTests
                 definition.Description,
                 Inputs(),
                 Condition(),
-                UserId,
+                Actor,
                 Now)
             .IsSuccess.Should().BeTrue();
 

@@ -24,7 +24,7 @@ The normative package bytes, component schemas, and DSSE vectors are owned by [d
 - The publish command is an authenticated Workspace Administrator lifecycle operation. Authorization is evaluated before any package or version information is disclosed or changed.
 - Solutions retains the exact uploaded DSSE envelope bytes in PostgreSQL `bytea`; no serialization, normalization, or reconstruction may replace those bytes. The payload must be exact UTF-8 deterministic Axis solution JSON.
 - Verification fails closed before mutation: envelope structure and payload extraction, deterministic JSON/schema validity, declared identity and exact current committed Axis OpenAPI SHA-256 digest, package limits, ordered inventory/dependency validity, component hashes, DSSE PAE construction, ECDSA P-256/SHA-256 (`ES256`) signature, and currently trusted non-revoked publisher/key must all match.
-- Limits are 10 MiB maximum package, 1 MiB maximum decoded component, 256 components, 512 dependency edges, and dependency-DAG depth 32. Package dependencies are not supported in Wave 1.
+- Limits are 10 MiB maximum package, 1 MiB maximum decoded component, 256 components, 512 dependency edges, and dependency-DAG depth 32. Package dependencies are not supported by the current package contract.
 - Version identity is deduplicated by `(solution key, exact SemVer, package hash)`. An exact retry returns the existing immutable version. An attempt to publish another byte sequence for an existing `(solution key, exact SemVer)` conflicts; it never replaces or aliases the immutable version.
 - Version persistence and its redacted audit-outbox record commit atomically. The safe read model exposes identity, manifest/provenance, trust classification, hashes, and lifecycle metadata, but not raw package bytes by default.
 
@@ -68,6 +68,6 @@ The normative package bytes, component schemas, and DSSE vectors are owned by [d
 
 ## Explicit exclusions
 
-- Wave 1 has no version upgrade, rollback, uninstall, marketplace, overlay, workspace trust policy, package dependency graph, product-data migration, drift detection, promotion, or trusted-publisher mutation surface.
+- Solutions has no version upgrade, rollback, uninstall, marketplace, overlay, workspace trust policy, package dependency graph, product-data migration, drift detection, promotion, or trusted-publisher mutation surface until those capabilities receive their own contracts.
 - First module adapters are Authorization policy, Business Object definition, and Rule binding to an existing immutable built-in Rule definition. Each remains the owner of its typed schema and resulting module state.
-- The Wave 0 reference-product provisioning path is retired only by its owning implementation and external-product evidence in a clean cutover; Solutions provides no compatibility shim or dual path.
+- Solutions exposes one signed publish/install lifecycle. Reference products have no product-specific provisioning surface, compatibility shim, fallback, flag, or dual install path in Axis.

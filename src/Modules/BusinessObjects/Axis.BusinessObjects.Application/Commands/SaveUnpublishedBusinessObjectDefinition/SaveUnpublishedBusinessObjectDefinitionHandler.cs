@@ -1,7 +1,9 @@
+using Axis.Authorization.Contracts;
 using Axis.BusinessObjects.Application.Repositories;
 using Axis.BusinessObjects.Application.Services;
 using Axis.BusinessObjects.Domain.Aggregates;
 using Axis.BusinessObjects.Domain.ValueObjects;
+using Axis.Identity.Contracts;
 using Axis.Shared.Application;
 using Axis.Shared.Application.CQRS;
 using Axis.Shared.Application.Identity;
@@ -11,6 +13,8 @@ namespace Axis.BusinessObjects.Application.Commands.SaveUnpublishedBusinessObjec
 
 public sealed class SaveUnpublishedBusinessObjectDefinitionHandler(
     ICurrentUser currentUser,
+    ICurrentSubject currentSubject,
+    IProductAuthorizationService authorization,
     IBusinessObjectDefinitionRepository repository,
     IUnitOfWork unitOfWork,
     IBusinessObjectDefinitionInputPlanner inputPlanner)
@@ -22,12 +26,26 @@ public sealed class SaveUnpublishedBusinessObjectDefinitionHandler(
     {
         if (currentUser.workspaceId is not Guid workspaceId)
             return BusinessObjectDefinitionFailures.MissingWorkspace<BusinessObjectDefinitionDetailDto>();
+        if (currentSubject.Subject.Id == Guid.Empty || !Enum.IsDefined(currentSubject.Subject.Kind))
+            return BusinessObjectDefinitionFailures.MissingUser<BusinessObjectDefinitionDetailDto>();
 
         BusinessObjectDefinitionId definitionId = BusinessObjectDefinitionId.From(command.BusinessObjectDefinitionId);
         BusinessObjectDefinition? definition =
             await repository.GetByIdForWorkspaceAsync(definitionId, workspaceId, cancellationToken);
         if (definition is null)
             return BusinessObjectDefinitionFailures.NotFound<BusinessObjectDefinitionDetailDto>();
+
+        ProductAuthorizationDecision decision = await BusinessObjectAuthorization.AuthorizeAsync(
+            authorization,
+            workspaceId,
+            currentSubject.Subject,
+            BusinessObjectProductActions.DefinitionManage,
+            BusinessObjectProductActions.DefinitionResourceType,
+            definition.Key.Value,
+            command.CorrelationId,
+            cancellationToken);
+        if (!decision.IsAllowed)
+            return BusinessObjectDefinitionFailures.Authorization<BusinessObjectDefinitionDetailDto>(decision);
 
         Result<IReadOnlyList<BusinessObjectFieldDefinitionSpec>> fields = await inputPlanner.PlanAsync(
             workspaceId,
@@ -59,7 +77,7 @@ public sealed class SaveUnpublishedBusinessObjectDefinitionHandler(
             return BusinessObjectDefinitionFailures.DuplicateObjectKey<BusinessObjectDefinitionDetailDto>();
         }
 
-        return BusinessObjectDefinitionMapper.ToDetailDto(definition);
+        return BusinessObjectDefinitionMapper.ToDetailDto(definition, canManage: true);
     }
 
     private static Result<BusinessObjectDefinitionDetailDto> MapDomainFailure(Result result) =>

@@ -1387,6 +1387,37 @@ Ship user value.
         self.assertIn("invalid Verification `Jest`", joined)
         self.assertIn("Required must be `Yes` or `No`", joined)
 
+    def test_accepts_cross_layer_and_architecture_boundaries(self) -> None:
+        issues = self.issues_for_use_case(
+            """## Acceptance Test Matrix
+
+| ID | Boundary | Scenario | Covers AC | Verification | Required |
+|---|---|---|---|---|---|
+| AT-001 | API/Infrastructure boundaries | Runtime and persistence cooperate | AC-001 | API integration test | Yes |
+| AT-002 | Architecture boundary | Public dependency direction is preserved | AC-001 | Architecture test | No |
+
+> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | Domain | N/A |
+> | Application | N/A |
+> | Infrastructure | N/A |
+> | API | N/A |
+> | Frontend | N/A |
+>
+> **Gaps vs spec:** none.
+>
+> **Deferred follow-ups:** N/A.
+>
+> **Verification:** N/A.
+>
+> **Decisions:** N/A.
+"""
+        )
+
+        self.assertNotIn("invalid Boundary", "\n".join(issues))
+
     def test_rejects_acceptance_matrix_mixed_id_prefixes(self) -> None:
         issues = self.issues_for_use_case(
             """## Acceptance Test Matrix
@@ -2830,6 +2861,7 @@ class TestVulnerablePackageGate(unittest.TestCase):
                 self.assertEqual(1, axis.check_frontend_vulnerable_packages())
 
         self.assertIn("high vulnerabilities cannot be accepted", stderr.getvalue())
+        self.assertIn("GHSA-frvp-7c67-39w9", stderr.getvalue())
 
     def test_frontend_gate_rejects_new_unaccepted_moderate_advisory(self) -> None:
         report = self.frontend_audit_report()
@@ -2966,6 +2998,28 @@ class TestVulnerablePackageGate(unittest.TestCase):
             self.assertEqual(1, axis.check_frontend_vulnerable_packages())
 
         self.assertIn("valid npm audit JSON", stderr.getvalue())
+
+    def test_frontend_gate_reports_structured_npm_audit_failure(self) -> None:
+        with (
+            mock.patch.object(axis, "check_frontend_toolchain", return_value=0),
+            mock.patch.object(
+                axis,
+                "run_frontend_npm",
+                return_value=axis.subprocess.CompletedProcess(
+                    [],
+                    1,
+                    stdout=json.dumps({"message": "registry unavailable", "error": {}}),
+                    stderr="",
+                ),
+            ),
+            contextlib.redirect_stderr(io.StringIO()) as stderr,
+        ):
+            self.assertEqual(1, axis.check_frontend_vulnerable_packages())
+
+        self.assertIn(
+            "npm audit did not return a vulnerability report: registry unavailable",
+            stderr.getvalue(),
+        )
 
     def test_frontend_gate_rejects_unexpected_npm_audit_exit_code(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -5241,6 +5295,61 @@ class TestAxisCommandWrappers(unittest.TestCase):
 
         self.assertEqual(["dotnet", "build", "Axis.sln", "--nologo", "--no-restore"], calls[0])
 
+    def test_dotnet_restore_accepts_project_target(self) -> None:
+        project = "src/Modules/BusinessObjects/Axis.BusinessObjects.Contracts/Axis.BusinessObjects.Contracts.csproj"
+        calls = self.run_with_fake_process(
+            axis.dotnet_command,
+            axis.argparse.Namespace(
+                dotnet_command="restore",
+                dotnet_args=[project, "--", "--locked-mode"],
+            ),
+        )
+
+        self.assertEqual(
+            ["dotnet", "restore", project, "--locked-mode"],
+            calls[0],
+        )
+
+    def test_api_contract_generation_builds_only_api_serially(self) -> None:
+        calls: list[list[str]] = []
+
+        def fake_run(command: list[str], **_kwargs):
+            calls.append(command)
+            return axis.subprocess.CompletedProcess(command, 0)
+
+        with (
+            mock.patch.object(axis, "check_dotnet_sdk", return_value=0),
+            mock.patch.object(axis, "check_frontend_toolchain", return_value=0),
+            mock.patch.object(axis, "run", side_effect=fake_run),
+            mock.patch.object(axis, "run_frontend_npm", return_value=axis.subprocess.CompletedProcess([], 0)),
+            mock.patch.object(axis, "sync_solution_openapi_digest") as sync_digest,
+            mock.patch.object(axis, "exe", side_effect=lambda name: name),
+            contextlib.redirect_stdout(io.StringIO()),
+        ):
+            self.assertEqual(0, axis.generate_api_contracts())
+
+        self.assertEqual(
+            ["dotnet", "build", "src/Axis.Api/Axis.Api.csproj", "--nologo", "-m:1"],
+            calls[1],
+        )
+        sync_digest.assert_called_once_with()
+
+    def test_solution_openapi_digest_sync_updates_only_configured_digest(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            openapi = root / "openapi.json"
+            settings = root / "appsettings.json"
+            openapi.write_bytes(b'{"openapi":"3.0.1"}')
+            settings.write_text(
+                '{\n  "Solutions": {\n    "AxisOpenApiSha256": "' + "0" * 64 + '"\n  }\n}\n',
+                encoding="utf-8",
+            )
+
+            axis.sync_solution_openapi_digest(openapi, settings)
+
+            expected = hashlib.sha256(openapi.read_bytes()).hexdigest()
+            self.assertIn(expected, settings.read_text(encoding="utf-8"))
+
     def test_dotnet_build_accepts_project_target(self) -> None:
         project = "src/Modules/Identity/Axis.Identity.Domain/Axis.Identity.Domain.csproj"
         calls = self.run_with_fake_process(
@@ -5253,6 +5362,28 @@ class TestAxisCommandWrappers(unittest.TestCase):
 
         self.assertEqual(
             ["dotnet", "build", project, "--nologo", "--no-restore"],
+            calls[0],
+        )
+
+    def test_dotnet_format_accepts_project_target(self) -> None:
+        project = "tests/Api/Axis.Api.Tests/Axis.Api.Tests.csproj"
+        calls = self.run_with_fake_process(
+            axis.dotnet_command,
+            axis.argparse.Namespace(
+                dotnet_command="format",
+                dotnet_args=[project, "--", "--no-restore"],
+                check=True,
+            ),
+        )
+
+        self.assertEqual(
+            [
+                "dotnet",
+                "format",
+                project,
+                "--verify-no-changes",
+                "--no-restore",
+            ],
             calls[0],
         )
 
@@ -5608,6 +5739,59 @@ class TestAxisCommandWrappers(unittest.TestCase):
         self.assertEqual("rules", args.module)
         self.assertEqual("AddDecisionTables", args.name)
 
+    def test_migration_remove_uses_owned_module_contract(self) -> None:
+        calls = self.run_with_fake_process(
+            axis.migration_command,
+            axis.argparse.Namespace(
+                migration_command="remove",
+                module="business-objects",
+            ),
+        )
+
+        project = str(
+            axis.ROOT
+            / "src"
+            / "Modules"
+            / "BusinessObjects"
+            / "Axis.BusinessObjects.Infrastructure"
+            / "Axis.BusinessObjects.Infrastructure.csproj"
+        )
+        self.assertEqual(
+            ["dotnet", "build", project, "--nologo", "-m:1"],
+            calls[0],
+        )
+        self.assertEqual(
+            [
+                "dotnet",
+                "ef",
+                "migrations",
+                "remove",
+                "--project",
+                project,
+                "--startup-project",
+                project,
+                "--context",
+                "BusinessObjectsDbContext",
+                "--force",
+                "--no-build",
+            ],
+            calls[1],
+        )
+
+    def test_cli_routes_finite_migration_remove(self) -> None:
+        with (
+            mock.patch.object(axis, "migration_command", return_value=0) as migration,
+            contextlib.redirect_stdout(io.StringIO()),
+        ):
+            self.assertEqual(
+                0,
+                axis.main(["migration", "remove", "business-objects"]),
+            )
+
+        args = migration.call_args.args[0]
+        self.assertEqual("remove", args.migration_command)
+        self.assertEqual("business-objects", args.module)
+
     def test_migration_add_uses_non_routable_design_time_connection(self) -> None:
         with (
             mock.patch.object(axis, "check_dotnet_sdk", return_value=0),
@@ -5680,6 +5864,46 @@ class TestAxisCommandWrappers(unittest.TestCase):
             contextlib.redirect_stderr(io.StringIO()),
         ):
             axis.main(["frontend", "test", "--watch"])
+
+    def test_frontend_format_maps_only_selected_source_paths(self) -> None:
+        calls = self.run_with_fake_process(
+            axis.frontend_command,
+            axis.argparse.Namespace(
+                frontend_command="format",
+                source_paths=["src/features/solutions/page.tsx", "src/index.css"],
+            ),
+        )
+
+        self.assertEqual(
+            [
+                "npm",
+                "exec",
+                "--",
+                "biome",
+                "check",
+                "--write",
+                "src/features/solutions/page.tsx",
+                "src/index.css",
+            ],
+            calls[0],
+        )
+
+    def test_frontend_format_rejects_flags_and_non_source_paths(self) -> None:
+        with (
+            self.assertRaises(SystemExit),
+            contextlib.redirect_stderr(io.StringIO()),
+        ):
+            axis.main(["frontend", "format", "--write"])
+
+        with tempfile.TemporaryDirectory() as temp:
+            frontend = Path(temp)
+            (frontend / "README.md").write_text("not source", encoding="utf-8")
+            with (
+                mock.patch.object(axis, "FRONTEND_DIR", frontend),
+                self.assertRaises(SystemExit),
+                contextlib.redirect_stderr(io.StringIO()),
+            ):
+                axis.main(["frontend", "format", "README.md"])
 
     def test_frontend_gen_api_types_check_generates_without_diffing_head(self) -> None:
         calls = self.run_with_fake_process(
@@ -6616,6 +6840,62 @@ class TestRepoSkillsGate(unittest.TestCase):
             {path.removesuffix(".toml") for path in project_orchestration.project_agent_role_files()},
             set(allowed),
         )
+
+    def test_named_agent_hook_allows_spawn_role_prefix_with_exact_profile(self) -> None:
+        specs = {
+            "axis_scout": {"model": "gpt-5.6-luna", "reasoning": "high"},
+        }
+        for tool_name in ("spawn_agent", "collaboration.spawn_agent"):
+            self.assertIsNone(
+                named_agent_hook.policy_decision(
+                    {
+                        "hook_event_name": "PreToolUse",
+                        "tool_name": tool_name,
+                        "tool_input": {
+                            "task_name": "axis_scout__route_inventory",
+                            "model": "gpt-5.6-luna",
+                            "reasoning_effort": "high",
+                        },
+                    },
+                    allowed_agent_types=frozenset(specs),
+                    agent_specs=specs,
+                )
+            )
+
+    def test_named_agent_hook_rejects_spawn_without_role_or_exact_profile(self) -> None:
+        specs = {
+            "axis_investigator": {"model": "gpt-5.6-terra", "reasoning": "high"},
+        }
+        invalid_inputs = (
+            {
+                "task_name": "authorization_inventory",
+                "model": "gpt-5.6-terra",
+                "reasoning_effort": "high",
+            },
+            {
+                "task_name": "axis_investigator__authorization_inventory",
+                "model": "gpt-5.6-sol",
+                "reasoning_effort": "high",
+            },
+            {
+                "task_name": "axis_investigator__authorization_inventory",
+                "model": "gpt-5.6-terra",
+                "reasoning_effort": "medium",
+            },
+        )
+
+        for tool_input in invalid_inputs:
+            decision = named_agent_hook.policy_decision(
+                {
+                    "hook_event_name": "PreToolUse",
+                    "tool_name": "spawn_agent",
+                    "tool_input": tool_input,
+                },
+                allowed_agent_types=frozenset(specs),
+                agent_specs=specs,
+            )
+
+            self.assertEqual("deny", decision["hookSpecificOutput"]["permissionDecision"])
 
 
 class TestDoctorPythonPackageChecks(unittest.TestCase):

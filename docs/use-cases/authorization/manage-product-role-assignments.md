@@ -108,23 +108,23 @@ Policy and assignment realization is owned by [Authorization architecture](../..
 >
 > | Layer | Status |
 > |---|---|
-> | Authorization Domain | Not started |
-> | Authorization Application | Not started |
-> | Authorization Infrastructure | Not started |
-> | Audit | Not started |
-> | Solutions adapter | Not started |
-> | API | Not started |
-> | MCP | Not started |
-> | Frontend | Not started |
+> | Authorization Domain | Done |
+> | Authorization Application | Done |
+> | Authorization Infrastructure | Done |
+> | Audit | Done |
+> | Solutions adapter | Done |
+> | API | Done |
+> | MCP | Done |
+> | Frontend | Partial |
 >
 > **Gaps vs spec:**
 >
 > | ID | Gap |
 > |---|---|
-> | GAP-001 | All implementation layers are not started; every acceptance criterion awaits implementation. |
+> | GAP-001 | The administrator component journey passes, but required Playwright AT-005 remains pending against the current checkpoint. |
 >
 > **Deferred follow-ups:** Only the separately owned capabilities under Out Of Scope are deferred.
 >
-> **Verification:** Not run; implementation evidence does not exist yet.
+> **Verification:** Domain, application, PostgreSQL infrastructure, API, MCP, and frontend component evidence passes. Browser evidence remains tracked by GAP-001.
 >
 > **Decisions:** Assignment grants exact installed product roles only. Lifecycle administrator bootstrap may install a Solution and assign its initial product roles, but lifecycle authority never becomes product authority.

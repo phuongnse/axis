@@ -40,7 +40,7 @@ Let an active human or service subject access a product capability only when an 
 3. Product operation asks Authorization to evaluate the exact installed policy/version, subject's active assignments, action key, resource/object key, and record scope.
 4. Authorization permits only an exact matching grant. For a record operation, `Own` resolves the module-owned persisted owner to the evaluated subject; `All` resolves any matching record in the same Workspace.
 5. The owning product module filters collections before materialization and enforces record ownership for get, save, and submit inside its boundary. Creation stamps the authenticated subject server-side and never accepts caller-provided owner data.
-6. Before returning the decision, Authorization commits and reads back the required redacted allow or deny audit outcome. Audit failure denies without product data access.
+6. Before returning an authoritative allow or deny decision, Authorization commits and reads back the required redacted audit outcome. A policy-resolution, persistence, or required-audit dependency failure returns `Unavailable` without product data access.
 7. Product operation performs the allowed read or mutation and returns its normal result. Client projections may show the resulting affordance but do not replace this check.
 
 Policy evaluation and product-boundary realization is owned by [Authorization architecture](../../architecture/authorization.md#evaluation-and-enforcement).
@@ -52,16 +52,16 @@ Policy evaluation and product-boundary realization is owned by [Authorization ar
 - Forged or caller-supplied record ownership denies; service-created records are owned by the authenticated service subject. Existing product mutation actor metadata migrates as `Human` with the same identifier and does not retain a parallel user-only path.
 - Cross-Workspace lookup and policy evaluation return a non-disclosing not-found style outcome.
 - A role assignment, service grant, service identity, or key revoked while a client holds stale state denies at the server immediately.
-- Authorization, policy-resolution, or required audit dependency failure fails closed. The client exposes a stable recovery state and does not retry a mutation as allowed without a fresh authoritative response.
+- Authorization, policy-resolution, persistence, or required-audit dependency failure fails closed as `Unavailable`, not as an authoritative policy denial. The API returns a stable non-sensitive `503`; the client exposes a retryable recovery state and does not retry a mutation as allowed without a fresh authoritative response.
 
 ## Acceptance Criteria
 
 *Happy path*
 
 - **AC-001** Server enforcement evaluates active human membership or active service grant through the shared Workspace-access policy before any policy-governed product data access; unknown subject kinds deny.
-- **AC-002** An active assigned product role can perform only the exact installed policy action, resource type, and nullable resource/object key for the current Workspace. A missing grant key matches only a keyless request and never acts as a wildcard.
+- **AC-002** An active assigned product role can perform only the exact installed policy action, resource type, and nullable resource/object key for the current Workspace. A missing grant key matches only a keyless request and never acts as a wildcard. Keyless Business Object or Rule definition-manage authorizes only the typed collection `canStartCreate` projection; every create mutation derives and authorizes its exact semantic key independently.
 - **AC-003** Product action descriptors classify actions as non-record or record-scoped. Policy installation permits only `None` for non-record actions and only `Own`/`All` for record actions. Matching grants union deterministically: `All` dominates `Own`; otherwise an exact `Own` match permits only the evaluated subject's records, while no exact match denies.
-- **AC-004** The Wave 1 reference policy permits product `Administrator` the exact Business Object definition read/manage, Rules definition/binding manage, and read-all-record actions; permits `Applicant` the exact published-definition read and create/read/save/submit-own-record actions; and permits `Caseworker` the exact published-definition read and list/read-all-record actions but no record-mutation action.
+- **AC-004** The reference policy permits product `Administrator` the exact Business Object definition read/manage, Rules definition/binding manage, and read-all-record actions; permits `Applicant` the exact published-definition read and create/read/save/submit-own-record actions; and permits `Caseworker` the exact published-definition read and list/read-all-record actions but no record-mutation action. A Rules binding grant is scoped by the exact Rule Definition Key; binding UUIDs remain locators and signed-package component keys remain artifact identities. A retargeting update requires authority for both old and new definition keys. The exact action/resource literals and record/non-record classifications are the closed registry in [Authorization architecture](../../architecture/authorization.md#product-action-descriptor-registry); no module, policy, REST/MCP caller, or client may substitute an alias, case variant, implicit wildcard, or broader key.
 
 *Validation and recovery*
 
@@ -69,13 +69,13 @@ Policy evaluation and product-boundary realization is owned by [Authorization ar
 - **AC-006** Missing resource/object/scope input never grants a broader action; an `Own` mismatch never falls back to `All`.
 - **AC-007** Cross-Workspace policy-governed reads and mutations are non-disclosing, and an inactive/revoked human membership, service identity, service grant, signing key, or product-role assignment denies immediately despite an existing token or client cache.
 - **AC-008** Server enforcement remains authoritative; forged, stale, missing, or permissive UI/client projection cannot make a denied product operation succeed.
-- **AC-009** Required policy-governed allow, deny, and failure outcomes are correlated, append-only, redacted, and fail closed when required audit work cannot persist.
+- **AC-009** Required policy-governed allow and deny outcomes are correlated, append-only, redacted, and read back before return. Policy-resolution, persistence, or required-audit failure returns `Unavailable`, never proceeds as allowed, and remains distinguishable from an authoritative policy denial.
 
 *Client and boundaries*
 
 - **AC-010** Product clients present only server-reported action affordances and provide accessible forbidden, non-disclosing-not-found, unavailable, and retryable-recovery states without revealing policy internals or cross-Workspace resources.
 - **AC-011** Policies are immutable versioned Solution components installed only through the Solutions adapter; no policy-authoring API or UI exists in this slice.
-- **AC-012** `Own` record ownership is a product-module-owned discriminated `Human`/`Service` subject reference stamped from authenticated server context. Business Objects and Rules migrate existing Created/Updated/Submitted/Published user IDs to `Human` without changing their IDs; public REST/OpenAPI/MCP/generated-client projections replace the exact `*ByUserId` fields named by Authorization architecture with `SubjectReferenceDto` fields in one clean cutover, with no aliases or parallel path.
+- **AC-012** `Own` record ownership is a product-module-owned discriminated `Human`/`Service` subject reference stamped from authenticated server context. Business Objects and Rules preserve existing human actor identifiers as `Human`; public REST/OpenAPI/MCP/generated-client projections expose only `SubjectReferenceDto` actor fields, with no aliases or parallel path.
 - **AC-013** Record collections filter `Own` in the owning module query/store before materialization; get/save/submit enforce owner in that module, creation ignores caller-supplied owner input, and a service subject owns a record it creates.
 - **AC-014** A service subject is denied by every current product endpoint that composes only baseline WorkspaceAccess, including when it has no product-role assignment; it is admitted only when that endpoint/application composes an exact Authorization product action. Human baseline behavior is unchanged.
 
@@ -83,12 +83,12 @@ Policy evaluation and product-boundary realization is owned by [Authorization ar
 
 | ID | Boundary | Scenario | Covers AC | Verification | Required |
 |---|---|---|---|---|---|
-| AT-001 | Application boundary | Exact policy/version/role/action/resource matching permits only explicitly granted current-Workspace operations; omitted resource key matches only keyless requests; invalid `None`/`Own`/`All` action combinations reject installation | AC-001, AC-002, AC-005, AC-006 | Application test | Yes |
+| AT-001 | Application boundary | Exact policy/version/role/action/resource matching permits only explicitly granted current-Workspace operations; omitted resource key matches only keyless requests; keyless definition-manage projects `canStartCreate` but cannot authorize an ungranted keyed create; invalid `None`/`Own`/`All` action combinations reject installation | AC-001, AC-002, AC-005, AC-006 | Application test | Yes |
 | AT-002 | API boundary | Multi-role and multi-policy record grants resolve `All` over `Own`; otherwise `Own` filters collections and permits only the subject's record without broadening | AC-003, AC-006 | Application test + API integration test | Yes |
-| AT-003 | API boundary | Reference Administrator, Applicant, and Caseworker outcomes prove permitted actions and Caseworker mutation denial | AC-004 | API integration test | Yes |
+| AT-003 | API boundary | Reference Administrator, Applicant, and Caseworker outcomes prove permitted actions and Caseworker mutation denial; Administrator binding operations authorize the exact Rule Definition Key and a retarget requires both keys | AC-004 | API integration test | Yes |
 | AT-004 | API/Application boundaries | Revoked membership, service grant/key/identity, assignment, stale policy, and cross-Workspace requests deny immediately and non-disclosingly | AC-005, AC-007 | API integration test + Application test | Yes |
-| AT-005 | API boundary | Forged or stale client affordances cannot bypass server enforcement; client exposes accessible denial/not-found/unavailable recovery without policy disclosure | AC-008, AC-010 | API integration test + UI component test | Yes |
-| AT-006 | Infrastructure boundary | Policy-governed allows, denies, and dependency failures have correlated redacted audit read-back and fail closed when audit persistence is unavailable | AC-009 | Infrastructure integration test | Yes |
+| AT-005 | API boundary | Forged or stale client affordances cannot bypass server enforcement; authoritative denial is distinct from retryable `503` unavailability; client exposes accessible denial/not-found/unavailable recovery without policy disclosure | AC-008, AC-010 | API integration test + UI component test | Yes |
+| AT-006 | Infrastructure boundary | Policy-governed allows and denies have correlated redacted audit read-back; policy-resolution and audit-persistence failures return `Unavailable` and fail closed without being reported as an authoritative denial | AC-009 | Infrastructure integration test | Yes |
 | AT-007 | Application boundary | Only the Solutions adapter installs immutable versioned policies; policy-authoring operations and UI are absent | AC-011 | Application test + API integration test | Yes |
 | AT-008 | Application/Infrastructure boundaries | The clean discriminated-subject persistence and wire migration preserves existing actor IDs as `Human`, emits only the new `SubjectReferenceDto` fields through REST/OpenAPI/MCP/generated clients, retains a `Service` owner for service-created records, and rejects forged owner input | AC-012, AC-013 | Application test + Infrastructure integration test + API integration test + MCP contract test | Yes |
 | AT-009 | API/Application boundaries | `Own` collection filtering occurs before materialization and get/save/submit deny foreign owner access; all current product endpoints deny an unassigned service subject when only baseline WorkspaceAccess is composed, while an exact assigned action admits it without changing human baseline access | AC-003, AC-005, AC-013, AC-014 | API integration test + Application test | Yes |
@@ -103,30 +103,26 @@ Policy evaluation and product-boundary realization is owned by [Authorization ar
 
 | Surface | Required contract |
 |---|---|
-| Product collection/detail/action | Render only server-reported current-Workspace data and action affordances; re-evaluate after server response rather than trusting cached permission state. |
+| Product collection/detail/action | Render only server-reported current-Workspace data and action affordances. A keyless collection projection may expose only `canStartCreate`; the keyed POST and every detail action re-evaluate exact authority rather than trusting cached permission state. |
 | Forbidden or unavailable result | Explain that the action cannot proceed without exposing policy internals, foreign-resource existence, credentials, or cross-Workspace identifiers; offer an appropriate safe return or retry. |
 
 > **Implementation status**
 >
 > | Layer | Status |
 > |---|---|
-> | Authorization Domain | Not started |
-> | Authorization Application | Not started |
-> | Authorization Infrastructure | Not started |
-> | Audit | Not started |
-> | Solutions adapter | Not started |
-> | Product module integration | Not started |
-> | API | Not started |
-> | Frontend | Not started |
+> | Authorization Domain | Done |
+> | Authorization Application | Done |
+> | Authorization Infrastructure | Done |
+> | Audit | Done |
+> | Solutions adapter | Done |
+> | Product module integration | Done |
+> | API | Done |
+> | Frontend | Done |
 >
-> **Gaps vs spec:**
->
-> | ID | Gap |
-> |---|---|
-> | GAP-001 | All implementation layers are not started; every acceptance criterion awaits implementation. |
+> **Gaps vs spec:** None.
 >
 > **Deferred follow-ups:** Only the separately owned capabilities under Out Of Scope are deferred.
 >
-> **Verification:** Not run; implementation evidence does not exist yet.
+> **Verification:** [Access Product By Policy evidence](./access-product-by-policy.evidence.md) records the passing exact-role API matrix, durable audit and failure semantics, server-reported BO/Rules affordances, safe `403`/`404`/`503` client states, service boundary, generated REST/MCP contracts, full repository verification, and browser recovery journeys.
 >
-> **Decisions:** The server evaluates exact immutable product-policy grants after shared Workspace access. `Own` and `All` are distinct outcomes; client projection is convenience only and policies are installed, never authored, through Solutions.
+> **Decisions:** The server evaluates exact immutable product-policy grants after shared Workspace access. `Own` and `All` are distinct outcomes; keyless definition-manage authorizes only `canStartCreate`; keyed mutations remain exact; `Unavailable` remains distinct from `Denied`; client projection is convenience only and policies are installed, never authored, through Solutions.

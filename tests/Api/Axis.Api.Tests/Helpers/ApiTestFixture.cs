@@ -1,9 +1,13 @@
+using System.Collections.Concurrent;
 using System.Net.Http.Json;
 using System.Reflection;
 using System.Runtime.ExceptionServices;
 using System.Text.Json;
 using Axis.Api.Infrastructure;
 using Axis.Audit.Infrastructure.Persistence;
+using Axis.Authorization.Application;
+using Axis.Authorization.Contracts;
+using Axis.Authorization.Infrastructure.Persistence;
 using Axis.BusinessObjects.Infrastructure.Persistence;
 using Axis.Identity.Application.Repositories;
 using Axis.Identity.Application.Services;
@@ -12,6 +16,7 @@ using Axis.Identity.Infrastructure.Persistence;
 using Axis.Identity.Infrastructure.Repositories;
 using Axis.Identity.Infrastructure.Services;
 using Axis.Rules.Infrastructure.Persistence;
+using Axis.Solutions.Infrastructure.Persistence;
 using Axis.Testing;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Hosting;
@@ -25,11 +30,14 @@ using StackExchange.Redis;
 using Testcontainers.PostgreSql;
 using Testcontainers.Redis;
 using static OpenIddict.Abstractions.OpenIddictConstants;
+using IdentitySubjectKind = Axis.Identity.Contracts.SubjectKind;
 
 namespace Axis.Api.Tests.Helpers;
 
 public sealed class ApiTestFixture : IAsyncLifetime
 {
+    private readonly ConcurrentDictionary<(Guid WorkspaceId, Guid SubjectId), Func<ProductAuthorizationRequest, ProductAuthorizationDecision>>
+        _productAuthorizationTestAccess = new();
     private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder()
         .WithImage("postgres:16-alpine")
         .Build();
@@ -43,14 +51,18 @@ public sealed class ApiTestFixture : IAsyncLifetime
 
     private string? _previousIdentityConnectionStringEnv;
     private string? _previousAuditConnectionStringEnv;
+    private string? _previousAuthorizationConnectionStringEnv;
     private string? _previousBusinessObjectsConnectionStringEnv;
     private string? _previousRulesConnectionStringEnv;
+    private string? _previousSolutionsConnectionStringEnv;
     private string? _previousRedisConnectionStringEnv;
     private WebApplicationFactory<Program> _factory = null!;
     private string _identityConnectionString = null!;
     private string _auditConnectionString = null!;
+    private string _authorizationConnectionString = null!;
     private string _businessObjectsConnectionString = null!;
     private string _rulesConnectionString = null!;
+    private string _solutionsConnectionString = null!;
 
     private readonly CapturingEmailSender _emailCapture = new();
 
@@ -74,20 +86,28 @@ public sealed class ApiTestFixture : IAsyncLifetime
             await PostgresModuleTestDatabase.CreateAsync(postgresAdminConnectionString, "axis_identity_test");
         _auditConnectionString =
             await PostgresModuleTestDatabase.CreateAsync(postgresAdminConnectionString, "axis_audit_test");
+        _authorizationConnectionString =
+            await PostgresModuleTestDatabase.CreateAsync(postgresAdminConnectionString, "axis_authorization_test");
         _businessObjectsConnectionString =
             await PostgresModuleTestDatabase.CreateAsync(postgresAdminConnectionString, "axis_business_objects_test");
         _rulesConnectionString =
             await PostgresModuleTestDatabase.CreateAsync(postgresAdminConnectionString, "axis_rules_test");
+        _solutionsConnectionString =
+            await PostgresModuleTestDatabase.CreateAsync(postgresAdminConnectionString, "axis_solutions_test");
 
         _previousIdentityConnectionStringEnv = Environment.GetEnvironmentVariable("ConnectionStrings__Identity");
         _previousAuditConnectionStringEnv = Environment.GetEnvironmentVariable("ConnectionStrings__Audit");
+        _previousAuthorizationConnectionStringEnv = Environment.GetEnvironmentVariable("ConnectionStrings__Authorization");
         _previousBusinessObjectsConnectionStringEnv = Environment.GetEnvironmentVariable("ConnectionStrings__BusinessObjects");
         _previousRulesConnectionStringEnv = Environment.GetEnvironmentVariable("ConnectionStrings__Rules");
+        _previousSolutionsConnectionStringEnv = Environment.GetEnvironmentVariable("ConnectionStrings__Solutions");
         _previousRedisConnectionStringEnv = Environment.GetEnvironmentVariable("Redis__ConnectionString");
         Environment.SetEnvironmentVariable("ConnectionStrings__Identity", _identityConnectionString);
         Environment.SetEnvironmentVariable("ConnectionStrings__Audit", _auditConnectionString);
+        Environment.SetEnvironmentVariable("ConnectionStrings__Authorization", _authorizationConnectionString);
         Environment.SetEnvironmentVariable("ConnectionStrings__BusinessObjects", _businessObjectsConnectionString);
         Environment.SetEnvironmentVariable("ConnectionStrings__Rules", _rulesConnectionString);
+        Environment.SetEnvironmentVariable("ConnectionStrings__Solutions", _solutionsConnectionString);
         Environment.SetEnvironmentVariable("Redis__ConnectionString", _redis.GetConnectionString());
 
         DbContextOptions<IdentityDbContext> identityOptions = new DbContextOptionsBuilder<IdentityDbContext>()
@@ -105,6 +125,13 @@ public sealed class ApiTestFixture : IAsyncLifetime
         {
             await auditCtx.Database.MigrateAsync();
         }
+        DbContextOptions<AuthorizationDbContext> authorizationOptions = new DbContextOptionsBuilder<AuthorizationDbContext>()
+            .UseNpgsql(_authorizationConnectionString)
+            .Options;
+        await using (AuthorizationDbContext authorizationCtx = new(authorizationOptions))
+        {
+            await authorizationCtx.Database.MigrateAsync();
+        }
         DbContextOptions<BusinessObjectsDbContext> objectsOptions = new DbContextOptionsBuilder<BusinessObjectsDbContext>()
             .UseNpgsql(_businessObjectsConnectionString)
             .Options;
@@ -119,6 +146,13 @@ public sealed class ApiTestFixture : IAsyncLifetime
         {
             await rulesCtx.Database.MigrateAsync();
         }
+        DbContextOptions<SolutionsDbContext> solutionsOptions = new DbContextOptionsBuilder<SolutionsDbContext>()
+            .UseNpgsql(_solutionsConnectionString)
+            .Options;
+        await using (SolutionsDbContext solutionsCtx = new(solutionsOptions))
+        {
+            await solutionsCtx.Database.MigrateAsync();
+        }
 
         _dataProtectionKeysDirectory.Create();
 
@@ -132,8 +166,10 @@ public sealed class ApiTestFixture : IAsyncLifetime
                 {
                     ["ConnectionStrings:Identity"] = _identityConnectionString,
                     ["ConnectionStrings:Audit"] = _auditConnectionString,
+                    ["ConnectionStrings:Authorization"] = _authorizationConnectionString,
                     ["ConnectionStrings:BusinessObjects"] = _businessObjectsConnectionString,
                     ["ConnectionStrings:Rules"] = _rulesConnectionString,
+                    ["ConnectionStrings:Solutions"] = _solutionsConnectionString,
                     ["Redis:ConnectionString"] = _redis.GetConnectionString(),
                 });
             });
@@ -155,6 +191,11 @@ public sealed class ApiTestFixture : IAsyncLifetime
                 services.AddDbContext<AuditDbContext>(opts =>
                     opts.UseNpgsql(_auditConnectionString));
 
+                services.RemoveAll<DbContextOptions<AuthorizationDbContext>>();
+                services.RemoveAll<AuthorizationDbContext>();
+                services.AddDbContext<AuthorizationDbContext>(opts =>
+                    opts.UseNpgsql(_authorizationConnectionString));
+
                 services.RemoveAll<DbContextOptions<BusinessObjectsDbContext>>();
                 services.RemoveAll<BusinessObjectsDbContext>();
                 services.AddDbContext<BusinessObjectsDbContext>(opts =>
@@ -165,12 +206,30 @@ public sealed class ApiTestFixture : IAsyncLifetime
                 services.AddDbContext<RulesDbContext>(opts =>
                     opts.UseNpgsql(_rulesConnectionString));
 
+                services.RemoveAll<DbContextOptions<SolutionsDbContext>>();
+                services.RemoveAll<SolutionsDbContext>();
+                services.AddDbContext<SolutionsDbContext>(opts =>
+                    opts.UseNpgsql(_solutionsConnectionString));
+
                 services.RemoveAll<IConnectionMultiplexer>();
                 services.AddSingleton<IConnectionMultiplexer>(_ =>
                     ConnectionMultiplexer.Connect(_redis.GetConnectionString()));
                 services.RemoveAll<IEmailSender>();
                 services.AddSingleton(_emailCapture);
                 services.AddSingleton<IEmailSender>(_emailCapture);
+
+                services.RemoveAll<IProductAuthorizationService>();
+                services.AddScoped<IProductAuthorizationService>(provider =>
+                    new OptInProductAuthorizationService(
+                        new ProductAuthorizationService(
+                            provider.GetRequiredService<IAuthorizationSubjectActivity>(),
+                            provider.GetRequiredService<IProductActionDescriptorRegistry>(),
+                            provider.GetRequiredService<IProductPolicyReadStore>(),
+                            provider.GetRequiredService<IAuthorizationAuditSink>(),
+                            provider.GetRequiredService<IAuthorizationUnitOfWork>(),
+                            provider.GetRequiredService<TimeProvider>()),
+                        provider.GetRequiredService<IProductActionDescriptorRegistry>(),
+                        _productAuthorizationTestAccess));
 
                 ServiceDescriptor? openIddictSeederDescriptor = services.FirstOrDefault(
                     d => d.ImplementationType == typeof(OpenIddictSeeder));
@@ -204,8 +263,10 @@ public sealed class ApiTestFixture : IAsyncLifetime
 
         Environment.SetEnvironmentVariable("ConnectionStrings__Identity", _previousIdentityConnectionStringEnv);
         Environment.SetEnvironmentVariable("ConnectionStrings__Audit", _previousAuditConnectionStringEnv);
+        Environment.SetEnvironmentVariable("ConnectionStrings__Authorization", _previousAuthorizationConnectionStringEnv);
         Environment.SetEnvironmentVariable("ConnectionStrings__BusinessObjects", _previousBusinessObjectsConnectionStringEnv);
         Environment.SetEnvironmentVariable("ConnectionStrings__Rules", _previousRulesConnectionStringEnv);
+        Environment.SetEnvironmentVariable("ConnectionStrings__Solutions", _previousSolutionsConnectionStringEnv);
         Environment.SetEnvironmentVariable("Redis__ConnectionString", _previousRedisConnectionStringEnv);
     }
 
@@ -274,6 +335,30 @@ public sealed class ApiTestFixture : IAsyncLifetime
         return browserSession;
     }
 
+    public async Task EnableProductAuthorizationTestAccessAsync(
+        CancellationToken cancellationToken = default)
+    {
+        JsonElement session = await RefreshBrowserSecurityContextAsync(cancellationToken);
+        JsonElement user = session.GetProperty("user");
+        _productAuthorizationTestAccess.TryAdd(
+            (user.GetProperty("workspaceId").GetGuid(), user.GetProperty("userId").GetGuid()),
+            request => new ProductAuthorizationDecision(
+                true,
+                request.ActionKey.Contains(".record.", StringComparison.Ordinal)
+                    ? ProductActionScope.All
+                    : ProductActionScope.None));
+    }
+
+    public async Task SetProductAuthorizationTestDecisionAsync(
+        Func<ProductAuthorizationRequest, ProductAuthorizationDecision> decide,
+        CancellationToken cancellationToken = default)
+    {
+        JsonElement session = await RefreshBrowserSecurityContextAsync(cancellationToken);
+        JsonElement user = session.GetProperty("user");
+        _productAuthorizationTestAccess[
+            (user.GetProperty("workspaceId").GetGuid(), user.GetProperty("userId").GetGuid())] = decide;
+    }
+
     public async Task<HttpResponseMessage> SendBrowserMutationAsync(
         HttpRequestMessage request,
         CancellationToken cancellationToken = default)
@@ -331,6 +416,30 @@ public sealed class ApiTestFixture : IAsyncLifetime
                     Requirements.Features.ProofKeyForCodeExchange,
                 },
             });
+        }
+    }
+
+    private sealed class OptInProductAuthorizationService(
+        IProductAuthorizationService inner,
+        IProductActionDescriptorRegistry descriptors,
+        ConcurrentDictionary<(Guid WorkspaceId, Guid SubjectId), Func<ProductAuthorizationRequest, ProductAuthorizationDecision>> access)
+        : IProductAuthorizationService
+    {
+        public Task<ProductAuthorizationDecision> AuthorizeAsync(
+            ProductAuthorizationRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            ProductActionDescriptor? descriptor = descriptors.Find(
+                request.ActionKey,
+                request.ResourceType);
+            if (request.Subject.Kind == IdentitySubjectKind.Human
+                && access.TryGetValue((request.WorkspaceId, request.Subject.Id), out Func<ProductAuthorizationRequest, ProductAuthorizationDecision>? decide)
+                && descriptor is not null)
+            {
+                return Task.FromResult(decide(request));
+            }
+
+            return inner.AuthorizeAsync(request, cancellationToken);
         }
     }
 }

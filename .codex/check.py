@@ -133,7 +133,7 @@ def config_issues() -> list[str]:
         pre_tool_use = hooks.get("PreToolUse") if isinstance(hooks, dict) else None
         hook_command = 'python "$(git rev-parse --show-toplevel)/.codex/hooks/require_named_agent.py"'
         expected_hook = {
-            "matcher": "^Agent$",
+            "matcher": r"^(Agent|(?:collaboration\.)?spawn_agent)$",
             "hooks": [
                 {
                     "type": "command",

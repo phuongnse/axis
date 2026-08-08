@@ -18,11 +18,11 @@ internal static class BusinessObjectRecordMapper
             record.Values,
             definition.Fields.OrderBy(field => field.Order).Select(ToFieldContractDto).ToArray(),
             record.RuleEvaluations.Select(ToEvaluationDto).ToArray(),
-            record.CreatedByUserId,
+            SubjectReferenceMapper.ToDto(record.CreatedBySubject),
             record.CreatedAt,
-            record.UpdatedByUserId,
+            SubjectReferenceMapper.ToDto(record.UpdatedBySubject),
             record.UpdatedAt,
-            record.SubmittedByUserId,
+            record.SubmittedBySubject is { } submittedBySubject ? SubjectReferenceMapper.ToDto(submittedBySubject) : null,
             record.SubmittedAt);
 
     public static BusinessObjectRecordListItemDto ToListItemDto(BusinessObjectRecord record) =>

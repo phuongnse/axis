@@ -14,12 +14,14 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
     public DbSet<WorkspaceMembership> WorkspaceMemberships => Set<WorkspaceMembership>();
     public DbSet<WorkspaceContextTransition> WorkspaceContextTransitions => Set<WorkspaceContextTransition>();
     public DbSet<WorkspaceInvitation> WorkspaceInvitations => Set<WorkspaceInvitation>();
+    public DbSet<ServiceIdentity> ServiceIdentities => Set<ServiceIdentity>();
     internal DbSet<EmailVerificationToken> EmailVerificationTokens => Set<EmailVerificationToken>();
     internal DbSet<RegistrationIdempotencyRecord> RegistrationIdempotencyRecords =>
         Set<RegistrationIdempotencyRecord>();
     internal DbSet<CreateOrganizationIdempotencyRecordEntity> CreateOrganizationIdempotencyRecords =>
         Set<CreateOrganizationIdempotencyRecordEntity>();
     internal DbSet<IdentityAuditOutboxRecord> IdentityAuditOutboxRecords => Set<IdentityAuditOutboxRecord>();
+    internal DbSet<ServiceAssertionReplayRecord> ServiceAssertionReplayRecords => Set<ServiceAssertionReplayRecord>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -29,6 +31,8 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
         modelBuilder.ApplyConfiguration(new WorkspaceMembershipConfiguration());
         modelBuilder.ApplyConfiguration(new WorkspaceContextTransitionConfiguration());
         modelBuilder.ApplyConfiguration(new WorkspaceInvitationConfiguration());
+        modelBuilder.ApplyConfiguration(new ServiceIdentityConfiguration());
+        modelBuilder.ApplyConfiguration(new ServiceAssertionReplayRecordConfiguration());
         modelBuilder.ApplyConfiguration(new CreateOrganizationIdempotencyRecordConfiguration());
         modelBuilder.ApplyConfiguration(new IdentityAuditOutboxRecordConfiguration());
         modelBuilder.ApplyConfiguration(new RegistrationIdempotencyRecordConfiguration());

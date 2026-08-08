@@ -37,6 +37,6 @@ internal static class RuleBindingHandlerTestData
             0,
             true,
             DomainFailureBehavior.FailClosed,
-            RuleDefinitionHandlerTestContext.UserId,
+            RuleSubjectReference.Human(RuleDefinitionHandlerTestContext.UserId),
             DateTime.UtcNow).Value;
 }

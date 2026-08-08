@@ -333,9 +333,25 @@ async function mockAuthenticatedSession(page: Page): Promise<void> {
       body: JSON.stringify(profile),
     });
   });
+  await page.route('**/api/workspace-context/eligible', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([
+        {
+          workspaceId: profile.workspaceId,
+          name: 'Test workspace',
+          slug: 'test-workspace',
+          type: 'Organization',
+          organizationId: '33333333-3333-4333-8333-333333333333',
+          isCurrent: true,
+        },
+      ]),
+    });
+  });
 }
 
-async function mockRulesApi(page: Page): Promise<CapturedRequest[]> {
+async function mockRulesApi(page: Page, canStartCreate = true): Promise<CapturedRequest[]> {
   let detail: MockRuleDetail | null = null;
   let binding: ApiTypes.RuleBindingDto = {
     id: '88888888-8888-4888-8888-888888888888',
@@ -360,6 +376,15 @@ async function mockRulesApi(page: Page): Promise<CapturedRequest[]> {
     const path = url.pathname;
     const captured: CapturedRequest = { method: request.method(), path };
     requests.push(captured);
+
+    if (request.method() === 'GET' && path === '/api/rules/actions') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ canStartCreate }),
+      });
+      return;
+    }
 
     if (request.method() === 'GET' && path === '/api/rules/expression-language') {
       await route.fulfill({
@@ -716,6 +741,17 @@ async function mockRulesApi(page: Page): Promise<CapturedRequest[]> {
 
   return requests;
 }
+
+test('denied create affordance blocks rule toolbar and deep-link launch', async ({ page }) => {
+  await mockAuthenticatedSession(page);
+  await mockRulesApi(page, false);
+
+  await page.goto('/rules?dialog=create');
+
+  await expect(page).toHaveURL(/\/rules\?page=1$/);
+  await expect(page.getByRole('button', { name: 'New rule' })).toHaveCount(0);
+  await expect(page.getByRole('dialog', { name: 'New workspace rule' })).toHaveCount(0);
+});
 
 test('rule catalog exposes inputs and read-only built-in details', async ({ page }) => {
   await mockAuthenticatedSession(page);

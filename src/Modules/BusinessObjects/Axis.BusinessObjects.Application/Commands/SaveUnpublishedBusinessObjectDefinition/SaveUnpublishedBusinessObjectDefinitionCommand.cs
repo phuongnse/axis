@@ -6,5 +6,6 @@ public sealed record SaveUnpublishedBusinessObjectDefinitionCommand(
     Guid BusinessObjectDefinitionId,
     int ExpectedRevision,
     string Name,
-    IReadOnlyList<BusinessObjectFieldDefinitionInput> Fields)
+    IReadOnlyList<BusinessObjectFieldDefinitionInput> Fields,
+    string? CorrelationId = null)
     : ICommand<BusinessObjectDefinitionDetailDto>;

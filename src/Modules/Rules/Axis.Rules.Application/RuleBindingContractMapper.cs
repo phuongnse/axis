@@ -40,6 +40,22 @@ internal static class RuleBindingContractMapper
             (ContractFailureBehavior)binding.FailureBehavior,
             binding.Revision);
 
+    public static RuleBindingSolutionComponent ToSolutionComponent(RuleBinding binding) =>
+        new(
+            binding.InstalledComponentKey!,
+            binding.DefinitionKey.Value,
+            binding.DefinitionVersion,
+            binding.TargetType,
+            binding.TargetId,
+            binding.UseCaseOrTrigger,
+            binding.InputMappings.ToDictionary(
+                pair => pair.Key,
+                pair => ToDto(pair.Value),
+                StringComparer.Ordinal),
+            binding.Priority,
+            binding.Enabled,
+            (ContractFailureBehavior)binding.FailureBehavior);
+
     public static Result<IReadOnlyDictionary<string, RuleInputMapping>> ToDomain(
         IReadOnlyDictionary<string, RuleInputMappingDto>? mappings)
     {

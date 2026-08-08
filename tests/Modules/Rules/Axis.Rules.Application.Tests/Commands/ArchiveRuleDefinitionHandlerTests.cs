@@ -21,6 +21,8 @@ public sealed class ArchiveRuleDefinitionHandlerTests
             .Returns(definition);
         ArchiveRuleDefinitionHandler sut = new(
             _context.CurrentUser,
+            _context.CurrentSubject,
+            _context.Authorization,
             _context.Repository,
             _context.UnitOfWork);
 
@@ -43,6 +45,8 @@ public sealed class ArchiveRuleDefinitionHandlerTests
             .Returns(definition);
         ArchiveRuleDefinitionHandler sut = new(
             _context.CurrentUser,
+            _context.CurrentSubject,
+            _context.Authorization,
             _context.Repository,
             _context.UnitOfWork);
 
@@ -59,6 +63,8 @@ public sealed class ArchiveRuleDefinitionHandlerTests
     {
         ArchiveRuleDefinitionHandler sut = new(
             _context.CurrentUser,
+            _context.CurrentSubject,
+            _context.Authorization,
             _context.Repository,
             _context.UnitOfWork);
 
@@ -81,6 +87,8 @@ public sealed class ArchiveRuleDefinitionHandlerTests
         Axis.Rules.Domain.RuleDefinition definition = RuleDefinitionHandlerTestContext.VersionedDefinition();
         ArchiveRuleDefinitionHandler sut = new(
             _context.CurrentUser,
+            _context.CurrentSubject,
+            _context.Authorization,
             _context.Repository,
             _context.UnitOfWork);
 

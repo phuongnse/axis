@@ -1,3 +1,5 @@
+using Axis.Authorization.Contracts;
+using Axis.Identity.Contracts;
 using Axis.Rules.Contracts;
 using Axis.Shared.Application.CQRS;
 using Axis.Shared.Application.Identity;
@@ -7,16 +9,23 @@ namespace Axis.Rules.Application.Queries.ProjectRuleCondition;
 
 public sealed class ProjectRuleConditionHandler(
     ICurrentUser currentUser,
+    ICurrentSubject currentSubject,
+    IProductAuthorizationService authorization,
     RuleConditionProjectionService projection)
     : IQueryHandler<ProjectRuleConditionQuery, Result<RuleConditionProjectionDto>>
 {
-    public Task<Result<RuleConditionProjectionDto>> Handle(
+    public async Task<Result<RuleConditionProjectionDto>> Handle(
         ProjectRuleConditionQuery query,
         CancellationToken cancellationToken)
     {
-        _ = cancellationToken;
-        return currentUser.workspaceId is null
-            ? Task.FromResult(RuleDefinitionFailures.MissingWorkspace<RuleConditionProjectionDto>())
-            : Task.FromResult(projection.Project(query.Request));
+        if (currentUser.workspaceId is not Guid workspaceId)
+            return RuleDefinitionFailures.MissingWorkspace<RuleConditionProjectionDto>();
+        ProductAuthorizationDecision decision = await RuleAuthorization.AuthorizeAsync(
+            authorization, workspaceId, currentSubject.Subject,
+            RuleProductActions.DefinitionManage, RuleProductActions.DefinitionResourceType,
+            null, null, cancellationToken);
+        return decision.IsAllowed
+            ? projection.Project(query.Request)
+            : RuleDefinitionFailures.Authorization<RuleConditionProjectionDto>(decision);
     }
 }

@@ -1,0 +1,22 @@
+# Authenticate A Service Identity Evidence
+
+> **Navigation**: [docs/use-cases/identity-access/authenticate-service-identity.md](./authenticate-service-identity.md) · [docs/use-cases/identity-access/README.md](./README.md) · [docs/use-cases/README.md](../README.md) · [docs/README.md](../../README.md) · [AGENTS.md](../../../AGENTS.md)
+
+## Acceptance Evidence
+
+| AT ID | Evidence | Commands |
+|---|---|---|
+| AT-001 | `tests/Modules/Identity/Axis.Identity.Infrastructure.Tests/Services/ServiceClientAssertionAuthenticationTests.cs`, `tests/Api/Axis.Api.Tests/Identity/ServiceIdentityTokenFlowTests.cs` | `python scripts/axis.py dotnet test tests/Modules/Identity/Axis.Identity.Infrastructure.Tests/Axis.Identity.Infrastructure.Tests.csproj --filter FullyQualifiedName~ServiceClientAssertionAuthenticationTests`; `python scripts/axis.py dotnet test tests/Api/Axis.Api.Tests/Axis.Api.Tests.csproj --filter FullyQualifiedName~ServiceIdentityTokenFlowTests` |
+| AT-002 | `tests/Modules/Identity/Axis.Identity.Infrastructure.Tests/Services/ServiceClientAssertionAuthenticationTests.cs`, `tests/Api/Axis.Api.Tests/Identity/ServiceIdentityTokenFlowTests.cs` | `python scripts/axis.py dotnet test tests/Modules/Identity/Axis.Identity.Infrastructure.Tests/Axis.Identity.Infrastructure.Tests.csproj --filter FullyQualifiedName~ServiceClientAssertionAuthenticationTests`; `python scripts/axis.py dotnet test tests/Api/Axis.Api.Tests/Axis.Api.Tests.csproj --filter FullyQualifiedName~ServiceIdentityTokenFlowTests` |
+| AT-003 | `tests/Modules/Identity/Axis.Identity.Infrastructure.Tests/Services/ServiceClientAssertionAuthenticationTests.cs` | `python scripts/axis.py dotnet test tests/Modules/Identity/Axis.Identity.Infrastructure.Tests/Axis.Identity.Infrastructure.Tests.csproj --filter FullyQualifiedName~ServiceClientAssertionAuthenticationTests` |
+| AT-004 | `tests/Modules/Identity/Axis.Identity.Infrastructure.Tests/Services/ServiceClientAssertionAuthenticationTests.cs`, `tests/Api/Axis.Api.Tests/Identity/ServiceIdentityTokenFlowTests.cs` | `python scripts/axis.py dotnet test tests/Modules/Identity/Axis.Identity.Infrastructure.Tests/Axis.Identity.Infrastructure.Tests.csproj --filter FullyQualifiedName~ServiceClientAssertionAuthenticationTests`; `python scripts/axis.py dotnet test tests/Api/Axis.Api.Tests/Axis.Api.Tests.csproj --filter FullyQualifiedName~ServiceIdentityTokenFlowTests` |
+| AT-005 | `tests/Modules/Identity/Axis.Identity.Infrastructure.Tests/Services/ServiceClientAssertionAuthenticationTests.cs`, `tests/Modules/Identity/Axis.Identity.Infrastructure.Tests/Repositories/IdentityAuditDispatchStoreTests.cs` | `python scripts/axis.py dotnet test tests/Modules/Identity/Axis.Identity.Infrastructure.Tests/Axis.Identity.Infrastructure.Tests.csproj` |
+| AT-006 | `tests/Api/Axis.Api.Tests/Identity/ServiceIdentityTokenFlowTests.cs` | `python scripts/axis.py dotnet test tests/Api/Axis.Api.Tests/Axis.Api.Tests.csproj --filter FullyQualifiedName~ServiceIdentityTokenFlowTests` |
+| AT-007 | `tests/Modules/Identity/Axis.Identity.Infrastructure.Tests/Services/ServiceClientAssertionAuthenticationTests.cs` | `python scripts/axis.py dotnet test tests/Modules/Identity/Axis.Identity.Infrastructure.Tests/Axis.Identity.Infrastructure.Tests.csproj --filter FullyQualifiedName~ServiceClientAssertionAuthenticationTests` |
+| AT-008 | `tests/Api/Axis.Api.Tests/Identity/ServiceIdentityTokenFlowTests.cs`, `tests/Modules/Authorization/Axis.Authorization.Application.Tests/ProductAuthorizationServiceTests.cs`, `tests/Api/Axis.Api.Tests/Authorization/ServiceProductEndpointBoundaryTests.cs` | `python scripts/axis.py dotnet test tests/Api/Axis.Api.Tests/Axis.Api.Tests.csproj --filter FullyQualifiedName~ServiceIdentityTokenFlowTests`; `python scripts/axis.py dotnet test tests/Modules/Authorization/Axis.Authorization.Application.Tests/Axis.Authorization.Application.Tests.csproj` |
+
+## Current verification
+
+- Changed-path verification passed every service-authentication dependency and consumer test: Identity Infrastructure 127, Authorization Application 29, API 110, and Architecture 321.
+- The focused service-product boundary run passed 5 tests, including valid exact-action admission, service-owned record persistence, denied non-granted actions, denied baseline-only routes, immediate key/identity revocation, and rejection of fallback credential flows.
+- The Identity dispatcher/store coverage proves lease-fenced durable delivery and poison handling for the same redacted audit envelope used by service-token exchange.

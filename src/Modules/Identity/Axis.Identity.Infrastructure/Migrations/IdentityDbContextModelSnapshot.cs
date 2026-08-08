@@ -87,6 +87,55 @@ namespace Axis.Identity.Infrastructure.Migrations
                     b.ToTable("organization_memberships", (string)null);
                 });
 
+            modelBuilder.Entity("Axis.Identity.Domain.Aggregates.ServiceIdentity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("ClientId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("client_id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<int>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer")
+                        .HasColumnName("revision");
+
+                    b.Property<DateTime?>("RevokedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("revoked_at");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("status");
+
+                    b.Property<string>("WorkspaceGrantStatus")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("workspace_grant_status");
+
+                    b.Property<Guid>("WorkspaceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("workspace_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ClientId")
+                        .IsUnique();
+
+                    b.HasIndex("WorkspaceId");
+
+                    b.ToTable("service_identities", (string)null);
+                });
+
             modelBuilder.Entity("Axis.Identity.Domain.Aggregates.User", b =>
                 {
                     b.Property<Guid>("Id")
@@ -628,6 +677,28 @@ namespace Axis.Identity.Infrastructure.Migrations
                     b.ToTable("registration_idempotency", (string)null);
                 });
 
+            modelBuilder.Entity("Axis.Identity.Infrastructure.Persistence.Entities.ServiceAssertionReplayRecord", b =>
+                {
+                    b.Property<string>("Digest")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("digest");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.HasKey("Digest");
+
+                    b.HasIndex("ExpiresAt");
+
+                    b.ToTable("service_assertion_replays", (string)null);
+                });
+
             modelBuilder.Entity("OpenIddict.EntityFrameworkCore.Models.OpenIddictEntityFrameworkCoreApplication", b =>
                 {
                     b.Property<string>("Id")
@@ -849,6 +920,120 @@ namespace Axis.Identity.Infrastructure.Migrations
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("Axis.Identity.Domain.Aggregates.ServiceIdentity", b =>
+                {
+                    b.HasOne("Axis.Identity.Domain.Aggregates.Workspace", null)
+                        .WithMany()
+                        .HasForeignKey("WorkspaceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.OwnsMany("Axis.Identity.Domain.Aggregates.ServiceIdentityKey", "Keys", b1 =>
+                        {
+                            b1.Property<Guid>("Id")
+                                .HasColumnType("uuid")
+                                .HasColumnName("id");
+
+                            b1.Property<DateTime>("CreatedAt")
+                                .HasColumnType("timestamp with time zone")
+                                .HasColumnName("created_at");
+
+                            b1.Property<string>("Kid")
+                                .IsRequired()
+                                .HasMaxLength(128)
+                                .HasColumnType("character varying(128)")
+                                .HasColumnName("kid");
+
+                            b1.Property<DateTime?>("RevokedAt")
+                                .HasColumnType("timestamp with time zone")
+                                .HasColumnName("revoked_at");
+
+                            b1.Property<string>("Status")
+                                .IsRequired()
+                                .HasColumnType("text")
+                                .HasColumnName("status");
+
+                            b1.Property<string>("Thumbprint")
+                                .IsRequired()
+                                .HasMaxLength(128)
+                                .HasColumnType("character varying(128)")
+                                .HasColumnName("thumbprint");
+
+                            b1.Property<string>("X")
+                                .IsRequired()
+                                .HasMaxLength(128)
+                                .HasColumnType("character varying(128)")
+                                .HasColumnName("x");
+
+                            b1.Property<string>("Y")
+                                .IsRequired()
+                                .HasMaxLength(128)
+                                .HasColumnType("character varying(128)")
+                                .HasColumnName("y");
+
+                            b1.Property<Guid>("service_identity_id")
+                                .HasColumnType("uuid")
+                                .HasColumnName("service_identity_id");
+
+                            b1.HasKey("Id");
+
+                            b1.HasIndex("service_identity_id", "Kid")
+                                .IsUnique();
+
+                            b1.HasIndex("service_identity_id", "Thumbprint")
+                                .IsUnique();
+
+                            b1.ToTable("service_identity_keys", (string)null);
+
+                            b1.WithOwner()
+                                .HasForeignKey("service_identity_id");
+                        });
+
+                    b.OwnsMany("Axis.Identity.Domain.Aggregates.ServiceIdentityKeyTombstone", "Tombstones", b1 =>
+                        {
+                            b1.Property<Guid>("Id")
+                                .HasColumnType("uuid")
+                                .HasColumnName("id");
+
+                            b1.Property<string>("Kid")
+                                .IsRequired()
+                                .HasMaxLength(128)
+                                .HasColumnType("character varying(128)")
+                                .HasColumnName("kid");
+
+                            b1.Property<DateTime>("RevokedAt")
+                                .HasColumnType("timestamp with time zone")
+                                .HasColumnName("revoked_at");
+
+                            b1.Property<string>("Thumbprint")
+                                .IsRequired()
+                                .HasMaxLength(128)
+                                .HasColumnType("character varying(128)")
+                                .HasColumnName("thumbprint");
+
+                            b1.Property<Guid>("service_identity_id")
+                                .HasColumnType("uuid")
+                                .HasColumnName("service_identity_id");
+
+                            b1.HasKey("Id");
+
+                            b1.HasIndex("service_identity_id", "Kid")
+                                .IsUnique();
+
+                            b1.HasIndex("service_identity_id", "Thumbprint")
+                                .IsUnique();
+
+                            b1.ToTable("service_identity_key_tombstones", (string)null);
+
+                            b1.WithOwner()
+                                .HasForeignKey("service_identity_id");
+                        });
+
+                    b.Navigation("Keys");
+
+                    b.Navigation("Tombstones");
                 });
 
             modelBuilder.Entity("Axis.Identity.Domain.Aggregates.Workspace", b =>

@@ -51,6 +51,34 @@ public sealed class RulePersistenceJsonTests
     }
 
     [Fact]
+    public void BindingRevision_WhenRoundTripped_PreservesServiceActor()
+    {
+        RuleSubjectReference actor = RuleSubjectReference.Service(Guid.NewGuid());
+        RuleBindingRevision revision = new(
+            1,
+            RuleDefinitionKey.Create("field.required").Value,
+            1,
+            "invoice-field",
+            "field-1",
+            "record.validate",
+            new Dictionary<string, RuleInputMapping>
+            {
+                ["value"] = RuleInputMapping.FromContext("record.value").Value,
+            },
+            0,
+            true,
+            RuleBindingFailureBehavior.FailClosed,
+            actor,
+            DateTime.UtcNow);
+
+        List<RuleBindingRevision> restored = RulePersistenceJson.DeserializeBindingRevisionHistory(
+            RulePersistenceJson.SerializeBindingRevisionHistory([revision]));
+
+        restored.Should().ContainSingle();
+        restored[0].UpdatedBySubject.Should().Be(actor);
+    }
+
+    [Fact]
     public void Condition_WhenFunctionOperandIsRoundTripped_PreservesCapabilityAndArguments()
     {
         RulePredicateCondition condition = RulePredicateCondition.Create(

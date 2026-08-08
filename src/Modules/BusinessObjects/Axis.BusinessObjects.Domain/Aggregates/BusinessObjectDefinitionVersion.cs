@@ -7,12 +7,19 @@ public sealed class BusinessObjectDefinitionVersion : Entity<BusinessObjectDefin
 {
     private readonly List<BusinessObjectDefinitionVersionField> _fields = [];
 
+    private BusinessObjectDefinitionVersion()
+        : base(default)
+    {
+        Name = string.Empty;
+        Key = BusinessObjectDefinitionKey.Create("definition").Value;
+    }
+
     public BusinessObjectDefinitionId SourceDefinitionId { get; private set; }
     public Guid WorkspaceId { get; private set; }
     public int VersionNumber { get; private set; }
     public string Name { get; private set; }
     public BusinessObjectDefinitionKey Key { get; private set; }
-    public Guid PublishedByUserId { get; private set; }
+    public SubjectReference PublishedBySubject { get; private set; }
     public DateTime PublishedAt { get; private set; }
     public IReadOnlyList<BusinessObjectDefinitionVersionField> Fields => _fields.AsReadOnly();
 
@@ -23,7 +30,7 @@ public sealed class BusinessObjectDefinitionVersion : Entity<BusinessObjectDefin
         int versionNumber,
         string name,
         BusinessObjectDefinitionKey key,
-        Guid publishedByUserId,
+        SubjectReference publishedBySubject,
         DateTime publishedAt)
         : base(id)
     {
@@ -32,14 +39,14 @@ public sealed class BusinessObjectDefinitionVersion : Entity<BusinessObjectDefin
         VersionNumber = versionNumber;
         Name = name;
         Key = key;
-        PublishedByUserId = publishedByUserId;
+        PublishedBySubject = publishedBySubject;
         PublishedAt = publishedAt;
     }
 
     public static BusinessObjectDefinitionVersion Create(
         BusinessObjectDefinition definition,
         int versionNumber,
-        Guid publishedByUserId,
+        SubjectReference publishedBySubject,
         DateTime publishedAt)
     {
         BusinessObjectDefinitionVersion version = new(
@@ -49,7 +56,7 @@ public sealed class BusinessObjectDefinitionVersion : Entity<BusinessObjectDefin
             versionNumber,
             definition.Name,
             definition.Key,
-            publishedByUserId,
+            publishedBySubject,
             publishedAt);
         version._fields.AddRange(definition.Fields
             .OrderBy(field => field.Order)

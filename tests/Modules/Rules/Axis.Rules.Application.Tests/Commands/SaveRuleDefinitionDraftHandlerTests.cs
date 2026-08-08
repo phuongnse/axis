@@ -24,6 +24,8 @@ public sealed class SaveRuleDefinitionDraftHandlerTests
             .Returns<Task<int>>(_ => throw new ConcurrencyException());
         SaveRuleDefinitionDraftHandler sut = new(
             _context.CurrentUser,
+            _context.CurrentSubject,
+            _context.Authorization,
             _context.Repository,
             _context.UnitOfWork);
 

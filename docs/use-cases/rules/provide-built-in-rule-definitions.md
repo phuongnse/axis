@@ -57,6 +57,7 @@ Provide a code-owned catalog of reusable built-in rules using the same semantic 
 - **AC-007** Consumers bind inputs and own applied snapshots; Rules only exposes the public definition and evaluator contracts.
 - **AC-008** Every built-in uses positive assertion polarity: Required matches a present non-blank value; range, precision, length, pattern, format, and selection-count rules match values that satisfy their declared constraints.
 - **AC-009** Required accepts an absent value as evaluable input and returns non-match; absence is not an evaluator failure. Other required runtime inputs remain validation failures when absent.
+- **AC-010** A code-owned built-in version exposes `publishedBySubject: null`; Axis does not fabricate a Human or Service subject for catalog provenance, while Workspace-authored versions require their real publishing subject.
 
 ## Acceptance Test Matrix
 
@@ -64,7 +65,7 @@ Provide a code-owned catalog of reusable built-in rules using the same semantic 
 |---|---|---|---|---|---|
 | AT-001 | Domain boundary | Catalog returns one normalized built-in definition model and a valid/invalid behavior matrix proves positive assertion polarity for every built-in | AC-001, AC-004, AC-005, AC-008 | Domain test | Yes |
 | AT-002 | Application boundary | Exact built-in versions resolve through the shared evaluator; Required returns match for present non-blank, non-match for blank or absent, while malformed input remains an error | AC-002, AC-007, AC-009 | Application test | Yes |
-| AT-003 | API boundary | Catalog/detail responses expose built-in metadata plus the same semantic fields as workspace definitions, with generated parity | AC-001, AC-002, AC-006 | API integration test | Yes |
+| AT-003 | API boundary | Catalog/detail responses expose built-in metadata plus the same semantic fields as workspace definitions, including nullable built-in publisher provenance, with generated parity | AC-001, AC-002, AC-006, AC-010 | API integration test | Yes |
 | AT-004 | Application boundary | No consumer module depends on a built-in-specific Rules type or internal implementation | AC-002, AC-007 | Architecture test | Yes |
 | AT-005 | UI component | Catalog and detail use the same renderer; built-in origin only removes mutation actions | AC-002, AC-003, AC-006 | UI component test | Yes |
 
@@ -98,4 +99,4 @@ Provide a code-owned catalog of reusable built-in rules using the same semantic 
 >
 > **Verification:** AT-001 through AT-005 are mapped to current domain, application, API, architecture, and focused frontend evidence in the sibling sidecar; the recorded suites pass at the current checkpoint.
 >
-> **Decisions:** Built-in and Workspace definitions expose one positive-assertion semantic contract; built-in origin removes mutation actions without creating a second Rule type. [Rules architecture](../../ARCHITECTURE.md#rules-boundary) owns catalog validation, shared evaluation, and the clean replacement of retired polarity surfaces.
+> **Decisions:** Built-in and Workspace definitions expose one positive-assertion semantic contract; built-in origin removes mutation actions without creating a second Rule type. Built-in publication is code-owned provenance and therefore has no fabricated Human or Service publishing subject. [Rules architecture](../../ARCHITECTURE.md#rules-boundary) owns catalog validation, shared evaluation, and the clean replacement of retired polarity surfaces.

@@ -1,7 +1,9 @@
+using Axis.Authorization.Contracts;
 using Axis.BusinessObjects.Application.Repositories;
 using Axis.BusinessObjects.Application.Services;
 using Axis.BusinessObjects.Domain.Aggregates;
 using Axis.BusinessObjects.Domain.ValueObjects;
+using Axis.Identity.Contracts;
 using Axis.Shared.Application;
 using Axis.Shared.Application.CQRS;
 using Axis.Shared.Application.Identity;
@@ -11,6 +13,8 @@ namespace Axis.BusinessObjects.Application.Commands.CreateBusinessObjectRecord;
 
 public sealed class CreateBusinessObjectRecordHandler(
     ICurrentUser currentUser,
+    ICurrentSubject currentSubject,
+    IProductAuthorizationService authorization,
     IBusinessObjectDefinitionRepository definitionRepository,
     IBusinessObjectRecordRepository recordRepository,
     IUnitOfWork unitOfWork)
@@ -22,12 +26,26 @@ public sealed class CreateBusinessObjectRecordHandler(
     {
         if (currentUser.workspaceId is not Guid workspaceId)
             return BusinessObjectRecordFailures.MissingWorkspace<BusinessObjectRecordDetailDto>();
-        if (currentUser.UserId is not Guid userId)
+        if (currentSubject.Subject.Id == Guid.Empty || !Enum.IsDefined(currentSubject.Subject.Kind))
             return BusinessObjectRecordFailures.MissingUser<BusinessObjectRecordDetailDto>();
 
         Result<BusinessObjectDefinitionKey> key = BusinessObjectDefinitionKey.Create(command.ObjectKey);
         if (key.IsFailure)
             return BusinessObjectRecordFailures.DefinitionNotFound<BusinessObjectRecordDetailDto>();
+
+        ProductAuthorizationDecision decision = await BusinessObjectAuthorization.AuthorizeAsync(
+            authorization,
+            workspaceId,
+            currentSubject.Subject,
+            BusinessObjectProductActions.RecordCreate,
+            BusinessObjectProductActions.RecordResourceType,
+            key.Value.Value,
+            command.CorrelationId,
+            cancellationToken);
+        if (!decision.IsAllowed)
+            return decision.IsUnavailable
+                ? BusinessObjectRecordFailures.AuthorizationUnavailable<BusinessObjectRecordDetailDto>()
+                : BusinessObjectRecordFailures.Forbidden<BusinessObjectRecordDetailDto>();
 
         IReadOnlyDictionary<string, IReadOnlyList<string>> values = command.Values ??
             new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal);
@@ -41,6 +59,9 @@ public sealed class CreateBusinessObjectRecordHandler(
             cancellationToken);
         if (existing is not null)
         {
+            if (decision.Scope == ProductActionScope.Own
+                && existing.Owner != SubjectReferenceMapper.ToDomain(currentSubject.Subject))
+                return BusinessObjectRecordFailures.NotFound<BusinessObjectRecordDetailDto>();
             if (!StringComparer.Ordinal.Equals(existing.PayloadHash, payloadHash.Value))
                 return BusinessObjectRecordFailures.IdempotencyConflict<BusinessObjectRecordDetailDto>();
 
@@ -79,7 +100,7 @@ public sealed class CreateBusinessObjectRecordHandler(
             command.IdempotencyKey,
             payloadHash.Value,
             validValues.Value,
-            userId,
+            SubjectReferenceMapper.ToDomain(currentSubject.Subject),
             DateTime.UtcNow);
         if (record.IsFailure)
             return BusinessObjectRecordFailures.Invalid<BusinessObjectRecordDetailDto>(record.Error);
@@ -97,6 +118,8 @@ public sealed class CreateBusinessObjectRecordHandler(
                 command.IdempotencyKey.Trim(),
                 cancellationToken);
             return concurrent is not null && StringComparer.Ordinal.Equals(concurrent.PayloadHash, payloadHash.Value)
+                && (decision.Scope != ProductActionScope.Own
+                    || concurrent.Owner == SubjectReferenceMapper.ToDomain(currentSubject.Subject))
                 ? BusinessObjectRecordMapper.ToDetailDto(concurrent, publishedVersion)
                 : BusinessObjectRecordFailures.IdempotencyConflict<BusinessObjectRecordDetailDto>();
         }

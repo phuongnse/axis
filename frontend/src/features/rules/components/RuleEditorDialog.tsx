@@ -112,6 +112,10 @@ export function RuleEditorDialog({
     queryFn: () => getRuleDefinition(definitionKey as string),
     enabled: open && !creating,
   });
+  const detailErrorStatus =
+    detailQuery.error instanceof ApiError ? detailQuery.error.status : undefined;
+  const detailTemporarilyUnavailable = detailErrorStatus === 503;
+  const detailActionUnavailable = detailErrorStatus === 403 || detailErrorStatus === 404;
   const languageQuery = useQuery({ ...ruleExpressionLanguageQueryOptions(), enabled: open });
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -368,7 +372,14 @@ export function RuleEditorDialog({
     },
     onError: (cause) => {
       if (cause instanceof ApiError && cause.status === 409) setStale(true);
-      setError(cause instanceof Error ? cause.message : t('rules.saveError'));
+      setError(
+        readRuleMutationError(
+          cause,
+          t('rules.saveError'),
+          t('rules.authorizationUnavailableDescription'),
+          t('rules.authorizationTemporarilyUnavailableDescription'),
+        ),
+      );
     },
   });
 
@@ -463,13 +474,22 @@ export function RuleEditorDialog({
     },
     onError: (cause) => {
       if (cause instanceof ApiError && cause.status === 409) setStale(true);
-      setError(cause instanceof Error ? cause.message : t('rules.lifecycleError'));
+      setError(
+        readRuleMutationError(
+          cause,
+          t('rules.lifecycleError'),
+          t('rules.authorizationUnavailableDescription'),
+          t('rules.authorizationTemporarilyUnavailableDescription'),
+        ),
+      );
     },
   });
 
   const detail = detailQuery.data ?? createdDraft;
-  const canEditDraft = detail ? detail.actions?.canEditDraft === true : creating;
-  const readOnly = Boolean(detail && !canEditDraft);
+  const canEditDraft =
+    !detailQuery.isError && (detail ? detail.actions?.canEditDraft === true : creating);
+  const readOnly =
+    detailQuery.isError || Boolean(detail && !canEditDraft) || (!creating && !detail);
   const dirty =
     canEditDraft &&
     snapshotRef.current !==
@@ -505,9 +525,15 @@ export function RuleEditorDialog({
       }}
       dirty={dirty}
       closeDisabled={saveMutation.isPending || lifecycleMutation.isPending}
-      title={detail?.name ?? (creating ? t('rules.createTitle') : t('rules.editorTitle'))}
+      title={
+        !detailQuery.isError && detail?.name
+          ? detail.name
+          : creating
+            ? t('rules.createTitle')
+            : t('rules.editorTitle')
+      }
       titleAccessory={
-        detail?.origin ? (
+        detail?.origin && !detailQuery.isError ? (
           <>
             <RuleOriginBadge origin={detail.origin} />
             <StatusBadge
@@ -551,12 +577,43 @@ export function RuleEditorDialog({
     >
       <ManagedDialogBody>
         {detailQuery.isLoading ? <p role="status">{t('rules.loadingRule')}</p> : null}
-        {error ? (
-          <p role="alert" className="text-sm text-destructive">
-            {error}
-          </p>
+        {detailQuery.isError ? (
+          <StatusNotice
+            tone={
+              detailActionUnavailable || detailTemporarilyUnavailable ? 'warning' : 'destructive'
+            }
+            title={
+              detailTemporarilyUnavailable
+                ? t('rules.authorizationTemporarilyUnavailableTitle')
+                : detailActionUnavailable
+                  ? t('rules.authorizationUnavailableTitle')
+                  : t('rules.loadErrorTitle')
+            }
+          >
+            <span>
+              {detailTemporarilyUnavailable
+                ? t('rules.authorizationTemporarilyUnavailableDescription')
+                : detailActionUnavailable
+                  ? t('rules.authorizationUnavailableDescription')
+                  : t('rules.loadErrorBody')}
+            </span>
+            {detailTemporarilyUnavailable ? (
+              <>
+                {' '}
+                <Button
+                  type="button"
+                  variant="link"
+                  disabled={detailQuery.isFetching}
+                  onClick={() => void detailQuery.refetch()}
+                >
+                  {t('app.retry')}
+                </Button>
+              </>
+            ) : null}
+          </StatusNotice>
         ) : null}
-        {!detailQuery.isLoading || creating ? (
+        {error ? <StatusNotice tone="destructive">{error}</StatusNotice> : null}
+        {creating || (!detailQuery.isLoading && !detailQuery.isError && detail) ? (
           <ManagedDialogTabs
             label={t('rules.definitionSections')}
             generalLabel={t('dialog.general')}
@@ -1018,6 +1075,19 @@ function RuleDetail({ label, value }: { label: string; value: string }) {
       <dd className="text-sm leading-relaxed font-medium text-foreground">{value}</dd>
     </div>
   );
+}
+
+function readRuleMutationError(
+  error: unknown,
+  fallback: string,
+  actionUnavailable: string,
+  temporarilyUnavailable: string,
+): string {
+  if (error instanceof ApiError) {
+    if (error.status === 403 || error.status === 404) return actionUnavailable;
+    if (error.status === 503) return temporarilyUnavailable;
+  }
+  return error instanceof Error ? error.message : fallback;
 }
 
 function VersionHistory({

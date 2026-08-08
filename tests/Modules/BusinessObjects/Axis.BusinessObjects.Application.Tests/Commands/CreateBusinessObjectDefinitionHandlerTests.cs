@@ -25,6 +25,8 @@ public sealed class CreateBusinessObjectDefinitionHandlerTests
 
         CreateBusinessObjectDefinitionHandler sut = new(
             _context.CurrentUser,
+            _context.CurrentSubject,
+            _context.Authorization,
             _context.Repository,
             _context.UnitOfWork);
 
@@ -49,6 +51,8 @@ public sealed class CreateBusinessObjectDefinitionHandlerTests
         _context.CurrentUser.workspaceId = null;
         CreateBusinessObjectDefinitionHandler sut = new(
             _context.CurrentUser,
+            _context.CurrentSubject,
+            _context.Authorization,
             _context.Repository,
             _context.UnitOfWork);
 
@@ -76,6 +80,8 @@ public sealed class CreateBusinessObjectDefinitionHandlerTests
             .Returns(false);
         CreateBusinessObjectDefinitionHandler sut = new(
             _context.CurrentUser,
+            _context.CurrentSubject,
+            _context.Authorization,
             _context.Repository,
             _context.UnitOfWork);
 
@@ -98,6 +104,8 @@ public sealed class CreateBusinessObjectDefinitionHandlerTests
             .Returns(true);
         CreateBusinessObjectDefinitionHandler sut = new(
             _context.CurrentUser,
+            _context.CurrentSubject,
+            _context.Authorization,
             _context.Repository,
             _context.UnitOfWork);
 

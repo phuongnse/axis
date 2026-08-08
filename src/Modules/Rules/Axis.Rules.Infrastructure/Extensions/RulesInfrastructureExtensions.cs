@@ -9,6 +9,7 @@ using Axis.Rules.Infrastructure.Search;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Axis.Rules.Infrastructure.Extensions;
 
@@ -20,6 +21,7 @@ public static class RulesInfrastructureExtensions
     {
         services.AddDbContext<RulesDbContext>(options =>
             options.UseNpgsql(configuration.GetConnectionString("Rules")));
+        services.TryAddSingleton(TimeProvider.System);
         services.AddScoped<IRuleDefinitionRepository, RuleDefinitionRepository>();
         services.AddScoped<IRuleBindingRepository, RuleBindingRepository>();
         services.AddScoped<IRuleCatalogSearchProvider, PostgresRuleCatalogSearchProvider>();
@@ -32,6 +34,7 @@ public static class RulesInfrastructureExtensions
         services.AddScoped<IRuleEvaluator, RuleEvaluator>();
         services.AddScoped<IRuleBindingEvaluator, RuleBindingEvaluator>();
         services.AddScoped<IRuleBindingReferenceValidator, RuleBindingReferenceValidator>();
+        services.AddScoped<IRuleBindingSolutionInstaller, RuleBindingSolutionInstaller>();
         return services;
     }
 }

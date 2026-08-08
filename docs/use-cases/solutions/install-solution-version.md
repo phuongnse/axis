@@ -2,7 +2,7 @@
 
 > **Navigation**: [docs/use-cases/solutions/README.md](./README.md) · [docs/architecture/solutions.md](../../architecture/solutions.md) · [docs/PLATFORM_STRATEGY.md](../../PLATFORM_STRATEGY.md) · [AGENTS.md](../../../AGENTS.md)
 
-> **Contract status:** Ready for implementation. Implementation layers and acceptance evidence are not started.
+> **Contract status:** Implementation is complete outside the pending browser and live lifecycle evidence below.
 
 ## Purpose
 
@@ -16,7 +16,7 @@ Allow a current-Workspace Administrator to install one already published trusted
 
 - The administrator can access the current Workspace.
 - The selected immutable solution version exists, targets the exact current committed Axis OpenAPI digest, and its publisher/key remains trusted and non-revoked.
-- The current Workspace has no installed version for that solution identity in this Wave 1 scope.
+- The current Workspace has no installed version for that solution identity under the current installation contract.
 
 ## Trigger
 
@@ -47,7 +47,7 @@ Allow a current-Workspace Administrator to install one already published trusted
 - Adapter mutation, read-back mismatch, infrastructure failure, or client response loss records the durable completed/pending state and reports an incomplete operation; a resume is available only when its preconditions remain satisfied.
 - Concurrent confirms/resumes observe serialized canonical state. Lease fencing prevents a stale worker from producing a duplicate confirmed effect, while making no claim that attempted adapter calls cannot overlap.
 - Publisher revocation before a next mutation halts the operation, marks the installation `Noncompliant`, audits that classification, and leaves already installed content usable. A revoked publisher cannot be used to begin or resume installation.
-- A request to install another version of an already installed solution, upgrade, rollback, uninstall, or repair drift is unsupported in Wave 1 and makes no mutation.
+- A request to install another version of an already installed solution, upgrade, rollback, uninstall, or repair drift is unsupported and makes no mutation.
 
 ## Acceptance Criteria
 
@@ -77,26 +77,25 @@ Allow a current-Workspace Administrator to install one already published trusted
 
 - **AC-017** Installing another version for the same solution, upgrade, rollback, uninstall, marketplace, overlays, workspace trust, package dependency graph, product data migrations, and drift repair are out of scope and have no hidden mutation path.
 - **AC-018** Solutions orchestrates but does not write any consuming module store or interpret its business semantics; adapters validate and apply typed module-owned component documents.
-- **AC-019** Existing Wave 0 provisioning remains untouched until its owning clean-cutover implementation and external-product evidence are ready; no compatibility shim or dual install path is introduced.
+- **AC-019** This durable operation is the only installation path; no compatibility, fallback, flag, or alternate install path exists.
 
 ## Acceptance Test Matrix
 
 | ID | Boundary | Scenario | Covers AC | Verification | Required |
 |---|---|---|---|---|---|
 | AT-001 | Application boundary | Current-Workspace authority, compatible trusted version revalidation, scoped idempotency, immutable version pinning, deterministic topological plan, and safe rejection paths | AC-001, AC-002, AC-010 | Application test | Yes |
-| AT-002 | Application boundary | Every first-wave adapter validates/plans its typed document before confirmation; invalid last component proves zero module mutations and Solutions reaches no module internals/stores | AC-003, AC-011, AC-018 | Application test | Yes |
+| AT-002 | Application boundary | Every required adapter validates/plans its typed document before confirmation; invalid last component proves zero module mutations and Solutions reaches no module internals/stores | AC-003, AC-011, AC-018 | Application test | Yes |
 | AT-003 | Application/Infrastructure boundaries | Apply plus exact-hash read-back/provenance confirms each step; injected apply/read-back/interruption failure records state and resumes without duplicate confirmed effects | AC-004, AC-005, AC-006, AC-007, AC-012, AC-013 | Application test + Infrastructure integration test | Yes |
 | AT-004 | Infrastructure boundary | Migration-backed operation, installation, step, idempotency, ledger/reconciliation, revision, fencing receipt, state transitions, and audit-outbox persistence survive response loss; lease expiry atomically reclaims `Running`/`Applying` to `Pending`, then read-back confirms, reapplies missing content, or blocks mismatch | AC-005, AC-007, AC-008, AC-013, AC-014, AC-015 | Infrastructure integration test | Yes |
 | AT-005 | API/Application boundaries | Revocation before begin/resume blocks before mutation; revocation between steps halts before next mutation, audits/marks noncompliant, and leaves confirmed active content usable | AC-001, AC-009, AC-010, AC-014, AC-015 | Application test + API integration test | Yes |
 | AT-006 | API/MCP boundaries | Authenticated Workspace-isolated install/status/resume and typed MCP tools preserve idempotency/error semantics without raw package exposure | AC-001, AC-005, AC-006, AC-010, AC-016 | API integration test + MCP contract test | Yes |
 | AT-007 | Browser journey | Administrator can inspect plan, confirm, observe progress/results, recover from failed/interrupted/noncompliant states, and resume accessibly | AC-002, AC-005, AC-006, AC-007, AC-009, AC-014 | UI component test + Browser automation | Yes |
-| AT-008 | API boundary | No mutation path implements another-version install, upgrade, rollback, uninstall, marketplace, overlays, workspace trust, package dependencies, data migration, drift repair, or Wave 0 compatibility | AC-017, AC-019 | Architecture test + API integration test | Yes |
+| AT-008 | API boundary | No mutation path implements another-version install, upgrade, rollback, uninstall, marketplace, overlays, workspace trust, package dependencies, data migration, drift repair, or an alternate installation contract | AC-017, AC-019 | Architecture test + API integration test | Yes |
 
 ## Out Of Scope
 
 - Installing another version of the same solution, upgrades, rollback, uninstall, marketplace, overlays, workspace trust, package dependencies, product data migrations, drift detection/repair, promotion, and automatic rollback.
 - Module data migration, module-store access by Solutions, opaque component support, and any cross-module distributed transaction.
-- Wave 0 provision-reference-solution replacement or compatibility behavior.
 
 ## Screen flow
 
@@ -114,23 +113,22 @@ Required UI quality: identity, plan, state, and recovery information are program
 >
 > | Layer | Status |
 > |---|---|
-> | Domain | Not started |
-> | Application | Not started |
-> | Infrastructure | Not started |
-> | API | Not started |
-> | Frontend | Not started |
-> | MCP | Not started |
-> | Audit | Not started |
+> | Domain | Done |
+> | Application | Done |
+> | Infrastructure | Done |
+> | API | Done |
+> | Frontend | Partial |
+> | MCP | Done |
+> | Audit | Done |
 >
 > **Gaps vs spec:**
 >
 > | ID | Gap |
 > |---|---|
-> | GAP-001 | Domain, application, infrastructure, API, frontend, MCP, and Audit implementation are not started. |
-> | GAP-002 | No acceptance evidence exists. |
+> | GAP-001 | The install/resume component journey passes, but required Playwright AT-007 and the current blank-Workspace lifecycle read-back remain pending. |
 >
 > **Deferred follow-ups:** The explicitly out-of-scope lifecycle capabilities above require their own use cases.
 >
-> **Verification:** Not run; implementation evidence does not exist yet.
+> **Verification:** Durable planning, preflight, lease fencing, apply/read-back recovery, provenance, revocation, API, MCP, and frontend component evidence passes. Browser and live lifecycle evidence remain tracked by GAP-001.
 >
 > **Decisions:** [docs/architecture/solutions.md](../../architecture/solutions.md) owns operation durability, adapter boundaries, concurrency, trust revalidation, persistence, and audit-outbox realization.

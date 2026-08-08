@@ -1,7 +1,9 @@
+import { administrationTranslations } from './administration-translations';
 import type { SupportedLanguage } from './language-store';
 
 export const translations = {
   en: {
+    ...administrationTranslations.en,
     'app.account': 'Account',
     'app.cancel': 'Cancel',
     'app.close': 'Close',
@@ -245,6 +247,16 @@ export const translations = {
     'businessObjects.addParameterValue': 'Add value',
     'businessObjects.addRule': 'Add rule',
     'businessObjects.actionUnavailable': 'Action unavailable in the current state',
+    'businessObjects.actionsUnavailableTitle':
+      'Business object actions are temporarily unavailable',
+    'businessObjects.actionsUnavailableDescription':
+      'Authorization could not be confirmed. Try again.',
+    'businessObjects.authorizationUnavailableTitle': 'Action unavailable',
+    'businessObjects.authorizationUnavailableDescription': 'This action is not available.',
+    'businessObjects.authorizationTemporarilyUnavailableTitle':
+      'Business object temporarily unavailable',
+    'businessObjects.authorizationTemporarilyUnavailableDescription':
+      'Authorization is temporarily unavailable. Try again.',
     'businessObjects.autosavePendingLabel': 'Saving changes',
     'businessObjects.availability': 'Availability',
     'businessObjects.boolean': 'Boolean',
@@ -487,6 +499,13 @@ export const translations = {
     'table.unpin': 'Unpin column',
 
     'rules.catalogTitle': 'Rules catalog',
+    'rules.actionsUnavailableTitle': 'Rule actions are temporarily unavailable',
+    'rules.actionsUnavailableDescription': 'Authorization could not be confirmed. Try again.',
+    'rules.authorizationUnavailableTitle': 'Action unavailable',
+    'rules.authorizationUnavailableDescription': 'This action is not available.',
+    'rules.authorizationTemporarilyUnavailableTitle': 'Rule temporarily unavailable',
+    'rules.authorizationTemporarilyUnavailableDescription':
+      'Authorization is temporarily unavailable. Try again.',
     'rules.definitionCount': '{count} definitions',
     'rules.definitionSections': 'Rule sections',
     'rules.definitionKey': 'Definition key',
@@ -790,6 +809,7 @@ export const translations = {
     'verify.title': 'Verifying email',
   },
   vi: {
+    ...administrationTranslations.vi,
     'app.account': 'Tài khoản',
     'app.cancel': 'Hủy',
     'app.close': 'Đóng',
@@ -1031,6 +1051,16 @@ export const translations = {
     'businessObjects.addParameterValue': 'Thêm giá trị',
     'businessObjects.addRule': 'Thêm quy tắc',
     'businessObjects.actionUnavailable': 'Thao tác chưa khả dụng ở trạng thái hiện tại',
+    'businessObjects.actionsUnavailableTitle':
+      'Các thao tác business object tạm thời chưa khả dụng',
+    'businessObjects.actionsUnavailableDescription':
+      'Chưa thể xác nhận quyền truy cập. Hãy thử lại.',
+    'businessObjects.authorizationUnavailableTitle': 'Thao tác không khả dụng',
+    'businessObjects.authorizationUnavailableDescription': 'Thao tác này không khả dụng.',
+    'businessObjects.authorizationTemporarilyUnavailableTitle':
+      'Business object tạm thời chưa khả dụng',
+    'businessObjects.authorizationTemporarilyUnavailableDescription':
+      'Dịch vụ phân quyền tạm thời chưa khả dụng. Hãy thử lại.',
     'businessObjects.autosavePendingLabel': 'Đang lưu thay đổi',
     'businessObjects.availability': 'Trạng thái dùng',
     'businessObjects.boolean': 'Boolean',
@@ -1272,6 +1302,13 @@ export const translations = {
     'table.unpin': 'Bỏ ghim cột',
 
     'rules.catalogTitle': 'Danh mục rule',
+    'rules.actionsUnavailableTitle': 'Các thao tác rule tạm thời chưa khả dụng',
+    'rules.actionsUnavailableDescription': 'Chưa thể xác nhận quyền truy cập. Hãy thử lại.',
+    'rules.authorizationUnavailableTitle': 'Thao tác không khả dụng',
+    'rules.authorizationUnavailableDescription': 'Thao tác này không khả dụng.',
+    'rules.authorizationTemporarilyUnavailableTitle': 'Rule tạm thời chưa khả dụng',
+    'rules.authorizationTemporarilyUnavailableDescription':
+      'Dịch vụ phân quyền tạm thời chưa khả dụng. Hãy thử lại.',
     'rules.definitionCount': '{count} định nghĩa',
     'rules.definitionSections': 'Các phần của rule',
     'rules.definitionKey': 'Definition key',

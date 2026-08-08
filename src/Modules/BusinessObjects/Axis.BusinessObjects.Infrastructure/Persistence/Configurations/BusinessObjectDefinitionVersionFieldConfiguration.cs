@@ -35,7 +35,7 @@ internal sealed class BusinessObjectDefinitionVersionFieldConfiguration : IEntit
 
         builder.Property(field => field.Label)
             .HasColumnName("label")
-            .HasMaxLength(200)
+            .HasMaxLength(256)
             .IsRequired();
 
         builder.Property(field => field.Order)

@@ -109,22 +109,22 @@ Shared lifecycle, assertion, immediate-revocation, concurrency, and audit realiz
 >
 > | Layer | Status |
 > |---|---|
-> | Identity Domain | Not started |
-> | Identity Application | Not started |
-> | Identity Infrastructure | Not started |
-> | Audit | Not started |
-> | API | Not started |
-> | MCP | Not started |
-> | Frontend | Not started |
+> | Identity Domain | Done |
+> | Identity Application | Done |
+> | Identity Infrastructure | Done |
+> | Audit | Done |
+> | API | Done |
+> | MCP | Done |
+> | Frontend | Partial |
 >
 > **Gaps vs spec:**
 >
 > | ID | Gap |
 > |---|---|
-> | GAP-001 | All implementation layers are not started; every acceptance criterion awaits implementation. |
+> | GAP-001 | The administrator component journey passes, but required Playwright AT-006 remains pending against the current checkpoint. |
 >
 > **Deferred follow-ups:** Only the separately owned capabilities under Out Of Scope are deferred.
 >
-> **Verification:** Not run; implementation evidence does not exist yet.
+> **Verification:** Domain, application, PostgreSQL infrastructure, API, MCP, and frontend component evidence passes. Browser evidence remains tracked by GAP-001.
 >
 > **Decisions:** Service identities are Identity-owned non-human subjects with exactly one Workspace grant. They authenticate only through the linked service-authentication contract; revocation is irreversible and immediately authoritative.

@@ -1,6 +1,8 @@
 using Axis.BusinessObjects.Application;
 using Axis.BusinessObjects.Application.Commands.PublishBusinessObjectDefinition;
 using Axis.BusinessObjects.Domain.Aggregates;
+using Axis.Identity.Contracts;
+using Axis.Rules.Contracts;
 using Axis.Shared.Application;
 using Axis.Shared.Domain.Primitives;
 using FluentAssertions;
@@ -23,6 +25,8 @@ public sealed class PublishBusinessObjectDefinitionHandlerTests
             .Returns(definition);
         PublishBusinessObjectDefinitionHandler sut = new(
             _context.CurrentUser,
+            _context.CurrentSubject,
+            _context.Authorization,
             _context.Repository,
             _context.UnitOfWork,
             _context.BindingValidator);
@@ -35,7 +39,8 @@ public sealed class PublishBusinessObjectDefinitionHandlerTests
         result.Value.Status.Should().Be(BusinessObjectDefinitionStatus.Published);
         result.Value.LatestPublishedVersionNumber.Should().Be(1);
         result.Value.LatestPublishedVersion.Should().NotBeNull();
-        result.Value.LatestPublishedVersion!.PublishedByUserId
+        result.Value.LatestPublishedVersion!.PublishedBySubject.Kind.Should().Be(SubjectKind.Human);
+        result.Value.LatestPublishedVersion.PublishedBySubject.SubjectId
             .Should().Be(BusinessObjectDefinitionHandlerTestContext.UserId);
         result.Value.LatestPublishedVersion.Fields.Should()
             .ContainSingle(field => field.FieldKey == "name");
@@ -46,9 +51,11 @@ public sealed class PublishBusinessObjectDefinitionHandlerTests
     [Fact]
     public async Task Publish_WhenUserScopeIsMissing_ReturnsForbiddenWithoutCommit()
     {
-        _context.CurrentUser.UserId = null;
+        _context.CurrentSubject.Subject = default;
         PublishBusinessObjectDefinitionHandler sut = new(
             _context.CurrentUser,
+            _context.CurrentSubject,
+            _context.Authorization,
             _context.Repository,
             _context.UnitOfWork,
             _context.BindingValidator);
@@ -84,13 +91,15 @@ public sealed class PublishBusinessObjectDefinitionHandlerTests
                 Arg.Any<CancellationToken>())
             .Returns(definition);
         _context.BindingValidator.ValidateAsync(
-                Arg.Any<Axis.Rules.Contracts.RuleBindingReferenceValidationRequest>(),
+                Arg.Any<RuleBindingReferenceValidationRequest>(),
                 Arg.Any<CancellationToken>())
-            .Returns(Task.FromResult(Axis.Rules.Contracts.RuleBindingReferenceValidationResult.Invalid(
+            .Returns(Task.FromResult(RuleBindingReferenceValidationResult.Invalid(
                 "binding_revision_conflict",
                 "Rule binding has changed.")));
         PublishBusinessObjectDefinitionHandler sut = new(
             _context.CurrentUser,
+            _context.CurrentSubject,
+            _context.Authorization,
             _context.Repository,
             _context.UnitOfWork,
             _context.BindingValidator);
@@ -126,13 +135,15 @@ public sealed class PublishBusinessObjectDefinitionHandlerTests
                 Arg.Any<CancellationToken>())
             .Returns(definition);
         _context.BindingValidator.ValidateAsync(
-                Arg.Any<Axis.Rules.Contracts.RuleBindingReferenceValidationRequest>(),
+                Arg.Any<RuleBindingReferenceValidationRequest>(),
                 Arg.Any<CancellationToken>())
-            .Returns(Task.FromResult(Axis.Rules.Contracts.RuleBindingReferenceValidationResult.Invalid(
+            .Returns(Task.FromResult(RuleBindingReferenceValidationResult.Invalid(
                 "binding_context_type_mismatch",
                 "Rule binding consumer context type does not match the rule input.")));
         PublishBusinessObjectDefinitionHandler sut = new(
             _context.CurrentUser,
+            _context.CurrentSubject,
+            _context.Authorization,
             _context.Repository,
             _context.UnitOfWork,
             _context.BindingValidator);

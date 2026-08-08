@@ -67,4 +67,44 @@ internal sealed class BusinessObjectRecordRepository(BusinessObjectsDbContext co
             query = query.Where(record => record.ObjectKey == key);
         return query.CountAsync(cancellationToken);
     }
+
+    public async Task<IReadOnlyList<BusinessObjectRecord>> ListOwnedForWorkspaceAsync(
+        Guid workspaceId,
+        SubjectReference owner,
+        BusinessObjectDefinitionKey? objectKey,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken = default)
+    {
+        IQueryable<BusinessObjectRecord> query = OwnedQuery(workspaceId, owner, objectKey);
+        return await query
+            .OrderByDescending(record => record.UpdatedAt)
+            .ThenBy(record => record.ObjectKey)
+            .ThenBy(record => record.Id)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(cancellationToken);
+    }
+
+    public Task<int> CountOwnedForWorkspaceAsync(
+        Guid workspaceId,
+        SubjectReference owner,
+        BusinessObjectDefinitionKey? objectKey,
+        CancellationToken cancellationToken = default) =>
+        OwnedQuery(workspaceId, owner, objectKey).CountAsync(cancellationToken);
+
+    private IQueryable<BusinessObjectRecord> OwnedQuery(
+        Guid workspaceId,
+        SubjectReference owner,
+        BusinessObjectDefinitionKey? objectKey)
+    {
+        IQueryable<BusinessObjectRecord> query = context.BusinessObjectRecords
+            .AsNoTracking()
+            .Where(record => record.WorkspaceId == workspaceId
+                && record.Owner.Kind == owner.Kind
+                && record.Owner.Id == owner.Id);
+        return objectKey is BusinessObjectDefinitionKey key
+            ? query.Where(record => record.ObjectKey == key)
+            : query;
+    }
 }

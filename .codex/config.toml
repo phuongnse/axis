@@ -1,12 +1,12 @@
 model = "gpt-5.6-sol"
-model_reasoning_effort = "high"
+model_reasoning_effort = "xhigh"
 
 [agents]
 enabled = true
 max_concurrent_threads_per_session = 2
 
 [[hooks.PreToolUse]]
-matcher = "^Agent$"
+matcher = '^(Agent|(?:collaboration\.)?spawn_agent)$'
 
 [[hooks.PreToolUse.hooks]]
 type = "command"

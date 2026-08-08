@@ -30,7 +30,7 @@ public sealed class RuleBindingEvaluatorTests
             priority: 0,
             enabled: true,
             DomainFailureBehavior.FailClosed,
-            userId,
+            RuleSubjectReference.Human(userId),
             DateTime.UtcNow).Value;
 
         IRuleBindingRepository repository = Substitute.For<IRuleBindingRepository>();
@@ -111,7 +111,7 @@ public sealed class RuleBindingEvaluatorTests
             priority: 0,
             enabled: false,
             DomainFailureBehavior.FailClosed,
-            userId,
+            RuleSubjectReference.Human(userId),
             DateTime.UtcNow).IsSuccess.Should().BeTrue();
 
         IRuleBindingRepository repository = Substitute.For<IRuleBindingRepository>();
@@ -181,7 +181,7 @@ public sealed class RuleBindingEvaluatorTests
             priority: 0,
             enabled: true,
             DomainFailureBehavior.FailClosed,
-            Guid.NewGuid(),
+            RuleSubjectReference.Human(Guid.NewGuid()),
             DateTime.UtcNow).Value;
 
     private sealed record InvoiceLineContext(string Description);

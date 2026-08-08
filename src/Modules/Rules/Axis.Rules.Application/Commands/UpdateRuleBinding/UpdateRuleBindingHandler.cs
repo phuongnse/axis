@@ -1,3 +1,5 @@
+using Axis.Authorization.Contracts;
+using Axis.Identity.Contracts;
 using Axis.Rules.Application.Commands.CreateRuleBinding;
 using Axis.Rules.Application.Repositories;
 using Axis.Rules.Application.Services;
@@ -13,6 +15,8 @@ namespace Axis.Rules.Application.Commands.UpdateRuleBinding;
 
 public sealed class UpdateRuleBindingHandler(
     ICurrentUser currentUser,
+    ICurrentSubject currentSubject,
+    IProductAuthorizationService authorization,
     IRuleDefinitionRepository definitionRepository,
     IRuleBindingRepository bindingRepository,
     IUnitOfWork unitOfWork)
@@ -22,8 +26,6 @@ public sealed class UpdateRuleBindingHandler(
     {
         if (currentUser.workspaceId is not Guid workspaceId)
             return RuleDefinitionFailures.MissingWorkspace<RuleBindingDto>();
-        if (currentUser.UserId is not Guid userId)
-            return RuleDefinitionFailures.MissingUser<RuleBindingDto>();
         if (command.BindingId == Guid.Empty)
             return RuleDefinitionFailures.NotFound<RuleBindingDto>();
 
@@ -32,10 +34,29 @@ public sealed class UpdateRuleBindingHandler(
         if (binding is null)
             return RuleDefinitionFailures.NotFound<RuleBindingDto>();
 
+        ProductAuthorizationDecision currentDecision = await RuleAuthorization.AuthorizeAsync(
+                authorization, workspaceId, currentSubject.Subject,
+                RuleProductActions.BindingManage, RuleProductActions.BindingResourceType,
+                binding.DefinitionKey.Value, null, cancellationToken);
+        if (!currentDecision.IsAllowed)
+            return RuleDefinitionFailures.Authorization<RuleBindingDto>(currentDecision);
+
         Result<RuleDefinitionKey> key = RuleDefinitionKey.Create(command.Request.DefinitionKey);
+        if (key.IsFailure)
+            return RuleDefinitionFailures.Invalid<RuleBindingDto>(key.Error);
+        if (key.Value != binding.DefinitionKey)
+        {
+            ProductAuthorizationDecision requestedDecision = await RuleAuthorization.AuthorizeAsync(
+                authorization, workspaceId, currentSubject.Subject,
+                RuleProductActions.BindingManage, RuleProductActions.BindingResourceType,
+                key.Value.Value, null, cancellationToken);
+            if (!requestedDecision.IsAllowed)
+                return RuleDefinitionFailures.Authorization<RuleBindingDto>(requestedDecision);
+        }
+
         Result<IReadOnlyDictionary<string, RuleInputMapping>> mappings = RuleBindingContractMapper.ToDomain(command.Request.InputMappings);
-        if (key.IsFailure || mappings.IsFailure)
-            return RuleDefinitionFailures.Invalid<RuleBindingDto>(key.IsFailure ? key.Error : mappings.Error);
+        if (mappings.IsFailure)
+            return RuleDefinitionFailures.Invalid<RuleBindingDto>(mappings.Error);
         bool retargetsVersion = binding.DefinitionKey != key.Value ||
             binding.DefinitionVersion != command.Request.DefinitionVersion;
         Result<RuleDefinitionVersion> version = await CreateRuleBindingHandler.ResolveVersionAsync(
@@ -58,7 +79,7 @@ public sealed class UpdateRuleBindingHandler(
             command.Request.Priority,
             command.Request.Enabled,
             (DomainFailureBehavior)command.Request.FailureBehavior,
-            userId,
+            RuleSubjectReferenceMapper.ToDomain(currentSubject.Subject),
             DateTime.UtcNow);
         if (updated.IsFailure)
             return updated.ErrorCode == ErrorCodes.Conflict

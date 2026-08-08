@@ -1,3 +1,5 @@
+using Axis.Authorization.Contracts;
+using Axis.Identity.Contracts;
 using Axis.Rules.Application.Repositories;
 using Axis.Rules.Application.Search;
 using Axis.Rules.Contracts;
@@ -15,6 +17,8 @@ namespace Axis.Rules.Application.Queries.ListRuleDefinitions;
 
 public sealed class ListRuleDefinitionsHandler(
     ICurrentUser currentUser,
+    ICurrentSubject currentSubject,
+    IProductAuthorizationService authorization,
     IRuleDefinitionRepository repository,
     IRuleCatalogSearchProvider catalogSearch)
     : IQueryHandler<ListRuleDefinitionsQuery, Result<PagedResult<RuleDefinitionSummaryDto>>>
@@ -25,6 +29,13 @@ public sealed class ListRuleDefinitionsHandler(
     {
         if (currentUser.workspaceId is not Guid workspaceId)
             return RuleDefinitionFailures.MissingWorkspace<PagedResult<RuleDefinitionSummaryDto>>();
+
+        ProductAuthorizationDecision decision = await RuleAuthorization.AuthorizeAsync(
+                authorization, workspaceId, currentSubject.Subject,
+                RuleProductActions.DefinitionRead, RuleProductActions.DefinitionResourceType,
+                null, null, cancellationToken);
+        if (!decision.IsAllowed)
+            return RuleDefinitionFailures.Authorization<PagedResult<RuleDefinitionSummaryDto>>(decision);
 
         IReadOnlyList<RuleDefinition> builtInCandidates = query.Origin == ContractOrigin.Workspace
             ? []
@@ -66,7 +77,7 @@ public sealed class ListRuleDefinitionsHandler(
         }
 
         IReadOnlyList<RuleDefinitionSummaryDto> builtInDefinitions =
-            builtInCandidates.Select(RuleContractMapper.ToSummaryDto).ToArray();
+            builtInCandidates.Select(definition => RuleContractMapper.ToSummaryDto(definition)).ToArray();
         int workspaceCount = includeWorkspace
             ? await repository.CountForWorkspaceAsync(
                 workspaceId,
@@ -92,7 +103,7 @@ public sealed class ListRuleDefinitionsHandler(
                 workspaceStatus,
                 searchQuery: null,
                 cancellationToken);
-            items.AddRange(workspaceDefinitions.Select(RuleContractMapper.ToSummaryDto));
+            items.AddRange(workspaceDefinitions.Select(definition => RuleContractMapper.ToSummaryDto(definition)));
         }
 
         return new PagedResult<RuleDefinitionSummaryDto>(

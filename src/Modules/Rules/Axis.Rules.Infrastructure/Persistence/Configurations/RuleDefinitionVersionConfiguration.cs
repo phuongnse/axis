@@ -71,7 +71,15 @@ internal sealed class RuleDefinitionVersionConfiguration : IEntityTypeConfigurat
             .HasConversion(OutputConverter)
             .IsRequired()
             .Metadata.SetValueComparer(OutputComparer);
-        builder.Property(version => version.PublishedByUserId).HasColumnName("published_by_user_id").IsRequired();
+        builder.Ignore(version => version.PublishedBySubject);
+        builder.Property<RuleSubjectKind?>("PublishedBySubjectKind")
+            .HasColumnName("published_by_subject_kind")
+            .HasConversion<string>()
+            .HasMaxLength(16)
+            .IsRequired();
+        builder.Property<Guid?>("PublishedBySubjectId")
+            .HasColumnName("published_by_subject_id")
+            .IsRequired();
         builder.Property(version => version.PublishedAt).HasColumnName("published_at").IsRequired();
         builder.HasIndex(version => new { version.DefinitionId, version.Version }).IsUnique();
 

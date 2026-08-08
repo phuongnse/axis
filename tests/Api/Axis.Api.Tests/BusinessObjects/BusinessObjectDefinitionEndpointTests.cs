@@ -5,6 +5,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Axis.Api.Tests.Helpers;
+using Axis.Authorization.Contracts;
 using Axis.BusinessObjects.Application;
 using Axis.BusinessObjects.Domain.Aggregates;
 using Axis.Identity.Domain.Legal;
@@ -27,6 +28,58 @@ public sealed class BusinessObjectDefinitionEndpointTests(ApiTestFixture fixture
         HttpResponseMessage response = await anonymousClient.GetAsync("/api/business-object-definitions", TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task DefinitionActions_WhenKeylessManageOnly_AllowsProjectionButDeniesKeyedCreate()
+    {
+        string accessToken = await CreateVerifiedSessionTokenAsync(UniqueEmail());
+        await fixture.SetProductAuthorizationTestDecisionAsync(
+            request => request.ActionKey == BusinessObjectProductActions.DefinitionManage
+                && request.ResourceKey is null
+                    ? new ProductAuthorizationDecision(true, ProductActionScope.None)
+                    : ProductAuthorizationDecision.Denied,
+            TestContext.Current.CancellationToken);
+
+        HttpResponseMessage actionsResponse = await SendWithBearerAsync(
+            HttpMethod.Get,
+            "/api/business-object-definitions/actions",
+            accessToken);
+        actionsResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        JsonElement actions = await actionsResponse.Content.ReadFromJsonAsync<JsonElement>(Json, TestContext.Current.CancellationToken);
+        actions.GetProperty("canStartCreate").GetBoolean().Should().BeTrue();
+
+        HttpResponseMessage createResponse = await SendWithBearerAsync(
+            HttpMethod.Post,
+            "/api/business-object-definitions",
+            accessToken,
+            new { name = "Ungranted Definition" });
+        createResponse.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task DefinitionActions_WhenAuthorizationUnavailable_ReturnsServiceUnavailable()
+    {
+        string accessToken = await CreateVerifiedSessionTokenAsync(UniqueEmail());
+        await fixture.SetProductAuthorizationTestDecisionAsync(
+            _ => ProductAuthorizationDecision.Unavailable,
+            TestContext.Current.CancellationToken);
+
+        HttpResponseMessage response = await SendWithBearerAsync(
+            HttpMethod.Get,
+            "/api/business-object-definitions/actions",
+            accessToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
+        ApiProblem problem = await ReadProblemAsync(response);
+        problem.Code.Should().Be(BusinessObjectsProblemCodes.AuthorizationUnavailable);
+
+        HttpResponseMessage createResponse = await SendWithBearerAsync(
+            HttpMethod.Post,
+            "/api/business-object-definitions",
+            accessToken,
+            new { name = "Unavailable Definition" });
+        createResponse.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
     }
 
     [Fact]
@@ -438,6 +491,8 @@ public sealed class BusinessObjectDefinitionEndpointTests(ApiTestFixture fixture
         await RegisterAsync(email);
         HttpResponseMessage verifyResponse = await VerifyEmailAsync(CapturedToken(email));
         verifyResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        await fixture.EnableProductAuthorizationTestAccessAsync(
+            TestContext.Current.CancellationToken);
 
         string verifier = CreateCodeVerifier();
         string state = Guid.NewGuid().ToString("N");

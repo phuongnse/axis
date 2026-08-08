@@ -25,7 +25,7 @@ public sealed class BusinessObjectRecord : AggregateRoot<BusinessObjectRecordId>
         string idempotencyKey,
         string payloadHash,
         IReadOnlyDictionary<string, IReadOnlyList<string>> values,
-        Guid createdByUserId,
+        SubjectReference createdBySubject,
         DateTime createdAt)
         : base(id)
     {
@@ -38,8 +38,9 @@ public sealed class BusinessObjectRecord : AggregateRoot<BusinessObjectRecordId>
         _values = CloneValues(values);
         Status = BusinessObjectRecordStatus.Draft;
         Revision = 1;
-        CreatedByUserId = createdByUserId;
-        UpdatedByUserId = createdByUserId;
+        Owner = createdBySubject;
+        CreatedBySubject = createdBySubject;
+        UpdatedBySubject = createdBySubject;
         CreatedAt = createdAt;
         UpdatedAt = createdAt;
     }
@@ -52,9 +53,10 @@ public sealed class BusinessObjectRecord : AggregateRoot<BusinessObjectRecordId>
     public string PayloadHash { get; private set; }
     public BusinessObjectRecordStatus Status { get; private set; }
     public int Revision { get; private set; }
-    public Guid CreatedByUserId { get; private set; }
-    public Guid UpdatedByUserId { get; private set; }
-    public Guid? SubmittedByUserId { get; private set; }
+    public SubjectReference Owner { get; private set; }
+    public SubjectReference CreatedBySubject { get; private set; }
+    public SubjectReference UpdatedBySubject { get; private set; }
+    public SubjectReference? SubmittedBySubject { get; private set; }
     public DateTime CreatedAt { get; private set; }
     public DateTime UpdatedAt { get; private set; }
     public DateTime? SubmittedAt { get; private set; }
@@ -71,10 +73,10 @@ public sealed class BusinessObjectRecord : AggregateRoot<BusinessObjectRecordId>
         string idempotencyKey,
         string payloadHash,
         IReadOnlyDictionary<string, IReadOnlyList<string>> values,
-        Guid createdByUserId,
+        SubjectReference createdBySubject,
         DateTime createdAt)
     {
-        if (workspaceId == Guid.Empty || definitionVersionId.Value == Guid.Empty || definitionVersionNumber <= 0 || createdByUserId == Guid.Empty)
+        if (workspaceId == Guid.Empty || definitionVersionId.Value == Guid.Empty || definitionVersionNumber <= 0 || createdBySubject.Id == Guid.Empty)
             return Result.Failure<BusinessObjectRecord>(ErrorCodes.InvalidInput, "Workspace, definition version, and user are required.");
         if (string.IsNullOrWhiteSpace(idempotencyKey) || idempotencyKey.Trim().Length > 120)
             return Result.Failure<BusinessObjectRecord>(ErrorCodes.InvalidInput, "An idempotency key is required and cannot exceed 120 characters.");
@@ -94,21 +96,21 @@ public sealed class BusinessObjectRecord : AggregateRoot<BusinessObjectRecordId>
             idempotencyKey.Trim(),
             payloadHash,
             canonicalValues.Value,
-            createdByUserId,
+            createdBySubject,
             createdAt);
     }
 
     public Result SaveDraft(
         int expectedRevision,
         IReadOnlyDictionary<string, IReadOnlyList<string>> values,
-        Guid updatedByUserId,
+        SubjectReference updatedBySubject,
         DateTime updatedAt)
     {
         if (Status != BusinessObjectRecordStatus.Draft)
             return Result.Failure(ErrorCodes.Conflict, "Submitted records cannot be edited.");
         if (expectedRevision != Revision)
             return Result.Failure(ErrorCodes.Conflict, "The record has changed.");
-        if (updatedByUserId == Guid.Empty)
+        if (updatedBySubject.Id == Guid.Empty)
             return Result.Failure(ErrorCodes.InvalidInput, "Updating user is required.");
         Result<IReadOnlyDictionary<string, IReadOnlyList<string>>> canonicalValues = CanonicalizeValues(values);
         if (canonicalValues.IsFailure)
@@ -116,7 +118,7 @@ public sealed class BusinessObjectRecord : AggregateRoot<BusinessObjectRecordId>
 
         _values = CloneValues(canonicalValues.Value);
         Revision += 1;
-        UpdatedByUserId = updatedByUserId;
+        UpdatedBySubject = updatedBySubject;
         UpdatedAt = updatedAt;
         return Result.Success();
     }
@@ -125,14 +127,14 @@ public sealed class BusinessObjectRecord : AggregateRoot<BusinessObjectRecordId>
         int expectedRevision,
         IReadOnlyDictionary<string, IReadOnlyList<string>> values,
         IReadOnlyList<BusinessObjectRecordRuleEvaluation> evaluations,
-        Guid submittedByUserId,
+        SubjectReference submittedBySubject,
         DateTime submittedAt)
     {
         if (Status != BusinessObjectRecordStatus.Draft)
             return Result.Failure(ErrorCodes.Conflict, "The record has already been submitted.");
         if (expectedRevision != Revision)
             return Result.Failure(ErrorCodes.Conflict, "The record has changed.");
-        if (submittedByUserId == Guid.Empty)
+        if (submittedBySubject.Id == Guid.Empty)
             return Result.Failure(ErrorCodes.InvalidInput, "Submitting user is required.");
         if (values is null)
             return Result.Failure(ErrorCodes.InvalidInput, "Record values are required.");
@@ -147,8 +149,8 @@ public sealed class BusinessObjectRecord : AggregateRoot<BusinessObjectRecordId>
         _ruleEvaluations = evaluations.ToList();
         Status = BusinessObjectRecordStatus.Submitted;
         Revision += 1;
-        UpdatedByUserId = submittedByUserId;
-        SubmittedByUserId = submittedByUserId;
+        UpdatedBySubject = submittedBySubject;
+        SubmittedBySubject = submittedBySubject;
         UpdatedAt = submittedAt;
         SubmittedAt = submittedAt;
         return Result.Success();

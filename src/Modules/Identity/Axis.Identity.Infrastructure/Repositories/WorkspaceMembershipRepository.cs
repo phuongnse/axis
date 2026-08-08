@@ -37,6 +37,25 @@ internal sealed class WorkspaceMembershipRepository(IdentityDbContext context)
             .OrderBy(x => x.WorkspaceId)
             .ToListAsync(ct);
 
+    public async Task<IReadOnlyList<ActiveWorkspaceHumanProjection>> ListActiveForWorkspaceAsync(
+        Guid workspaceId,
+        CancellationToken ct = default) =>
+        await context.WorkspaceMemberships
+            .AsNoTracking()
+            .Where(x => x.WorkspaceId == workspaceId && x.Status == MembershipStatus.Active)
+            .Join(
+                context.Users.Where(user => user.Status == UserStatus.Active),
+                membership => membership.UserId,
+                user => user.Id,
+                (_, user) => user)
+            .OrderBy(user => user.FullName)
+            .ThenBy(user => user.Id)
+            .Select(user => new ActiveWorkspaceHumanProjection(
+                user.Id,
+                user.FullName,
+                user.Email.Value))
+            .ToListAsync(ct);
+
     public Task<bool> HasActivePersonalOwnerWorkspaceAsync(
         Guid userId,
         CancellationToken ct = default) =>

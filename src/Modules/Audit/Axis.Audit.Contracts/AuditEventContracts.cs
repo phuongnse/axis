@@ -32,7 +32,7 @@ public static class AuditEventV1Validator
             return Invalid("audit.actor_invalid");
         if (!HasValidScope(auditEvent.ActorKind, auditEvent.WorkspaceId))
             return Invalid("audit.scope_invalid");
-        if (auditEvent.SubjectId == Guid.Empty)
+        if (!HasValidSubject(auditEvent.ActorKind, auditEvent.SubjectId))
             return Invalid("audit.subject_invalid");
         if (!IsCategory(auditEvent.Action, MaximumCategoryLength) ||
             !IsCategory(auditEvent.TargetType, MaximumCategoryLength) ||
@@ -76,6 +76,14 @@ public static class AuditEventV1Validator
     {
         AuditActorKindV1.Human or AuditActorKindV1.ServiceIdentity => workspaceId is Guid id && id != Guid.Empty,
         AuditActorKindV1.System or AuditActorKindV1.Anonymous => workspaceId != Guid.Empty,
+        _ => false,
+    };
+
+    private static bool HasValidSubject(AuditActorKindV1 actorKind, Guid? subjectId) => actorKind switch
+    {
+        AuditActorKindV1.Human or AuditActorKindV1.ServiceIdentity =>
+            subjectId is Guid id && id != Guid.Empty,
+        AuditActorKindV1.System or AuditActorKindV1.Anonymous => subjectId != Guid.Empty,
         _ => false,
     };
 

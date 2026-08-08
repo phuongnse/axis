@@ -248,6 +248,7 @@ function conditionProjectionResponse(init?: RequestInit) {
 
 function respondForRules(input: RequestInfo | URL, init?: RequestInit): Response {
   const url = input.toString();
+  if (url.endsWith('/rules/actions')) return jsonResponse({ canStartCreate: true });
   if (url.endsWith('/rules/condition/project')) return conditionProjectionResponse(init);
   if (url.endsWith('/rules/authoring/project')) {
     const body = init?.body ? JSON.parse(String(init.body)) : {};
@@ -346,6 +347,199 @@ describe('RulesPage', () => {
     useAuthStore.getState().clearSession();
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
+  });
+
+  it('hides create and consumes a denied create deep link', async () => {
+    const actionsResponse = deferred<Response>();
+    vi.mocked(fetch).mockImplementation((input, init) => {
+      if (input.toString().endsWith('/rules/actions')) {
+        return actionsResponse.promise;
+      }
+      return Promise.resolve(respondForRules(input, init));
+    });
+
+    const { router } = await renderWithRouter(<RulesPage />, {
+      path: '/rules?dialog=create',
+      authenticatedPath: 'rules',
+    });
+
+    await waitFor(() =>
+      expect(
+        vi.mocked(fetch).mock.calls.some(([input]) => input.toString().endsWith('/rules/actions')),
+      ).toBe(true),
+    );
+    expect(screen.queryByRole('button', { name: 'New rule' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: 'New workspace rule' })).not.toBeInTheDocument();
+    actionsResponse.resolve(jsonResponse({ canStartCreate: false }));
+    await waitFor(() => expect(router.state.location.search).toEqual({}));
+    expect(screen.queryByRole('button', { name: 'New rule' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: 'New workspace rule' })).not.toBeInTheDocument();
+  });
+
+  it('keeps a create deep link retryable while authorization is unavailable', async () => {
+    const user = userEvent.setup();
+    let actionReads = 0;
+    vi.mocked(fetch).mockImplementation((input, init) => {
+      if (input.toString().endsWith('/rules/actions')) {
+        actionReads += 1;
+        return Promise.resolve(
+          actionReads === 1
+            ? jsonResponse({ title: 'Unavailable' }, 503)
+            : jsonResponse({ canStartCreate: true }),
+        );
+      }
+      return Promise.resolve(respondForRules(input, init));
+    });
+
+    const { router } = await renderWithRouter(<RulesPage />, {
+      path: '/rules?dialog=create',
+      authenticatedPath: 'rules',
+    });
+
+    const notice = await screen.findByRole('alert');
+    expect(notice).toHaveTextContent('Rule actions are temporarily unavailable');
+    expect(router.state.location.search).toEqual({ dialog: 'create' });
+    await user.click(within(notice).getByRole('button', { name: 'Retry' }));
+    expect(await screen.findByRole('dialog', { name: 'New workspace rule' })).toBeVisible();
+    await waitFor(() => expect(router.state.location.search).toEqual({}));
+  });
+
+  it.each([
+    403, 404,
+  ])('keeps a %s rule detail non-disclosing and non-interactive', async (status) => {
+    vi.mocked(fetch).mockImplementation((input, init) => {
+      const url = input.toString();
+      if (url.endsWith('/rules/credit_threshold')) {
+        return Promise.resolve(jsonResponse({ detail: 'Secret authorization detail' }, status));
+      }
+      return Promise.resolve(respondForRules(input, init));
+    });
+
+    await renderWithRouter(<RulesPage />, { path: '/rules', authenticatedPath: 'rules' });
+    await userEvent.click(
+      within(await screen.findByRole('region', { name: 'Rules catalog' })).getByRole('button', {
+        name: 'Credit threshold',
+      }),
+    );
+
+    const editor = await screen.findByRole('dialog', { name: 'Edit rule' });
+    const notice = await within(editor).findByRole('alert');
+    expect(notice).toHaveTextContent('Action unavailable');
+    expect(notice).toHaveTextContent('This action is not available.');
+    expect(notice).not.toHaveTextContent('Secret authorization detail');
+    expect(within(editor).queryByRole('textbox')).not.toBeInTheDocument();
+    expect(within(editor).queryByRole('button', { name: 'Save draft' })).not.toBeInTheDocument();
+    expect(within(editor).getByRole('button', { name: 'Close' })).toBeEnabled();
+  });
+
+  it('retries a temporarily unavailable rule detail without exposing controls', async () => {
+    const user = userEvent.setup();
+    let detailReads = 0;
+    vi.mocked(fetch).mockImplementation((input, init) => {
+      const url = input.toString();
+      if (url.endsWith('/rules/credit_threshold')) {
+        detailReads += 1;
+        return Promise.resolve(
+          detailReads === 1
+            ? jsonResponse({ detail: 'Private dependency detail' }, 503)
+            : jsonResponse(workspaceDetail()),
+        );
+      }
+      return Promise.resolve(respondForRules(input, init));
+    });
+
+    await renderWithRouter(<RulesPage />, { path: '/rules', authenticatedPath: 'rules' });
+    await user.click(
+      within(await screen.findByRole('region', { name: 'Rules catalog' })).getByRole('button', {
+        name: 'Credit threshold',
+      }),
+    );
+
+    const editor = await screen.findByRole('dialog', { name: 'Edit rule' });
+    const notice = await within(editor).findByRole('alert');
+    expect(notice).toHaveTextContent('Rule temporarily unavailable');
+    expect(notice).not.toHaveTextContent('Private dependency detail');
+    expect(within(editor).queryByRole('textbox')).not.toBeInTheDocument();
+    expect(within(editor).queryByRole('button', { name: 'Save draft' })).not.toBeInTheDocument();
+    await user.click(within(notice).getByRole('button', { name: 'Retry' }));
+    expect(await within(editor).findByLabelText('Name')).toHaveValue('Credit threshold');
+    expect(within(editor).getByRole('button', { name: 'Save draft' })).toBeEnabled();
+  });
+
+  it.each([
+    [403, 'This action is not available.'],
+    [404, 'This action is not available.'],
+    [503, 'Authorization is temporarily unavailable. Try again.'],
+  ])('maps a %s rule save failure to safe copy', async (status, expectedMessage) => {
+    const user = userEvent.setup();
+    vi.mocked(fetch).mockImplementation((input, init) => {
+      const url = input.toString();
+      if (url.endsWith('/rules/credit_threshold/draft') && init?.method === 'PUT') {
+        return Promise.resolve(jsonResponse({ detail: 'Private mutation detail' }, status));
+      }
+      return Promise.resolve(respondForRules(input, init));
+    });
+
+    await renderWithRouter(<RulesPage />, { path: '/rules', authenticatedPath: 'rules' });
+    await user.click(
+      within(await screen.findByRole('region', { name: 'Rules catalog' })).getByRole('button', {
+        name: 'Credit threshold',
+      }),
+    );
+    const editor = await screen.findByRole('dialog', { name: 'Credit threshold' });
+    const name = within(editor).getByLabelText('Name');
+    await user.clear(name);
+    await user.type(name, 'Updated threshold');
+    await waitFor(() =>
+      expect(within(editor).getByRole('button', { name: 'Save draft' })).toBeEnabled(),
+    );
+    await user.click(within(editor).getByRole('button', { name: 'Save draft' }));
+
+    const notice = await within(editor).findByRole('alert');
+    expect(notice).toHaveTextContent(expectedMessage);
+    expect(notice).not.toHaveTextContent('Private mutation detail');
+  });
+
+  it.each([
+    [403, 'This action is not available.'],
+    [404, 'This action is not available.'],
+    [503, 'Authorization is temporarily unavailable. Try again.'],
+  ])('maps a %s rule lifecycle failure to safe copy', async (status, expectedMessage) => {
+    const user = userEvent.setup();
+    vi.mocked(fetch).mockImplementation((input, init) => {
+      const url = input.toString();
+      if (url.endsWith('/rules/credit_threshold/archive') && init?.method === 'POST') {
+        return Promise.resolve(jsonResponse({ detail: 'Private lifecycle detail' }, status));
+      }
+      return Promise.resolve(respondForRules(input, init));
+    });
+
+    await renderWithRouter(<RulesPage />, { path: '/rules', authenticatedPath: 'rules' });
+    await user.click(
+      within(await screen.findByRole('region', { name: 'Rules catalog' })).getByRole('button', {
+        name: 'Credit threshold',
+      }),
+    );
+    const editor = await screen.findByRole('dialog', { name: 'Credit threshold' });
+    await user.click(await within(editor).findByRole('button', { name: 'Archive' }));
+    const confirmation = await screen.findByRole('alertdialog', { name: 'Archive this rule?' });
+    await user.click(within(confirmation).getByRole('button', { name: 'Archive' }));
+    await waitFor(() =>
+      expect(
+        vi
+          .mocked(fetch)
+          .mock.calls.some(
+            ([input, requestInit]) =>
+              input.toString().endsWith('/rules/credit_threshold/archive') &&
+              requestInit?.method === 'POST',
+          ),
+      ).toBe(true),
+    );
+    await user.click(within(confirmation).getByRole('button', { name: 'Cancel' }));
+
+    const notice = await within(editor).findByRole('alert');
+    expect(notice).toHaveTextContent(expectedMessage);
+    expect(notice).not.toHaveTextContent('Private lifecycle detail');
   });
 
   it('renders one catalog shape for built-in and workspace rules', async () => {

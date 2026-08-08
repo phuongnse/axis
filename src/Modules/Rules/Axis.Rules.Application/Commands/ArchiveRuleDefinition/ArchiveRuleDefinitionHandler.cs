@@ -1,3 +1,5 @@
+using Axis.Authorization.Contracts;
+using Axis.Identity.Contracts;
 using Axis.Rules.Application.Repositories;
 using Axis.Rules.Application.Services;
 using Axis.Rules.Contracts;
@@ -11,6 +13,8 @@ namespace Axis.Rules.Application.Commands.ArchiveRuleDefinition;
 
 public sealed class ArchiveRuleDefinitionHandler(
     ICurrentUser currentUser,
+    ICurrentSubject currentSubject,
+    IProductAuthorizationService authorization,
     IRuleDefinitionRepository repository,
     IUnitOfWork unitOfWork)
     : ICommandHandler<ArchiveRuleDefinitionCommand, RuleDefinitionDetailDto>
@@ -21,12 +25,16 @@ public sealed class ArchiveRuleDefinitionHandler(
     {
         if (currentUser.workspaceId is not Guid workspaceId)
             return RuleDefinitionFailures.MissingWorkspace<RuleDefinitionDetailDto>();
-        if (currentUser.UserId is not Guid userId)
-            return RuleDefinitionFailures.MissingUser<RuleDefinitionDetailDto>();
-
         Result<RuleDefinitionKey> key = RuleDefinitionKey.Create(command.DefinitionKey);
         if (key.IsFailure)
             return RuleDefinitionFailures.NotFound<RuleDefinitionDetailDto>();
+
+        ProductAuthorizationDecision decision = await RuleAuthorization.AuthorizeAsync(
+                authorization, workspaceId, currentSubject.Subject,
+                RuleProductActions.DefinitionManage, RuleProductActions.DefinitionResourceType,
+                key.Value.Value, null, cancellationToken);
+        if (!decision.IsAllowed)
+            return RuleDefinitionFailures.Authorization<RuleDefinitionDetailDto>(decision);
 
         RuleDefinition? definition = await repository.GetByKeyForWorkspaceAsync(
             key.Value,
@@ -35,7 +43,7 @@ public sealed class ArchiveRuleDefinitionHandler(
         if (definition is null)
             return RuleDefinitionFailures.NotFound<RuleDefinitionDetailDto>();
 
-        Result archived = definition.Archive(command.ExpectedRevision, userId, DateTime.UtcNow);
+        Result archived = definition.Archive(command.ExpectedRevision, RuleSubjectReferenceMapper.ToDomain(currentSubject.Subject), DateTime.UtcNow);
         if (archived.IsFailure)
             return archived.ErrorCode == ErrorCodes.Conflict
                 ? RuleDefinitionFailures.Conflict<RuleDefinitionDetailDto>(archived.Error)
@@ -49,6 +57,6 @@ public sealed class ArchiveRuleDefinitionHandler(
         {
             return RuleDefinitionFailures.Conflict<RuleDefinitionDetailDto>("The rule definition has changed.");
         }
-        return RuleContractMapper.ToDetailDto(definition);
+        return RuleContractMapper.ToDetailDto(definition, canManage: true);
     }
 }

@@ -1,3 +1,5 @@
+using Axis.Authorization.Contracts;
+using Axis.Identity.Contracts;
 using Axis.Rules.Application.Repositories;
 using Axis.Rules.Application.Search;
 using Axis.Rules.Application.Services;
@@ -24,9 +26,14 @@ internal sealed class RuleDefinitionHandlerTestContext
     {
         CurrentUser.UserId.Returns(UserId);
         CurrentUser.workspaceId.Returns(WorkspaceId);
+        CurrentSubject.Subject.Returns(SubjectReference.Human(UserId));
+        Authorization.AuthorizeAsync(Arg.Any<ProductAuthorizationRequest>(), Arg.Any<CancellationToken>())
+            .Returns(new ProductAuthorizationDecision(true, ProductActionScope.None));
     }
 
     public ICurrentUser CurrentUser { get; } = Substitute.For<ICurrentUser>();
+    public ICurrentSubject CurrentSubject { get; } = Substitute.For<ICurrentSubject>();
+    public IProductAuthorizationService Authorization { get; } = Substitute.For<IProductAuthorizationService>();
     public IRuleDefinitionRepository Repository { get; } = Substitute.For<IRuleDefinitionRepository>();
     public IRuleCatalogSearchProvider CatalogSearch { get; } = Substitute.For<IRuleCatalogSearchProvider>();
     public IRuleTextSearchProvider TextSearch { get; } = Substitute.For<IRuleTextSearchProvider>();
@@ -39,7 +46,7 @@ internal sealed class RuleDefinitionHandlerTestContext
             RuleDefinitionKey.Create("credit_threshold").Value,
             "Credit threshold",
             "Flags high credit values.",
-            UserId,
+            RuleSubjectReference.Human(UserId),
             DateTime.UtcNow).Value;
 
         if (configured)
@@ -51,14 +58,14 @@ internal sealed class RuleDefinitionHandlerTestContext
     public static RuleDefinition VersionedDefinition()
     {
         RuleDefinition definition = DraftDefinition(configured: true);
-        definition.CreateVersion(definition.Revision, UserId, DateTime.UtcNow).IsSuccess.Should().BeTrue();
+        definition.CreateVersion(definition.Revision, RuleSubjectReference.Human(UserId), DateTime.UtcNow).IsSuccess.Should().BeTrue();
         return definition;
     }
 
     public static RuleDefinition ActiveDefinition()
     {
         RuleDefinition definition = VersionedDefinition();
-        definition.ActivateVersion(definition.Revision, 1, UserId, DateTime.UtcNow).IsSuccess.Should().BeTrue();
+        definition.ActivateVersion(definition.Revision, 1, RuleSubjectReference.Human(UserId), DateTime.UtcNow).IsSuccess.Should().BeTrue();
         return definition;
     }
 
@@ -82,7 +89,7 @@ internal sealed class RuleDefinitionHandlerTestContext
                 definition.Description,
                 [value, threshold],
                 condition,
-                UserId,
+                RuleSubjectReference.Human(UserId),
                 DateTime.UtcNow)
             .IsSuccess.Should().BeTrue();
     }

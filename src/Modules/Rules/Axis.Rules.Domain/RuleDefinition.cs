@@ -28,11 +28,16 @@ public sealed class RuleDefinition : AggregateRoot<RuleDefinitionId>
     public IReadOnlyList<RuleInputDefinition> Inputs => _inputs.AsReadOnly();
     public IReadOnlyList<RuleDefinitionVersion> Versions => _versions.AsReadOnly();
     public RuleReferenceDocumentation? Documentation { get; private set; }
-    public Guid CreatedByUserId { get; private set; }
-    public Guid UpdatedByUserId { get; private set; }
+    public RuleSubjectReference CreatedBySubject { get; private set; }
+    public RuleSubjectReference UpdatedBySubject { get; private set; }
     public DateTime CreatedAt { get; private set; }
     public DateTime UpdatedAt { get; private set; }
-    public Guid? ArchivedByUserId { get; private set; }
+    private RuleSubjectKind? ArchivedBySubjectKind { get; set; }
+    private Guid? ArchivedBySubjectId { get; set; }
+    public RuleSubjectReference? ArchivedBySubject =>
+        ArchivedBySubjectKind is RuleSubjectKind kind && ArchivedBySubjectId is Guid id
+            ? new RuleSubjectReference(kind, id)
+            : null;
     public DateTime? ArchivedAt { get; private set; }
 
     private RuleDefinition()
@@ -51,7 +56,7 @@ public sealed class RuleDefinition : AggregateRoot<RuleDefinitionId>
         string name,
         string description,
         RuleOrigin origin,
-        Guid createdByUserId,
+        RuleSubjectReference createdBySubject,
         DateTime createdAt)
         : base(id)
     {
@@ -63,8 +68,8 @@ public sealed class RuleDefinition : AggregateRoot<RuleDefinitionId>
         ExpressionLanguageVersion = RuleExpressionLanguage.Version;
         Output = RuleOutputContract.BooleanMatch;
         Revision = 1;
-        CreatedByUserId = createdByUserId;
-        UpdatedByUserId = createdByUserId;
+        CreatedBySubject = createdBySubject;
+        UpdatedBySubject = createdBySubject;
         CreatedAt = createdAt;
         UpdatedAt = createdAt;
     }
@@ -74,14 +79,14 @@ public sealed class RuleDefinition : AggregateRoot<RuleDefinitionId>
         RuleDefinitionKey key,
         string name,
         string description,
-        Guid createdByUserId,
+        RuleSubjectReference createdBySubject,
         DateTime createdAt)
     {
         if (workspaceId == Guid.Empty)
             return Result.Failure<RuleDefinition>("Workspace is required.");
 
-        if (createdByUserId == Guid.Empty)
-            return Result.Failure<RuleDefinition>("Creating user is required.");
+        if (createdBySubject.Id == Guid.Empty || !Enum.IsDefined(createdBySubject.Kind))
+            return Result.Failure<RuleDefinition>("Creating subject is required.");
 
         Result<RuleDefinitionKey> canonicalKey = RuleDefinitionKey.Create(key.Value);
         if (canonicalKey.IsFailure)
@@ -98,7 +103,7 @@ public sealed class RuleDefinition : AggregateRoot<RuleDefinitionId>
             name.Trim(),
             description.Trim(),
             RuleOrigin.Workspace,
-            createdByUserId,
+            createdBySubject,
             createdAt);
     }
 
@@ -132,12 +137,12 @@ public sealed class RuleDefinition : AggregateRoot<RuleDefinitionId>
 
         RuleDefinition definition = new(
             RuleDefinitionId.New(),
-            Guid.Empty,
+            default,
             canonicalKey.Value,
             name.Trim(),
             description.Trim(),
             RuleOrigin.BuiltIn,
-            Guid.Empty,
+            default,
             default)
         {
             Documentation = documentation,
@@ -148,7 +153,7 @@ public sealed class RuleDefinition : AggregateRoot<RuleDefinitionId>
             Output = output,
         };
         definition._inputs.AddRange(inputs);
-        definition._versions.Add(RuleDefinitionVersion.Create(definition, version, Guid.Empty, default));
+        definition._versions.Add(RuleDefinitionVersion.Create(definition, version, null, default));
         return definition;
     }
 
@@ -158,7 +163,7 @@ public sealed class RuleDefinition : AggregateRoot<RuleDefinitionId>
         string description,
         IReadOnlyList<RuleInputDefinition> inputs,
         RuleConditionNode condition,
-        Guid updatedByUserId,
+        RuleSubjectReference updatedBySubject,
         DateTime updatedAt)
     {
         if (Origin != RuleOrigin.Workspace)
@@ -167,7 +172,7 @@ public sealed class RuleDefinition : AggregateRoot<RuleDefinitionId>
         if (ArchivedAt is not null)
             return Result.Failure(ErrorCodes.Conflict, "Archived rules are read-only.");
 
-        Result concurrency = ValidateMutation(expectedRevision, updatedByUserId);
+        Result concurrency = ValidateMutation(expectedRevision, updatedBySubject);
         if (concurrency.IsFailure)
             return concurrency;
 
@@ -185,14 +190,14 @@ public sealed class RuleDefinition : AggregateRoot<RuleDefinitionId>
         _inputs.AddRange(inputs);
         Condition = condition;
         Revision += 1;
-        UpdatedByUserId = updatedByUserId;
+        UpdatedBySubject = updatedBySubject;
         UpdatedAt = updatedAt;
         return Result.Success();
     }
 
     public Result<RuleDefinitionVersion> CreateVersion(
         int expectedRevision,
-        Guid createdByUserId,
+        RuleSubjectReference publishedBySubject,
         DateTime createdAt)
     {
         if (Origin != RuleOrigin.Workspace)
@@ -201,7 +206,7 @@ public sealed class RuleDefinition : AggregateRoot<RuleDefinitionId>
         if (ArchivedAt is not null)
             return Result.Failure<RuleDefinitionVersion>(ErrorCodes.Conflict, "Archived rules cannot create versions.");
 
-        Result concurrency = ValidateMutation(expectedRevision, createdByUserId);
+        Result concurrency = ValidateMutation(expectedRevision, publishedBySubject);
         if (concurrency.IsFailure)
             return Result.Failure<RuleDefinitionVersion>(concurrency.ErrorCode ?? ErrorCodes.InvalidInput, concurrency.Error);
 
@@ -209,16 +214,16 @@ public sealed class RuleDefinition : AggregateRoot<RuleDefinitionId>
             return Result.Failure<RuleDefinitionVersion>(ErrorCodes.InvalidInput, "Rule draft must be configured before versioning.");
 
         int versionNumber = (LatestPublishedVersion ?? 0) + 1;
-        RuleDefinitionVersion version = RuleDefinitionVersion.Create(this, versionNumber, createdByUserId, createdAt);
+        RuleDefinitionVersion version = RuleDefinitionVersion.Create(this, versionNumber, publishedBySubject, createdAt);
         _versions.Add(version);
         LatestPublishedVersion = versionNumber;
         Revision += 1;
-        UpdatedByUserId = createdByUserId;
+        UpdatedBySubject = publishedBySubject;
         UpdatedAt = createdAt;
         return version;
     }
 
-    public Result ActivateVersion(int expectedRevision, int version, Guid activatedByUserId, DateTime activatedAt)
+    public Result ActivateVersion(int expectedRevision, int version, RuleSubjectReference activatedBySubject, DateTime activatedAt)
     {
         if (Origin != RuleOrigin.Workspace)
             return Result.Failure(ErrorCodes.Conflict, "Built-in rules are read-only.");
@@ -226,7 +231,7 @@ public sealed class RuleDefinition : AggregateRoot<RuleDefinitionId>
         if (ArchivedAt is not null)
             return Result.Failure(ErrorCodes.Conflict, "Archived rules cannot be activated.");
 
-        Result concurrency = ValidateMutation(expectedRevision, activatedByUserId);
+        Result concurrency = ValidateMutation(expectedRevision, activatedBySubject);
         if (concurrency.IsFailure)
             return concurrency;
 
@@ -235,12 +240,12 @@ public sealed class RuleDefinition : AggregateRoot<RuleDefinitionId>
 
         ActiveVersion = version;
         Revision += 1;
-        UpdatedByUserId = activatedByUserId;
+        UpdatedBySubject = activatedBySubject;
         UpdatedAt = activatedAt;
         return Result.Success();
     }
 
-    public Result Deactivate(int expectedRevision, Guid deactivatedByUserId, DateTime deactivatedAt)
+    public Result Deactivate(int expectedRevision, RuleSubjectReference deactivatedBySubject, DateTime deactivatedAt)
     {
         if (Origin != RuleOrigin.Workspace)
             return Result.Failure(ErrorCodes.Conflict, "Built-in rules are read-only.");
@@ -248,7 +253,7 @@ public sealed class RuleDefinition : AggregateRoot<RuleDefinitionId>
         if (ArchivedAt is not null)
             return Result.Failure(ErrorCodes.Conflict, "Archived rules cannot be deactivated.");
 
-        Result concurrency = ValidateMutation(expectedRevision, deactivatedByUserId);
+        Result concurrency = ValidateMutation(expectedRevision, deactivatedBySubject);
         if (concurrency.IsFailure)
             return concurrency;
 
@@ -257,12 +262,12 @@ public sealed class RuleDefinition : AggregateRoot<RuleDefinitionId>
 
         ActiveVersion = null;
         Revision += 1;
-        UpdatedByUserId = deactivatedByUserId;
+        UpdatedBySubject = deactivatedBySubject;
         UpdatedAt = deactivatedAt;
         return Result.Success();
     }
 
-    public Result Archive(int expectedRevision, Guid archivedByUserId, DateTime archivedAt)
+    public Result Archive(int expectedRevision, RuleSubjectReference archivedBySubject, DateTime archivedAt)
     {
         if (Origin != RuleOrigin.Workspace)
             return Result.Failure(ErrorCodes.Conflict, "Built-in rules are read-only.");
@@ -270,15 +275,16 @@ public sealed class RuleDefinition : AggregateRoot<RuleDefinitionId>
         if (ArchivedAt is not null)
             return Result.Success();
 
-        Result concurrency = ValidateMutation(expectedRevision, archivedByUserId);
+        Result concurrency = ValidateMutation(expectedRevision, archivedBySubject);
         if (concurrency.IsFailure)
             return concurrency;
 
         ActiveVersion = null;
         Revision += 1;
-        UpdatedByUserId = archivedByUserId;
+        UpdatedBySubject = archivedBySubject;
         UpdatedAt = archivedAt;
-        ArchivedByUserId = archivedByUserId;
+        ArchivedBySubjectKind = archivedBySubject.Kind;
+        ArchivedBySubjectId = archivedBySubject.Id;
         ArchivedAt = archivedAt;
         return Result.Success();
     }
@@ -286,9 +292,9 @@ public sealed class RuleDefinition : AggregateRoot<RuleDefinitionId>
     public RuleDefinitionVersion? FindVersion(int version) =>
         _versions.SingleOrDefault(candidate => candidate.Version == version);
 
-    private Result ValidateMutation(int expectedRevision, Guid userId) =>
-        userId == Guid.Empty
-            ? Result.Failure(ErrorCodes.InvalidInput, "Acting user is required.")
+    private Result ValidateMutation(int expectedRevision, RuleSubjectReference subject) =>
+        subject.Id == Guid.Empty || !Enum.IsDefined(subject.Kind)
+            ? Result.Failure(ErrorCodes.InvalidInput, "Acting subject is required.")
             : expectedRevision == Revision
                 ? Result.Success()
                 : Result.Failure(ErrorCodes.Conflict, "The rule definition has changed.");

@@ -1,4 +1,5 @@
 using Axis.BusinessObjects.Domain.Aggregates;
+using Axis.BusinessObjects.Domain.ValueObjects;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -31,7 +32,7 @@ internal sealed class BusinessObjectDefinitionVersionConfiguration : IEntityType
 
         builder.Property(version => version.Name)
             .HasColumnName("name")
-            .HasMaxLength(200)
+            .HasMaxLength(256)
             .IsRequired();
 
         builder.Property(version => version.Key)
@@ -40,8 +41,14 @@ internal sealed class BusinessObjectDefinitionVersionConfiguration : IEntityType
             .HasConversion(BusinessObjectValueConverters.DefinitionKey)
             .IsRequired();
 
-        builder.Property(version => version.PublishedByUserId)
-            .HasColumnName("published_by_user_id")
+        ComplexPropertyBuilder<SubjectReference> publishedBy = builder.ComplexProperty(version => version.PublishedBySubject);
+        publishedBy.Property(subject => subject.Kind)
+            .HasColumnName("published_by_subject_kind")
+            .HasConversion<string>()
+            .HasMaxLength(16)
+            .IsRequired();
+        publishedBy.Property(subject => subject.Id)
+            .HasColumnName("published_by_subject_id")
             .IsRequired();
 
         builder.Property(version => version.PublishedAt)

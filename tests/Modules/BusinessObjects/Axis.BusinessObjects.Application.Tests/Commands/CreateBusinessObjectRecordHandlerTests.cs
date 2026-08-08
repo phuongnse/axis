@@ -1,16 +1,75 @@
+using Axis.Authorization.Contracts;
 using Axis.BusinessObjects.Application.Commands.CreateBusinessObjectRecord;
 using Axis.BusinessObjects.Application.Repositories;
 using Axis.BusinessObjects.Application.Services;
 using Axis.BusinessObjects.Domain.Aggregates;
+using Axis.BusinessObjects.Domain.ValueObjects;
+using Axis.Identity.Contracts;
 using Axis.Shared.Application.Identity;
 using Axis.Shared.Domain.Primitives;
 using FluentAssertions;
 using NSubstitute;
+using DomainSubjectReference = Axis.BusinessObjects.Domain.ValueObjects.SubjectReference;
+using IdentitySubjectKind = Axis.Identity.Contracts.SubjectKind;
+using IdentitySubjectReference = Axis.Identity.Contracts.SubjectReference;
 
 namespace Axis.BusinessObjects.Application.Tests.Commands;
 
 public sealed class CreateBusinessObjectRecordHandlerTests
 {
+    [Fact]
+    public async Task CreateRecord_WhenServiceHasExactOwnAction_StampsServiceOwnerServerSide()
+    {
+        Guid serviceId = Guid.Parse("55555555-5555-4555-8555-555555555555");
+        BusinessObjectDefinition definition =
+            BusinessObjectRecordHandlerTestContext.CreatePublishedDefinition();
+        IBusinessObjectDefinitionRepository definitions = Substitute.For<IBusinessObjectDefinitionRepository>();
+        IBusinessObjectRecordRepository records = Substitute.For<IBusinessObjectRecordRepository>();
+        IUnitOfWork unitOfWork = Substitute.For<IUnitOfWork>();
+        IProductAuthorizationService authorization = BusinessObjectRecordHandlerTestContext.AllowedAuthorization();
+        BusinessObjectRecord? persisted = null;
+        definitions.GetByKeyForWorkspaceAsync(
+                definition.Key,
+                BusinessObjectRecordHandlerTestContext.WorkspaceId,
+                Arg.Any<CancellationToken>())
+            .Returns(definition);
+        records.AddAsync(
+                Arg.Do<BusinessObjectRecord>(record => persisted = record),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.CompletedTask);
+        BusinessObjectRecordHandlerTestContext.FakeCurrentSubject subject = new()
+        {
+            Subject = IdentitySubjectReference.Service(serviceId),
+        };
+        CreateBusinessObjectRecordHandler sut = new(
+            new BusinessObjectRecordHandlerTestContext.FakeCurrentUser(),
+            subject,
+            authorization,
+            definitions,
+            records,
+            unitOfWork);
+
+        Result<BusinessObjectRecordDetailDto> result = await sut.Handle(
+            new CreateBusinessObjectRecordCommand(
+                definition.Key.Value,
+                "service-record",
+                new Dictionary<string, IReadOnlyList<string>> { ["display_name"] = ["Service record"] },
+                "create-service-record"),
+            TestContext.Current.CancellationToken);
+
+        result.IsSuccess.Should().BeTrue();
+        persisted!.Owner.Should().Be(DomainSubjectReference.Service(serviceId));
+        result.Value.CreatedBySubject.Should().Be(new SubjectReferenceDto(IdentitySubjectKind.Service, serviceId));
+        await authorization.Received(1).AuthorizeAsync(
+            Arg.Is<ProductAuthorizationRequest>(request =>
+                request.ActionKey == BusinessObjectProductActions.RecordCreate
+                && request.ResourceType == BusinessObjectProductActions.RecordResourceType
+                && request.ResourceKey == definition.Key.Value
+                && request.Subject == IdentitySubjectReference.Service(serviceId)
+                && request.CorrelationId == "create-service-record"),
+            Arg.Any<CancellationToken>());
+    }
+
     [Fact]
     public async Task CreateRecord_WhenValueArrayIsNull_ReturnsInvalidInputBeforeRepositoryAccess()
     {
@@ -19,6 +78,8 @@ public sealed class CreateBusinessObjectRecordHandlerTests
         IUnitOfWork unitOfWork = Substitute.For<IUnitOfWork>();
         CreateBusinessObjectRecordHandler sut = new(
             new BusinessObjectRecordHandlerTestContext.FakeCurrentUser(),
+            new BusinessObjectRecordHandlerTestContext.FakeCurrentSubject(),
+            BusinessObjectRecordHandlerTestContext.AllowedAuthorization(),
             definitions,
             records,
             unitOfWork);
@@ -34,7 +95,7 @@ public sealed class CreateBusinessObjectRecordHandlerTests
         result.ErrorCode.Should().Be(ErrorCodes.InvalidInput);
         await records.DidNotReceive().FindByIdempotencyKeyAsync(
             Arg.Any<Guid>(),
-            Arg.Any<Axis.BusinessObjects.Domain.ValueObjects.BusinessObjectDefinitionKey>(),
+            Arg.Any<BusinessObjectDefinitionKey>(),
             Arg.Any<string>(),
             Arg.Any<CancellationToken>());
     }
@@ -72,6 +133,8 @@ public sealed class CreateBusinessObjectRecordHandlerTests
 
         CreateBusinessObjectRecordHandler sut = new(
             new BusinessObjectRecordHandlerTestContext.FakeCurrentUser(),
+            new BusinessObjectRecordHandlerTestContext.FakeCurrentSubject(),
+            BusinessObjectRecordHandlerTestContext.AllowedAuthorization(),
             definitions,
             records,
             unitOfWork);
@@ -94,7 +157,7 @@ public sealed class CreateBusinessObjectRecordHandlerTests
             {
                 ["quantity"] = ["13"],
             },
-            BusinessObjectRecordHandlerTestContext.UserId,
+            DomainSubjectReference.Human(BusinessObjectRecordHandlerTestContext.UserId),
             BusinessObjectRecordHandlerTestContext.Now.AddMinutes(1)).IsSuccess.Should().BeTrue();
 
         records.FindByIdempotencyKeyAsync(

@@ -14,10 +14,16 @@ import {
 } from '@/components/shared/data-table';
 import { useManagedWindowActions } from '@/components/shared/ManagedWindowManager';
 import { StatusBadge, type StatusBadgeTone } from '@/components/shared/StatusBadge';
+import { StatusNotice } from '@/components/shared/StatusNotice';
 import { Button } from '@/components/ui/button';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
+import { ApiError } from '@/lib/api';
 import { referenceContent } from '@/lib/reference-metadata';
-import { type RuleDefinitionSummary, ruleDefinitionsListQueryOptions } from '../api';
+import {
+  type RuleDefinitionSummary,
+  ruleDefinitionCollectionActionsQueryOptions,
+  ruleDefinitionsListQueryOptions,
+} from '../api';
 import { ruleCreateWindowDescriptor, ruleDefinitionWindowDescriptor } from '../managed-windows';
 import { RuleOriginBadge } from './RuleOriginBadge';
 
@@ -38,6 +44,10 @@ export function RulesPage() {
       language: i18n.language,
     }),
   );
+  const collectionActionsQuery = useQuery(ruleDefinitionCollectionActionsQueryOptions());
+  const canStartCreate = collectionActionsQuery.data?.canStartCreate === true;
+  const actionsUnavailable =
+    collectionActionsQuery.error instanceof ApiError && collectionActionsQuery.error.status === 503;
   const definitions = definitionsQuery.data?.items ?? [];
   const tableQuery = useMemo<DataTableQueryState>(
     () => ({
@@ -55,7 +65,8 @@ export function RulesPage() {
   useEffect(() => {
     if (!search.dialog) return;
     if (search.dialog === 'create') {
-      openWindow(ruleCreateWindowDescriptor(t('rules.createTitle')));
+      if (collectionActionsQuery.isLoading || collectionActionsQuery.isError) return;
+      if (canStartCreate) openWindow(ruleCreateWindowDescriptor(t('rules.createTitle')));
       void navigate({ replace: true, search: {} });
       return;
     }
@@ -72,6 +83,9 @@ export function RulesPage() {
     if (descriptor) openWindow(descriptor);
     void navigate({ replace: true, search: {} });
   }, [
+    canStartCreate,
+    collectionActionsQuery.isError,
+    collectionActionsQuery.isLoading,
     definitionsQuery.isLoading,
     navigate,
     openWindow,
@@ -185,21 +199,24 @@ export function RulesPage() {
       globalSearch: true,
       columnControls: true,
       grouping: false,
-      renderToolbarActions: () => (
-        <Button
-          type="button"
-          size="sm"
-          onClick={() => openWindow(ruleCreateWindowDescriptor(t('rules.createTitle')))}
-        >
-          <Plus aria-hidden />
-          {t('rules.newRule')}
-        </Button>
-      ),
+      renderToolbarActions: canStartCreate
+        ? () => (
+            <Button
+              type="button"
+              size="sm"
+              onClick={() => openWindow(ruleCreateWindowDescriptor(t('rules.createTitle')))}
+            >
+              <Plus aria-hidden />
+              {t('rules.newRule')}
+            </Button>
+          )
+        : undefined,
       loading: definitionsQuery.isFetching,
       error: definitionsQuery.isError,
       onRetry: () => void definitionsQuery.refetch(),
     };
   }, [
+    canStartCreate,
     definitions,
     definitionsQuery.isError,
     definitionsQuery.isFetching,
@@ -226,6 +243,20 @@ export function RulesPage() {
           </p>
         </div>
       </header>
+
+      {actionsUnavailable ? (
+        <StatusNotice tone="warning" title={t('rules.actionsUnavailableTitle')}>
+          <span>{t('rules.actionsUnavailableDescription')}</span>{' '}
+          <Button
+            type="button"
+            variant="link"
+            disabled={collectionActionsQuery.isFetching}
+            onClick={() => void collectionActionsQuery.refetch()}
+          >
+            {t('app.retry')}
+          </Button>
+        </StatusNotice>
+      ) : null}
 
       <div className="min-h-0 flex-1">
         <DataTable definition={tableDefinition} />

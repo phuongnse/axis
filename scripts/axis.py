@@ -986,6 +986,17 @@ def check_frontend_vulnerable_packages(_args: argparse.Namespace | None = None) 
             file=sys.stderr,
         )
         return 1
+    if isinstance(report, dict) and "auditReportVersion" not in report:
+        audit_error = report.get("message") or report.get("error")
+        if isinstance(audit_error, dict):
+            audit_error = audit_error.get("summary") or audit_error.get("message")
+        detail = " ".join(str(audit_error).split())[:500] if audit_error else "unknown audit error"
+        print(
+            "check-frontend-vulnerable-packages: FAIL - "
+            f"npm audit did not return a vulnerability report: {detail}",
+            file=sys.stderr,
+        )
+        return 1
     if result.returncode not in {0, 1}:
         detail = (result.stderr or "").strip()
         suffix = f": {detail}" if detail else ""
@@ -3094,7 +3105,12 @@ def dotnet_command(args: argparse.Namespace) -> int:
     if dotnet_args and dotnet_args[0] == "--":
         dotnet_args = dotnet_args[1:]
     if command == "restore":
-        return run([exe("dotnet"), "restore", "Axis.sln", *dotnet_args], check=False).returncode
+        target = "Axis.sln"
+        if dotnet_args and Path(dotnet_args[0]).suffix.lower() in {".csproj", ".sln"}:
+            target = dotnet_args.pop(0)
+            if dotnet_args and dotnet_args[0] == "--":
+                dotnet_args = dotnet_args[1:]
+        return run([exe("dotnet"), "restore", target, *dotnet_args], check=False).returncode
     if command == "restore-tools":
         return run([exe("dotnet"), "tool", "restore", *dotnet_args], check=False).returncode
     if command == "build":
@@ -3112,7 +3128,12 @@ def dotnet_command(args: argparse.Namespace) -> int:
                 dotnet_args = dotnet_args[1:]
         return run([exe("dotnet"), "test", target, "--nologo", *dotnet_args], check=False).returncode
     if command == "format":
-        format_args = ["format", "Axis.sln"]
+        target = "Axis.sln"
+        if dotnet_args and Path(dotnet_args[0]).suffix.lower() in {".csproj", ".sln"}:
+            target = dotnet_args.pop(0)
+            if dotnet_args and dotnet_args[0] == "--":
+                dotnet_args = dotnet_args[1:]
+        format_args = ["format", target]
         if args.check:
             format_args.append("--verify-no-changes")
         format_args.extend(dotnet_args)
@@ -3201,9 +3222,9 @@ def migration_command(args: argparse.Namespace) -> int:
     rc = check_dotnet_sdk()
     if rc != 0:
         return rc
-    if args.migration_command != "add":
+    if args.migration_command not in {"add", "remove"}:
         raise CheckError(f"Unknown migration command: {args.migration_command}")
-    if MIGRATION_NAME_RE.fullmatch(args.name) is None:
+    if args.migration_command == "add" and MIGRATION_NAME_RE.fullmatch(args.name) is None:
         raise CheckError("migration add: name must be PascalCase letters and digits")
 
     project, context, connection_key = MIGRATION_TARGETS[args.module]
@@ -3220,12 +3241,9 @@ def migration_command(args: argparse.Namespace) -> int:
     if build.returncode != 0:
         return build.returncode
 
-    return run(
-        [
-            exe("dotnet"),
-            "ef",
-            "migrations",
-            "add",
+    ef_args = [exe("dotnet"), "ef", "migrations", args.migration_command]
+    if args.migration_command == "add":
+        ef_args.extend([
             args.name,
             "--project",
             str(project),
@@ -3236,7 +3254,20 @@ def migration_command(args: argparse.Namespace) -> int:
             "--output-dir",
             "Migrations",
             "--no-build",
-        ],
+        ])
+    else:
+        ef_args.extend([
+            "--project",
+            str(project),
+            "--startup-project",
+            str(project),
+            "--context",
+            context,
+            "--force",
+            "--no-build",
+        ])
+    return run(
+        ef_args,
         check=False,
         env={connection_key: DESIGN_TIME_CONNECTION_STRING},
     ).returncode
@@ -3278,6 +3309,24 @@ def frontend_test_path(value: str) -> str:
     return normalized
 
 
+def frontend_format_path(value: str) -> str:
+    path = Path(value)
+    normalized = path.as_posix()
+    candidate = FRONTEND_DIR / path
+    if (
+        value.startswith("-")
+        or path.is_absolute()
+        or ".." in path.parts
+        or not candidate.is_file()
+        or not candidate.resolve().is_relative_to(FRONTEND_DIR.resolve())
+        or path.suffix not in {".css", ".js", ".json", ".jsonc", ".jsx", ".ts", ".tsx"}
+    ):
+        raise argparse.ArgumentTypeError(
+            "frontend format paths must name existing frontend-relative source files"
+        )
+    return normalized
+
+
 def frontend_command(args: argparse.Namespace) -> int:
     command = args.frontend_command
     rc = check_frontend_toolchain()
@@ -3296,6 +3345,10 @@ def frontend_command(args: argparse.Namespace) -> int:
         return run_frontend_npm(["exec", "--", "playwright", "install", "chromium"]).returncode
     if command == "ci":
         return run_frontend_npm(["run", "ci"]).returncode
+    if command == "format":
+        return run_frontend_npm(
+            ["exec", "--", "biome", "check", "--write", *args.source_paths]
+        ).returncode
     if command == "test":
         npm_args = ["run", "test"]
         vitest_args = list(getattr(args, "test_paths", []))
@@ -3869,7 +3922,7 @@ def generate_api_contracts(_args: argparse.Namespace | None = None) -> int:
             return rc
     commands = [
         ([exe("dotnet"), "tool", "restore"], ROOT, None),
-        ([exe("dotnet"), "build", "src/Axis.Api/Axis.Api.csproj", "--nologo"], ROOT, None),
+        ([exe("dotnet"), "build", "src/Axis.Api/Axis.Api.csproj", "--nologo", "-m:1"], ROOT, None),
         (
             [
                 exe("dotnet"),
@@ -3883,14 +3936,39 @@ def generate_api_contracts(_args: argparse.Namespace | None = None) -> int:
                 "v1",
             ],
             ROOT / "src" / "Axis.Api",
-            {"ASPNETCORE_ENVIRONMENT": "Testing", "DOTNET_ENVIRONMENT": "Testing"},
+            {
+                "ASPNETCORE_ENVIRONMENT": "Testing",
+                "DOTNET_ENVIRONMENT": "Testing",
+                "Redis__ConnectionString": "localhost:6379,abortConnect=false,connectTimeout=1000,syncTimeout=1000",
+            },
         ),
     ]
     for command, cwd, env in commands:
         result = run(command, cwd=cwd, env=env, check=False)
         if result.returncode != 0:
             return result.returncode
+    sync_solution_openapi_digest()
     return run_frontend_npm(["run", "gen:api-types"]).returncode
+
+
+def sync_solution_openapi_digest(
+    openapi_path: Path = ROOT / "openapi.json",
+    settings_path: Path = ROOT / "src" / "Axis.Api" / "appsettings.json",
+) -> None:
+    digest = hashlib.sha256(openapi_path.read_bytes()).hexdigest()
+    content = settings_path.read_text(encoding="utf-8")
+    updated, count = re.subn(
+        r'("AxisOpenApiSha256"\s*:\s*")[0-9a-f]{64}(")',
+        rf"\g<1>{digest}\g<2>",
+        content,
+        count=1,
+    )
+    if count != 1:
+        raise CheckError(
+            "src/Axis.Api/appsettings.json must declare one Solutions:AxisOpenApiSha256 value"
+        )
+    if updated != content:
+        settings_path.write_text(updated, encoding="utf-8")
 
 
 def install_hooks(_args: argparse.Namespace | None = None) -> int:
@@ -5436,6 +5514,12 @@ def build_parser(
     migration_add.add_argument("module", choices=sorted(MIGRATION_TARGETS))
     migration_add.add_argument("name", help="PascalCase migration name")
     migration_add.set_defaults(func=migration_command)
+    migration_remove = migration_sub.add_parser(
+        "remove",
+        help="Remove the latest unpublished migration for one Axis module",
+    )
+    migration_remove.add_argument("module", choices=sorted(MIGRATION_TARGETS))
+    migration_remove.set_defaults(func=migration_command)
 
     frontend_parser = sub.add_parser("frontend", help="Run repository-standard frontend commands")
     frontend_sub = frontend_parser.add_subparsers(dest="frontend_command", required=True)
@@ -5452,6 +5536,17 @@ def build_parser(
     frontend_sync_lock.set_defaults(func=frontend_command)
     frontend_sub.add_parser("install-browsers", help="Install Playwright Chromium").set_defaults(func=frontend_command)
     frontend_sub.add_parser("ci", help="Run frontend type-check and lint gates").set_defaults(func=frontend_command)
+    frontend_format = frontend_sub.add_parser(
+        "format",
+        help="Apply Biome formatting and safe fixes to selected frontend source files",
+    )
+    frontend_format.add_argument(
+        "source_paths",
+        nargs="+",
+        type=frontend_format_path,
+        help="Existing frontend-relative source files",
+    )
+    frontend_format.set_defaults(func=frontend_command)
     frontend_test = frontend_sub.add_parser("test", help="Run all or selected frontend unit tests")
     frontend_test.add_argument(
         "test_paths",

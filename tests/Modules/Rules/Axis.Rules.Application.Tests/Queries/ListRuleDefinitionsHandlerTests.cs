@@ -22,6 +22,8 @@ public sealed class ListRuleDefinitionsHandlerTests
         currentUser.workspaceId.Returns((Guid?)null);
         ListRuleDefinitionsHandler sut = new(
             currentUser,
+            _context.CurrentSubject,
+            _context.Authorization,
             _context.Repository,
             _context.CatalogSearch);
 
@@ -37,6 +39,8 @@ public sealed class ListRuleDefinitionsHandlerTests
     {
         ListRuleDefinitionsHandler sut = new(
             _context.CurrentUser,
+            _context.CurrentSubject,
+            _context.Authorization,
             _context.Repository,
             _context.CatalogSearch);
 
@@ -75,6 +79,8 @@ public sealed class ListRuleDefinitionsHandlerTests
             .Returns([workspaceDefinition]);
         ListRuleDefinitionsHandler sut = new(
             _context.CurrentUser,
+            _context.CurrentSubject,
+            _context.Authorization,
             _context.Repository,
             _context.CatalogSearch);
 

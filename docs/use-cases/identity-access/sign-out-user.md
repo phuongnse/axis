@@ -135,4 +135,4 @@ sequenceDiagram
 >
 > **Verification:** See [sign-out-user.evidence.md](./sign-out-user.evidence.md) for the browser, API, and UI proof covering every required AT.
 >
-> **Decisions:** This use case owns current-browser sign-out behavior. [Identity Access architecture](../../architecture/identity-access.md#browser-session-realization) owns session realization. The action affects only the current ticket and cookie, not other devices or confidential product-BFF sessions; Product BFF logout and refresh-token revocation are owned by [docs/use-cases/solutions/provision-reference-solution.md](../solutions/provision-reference-solution.md).
+> **Decisions:** This use case owns current-browser sign-out behavior. [Identity Access architecture](../../architecture/identity-access.md#browser-session-realization) owns session realization. The action affects only the current ticket and cookie, not other devices or confidential product-BFF sessions; the independently deployed reference-product BFF owns its logout and refresh-token revocation boundary under [the reference-product solution lifecycle](../solutions/validate-reference-product-lifecycle.md).

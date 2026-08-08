@@ -1,3 +1,4 @@
+using Axis.Api.Authorization;
 using Axis.Api.Extensions;
 using Axis.BusinessObjects.Application;
 using Axis.BusinessObjects.Application.Commands.CreateBusinessObjectRecord;
@@ -18,6 +19,7 @@ public static class BusinessObjectRecordEndpoints
     {
         RouteGroupBuilder group = app.MapGroup("/api/business-object-records")
             .RequireAuthorization(AxisApiServiceExtensions.WorkspaceAccessPolicy)
+            .WithMetadata(ServiceProductEndpointMetadata.Instance)
             .WithTags("Business Object Records");
 
         group.MapGet("", List)
@@ -26,7 +28,8 @@ public static class BusinessObjectRecordEndpoints
             .Produces<PagedResult<BusinessObjectRecordListItemDto>>()
             .ProducesProblem(400)
             .ProducesProblem(401)
-            .ProducesProblem(403);
+            .ProducesProblem(403)
+            .ProducesProblem(StatusCodes.Status503ServiceUnavailable);
 
         group.MapPost("/{objectKey}", Create)
             .WithName("CreateBusinessObjectRecord")
@@ -38,6 +41,7 @@ public static class BusinessObjectRecordEndpoints
             .ProducesProblem(404)
             .ProducesProblem(409)
             .ProducesProblem(422)
+            .ProducesProblem(StatusCodes.Status503ServiceUnavailable)
             .ProducesValidationProblem();
 
         group.MapGet("/{recordId:guid}", Get)
@@ -46,7 +50,8 @@ public static class BusinessObjectRecordEndpoints
             .Produces<BusinessObjectRecordDetailDto>()
             .ProducesProblem(401)
             .ProducesProblem(403)
-            .ProducesProblem(404);
+            .ProducesProblem(404)
+            .ProducesProblem(StatusCodes.Status503ServiceUnavailable);
 
         group.MapPut("/{recordId:guid}", Save)
             .WithName("SaveBusinessObjectRecord")
@@ -58,6 +63,7 @@ public static class BusinessObjectRecordEndpoints
             .ProducesProblem(404)
             .ProducesProblem(409)
             .ProducesProblem(422)
+            .ProducesProblem(StatusCodes.Status503ServiceUnavailable)
             .ProducesValidationProblem();
 
         group.MapPost("/{recordId:guid}/submit", Submit)
@@ -70,6 +76,7 @@ public static class BusinessObjectRecordEndpoints
             .ProducesProblem(404)
             .ProducesProblem(409)
             .ProducesProblem(422)
+            .ProducesProblem(StatusCodes.Status503ServiceUnavailable)
             .ProducesValidationProblem();
 
         return app;

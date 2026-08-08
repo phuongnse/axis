@@ -16,6 +16,18 @@ internal static class BusinessObjectRecordFailures
             "Current user scope is required.",
             BusinessObjectsProblemCodes.UserScopeRequired);
 
+    public static Result<T> Forbidden<T>() =>
+        Result.Failure<T>(
+            ErrorCodes.Forbidden,
+            "The requested product action is not allowed.",
+            BusinessObjectsProblemCodes.AccessDenied);
+
+    public static Result<T> AuthorizationUnavailable<T>() =>
+        Result.Failure<T>(
+            ErrorCodes.Unavailable,
+            "Product authorization is temporarily unavailable.",
+            BusinessObjectsProblemCodes.AuthorizationUnavailable);
+
     public static Result<T> NotFound<T>() =>
         Result.Failure<T>(
             ErrorCodes.NotFound,

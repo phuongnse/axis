@@ -12,4 +12,4 @@ Identity Access owns account access flows for Axis Platform users and non-intera
 | [docs/use-cases/identity-access/sign-in-user.md](./sign-in-user.md) | Done |
 | [docs/use-cases/identity-access/authorize-local-mcp-client.md](./authorize-local-mcp-client.md) | Done |
 | [docs/use-cases/identity-access/sign-out-user.md](./sign-out-user.md) | Done |
-| [docs/use-cases/identity-access/authenticate-service-identity.md](./authenticate-service-identity.md) | Not started |
+| [docs/use-cases/identity-access/authenticate-service-identity.md](./authenticate-service-identity.md) | Done |

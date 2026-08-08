@@ -13,10 +13,13 @@ import {
 } from '@/components/shared/data-table';
 import { useManagedWindowActions } from '@/components/shared/ManagedWindowManager';
 import { StatusBadge } from '@/components/shared/StatusBadge';
+import { StatusNotice } from '@/components/shared/StatusNotice';
 import { Button } from '@/components/ui/button';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
+import { ApiError } from '@/lib/api';
 import {
   type BusinessObjectDefinitionListItem,
+  businessObjectDefinitionCollectionActionsQueryOptions,
   businessObjectDefinitionDetailQueryOptions,
   businessObjectDefinitionsDefaultPageSize,
   businessObjectDefinitionsListQueryOptions,
@@ -43,6 +46,10 @@ export function BusinessObjectsPage() {
       i18n.language,
     ),
   );
+  const collectionActionsQuery = useQuery(businessObjectDefinitionCollectionActionsQueryOptions());
+  const canStartCreate = collectionActionsQuery.data?.canStartCreate === true;
+  const actionsUnavailable =
+    collectionActionsQuery.error instanceof ApiError && collectionActionsQuery.error.status === 503;
   const definitions = definitionsQuery.data?.items ?? [];
   const tableQuery = useMemo<DataTableQueryState>(
     () => ({
@@ -79,7 +86,10 @@ export function BusinessObjectsPage() {
   useEffect(() => {
     if (!search.dialog) return;
     if (search.dialog === 'create') {
-      openWindow(businessObjectCreateWindowDescriptor(t('businessObjects.defineTitle')));
+      if (collectionActionsQuery.isLoading || collectionActionsQuery.isError) return;
+      if (canStartCreate) {
+        openWindow(businessObjectCreateWindowDescriptor(t('businessObjects.defineTitle')));
+      }
     } else if (search.recordId) {
       if (launchDefinitionQuery.isLoading) return;
       const definition = definitions.find((candidate) => candidate.id === search.recordId);
@@ -102,6 +112,9 @@ export function BusinessObjectsPage() {
       search: (current) => ({ ...current, dialog: undefined, recordId: undefined }),
     });
   }, [
+    canStartCreate,
+    collectionActionsQuery.isError,
+    collectionActionsQuery.isLoading,
     definitions,
     launchDefinitionQuery.data?.name,
     launchDefinitionQuery.isLoading,
@@ -227,23 +240,26 @@ export function BusinessObjectsPage() {
       grouping: false,
       columnControls: true,
       enableColumnResizing: true,
-      renderToolbarActions: () => (
-        <Button
-          type="button"
-          size="sm"
-          onClick={() => {
-            openWindow(businessObjectCreateWindowDescriptor(t('businessObjects.defineTitle')));
-          }}
-        >
-          <Plus aria-hidden />
-          {t('businessObjects.new')}
-        </Button>
-      ),
+      renderToolbarActions: canStartCreate
+        ? () => (
+            <Button
+              type="button"
+              size="sm"
+              onClick={() => {
+                openWindow(businessObjectCreateWindowDescriptor(t('businessObjects.defineTitle')));
+              }}
+            >
+              <Plus aria-hidden />
+              {t('businessObjects.new')}
+            </Button>
+          )
+        : undefined,
       loading: definitionsQuery.isFetching,
       error: definitionsQuery.isError,
       onRetry: () => void definitionsQuery.refetch(),
     };
   }, [
+    canStartCreate,
     dateFormatter,
     definitions,
     definitionsQuery.data?.pageSize,
@@ -270,6 +286,20 @@ export function BusinessObjectsPage() {
           {t('businessObjects.pageDescription')}
         </p>
       </header>
+
+      {actionsUnavailable ? (
+        <StatusNotice tone="warning" title={t('businessObjects.actionsUnavailableTitle')}>
+          <span>{t('businessObjects.actionsUnavailableDescription')}</span>{' '}
+          <Button
+            type="button"
+            variant="link"
+            disabled={collectionActionsQuery.isFetching}
+            onClick={() => void collectionActionsQuery.refetch()}
+          >
+            {t('app.retry')}
+          </Button>
+        </StatusNotice>
+      ) : null}
 
       <div className="min-h-0 flex-1">
         <DataTable definition={tableDefinition} />

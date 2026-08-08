@@ -1,12 +1,15 @@
+using Axis.Authorization.Contracts;
 using Axis.BusinessObjects.Application.Repositories;
 using Axis.BusinessObjects.Application.Services;
 using Axis.BusinessObjects.Domain.Aggregates;
 using Axis.BusinessObjects.Domain.ValueObjects;
+using Axis.Identity.Contracts;
 using Axis.Rules.Contracts;
 using Axis.Shared.Application.Identity;
 using Axis.Shared.Domain.Primitives;
 using FluentAssertions;
 using NSubstitute;
+using IdentitySubjectReference = Axis.Identity.Contracts.SubjectReference;
 
 namespace Axis.BusinessObjects.Application.Tests;
 
@@ -17,6 +20,7 @@ internal sealed class BusinessObjectDefinitionHandlerTestContext
 
     public IBusinessObjectDefinitionRepository Repository { get; } = Substitute.For<IBusinessObjectDefinitionRepository>();
     public IUnitOfWork UnitOfWork { get; } = Substitute.For<IUnitOfWork>();
+    public IProductAuthorizationService Authorization { get; } = Substitute.For<IProductAuthorizationService>();
     public IRuleBindingReferenceValidator BindingValidator { get; } =
         Substitute.For<IRuleBindingReferenceValidator>();
     public IBusinessObjectDefinitionInputPlanner InputPlanner =>
@@ -26,9 +30,17 @@ internal sealed class BusinessObjectDefinitionHandlerTestContext
         UserId = UserId,
         workspaceId = WorkspaceId,
     };
+    public FakeCurrentSubject CurrentSubject { get; } = new()
+    {
+        Subject = IdentitySubjectReference.Human(UserId),
+    };
 
     public BusinessObjectDefinitionHandlerTestContext()
     {
+        Authorization.AuthorizeAsync(
+                Arg.Any<ProductAuthorizationRequest>(),
+                Arg.Any<CancellationToken>())
+            .Returns(new ProductAuthorizationDecision(true, ProductActionScope.None));
         BindingValidator.ValidateAsync(
                 Arg.Any<RuleBindingReferenceValidationRequest>(),
                 Arg.Any<CancellationToken>())
@@ -78,6 +90,11 @@ internal sealed class BusinessObjectDefinitionHandlerTestContext
     {
         public Guid? UserId { get; set; }
         public Guid? workspaceId { get; set; }
+    }
+
+    internal sealed class FakeCurrentSubject : ICurrentSubject
+    {
+        public IdentitySubjectReference Subject { get; set; }
     }
 }
 

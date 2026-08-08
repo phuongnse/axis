@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\Axis.Authorization.Application\Axis.Authorization.Application.csproj" />
+    <ProjectReference Include="..\Axis.Authorization.Contracts\Axis.Authorization.Contracts.csproj" />
+    <ProjectReference Include="..\..\Audit\Axis.Audit.Contracts\Axis.Audit.Contracts.csproj" />
+    <ProjectReference Include="..\..\Identity\Axis.Identity.Contracts\Axis.Identity.Contracts.csproj" />
+  </ItemGroup>
+  <ItemGroup><PackageReference Include="Microsoft.EntityFrameworkCore.Relational" /><PackageReference Include="Microsoft.Extensions.Hosting" /><PackageReference Include="Microsoft.EntityFrameworkCore.Design"><PrivateAssets>all</PrivateAssets></PackageReference><PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" /></ItemGroup>
+  <PropertyGroup><TargetFramework>net10.0</TargetFramework><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable></PropertyGroup>
+</Project>

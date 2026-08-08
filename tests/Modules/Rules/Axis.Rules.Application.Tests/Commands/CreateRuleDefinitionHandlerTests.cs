@@ -17,7 +17,7 @@ public sealed class CreateRuleDefinitionHandlerTests
                 RuleDefinitionHandlerTestContext.WorkspaceId,
                 Arg.Any<CancellationToken>())
             .Returns(false);
-        CreateRuleDefinitionHandler sut = new(_context.CurrentUser, _context.Repository, _context.UnitOfWork);
+        CreateRuleDefinitionHandler sut = new(_context.CurrentUser, _context.CurrentSubject, _context.Authorization, _context.Repository, _context.UnitOfWork);
 
         Shared.Domain.Primitives.Result<RuleDefinitionDetailDto> result = await sut.Handle(
             new CreateRuleDefinitionCommand(
@@ -40,7 +40,7 @@ public sealed class CreateRuleDefinitionHandlerTests
                 RuleDefinitionHandlerTestContext.WorkspaceId,
                 Arg.Any<CancellationToken>())
             .Returns(false);
-        CreateRuleDefinitionHandler sut = new(_context.CurrentUser, _context.Repository, _context.UnitOfWork);
+        CreateRuleDefinitionHandler sut = new(_context.CurrentUser, _context.CurrentSubject, _context.Authorization, _context.Repository, _context.UnitOfWork);
 
         Shared.Domain.Primitives.Result<RuleDefinitionDetailDto> result = await sut.Handle(
             new CreateRuleDefinitionCommand(

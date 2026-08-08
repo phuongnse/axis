@@ -181,7 +181,14 @@ export function BusinessObjectDefinitionDialog({
     enabled: Boolean(recordId && mode !== 'create'),
   });
   const definition = detailQuery.data;
-  const readOnly = mode === 'view' || definition?.status === 'Published';
+  const detailErrorStatus =
+    detailQuery.error instanceof ApiError ? detailQuery.error.status : undefined;
+  const detailTemporarilyUnavailable = detailErrorStatus === 503;
+  const detailActionUnavailable = detailErrorStatus === 403 || detailErrorStatus === 404;
+  const canSave = !detailQuery.isError && mode === 'edit' && definition?.actions?.canSave === true;
+  const canPublish =
+    !detailQuery.isError && mode === 'edit' && definition?.actions?.canPublish === true;
+  const readOnly = mode === 'view' || (mode !== 'create' && !canSave);
   const open = Boolean(mode);
   const exitLabel =
     readOnly || (mode !== 'create' && !definition) ? t('app.close') : t('app.cancel');
@@ -204,7 +211,15 @@ export function BusinessObjectDefinitionDialog({
       await invalidateLists(queryClient);
       if (created.id) onCreated(created.id, created.name ?? t('businessObjects.definitionTitle'));
     },
-    onError: (error) => setRequestError(readApiError(error, t('businessObjects.requestError'))),
+    onError: (error) =>
+      setRequestError(
+        readApiError(
+          error,
+          t('businessObjects.requestError'),
+          t('businessObjects.authorizationUnavailableDescription'),
+          t('businessObjects.authorizationTemporarilyUnavailableDescription'),
+        ),
+      ),
   });
 
   const saveMutation = useMutation({
@@ -231,7 +246,15 @@ export function BusinessObjectDefinitionDialog({
       setRequestError(null);
       await invalidateLists(queryClient);
     },
-    onError: (error) => setRequestError(readApiError(error, t('businessObjects.requestError'))),
+    onError: (error) =>
+      setRequestError(
+        readApiError(
+          error,
+          t('businessObjects.requestError'),
+          t('businessObjects.authorizationUnavailableDescription'),
+          t('businessObjects.authorizationTemporarilyUnavailableDescription'),
+        ),
+      ),
   });
 
   const publishMutation = useMutation({
@@ -244,14 +267,24 @@ export function BusinessObjectDefinitionDialog({
       setPublishOpen(false);
       await invalidateLists(queryClient);
     },
-    onError: (error) => setRequestError(readApiError(error, t('businessObjects.requestError'))),
+    onError: (error) =>
+      setRequestError(
+        readApiError(
+          error,
+          t('businessObjects.requestError'),
+          t('businessObjects.authorizationUnavailableDescription'),
+          t('businessObjects.authorizationTemporarilyUnavailableDescription'),
+        ),
+      ),
   });
 
   const busy = createMutation.isPending || saveMutation.isPending || publishMutation.isPending;
   const title =
     mode === 'create'
       ? t('businessObjects.defineTitle')
-      : definition?.name || t('businessObjects.definitionTitle');
+      : !detailQuery.isError && definition?.name
+        ? definition.name
+        : t('businessObjects.definitionTitle');
 
   function requestClose() {
     if (!readOnly && form.formState.isDirty) {
@@ -286,7 +319,7 @@ export function BusinessObjectDefinitionDialog({
         createMutation.mutate({ name: values.name.trim() });
         return;
       }
-      if (definition?.id && definition.revision != null) {
+      if (canSave && definition?.id && definition.revision != null) {
         const ruleIssues = validateRuleBindings(values.fields, ruleDefinitions);
         setRuleInputErrors(toRuleInputErrors(ruleIssues, i18n.language, t));
         if (ruleIssues.length > 0) {
@@ -314,7 +347,7 @@ export function BusinessObjectDefinitionDialog({
             : t('businessObjects.editorDescription')
         }
         titleAccessory={
-          definition ? (
+          definition && !detailQuery.isError ? (
             <StatusBadge tone={definition.status === 'Published' ? 'success' : 'neutral'}>
               {t(
                 definition.status === 'Published'
@@ -339,27 +372,33 @@ export function BusinessObjectDefinitionDialog({
                   : t('businessObjects.create')}
               </Button>
             ) : null}
-            {!readOnly && mode !== 'create' ? (
+            {mode === 'edit' && (canSave || canPublish) ? (
               <>
-                <Button
-                  type="submit"
-                  form={formId}
-                  variant="secondary"
-                  disabled={busy || !form.formState.isDirty}
-                >
-                  <Save aria-hidden />
-                  {saveMutation.isPending ? t('businessObjects.saving') : t('businessObjects.save')}
-                </Button>
-                <Button
-                  type="button"
-                  disabled={busy || form.formState.isDirty || fields.length === 0}
-                  onClick={() => setPublishOpen(true)}
-                >
-                  <UploadCloud aria-hidden />
-                  {publishMutation.isPending
-                    ? t('businessObjects.publishing')
-                    : t('businessObjects.publish')}
-                </Button>
+                {canSave ? (
+                  <Button
+                    type="submit"
+                    form={formId}
+                    variant="secondary"
+                    disabled={busy || !form.formState.isDirty}
+                  >
+                    <Save aria-hidden />
+                    {saveMutation.isPending
+                      ? t('businessObjects.saving')
+                      : t('businessObjects.save')}
+                  </Button>
+                ) : null}
+                {canPublish ? (
+                  <Button
+                    type="button"
+                    disabled={busy || form.formState.isDirty || fields.length === 0}
+                    onClick={() => setPublishOpen(true)}
+                  >
+                    <UploadCloud aria-hidden />
+                    {publishMutation.isPending
+                      ? t('businessObjects.publishing')
+                      : t('businessObjects.publish')}
+                  </Button>
+                ) : null}
               </>
             ) : null}
           </>
@@ -371,8 +410,40 @@ export function BusinessObjectDefinitionDialog({
               <p role="status">{t('table.loading')}</p>
             ) : null}
             {detailQuery.isError ? (
-              <StatusNotice tone="destructive" title={t('businessObjects.loadError')}>
-                {t('businessObjects.loadErrorDescription')}
+              <StatusNotice
+                tone={
+                  detailActionUnavailable || detailTemporarilyUnavailable
+                    ? 'warning'
+                    : 'destructive'
+                }
+                title={
+                  detailTemporarilyUnavailable
+                    ? t('businessObjects.authorizationTemporarilyUnavailableTitle')
+                    : detailActionUnavailable
+                      ? t('businessObjects.authorizationUnavailableTitle')
+                      : t('businessObjects.loadError')
+                }
+              >
+                <span>
+                  {detailTemporarilyUnavailable
+                    ? t('businessObjects.authorizationTemporarilyUnavailableDescription')
+                    : detailActionUnavailable
+                      ? t('businessObjects.authorizationUnavailableDescription')
+                      : t('businessObjects.loadErrorDescription')}
+                </span>
+                {detailTemporarilyUnavailable ? (
+                  <>
+                    {' '}
+                    <Button
+                      type="button"
+                      variant="link"
+                      disabled={detailQuery.isFetching}
+                      onClick={() => void detailQuery.refetch()}
+                    >
+                      {t('app.retry')}
+                    </Button>
+                  </>
+                ) : null}
               </StatusNotice>
             ) : null}
             {requestError ? (
@@ -381,9 +452,9 @@ export function BusinessObjectDefinitionDialog({
               </StatusNotice>
             ) : null}
 
-            {readOnly && definition ? (
+            {!detailQuery.isError && readOnly && definition ? (
               <BusinessObjectReadOnlyDetails definition={definition} />
-            ) : !detailQuery.isLoading || mode === 'create' ? (
+            ) : (!detailQuery.isLoading && !detailQuery.isError) || mode === 'create' ? (
               <ManagedDialogTabs
                 label={t('businessObjects.definitionSections')}
                 generalLabel={t('dialog.general')}
@@ -1745,7 +1816,16 @@ async function invalidateLists(queryClient: ReturnType<typeof useQueryClient>) {
   await queryClient.invalidateQueries({ queryKey: businessObjectDefinitionQueryKeys.lists() });
 }
 
-function readApiError(error: unknown, fallback: string): string {
+function readApiError(
+  error: unknown,
+  fallback: string,
+  actionUnavailable: string,
+  temporarilyUnavailable: string,
+): string {
+  if (error instanceof ApiError) {
+    if (error.status === 403 || error.status === 404) return actionUnavailable;
+    if (error.status === 503) return temporarilyUnavailable;
+  }
   if (!(error instanceof ApiError) || typeof error.data !== 'object' || error.data === null) {
     return fallback;
   }

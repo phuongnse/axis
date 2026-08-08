@@ -177,7 +177,11 @@ def evaluate_npm_audit(
     dependency_edges: Mapping[str, AbstractSet[str]] | None = None,
 ) -> NpmAuditPolicyResult:
     if not isinstance(report, Mapping) or report.get("auditReportVersion") != 2:
-        return NpmAuditPolicyResult(("npm audit output must use auditReportVersion 2",), ())
+        version = report.get("auditReportVersion") if isinstance(report, Mapping) else None
+        return NpmAuditPolicyResult(
+            (f"npm audit output must use auditReportVersion 2, found {version!r}",),
+            (),
+        )
     vulnerabilities = report.get("vulnerabilities")
     if not isinstance(vulnerabilities, Mapping):
         return NpmAuditPolicyResult(("npm audit output must contain a vulnerabilities object",), ())
@@ -220,7 +224,11 @@ def evaluate_npm_audit(
             continue
         severity = _severity(vulnerability.get("severity"))
         if severity in {"high", "critical"}:
-            issues.append(f"{package}: {severity} vulnerabilities cannot be accepted")
+            advisories = ", ".join(sorted(package_advisories.get(package, set())))
+            suffix = f" ({advisories})" if advisories else ""
+            issues.append(
+                f"{package}: {severity} vulnerabilities cannot be accepted{suffix}"
+            )
             continue
         for advisory in sorted(package_advisories.get(package, set())):
             if advisory not in acceptances:

@@ -16,5 +16,5 @@ public sealed record RuleBindingRevision(
     int Priority,
     bool Enabled,
     RuleBindingFailureBehavior FailureBehavior,
-    Guid UpdatedByUserId,
+    RuleSubjectReference UpdatedBySubject,
     DateTime UpdatedAt);

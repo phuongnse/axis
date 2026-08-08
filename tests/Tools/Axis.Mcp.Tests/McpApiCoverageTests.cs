@@ -68,6 +68,43 @@ public sealed class McpApiCoverageTests
                 .ToDictionary());
     }
 
+    [Fact]
+    public void OperationCatalog_WhenMapped_UsesTypedSemanticToolsOnly()
+    {
+        Dictionary<string, string> expected = new(StringComparer.Ordinal)
+        {
+            ["GetBusinessObjectDefinitionCollectionActions"] = "axis_get_business_object_definition_collection_actions",
+            ["GetRuleDefinitionCollectionActions"] = "axis_get_rule_definition_collection_actions",
+            ["CreateServiceIdentity"] = "axis_create_service_identity",
+            ["ListServiceIdentities"] = "axis_list_service_identities",
+            ["GetServiceIdentity"] = "axis_get_service_identity",
+            ["AddServiceIdentityKey"] = "axis_add_service_identity_key",
+            ["RevokeServiceIdentityKey"] = "axis_revoke_service_identity_key",
+            ["RevokeServiceIdentity"] = "axis_revoke_service_identity",
+            ["ListProductRoleAssignments"] = "axis_list_product_role_assignments",
+            ["AssignProductRole"] = "axis_assign_product_role",
+            ["RevokeProductRole"] = "axis_revoke_product_role",
+            ["PublishSolutionVersion"] = "axis_publish_solution_version",
+            ["ListSolutionVersions"] = "axis_list_solution_versions",
+            ["GetSolutionVersionStatus"] = "axis_get_solution_version_status",
+            ["InstallSolutionVersion"] = "axis_install_solution_version",
+            ["ListSolutionInstallations"] = "axis_list_solution_installations",
+            ["GetSolutionOperationStatus"] = "axis_get_solution_installation_status",
+            ["ResumeSolutionInstallation"] = "axis_resume_solution_installation",
+        };
+
+        Assert.Equal(
+            expected,
+            AxisMcpOperationCatalog.OperationToTool
+                .Where(pair => expected.ContainsKey(pair.Key))
+                .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal));
+        Assert.DoesNotContain(
+            AxisMcpOperationCatalog.OperationToTool.Values,
+            tool => tool.Contains("proxy", StringComparison.OrdinalIgnoreCase)
+                || tool.Contains("raw_package", StringComparison.OrdinalIgnoreCase)
+                || tool.Contains("trusted_publisher", StringComparison.OrdinalIgnoreCase));
+    }
+
     private static string FindRepoRoot()
     {
         DirectoryInfo? current = new(AppContext.BaseDirectory);

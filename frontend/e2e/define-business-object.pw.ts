@@ -102,6 +102,7 @@ interface BusinessObjectDefinitionRequest {
 type TestTheme = 'light' | 'dark';
 
 interface MockBusinessObjectDefinitionApiOptions {
+  canStartCreate?: boolean;
   createDefinitionFailure?: {
     status: number;
     body: unknown;
@@ -139,6 +140,7 @@ function unpublishedDetail({
     latestPublishedVersionNumber: null as number | null,
     createdAt: now,
     updatedAt: now,
+    actions: { canSave: true, canPublish: true },
     fields: fields.map((field, index) => ({
       id: index === 0 ? fieldId : `44444444-4444-4444-8444-${String(index).padStart(12, '0')}`,
       order: index,
@@ -147,7 +149,7 @@ function unpublishedDetail({
     latestPublishedVersion: null as {
       id: string;
       versionNumber: number;
-      publishedByUserId: string;
+      publishedBySubject: { kind: 'Human'; subjectId: string };
       publishedAt: string;
       fields: unknown[];
     } | null,
@@ -185,11 +187,12 @@ function publishedDetail(definition: BusinessObjectDefinitionDetail) {
       fields,
     }),
     status: 'Published',
+    actions: { canSave: false, canPublish: false },
     latestPublishedVersionNumber: 1,
     latestPublishedVersion: {
       id: versionId,
       versionNumber: 1,
-      publishedByUserId: profile.id,
+      publishedBySubject: { kind: 'Human', subjectId: profile.id },
       publishedAt: now,
       fields: fields.map((field, index) => ({
         id: index === 0 ? fieldId : `44444444-4444-4444-8444-${String(index).padStart(12, '0')}`,
@@ -238,6 +241,23 @@ async function mockAuthenticatedSession(
     });
   });
 
+  await page.route('**/api/workspace-context/eligible', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([
+        {
+          workspaceId: sessionProfile.workspaceId,
+          name: 'Test workspace',
+          slug: 'test-workspace',
+          type: 'Organization',
+          organizationId: '33333333-3333-4333-8333-333333333333',
+          isCurrent: true,
+        },
+      ]),
+    });
+  });
+
   await page.route('**/api/auth/sign-out', async (route) => {
     await route.fulfill({ status: 204 });
   });
@@ -254,6 +274,14 @@ async function mockBusinessObjectDefinitionApi(
   });
   let hasDefinition = false;
   const requests: MockBusinessObjectDefinitionRequest[] = [];
+
+  await page.route('**/api/rules/actions', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ canStartCreate: true }),
+    });
+  });
 
   await page.route('**/api/rules?**', async (route) => {
     await route.fulfill({
@@ -289,6 +317,15 @@ async function mockBusinessObjectDefinitionApi(
     const method = request.method();
     const requestEntry: MockBusinessObjectDefinitionRequest = { method, path: url.pathname };
     requests.push(requestEntry);
+
+    if (method === 'GET' && url.pathname === '/api/business-object-definitions/actions') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ canStartCreate: options.canStartCreate ?? true }),
+      });
+      return;
+    }
 
     if (method === 'GET' && url.pathname === '/api/business-object-definitions') {
       const candidates = hasDefinition
@@ -613,6 +650,17 @@ async function expectDarkReadableContrast(locator: Locator): Promise<void> {
 }
 
 test.describe('define business object', () => {
+  test('denied create affordance blocks toolbar and deep-link launch', async ({ page }) => {
+    await mockAuthenticatedSession(page);
+    await mockBusinessObjectDefinitionApi(page, { canStartCreate: false });
+
+    await page.goto('/business-objects?dialog=create');
+
+    await expect(page).toHaveURL(/\/business-objects\?page=1$/);
+    await expect(page.getByRole('button', { name: 'New definition' })).toHaveCount(0);
+    await expect(page.getByRole('dialog', { name: 'Define business object' })).toHaveCount(0);
+  });
+
   test('managed draft survives navigation and sign-out clears the window workspace', async ({
     page,
   }) => {

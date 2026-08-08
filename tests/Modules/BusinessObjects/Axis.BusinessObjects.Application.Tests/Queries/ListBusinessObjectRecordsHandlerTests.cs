@@ -1,3 +1,4 @@
+using Axis.Authorization.Contracts;
 using Axis.BusinessObjects.Application.Queries.ListBusinessObjectRecords;
 using Axis.BusinessObjects.Application.Repositories;
 using Axis.BusinessObjects.Domain.Aggregates;
@@ -11,6 +12,51 @@ namespace Axis.BusinessObjects.Application.Tests.Queries;
 
 public sealed class ListBusinessObjectRecordsHandlerTests
 {
+    [Fact]
+    public async Task ListRecords_WhenDecisionIsOwn_FiltersByOwnerBeforeMaterialization()
+    {
+        IBusinessObjectRecordRepository records = Substitute.For<IBusinessObjectRecordRepository>();
+        SubjectReference owner = SubjectReference.Human(BusinessObjectRecordHandlerTestContext.UserId);
+        records.CountOwnedForWorkspaceAsync(
+                BusinessObjectRecordHandlerTestContext.WorkspaceId,
+                owner,
+                null,
+                Arg.Any<CancellationToken>())
+            .Returns(0);
+        records.ListOwnedForWorkspaceAsync(
+                BusinessObjectRecordHandlerTestContext.WorkspaceId,
+                owner,
+                null,
+                1,
+                20,
+                Arg.Any<CancellationToken>())
+            .Returns([]);
+        ListBusinessObjectRecordsHandler sut = new(
+            new BusinessObjectRecordHandlerTestContext.FakeCurrentUser(),
+            new BusinessObjectRecordHandlerTestContext.FakeCurrentSubject(),
+            BusinessObjectRecordHandlerTestContext.AllowedAuthorization(ProductActionScope.Own),
+            records);
+
+        Result<PagedResult<BusinessObjectRecordListItemDto>> result = await sut.Handle(
+            new ListBusinessObjectRecordsQuery(1, 20, CorrelationId: "list-own"),
+            TestContext.Current.CancellationToken);
+
+        result.IsSuccess.Should().BeTrue();
+        await records.Received(1).ListOwnedForWorkspaceAsync(
+            BusinessObjectRecordHandlerTestContext.WorkspaceId,
+            owner,
+            null,
+            1,
+            20,
+            Arg.Any<CancellationToken>());
+        await records.DidNotReceiveWithAnyArgs().ListForWorkspaceAsync(
+            default,
+            default,
+            default,
+            default,
+            TestContext.Current.CancellationToken);
+    }
+
     [Fact]
     public async Task ListRecords_WhenPageIsRequested_ReturnsRowsAndPagingMetadata()
     {
@@ -45,7 +91,11 @@ public sealed class ListBusinessObjectRecordsHandlerTests
                 Arg.Any<CancellationToken>())
             .Returns([first, second]);
 
-        ListBusinessObjectRecordsHandler sut = new(new BusinessObjectRecordHandlerTestContext.FakeCurrentUser(), records);
+        ListBusinessObjectRecordsHandler sut = new(
+            new BusinessObjectRecordHandlerTestContext.FakeCurrentUser(),
+            new BusinessObjectRecordHandlerTestContext.FakeCurrentSubject(),
+            BusinessObjectRecordHandlerTestContext.AllowedAuthorization(ProductActionScope.All),
+            records);
         Result<PagedResult<BusinessObjectRecordListItemDto>> result = await sut.Handle(
             new ListBusinessObjectRecordsQuery(2, 2, objectKey.Value),
             TestContext.Current.CancellationToken);

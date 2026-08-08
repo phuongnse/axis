@@ -38,7 +38,7 @@ internal sealed class BusinessObjectChoiceOptionConfiguration : IEntityTypeConfi
             .IsRequired();
         builder.Property<string>(nameof(BusinessObjectChoiceOption.Label))
             .HasColumnName("label")
-            .HasMaxLength(200)
+            .HasMaxLength(256)
             .IsRequired();
         builder.Property<int>(nameof(BusinessObjectChoiceOption.Order))
             .HasColumnName("sort_order")

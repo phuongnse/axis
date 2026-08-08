@@ -16,6 +16,10 @@ public interface IWorkspaceMembershipRepository
     Task<IReadOnlyList<WorkspaceMembership>> ListActiveForUserAsync(
         Guid userId,
         CancellationToken ct = default);
+    Task<IReadOnlyList<ActiveWorkspaceHumanProjection>> ListActiveForWorkspaceAsync(
+        Guid workspaceId,
+        CancellationToken ct = default) =>
+        Task.FromResult<IReadOnlyList<ActiveWorkspaceHumanProjection>>([]);
     Task<bool> HasActivePersonalOwnerWorkspaceAsync(
         Guid userId,
         CancellationToken ct = default);
@@ -34,3 +38,8 @@ public sealed record EligibleWorkspaceProjection(
     WorkspaceSlug Slug,
     WorkspaceType Type,
     Guid? OrganizationId);
+
+public sealed record ActiveWorkspaceHumanProjection(
+    Guid UserId,
+    string DisplayName,
+    string Email);

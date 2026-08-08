@@ -3,6 +3,8 @@ import { fetchApi } from '@/lib/api';
 import type * as ApiTypes from '@/lib/api-generated';
 
 export type BusinessObjectDefinitionDetail = ApiTypes.BusinessObjectDefinitionDetailDto;
+export type BusinessObjectDefinitionCollectionActions =
+  ApiTypes.BusinessObjectDefinitionCollectionActionsDto;
 export type BusinessObjectDefinitionListItem = ApiTypes.BusinessObjectDefinitionListItemDto;
 export type BusinessObjectDefinitionPage = ApiTypes.BusinessObjectDefinitionListItemDtoPagedResult;
 export type CreateBusinessObjectDefinitionRequest = ApiTypes.CreateBusinessObjectDefinitionRequest;
@@ -23,12 +25,21 @@ export const businessObjectDefinitionStaleTimeMs = 1000 * 60 * 5;
 
 export const businessObjectDefinitionQueryKeys = {
   all: ['business-object-definitions'] as const,
+  actions: () => [...businessObjectDefinitionQueryKeys.all, 'actions'] as const,
   lists: () => [...businessObjectDefinitionQueryKeys.all, 'list'] as const,
   list: (page: number, pageSize: number, query: string, language: string) =>
     [...businessObjectDefinitionQueryKeys.lists(), page, pageSize, query, language] as const,
   details: () => [...businessObjectDefinitionQueryKeys.all, 'detail'] as const,
   detail: (id: string) => [...businessObjectDefinitionQueryKeys.all, 'detail', id] as const,
 };
+
+export function businessObjectDefinitionCollectionActionsQueryOptions() {
+  return queryOptions({
+    queryKey: businessObjectDefinitionQueryKeys.actions(),
+    queryFn: getBusinessObjectDefinitionCollectionActions,
+    staleTime: businessObjectDefinitionStaleTimeMs,
+  });
+}
 
 export function businessObjectDefinitionsListQueryOptions(
   page = 1,
@@ -64,6 +75,12 @@ export async function listBusinessObjectDefinitions(
   return fetchApi<BusinessObjectDefinitionPage>(
     `/business-object-definitions?${search.toString()}`,
     { signal },
+  );
+}
+
+export async function getBusinessObjectDefinitionCollectionActions(): Promise<BusinessObjectDefinitionCollectionActions> {
+  return fetchApi<BusinessObjectDefinitionCollectionActions>(
+    '/business-object-definitions/actions',
   );
 }
 

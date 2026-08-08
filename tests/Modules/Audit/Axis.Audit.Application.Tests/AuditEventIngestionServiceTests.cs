@@ -136,8 +136,24 @@ public sealed class AuditEventIngestionServiceTests
         result.RejectionCode.Should().Be("audit.scope_invalid");
     }
 
+    [Theory]
+    [InlineData(AuditActorKindV1.Human)]
+    [InlineData(AuditActorKindV1.ServiceIdentity)]
+    public async Task IngestAsync_WhenResolvedActorHasNoSubject_RejectsSubject(AuditActorKindV1 actorKind)
+    {
+        InMemoryAuditStore store = new();
+        AuditEventIngestionService service = new(store, store);
+
+        AuditIngestionResult result = await service.IngestAsync(
+            Event() with { ActorKind = actorKind, ActorId = Guid.NewGuid(), SubjectId = null },
+            TestContext.Current.CancellationToken);
+
+        result.Disposition.Should().Be(AuditIngestionDisposition.Rejected);
+        result.RejectionCode.Should().Be("audit.subject_invalid");
+    }
+
     private static AuditEventV1 Event() => new(
-        Guid.NewGuid(), AuditActorKindV1.Human, Guid.NewGuid(), null, Guid.NewGuid(), "workspace.created", "workspace",
+        Guid.NewGuid(), AuditActorKindV1.Human, Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "workspace.created", "workspace",
         Guid.NewGuid(), "succeeded", DateTimeOffset.UtcNow, "correlation-1",
         new Dictionary<string, string> { ["transition_state"] = "completed" });
 

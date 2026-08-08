@@ -75,13 +75,13 @@ Assertion, token, immediate-revocation, replay, and audit realization is owned b
 
 | ID | Boundary | Scenario | Covers AC | Verification | Required |
 |---|---|---|---|---|---|
-| AT-001 | Application/Infrastructure boundaries | Valid private-key JWT client credentials issue a short-lived opaque/reference token bound to one active service identity and Workspace | AC-001, AC-002, AC-003 | Application test + Infrastructure integration test | Yes |
-| AT-002 | Application boundary | Unsupported grant/auth methods and all malformed, claim-invalid, stale, unknown, revoked, or invalid-signature assertions deny without token issue | AC-004, AC-005 | Application test | Yes |
+| AT-001 | API/Infrastructure boundaries | Valid private-key JWT client credentials issue a short-lived opaque/reference token bound to one active service identity and Workspace | AC-001, AC-002, AC-003 | API integration test + Infrastructure integration test | Yes |
+| AT-002 | API/Infrastructure boundaries | Unsupported grant/auth methods and all malformed, claim-invalid, stale, unknown, revoked, or invalid-signature assertions deny without token issue | AC-004, AC-005 | API integration test + Infrastructure integration test | Yes |
 | AT-003 | Infrastructure boundary | Duplicate and concurrent `jti` exchange attempts are replay-rejected for the valid assertion lifetime | AC-006 | Infrastructure integration test | Yes |
-| AT-004 | API/Application boundaries | Identity revocation, including its intrinsic Workspace grant, and key revocation deny new and previously issued opaque/reference token authority immediately | AC-007 | API integration test + Application test | Yes |
+| AT-004 | API/Infrastructure boundaries | Identity revocation, including its intrinsic Workspace grant, and key revocation deny new and previously issued opaque/reference token authority immediately | AC-007 | API integration test + Infrastructure integration test | Yes |
 | AT-005 | Infrastructure boundary | Authentication success, denial, replay, and dependency failure have correlated redacted audit read-back and fail closed when required audit work is unavailable | AC-008, AC-009 | Infrastructure integration test | Yes |
 | AT-006 | API boundary | The machine flow exposes no browser/MCP continuation, interactive consent, refresh token, or credential artifact beyond the required token response | AC-004, AC-009, AC-010 | API integration test | Yes |
-| AT-007 | Application/Infrastructure boundaries | Missing temporal claims, overlong or stale lifetime, future/expired values at the 30-second skew boundary, and invalid optional `nbf` deny; a replay digest remains through `exp + 30 seconds` and is then purged | AC-002, AC-005, AC-006 | Application test + Infrastructure integration test | Yes |
+| AT-007 | Infrastructure boundary | Missing temporal claims, overlong or stale lifetime, future/expired values at the 30-second skew boundary, and invalid optional `nbf` deny; a replay digest remains through `exp + 30 seconds` and is then purged | AC-002, AC-005, AC-006 | Infrastructure integration test | Yes |
 | AT-008 | API/Application boundaries | Client-credentials activation and every service-reachable product action deploy together; service tokens deny at all baseline-WorkspaceAccess-only endpoints | AC-003, AC-010, AC-011 | API integration test + Application test | Yes |
 
 ## Out Of Scope
@@ -94,20 +94,16 @@ Assertion, token, immediate-revocation, replay, and audit realization is owned b
 >
 > | Layer | Status |
 > |---|---|
-> | Identity Application | Not started |
-> | Identity Infrastructure | Not started |
-> | Audit | Not started |
-> | API | Not started |
+> | Identity Application | Done |
+> | Identity Infrastructure | Done |
+> | Audit | Done |
+> | API | Done |
 > | MCP | N/A |
 >
-> **Gaps vs spec:**
->
-> | ID | Gap |
-> |---|---|
-> | GAP-001 | All implementation layers are not started; every acceptance criterion awaits implementation. |
+> **Gaps vs spec:** None.
 >
 > **Deferred follow-ups:** Only the separately owned capabilities under Out Of Scope are deferred.
 >
-> **Verification:** Not run; implementation evidence does not exist yet.
+> **Verification:** Every required AT is mapped to current passing application, PostgreSQL infrastructure, API, and durable audit evidence in [authenticate-service-identity.evidence.md](./authenticate-service-identity.evidence.md).
 >
 > **Decisions:** Service authentication is non-interactive OAuth client credentials with `private_key_jwt` and ES256 only. Opaque/reference tokens remain short-lived and immediately revocable through current Identity lifecycle state.

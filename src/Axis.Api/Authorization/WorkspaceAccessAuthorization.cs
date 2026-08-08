@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Axis.Api.Infrastructure;
 using Axis.Identity.Application.Repositories;
+using Axis.Identity.Application.Services;
 using Axis.Identity.Domain.Aggregates;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
@@ -13,13 +14,31 @@ internal sealed class WorkspaceAccessRequirement : IAuthorizationRequirement;
 
 internal sealed class WorkspaceAccessAuthorizationHandler(
     IWorkspaceMembershipRepository memberships,
-    IWorkspaceContextTransitionRepository transitions)
+    IWorkspaceContextTransitionRepository transitions,
+    IServiceClientAssertionAuthentication serviceAuthority,
+    IHttpContextAccessor httpContextAccessor)
     : AuthorizationHandler<WorkspaceAccessRequirement>
 {
     protected override async Task HandleRequirementAsync(
         AuthorizationHandlerContext context,
         WorkspaceAccessRequirement requirement)
     {
+        if (string.Equals(context.User.FindFirst("subject_kind")?.Value, "service", StringComparison.Ordinal))
+        {
+            if (httpContextAccessor.HttpContext?.GetEndpoint()?.Metadata
+                    .GetMetadata<ServiceProductEndpointMetadata>() is null
+                || !Guid.TryParse(context.User.GetClaim(Claims.Subject), out Guid serviceId)
+                || !Guid.TryParse(context.User.FindFirstValue("workspace_id"), out _)
+                || !Guid.TryParse(context.User.FindFirstValue("service_key_id"), out Guid keyId)
+                || !await serviceAuthority.HasActiveAuthorityAsync(serviceId, keyId))
+            {
+                return;
+            }
+
+            context.Succeed(requirement);
+            return;
+        }
+
         if (!Guid.TryParse(context.User.GetClaim(Claims.Subject), out Guid userId)
             || !Guid.TryParse(context.User.FindFirstValue("workspace_id"), out Guid workspaceId)
             || !await memberships.HasActiveWorkspaceAccessAsync(workspaceId, userId))
