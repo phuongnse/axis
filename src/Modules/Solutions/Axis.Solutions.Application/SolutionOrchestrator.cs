@@ -10,6 +10,7 @@ public sealed class SolutionOrchestrator(
     ISolutionInstallationRepository installations,
     ISolutionOperationRepository operations,
     ITrustedPublisherKeyReader trustedKeys,
+    ICurrentAxisOpenApiDigestProvider currentAxisOpenApiDigest,
     ISolutionAuthority authority,
     ISolutionsAuditOutbox audit,
     ISolutionsUnitOfWork uow,
@@ -22,7 +23,7 @@ public sealed class SolutionOrchestrator(
     {
         await DemandAsync(request.Actor, request.Actor.WorkspaceId, SolutionAuthorityAction.Publish, request.RequestedAt, cancellationToken);
         VerifiedSolutionPackage package;
-        try { package = await verifier.VerifyAsync(request.Envelope, request.AxisOpenApiSha256, cancellationToken); }
+        try { package = await verifier.VerifyAsync(request.Envelope, RequireCurrentAxisOpenApiDigest(), cancellationToken); }
         catch (SolutionPackageException exception)
         {
             await AuditDeniedAsync(null, null, null, null, exception.ProblemCode, request.RequestedAt, cancellationToken, request.Actor);
@@ -54,7 +55,16 @@ public sealed class SolutionOrchestrator(
         await versions.AddAsync(version, package.Components, cancellationToken);
         SolutionAuditEvent published = NewAudit("solutions.version.published", null, version.Id, null, null, "succeeded", null, request.RequestedAt, actor: request.Actor);
         await audit.EnqueueAsync(published, cancellationToken);
-        await uow.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await uow.SaveChangesAsync(cancellationToken);
+        }
+        catch (SolutionPersistenceException exception) when (
+            exception.ProblemCode == "solutions.persistence.version_identity_conflict")
+        {
+            await uow.RollbackAsync(cancellationToken);
+            return await ResolveConcurrentPublishAsync(package, request, cancellationToken);
+        }
         await ConfirmAuditAsync(published.EventId, cancellationToken);
         return new PublishSolutionResult(
             ToDto(version, SolutionTrustStatus.Trusted, package.Components),
@@ -79,13 +89,13 @@ public sealed class SolutionOrchestrator(
         }
 
         SolutionVersion version;
-        try { version = await RequireTrustedVersion(request.SolutionVersionId, cancellationToken); }
+        try { version = await RequireInstallableVersion(request.SolutionVersionId, cancellationToken); }
         catch (SolutionPackageException exception)
         {
             await AuditDeniedAsync(request.WorkspaceId, request.SolutionVersionId, null, null, exception.ProblemCode, request.RequestedAt, cancellationToken, request.Actor);
             throw;
         }
-        SolutionInstallation? existing = await installations.FindAsync(request.WorkspaceId, version.Id, cancellationToken);
+        SolutionInstallation? existing = await installations.FindBySolutionKeyAsync(request.WorkspaceId, version.SolutionKey, cancellationToken);
         if (existing is not null)
         {
             await AuditDeniedAsync(request.WorkspaceId, version.Id, existing.Id, null, "solutions.install.already_exists", request.RequestedAt, cancellationToken, request.Actor);
@@ -111,7 +121,11 @@ public sealed class SolutionOrchestrator(
             throw;
         }
 
-        SolutionInstallation installation = SolutionInstallation.Create(request.WorkspaceId, version.Id, request.RequestedAt);
+        SolutionInstallation installation = SolutionInstallation.Create(
+            request.WorkspaceId,
+            version.SolutionKey,
+            version.Id,
+            request.RequestedAt);
         SolutionInstallationOperation operation = SolutionInstallationOperation.Create(
             request.WorkspaceId,
             request.Actor.SubjectId,
@@ -126,7 +140,17 @@ public sealed class SolutionOrchestrator(
         await operations.AddAsync(operation, cancellationToken);
         SolutionAuditEvent requested = NewAudit("solutions.install.requested", request.WorkspaceId, version.Id, installation.Id, operation.Id, "accepted", null, request.RequestedAt, actor: request.Actor);
         await audit.EnqueueAsync(requested, cancellationToken);
-        await uow.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await uow.SaveChangesAsync(cancellationToken);
+        }
+        catch (SolutionPersistenceException exception) when (exception.ProblemCode is
+            "solutions.persistence.installation_solution_conflict" or
+            "solutions.persistence.operation_idempotency_conflict")
+        {
+            await uow.RollbackAsync(cancellationToken);
+            return await ResolveConcurrentInstallAsync(request, version, cancellationToken);
+        }
         await ConfirmAuditAsync(requested.EventId, cancellationToken);
         return new InstallSolutionResult(ToDto(operation), false);
     }
@@ -135,6 +159,19 @@ public sealed class SolutionOrchestrator(
     {
         SolutionInstallationOperation operation = await RequireOperation(operationId, cancellationToken);
         await DemandAsync(actor, operation.WorkspaceId, SolutionAuthorityAction.Resume, now, cancellationToken);
+        if (operation.Status != InstallationOperationStatus.Failed)
+        {
+            await AuditDeniedAsync(
+                operation.WorkspaceId,
+                null,
+                operation.InstallationId,
+                operation.Id,
+                "solutions.install.operation_not_resumable",
+                now,
+                cancellationToken,
+                actor);
+            throw new SolutionPackageException("solutions.install.operation_not_resumable");
+        }
         try { await RequireTrustedForOperation(operation, cancellationToken); }
         catch (SolutionPackageException exception)
         {
@@ -149,8 +186,7 @@ public sealed class SolutionOrchestrator(
             }
             throw;
         }
-        if (operation.Status == InstallationOperationStatus.Failed)
-            operation.Resume(now);
+        operation.Resume(now);
         SolutionAuditEvent resumed = NewAudit("solutions.install.resumed", null, null, operation.InstallationId, operation.Id, "accepted", null, now, actor: actor);
         await audit.EnqueueAsync(resumed, cancellationToken);
         await uow.SaveChangesAsync(cancellationToken);
@@ -225,11 +261,13 @@ public sealed class SolutionOrchestrator(
         SolutionInstallationOperation operation = await RequireOperation(operationId, cancellationToken);
         SolutionInstallation installation = await RequireInstallation(operation.InstallationId, cancellationToken);
         SolutionVersion version;
-        try { version = await RequireTrustedVersion(installation.SolutionVersionId, cancellationToken); }
+        try { version = await RequireInstallableVersion(installation.SolutionVersionId, cancellationToken); }
         catch (SolutionPackageException exception)
         {
             if (exception.ProblemCode == "solutions.package.publisher_untrusted")
                 await MarkUntrustedAsync(installation, operation, now, cancellationToken);
+            else if (exception.ProblemCode == "solutions.package.axis_openapi_mismatch")
+                await MarkIncompatibleAsync(installation, operation, now, cancellationToken);
             else
                 await AuditDeniedAsync(installation.WorkspaceId, installation.SolutionVersionId, installation.Id, operation.Id, exception.ProblemCode, now, cancellationToken, operation: operation);
             throw;
@@ -237,34 +275,41 @@ public sealed class SolutionOrchestrator(
         long epoch = operation.AcquireLease(now, leaseDuration);
         await uow.SaveChangesAsync(cancellationToken);
         SolutionAuditEvent? stepAudit = null;
+        await uow.BeginAsync(cancellationToken);
         try
         {
-            SolutionInstallationStep step = operation.ClaimNext(epoch, clock.GetUtcNow());
-            IReadOnlyList<VerifiedSolutionComponent> components = await versions.GetComponentsAsync(version.Id, cancellationToken);
-            VerifiedSolutionComponent component = components.Single(x => x.Type == step.Type && x.Key == step.Key);
-            SolutionAdapterPreflight adapterComponent = ToAdapterComponent(components, new SolutionComponentPlan(step.Type, step.Key, step.Sha256, component.DependsOn.Select(x => new SolutionComponentIdentity(x.Type, x.Key)).ToArray()));
-            ISolutionComponentAdapter adapter = _adapters[step.Type];
-            SolutionApplyReceipt receipt = new(
-                operation.Id,
-                step.Id,
-                version.Id,
-                operation.ActorSubjectId,
-                operation.ActorSubjectKind,
-                operation.ActorCorrelationId,
-                version.Version,
-                step.Sha256,
-                epoch);
-            SolutionAdapterReadback readback = await adapter.ReadBackAsync(
-                installation.WorkspaceId,
-                adapterComponent,
-                receipt,
-                cancellationToken);
-            if (readback.IsMismatch)
-                throw new SolutionAdapterException(readback.ProblemCode ?? "solutions.install.readback_mismatch", retryable: false);
-            if (!readback.IsConfirmed)
+            try
             {
-                await adapter.ApplyAsync(installation.WorkspaceId, adapterComponent, receipt, cancellationToken);
-                readback = await adapter.ReadBackAsync(
+                await uow.AcquirePublisherFenceAsync(version.PublisherId, cancellationToken);
+                try { version = await RequireInstallableVersion(installation.SolutionVersionId, cancellationToken); }
+                catch (SolutionPackageException exception)
+                {
+                    if (exception.ProblemCode == "solutions.package.publisher_untrusted")
+                        await MarkUntrustedAsync(installation, operation, clock.GetUtcNow(), cancellationToken);
+                    else if (exception.ProblemCode == "solutions.package.axis_openapi_mismatch")
+                        await MarkIncompatibleAsync(installation, operation, clock.GetUtcNow(), cancellationToken);
+                    else
+                        await AuditDeniedAsync(installation.WorkspaceId, installation.SolutionVersionId, installation.Id, operation.Id, exception.ProblemCode, clock.GetUtcNow(), cancellationToken, operation: operation);
+                    await uow.CommitAsync(cancellationToken);
+                    throw;
+                }
+
+                SolutionInstallationStep step = operation.ClaimNext(epoch, clock.GetUtcNow());
+                IReadOnlyList<VerifiedSolutionComponent> components = await versions.GetComponentsAsync(version.Id, cancellationToken);
+                VerifiedSolutionComponent component = components.Single(x => x.Type == step.Type && x.Key == step.Key);
+                SolutionAdapterPreflight adapterComponent = ToAdapterComponent(components, new SolutionComponentPlan(step.Type, step.Key, step.Sha256, component.DependsOn.Select(x => new SolutionComponentIdentity(x.Type, x.Key)).ToArray()));
+                ISolutionComponentAdapter adapter = _adapters[step.Type];
+                SolutionApplyReceipt receipt = new(
+                    operation.Id,
+                    step.Id,
+                    version.Id,
+                    operation.ActorSubjectId,
+                    operation.ActorSubjectKind,
+                    operation.ActorCorrelationId,
+                    version.Version,
+                    step.Sha256,
+                    epoch);
+                SolutionAdapterReadback readback = await adapter.ReadBackAsync(
                     installation.WorkspaceId,
                     adapterComponent,
                     receipt,
@@ -272,30 +317,47 @@ public sealed class SolutionOrchestrator(
                 if (readback.IsMismatch)
                     throw new SolutionAdapterException(readback.ProblemCode ?? "solutions.install.readback_mismatch", retryable: false);
                 if (!readback.IsConfirmed)
-                    throw new SolutionAdapterException("solutions.install.readback_unconfirmed", retryable: true);
+                {
+                    await adapter.ApplyAsync(installation.WorkspaceId, adapterComponent, receipt, cancellationToken);
+                    readback = await adapter.ReadBackAsync(
+                        installation.WorkspaceId,
+                        adapterComponent,
+                        receipt,
+                        cancellationToken);
+                    if (readback.IsMismatch)
+                        throw new SolutionAdapterException(readback.ProblemCode ?? "solutions.install.readback_mismatch", retryable: false);
+                    if (!readback.IsConfirmed)
+                        throw new SolutionAdapterException("solutions.install.readback_unconfirmed", retryable: true);
+                }
+                operation.Confirm(step.Id, epoch, clock.GetUtcNow());
+                if (operation.Status == InstallationOperationStatus.Succeeded)
+                    installation.MarkInstalled(clock.GetUtcNow());
+                stepAudit = NewAudit("solutions.install.step", installation.WorkspaceId, version.Id, installation.Id, operation.Id, "succeeded", null, clock.GetUtcNow(), operation: operation);
+                await audit.EnqueueAsync(stepAudit, cancellationToken);
             }
-            operation.Confirm(step.Id, epoch, clock.GetUtcNow());
-            if (operation.Status == InstallationOperationStatus.Succeeded)
-                installation.MarkInstalled(clock.GetUtcNow());
-            stepAudit = NewAudit("solutions.install.step", installation.WorkspaceId, version.Id, installation.Id, operation.Id, "succeeded", null, clock.GetUtcNow(), operation: operation);
-            await audit.EnqueueAsync(stepAudit, cancellationToken);
+            catch (SolutionAdapterException exception) when (exception.Retryable)
+            {
+                SolutionInstallationStep step = operation.Steps.Single(x => x.Status == InstallationStepStatus.Applying);
+                operation.RecordRetryableFailure(step.Id, epoch, exception.ProblemCode, clock.GetUtcNow());
+                stepAudit = NewAudit("solutions.install.step", installation.WorkspaceId, version.Id, installation.Id, operation.Id, "retryable_failure", exception.ProblemCode, clock.GetUtcNow(), operation: operation);
+                await audit.EnqueueAsync(stepAudit, cancellationToken);
+            }
+            catch (SolutionAdapterException exception)
+            {
+                SolutionInstallationStep step = operation.Steps.Single(x => x.Status == InstallationStepStatus.Applying);
+                operation.Block(step.Id, epoch, exception.ProblemCode, clock.GetUtcNow());
+                installation.MarkFailed(clock.GetUtcNow());
+                stepAudit = NewAudit("solutions.install.step", installation.WorkspaceId, version.Id, installation.Id, operation.Id, "blocked", exception.ProblemCode, clock.GetUtcNow(), operation: operation);
+                await audit.EnqueueAsync(stepAudit, cancellationToken);
+            }
+            await uow.SaveChangesAsync(cancellationToken);
+            await uow.CommitAsync(cancellationToken);
         }
-        catch (SolutionAdapterException exception) when (exception.Retryable)
+        catch
         {
-            SolutionInstallationStep step = operation.Steps.Single(x => x.Status == InstallationStepStatus.Applying);
-            operation.RecordRetryableFailure(step.Id, epoch, exception.ProblemCode, clock.GetUtcNow());
-            stepAudit = NewAudit("solutions.install.step", installation.WorkspaceId, version.Id, installation.Id, operation.Id, "retryable_failure", exception.ProblemCode, clock.GetUtcNow(), operation: operation);
-            await audit.EnqueueAsync(stepAudit, cancellationToken);
+            await uow.RollbackAsync(cancellationToken);
+            throw;
         }
-        catch (SolutionAdapterException exception)
-        {
-            SolutionInstallationStep step = operation.Steps.Single(x => x.Status == InstallationStepStatus.Applying);
-            operation.Block(step.Id, epoch, exception.ProblemCode, clock.GetUtcNow());
-            installation.MarkFailed(clock.GetUtcNow());
-            stepAudit = NewAudit("solutions.install.step", installation.WorkspaceId, version.Id, installation.Id, operation.Id, "blocked", exception.ProblemCode, clock.GetUtcNow(), operation: operation);
-            await audit.EnqueueAsync(stepAudit, cancellationToken);
-        }
-        await uow.SaveChangesAsync(cancellationToken);
         if (stepAudit is not null)
             await ConfirmAuditAsync(stepAudit.EventId, cancellationToken);
         return ToDto(operation);
@@ -325,6 +387,126 @@ public sealed class SolutionOrchestrator(
             await ConfirmAuditAsync(eventId, cancellationToken);
     }
 
+    private async Task<PublishSolutionResult> ResolveConcurrentPublishAsync(
+        VerifiedSolutionPackage package,
+        PublishSolutionRequest request,
+        CancellationToken cancellationToken)
+    {
+        SolutionVersion existing = await versions.FindByIdentityAsync(
+            package.SolutionKey,
+            package.SolutionVersion,
+            cancellationToken) ?? throw new SolutionPackageException("solutions.version.conflict");
+        if (!string.Equals(existing.PackageSha256, package.PackageSha256, StringComparison.Ordinal))
+        {
+            await AuditDeniedAsync(
+                null,
+                existing.Id,
+                null,
+                null,
+                "solutions.version.conflict",
+                request.RequestedAt,
+                cancellationToken,
+                request.Actor);
+            throw new SolutionPackageException("solutions.version.conflict");
+        }
+        await PersistAuditAsync(
+            NewAudit(
+                "solutions.version.publish_retried",
+                null,
+                existing.Id,
+                null,
+                null,
+                "canonical_retry",
+                null,
+                request.RequestedAt,
+                actor: request.Actor),
+            cancellationToken);
+        return new PublishSolutionResult(
+            ToDto(
+                existing,
+                SolutionTrustStatus.Trusted,
+                await versions.GetComponentsAsync(existing.Id, cancellationToken)),
+            true);
+    }
+
+    private async Task<InstallSolutionResult> ResolveConcurrentInstallAsync(
+        InstallSolutionRequest request,
+        SolutionVersion version,
+        CancellationToken cancellationToken)
+    {
+        SolutionInstallationOperation? retry = await operations.FindByIdempotencyAsync(
+            request.WorkspaceId,
+            request.IdempotencyKey,
+            cancellationToken);
+        if (retry is not null)
+        {
+            if (!string.Equals(retry.RequestHash, request.RequestHash, StringComparison.Ordinal))
+            {
+                await AuditDeniedAsync(
+                    request.WorkspaceId,
+                    version.Id,
+                    retry.InstallationId,
+                    retry.Id,
+                    "solutions.install.idempotency_conflict",
+                    request.RequestedAt,
+                    cancellationToken,
+                    request.Actor);
+                throw new SolutionPackageException("solutions.install.idempotency_conflict");
+            }
+            await PersistAuditAsync(
+                NewAudit(
+                    "solutions.install.retried",
+                    request.WorkspaceId,
+                    version.Id,
+                    retry.InstallationId,
+                    retry.Id,
+                    "canonical_retry",
+                    null,
+                    request.RequestedAt,
+                    actor: request.Actor),
+                cancellationToken);
+            return new InstallSolutionResult(ToDto(retry), true);
+        }
+
+        SolutionInstallation? existing = await installations.FindBySolutionKeyAsync(
+            request.WorkspaceId,
+            version.SolutionKey,
+            cancellationToken);
+        await AuditDeniedAsync(
+            request.WorkspaceId,
+            version.Id,
+            existing?.Id,
+            null,
+            "solutions.install.already_exists",
+            request.RequestedAt,
+            cancellationToken,
+            request.Actor);
+        throw new SolutionPackageException("solutions.install.already_exists");
+    }
+
+    private async Task MarkIncompatibleAsync(
+        SolutionInstallation installation,
+        SolutionInstallationOperation operation,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        if (installation.ProvisioningStatus == ProvisioningStatus.Installing)
+            installation.MarkFailed(now);
+        operation.BlockBeforeNextMutation("solutions.package.axis_openapi_mismatch", now);
+        await PersistAuditAsync(
+            NewAudit(
+                "solutions.install.blocked",
+                installation.WorkspaceId,
+                installation.SolutionVersionId,
+                installation.Id,
+                operation.Id,
+                "incompatible",
+                "solutions.package.axis_openapi_mismatch",
+                now,
+                operation: operation),
+            cancellationToken);
+    }
+
     private async Task MarkUntrustedAsync(
         SolutionInstallation installation,
         SolutionInstallationOperation operation,
@@ -352,13 +534,31 @@ public sealed class SolutionOrchestrator(
         await PersistAuditAsync(auditEvent, cancellationToken);
     }
 
-    private async Task<SolutionVersion> RequireTrustedVersion(Guid versionId, CancellationToken cancellationToken)
+    private async Task<SolutionVersion> RequireInstallableVersion(Guid versionId, CancellationToken cancellationToken)
     {
         SolutionVersion version = await versions.FindByIdAsync(versionId, cancellationToken) ?? throw new SolutionPackageException("solutions.version.not_found");
+        if (!string.Equals(
+                version.AxisOpenApiSha256,
+                RequireCurrentAxisOpenApiDigest(),
+                StringComparison.Ordinal))
+        {
+            throw new SolutionPackageException("solutions.package.axis_openapi_mismatch");
+        }
         TrustedPublisherSnapshot? key = await trustedKeys.FindAsync(version.PublisherId, version.PublisherKeyId, cancellationToken);
         if (key is null || !key.IsActive || key.IsTombstone)
             throw new SolutionPackageException("solutions.package.publisher_untrusted");
         return version;
+    }
+
+    private string RequireCurrentAxisOpenApiDigest()
+    {
+        string? value = currentAxisOpenApiDigest.CurrentSha256;
+        if (value is not { Length: 64 }
+            || value.Any(character => character is not (>= '0' and <= '9' or >= 'a' and <= 'f')))
+        {
+            throw new SolutionPackageException("solutions.configuration.unavailable");
+        }
+        return value;
     }
 
     private async Task<SolutionTrustStatus> TrustStatusAsync(
@@ -379,7 +579,7 @@ public sealed class SolutionOrchestrator(
     private async Task RequireTrustedForOperation(SolutionInstallationOperation operation, CancellationToken cancellationToken)
     {
         SolutionInstallation installation = await RequireInstallation(operation.InstallationId, cancellationToken);
-        await RequireTrustedVersion(installation.SolutionVersionId, cancellationToken);
+        await RequireInstallableVersion(installation.SolutionVersionId, cancellationToken);
     }
 
     private async Task<SolutionInstallationOperation> RequireOperation(Guid id, CancellationToken cancellationToken) =>

@@ -8,9 +8,18 @@ namespace Axis.Solutions.Infrastructure.Repositories;
 
 internal sealed class TrustedPublisherLedger(SolutionsDbContext context) : ITrustedPublisherLedger
 {
+    public async Task<IReadOnlyList<string>> ListPublisherIdsAsync(CancellationToken cancellationToken = default) =>
+        await context.TrustedPublisherKeys.AsNoTracking()
+            .Select(value => value.PublisherId)
+            .Distinct()
+            .OrderBy(value => value)
+            .ToListAsync(cancellationToken);
+
     public async Task<IReadOnlyList<TrustedPublisherIdentity>> ReconcileAsync(long configurationRevision, IReadOnlyList<TrustedPublisherConfigurationKey> candidate, CancellationToken cancellationToken = default)
     {
-        if (configurationRevision <= 0 || candidate.GroupBy(x => (x.PublisherId, x.KeyId)).Any(x => x.Count() != 1))
+        if (configurationRevision < 0 ||
+            configurationRevision == 0 && candidate.Count != 0 ||
+            candidate.GroupBy(x => (x.PublisherId, x.KeyId)).Any(x => x.Count() != 1))
             throw new InvalidOperationException("solutions.publisher_configuration.invalid");
         try
         {
@@ -25,6 +34,12 @@ internal sealed class TrustedPublisherLedger(SolutionsDbContext context) : ITrus
 
             TrustedPublisherLedgerStateRecord? state = await context.TrustedPublisherLedgerState.SingleOrDefaultAsync(cancellationToken);
             List<TrustedPublisherKey> current = await context.TrustedPublisherKeys.ToListAsync(cancellationToken);
+            if (configurationRevision == 0)
+            {
+                if (state is not null || current.Count != 0)
+                    throw new InvalidOperationException("solutions.publisher_configuration.revision_conflict");
+                return [];
+            }
             if (state is not null && configurationRevision < state.ActiveRevision)
                 throw new InvalidOperationException("solutions.publisher_configuration.revision_not_monotonic");
 

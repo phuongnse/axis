@@ -147,6 +147,59 @@ public sealed class ProductPolicyInstallerPersistenceTests(AuthorizationDatabase
         Assert.Equal(1, await CountAuditsAsync(read, request.WorkspaceId));
     }
 
+    [Fact]
+    public async Task AuthorizationRead_WhenPolicyIsCorrupt_ReturnsAndAuditsUnavailable()
+    {
+        Guid workspaceId = Guid.NewGuid();
+        Guid versionId = Guid.NewGuid();
+        SubjectReference subject = SubjectReference.Human(Guid.NewGuid());
+        await using AuthorizationDbContext context = database.CreateContext();
+        await context.Policies.AddAsync(new InstalledPolicyRow
+        {
+            WorkspaceId = workspaceId,
+            VersionId = versionId,
+            PolicyKey = "corrupt",
+            CanonicalContent = "not-json",
+            Provenance = "test",
+            InstalledAt = DateTimeOffset.Parse("2026-08-07T00:00:00Z"),
+        }, TestContext.Current.CancellationToken);
+        await context.Assignments.AddAsync(new ProductRoleAssignmentRow
+        {
+            Id = Guid.NewGuid(),
+            WorkspaceId = workspaceId,
+            SubjectKind = subject.Kind.ToString(),
+            SubjectId = subject.Id,
+            PolicyVersionId = versionId,
+            RoleKey = "Applicant",
+            IsActive = true,
+            Revision = 1,
+            CreatedAt = DateTimeOffset.Parse("2026-08-07T00:00:00Z"),
+        }, TestContext.Current.CancellationToken);
+        await context.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        FixedClock clock = new(DateTimeOffset.Parse("2026-08-07T00:00:00Z"));
+        ProductAuthorizationDecision decision = await new ProductAuthorizationService(
+            new ActiveSubjects(),
+            new Descriptors(),
+            new ProductAuthorizationReadStore(context),
+            new AuthorizationAuditOutbox(context, clock),
+            new AuthorizationUnitOfWork(context),
+            clock).AuthorizeAsync(
+                new(workspaceId, subject, "record.read", "record", null, "corrupt-policy"),
+                TestContext.Current.CancellationToken);
+
+        Assert.True(decision.IsUnavailable);
+        AuthorizationAuditOutboxRow audit = Assert.Single(
+            await context.AuditOutbox.AsNoTracking().ToListAsync(
+                TestContext.Current.CancellationToken),
+            row => (JsonSerializer.Deserialize<AuditEventV1>(row.Payload)
+                ?? throw new InvalidOperationException("Expected audit payload.")).WorkspaceId == workspaceId);
+        AuditEventV1 persisted = JsonSerializer.Deserialize<AuditEventV1>(audit.Payload)
+            ?? throw new InvalidOperationException("Expected audit payload.");
+        Assert.Equal("dependency_failure", persisted.Outcome);
+        Assert.Equal("Unavailable", persisted.Metadata!["scope"]);
+    }
+
     private static async Task<int> CountAuditsAsync(
         AuthorizationDbContext context,
         Guid workspaceId) =>
@@ -204,6 +257,15 @@ public sealed class ProductPolicyInstallerPersistenceTests(AuthorizationDatabase
             actionKey == "record.read" && resourceType == "record"
                 ? new(actionKey, resourceType, ProductActionKind.Record)
                 : null;
+    }
+
+    private sealed class ActiveSubjects : IAuthorizationSubjectActivity
+    {
+        public Task<bool> IsActiveAsync(
+            Guid workspaceId,
+            SubjectReference subject,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(true);
     }
 
     private sealed class MissingReadBackAuditSink(AuthorizationAuditOutbox inner) : IAuthorizationAuditSink

@@ -48,6 +48,7 @@ public sealed record TrustedPublisherIdentity(string PublisherId, string KeyId);
 
 public interface ITrustedPublisherLedger
 {
+    Task<IReadOnlyList<string>> ListPublisherIdsAsync(CancellationToken cancellationToken = default);
     Task<IReadOnlyList<TrustedPublisherIdentity>> ReconcileAsync(long configurationRevision, IReadOnlyList<TrustedPublisherConfigurationKey> candidate, CancellationToken cancellationToken = default);
 }
 

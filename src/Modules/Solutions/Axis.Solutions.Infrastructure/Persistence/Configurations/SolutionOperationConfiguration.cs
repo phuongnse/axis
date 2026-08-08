@@ -24,7 +24,9 @@ internal sealed class SolutionOperationConfiguration : IEntityTypeConfiguration<
         builder.Property(x => x.CreatedAt).HasColumnName("created_at").IsRequired();
         builder.Property(x => x.UpdatedAt).HasColumnName("updated_at").IsRequired();
         builder.Property(x => x.Revision).HasColumnName("revision").IsConcurrencyToken();
-        builder.HasIndex(x => new { x.WorkspaceId, x.IdempotencyKey }).IsUnique();
+        builder.HasIndex(x => new { x.WorkspaceId, x.IdempotencyKey })
+            .IsUnique()
+            .HasDatabaseName("ux_solution_operations_workspace_idempotency");
         builder.HasOne<SolutionInstallation>().WithMany().HasForeignKey(x => x.InstallationId).OnDelete(DeleteBehavior.Cascade);
         builder.HasMany(x => x.Steps).WithOne().HasForeignKey("OperationId").OnDelete(DeleteBehavior.Cascade);
         builder.Navigation(x => x.Steps).HasField("_steps").UsePropertyAccessMode(PropertyAccessMode.Field);

@@ -13,50 +13,49 @@ public sealed class TrustedPublisherConfigurationService(
     ILogger<TrustedPublisherConfigurationService> logger) : BackgroundService
 {
     private static readonly TimeSpan ReloadInterval = TimeSpan.FromSeconds(5);
+    private long _appliedRevision = -1;
+
+    public override async Task StartAsync(CancellationToken cancellationToken)
+    {
+        await ReconcileCandidateAsync(cancellationToken);
+        await base.StartAsync(cancellationToken);
+    }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        long appliedRevision = 0;
-        bool startupComplete = false;
         while (!stoppingToken.IsCancellationRequested)
         {
+            await Task.Delay(ReloadInterval, clock, stoppingToken);
             try
             {
-                (long revision, IReadOnlyList<TrustedPublisherConfigurationKey> keys) = ReadCandidate();
-                if (revision == 0 && keys.Count == 0)
-                {
-                    startupComplete = true;
-                }
-                else if (revision != appliedRevision)
-                {
-                    await using AsyncServiceScope scope = scopes.CreateAsyncScope();
-                    PublisherReconciliationService reconciliation = scope.ServiceProvider
-                        .GetRequiredService<PublisherReconciliationService>();
-                    await reconciliation.ReconcileAsync(
-                        revision,
-                        keys,
-                        clock.GetUtcNow(),
-                        stoppingToken);
-                    appliedRevision = revision;
-                    startupComplete = true;
-                    logger.LogInformation(
-                        "Applied trusted publisher configuration revision {ConfigurationRevision}.",
-                        revision);
-                }
+                await ReconcileCandidateAsync(stoppingToken);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
                 break;
             }
-            catch (Exception exception) when (startupComplete)
+            catch (Exception exception)
             {
                 logger.LogError(
                     exception,
                     "Rejected trusted publisher configuration reload; the active ledger is unchanged.");
             }
-
-            await Task.Delay(ReloadInterval, clock, stoppingToken);
         }
+    }
+
+    private async Task ReconcileCandidateAsync(CancellationToken cancellationToken)
+    {
+        (long revision, IReadOnlyList<TrustedPublisherConfigurationKey> keys) = ReadCandidate();
+        if (revision == _appliedRevision)
+            return;
+        await using AsyncServiceScope scope = scopes.CreateAsyncScope();
+        PublisherReconciliationService reconciliation = scope.ServiceProvider
+            .GetRequiredService<PublisherReconciliationService>();
+        await reconciliation.ReconcileAsync(revision, keys, clock.GetUtcNow(), cancellationToken);
+        _appliedRevision = revision;
+        logger.LogInformation(
+            "Applied trusted publisher configuration revision {ConfigurationRevision}.",
+            revision);
     }
 
     private (long Revision, IReadOnlyList<TrustedPublisherConfigurationKey> Keys) ReadCandidate()

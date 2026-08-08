@@ -49,6 +49,12 @@ namespace Axis.Solutions.Infrastructure.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("revision");
 
+                    b.Property<string>("SolutionKey")
+                        .IsRequired()
+                        .HasMaxLength(63)
+                        .HasColumnType("character varying(63)")
+                        .HasColumnName("solution_key");
+
                     b.Property<Guid>("SolutionVersionId")
                         .HasColumnType("uuid")
                         .HasColumnName("solution_version_id");
@@ -65,8 +71,9 @@ namespace Axis.Solutions.Infrastructure.Migrations
 
                     b.HasIndex("SolutionVersionId");
 
-                    b.HasIndex("WorkspaceId", "SolutionVersionId")
-                        .IsUnique();
+                    b.HasIndex("WorkspaceId", "SolutionKey")
+                        .IsUnique()
+                        .HasDatabaseName("ux_solution_installations_workspace_solution");
 
                     b.ToTable("solution_installations", (string)null);
                 });
@@ -150,7 +157,8 @@ namespace Axis.Solutions.Infrastructure.Migrations
                     b.HasIndex("InstallationId");
 
                     b.HasIndex("WorkspaceId", "IdempotencyKey")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasDatabaseName("ux_solution_operations_workspace_idempotency");
 
                     b.ToTable("solution_installation_operations", (string)null);
                 });
@@ -290,10 +298,8 @@ namespace Axis.Solutions.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("SolutionKey", "Version")
-                        .IsUnique();
-
-                    b.HasIndex("SolutionKey", "Version", "PackageSha256")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasDatabaseName("ux_solution_versions_identity");
 
                     b.ToTable("solution_versions", (string)null);
                 });

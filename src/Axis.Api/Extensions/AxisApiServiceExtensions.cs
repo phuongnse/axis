@@ -400,6 +400,7 @@ internal static class AxisApiServiceExtensions
         services.AddRulesInfrastructure(configuration);
         services.AddBusinessObjectsInfrastructure(configuration);
         services.AddSolutionsInfrastructure(configuration);
+        services.AddSingleton<ICurrentAxisOpenApiDigestProvider, ConfigurationAxisOpenApiDigestProvider>();
         services.AddScoped<IAuthorizationSubjectActivity, IdentityAuthorizationSubjectActivity>();
         services.AddScoped<IAuthorizationAdministratorAuthority, IdentityAuthorizationAdministratorAuthority>();
         services.AddScoped<ISolutionAuthority, IdentitySolutionAuthority>();

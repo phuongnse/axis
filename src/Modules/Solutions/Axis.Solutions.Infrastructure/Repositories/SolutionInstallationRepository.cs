@@ -7,8 +7,8 @@ namespace Axis.Solutions.Infrastructure.Repositories;
 
 internal sealed class SolutionInstallationRepository(SolutionsDbContext context) : ISolutionInstallationRepository
 {
-    public Task<SolutionInstallation?> FindAsync(Guid workspaceId, Guid versionId, CancellationToken cancellationToken = default) =>
-        context.SolutionInstallations.SingleOrDefaultAsync(x => x.WorkspaceId == workspaceId && x.SolutionVersionId == versionId, cancellationToken);
+    public Task<SolutionInstallation?> FindBySolutionKeyAsync(Guid workspaceId, string solutionKey, CancellationToken cancellationToken = default) =>
+        context.SolutionInstallations.SingleOrDefaultAsync(x => x.WorkspaceId == workspaceId && x.SolutionKey == solutionKey, cancellationToken);
     public Task<SolutionInstallation?> FindByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
         context.SolutionInstallations.SingleOrDefaultAsync(x => x.Id == id, cancellationToken);
     public async Task<IReadOnlyList<SolutionInstallation>> ListByWorkspaceAsync(Guid workspaceId, CancellationToken cancellationToken = default) =>

@@ -98,7 +98,7 @@ public sealed class SolutionInstallationOperationTests
     public void Installation_RevokedPublisher_BecomesNoncompliant()
     {
         DateTimeOffset now = DateTimeOffset.Parse("2026-08-07T00:00:00Z");
-        SolutionInstallation installation = SolutionInstallation.Create(Guid.NewGuid(), Guid.NewGuid(), now);
+        SolutionInstallation installation = SolutionInstallation.Create(Guid.NewGuid(), "reference_application", Guid.NewGuid(), now);
         installation.MarkInstalled(now.AddSeconds(1));
         installation.MarkNoncompliant(now.AddSeconds(2));
         int revision = installation.Revision;

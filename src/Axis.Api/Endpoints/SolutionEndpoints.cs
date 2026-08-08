@@ -17,7 +17,6 @@ public static class SolutionEndpoints
 {
     private const int MaximumPackageBytes = 10 * 1024 * 1024;
     private const string PackageMediaType = "application/vnd.dsse.envelope.v1+json";
-    private const string OpenApiDigestConfigurationKey = "Solutions:AxisOpenApiSha256";
 
     public static IEndpointRouteBuilder MapSolutionEndpoints(this IEndpointRouteBuilder app)
     {
@@ -102,7 +101,6 @@ public static class SolutionEndpoints
         CurrentUser currentUser,
         ICurrentSubject currentSubject,
         SolutionOrchestrator orchestrator,
-        IConfiguration configuration,
         TimeProvider clock,
         CancellationToken cancellationToken)
     {
@@ -141,22 +139,12 @@ public static class SolutionEndpoints
                 "A solution package is required.");
         }
 
-        string? openApiDigest = configuration[OpenApiDigestConfigurationKey];
-        if (!IsLowerSha256(openApiDigest))
-        {
-            return Problem(
-                "solutions.configuration.unavailable",
-                StatusCodes.Status503ServiceUnavailable,
-                "Solution publication is not currently available.");
-        }
-
         try
         {
             PublishSolutionResult result = await orchestrator.PublishAsync(
                 new PublishSolutionRequest(
                     Actor(currentUser, currentSubject, httpContext),
                     envelope,
-                    openApiDigest!,
                     clock.GetUtcNow()),
                 cancellationToken);
             PublishSolutionResponse response = new(result.Version, result.IsRetry);
@@ -390,10 +378,6 @@ public static class SolutionEndpoints
         Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(
             $"{workspaceId:D}\n{solutionVersionId:D}"))).ToLowerInvariant();
 
-    private static bool IsLowerSha256(string? value) =>
-        value is { Length: 64 }
-        && value.All(character => character is >= '0' and <= '9' or >= 'a' and <= 'f');
-
     private static IResult ToProblem(string problemCode)
     {
         int statusCode = problemCode switch
@@ -425,7 +409,9 @@ public static class SolutionEndpoints
         };
         string safeCode = problemCode is
             "solutions.authorization.denied" or
-            "solutions.authorization.workspace_mismatch"
+            "solutions.authorization.workspace_mismatch" or
+            "solutions.operation.not_found" or
+            "solutions.installation.not_found"
                 ? "solutions.resource.not_found"
                 : problemCode;
         return Problem(

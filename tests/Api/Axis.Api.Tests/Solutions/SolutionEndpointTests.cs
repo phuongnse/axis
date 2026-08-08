@@ -68,6 +68,13 @@ public sealed class SolutionEndpointTests(ApiTestFixture fixture)
             value.GetProperty("operationId").GetGuid() == seededOperationId &&
             value.GetProperty("operationStatus").GetString() == "Pending");
 
+        HttpResponseMessage pendingResume = await fixture.PostBrowserAsync(
+            $"/api/solutions/operations/{seededOperationId}/resume",
+            cancellationToken: TestContext.Current.CancellationToken);
+        pendingResume.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await ReadJsonAsync(pendingResume)).GetProperty("code").GetString()
+            .Should().Be("solutions.install.operation_not_resumable");
+
         Guid unavailableVersionId = Guid.NewGuid();
         HttpResponseMessage missingKey = await fixture.PostBrowserAsync(
             $"/api/solutions/versions/{unavailableVersionId}/installations",
@@ -97,14 +104,14 @@ public sealed class SolutionEndpointTests(ApiTestFixture fixture)
             TestContext.Current.CancellationToken);
         status.StatusCode.Should().Be(HttpStatusCode.NotFound);
         (await ReadJsonAsync(status)).GetProperty("code").GetString()
-            .Should().Be("solutions.operation.not_found");
+            .Should().Be("solutions.resource.not_found");
 
         HttpResponseMessage resume = await fixture.PostBrowserAsync(
             $"/api/solutions/operations/{unavailableOperationId}/resume",
             cancellationToken: TestContext.Current.CancellationToken);
         resume.StatusCode.Should().Be(HttpStatusCode.NotFound);
         (await ReadJsonAsync(resume)).GetProperty("code").GetString()
-            .Should().Be("solutions.operation.not_found");
+            .Should().Be("solutions.resource.not_found");
     }
 
     [Fact]
@@ -176,6 +183,13 @@ public sealed class SolutionEndpointTests(ApiTestFixture fixture)
         problem.GetRawText().Contains(
             operationId.ToString(),
             StringComparison.OrdinalIgnoreCase).Should().BeFalse();
+
+        HttpResponseMessage resume = await fixture.PostBrowserAsync(
+            $"/api/solutions/operations/{operationId}/resume",
+            cancellationToken: TestContext.Current.CancellationToken);
+        resume.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        (await ReadJsonAsync(resume)).GetProperty("code").GetString()
+            .Should().Be("solutions.resource.not_found");
     }
 
     [Fact]
@@ -231,10 +245,10 @@ public sealed class SolutionEndpointTests(ApiTestFixture fixture)
             """, TestContext.Current.CancellationToken);
         await db.Database.ExecuteSqlInterpolatedAsync($"""
             INSERT INTO solution_installations
-                (id, workspace_id, solution_version_id, provisioning_status,
+                (id, workspace_id, solution_key, solution_version_id, provisioning_status,
                  compliance_status, created_at, updated_at, revision)
             VALUES
-                ({installationId}, {foreignWorkspaceId}, {versionId}, {"Installing"},
+                ({installationId}, {foreignWorkspaceId}, {"foreign_" + suffix}, {versionId}, {"Installing"},
                  {"Compliant"}, {now}, {now}, {0})
             """, TestContext.Current.CancellationToken);
         await db.Database.ExecuteSqlInterpolatedAsync($"""
@@ -260,6 +274,8 @@ public sealed class SolutionEndpointTests(ApiTestFixture fixture)
         using ECDsa key = ECDsa.Create(ECCurve.NamedCurves.nistP256);
         using IServiceScope scope = fixture.CreateScope();
         SolutionsDbContext db = scope.ServiceProvider.GetRequiredService<SolutionsDbContext>();
+        string currentOpenApiDigest = scope.ServiceProvider
+            .GetRequiredService<IConfiguration>()["Solutions:AxisOpenApiSha256"]!;
         await db.Database.ExecuteSqlInterpolatedAsync($"""
             INSERT INTO trusted_publisher_keys
                 (id, publisher_id, key_id, spki_sha256, public_key_pem, status,
@@ -274,7 +290,7 @@ public sealed class SolutionEndpointTests(ApiTestFixture fixture)
             "1.0.0",
             new string('b', 64),
             [1],
-            new string('c', 64),
+            currentOpenApiDigest,
             publisherId,
             publisherKeyId,
             new string('d', 40),
@@ -296,7 +312,7 @@ public sealed class SolutionEndpointTests(ApiTestFixture fixture)
         ISolutionsUnitOfWork unitOfWork = scope.ServiceProvider
             .GetRequiredService<ISolutionsUnitOfWork>();
         await versions.AddAsync(version, components, TestContext.Current.CancellationToken);
-        SolutionInstallation installation = SolutionInstallation.Create(workspaceId, version.Id, now);
+        SolutionInstallation installation = SolutionInstallation.Create(workspaceId, version.SolutionKey, version.Id, now);
         await installations.AddAsync(installation, TestContext.Current.CancellationToken);
         SolutionInstallationOperation operation = SolutionInstallationOperation.Create(
             workspaceId,
@@ -375,12 +391,16 @@ public sealed class SolutionEndpointTests(ApiTestFixture fixture)
         string hash = new('b', 64);
         using IServiceScope scope = fixture.CreateScope();
         SolutionsDbContext db = scope.ServiceProvider.GetRequiredService<SolutionsDbContext>();
+        string solutionKey = await db.SolutionVersions
+            .Where(value => value.Id == versionId)
+            .Select(value => value.SolutionKey)
+            .SingleAsync(TestContext.Current.CancellationToken);
         await db.Database.ExecuteSqlInterpolatedAsync($"""
             INSERT INTO solution_installations
-                (id, workspace_id, solution_version_id, provisioning_status,
+                (id, workspace_id, solution_key, solution_version_id, provisioning_status,
                  compliance_status, created_at, updated_at, revision)
             VALUES
-                ({installationId}, {workspaceId}, {versionId}, {"Installing"},
+                ({installationId}, {workspaceId}, {solutionKey}, {versionId}, {"Installing"},
                  {"Compliant"}, {now}, {now}, {0})
             """, TestContext.Current.CancellationToken);
         await db.Database.ExecuteSqlInterpolatedAsync($"""

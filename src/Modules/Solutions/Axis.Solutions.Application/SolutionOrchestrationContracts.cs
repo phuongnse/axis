@@ -25,11 +25,16 @@ public interface ISolutionVersionRepository
 
 public interface ISolutionInstallationRepository
 {
-    Task<SolutionInstallation?> FindAsync(Guid workspaceId, Guid versionId, CancellationToken cancellationToken = default);
+    Task<SolutionInstallation?> FindBySolutionKeyAsync(Guid workspaceId, string solutionKey, CancellationToken cancellationToken = default);
     Task<SolutionInstallation?> FindByIdAsync(Guid id, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<SolutionInstallation>> ListByWorkspaceAsync(Guid workspaceId, CancellationToken cancellationToken = default);
     Task AddAsync(SolutionInstallation installation, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<SolutionInstallation>> ListByPublisherKeyAsync(string publisherId, string keyId, CancellationToken cancellationToken = default);
+}
+
+public interface ICurrentAxisOpenApiDigestProvider
+{
+    string? CurrentSha256 { get; }
 }
 
 public interface ISolutionOperationRepository
@@ -45,6 +50,7 @@ public interface ISolutionOperationRepository
 public interface ISolutionsUnitOfWork
 {
     Task BeginAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+    Task AcquirePublisherFenceAsync(string publisherId, CancellationToken cancellationToken = default) => Task.CompletedTask;
     Task SaveChangesAsync(CancellationToken cancellationToken = default);
     Task CommitAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
     Task RollbackAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
@@ -131,7 +137,7 @@ public interface ISolutionComponentAdapter
     Task ApplyAsync(Guid workspaceId, SolutionAdapterPreflight component, SolutionApplyReceipt receipt, CancellationToken cancellationToken = default);
 }
 
-public sealed record PublishSolutionRequest(SolutionActor Actor, byte[] Envelope, string AxisOpenApiSha256, DateTimeOffset RequestedAt);
+public sealed record PublishSolutionRequest(SolutionActor Actor, byte[] Envelope, DateTimeOffset RequestedAt);
 public sealed record InstallSolutionRequest(SolutionActor Actor, Guid WorkspaceId, Guid SolutionVersionId, string IdempotencyKey, string RequestHash, DateTimeOffset RequestedAt);
 
 public sealed record PublishSolutionResult(SolutionVersionSummaryDto Version, bool IsRetry);

@@ -27,9 +27,9 @@ public static class SolutionsInfrastructureExtensions
         services.AddScoped<PublisherReconciliationService>();
         services.AddSingleton<SolutionOperationWorker>();
         services.AddSingleton<SolutionsAuditDispatchWorker>();
+        services.AddHostedService<TrustedPublisherConfigurationService>();
         services.AddHostedService<SolutionsBackgroundService>();
         services.AddHostedService<SolutionsAuditDispatcher>();
-        services.AddHostedService<TrustedPublisherConfigurationService>();
         return services;
     }
 }

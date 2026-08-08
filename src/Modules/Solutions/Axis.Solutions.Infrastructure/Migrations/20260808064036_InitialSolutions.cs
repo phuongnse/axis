@@ -127,6 +127,7 @@ namespace Axis.Solutions.Infrastructure.Migrations
                 {
                     id = table.Column<Guid>(type: "uuid", nullable: false),
                     workspace_id = table.Column<Guid>(type: "uuid", nullable: false),
+                    solution_key = table.Column<string>(type: "character varying(63)", maxLength: 63, nullable: false),
                     solution_version_id = table.Column<Guid>(type: "uuid", nullable: false),
                     provisioning_status = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false),
                     compliance_status = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false),
@@ -208,7 +209,7 @@ namespace Axis.Solutions.Infrastructure.Migrations
                 column: "installation_id");
 
             migrationBuilder.CreateIndex(
-                name: "IX_solution_installation_operations_workspace_id_idempotency_k~",
+                name: "ux_solution_operations_workspace_idempotency",
                 table: "solution_installation_operations",
                 columns: new[] { "workspace_id", "idempotency_key" },
                 unique: true);
@@ -225,21 +226,15 @@ namespace Axis.Solutions.Infrastructure.Migrations
                 column: "solution_version_id");
 
             migrationBuilder.CreateIndex(
-                name: "IX_solution_installations_workspace_id_solution_version_id",
+                name: "ux_solution_installations_workspace_solution",
                 table: "solution_installations",
-                columns: new[] { "workspace_id", "solution_version_id" },
+                columns: new[] { "workspace_id", "solution_key" },
                 unique: true);
 
             migrationBuilder.CreateIndex(
-                name: "IX_solution_versions_solution_key_version",
+                name: "ux_solution_versions_identity",
                 table: "solution_versions",
                 columns: new[] { "solution_key", "version" },
-                unique: true);
-
-            migrationBuilder.CreateIndex(
-                name: "IX_solution_versions_solution_key_version_package_sha256",
-                table: "solution_versions",
-                columns: new[] { "solution_key", "version", "package_sha256" },
                 unique: true);
 
             migrationBuilder.CreateIndex(

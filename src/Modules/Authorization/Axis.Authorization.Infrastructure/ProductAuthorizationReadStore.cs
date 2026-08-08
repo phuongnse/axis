@@ -44,7 +44,8 @@ internal sealed class ProductAuthorizationReadStore(AuthorizationDbContext conte
             }
             catch (JsonException)
             {
-                return [];
+                throw new AuthorizationPersistenceConflictException(
+                    "The stored product policy is not readable.");
             }
         }
 

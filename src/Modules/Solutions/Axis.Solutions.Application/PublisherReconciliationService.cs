@@ -10,6 +10,15 @@ public sealed class PublisherReconciliationService(
         await unitOfWork.BeginAsync(cancellationToken);
         try
         {
+            IReadOnlyList<string> currentPublishers = await ledger.ListPublisherIdsAsync(cancellationToken);
+            foreach (string publisherId in currentPublishers
+                .Concat(candidate.Select(value => value.PublisherId))
+                .Distinct(StringComparer.Ordinal)
+                .Order(StringComparer.Ordinal))
+            {
+                await unitOfWork.AcquirePublisherFenceAsync(publisherId, cancellationToken);
+            }
+
             IReadOnlyList<TrustedPublisherIdentity> revoked = await ledger.ReconcileAsync(configurationRevision, candidate, cancellationToken);
             foreach (TrustedPublisherIdentity key in revoked)
                 await orchestrator.MarkRevokedNoncompliantAsync(key.PublisherId, key.KeyId, now, cancellationToken);

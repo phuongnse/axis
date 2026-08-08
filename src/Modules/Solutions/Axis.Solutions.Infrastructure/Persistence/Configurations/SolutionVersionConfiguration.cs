@@ -22,7 +22,8 @@ internal sealed class SolutionVersionConfiguration : IEntityTypeConfiguration<So
         builder.Property(x => x.BuiltAt).HasColumnName("built_at").IsRequired();
         builder.Property(x => x.SourceUri).HasColumnName("source_uri").HasMaxLength(2048).IsRequired();
         builder.Property(x => x.PublishedAt).HasColumnName("published_at").IsRequired();
-        builder.HasIndex(x => new { x.SolutionKey, x.Version }).IsUnique();
-        builder.HasIndex(x => new { x.SolutionKey, x.Version, x.PackageSha256 }).IsUnique();
+        builder.HasIndex(x => new { x.SolutionKey, x.Version })
+            .IsUnique()
+            .HasDatabaseName("ux_solution_versions_identity");
     }
 }

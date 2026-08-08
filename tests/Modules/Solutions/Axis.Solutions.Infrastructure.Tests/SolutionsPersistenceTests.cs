@@ -7,6 +7,7 @@ using Axis.Solutions.Infrastructure.Tests.Fixtures;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using Axis.Audit.Contracts;
@@ -44,7 +45,7 @@ public sealed class SolutionsPersistenceTests(SolutionsDatabaseFixture db)
     {
         DateTimeOffset now = DateTimeOffset.Parse("2026-08-07T00:00:00Z");
         SolutionVersion version = Version(now);
-        SolutionInstallation installation = SolutionInstallation.Create(Guid.NewGuid(), version.Id, now);
+        SolutionInstallation installation = SolutionInstallation.Create(Guid.NewGuid(), version.SolutionKey, version.Id, now);
         SolutionInstallationOperation operation = SolutionInstallationOperation.Create(installation.WorkspaceId, Guid.NewGuid(), SolutionSubjectKind.Human, "test-correlation", installation.Id, "request-1", new string('d', 64), [new("authorization.policy.v1", "reference", new string('e', 64), [])], now);
         await using (SolutionsDbContext context = db.CreateContext())
         {
@@ -59,12 +60,67 @@ public sealed class SolutionsPersistenceTests(SolutionsDatabaseFixture db)
     }
 
     [Fact]
+    public async Task Persistence_ConcurrentDifferentVersions_EnforcesOneWorkspaceSolutionKey()
+    {
+        DateTimeOffset now = DateTimeOffset.Parse("2026-08-07T00:00:00Z");
+        string solutionKey = $"concurrent_{Guid.NewGuid():N}";
+        SolutionVersion firstVersion = Version(now, solutionKey, "1.0.0");
+        SolutionVersion secondVersion = Version(now, solutionKey, "2.0.0");
+        Guid workspaceId = Guid.NewGuid();
+        await using (SolutionsDbContext seed = db.CreateContext())
+        {
+            await seed.SolutionVersions.AddRangeAsync(
+                [firstVersion, secondVersion],
+                TestContext.Current.CancellationToken);
+            await seed.SaveChangesAsync(TestContext.Current.CancellationToken);
+        }
+
+        async Task<Exception?> SaveAsync(SolutionVersion version)
+        {
+            using ServiceProvider provider = CreateProvider();
+            await using AsyncServiceScope scope = provider.CreateAsyncScope();
+            ISolutionInstallationRepository installations = scope.ServiceProvider
+                .GetRequiredService<ISolutionInstallationRepository>();
+            ISolutionsUnitOfWork unitOfWork = scope.ServiceProvider
+                .GetRequiredService<ISolutionsUnitOfWork>();
+            await installations.AddAsync(
+                SolutionInstallation.Create(workspaceId, solutionKey, version.Id, now),
+                TestContext.Current.CancellationToken);
+            try
+            {
+                await unitOfWork.SaveChangesAsync(TestContext.Current.CancellationToken);
+                return null;
+            }
+            catch (Exception exception)
+            {
+                return exception;
+            }
+        }
+
+        Exception?[] outcomes = await Task.WhenAll(
+            SaveAsync(firstVersion),
+            SaveAsync(secondVersion));
+
+        SolutionPersistenceException conflict = Assert.IsType<SolutionPersistenceException>(
+            Assert.Single(outcomes, value => value is not null));
+        Assert.Equal("solutions.persistence.installation_solution_conflict", conflict.ProblemCode);
+        await using SolutionsDbContext read = db.CreateContext();
+        SolutionInstallation installation = await read.SolutionInstallations.SingleAsync(
+            value => value.WorkspaceId == workspaceId && value.SolutionKey == solutionKey,
+            TestContext.Current.CancellationToken);
+        Assert.Contains(
+            installation.SolutionVersionId,
+            new[] { firstVersion.Id, secondVersion.Id });
+    }
+
+    [Fact]
     public async Task Persistence_ExpiredApplyingLease_ReclaimsAndFencesAcrossContexts()
     {
         DateTimeOffset now = DateTimeOffset.Parse("2026-08-07T00:00:00Z");
         SolutionVersion version = Version(now);
         SolutionInstallation installation = SolutionInstallation.Create(
             Guid.NewGuid(),
+            version.SolutionKey,
             version.Id,
             now);
         SolutionInstallationOperation operation = SolutionInstallationOperation.Create(
@@ -167,6 +223,158 @@ public sealed class SolutionsPersistenceTests(SolutionsDatabaseFixture db)
             [new("axis", keyId, substitute.ExportSubjectPublicKeyInfoPem(), true)],
             TestContext.Current.CancellationToken));
         Assert.Equal("solutions.publisher_configuration.revision_conflict", exception.Message);
+    }
+
+    [Fact]
+    public async Task TrustedPublisherConfiguration_EmptyRestartAfterActiveLedger_FailsClosed()
+    {
+        await ResetPublisherLedgerAsync();
+        using ECDsa key = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        using (ServiceProvider initialProvider = CreateProvider())
+        {
+            await using AsyncServiceScope scope = initialProvider.CreateAsyncScope();
+            await scope.ServiceProvider.GetRequiredService<ITrustedPublisherLedger>()
+                .ReconcileAsync(
+                    1,
+                    [new("axis", "release_key", key.ExportSubjectPublicKeyInfoPem(), true)],
+                    TestContext.Current.CancellationToken);
+        }
+
+        using ServiceProvider restartedProvider = CreateProvider();
+        TrustedPublisherConfigurationService startup = restartedProvider
+            .GetServices<IHostedService>()
+            .OfType<TrustedPublisherConfigurationService>()
+            .Single();
+
+        InvalidOperationException exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            startup.StartAsync(TestContext.Current.CancellationToken));
+
+        Assert.Equal("solutions.publisher_configuration.revision_conflict", exception.Message);
+        await using SolutionsDbContext read = db.CreateContext();
+        TrustedPublisherKey stored = await read.TrustedPublisherKeys.SingleAsync(
+            TestContext.Current.CancellationToken);
+        Assert.Equal(TrustedPublisherKeyStatus.Active, stored.Status);
+    }
+
+    [Fact]
+    public async Task TrustedPublisherConfiguration_EmptyFirstStartup_ReconcilesBeforeReturning()
+    {
+        await ResetPublisherLedgerAsync();
+        using ServiceProvider provider = CreateProvider();
+        TrustedPublisherConfigurationService startup = provider
+            .GetServices<IHostedService>()
+            .OfType<TrustedPublisherConfigurationService>()
+            .Single();
+
+        await startup.StartAsync(TestContext.Current.CancellationToken);
+        await startup.StopAsync(TestContext.Current.CancellationToken);
+
+        await using SolutionsDbContext read = db.CreateContext();
+        Assert.Empty(await read.TrustedPublisherKeys.ToListAsync(TestContext.Current.CancellationToken));
+        Assert.Empty(await read.TrustedPublisherLedgerState.ToListAsync(TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task PublisherRevocation_WhenItWinsFence_PreventsLaterAdapterMutation()
+    {
+        await ResetPublisherLedgerAsync();
+        DateTimeOffset now = DateTimeOffset.Parse("2026-08-08T00:00:00Z");
+        using ECDsa key = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        RecordingAdapter adapter = new();
+        using ServiceProvider provider = CreateProvider(
+            clock: new FixedClock(now),
+            componentAdapter: adapter);
+        await using (AsyncServiceScope trustScope = provider.CreateAsyncScope())
+        {
+            await trustScope.ServiceProvider.GetRequiredService<ITrustedPublisherLedger>()
+                .ReconcileAsync(
+                    1,
+                    [new("axis", "release_key", key.ExportSubjectPublicKeyInfoPem(), true)],
+                    TestContext.Current.CancellationToken);
+        }
+
+        SolutionVersion version = Version(now);
+        SolutionInstallation installation = SolutionInstallation.Create(
+            Guid.NewGuid(),
+            version.SolutionKey,
+            version.Id,
+            now);
+        string componentSha256 = new('e', 64);
+        SolutionInstallationOperation operation = SolutionInstallationOperation.Create(
+            installation.WorkspaceId,
+            Guid.NewGuid(),
+            SolutionSubjectKind.Human,
+            "publisher-fence-test",
+            installation.Id,
+            $"publisher-fence-{Guid.NewGuid():N}",
+            new string('f', 64),
+            [new(adapter.ComponentType, "reference", componentSha256, [])],
+            now);
+        await using (SolutionsDbContext seed = db.CreateContext())
+        {
+            await seed.SolutionVersions.AddAsync(version, TestContext.Current.CancellationToken);
+            await seed.SolutionInstallations.AddAsync(installation, TestContext.Current.CancellationToken);
+            await seed.SolutionOperations.AddAsync(operation, TestContext.Current.CancellationToken);
+            await seed.Components.AddAsync(new SolutionComponentRecord
+            {
+                SolutionVersionId = version.Id,
+                Type = adapter.ComponentType,
+                Key = "reference",
+                Sha256 = componentSha256,
+                Content = [1],
+                DependsOnJson = "[]",
+            }, TestContext.Current.CancellationToken);
+            await seed.SaveChangesAsync(TestContext.Current.CancellationToken);
+        }
+
+        await using AsyncServiceScope revocationScope = provider.CreateAsyncScope();
+        ISolutionsUnitOfWork revocationUow = revocationScope.ServiceProvider
+            .GetRequiredService<ISolutionsUnitOfWork>();
+        await revocationUow.BeginAsync(TestContext.Current.CancellationToken);
+        await revocationUow.AcquirePublisherFenceAsync("axis", TestContext.Current.CancellationToken);
+        await revocationScope.ServiceProvider.GetRequiredService<ITrustedPublisherLedger>()
+            .ReconcileAsync(2, [], TestContext.Current.CancellationToken);
+
+        Task<SolutionPackageException> worker = Task.Run(async () =>
+        {
+            await using AsyncServiceScope workerScope = provider.CreateAsyncScope();
+            return await Assert.ThrowsAsync<SolutionPackageException>(() =>
+                workerScope.ServiceProvider.GetRequiredService<SolutionOrchestrator>()
+                    .RunOnceAsync(
+                        operation.Id,
+                        TimeSpan.FromMinutes(1),
+                        TestContext.Current.CancellationToken));
+        }, TestContext.Current.CancellationToken);
+
+        bool leasePersisted = false;
+        for (int attempt = 0; attempt < 100 && !leasePersisted; attempt++)
+        {
+            await using SolutionsDbContext observer = db.CreateContext();
+            leasePersisted = await observer.SolutionOperations.AsNoTracking()
+                .AnyAsync(
+                    value => value.Id == operation.Id && value.LeaseEpoch == 1,
+                    TestContext.Current.CancellationToken);
+            if (!leasePersisted)
+                await Task.Delay(10, TestContext.Current.CancellationToken);
+        }
+        Assert.True(leasePersisted);
+        Assert.False(worker.IsCompleted);
+
+        await revocationUow.CommitAsync(TestContext.Current.CancellationToken);
+        SolutionPackageException failure = await worker.WaitAsync(
+            TimeSpan.FromSeconds(10),
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal("solutions.package.publisher_untrusted", failure.ProblemCode);
+        Assert.Equal(0, adapter.ApplyCalls);
+        await using SolutionsDbContext read = db.CreateContext();
+        SolutionInstallation persistedInstallation = await read.SolutionInstallations
+            .SingleAsync(value => value.Id == installation.Id, TestContext.Current.CancellationToken);
+        Assert.Equal(ProvisioningStatus.Failed, persistedInstallation.ProvisioningStatus);
+        Assert.Equal(ComplianceStatus.Noncompliant, persistedInstallation.ComplianceStatus);
+        await read.AuditOutbox
+            .Where(value => value.OperationId == operation.Id)
+            .ExecuteDeleteAsync(TestContext.Current.CancellationToken);
     }
 
     private async Task ResetPublisherLedgerAsync()
@@ -355,11 +563,17 @@ public sealed class SolutionsPersistenceTests(SolutionsDatabaseFixture db)
 
     private ServiceProvider CreateProvider(
         IAuditEventSink? auditSink = null,
-        TimeProvider? clock = null)
+        TimeProvider? clock = null,
+        ISolutionComponentAdapter? componentAdapter = null)
     {
         IConfiguration configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> { ["ConnectionStrings:Solutions"] = db.ConnectionString }).Build();
         ServiceCollection services = new();
+        services.AddSingleton(configuration);
+        services.AddLogging();
         if (clock is not null) services.AddSingleton(clock);
+        services.AddSingleton<ICurrentAxisOpenApiDigestProvider>(new FixedAxisOpenApiDigestProvider());
+        services.AddSingleton<ISolutionAuthority>(new AllowAllAuthority());
+        if (componentAdapter is not null) services.AddSingleton(componentAdapter);
         services.AddSolutionsInfrastructure(configuration);
         if (auditSink is not null) services.AddSingleton(auditSink);
         return services.BuildServiceProvider();
@@ -404,5 +618,63 @@ public sealed class SolutionsPersistenceTests(SolutionsDatabaseFixture db)
         public override DateTimeOffset GetUtcNow() => now;
     }
 
-    private static SolutionVersion Version(DateTimeOffset now) => SolutionVersion.Create("reference_application", $"0.1.{Guid.NewGuid():N}"[..7], new string('a', 64), [1], new string('b', 64), "axis", "release_key", new string('c', 40), "build", now, new Uri("https://example.test/reference"), now);
+    private sealed class FixedAxisOpenApiDigestProvider : ICurrentAxisOpenApiDigestProvider
+    {
+        public string CurrentSha256 => new('b', 64);
+    }
+
+    private sealed class AllowAllAuthority : ISolutionAuthority
+    {
+        public Task DemandAsync(
+            SolutionActor actor,
+            Guid targetWorkspaceId,
+            SolutionAuthorityAction action,
+            CancellationToken cancellationToken = default) => Task.CompletedTask;
+    }
+
+    private sealed class RecordingAdapter : ISolutionComponentAdapter
+    {
+        public string ComponentType => "authorization.policy.v1";
+        public int ApplyCalls;
+
+        public Task PreflightAsync(
+            Guid workspaceId,
+            SolutionAdapterPreflight component,
+            CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+        public Task<SolutionAdapterReadback> ReadBackAsync(
+            Guid workspaceId,
+            SolutionAdapterPreflight component,
+            SolutionApplyReceipt receipt,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(new SolutionAdapterReadback(ApplyCalls > 0, false));
+
+        public Task ApplyAsync(
+            Guid workspaceId,
+            SolutionAdapterPreflight component,
+            SolutionApplyReceipt receipt,
+            CancellationToken cancellationToken = default)
+        {
+            Interlocked.Increment(ref ApplyCalls);
+            return Task.CompletedTask;
+        }
+    }
+
+    private static SolutionVersion Version(
+        DateTimeOffset now,
+        string? solutionKey = null,
+        string? version = null) =>
+        SolutionVersion.Create(
+            solutionKey ?? "reference_application",
+            version ?? $"0.1.{Guid.NewGuid():N}"[..7],
+            new string('a', 64),
+            [1],
+            new string('b', 64),
+            "axis",
+            "release_key",
+            new string('c', 40),
+            "build",
+            now,
+            new Uri("https://example.test/reference"),
+            now);
 }

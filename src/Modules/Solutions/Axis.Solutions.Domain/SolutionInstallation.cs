@@ -19,10 +19,11 @@ public sealed class SolutionInstallation
     {
     }
 
-    private SolutionInstallation(Guid workspaceId, Guid solutionVersionId, DateTimeOffset now)
+    private SolutionInstallation(Guid workspaceId, string solutionKey, Guid solutionVersionId, DateTimeOffset now)
     {
         Id = Guid.NewGuid();
         WorkspaceId = workspaceId;
+        SolutionKey = solutionKey;
         SolutionVersionId = solutionVersionId;
         ProvisioningStatus = ProvisioningStatus.Installing;
         ComplianceStatus = ComplianceStatus.Compliant;
@@ -32,6 +33,7 @@ public sealed class SolutionInstallation
 
     public Guid Id { get; private set; }
     public Guid WorkspaceId { get; private set; }
+    public string SolutionKey { get; private set; } = string.Empty;
     public Guid SolutionVersionId { get; private set; }
     public ProvisioningStatus ProvisioningStatus { get; private set; }
     public ComplianceStatus ComplianceStatus { get; private set; }
@@ -39,11 +41,16 @@ public sealed class SolutionInstallation
     public DateTimeOffset UpdatedAt { get; private set; }
     public int Revision { get; private set; }
 
-    public static SolutionInstallation Create(Guid workspaceId, Guid solutionVersionId, DateTimeOffset now)
+    public static SolutionInstallation Create(
+        Guid workspaceId,
+        string solutionKey,
+        Guid solutionVersionId,
+        DateTimeOffset now)
     {
-        if (workspaceId == Guid.Empty || solutionVersionId == Guid.Empty || now == default)
+        if (workspaceId == Guid.Empty || string.IsNullOrWhiteSpace(solutionKey)
+            || solutionKey.Length > 63 || solutionVersionId == Guid.Empty || now == default)
             throw new ArgumentException("Installation data is incomplete.");
-        return new SolutionInstallation(workspaceId, solutionVersionId, now);
+        return new SolutionInstallation(workspaceId, solutionKey, solutionVersionId, now);
     }
 
     public void MarkInstalled(DateTimeOffset now)
