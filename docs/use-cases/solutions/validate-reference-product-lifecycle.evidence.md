@@ -13,9 +13,9 @@
 
 ## Immutable Checkpoint
 
-- External source commit: `595d4cf7bbf371deab11162382c3720a16ede3f5`.
+- External source commit: `26fdf0216f25670634fa4e32189b0dbd2e6676ed`.
 - Draft signed solution identity: `reference_application` version `0.1.1`; build ID `reference-product-0.1.1`; publisher/key `axis_reference_product/release`.
-- Signed payload `sourceRevision`: `595d4cf7bbf371deab11162382c3720a16ede3f5`.
+- Signed payload `sourceRevision`: `26fdf0216f25670634fa4e32189b0dbd2e6676ed`.
 - Axis OpenAPI SHA-256 in both the signed payload and external source: `09a2eb4f03605b6e7751f10fd13cafdffefad480dca9be2607d9ddfb8da0de5c`.
 - The private release key remains ignored, preserved, and mode `0600`; it is not repository evidence and was not rotated.
 

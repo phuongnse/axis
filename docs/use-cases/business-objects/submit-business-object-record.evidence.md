@@ -38,5 +38,5 @@ The evidence below records the current proof boundary for the generic Draft → 
 
 - `python scripts/axis.py verify` passes at the current Axis checkpoint, including the API, architecture, Business Objects, Identity, MCP, frontend, policy, repository-skill, and documentation gates. The frontend unit suite passes all 27 files and 157 tests.
 - The product-identity sweep across Axis source, tests, frontend, and scripts returns no matches; external-product proof remains in [docs/use-cases/solutions/validate-reference-product-lifecycle.md](../solutions/validate-reference-product-lifecycle.md).
-- The independently versioned reference solution is fixed at commit `595d4cf7bbf371deab11162382c3720a16ede3f5`, with its generated client aligned to Axis OpenAPI SHA-256 `09a2eb4f03605b6e7751f10fd13cafdffefad480dca9be2607d9ddfb8da0de5c` and its blank-Workspace acceptance journey passing.
+- The independently versioned reference solution is fixed at commit `26fdf0216f25670634fa4e32189b0dbd2e6676ed`, with its generated client aligned to Axis OpenAPI SHA-256 `09a2eb4f03605b6e7751f10fd13cafdffefad480dca9be2607d9ddfb8da0de5c` and its blank-Workspace acceptance journey passing.
 - The MCP supported-client runtime boundary passes with current write-registry discovery, authenticated mutation, exact rule evidence, and same-session persisted read-back.
