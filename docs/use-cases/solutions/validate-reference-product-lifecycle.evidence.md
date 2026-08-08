@@ -23,5 +23,5 @@
 
 - Axis `python scripts/axis.py verify` passes the 447-path scope, including API 115, Architecture 321, frontend 228, MCP 36, all module suites, scripts/policy 452, vulnerabilities, format, generated contracts, docs, and repository skills.
 - Axis browser governance passes 3/3 for service-key recovery, product-role recovery, and signed Solution publish/install resume behavior.
-- External `npm run check` and `npm run test:unit` pass with zero dependency-audit findings; the generated client and source OpenAPI carry the same current Axis digest.
-- External `npm run test:e2e` passes 1/1 after recreating the current Axis/reference-product overlay: the administrator publishes and installs the signed release before the Applicant creates, saves, submits, and canonically reads back the product record through the BFF.
+- The external reference-product `check` and `test:unit` package workflows pass with zero dependency-audit findings; the generated client and source OpenAPI carry the same current Axis digest.
+- The external reference-product `test:e2e` package workflow passes 1/1 after recreating the current Axis/reference-product overlay: the administrator publishes and installs the signed release before the Applicant creates, saves, submits, and canonically reads back the product record through the BFF.
