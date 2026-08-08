@@ -42,6 +42,8 @@ public interface ISolutionOperationRepository
     Task<SolutionInstallationOperation?> FindByIdempotencyAsync(Guid workspaceId, string idempotencyKey, CancellationToken cancellationToken = default);
     Task<SolutionInstallationOperation?> FindByIdAsync(Guid operationId, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<SolutionInstallationOperation>> ListByInstallationAsync(Guid installationId, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<SolutionInstallationOperation>> ListTrackedByInstallationAsync(Guid installationId, CancellationToken cancellationToken = default) =>
+        ListByInstallationAsync(installationId, cancellationToken);
     Task<IReadOnlyList<Guid>> ListRunnableIdsAsync(DateTimeOffset now, int maximumCount, CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<Guid>>([]);
     Task AddAsync(SolutionInstallationOperation operation, CancellationToken cancellationToken = default);

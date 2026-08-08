@@ -37,7 +37,9 @@ public sealed class SolutionsPersistenceTests(SolutionsDatabaseFixture db)
         await using SolutionsDbContext read = db.CreateContext();
         Assert.Equal(1, await read.SolutionVersions.CountAsync(x => x.Id == version.Id, TestContext.Current.CancellationToken));
         Assert.Equal(1, await read.Components.CountAsync(x => x.SolutionVersionId == version.Id, TestContext.Current.CancellationToken));
-        Assert.Equal(1, await read.AuditOutbox.CountAsync(x => x.SolutionVersionId == version.Id, TestContext.Current.CancellationToken));
+        Assert.Equal(1, await read.AuditOutbox
+            .Where(x => x.SolutionVersionId == version.Id)
+            .ExecuteDeleteAsync(TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -372,9 +374,85 @@ public sealed class SolutionsPersistenceTests(SolutionsDatabaseFixture db)
             .SingleAsync(value => value.Id == installation.Id, TestContext.Current.CancellationToken);
         Assert.Equal(ProvisioningStatus.Failed, persistedInstallation.ProvisioningStatus);
         Assert.Equal(ComplianceStatus.Noncompliant, persistedInstallation.ComplianceStatus);
-        await read.AuditOutbox
+        Assert.Equal(1, await read.AuditOutbox
             .Where(value => value.OperationId == operation.Id)
-            .ExecuteDeleteAsync(TestContext.Current.CancellationToken);
+            .ExecuteDeleteAsync(TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task PublisherReconciliation_RevokedApplyingOperation_PersistsTerminalBlock()
+    {
+        await ResetPublisherLedgerAsync();
+        DateTimeOffset now = DateTimeOffset.Parse("2026-08-08T00:00:00Z");
+        using ECDsa key = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        using ServiceProvider provider = CreateProvider(clock: new FixedClock(now));
+        await using (AsyncServiceScope trustScope = provider.CreateAsyncScope())
+        {
+            await trustScope.ServiceProvider.GetRequiredService<ITrustedPublisherLedger>()
+                .ReconcileAsync(
+                    1,
+                    [new("axis", "release_key", key.ExportSubjectPublicKeyInfoPem(), true)],
+                    TestContext.Current.CancellationToken);
+        }
+
+        SolutionVersion version = Version(now);
+        SolutionInstallation installation = SolutionInstallation.Create(
+            Guid.NewGuid(),
+            version.SolutionKey,
+            version.Id,
+            now);
+        SolutionInstallationOperation operation = SolutionInstallationOperation.Create(
+            installation.WorkspaceId,
+            Guid.NewGuid(),
+            SolutionSubjectKind.Human,
+            "publisher-reconciliation-test",
+            installation.Id,
+            $"publisher-reconciliation-{Guid.NewGuid():N}",
+            new string('f', 64),
+            [new("authorization.policy.v1", "reference", new string('e', 64), [])],
+            now);
+        long epoch = operation.AcquireLease(now, TimeSpan.FromMinutes(1));
+        operation.ClaimNext(epoch, now.AddSeconds(1));
+        await using (SolutionsDbContext seed = db.CreateContext())
+        {
+            await seed.SolutionVersions.AddAsync(version, TestContext.Current.CancellationToken);
+            await seed.SolutionInstallations.AddAsync(installation, TestContext.Current.CancellationToken);
+            await seed.SolutionOperations.AddAsync(operation, TestContext.Current.CancellationToken);
+            await seed.SaveChangesAsync(TestContext.Current.CancellationToken);
+        }
+
+        await using (AsyncServiceScope reconciliationScope = provider.CreateAsyncScope())
+        {
+            await reconciliationScope.ServiceProvider
+                .GetRequiredService<PublisherReconciliationService>()
+                .ReconcileAsync(
+                    2,
+                    [],
+                    now.AddSeconds(2),
+                    TestContext.Current.CancellationToken);
+        }
+
+        await using AsyncServiceScope readScope = provider.CreateAsyncScope();
+        SolutionsDbContext read = readScope.ServiceProvider.GetRequiredService<SolutionsDbContext>();
+        SolutionInstallationOperation persisted = await read.SolutionOperations
+            .AsNoTracking()
+            .Include(value => value.Steps)
+            .SingleAsync(value => value.Id == operation.Id, TestContext.Current.CancellationToken);
+        Assert.Equal(InstallationOperationStatus.Blocked, persisted.Status);
+        Assert.Equal("solutions.package.publisher_untrusted", persisted.ProblemCode);
+        SolutionInstallationStep step = Assert.Single(persisted.Steps);
+        Assert.Equal(InstallationStepStatus.Failed, step.Status);
+        Assert.Equal("solutions.package.publisher_untrusted", step.ProblemCode);
+        Assert.DoesNotContain(
+            operation.Id,
+            await readScope.ServiceProvider.GetRequiredService<ISolutionOperationRepository>()
+                .ListRunnableIdsAsync(
+                    now.AddMinutes(2),
+                    100,
+                    TestContext.Current.CancellationToken));
+        Assert.Equal(1, await read.AuditOutbox
+            .Where(value => value.InstallationId == installation.Id)
+            .ExecuteDeleteAsync(TestContext.Current.CancellationToken));
     }
 
     private async Task ResetPublisherLedgerAsync()
@@ -439,7 +517,7 @@ public sealed class SolutionsPersistenceTests(SolutionsDatabaseFixture db)
     [Fact]
     public async Task AuditDispatcher_InvalidEnvelope_PoisonsBeforeCentralIngest()
     {
-        DateTimeOffset now = DateTimeOffset.Parse("2026-08-08T00:00:00Z");
+        DateTimeOffset now = DateTimeOffset.Parse("2000-01-01T00:00:00Z");
         Guid eventId = await SeedAuditAsync(now, row =>
         {
             row.ActorKind = AuditActorKindV1.Human;

@@ -13,6 +13,8 @@ internal sealed class SolutionOperationRepository(SolutionsDbContext context) : 
         context.SolutionOperations.Include(x => x.Steps).SingleOrDefaultAsync(x => x.Id == operationId, cancellationToken);
     public async Task<IReadOnlyList<SolutionInstallationOperation>> ListByInstallationAsync(Guid installationId, CancellationToken cancellationToken = default) =>
         await context.SolutionOperations.AsNoTracking().Include(x => x.Steps).Where(x => x.InstallationId == installationId).OrderByDescending(x => x.UpdatedAt).ThenBy(x => x.Id).ToListAsync(cancellationToken);
+    public async Task<IReadOnlyList<SolutionInstallationOperation>> ListTrackedByInstallationAsync(Guid installationId, CancellationToken cancellationToken = default) =>
+        await context.SolutionOperations.Include(x => x.Steps).Where(x => x.InstallationId == installationId).OrderByDescending(x => x.UpdatedAt).ThenBy(x => x.Id).ToListAsync(cancellationToken);
     public async Task<IReadOnlyList<Guid>> ListRunnableIdsAsync(DateTimeOffset now, int maximumCount, CancellationToken cancellationToken = default) =>
         await context.SolutionOperations
             .AsNoTracking()

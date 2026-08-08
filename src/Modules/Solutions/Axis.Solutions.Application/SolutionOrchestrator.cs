@@ -374,7 +374,7 @@ public sealed class SolutionOrchestrator(
             {
                 installation.MarkFailed(now);
                 IReadOnlyList<SolutionInstallationOperation> installationOperations =
-                    await operations.ListByInstallationAsync(installation.Id, cancellationToken);
+                    await operations.ListTrackedByInstallationAsync(installation.Id, cancellationToken);
                 foreach (SolutionInstallationOperation operation in installationOperations)
                     operation.BlockBeforeNextMutation("solutions.package.publisher_untrusted", now);
             }
