@@ -17,6 +17,7 @@ using Axis.Identity.Infrastructure.Repositories;
 using Axis.Identity.Infrastructure.Services;
 using Axis.Rules.Infrastructure.Persistence;
 using Axis.Solutions.Infrastructure.Persistence;
+using Axis.Solutions.Infrastructure.Services;
 using Axis.Testing;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Hosting;
@@ -293,6 +294,11 @@ public sealed class ApiTestFixture : IAsyncLifetime
         {
             builder.ConfigureTestServices(services =>
             {
+                ServiceDescriptor? trustedPublisherConfigurationDescriptor = services.FirstOrDefault(
+                    descriptor => descriptor.ImplementationType == typeof(TrustedPublisherConfigurationService));
+                if (trustedPublisherConfigurationDescriptor is not null)
+                    services.Remove(trustedPublisherConfigurationDescriptor);
+
                 if (clock is not null)
                 {
                     services.RemoveAll<TimeProvider>();
