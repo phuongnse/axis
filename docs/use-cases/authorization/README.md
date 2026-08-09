@@ -8,5 +8,5 @@ Authorization owns product-policy installation, product-role assignment, and ser
 
 | Use case | Status |
 |---|---|
-| [docs/use-cases/authorization/manage-product-role-assignments.md](./manage-product-role-assignments.md) | Partial |
+| [docs/use-cases/authorization/manage-product-role-assignments.md](./manage-product-role-assignments.md) | Done |
 | [docs/use-cases/authorization/access-product-by-policy.md](./access-product-by-policy.md) | Done |

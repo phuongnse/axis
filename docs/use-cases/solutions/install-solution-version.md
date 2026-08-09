@@ -2,7 +2,7 @@
 
 > **Navigation**: [docs/use-cases/solutions/README.md](./README.md) · [docs/architecture/solutions.md](../../architecture/solutions.md) · [docs/PLATFORM_STRATEGY.md](../../PLATFORM_STRATEGY.md) · [AGENTS.md](../../../AGENTS.md)
 
-> **Contract status:** Implementation is complete outside the pending browser and live lifecycle evidence below.
+> **Contract status:** Implementation and scoped acceptance evidence are complete; authentic external release proof remains owned by Validate The Reference Product Solution Lifecycle.
 
 ## Purpose
 
@@ -117,18 +117,15 @@ Required UI quality: identity, plan, state, and recovery information are program
 > | Application | Done |
 > | Infrastructure | Done |
 > | API | Done |
-> | Frontend | Partial |
+> | Frontend | Done |
 > | MCP | Done |
 > | Audit | Done |
+> | Architecture evidence | Done |
 >
-> **Gaps vs spec:**
->
-> | ID | Gap |
-> |---|---|
-> | GAP-001 | The install/resume component journey passes, but required Playwright AT-007 and the current blank-Workspace lifecycle read-back remain pending. |
+> **Gaps vs spec:** None.
 >
 > **Deferred follow-ups:** The explicitly out-of-scope lifecycle capabilities above require their own use cases.
 >
-> **Verification:** Durable planning, preflight, lease fencing, apply/read-back recovery, provenance, revocation, API, MCP, and frontend component evidence passes. Browser and live lifecycle evidence remain tracked by GAP-001.
+> **Verification:** Every required AT is mapped to current Application, PostgreSQL infrastructure, API, Architecture, MCP contract, frontend component, and focused browser evidence in [install-solution-version.evidence.md](./install-solution-version.evidence.md). Authentic reference-product release/provenance validation remains separately owned by [Validate Reference Product Lifecycle](./validate-reference-product-lifecycle.md).
 >
 > **Decisions:** [docs/architecture/solutions.md](../../architecture/solutions.md) owns operation durability, adapter boundaries, concurrency, trust revalidation, persistence, and audit-outbox realization.

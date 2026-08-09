@@ -17,6 +17,7 @@ Provide the global authenticated sidebar navigation contract for Axis Platform m
 ## Guarantees
 
 - Accepts module-owned contributions with their destinations and visibility rules.
+- Consumes one authenticated server projection of contribution identities available in the current Workspace; omission, denial, or projection failure never exposes a server-managed destination.
 - Renders only visible, navigable contributions.
 - Renders global navigation only when one or more contributions remain.
 - Applies consistent grouping, ordering, labels, icons, and active state without imposing module-specific route layout.
@@ -31,9 +32,9 @@ Provide the global authenticated sidebar navigation contract for Axis Platform m
 ## Acceptance Criteria
 
 *Contribution contract*
-- **AC-001** Module navigation contributions declare a stable identity, localized label, recognizable icon, route target, grouping, ordering, active matching rule, and visibility metadata.
+- **AC-001** Module navigation contributions declare a stable identity, localized label, recognizable icon, route target, grouping, ordering, active matching rule, and whether server-reported availability is required.
 - **AC-002** App Shell consumes module navigation contributions through a shared extension point instead of hard-coding module-specific sidebar items.
-- **AC-003** Contribution owners define route targets and visibility rules; App Shell only renders contributions that are visible and navigable for the current user and route context.
+- **AC-003** Contribution owners define route targets and visibility rules; App Shell only renders server-managed contributions whose stable identities are present in the authenticated current-Workspace availability projection. Missing, denied, unavailable, stale-after-switch, or invalid contributions are not exposed.
 
 *Frame behavior*
 - **AC-004** App Shell renders the global sidebar only when at least one visible contribution exists.
@@ -46,7 +47,7 @@ Provide the global authenticated sidebar navigation contract for Axis Platform m
 |---|---|---|---|---|---|
 | AT-001 | UI component | Empty contribution set renders no sidebar or placeholder navigation. | AC-004 | UI component test | Yes |
 | AT-002 | UI component | Visible contributions render in group/order with localized labels, icons, route targets, and active state. | AC-001, AC-002, AC-005 | UI component test | Yes |
-| AT-003 | UI component | Hidden, unauthorized, unavailable, or invalid contributions are not exposed as navigable sidebar items. | AC-003 | UI component test | Yes |
+| AT-003 | UI component | The current-Workspace projection reports only server-available stable contribution identities; omitted, unauthorized, unavailable, or invalid contributions are not exposed as navigable sidebar items. | AC-003 | UI component test | Yes |
 | AT-004 | Browser journey | Desktop and mobile navigation render without console errors or horizontal overflow. | AC-006 | Browser automation | Yes |
 | AT-005 | Static frontend | Contribution registry and renderer typecheck, lint, and keep localized copy keys valid. | AC-001, AC-002 | Frontend CI | Yes |
 
@@ -76,10 +77,11 @@ Required UI quality: navigation controls must be keyboard-reachable, labels must
 > | Layer | Status |
 > |-------|--------|
 > | Contract | Done |
+> | API | Done |
 > | Frontend | Done |
 > | Tests | Done |
 >
-> **Implemented:** Shared module-navigation contribution contract, renderer, empty-contribution behavior, localized labels, active route state, and desktop/mobile browser coverage.
+> **Implemented:** Shared module-navigation contribution contract, authenticated current-Workspace availability projection, fail-closed renderer, empty-contribution behavior, localized labels, active route state, and desktop/mobile browser coverage.
 >
 > **Gaps vs spec:** None for the initial module-navigation foundation contract.
 >
@@ -87,4 +89,4 @@ Required UI quality: navigation controls must be keyboard-reachable, labels must
 >
 > **Verification:** Acceptance proof is tracked in the sibling evidence sidecar; foundation status is checked by the foundation docs gate.
 >
-> **Decisions:** Module Navigation is an App Shell foundation, not a use case. App Shell owns the global navigation renderer and empty behavior; modules own their contributions, labels, routes, ordering hints, and visibility rules. The sidebar does not render when there are no visible contributions. User-created extension mechanics remain separate platform extensibility contracts.
+> **Decisions:** Module Navigation is an App Shell foundation, not a use case. App Shell owns the authenticated availability projection, global renderer, and empty behavior; modules own their stable contribution identities, labels, routes, ordering hints, and server-availability requirement. The projection is visibility metadata only: direct routes and mutations retain their owning server authorization. The sidebar does not render when there are no visible contributions. User-created extension mechanics remain separate platform extensibility contracts.

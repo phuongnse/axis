@@ -5,6 +5,7 @@ using Axis.Identity.Application;
 using Axis.Identity.Application.Commands.ManageServiceIdentity;
 using Axis.Identity.Application.Repositories;
 using Axis.Identity.Application.Services;
+using Axis.Identity.Contracts;
 using Axis.Identity.Domain.Aggregates;
 using Axis.Shared.Domain.Primitives;
 using FluentAssertions;
@@ -93,6 +94,24 @@ public sealed class ManageServiceIdentityHandlerTests
                 TestContext.Current.CancellationToken);
 
         result.IsSuccess.Should().BeTrue();
+        result.Value.Subject.Should().Be(new SubjectReferenceDto(SubjectKind.Service, result.Value.Id));
+        result.Value.WorkspaceId.Should().Be(workspaceId);
+        result.Value.WorkspaceGrantStatus.Should().Be(nameof(ServiceWorkspaceGrantStatus.Active));
+        stagedIdentity.Should().NotBeNull();
+        stagedIdentity!.Id.Should().Be(result.Value.Id);
+        stagedIdentity.WorkspaceId.Should().Be(workspaceId);
+        stagedIdentity.WorkspaceGrantStatus.Should().Be(ServiceWorkspaceGrantStatus.Active);
+        await memberships.Received(1).GetActiveAsync(
+            workspaceId,
+            actorId,
+            Arg.Any<CancellationToken>());
+        await memberships.DidNotReceive().AddAsync(
+            Arg.Any<WorkspaceMembership>(),
+            Arg.Any<CancellationToken>());
+        typeof(CreateServiceIdentityHandler).GetConstructors()
+            .SelectMany(constructor => constructor.GetParameters())
+            .Select(parameter => parameter.ParameterType)
+            .Should().NotContain(typeof(IOrganizationMembershipRepository));
         await projection.Received(1).StageAsync(
             Arg.Is<ServiceIdentity>(identity => identity == stagedIdentity),
             Arg.Any<CancellationToken>());

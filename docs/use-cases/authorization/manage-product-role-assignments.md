@@ -36,7 +36,7 @@ Let an active Workspace administrator assign or revoke one or more exact install
 
 ## Main flow
 
-1. Lifecycle administrator bootstrap installs the applicable Solution policy and assigns initial product roles; it does not convert any Identity lifecycle role into a product role.
+1. Lifecycle administrator performs two explicit bootstrap steps: installs the applicable Solution policy and, only after installation succeeds, explicitly assigns exact initial product roles. Installation never derives an assignment from an Identity lifecycle role.
 2. An active Workspace administrator opens product-role assignment management for the current Workspace.
 3. System shows only active current-Workspace human and service subjects and installed product roles with server-projected product-owned localized presentation for the exact current UI language or `en` fallback.
 4. Administrator selects one or more exact product roles for one subject and confirms assignment or revocation.
@@ -57,7 +57,7 @@ Policy and assignment realization is owned by [Authorization architecture](../..
 
 *Happy path*
 
-- **AC-001** Lifecycle administrator bootstrap installs a Solution and can assign its initial product roles, while `Administrator`, `Applicant`, and `Caseworker` remain reference-solution product-role keys rather than global or Identity lifecycle roles.
+- **AC-001** Lifecycle administrator bootstrap explicitly installs a Solution and then explicitly assigns its initial product roles; installation itself creates no assignment, while `Administrator`, `Applicant`, and `Caseworker` remain reference-solution product-role keys rather than global or Identity lifecycle roles.
 - **AC-002** An active current-Workspace administrator can assign one or more exact installed product roles to one active human Workspace member or one active service subject in that Workspace.
 - **AC-003** An active current-Workspace administrator can revoke an exact product-role assignment, and the role no longer grants product authority immediately.
 - **AC-004** Assignment management reads current subject, exact product-role key, policy/version identity, status, and canonical mutation result without credentials or cross-Workspace information.
@@ -81,7 +81,7 @@ Policy and assignment realization is owned by [Authorization architecture](../..
 
 | ID | Boundary | Scenario | Covers AC | Verification | Required |
 |---|---|---|---|---|---|
-| AT-001 | Application boundary | Bootstrap assigns reference-solution initial roles without lifecycle-role conflation; active human and service subjects receive one or more exact installed roles | AC-001, AC-002, AC-005, AC-007 | Application test | Yes |
+| AT-001 | API boundary | Signed Solution installation creates no assignment; a later explicit administrator request assigns one exact installed role without changing Identity lifecycle authority | AC-001, AC-002, AC-005, AC-007 | API integration test | Yes |
 | AT-002 | Application/Infrastructure boundaries | Assignment, equivalent retry, stale revision, and concurrent assign/revoke preserve one canonical active authority outcome with audit read-back | AC-003, AC-004, AC-008, AC-009 | Application test + Infrastructure integration test | Yes |
 | AT-003 | API boundary | Missing actor/subject activity, unknown subject kind, unknown/stale policy/role, and cross-Workspace target deny without mutation or disclosure | AC-006 | API integration test | Yes |
 | AT-004 | API/Application boundaries | Revoked assignments deny the formerly permitted product operation immediately despite stale client state or projected UI affordance | AC-003, AC-010 | API integration test + Application test | Yes |
@@ -115,16 +115,12 @@ Policy and assignment realization is owned by [Authorization architecture](../..
 > | Solutions adapter | Done |
 > | API | Done |
 > | MCP | Done |
-> | Frontend | Partial |
+> | Frontend | Done |
 >
-> **Gaps vs spec:**
->
-> | ID | Gap |
-> |---|---|
-> | GAP-001 | The administrator component journey passes, but required Playwright AT-005 remains pending against the current checkpoint. |
+> **Gaps vs spec:** None.
 >
 > **Deferred follow-ups:** Only the separately owned capabilities under Out Of Scope are deferred.
 >
-> **Verification:** Domain, application, PostgreSQL infrastructure, API, MCP, and frontend component evidence passes. Browser evidence remains tracked by GAP-001.
+> **Verification:** Every required AT is mapped to current Application, PostgreSQL infrastructure, signed-Solution/API, MCP contract, durable audit, and focused browser evidence in [manage-product-role-assignments.evidence.md](./manage-product-role-assignments.evidence.md).
 >
 > **Decisions:** Assignment grants exact installed product roles only. Lifecycle administrator bootstrap may install a Solution and assign its initial product roles, but lifecycle authority never becomes product authority.

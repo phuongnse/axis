@@ -1,4 +1,4 @@
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useRouter, useRouterState } from '@tanstack/react-router';
 import type { ReactNode } from 'react';
 import { useRef, useState } from 'react';
@@ -23,6 +23,7 @@ import { invalidateClientRequestSession } from '@/lib/api';
 import { managedWindowRenderers } from '@/lib/managed-window-registry';
 import type { ModuleNavigationContribution } from '@/lib/module-navigation';
 import { visibleModuleNavigationContributions } from '@/lib/module-navigation';
+import { moduleNavigationAvailabilityQueryOptions } from '@/lib/module-navigation-api';
 import { moduleNavigationContributions } from '@/lib/module-navigation-registry';
 
 interface AppShellProps {
@@ -63,7 +64,19 @@ function AppShellContent({
   const [signingOut, setSigningOut] = useState(false);
   const [signOutError, setSignOutError] = useState(false);
   const [workspaceRefresh, setWorkspaceRefresh] = useState<'idle' | 'pending' | 'failed'>('idle');
-  const navigationContext = { pathname };
+  const requiresServerAvailability = navigationContributions.some(
+    (contribution) => contribution.requiresServerAvailability,
+  );
+  const navigationAvailabilityQuery = useQuery({
+    ...moduleNavigationAvailabilityQueryOptions(),
+    enabled: requiresServerAvailability,
+  });
+  const navigationContext = {
+    pathname,
+    availableContributionIds: new Set(
+      navigationAvailabilityQuery.data?.availableContributionIds ?? [],
+    ),
+  };
   const visibleNavigationItems = visibleModuleNavigationContributions(
     navigationContributions,
     navigationContext,

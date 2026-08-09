@@ -1,12 +1,15 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { ManagedWindowHost } from '@/components/shared/ManagedWindowHost';
+import { ManagedWindowProvider } from '@/components/shared/ManagedWindowManager';
 import {
   inviteWorkspaceMember,
   resendWorkspaceInvitation,
   revokeWorkspaceInvitation,
 } from '../api';
+import { membershipsManagedWindowRenderers } from '../managed-windows';
 import { MembershipManagementPage } from './MembershipManagementPage';
 
 const api = vi.hoisted(() => ({
@@ -33,7 +36,12 @@ function renderPage() {
   });
   render(
     <QueryClientProvider client={queryClient}>
-      <MembershipManagementPage />
+      <ManagedWindowProvider renderers={membershipsManagedWindowRenderers}>
+        <div className="relative h-dvh w-dvw">
+          <MembershipManagementPage />
+          <ManagedWindowHost />
+        </div>
+      </ManagedWindowProvider>
     </QueryClientProvider>,
   );
   return queryClient;
@@ -52,14 +60,41 @@ describe('MembershipManagementPage', () => {
     api.revoke.mockResolvedValue({ ...pendingInvitation(), status: 'Revoked', revision: 3 });
   });
 
+  it('composes the frozen resource workspace and launches the invitation task in a managed window', async () => {
+    const user = userEvent.setup();
+    api.list.mockResolvedValue({
+      items: [pendingInvitation()],
+      page: 1,
+      pageSize: 20,
+      totalCount: 1,
+    });
+    renderPage();
+
+    const page = document.querySelector<HTMLElement>('[data-slot="page-layout"]');
+    const table = await screen.findByRole('region', { name: 'Workspace invitation outcomes' });
+    const invite = await within(table).findByRole('button', { name: 'Invite member' });
+
+    expect(page).toHaveAttribute('data-scroll-mode', 'contained');
+    expect(page?.querySelectorAll('[data-slot="page-header"]')).toHaveLength(1);
+    expect(page?.querySelectorAll('[data-slot="data-table"]')).toHaveLength(1);
+    expect(within(table).queryByRole('columnheader', { name: 'Actions' })).not.toBeInTheDocument();
+    expect(invite).toHaveClass('min-h-11', 'min-w-11', 'sm:min-h-8', 'sm:min-w-8');
+
+    await user.click(invite);
+    expect(await screen.findByRole('dialog', { name: 'Invite member' })).toBeVisible();
+  });
+
   it('invites with the accessible form and refreshes the authoritative list', async () => {
     const user = userEvent.setup();
     const queryClient = renderPage();
     const invalidate = vi.spyOn(queryClient, 'invalidateQueries');
 
-    const email = screen.getByRole('textbox', { name: 'Recipient email' });
+    const table = await screen.findByRole('region', { name: 'Workspace invitation outcomes' });
+    await user.click(await within(table).findByRole('button', { name: 'Invite member' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Invite member' });
+    const email = within(dialog).getByRole('textbox', { name: 'Recipient email' });
     await user.type(email, '  member@example.com  ');
-    await user.click(screen.getByRole('button', { name: 'Invite member' }));
+    await user.click(within(dialog).getByRole('button', { name: 'Invite member' }));
 
     await waitFor(() =>
       expect(inviteWorkspaceMember).toHaveBeenCalledWith(
@@ -70,19 +105,57 @@ describe('MembershipManagementPage', () => {
         expect.anything(),
       ),
     );
-    expect(await screen.findByText('Invitation outcome confirmed')).toBeInTheDocument();
+    expect(await within(dialog).findByText('Invitation outcome confirmed')).toBeInTheDocument();
     expect(email).toHaveValue('');
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ['workspace-invitations'] });
+  });
+
+  it('preserves an invitation draft through minimize and guards destructive closure', async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    const table = await screen.findByRole('region', { name: 'Workspace invitation outcomes' });
+    await user.click(await within(table).findByRole('button', { name: 'Invite member' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Invite member' });
+    const email = within(dialog).getByRole('textbox', { name: 'Recipient email' });
+    await user.type(email, 'member@example.com');
+    await user.click(within(dialog).getByRole('button', { name: 'Minimize dialog' }));
+
+    const dock = document.querySelector<HTMLElement>('[data-slot="managed-window-dock"]');
+    await user.click(within(dock as HTMLElement).getByRole('button', { name: 'Restore dialog' }));
+    expect(email).toHaveValue('member@example.com');
+
+    await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+    const confirmation = await screen.findByRole('alertdialog', {
+      name: 'Discard this invitation?',
+    });
+    await user.click(within(confirmation).getByRole('button', { name: 'Keep editing' }));
+    expect(dialog).toBeVisible();
+    expect(email).toHaveValue('member@example.com');
+
+    await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+    await user.click(
+      within(
+        await screen.findByRole('alertdialog', { name: 'Discard this invitation?' }),
+      ).getByRole('button', { name: 'Discard invitation' }),
+    );
+    await waitFor(() => expect(dialog).not.toBeInTheDocument());
   });
 
   it('keeps malformed email feedback field-local without mutating the server', async () => {
     const user = userEvent.setup();
     renderPage();
 
-    await user.type(screen.getByRole('textbox', { name: 'Recipient email' }), 'not-an-email');
-    await user.click(screen.getByRole('button', { name: 'Invite member' }));
+    const table = await screen.findByRole('region', { name: 'Workspace invitation outcomes' });
+    await user.click(await within(table).findByRole('button', { name: 'Invite member' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Invite member' });
+    await user.type(
+      within(dialog).getByRole('textbox', { name: 'Recipient email' }),
+      'not-an-email',
+    );
+    await user.click(within(dialog).getByRole('button', { name: 'Invite member' }));
 
-    expect(screen.getByText('Enter a valid recipient email address.')).toBeInTheDocument();
+    expect(within(dialog).getByText('Enter a valid recipient email address.')).toBeInTheDocument();
     expect(inviteWorkspaceMember).not.toHaveBeenCalled();
   });
 
@@ -96,8 +169,10 @@ describe('MembershipManagementPage', () => {
     });
     renderPage();
 
-    expect(await screen.findByRole('cell', { name: 'member@example.com' })).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Resend' }));
+    const table = await screen.findByRole('region', { name: 'Workspace invitation outcomes' });
+    await user.click(await within(table).findByRole('button', { name: 'member@example.com' }));
+    const dialog = await screen.findByRole('dialog', { name: 'member@example.com' });
+    await user.click(within(dialog).getByRole('button', { name: 'Resend' }));
     await waitFor(() =>
       expect(resendWorkspaceInvitation).toHaveBeenCalledWith('invitation-1', {
         expectedRevision: 2,
@@ -105,10 +180,14 @@ describe('MembershipManagementPage', () => {
     );
     expect(await screen.findByText('New invitation link queued')).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'Revoke' }));
+    await user.click(within(dialog).getByRole('button', { name: 'Revoke' }));
+    const confirmation = await screen.findByRole('alertdialog', {
+      name: 'Revoke this invitation?',
+    });
+    await user.click(within(confirmation).getByRole('button', { name: 'Revoke' }));
     await waitFor(() =>
       expect(revokeWorkspaceInvitation).toHaveBeenCalledWith('invitation-1', {
-        expectedRevision: 2,
+        expectedRevision: 3,
       }),
     );
   });

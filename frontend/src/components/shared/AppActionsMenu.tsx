@@ -1,8 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
-import { ChevronDown, LogOut, Settings2 } from 'lucide-react';
+import { Building2, ChevronDown, LogOut, Settings2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { AccountAvatar } from '@/components/shared/AccountAvatar';
 import { StatusNotice } from '@/components/shared/StatusNotice';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Separator } from '@/components/ui/separator';
@@ -10,9 +11,11 @@ import { useAuthStore } from '@/features/auth/auth-store';
 import { sessionDisplayFromLabel } from '@/features/auth/session-display';
 import { dashboardQueryKeys, getCurrentUserProfile } from '@/features/dashboard/api';
 import { LanguageControl, ThemeControl } from '@/features/preferences';
+import { WorkspaceControl } from '@/features/workspaces/WorkspaceControl';
 
 interface AppActionsMenuProps {
   onSignOut: () => void;
+  onWorkspaceChanged: () => Promise<void>;
   signOutError?: boolean;
   signingOut?: boolean;
 }
@@ -27,6 +30,7 @@ function firstNonEmpty(...values: Array<string | null | undefined>): string | nu
 
 export function AppActionsMenu({
   onSignOut,
+  onWorkspaceChanged,
   signOutError = false,
   signingOut = false,
 }: AppActionsMenuProps) {
@@ -43,6 +47,12 @@ export function AppActionsMenu({
   const profileDisplay = profileLabel ? sessionDisplayFromLabel(profileLabel) : null;
   const displayName = profileDisplay?.userLabel ?? userLabel ?? t('nav.user');
   const displayInitials = profileDisplay?.userInitials ?? userInitials ?? '?';
+  const currentWorkspace = profileQuery.data?.workspaces?.find((workspace) => workspace.isCurrent);
+  const currentWorkspaceName = firstNonEmpty(currentWorkspace?.name);
+  const topBarLabel =
+    currentWorkspace?.type === 'Organization' && currentWorkspaceName
+      ? currentWorkspaceName
+      : displayName;
 
   return (
     <Popover>
@@ -52,17 +62,33 @@ export function AppActionsMenu({
             type="button"
             variant="ghost"
             size="lg"
-            className="max-w-56 gap-2 px-2 text-foreground"
+            className="min-h-11 max-w-64 gap-2 px-2 text-foreground"
             aria-label={t('nav.accountMenu')}
             title={t('nav.accountMenu')}
           >
-            <AccountAvatar initials={displayInitials} size="md" />
-            <span className="hidden min-w-0 truncate sm:inline">{displayName}</span>
+            {currentWorkspace?.type === 'Organization' ? (
+              <Avatar aria-hidden>
+                <AvatarFallback>
+                  <Building2 className="size-4" />
+                </AvatarFallback>
+              </Avatar>
+            ) : (
+              <AccountAvatar initials={displayInitials} size="md" />
+            )}
+            <span className="hidden min-w-0 truncate sm:inline">{topBarLabel}</span>
             <ChevronDown className="size-3.5 text-muted-foreground" aria-hidden />
           </Button>
         }
       />
-      <PopoverContent align="end" className="w-80" aria-label={t('nav.accountMenu')}>
+      <PopoverContent
+        align="end"
+        className="max-h-(--available-height) w-80 max-w-full overflow-y-auto"
+        aria-label={t('nav.accountMenu')}
+      >
+        <WorkspaceControl onWorkspaceChanged={onWorkspaceChanged} />
+
+        <Separator />
+
         <section aria-label={t('app.preferences')} className="grid gap-3">
           <div className="flex items-center gap-2 px-1 text-xs font-medium text-muted-foreground">
             <Settings2 className="size-3.5" aria-hidden />
@@ -74,21 +100,25 @@ export function AppActionsMenu({
 
         <Separator />
 
-        <Button
-          type="button"
-          variant="destructive"
-          size="sm"
-          className="w-full"
-          aria-busy={signingOut}
-          disabled={signingOut}
-          onClick={onSignOut}
-        >
-          <LogOut className="size-3.5" aria-hidden />
-          {signingOut ? t('nav.signingOut') : t('nav.signOut')}
-        </Button>
-        {signOutError ? (
-          <StatusNotice tone="destructive">{t('nav.signOutFailed')}</StatusNotice>
-        ) : null}
+        <section aria-label={t('app.account')} className="grid gap-2">
+          <div className="px-1 text-xs font-medium text-muted-foreground">{t('app.account')}</div>
+          <p className="min-w-0 truncate px-1 text-sm font-medium">{displayName}</p>
+          <Button
+            type="button"
+            variant="destructive"
+            size="sm"
+            className="w-full"
+            aria-busy={signingOut}
+            disabled={signingOut}
+            onClick={onSignOut}
+          >
+            <LogOut className="size-3.5" aria-hidden />
+            {signingOut ? t('nav.signingOut') : t('nav.signOut')}
+          </Button>
+          {signOutError ? (
+            <StatusNotice tone="destructive">{t('nav.signOutFailed')}</StatusNotice>
+          ) : null}
+        </section>
       </PopoverContent>
     </Popover>
   );

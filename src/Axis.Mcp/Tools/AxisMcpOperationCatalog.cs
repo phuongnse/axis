@@ -84,5 +84,6 @@ public static class AxisMcpOperationCatalog
             "SignOutUser",
             "RegisterUser",
             "GetBrowserSession",
+            "GetModuleNavigationAvailability",
         };
 }

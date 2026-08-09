@@ -3,6 +3,9 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { AppActionsMenu } from '@/components/shared/AppActionsMenu';
+import { useAuthStore } from '@/features/auth/auth-store';
+import { getCurrentUserProfile } from '@/features/dashboard/api';
 import { invalidateClientRequestSession } from '@/lib/api';
 import {
   beginWorkspaceTransition,
@@ -17,6 +20,19 @@ vi.mock('@/lib/api', async (importActual) => {
   const actual = await importActual<typeof import('@/lib/api')>();
   return { ...actual, invalidateClientRequestSession: vi.fn() };
 });
+
+vi.mock('@/features/dashboard/api', () => ({
+  dashboardQueryKeys: {
+    all: ['dashboard'] as const,
+    currentUser: () => ['dashboard', 'current-user'] as const,
+  },
+  getCurrentUserProfile: vi.fn(),
+}));
+
+vi.mock('@/features/preferences', () => ({
+  LanguageControl: () => <div>Language control</div>,
+  ThemeControl: () => <div>Theme control</div>,
+}));
 
 vi.mock('./api', () => ({
   workspaceKeys: { all: ['workspaces'], eligible: ['workspaces', 'eligible'] },
@@ -73,6 +89,34 @@ function renderControl(onWorkspaceChanged = vi.fn(async () => undefined)) {
 describe('WorkspaceControl', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(getCurrentUserProfile).mockResolvedValue({
+      id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      email: 'ada@example.com',
+      fullName: 'Ada Lovelace',
+      isActive: true,
+      language: 'en',
+      theme: 'light',
+      workspaceId: personalWorkspace.workspaceId,
+      workspaces: [
+        {
+          id: personalWorkspace.workspaceId,
+          name: personalWorkspace.name,
+          slug: personalWorkspace.slug,
+          type: personalWorkspace.type,
+          isCurrent: true,
+        },
+      ],
+    });
+    useAuthStore.getState().setBrowserSession({
+      authenticated: true,
+      csrfToken: 'csrf-token',
+      user: {
+        userId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        workspaceId: personalWorkspace.workspaceId,
+        email: 'ada@example.com',
+        name: 'Ada Lovelace',
+      },
+    });
     vi.mocked(listEligibleWorkspaces).mockResolvedValue([personalWorkspace, organizationWorkspace]);
     vi.mocked(beginWorkspaceTransition).mockResolvedValue({
       ...completedTransition,
@@ -99,10 +143,8 @@ describe('WorkspaceControl', () => {
     );
     const onWorkspaceChanged = renderControl();
 
-    const control = await screen.findByRole('button', { name: 'Workspace control' });
-    await waitFor(() => expect(control).toHaveTextContent('Personal workspace'));
-    await user.click(control);
-
+    const workspaceSection = screen.getByRole('region', { name: 'Choose Workspace' });
+    await screen.findByRole('button', { name: 'Personal workspace' });
     expect(screen.getByRole('region', { name: 'Personal' })).toBeInTheDocument();
     expect(screen.getByRole('region', { name: 'Organizations' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Personal workspace' })).toHaveAttribute(
@@ -111,7 +153,7 @@ describe('WorkspaceControl', () => {
     );
 
     await user.click(screen.getByRole('button', { name: 'Acme Operations' }));
-    expect(control).toHaveAttribute('aria-busy', 'true');
+    expect(workspaceSection).toHaveAttribute('aria-busy', 'true');
     expect(screen.getByText('Switching Workspace...')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Personal workspace' })).toBeDisabled();
 
@@ -134,7 +176,7 @@ describe('WorkspaceControl', () => {
     });
     const onWorkspaceChanged = renderControl();
 
-    await user.click(await screen.findByRole('button', { name: 'Workspace control' }));
+    await screen.findByRole('button', { name: 'Personal workspace' });
     await user.click(screen.getByRole('button', { name: 'Create Organization' }));
     const name = screen.getByRole('textbox', { name: 'Organization name' });
     await user.type(name, 'A');
@@ -163,12 +205,26 @@ describe('WorkspaceControl', () => {
     await waitFor(() => expect(onWorkspaceChanged).toHaveBeenCalledOnce());
   });
 
+  it('keeps organization creation available inside the account menu', async () => {
+    const user = userEvent.setup();
+    render(
+      <TestBoundary>
+        <AppActionsMenu onSignOut={vi.fn()} onWorkspaceChanged={vi.fn(async () => undefined)} />
+      </TestBoundary>,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Account menu' }));
+    await user.click(await screen.findByRole('button', { name: 'Create Organization' }));
+
+    expect(screen.getByRole('dialog', { name: 'Create Organization' })).toBeVisible();
+  });
+
   it('recovers a lost confirmation response from durable completion', async () => {
     const user = userEvent.setup();
     vi.mocked(confirmWorkspaceTransition).mockRejectedValue(new TypeError('Lost response'));
     const onWorkspaceChanged = renderControl();
 
-    await user.click(await screen.findByRole('button', { name: 'Workspace control' }));
+    await screen.findByRole('button', { name: 'Personal workspace' });
     await user.click(screen.getByRole('button', { name: 'Acme Operations' }));
 
     await waitFor(() => expect(recoverWorkspaceTransition).toHaveBeenCalledOnce());
@@ -181,7 +237,7 @@ describe('WorkspaceControl', () => {
     vi.mocked(recoverWorkspaceTransition).mockRejectedValue(new TypeError('Recovery unavailable'));
     const onWorkspaceChanged = renderControl();
 
-    await user.click(await screen.findByRole('button', { name: 'Workspace control' }));
+    await screen.findByRole('button', { name: 'Personal workspace' });
     await user.click(screen.getByRole('button', { name: 'Acme Operations' }));
 
     await waitFor(() => expect(onWorkspaceChanged).toHaveBeenCalledOnce());
@@ -198,7 +254,7 @@ describe('WorkspaceControl', () => {
     });
     const onWorkspaceChanged = renderControl();
 
-    await user.click(await screen.findByRole('button', { name: 'Workspace control' }));
+    await screen.findByRole('button', { name: 'Personal workspace' });
     await user.click(screen.getByRole('button', { name: 'Acme Operations' }));
 
     await waitFor(() => expect(onWorkspaceChanged).toHaveBeenCalledOnce());
@@ -207,11 +263,8 @@ describe('WorkspaceControl', () => {
   });
 
   it('shows a non-disclosing recovery state when eligibility cannot be loaded', async () => {
-    const user = userEvent.setup();
     vi.mocked(listEligibleWorkspaces).mockRejectedValue(new TypeError('Unavailable'));
     renderControl();
-
-    await user.click(screen.getByRole('button', { name: 'Workspace control' }));
 
     expect(await screen.findByText(/Eligible Workspaces are unavailable/i)).toBeInTheDocument();
     expect(screen.queryByText('Acme Operations')).not.toBeInTheDocument();

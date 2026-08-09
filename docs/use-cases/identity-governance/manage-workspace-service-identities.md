@@ -115,16 +115,12 @@ Shared lifecycle, assertion, immediate-revocation, concurrency, and audit realiz
 > | Audit | Done |
 > | API | Done |
 > | MCP | Done |
-> | Frontend | Partial |
+> | Frontend | Done |
 >
-> **Gaps vs spec:**
->
-> | ID | Gap |
-> |---|---|
-> | GAP-001 | The administrator component journey passes, but required Playwright AT-006 remains pending against the current checkpoint. |
+> **Gaps vs spec:** None.
 >
 > **Deferred follow-ups:** Only the separately owned capabilities under Out Of Scope are deferred.
 >
-> **Verification:** Domain, application, PostgreSQL infrastructure, API, MCP, and frontend component evidence passes. Browser evidence remains tracked by GAP-001.
+> **Verification:** Every required AT is mapped to current Domain, Application, PostgreSQL infrastructure, API, MCP contract, durable audit, and focused browser evidence in [manage-workspace-service-identities.evidence.md](./manage-workspace-service-identities.evidence.md).
 >
 > **Decisions:** Service identities are Identity-owned non-human subjects with exactly one Workspace grant. They authenticate only through the linked service-authentication contract; revocation is irreversible and immediately authoritative.

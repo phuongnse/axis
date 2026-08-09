@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { Building2, Check, ChevronsUpDown, LoaderCircle, Plus, UserRound } from 'lucide-react';
+import { Building2, Check, LoaderCircle, Plus, UserRound } from 'lucide-react';
 import type { FormEvent, ReactNode } from 'react';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -15,14 +15,6 @@ import {
 } from '@/components/ui/dialog';
 import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
-import {
-  Popover,
-  PopoverContent,
-  PopoverDescription,
-  PopoverHeader,
-  PopoverTitle,
-  PopoverTrigger,
-} from '@/components/ui/popover';
 import { ApiError, invalidateClientRequestSession } from '@/lib/api';
 import {
   beginWorkspaceTransition,
@@ -48,7 +40,6 @@ interface RetryIdentity {
 
 export function WorkspaceControl({ onWorkspaceChanged }: WorkspaceControlProps) {
   const { t } = useTranslation();
-  const [open, setOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [switchingWorkspaceId, setSwitchingWorkspaceId] = useState<string | null>(null);
   const [switchError, setSwitchError] = useState(false);
@@ -59,7 +50,6 @@ export function WorkspaceControl({ onWorkspaceChanged }: WorkspaceControlProps) 
     staleTime: 0,
   });
   const workspaces = eligibleQuery.data ?? [];
-  const current = workspaces.find((workspace) => workspace.isCurrent);
 
   async function switchWorkspace(target: EligibleWorkspace | CreatedOrganizationWorkspace) {
     if (switchingWorkspaceId) return;
@@ -100,7 +90,6 @@ export function WorkspaceControl({ onWorkspaceChanged }: WorkspaceControlProps) 
 
       await onWorkspaceChanged();
       if (enteredTarget) {
-        setOpen(false);
         setCreateOpen(false);
       } else {
         setSwitchError(true);
@@ -116,93 +105,73 @@ export function WorkspaceControl({ onWorkspaceChanged }: WorkspaceControlProps) 
 
   return (
     <>
-      <Popover open={open} onOpenChange={(nextOpen) => !switchingWorkspaceId && setOpen(nextOpen)}>
-        <PopoverTrigger
-          render={
+      <section
+        className="grid gap-3"
+        aria-label={t('workspace.choose')}
+        aria-busy={Boolean(switchingWorkspaceId)}
+      >
+        <div className="grid gap-0.5 px-1">
+          <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+            <Building2 className="size-3.5" aria-hidden />
+            {t('workspace.choose')}
+          </div>
+          <p className="text-xs text-muted-foreground">{t('workspace.chooseDescription')}</p>
+        </div>
+
+        {eligibleQuery.isPending ? (
+          <p
+            className="flex items-center gap-2 px-2 py-3 text-sm text-muted-foreground"
+            role="status"
+          >
+            <LoaderCircle className="size-4 animate-spin" aria-hidden />
+            {t('workspace.loading')}
+          </p>
+        ) : eligibleQuery.isError ? (
+          <StatusNotice tone="destructive" title={t('workspace.unavailable')}>
             <Button
               type="button"
-              variant="outline"
               size="sm"
-              className="max-w-52 min-w-0 gap-2"
-              aria-label={t('workspace.control')}
-              aria-busy={Boolean(switchingWorkspaceId)}
-            />
-          }
-        >
-          {current?.type === 'Organization' ? (
-            <Building2 className="size-3.5 shrink-0" aria-hidden />
-          ) : (
-            <UserRound className="size-3.5 shrink-0" aria-hidden />
-          )}
-          <span className="min-w-0 truncate">{current?.name ?? t('workspace.control')}</span>
-          {switchingWorkspaceId ? (
-            <LoaderCircle className="size-3.5 shrink-0 animate-spin" aria-hidden />
-          ) : (
-            <ChevronsUpDown className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
-          )}
-        </PopoverTrigger>
-
-        <PopoverContent align="end" className="w-80">
-          <PopoverHeader>
-            <PopoverTitle>{t('workspace.choose')}</PopoverTitle>
-            <PopoverDescription>{t('workspace.chooseDescription')}</PopoverDescription>
-          </PopoverHeader>
-
-          {eligibleQuery.isPending ? (
-            <p
-              className="flex items-center gap-2 px-2 py-3 text-sm text-muted-foreground"
-              role="status"
+              variant="outline"
+              onClick={() => eligibleQuery.refetch()}
             >
-              <LoaderCircle className="size-4 animate-spin" aria-hidden />
-              {t('workspace.loading')}
-            </p>
-          ) : eligibleQuery.isError ? (
-            <StatusNotice tone="destructive" title={t('workspace.unavailable')}>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                onClick={() => eligibleQuery.refetch()}
-              >
-                {t('app.retry')}
-              </Button>
-            </StatusNotice>
-          ) : (
-            <WorkspaceGroups
-              workspaces={workspaces}
-              switchingWorkspaceId={switchingWorkspaceId}
-              onSelect={switchWorkspace}
-            />
-          )}
+              {t('app.retry')}
+            </Button>
+          </StatusNotice>
+        ) : (
+          <WorkspaceGroups
+            workspaces={workspaces}
+            switchingWorkspaceId={switchingWorkspaceId}
+            onSelect={switchWorkspace}
+          />
+        )}
 
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            className="w-full"
-            disabled={Boolean(switchingWorkspaceId)}
-            onClick={() => {
-              setSwitchError(false);
-              setSwitchOutcomeUnknown(false);
-              setCreateOpen(true);
-            }}
-          >
-            <Plus className="size-3.5" aria-hidden />
-            {t('workspace.createOrganization')}
-          </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          className="w-full"
+          disabled={Boolean(switchingWorkspaceId)}
+          onClick={() => {
+            setSwitchError(false);
+            setSwitchOutcomeUnknown(false);
+            setCreateOpen(true);
+          }}
+        >
+          <Plus className="size-3.5" aria-hidden />
+          {t('workspace.createOrganization')}
+        </Button>
 
-          <div aria-live="polite">
-            {switchingWorkspaceId ? (
-              <StatusNotice tone="info">{t('workspace.switching')}</StatusNotice>
-            ) : null}
-            {switchOutcomeUnknown ? (
-              <StatusNotice tone="warning">{t('workspace.switchOutcomeUnknown')}</StatusNotice>
-            ) : switchError ? (
-              <StatusNotice tone="destructive">{t('workspace.switchFailed')}</StatusNotice>
-            ) : null}
-          </div>
-        </PopoverContent>
-      </Popover>
+        <div aria-live="polite">
+          {switchingWorkspaceId ? (
+            <StatusNotice tone="info">{t('workspace.switching')}</StatusNotice>
+          ) : null}
+          {switchOutcomeUnknown ? (
+            <StatusNotice tone="warning">{t('workspace.switchOutcomeUnknown')}</StatusNotice>
+          ) : switchError ? (
+            <StatusNotice tone="destructive">{t('workspace.switchFailed')}</StatusNotice>
+          ) : null}
+        </div>
+      </section>
 
       <CreateOrganizationDialog
         open={createOpen}

@@ -1,14 +1,53 @@
+using System.Security.Cryptography;
+using System.Text;
 using Axis.Audit.Contracts;
 using Axis.Solutions.Application;
 using Axis.Solutions.Contracts;
 using Axis.Solutions.Domain;
-using System.Security.Cryptography;
-using System.Text;
 
 namespace Axis.Solutions.Application.Tests;
 
 public sealed class SolutionOrchestratorTests
 {
+    [Fact]
+    public async Task Orchestrator_WhenPublishComponentPreflightFails_PersistsAuditWithoutVersion()
+    {
+        const string digest = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+        using ECDsa key = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        Keys keys = new() { PublicKeyPem = key.ExportSubjectPublicKeyInfoPem() };
+        MemoryVersions versions = new();
+        Audit audit = new();
+        UnitOfWork unitOfWork = new();
+        DateTimeOffset now = DateTimeOffset.Parse("2026-08-07T00:00:00Z");
+        SolutionActor actor = new(Guid.NewGuid(), Guid.NewGuid(), "publish-preflight", SolutionSubjectKind.Human);
+        Adapter adapter = new("authorization.policy.v1", fail: true);
+        SolutionOrchestrator orchestrator = new(
+            new SolutionPackageVerifier(keys),
+            versions,
+            new MemoryInstallations(),
+            new MemoryOperations(),
+            keys,
+            new Digest(digest),
+            new Authority(),
+            audit,
+            unitOfWork,
+            [adapter],
+            new Clock(now));
+
+        SolutionAdapterException failure = await Assert.ThrowsAsync<SolutionAdapterException>(() =>
+            orchestrator.PublishAsync(
+                new PublishSolutionRequest(actor, CreateSignedEnvelope(key, digest), now),
+                TestContext.Current.CancellationToken));
+
+        Assert.Equal("preflight", failure.ProblemCode);
+        Assert.Equal(1, adapter.PreflightCalls);
+        Assert.Null(versions.Version);
+        Assert.Equal(1, unitOfWork.Saves);
+        Assert.Contains(audit.Events, value =>
+            value.EventType == "solutions.denied"
+            && value.ProblemCode == "preflight");
+    }
+
     [Fact]
     public async Task Orchestrator_ExactPublishPersistenceRace_ReturnsCanonicalVersion()
     {
@@ -56,7 +95,7 @@ public sealed class SolutionOrchestratorTests
             new Authority(),
             audit,
             unitOfWork,
-            [],
+            [new Adapter("authorization.policy.v1", fail: false)],
             new Clock(now));
 
         PublishSolutionResult result = await orchestrator.PublishAsync(
@@ -65,9 +104,74 @@ public sealed class SolutionOrchestratorTests
 
         Assert.True(result.IsRetry);
         Assert.Equal(canonicalVersionId, result.Version.Id);
+        Assert.Equal(envelope, versions.Version!.Envelope);
         Assert.Contains(audit.Events, value =>
             value.EventType == "solutions.version.publish_retried"
             && value.Outcome == "canonical_retry");
+    }
+
+    [Fact]
+    public async Task Orchestrator_DifferentPublishPersistenceRace_ConflictsWithoutReplacement()
+    {
+        const string digest = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+        using ECDsa key = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        Keys keys = new() { PublicKeyPem = key.ExportSubjectPublicKeyInfoPem() };
+        MemoryVersions versions = new();
+        Audit audit = new();
+        UnitOfWork unitOfWork = new();
+        DateTimeOffset now = DateTimeOffset.Parse("2026-08-07T00:00:00Z");
+        SolutionActor actor = new(Guid.NewGuid(), Guid.NewGuid(), "publish-conflict", SolutionSubjectKind.Human);
+        byte[] requestedEnvelope = CreateSignedEnvelope(key, digest);
+        byte[] canonicalEnvelope = CreateSignedEnvelope(key, digest, "other-build");
+        string canonicalPackageSha256 = Convert.ToHexString(SHA256.HashData(canonicalEnvelope)).ToLowerInvariant();
+        Guid canonicalVersionId = Guid.Empty;
+        unitOfWork.OnNextSave = () =>
+        {
+            SolutionVersion proposed = versions.Version!;
+            SolutionVersion canonical = SolutionVersion.Create(
+                proposed.SolutionKey,
+                proposed.Version,
+                canonicalPackageSha256,
+                canonicalEnvelope,
+                proposed.AxisOpenApiSha256,
+                proposed.PublisherId,
+                proposed.PublisherKeyId,
+                proposed.SourceRevision,
+                "other-build",
+                proposed.BuiltAt,
+                new Uri(proposed.SourceUri),
+                proposed.PublishedAt);
+            canonicalVersionId = canonical.Id;
+            versions.Version = canonical;
+            return new SolutionPersistenceException(
+                "solutions.persistence.version_identity_conflict",
+                new InvalidOperationException("simulated concurrent winner"));
+        };
+        SolutionOrchestrator orchestrator = new(
+            new SolutionPackageVerifier(keys),
+            versions,
+            new MemoryInstallations(),
+            new MemoryOperations(),
+            keys,
+            new Digest(digest),
+            new Authority(),
+            audit,
+            unitOfWork,
+            [new Adapter("authorization.policy.v1", fail: false)],
+            new Clock(now));
+
+        SolutionPackageException failure = await Assert.ThrowsAsync<SolutionPackageException>(() =>
+            orchestrator.PublishAsync(
+                new PublishSolutionRequest(actor, requestedEnvelope, now),
+                TestContext.Current.CancellationToken));
+
+        Assert.Equal("solutions.version.conflict", failure.ProblemCode);
+        Assert.Equal(canonicalVersionId, versions.Version!.Id);
+        Assert.Equal(canonicalPackageSha256, versions.Version.PackageSha256);
+        Assert.Equal(canonicalEnvelope, versions.Version.Envelope);
+        Assert.Contains(audit.Events, value =>
+            value.EventType == "solutions.denied"
+            && value.ProblemCode == "solutions.version.conflict");
     }
 
     [Fact]
@@ -619,7 +723,10 @@ public sealed class SolutionOrchestratorTests
     }
     private sealed class Clock(DateTimeOffset now) : TimeProvider { public override DateTimeOffset GetUtcNow() => now; }
 
-    private static byte[] CreateSignedEnvelope(ECDsa key, string digest)
+    private static byte[] CreateSignedEnvelope(
+        ECDsa key,
+        string digest,
+        string buildId = "publish-race")
     {
         byte[] component = "{\"schemaVersion\":1}"u8.ToArray();
         string componentHash = Convert.ToHexString(SHA256.HashData(component)).ToLowerInvariant();
@@ -627,8 +734,8 @@ public sealed class SolutionOrchestratorTests
         byte[] payload = Encoding.UTF8.GetBytes(
             "{\"schemaVersion\":1,\"solutionKey\":\"publish_race\",\"solutionVersion\":\"1.0.0\",\"axisOpenApiSha256\":\"" + digest +
             "\",\"publisher\":{\"publisherId\":\"axis\",\"publisherKeyId\":\"release_key\"},\"provenance\":{\"sourceRevision\":\"" + new string('c', 40) +
-            "\",\"buildId\":\"publish-race\",\"builtAt\":\"2026-08-07T00:00:00Z\",\"sourceUri\":\"https://example.test/publish-race\"},\"components\":[{\"type\":\"authorization.policy.v1\",\"key\":\"policy\",\"sha256\":\"" + componentHash +
-            "\",\"content\":\"" + componentContent + "\",\"dependsOn\":[]}]}" );
+            "\",\"buildId\":\"" + buildId + "\",\"builtAt\":\"2026-08-07T00:00:00Z\",\"sourceUri\":\"https://example.test/publish-race\"},\"components\":[{\"type\":\"authorization.policy.v1\",\"key\":\"policy\",\"sha256\":\"" + componentHash +
+            "\",\"content\":\"" + componentContent + "\",\"dependsOn\":[]}]}");
         byte[] signature = key.SignData(
             SolutionPackageVerifier.CreatePae(SolutionPackageVerifier.PayloadType, payload),
             HashAlgorithmName.SHA256,
@@ -636,7 +743,7 @@ public sealed class SolutionOrchestratorTests
         return Encoding.UTF8.GetBytes(
             "{\"payloadType\":\"" + SolutionPackageVerifier.PayloadType + "\",\"payload\":\"" +
             Base64Url(payload) + "\",\"signatures\":[{\"keyid\":\"release_key\",\"sig\":\"" +
-            Base64Url(signature) + "\"}]}" );
+            Base64Url(signature) + "\"}]}");
     }
 
     private static string Base64Url(byte[] value) =>

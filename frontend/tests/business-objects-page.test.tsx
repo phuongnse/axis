@@ -80,6 +80,79 @@ describe('BusinessObjectsPage', () => {
     ).toEqual(fieldRuleDefinitions);
   });
 
+  it('composes the proving resource workspace from shared page patterns', async () => {
+    const detail = definitionDetail();
+    vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL) => {
+      const path = requestPath(input);
+      if (isRulesRequest(input)) return jsonResponse(fieldRuleDefinitions);
+      if (isDefinitionActionsRequest(input)) return allowedDefinitionActions();
+      if (path === '/api/business-object-definitions') return jsonResponse(pageWith(detail));
+      throw new Error(`Unexpected fetch: ${path}`);
+    });
+
+    await renderPage();
+
+    const page = document.querySelector<HTMLElement>('[data-slot="page-layout"]');
+    const header = document.querySelector<HTMLElement>('[data-slot="page-header"]');
+    const title = await screen.findByRole('heading', { level: 1, name: 'Business objects' });
+    const table = screen.getByRole('region', { name: 'Definitions' });
+    const recordAction = await within(table).findByRole('button', { name: 'Customer' });
+    const createAction = await within(table).findByRole('button', { name: 'New definition' });
+
+    expect(page).toHaveAttribute('data-scroll-mode', 'contained');
+    expect(page).toHaveClass('h-full', 'min-h-0', 'gap-4', 'p-4', 'sm:p-6', 'lg:p-8');
+    expect(page?.parentElement).not.toHaveClass('p-4', 'sm:p-6', 'lg:p-8', 'font-heading');
+    expect(header?.parentElement).toBe(page);
+    expect(title).toHaveAttribute('data-slot', 'page-title');
+    expect(title.closest('[data-slot="page-header"]')).toBe(header);
+    expect(page?.querySelectorAll('[data-slot="page-layout"]')).toHaveLength(0);
+    expect(page?.querySelectorAll('[data-slot="page-header"]')).toHaveLength(1);
+    expect(page?.querySelectorAll('[data-slot="data-table"]')).toHaveLength(1);
+    expect(within(table).queryByRole('columnheader', { name: 'Actions' })).not.toBeInTheDocument();
+    expectPageActionSizing(recordAction);
+    expectPageActionSizing(createAction);
+  });
+
+  it('keeps collection loading and retryable list failure inside the stable page', async () => {
+    const user = userEvent.setup();
+    const detail = definitionDetail();
+    let listReads = 0;
+    let resolveInitialList!: (response: Response) => void;
+    const initialList = new Promise<Response>((resolve) => {
+      resolveInitialList = resolve;
+    });
+    vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL) => {
+      const path = requestPath(input);
+      if (isRulesRequest(input)) return jsonResponse(fieldRuleDefinitions);
+      if (isDefinitionActionsRequest(input)) return allowedDefinitionActions();
+      if (path === '/api/business-object-definitions') {
+        listReads += 1;
+        return listReads === 1 ? initialList : jsonResponse(pageWith(detail));
+      }
+      throw new Error(`Unexpected fetch: ${path}`);
+    });
+
+    await renderPage();
+
+    const page = document.querySelector<HTMLElement>('[data-slot="page-layout"]');
+    const table = screen.getByRole('region', { name: 'Definitions' });
+    expect(table).toHaveAttribute('aria-busy', 'true');
+    expect(within(table).getAllByText('Loading rows')).not.toHaveLength(0);
+
+    await act(async () => resolveInitialList(jsonResponse({ title: 'List failed' }, 500)));
+
+    const error = await within(table).findByRole('alert');
+    expect(error).toHaveTextContent('Unable to load business objects');
+    expect(error).toHaveTextContent('Check the connection and try again.');
+    expect(page).toContainElement(error);
+    await user.click(within(error).getByRole('button', { name: 'Retry' }));
+
+    expect(await within(table).findByRole('button', { name: 'Customer' })).toBeVisible();
+    expect(table).not.toHaveAttribute('aria-busy');
+    expect(listReads).toBe(2);
+    expect(document.querySelector('[data-slot="page-layout"]')).toBe(page);
+  });
+
   it('hides create and consumes a denied create deep link', async () => {
     let resolveActions!: (response: Response) => void;
     const actionsResponse = new Promise<Response>((resolve) => {
@@ -139,7 +212,9 @@ describe('BusinessObjectsPage', () => {
     const notice = await screen.findByRole('alert');
     expect(notice).toHaveTextContent('Business object actions are temporarily unavailable');
     expect(router.state.location.search).toEqual({ page: 1, dialog: 'create' });
-    await user.click(within(notice).getByRole('button', { name: 'Retry' }));
+    const retry = within(notice).getByRole('button', { name: 'Retry' });
+    expectPageActionSizing(retry);
+    await user.click(retry);
     expect(await screen.findByRole('dialog', { name: 'Define business object' })).toBeVisible();
     await waitFor(() => expect(router.state.location.search).toEqual({ page: 1 }));
   });
@@ -271,6 +346,44 @@ describe('BusinessObjectsPage', () => {
     const notice = await within(dialog).findByRole('alert');
     expect(notice).toHaveTextContent(expectedMessage);
     expect(notice).not.toHaveTextContent('Private mutation detail');
+  });
+
+  it('keeps form labels scoped to each concurrent definition window', async () => {
+    const user = userEvent.setup();
+    const detail = definitionDetail();
+    vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL) => {
+      const path = requestPath(input);
+      if (isRulesRequest(input)) return jsonResponse(fieldRuleDefinitions);
+      if (isDefinitionActionsRequest(input)) return allowedDefinitionActions();
+      if (path === '/api/business-object-definitions') return jsonResponse(pageWith(detail));
+      if (path === `/api/business-object-definitions/${definitionId}`) {
+        return jsonResponse(detail);
+      }
+      throw new Error(`Unexpected fetch: ${path}`);
+    });
+
+    await renderPage();
+    await user.click(await screen.findByRole('button', { name: 'Customer' }));
+    await user.click(screen.getByRole('button', { name: 'New definition' }));
+
+    const editDialog = await screen.findByRole('dialog', { name: 'Customer' });
+    const createDialog = await screen.findByRole('dialog', { name: 'Define business object' });
+    const inputs = (
+      [
+        [editDialog, 'Name'],
+        [editDialog, 'Object key'],
+        [createDialog, 'Name'],
+        [createDialog, 'Object key'],
+      ] as const
+    ).map(([dialog, label]) => {
+      const input = within(dialog).getByLabelText(label);
+      const labelElement = within(dialog).getByText(label, { selector: 'label' });
+      expect(dialog).toContainElement(input);
+      expect(labelElement).toHaveAttribute('for', input.id);
+      return input;
+    });
+
+    expect(new Set(inputs.map((input) => input.id)).size).toBe(inputs.length);
   });
 
   it('prefetches a definition and opens its managed window without another detail request', async () => {
@@ -985,6 +1098,11 @@ function allowedDefinitionActions() {
 
 function emptyPage() {
   return { items: [], totalCount: 0, page: 1, pageSize: 20 };
+}
+
+function expectPageActionSizing(action: HTMLElement) {
+  expect(action).toHaveAttribute('data-slot', 'button');
+  expect(action).toHaveClass('min-h-11', 'min-w-11', 'sm:min-h-8', 'sm:min-w-8');
 }
 
 function pageWith(detail: ReturnType<typeof definitionDetail>) {

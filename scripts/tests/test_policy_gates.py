@@ -17,6 +17,7 @@ SCRIPTS = ROOT / "scripts"
 if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
 
+import acceptance_evidence  # noqa: E402
 import axis  # noqa: E402
 import axis_repo  # noqa: E402
 import doc_drift_domains  # noqa: E402
@@ -249,6 +250,33 @@ N/A
 """
 
         self.assertIn("must include `[reason: ...]`", "\n".join(check_pr.validate("fix: x", body)))
+
+
+class TestAcceptanceEvidenceCommands(unittest.TestCase):
+    def test_browser_e2e_command_accepts_global_compose_overlays(self) -> None:
+        commands = (
+            "python scripts/axis.py local-dev e2e -- e2e/sample.pw.ts",
+            "python scripts/axis.py local-dev --compose-overlay product.yml e2e -- e2e/sample.pw.ts",
+            "python scripts/axis.py local-dev --compose-overlay first.yml --compose-overlay second.yaml e2e",
+        )
+
+        for command in commands:
+            with self.subTest(command=command):
+                self.assertTrue(acceptance_evidence.is_browser_e2e_command(command))
+
+    def test_browser_e2e_command_rejects_invalid_global_arguments(self) -> None:
+        commands = (
+            "python scripts/axis.py local-dev --compose-overlay",
+            "python scripts/axis.py local-dev --compose-overlay e2e",
+            "python scripts/axis.py local-dev --compose-overlay --unknown e2e",
+            "python scripts/axis.py local-dev --unknown value e2e",
+            "python scripts/axis.py local-dev status -- e2e",
+            'python scripts/axis.py frontend test sample.test.tsx -t "local-dev e2e"',
+        )
+
+        for command in commands:
+            with self.subTest(command=command):
+                self.assertFalse(acceptance_evidence.is_browser_e2e_command(command))
 
 
 class TestUseCaseDocsGate(unittest.TestCase):
@@ -4325,6 +4353,45 @@ class TestScriptsStandardGate(unittest.TestCase):
 
 
 class TestLocalDevCli(unittest.TestCase):
+    def setUp(self) -> None:
+        self.real_discover_local_dev_compose_overlays = (
+            axis.discover_local_dev_compose_overlays
+        )
+        self.topology_temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.topology_temp.cleanup)
+        self.topology_root = Path(self.topology_temp.name)
+        self.topology_state = self.topology_root / "local-dev-topology.json"
+        topology_state = mock.patch.object(
+            axis,
+            "LOCAL_DEV_TOPOLOGY_STATE",
+            self.topology_state,
+        )
+        topology_state.start()
+        self.addCleanup(topology_state.stop)
+        topology_discovery = mock.patch.object(
+            axis,
+            "discover_local_dev_compose_overlays",
+            return_value=None,
+        )
+        topology_discovery.start()
+        self.addCleanup(topology_discovery.stop)
+
+    def make_overlay(self, name: str = "product.yml") -> Path:
+        overlay = self.topology_root / name
+        overlay.write_text("services: {}\n", encoding="utf-8")
+        return overlay
+
+    def write_topology_state(self, overlays: list[Path]) -> None:
+        self.topology_state.write_text(
+            json.dumps(
+                {
+                    "version": 1,
+                    "composeOverlays": [str(overlay.resolve()) for overlay in overlays],
+                }
+            ),
+            encoding="utf-8",
+        )
+
     def test_compose_app_base_url_allows_human_local_dev_default(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             compose = Path(temp) / "docker-compose.yml"
@@ -4533,6 +4600,29 @@ class TestLocalDevCli(unittest.TestCase):
 
         return calls
 
+    def run_local_dev_with_codes(
+        self,
+        args: axis.argparse.Namespace,
+        *return_codes: int,
+    ) -> tuple[int, list[list[str]]]:
+        calls: list[list[str]] = []
+        codes = iter(return_codes)
+
+        def fake_run(command: list[str], **_kwargs):
+            calls.append(command)
+            return axis.subprocess.CompletedProcess(
+                command,
+                next(codes),
+                stdout="",
+                stderr="",
+            )
+
+        with (
+            mock.patch.object(axis, "_docker_compose_ok", return_value=True),
+            mock.patch.object(axis, "run", side_effect=fake_run),
+        ):
+            return axis.local_dev(args), calls
+
     def test_up_uses_axis_project_and_committed_compose_file(self) -> None:
         calls = self.run_local_dev(
             axis.argparse.Namespace(local_dev_command="up", build=False, services=[])
@@ -4618,6 +4708,249 @@ class TestLocalDevCli(unittest.TestCase):
                 )
 
         docker_compose_ok.assert_not_called()
+
+    def test_overlay_topology_survives_down_and_blocks_bare_reconciliation_before_docker(self) -> None:
+        overlay = self.make_overlay()
+        overlay_args = [str(overlay)]
+        self.run_local_dev(
+            axis.argparse.Namespace(
+                local_dev_command="up",
+                build=False,
+                services=[],
+                compose_overlays=overlay_args,
+            )
+        )
+        self.run_local_dev(
+            axis.argparse.Namespace(
+                local_dev_command="down",
+                volumes=False,
+                compose_overlays=overlay_args,
+            )
+        )
+        self.assertEqual(
+            {"version": 1, "composeOverlays": [str(overlay.resolve())]},
+            json.loads(self.topology_state.read_text(encoding="utf-8")),
+        )
+        self.run_local_dev(axis.argparse.Namespace(local_dev_command="status"))
+        self.run_local_dev(
+            axis.argparse.Namespace(local_dev_command="logs", follow=False, services=[])
+        )
+
+        bare_commands = (
+            axis.argparse.Namespace(local_dev_command="up", build=False, services=[]),
+            axis.argparse.Namespace(local_dev_command="e2e", e2e_args=[]),
+            axis.argparse.Namespace(local_dev_command="recreate", services=["api"]),
+        )
+        for args in bare_commands:
+            with (
+                self.subTest(command=args.local_dev_command),
+                mock.patch.object(axis, "_docker_compose_ok") as docker_compose_ok,
+                mock.patch.object(axis, "run") as run,
+                self.assertRaisesRegex(axis.CheckError, "deployment topology mismatch"),
+            ):
+                axis.local_dev(args)
+            docker_compose_ok.assert_not_called()
+            run.assert_not_called()
+
+    def test_matching_ordered_overlay_topology_is_allowed(self) -> None:
+        first = self.make_overlay()
+        second = self.make_overlay("environment.yaml")
+        self.write_topology_state([first, second])
+        calls = self.run_local_dev(
+            axis.argparse.Namespace(
+                local_dev_command="up",
+                build=False,
+                services=[],
+                compose_overlays=[str(first), str(second)],
+            )
+        )
+        self.assertEqual([str(first), "-f", str(second)], calls[0][7:10])
+
+        with (
+            mock.patch.object(axis, "_docker_compose_ok") as docker_compose_ok,
+            mock.patch.object(axis, "run") as run,
+            self.assertRaisesRegex(axis.CheckError, "deployment topology mismatch"),
+        ):
+            axis.local_dev(
+                axis.argparse.Namespace(
+                    local_dev_command="up",
+                    build=False,
+                    services=[],
+                    compose_overlays=[str(second), str(first)],
+                )
+            )
+        docker_compose_ok.assert_not_called()
+        run.assert_not_called()
+
+    def test_active_overlay_topology_is_adopted_before_bare_reconciliation(self) -> None:
+        overlay = self.make_overlay()
+        with (
+            mock.patch.object(axis, "_docker_compose_ok", return_value=True),
+            mock.patch.object(
+                axis,
+                "discover_local_dev_compose_overlays",
+                return_value=(overlay.resolve(),),
+            ),
+            mock.patch.object(axis, "run") as run,
+            self.assertRaisesRegex(axis.CheckError, "deployment topology mismatch"),
+        ):
+            axis.local_dev(
+                axis.argparse.Namespace(
+                    local_dev_command="up",
+                    build=False,
+                    services=[],
+                )
+            )
+
+        run.assert_not_called()
+        self.assertTrue(self.topology_state.is_file())
+
+    def test_base_topology_allows_the_first_explicit_overlay_claim(self) -> None:
+        overlay = self.make_overlay()
+        with mock.patch.object(
+            axis,
+            "discover_local_dev_compose_overlays",
+            return_value=(),
+        ):
+            self.run_local_dev(
+                axis.argparse.Namespace(
+                    local_dev_command="up",
+                    build=False,
+                    services=[],
+                    compose_overlays=[str(overlay)],
+                )
+            )
+
+        self.assertEqual((overlay.resolve(),), axis.read_local_dev_topology())
+
+    def test_failed_first_overlay_up_does_not_claim_topology(self) -> None:
+        overlay = self.make_overlay()
+        result, _ = self.run_local_dev_with_codes(
+            axis.argparse.Namespace(
+                local_dev_command="up",
+                build=False,
+                services=[],
+                compose_overlays=[str(overlay)],
+            ),
+            1,
+        )
+
+        self.assertEqual(1, result)
+        self.assertFalse(self.topology_state.exists())
+
+    def test_e2e_claims_first_overlay_only_after_stack_up_succeeds(self) -> None:
+        overlay = self.make_overlay()
+
+        def run_e2e(build_services: list[str], *return_codes: int) -> int:
+            result, _ = self.run_local_dev_with_codes(
+                axis.argparse.Namespace(
+                    local_dev_command="e2e",
+                    build_services=build_services,
+                    e2e_args=[],
+                    compose_overlays=[str(overlay)],
+                ),
+                *return_codes,
+            )
+            return result
+
+        self.assertEqual(1, run_e2e(["api"], 1))
+        self.assertFalse(self.topology_state.exists())
+
+        self.assertEqual(1, run_e2e([], 0, 1))
+        self.assertEqual((overlay.resolve(),), axis.read_local_dev_topology())
+
+    def test_active_overlay_topology_is_read_from_compose_container_metadata(self) -> None:
+        overlay = self.topology_root / "product.yml"
+        result = axis.subprocess.CompletedProcess(
+            [],
+            0,
+            stdout=f"{axis.LOCAL_DEV_COMPOSE_FILE},{overlay}\n",
+            stderr="",
+        )
+        with mock.patch.object(axis, "run_optional", return_value=result) as run_optional:
+            self.assertEqual(
+                (overlay.resolve(),),
+                self.real_discover_local_dev_compose_overlays(),
+            )
+
+        self.assertEqual("inspect", run_optional.call_args.args[0][1])
+        missing = axis.subprocess.CompletedProcess(
+            [],
+            1,
+            stdout="",
+            stderr="error: no such object: axis_api",
+        )
+        with mock.patch.object(axis, "run_optional", return_value=missing):
+            self.assertIsNone(self.real_discover_local_dev_compose_overlays())
+
+    def test_reset_all_replaces_topology_state_only_after_success(self) -> None:
+        overlay = self.make_overlay()
+        self.write_topology_state([overlay])
+        result, calls = self.run_local_dev_with_codes(
+            axis.argparse.Namespace(local_dev_command="reset-all", yes=True),
+            0,
+            1,
+        )
+        self.assertEqual(1, result)
+        self.assertIn(str(overlay), calls[0])
+        self.assertTrue(self.topology_state.is_file())
+
+        self.run_local_dev(
+            axis.argparse.Namespace(local_dev_command="reset-all", yes=True)
+        )
+        self.assertFalse(self.topology_state.exists())
+
+    def test_failed_first_overlay_reset_all_does_not_claim_topology(self) -> None:
+        overlay = self.make_overlay()
+        result, _ = self.run_local_dev_with_codes(
+            axis.argparse.Namespace(
+                local_dev_command="reset-all",
+                yes=True,
+                compose_overlays=[str(overlay)],
+            ),
+            0,
+            1,
+        )
+
+        self.assertEqual(1, result)
+        self.assertFalse(self.topology_state.exists())
+
+    def test_down_volumes_clears_topology_only_after_success(self) -> None:
+        overlay = self.make_overlay()
+        self.write_topology_state([overlay])
+        args = axis.argparse.Namespace(
+            local_dev_command="down",
+            volumes=True,
+            compose_overlays=[str(overlay)],
+        )
+
+        with mock.patch.object(axis, "_docker_compose_ok", return_value=True):
+            self.assertEqual(1, axis.local_dev(axis.argparse.Namespace(**vars(args), yes=False)))
+        self.assertTrue(self.topology_state.is_file())
+
+        result, _ = self.run_local_dev_with_codes(
+            axis.argparse.Namespace(**vars(args), yes=True),
+            1,
+        )
+        self.assertEqual(1, result)
+        self.assertTrue(self.topology_state.is_file())
+
+        self.run_local_dev(axis.argparse.Namespace(**vars(args), yes=True))
+        self.assertFalse(self.topology_state.exists())
+
+    def test_run_api_is_blocked_when_local_data_requires_compose_overlays(self) -> None:
+        self.write_topology_state([self.make_overlay()])
+        with (
+            mock.patch.object(axis, "check_dotnet_sdk") as check_dotnet_sdk,
+            mock.patch.object(axis, "run") as run,
+            self.assertRaisesRegex(axis.CheckError, "deployment topology mismatch"),
+        ):
+            axis.dotnet_command(
+                axis.argparse.Namespace(dotnet_command="run-api", dotnet_args=[])
+            )
+
+        check_dotnet_sdk.assert_not_called()
+        run.assert_not_called()
 
     def test_up_reports_ready_urls_and_host_trust_followup(self) -> None:
         with (

@@ -1,7 +1,6 @@
 import { Link, useRouterState } from '@tanstack/react-router';
 import { useTranslation } from 'react-i18next';
 import { AppActionsMenu } from '@/components/shared/AppActionsMenu';
-import { WorkspaceControl } from '@/features/workspaces/WorkspaceControl';
 
 interface AppHeaderProps {
   onSignOut: () => void;
@@ -27,7 +26,7 @@ export function AppHeader({
   const pageTitle = t(pageTitleKeyForPath(pathname));
 
   return (
-    <header className="shrink-0 border-b border-border bg-card/95 backdrop-blur">
+    <header className="shrink-0 border-b border-border bg-card">
       <div className="flex min-h-16 w-full min-w-0 flex-wrap items-center gap-3 px-4 py-3 sm:px-6 lg:px-8">
         <Link to="/dashboard" className="flex min-w-0 items-center gap-3">
           <img src="/axis-logo.svg" alt="" className="size-11 shrink-0" width={44} height={44} />
@@ -37,9 +36,9 @@ export function AppHeader({
         </Link>
 
         <div className="ml-auto flex min-w-0 shrink items-center gap-2">
-          <WorkspaceControl onWorkspaceChanged={onWorkspaceChanged} />
           <AppActionsMenu
             onSignOut={onSignOut}
+            onWorkspaceChanged={onWorkspaceChanged}
             signOutError={signOutError}
             signingOut={signingOut}
           />

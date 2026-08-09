@@ -50,6 +50,7 @@ RENOVATE_CONFIG_PATH = ROOT / ".github" / "renovate.json5"
 LOCAL_DEV_ENV_FILE = ROOT / ".env.local"
 LOCAL_DEV_PROJECT_NAME = "axis"
 LOCAL_DEV_POSTGRES_VOLUME = f"{LOCAL_DEV_PROJECT_NAME}_postgres_data"
+LOCAL_DEV_TOPOLOGY_STATE = ROOT / ".local" / "local-dev-topology.json"
 API_PROJECT = ROOT / "src" / "Axis.Api" / "Axis.Api.csproj"
 MCP_PROJECT = ROOT / "src" / "Axis.Mcp" / "Axis.Mcp.csproj"
 FRONTEND_DIR = ROOT / "frontend"
@@ -3096,6 +3097,9 @@ def explicit_confirmation(
 
 
 def dotnet_command(args: argparse.Namespace) -> int:
+    if args.dotnet_command == "run-api":
+        require_local_dev_topology("dotnet run-api", ())
+
     rc = check_dotnet_sdk()
     if rc != 0:
         return rc
@@ -4150,6 +4154,114 @@ def resolve_local_dev_compose_overlays(values: Iterable[str]) -> tuple[Path, ...
     return tuple(overlays)
 
 
+def read_local_dev_topology() -> tuple[Path, ...] | None:
+    if not LOCAL_DEV_TOPOLOGY_STATE.is_file():
+        return None
+    try:
+        state = json.loads(LOCAL_DEV_TOPOLOGY_STATE.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise CheckError(
+            f"local-dev deployment topology state is invalid: {LOCAL_DEV_TOPOLOGY_STATE}"
+        ) from exc
+    values = state.get("composeOverlays") if isinstance(state, dict) else None
+    if (
+        not isinstance(state, dict)
+        or state.get("version") != 1
+        or not isinstance(values, list)
+        or not values
+    ):
+        raise CheckError(
+            f"local-dev deployment topology state is invalid: {LOCAL_DEV_TOPOLOGY_STATE}"
+        )
+    overlays: list[Path] = []
+    for value in values:
+        if not isinstance(value, str) or not Path(value).is_absolute():
+            raise CheckError(
+                f"local-dev deployment topology state is invalid: {LOCAL_DEV_TOPOLOGY_STATE}"
+            )
+        overlays.append(Path(value).resolve(strict=False))
+    return tuple(overlays)
+
+
+def write_local_dev_topology(overlays: tuple[Path, ...]) -> None:
+    if not overlays:
+        LOCAL_DEV_TOPOLOGY_STATE.unlink(missing_ok=True)
+        return
+    LOCAL_DEV_TOPOLOGY_STATE.parent.mkdir(parents=True, exist_ok=True)
+    LOCAL_DEV_TOPOLOGY_STATE.write_text(
+        json.dumps(
+            {
+                "version": 1,
+                "composeOverlays": [str(overlay) for overlay in overlays],
+            },
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+
+def claim_local_dev_topology(overlays: tuple[Path, ...]) -> None:
+    if overlays and read_local_dev_topology() is None:
+        write_local_dev_topology(overlays)
+
+
+def discover_local_dev_compose_overlays() -> tuple[Path, ...] | None:
+    config_files = run_optional(
+        [
+            exe("docker"),
+            "inspect",
+            "--format",
+            '{{ index .Config.Labels "com.docker.compose.project.config_files" }}',
+            f"{LOCAL_DEV_PROJECT_NAME}_api",
+        ],
+        timeout=DOCKER_PROBE_TIMEOUT_SECONDS,
+    )
+    if config_files is None:
+        raise CheckError("local-dev could not inspect the active deployment topology")
+    if config_files.returncode != 0:
+        if "no such object" in config_files.stderr.lower():
+            return None
+        raise CheckError("local-dev could not inspect the active deployment topology")
+    files = tuple(
+        Path(value).resolve(strict=False)
+        for value in config_files.stdout.strip().split(",")
+        if value
+    )
+    if not files or files[0] != LOCAL_DEV_COMPOSE_FILE.resolve(strict=False):
+        raise CheckError("local-dev active deployment topology metadata is invalid")
+    return files[1:]
+
+
+def require_local_dev_topology(
+    action: str,
+    overlays: tuple[Path, ...],
+    *,
+    discover: bool = False,
+) -> None:
+    expected = read_local_dev_topology()
+    if expected is None and discover:
+        active_overlays = discover_local_dev_compose_overlays()
+        if active_overlays:
+            write_local_dev_topology(active_overlays)
+            expected = active_overlays
+    if expected is None or expected == overlays:
+        return
+    overlay_args = " ".join(
+        f"--compose-overlay {shlex.quote(str(overlay))}" for overlay in expected
+    )
+    remediation = (
+        "Use the owning product's local-dev wrapper or rerun Axis with the exact ordered "
+        f"overlay arguments: `{overlay_args}`."
+    )
+    if action == "dotnet run-api":
+        remediation += " Host-native run-api cannot prove overlay-owned deployment values."
+    raise CheckError(
+        f"{action}: deployment topology mismatch; persistent local data requires the "
+        f"recorded Compose overlays. {remediation}"
+    )
+
+
 def local_dev_env_args() -> list[str]:
     if LOCAL_DEV_ENV_FILE.is_file():
         return ["--env-file", str(LOCAL_DEV_ENV_FILE)]
@@ -4213,6 +4325,7 @@ def run_local_dev_browser(
     service: str = "e2e",
     build_services: Iterable[str] = (),
 ) -> int:
+    overlays = tuple(overlays)
     runtime_services = list(build_services)
     if runtime_services:
         runtime_build = run(
@@ -4224,6 +4337,7 @@ def run_local_dev_browser(
     up = run(local_dev_up_args(overlays=overlays), check=False)
     if up.returncode != 0:
         return up.returncode
+    claim_local_dev_topology(overlays)
     build = run(
         local_dev_compose_args(
             "--profile",
@@ -4689,12 +4803,26 @@ def local_dev(args: argparse.Namespace) -> int:
         return local_dev_untrust_certs(args)
 
     overlays = resolve_local_dev_compose_overlays(overlay_values)
+    command = args.local_dev_command
+    read_only = command in {"status", "logs"} or (
+        command == "observability"
+        and args.observability_command in {"status", "logs"}
+    )
+    replaces_topology = command == "reset-all"
+    if not read_only and not replaces_topology:
+        require_local_dev_topology(f"local-dev {command}", overlays)
 
     rc = require_docker_compose("local-dev")
     if rc != 0:
         return rc
 
-    command = args.local_dev_command
+    if not read_only and not replaces_topology:
+        require_local_dev_topology(
+            f"local-dev {command}",
+            overlays,
+            discover=True,
+        )
+
     if command == "up":
         result = run(
             local_dev_up_args(*args.services, build=args.build, overlays=overlays),
@@ -4702,6 +4830,7 @@ def local_dev(args: argparse.Namespace) -> int:
         )
         if result.returncode != 0:
             return result.returncode
+        claim_local_dev_topology(overlays)
         print("local-dev up: ready")
         if not args.services:
             print("web: https://localhost:3000")
@@ -4721,7 +4850,10 @@ def local_dev(args: argparse.Namespace) -> int:
             ):
                 return 1
             compose.append("--volumes")
-        return run(local_dev_compose_args(*compose, overlays=overlays), check=False).returncode
+        result = run(local_dev_compose_args(*compose, overlays=overlays), check=False)
+        if result.returncode == 0 and args.volumes:
+            write_local_dev_topology(())
+        return result.returncode
 
     if command in {"start", "stop", "restart"}:
         return run(
@@ -4733,14 +4865,17 @@ def local_dev(args: argparse.Namespace) -> int:
         if not args.services:
             print("local-dev recreate: name at least one service", file=sys.stderr)
             return 1
-        return run(
+        result = run(
             local_dev_up_args(
                 *args.services,
                 force_recreate=True,
                 overlays=overlays,
             ),
             check=False,
-        ).returncode
+        )
+        if result.returncode == 0:
+            claim_local_dev_topology(overlays)
+        return result.returncode
 
     if command == "status":
         return run(local_dev_compose_args("ps", overlays=overlays), check=False).returncode
@@ -4854,7 +4989,10 @@ def local_dev(args: argparse.Namespace) -> int:
             if remove_output:
                 print(remove_output, file=sys.stderr)
             return remove.returncode
-        return run(local_dev_up_args(overlays=overlays), check=False).returncode
+        up = run(local_dev_up_args(overlays=overlays), check=False)
+        if up.returncode == 0:
+            claim_local_dev_topology(overlays)
+        return up.returncode
 
     if command == "reset-all":
         if not explicit_confirmation(
@@ -4863,13 +5001,25 @@ def local_dev(args: argparse.Namespace) -> int:
             target="all Axis local-development volumes",
         ):
             return 1
+        previous_topology = read_local_dev_topology()
+        if previous_topology is None:
+            previous_topology = discover_local_dev_compose_overlays()
+            if previous_topology:
+                write_local_dev_topology(previous_topology)
         down = run(
-            local_dev_compose_args("down", "--volumes", overlays=overlays),
+            local_dev_compose_args(
+                "down",
+                "--volumes",
+                overlays=previous_topology or overlays,
+            ),
             check=False,
         )
         if down.returncode != 0:
             return down.returncode
-        return run(local_dev_up_args(overlays=overlays), check=False).returncode
+        up = run(local_dev_up_args(overlays=overlays), check=False)
+        if up.returncode == 0:
+            write_local_dev_topology(overlays)
+        return up.returncode
 
     raise CheckError(f"Unknown local-dev command: {command}")
 

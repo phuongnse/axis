@@ -542,13 +542,31 @@ describe('RulesPage', () => {
     expect(notice).not.toHaveTextContent('Private lifecycle detail');
   });
 
-  it('renders one catalog shape for built-in and workspace rules', async () => {
+  it('composes the frozen resource workspace for built-in and workspace rules', async () => {
     vi.mocked(fetch).mockImplementation((input) => Promise.resolve(respondForRules(input)));
 
     await renderWithRouter(<RulesPage />, { path: '/rules', authenticatedPath: 'rules' });
 
+    const page = document.querySelector<HTMLElement>('[data-slot="page-layout"]');
+    const header = document.querySelector<HTMLElement>('[data-slot="page-header"]');
+    const title = await screen.findByRole('heading', { level: 1, name: 'Rules' });
     const catalog = await screen.findByRole('region', { name: 'Rules catalog' });
-    expect(within(catalog).getByRole('button', { name: 'Required value' })).toBeInTheDocument();
+    const recordAction = within(catalog).getByRole('button', { name: 'Required value' });
+    const createAction = within(catalog).getByRole('button', { name: 'New rule' });
+
+    expect(page).toHaveAttribute('data-scroll-mode', 'contained');
+    expect(page).toHaveClass('h-full', 'min-h-0', 'gap-4', 'p-4', 'sm:p-6', 'lg:p-8');
+    expect(header?.parentElement).toBe(page);
+    expect(title).toHaveAttribute('data-slot', 'page-title');
+    expect(title.closest('[data-slot="page-header"]')).toBe(header);
+    expect(page?.querySelectorAll('[data-slot="page-layout"]')).toHaveLength(0);
+    expect(page?.querySelectorAll('[data-slot="page-header"]')).toHaveLength(1);
+    expect(page?.querySelectorAll('[data-slot="data-table"]')).toHaveLength(1);
+    expect(
+      within(catalog).queryByRole('columnheader', { name: 'Actions' }),
+    ).not.toBeInTheDocument();
+    expect(recordAction).toHaveClass('min-h-11', 'min-w-11', 'sm:min-h-8', 'sm:min-w-8');
+    expect(createAction).toHaveClass('min-h-11', 'min-w-11', 'sm:min-h-8', 'sm:min-w-8');
     expect(within(catalog).getByRole('button', { name: 'Credit threshold' })).toBeInTheDocument();
     expect(within(catalog).getByText('Value, Threshold')).toBeInTheDocument();
     expect(within(catalog).getByRole('columnheader', { name: 'Inputs' })).toBeInTheDocument();

@@ -54,7 +54,7 @@ Use TanStack Router patterns already in the app. Classify every route as authent
 
 ## Component design
 
-Use the approved design system first. Product UI uses the interaction-consistent shadcn primitive when one exists; native fallback variants require a documented platform-native behavior need and explicit sign-off. Select triggers and options use the same user-facing display-label source; never expose raw protocol values as the selected label. Use icons for iconable actions, labels/tooltips for clarity, and stable dimensions for fixed controls.
+Follow the phase gate in the [Axis Visual System](../foundations/visual-system/axis-visual-system.md): before the golden reference is frozen, only its named proving consumer may adopt the draft composition; after freeze, migrated consumers use it first. Product UI uses the interaction-consistent shadcn primitive when one exists; native fallback variants require a documented platform-native behavior need and explicit sign-off. Select triggers and options use the same user-facing display-label source; never expose raw protocol values as the selected label. Use icons for iconable actions, labels/tooltips for clarity, and stable dimensions for fixed controls.
 
 Treat design-system component visuals as owned by the component contract. Feature code uses defaults and documented props; it does not locally alter component visual treatment through style overrides, selectors, or wrapper styling. If the requested UI needs a visual deviation or component API change, stop before implementation, name the deviation, and get explicit user sign-off; this applies even when the broader change is standard-tier.
 

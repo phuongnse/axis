@@ -2,7 +2,7 @@
 
 > **Navigation**: [docs/use-cases/solutions/README.md](./README.md) · [docs/architecture/solutions.md](../../architecture/solutions.md) · [docs/PLATFORM_STRATEGY.md](../../PLATFORM_STRATEGY.md) · [AGENTS.md](../../../AGENTS.md)
 
-> **Contract status:** Implementation is complete outside the pending browser acceptance evidence below.
+> **Contract status:** Implementation and acceptance evidence are complete.
 
 ## Purpose
 
@@ -80,7 +80,7 @@ Allow a Workspace Administrator to publish one trusted, immutable signed solutio
 
 | ID | Boundary | Scenario | Covers AC | Verification | Required |
 |---|---|---|---|---|---|
-| AT-001 | Domain boundary | Exact v1 byte schema, deterministic payload, typed component schema, limits, DAG, DSSE v1.0.2 PAE/base64 vectors, and ES256 verification accept only conformance vectors before a command mutation | AC-001, AC-002, AC-003, AC-006, AC-007, AC-011, AC-016 | Domain test + Application test | Yes |
+| AT-001 | Application boundary | Exact v1 byte schema, deterministic payload, typed component schema, limits, DAG, DSSE v1.0.2 PAE/base64 vectors, and ES256 verification accept only conformance vectors before a command mutation | AC-001, AC-002, AC-003, AC-006, AC-007, AC-011, AC-016 | Application test + API integration test | Yes |
 | AT-002 | Infrastructure boundary | Immutable version uniqueness, exact retry, conflicting bytes, exact envelope-byte retention, audit-outbox atomicity/read-back, and safe projection persistence | AC-004, AC-005, AC-009, AC-010, AC-013 | Infrastructure integration test | Yes |
 | AT-003 | Application boundary | Ledger reconciliation activates a valid revision atomically across replicas; rejects invalid config, missing/revived/substituted keys; and blocks unknown/revoked publication | AC-003, AC-008, AC-009, AC-012 | Application test | Yes |
 | AT-004 | API boundary | Authenticated administrator publish/read-back enforces Workspace authority, stable safe errors, no raw package default, and generated contract parity | AC-001, AC-004, AC-006, AC-010 | API integration test | Yes |
@@ -112,18 +112,14 @@ Required UI quality: status and result information are programmatically labelled
 > | Application | Done |
 > | Infrastructure | Done |
 > | API | Done |
-> | Frontend | Partial |
+> | Frontend | Done |
 > | MCP | Done |
 > | Audit | Done |
 >
-> **Gaps vs spec:**
->
-> | ID | Gap |
-> |---|---|
-> | GAP-001 | The publish component journey passes, but required Playwright AT-005 remains pending against the current checkpoint. |
+> **Gaps vs spec:** None.
 >
 > **Deferred follow-ups:** The explicitly out-of-scope lifecycle capabilities above require their own use cases.
 >
-> **Verification:** Package verification, trusted-ledger reconciliation, immutable persistence, durable audit, API, MCP, and frontend component evidence passes. Browser evidence remains tracked by GAP-001.
+> **Verification:** [publish-signed-solution-version.evidence.md](./publish-signed-solution-version.evidence.md) records the exact package-conformance fixture/vectors, typed preflight, immutable persistence, trust, API, MCP, frontend, and governed browser evidence.
 >
 > **Decisions:** [docs/architecture/solutions.md](../../architecture/solutions.md) owns signature, publisher trust, immutable persistence, audit-outbox, and safe-readback realization.

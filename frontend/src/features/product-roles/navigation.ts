@@ -8,5 +8,6 @@ export const productRolesNavigationContributions: readonly ModuleNavigationContr
     to: '/product-role-assignments',
     group: { id: 'workspace', labelKey: 'nav.group.workspace', order: 100 },
     order: 97,
+    requiresServerAvailability: true,
   },
 ];

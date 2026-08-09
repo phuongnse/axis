@@ -15,6 +15,14 @@ export const administrationTranslations = {
     'serviceIdentities.creating': 'Creating…',
     'serviceIdentities.description':
       'Manage non-human Workspace identities and public ES256 signing keys without handling private key material.',
+    'serviceIdentities.discardCreate': 'Discard identity draft',
+    'serviceIdentities.discardCreateDescription':
+      'The client identifier in this service-identity draft will be discarded.',
+    'serviceIdentities.discardCreateTitle': 'Discard this identity draft?',
+    'serviceIdentities.discardKey': 'Discard public-key draft',
+    'serviceIdentities.discardKeyDescription':
+      'The public JWK in this draft will be discarded. No key material will be submitted.',
+    'serviceIdentities.discardKeyTitle': 'Discard this public-key draft?',
     'serviceIdentities.empty': 'No service identities in this Workspace.',
     'serviceIdentities.forbidden': 'Administrator access required',
     'serviceIdentities.forbiddenDescription':
@@ -32,9 +40,9 @@ export const administrationTranslations = {
       'This key identifier and thumbprint cannot be used again.',
     'serviceIdentities.keysEmpty': 'No public signing keys have been added.',
     'serviceIdentities.keysTitle': 'Signing keys',
+    'serviceIdentities.keepEditing': 'Keep editing',
     'serviceIdentities.listTitle': 'Service identities',
     'serviceIdentities.loadFailed': 'Unable to load service identities',
-    'serviceIdentities.loading': 'Loading service identities…',
     'serviceIdentities.nav': 'Service identities',
     'serviceIdentities.notAvailable': 'Not available',
     'serviceIdentities.publicJwk': 'Public ES256 JWK',
@@ -54,6 +62,7 @@ export const administrationTranslations = {
       'Its Workspace authority was removed immediately and cannot be restored.',
     'serviceIdentities.revokedStatus': 'Revoked',
     'serviceIdentities.subject': 'Subject identifier',
+    'serviceIdentities.status': 'Status',
     'serviceIdentities.title': 'Service identities',
     'serviceIdentities.unavailable': 'Identity service unavailable',
     'serviceIdentities.unavailableDescription':
@@ -73,24 +82,30 @@ export const administrationTranslations = {
     'productRoles.assignmentUnavailable': 'Assignment unavailable',
     'productRoles.conflict': 'Assignment changed',
     'productRoles.conflictDescription': 'Reload the authoritative revision before trying again.',
+    'productRoles.discard': 'Discard assignment draft',
+    'productRoles.discardDescription': 'The selected subject and product role will be discarded.',
+    'productRoles.discardTitle': 'Discard this assignment draft?',
     'productRoles.currentDescription':
       'Exact active assignments reported by the current Workspace policy.',
-    'productRoles.currentTitle': 'Current assignments',
     'productRoles.description':
       'Assign installed product roles without changing Workspace lifecycle roles or subject membership.',
     'productRoles.empty': 'No active product-role assignments.',
+    'productRoles.keepEditing': 'Keep editing',
+    'productRoles.kind': 'Subject kind',
     'productRoles.listLabel': 'Current product-role assignments',
     'productRoles.loadFailed': 'Unable to load product-role management',
-    'productRoles.loading': 'Loading subjects, roles, and assignments…',
     'productRoles.nav': 'Product roles',
     'productRoles.noRoles': 'No installed product roles are available.',
     'productRoles.noSubjects': 'No active human or service subjects are available.',
+    'productRoles.notAvailable': 'Not available',
+    'productRoles.policy': 'Product policy',
     'productRoles.revoke': 'Revoke role',
     'productRoles.revokeDescription':
       'Revoke {role} from {subject}. Product authority is removed immediately.',
     'productRoles.revokeTitle': 'Revoke this exact product role?',
     'productRoles.revoked': 'Product role revoked',
     'productRoles.revokedDescription': 'The exact product authority was removed immediately.',
+    'productRoles.revokedStatus': 'Revoked',
     'productRoles.role': 'Installed product role',
     'productRoles.roleHelp': 'Names and descriptions come from the installed server policy.',
     'productRoles.selectRole': 'Select a product role',
@@ -101,6 +116,7 @@ export const administrationTranslations = {
     'productRoles.subject': 'Active subject',
     'productRoles.subjectHelp':
       'Human members and service identities remain distinct subject kinds.',
+    'productRoles.status': 'Status',
     'productRoles.title': 'Product-role assignments',
     'productRoles.unavailable': 'Assignment unavailable',
     'productRoles.unavailableDescription':
@@ -180,6 +196,9 @@ export const administrationTranslations = {
     'solutions.publishTitle': 'Publish signed version',
     'solutions.publisher': 'Publisher',
     'solutions.publisherKey': 'Publisher key',
+    'solutions.publisherTrustUnavailable': 'Publisher trust unavailable',
+    'solutions.publisherTrustUnavailableDescription':
+      'The package publisher is unavailable or revoked. The local package remains selected; retry after trusted-publisher configuration is restored.',
     'solutions.publishing': 'Verifying and publishing…',
     'solutions.releaseDescription':
       'Safe immutable identity, trust, hashes, and provenance returned by Axis.',
@@ -227,6 +246,14 @@ export const administrationTranslations = {
     'serviceIdentities.creating': 'Đang tạo…',
     'serviceIdentities.description':
       'Quản lý identity phi con người và public key ES256 mà không xử lý private key.',
+    'serviceIdentities.discardCreate': 'Bỏ bản nháp identity',
+    'serviceIdentities.discardCreateDescription':
+      'Client identifier trong bản nháp service identity này sẽ bị bỏ.',
+    'serviceIdentities.discardCreateTitle': 'Bỏ bản nháp identity này?',
+    'serviceIdentities.discardKey': 'Bỏ bản nháp public key',
+    'serviceIdentities.discardKeyDescription':
+      'Public JWK trong bản nháp này sẽ bị bỏ. Không có key material nào được gửi.',
+    'serviceIdentities.discardKeyTitle': 'Bỏ bản nháp public key này?',
     'serviceIdentities.empty': 'Workspace này chưa có service identity.',
     'serviceIdentities.forbidden': 'Cần quyền Administrator',
     'serviceIdentities.forbiddenDescription':
@@ -242,9 +269,9 @@ export const administrationTranslations = {
       'Không thể dùng lại key identifier và thumbprint này.',
     'serviceIdentities.keysEmpty': 'Chưa thêm public signing key.',
     'serviceIdentities.keysTitle': 'Signing keys',
+    'serviceIdentities.keepEditing': 'Tiếp tục chỉnh sửa',
     'serviceIdentities.listTitle': 'Service identities',
     'serviceIdentities.loadFailed': 'Không tải được service identities',
-    'serviceIdentities.loading': 'Đang tải service identities…',
     'serviceIdentities.nav': 'Service identities',
     'serviceIdentities.notAvailable': 'Không có',
     'serviceIdentities.publicJwk': 'Public ES256 JWK',
@@ -264,6 +291,7 @@ export const administrationTranslations = {
       'Workspace authority đã bị xóa ngay và không thể khôi phục.',
     'serviceIdentities.revokedStatus': 'Đã thu hồi',
     'serviceIdentities.subject': 'Subject identifier',
+    'serviceIdentities.status': 'Trạng thái',
     'serviceIdentities.title': 'Service identities',
     'serviceIdentities.unavailable': 'Identity service chưa khả dụng',
     'serviceIdentities.unavailableDescription':
@@ -283,24 +311,30 @@ export const administrationTranslations = {
     'productRoles.assignmentUnavailable': 'Không thể gán role',
     'productRoles.conflict': 'Assignment đã thay đổi',
     'productRoles.conflictDescription': 'Tải revision chính thức trước khi thử lại.',
+    'productRoles.discard': 'Bỏ bản nháp assignment',
+    'productRoles.discardDescription': 'Subject và product role đã chọn sẽ bị bỏ.',
+    'productRoles.discardTitle': 'Bỏ bản nháp assignment này?',
     'productRoles.currentDescription':
       'Các assignment đang hoạt động theo policy Workspace hiện tại.',
-    'productRoles.currentTitle': 'Assignment hiện tại',
     'productRoles.description':
       'Gán product role đã cài mà không thay đổi lifecycle role hoặc membership.',
     'productRoles.empty': 'Chưa có product-role assignment đang hoạt động.',
+    'productRoles.keepEditing': 'Tiếp tục chỉnh sửa',
+    'productRoles.kind': 'Loại subject',
     'productRoles.listLabel': 'Các product-role assignment hiện tại',
     'productRoles.loadFailed': 'Không tải được quản lý product role',
-    'productRoles.loading': 'Đang tải subject, role và assignment…',
     'productRoles.nav': 'Product roles',
     'productRoles.noRoles': 'Không có product role đã cài.',
     'productRoles.noSubjects': 'Không có human hoặc service subject đang hoạt động.',
+    'productRoles.notAvailable': 'Không có',
+    'productRoles.policy': 'Product policy',
     'productRoles.revoke': 'Thu hồi role',
     'productRoles.revokeDescription':
       'Thu hồi {role} khỏi {subject}. Product authority bị xóa ngay.',
     'productRoles.revokeTitle': 'Thu hồi đúng product role này?',
     'productRoles.revoked': 'Đã thu hồi product role',
     'productRoles.revokedDescription': 'Product authority chính xác đã bị xóa ngay.',
+    'productRoles.revokedStatus': 'Đã thu hồi',
     'productRoles.role': 'Product role đã cài',
     'productRoles.roleHelp': 'Tên và mô tả do policy đã cài trên server cung cấp.',
     'productRoles.selectRole': 'Chọn product role',
@@ -311,6 +345,7 @@ export const administrationTranslations = {
     'productRoles.subject': 'Subject đang hoạt động',
     'productRoles.subjectHelp':
       'Human member và service identity vẫn là hai subject kind khác nhau.',
+    'productRoles.status': 'Trạng thái',
     'productRoles.title': 'Product-role assignments',
     'productRoles.unavailable': 'Assignment không khả dụng',
     'productRoles.unavailableDescription':
@@ -390,6 +425,9 @@ export const administrationTranslations = {
     'solutions.publishTitle': 'Publish version đã ký',
     'solutions.publisher': 'Publisher',
     'solutions.publisherKey': 'Publisher key',
+    'solutions.publisherTrustUnavailable': 'Publisher trust chưa khả dụng',
+    'solutions.publisherTrustUnavailableDescription':
+      'Publisher của package hiện chưa khả dụng hoặc đã bị thu hồi. Package cục bộ vẫn được giữ để thử lại sau khi cấu hình trusted publisher được khôi phục.',
     'solutions.publishing': 'Đang kiểm tra và publish…',
     'solutions.releaseDescription': 'Định danh, trust, hash và provenance an toàn do Axis trả về.',
     'solutions.releaseTitle': 'Release đã chọn',

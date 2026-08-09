@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { ApiError } from '@/lib/api';
 import { installSolutionVersion, publishSolutionVersion } from '../api';
 import { SolutionsPage } from './SolutionsPage';
 
@@ -56,7 +57,7 @@ describe('SolutionsPage', () => {
     vi.clearAllMocks();
     api.versions.mockResolvedValue([]);
     api.installations.mockResolvedValue([]);
-    api.publish.mockResolvedValue({ version: version(), isRetry: false });
+    api.publish.mockReset().mockResolvedValue({ version: version(), isRetry: false });
     api.install.mockResolvedValue({
       operation: { id: 'operation-1', status: 'Pending', steps: [] },
       isRetry: false,
@@ -100,6 +101,69 @@ describe('SolutionsPage', () => {
       expect(installSolutionVersion).toHaveBeenCalledWith('version-1', expect.stringMatching(/.+/)),
     );
     await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument());
+  });
+
+  it('retains the local package and retries after publisher trust recovers', async () => {
+    const user = userEvent.setup();
+    const file = new File(['raw-package-secret'], 'retry.axis-solution', {
+      type: 'application/vnd.dsse.envelope.v1+json',
+    });
+    api.publish
+      .mockRejectedValueOnce(
+        new ApiError(409, {
+          code: 'solutions.package.publisher_untrusted',
+          detail: 'publisher-private-diagnostic',
+        }),
+      )
+      .mockResolvedValueOnce({ version: version(), isRetry: false });
+
+    renderPage();
+    await user.upload(screen.getByLabelText('Signed solution package'), file);
+    await user.click(screen.getByRole('button', { name: 'Publish package' }));
+    await user.click(screen.getByRole('button', { name: 'Publish package' }));
+
+    expect(await screen.findByText('Publisher trust unavailable')).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'The package publisher is unavailable or revoked. The local package remains selected; retry after trusted-publisher configuration is restored.',
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Selected retry.axis-solution (18 B)')).toBeInTheDocument();
+    expect(screen.queryByText('publisher-private-diagnostic')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Retry' }));
+
+    await waitFor(() => expect(publishSolutionVersion).toHaveBeenCalledTimes(2));
+    expect(publishSolutionVersion).toHaveBeenLastCalledWith(file, expect.anything());
+    expect(await screen.findByText('Solution version published')).toBeInTheDocument();
+  });
+
+  it('keeps a generic publish conflict mapped to solution changed', async () => {
+    const user = userEvent.setup();
+    api.publish.mockRejectedValueOnce(
+      new ApiError(409, {
+        code: 'solutions.version.identity_conflict',
+        detail: 'conflicting-package-private-diagnostic',
+      }),
+    );
+
+    renderPage();
+    await user.upload(
+      screen.getByLabelText('Signed solution package'),
+      new File(['package'], 'conflict.axis-solution', {
+        type: 'application/vnd.dsse.envelope.v1+json',
+      }),
+    );
+    await user.click(screen.getByRole('button', { name: 'Publish package' }));
+    await user.click(screen.getByRole('button', { name: 'Publish package' }));
+
+    expect(await screen.findByText('Solution changed')).toBeInTheDocument();
+    expect(
+      screen.getByText('Refresh the authoritative state before retrying.'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Publisher trust unavailable')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument();
+    expect(screen.queryByText('conflicting-package-private-diagnostic')).not.toBeInTheDocument();
   });
 
   it('reopens a durable failed operation from the installation list after reload', async () => {

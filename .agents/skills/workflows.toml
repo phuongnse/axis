@@ -42,3 +42,43 @@ from = "review-approved"
 to = "published"
 owner = "skill:axis-pull-request"
 evidence = "validated-remote-state"
+
+[workflows.ui-design]
+initial = "requested"
+terminal_states = ["frozen"]
+states = ["requested", "authorized", "defined", "reference-ready", "frozen"]
+
+[[workflows.ui-design.transitions]]
+id = "authorize-ui-design"
+from = "requested"
+to = "authorized"
+owner = "skill:axis-design-gate"
+evidence = "current-design-dossier-and-required-sign-off"
+
+[[workflows.ui-design.transitions]]
+id = "define-ui-system"
+from = "authorized"
+to = "defined"
+owner = "skill:axis-ui-system"
+evidence = "current-owned-visual-contract"
+
+[[workflows.ui-design.transitions]]
+id = "build-golden-reference"
+from = "defined"
+to = "reference-ready"
+owner = "skill:axis-ui-system"
+evidence = "running-golden-reference-and-focused-browser-evidence"
+
+[[workflows.ui-design.transitions]]
+id = "revise-golden-reference"
+from = "reference-ready"
+to = "defined"
+owner = "skill:axis-ui-system"
+evidence = "requested-visual-contract-change"
+
+[[workflows.ui-design.transitions]]
+id = "freeze-ui-system"
+from = "reference-ready"
+to = "frozen"
+owner = "skill:axis-ui-system"
+evidence = "explicit-user-visual-acceptance"

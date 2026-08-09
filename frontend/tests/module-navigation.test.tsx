@@ -109,14 +109,31 @@ describe('module navigation', () => {
 
     render(<ModuleNavigation context={{ pathname: '/rules' }} items={items} />);
 
-    expect(screen.getByRole('navigation', { name: 'Modules' })).toBeInTheDocument();
+    const navigation = screen.getByRole('navigation', { name: 'Modules' });
+    expect(navigation).toHaveClass('bg-card');
+    expect(navigation).not.toHaveClass('bg-card/80', 'backdrop-blur');
     expect(screen.getByText('Workspace')).toBeInTheDocument();
     const businessObjectsLink = screen.getByRole('link', { name: 'Business objects' });
     expect(businessObjectsLink).toHaveAttribute('href', '/business-objects');
     expect(businessObjectsLink).toHaveClass(
+      'h-8',
+      'min-h-11',
+      'min-w-11',
+      'md:min-h-0',
+      'md:min-w-0',
+      'md:w-full',
+    );
+    const navigationIcon = businessObjectsLink.querySelector('svg');
+    expect(navigationIcon).toHaveClass('size-5');
+    expect(navigationIcon).not.toHaveClass('size-4');
+    expect(businessObjectsLink).toHaveClass(
       'hover:bg-accent',
       'hover:text-accent-foreground',
       'dark:hover:bg-accent',
+      'transition-colors',
+      'duration-150',
+      'ease-out',
+      'motion-reduce:transition-none',
     );
     expect(businessObjectsLink).not.toHaveClass('dark:hover:bg-muted/50');
     const rulesLink = screen.getByRole('link', { name: 'Rules' });
@@ -140,5 +157,46 @@ describe('module navigation', () => {
       'rules.fieldDefinitions',
       'solutions.management',
     ]);
+  });
+
+  it('renders only production contributions returned by the server availability projection', () => {
+    const visible = visibleModuleNavigationContributions(moduleNavigationContributions, {
+      pathname: '/business-objects',
+      availableContributionIds: new Set(['identity.memberships', 'businessObjects.definitions']),
+    });
+
+    expect(visible.map((item) => item.id)).toEqual([
+      'identity.memberships',
+      'businessObjects.definitions',
+    ]);
+  });
+
+  it('reveals the active item when the responsive navigation viewport changes', () => {
+    const items = visibleModuleNavigationContributions(moduleNavigationContributions, {
+      pathname: '/rules',
+      availableContributionIds: new Set(['businessObjects.definitions', 'rules.fieldDefinitions']),
+    });
+    const scrollIntoView = vi.fn();
+    const originalScrollIntoView = Object.getOwnPropertyDescriptor(
+      HTMLElement.prototype,
+      'scrollIntoView',
+    );
+    Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
+      configurable: true,
+      value: scrollIntoView,
+    });
+
+    try {
+      render(<ModuleNavigation context={{ pathname: '/rules' }} items={items} />);
+
+      expect(scrollIntoView).toHaveBeenCalledWith({ block: 'nearest', inline: 'center' });
+      expect(screen.getByRole('link', { name: 'Rules' })).toHaveAttribute('aria-current', 'page');
+    } finally {
+      if (originalScrollIntoView) {
+        Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', originalScrollIntoView);
+      } else {
+        Reflect.deleteProperty(HTMLElement.prototype, 'scrollIntoView');
+      }
+    }
   });
 });

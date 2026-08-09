@@ -12,5 +12,6 @@ export const rulesNavigationContributions: readonly ModuleNavigationContribution
       order: 100,
     },
     order: 110,
+    requiresServerAvailability: true,
   },
 ];

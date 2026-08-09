@@ -1,3 +1,4 @@
+import path from 'node:path';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -8,6 +9,7 @@ import { restoreBrowserSession, signOutUser } from '@/features/auth/api';
 import { useAuthStore } from '@/features/auth/auth-store';
 import { getCurrentUserProfile } from '@/features/dashboard/api';
 import { invalidateClientRequestSession } from '@/lib/api';
+import type { ModuleNavigationContribution } from '@/lib/module-navigation';
 import { AppShell } from '../src/components/shared/AppShell';
 import { ManagedDialog, ManagedDialogBody } from '../src/components/shared/ManagedDialog';
 import {
@@ -20,6 +22,7 @@ import {
 const routerState = { location: { pathname: '/dashboard' } };
 const navigateMock = vi.fn();
 const routerInvalidateMock = vi.fn(() => Promise.resolve());
+const moduleNavigationAvailabilityMock = vi.hoisted(() => vi.fn());
 const testWindowRenderers: ManagedWindowRendererRegistry = {
   test: TestWindowRenderer,
   'sizing-test': SizingTestWindowRenderer,
@@ -82,6 +85,13 @@ vi.mock('@/features/dashboard/api', () => ({
   getCurrentUserProfile: vi.fn(),
 }));
 
+vi.mock('@/lib/module-navigation-api', () => ({
+  moduleNavigationAvailabilityQueryOptions: () => ({
+    queryKey: ['module-navigation-availability'],
+    queryFn: moduleNavigationAvailabilityMock,
+  }),
+}));
+
 describe('AppShell', () => {
   beforeEach(() => {
     vi.stubGlobal(
@@ -113,8 +123,18 @@ describe('AppShell', () => {
       language: 'en',
       theme: 'light',
       workspaceId: '22222222-2222-4222-8222-222222222222',
-      workspaces: [],
+      workspaces: [
+        {
+          id: '22222222-2222-4222-8222-222222222222',
+          name: 'Axis Reference Product',
+          slug: 'axis-reference-product',
+          type: 'Organization',
+          isCurrent: true,
+        },
+      ],
     });
+    moduleNavigationAvailabilityMock.mockReset();
+    moduleNavigationAvailabilityMock.mockResolvedValue({ availableContributionIds: [] });
     useAuthStore.getState().setBrowserSession({
       authenticated: true,
       csrfToken: 'csrf-token',
@@ -150,7 +170,10 @@ describe('AppShell', () => {
       </QueryClientProvider>,
     );
 
-    expect(screen.getByRole('banner')).toHaveTextContent('Dashboard');
+    const appHeader = screen.getByRole('banner');
+    expect(appHeader).toHaveTextContent('Dashboard');
+    expect(appHeader).toHaveClass('bg-card');
+    expect(appHeader).not.toHaveClass('bg-card/95', 'backdrop-blur');
     expect(await screen.findByText('Ada Lovelace')).toBeInTheDocument();
     const accountMenu = screen.getByRole('button', { name: 'Account menu' });
     expect(accountMenu).toHaveClass('h-9', 'hover:bg-muted', 'dark:hover:bg-muted/50');
@@ -159,12 +182,15 @@ describe('AppShell', () => {
       'data-size',
       'default',
     );
+    await waitFor(() => expect(accountMenu).toHaveTextContent('Axis Reference Product'));
     await user.click(accountMenu);
     expect(accountMenu).toHaveAttribute('aria-expanded', 'true');
     expect(screen.queryByText('Profile')).not.toBeInTheDocument();
-    expect(screen.getAllByText('AL')).toHaveLength(1);
+    expect(accountMenu.querySelector('.lucide-building-2')).not.toBeNull();
+    expect(screen.queryByText('AL')).not.toBeInTheDocument();
     expect(screen.getAllByText('Ada Lovelace')).toHaveLength(1);
     expect(screen.getByText('Preferences')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Simulate Workspace change' })).toBeInTheDocument();
     expect(screen.getByText('Language control')).toBeInTheDocument();
     expect(screen.getByText('Theme control')).toBeInTheDocument();
     const signOut = screen.getByRole('button', { name: 'Sign out' });
@@ -182,6 +208,19 @@ describe('AppShell', () => {
     expect(windowHost).not.toBeNull();
     expect(windowHost?.parentElement).toContainElement(screen.getByRole('main'));
     expect(windowHost?.parentElement?.nextElementSibling).toBe(footer);
+  });
+
+  it('statically guards the app-wide reduced-motion base rule', async () => {
+    const fs = await import('node:fs');
+    const indexStyles = fs.readFileSync(path.resolve(__dirname, '../src/index.css'), 'utf-8');
+
+    expect(indexStyles).toContain('@media (prefers-reduced-motion: reduce)');
+    expect(indexStyles).toContain('animation-duration: 0.01ms');
+    expect(indexStyles).toContain('animation-delay: 0ms');
+    expect(indexStyles).toContain('animation-iteration-count: 1');
+    expect(indexStyles).toContain('transition-duration: 0.01ms');
+    expect(indexStyles).toContain('transition-delay: 0ms');
+    expect(indexStyles).toContain('scroll-behavior: auto');
   });
 
   it('renders the Rules route title in the authenticated app frame', () => {
@@ -203,6 +242,84 @@ describe('AppShell', () => {
     );
 
     expect(screen.getByRole('banner')).toHaveTextContent('Rules');
+  });
+
+  it('shows the user name instead of the Workspace name for a Personal context', async () => {
+    vi.mocked(getCurrentUserProfile).mockResolvedValue({
+      id: '11111111-1111-4111-8111-111111111111',
+      email: 'ada@example.com',
+      fullName: 'Ada Lovelace',
+      isActive: true,
+      language: 'en',
+      theme: 'light',
+      workspaceId: '22222222-2222-4222-8222-222222222222',
+      workspaces: [
+        {
+          id: '22222222-2222-4222-8222-222222222222',
+          name: 'Personal workspace',
+          slug: 'personal-workspace',
+          type: 'Personal',
+          isCurrent: true,
+        },
+      ],
+    });
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <AppShell navigationContributions={[]}>
+          <section>Frame content</section>
+        </AppShell>
+      </QueryClientProvider>,
+    );
+
+    const accountMenu = screen.getByRole('button', { name: 'Account menu' });
+    await waitFor(() => expect(accountMenu).toHaveTextContent('Ada Lovelace'));
+    expect(accountMenu).toHaveTextContent('AL');
+    expect(accountMenu.querySelector('.lucide-building-2')).toBeNull();
+    expect(accountMenu).not.toHaveTextContent('Personal workspace');
+  });
+
+  it('renders only navigation contributions reported available by the server', async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    const contributions: ModuleNavigationContribution[] = [
+      {
+        id: 'businessObjects.definitions',
+        labelKey: 'businessObjects.nav.definitions',
+        icon: 'businessObjects',
+        to: '/business-objects',
+        group: { id: 'workspace', labelKey: 'nav.group.workspace', order: 100 },
+        order: 100,
+        requiresServerAvailability: true,
+      },
+      {
+        id: 'rules.fieldDefinitions',
+        labelKey: 'rules.nav.definitions',
+        icon: 'rules',
+        to: '/rules',
+        group: { id: 'workspace', labelKey: 'nav.group.workspace', order: 100 },
+        order: 110,
+        requiresServerAvailability: true,
+      },
+    ];
+    moduleNavigationAvailabilityMock.mockResolvedValue({
+      availableContributionIds: ['businessObjects.definitions'],
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <AppShell navigationContributions={contributions}>
+          <section aria-label="Work area">Frame content</section>
+        </AppShell>
+      </QueryClientProvider>,
+    );
+
+    expect(await screen.findByRole('link', { name: 'Business objects' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Rules' })).not.toBeInTheDocument();
   });
 
   it('keeps managed windows mounted across route content changes and clears them on sign-out', async () => {
@@ -265,6 +382,7 @@ describe('AppShell', () => {
     await user.click(screen.getByRole('button', { name: 'Open test window' }));
     expect(await screen.findByRole('dialog', { name: 'Persistent test window' })).toBeVisible();
 
+    await user.click(screen.getByRole('button', { name: 'Account menu' }));
     await user.click(screen.getByRole('button', { name: 'Simulate Workspace change' }));
 
     expect(await screen.findByText('Refreshing Workspace')).toBeVisible();

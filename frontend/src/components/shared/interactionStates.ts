@@ -1,5 +1,5 @@
 export const transientItemHighlight =
-  'hover:bg-accent hover:text-accent-foreground focus-visible:bg-accent focus-visible:text-accent-foreground dark:hover:bg-accent dark:hover:text-accent-foreground';
+  'hover:bg-accent hover:text-accent-foreground focus-visible:bg-accent focus-visible:text-accent-foreground dark:hover:bg-accent dark:hover:text-accent-foreground transition-colors duration-150 ease-out motion-reduce:transition-none';
 
 export const persistentItemHighlight =
   'bg-secondary text-secondary-foreground hover:bg-secondary hover:text-secondary-foreground dark:hover:bg-secondary dark:hover:text-secondary-foreground';

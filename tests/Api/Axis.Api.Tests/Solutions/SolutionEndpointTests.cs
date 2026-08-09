@@ -9,7 +9,9 @@ using Axis.Solutions.Application;
 using Axis.Solutions.Domain;
 using Axis.Solutions.Infrastructure.Persistence;
 using FluentAssertions;
+using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
+using Swashbuckle.AspNetCore.Swagger;
 
 namespace Axis.Api.Tests.Solutions;
 
@@ -30,6 +32,52 @@ public sealed class SolutionEndpointTests(ApiTestFixture fixture)
         (await anonymous.GetAsync(
             $"/api/solutions/operations/{Guid.NewGuid()}",
             TestContext.Current.CancellationToken)).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public void SolutionLifecycleSurface_WhenEnumerated_ContainsOnlyThePublishedWorkflowContracts()
+    {
+        using IServiceScope scope = fixture.CreateScope();
+        EndpointDataSource endpoints = scope.ServiceProvider.GetRequiredService<EndpointDataSource>();
+        string[] routes = endpoints.Endpoints
+            .OfType<RouteEndpoint>()
+            .Where(endpoint => endpoint.RoutePattern.RawText?.StartsWith(
+                "/api/solutions",
+                StringComparison.Ordinal) is true)
+            .SelectMany(endpoint => endpoint.Metadata.GetRequiredMetadata<HttpMethodMetadata>().HttpMethods
+                .Select(method => $"{method} {endpoint.RoutePattern.RawText}"))
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+        string[] expectedRoutes =
+        [
+            "GET /api/solutions/installations",
+            "GET /api/solutions/operations/{operationId:guid}",
+            "GET /api/solutions/versions",
+            "GET /api/solutions/versions/{solutionVersionId:guid}",
+            "POST /api/solutions/operations/{operationId:guid}/resume",
+            "POST /api/solutions/versions",
+            "POST /api/solutions/versions/{solutionVersionId:guid}/installations",
+        ];
+        routes.Should().Equal(expectedRoutes);
+
+        ISwaggerProvider provider = scope.ServiceProvider.GetRequiredService<ISwaggerProvider>();
+        string[] openApiRoutes = provider.GetSwagger("v1").Paths
+            .Where(path => path.Key.StartsWith("/api/solutions", StringComparison.Ordinal))
+            .SelectMany(path => (path.Value.Operations ?? []).Keys.Select(method =>
+                $"{method.ToString().ToUpperInvariant()} {path.Key}"))
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+        string[] expectedOpenApiRoutes =
+        [
+            "GET /api/solutions/installations",
+            "GET /api/solutions/operations/{operationId}",
+            "GET /api/solutions/versions",
+            "GET /api/solutions/versions/{solutionVersionId}",
+            "POST /api/solutions/operations/{operationId}/resume",
+            "POST /api/solutions/versions",
+            "POST /api/solutions/versions/{solutionVersionId}/installations",
+        ];
+        openApiRoutes.Should().Equal(expectedOpenApiRoutes);
     }
 
     [Fact]

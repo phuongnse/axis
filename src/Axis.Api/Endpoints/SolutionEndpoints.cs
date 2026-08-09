@@ -162,6 +162,10 @@ public static class SolutionEndpoints
         {
             return ToProblem(exception.ProblemCode);
         }
+        catch (SolutionAdapterException exception)
+        {
+            return ToProblem(exception.ProblemCode);
+        }
     }
 
     private static async Task<IResult> Install(
@@ -393,6 +397,9 @@ public static class SolutionEndpoints
             "solutions.package.publisher_untrusted" or
             "solutions.package.axis_openapi_mismatch" or
             "solutions.install.readback_mismatch" => StatusCodes.Status409Conflict,
+            "authorization.policy_invalid" or
+            "businessObjects.definition_component_invalid" or
+            "rules.binding_component_invalid" => StatusCodes.Status422UnprocessableEntity,
             _ when problemCode.StartsWith("authorization.", StringComparison.Ordinal) =>
                 StatusCodes.Status409Conflict,
             _ when problemCode.StartsWith("businessObjects.", StringComparison.Ordinal) =>

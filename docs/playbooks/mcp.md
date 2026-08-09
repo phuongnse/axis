@@ -43,7 +43,7 @@ The coverage catalog classifies every committed OpenAPI operation and is updated
 
 `AxisMcpOperationCatalog` and its coverage tests own every typed tool name and schema.
 
-The six account/browser-session operations (`RegisterUser`, `SignInUser`, `VerifyEmail`, `ResendEmailVerification`, `SignOutUser`, and `GetBrowserSession`) are classified but not exposed as product-work tools. Browser/OAuth bootstrap owns those session concerns, `/connect/*` is MCP's internal OAuth transport, and identity/scope always come from the access token.
+The account/browser-session operations (`RegisterUser`, `SignInUser`, `VerifyEmail`, `ResendEmailVerification`, `SignOutUser`, and `GetBrowserSession`) and the SPA-only `GetModuleNavigationAvailability` projection are classified but not exposed as product-work tools. Browser/OAuth bootstrap owns those session concerns, the App Shell owns its navigation projection, `/connect/*` is MCP's internal OAuth transport, and identity/scope always come from the access token.
 
 ## Mutation contract
 

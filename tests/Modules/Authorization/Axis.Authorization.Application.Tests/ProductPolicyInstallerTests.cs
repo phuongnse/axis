@@ -238,6 +238,58 @@ public sealed class ProductPolicyInstallerTests
             Arg.Any<CancellationToken>());
     }
 
+    [Theory]
+    [InlineData("missing-en")]
+    [InlineData("invalid-language")]
+    [InlineData("duplicate-language")]
+    [InlineData("display-not-nfc")]
+    [InlineData("description-not-nfc")]
+    [InlineData("display-too-long")]
+    [InlineData("description-too-long")]
+    public async Task Install_InvalidLocalizedRolePresentation_RejectsBeforeMutation(string caseName)
+    {
+        Context context = Create();
+        Dictionary<string, ProductRolePresentation> presentation = caseName switch
+        {
+            "missing-en" => new() { ["vi"] = new("Ứng viên", null) },
+            "invalid-language" => new() { ["en"] = new("Applicant", null), ["en_US"] = new("Applicant", null) },
+            "duplicate-language" => new() { ["en"] = new("Applicant", null), ["EN"] = new("Applicant", null) },
+            "display-not-nfc" => new() { ["en"] = new("Cafe\u0301", null) },
+            "description-not-nfc" => new() { ["en"] = new("Applicant", "Cafe\u0301") },
+            "display-too-long" => new() { ["en"] = new(new string('a', 257), null) },
+            "description-too-long" => new() { ["en"] = new("Applicant", new string('a', 2049)) },
+            _ => throw new ArgumentOutOfRangeException(nameof(caseName)),
+        };
+        ProductPolicyRole invalidRole = context.Request.Component.Roles[0] with { Presentation = presentation };
+        InstallProductPolicyRequest request = context.Request with
+        {
+            Component = context.Request.Component with
+            {
+                Roles = [invalidRole, context.Request.Component.Roles[1]],
+            },
+        };
+
+        ProductPolicyInstallResult result = await context.Installer.InstallAsync(
+            request,
+            TestContext.Current.CancellationToken);
+
+        Assert.False(result.IsInstalled);
+        Assert.Equal("authorization.policy_invalid", result.Error);
+        await context.Store.DidNotReceive().AddAsync(
+            Arg.Any<StoredProductPolicy>(),
+            Arg.Any<CancellationToken>());
+        await context.Store.DidNotReceive().TryUpdateProvenanceAsync(
+            Arg.Any<Guid>(),
+            Arg.Any<Guid>(),
+            Arg.Any<string>(),
+            Arg.Any<string>(),
+            Arg.Any<CancellationToken>());
+        await context.UnitOfWork.DidNotReceive().BeginAsync(Arg.Any<CancellationToken>());
+        await context.UnitOfWork.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
+        await context.UnitOfWork.DidNotReceive().CommitAsync(Arg.Any<CancellationToken>());
+        await context.UnitOfWork.DidNotReceive().RollbackAsync(Arg.Any<CancellationToken>());
+    }
+
     private static Context Create(bool readBack = true)
     {
         IInstalledProductPolicyStore store = Substitute.For<IInstalledProductPolicyStore>();

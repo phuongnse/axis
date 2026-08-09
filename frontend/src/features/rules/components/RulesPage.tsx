@@ -13,9 +13,9 @@ import {
   type DataTableQueryState,
 } from '@/components/shared/data-table';
 import { useManagedWindowActions } from '@/components/shared/ManagedWindowManager';
+import { PageAction, PageHeader, PageLayout } from '@/components/shared/PageLayout';
 import { StatusBadge, type StatusBadgeTone } from '@/components/shared/StatusBadge';
 import { StatusNotice } from '@/components/shared/StatusNotice';
-import { Button } from '@/components/ui/button';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { ApiError } from '@/lib/api';
 import { referenceContent } from '@/lib/reference-metadata';
@@ -201,14 +201,14 @@ export function RulesPage() {
       grouping: false,
       renderToolbarActions: canStartCreate
         ? () => (
-            <Button
+            <PageAction
               type="button"
               size="sm"
               onClick={() => openWindow(ruleCreateWindowDescriptor(t('rules.createTitle')))}
             >
               <Plus aria-hidden />
               {t('rules.newRule')}
-            </Button>
+            </PageAction>
           )
         : undefined,
       loading: definitionsQuery.isFetching,
@@ -232,36 +232,27 @@ export function RulesPage() {
   ]);
 
   return (
-    <div className="flex h-full min-h-0 w-full min-w-0 flex-col gap-4 overflow-hidden p-4 sm:p-6 lg:p-8">
-      <header className="min-w-0 shrink-0">
-        <div className="min-w-0">
-          <h1 className="font-heading text-2xl font-semibold text-foreground">
-            {t('rules.title')}
-          </h1>
-          <p className="mt-1 max-w-3xl text-sm leading-6 text-muted-foreground">
-            {t('rules.pageDescription')}
-          </p>
-        </div>
-      </header>
+    <PageLayout scrollMode="contained">
+      <PageHeader title={t('rules.title')} description={t('rules.pageDescription')} />
 
       {actionsUnavailable ? (
         <StatusNotice tone="warning" title={t('rules.actionsUnavailableTitle')}>
           <span>{t('rules.actionsUnavailableDescription')}</span>{' '}
-          <Button
+          <PageAction
             type="button"
             variant="link"
             disabled={collectionActionsQuery.isFetching}
             onClick={() => void collectionActionsQuery.refetch()}
           >
             {t('app.retry')}
-          </Button>
+          </PageAction>
         </StatusNotice>
       ) : null}
 
       <div className="min-h-0 flex-1">
         <DataTable definition={tableDefinition} />
       </div>
-    </div>
+    </PageLayout>
   );
 }
 
@@ -277,15 +268,9 @@ function RuleIdentityCell({
   return (
     <div className="min-w-0 whitespace-normal">
       {onOpen ? (
-        <Button
-          data-slot="rule-table-value"
-          type="button"
-          variant="link"
-          className="h-auto p-0"
-          onClick={onOpen}
-        >
+        <PageAction data-slot="rule-table-value" type="button" variant="link" onClick={onOpen}>
           {name}
-        </Button>
+        </PageAction>
       ) : (
         <p data-slot="rule-table-value" className="font-semibold text-foreground">
           {name}

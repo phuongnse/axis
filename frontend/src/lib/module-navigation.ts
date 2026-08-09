@@ -21,6 +21,7 @@ export interface ModuleNavigationGroup {
 
 export interface ModuleNavigationContext {
   pathname: string;
+  availableContributionIds?: ReadonlySet<string>;
 }
 
 export interface ModuleNavigationContribution {
@@ -30,6 +31,7 @@ export interface ModuleNavigationContribution {
   to: ModuleNavigationRouteTarget;
   group: ModuleNavigationGroup;
   order: number;
+  requiresServerAvailability?: boolean;
   isVisible?: (context: ModuleNavigationContext) => boolean;
   isActive?: (context: ModuleNavigationContext) => boolean;
 }
@@ -59,6 +61,11 @@ export function visibleModuleNavigationContributions(
 ): VisibleModuleNavigationContribution[] {
   return contributions
     .filter(isValidContribution)
+    .filter(
+      (contribution) =>
+        !contribution.requiresServerAvailability ||
+        context.availableContributionIds?.has(contribution.id) === true,
+    )
     .filter((contribution) => contribution.isVisible?.(context) ?? true)
     .map((contribution) => ({
       ...contribution,

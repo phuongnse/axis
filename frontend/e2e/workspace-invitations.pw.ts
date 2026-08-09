@@ -128,7 +128,7 @@ async function signOut(page: Page): Promise<void> {
 }
 
 async function createOrganizationAndEnter(page: Page, organizationName: string): Promise<void> {
-  await page.getByRole('button', { name: 'Workspace control' }).click();
+  await page.getByRole('button', { name: 'Account menu' }).click();
   await page.getByRole('button', { name: 'Create Organization' }).click();
   const createDialog = page.getByRole('dialog', { name: 'Create Organization' });
   await createDialog.getByRole('textbox', { name: 'Organization name' }).fill(organizationName);
@@ -138,20 +138,20 @@ async function createOrganizationAndEnter(page: Page, organizationName: string):
     .getByRole('button', { name: 'Enter Workspace' })
     .click();
   await expect(page).toHaveURL(/\/dashboard$/);
-  await expect(page.getByRole('button', { name: 'Workspace control' })).toContainText(
-    organizationName,
-    { timeout: 30_000 },
-  );
+  await expect(page.getByRole('button', { name: 'Account menu' })).toContainText(organizationName, {
+    timeout: 30_000,
+  });
 }
 
 async function inviteMember(page: Page, email: string): Promise<void> {
   await page.goto('/memberships');
-  await page.getByLabel('Recipient email').fill(email);
-  await page.getByRole('button', { name: 'Invite member' }).click();
-  await expect(page.getByText('Invitation outcome confirmed')).toBeVisible();
-  await expect(page.getByRole('table', { name: 'Workspace invitation outcomes' })).toContainText(
-    email,
-  );
+  const table = page.getByRole('region', { name: 'Workspace invitation outcomes' });
+  await table.getByRole('button', { name: 'Invite member' }).click();
+  const invitation = page.getByRole('dialog', { name: 'Invite member' });
+  await invitation.getByLabel('Recipient email').fill(email);
+  await invitation.getByRole('button', { name: 'Invite member' }).click();
+  await expect(invitation.getByText('Invitation outcome confirmed')).toBeVisible();
+  await expect(table).toContainText(email);
 }
 
 async function openInvitationWithoutRetainingToken(page: Page, link: string): Promise<string> {

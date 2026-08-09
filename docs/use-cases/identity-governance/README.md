@@ -12,4 +12,4 @@ Identity Governance owns organizations, workspace access, memberships, invitatio
 | [docs/use-cases/identity-governance/switch-active-workspace.md](./switch-active-workspace.md) | Done |
 | [docs/use-cases/identity-governance/invite-workspace-member.md](./invite-workspace-member.md) | Done |
 | [docs/use-cases/identity-governance/accept-workspace-invitation.md](./accept-workspace-invitation.md) | Done |
-| [docs/use-cases/identity-governance/manage-workspace-service-identities.md](./manage-workspace-service-identities.md) | Partial |
+| [docs/use-cases/identity-governance/manage-workspace-service-identities.md](./manage-workspace-service-identities.md) | Done |

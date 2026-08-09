@@ -15,6 +15,7 @@ Follow [reference.md](../reference.md).
 - Do not substitute a broad suite for missing targeted evidence.
 - Run checks only for touched surfaces. During the inner loop, run the focused proof owned by the current writer; run a triggered broad suite once at the immutable review boundary.
 - One agent owns each check. Reuse current checkpoint evidence across agents and do not repeat a passing check unless a later edit or concrete finding invalidates it.
+- Do not run multiple .NET build, test, format, migration, or generation workflows concurrently in one checkout unless every workflow has explicitly isolated `obj` and `bin` outputs. Shared MSBuild artifacts make concurrent results invalid; sequence those commands and parallelize only independent non-.NET surfaces.
 - `$axis-review-readiness` owns immutable review-boundary verification.
 - Editing durable guidance **Requires** entering `$axis-doc-hygiene` before edit; reuse an active handoff supplied by the caller.
 - Report omitted checks with a reason.

@@ -17,4 +17,7 @@
     <ProjectReference Include="../../../../src/Modules/Solutions/Axis.Solutions.Application/Axis.Solutions.Application.csproj" />
     <ProjectReference Include="../../../../src/Modules/Solutions/Axis.Solutions.Infrastructure/Axis.Solutions.Infrastructure.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <Content Include="Fixtures/solution-package-v1.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>

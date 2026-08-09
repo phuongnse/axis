@@ -836,12 +836,15 @@ function DefinitionDetails({
   onNameChange: (value: string) => void;
 }) {
   const { t } = useTranslation();
+  const inputId = useId();
+  const nameInputId = `${inputId}-name`;
+  const objectKeyInputId = `${inputId}-object-key`;
   return (
     <div className="grid gap-4 md:grid-cols-2">
       <Field data-invalid={Boolean(nameError)}>
-        <FieldLabel htmlFor="business-object-name">{t('businessObjects.name')}</FieldLabel>
+        <FieldLabel htmlFor={nameInputId}>{t('businessObjects.name')}</FieldLabel>
         <Input
-          id="business-object-name"
+          id={nameInputId}
           value={name}
           readOnly={readOnly}
           aria-invalid={Boolean(nameError)}
@@ -851,8 +854,8 @@ function DefinitionDetails({
         <FieldDescription>{t('businessObjects.nameHelp')}</FieldDescription>
       </Field>
       <Field>
-        <FieldLabel htmlFor="business-object-key">{t('businessObjects.objectKey')}</FieldLabel>
-        <Input id="business-object-key" value={objectKey} readOnly aria-readonly="true" />
+        <FieldLabel htmlFor={objectKeyInputId}>{t('businessObjects.objectKey')}</FieldLabel>
+        <Input id={objectKeyInputId} value={objectKey} readOnly aria-readonly="true" />
         <FieldDescription>{t('businessObjects.objectKeyHelp')}</FieldDescription>
       </Field>
     </div>

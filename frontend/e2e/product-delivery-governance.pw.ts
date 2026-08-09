@@ -1,4 +1,4 @@
-import { expect, type Page, type Route, test } from '@playwright/test';
+import { expect, type Locator, type Page, type Route, test } from '@playwright/test';
 import type * as ApiTypes from '../src/lib/api-generated';
 
 const profile = {
@@ -81,6 +81,15 @@ async function mockAuthenticatedSession(page: Page): Promise<void> {
         isCurrent: true,
       },
     ]),
+  );
+  await page.route('**/api/module-navigation', (route) =>
+    fulfillJson(route, 200, {
+      availableContributionIds: [
+        'identity.service-identities',
+        'authorization.product-roles',
+        'solutions.management',
+      ],
+    }),
   );
 }
 
@@ -177,6 +186,9 @@ test('manage-workspace-service-identities AT-006 recovers a key conflict and rev
   await expect(
     page.getByRole('heading', { level: 1, name: 'Service identities', exact: true }),
   ).toBeVisible();
+  const table = page.getByRole('region', { name: 'Service identities' });
+  await table.getByRole('button', { name: 'invoice-worker' }).click();
+  const firstIdentityDialog = page.getByRole('dialog', { name: 'invoice-worker' });
 
   const publicJwk = JSON.stringify({
     kty: 'EC',
@@ -185,9 +197,9 @@ test('manage-workspace-service-identities AT-006 recovers a key conflict and rev
     x: 'public-x-coordinate',
     y: 'public-y-coordinate',
   });
-  const jwkInput = page.getByRole('textbox', { name: 'Public ES256 JWK' });
+  const jwkInput = firstIdentityDialog.getByRole('textbox', { name: 'Public ES256 JWK' });
   await jwkInput.fill(publicJwk);
-  const addKey = page.getByRole('button', { name: 'Add public key' });
+  const addKey = firstIdentityDialog.getByRole('button', { name: 'Add public key' });
   await addKey.focus();
   await expect(addKey).toBeFocused();
   await page.keyboard.press('Enter');
@@ -195,20 +207,27 @@ test('manage-workspace-service-identities AT-006 recovers a key conflict and rev
   await expect(addKey).toBeDisabled();
   await expect(jwkInput).toBeDisabled();
   releaseFirstAdd.resolve();
-  await expect(page.getByText('Identity changed')).toBeVisible();
-  await expect(page.getByText('Reload the current revision before trying again.')).toBeVisible();
+  await expect(firstIdentityDialog.getByText('Identity changed')).toBeVisible();
+  await expect(
+    firstIdentityDialog.getByText('Reload the current revision before trying again.'),
+  ).toBeVisible();
 
   await page.reload();
   await expect(page).toHaveURL(/\/service-identities$/);
-  await expect(page.getByText('concurrent-kid')).toBeVisible();
-  await expect(page.getByText('3', { exact: true })).toBeVisible();
-  await jwkInput.fill(publicJwk);
-  await addKey.focus();
+  const refreshedTable = page.getByRole('region', { name: 'Service identities' });
+  await refreshedTable.getByRole('button', { name: 'invoice-worker' }).click();
+  const identityDialog = page.getByRole('dialog', { name: 'invoice-worker' });
+  await expect(identityDialog.getByText('concurrent-kid')).toBeVisible();
+  await expect(identityDialog.getByText('3', { exact: true })).toBeVisible();
+  const refreshedJwkInput = identityDialog.getByRole('textbox', { name: 'Public ES256 JWK' });
+  await refreshedJwkInput.fill(publicJwk);
+  const retryAddKey = identityDialog.getByRole('button', { name: 'Add public key' });
+  await retryAddKey.focus();
   await page.keyboard.press('Enter');
-  await expect(page.getByText('Public key added')).toBeVisible();
-  await expect(page.getByText('rotation-2026-08')).toBeVisible();
+  await expect(identityDialog.getByText('Public key added')).toBeVisible();
+  await expect(identityDialog.getByText('rotation-2026-08')).toBeVisible();
 
-  const revokeKey = page.getByRole('button', { name: 'Revoke key' }).last();
+  const revokeKey = identityDialog.getByRole('button', { name: 'Revoke key' }).last();
   await revokeKey.focus();
   await page.keyboard.press('Enter');
   const revokeDialog = page.getByRole('alertdialog', { name: 'Revoke this public key?' });
@@ -219,9 +238,9 @@ test('manage-workspace-service-identities AT-006 recovers a key conflict and rev
   const confirmRevoke = revokeDialog.getByRole('button', { name: 'Revoke key' });
   await confirmRevoke.focus();
   await page.keyboard.press('Enter');
-  await expect(page.getByText('Key revoked')).toBeVisible();
+  await expect(identityDialog.getByText('Key revoked')).toBeVisible();
   await expect(
-    page.getByText('rotation-2026-08', { exact: true }).locator('..').locator('..'),
+    identityDialog.getByText('rotation-2026-08', { exact: true }).locator('..').locator('..'),
   ).toContainText('Revoked');
 
   expect(mutations).toEqual([
@@ -316,8 +335,16 @@ test('manage-product-role-assignments AT-005 reloads a conflict then assigns and
     await fulfillJson(route, 404, {});
   });
 
-  async function selectExactAssignment(): Promise<void> {
-    const subjectSelect = page.getByRole('combobox', { name: 'Active subject' });
+  async function openAssignmentDialog(): Promise<Locator> {
+    const table = page.getByRole('region', { name: 'Current product-role assignments' });
+    const open = table.getByRole('button', { name: 'Assign role' });
+    await open.focus();
+    await page.keyboard.press('Enter');
+    return page.getByRole('dialog', { name: 'Assign product role' });
+  }
+
+  async function selectExactAssignment(dialog: Locator): Promise<void> {
+    const subjectSelect = dialog.getByRole('combobox', { name: 'Active subject' });
     await subjectSelect.focus();
     await expect(subjectSelect).toBeFocused();
     await page.keyboard.press('Enter');
@@ -325,15 +352,13 @@ test('manage-product-role-assignments AT-005 reloads a conflict then assigns and
     await page.keyboard.press('Enter');
     await expect(subjectSelect).toContainText('Invoice worker');
 
-    const roleSelect = page.getByRole('combobox', { name: 'Installed product role' });
+    const roleSelect = dialog.getByRole('combobox', { name: 'Installed product role' });
     await roleSelect.focus();
     await page.keyboard.press('Enter');
     await page.keyboard.press('ArrowDown');
     await page.keyboard.press('Enter');
     await expect(roleSelect).toContainText('Invoice approver');
-    await expect(
-      page.getByLabel('Assign product role').getByText('Approves invoices for payment.'),
-    ).toBeVisible();
+    await expect(dialog.getByText('Approves invoices for payment.')).toBeVisible();
   }
 
   await page.goto('/product-role-assignments');
@@ -341,30 +366,35 @@ test('manage-product-role-assignments AT-005 reloads a conflict then assigns and
   await expect(
     page.getByRole('heading', { name: 'Product-role assignments', exact: true }),
   ).toBeVisible();
-  await selectExactAssignment();
-  const assignRole = page.getByRole('button', { name: 'Assign role' });
+  const firstAssignDialog = await openAssignmentDialog();
+  await selectExactAssignment(firstAssignDialog);
+  const assignRole = firstAssignDialog.getByRole('button', { name: 'Assign role' });
   await assignRole.focus();
   await page.keyboard.press('Enter');
   await firstAssignStarted.promise;
-  await expect(page.getByRole('button', { name: 'Assigning…' })).toBeDisabled();
-  await expect(page.getByRole('combobox', { name: 'Active subject' })).toBeDisabled();
+  await expect(firstAssignDialog.getByRole('button', { name: 'Assigning…' })).toBeDisabled();
+  await expect(firstAssignDialog.getByRole('combobox', { name: 'Active subject' })).toBeDisabled();
   releaseFirstAssign.resolve();
-  await expect(page.getByText('Assignment changed')).toBeVisible();
+  await expect(firstAssignDialog.getByText('Assignment changed')).toBeVisible();
   await expect(
-    page.getByText('Reload the authoritative revision before trying again.'),
+    firstAssignDialog.getByText('Reload the authoritative revision before trying again.'),
   ).toBeVisible();
 
   await page.reload();
   await expect(page).toHaveURL(/\/product-role-assignments$/);
-  await expect(page.getByRole('list', { name: 'Current product-role assignments' })).toContainText(
-    'Invoice approver',
-  );
-  await selectExactAssignment();
-  await assignRole.focus();
+  const table = page.getByRole('region', { name: 'Current product-role assignments' });
+  await expect(table).toContainText('Invoice approver');
+  const secondAssignDialog = await openAssignmentDialog();
+  await selectExactAssignment(secondAssignDialog);
+  const retryAssign = secondAssignDialog.getByRole('button', { name: 'Assign role' });
+  await retryAssign.focus();
   await page.keyboard.press('Enter');
-  await expect(page.getByText('Product role assigned')).toBeVisible();
+  await expect(secondAssignDialog.getByText('Product role assigned')).toBeVisible();
+  await secondAssignDialog.getByRole('button', { name: 'Cancel' }).click();
 
-  const revokeRole = page.getByRole('button', { name: 'Revoke role' });
+  await table.getByRole('button', { name: 'Invoice worker' }).click();
+  const assignmentDialog = page.getByRole('dialog', { name: 'Invoice worker' });
+  const revokeRole = assignmentDialog.getByRole('button', { name: 'Revoke role' });
   await revokeRole.focus();
   await page.keyboard.press('Enter');
   const revokeDialog = page.getByRole('alertdialog', {
@@ -377,7 +407,8 @@ test('manage-product-role-assignments AT-005 reloads a conflict then assigns and
   const confirmRevoke = revokeDialog.getByRole('button', { name: 'Revoke role' });
   await confirmRevoke.focus();
   await page.keyboard.press('Enter');
-  await expect(page.getByText('Product role revoked')).toBeVisible();
+  await expect(assignmentDialog.getByText('Product role revoked')).toBeVisible();
+  await assignmentDialog.getByRole('button', { name: 'Close', exact: true }).click();
   await expect(page.getByText('No active product-role assignments.')).toBeVisible();
 
   expect(mutations.map(({ path, body }) => ({ path, body }))).toEqual([
@@ -542,7 +573,8 @@ test('solution management proves publish AT-005 and install AT-007 recovery', as
         await fulfillJson(route, 409, {
           title: 'Conflict',
           status: 409,
-          code: 'solutions.version.identity_conflict',
+          code: 'solutions.package.publisher_untrusted',
+          detail: 'publisher-private-diagnostic',
         });
         return;
       }
@@ -600,13 +632,18 @@ test('solution management proves publish AT-005 and install AT-007 recovery', as
   await firstPublishStarted.promise;
   await expect(page.getByRole('button', { name: 'Verifying and publishing…' })).toBeDisabled();
   releaseFirstPublish.resolve();
-  await expect(page.getByText('Solution changed')).toBeVisible();
-  await expect(page.getByText('Refresh the authoritative state before retrying.')).toBeVisible();
-
-  await publishPackage.focus();
-  await page.keyboard.press('Enter');
-  confirmation = page.getByRole('alertdialog', { name: 'Publish this signed package?' });
-  await confirmation.getByRole('button', { name: 'Publish package' }).focus();
+  await expect(page.getByText('Publisher trust unavailable')).toBeVisible();
+  await expect(
+    page.getByText(
+      'The package publisher is unavailable or revoked. The local package remains selected; retry after trusted-publisher configuration is restored.',
+    ),
+  ).toBeVisible();
+  await expect(page.getByText('publisher-private-diagnostic')).toHaveCount(0);
+  await expect(page.getByText(/Selected invoice-operations\.axis-solution/)).toBeVisible();
+  const retryPublish = page.getByRole('button', { name: 'Retry' });
+  await expect(retryPublish).toBeEnabled();
+  await retryPublish.focus();
+  await expect(retryPublish).toBeFocused();
   await page.keyboard.press('Enter');
   await expect(page.getByText('Solution version published')).toBeVisible();
   await expect(

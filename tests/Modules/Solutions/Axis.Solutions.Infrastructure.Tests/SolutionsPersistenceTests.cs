@@ -1,17 +1,17 @@
+using System.Collections.Concurrent;
+using System.Security.Cryptography;
+using Axis.Audit.Contracts;
 using Axis.Solutions.Application;
 using Axis.Solutions.Domain;
+using Axis.Solutions.Infrastructure.Extensions;
 using Axis.Solutions.Infrastructure.Persistence;
 using Axis.Solutions.Infrastructure.Persistence.Entities;
-using Axis.Solutions.Infrastructure.Extensions;
+using Axis.Solutions.Infrastructure.Services;
 using Axis.Solutions.Infrastructure.Tests.Fixtures;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using System.Collections.Concurrent;
-using System.Security.Cryptography;
-using Axis.Audit.Contracts;
-using Axis.Solutions.Infrastructure.Services;
 
 namespace Axis.Solutions.Infrastructure.Tests;
 
@@ -28,7 +28,12 @@ public sealed class SolutionsPersistenceTests(SolutionsDatabaseFixture db)
             await context.SolutionVersions.AddAsync(version, TestContext.Current.CancellationToken);
             await context.Components.AddAsync(new SolutionComponentRecord
             {
-                SolutionVersionId = version.Id, Type = "authorization.policy.v1", Key = "reference", Sha256 = new string('c', 64), Content = [1], DependsOnJson = "[]",
+                SolutionVersionId = version.Id,
+                Type = "authorization.policy.v1",
+                Key = "reference",
+                Sha256 = new string('c', 64),
+                Content = [1],
+                DependsOnJson = "[]",
             }, TestContext.Current.CancellationToken);
             Guid auditEventId = Guid.NewGuid();
             await context.AuditOutbox.AddAsync(new SolutionsAuditOutboxRecord { EventId = auditEventId, ActorKind = AuditActorKindV1.System, CorrelationId = $"solutions-{auditEventId:N}", EventType = "solutions.version.published", SolutionVersionId = version.Id, Outcome = "succeeded", OccurredAt = now, CreatedAt = now, NextAttemptAt = now }, TestContext.Current.CancellationToken);
@@ -40,6 +45,53 @@ public sealed class SolutionsPersistenceTests(SolutionsDatabaseFixture db)
         Assert.Equal(1, await read.AuditOutbox
             .Where(x => x.SolutionVersionId == version.Id)
             .ExecuteDeleteAsync(TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task Persistence_VersionIdentityConflict_RetainsExactEnvelope()
+    {
+        DateTimeOffset now = DateTimeOffset.Parse("2026-08-07T00:00:00Z");
+        string solutionKey = $"envelope_{Guid.NewGuid():N}";
+        byte[] originalEnvelope = [0, 1, 127, 128, 255, 13, 10];
+        SolutionVersion original = Version(
+            now,
+            solutionKey,
+            "1.0.0",
+            new string('a', 64),
+            originalEnvelope);
+        using ServiceProvider provider = CreateProvider();
+        await using (AsyncServiceScope seedScope = provider.CreateAsyncScope())
+        {
+            await seedScope.ServiceProvider.GetRequiredService<ISolutionVersionRepository>()
+                .AddAsync(original, [], TestContext.Current.CancellationToken);
+            await seedScope.ServiceProvider.GetRequiredService<ISolutionsUnitOfWork>()
+                .SaveChangesAsync(TestContext.Current.CancellationToken);
+        }
+
+        await using (AsyncServiceScope conflictScope = provider.CreateAsyncScope())
+        {
+            SolutionVersion conflicting = Version(
+                now,
+                solutionKey,
+                "1.0.0",
+                new string('f', 64),
+                [9, 8, 7]);
+            await conflictScope.ServiceProvider.GetRequiredService<ISolutionVersionRepository>()
+                .AddAsync(conflicting, [], TestContext.Current.CancellationToken);
+            SolutionPersistenceException failure = await Assert.ThrowsAsync<SolutionPersistenceException>(() =>
+                conflictScope.ServiceProvider.GetRequiredService<ISolutionsUnitOfWork>()
+                    .SaveChangesAsync(TestContext.Current.CancellationToken));
+
+            Assert.Equal("solutions.persistence.version_identity_conflict", failure.ProblemCode);
+        }
+
+        await using SolutionsDbContext read = db.CreateContext();
+        SolutionVersion persisted = await read.SolutionVersions.AsNoTracking().SingleAsync(
+            value => value.SolutionKey == solutionKey && value.Version == "1.0.0",
+            TestContext.Current.CancellationToken);
+        Assert.Equal(original.Id, persisted.Id);
+        Assert.Equal(original.PackageSha256, persisted.PackageSha256);
+        Assert.Equal(originalEnvelope, persisted.Envelope);
     }
 
     [Fact]
@@ -741,12 +793,14 @@ public sealed class SolutionsPersistenceTests(SolutionsDatabaseFixture db)
     private static SolutionVersion Version(
         DateTimeOffset now,
         string? solutionKey = null,
-        string? version = null) =>
+        string? version = null,
+        string? packageSha256 = null,
+        byte[]? envelope = null) =>
         SolutionVersion.Create(
             solutionKey ?? "reference_application",
             version ?? $"0.1.{Guid.NewGuid():N}"[..7],
-            new string('a', 64),
-            [1],
+            packageSha256 ?? new string('a', 64),
+            envelope ?? [1],
             new string('b', 64),
             "axis",
             "release_key",

@@ -8,6 +8,6 @@ Solutions owns the durable boundary through which independently versioned produc
 
 | Use case | Status |
 |---|---|
-| [docs/use-cases/solutions/publish-signed-solution-version.md](./publish-signed-solution-version.md) | Partial |
-| [docs/use-cases/solutions/install-solution-version.md](./install-solution-version.md) | Partial |
+| [docs/use-cases/solutions/publish-signed-solution-version.md](./publish-signed-solution-version.md) | Done |
+| [docs/use-cases/solutions/install-solution-version.md](./install-solution-version.md) | Done |
 | [docs/use-cases/solutions/validate-reference-product-lifecycle.md](./validate-reference-product-lifecycle.md) | Done |

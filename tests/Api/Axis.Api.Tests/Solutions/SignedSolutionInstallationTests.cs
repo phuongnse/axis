@@ -6,7 +6,10 @@ using System.Text.Json;
 using Axis.Api.Tests.Administration;
 using Axis.Api.Tests.Helpers;
 using Axis.Authorization.Contracts;
+using Axis.Authorization.Infrastructure.Persistence;
 using Axis.BusinessObjects.Contracts;
+using Axis.Identity.Domain.Aggregates;
+using Axis.Identity.Infrastructure.Persistence;
 using Axis.Rules.Contracts;
 using Axis.Solutions.Application;
 using Axis.Solutions.Infrastructure.Persistence;
@@ -112,10 +115,160 @@ public sealed class SignedSolutionInstallationTests(ApiTestFixture fixture)
     }
 
     [Fact]
-    public async Task SignedSolution_WhenPolicyPresentationIsInvalid_RejectsBeforeInstallationMutation()
+    public async Task ProductRoleBootstrap_WhenSignedSolutionIsInstalled_AssignsOnlyAfterExplicitAdministratorAction()
     {
         WorkspaceAdministratorApiTestSession.AdministratorContext administrator =
             await WorkspaceAdministratorApiTestSession.CreateAdministratorAsync(fixture);
+        int lifecycleRevision;
+        using (IServiceScope identityScope = fixture.CreateScope())
+        {
+            WorkspaceMembership membership = await identityScope.ServiceProvider
+                .GetRequiredService<IdentityDbContext>()
+                .WorkspaceMemberships.SingleAsync(
+                    value => value.WorkspaceId == administrator.WorkspaceId
+                        && value.UserId == administrator.UserId,
+                    TestContext.Current.CancellationToken);
+            membership.Role.Should().Be(WorkspaceMembershipRole.Administrator);
+            membership.Status.Should().Be(MembershipStatus.Active);
+            lifecycleRevision = membership.Revision;
+        }
+
+        using ECDsa signingKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        string suffix = Guid.NewGuid().ToString("N");
+        string publisherId = $"publisher_{suffix}";
+        string publisherKeyId = $"key_{suffix}";
+        string openApiHash;
+        using (IServiceScope scope = fixture.CreateScope())
+        {
+            IConfiguration configuration = scope.ServiceProvider.GetRequiredService<IConfiguration>();
+            openApiHash = configuration["Solutions:AxisOpenApiSha256"]!;
+            SolutionsDbContext db = scope.ServiceProvider.GetRequiredService<SolutionsDbContext>();
+            string spkiSha256 = Convert.ToHexString(
+                SHA256.HashData(signingKey.ExportSubjectPublicKeyInfo()))
+                .ToLowerInvariant();
+            await db.Database.ExecuteSqlInterpolatedAsync($"""
+                INSERT INTO trusted_publisher_keys
+                    (id, publisher_id, key_id, spki_sha256, public_key_pem, status,
+                     configuration_revision, is_tombstone)
+                VALUES
+                    ({Guid.NewGuid()}, {publisherId}, {publisherKeyId}, {spkiSha256},
+                     {signingKey.ExportSubjectPublicKeyInfoPem()}, {"Active"}, {1L}, {false})
+                """, TestContext.Current.CancellationToken);
+        }
+
+        byte[] envelope = CreatePolicyEnvelope(
+            signingKey,
+            openApiHash,
+            publisherId,
+            publisherKeyId,
+            $"bootstrap_{suffix}",
+            PolicyKey,
+            PolicyJson());
+        using HttpRequestMessage publish = new(HttpMethod.Post, "/api/solutions/versions")
+        {
+            Content = PackageContent(envelope),
+        };
+        HttpResponseMessage published = await fixture.SendBrowserMutationAsync(
+            publish,
+            TestContext.Current.CancellationToken);
+        published.StatusCode.Should().Be(HttpStatusCode.Created);
+        Guid policyVersionId = (await ReadJsonAsync(published))
+            .GetProperty("version")
+            .GetProperty("id")
+            .GetGuid();
+
+        using HttpRequestMessage install = new(
+            HttpMethod.Post,
+            $"/api/solutions/versions/{policyVersionId}/installations");
+        install.Headers.Add("Idempotency-Key", Guid.NewGuid().ToString("N"));
+        HttpResponseMessage started = await fixture.SendBrowserMutationAsync(
+            install,
+            TestContext.Current.CancellationToken);
+        started.StatusCode.Should().Be(HttpStatusCode.Created);
+        Guid operationId = (await ReadJsonAsync(started))
+            .GetProperty("operation")
+            .GetProperty("id")
+            .GetGuid();
+        (await WaitForSuccessAsync(operationId)).GetProperty("status").GetString()
+            .Should().Be("Succeeded");
+
+        using (IServiceScope observerScope = fixture.CreateScope())
+        {
+            AuthorizationDbContext authorization = observerScope.ServiceProvider
+                .GetRequiredService<AuthorizationDbContext>();
+            (await authorization.Assignments.AnyAsync(
+                value => value.WorkspaceId == administrator.WorkspaceId
+                    && value.SubjectKind == "Human"
+                    && value.SubjectId == administrator.UserId
+                    && value.PolicyVersionId == policyVersionId,
+                TestContext.Current.CancellationToken)).Should().BeFalse();
+            WorkspaceMembership membership = await observerScope.ServiceProvider
+                .GetRequiredService<IdentityDbContext>()
+                .WorkspaceMemberships.SingleAsync(
+                    value => value.WorkspaceId == administrator.WorkspaceId
+                        && value.UserId == administrator.UserId,
+                    TestContext.Current.CancellationToken);
+            membership.Role.Should().Be(WorkspaceMembershipRole.Administrator);
+            membership.Status.Should().Be(MembershipStatus.Active);
+            membership.Revision.Should().Be(lifecycleRevision);
+        }
+
+        using HttpRequestMessage assign = new(HttpMethod.Post, "/api/product-role-assignments/assign")
+        {
+            Content = JsonContent.Create(new
+            {
+                target = new { kind = "Human", subjectId = administrator.UserId },
+                policyVersionId,
+                roleKey = "Applicant",
+            }, options: ApiTestFixture.JsonOptions),
+        };
+        assign.Headers.Add("Idempotency-Key", Guid.NewGuid().ToString("N"));
+        HttpResponseMessage assigned = await fixture.SendBrowserMutationAsync(
+            assign,
+            TestContext.Current.CancellationToken);
+        string assignedPayload = await assigned.Content.ReadAsStringAsync(
+            TestContext.Current.CancellationToken);
+        assigned.StatusCode.Should().Be(HttpStatusCode.OK, assignedPayload);
+        JsonElement assignedBody = await ReadJsonAsync(assigned);
+        assignedBody.GetProperty("workspaceId").GetGuid().Should().Be(administrator.WorkspaceId);
+        assignedBody.GetProperty("policyVersionId").GetGuid().Should().Be(policyVersionId);
+        assignedBody.GetProperty("roleKey").GetString().Should().Be("Applicant");
+        assignedBody.GetProperty("isActive").GetBoolean().Should().BeTrue();
+        assignedBody.GetProperty("subject").GetProperty("kind").GetString().Should().Be("Human");
+        assignedBody.GetProperty("subject").GetProperty("subjectId").GetGuid()
+            .Should().Be(administrator.UserId);
+
+        HttpResponseMessage management = await fixture.Client.GetAsync(
+            "/api/product-role-assignments?language=en",
+            TestContext.Current.CancellationToken);
+        management.StatusCode.Should().Be(HttpStatusCode.OK);
+        JsonElement readBack = (await ReadJsonAsync(management))
+            .GetProperty("assignments")
+            .EnumerateArray()
+            .Single(value => value.GetProperty("policyVersionId").GetGuid() == policyVersionId
+                && value.GetProperty("roleKey").GetString() == "Applicant");
+        readBack.GetProperty("workspaceId").GetGuid().Should().Be(administrator.WorkspaceId);
+        readBack.GetProperty("subject").GetProperty("kind").GetString().Should().Be("Human");
+        readBack.GetProperty("subject").GetProperty("subjectId").GetGuid()
+            .Should().Be(administrator.UserId);
+        readBack.GetProperty("isActive").GetBoolean().Should().BeTrue();
+
+        using IServiceScope finalScope = fixture.CreateScope();
+        WorkspaceMembership finalMembership = await finalScope.ServiceProvider
+            .GetRequiredService<IdentityDbContext>()
+            .WorkspaceMemberships.SingleAsync(
+                value => value.WorkspaceId == administrator.WorkspaceId
+                    && value.UserId == administrator.UserId,
+                TestContext.Current.CancellationToken);
+        finalMembership.Role.Should().Be(WorkspaceMembershipRole.Administrator);
+        finalMembership.Status.Should().Be(MembershipStatus.Active);
+        finalMembership.Revision.Should().Be(lifecycleRevision);
+    }
+
+    [Fact]
+    public async Task SignedSolution_WhenPolicyPresentationIsInvalid_RejectsBeforePublicationMutation()
+    {
+        await WorkspaceAdministratorApiTestSession.CreateAdministratorAsync(fixture);
         using ECDsa signingKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
         string suffix = Guid.NewGuid().ToString("N");
         string publisherId = $"publisher_{suffix}";
@@ -155,32 +308,18 @@ public sealed class SignedSolutionInstallationTests(ApiTestFixture fixture)
         {
             Content = PackageContent(envelope),
         };
-        HttpResponseMessage published = await fixture.SendBrowserMutationAsync(
+        HttpResponseMessage rejected = await fixture.SendBrowserMutationAsync(
             publish,
             TestContext.Current.CancellationToken);
-        published.StatusCode.Should().Be(HttpStatusCode.Created);
-        Guid solutionVersionId = (await ReadJsonAsync(published))
-            .GetProperty("version")
-            .GetProperty("id")
-            .GetGuid();
 
-        using HttpRequestMessage install = new(
-            HttpMethod.Post,
-            $"/api/solutions/versions/{solutionVersionId}/installations");
-        install.Headers.Add("Idempotency-Key", Guid.NewGuid().ToString("N"));
-        HttpResponseMessage rejected = await fixture.SendBrowserMutationAsync(
-            install,
-            TestContext.Current.CancellationToken);
-
-        rejected.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        rejected.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
         (await ReadJsonAsync(rejected)).GetProperty("code").GetString()
             .Should().Be("authorization.policy_invalid");
         using IServiceScope observerScope = fixture.CreateScope();
         SolutionsDbContext observer = observerScope.ServiceProvider
             .GetRequiredService<SolutionsDbContext>();
-        (await observer.SolutionInstallations.AnyAsync(
-            value => value.WorkspaceId == administrator.WorkspaceId
-                && value.SolutionVersionId == solutionVersionId,
+        (await observer.SolutionVersions.AnyAsync(
+            value => value.SolutionKey == solutionKey,
             TestContext.Current.CancellationToken)).Should().BeFalse();
     }
 

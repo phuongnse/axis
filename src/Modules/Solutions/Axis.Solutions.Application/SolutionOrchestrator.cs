@@ -29,6 +29,21 @@ public sealed class SolutionOrchestrator(
             await AuditDeniedAsync(null, null, null, null, exception.ProblemCode, request.RequestedAt, cancellationToken, request.Actor);
             throw;
         }
+        try
+        {
+            await PreflightComponentsAsync(request.Actor.WorkspaceId, package.Components, cancellationToken);
+        }
+        catch (Exception exception) when (exception is SolutionPackageException or SolutionAdapterException)
+        {
+            string problemCode = exception switch
+            {
+                SolutionPackageException packageException => packageException.ProblemCode,
+                SolutionAdapterException adapterException => adapterException.ProblemCode,
+                _ => "solutions.package.component_invalid",
+            };
+            await AuditDeniedAsync(null, null, null, null, problemCode, request.RequestedAt, cancellationToken, request.Actor);
+            throw;
+        }
         SolutionVersion? existing = await versions.FindByIdentityAsync(package.SolutionKey, package.SolutionVersion, cancellationToken);
         if (existing is not null)
         {
@@ -105,9 +120,7 @@ public sealed class SolutionOrchestrator(
         IReadOnlyList<SolutionComponentPlan> plan;
         try
         {
-            plan = BuildPlan(components);
-            foreach (SolutionComponentPlan entry in plan)
-                await _adapters[entry.Type].PreflightAsync(request.WorkspaceId, ToAdapterComponent(components, entry), cancellationToken);
+            plan = await PreflightComponentsAsync(request.WorkspaceId, components, cancellationToken);
         }
         catch (Exception exception) when (exception is SolutionPackageException or SolutionAdapterException)
         {
@@ -592,6 +605,22 @@ public sealed class SolutionOrchestrator(
         if (components.Count == 0 || components.Any(x => !_adapters.ContainsKey(x.Type)))
             throw new SolutionPackageException("solutions.install.adapter_unavailable");
         return TopologicalPlan(components);
+    }
+
+    private async Task<IReadOnlyList<SolutionComponentPlan>> PreflightComponentsAsync(
+        Guid workspaceId,
+        IReadOnlyList<VerifiedSolutionComponent> components,
+        CancellationToken cancellationToken)
+    {
+        IReadOnlyList<SolutionComponentPlan> plan = BuildPlan(components);
+        foreach (SolutionComponentPlan entry in plan)
+        {
+            await _adapters[entry.Type].PreflightAsync(
+                workspaceId,
+                ToAdapterComponent(components, entry),
+                cancellationToken);
+        }
+        return plan;
     }
 
     private static IReadOnlyList<SolutionComponentPlan> TopologicalPlan(

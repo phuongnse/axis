@@ -40,7 +40,12 @@ import {
   solutionVersionsQueryOptions,
 } from '../api';
 
-type Feedback = { tone: StatusNoticeTone; title: string; body: string };
+type Feedback = {
+  tone: StatusNoticeTone;
+  title: string;
+  body: string;
+  retryPublish?: boolean;
+};
 
 export function SolutionsPage() {
   const { t } = useTranslation();
@@ -74,7 +79,7 @@ export function SolutionsPage() {
       });
       void queryClient.invalidateQueries({ queryKey: solutionQueryKeys.versions() });
     },
-    onError: (error) => setFeedback(solutionProblemFeedback(error, t)),
+    onError: (error) => setFeedback(publishProblemFeedback(error, t)),
   });
 
   const installMutation = useMutation({
@@ -160,7 +165,24 @@ export function SolutionsPage() {
       {feedback ? (
         <div aria-live="polite">
           <StatusNotice tone={feedback.tone} title={feedback.title}>
-            {feedback.body}
+            {feedback.retryPublish && file ? (
+              <div className="grid gap-2">
+                <span>{feedback.body}</span>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="w-fit"
+                  disabled={publishMutation.isPending}
+                  onClick={() => publishMutation.mutate(file)}
+                >
+                  <RotateCw aria-hidden />
+                  {t('app.retry')}
+                </Button>
+              </div>
+            ) : (
+              feedback.body
+            )}
           </StatusNotice>
         </div>
       ) : null}
@@ -679,6 +701,28 @@ function solutionProblemFeedback(
     title: t('solutions.actionFailed'),
     body: t('solutions.actionFailedDescription'),
   };
+}
+
+function publishProblemFeedback(
+  error: unknown,
+  t: (key: string, values?: Record<string, unknown>) => string,
+): Feedback {
+  if (isPublisherTrustProblem(error)) {
+    return {
+      tone: 'warning',
+      title: t('solutions.publisherTrustUnavailable'),
+      body: t('solutions.publisherTrustUnavailableDescription'),
+      retryPublish: true,
+    };
+  }
+  return solutionProblemFeedback(error, t);
+}
+
+function isPublisherTrustProblem(error: unknown): boolean {
+  if (!(error instanceof ApiError) || typeof error.data !== 'object' || error.data === null) {
+    return false;
+  }
+  return 'code' in error.data && error.data.code === 'solutions.package.publisher_untrusted';
 }
 
 function trustTone(status: string | undefined): StatusBadgeTone {

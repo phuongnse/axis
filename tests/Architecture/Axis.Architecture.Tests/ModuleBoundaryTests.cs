@@ -47,6 +47,36 @@ public class ModuleBoundaryTests
         }
     }
 
+    [Fact]
+    public void SolutionsApplication_WhenInspected_ReferencesOnlyOwnedAndPublicContractAssemblies()
+    {
+        Assembly application = Conventions.TryLoad("Axis.Solutions.Application")
+            ?? throw new InvalidOperationException("Axis.Solutions.Application could not be loaded.");
+        string[] allowedAxisReferences =
+        [
+            "Axis.Audit.Contracts",
+            "Axis.Authorization.Contracts",
+            "Axis.BusinessObjects.Contracts",
+            "Axis.Rules.Contracts",
+            "Axis.Shared.Application",
+            "Axis.Shared.Domain",
+            "Axis.Solutions.Contracts",
+            "Axis.Solutions.Domain",
+        ];
+
+        application.GetReferencedAssemblies()
+            .Select(reference => reference.Name)
+            .Where(name => name?.StartsWith("Axis.", StringComparison.Ordinal) is true)
+            .Should().OnlyContain(name => allowedAxisReferences.Contains(name, StringComparer.Ordinal));
+
+        foreach (string consumer in new[] { "Authorization", "BusinessObjects", "Rules" })
+        {
+            AssertAssemblyHasNoDependencyOn(application, $"Axis.{consumer}.Domain");
+            AssertAssemblyHasNoDependencyOn(application, $"Axis.{consumer}.Application");
+            AssertAssemblyHasNoDependencyOn(application, $"Axis.{consumer}.Infrastructure");
+        }
+    }
+
     private static void AssertNoCrossModuleDependency(string moduleA, string moduleB, string layer)
     {
         string forbiddenNamespacePrefix = $"Axis.{moduleB}.{layer}";
@@ -69,6 +99,18 @@ public class ModuleBoundaryTests
                 $"Axis.{moduleA}.{aLayer} must not depend on {forbiddenNamespacePrefix}. " +
                 $"Failing types: {FormatFailingTypes(result)}.");
         }
+    }
+
+    private static void AssertAssemblyHasNoDependencyOn(Assembly assembly, string forbiddenNamespacePrefix)
+    {
+        TestResult result = Types.InAssembly(assembly)
+            .Should()
+            .NotHaveDependencyOn(forbiddenNamespacePrefix)
+            .GetResult();
+
+        result.IsSuccessful.Should().BeTrue(
+            $"{assembly.GetName().Name} must not depend on {forbiddenNamespacePrefix}. " +
+            $"Failing types: {FormatFailingTypes(result)}.");
     }
 
     private static string FormatFailingTypes(TestResult result) =>

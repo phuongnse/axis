@@ -17,8 +17,8 @@ Use cases are the product source of truth. Each use case owns one independently 
 | [docs/use-cases/identity-governance/README.md](./identity-governance/README.md) | [docs/use-cases/identity-governance/switch-active-workspace.md](./identity-governance/switch-active-workspace.md) | Done |
 | [docs/use-cases/identity-governance/README.md](./identity-governance/README.md) | [docs/use-cases/identity-governance/invite-workspace-member.md](./identity-governance/invite-workspace-member.md) | Done |
 | [docs/use-cases/identity-governance/README.md](./identity-governance/README.md) | [docs/use-cases/identity-governance/accept-workspace-invitation.md](./identity-governance/accept-workspace-invitation.md) | Done |
-| [docs/use-cases/identity-governance/README.md](./identity-governance/README.md) | [docs/use-cases/identity-governance/manage-workspace-service-identities.md](./identity-governance/manage-workspace-service-identities.md) | Partial |
-| [docs/use-cases/authorization/README.md](./authorization/README.md) | [docs/use-cases/authorization/manage-product-role-assignments.md](./authorization/manage-product-role-assignments.md) | Partial |
+| [docs/use-cases/identity-governance/README.md](./identity-governance/README.md) | [docs/use-cases/identity-governance/manage-workspace-service-identities.md](./identity-governance/manage-workspace-service-identities.md) | Done |
+| [docs/use-cases/authorization/README.md](./authorization/README.md) | [docs/use-cases/authorization/manage-product-role-assignments.md](./authorization/manage-product-role-assignments.md) | Done |
 | [docs/use-cases/authorization/README.md](./authorization/README.md) | [docs/use-cases/authorization/access-product-by-policy.md](./authorization/access-product-by-policy.md) | Done |
 | [docs/use-cases/business-objects/README.md](./business-objects/README.md) | [docs/use-cases/business-objects/configure-field-rules.md](./business-objects/configure-field-rules.md) | Done |
 | [docs/use-cases/business-objects/README.md](./business-objects/README.md) | [docs/use-cases/business-objects/define-business-object.md](./business-objects/define-business-object.md) | Done |
@@ -27,8 +27,8 @@ Use cases are the product source of truth. Each use case owns one independently 
 | [docs/use-cases/rules/README.md](./rules/README.md) | [docs/use-cases/rules/manage-rule-bindings.md](./rules/manage-rule-bindings.md) | Done |
 | [docs/use-cases/rules/README.md](./rules/README.md) | [docs/use-cases/rules/manage-workspace-rule-definitions.md](./rules/manage-workspace-rule-definitions.md) | Done |
 | [docs/use-cases/rules/README.md](./rules/README.md) | [docs/use-cases/rules/provide-built-in-rule-definitions.md](./rules/provide-built-in-rule-definitions.md) | Done |
-| [docs/use-cases/solutions/README.md](./solutions/README.md) | [docs/use-cases/solutions/publish-signed-solution-version.md](./solutions/publish-signed-solution-version.md) | Partial |
-| [docs/use-cases/solutions/README.md](./solutions/README.md) | [docs/use-cases/solutions/install-solution-version.md](./solutions/install-solution-version.md) | Partial |
+| [docs/use-cases/solutions/README.md](./solutions/README.md) | [docs/use-cases/solutions/publish-signed-solution-version.md](./solutions/publish-signed-solution-version.md) | Done |
+| [docs/use-cases/solutions/README.md](./solutions/README.md) | [docs/use-cases/solutions/install-solution-version.md](./solutions/install-solution-version.md) | Done |
 | [docs/use-cases/solutions/README.md](./solutions/README.md) | [docs/use-cases/solutions/validate-reference-product-lifecycle.md](./solutions/validate-reference-product-lifecycle.md) | Done |
 | [docs/use-cases/site-experience/README.md](./site-experience/README.md) | [docs/use-cases/site-experience/select-site-language.md](./site-experience/select-site-language.md) | Done |
 | [docs/use-cases/site-experience/README.md](./site-experience/README.md) | [docs/use-cases/site-experience/select-site-theme.md](./site-experience/select-site-theme.md) | Done |

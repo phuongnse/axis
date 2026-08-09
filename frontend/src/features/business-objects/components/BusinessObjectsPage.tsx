@@ -12,9 +12,9 @@ import {
   type DataTableQueryState,
 } from '@/components/shared/data-table';
 import { useManagedWindowActions } from '@/components/shared/ManagedWindowManager';
+import { PageAction, PageHeader, PageLayout } from '@/components/shared/PageLayout';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { StatusNotice } from '@/components/shared/StatusNotice';
-import { Button } from '@/components/ui/button';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { ApiError } from '@/lib/api';
 import {
@@ -138,12 +138,12 @@ export function BusinessObjectsPage() {
       {
         id: 'name',
         accessorKey: 'name',
-        size: 320,
+        size: 280,
         minSize: 220,
         enableSorting: false,
         meta: { label: t('businessObjects.name') },
         cell: ({ row }) => (
-          <Button
+          <PageAction
             type="button"
             variant="link"
             onFocus={() => prefetchDefinition(row.original.id)}
@@ -151,13 +151,13 @@ export function BusinessObjectsPage() {
             onClick={() => openDefinition(row.original)}
           >
             {row.original.name}
-          </Button>
+          </PageAction>
         ),
       },
       {
         id: 'key',
         accessorKey: 'objectKey',
-        size: 240,
+        size: 200,
         minSize: 180,
         enableSorting: false,
         meta: { label: t('businessObjects.objectKey') },
@@ -165,7 +165,7 @@ export function BusinessObjectsPage() {
       {
         id: 'status',
         accessorKey: 'status',
-        size: 160,
+        size: 150,
         minSize: 140,
         enableSorting: false,
         meta: { label: t('businessObjects.status'), searchable: false },
@@ -174,7 +174,7 @@ export function BusinessObjectsPage() {
       {
         id: 'version',
         accessorKey: 'latestPublishedVersionNumber',
-        size: 140,
+        size: 130,
         minSize: 120,
         enableSorting: false,
         meta: { label: t('businessObjects.version'), searchable: false },
@@ -188,7 +188,7 @@ export function BusinessObjectsPage() {
       {
         id: 'updated',
         accessorKey: 'updatedAt',
-        size: 220,
+        size: 190,
         minSize: 180,
         enableSorting: false,
         meta: { label: t('businessObjects.updated'), searchable: false },
@@ -242,7 +242,7 @@ export function BusinessObjectsPage() {
       enableColumnResizing: true,
       renderToolbarActions: canStartCreate
         ? () => (
-            <Button
+            <PageAction
               type="button"
               size="sm"
               onClick={() => {
@@ -251,7 +251,7 @@ export function BusinessObjectsPage() {
             >
               <Plus aria-hidden />
               {t('businessObjects.new')}
-            </Button>
+            </PageAction>
           )
         : undefined,
       loading: definitionsQuery.isFetching,
@@ -277,34 +277,30 @@ export function BusinessObjectsPage() {
   ]);
 
   return (
-    <div className="flex h-full min-h-0 w-full min-w-0 flex-col gap-4 overflow-hidden p-4 sm:p-6 lg:p-8">
-      <header className="min-w-0 shrink-0">
-        <h1 className="font-heading text-2xl font-semibold text-foreground">
-          {t('businessObjects.title')}
-        </h1>
-        <p className="mt-1 max-w-3xl text-sm leading-6 text-muted-foreground">
-          {t('businessObjects.pageDescription')}
-        </p>
-      </header>
+    <PageLayout scrollMode="contained">
+      <PageHeader
+        title={t('businessObjects.title')}
+        description={t('businessObjects.pageDescription')}
+      />
 
       {actionsUnavailable ? (
         <StatusNotice tone="warning" title={t('businessObjects.actionsUnavailableTitle')}>
           <span>{t('businessObjects.actionsUnavailableDescription')}</span>{' '}
-          <Button
+          <PageAction
             type="button"
             variant="link"
             disabled={collectionActionsQuery.isFetching}
             onClick={() => void collectionActionsQuery.refetch()}
           >
             {t('app.retry')}
-          </Button>
+          </PageAction>
         </StatusNotice>
       ) : null}
 
       <div className="min-h-0 flex-1">
         <DataTable definition={tableDefinition} />
       </div>
-    </div>
+    </PageLayout>
   );
 }
 

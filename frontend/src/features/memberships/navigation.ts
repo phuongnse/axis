@@ -12,5 +12,6 @@ export const membershipsNavigationContributions: readonly ModuleNavigationContri
       order: 100,
     },
     order: 90,
+    requiresServerAvailability: true,
   },
 ];

@@ -8,5 +8,6 @@ export const serviceIdentitiesNavigationContributions: readonly ModuleNavigation
     to: '/service-identities',
     group: { id: 'workspace', labelKey: 'nav.group.workspace', order: 100 },
     order: 95,
+    requiresServerAvailability: true,
   },
 ];

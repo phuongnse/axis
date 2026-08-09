@@ -144,7 +144,6 @@ export const translations = {
 
     'memberships.actionFailed': 'Invitation action failed',
     'memberships.actionFailedDescription': 'Check the connection and try again.',
-    'memberships.actions': 'Actions',
     'memberships.canonicalPending': 'The existing pending invitation remains the only valid link.',
     'memberships.changed': 'Invitation changed',
     'memberships.changedDescription': 'Refresh the list before trying this action again.',
@@ -155,6 +154,10 @@ export const translations = {
     'memberships.deliveryQueued': 'A recoverable invitation delivery has been queued.',
     'memberships.description':
       'Invite real users and review non-secret invitation lifecycle outcomes for the active Workspace.',
+    'memberships.discardInvite': 'Discard invitation',
+    'memberships.discardInviteDescription':
+      'The recipient and Workspace role entered in this window will be lost.',
+    'memberships.discardInviteTitle': 'Discard this invitation?',
     'memberships.email': 'Recipient email',
     'memberships.emailHelp': 'The recipient must accept with an account using this address.',
     'memberships.emailInvalid': 'Enter a valid recipient email address.',
@@ -167,11 +170,10 @@ export const translations = {
     'memberships.invite': 'Invite member',
     'memberships.inviteSucceeded': 'Invitation outcome confirmed',
     'memberships.inviting': 'Inviting...',
+    'memberships.keepEditing': 'Keep editing',
     'memberships.loadFailed': 'Unable to load invitations',
     'memberships.loadFailedDescription': 'Retry the current Workspace invitation list.',
-    'memberships.loading': 'Loading Workspace invitations...',
     'memberships.nav': 'Memberships',
-    'memberships.noActions': 'No pending actions',
     'memberships.notAvailable': 'Not available',
     'memberships.rateLimited': 'Please wait',
     'memberships.rateLimitedDescription': 'This invitation action reached its current rate limit.',
@@ -180,6 +182,9 @@ export const translations = {
     'memberships.resendSucceeded': 'New invitation link queued',
     'memberships.resendSucceededDescription': 'Every prior link is now invalid.',
     'memberships.revoke': 'Revoke',
+    'memberships.revokeConfirmDescription':
+      'The pending invitation link will no longer be accepted.',
+    'memberships.revokeConfirmTitle': 'Revoke this invitation?',
     'memberships.revokeSucceeded': 'Invitation revoked',
     'memberships.revokeSucceededDescription': 'The pending link can no longer be accepted.',
     'memberships.role': 'Workspace role',
@@ -949,7 +954,6 @@ export const translations = {
 
     'memberships.actionFailed': 'Thao tác lời mời thất bại',
     'memberships.actionFailedDescription': 'Kiểm tra kết nối rồi thử lại.',
-    'memberships.actions': 'Thao tác',
     'memberships.canonicalPending': 'Lời mời đang chờ hiện có vẫn là liên kết hợp lệ duy nhất.',
     'memberships.changed': 'Lời mời đã thay đổi',
     'memberships.changedDescription': 'Tải lại danh sách trước khi thử lại thao tác này.',
@@ -960,6 +964,10 @@ export const translations = {
     'memberships.deliveryQueued': 'Công việc gửi lời mời có thể phục hồi đã được xếp hàng.',
     'memberships.description':
       'Mời người dùng thật và xem trạng thái vòng đời không chứa bí mật của lời mời trong Workspace hiện tại.',
+    'memberships.discardInvite': 'Bỏ lời mời',
+    'memberships.discardInviteDescription':
+      'Người nhận và vai trò Workspace đã nhập trong cửa sổ này sẽ bị mất.',
+    'memberships.discardInviteTitle': 'Bỏ lời mời này?',
     'memberships.email': 'Email người nhận',
     'memberships.emailHelp': 'Người nhận phải chấp nhận bằng tài khoản dùng địa chỉ này.',
     'memberships.emailInvalid': 'Nhập địa chỉ email người nhận hợp lệ.',
@@ -972,11 +980,10 @@ export const translations = {
     'memberships.invite': 'Mời thành viên',
     'memberships.inviteSucceeded': 'Đã xác nhận kết quả lời mời',
     'memberships.inviting': 'Đang mời...',
+    'memberships.keepEditing': 'Tiếp tục chỉnh sửa',
     'memberships.loadFailed': 'Không tải được lời mời',
     'memberships.loadFailedDescription': 'Thử tải lại danh sách lời mời của Workspace hiện tại.',
-    'memberships.loading': 'Đang tải lời mời Workspace...',
     'memberships.nav': 'Thành viên',
-    'memberships.noActions': 'Không có thao tác chờ',
     'memberships.notAvailable': 'Không có',
     'memberships.rateLimited': 'Vui lòng chờ',
     'memberships.rateLimitedDescription': 'Thao tác lời mời này đã đạt giới hạn hiện tại.',
@@ -985,6 +992,9 @@ export const translations = {
     'memberships.resendSucceeded': 'Đã xếp hàng liên kết lời mời mới',
     'memberships.resendSucceededDescription': 'Mọi liên kết trước đó hiện không còn hiệu lực.',
     'memberships.revoke': 'Thu hồi',
+    'memberships.revokeConfirmDescription':
+      'Liên kết lời mời đang chờ sẽ không còn được chấp nhận.',
+    'memberships.revokeConfirmTitle': 'Thu hồi lời mời này?',
     'memberships.revokeSucceeded': 'Đã thu hồi lời mời',
     'memberships.revokeSucceededDescription': 'Liên kết đang chờ không còn có thể được chấp nhận.',
     'memberships.role': 'Vai trò Workspace',
