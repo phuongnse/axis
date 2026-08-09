@@ -3,6 +3,10 @@ import { Building2, Check, LoaderCircle, Plus, UserRound } from 'lucide-react';
 import type { FormEvent, ReactNode } from 'react';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import {
+  persistentItemHighlight,
+  transientItemHighlight,
+} from '@/components/shared/interactionStates';
 import { StatusNotice } from '@/components/shared/StatusNotice';
 import { Button } from '@/components/ui/button';
 import {
@@ -16,6 +20,7 @@ import {
 import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { ApiError, invalidateClientRequestSession } from '@/lib/api';
+import { cn } from '@/lib/utils';
 import {
   beginWorkspaceTransition,
   type CreatedOrganizationWorkspace,
@@ -247,7 +252,11 @@ function WorkspaceGroup({
           type="button"
           variant="ghost"
           size="sm"
-          className="w-full justify-start"
+          className={cn(
+            'w-full justify-start',
+            workspace.isCurrent ? persistentItemHighlight : transientItemHighlight,
+            workspace.isCurrent && 'disabled:opacity-100',
+          )}
           disabled={workspace.isCurrent || Boolean(switchingWorkspaceId)}
           aria-current={workspace.isCurrent ? 'page' : undefined}
           onClick={() => onSelect(workspace)}

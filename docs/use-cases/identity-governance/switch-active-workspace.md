@@ -107,7 +107,7 @@ The cross-store state machine, recovery, cleanup, authorization, and audit reali
 
 | Surface | Required contract |
 |---|---|
-| Workspace control | Show current and eligible choices only, grouped by Personal and Organizations. |
+| Workspace control | Show current and eligible choices only, grouped by Personal Workspace and Organization Workspaces. |
 | Switch pending | Keep the current label visible, prevent competing transitions, and announce progress. |
 | Switch success | Clear prior state and open a safe target route before target content renders. |
 | Recovery | Show only eligible choices and sign-out, with a concrete retry where recovery is safe. |

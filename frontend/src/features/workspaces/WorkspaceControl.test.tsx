@@ -145,11 +145,14 @@ describe('WorkspaceControl', () => {
 
     const workspaceSection = screen.getByRole('region', { name: 'Choose Workspace' });
     await screen.findByRole('button', { name: 'Personal workspace' });
-    expect(screen.getByRole('region', { name: 'Personal' })).toBeInTheDocument();
-    expect(screen.getByRole('region', { name: 'Organizations' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Personal workspace' })).toHaveAttribute(
-      'aria-current',
-      'page',
+    expect(screen.getByRole('region', { name: 'Personal Workspace' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Organization Workspaces' })).toBeInTheDocument();
+    const currentWorkspace = screen.getByRole('button', { name: 'Personal workspace' });
+    expect(currentWorkspace).toHaveAttribute('aria-current', 'page');
+    expect(currentWorkspace).toHaveClass('bg-secondary', 'disabled:opacity-100');
+    expect(screen.getByRole('button', { name: 'Acme Operations' })).toHaveClass(
+      'hover:bg-accent',
+      'focus-visible:bg-accent',
     );
 
     await user.click(screen.getByRole('button', { name: 'Acme Operations' }));

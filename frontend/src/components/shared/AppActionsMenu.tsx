@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Building2, ChevronDown, LogOut, Settings2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { AccountAvatar } from '@/components/shared/AccountAvatar';
+import { transientItemHighlight } from '@/components/shared/interactionStates';
 import { StatusNotice } from '@/components/shared/StatusNotice';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -62,7 +63,7 @@ export function AppActionsMenu({
             type="button"
             variant="ghost"
             size="lg"
-            className="min-h-11 max-w-64 gap-2 px-2 text-foreground"
+            className={`min-h-11 max-w-64 gap-2 px-2 text-foreground ${transientItemHighlight}`}
             aria-label={t('nav.accountMenu')}
             title={t('nav.accountMenu')}
           >

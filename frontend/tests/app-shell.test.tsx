@@ -176,7 +176,7 @@ describe('AppShell', () => {
     expect(appHeader).not.toHaveClass('bg-card/95', 'backdrop-blur');
     expect(await screen.findByText('Ada Lovelace')).toBeInTheDocument();
     const accountMenu = screen.getByRole('button', { name: 'Account menu' });
-    expect(accountMenu).toHaveClass('h-9', 'hover:bg-muted', 'dark:hover:bg-muted/50');
+    expect(accountMenu).toHaveClass('h-9', 'hover:bg-accent', 'dark:hover:bg-accent');
     expect(accountMenu).not.toHaveClass('border-border', 'bg-background');
     expect(accountMenu.querySelector('[data-slot="avatar"]')).toHaveAttribute(
       'data-size',
@@ -277,6 +277,7 @@ describe('AppShell', () => {
 
     const accountMenu = screen.getByRole('button', { name: 'Account menu' });
     await waitFor(() => expect(accountMenu).toHaveTextContent('Ada Lovelace'));
+    expect(accountMenu).toHaveClass('hover:bg-accent', 'focus-visible:bg-accent');
     expect(accountMenu).toHaveTextContent('AL');
     expect(accountMenu.querySelector('.lucide-building-2')).toBeNull();
     expect(accountMenu).not.toHaveTextContent('Personal workspace');

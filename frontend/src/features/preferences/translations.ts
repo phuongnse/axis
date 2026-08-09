@@ -221,8 +221,8 @@ export const translations = {
     'workspace.organizationNameHelp': 'Use a name people will recognize. 2–100 characters.',
     'workspace.organizationNameLength': 'Enter an Organization name between 2 and 100 characters.',
     'workspace.organizationNameRequired': 'Organization name is required.',
-    'workspace.organizations': 'Organizations',
-    'workspace.personal': 'Personal',
+    'workspace.organizations': 'Organization Workspaces',
+    'workspace.personal': 'Personal Workspace',
     'workspace.refreshFailedDescription':
       'Prior Workspace state remains cleared. Retry the target session refresh or sign out.',
     'workspace.refreshFailedTitle': 'Workspace refresh needs attention',
@@ -1030,8 +1030,8 @@ export const translations = {
     'workspace.organizationNameHelp': 'Dùng tên mọi người dễ nhận biết, từ 2–100 ký tự.',
     'workspace.organizationNameLength': 'Nhập tên Organization từ 2 đến 100 ký tự.',
     'workspace.organizationNameRequired': 'Tên Organization là bắt buộc.',
-    'workspace.organizations': 'Organizations',
-    'workspace.personal': 'Cá nhân',
+    'workspace.organizations': 'Các Workspace tổ chức',
+    'workspace.personal': 'Workspace cá nhân',
     'workspace.refreshFailedDescription':
       'Trạng thái Workspace trước vẫn được xóa. Hãy tải lại session đích hoặc đăng xuất.',
     'workspace.refreshFailedTitle': 'Cần xử lý việc tải lại Workspace',
