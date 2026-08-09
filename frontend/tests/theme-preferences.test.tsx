@@ -210,11 +210,21 @@ describe('theme preferences', () => {
     await user.click(screen.getByRole('button', { name: 'Dark' }));
 
     expect(document.documentElement.dataset.themeMode).toBe('dark');
-    expect(screen.getByText('Saving...')).toHaveClass('absolute', 'top-0', 'right-1');
+    expect(screen.getByText('Theme', { selector: 'legend' }).closest('fieldset')).toHaveAttribute(
+      'aria-busy',
+      'true',
+    );
+    expect(screen.queryByText('Saving...')).not.toBeInTheDocument();
+    expect((await screen.findByText('Saving...')).closest('#theme-save-status')).toHaveClass(
+      'sr-only',
+    );
+    expect(
+      screen.getByRole('button', { name: 'Dark' }).querySelector('[data-slot="spinner"]'),
+    ).not.toBeNull();
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
     themeSave.resolve(jsonResponse({ theme: 'dark' }));
     await waitFor(() =>
-      expect(document.querySelector('#theme-save-status')).not.toBeInTheDocument(),
+      expect(document.querySelector('#theme-save-status')).not.toHaveAttribute('aria-busy'),
     );
     expect(screen.getByRole('button', { name: 'Dark' })).toHaveAttribute('aria-pressed', 'true');
     const request = vi.mocked(fetch).mock.calls[0][1];

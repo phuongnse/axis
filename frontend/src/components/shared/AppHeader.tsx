@@ -1,12 +1,21 @@
 import { Link, useRouterState } from '@tanstack/react-router';
 import { useTranslation } from 'react-i18next';
 import { AppActionsMenu } from '@/components/shared/AppActionsMenu';
+import type { CreatedOrganizationWorkspace, EligibleWorkspace } from '@/features/workspaces/api';
+import type {
+  WorkspaceChangeResult,
+  WorkspaceContextState,
+} from '@/features/workspaces/WorkspaceControl';
 
 interface AppHeaderProps {
   onSignOut: () => void;
-  onWorkspaceChanged: () => Promise<void>;
+  onRetryWorkspaceContext: () => Promise<void>;
+  onWorkspaceChange: (
+    target: EligibleWorkspace | CreatedOrganizationWorkspace,
+  ) => Promise<WorkspaceChangeResult>;
   signOutError?: boolean;
   signingOut?: boolean;
+  workspaceContext: WorkspaceContextState;
 }
 
 function pageTitleKeyForPath(pathname: string) {
@@ -17,9 +26,11 @@ function pageTitleKeyForPath(pathname: string) {
 
 export function AppHeader({
   onSignOut,
-  onWorkspaceChanged,
+  onRetryWorkspaceContext,
+  onWorkspaceChange,
   signOutError = false,
   signingOut = false,
+  workspaceContext,
 }: AppHeaderProps) {
   const { t } = useTranslation();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
@@ -38,9 +49,11 @@ export function AppHeader({
         <div className="ml-auto flex min-w-0 shrink items-center gap-2">
           <AppActionsMenu
             onSignOut={onSignOut}
-            onWorkspaceChanged={onWorkspaceChanged}
+            onRetryWorkspaceContext={onRetryWorkspaceContext}
+            onWorkspaceChange={onWorkspaceChange}
             signOutError={signOutError}
             signingOut={signingOut}
+            workspaceContext={workspaceContext}
           />
         </div>
       </div>

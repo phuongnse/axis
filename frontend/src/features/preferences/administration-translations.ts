@@ -4,6 +4,7 @@ export const administrationTranslations = {
     'serviceIdentities.actionFailedDescription': 'Check the connection and try again.',
     'serviceIdentities.active': 'Active',
     'serviceIdentities.addKey': 'Add public key',
+    'serviceIdentities.addingKey': 'Adding public key…',
     'serviceIdentities.clientId': 'Client identifier',
     'serviceIdentities.clientIdHelp': 'Use the stable identifier assigned to this integration.',
     'serviceIdentities.conflict': 'Identity changed',
@@ -50,10 +51,12 @@ export const administrationTranslations = {
       'Paste only the public JWK. Never paste a private key, assertion, token, or shared secret.',
     'serviceIdentities.revision': 'Revision',
     'serviceIdentities.revokeIdentity': 'Revoke identity',
+    'serviceIdentities.revokingIdentity': 'Revoking identity…',
     'serviceIdentities.revokeIdentityDescription':
       'This permanently revokes the identity, its Workspace grant, and service access.',
     'serviceIdentities.revokeIdentityTitle': 'Revoke this service identity?',
     'serviceIdentities.revokeKey': 'Revoke key',
+    'serviceIdentities.revokingKey': 'Revoking key…',
     'serviceIdentities.revokeKeyDescription':
       'Key {kid} will be permanently revoked and cannot be re-added.',
     'serviceIdentities.revokeKeyTitle': 'Revoke this public key?',
@@ -100,6 +103,7 @@ export const administrationTranslations = {
     'productRoles.notAvailable': 'Not available',
     'productRoles.policy': 'Product policy',
     'productRoles.revoke': 'Revoke role',
+    'productRoles.revoking': 'Revoking role…',
     'productRoles.revokeDescription':
       'Revoke {role} from {subject}. Product authority is removed immediately.',
     'productRoles.revokeTitle': 'Revoke this exact product role?',
@@ -236,6 +240,7 @@ export const administrationTranslations = {
     'serviceIdentities.actionFailedDescription': 'Kiểm tra kết nối rồi thử lại.',
     'serviceIdentities.active': 'Đang hoạt động',
     'serviceIdentities.addKey': 'Thêm public key',
+    'serviceIdentities.addingKey': 'Đang thêm public key…',
     'serviceIdentities.clientId': 'Client identifier',
     'serviceIdentities.clientIdHelp': 'Dùng định danh ổn định được cấp cho integration này.',
     'serviceIdentities.conflict': 'Identity đã thay đổi',
@@ -279,10 +284,12 @@ export const administrationTranslations = {
       'Chỉ dán public JWK. Không dán private key, assertion, token hay shared secret.',
     'serviceIdentities.revision': 'Revision',
     'serviceIdentities.revokeIdentity': 'Thu hồi identity',
+    'serviceIdentities.revokingIdentity': 'Đang thu hồi identity…',
     'serviceIdentities.revokeIdentityDescription':
       'Identity, Workspace grant và service access sẽ bị thu hồi vĩnh viễn.',
     'serviceIdentities.revokeIdentityTitle': 'Thu hồi service identity này?',
     'serviceIdentities.revokeKey': 'Thu hồi key',
+    'serviceIdentities.revokingKey': 'Đang thu hồi key…',
     'serviceIdentities.revokeKeyDescription':
       'Key {kid} sẽ bị thu hồi vĩnh viễn và không thể thêm lại.',
     'serviceIdentities.revokeKeyTitle': 'Thu hồi public key này?',
@@ -329,6 +336,7 @@ export const administrationTranslations = {
     'productRoles.notAvailable': 'Không có',
     'productRoles.policy': 'Product policy',
     'productRoles.revoke': 'Thu hồi role',
+    'productRoles.revoking': 'Đang thu hồi role…',
     'productRoles.revokeDescription':
       'Thu hồi {role} khỏi {subject}. Product authority bị xóa ngay.',
     'productRoles.revokeTitle': 'Thu hồi đúng product role này?',

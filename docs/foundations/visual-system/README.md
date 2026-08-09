@@ -8,4 +8,4 @@ Visual System foundations own the cross-feature visual language, page archetypes
 
 | Foundation | Status |
 |---|---|
-| [docs/foundations/visual-system/axis-visual-system.md](./axis-visual-system.md) | Partial |
+| [docs/foundations/visual-system/axis-visual-system.md](./axis-visual-system.md) | Done |

@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ShieldCheck, ShieldMinus } from 'lucide-react';
 import { type FormEvent, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { AsyncButton } from '@/components/shared/AsyncButton';
 import { ManagedDialog, ManagedDialogBody } from '@/components/shared/ManagedDialog';
 import {
   type ManagedWindowDescriptor,
@@ -203,14 +204,16 @@ function ProductRoleAssignDialog({
             >
               {t('app.cancel')}
             </Button>
-            <Button
+            <AsyncButton
               type="submit"
               form={formId}
               disabled={mutation.isPending || !selectedSubject || !selectedRole}
+              icon={<ShieldCheck aria-hidden />}
+              pending={mutation.isPending}
+              pendingLabel={t('productRoles.assigning')}
             >
-              <ShieldCheck aria-hidden />
-              {mutation.isPending ? t('productRoles.assigning') : t('productRoles.assign')}
-            </Button>
+              {t('productRoles.assign')}
+            </AsyncButton>
           </>
         }
       >
@@ -383,10 +386,16 @@ function ProductRoleAssignmentDialog({
             <AlertDialog>
               <AlertDialogTrigger
                 render={
-                  <Button type="button" variant="destructive" disabled={mutation.isPending}>
-                    <ShieldMinus aria-hidden />
+                  <AsyncButton
+                    type="button"
+                    variant="destructive"
+                    disabled={mutation.isPending}
+                    icon={<ShieldMinus aria-hidden />}
+                    pending={mutation.isPending}
+                    pendingLabel={t('productRoles.revoking')}
+                  >
                     {t('productRoles.revoke')}
-                  </Button>
+                  </AsyncButton>
                 }
               />
               <AlertDialogContent>

@@ -65,12 +65,12 @@ export function RulesPage() {
   useEffect(() => {
     if (!search.dialog) return;
     if (search.dialog === 'create') {
-      if (collectionActionsQuery.isLoading || collectionActionsQuery.isError) return;
+      if (collectionActionsQuery.isPending || collectionActionsQuery.isError) return;
       if (canStartCreate) openWindow(ruleCreateWindowDescriptor(t('rules.createTitle')));
       void navigate({ replace: true, search: {} });
       return;
     }
-    if (!search.definitionKey || definitionsQuery.isLoading) return;
+    if (!search.definitionKey || definitionsQuery.isPending) return;
     const definition =
       selectedDefinition ??
       ({ definitionKey: search.definitionKey, origin: 'Workspace' } as RuleDefinitionSummary);
@@ -85,8 +85,8 @@ export function RulesPage() {
   }, [
     canStartCreate,
     collectionActionsQuery.isError,
-    collectionActionsQuery.isLoading,
-    definitionsQuery.isLoading,
+    collectionActionsQuery.isPending,
+    definitionsQuery.isPending,
     navigate,
     openWindow,
     search.definitionKey,
@@ -211,7 +211,7 @@ export function RulesPage() {
             </PageAction>
           )
         : undefined,
-      loading: definitionsQuery.isFetching,
+      loading: definitionsQuery.isPending,
       error: definitionsQuery.isError,
       onRetry: () => void definitionsQuery.refetch(),
     };
@@ -219,7 +219,7 @@ export function RulesPage() {
     canStartCreate,
     definitions,
     definitionsQuery.isError,
-    definitionsQuery.isFetching,
+    definitionsQuery.isPending,
     definitionsQuery.refetch,
     definitionsQuery.data?.pageSize,
     definitionsQuery.data?.totalCount,

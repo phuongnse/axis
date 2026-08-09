@@ -1,13 +1,19 @@
 import path from 'node:path';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { AnchorHTMLAttributes, ReactNode } from 'react';
 import { toast } from 'sonner';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { restoreBrowserSession, signOutUser } from '@/features/auth/api';
 import { useAuthStore } from '@/features/auth/auth-store';
-import { getCurrentUserProfile } from '@/features/dashboard/api';
+import { dashboardQueryKeys, getCurrentUserProfile } from '@/features/dashboard/api';
+import {
+  beginWorkspaceTransition,
+  confirmWorkspaceTransition,
+  recoverWorkspaceTransition,
+  workspaceKeys,
+} from '@/features/workspaces/api';
 import { invalidateClientRequestSession } from '@/lib/api';
 import type { ModuleNavigationContribution } from '@/lib/module-navigation';
 import { AppShell } from '../src/components/shared/AppShell';
@@ -59,12 +65,59 @@ vi.mock('@/lib/api', async (importActual) => {
 });
 
 vi.mock('@/features/workspaces/WorkspaceControl', () => ({
-  WorkspaceControl: ({ onWorkspaceChanged }: { onWorkspaceChanged: () => Promise<void> }) => (
-    <button type="button" onClick={onWorkspaceChanged}>
-      Simulate Workspace change
-    </button>
+  WorkspaceControl: ({
+    contextState,
+    onRetryContext,
+    onWorkspaceChange,
+  }: {
+    contextState: { failure: string | null; phase: string };
+    onRetryContext: () => Promise<void>;
+    onWorkspaceChange: (target: {
+      workspaceId: string;
+      name: string;
+      slug: string;
+      type: 'Personal';
+      organizationId: null;
+      isCurrent: false;
+    }) => Promise<unknown>;
+  }) => (
+    <>
+      <button
+        type="button"
+        onClick={() =>
+          onWorkspaceChange({
+            workspaceId: '33333333-3333-4333-8333-333333333333',
+            name: 'Personal workspace',
+            slug: 'personal-workspace',
+            type: 'Personal',
+            organizationId: null,
+            isCurrent: false,
+          })
+        }
+      >
+        Simulate Workspace change
+      </button>
+      <output data-testid="workspace-context-state">
+        {contextState.phase}:{contextState.failure ?? 'none'}
+      </output>
+      {contextState.failure === 'refresh-failed' || contextState.failure === 'outcome-unknown' ? (
+        <button type="button" onClick={onRetryContext}>
+          Retry refresh
+        </button>
+      ) : null}
+    </>
   ),
 }));
+
+vi.mock('@/features/workspaces/api', async (importActual) => {
+  const actual = await importActual<typeof import('@/features/workspaces/api')>();
+  return {
+    ...actual,
+    beginWorkspaceTransition: vi.fn(),
+    confirmWorkspaceTransition: vi.fn(),
+    recoverWorkspaceTransition: vi.fn(),
+  };
+});
 
 vi.mock('@/features/preferences', async (importActual) => {
   const actual = await importActual<typeof import('@/features/preferences')>();
@@ -86,6 +139,9 @@ vi.mock('@/features/dashboard/api', () => ({
 }));
 
 vi.mock('@/lib/module-navigation-api', () => ({
+  moduleNavigationAvailabilityKeys: {
+    all: ['module-navigation-availability'] as const,
+  },
   moduleNavigationAvailabilityQueryOptions: () => ({
     queryKey: ['module-navigation-availability'],
     queryFn: moduleNavigationAvailabilityMock,
@@ -115,6 +171,27 @@ describe('AppShell', () => {
     vi.mocked(restoreBrowserSession).mockReset();
     vi.mocked(restoreBrowserSession).mockResolvedValue(true);
     vi.mocked(invalidateClientRequestSession).mockReset();
+    vi.mocked(beginWorkspaceTransition).mockReset();
+    vi.mocked(beginWorkspaceTransition).mockResolvedValue({
+      transitionId: '44444444-4444-4444-8444-444444444444',
+      status: 'Pending',
+      expiresAt: '2026-08-06T12:00:00Z',
+      authoritativeWorkspaceId: null,
+    });
+    vi.mocked(confirmWorkspaceTransition).mockReset();
+    vi.mocked(confirmWorkspaceTransition).mockResolvedValue({
+      transitionId: '44444444-4444-4444-8444-444444444444',
+      status: 'Completed',
+      expiresAt: '2026-08-06T12:00:00Z',
+      authoritativeWorkspaceId: '33333333-3333-4333-8333-333333333333',
+    });
+    vi.mocked(recoverWorkspaceTransition).mockReset();
+    vi.mocked(recoverWorkspaceTransition).mockResolvedValue({
+      transitionId: '44444444-4444-4444-8444-444444444444',
+      status: 'Completed',
+      expiresAt: '2026-08-06T12:00:00Z',
+      authoritativeWorkspaceId: '33333333-3333-4333-8333-333333333333',
+    });
     vi.mocked(getCurrentUserProfile).mockResolvedValue({
       id: '11111111-1111-4111-8111-111111111111',
       email: 'ada@example.com',
@@ -188,7 +265,7 @@ describe('AppShell', () => {
     expect(screen.queryByText('Profile')).not.toBeInTheDocument();
     expect(accountMenu.querySelector('.lucide-building-2')).not.toBeNull();
     expect(screen.queryByText('AL')).not.toBeInTheDocument();
-    expect(screen.getAllByText('Ada Lovelace')).toHaveLength(1);
+    expect(screen.queryByText('Ada Lovelace')).not.toBeInTheDocument();
     expect(screen.getByText('Preferences')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Simulate Workspace change' })).toBeInTheDocument();
     expect(screen.getByText('Language control')).toBeInTheDocument();
@@ -357,12 +434,44 @@ describe('AppShell', () => {
     expect(screen.queryByRole('button', { name: 'Windows (1)' })).not.toBeInTheDocument();
   });
 
-  it('purges managed windows and cached Workspace state before a held session restore completes', async () => {
+  it('keeps the account view and shell geometry stable through the authoritative context cutover', async () => {
     const user = userEvent.setup();
     let resolveSessionRestore!: (authenticated: boolean) => void;
     vi.mocked(restoreBrowserSession).mockReturnValue(
       new Promise<boolean>((resolve) => {
-        resolveSessionRestore = resolve;
+        resolveSessionRestore = (authenticated) => {
+          if (authenticated) {
+            vi.mocked(getCurrentUserProfile).mockResolvedValue({
+              id: '11111111-1111-4111-8111-111111111111',
+              email: 'ada@example.com',
+              fullName: 'Ada Lovelace',
+              isActive: true,
+              language: 'en',
+              theme: 'light',
+              workspaceId: '33333333-3333-4333-8333-333333333333',
+              workspaces: [
+                {
+                  id: '33333333-3333-4333-8333-333333333333',
+                  name: 'Personal workspace',
+                  slug: 'personal-workspace',
+                  type: 'Personal',
+                  isCurrent: true,
+                },
+              ],
+            });
+            useAuthStore.getState().setBrowserSession({
+              authenticated: true,
+              csrfToken: 'target-csrf-token',
+              user: {
+                userId: '11111111-1111-4111-8111-111111111111',
+                workspaceId: '33333333-3333-4333-8333-333333333333',
+                email: 'ada@example.com',
+                name: 'Ada Lovelace',
+              },
+            });
+          }
+          resolve(authenticated);
+        };
       }),
     );
     const queryClient = new QueryClient({
@@ -371,6 +480,24 @@ describe('AppShell', () => {
     queryClient.setQueryData(['business-objects', 'workspace-source'], {
       name: 'Source definition',
     });
+    queryClient.setQueryData(workspaceKeys.eligible, [
+      {
+        workspaceId: '22222222-2222-4222-8222-222222222222',
+        name: 'Axis Reference Product',
+        slug: 'axis-reference-product',
+        type: 'Organization',
+        organizationId: '44444444-4444-4444-8444-444444444444',
+        isCurrent: true,
+      },
+      {
+        workspaceId: '33333333-3333-4333-8333-333333333333',
+        name: 'Personal workspace',
+        slug: 'personal-workspace',
+        type: 'Personal',
+        organizationId: null,
+        isCurrent: false,
+      },
+    ]);
 
     render(
       <QueryClientProvider client={queryClient}>
@@ -383,24 +510,145 @@ describe('AppShell', () => {
     await user.click(screen.getByRole('button', { name: 'Open test window' }));
     expect(await screen.findByRole('dialog', { name: 'Persistent test window' })).toBeVisible();
 
-    await user.click(screen.getByRole('button', { name: 'Account menu' }));
+    const accountMenu = screen.getByRole('button', { name: 'Account menu' });
+    await user.click(accountMenu);
     await user.click(screen.getByRole('button', { name: 'Simulate Workspace change' }));
 
-    expect(await screen.findByText('Refreshing Workspace')).toBeVisible();
-    expect(invalidateClientRequestSession).toHaveBeenCalledOnce();
+    expect(accountMenu).toHaveAttribute('aria-expanded', 'true');
+    await waitFor(() => expect(restoreBrowserSession).toHaveBeenCalledWith({ force: true }));
+    const routeContent = document.querySelector('[data-slot="authenticated-route-content"]');
+    expect(routeContent).not.toHaveClass('invisible');
+    expect(routeContent).toHaveAttribute('inert');
+    expect(routeContent).toHaveTextContent('Open test window');
+    const refreshStatus = await screen.findByText('Refreshing Workspace');
+    const contextSurface = document.querySelector('[data-slot="workspace-context-surface"]');
+    expect(routeContent).toHaveClass('invisible');
+    expect(contextSurface).toHaveClass('absolute', 'inset-0', 'overflow-hidden');
+    expect(contextSurface).not.toHaveClass('overflow-y-auto');
+    expect(refreshStatus).toBeVisible();
+    expect(refreshStatus.closest('[data-slot="alert"]')).toBeNull();
+    expect(invalidateClientRequestSession).toHaveBeenCalledTimes(2);
     expect(vi.mocked(invalidateClientRequestSession).mock.invocationCallOrder[0]).toBeLessThan(
-      vi.mocked(restoreBrowserSession).mock.invocationCallOrder[0] ?? Number.MAX_SAFE_INTEGER,
+      vi.mocked(beginWorkspaceTransition).mock.invocationCallOrder[0] ?? Number.MAX_SAFE_INTEGER,
     );
     expect(
       screen.queryByRole('dialog', { name: 'Persistent test window' }),
     ).not.toBeInTheDocument();
-    expect(queryClient.getQueryData(['business-objects', 'workspace-source'])).toBeUndefined();
-    expect(restoreBrowserSession).toHaveBeenCalledWith({ force: true });
+    expect(queryClient.getQueryData(['business-objects', 'workspace-source'])).toEqual({
+      name: 'Source definition',
+    });
+    expect(queryClient.getQueryData(workspaceKeys.eligible)).toEqual([
+      expect.objectContaining({
+        workspaceId: '22222222-2222-4222-8222-222222222222',
+        isCurrent: false,
+      }),
+      expect.objectContaining({
+        workspaceId: '33333333-3333-4333-8333-333333333333',
+        isCurrent: true,
+      }),
+    ]);
 
-    resolveSessionRestore(true);
+    await act(async () => resolveSessionRestore(true));
     await waitFor(() =>
       expect(navigateMock).toHaveBeenCalledWith({ to: '/dashboard', replace: true }),
     );
+    await waitFor(() =>
+      expect(queryClient.getQueryData(['business-objects', 'workspace-source'])).toBeUndefined(),
+    );
+    expect(queryClient.getQueryData(workspaceKeys.eligible)).toEqual([
+      expect.objectContaining({
+        workspaceId: '22222222-2222-4222-8222-222222222222',
+        isCurrent: false,
+      }),
+      expect.objectContaining({
+        workspaceId: '33333333-3333-4333-8333-333333333333',
+        isCurrent: true,
+      }),
+    ]);
+    expect(queryClient.getQueryData(dashboardQueryKeys.currentUser())).toEqual(
+      expect.objectContaining({
+        workspaceId: '33333333-3333-4333-8333-333333333333',
+      }),
+    );
+    await waitFor(() => expect(routerInvalidateMock).toHaveBeenCalledOnce());
+    await new Promise((resolve) => window.setTimeout(resolve, 0));
+    expect(refreshStatus).toBeVisible();
+    await waitFor(() => expect(refreshStatus).not.toBeInTheDocument(), { timeout: 1_000 });
+  });
+
+  it('finishes a fast context refresh without flashing a transition surface', async () => {
+    const user = userEvent.setup();
+    vi.mocked(restoreBrowserSession).mockImplementation(async () => {
+      useAuthStore.getState().setBrowserSession({
+        authenticated: true,
+        csrfToken: 'target-csrf-token',
+        user: {
+          userId: '11111111-1111-4111-8111-111111111111',
+          workspaceId: '33333333-3333-4333-8333-333333333333',
+          email: 'ada@example.com',
+          name: 'Ada Lovelace',
+        },
+      });
+      return true;
+    });
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <AppShell navigationContributions={[]}>
+          <section>Stable route content</section>
+        </AppShell>
+      </QueryClientProvider>,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Account menu' }));
+    await user.click(screen.getByRole('button', { name: 'Simulate Workspace change' }));
+
+    await waitFor(() => expect(routerInvalidateMock).toHaveBeenCalledOnce());
+    expect(screen.getByTestId('workspace-context-state')).toHaveTextContent('idle:none');
+    expect(screen.queryByText('Refreshing Workspace')).not.toBeInTheDocument();
+    expect(document.querySelector('[data-slot="workspace-context-surface"]')).toBeNull();
+    expect(document.querySelector('[data-slot="authenticated-route-content"]')).not.toHaveClass(
+      'invisible',
+    );
+  });
+
+  it('keeps a known cutover failed refresh recoverable without replaying the transition', async () => {
+    const user = userEvent.setup();
+    vi.mocked(restoreBrowserSession).mockResolvedValue(false);
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <AppShell navigationContributions={[]}>
+          <section>Source route content</section>
+        </AppShell>
+      </QueryClientProvider>,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Account menu' }));
+    await user.click(screen.getByRole('button', { name: 'Simulate Workspace change' }));
+
+    await waitFor(() =>
+      expect(screen.getByTestId('workspace-context-state')).toHaveTextContent(
+        'failed:refresh-failed',
+      ),
+    );
+    expect(restoreBrowserSession).toHaveBeenCalledOnce();
+    expect(confirmWorkspaceTransition).toHaveBeenCalledOnce();
+    expect(recoverWorkspaceTransition).not.toHaveBeenCalled();
+    expect(navigateMock).not.toHaveBeenCalled();
+    expect(document.querySelector('[data-slot="authenticated-route-content"]')).toHaveTextContent(
+      'Source route content',
+    );
+    expect(document.querySelector('[data-slot="authenticated-route-content"]')).toHaveClass(
+      'invisible',
+    );
+    expect(screen.getByRole('button', { name: 'Account menu' })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
+    expect(screen.getByRole('button', { name: 'Retry refresh' })).toBeEnabled();
   });
 
   it('renders managed windows with restrained elevation', async () => {

@@ -4,6 +4,32 @@ import { Button } from '@/components/ui/button';
 
 type PageScrollMode = 'contained' | 'route';
 
+interface EntryLayoutProps {
+  children: ReactNode;
+  utilities?: ReactNode;
+}
+
+function EntryLayout({ children, utilities }: EntryLayoutProps) {
+  return (
+    <div
+      data-slot="entry-layout"
+      className="flex min-h-dvh w-full min-w-0 flex-col overflow-x-hidden bg-background p-4 sm:p-6 lg:p-8"
+    >
+      {utilities ? (
+        <div data-slot="entry-utilities" className="flex shrink-0 justify-end">
+          {utilities}
+        </div>
+      ) : null}
+      <main
+        data-slot="entry-content"
+        className="mx-auto flex w-full max-w-lg flex-1 items-center justify-center py-4"
+      >
+        {children}
+      </main>
+    </div>
+  );
+}
+
 interface PageLayoutProps {
   children: ReactNode;
   scrollMode: PageScrollMode;
@@ -69,7 +95,44 @@ function PageHeader({ title, description, actions }: PageHeaderProps) {
   );
 }
 
+interface SectionHeaderProps {
+  actions?: ReactNode;
+  description?: ReactNode;
+  id: string;
+  title: ReactNode;
+}
+
+function SectionHeader({ actions, description, id, title }: SectionHeaderProps) {
+  return (
+    <div
+      data-slot="section-header"
+      className="flex min-w-0 flex-wrap items-start justify-between gap-3"
+    >
+      <div data-slot="section-header-content" className="min-w-0 space-y-1">
+        <h2 id={id} data-slot="section-title" className="font-heading text-lg font-medium">
+          {title}
+        </h2>
+        {description ? (
+          <p
+            data-slot="section-description"
+            className="max-w-3xl break-words text-sm text-muted-foreground"
+          >
+            {description}
+          </p>
+        ) : null}
+      </div>
+      {actions ? (
+        <div data-slot="section-actions" className="flex shrink-0 flex-wrap items-center gap-2">
+          {actions}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export {
+  EntryLayout,
+  type EntryLayoutProps,
   PageAction,
   type PageActionChild,
   type PageActionElement,
@@ -79,4 +142,6 @@ export {
   PageLayout,
   type PageLayoutProps,
   type PageScrollMode,
+  SectionHeader,
+  type SectionHeaderProps,
 };

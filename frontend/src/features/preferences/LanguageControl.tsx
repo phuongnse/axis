@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { RotateCcw } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { AsyncContent } from '@/components/shared/AsyncContent';
 import { OptionList, OptionListItem } from '@/components/shared/OptionList';
 import { Button } from '@/components/ui/button';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
@@ -75,8 +76,7 @@ export function LanguageControl({
   });
 
   const shouldPersistToServer = authenticated && getBrowserSessionStatus() === 'authenticated';
-  const showSaveStatus = authenticated && (mutation.isPending || mutation.isError);
-  const statusId = showSaveStatus ? 'language-save-status' : undefined;
+  const statusId = authenticated ? 'language-save-status' : undefined;
 
   function chooseLanguage(nextLanguage: SupportedLanguage) {
     void changeSiteLanguage(nextLanguage);
@@ -112,7 +112,11 @@ export function LanguageControl({
         className,
       )}
     >
-      <fieldset aria-describedby={statusId} className={cn(isMenu && 'grid gap-1')}>
+      <fieldset
+        aria-busy={mutation.isPending || undefined}
+        aria-describedby={statusId}
+        className={cn(isMenu && 'grid gap-1')}
+      >
         <legend
           className={cn(isMenu ? 'mb-1 px-1 text-xs font-medium text-muted-foreground' : 'sr-only')}
         >
@@ -125,13 +129,12 @@ export function LanguageControl({
             onValueChange={(value) => chooseToggleLanguage([value])}
           >
             {supportedLanguages.map((item) => (
-              <OptionListItem key={item.value} value={item.value}>
-                <span
-                  aria-hidden
-                  className="flex size-4 shrink-0 items-center justify-center text-xs font-semibold leading-none"
-                >
-                  {languageBadges[item.value]}
-                </span>
+              <OptionListItem
+                key={item.value}
+                icon={languageBadges[item.value]}
+                pending={mutation.isPending && latestServerLanguageRef.current === item.value}
+                value={item.value}
+              >
                 {t(languageLabelKeys[item.value])}
               </OptionListItem>
             ))}
@@ -154,17 +157,14 @@ export function LanguageControl({
         )}
       </fieldset>
 
-      {showSaveStatus ? (
-        <div
+      {authenticated ? (
+        <AsyncContent
           id={statusId}
-          className={cn(
-            'min-h-4 text-xs text-muted-foreground',
-            isMenu && 'px-1',
-            isMenu && mutation.isPending && 'pointer-events-none absolute top-0 right-1',
-          )}
-          aria-live="polite"
+          className={cn('min-h-5 text-xs text-muted-foreground', isMenu && 'px-1 sr-only')}
+          error={mutation.isError}
+          pending={mutation.isPending}
+          pendingLabel={t('app.saving')}
         >
-          {mutation.isPending ? t('app.saving') : null}
           {mutation.isError ? (
             <span className="inline-flex items-center gap-1 text-destructive">
               {t('app.languageSaveFailed')}
@@ -174,7 +174,7 @@ export function LanguageControl({
               </Button>
             </span>
           ) : null}
-        </div>
+        </AsyncContent>
       ) : null}
     </div>
   );

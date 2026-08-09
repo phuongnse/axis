@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { KeyRound, Plus, ShieldX } from 'lucide-react';
 import { type FormEvent, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { AsyncButton } from '@/components/shared/AsyncButton';
 import { ManagedDialog, ManagedDialogBody } from '@/components/shared/ManagedDialog';
 import {
   type ManagedWindowDescriptor,
@@ -137,10 +138,16 @@ function ServiceIdentityCreateDialog({ onClose }: { onClose: () => void }) {
             >
               {t('app.cancel')}
             </Button>
-            <Button type="submit" form={formId} disabled={mutation.isPending || !value.trim()}>
-              <Plus aria-hidden />
-              {mutation.isPending ? t('serviceIdentities.creating') : t('serviceIdentities.create')}
-            </Button>
+            <AsyncButton
+              type="submit"
+              form={formId}
+              disabled={mutation.isPending || !value.trim()}
+              icon={<Plus aria-hidden />}
+              pending={mutation.isPending}
+              pendingLabel={t('serviceIdentities.creating')}
+            >
+              {t('serviceIdentities.create')}
+            </AsyncButton>
           </>
         }
       >
@@ -301,10 +308,16 @@ function ServiceIdentityDialog({
               <AlertDialog>
                 <AlertDialogTrigger
                   render={
-                    <Button type="button" variant="destructive" disabled={busy}>
-                      <ShieldX aria-hidden />
+                    <AsyncButton
+                      type="button"
+                      variant="destructive"
+                      disabled={busy}
+                      icon={<ShieldX aria-hidden />}
+                      pending={revokeIdentityMutation.isPending}
+                      pendingLabel={t('serviceIdentities.revokingIdentity')}
+                    >
                       {t('serviceIdentities.revokeIdentity')}
-                    </Button>
+                    </AsyncButton>
                   }
                 />
                 <AlertDialogContent>
@@ -366,6 +379,9 @@ function ServiceIdentityDialog({
                     key={key.id}
                     serviceKey={key}
                     disabled={busy || !active || !identityReady}
+                    pending={
+                      revokeKeyMutation.isPending && revokeKeyMutation.variables?.keyId === key.id
+                    }
                     onRevoke={() =>
                       identity.id &&
                       key.id &&
@@ -402,10 +418,16 @@ function ServiceIdentityDialog({
                   <FieldDescription>{t('serviceIdentities.publicJwkHelp')}</FieldDescription>
                 )}
               </Field>
-              <Button type="submit" className="w-fit" disabled={busy || !publicJwk.trim()}>
-                <KeyRound aria-hidden />
+              <AsyncButton
+                type="submit"
+                className="w-fit"
+                disabled={busy || !publicJwk.trim()}
+                icon={<KeyRound aria-hidden />}
+                pending={addKeyMutation.isPending}
+                pendingLabel={t('serviceIdentities.addingKey')}
+              >
                 {t('serviceIdentities.addKey')}
-              </Button>
+              </AsyncButton>
             </form>
           ) : null}
         </ManagedDialogBody>
@@ -425,10 +447,12 @@ function ServiceIdentityDialog({
 function ServiceKey({
   serviceKey,
   disabled,
+  pending,
   onRevoke,
 }: {
   serviceKey: ServiceIdentityKeyDto;
   disabled: boolean;
+  pending: boolean;
   onRevoke: () => void;
 }) {
   const { t } = useTranslation();
@@ -448,15 +472,18 @@ function ServiceKey({
         <AlertDialog>
           <AlertDialogTrigger
             render={
-              <Button
+              <AsyncButton
                 type="button"
                 size="sm"
                 variant="destructive"
                 className="w-fit"
                 disabled={disabled}
+                icon={<ShieldX aria-hidden />}
+                pending={pending}
+                pendingLabel={t('serviceIdentities.revokingKey')}
               >
                 {t('serviceIdentities.revokeKey')}
-              </Button>
+              </AsyncButton>
             }
           />
           <AlertDialogContent>

@@ -1,13 +1,64 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, expectTypeOf, it } from 'vitest';
 import {
+  EntryLayout,
+  type EntryLayoutProps,
   PageAction,
   type PageActionProps,
   PageHeader,
   type PageHeaderProps,
   PageLayout,
   type PageLayoutProps,
+  SectionHeader,
+  type SectionHeaderProps,
 } from '../src/components/shared/PageLayout';
+
+describe('EntryLayout', () => {
+  it('owns the full-viewport entry anatomy and optional utilities without horizontal overflow', () => {
+    const { container } = render(
+      <EntryLayout utilities={<button type="button">Preferences</button>}>
+        <section>Entry content</section>
+      </EntryLayout>,
+    );
+
+    const layout = container.querySelector<HTMLElement>('[data-slot="entry-layout"]');
+    const utilities = container.querySelector<HTMLElement>('[data-slot="entry-utilities"]');
+    const content = screen.getByRole('main');
+
+    expect(layout).toHaveClass(
+      'flex',
+      'min-h-dvh',
+      'w-full',
+      'min-w-0',
+      'flex-col',
+      'overflow-x-hidden',
+      'bg-background',
+      'p-4',
+      'sm:p-6',
+      'lg:p-8',
+    );
+    expect(utilities).toContainElement(screen.getByRole('button', { name: 'Preferences' }));
+    expect(content).toHaveAttribute('data-slot', 'entry-content');
+    expect(content).toHaveClass(
+      'mx-auto',
+      'flex',
+      'w-full',
+      'max-w-lg',
+      'flex-1',
+      'items-center',
+      'justify-center',
+      'py-4',
+    );
+    expect(content).toHaveTextContent('Entry content');
+  });
+
+  it('omits utilities cleanly and does not expose a free-form className escape hatch', () => {
+    const { container } = render(<EntryLayout>Entry content</EntryLayout>);
+
+    expect(container.querySelector('[data-slot="entry-utilities"]')).toBeNull();
+    expectTypeOf<EntryLayoutProps>().not.toHaveProperty('className');
+  });
+});
 
 describe('PageLayout', () => {
   it.each([
@@ -145,5 +196,32 @@ describe('PageAction', () => {
 
   it('does not expose a free-form className escape hatch', () => {
     expectTypeOf<PageActionProps>().not.toHaveProperty('className');
+  });
+});
+
+describe('SectionHeader', () => {
+  it('owns section typography, description, and contextual actions', () => {
+    const { container } = render(
+      <SectionHeader
+        id="release-title"
+        title="Release"
+        description="Inspect immutable release facts."
+        actions={<span>Trusted</span>}
+      />,
+    );
+
+    const header = container.querySelector('[data-slot="section-header"]');
+    const title = screen.getByRole('heading', { level: 2, name: 'Release' });
+    const description = screen.getByText('Inspect immutable release facts.');
+
+    expect(header).toHaveClass('flex', 'min-w-0', 'flex-wrap', 'justify-between', 'gap-3');
+    expect(title).toHaveAttribute('id', 'release-title');
+    expect(title).toHaveClass('font-heading', 'text-lg', 'font-medium');
+    expect(description).toHaveAttribute('data-slot', 'section-description');
+    expect(container.querySelector('[data-slot="section-actions"]')).toHaveTextContent('Trusted');
+  });
+
+  it('does not expose a free-form className escape hatch', () => {
+    expectTypeOf<SectionHeaderProps>().not.toHaveProperty('className');
   });
 });

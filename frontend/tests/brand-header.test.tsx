@@ -7,6 +7,12 @@ describe('BrandHeader', () => {
     const { container } = render(<BrandHeader label="Sign in" labelElement="h1" />);
 
     expect(screen.getByRole('heading', { name: 'Sign in', level: 1 })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Sign in', level: 1 })).toHaveClass(
+      'font-heading',
+      'text-2xl',
+      'font-semibold',
+      'text-foreground',
+    );
     expect(container.firstElementChild).toHaveClass('flex', 'items-center', 'gap-3', 'pb-2');
     expect(container.firstElementChild).not.toHaveClass('space-y-6');
     expect(screen.queryByRole('separator')).not.toBeInTheDocument();

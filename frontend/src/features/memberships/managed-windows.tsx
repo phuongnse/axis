@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { MailPlus, RefreshCw, UserMinus } from 'lucide-react';
 import { type FormEvent, useEffect, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { AsyncButton } from '@/components/shared/AsyncButton';
 import { ManagedDialog, ManagedDialogBody } from '@/components/shared/ManagedDialog';
 import type {
   ManagedWindowDescriptor,
@@ -188,10 +189,16 @@ function MembershipInviteDialog({ onClose }: { onClose: () => void }) {
             >
               {t('app.cancel')}
             </Button>
-            <Button type="submit" form={formId} disabled={mutation.isPending || !email.trim()}>
-              <MailPlus aria-hidden />
-              {mutation.isPending ? t('memberships.inviting') : t('memberships.invite')}
-            </Button>
+            <AsyncButton
+              type="submit"
+              form={formId}
+              disabled={mutation.isPending || !email.trim()}
+              icon={<MailPlus aria-hidden />}
+              pending={mutation.isPending}
+              pendingLabel={t('memberships.inviting')}
+            >
+              {t('memberships.invite')}
+            </AsyncButton>
           </>
         }
       >
@@ -347,24 +354,32 @@ function MembershipInvitationDialog({
             {t('app.close')}
           </Button>
           {actionable ? (
-            <Button
+            <AsyncButton
               type="button"
               variant="secondary"
               disabled={busy}
               onClick={() => resendMutation.mutate({ invitationId, revision })}
+              icon={<RefreshCw aria-hidden />}
+              pending={resendMutation.isPending}
+              pendingLabel={t('memberships.resending')}
             >
-              <RefreshCw aria-hidden />
               {t('memberships.resend')}
-            </Button>
+            </AsyncButton>
           ) : null}
           {actionable ? (
             <AlertDialog>
               <AlertDialogTrigger
                 render={
-                  <Button type="button" variant="destructive" disabled={busy}>
-                    <UserMinus aria-hidden />
+                  <AsyncButton
+                    type="button"
+                    variant="destructive"
+                    disabled={busy}
+                    icon={<UserMinus aria-hidden />}
+                    pending={revokeMutation.isPending}
+                    pendingLabel={t('memberships.revoking')}
+                  >
                     {t('memberships.revoke')}
-                  </Button>
+                  </AsyncButton>
                 }
               />
               <AlertDialogContent>

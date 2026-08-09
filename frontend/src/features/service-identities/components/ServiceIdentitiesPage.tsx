@@ -141,14 +141,14 @@ export function ServiceIdentitiesPage() {
             </PageAction>
           )
         : undefined,
-      loading: identitiesQuery.isFetching,
+      loading: identitiesQuery.isPending,
       error: identitiesQuery.isError,
       onRetry: () => void identitiesQuery.refetch(),
     };
   }, [
     identities,
     identitiesQuery.isError,
-    identitiesQuery.isFetching,
+    identitiesQuery.isPending,
     identitiesQuery.isSuccess,
     identitiesQuery.refetch,
     openWindow,

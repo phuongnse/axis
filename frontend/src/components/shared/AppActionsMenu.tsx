@@ -1,7 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
 import { Building2, ChevronDown, LogOut, Settings2 } from 'lucide-react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AccountAvatar } from '@/components/shared/AccountAvatar';
+import { AsyncButton } from '@/components/shared/AsyncButton';
 import { transientItemHighlight } from '@/components/shared/interactionStates';
 import { StatusNotice } from '@/components/shared/StatusNotice';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -12,13 +14,22 @@ import { useAuthStore } from '@/features/auth/auth-store';
 import { sessionDisplayFromLabel } from '@/features/auth/session-display';
 import { dashboardQueryKeys, getCurrentUserProfile } from '@/features/dashboard/api';
 import { LanguageControl, ThemeControl } from '@/features/preferences';
-import { WorkspaceControl } from '@/features/workspaces/WorkspaceControl';
+import type { CreatedOrganizationWorkspace, EligibleWorkspace } from '@/features/workspaces/api';
+import {
+  type WorkspaceChangeResult,
+  type WorkspaceContextState,
+  WorkspaceControl,
+} from '@/features/workspaces/WorkspaceControl';
 
 interface AppActionsMenuProps {
   onSignOut: () => void;
-  onWorkspaceChanged: () => Promise<void>;
+  onRetryWorkspaceContext: () => Promise<void>;
+  onWorkspaceChange: (
+    target: EligibleWorkspace | CreatedOrganizationWorkspace,
+  ) => Promise<WorkspaceChangeResult>;
   signOutError?: boolean;
   signingOut?: boolean;
+  workspaceContext: WorkspaceContextState;
 }
 
 function firstNonEmpty(...values: Array<string | null | undefined>): string | null {
@@ -31,11 +42,14 @@ function firstNonEmpty(...values: Array<string | null | undefined>): string | nu
 
 export function AppActionsMenu({
   onSignOut,
-  onWorkspaceChanged,
+  onRetryWorkspaceContext,
+  onWorkspaceChange,
   signOutError = false,
   signingOut = false,
+  workspaceContext,
 }: AppActionsMenuProps) {
   const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
   const authenticated = useAuthStore((state) => state.browserSessionStatus === 'authenticated');
   const userLabel = useAuthStore((state) => state.userLabel);
   const userInitials = useAuthStore((state) => state.userInitials);
@@ -54,9 +68,17 @@ export function AppActionsMenu({
     currentWorkspace?.type === 'Organization' && currentWorkspaceName
       ? currentWorkspaceName
       : displayName;
+  const contextTransitionActive =
+    workspaceContext.phase === 'switching' || workspaceContext.phase === 'refreshing';
 
   return (
-    <Popover>
+    <Popover
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen && contextTransitionActive) return;
+        setOpen(nextOpen);
+      }}
+    >
       <PopoverTrigger
         render={
           <Button
@@ -86,7 +108,11 @@ export function AppActionsMenu({
         className="max-h-(--available-height) w-80 max-w-full overflow-y-auto"
         aria-label={t('nav.accountMenu')}
       >
-        <WorkspaceControl onWorkspaceChanged={onWorkspaceChanged} />
+        <WorkspaceControl
+          contextState={workspaceContext}
+          onRetryContext={onRetryWorkspaceContext}
+          onWorkspaceChange={onWorkspaceChange}
+        />
 
         <Separator />
 
@@ -102,20 +128,18 @@ export function AppActionsMenu({
         <Separator />
 
         <section aria-label={t('app.account')} className="grid gap-2">
-          <div className="px-1 text-xs font-medium text-muted-foreground">{t('app.account')}</div>
-          <p className="min-w-0 truncate px-1 text-sm font-medium">{displayName}</p>
-          <Button
+          <AsyncButton
             type="button"
             variant="destructive"
             size="sm"
             className="w-full"
-            aria-busy={signingOut}
-            disabled={signingOut}
+            icon={<LogOut />}
+            pending={signingOut}
+            pendingLabel={t('nav.signingOut')}
             onClick={onSignOut}
           >
-            <LogOut className="size-3.5" aria-hidden />
-            {signingOut ? t('nav.signingOut') : t('nav.signOut')}
-          </Button>
+            {t('nav.signOut')}
+          </AsyncButton>
           {signOutError ? (
             <StatusNotice tone="destructive">{t('nav.signOutFailed')}</StatusNotice>
           ) : null}

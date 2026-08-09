@@ -201,14 +201,25 @@ describe('language preferences', () => {
     });
 
     await user.click(screen.getByRole('button', { name: 'Vietnamese' }));
-    expect(screen.getByText('Đang lưu...')).toHaveClass('absolute', 'top-0', 'right-1');
+    expect(
+      screen.getByText('Ngôn ngữ', { selector: 'legend' }).closest('fieldset'),
+    ).toHaveAttribute('aria-busy', 'true');
+    expect(screen.queryByText('Đang lưu...')).not.toBeInTheDocument();
+    expect((await screen.findByText('Đang lưu...')).closest('#language-save-status')).toHaveClass(
+      'sr-only',
+    );
+    expect(
+      screen.getByRole('button', { name: 'Tiếng Việt' }).querySelector('[data-slot="spinner"]'),
+    ).not.toBeNull();
     await user.click(screen.getByRole('button', { name: 'Tiếng Anh' }));
 
     let staleResponseParsed = false;
 
     englishSave.resolve(jsonResponse({ language: 'en' }));
     await waitFor(() => expect(localStorage.getItem(LANGUAGE_STORAGE_KEY)).toBe('en'));
-    expect(document.querySelector('#language-save-status')).not.toBeInTheDocument();
+    await waitFor(() =>
+      expect(document.querySelector('#language-save-status')).not.toHaveAttribute('aria-busy'),
+    );
 
     vietnameseSave.resolve({
       ok: true,

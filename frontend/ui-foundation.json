@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "phase": "frozen",
+  "goldenReference": {
+    "archetype": "resource-workspace",
+    "route": "/business-objects",
+    "sourceRoots": [
+      "src/features/business-objects",
+      "src/features/preferences",
+      "src/features/workspaces"
+    ]
+  },
+  "draftSharedModules": [
+    "@/components/shared/AsyncButton",
+    "@/components/shared/AsyncContent",
+    "@/components/shared/ResourceWorkspace"
+  ]
+}

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import re
 import sys
 from pathlib import Path
@@ -10,8 +11,209 @@ from pathlib import Path
 from axis_repo import ROOT, iter_files
 
 
+UI_FOUNDATION_PHASES = {
+    "requested",
+    "authorized",
+    "defined",
+    "reference-ready",
+    "frozen",
+}
+UI_FOUNDATION_MANIFEST_KEYS = {
+    "schemaVersion",
+    "phase",
+    "goldenReference",
+    "draftSharedModules",
+}
+UI_GOLDEN_REFERENCE_KEYS = {"archetype", "route", "sourceRoots"}
+
+
 def rel(path: Path) -> str:
     return str(path.relative_to(ROOT)).replace("\\", "/")
+
+
+def ui_foundation_issues(root: Path = ROOT) -> list[str]:
+    manifest_path = root / "frontend" / "ui-foundation.json"
+    contract_path = root / "docs" / "foundations" / "visual-system" / "axis-visual-system.md"
+    if not manifest_path.is_file():
+        return ["frontend/ui-foundation.json: active UI foundation state is missing"]
+
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError) as exc:
+        return [f"frontend/ui-foundation.json: cannot read active UI foundation state: {exc}"]
+    if not isinstance(manifest, dict):
+        return ["frontend/ui-foundation.json: root value must be an object"]
+
+    issues: list[str] = []
+    unexpected_keys = sorted(set(manifest) - UI_FOUNDATION_MANIFEST_KEYS)
+    missing_keys = sorted(UI_FOUNDATION_MANIFEST_KEYS - set(manifest))
+    if unexpected_keys:
+        issues.append(
+            "frontend/ui-foundation.json: unexpected keys: " + ", ".join(unexpected_keys)
+        )
+    if missing_keys:
+        issues.append(
+            "frontend/ui-foundation.json: missing keys: " + ", ".join(missing_keys)
+        )
+
+    if manifest.get("schemaVersion") != 1:
+        issues.append("frontend/ui-foundation.json: `schemaVersion` must be 1")
+
+    phase = manifest.get("phase")
+    if phase not in UI_FOUNDATION_PHASES:
+        issues.append(
+            "frontend/ui-foundation.json: unknown `phase`; use one of "
+            f"{sorted(UI_FOUNDATION_PHASES)}"
+        )
+
+    golden_reference = manifest.get("goldenReference")
+    source_roots: list[str] = []
+    if not isinstance(golden_reference, dict):
+        issues.append("frontend/ui-foundation.json: `goldenReference` must be an object")
+    else:
+        unexpected_golden_keys = sorted(set(golden_reference) - UI_GOLDEN_REFERENCE_KEYS)
+        missing_golden_keys = sorted(UI_GOLDEN_REFERENCE_KEYS - set(golden_reference))
+        if unexpected_golden_keys:
+            issues.append(
+                "frontend/ui-foundation.json: `goldenReference` has unexpected keys: "
+                + ", ".join(unexpected_golden_keys)
+            )
+        if missing_golden_keys:
+            issues.append(
+                "frontend/ui-foundation.json: `goldenReference` is missing keys: "
+                + ", ".join(missing_golden_keys)
+            )
+        for field in ("archetype", "route"):
+            value = golden_reference.get(field)
+            if not isinstance(value, str) or not value.strip():
+                issues.append(
+                    f"frontend/ui-foundation.json: `goldenReference.{field}` must be a non-empty string"
+                )
+
+        raw_source_roots = golden_reference.get("sourceRoots")
+        if not isinstance(raw_source_roots, list) or not raw_source_roots:
+            issues.append(
+                "frontend/ui-foundation.json: `goldenReference.sourceRoots` must be a non-empty array"
+            )
+        elif any(not isinstance(value, str) for value in raw_source_roots):
+            issues.append(
+                "frontend/ui-foundation.json: every `goldenReference.sourceRoots` entry must be a string"
+            )
+        else:
+            source_roots = raw_source_roots
+            if len(source_roots) != len(set(source_roots)):
+                issues.append(
+                    "frontend/ui-foundation.json: `goldenReference.sourceRoots` must not contain duplicates"
+                )
+            for source_root in source_roots:
+                source_path = Path(source_root)
+                if (
+                    source_path.is_absolute()
+                    or ".." in source_path.parts
+                    or not source_root.startswith("src/features/")
+                ):
+                    issues.append(
+                        "frontend/ui-foundation.json: golden-reference source roots must stay under "
+                        f"`src/features/`: {source_root}"
+                    )
+
+    draft_modules = manifest.get("draftSharedModules")
+    valid_draft_modules: set[str] = set()
+    if not isinstance(draft_modules, list) or not draft_modules:
+        issues.append(
+            "frontend/ui-foundation.json: `draftSharedModules` must be a non-empty array"
+        )
+    elif any(not isinstance(value, str) or not value.startswith("@/") for value in draft_modules):
+        issues.append(
+            "frontend/ui-foundation.json: every draft shared module must be an `@/` import path"
+        )
+    else:
+        valid_draft_modules = set(draft_modules)
+        if len(valid_draft_modules) != len(draft_modules):
+            issues.append(
+                "frontend/ui-foundation.json: `draftSharedModules` must not contain duplicates"
+            )
+
+    if not contract_path.is_file():
+        issues.append(
+            "docs/foundations/visual-system/axis-visual-system.md: visual-system contract is missing"
+        )
+    else:
+        try:
+            contract = contract_path.read_text(encoding="utf-8")
+        except OSError as exc:
+            issues.append(
+                "docs/foundations/visual-system/axis-visual-system.md: "
+                f"cannot read visual-system contract: {exc}"
+            )
+        else:
+            frontend_status = re.search(
+                r"^[>| ]*\|\s*Frontend\s*\|\s*(?P<status>[A-Za-z-]+)\s*\|",
+                contract,
+                re.MULTILINE,
+            )
+            if frontend_status is None:
+                issues.append(
+                    "docs/foundations/visual-system/axis-visual-system.md: "
+                    "implementation status must contain a Frontend row"
+                )
+            elif phase != "frozen" and frontend_status.group("status") == "Done":
+                issues.append(
+                    "docs/foundations/visual-system/axis-visual-system.md: "
+                    "cannot claim `Frontend | Done` before phase `frozen`"
+                )
+
+    if phase == "frozen" or not source_roots or not valid_draft_modules:
+        return issues
+
+    features_root = root / "frontend" / "src" / "features"
+    import_target = re.compile(
+        r"(?:\bfrom\s*|\bimport\s*(?:\(\s*)?|\brequire\s*\(\s*)"
+        r"['\"](?P<target>[^'\"]+)['\"]"
+    )
+    frontend_root = root / "frontend"
+    for path in iter_files(features_root, (".ts", ".tsx")):
+        feature_relative = str(path.relative_to(frontend_root)).replace("\\", "/")
+        if any(
+            feature_relative == source_root or feature_relative.startswith(f"{source_root}/")
+            for source_root in source_roots
+        ):
+            continue
+        text = path.read_text(encoding="utf-8")
+        for match in import_target.finditer(text):
+            target = match.group("target").replace("\\", "/")
+            if target not in valid_draft_modules:
+                continue
+            line_number = text.count("\n", 0, match.start()) + 1
+            issues.append(
+                f"frontend/{feature_relative}:{line_number}: draft UI module `{target}` is limited "
+                "to the active golden-reference source roots until phase `frozen`"
+            )
+    return issues
+
+
+def check_ui_foundation(_args: argparse.Namespace | None = None) -> int:
+    issues = ui_foundation_issues()
+    if issues:
+        for issue in issues:
+            print(f"check-ui-foundation FAIL: {issue}", file=sys.stderr)
+        return 1
+    print("check-ui-foundation: OK")
+    return 0
+
+
+def active_ui_migration_roots(root: Path) -> tuple[Path, ...] | None:
+    """Return the bounded proving scope, or None when policy applies repo-wide."""
+    manifest_path = root / "frontend" / "ui-foundation.json"
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        phase = manifest["phase"]
+        source_roots = manifest["goldenReference"]["sourceRoots"]
+    except (FileNotFoundError, KeyError, TypeError, json.JSONDecodeError, OSError):
+        return None
+    if phase == "frozen" or not isinstance(source_roots, list):
+        return None
+    return tuple(root / "frontend" / source_root for source_root in source_roots)
 
 
 def frontend_ui_system_issues(root: Path = ROOT) -> list[str]:
@@ -54,11 +256,36 @@ def frontend_ui_system_issues(root: Path = ROOT) -> list[str]:
     raw_alert_owners = {
         src_root / "components" / "shared" / "StatusNotice.tsx",
     }
+    product_roots = (
+        src_root / "features",
+        src_root / "routes",
+    )
+    direct_pending_animation = re.compile(r"\banimate-(?:spin|pulse)\b")
+    legacy_query_loading = re.compile(r"[.]isLoading\b")
+    background_refresh_as_initial_load = re.compile(
+        r"\bloading\s*:\s*[^,\n]*[.]isFetching\b"
+    )
+    pending_label_swap = re.compile(
+        r"\{\s*(?:loading|[A-Za-z_$][A-Za-z0-9_$.]*[.]isPending|"
+        r"[A-Za-z_$][A-Za-z0-9_$]*(?:Pending|Loading))"
+        r"\s*[?]\s*t\([^{}]*?\)\s*:\s*t\([^{}]*?\)\s*\}",
+        re.DOTALL,
+    )
+    raw_query_pending_status = re.compile(
+        r"(?:\b[A-Za-z_$][A-Za-z0-9_$.]*[.](?:isPending|isFetching|isLoading)|\bloading)"
+        r"[^?]{0,100}[?]\s*<p\b[^>]*\brole=['\"]status['\"]",
+        re.DOTALL,
+    )
+    migration_roots = active_ui_migration_roots(root)
 
     for path in iter_files(src_root, (".ts", ".tsx")):
         normalized = rel(path) if root == ROOT else str(path.relative_to(root)).replace("\\", "/")
         text = path.read_text(encoding="utf-8")
         in_ui_primitives = path.is_relative_to(ui_root) if hasattr(path, "is_relative_to") else False
+        in_product_surface = any(path.is_relative_to(root_path) for root_path in product_roots)
+        in_ui_migration_scope = migration_roots is None or any(
+            path.is_relative_to(root_path) for root_path in migration_roots
+        )
         owns_interaction_states = path == interaction_state_owner
         if in_ui_primitives:
             for match in import_target.finditer(text):
@@ -74,6 +301,24 @@ def frontend_ui_system_issues(root: Path = ROOT) -> list[str]:
                     idx = text.count("\n", 0, match.start()) + 1
                     issues.append(
                         f"{normalized}:{idx}: registry primitives cannot depend on feature, shared, or route code"
+                    )
+            if path.name in {"select.tsx", "combobox.tsx"}:
+                if "CheckIcon" in text or ".ItemIndicator" in text:
+                    issues.append(
+                        f"{normalized}:1: single-selection primitives use persistent secondary fill, not a trailing indicator"
+                    )
+                if "data-selected:bg-secondary" not in text:
+                    issues.append(
+                        f"{normalized}:1: single-selection primitives must own persistent secondary selection fill"
+                    )
+            if path.name == "command.tsx":
+                if "CheckIcon" in text:
+                    issues.append(
+                        f"{normalized}:1: checked command options use persistent secondary fill, not a trailing checkmark"
+                    )
+                if "data-[checked=true]:bg-secondary" not in text:
+                    issues.append(
+                        f"{normalized}:1: checked command options must own persistent secondary selection fill"
                     )
             continue
 
@@ -98,6 +343,67 @@ def frontend_ui_system_issues(root: Path = ROOT) -> list[str]:
                     f"{normalized}:{idx}: raw Alert is restricted to the StatusNotice owner; "
                     "use StatusNotice for page, form, dialog, and menu feedback"
                 )
+            imports_raw_pending_visual = target in {
+                "@/components/ui/spinner",
+                "@/components/ui/skeleton",
+            } or target.endswith(("/components/ui/spinner", "/components/ui/skeleton"))
+            if in_product_surface and in_ui_migration_scope and imports_raw_pending_visual:
+                idx = text.count("\n", 0, match.start()) + 1
+                issues.append(
+                    f"{normalized}:{idx}: feature and route pending visuals must use shared async-state patterns"
+                )
+            if (
+                in_product_surface
+                and in_ui_migration_scope
+                and target.endswith("/components/shared/PendingIndicator")
+            ):
+                idx = text.count("\n", 0, match.start()) + 1
+                issues.append(
+                    f"{normalized}:{idx}: PendingIndicator is an internal shared visual; "
+                    "use a semantic shared async pattern"
+                )
+            if (
+                in_product_surface
+                and in_ui_migration_scope
+                and target.endswith("/hooks/usePendingVisibility")
+            ):
+                idx = text.count("\n", 0, match.start()) + 1
+                issues.append(
+                    f"{normalized}:{idx}: pending timing is owned by shared async patterns; "
+                    "feature and route code supplies semantic state only"
+                )
+
+        if (
+            in_product_surface
+            and in_ui_migration_scope
+            and path.name.endswith("Page.tsx")
+            and not any(
+                owner in text
+                for owner in ("<ResourceWorkspace", "<PageLayout", "<EntryLayout", "<AuthCard")
+            )
+        ):
+            issues.append(
+                f"{normalized}:1: product pages must compose an approved shared page-anatomy owner"
+            )
+
+        if in_product_surface and in_ui_migration_scope:
+            for match, message in (
+                (
+                    legacy_query_loading.finditer(text),
+                    "TanStack Query initial state must use isPending; background refresh preserves current content",
+                ),
+                (
+                    pending_label_swap.finditer(text),
+                    "pending actions must use a shared async action with a stable visible label",
+                ),
+                (
+                    raw_query_pending_status.finditer(text),
+                    "query pending feedback must use a semantic shared async region",
+                ),
+            ):
+                for occurrence in match:
+                    idx = text.count("\n", 0, occurrence.start()) + 1
+                    issues.append(f"{normalized}:{idx}: {message}")
 
         for idx, line in enumerate(text.splitlines(), 1):
             for match in palette_utility.finditer(line):
@@ -111,6 +417,22 @@ def frontend_ui_system_issues(root: Path = ROOT) -> list[str]:
             if inline_color.search(line):
                 issues.append(
                     f"{normalized}:{idx}: component-local hard-coded color; use a semantic token"
+                )
+            if (
+                in_product_surface
+                and in_ui_migration_scope
+                and direct_pending_animation.search(line)
+            ):
+                issues.append(
+                    f"{normalized}:{idx}: feature and route pending motion must use shared async-state patterns"
+                )
+            if (
+                in_product_surface
+                and in_ui_migration_scope
+                and background_refresh_as_initial_load.search(line)
+            ):
+                issues.append(
+                    f"{normalized}:{idx}: DataTable initial loading must use query isPending; background isFetching preserves current content"
                 )
             for match in interaction_state_visual.finditer(line):
                 if not owns_interaction_states:

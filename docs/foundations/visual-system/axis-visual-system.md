@@ -24,7 +24,34 @@ Define one calm, precise, data-first visual language for the Axis product so eve
 - Provides a Resource Workspace as the default management-page archetype: one primary data table retains collection context while create, view, and edit workflows open in app-scoped managed windows.
 - Provides a Dedicated Workbench only for workflows whose canvas, comparison, long-running process, or dependent panels require a route-sized work area.
 - Keeps light and dark modes, desktop and compact layouts, pointer and keyboard interaction, and all product states within the same visual hierarchy.
+- Owns async feedback once for the whole product: shared timing, pending indicators, action buttons, DataTable loading, accessibility state, and source-policy enforcement replace feature-local spinners, skeletons, timers, and loading-label morphs.
 - Requires one accepted golden reference before cross-feature migration and uses that frozen reference as the visual comparison target for later consumers.
+
+Async state uses four product-wide patterns:
+
+| Work type | Immediate state | Delayed visual state | Geometry and replacement |
+|---|---|---|---|
+| Initial content | Owning region is `aria-busy`; unresolved actions are unavailable. | Shared indicator or skeleton appears after 300 milliseconds and, once visible, remains stable for at least 400 milliseconds. | The unresolved region reserves its normal footprint; ready content replaces it without first rendering an empty state. |
+| Background refresh | Existing content remains interactive unless the exact action requires a lock; the region may expose `aria-busy`. | No initial-load indicator or skeleton replaces current content. | Current rows, panels, and scroll positions remain mounted until fresh authoritative data replaces them. |
+| User action | The exact action locks and exposes `aria-busy` immediately. | `AsyncButton` replaces the leading icon with the shared spinner after 300 milliseconds while keeping the visible label and width stable. | Success, failure, or recovery owns the subsequent state; feature code does not insert a temporary status row beside the action. |
+| Context transition | Existing workspace content and competing actions become inert immediately. The content remains visually stable for a fast authoritative refresh, then an opaque neutral surface obscures it if delayed; the context-owning account view remains open. | Neutral progress may appear after 500 milliseconds and, once visible, remains for at least 600 milliseconds. | The authenticated frame, route geometry, and account view remain mounted; no informational notice, temporary panel, or document scrollbar is introduced. |
+
+Shared async patterns own these timing values internally; feature and route code supplies only semantic state and cannot import the timing hook or provide local milliseconds. `PendingIndicator`, `AsyncButton`, selectable-option content, and DataTable are the only owners of pending visuals. Feature and route code may compose these owners but may not import spinner or skeleton primitives, add pending animation utilities, or present `isFetching` as an initial DataTable load.
+
+Page anatomy is owned at the same level. `PageLayout` accepts an approved semantic archetype and owns authenticated route scrolling and responsive insets; feature code does not select an implementation scroll mode. `PageHeader` and `SectionHeader` own page and section hierarchy; `EntryLayout` owns the full-viewport public-entry frame, utilities slot, horizontal-overflow boundary, and centered content region. Resource Workspaces, Overviews, and Dedicated Workbenches each receive their owned geometry, while entry or informational features supply content without rebuilding the surrounding viewport anatomy.
+
+The UI dependency direction is fixed:
+
+| Layer | Owns | Must not own |
+|---|---|---|
+| Semantic theme | Product color, typography, radius, and focus values | Components or feature behavior |
+| Upstream primitives | Accessible control mechanics and reviewed registry visuals | Product variants, business state, or feature imports |
+| Semantic interaction | Actions, choices, forms, feedback, async timing, and focus recovery | Page-specific layout or business meaning |
+| Page archetypes | Route hierarchy, responsive geometry, and scroll ownership | Product-specific data or lifecycle |
+| App shell | Stable viewport, navigation, overlays, and one context-transition boundary | Feature refresh choreography or page-local loading notices |
+| Feature composition | Product state, data, copy, and authorized actions | Global timing, control visuals, scroll containers, or alternate page anatomies |
+
+Management surfaces default to Resource Workspace; dashboard and home surfaces use Overview; only an approved canvas, workflow builder, comparison, or dependent-panel experience uses Dedicated Workbench. Popovers own short contextual choices, managed windows own long-lived tasks and drafts, and alert dialogs own bounded confirmation.
 
 Visual roles are measurable and owned once:
 
@@ -38,7 +65,7 @@ Visual roles are measurable and owned once:
 
 ## Alternate / error flows
 
-- Loading: preserve stable page regions and use skeletons or local progress without replacing the entire authenticated shell.
+- Loading: mark the owning control or region busy immediately, but delay visual pending feedback for 300 milliseconds so fast work completes without a flash. Once shown, keep the indicator visible for at least 400 milliseconds unless newer content, an error, or a recovery state replaces it. Pending feedback occupies a reserved, overlaid, or fixed-size icon slot and never inserts transient layout that changes menu, popover, page, or window geometry. Preserve stable page regions, retain current content during background refresh, and use skeletons or local progress only for an unresolved initial load without replacing the authenticated shell. Context transitions make stale product content inert immediately, retain it visually for a fast refresh, obscure it with a neutral fixed-geometry surface only after 500 milliseconds, keep the account context view mounted with safe choices, and close unrelated transient surfaces.
 - Empty collection: keep page hierarchy and relevant controls visible, explain the empty state briefly, and offer only an authorized next action.
 - Forbidden or missing resource: fail closed, avoid disclosing protected identity or policy detail, and remove unavailable mutation controls.
 - Unavailable dependency: distinguish the temporary unavailable state from forbidden and missing states and provide a safe retry where retry can help.
@@ -54,7 +81,7 @@ Visual roles are measurable and owned once:
 - **AC-003** Typography uses the theme heading family for page, section, and component titles and the theme body family for controls and content. Page titles use a 24-pixel semibold role, section titles an 18-pixel medium role, component titles a 16-pixel medium role, standard body and desktop controls a 14-pixel role, and metadata a 12-pixel role; compact form controls retain a 16-pixel text role where needed to avoid mobile zoom.
 - **AC-004** Layout uses a 4-pixel base rhythm with primary spacing steps of 8, 12, 16, 24, and 32 pixels; route padding is 16 pixels on compact, 24 pixels on standard, and 32 pixels on wide viewports. Standard desktop controls use the shared compact height, every compact touch control exposes at least a 44-by-44-pixel hit area, and dense tables remain readable without making unrelated pages sparse.
 - **AC-005** Radius, elevation, icons, contrast, and motion use the measurable visual-role table above; feature code neither introduces another tier nor weakens its accessible threshold.
-- **AC-006** Interaction states use the shared hierarchy: `accent` for transient hover or keyboard highlight, `secondary` for persistent selection or current state, the semantic focus ring independently of fill, and semantic feedback pairs for informational, success, warning, and destructive meaning. Persistent state remains stronger than transient state in light and dark modes.
+- **AC-006** Interaction states use the shared hierarchy: `accent` for transient hover or keyboard highlight, `secondary` for persistent selection or current state, the semantic focus ring independently of fill, and semantic feedback pairs for informational, success, warning, and destructive meaning. Persistent state remains stronger than transient state in light and dark modes. Selectable menu options keep their semantic icon at the inline start and express the current choice through persistent fill without a trailing checkmark. Async surfaces lock interaction and expose `aria-busy` immediately, delay visual pending feedback, render it only in a geometry-stable slot, preserve current content during background refresh, and let ready, error, or recovery feedback replace pending state immediately. Context transitions keep their owning account view mounted, update safe selection state in place, close unrelated transient surfaces, and never replace the work area with an informational notice.
 - **AC-007** A management route defaults to the Resource Workspace composition: one clear page title and optional concise description, one contextual status region, and the [Collection Page](../data-display/collection-page.md) plus [Data Table](../data-display/data-table.md) foundations. It adds no competing detail card grid or feature-owned action column.
 - **AC-008** Long-lived record tasks compose the [Managed Dialog](../overlays/managed-dialog.md) foundation. Alert dialogs own bounded destructive or dirty confirmations; popovers and menus own immediate contextual choices. This contract tests the proving-consumer integration and does not duplicate the mechanics or evidence of those foundations.
 - **AC-009** A Dedicated Workbench is used only for a documented canvas, drag-and-drop builder, multi-record comparison, long-running process, or several dependent panels that cannot remain usable in a managed window. Entry and informational pages may use a simpler anatomy but retain the same visual and state foundations.
@@ -102,15 +129,15 @@ The golden reference must show complete, loading, empty, forbidden, missing, una
 > | Layer | Status |
 > |---|---|
 > | Contract | Done |
-> | Frontend | Partial |
-> | Tests | Partial |
+> | Frontend | Done |
+> | Tests | Done |
 >
-> **Implemented:** The durable contract, ownership hierarchy, page archetypes, golden-reference scope, state matrix, and migration gate are defined. Shared page composition and interaction-state owners are implemented. Business Objects is the accepted and frozen proving Resource Workspace; Rules, Memberships, Product Roles, and Service Identities are migrated consumers of that composition. Each management consumer keeps one primary table while moving record, mutation, and lifecycle work into app-scoped managed windows.
+> **Implemented:** The durable contract, ownership layers, page-archetype decisions, golden-reference scope, state matrix, and clean-cutover gate are implemented. Shared async patterns own timing and geometry; registry selection primitives own persistent secondary fill without a trailing checkmark; `ResourceWorkspace` owns management-page anatomy; Business Objects remains the golden reference; and the app shell owns one recoverable context-transition coordinator. After explicit visual acceptance, `frontend/ui-foundation.json` records phase `frozen`, and Auth, Invitations, Memberships, Product Roles, Service Identities, Rules, Solutions, and Business Objects consume the approved owners without compatibility paths.
 >
-> **Gaps vs spec:** The approved Resource Workspace migration set is complete. Solutions retains its documented long-running lifecycle needs and requires a Dedicated Workbench review instead of a forced table/dialog conversion; entry and informational surfaces still require their separate anatomy review.
+> **Gaps vs spec:** None.
 >
-> **Deferred follow-ups:** Migrate the remaining Resource Workspaces in bounded feature-owned waves, review Dedicated Workbench and entry/informational surfaces against their approved anatomies, and remove superseded local composition only as each consumer moves.
+> **Deferred follow-ups:** New specialized workbenches still require the documented exception decision before implementation; this is future product scope, not unfinished foundation work.
 >
-> **Verification:** Focused shared-pattern, Business Objects, Rules, Memberships, Product Roles, and Service Identities component evidence covers the implemented composition, state behavior, managed drafts, exact mutations, and guarded closure. Browser evidence covers the proving consumer's light/dark desktop/compact matrix and managed-window journey. Explicit visual acceptance freezes that proving consumer as the comparison target for subsequent migration; focused Memberships, Product Roles, and Service Identities browser journeys remain their runtime checks.
+> **Verification:** Phase and UI-policy regressions prove the frozen boundary, async ownership, page anatomy, and primitive selection contract. Frontend compile/lint and the focused Auth, invitation, management, Rules, Solutions, Business Objects, shared async, option, DataTable, and primitive suites pass. Browser evidence passes the accepted light/dark desktop/compact golden matrix, independent managed windows, and both Workspace directions without document or account-menu scroll drift. The approved UI baseline records the reviewed registry changes.
 >
-> **Decisions:** Business Objects is the frozen proving Resource Workspace because it combines a collection table, record actions, permission states, and managed windows. Rules is the first follow-on Resource Workspace because its existing grid-first workflow already fits the approved archetype without behavioral redesign. Existing theme values and focused foundation mechanics remain their single owners; this contract defines how they compose into the coherent product experience. Explicit visual acceptance closes the subjective freeze gate but does not replace automated behavior and accessibility evidence.
+> **Decisions:** Business Objects is the proving Resource Workspace because it combines a collection table, record actions, permission states, and managed windows; its authenticated shell proves the account/workspace context boundary. Explicit visual acceptance on 2026-08-10 froze the contract. Existing theme values, registry primitives, semantic interaction patterns, page archetypes, and the app shell remain their single owners; feature code supplies business state and copy only.

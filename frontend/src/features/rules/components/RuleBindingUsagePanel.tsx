@@ -1,13 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Pencil, Trash2 } from 'lucide-react';
+import { Pencil, Power, RefreshCw, Save, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { AsyncButton } from '@/components/shared/AsyncButton';
+import { AsyncContent } from '@/components/shared/AsyncContent';
 import { MetadataTag } from '@/components/shared/MetadataTag';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { StatusNotice } from '@/components/shared/StatusNotice';
 import {
   AlertDialog,
-  AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
@@ -185,7 +186,13 @@ export function RuleBindingUsagePanel({
       <p className="text-sm leading-relaxed text-muted-foreground">
         {t('rules.bindingUsageDescription')}
       </p>
-      {usageQuery.isLoading ? <p role="status">{t('rules.bindingUsageLoading')}</p> : null}
+      <AsyncContent
+        pending={usageQuery.isPending}
+        error={usageQuery.isError}
+        pendingLabel={t('rules.bindingUsageLoading')}
+      >
+        <span />
+      </AsyncContent>
       {usageQuery.isError ? (
         <p role="alert" className="text-sm text-destructive">
           {t('rules.bindingUsageError')}
@@ -196,12 +203,19 @@ export function RuleBindingUsagePanel({
           {actionError === 'conflict'
             ? t('rules.bindingConflict')
             : t('rules.bindingMutationError')}{' '}
-          <Button type="button" variant="link" onClick={() => void refreshUsage()}>
+          <AsyncButton
+            type="button"
+            variant="link"
+            onClick={() => void refreshUsage()}
+            icon={<RefreshCw aria-hidden />}
+            pending={usageQuery.isFetching}
+            pendingLabel={t('rules.bindingUsageLoading')}
+          >
             {t('rules.bindingRefresh')}
-          </Button>
+          </AsyncButton>
         </StatusNotice>
       ) : null}
-      {!usageQuery.isLoading && !usageQuery.isError && usages.length === 0 ? (
+      {!usageQuery.isPending && !usageQuery.isError && usages.length === 0 ? (
         <p className="text-sm text-muted-foreground">{t('rules.bindingUsageEmpty')}</p>
       ) : null}
       {usages.length > 0 ? (
@@ -224,11 +238,16 @@ export function RuleBindingUsagePanel({
                 <UsageFact label={t('rules.bindingId')} value={usage.bindingId ?? '—'} />
               </dl>
               <div className="flex flex-wrap gap-2">
-                <Button
+                <AsyncButton
                   type="button"
                   variant="outline"
                   size="sm"
                   disabled={!usage.bindingId || usage.revision == null || mutationPending}
+                  icon={<Power aria-hidden />}
+                  pending={
+                    toggleMutation.isPending && toggleMutation.variables?.id === usage.bindingId
+                  }
+                  pendingLabel={t('rules.bindingUpdating')}
                   onClick={() => {
                     if (!usage.bindingId || usage.revision == null) return;
                     setActionError(null);
@@ -240,7 +259,7 @@ export function RuleBindingUsagePanel({
                   }}
                 >
                   {usage.enabled ? t('rules.bindingDisable') : t('rules.bindingEnable')}
-                </Button>
+                </AsyncButton>
                 <Button
                   type="button"
                   variant="outline"
@@ -292,15 +311,18 @@ export function RuleBindingUsagePanel({
             <AlertDialogCancel disabled={deleteMutation.isPending}>
               {t('app.cancel')}
             </AlertDialogCancel>
-            <AlertDialogAction
+            <AsyncButton
               variant="destructive"
               disabled={deleteMutation.isPending}
+              icon={<Trash2 aria-hidden />}
+              pending={deleteMutation.isPending}
+              pendingLabel={t('rules.bindingRemoving')}
               onClick={() => {
                 if (bindingToDelete) deleteMutation.mutate(bindingToDelete);
               }}
             >
               {t('rules.bindingRemove')}
-            </AlertDialogAction>
+            </AsyncButton>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -320,7 +342,13 @@ export function RuleBindingUsagePanel({
             <DialogTitle>{t('rules.bindingEdit')}</DialogTitle>
             <DialogDescription>{t('rules.bindingEditDescription')}</DialogDescription>
           </DialogHeader>
-          {bindingQuery.isLoading ? <p role="status">{t('rules.bindingUsageLoading')}</p> : null}
+          <AsyncContent
+            pending={bindingQuery.isPending}
+            error={bindingQuery.isError}
+            pendingLabel={t('rules.bindingUsageLoading')}
+          >
+            <span />
+          </AsyncContent>
           {bindingQuery.isError ? (
             <StatusNotice tone="destructive">{t('rules.bindingUsageError')}</StatusNotice>
           ) : null}
@@ -330,9 +358,12 @@ export function RuleBindingUsagePanel({
                 ? t('rules.bindingConflict')
                 : t('rules.bindingMutationError')}{' '}
               {editError === 'conflict' ? (
-                <Button
+                <AsyncButton
                   type="button"
                   variant="link"
+                  icon={<RefreshCw aria-hidden />}
+                  pending={bindingQuery.isFetching}
+                  pendingLabel={t('rules.bindingUsageLoading')}
                   onClick={() => {
                     setEditError(null);
                     void bindingQuery.refetch();
@@ -340,7 +371,7 @@ export function RuleBindingUsagePanel({
                   }}
                 >
                   {t('rules.bindingRefresh')}
-                </Button>
+                </AsyncButton>
               ) : null}
             </StatusNotice>
           ) : null}
@@ -360,9 +391,12 @@ export function RuleBindingUsagePanel({
             >
               {t('app.cancel')}
             </Button>
-            <Button
+            <AsyncButton
               type="button"
               disabled={!form || !bindingQuery.data || editMutation.isPending}
+              icon={<Save aria-hidden />}
+              pending={editMutation.isPending}
+              pendingLabel={t('rules.bindingSaving')}
               onClick={() => {
                 if (form && bindingQuery.data) {
                   setEditError(null);
@@ -371,7 +405,7 @@ export function RuleBindingUsagePanel({
               }}
             >
               {t('rules.bindingSave')}
-            </Button>
+            </AsyncButton>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -154,7 +154,7 @@ export function MembershipManagementPage() {
             </PageAction>
           )
         : undefined,
-      loading: invitationsQuery.isFetching,
+      loading: invitationsQuery.isPending,
       error: invitationsQuery.isError,
       onRetry: () => void invitationsQuery.refetch(),
     };
@@ -164,7 +164,7 @@ export function MembershipManagementPage() {
     invitations,
     invitationsQuery.data?.totalCount,
     invitationsQuery.isError,
-    invitationsQuery.isFetching,
+    invitationsQuery.isPending,
     invitationsQuery.isSuccess,
     invitationsQuery.refetch,
     openWindow,

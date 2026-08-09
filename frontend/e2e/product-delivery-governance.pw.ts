@@ -610,6 +610,19 @@ test('solution management proves publish AT-005 and install AT-007 recovery', as
   await page.goto('/solutions');
   await expect(page).toHaveURL(/\/solutions$/);
   await expect(page.getByRole('heading', { name: 'Solutions', exact: true })).toBeVisible();
+  await expect(page.locator('[data-slot="page-layout"]')).toHaveAttribute(
+    'data-scroll-mode',
+    'route',
+  );
+  await expect(page.getByRole('heading', { name: 'Publish signed version' })).toHaveAttribute(
+    'data-slot',
+    'section-title',
+  );
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollHeight <= document.documentElement.clientHeight,
+    ),
+  ).toBe(true);
 
   const packageBytes = 'signed-envelope-browser-evidence';
   await page.getByLabel('Signed solution package').setInputFiles({
@@ -630,7 +643,9 @@ test('solution management proves publish AT-005 and install AT-007 recovery', as
   await confirmation.getByRole('button', { name: 'Publish package' }).focus();
   await page.keyboard.press('Enter');
   await firstPublishStarted.promise;
-  await expect(page.getByRole('button', { name: 'Verifying and publishing…' })).toBeDisabled();
+  await expect(publishPackage).toBeDisabled();
+  await expect(publishPackage).toHaveAccessibleName('Publish package');
+  await expect(publishPackage.getByRole('status')).toContainText('Verifying and publishing…');
   releaseFirstPublish.resolve();
   await expect(page.getByText('Publisher trust unavailable')).toBeVisible();
   await expect(
@@ -680,7 +695,9 @@ test('solution management proves publish AT-005 and install AT-007 recovery', as
   await expect(resumeOperation).toBeFocused();
   await page.keyboard.press('Enter');
   await resumeStarted.promise;
-  await expect(progress.getByRole('button', { name: 'Resuming…' })).toBeDisabled();
+  await expect(resumeOperation).toBeDisabled();
+  await expect(resumeOperation).toHaveAccessibleName('Resume operation');
+  await expect(resumeOperation.getByRole('status')).toContainText('Resuming…');
   releaseResume.resolve();
   await expect(page.getByText('Resume accepted')).toBeVisible();
   await expect(progress).toContainText('Succeeded');

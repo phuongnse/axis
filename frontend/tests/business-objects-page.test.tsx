@@ -93,6 +93,7 @@ describe('BusinessObjectsPage', () => {
     await renderPage();
 
     const page = document.querySelector<HTMLElement>('[data-slot="page-layout"]');
+    const workspace = document.querySelector<HTMLElement>('[data-slot="resource-workspace"]');
     const header = document.querySelector<HTMLElement>('[data-slot="page-header"]');
     const title = await screen.findByRole('heading', { level: 1, name: 'Business objects' });
     const table = screen.getByRole('region', { name: 'Definitions' });
@@ -102,10 +103,11 @@ describe('BusinessObjectsPage', () => {
     expect(page).toHaveAttribute('data-scroll-mode', 'contained');
     expect(page).toHaveClass('h-full', 'min-h-0', 'gap-4', 'p-4', 'sm:p-6', 'lg:p-8');
     expect(page?.parentElement).not.toHaveClass('p-4', 'sm:p-6', 'lg:p-8', 'font-heading');
-    expect(header?.parentElement).toBe(page);
+    expect(page).toContainElement(workspace);
+    expect(header?.parentElement).toBe(workspace);
     expect(title).toHaveAttribute('data-slot', 'page-title');
     expect(title.closest('[data-slot="page-header"]')).toBe(header);
-    expect(page?.querySelectorAll('[data-slot="page-layout"]')).toHaveLength(0);
+    expect(workspace?.querySelectorAll('[data-slot="page-layout"]')).toHaveLength(0);
     expect(page?.querySelectorAll('[data-slot="page-header"]')).toHaveLength(1);
     expect(page?.querySelectorAll('[data-slot="data-table"]')).toHaveLength(1);
     expect(within(table).queryByRole('columnheader', { name: 'Actions' })).not.toBeInTheDocument();
@@ -151,6 +153,30 @@ describe('BusinessObjectsPage', () => {
     expect(table).not.toHaveAttribute('aria-busy');
     expect(listReads).toBe(2);
     expect(document.querySelector('[data-slot="page-layout"]')).toBe(page);
+  });
+
+  it('keeps the empty collection inside the resource workspace with its authorized next action', async () => {
+    vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL) => {
+      const path = requestPath(input);
+      if (isRulesRequest(input)) return jsonResponse(fieldRuleDefinitions);
+      if (isDefinitionActionsRequest(input)) return allowedDefinitionActions();
+      if (path === '/api/business-object-definitions') return jsonResponse(emptyPage());
+      throw new Error(`Unexpected fetch: ${path}`);
+    });
+
+    await renderPage();
+
+    const workspace = document.querySelector('[data-slot="resource-workspace"]');
+    const table = screen.getByRole('region', { name: 'Definitions' });
+    expect(workspace).toContainElement(table);
+    await waitFor(() => expect(table).not.toHaveAttribute('aria-busy'));
+    expect(within(table).getByText('No business objects')).toBeVisible();
+    expect(
+      within(table).getByText(
+        'Start a definition to capture the structure and rules for a reusable business object.',
+      ),
+    ).toBeVisible();
+    expect(within(table).getByRole('button', { name: 'New definition' })).toBeEnabled();
   });
 
   it('hides create and consumes a denied create deep link', async () => {

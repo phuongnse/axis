@@ -5,6 +5,8 @@ import { type ReactNode, useEffect, useId, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
+import { AsyncButton } from '@/components/shared/AsyncButton';
+import { AsyncContent } from '@/components/shared/AsyncContent';
 import { ManagedDialog, ManagedDialogBody } from '@/components/shared/ManagedDialog';
 import { ManagedDialogTabs } from '@/components/shared/ManagedDialogTabs';
 import { MetadataTag } from '@/components/shared/MetadataTag';
@@ -365,39 +367,42 @@ export function BusinessObjectDefinitionDialog({
               {exitLabel}
             </Button>
             {mode === 'create' ? (
-              <Button type="submit" form={formId} disabled={busy}>
-                <Plus aria-hidden />
-                {createMutation.isPending
-                  ? t('businessObjects.creating')
-                  : t('businessObjects.create')}
-              </Button>
+              <AsyncButton
+                type="submit"
+                form={formId}
+                icon={<Plus />}
+                pending={createMutation.isPending}
+                pendingLabel={t('businessObjects.creating')}
+              >
+                {t('businessObjects.create')}
+              </AsyncButton>
             ) : null}
             {mode === 'edit' && (canSave || canPublish) ? (
               <>
                 {canSave ? (
-                  <Button
+                  <AsyncButton
                     type="submit"
                     form={formId}
                     variant="secondary"
                     disabled={busy || !form.formState.isDirty}
+                    icon={<Save />}
+                    pending={saveMutation.isPending}
+                    pendingLabel={t('businessObjects.saving')}
                   >
-                    <Save aria-hidden />
-                    {saveMutation.isPending
-                      ? t('businessObjects.saving')
-                      : t('businessObjects.save')}
-                  </Button>
+                    {t('businessObjects.save')}
+                  </AsyncButton>
                 ) : null}
                 {canPublish ? (
-                  <Button
+                  <AsyncButton
                     type="button"
                     disabled={busy || form.formState.isDirty || fields.length === 0}
+                    icon={<UploadCloud />}
+                    pending={publishMutation.isPending}
+                    pendingLabel={t('businessObjects.publishing')}
                     onClick={() => setPublishOpen(true)}
                   >
-                    <UploadCloud aria-hidden />
-                    {publishMutation.isPending
-                      ? t('businessObjects.publishing')
-                      : t('businessObjects.publish')}
-                  </Button>
+                    {t('businessObjects.publish')}
+                  </AsyncButton>
                 ) : null}
               </>
             ) : null}
@@ -406,117 +411,122 @@ export function BusinessObjectDefinitionDialog({
       >
         <form id={formId} className="contents" onSubmit={submit} noValidate>
           <ManagedDialogBody>
-            {detailQuery.isLoading && mode !== 'create' ? (
-              <p role="status">{t('table.loading')}</p>
-            ) : null}
-            {detailQuery.isError ? (
-              <StatusNotice
-                tone={
-                  detailActionUnavailable || detailTemporarilyUnavailable
-                    ? 'warning'
-                    : 'destructive'
-                }
-                title={
-                  detailTemporarilyUnavailable
-                    ? t('businessObjects.authorizationTemporarilyUnavailableTitle')
-                    : detailActionUnavailable
-                      ? t('businessObjects.authorizationUnavailableTitle')
-                      : t('businessObjects.loadError')
-                }
-              >
-                <span>
-                  {detailTemporarilyUnavailable
-                    ? t('businessObjects.authorizationTemporarilyUnavailableDescription')
-                    : detailActionUnavailable
-                      ? t('businessObjects.authorizationUnavailableDescription')
-                      : t('businessObjects.loadErrorDescription')}
-                </span>
-                {detailTemporarilyUnavailable ? (
-                  <>
-                    {' '}
-                    <Button
-                      type="button"
-                      variant="link"
-                      disabled={detailQuery.isFetching}
-                      onClick={() => void detailQuery.refetch()}
-                    >
-                      {t('app.retry')}
-                    </Button>
-                  </>
-                ) : null}
-              </StatusNotice>
-            ) : null}
-            {requestError ? (
-              <StatusNotice tone="destructive" title={t('businessObjects.requestError')}>
-                {requestError}
-              </StatusNotice>
-            ) : null}
+            <AsyncContent
+              pending={detailQuery.isPending && mode !== 'create'}
+              error={detailQuery.isError}
+              pendingLabel={t('table.loading')}
+            >
+              {detailQuery.isError ? (
+                <StatusNotice
+                  tone={
+                    detailActionUnavailable || detailTemporarilyUnavailable
+                      ? 'warning'
+                      : 'destructive'
+                  }
+                  title={
+                    detailTemporarilyUnavailable
+                      ? t('businessObjects.authorizationTemporarilyUnavailableTitle')
+                      : detailActionUnavailable
+                        ? t('businessObjects.authorizationUnavailableTitle')
+                        : t('businessObjects.loadError')
+                  }
+                >
+                  <span>
+                    {detailTemporarilyUnavailable
+                      ? t('businessObjects.authorizationTemporarilyUnavailableDescription')
+                      : detailActionUnavailable
+                        ? t('businessObjects.authorizationUnavailableDescription')
+                        : t('businessObjects.loadErrorDescription')}
+                  </span>
+                  {detailTemporarilyUnavailable ? (
+                    <>
+                      {' '}
+                      <Button
+                        type="button"
+                        variant="link"
+                        disabled={detailQuery.isFetching}
+                        onClick={() => void detailQuery.refetch()}
+                      >
+                        {t('app.retry')}
+                      </Button>
+                    </>
+                  ) : null}
+                </StatusNotice>
+              ) : null}
+              {requestError ? (
+                <StatusNotice tone="destructive" title={t('businessObjects.requestError')}>
+                  {requestError}
+                </StatusNotice>
+              ) : null}
 
-            {!detailQuery.isError && readOnly && definition ? (
-              <BusinessObjectReadOnlyDetails definition={definition} />
-            ) : (!detailQuery.isLoading && !detailQuery.isError) || mode === 'create' ? (
-              <ManagedDialogTabs
-                label={t('businessObjects.definitionSections')}
-                generalLabel={t('dialog.general')}
-                activeSection={activeSection}
-                onActiveSectionChange={setActiveSection}
-                general={
-                  <DefinitionDetails
-                    name={name}
-                    objectKey={definition?.objectKey ?? deriveKey(name)}
-                    readOnly={readOnly}
-                    nameError={form.formState.errors.name?.message}
-                    onNameChange={(value) =>
-                      form.setValue('name', value, { shouldDirty: true, shouldValidate: true })
-                    }
-                  />
-                }
-                sections={[
-                  ...(mode !== 'create'
-                    ? [
-                        {
-                          id: 'fields',
-                          label: t('businessObjects.fields'),
-                          content: (
-                            <FieldsEditor
-                              fields={fields}
-                              errors={form.formState.errors.fields}
-                              readOnly={readOnly}
-                              ruleDefinitions={ruleDefinitions}
-                              ruleCatalogLoading={ruleCatalogLoading}
-                              ruleCatalogUnavailable={ruleCatalogUnavailable}
-                              ruleInputErrors={ruleInputErrors}
-                              onChange={updateField}
-                              onRuleInputChange={(ruleId, inputKey) =>
-                                setRuleInputErrors((current) => {
-                                  const key = ruleInputErrorKey(ruleId, inputKey);
-                                  if (!current[key]) return current;
-                                  const { [key]: _, ...next } = current;
-                                  return next;
-                                })
-                              }
-                              onMove={moveField}
-                              onRemove={(index) =>
-                                updateFields(fields.filter((_, fieldIndex) => fieldIndex !== index))
-                              }
-                              onAdd={() => updateFields([...fields, newField()])}
-                            />
-                          ),
-                        },
-                      ]
-                    : []),
-                  ...(definition?.latestPublishedVersion
-                    ? [
-                        {
-                          id: 'published',
-                          label: t('businessObjects.publishedVersion'),
-                          content: <PublishedVersion definition={definition} />,
-                        },
-                      ]
-                    : []),
-                ]}
-              />
-            ) : null}
+              {!detailQuery.isError && readOnly && definition ? (
+                <BusinessObjectReadOnlyDetails definition={definition} />
+              ) : (!detailQuery.isPending && !detailQuery.isError) || mode === 'create' ? (
+                <ManagedDialogTabs
+                  label={t('businessObjects.definitionSections')}
+                  generalLabel={t('dialog.general')}
+                  activeSection={activeSection}
+                  onActiveSectionChange={setActiveSection}
+                  general={
+                    <DefinitionDetails
+                      name={name}
+                      objectKey={definition?.objectKey ?? deriveKey(name)}
+                      readOnly={readOnly}
+                      nameError={form.formState.errors.name?.message}
+                      onNameChange={(value) =>
+                        form.setValue('name', value, { shouldDirty: true, shouldValidate: true })
+                      }
+                    />
+                  }
+                  sections={[
+                    ...(mode !== 'create'
+                      ? [
+                          {
+                            id: 'fields',
+                            label: t('businessObjects.fields'),
+                            content: (
+                              <FieldsEditor
+                                fields={fields}
+                                errors={form.formState.errors.fields}
+                                readOnly={readOnly}
+                                ruleDefinitions={ruleDefinitions}
+                                ruleCatalogLoading={ruleCatalogLoading}
+                                ruleCatalogUnavailable={ruleCatalogUnavailable}
+                                ruleInputErrors={ruleInputErrors}
+                                onChange={updateField}
+                                onRuleInputChange={(ruleId, inputKey) =>
+                                  setRuleInputErrors((current) => {
+                                    const key = ruleInputErrorKey(ruleId, inputKey);
+                                    if (!current[key]) return current;
+                                    const { [key]: _, ...next } = current;
+                                    return next;
+                                  })
+                                }
+                                onMove={moveField}
+                                onRemove={(index) =>
+                                  updateFields(
+                                    fields.filter((_, fieldIndex) => fieldIndex !== index),
+                                  )
+                                }
+                                onAdd={() => updateFields([...fields, newField()])}
+                              />
+                            ),
+                          },
+                        ]
+                      : []),
+                    ...(definition?.latestPublishedVersion
+                      ? [
+                          {
+                            id: 'published',
+                            label: t('businessObjects.publishedVersion'),
+                            content: <PublishedVersion definition={definition} />,
+                          },
+                        ]
+                      : []),
+                  ]}
+                />
+              ) : null}
+            </AsyncContent>
           </ManagedDialogBody>
         </form>
       </ManagedDialog>
@@ -1243,88 +1253,91 @@ function RulesEditor({
           </Select>
         ) : null}
       </div>
-      {loading ? (
-        <p className="mt-3 text-sm text-muted-foreground">
-          {t('businessObjects.rulesCatalogLoading')}
-        </p>
-      ) : null}
-      {unavailable ? (
-        <div className="mt-3">
+      <AsyncContent
+        className="mt-3"
+        pending={loading}
+        error={unavailable}
+        pendingLabel={t('businessObjects.rulesCatalogLoading')}
+      >
+        {unavailable ? (
           <StatusNotice
             tone="destructive"
             title={t('businessObjects.rulesCatalogUnavailableTitle')}
           >
             {t('businessObjects.rulesCatalogUnavailableDescription')}
           </StatusNotice>
-        </div>
-      ) : null}
-      <ItemGroup className="mt-3">
-        {field.rules.map((rule, ruleIndex) => {
-          const definition = definitions.find(
-            (candidate) => candidate.definitionKey === rule.definitionKey,
-          );
-          return (
-            <Item key={rule.clientId} variant="muted" size="sm">
-              <ItemHeader>
-                <ItemTitle>
-                  {definition
-                    ? ruleDisplayName(definition, i18n.language, t)
-                    : (rule.bindingId ?? rule.definitionKey ?? t('businessObjects.unknownRule'))}
-                </ItemTitle>
-                <ItemActions>
-                  {rule.definitionVersion ? (
-                    <span className="text-xs text-muted-foreground">
-                      {t('businessObjects.ruleVersion', { version: rule.definitionVersion })}
-                    </span>
-                  ) : null}
-                  {!readOnly ? (
-                    <Button
-                      type="button"
-                      variant="destructive"
-                      size="icon-sm"
-                      aria-label={t('businessObjects.removeRule')}
-                      onClick={() =>
-                        onChange(index, {
-                          rules: field.rules.filter(
-                            (_, currentIndex) => currentIndex !== ruleIndex,
-                          ),
-                        })
-                      }
-                    >
-                      <Trash2 aria-hidden />
-                    </Button>
-                  ) : null}
-                </ItemActions>
-              </ItemHeader>
-              <ItemContent>
-                {(definition?.inputs ?? [])
-                  .filter((input) => input.key !== 'value')
-                  .map((input) => (
-                    <RuleInputEditor
-                      key={input.key}
-                      input={input}
-                      idPrefix={`${field.clientId}-${rule.clientId}`}
-                      contextLabel={`${field.label || field.fieldKey}: ${
-                        definition
-                          ? ruleDisplayName(definition, i18n.language, t)
-                          : (rule.definitionKey ?? t('businessObjects.unknownRule'))
-                      }`}
-                      values={rule.inputs[input.key ?? ''] ?? []}
-                      readOnly={readOnly}
-                      error={inputErrors[ruleInputErrorKey(rule.clientId, input.key ?? '')]}
-                      onChange={(values) => {
-                        onInputChange(rule.clientId, input.key ?? '');
-                        updateRule(ruleIndex, {
-                          inputs: { ...rule.inputs, [input.key ?? '']: values },
-                        });
-                      }}
-                    />
-                  ))}
-              </ItemContent>
-            </Item>
-          );
-        })}
-      </ItemGroup>
+        ) : (
+          <ItemGroup>
+            {field.rules.map((rule, ruleIndex) => {
+              const definition = definitions.find(
+                (candidate) => candidate.definitionKey === rule.definitionKey,
+              );
+              return (
+                <Item key={rule.clientId} variant="muted" size="sm">
+                  <ItemHeader>
+                    <ItemTitle>
+                      {definition
+                        ? ruleDisplayName(definition, i18n.language, t)
+                        : (rule.bindingId ??
+                          rule.definitionKey ??
+                          t('businessObjects.unknownRule'))}
+                    </ItemTitle>
+                    <ItemActions>
+                      {rule.definitionVersion ? (
+                        <span className="text-xs text-muted-foreground">
+                          {t('businessObjects.ruleVersion', { version: rule.definitionVersion })}
+                        </span>
+                      ) : null}
+                      {!readOnly ? (
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          size="icon-sm"
+                          aria-label={t('businessObjects.removeRule')}
+                          onClick={() =>
+                            onChange(index, {
+                              rules: field.rules.filter(
+                                (_, currentIndex) => currentIndex !== ruleIndex,
+                              ),
+                            })
+                          }
+                        >
+                          <Trash2 aria-hidden />
+                        </Button>
+                      ) : null}
+                    </ItemActions>
+                  </ItemHeader>
+                  <ItemContent>
+                    {(definition?.inputs ?? [])
+                      .filter((input) => input.key !== 'value')
+                      .map((input) => (
+                        <RuleInputEditor
+                          key={input.key}
+                          input={input}
+                          idPrefix={`${field.clientId}-${rule.clientId}`}
+                          contextLabel={`${field.label || field.fieldKey}: ${
+                            definition
+                              ? ruleDisplayName(definition, i18n.language, t)
+                              : (rule.definitionKey ?? t('businessObjects.unknownRule'))
+                          }`}
+                          values={rule.inputs[input.key ?? ''] ?? []}
+                          readOnly={readOnly}
+                          error={inputErrors[ruleInputErrorKey(rule.clientId, input.key ?? '')]}
+                          onChange={(values) => {
+                            onInputChange(rule.clientId, input.key ?? '');
+                            updateRule(ruleIndex, {
+                              inputs: { ...rule.inputs, [input.key ?? '']: values },
+                            });
+                          }}
+                        />
+                      ))}
+                  </ItemContent>
+                </Item>
+              );
+            })}
+          </ItemGroup>
+        )}
+      </AsyncContent>
       {!loading && !unavailable && compatible.length === 0 && field.rules.length === 0 ? (
         <p className="mt-3 text-sm text-muted-foreground">
           {t('businessObjects.noCompatibleRules')}

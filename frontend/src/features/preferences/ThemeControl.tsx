@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Monitor, Moon, RotateCcw, Sun } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { AsyncContent } from '@/components/shared/AsyncContent';
 import { OptionList, OptionListItem } from '@/components/shared/OptionList';
 import { Button } from '@/components/ui/button';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
@@ -72,8 +73,7 @@ export function ThemeControl({
   });
 
   const shouldPersistToServer = authenticated && getBrowserSessionStatus() === 'authenticated';
-  const showSaveStatus = authenticated && (mutation.isPending || mutation.isError);
-  const statusId = showSaveStatus ? 'theme-save-status' : undefined;
+  const statusId = authenticated ? 'theme-save-status' : undefined;
 
   function chooseTheme(nextThemeMode: ThemeMode) {
     setThemeMode(nextThemeMode);
@@ -104,7 +104,11 @@ export function ThemeControl({
         className,
       )}
     >
-      <fieldset aria-describedby={statusId} className={cn(isMenu && 'grid gap-1')}>
+      <fieldset
+        aria-busy={mutation.isPending || undefined}
+        aria-describedby={statusId}
+        className={cn(isMenu && 'grid gap-1')}
+      >
         <legend
           className={cn(isMenu ? 'mb-1 px-1 text-xs font-medium text-muted-foreground' : 'sr-only')}
         >
@@ -121,8 +125,12 @@ export function ThemeControl({
               const label = t(item.labelKey);
 
               return (
-                <OptionListItem key={item.value} value={item.value}>
-                  <Icon aria-hidden />
+                <OptionListItem
+                  key={item.value}
+                  icon={<Icon />}
+                  pending={mutation.isPending && latestServerThemeRef.current === item.value}
+                  value={item.value}
+                >
                   {label}
                 </OptionListItem>
               );
@@ -157,17 +165,14 @@ export function ThemeControl({
         )}
       </fieldset>
 
-      {showSaveStatus ? (
-        <div
+      {authenticated ? (
+        <AsyncContent
           id={statusId}
-          className={cn(
-            'min-h-4 text-xs text-muted-foreground',
-            isMenu && 'px-1',
-            isMenu && mutation.isPending && 'pointer-events-none absolute top-0 right-1',
-          )}
-          aria-live="polite"
+          className={cn('min-h-5 text-xs text-muted-foreground', isMenu && 'px-1 sr-only')}
+          error={mutation.isError}
+          pending={mutation.isPending}
+          pendingLabel={t('app.saving')}
         >
-          {mutation.isPending ? t('app.saving') : null}
           {mutation.isError ? (
             <span className="inline-flex items-center gap-1 text-destructive">
               {t('app.themeSaveFailed')}
@@ -177,7 +182,7 @@ export function ThemeControl({
               </Button>
             </span>
           ) : null}
-        </div>
+        </AsyncContent>
       ) : null}
     </div>
   );

@@ -1,7 +1,9 @@
 import { Link, useNavigate } from '@tanstack/react-router';
-import { ArrowRight, Loader2, LogOut, UserPlus } from 'lucide-react';
+import { ArrowRight, LogOut, UserPlus } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { AsyncButton } from '@/components/shared/AsyncButton';
+import { AsyncContent } from '@/components/shared/AsyncContent';
 import { StatusNotice } from '@/components/shared/StatusNotice';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { restoreBrowserSession, signOutUser } from '@/features/auth/api';
@@ -96,10 +98,9 @@ export function AcceptWorkspaceInvitationPage() {
   if (state.kind === 'loading') {
     return (
       <AuthCard title={t('invitationAccept.loadingTitle')}>
-        <div className="flex items-center gap-3 text-sm text-muted-foreground" aria-live="polite">
-          <Loader2 className="size-4 animate-spin" aria-hidden />
-          {t('invitationAccept.loading')}
-        </div>
+        <AsyncContent pending pendingLabel={t('invitationAccept.loading')}>
+          <span />
+        </AsyncContent>
       </AuthCard>
     );
   }
@@ -129,16 +130,18 @@ export function AcceptWorkspaceInvitationPage() {
       <AuthCard title={t('invitationAccept.wrongAccountTitle')}>
         <div className="space-y-4">
           <StatusNotice tone="warning">{t('invitationAccept.wrongAccountBody')}</StatusNotice>
-          <Button
+          <AsyncButton
             type="button"
             size="lg"
             className="w-full"
             disabled={actionPending}
             onClick={() => void switchAccount()}
+            icon={<LogOut aria-hidden />}
+            pending={actionPending}
+            pendingLabel={t('invitationAccept.switchingAccount')}
           >
-            <LogOut aria-hidden />
             {t('invitationAccept.useAnotherAccount')}
-          </Button>
+          </AsyncButton>
         </div>
       </AuthCard>
     );
@@ -170,20 +173,18 @@ export function AcceptWorkspaceInvitationPage() {
       <AuthCard title={t('invitationAccept.successTitle')}>
         <div className="space-y-4">
           <StatusNotice tone="success">{t('invitationAccept.successBody')}</StatusNotice>
-          <Button
+          <AsyncButton
             type="button"
             size="lg"
             className="w-full"
             disabled={actionPending}
             onClick={() => void enterWorkspace(state.acceptance.workspaceId)}
+            icon={<ArrowRight aria-hidden />}
+            pending={actionPending}
+            pendingLabel={t('invitationAccept.enteringWorkspace')}
           >
-            {actionPending ? (
-              <Loader2 className="size-4 animate-spin" aria-hidden />
-            ) : (
-              <ArrowRight aria-hidden />
-            )}
             {t('invitationAccept.enterWorkspace')}
-          </Button>
+          </AsyncButton>
         </div>
       </AuthCard>
     );
@@ -208,16 +209,18 @@ export function AcceptWorkspaceInvitationPage() {
           <dt className="text-muted-foreground">{t('invitationAccept.expires')}</dt>
           <dd>{expiresAt}</dd>
         </dl>
-        <Button
+        <AsyncButton
           type="button"
           size="lg"
           className="w-full"
           disabled={actionPending}
           onClick={() => void accept()}
+          icon={<UserPlus aria-hidden />}
+          pending={actionPending}
+          pendingLabel={t('invitationAccept.accepting')}
         >
-          {actionPending ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
           {t('invitationAccept.accept')}
-        </Button>
+        </AsyncButton>
       </div>
     </AuthCard>
   );

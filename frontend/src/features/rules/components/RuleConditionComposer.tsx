@@ -1,5 +1,6 @@
 import { Plus, Trash2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { AsyncContent } from '@/components/shared/AsyncContent';
 import { Button } from '@/components/ui/button';
 import { Field, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
@@ -49,9 +50,9 @@ export function RuleConditionComposer({
         <h3 id="rule-condition-composer-title" className="text-sm font-semibold">
           {t('rules.expressionEditorTitle')}
         </h3>
-        <p role="status" className="text-sm text-muted-foreground">
-          {t('rules.referenceLoading')}
-        </p>
+        <AsyncContent pending pendingLabel={t('rules.referenceLoading')}>
+          <span />
+        </AsyncContent>
       </section>
     );
   }

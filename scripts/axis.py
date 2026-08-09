@@ -149,6 +149,7 @@ import doc_drift_domains  # noqa: E402
 from axis_dependency_policy import evaluate_npm_audit  # noqa: E402
 from axis_frontend_policy import (  # noqa: E402
     check_frontend_quality,
+    check_ui_foundation,
     frontend_component_file_name_issues,
     frontend_e2e_structure_issues,
     frontend_form_schema_type_issues,
@@ -156,6 +157,7 @@ from axis_frontend_policy import (  # noqa: E402
     frontend_tailwind_opacity_issues,
     frontend_test_async_boundary_issues,
     frontend_ui_system_issues,
+    ui_foundation_issues,
 )
 
 
@@ -2502,7 +2504,11 @@ def doc_drift_checker_names(paths: list[str]) -> set[str]:
     if any(path.startswith(("src/", "tests/")) and path.endswith(".cs") for path in paths):
         names.add("check-ef-domain-mapping")
     if any(is_frontend_path(path) for path in paths):
-        names.update({"check-frontend-api-contracts", "check-frontend-quality"})
+        names.update(
+            {"check-frontend-api-contracts", "check-frontend-quality", "check-ui-foundation"}
+        )
+    if "docs/foundations/visual-system/axis-visual-system.md" in paths:
+        names.add("check-ui-foundation")
     if any(
         path in {
             "frontend/components.json",
@@ -2607,6 +2613,7 @@ def check_doc_drift(_args: argparse.Namespace | None = None) -> int:
         ("check-ui-baseline", check_ui_baseline),
         ("check-theme", check_theme),
         ("check-frontend-quality", check_frontend_quality),
+        ("check-ui-foundation", check_ui_foundation),
         ("check-use-case-docs.py", lambda _=None: run_module_check("check-use-case-docs.py", [])),
         ("check-foundation-docs.py", lambda _=None: run_module_check("check-foundation-docs.py", [])),
         ("check-doc-link-targets.py", lambda _=None: run_module_check("check-doc-link-targets.py", [])),
@@ -5835,6 +5842,10 @@ def build_parser(
     check_sub.add_parser("ui-baseline", help="Check the approved frontend UI baseline").set_defaults(func=check_ui_baseline)
     check_sub.add_parser("theme", help="Check canonical theme generated artifacts").set_defaults(func=check_theme)
     check_sub.add_parser("frontend-quality", help="Run deterministic frontend policy checks").set_defaults(func=check_frontend_quality)
+    check_sub.add_parser(
+        "ui-foundation",
+        help="Validate the active UI foundation phase and draft-consumer boundary",
+    ).set_defaults(func=check_ui_foundation)
     check_sub.add_parser("local-dev-docs", help="Check local-development docs against Compose").set_defaults(
         func=lambda _args: run_module_check("check-local-dev-docs.py", [])
     )

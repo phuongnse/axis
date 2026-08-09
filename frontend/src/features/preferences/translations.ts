@@ -116,10 +116,12 @@ export const translations = {
     'nav.verifiedAccount': 'Verified account',
 
     'invitationAccept.accept': 'Accept invitation',
+    'invitationAccept.accepting': 'Accepting invitation...',
     'invitationAccept.authenticateBody':
       'Sign in with the invited address, or create and verify a new account with that address.',
     'invitationAccept.authenticateTitle': 'Continue with the invited account',
     'invitationAccept.enterWorkspace': 'Enter Workspace',
+    'invitationAccept.enteringWorkspace': 'Entering Workspace...',
     'invitationAccept.errorBody':
       'The invitation outcome could not be confirmed. Retry without reopening the email link.',
     'invitationAccept.errorTitle': 'Invitation temporarily unavailable',
@@ -136,6 +138,7 @@ export const translations = {
     'invitationAccept.successBody':
       'Your memberships were confirmed. Entering the Workspace is an explicit separate action.',
     'invitationAccept.successTitle': 'Invitation accepted',
+    'invitationAccept.switchingAccount': 'Switching account...',
     'invitationAccept.useAnotherAccount': 'Use another account',
     'invitationAccept.workspace': 'Workspace',
     'invitationAccept.wrongAccountBody':
@@ -179,9 +182,11 @@ export const translations = {
     'memberships.rateLimitedDescription': 'This invitation action reached its current rate limit.',
     'memberships.recipientRemoved': 'Recipient details removed',
     'memberships.resend': 'Resend',
+    'memberships.resending': 'Resending...',
     'memberships.resendSucceeded': 'New invitation link queued',
     'memberships.resendSucceededDescription': 'Every prior link is now invalid.',
     'memberships.revoke': 'Revoke',
+    'memberships.revoking': 'Revoking...',
     'memberships.revokeConfirmDescription':
       'The pending invitation link will no longer be accepted.',
     'memberships.revokeConfirmTitle': 'Revoke this invitation?',
@@ -224,10 +229,8 @@ export const translations = {
     'workspace.organizations': 'Organization Workspaces',
     'workspace.personal': 'Personal Workspace',
     'workspace.refreshFailedDescription':
-      'Prior Workspace state remains cleared. Retry the target session refresh or sign out.',
+      'The new Workspace context could not be loaded. Retry the refresh or sign out.',
     'workspace.refreshFailedTitle': 'Workspace refresh needs attention',
-    'workspace.refreshingDescription':
-      'The prior Workspace state has been cleared. Loading the selected Workspace.',
     'workspace.refreshingTitle': 'Refreshing Workspace',
     'workspace.retryRefresh': 'Retry refresh',
     'workspace.switchFailed':
@@ -622,6 +625,7 @@ export const translations = {
     'rules.expressionPreviewEmpty': 'Complete a valid expression to see its meaning.',
     'rules.expressionSuggestions': 'Expression suggestions',
     'rules.showSuggestions': 'Show suggestions',
+    'rules.loadingSuggestions': 'Loading suggestions…',
     'rules.applySuggestion': 'Apply suggestion',
     'rules.completionError': 'Unable to load expression suggestions',
     'rules.expressionSyntax': 'Expression syntax',
@@ -650,10 +654,12 @@ export const translations = {
     'rules.key': 'Key',
     'rules.keepEditing': 'Keep editing',
     'rules.lifecycleError': 'Unable to update rule lifecycle',
+    'rules.updatingLifecycle': 'Updating rule lifecycle…',
     'rules.lifecycleUpdated': 'Rule lifecycle updated',
     'rules.staleChanges':
       'This rule changed elsewhere. Your edits are preserved; refresh before retrying.',
     'rules.refetch': 'Refresh current rule',
+    'rules.refreshing': 'Refreshing current rule…',
     'rules.literal': 'Literal value',
     'rules.loadingRule': 'Loading rule',
     'rules.message': 'Message',
@@ -690,11 +696,13 @@ export const translations = {
     'rules.saveDraft': 'Save draft',
     'rules.saveError': 'Unable to save draft',
     'rules.save': 'Save draft',
+    'rules.saving': 'Saving draft…',
     'rules.conditionRequired': 'Add a valid condition before saving.',
     'rules.saved': 'Draft saved',
     'rules.searchLabel': 'Search rules',
     'rules.searchPlaceholder': 'Search rules',
     'rules.simulation': 'Simulation',
+    'rules.simulating': 'Running simulation…',
     'rules.simulationError': 'Simulation failed',
     'rules.simulationInvalid':
       'The sample values could not be evaluated. Correct them and try again.',
@@ -745,6 +753,7 @@ export const translations = {
     'rules.bindingUsageEmpty': 'This version has no active consumer bindings.',
     'rules.bindingEnabled': 'Enabled',
     'rules.bindingMutationError': 'Unable to update this binding.',
+    'rules.bindingUpdating': 'Updating binding…',
     'rules.bindingRefresh': 'Refresh binding',
     'rules.bindingDefinitionKey': 'Rule key',
     'rules.bindingVersion': 'Rule version',
@@ -766,6 +775,7 @@ export const translations = {
     'rules.bindingConflict': 'This binding changed. Refresh it and try again.',
     'rules.bindingEdit': 'Edit binding',
     'rules.bindingSave': 'Save binding',
+    'rules.bindingSaving': 'Saving binding…',
     'rules.bindingEditDescription':
       'Update binding-owned target, trigger, mapping, priority, enabled state, and failure behavior without changing its exact rule version.',
     'rules.bindingTarget': 'Target',
@@ -773,6 +783,7 @@ export const translations = {
     'rules.bindingPriority': 'Priority',
     'rules.bindingId': 'Binding ID',
     'rules.bindingRemove': 'Remove binding',
+    'rules.bindingRemoving': 'Removing binding…',
     'rules.bindingRemoveTitle': 'Remove this binding?',
     'rules.bindingRemoveDescription':
       'The rule definition and other bindings will remain unchanged.',
@@ -926,10 +937,12 @@ export const translations = {
     'nav.verifiedAccount': 'Tài khoản đã xác minh',
 
     'invitationAccept.accept': 'Chấp nhận lời mời',
+    'invitationAccept.accepting': 'Đang chấp nhận lời mời...',
     'invitationAccept.authenticateBody':
       'Đăng nhập bằng địa chỉ được mời, hoặc tạo và xác minh tài khoản mới bằng địa chỉ đó.',
     'invitationAccept.authenticateTitle': 'Tiếp tục bằng tài khoản được mời',
     'invitationAccept.enterWorkspace': 'Vào Workspace',
+    'invitationAccept.enteringWorkspace': 'Đang vào Workspace...',
     'invitationAccept.errorBody':
       'Không thể xác nhận kết quả lời mời. Hãy thử lại mà không cần mở lại liên kết trong email.',
     'invitationAccept.errorTitle': 'Lời mời tạm thời không dùng được',
@@ -946,6 +959,7 @@ export const translations = {
     'invitationAccept.successBody':
       'Membership của bạn đã được xác nhận. Việc vào Workspace là một thao tác riêng biệt.',
     'invitationAccept.successTitle': 'Đã chấp nhận lời mời',
+    'invitationAccept.switchingAccount': 'Đang chuyển tài khoản...',
     'invitationAccept.useAnotherAccount': 'Dùng tài khoản khác',
     'invitationAccept.workspace': 'Workspace',
     'invitationAccept.wrongAccountBody':
@@ -989,9 +1003,11 @@ export const translations = {
     'memberships.rateLimitedDescription': 'Thao tác lời mời này đã đạt giới hạn hiện tại.',
     'memberships.recipientRemoved': 'Đã xóa thông tin người nhận',
     'memberships.resend': 'Gửi lại',
+    'memberships.resending': 'Đang gửi lại...',
     'memberships.resendSucceeded': 'Đã xếp hàng liên kết lời mời mới',
     'memberships.resendSucceededDescription': 'Mọi liên kết trước đó hiện không còn hiệu lực.',
     'memberships.revoke': 'Thu hồi',
+    'memberships.revoking': 'Đang thu hồi...',
     'memberships.revokeConfirmDescription':
       'Liên kết lời mời đang chờ sẽ không còn được chấp nhận.',
     'memberships.revokeConfirmTitle': 'Thu hồi lời mời này?',
@@ -1033,10 +1049,8 @@ export const translations = {
     'workspace.organizations': 'Các Workspace tổ chức',
     'workspace.personal': 'Workspace cá nhân',
     'workspace.refreshFailedDescription':
-      'Trạng thái Workspace trước vẫn được xóa. Hãy tải lại session đích hoặc đăng xuất.',
+      'Không thể tải ngữ cảnh Workspace mới. Hãy thử tải lại hoặc đăng xuất.',
     'workspace.refreshFailedTitle': 'Cần xử lý việc tải lại Workspace',
-    'workspace.refreshingDescription':
-      'Trạng thái Workspace trước đã được xóa. Đang tải Workspace đã chọn.',
     'workspace.refreshingTitle': 'Đang tải lại Workspace',
     'workspace.retryRefresh': 'Thử tải lại',
     'workspace.switchFailed':
@@ -1430,6 +1444,7 @@ export const translations = {
     'rules.expressionPreviewEmpty': 'Hoàn thành một biểu thức hợp lệ để xem ý nghĩa.',
     'rules.expressionSuggestions': 'Gợi ý biểu thức',
     'rules.showSuggestions': 'Hiện gợi ý',
+    'rules.loadingSuggestions': 'Đang tải gợi ý…',
     'rules.applySuggestion': 'Áp dụng gợi ý',
     'rules.completionError': 'Không tải được gợi ý biểu thức',
     'rules.expressionSyntax': 'Syntax biểu thức',
@@ -1458,10 +1473,12 @@ export const translations = {
     'rules.key': 'Khóa',
     'rules.keepEditing': 'Tiếp tục chỉnh sửa',
     'rules.lifecycleError': 'Không cập nhật được vòng đời rule',
+    'rules.updatingLifecycle': 'Đang cập nhật vòng đời rule…',
     'rules.lifecycleUpdated': 'Đã cập nhật vòng đời rule',
     'rules.staleChanges':
       'Rule đã thay đổi ở nơi khác. Các chỉnh sửa của bạn vẫn được giữ; hãy tải lại trước khi thử lại.',
     'rules.refetch': 'Tải lại rule hiện tại',
+    'rules.refreshing': 'Đang tải lại rule hiện tại…',
     'rules.literal': 'Giá trị cố định',
     'rules.loadingRule': 'Đang tải rule',
     'rules.message': 'Thông báo',
@@ -1498,11 +1515,13 @@ export const translations = {
     'rules.saveDraft': 'Lưu draft',
     'rules.saveError': 'Không lưu được draft',
     'rules.save': 'Lưu draft',
+    'rules.saving': 'Đang lưu draft…',
     'rules.conditionRequired': 'Hãy thêm điều kiện hợp lệ trước khi lưu.',
     'rules.saved': 'Đã lưu draft',
     'rules.searchLabel': 'Tìm rule',
     'rules.searchPlaceholder': 'Tìm rule',
     'rules.simulation': 'Mô phỏng',
+    'rules.simulating': 'Đang chạy mô phỏng…',
     'rules.simulationError': 'Mô phỏng thất bại',
     'rules.simulationInvalid': 'Không thể đánh giá các giá trị mẫu. Hãy chỉnh lại và thử lại.',
     'rules.simulationDraft': 'Bản nháp',
@@ -1551,6 +1570,7 @@ export const translations = {
     'rules.bindingUsageEmpty': 'Phiên bản này chưa có consumer binding nào.',
     'rules.bindingEnabled': 'Đang bật',
     'rules.bindingMutationError': 'Không thể cập nhật binding này.',
+    'rules.bindingUpdating': 'Đang cập nhật binding…',
     'rules.bindingRefresh': 'Tải lại binding',
     'rules.bindingDefinitionKey': 'Khóa rule',
     'rules.bindingVersion': 'Phiên bản rule',
@@ -1572,6 +1592,7 @@ export const translations = {
     'rules.bindingConflict': 'Binding này đã thay đổi. Hãy làm mới và thử lại.',
     'rules.bindingEdit': 'Sửa binding',
     'rules.bindingSave': 'Lưu binding',
+    'rules.bindingSaving': 'Đang lưu binding…',
     'rules.bindingEditDescription':
       'Cập nhật target, trigger, ánh xạ, mức ưu tiên, trạng thái bật và hành vi lỗi do binding sở hữu mà không đổi đúng phiên bản rule.',
     'rules.bindingTarget': 'Target',
@@ -1579,6 +1600,7 @@ export const translations = {
     'rules.bindingPriority': 'Priority',
     'rules.bindingId': 'Binding ID',
     'rules.bindingRemove': 'Xóa binding',
+    'rules.bindingRemoving': 'Đang xóa binding…',
     'rules.bindingRemoveTitle': 'Xóa binding này?',
     'rules.bindingRemoveDescription': 'Rule và các binding khác sẽ không thay đổi.',
     'rules.unknownRule': 'Rule không rõ',

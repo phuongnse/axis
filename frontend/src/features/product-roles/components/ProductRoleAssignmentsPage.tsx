@@ -169,7 +169,7 @@ export function ProductRoleAssignmentsPage() {
               </PageAction>
             )
           : undefined,
-      loading: managementQuery.isFetching,
+      loading: managementQuery.isPending,
       error: managementQuery.isError,
       onRetry: () => void managementQuery.refetch(),
     };
@@ -177,7 +177,7 @@ export function ProductRoleAssignmentsPage() {
     assignments,
     data?.assignments,
     managementQuery.isError,
-    managementQuery.isFetching,
+    managementQuery.isPending,
     managementQuery.isSuccess,
     managementQuery.refetch,
     openWindow,

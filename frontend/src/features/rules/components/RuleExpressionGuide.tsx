@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { BookOpenText } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { AsyncContent } from '@/components/shared/AsyncContent';
 import {
   keyboardFocusRing,
   persistentItemHighlight,
@@ -179,11 +180,13 @@ function ExpressionGuideContent({
       </div>
 
       <div className="min-h-0 flex-1 space-y-7 overflow-y-auto px-4 py-5">
-        {guideQuery.isLoading || guideQuery.isFetching ? (
-          <p role="status" className="text-sm text-muted-foreground">
-            {t('rules.referenceLoading')}
-          </p>
-        ) : null}
+        <AsyncContent
+          pending={guideQuery.isPending}
+          error={guideQuery.isError}
+          pendingLabel={t('rules.referenceLoading')}
+        >
+          <span />
+        </AsyncContent>
 
         {guideQuery.isError ? (
           <div role="alert" className="space-y-2 text-sm">
@@ -199,7 +202,7 @@ function ExpressionGuideContent({
           </div>
         ) : null}
 
-        {!guideQuery.isFetching && !guideQuery.isError && (document?.totalResults ?? 0) === 0 ? (
+        {!guideQuery.isPending && !guideQuery.isError && (document?.totalResults ?? 0) === 0 ? (
           <p role="status" className="text-sm text-muted-foreground">
             {t('rules.expressionGuideSearchEmpty')}
           </p>

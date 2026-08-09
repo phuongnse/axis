@@ -2,6 +2,9 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { PackageCheck, Play, RotateCw, Upload } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { AsyncButton } from '@/components/shared/AsyncButton';
+import { AsyncContent } from '@/components/shared/AsyncContent';
+import { PageHeader, PageLayout } from '@/components/shared/PageLayout';
 import { StatusBadge, type StatusBadgeTone } from '@/components/shared/StatusBadge';
 import { StatusNotice, type StatusNoticeTone } from '@/components/shared/StatusNotice';
 import {
@@ -156,11 +159,8 @@ export function SolutionsPage() {
   }
 
   return (
-    <section className="flex h-full min-h-0 w-full min-w-0 flex-col gap-5 overflow-auto p-4 sm:p-6">
-      <header className="shrink-0">
-        <h1 className="text-2xl font-semibold tracking-tight">{t('solutions.title')}</h1>
-        <p className="mt-1 max-w-3xl text-sm text-muted-foreground">{t('solutions.description')}</p>
-      </header>
+    <PageLayout scrollMode="route">
+      <PageHeader title={t('solutions.title')} description={t('solutions.description')} />
 
       {feedback ? (
         <div aria-live="polite">
@@ -168,17 +168,19 @@ export function SolutionsPage() {
             {feedback.retryPublish && file ? (
               <div className="grid gap-2">
                 <span>{feedback.body}</span>
-                <Button
+                <AsyncButton
                   type="button"
                   size="sm"
                   variant="outline"
                   className="w-fit"
                   disabled={publishMutation.isPending}
                   onClick={() => publishMutation.mutate(file)}
+                  icon={<RotateCw aria-hidden />}
+                  pending={publishMutation.isPending}
+                  pendingLabel={t('solutions.publishing')}
                 >
-                  <RotateCw aria-hidden />
                   {t('app.retry')}
-                </Button>
+                </AsyncButton>
               </div>
             ) : (
               feedback.body
@@ -217,12 +219,15 @@ export function SolutionsPage() {
           <AlertDialog open={publishConfirmOpen} onOpenChange={setPublishConfirmOpen}>
             <AlertDialogTrigger
               render={
-                <Button type="button" disabled={!file || pending}>
-                  <Upload aria-hidden />
-                  {publishMutation.isPending
-                    ? t('solutions.publishing')
-                    : t('solutions.publishAction')}
-                </Button>
+                <AsyncButton
+                  type="button"
+                  disabled={!file || pending}
+                  icon={<Upload aria-hidden />}
+                  pending={publishMutation.isPending}
+                  pendingLabel={t('solutions.publishing')}
+                >
+                  {t('solutions.publishAction')}
+                </AsyncButton>
               }
             />
             <AlertDialogContent>
@@ -265,53 +270,55 @@ export function SolutionsPage() {
           </h2>
           <p className="text-sm text-muted-foreground">{t('solutions.versionsDescription')}</p>
         </div>
-        {versionsQuery.isLoading ? (
-          <p className="text-sm text-muted-foreground" aria-live="polite">
-            {t('solutions.versionsLoading')}
-          </p>
-        ) : versionsQuery.isError ? (
-          <StatusNotice tone="destructive" title={t('solutions.versionsLoadFailed')}>
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              onClick={() => void versionsQuery.refetch()}
-            >
-              {t('app.retry')}
-            </Button>
-          </StatusNotice>
-        ) : (versionsQuery.data ?? []).length === 0 ? (
-          <p className="text-sm text-muted-foreground">{t('solutions.versionsEmpty')}</p>
-        ) : (
-          <ul className="grid gap-2" aria-label={t('solutions.versionsListLabel')}>
-            {(versionsQuery.data ?? []).map((version) => (
-              <li key={version.id}>
-                <Button
-                  type="button"
-                  variant={version.id === publishedVersion?.id ? 'secondary' : 'ghost'}
-                  className="h-auto w-full justify-between py-2 text-left"
-                  onClick={() => {
-                    setPublishedVersion(version);
-                    setInstallKey(createIdempotencyKey());
-                    setOperationId('');
-                  }}
-                >
-                  <span className="min-w-0">
-                    <span className="block truncate">
-                      {version.solutionKey} {version.solutionVersion}
+        <AsyncContent
+          pending={versionsQuery.isPending}
+          error={versionsQuery.isError}
+          pendingLabel={t('solutions.versionsLoading')}
+        >
+          {versionsQuery.isError ? (
+            <StatusNotice tone="destructive" title={t('solutions.versionsLoadFailed')}>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => void versionsQuery.refetch()}
+              >
+                {t('app.retry')}
+              </Button>
+            </StatusNotice>
+          ) : (versionsQuery.data ?? []).length === 0 ? (
+            <p className="text-sm text-muted-foreground">{t('solutions.versionsEmpty')}</p>
+          ) : (
+            <ul className="grid gap-2" aria-label={t('solutions.versionsListLabel')}>
+              {(versionsQuery.data ?? []).map((version) => (
+                <li key={version.id}>
+                  <Button
+                    type="button"
+                    variant={version.id === publishedVersion?.id ? 'secondary' : 'ghost'}
+                    className="h-auto w-full justify-between py-2 text-left"
+                    onClick={() => {
+                      setPublishedVersion(version);
+                      setInstallKey(createIdempotencyKey());
+                      setOperationId('');
+                    }}
+                  >
+                    <span className="min-w-0">
+                      <span className="block truncate">
+                        {version.solutionKey} {version.solutionVersion}
+                      </span>
+                      <span className="block truncate text-xs text-muted-foreground">
+                        {version.packageSha256}
+                      </span>
                     </span>
-                    <span className="block truncate text-xs text-muted-foreground">
-                      {version.packageSha256}
-                    </span>
-                  </span>
-                  <StatusBadge tone={trustTone(version.trustStatus)}>
-                    {solutionTrustLabel(version.trustStatus, t)}
-                  </StatusBadge>
-                </Button>
-              </li>
-            ))}
-          </ul>
-        )}
+                    <StatusBadge tone={trustTone(version.trustStatus)}>
+                      {solutionTrustLabel(version.trustStatus, t)}
+                    </StatusBadge>
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </AsyncContent>
       </section>
 
       {publishedVersion ? (
@@ -333,12 +340,16 @@ export function SolutionsPage() {
             <AlertDialog open={installConfirmOpen} onOpenChange={setInstallConfirmOpen}>
               <AlertDialogTrigger
                 render={
-                  <Button type="button" className="w-fit" disabled={pending}>
-                    <PackageCheck aria-hidden />
-                    {installMutation.isPending
-                      ? t('solutions.installing')
-                      : t('solutions.installAction')}
-                  </Button>
+                  <AsyncButton
+                    type="button"
+                    className="w-fit"
+                    disabled={pending}
+                    icon={<PackageCheck aria-hidden />}
+                    pending={installMutation.isPending}
+                    pendingLabel={t('solutions.installing')}
+                  >
+                    {t('solutions.installAction')}
+                  </AsyncButton>
                 }
               />
               <AlertDialogContent>
@@ -380,7 +391,7 @@ export function SolutionsPage() {
       {operationId ? (
         <OperationPanel
           operation={operation}
-          loading={operationQuery.isLoading}
+          loading={operationQuery.isPending}
           error={operationQuery.isError}
           resuming={resumeMutation.isPending}
           onRetry={() => void operationQuery.refetch()}
@@ -390,12 +401,12 @@ export function SolutionsPage() {
 
       <InstallationsPanel
         installations={installationsQuery.data ?? []}
-        loading={installationsQuery.isLoading}
+        loading={installationsQuery.isPending}
         error={installationsQuery.isError}
         onRetry={() => void installationsQuery.refetch()}
         onOpenOperation={setOperationId}
       />
-    </section>
+    </PageLayout>
   );
 }
 
@@ -442,11 +453,13 @@ function OperationPanel({
   const { t } = useTranslation();
   if (loading) {
     return (
-      <section aria-labelledby="operation-title" aria-live="polite">
+      <section aria-labelledby="operation-title">
         <h2 id="operation-title" className="text-lg font-medium">
           {t('solutions.operationTitle')}
         </h2>
-        <p className="text-sm text-muted-foreground">{t('solutions.operationLoading')}</p>
+        <AsyncContent pending pendingLabel={t('solutions.operationLoading')}>
+          <span />
+        </AsyncContent>
       </section>
     );
   }
@@ -488,10 +501,17 @@ function OperationPanel({
       ) : null}
       <ComponentSequence components={operation.steps ?? []} />
       {resumable ? (
-        <Button type="button" className="w-fit" disabled={resuming} onClick={onResume}>
-          <Play aria-hidden />
-          {resuming ? t('solutions.resuming') : t('solutions.resumeAction')}
-        </Button>
+        <AsyncButton
+          type="button"
+          className="w-fit"
+          disabled={resuming}
+          onClick={onResume}
+          icon={<Play aria-hidden />}
+          pending={resuming}
+          pendingLabel={t('solutions.resuming')}
+        >
+          {t('solutions.resumeAction')}
+        </AsyncButton>
       ) : null}
     </section>
   );
@@ -519,65 +539,67 @@ function InstallationsPanel({
         </h2>
         <p className="text-sm text-muted-foreground">{t('solutions.installationsDescription')}</p>
       </div>
-      {loading ? (
-        <p className="text-sm text-muted-foreground" aria-live="polite">
-          {t('solutions.installationsLoading')}
-        </p>
-      ) : error ? (
-        <StatusNotice tone="destructive" title={t('solutions.installationsLoadFailed')}>
-          <span>{t('solutions.installationsLoadFailedDescription')}</span>{' '}
-          <Button type="button" size="sm" variant="outline" onClick={onRetry}>
-            <RotateCw aria-hidden />
-            {t('app.retry')}
-          </Button>
-        </StatusNotice>
-      ) : installations.length === 0 ? (
-        <p className="text-sm text-muted-foreground">{t('solutions.installationsEmpty')}</p>
-      ) : (
-        <ul className="grid gap-4" aria-label={t('solutions.installationsListLabel')}>
-          {installations.map((installation) => (
-            <li
-              key={installation.id}
-              className="grid gap-3 border-b border-border pb-4 last:border-0"
-            >
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="break-all font-medium">
-                    {installation.solutionVersionId ?? t('solutions.notAvailable')}
-                  </p>
-                  <p className="break-all text-xs text-muted-foreground">
-                    {installation.id ?? t('solutions.notAvailable')}
-                  </p>
+      <AsyncContent
+        pending={loading}
+        error={error}
+        pendingLabel={t('solutions.installationsLoading')}
+      >
+        {error ? (
+          <StatusNotice tone="destructive" title={t('solutions.installationsLoadFailed')}>
+            <span>{t('solutions.installationsLoadFailedDescription')}</span>{' '}
+            <Button type="button" size="sm" variant="outline" onClick={onRetry}>
+              <RotateCw aria-hidden />
+              {t('app.retry')}
+            </Button>
+          </StatusNotice>
+        ) : installations.length === 0 ? (
+          <p className="text-sm text-muted-foreground">{t('solutions.installationsEmpty')}</p>
+        ) : (
+          <ul className="grid gap-4" aria-label={t('solutions.installationsListLabel')}>
+            {installations.map((installation) => (
+              <li
+                key={installation.id}
+                className="grid gap-3 border-b border-border pb-4 last:border-0"
+              >
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="break-all font-medium">
+                      {installation.solutionVersionId ?? t('solutions.notAvailable')}
+                    </p>
+                    <p className="break-all text-xs text-muted-foreground">
+                      {installation.id ?? t('solutions.notAvailable')}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <StatusBadge tone={provisioningTone(installation.provisioningStatus)}>
+                      {provisioningLabel(installation.provisioningStatus, t)}
+                    </StatusBadge>
+                    <StatusBadge
+                      tone={installation.complianceStatus === 'Compliant' ? 'success' : 'muted'}
+                    >
+                      {installation.complianceStatus === 'Compliant'
+                        ? t('solutions.compliant')
+                        : t('solutions.noncompliant')}
+                    </StatusBadge>
+                  </div>
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  <StatusBadge tone={provisioningTone(installation.provisioningStatus)}>
-                    {provisioningLabel(installation.provisioningStatus, t)}
-                  </StatusBadge>
-                  <StatusBadge
-                    tone={installation.complianceStatus === 'Compliant' ? 'success' : 'muted'}
+                <ComponentSequence components={installation.components ?? []} />
+                {installation.operationId ? (
+                  <Button
+                    type="button"
+                    className="w-fit"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => onOpenOperation(installation.operationId ?? '')}
                   >
-                    {installation.complianceStatus === 'Compliant'
-                      ? t('solutions.compliant')
-                      : t('solutions.noncompliant')}
-                  </StatusBadge>
-                </div>
-              </div>
-              <ComponentSequence components={installation.components ?? []} />
-              {installation.operationId ? (
-                <Button
-                  type="button"
-                  className="w-fit"
-                  size="sm"
-                  variant="outline"
-                  onClick={() => onOpenOperation(installation.operationId ?? '')}
-                >
-                  {t('solutions.viewOperation')}
-                </Button>
-              ) : null}
-            </li>
-          ))}
-        </ul>
-      )}
+                    {t('solutions.viewOperation')}
+                  </Button>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        )}
+      </AsyncContent>
     </section>
   );
 }

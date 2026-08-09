@@ -1,12 +1,15 @@
 import { useQuery } from '@tanstack/react-query';
-import { Building2, Check, LoaderCircle, Plus, UserRound } from 'lucide-react';
-import type { FormEvent, ReactNode } from 'react';
+import { ArrowRight, Building2, Plus, UserRound } from 'lucide-react';
+import type { FormEvent } from 'react';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { AsyncButton } from '@/components/shared/AsyncButton';
+import { AsyncContent } from '@/components/shared/AsyncContent';
 import {
   persistentItemHighlight,
   transientItemHighlight,
 } from '@/components/shared/interactionStates';
+import { OptionItemContent } from '@/components/shared/OptionList';
 import { StatusNotice } from '@/components/shared/StatusNotice';
 import { Button } from '@/components/ui/button';
 import {
@@ -19,23 +22,33 @@ import {
 } from '@/components/ui/dialog';
 import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
-import { ApiError, invalidateClientRequestSession } from '@/lib/api';
+import { ApiError } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import {
-  beginWorkspaceTransition,
   type CreatedOrganizationWorkspace,
-  confirmWorkspaceTransition,
   createOrganizationIdempotencyKey,
   createOrganizationWorkspace,
   type EligibleWorkspace,
   listEligibleWorkspaces,
-  recoverWorkspaceTransition,
-  type WorkspaceContextTransition,
   workspaceKeys,
 } from './api';
 
+export type WorkspaceChangeResult = 'entered' | 'not-entered' | 'unknown';
+export type WorkspaceContextPhase = 'idle' | 'switching' | 'refreshing' | 'failed';
+export type WorkspaceContextFailure = 'switch-failed' | 'outcome-unknown' | 'refresh-failed';
+
+export interface WorkspaceContextState {
+  failure: WorkspaceContextFailure | null;
+  phase: WorkspaceContextPhase;
+  targetWorkspaceId: string | null;
+}
+
 interface WorkspaceControlProps {
-  onWorkspaceChanged: () => Promise<void>;
+  contextState: WorkspaceContextState;
+  onRetryContext: () => Promise<void>;
+  onWorkspaceChange: (
+    target: EligibleWorkspace | CreatedOrganizationWorkspace,
+  ) => Promise<WorkspaceChangeResult>;
 }
 
 interface RetryIdentity {
@@ -43,69 +56,27 @@ interface RetryIdentity {
   normalizedName: string;
 }
 
-export function WorkspaceControl({ onWorkspaceChanged }: WorkspaceControlProps) {
+export function WorkspaceControl({
+  contextState,
+  onRetryContext,
+  onWorkspaceChange,
+}: WorkspaceControlProps) {
   const { t } = useTranslation();
   const [createOpen, setCreateOpen] = useState(false);
-  const [switchingWorkspaceId, setSwitchingWorkspaceId] = useState<string | null>(null);
-  const [switchError, setSwitchError] = useState(false);
-  const [switchOutcomeUnknown, setSwitchOutcomeUnknown] = useState(false);
   const eligibleQuery = useQuery({
     queryKey: workspaceKeys.eligible,
     queryFn: listEligibleWorkspaces,
     staleTime: 0,
   });
   const workspaces = eligibleQuery.data ?? [];
+  const switching = contextState.phase === 'switching' || contextState.phase === 'refreshing';
+  const switchError = contextState.failure !== null;
+  const switchOutcomeUnknown = contextState.failure === 'outcome-unknown';
 
   async function switchWorkspace(target: EligibleWorkspace | CreatedOrganizationWorkspace) {
-    if (switchingWorkspaceId) return;
-
-    setSwitchingWorkspaceId(target.workspaceId);
-    setSwitchError(false);
-    setSwitchOutcomeUnknown(false);
-    try {
-      let transition: WorkspaceContextTransition;
-      let confirmationAttempted = false;
-      try {
-        invalidateClientRequestSession();
-        await beginWorkspaceTransition(target.workspaceId);
-        confirmationAttempted = true;
-        transition = await confirmWorkspaceTransition();
-      } catch {
-        try {
-          transition = await recoverWorkspaceTransition();
-        } catch (error) {
-          if (confirmationAttempted) {
-            setSwitchOutcomeUnknown(true);
-            await onWorkspaceChanged().catch(() => undefined);
-            await eligibleQuery.refetch().catch(() => undefined);
-            return;
-          }
-          throw error;
-        }
-      }
-
-      const enteredTarget =
-        transition.status === 'Completed' &&
-        transition.authoritativeWorkspaceId === target.workspaceId;
-      if (!transition.authoritativeWorkspaceId) {
-        setSwitchError(true);
-        await eligibleQuery.refetch();
-        return;
-      }
-
-      await onWorkspaceChanged();
-      if (enteredTarget) {
-        setCreateOpen(false);
-      } else {
-        setSwitchError(true);
-        await eligibleQuery.refetch();
-      }
-    } catch {
-      setSwitchError(true);
-      await eligibleQuery.refetch().catch(() => undefined);
-    } finally {
-      setSwitchingWorkspaceId(null);
-    }
+    if (switching) return;
+    const result = await onWorkspaceChange(target);
+    if (result === 'entered') setCreateOpen(false);
   }
 
   return (
@@ -113,7 +84,7 @@ export function WorkspaceControl({ onWorkspaceChanged }: WorkspaceControlProps) 
       <section
         className="grid gap-3"
         aria-label={t('workspace.choose')}
-        aria-busy={Boolean(switchingWorkspaceId)}
+        aria-busy={switching || undefined}
       >
         <div className="grid gap-0.5 px-1">
           <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
@@ -123,42 +94,40 @@ export function WorkspaceControl({ onWorkspaceChanged }: WorkspaceControlProps) 
           <p className="text-xs text-muted-foreground">{t('workspace.chooseDescription')}</p>
         </div>
 
-        {eligibleQuery.isPending ? (
-          <p
-            className="flex items-center gap-2 px-2 py-3 text-sm text-muted-foreground"
-            role="status"
-          >
-            <LoaderCircle className="size-4 animate-spin" aria-hidden />
-            {t('workspace.loading')}
-          </p>
-        ) : eligibleQuery.isError ? (
-          <StatusNotice tone="destructive" title={t('workspace.unavailable')}>
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              onClick={() => eligibleQuery.refetch()}
-            >
-              {t('app.retry')}
-            </Button>
-          </StatusNotice>
-        ) : (
-          <WorkspaceGroups
-            workspaces={workspaces}
-            switchingWorkspaceId={switchingWorkspaceId}
-            onSelect={switchWorkspace}
-          />
-        )}
+        <AsyncContent
+          className="min-h-10"
+          pending={eligibleQuery.isPending}
+          error={eligibleQuery.isError}
+          pendingLabel={t('workspace.loading')}
+        >
+          {eligibleQuery.isError ? (
+            <StatusNotice tone="destructive" title={t('workspace.unavailable')}>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => eligibleQuery.refetch()}
+              >
+                {t('app.retry')}
+              </Button>
+            </StatusNotice>
+          ) : eligibleQuery.data ? (
+            <WorkspaceGroups
+              workspaces={workspaces}
+              switchingWorkspaceId={contextState.targetWorkspaceId}
+              switching={switching}
+              onSelect={switchWorkspace}
+            />
+          ) : null}
+        </AsyncContent>
 
         <Button
           type="button"
           size="sm"
           variant="outline"
           className="w-full"
-          disabled={Boolean(switchingWorkspaceId)}
+          disabled={switching}
           onClick={() => {
-            setSwitchError(false);
-            setSwitchOutcomeUnknown(false);
             setCreateOpen(true);
           }}
         >
@@ -166,12 +135,22 @@ export function WorkspaceControl({ onWorkspaceChanged }: WorkspaceControlProps) 
           {t('workspace.createOrganization')}
         </Button>
 
-        <div aria-live="polite">
-          {switchingWorkspaceId ? (
-            <StatusNotice tone="info">{t('workspace.switching')}</StatusNotice>
-          ) : null}
+        <div aria-live="polite" className="grid gap-2">
+          {switching ? <span className="sr-only">{t('workspace.switching')}</span> : null}
           {switchOutcomeUnknown ? (
-            <StatusNotice tone="warning">{t('workspace.switchOutcomeUnknown')}</StatusNotice>
+            <StatusNotice tone="warning">
+              <span>{t('workspace.switchOutcomeUnknown')}</span>{' '}
+              <Button type="button" variant="link" onClick={() => void onRetryContext()}>
+                {t('workspace.retryRefresh')}
+              </Button>
+            </StatusNotice>
+          ) : contextState.failure === 'refresh-failed' ? (
+            <StatusNotice tone="destructive">
+              <span>{t('workspace.refreshFailedDescription')}</span>{' '}
+              <Button type="button" variant="link" onClick={() => void onRetryContext()}>
+                {t('workspace.retryRefresh')}
+              </Button>
+            </StatusNotice>
           ) : switchError ? (
             <StatusNotice tone="destructive">{t('workspace.switchFailed')}</StatusNotice>
           ) : null}
@@ -182,7 +161,7 @@ export function WorkspaceControl({ onWorkspaceChanged }: WorkspaceControlProps) 
         open={createOpen}
         switchError={switchError}
         switchOutcomeUnknown={switchOutcomeUnknown}
-        switching={Boolean(switchingWorkspaceId)}
+        switching={switching}
         onOpenChange={setCreateOpen}
         onEnter={switchWorkspace}
       />
@@ -193,10 +172,12 @@ export function WorkspaceControl({ onWorkspaceChanged }: WorkspaceControlProps) 
 function WorkspaceGroups({
   workspaces,
   switchingWorkspaceId,
+  switching,
   onSelect,
 }: {
   workspaces: EligibleWorkspace[];
   switchingWorkspaceId: string | null;
+  switching: boolean;
   onSelect: (workspace: EligibleWorkspace) => void;
 }) {
   const { t } = useTranslation();
@@ -206,18 +187,18 @@ function WorkspaceGroups({
   return (
     <section className="grid max-h-72 gap-3 overflow-y-auto" aria-label={t('workspace.eligible')}>
       <WorkspaceGroup
-        icon={<UserRound className="size-3.5" aria-hidden />}
         label={t('workspace.personal')}
         workspaces={personal}
         switchingWorkspaceId={switchingWorkspaceId}
+        switching={switching}
         onSelect={onSelect}
       />
       {organizations.length > 0 ? (
         <WorkspaceGroup
-          icon={<Building2 className="size-3.5" aria-hidden />}
           label={t('workspace.organizations')}
           workspaces={organizations}
           switchingWorkspaceId={switchingWorkspaceId}
+          switching={switching}
           onSelect={onSelect}
         />
       ) : null}
@@ -226,48 +207,51 @@ function WorkspaceGroups({
 }
 
 function WorkspaceGroup({
-  icon,
   label,
   workspaces,
   switchingWorkspaceId,
+  switching,
   onSelect,
 }: {
-  icon: ReactNode;
   label: string;
   workspaces: EligibleWorkspace[];
   switchingWorkspaceId: string | null;
+  switching: boolean;
   onSelect: (workspace: EligibleWorkspace) => void;
 }) {
   if (workspaces.length === 0) return null;
 
   return (
     <section className="grid gap-1" aria-label={label}>
-      <h3 className="flex items-center gap-2 px-2 text-xs font-medium text-muted-foreground">
-        {icon}
-        {label}
-      </h3>
-      {workspaces.map((workspace) => (
-        <Button
-          key={workspace.workspaceId}
-          type="button"
-          variant="ghost"
-          size="sm"
-          className={cn(
-            'w-full justify-start',
-            workspace.isCurrent ? persistentItemHighlight : transientItemHighlight,
-            workspace.isCurrent && 'disabled:opacity-100',
-          )}
-          disabled={workspace.isCurrent || Boolean(switchingWorkspaceId)}
-          aria-current={workspace.isCurrent ? 'page' : undefined}
-          onClick={() => onSelect(workspace)}
-        >
-          <span className="min-w-0 flex-1 truncate text-left">{workspace.name}</span>
-          {workspace.isCurrent ? <Check className="size-3.5" aria-hidden /> : null}
-          {switchingWorkspaceId === workspace.workspaceId ? (
-            <LoaderCircle className="size-3.5 animate-spin" aria-hidden />
-          ) : null}
-        </Button>
-      ))}
+      <h3 className="px-2 text-xs font-medium text-muted-foreground">{label}</h3>
+      {workspaces.map((workspace) => {
+        const WorkspaceIcon = workspace.type === 'Personal' ? UserRound : Building2;
+        const switchingThisWorkspace = switching && switchingWorkspaceId === workspace.workspaceId;
+
+        return (
+          <Button
+            key={workspace.workspaceId}
+            type="button"
+            variant="ghost"
+            size="sm"
+            className={cn(
+              'w-full justify-start',
+              workspace.isCurrent ? persistentItemHighlight : transientItemHighlight,
+              workspace.isCurrent && 'disabled:opacity-100',
+            )}
+            disabled={workspace.isCurrent || switching}
+            aria-current={workspace.isCurrent ? 'page' : undefined}
+            onClick={() => onSelect(workspace)}
+          >
+            <OptionItemContent
+              icon={<WorkspaceIcon className="size-3.5" />}
+              pending={switchingThisWorkspace}
+            >
+              {workspace.name}
+            </OptionItemContent>
+          </Button>
+        );
+      })}
     </section>
   );
 }
@@ -393,7 +377,6 @@ function CreateOrganizationDialog({
               ) : null}
             </Field>
             <div aria-live="polite">
-              {pending ? <StatusNotice tone="info">{t('workspace.creating')}</StatusNotice> : null}
               {submitError ? (
                 <StatusNotice tone="destructive">{t('workspace.createFailed')}</StatusNotice>
               ) : null}
@@ -414,21 +397,26 @@ function CreateOrganizationDialog({
             {created ? t('app.close') : t('app.cancel')}
           </Button>
           {created ? (
-            <Button type="button" disabled={switching} onClick={() => onEnter(created)}>
-              {switching ? t('workspace.switching') : t('workspace.enterWorkspace')}
-            </Button>
+            <AsyncButton
+              type="button"
+              icon={<ArrowRight />}
+              pending={switching}
+              pendingLabel={t('workspace.switching')}
+              onClick={() => onEnter(created)}
+            >
+              {t('workspace.enterWorkspace')}
+            </AsyncButton>
           ) : (
-            <Button
+            <AsyncButton
               type="submit"
               form="create-organization-form"
-              disabled={pending || !name.trim()}
+              disabled={!name.trim()}
+              icon={<Plus />}
+              pending={pending}
+              pendingLabel={t('workspace.creating')}
             >
-              {pending
-                ? t('workspace.creating')
-                : submitError
-                  ? t('app.retry')
-                  : t('workspace.create')}
-            </Button>
+              {submitError ? t('app.retry') : t('workspace.create')}
+            </AsyncButton>
           )}
         </DialogFooter>
       </DialogContent>

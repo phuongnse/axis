@@ -12,7 +12,8 @@ import {
   type DataTableQueryState,
 } from '@/components/shared/data-table';
 import { useManagedWindowActions } from '@/components/shared/ManagedWindowManager';
-import { PageAction, PageHeader, PageLayout } from '@/components/shared/PageLayout';
+import { PageAction } from '@/components/shared/PageLayout';
+import { ResourceWorkspace } from '@/components/shared/ResourceWorkspace';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { StatusNotice } from '@/components/shared/StatusNotice';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
@@ -86,12 +87,12 @@ export function BusinessObjectsPage() {
   useEffect(() => {
     if (!search.dialog) return;
     if (search.dialog === 'create') {
-      if (collectionActionsQuery.isLoading || collectionActionsQuery.isError) return;
+      if (collectionActionsQuery.isPending || collectionActionsQuery.isError) return;
       if (canStartCreate) {
         openWindow(businessObjectCreateWindowDescriptor(t('businessObjects.defineTitle')));
       }
     } else if (search.recordId) {
-      if (launchDefinitionQuery.isLoading) return;
+      if (launchDefinitionQuery.isPending) return;
       const definition = definitions.find((candidate) => candidate.id === search.recordId);
       openWindow(
         businessObjectDefinitionWindowDescriptor({
@@ -114,10 +115,10 @@ export function BusinessObjectsPage() {
   }, [
     canStartCreate,
     collectionActionsQuery.isError,
-    collectionActionsQuery.isLoading,
+    collectionActionsQuery.isPending,
     definitions,
     launchDefinitionQuery.data?.name,
-    launchDefinitionQuery.isLoading,
+    launchDefinitionQuery.isPending,
     navigate,
     openWindow,
     search.dialog,
@@ -254,7 +255,7 @@ export function BusinessObjectsPage() {
             </PageAction>
           )
         : undefined,
-      loading: definitionsQuery.isFetching,
+      loading: definitionsQuery.isPending,
       error: definitionsQuery.isError,
       onRetry: () => void definitionsQuery.refetch(),
     };
@@ -265,7 +266,7 @@ export function BusinessObjectsPage() {
     definitionsQuery.data?.pageSize,
     definitionsQuery.data?.totalCount,
     definitionsQuery.isError,
-    definitionsQuery.isFetching,
+    definitionsQuery.isPending,
     definitionsQuery.refetch,
     navigate,
     openDefinition,
@@ -277,30 +278,27 @@ export function BusinessObjectsPage() {
   ]);
 
   return (
-    <PageLayout scrollMode="contained">
-      <PageHeader
-        title={t('businessObjects.title')}
-        description={t('businessObjects.pageDescription')}
-      />
-
-      {actionsUnavailable ? (
-        <StatusNotice tone="warning" title={t('businessObjects.actionsUnavailableTitle')}>
-          <span>{t('businessObjects.actionsUnavailableDescription')}</span>{' '}
-          <PageAction
-            type="button"
-            variant="link"
-            disabled={collectionActionsQuery.isFetching}
-            onClick={() => void collectionActionsQuery.refetch()}
-          >
-            {t('app.retry')}
-          </PageAction>
-        </StatusNotice>
-      ) : null}
-
-      <div className="min-h-0 flex-1">
-        <DataTable definition={tableDefinition} />
-      </div>
-    </PageLayout>
+    <ResourceWorkspace
+      title={t('businessObjects.title')}
+      description={t('businessObjects.pageDescription')}
+      status={
+        actionsUnavailable ? (
+          <StatusNotice tone="warning" title={t('businessObjects.actionsUnavailableTitle')}>
+            <span>{t('businessObjects.actionsUnavailableDescription')}</span>{' '}
+            <PageAction
+              type="button"
+              variant="link"
+              disabled={collectionActionsQuery.isFetching}
+              onClick={() => void collectionActionsQuery.refetch()}
+            >
+              {t('app.retry')}
+            </PageAction>
+          </StatusNotice>
+        ) : undefined
+      }
+    >
+      <DataTable definition={tableDefinition} />
+    </ResourceWorkspace>
   );
 }
 
