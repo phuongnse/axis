@@ -6,9 +6,7 @@ Use `$axis-frontend-feature` for SPA feature work. Use `$axis-frontend-foundatio
 
 ## UX-first product UI
 
-Build the workflow, not a landing page or explanation page. Visible copy should help users act and avoid internal architecture terms.
-
-On localized surfaces, user-facing product copy must use the frontend translation layer instead of component-local static text. Keep non-product constants, routes, and protocol values separate from visible copy.
+Build the workflow, not a landing page or explanation page. Visible copy should help users act and avoid internal architecture terms. On localized surfaces, user-facing product copy must use the frontend translation layer instead of component-local static text. Keep non-product constants, routes, and protocol values separate from visible copy.
 
 Every route must expose an obvious next navigation path. Auth and public standalone screens declare route-level escape targets with `routeNavigation = publicRouteNavigation(...)` and render a visible sign-in, registration, back, or home-style link in every loading, success, and error state. Redirect-only route entries that render no screen state are exempt. Authenticated screens satisfy this through the app shell navigation and sign-out.
 
