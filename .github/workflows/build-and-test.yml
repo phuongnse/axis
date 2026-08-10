@@ -266,6 +266,4 @@ jobs:
           base: ${{ github.event.pull_request.base.sha }}
           head: ${{ github.event.pull_request.head.sha }}
           version: 3.95.3
-          # Lob's verified detector falsely classifies Python unittest identifiers;
-          # retain every other detector and the full verified PR-diff scan.
-          extra_args: --only-verified --exclude-detectors=Lob
+          extra_args: --only-verified

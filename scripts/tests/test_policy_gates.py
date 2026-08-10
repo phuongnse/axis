@@ -5336,7 +5336,7 @@ class TestLocalDevShellArgv(unittest.TestCase):
 
 
 class TestGitWorkflows(unittest.TestCase):
-    def test_secret_scan_keeps_full_verified_scan_with_only_lob_excluded(self) -> None:
+    def test_secret_scan_pins_runtime_and_keeps_full_verified_scan(self) -> None:
         workflow = (ROOT / ".github" / "workflows" / "build-and-test.yml").read_text(encoding="utf-8")
         secret_scan = workflow.split("  secret-scan:\n", maxsplit=1)[1]
 
@@ -5348,7 +5348,7 @@ class TestGitWorkflows(unittest.TestCase):
         self.assertIn("head: ${{ github.event.pull_request.head.sha }}", secret_scan)
         self.assertIn("version: 3.95.3", secret_scan)
         extra_args = next(line.strip() for line in secret_scan.splitlines() if "extra_args:" in line)
-        self.assertEqual("extra_args: --only-verified --exclude-detectors=Lob", extra_args)
+        self.assertEqual("extra_args: --only-verified", extra_args)
 
     def test_sync_fast_forwards_existing_branch(self) -> None:
         calls: list[list[str]] = []
