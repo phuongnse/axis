@@ -7,7 +7,6 @@ import tomllib
 
 ROOT = Path(__file__).resolve().parent.parent
 ORCHESTRATION_PATH = ROOT / ".codex" / "orchestration.toml"
-PROFILE_LEVELS = {"off", "lite", "full"}
 REASONING_LEVELS = {"low", "medium", "high", "xhigh", "max", "ultra"}
 FORBIDDEN_DEFAULT_AGENT_KEYS = ("default_subagent_model", "default_subagent_reasoning_effort")
 
@@ -35,7 +34,7 @@ def config_issues() -> list[str]:
     agent_specs: dict[str, dict[str, object]] = {}
     runtime: dict[str, object] = {}
     if orchestration is not None:
-        expected_root_keys = {"version", "runtime", "profile_providers", "agents"}
+        expected_root_keys = {"version", "runtime", "agents"}
         unknown = sorted(set(orchestration) - expected_root_keys)
         if unknown:
             issues.append(f".codex/orchestration.toml: unknown root keys {unknown}")
@@ -67,20 +66,11 @@ def config_issues() -> list[str]:
             if not isinstance(runtime.get("allow_default_delegate"), bool):
                 issues.append(".codex/orchestration.toml: `runtime.allow_default_delegate` must be boolean")
 
-        providers = orchestration.get("profile_providers")
-        if not isinstance(providers, dict) or set(providers) != {"minimality", "compression"} or any(
-            not isinstance(value, str) or not value for value in providers.values()
-        ):
-            issues.append(
-                ".codex/orchestration.toml: `[profile_providers]` must define non-empty "
-                "`minimality` and `compression` providers"
-            )
-
         agents_value = orchestration.get("agents")
         if not isinstance(agents_value, dict) or not agents_value:
             issues.append(".codex/orchestration.toml: `[agents]` must define named roles")
         else:
-            expected_agent_keys = {"model", "reasoning", "minimality", "compression"}
+            expected_agent_keys = {"model", "reasoning"}
             for name, spec in agents_value.items():
                 label = f".codex/orchestration.toml: agent `{name}`"
                 if not isinstance(spec, dict):
@@ -93,9 +83,6 @@ def config_issues() -> list[str]:
                     issues.append(f"{label} model is required")
                 if spec.get("reasoning") not in REASONING_LEVELS:
                     issues.append(f"{label} reasoning must be one of {sorted(REASONING_LEVELS)}")
-                for profile in ("minimality", "compression"):
-                    if spec.get(profile) not in PROFILE_LEVELS:
-                        issues.append(f"{label} {profile} must be one of {sorted(PROFILE_LEVELS)}")
                 agent_specs[name] = spec
 
     config = load(ROOT / ".codex" / "config.toml")

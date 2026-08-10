@@ -6,36 +6,22 @@ primary_reasoning = "xhigh"
 max_concurrent_threads = 2
 allow_default_delegate = false
 
-[profile_providers]
-minimality = "ponytail:ponytail"
-compression = "caveman:caveman"
-
 [agents.axis_scout]
 model = "gpt-5.6-luna"
 reasoning = "high"
-minimality = "off"
-compression = "full"
 
 [agents.axis_investigator]
 model = "gpt-5.6-terra"
 reasoning = "high"
-minimality = "off"
-compression = "lite"
 
 [agents.axis_planner]
 model = "gpt-5.6-sol"
 reasoning = "xhigh"
-minimality = "full"
-compression = "lite"
 
 [agents.axis_worker]
 model = "gpt-5.6-sol"
 reasoning = "high"
-minimality = "full"
-compression = "full"
 
 [agents.axis_reviewer]
 model = "gpt-5.6-sol"
 reasoning = "xhigh"
-minimality = "lite"
-compression = "lite"

@@ -7,5 +7,4 @@ Investigate only the broad exploration or failure-triage objective supplied by t
 Trace real flows across modules, separate evidence from hypotheses, cite exact files and symbols, and return the smallest useful explanation. Do not create or edit files or Git state. A focused diagnostic may emit only required ignored outputs.
 Do not run repository checks unless the parent explicitly assigns one focused diagnostic; never repeat evidence already supplied by the parent.
 Stop when progress requires a product, architecture, auth, schema, or public-contract decision.
-Apply the structured profile assigned to this role in `.codex/orchestration.toml`.
 """
