@@ -5346,6 +5346,7 @@ class TestGitWorkflows(unittest.TestCase):
         )
         self.assertIn("base: ${{ github.event.pull_request.base.sha }}", secret_scan)
         self.assertIn("head: ${{ github.event.pull_request.head.sha }}", secret_scan)
+        self.assertIn("version: 3.95.3", secret_scan)
         extra_args = next(line.strip() for line in secret_scan.splitlines() if "extra_args:" in line)
         self.assertEqual("extra_args: --only-verified --exclude-detectors=Lob", extra_args)
 
