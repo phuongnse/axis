@@ -8,6 +8,11 @@ public interface IBusinessObjectDefinitionRepository
     Task AddAsync(BusinessObjectDefinition definition, CancellationToken ct = default);
     Task<BusinessObjectDefinition?> GetByIdForWorkspaceAsync(BusinessObjectDefinitionId id, Guid workspaceId, CancellationToken ct = default);
     Task<BusinessObjectDefinition?> GetByKeyForWorkspaceAsync(BusinessObjectDefinitionKey key, Guid workspaceId, CancellationToken ct = default);
+    Task<BusinessObjectDefinition?> GetInstalledByComponentKeyAsync(
+        Guid workspaceId,
+        string componentKey,
+        CancellationToken ct = default) =>
+        Task.FromResult<BusinessObjectDefinition?>(null);
     Task<BusinessObjectDefinitionVersion?> GetPublishedVersionByIdForWorkspaceAsync(
         BusinessObjectDefinitionVersionId id,
         Guid workspaceId,
@@ -16,11 +21,13 @@ public interface IBusinessObjectDefinitionRepository
     Task<int> CountForWorkspaceAsync(
         Guid workspaceId,
         string? searchQuery = null,
+        bool publishedOnly = false,
         CancellationToken ct = default);
     Task<IReadOnlyList<BusinessObjectDefinition>> ListForWorkspaceAsync(
         Guid workspaceId,
         int page,
         int pageSize,
         string? searchQuery = null,
+        bool publishedOnly = false,
         CancellationToken ct = default);
 }

@@ -20,7 +20,7 @@ public sealed class PostgresRuleCatalogSearchProviderTests(RulesDatabaseFixture 
             RuleDefinitionKey.Create($"customer_archive_{Guid.NewGuid():N}"[..26]).Value,
             "Customer archive",
             "Workspace customer retention rule.",
-            Guid.NewGuid(),
+            RuleSubjectReference.Human(Guid.NewGuid()),
             DateTime.UtcNow).Value;
         context.RuleDefinitions.Add(workspaceDefinition);
         await context.SaveChangesAsync(TestContext.Current.CancellationToken);

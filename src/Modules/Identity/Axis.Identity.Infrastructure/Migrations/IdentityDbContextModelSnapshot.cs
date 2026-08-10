@@ -22,6 +22,120 @@ namespace Axis.Identity.Infrastructure.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("Axis.Identity.Domain.Aggregates.Organization", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("name");
+
+                    b.Property<int>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer")
+                        .HasColumnName("revision");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("organizations", (string)null);
+                });
+
+            modelBuilder.Entity("Axis.Identity.Domain.Aggregates.OrganizationMembership", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("organization_id");
+
+                    b.Property<int>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer")
+                        .HasColumnName("revision");
+
+                    b.Property<string>("Role")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("role");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("status");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrganizationId", "UserId")
+                        .IsUnique();
+
+                    b.HasIndex("UserId", "Status");
+
+                    b.ToTable("organization_memberships", (string)null);
+                });
+
+            modelBuilder.Entity("Axis.Identity.Domain.Aggregates.ServiceIdentity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("ClientId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("client_id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<int>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer")
+                        .HasColumnName("revision");
+
+                    b.Property<DateTime?>("RevokedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("revoked_at");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("status");
+
+                    b.Property<string>("WorkspaceGrantStatus")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("workspace_grant_status");
+
+                    b.Property<Guid>("WorkspaceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("workspace_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ClientId")
+                        .IsUnique();
+
+                    b.HasIndex("WorkspaceId");
+
+                    b.ToTable("service_identities", (string)null);
+                });
+
             modelBuilder.Entity("Axis.Identity.Domain.Aggregates.User", b =>
                 {
                     b.Property<Guid>("Id")
@@ -117,19 +231,18 @@ namespace Axis.Identity.Infrastructure.Migrations
 
                     b.Property<string>("Name")
                         .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
                         .HasColumnName("name");
 
-                    b.Property<string>("OwnerEmail")
-                        .IsRequired()
-                        .HasMaxLength(320)
-                        .HasColumnType("character varying(320)")
-                        .HasColumnName("owner_email");
-
-                    b.Property<Guid?>("OwnerUserId")
+                    b.Property<Guid?>("OrganizationId")
                         .HasColumnType("uuid")
-                        .HasColumnName("owner_user_id");
+                        .HasColumnName("organization_id");
+
+                    b.Property<int>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer")
+                        .HasColumnName("revision");
 
                     b.Property<string>("Slug")
                         .IsRequired()
@@ -149,14 +262,256 @@ namespace Axis.Identity.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("OrganizationId");
+
                     b.HasIndex("Slug")
                         .IsUnique();
 
-                    b.HasIndex("OwnerUserId", "Type")
-                        .IsUnique()
-                        .HasFilter("owner_user_id IS NOT NULL AND type = 'Personal'");
+                    b.ToTable("workspaces", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_workspaces_type_organization", "(type = 'Personal' AND organization_id IS NULL) OR (type = 'Organization' AND organization_id IS NOT NULL)");
+                        });
+                });
 
-                    b.ToTable("Workspaces", (string)null);
+            modelBuilder.Entity("Axis.Identity.Domain.Aggregates.WorkspaceContextTransition", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime?>("AuditProjectionConfirmedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("audit_projection_confirmed_at");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<DateTime?>("RedisCleanupCompletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("redis_cleanup_completed_at");
+
+                    b.Property<DateTime>("RetainUntil")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("retain_until");
+
+                    b.Property<int>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer")
+                        .HasColumnName("revision");
+
+                    b.Property<string>("SourceCorrelationDigest")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("source_correlation_digest");
+
+                    b.Property<Guid>("SourceWorkspaceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("source_workspace_id");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("status");
+
+                    b.Property<string>("TargetCorrelationDigest")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("target_correlation_digest");
+
+                    b.Property<Guid>("TargetWorkspaceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("target_workspace_id");
+
+                    b.Property<DateTime?>("TerminalAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("terminal_at");
+
+                    b.Property<Guid>("TerminalAuditEventId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("terminal_audit_event_id");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SourceCorrelationDigest")
+                        .IsUnique();
+
+                    b.HasIndex("SourceWorkspaceId");
+
+                    b.HasIndex("TargetCorrelationDigest")
+                        .IsUnique();
+
+                    b.HasIndex("TargetWorkspaceId");
+
+                    b.HasIndex("TerminalAuditEventId")
+                        .IsUnique();
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("Status", "ExpiresAt");
+
+                    b.ToTable("workspace_context_transitions", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_transition_source_digest", "source_correlation_digest ~ '^[0-9a-f]{64}$'");
+
+                            t.HasCheckConstraint("CK_transition_target_digest", "target_correlation_digest ~ '^[0-9a-f]{64}$'");
+                        });
+                });
+
+            modelBuilder.Entity("Axis.Identity.Domain.Aggregates.WorkspaceInvitation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime?>("AcceptedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("accepted_at");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<Guid>("InviterUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("inviter_user_id");
+
+                    b.Property<string>("NormalizedEmail")
+                        .HasMaxLength(320)
+                        .HasColumnType("character varying(320)")
+                        .HasColumnName("normalized_email");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("organization_id");
+
+                    b.Property<string>("RequestedRole")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("requested_role");
+
+                    b.Property<int>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer")
+                        .HasColumnName("revision");
+
+                    b.Property<DateTime?>("RevokedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("revoked_at");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("status");
+
+                    b.Property<DateTime?>("TerminalMaterialPurgedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("terminal_material_purged_at");
+
+                    b.Property<Guid>("WorkspaceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("workspace_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("InviterUserId");
+
+                    b.HasIndex("OrganizationId");
+
+                    b.HasIndex("WorkspaceId", "NormalizedEmail")
+                        .IsUnique()
+                        .HasFilter("status = 'Pending' AND normalized_email IS NOT NULL");
+
+                    b.HasIndex("WorkspaceId", "Status", "CreatedAt");
+
+                    b.ToTable("workspace_invitations", (string)null);
+                });
+
+            modelBuilder.Entity("Axis.Identity.Domain.Aggregates.WorkspaceMembership", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer")
+                        .HasColumnName("revision");
+
+                    b.Property<string>("Role")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("role");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("status");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.Property<Guid>("WorkspaceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("workspace_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId", "Status");
+
+                    b.HasIndex("WorkspaceId", "Role")
+                        .IsUnique()
+                        .HasFilter("role = 'Owner' AND status = 'Active'");
+
+                    b.HasIndex("WorkspaceId", "UserId")
+                        .IsUnique();
+
+                    b.ToTable("workspace_memberships", (string)null);
+                });
+
+            modelBuilder.Entity("Axis.Identity.Infrastructure.Persistence.Entities.CreateOrganizationIdempotencyRecordEntity", b =>
+                {
+                    b.Property<string>("ScopedKey")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("idempotency_key");
+
+                    b.Property<string>("CanonicalRequest")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("canonical_request");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("organization_id");
+
+                    b.Property<Guid>("WorkspaceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("workspace_id");
+
+                    b.HasKey("ScopedKey");
+
+                    b.ToTable("create_organization_idempotency", (string)null);
                 });
 
             modelBuilder.Entity("Axis.Identity.Infrastructure.Persistence.Entities.EmailVerificationToken", b =>
@@ -191,6 +546,115 @@ namespace Axis.Identity.Infrastructure.Migrations
                     b.ToTable("email_verification_tokens", (string)null);
                 });
 
+            modelBuilder.Entity("Axis.Identity.Infrastructure.Persistence.Entities.IdentityAuditOutboxRecord", b =>
+                {
+                    b.Property<Guid>("EventId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("event_id");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("action");
+
+                    b.Property<Guid?>("ActorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("actor_id");
+
+                    b.Property<string>("ActorKind")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("actor_kind");
+
+                    b.Property<int>("AttemptCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("attempt_count");
+
+                    b.Property<string>("CorrelationId")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("correlation_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("FailureReason")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("failure_reason");
+
+                    b.Property<DateTimeOffset?>("LastAttemptAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_attempt_at");
+
+                    b.Property<Guid?>("LeaseId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("lease_id");
+
+                    b.Property<DateTimeOffset?>("LeaseUntil")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("lease_until");
+
+                    b.Property<string>("MetadataJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("metadata_json");
+
+                    b.Property<DateTimeOffset?>("NextAttemptAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("next_attempt_at");
+
+                    b.Property<DateTimeOffset>("OccurredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("occurred_at");
+
+                    b.Property<string>("Outcome")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("outcome");
+
+                    b.Property<int>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer")
+                        .HasColumnName("revision");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("status");
+
+                    b.Property<Guid?>("SubjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("subject_id");
+
+                    b.Property<Guid>("TargetId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("target_id");
+
+                    b.Property<string>("TargetType")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("target_type");
+
+                    b.Property<Guid?>("WorkspaceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("workspace_id");
+
+                    b.HasKey("EventId");
+
+                    b.HasIndex("Status", "NextAttemptAt");
+
+                    b.ToTable("identity_audit_outbox", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_identity_audit_outbox_scope", "actor_kind IN ('System', 'Anonymous') OR workspace_id IS NOT NULL");
+                        });
+                });
+
             modelBuilder.Entity("Axis.Identity.Infrastructure.Persistence.Entities.RegistrationIdempotencyRecord", b =>
                 {
                     b.Property<string>("IdempotencyKey")
@@ -211,6 +675,28 @@ namespace Axis.Identity.Infrastructure.Migrations
                     b.HasKey("IdempotencyKey");
 
                     b.ToTable("registration_idempotency", (string)null);
+                });
+
+            modelBuilder.Entity("Axis.Identity.Infrastructure.Persistence.Entities.ServiceAssertionReplayRecord", b =>
+                {
+                    b.Property<string>("Digest")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("digest");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.HasKey("Digest");
+
+                    b.HasIndex("ExpiresAt");
+
+                    b.ToTable("service_assertion_replays", (string)null);
                 });
 
             modelBuilder.Entity("OpenIddict.EntityFrameworkCore.Models.OpenIddictEntityFrameworkCoreApplication", b =>
@@ -419,6 +905,321 @@ namespace Axis.Identity.Infrastructure.Migrations
                     b.HasIndex("ApplicationId", "Status", "Subject", "Type");
 
                     b.ToTable("OpenIddictTokens", (string)null);
+                });
+
+            modelBuilder.Entity("Axis.Identity.Domain.Aggregates.OrganizationMembership", b =>
+                {
+                    b.HasOne("Axis.Identity.Domain.Aggregates.Organization", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Axis.Identity.Domain.Aggregates.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Axis.Identity.Domain.Aggregates.ServiceIdentity", b =>
+                {
+                    b.HasOne("Axis.Identity.Domain.Aggregates.Workspace", null)
+                        .WithMany()
+                        .HasForeignKey("WorkspaceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.OwnsMany("Axis.Identity.Domain.Aggregates.ServiceIdentityKey", "Keys", b1 =>
+                        {
+                            b1.Property<Guid>("Id")
+                                .HasColumnType("uuid")
+                                .HasColumnName("id");
+
+                            b1.Property<DateTime>("CreatedAt")
+                                .HasColumnType("timestamp with time zone")
+                                .HasColumnName("created_at");
+
+                            b1.Property<string>("Kid")
+                                .IsRequired()
+                                .HasMaxLength(128)
+                                .HasColumnType("character varying(128)")
+                                .HasColumnName("kid");
+
+                            b1.Property<DateTime?>("RevokedAt")
+                                .HasColumnType("timestamp with time zone")
+                                .HasColumnName("revoked_at");
+
+                            b1.Property<string>("Status")
+                                .IsRequired()
+                                .HasColumnType("text")
+                                .HasColumnName("status");
+
+                            b1.Property<string>("Thumbprint")
+                                .IsRequired()
+                                .HasMaxLength(128)
+                                .HasColumnType("character varying(128)")
+                                .HasColumnName("thumbprint");
+
+                            b1.Property<string>("X")
+                                .IsRequired()
+                                .HasMaxLength(128)
+                                .HasColumnType("character varying(128)")
+                                .HasColumnName("x");
+
+                            b1.Property<string>("Y")
+                                .IsRequired()
+                                .HasMaxLength(128)
+                                .HasColumnType("character varying(128)")
+                                .HasColumnName("y");
+
+                            b1.Property<Guid>("service_identity_id")
+                                .HasColumnType("uuid")
+                                .HasColumnName("service_identity_id");
+
+                            b1.HasKey("Id");
+
+                            b1.HasIndex("service_identity_id", "Kid")
+                                .IsUnique();
+
+                            b1.HasIndex("service_identity_id", "Thumbprint")
+                                .IsUnique();
+
+                            b1.ToTable("service_identity_keys", (string)null);
+
+                            b1.WithOwner()
+                                .HasForeignKey("service_identity_id");
+                        });
+
+                    b.OwnsMany("Axis.Identity.Domain.Aggregates.ServiceIdentityKeyTombstone", "Tombstones", b1 =>
+                        {
+                            b1.Property<Guid>("Id")
+                                .HasColumnType("uuid")
+                                .HasColumnName("id");
+
+                            b1.Property<string>("Kid")
+                                .IsRequired()
+                                .HasMaxLength(128)
+                                .HasColumnType("character varying(128)")
+                                .HasColumnName("kid");
+
+                            b1.Property<DateTime>("RevokedAt")
+                                .HasColumnType("timestamp with time zone")
+                                .HasColumnName("revoked_at");
+
+                            b1.Property<string>("Thumbprint")
+                                .IsRequired()
+                                .HasMaxLength(128)
+                                .HasColumnType("character varying(128)")
+                                .HasColumnName("thumbprint");
+
+                            b1.Property<Guid>("service_identity_id")
+                                .HasColumnType("uuid")
+                                .HasColumnName("service_identity_id");
+
+                            b1.HasKey("Id");
+
+                            b1.HasIndex("service_identity_id", "Kid")
+                                .IsUnique();
+
+                            b1.HasIndex("service_identity_id", "Thumbprint")
+                                .IsUnique();
+
+                            b1.ToTable("service_identity_key_tombstones", (string)null);
+
+                            b1.WithOwner()
+                                .HasForeignKey("service_identity_id");
+                        });
+
+                    b.Navigation("Keys");
+
+                    b.Navigation("Tombstones");
+                });
+
+            modelBuilder.Entity("Axis.Identity.Domain.Aggregates.Workspace", b =>
+                {
+                    b.HasOne("Axis.Identity.Domain.Aggregates.Organization", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("Axis.Identity.Domain.Aggregates.WorkspaceContextTransition", b =>
+                {
+                    b.HasOne("Axis.Identity.Domain.Aggregates.Workspace", null)
+                        .WithMany()
+                        .HasForeignKey("SourceWorkspaceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Axis.Identity.Domain.Aggregates.Workspace", null)
+                        .WithMany()
+                        .HasForeignKey("TargetWorkspaceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Axis.Identity.Domain.Aggregates.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Axis.Identity.Domain.Aggregates.WorkspaceInvitation", b =>
+                {
+                    b.HasOne("Axis.Identity.Domain.Aggregates.User", null)
+                        .WithMany()
+                        .HasForeignKey("InviterUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Axis.Identity.Domain.Aggregates.Organization", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Axis.Identity.Domain.Aggregates.Workspace", null)
+                        .WithMany()
+                        .HasForeignKey("WorkspaceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.OwnsMany("Axis.Identity.Domain.Aggregates.InvitationHandoff", "Handoffs", b1 =>
+                        {
+                            b1.Property<Guid>("Id")
+                                .HasColumnType("uuid")
+                                .HasColumnName("id");
+
+                            b1.Property<DateTime>("ExpiresAt")
+                                .HasColumnType("timestamp with time zone")
+                                .HasColumnName("expires_at");
+
+                            b1.Property<string>("HandoffHash")
+                                .IsRequired()
+                                .HasMaxLength(64)
+                                .HasColumnType("character varying(64)")
+                                .HasColumnName("handoff_hash");
+
+                            b1.Property<string>("Status")
+                                .IsRequired()
+                                .HasColumnType("text")
+                                .HasColumnName("status");
+
+                            b1.Property<int>("TokenGeneration")
+                                .HasColumnType("integer")
+                                .HasColumnName("token_generation");
+
+                            b1.Property<Guid>("invitation_id")
+                                .HasColumnType("uuid")
+                                .HasColumnName("invitation_id");
+
+                            b1.HasKey("Id");
+
+                            b1.HasIndex("HandoffHash")
+                                .IsUnique();
+
+                            b1.HasIndex("invitation_id");
+
+                            b1.HasIndex("Status", "ExpiresAt");
+
+                            b1.ToTable("workspace_invitation_handoffs", (string)null);
+
+                            b1.WithOwner()
+                                .HasForeignKey("invitation_id");
+                        });
+
+                    b.OwnsMany("Axis.Identity.Domain.Aggregates.InvitationTokenGeneration", "TokenGenerations", b1 =>
+                        {
+                            b1.Property<Guid>("Id")
+                                .HasColumnType("uuid")
+                                .HasColumnName("id");
+
+                            b1.Property<int>("DeliveryAttempts")
+                                .HasColumnType("integer")
+                                .HasColumnName("delivery_attempts");
+
+                            b1.Property<string>("DeliveryCorrelation")
+                                .IsRequired()
+                                .HasMaxLength(128)
+                                .HasColumnType("character varying(128)")
+                                .HasColumnName("delivery_correlation");
+
+                            b1.Property<string>("DeliveryEnvelope")
+                                .HasColumnType("text")
+                                .HasColumnName("delivery_envelope");
+
+                            b1.Property<string>("DeliveryStatus")
+                                .IsRequired()
+                                .HasColumnType("text")
+                                .HasColumnName("delivery_status");
+
+                            b1.Property<DateTime>("ExpiresAt")
+                                .HasColumnType("timestamp with time zone")
+                                .HasColumnName("expires_at");
+
+                            b1.Property<int>("Generation")
+                                .HasColumnType("integer")
+                                .HasColumnName("generation");
+
+                            b1.Property<string>("LastDeliveryErrorCode")
+                                .HasMaxLength(128)
+                                .HasColumnType("character varying(128)")
+                                .HasColumnName("last_delivery_error_code");
+
+                            b1.Property<DateTime?>("NextDeliveryAttemptAt")
+                                .HasColumnType("timestamp with time zone")
+                                .HasColumnName("next_delivery_attempt_at");
+
+                            b1.Property<string>("Status")
+                                .IsRequired()
+                                .HasColumnType("text")
+                                .HasColumnName("status");
+
+                            b1.Property<string>("TokenHash")
+                                .IsRequired()
+                                .HasMaxLength(64)
+                                .HasColumnType("character varying(64)")
+                                .HasColumnName("token_hash");
+
+                            b1.Property<Guid>("invitation_id")
+                                .HasColumnType("uuid")
+                                .HasColumnName("invitation_id");
+
+                            b1.HasKey("Id");
+
+                            b1.HasIndex("TokenHash")
+                                .IsUnique();
+
+                            b1.HasIndex("DeliveryStatus", "NextDeliveryAttemptAt");
+
+                            b1.HasIndex("invitation_id", "Generation")
+                                .IsUnique();
+
+                            b1.ToTable("workspace_invitation_tokens", (string)null);
+
+                            b1.WithOwner()
+                                .HasForeignKey("invitation_id");
+                        });
+
+                    b.Navigation("Handoffs");
+
+                    b.Navigation("TokenGenerations");
+                });
+
+            modelBuilder.Entity("Axis.Identity.Domain.Aggregates.WorkspaceMembership", b =>
+                {
+                    b.HasOne("Axis.Identity.Domain.Aggregates.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Axis.Identity.Domain.Aggregates.Workspace", null)
+                        .WithMany()
+                        .HasForeignKey("WorkspaceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Axis.Identity.Infrastructure.Persistence.Entities.EmailVerificationToken", b =>

@@ -28,6 +28,9 @@ SKIP_DIRS = set()
 
 REQUIRED_SECTIONS = (
     "Purpose",
+    "Preconditions",
+    "Success guarantee",
+    "Minimal guarantee",
     "Primary actor",
     "Trigger",
     "Main flow",
@@ -67,8 +70,11 @@ ACCEPTANCE_MATRIX_BOUNDARIES = {
     "Application boundary",
     "Infrastructure boundary",
     "Domain boundary",
+    "Architecture boundary",
     "UI/API boundaries",
+    "API/Infrastructure boundaries",
     "API/Application boundaries",
+    "API/MCP boundaries",
     "Application/Infrastructure boundaries",
 }
 VERIFICATION_VALUES = {
@@ -80,9 +86,25 @@ VERIFICATION_VALUES = {
     "Infrastructure integration test",
     "Domain test",
     "Architecture test",
+    "MCP contract test",
 }
 IMPLEMENTATION_STATUS_COLUMNS = ["Layer", "Status"]
-USE_CASE_TAIL_SECTION_ORDER = (
+ROOT_INVENTORY_COLUMNS = ["Domain", "Use case", "Status"]
+DOMAIN_INVENTORY_COLUMNS = ["Use case", "Status"]
+ROOT_SUPPORTING_DOMAIN_COLUMNS = ["Domain", "Layer", "Responsibilities"]
+SUPPORTING_RESPONSIBILITY_COLUMNS = ["Owning use case", "Layer", "Responsibility", "Status"]
+USE_CASE_SECTION_ORDER = (
+    "Purpose",
+    "Primary actor",
+    "Supporting actors",
+    "Preconditions",
+    "Trigger",
+    "Success guarantee",
+    "Minimal guarantee",
+    "Main flow",
+    "Alternate / error flows",
+    "Acceptance Criteria",
+    "Acceptance Test Matrix",
     "Out Of Scope",
     "Screen flow",
     "Diagrams",
@@ -269,6 +291,18 @@ def check_use_case_inventory_layout() -> list[str]:
         if not (domain_dir / "README.md").is_file():
             issues.append(f"{rel}: missing domain README.md hub")
 
+        direct_specs = [
+            child
+            for child in domain_dir.glob("*.md")
+            if child.name != "README.md" and not child.name.endswith(".evidence.md")
+        ]
+        hub_text = (domain_dir / "README.md").read_text(encoding="utf-8") if (domain_dir / "README.md").is_file() else ""
+        if not direct_specs and "## Supporting Responsibilities" not in hub_text:
+            issues.append(
+                f"{rel}: domain hub must own at least one direct use-case spec; "
+                "otherwise declare a validated `## Supporting Responsibilities` inventory",
+            )
+
         for child in sorted(domain_dir.iterdir()):
             child_rel = child.relative_to(ROOT)
             if child.is_dir():
@@ -303,6 +337,246 @@ def iter_use_case_files() -> list[Path]:
     return files
 
 
+def inventory_link_target(value: str) -> str | None:
+    match = re.fullmatch(r"\[[^]]+\]\(([^)]+)\)", value.strip())
+    return match.group(1) if match else None
+
+
+def overall_status(doc: UseCaseDocument) -> str | None:
+    table = implementation_status_table(doc)
+    if table is None or table.headers != IMPLEMENTATION_STATUS_COLUMNS:
+        return None
+    statuses = [record_for_row(table, row).get("Status", "") for row in table.rows]
+    if not statuses or any(status not in IMPLEMENTATION_STATUS_VALUES for status in statuses):
+        return None
+    if any(status == "Done" for status in statuses) and all(status in {"Done", "N/A"} for status in statuses):
+        return "Done"
+    if any(status == "Not started" for status in statuses) and all(status in {"Not started", "N/A"} for status in statuses):
+        return "Not started"
+    return "Partial"
+
+
+def validate_inventory_table(
+    path: Path,
+    *,
+    columns: list[str],
+    expected: dict[tuple[str, ...], str],
+) -> list[str]:
+    rel = path.relative_to(ROOT)
+    headings, sections = split_h2_sections(path.read_text(encoding="utf-8"))
+    if "Current Use Cases" not in headings:
+        return [f"{rel}: missing `## Current Use Cases` inventory"]
+    table = first_markdown_table(sections["Current Use Cases"])
+    if table is None or table.headers != columns:
+        return [f"{rel}: Current Use Cases inventory columns must be exactly `{' | '.join(columns)}`"]
+
+    actual: dict[tuple[str, ...], str] = {}
+    issues: list[str] = []
+    for idx, row in enumerate(table.rows, start=1):
+        if len(row) != len(columns):
+            issues.append(f"{rel}: Current Use Cases inventory row {idx} has an invalid column count")
+            continue
+        links = tuple(inventory_link_target(value) or "" for value in row[:-1])
+        if not all(links):
+            issues.append(f"{rel}: Current Use Cases inventory row {idx} must use exact Markdown links")
+            continue
+        if links in actual:
+            issues.append(f"{rel}: Current Use Cases inventory has duplicate entry `{links[-1]}`")
+        actual[links] = row[-1]
+
+    for links, status in sorted(expected.items()):
+        if links not in actual:
+            issues.append(f"{rel}: Current Use Cases inventory is missing `{links[-1]}`")
+        elif actual[links] != status:
+            issues.append(
+                f"{rel}: Current Use Cases inventory status for `{links[-1]}` must be `{status}`, found `{actual[links]}`",
+            )
+    for links in sorted(set(actual).difference(expected)):
+        issues.append(f"{rel}: Current Use Cases inventory references non-spec `{links[-1]}`")
+    return issues
+
+
+def validate_use_case_inventories(files: list[Path]) -> list[str]:
+    expected_by_domain: dict[str, dict[tuple[str, ...], str]] = {}
+    issues: list[str] = []
+    for path in files:
+        status = overall_status(use_case_document(path))
+        if status is None:
+            issues.append(f"{path.relative_to(ROOT)}: cannot derive overall status from Implementation status layer rows")
+            continue
+        domain = path.parent.name
+        expected_by_domain.setdefault(domain, {})[(f"./{path.name}",)] = status
+
+    root_expected: dict[tuple[str, ...], str] = {}
+    for domain, expected in expected_by_domain.items():
+        domain_readme = USE_CASES / domain / "README.md"
+        issues.extend(validate_inventory_table(domain_readme, columns=DOMAIN_INVENTORY_COLUMNS, expected=expected))
+        for (use_case_link,), status in expected.items():
+            root_expected[(f"./{domain}/README.md", f"./{domain}/{use_case_link.removeprefix('./')}")] = status
+    issues.extend(
+        validate_inventory_table(USE_CASES / "README.md", columns=ROOT_INVENTORY_COLUMNS, expected=root_expected),
+    )
+    return issues
+
+
+def validate_supporting_domain_inventories(files: list[Path]) -> list[str]:
+    issues: list[str] = []
+    known_docs = {path.resolve(): use_case_document(path) for path in files}
+    supporting_hubs: list[Path] = []
+    declared_by_hub: dict[Path, set[tuple[Path, str]]] = {}
+
+    for domain_dir in sorted(USE_CASES.iterdir()):
+        if not domain_dir.is_dir() or domain_dir.name.startswith("_"):
+            continue
+        direct_specs = [
+            child
+            for child in domain_dir.glob("*.md")
+            if child.name != "README.md" and not child.name.endswith(".evidence.md")
+        ]
+        if direct_specs:
+            continue
+
+        hub = domain_dir / "README.md"
+        if not hub.is_file():
+            continue
+        supporting_hubs.append(hub)
+        declared_by_hub[hub] = set()
+        rel = hub.relative_to(ROOT)
+        headings, sections = split_h2_sections(hub.read_text(encoding="utf-8"))
+        if "Supporting Responsibilities" not in headings:
+            issues.append(f"{rel}: missing `## Supporting Responsibilities` inventory")
+            continue
+        table = first_markdown_table(sections["Supporting Responsibilities"])
+        if table is None or table.headers != SUPPORTING_RESPONSIBILITY_COLUMNS:
+            issues.append(
+                f"{rel}: Supporting Responsibilities columns must be exactly "
+                f"`{' | '.join(SUPPORTING_RESPONSIBILITY_COLUMNS)}`",
+            )
+            continue
+
+        seen: set[tuple[Path, str]] = set()
+        for idx, row in enumerate(table.rows, start=1):
+            if len(row) != len(SUPPORTING_RESPONSIBILITY_COLUMNS):
+                issues.append(f"{rel}: Supporting Responsibilities row {idx} has an invalid column count")
+                continue
+            record = record_for_row(table, row)
+            target_link = inventory_link_target(record.get("Owning use case", ""))
+            layer = record.get("Layer", "")
+            responsibility = record.get("Responsibility", "")
+            status = record.get("Status", "")
+            if target_link is None:
+                issues.append(f"{rel}: Supporting Responsibilities row {idx} must link an owning use case")
+                continue
+            target = (hub.parent / target_link).resolve()
+            owner = known_docs.get(target)
+            if owner is None:
+                issues.append(f"{rel}: Supporting Responsibilities row {idx} links non-spec `{target_link}`")
+                continue
+            key = (target, layer)
+            if key in seen:
+                issues.append(f"{rel}: duplicate supporting responsibility for `{target_link}` layer `{layer}`")
+            seen.add(key)
+            if not responsibility.strip():
+                issues.append(f"{rel}: Supporting Responsibilities row {idx} has an empty responsibility")
+
+            status_table = implementation_status_table(owner)
+            layer_statuses: dict[str, str] = {}
+            if status_table is not None and status_table.headers == IMPLEMENTATION_STATUS_COLUMNS:
+                for status_row in status_table.rows:
+                    status_record = record_for_row(status_table, status_row)
+                    layer_statuses[status_record.get("Layer", "")] = status_record.get("Status", "")
+            if layer not in layer_statuses:
+                issues.append(
+                    f"{rel}: Supporting Responsibilities row {idx} names missing layer `{layer}` in `{target_link}`",
+                )
+            elif status != layer_statuses[layer]:
+                issues.append(
+                    f"{rel}: Supporting Responsibilities status for `{target_link}` layer `{layer}` must be "
+                    f"`{layer_statuses[layer]}`, found `{status}`",
+                )
+        declared_by_hub[hub] = seen
+
+    root = USE_CASES / "README.md"
+    root_rel = root.relative_to(ROOT)
+    headings, sections = split_h2_sections(root.read_text(encoding="utf-8"))
+    if supporting_hubs and "Supporting Domains" not in headings:
+        issues.append(f"{root_rel}: missing `## Supporting Domains` inventory")
+        return issues
+    if "Supporting Domains" not in headings:
+        return issues
+    table = first_markdown_table(sections["Supporting Domains"])
+    if table is None or table.headers != ROOT_SUPPORTING_DOMAIN_COLUMNS:
+        issues.append(
+            f"{root_rel}: Supporting Domains columns must be exactly `{' | '.join(ROOT_SUPPORTING_DOMAIN_COLUMNS)}`",
+        )
+        return issues
+
+    actual: dict[str, tuple[str, str]] = {}
+    for idx, row in enumerate(table.rows, start=1):
+        if len(row) != len(ROOT_SUPPORTING_DOMAIN_COLUMNS):
+            issues.append(f"{root_rel}: Supporting Domains row {idx} has an invalid column count")
+            continue
+        target = inventory_link_target(row[0])
+        if target is None:
+            issues.append(f"{root_rel}: Supporting Domains row {idx} must link a supporting-domain hub")
+            continue
+        if target in actual:
+            issues.append(f"{root_rel}: Supporting Domains has duplicate entry `{target}`")
+        actual[target] = (row[1], row[2])
+
+    expected = {f"./{hub.parent.name}/README.md" for hub in supporting_hubs}
+    for target in sorted(expected.difference(actual)):
+        issues.append(f"{root_rel}: Supporting Domains is missing `{target}`")
+    for target in sorted(set(actual).difference(expected)):
+        issues.append(f"{root_rel}: Supporting Domains references non-supporting hub `{target}`")
+    for target, (layer, responsibility) in actual.items():
+        if target not in expected:
+            continue
+        if not layer.strip():
+            issues.append(f"{root_rel}: Supporting Domains layer for `{target}` is empty")
+        if not responsibility.strip():
+            issues.append(f"{root_rel}: Supporting Domains responsibility for `{target}` is empty")
+
+    for hub in supporting_hubs:
+        root_target = f"./{hub.parent.name}/README.md"
+        root_record = actual.get(root_target)
+        if root_record is None:
+            continue
+        owned_layer = root_record[0]
+        if not owned_layer.strip():
+            continue
+
+        expected_responsibilities: set[tuple[Path, str]] = set()
+        for owner_path, owner in known_docs.items():
+            status_table = implementation_status_table(owner)
+            if status_table is None or status_table.headers != IMPLEMENTATION_STATUS_COLUMNS:
+                continue
+            owner_layers = {
+                record_for_row(status_table, status_row).get("Layer", "")
+                for status_row in status_table.rows
+            }
+            if owned_layer in owner_layers:
+                expected_responsibilities.add((owner_path, owned_layer))
+
+        hub_rel = hub.relative_to(ROOT)
+        if not expected_responsibilities:
+            issues.append(
+                f"{hub_rel}: supporting layer `{owned_layer}` is not declared by any owning use case",
+            )
+        declared_responsibilities = declared_by_hub.get(hub, set())
+        for owner_path, layer in sorted(expected_responsibilities.difference(declared_responsibilities)):
+            owner_link = os.path.relpath(owner_path, hub.parent)
+            issues.append(
+                f"{hub_rel}: missing supporting responsibility for `{owner_link}` layer `{layer}`",
+            )
+        for owner_path, layer in sorted(declared_responsibilities.difference(expected_responsibilities)):
+            owner_link = os.path.relpath(owner_path, hub.parent)
+            issues.append(
+                f"{hub_rel}: unexpected supporting responsibility for `{owner_link}` layer `{layer}`",
+            )
+    return issues
+
+
 def validate_sections(doc: UseCaseDocument) -> list[str]:
     issues: list[str] = []
     rel = doc.rel
@@ -317,6 +591,9 @@ def validate_sections(doc: UseCaseDocument) -> list[str]:
         if heading not in doc.sections:
             issues.append(f"{rel}: missing {heading.lower()} section")
 
+    if "Supporting actor" in doc.sections and "Supporting actors" in doc.sections:
+        issues.append(f"{rel}: use only one of `## Supporting actor` or `## Supporting actors`")
+
     return issues
 
 
@@ -330,11 +607,16 @@ def section_position(doc: UseCaseDocument, heading: str) -> int | None:
 
 
 def validate_section_order(doc: UseCaseDocument) -> list[str]:
-    positions = [
-        (heading, position)
-        for heading in USE_CASE_TAIL_SECTION_ORDER
-        if (position := section_position(doc, heading)) is not None
-    ]
+    positions: list[tuple[str, int]] = []
+    for heading in USE_CASE_SECTION_ORDER:
+        if heading == "Supporting actors":
+            singular = section_position(doc, "Supporting actor")
+            plural = section_position(doc, "Supporting actors")
+            position = singular if singular is not None else plural
+        else:
+            position = section_position(doc, heading)
+        if position is not None:
+            positions.append((heading, position))
     for (previous_heading, previous_position), (current_heading, current_position) in zip(
         positions,
         positions[1:],
@@ -343,8 +625,7 @@ def validate_section_order(doc: UseCaseDocument) -> list[str]:
         if previous_position <= current_position:
             continue
         return [
-            f"{doc.rel}: section order must be `## Out Of Scope`, `## Screen flow` when present, "
-            "`## Diagrams` when present, then implementation status "
+            f"{doc.rel}: sections must follow the canonical use-case order from Purpose through implementation status "
             f"(`{current_heading}` appears before `{previous_heading}`)",
         ]
     return []
@@ -603,6 +884,24 @@ def verification_evidence_issues(
         if not has_dotnet_test_command(commands, "tests/Architecture/"):
             issues.append(
                 f"{ctx.evidence_rel}: Acceptance Evidence {at_id} Architecture test Commands must run dotnet tests through scripts/axis.py",
+            )
+    elif verification == "MCP contract test":
+        if not any(
+            path.startswith("tests/Tools/Axis.Mcp.Tests/") and path.endswith(".cs")
+            for path in paths
+        ):
+            issues.append(
+                f"{ctx.evidence_rel}: Acceptance Evidence {at_id} MCP contract test must reference a committed `tests/Tools/Axis.Mcp.Tests/**/*.cs` file",
+            )
+        required_commands = {
+            "python scripts/axis.py check mcp-api-coverage",
+            "python scripts/axis.py check mcp-contracts",
+            "python scripts/axis.py check mcp-tool-safety",
+        }
+        missing_commands = sorted(required_commands.difference(commands))
+        if missing_commands:
+            issues.append(
+                f"{ctx.evidence_rel}: Acceptance Evidence {at_id} MCP contract test Commands must run: {', '.join(missing_commands)}",
             )
     return issues
 
@@ -882,6 +1181,8 @@ def main() -> int:
     issues: list[str] = []
     issues.extend(check_use_case_inventory_layout())
     files = iter_use_case_files()
+    issues.extend(validate_use_case_inventories(files))
+    issues.extend(validate_supporting_domain_inventories(files))
     changed_paths: set[Path] = set()
     try:
         changed_paths = set(changed_paths_against_base())

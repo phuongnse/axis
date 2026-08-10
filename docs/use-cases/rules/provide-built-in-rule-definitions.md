@@ -8,12 +8,28 @@ Provide a code-owned catalog of reusable built-in rules using the same semantic 
 
 ## Primary actor
 
-- Rules module and consumer modules reading the public catalog
+- Authorized consumer discovering a built-in Rule definition
+
+## Supporting actors
+
+- The Rules composition root validates and loads the code-owned catalog.
+
+## Preconditions
+
+- The deployed built-in catalog and its versioned language contract are available during application composition.
 
 ## Trigger
 
 - The application starts and needs the built-in rule catalog.
 - A consumer discovers a built-in rule version to bind to its own inputs.
+
+## Success guarantee
+
+- The consumer resolves the exact immutable built-in definition and evaluates it through the same public semantic model as Workspace Rules.
+
+## Minimal guarantee
+
+- Invalid catalog content fails construction, and unknown versions or mutation attempts never substitute, shadow, or change a built-in definition.
 
 ## Main flow
 
@@ -41,6 +57,7 @@ Provide a code-owned catalog of reusable built-in rules using the same semantic 
 - **AC-007** Consumers bind inputs and own applied snapshots; Rules only exposes the public definition and evaluator contracts.
 - **AC-008** Every built-in uses positive assertion polarity: Required matches a present non-blank value; range, precision, length, pattern, format, and selection-count rules match values that satisfy their declared constraints.
 - **AC-009** Required accepts an absent value as evaluable input and returns non-match; absence is not an evaluator failure. Other required runtime inputs remain validation failures when absent.
+- **AC-010** A code-owned built-in version exposes `publishedBySubject: null`; Axis does not fabricate a Human or Service subject for catalog provenance, while Workspace-authored versions require their real publishing subject.
 
 ## Acceptance Test Matrix
 
@@ -48,7 +65,7 @@ Provide a code-owned catalog of reusable built-in rules using the same semantic 
 |---|---|---|---|---|---|
 | AT-001 | Domain boundary | Catalog returns one normalized built-in definition model and a valid/invalid behavior matrix proves positive assertion polarity for every built-in | AC-001, AC-004, AC-005, AC-008 | Domain test | Yes |
 | AT-002 | Application boundary | Exact built-in versions resolve through the shared evaluator; Required returns match for present non-blank, non-match for blank or absent, while malformed input remains an error | AC-002, AC-007, AC-009 | Application test | Yes |
-| AT-003 | API boundary | Catalog/detail responses expose built-in metadata plus the same semantic fields as workspace definitions, with generated parity | AC-001, AC-002, AC-006 | API integration test | Yes |
+| AT-003 | API boundary | Catalog/detail responses expose built-in metadata plus the same semantic fields as workspace definitions, including nullable built-in publisher provenance, with generated parity | AC-001, AC-002, AC-006, AC-010 | API integration test | Yes |
 | AT-004 | Application boundary | No consumer module depends on a built-in-specific Rules type or internal implementation | AC-002, AC-007 | Architecture test | Yes |
 | AT-005 | UI component | Catalog and detail use the same renderer; built-in origin only removes mutation actions | AC-002, AC-003, AC-006 | UI component test | Yes |
 
@@ -63,7 +80,7 @@ Provide a code-owned catalog of reusable built-in rules using the same semantic 
 | Screen | Required contract |
 |---|---|
 | Rules catalog | Show built-in and workspace definitions in one collection and one semantic row shape. |
-| Rule detail | Use the same managed-dialog record-tab structure and one compact semantic `Inputs -> Logic -> Outputs` sequence for both sources. Sequence markers, connectors, labels, and alignment use one visual grammar. Read-only expressions are static semantic content; explicit authoring help opens the canonical expression guide, and operators expose the same reference behavior there. |
+| Rule detail | Use [Detail Sections](../../foundations/data-display/detail-sections.md) and one compact semantic `Inputs -> Logic -> Outputs` sequence for both sources. Sequence markers, connectors, labels, and alignment use one visual grammar. Read-only expressions are static semantic content; explicit authoring help opens the canonical expression guide, and operators expose the same reference behavior there. |
 | Consumer binding | Consumer selects a built-in version and maps its inputs to consumer-owned values. |
 
 > **Implementation status**
@@ -82,4 +99,4 @@ Provide a code-owned catalog of reusable built-in rules using the same semantic 
 >
 > **Verification:** AT-001 through AT-005 are mapped to current domain, application, API, architecture, and focused frontend evidence in the sibling sidecar; the recorded suites pass at the current checkpoint.
 >
-> **Decisions:** Built-in and workspace definitions use one semantic type and one public positive-assertion contract; `BuiltIn` origin and server-owned capabilities only remove mutation actions. The code-owned catalog is validated eagerly in every environment before endpoints serve traffic. No supported production consumer or data requires the replaced polarity, so corrected built-in behavior uses a clean cutover with no compatibility alias or dual view and no reduction in production quality.
+> **Decisions:** Built-in and Workspace definitions expose one positive-assertion semantic contract; built-in origin removes mutation actions without creating a second Rule type. Built-in publication is code-owned provenance and therefore has no fabricated Human or Service publishing subject. [Rules architecture](../../ARCHITECTURE.md#rules-boundary) owns catalog validation, shared evaluation, and the clean replacement of retired polarity surfaces.

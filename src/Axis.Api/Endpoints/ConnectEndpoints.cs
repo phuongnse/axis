@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Axis.Api.Authorization;
 using Axis.Identity.Application.Queries.GetUserTokenClaims;
+using Axis.Identity.Application.Services;
 using Axis.Shared.Domain.Primitives;
 using MediatR;
 using Microsoft.AspNetCore;
@@ -115,6 +116,8 @@ public static class ConnectEndpoints
     private static async Task<IResult> Token(
         HttpContext httpContext,
         ISender mediator,
+        IServiceClientAssertionAuthentication serviceAssertions,
+        IConfiguration configuration,
         CancellationToken ct)
     {
         OpenIddictRequest request = httpContext.GetOpenIddictServerRequest()
@@ -186,10 +189,60 @@ public static class ConnectEndpoints
                 OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
         }
 
+        if (request.IsClientCredentialsGrantType())
+        {
+            // OpenIddict has already parsed the OAuth request. Axis accepts no secret
+            // or fallback client authentication: the assertion is the sole proof.
+            if (string.IsNullOrWhiteSpace(request.ClientId)
+                || string.IsNullOrWhiteSpace(request.ClientAssertion)
+                || !string.Equals(
+                    request.ClientAssertionType,
+                    "urn:ietf:params:oauth:client-assertion-type:jwt-bearer",
+                    StringComparison.Ordinal))
+            {
+                return InvalidClient();
+            }
+
+            ServiceAssertionAuthenticationResult? service = await serviceAssertions.AuthenticateAsync(
+                new ServiceAssertionAuthenticationRequest(
+                    request.ClientId,
+                    request.ClientAssertion,
+                    new Uri(
+                        new Uri(configuration["OpenIddict:Issuer"]
+                            ?? throw new InvalidOperationException("OpenIddict:Issuer is required.")),
+                        "/connect/token").ToString()),
+                ct);
+            if (service is null)
+                return InvalidClient();
+
+            ClaimsIdentity identity = new(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
+            identity.AddClaim(new Claim(Claims.Subject, service.ServiceIdentityId.ToString()));
+            identity.AddClaim(new Claim("workspace_id", service.WorkspaceId.ToString()));
+            identity.AddClaim(new Claim("subject_kind", "service"));
+            identity.AddClaim(new Claim("service_key_id", service.KeyId.ToString()));
+            ClaimsPrincipal principal = new(identity);
+            principal.SetScopes([]);
+            principal.SetAccessTokenLifetime(TimeSpan.FromMinutes(5));
+            ClaimDestinationsHelper.SetDestinations(principal);
+            return Results.SignIn(
+                principal,
+                properties: null,
+                OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
+        }
+
         return Results.Problem(
             detail: "The specified grant type is not supported.",
             statusCode: StatusCodes.Status400BadRequest);
     }
+
+    private static IResult InvalidClient() => Results.Challenge(
+        new AuthenticationProperties(new Dictionary<string, string?>
+        {
+            [OpenIddictServerAspNetCoreConstants.Properties.Error] = Errors.InvalidClient,
+            [OpenIddictServerAspNetCoreConstants.Properties.ErrorDescription] =
+                "The service client assertion is invalid.",
+        }),
+        [OpenIddictServerAspNetCoreDefaults.AuthenticationScheme]);
 
     private static async Task<IResult> EndSession(HttpContext httpContext)
     {

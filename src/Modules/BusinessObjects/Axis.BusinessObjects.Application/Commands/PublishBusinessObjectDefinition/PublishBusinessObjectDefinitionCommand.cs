@@ -4,5 +4,6 @@ namespace Axis.BusinessObjects.Application.Commands.PublishBusinessObjectDefinit
 
 public sealed record PublishBusinessObjectDefinitionCommand(
     Guid BusinessObjectDefinitionId,
-    int ExpectedRevision)
+    int ExpectedRevision,
+    string? CorrelationId = null)
     : ICommand<BusinessObjectDefinitionDetailDto>;

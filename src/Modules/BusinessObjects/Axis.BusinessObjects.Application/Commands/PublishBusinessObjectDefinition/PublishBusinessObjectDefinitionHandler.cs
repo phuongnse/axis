@@ -1,7 +1,9 @@
+using Axis.Authorization.Contracts;
 using Axis.BusinessObjects.Application.Repositories;
 using Axis.BusinessObjects.Application.Services;
 using Axis.BusinessObjects.Domain.Aggregates;
 using Axis.BusinessObjects.Domain.ValueObjects;
+using Axis.Identity.Contracts;
 using Axis.Rules.Contracts;
 using Axis.Shared.Application;
 using Axis.Shared.Application.CQRS;
@@ -12,6 +14,8 @@ namespace Axis.BusinessObjects.Application.Commands.PublishBusinessObjectDefinit
 
 public sealed class PublishBusinessObjectDefinitionHandler(
     ICurrentUser currentUser,
+    ICurrentSubject currentSubject,
+    IProductAuthorizationService authorization,
     IBusinessObjectDefinitionRepository repository,
     IUnitOfWork unitOfWork,
     IRuleBindingReferenceValidator bindingReferenceValidator)
@@ -24,7 +28,7 @@ public sealed class PublishBusinessObjectDefinitionHandler(
         if (currentUser.workspaceId is not Guid workspaceId)
             return BusinessObjectDefinitionFailures.MissingWorkspace<BusinessObjectDefinitionDetailDto>();
 
-        if (currentUser.UserId is not Guid userId)
+        if (currentSubject.Subject.Id == Guid.Empty || !Enum.IsDefined(currentSubject.Subject.Kind))
             return BusinessObjectDefinitionFailures.MissingUser<BusinessObjectDefinitionDetailDto>();
 
         BusinessObjectDefinition? definition = await repository.GetByIdForWorkspaceAsync(
@@ -33,6 +37,18 @@ public sealed class PublishBusinessObjectDefinitionHandler(
             cancellationToken);
         if (definition is null)
             return BusinessObjectDefinitionFailures.NotFound<BusinessObjectDefinitionDetailDto>();
+
+        ProductAuthorizationDecision decision = await BusinessObjectAuthorization.AuthorizeAsync(
+            authorization,
+            workspaceId,
+            currentSubject.Subject,
+            BusinessObjectProductActions.DefinitionManage,
+            BusinessObjectProductActions.DefinitionResourceType,
+            definition.Key.Value,
+            command.CorrelationId,
+            cancellationToken);
+        if (!decision.IsAllowed)
+            return BusinessObjectDefinitionFailures.Authorization<BusinessObjectDefinitionDetailDto>(decision);
 
         foreach (BusinessObjectFieldDefinition field in definition.Fields)
         {
@@ -60,7 +76,7 @@ public sealed class PublishBusinessObjectDefinitionHandler(
 
         Result<BusinessObjectDefinitionVersion> published = definition.Publish(
             command.ExpectedRevision,
-            userId,
+            SubjectReferenceMapper.ToDomain(currentSubject.Subject),
             DateTime.UtcNow);
         if (published.IsFailure)
             return MapDomainFailure(published);
@@ -75,7 +91,7 @@ public sealed class PublishBusinessObjectDefinitionHandler(
                 "The object definition has changed.");
         }
 
-        return BusinessObjectDefinitionMapper.ToDetailDto(definition);
+        return BusinessObjectDefinitionMapper.ToDetailDto(definition, canManage: true);
     }
 
     private static Result<BusinessObjectDefinitionDetailDto> MapDomainFailure(Result result) =>

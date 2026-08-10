@@ -1,3 +1,4 @@
+using Axis.Authorization.Contracts;
 using Axis.Shared.Domain.Primitives;
 
 namespace Axis.BusinessObjects.Application;
@@ -15,6 +16,20 @@ internal static class BusinessObjectDefinitionFailures
             ErrorCodes.Forbidden,
             "Current user scope is required.",
             BusinessObjectsProblemCodes.UserScopeRequired);
+
+    public static Result<T> Forbidden<T>() =>
+        Result.Failure<T>(
+            ErrorCodes.Forbidden,
+            "The requested product action is not allowed.",
+            BusinessObjectsProblemCodes.AccessDenied);
+
+    public static Result<T> Authorization<T>(ProductAuthorizationDecision decision) =>
+        decision.IsUnavailable
+            ? Result.Failure<T>(
+                ErrorCodes.Unavailable,
+                "Product authorization is temporarily unavailable.",
+                BusinessObjectsProblemCodes.AuthorizationUnavailable)
+            : Forbidden<T>();
 
     public static Result<T> NotFound<T>() =>
         Result.Failure<T>(

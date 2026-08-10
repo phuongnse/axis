@@ -12,5 +12,6 @@ export const businessObjectsNavigationContributions: readonly ModuleNavigationCo
       order: 100,
     },
     order: 100,
+    requiresServerAvailability: true,
   },
 ];

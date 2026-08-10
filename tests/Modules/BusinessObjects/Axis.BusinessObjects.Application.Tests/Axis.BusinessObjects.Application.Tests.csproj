@@ -10,6 +10,8 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\..\..\src\Modules\Authorization\Axis.Authorization.Contracts\Axis.Authorization.Contracts.csproj" />
+    <ProjectReference Include="..\..\..\..\src\Modules\Identity\Axis.Identity.Contracts\Axis.Identity.Contracts.csproj" />
     <PackageReference Include="coverlet.collector" />
     <PackageReference Include="FluentValidation" />
     <PackageReference Include="MediatR" />
@@ -24,6 +26,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\..\..\src\Modules\BusinessObjects\Axis.BusinessObjects.Application\Axis.BusinessObjects.Application.csproj" />
+    <ProjectReference Include="..\..\..\..\src\Modules\BusinessObjects\Axis.BusinessObjects.Contracts\Axis.BusinessObjects.Contracts.csproj" />
     <ProjectReference Include="..\..\..\..\src\Modules\Rules\Axis.Rules.Application\Axis.Rules.Application.csproj" />
     <ProjectReference Include="..\..\..\..\src\Modules\Rules\Axis.Rules.Contracts\Axis.Rules.Contracts.csproj" />
     <ProjectReference Include="..\..\..\Shared\Axis.Testing\Axis.Testing.csproj" />

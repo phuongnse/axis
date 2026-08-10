@@ -264,6 +264,84 @@ class TestFrontendUiSystemPolicy(unittest.TestCase):
 
         self.assertIn("registry primitives cannot depend on feature", "\n".join(issues))
 
+    def test_rejects_feature_local_pending_visuals_and_background_refresh_loading(self) -> None:
+        issues = self.issues_for_frontend(
+            {
+                "frontend/src/features/rules/components/RulePanel.tsx": (
+                    "import { Spinner } from '@/components/ui/spinner';\n"
+                    "export const definition = { loading: query.isFetching };\n"
+                    "export function RulePanel() { return <Spinner className=\"animate-spin\" />; }\n"
+                )
+            }
+        )
+
+        joined = "\n".join(issues)
+        self.assertIn("must use shared async-state patterns", joined)
+        self.assertIn("background isFetching preserves current content", joined)
+
+    def test_rejects_legacy_query_loading_raw_status_and_pending_label_swap(self) -> None:
+        issues = self.issues_for_frontend(
+            {
+                "frontend/src/features/rules/components/RulePanel.tsx": (
+                    "export function RulePanel({ loading, query }) {\n"
+                    "  const content = query.isLoading ? <p role='status'>Loading</p> : null;\n"
+                    "  return <><Button>{loading ? t('saving') : t('save')}</Button>{content}</>;\n"
+                    "}\n"
+                )
+            }
+        )
+
+        joined = "\n".join(issues)
+        self.assertIn("initial state must use isPending", joined)
+        self.assertIn("semantic shared async region", joined)
+        self.assertIn("stable visible label", joined)
+
+    def test_rejects_shared_pending_internals_from_feature_code(self) -> None:
+        issues = self.issues_for_frontend(
+            {
+                "frontend/src/features/rules/components/RulePanel.tsx": (
+                    "import { PendingIndicator } from '@/components/shared/PendingIndicator';\n"
+                    "import { usePendingVisibility } from '@/hooks/usePendingVisibility';\n"
+                    "export function RulePanel() { return <PendingIndicator>Loading</PendingIndicator>; }\n"
+                )
+            }
+        )
+
+        joined = "\n".join(issues)
+        self.assertIn("PendingIndicator is an internal shared visual", joined)
+        self.assertIn("pending timing is owned by shared async patterns", joined)
+
+    def test_accepts_semantic_async_content_without_feature_timing(self) -> None:
+        issues = self.issues_for_frontend(
+            {
+                "frontend/src/features/rules/components/RulePanel.tsx": (
+                    "import { AsyncContent } from '@/components/shared/AsyncContent';\n"
+                    "export function RulePanel() {\n"
+                    "  return <AsyncContent pending pendingLabel='Loading'>Ready</AsyncContent>;\n"
+                    "}\n"
+                )
+            }
+        )
+
+        self.assertEqual([], issues)
+
+    def test_accepts_shared_pending_patterns_and_initial_query_loading(self) -> None:
+        issues = self.issues_for_frontend(
+            {
+                "frontend/src/components/shared/AsyncButton.tsx": (
+                    "import { Spinner } from '@/components/ui/spinner';\n"
+                    "export function AsyncButton() { return <Spinner className=\"animate-spin\" />; }\n"
+                ),
+                "frontend/src/features/rules/components/RulePanel.tsx": (
+                    "import { AsyncButton } from '@/components/shared/AsyncButton';\n"
+                    "export const definition = { loading: query.isPending };\n"
+                    "export function RulePanel() { return <AsyncButton />; }\n"
+                ),
+            }
+        )
+
+        self.assertEqual([], issues)
+
     def test_rejects_relative_app_dependency_from_registry_primitive(self) -> None:
         issues = self.issues_for_frontend(
             {
@@ -290,6 +368,7 @@ class TestFrontendUiSystemPolicy(unittest.TestCase):
 
         self.assertEqual(3, len(issues))
         self.assertTrue(all("registry primitives cannot depend on feature" in issue for issue in issues))
+
 
     def test_rejects_palette_arbitrary_value_and_inline_color_outside_upstream_zone(self) -> None:
         issues = self.issues_for_frontend(
@@ -424,6 +503,122 @@ class TestFrontendUiSystemPolicy(unittest.TestCase):
         )
 
         self.assertEqual([], issues)
+
+
+class TestUiFoundationPhase(unittest.TestCase):
+    def issues_for_foundation(
+        self,
+        *,
+        phase: str = "defined",
+        frontend_status: str = "Partial",
+        files: dict[str, str] | None = None,
+        schema_version: int = 2,
+        checker=axis.ui_foundation_issues,
+    ) -> list[str]:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            manifest_path = root / "frontend/ui-foundation.json"
+            manifest_path.parent.mkdir(parents=True, exist_ok=True)
+            manifest = {
+                "schemaVersion": schema_version,
+                "phase": phase,
+                "goldenReference": {
+                    "archetype": "resource-workspace",
+                    "route": "/business-objects",
+                },
+            }
+            manifest_path.write_text(f"{json.dumps(manifest)}\n", encoding="utf-8")
+
+            contract_path = root / "docs/foundations/visual-system/axis-visual-system.md"
+            contract_path.parent.mkdir(parents=True, exist_ok=True)
+            contract_path.write_text(
+                "## Implementation status\n\n"
+                "| Layer | Status |\n"
+                "|---|---|\n"
+                "| Contract | Done |\n"
+                f"| Frontend | {frontend_status} |\n"
+                "| Tests | Partial |\n",
+                encoding="utf-8",
+            )
+
+            for relative_path, content in (files or {}).items():
+                path = root / relative_path
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(content, encoding="utf-8")
+
+            return checker(root=root)
+
+    def test_accepts_defined_manifest_without_component_or_source_allowlists(self) -> None:
+        self.assertEqual([], self.issues_for_foundation())
+
+    def test_rejects_retired_component_and_source_allowlists(self) -> None:
+        issues = self.issues_for_foundation()
+        self.assertEqual([], issues)
+
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            manifest_path = root / "frontend/ui-foundation.json"
+            manifest_path.parent.mkdir(parents=True, exist_ok=True)
+            manifest_path.write_text(
+                json.dumps(
+                    {
+                        "schemaVersion": 2,
+                        "phase": "defined",
+                        "goldenReference": {
+                            "archetype": "resource-workspace",
+                            "route": "/business-objects",
+                            "sourceRoots": ["src/features/business-objects"],
+                        },
+                        "draftSharedModules": ["@/components/shared/AsyncButton"],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            contract_path = root / "docs/foundations/visual-system/axis-visual-system.md"
+            contract_path.parent.mkdir(parents=True, exist_ok=True)
+            contract_path.write_text("| Frontend | Partial |\n", encoding="utf-8")
+
+            joined = "\n".join(axis.ui_foundation_issues(root))
+
+        self.assertIn("unexpected keys: draftSharedModules", joined)
+        self.assertIn("goldenReference` has unexpected keys: sourceRoots", joined)
+
+    def test_rejects_done_frontend_status_before_complete_adoption(self) -> None:
+        issues = self.issues_for_foundation(frontend_status="Done")
+
+        self.assertIn("cannot claim `Frontend | Done` before phase `adopted`", "\n".join(issues))
+
+    def test_accepts_done_status_only_after_complete_adoption(self) -> None:
+        issues = self.issues_for_foundation(
+            phase="adopted",
+            frontend_status="Done",
+        )
+
+        self.assertEqual([], issues)
+
+    def test_ui_policy_applies_semantic_ownership_repo_wide_during_definition(self) -> None:
+        legacy_source = (
+            "import { Spinner } from '@/components/ui/spinner';\n"
+            "export function RulesPage() { return <Spinner className='animate-spin' />; }\n"
+        )
+        golden_source = legacy_source.replace("RulesPage", "BusinessObjectsPage")
+
+        defined_issues = self.issues_for_foundation(
+            files={
+                "frontend/src/features/rules/components/RulesPage.tsx": legacy_source,
+                "frontend/src/features/business-objects/components/BusinessObjectsPage.tsx": golden_source,
+            },
+            checker=axis.frontend_ui_system_issues,
+        )
+        self.assertIn("frontend/src/features/rules", "\n".join(defined_issues))
+        self.assertIn("frontend/src/features/business-objects", "\n".join(defined_issues))
+
+    def test_rejects_unknown_schema_and_phase(self) -> None:
+        schema_issues = self.issues_for_foundation(schema_version=1)
+        phase_issues = self.issues_for_foundation(phase="migrating")
+
+        self.assertIn("`schemaVersion` must be 2", "\n".join(schema_issues))
+        self.assertIn("unknown `phase`", "\n".join(phase_issues))
 
 
 class TestUiBaseline(unittest.TestCase):

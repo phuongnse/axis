@@ -29,7 +29,7 @@ public sealed partial class RuleBinding : AggregateRoot<RuleBindingId>
         int priority,
         bool enabled,
         RuleBindingFailureBehavior failureBehavior,
-        Guid createdByUserId,
+        RuleSubjectReference createdBySubject,
         DateTime createdAt)
         : base(id)
     {
@@ -44,11 +44,11 @@ public sealed partial class RuleBinding : AggregateRoot<RuleBindingId>
         Enabled = enabled;
         FailureBehavior = failureBehavior;
         Revision = 1;
-        CreatedByUserId = createdByUserId;
-        UpdatedByUserId = createdByUserId;
+        CreatedBySubject = createdBySubject;
+        UpdatedBySubject = createdBySubject;
         CreatedAt = createdAt;
         UpdatedAt = createdAt;
-        _revisionHistory.Add(CreateRevision(createdByUserId, createdAt));
+        _revisionHistory.Add(CreateRevision(createdBySubject, createdAt));
     }
 
     public Guid WorkspaceId { get; private set; }
@@ -63,10 +63,17 @@ public sealed partial class RuleBinding : AggregateRoot<RuleBindingId>
     public bool Enabled { get; private set; }
     public RuleBindingFailureBehavior FailureBehavior { get; private set; }
     public int Revision { get; private set; }
-    public Guid CreatedByUserId { get; private set; }
-    public Guid UpdatedByUserId { get; private set; }
+    public RuleSubjectReference CreatedBySubject { get; private set; }
+    public RuleSubjectReference UpdatedBySubject { get; private set; }
     public DateTime CreatedAt { get; private set; }
     public DateTime UpdatedAt { get; private set; }
+    public Guid? InstalledSolutionVersionId { get; private set; }
+    public string? InstalledComponentKey { get; private set; }
+    public string? InstalledComponentHash { get; private set; }
+    public Guid? InstalledOperationId { get; private set; }
+    public Guid? InstalledStepId { get; private set; }
+    public long? InstalledLeaseEpoch { get; private set; }
+    public bool IsInstalled => InstalledSolutionVersionId.HasValue;
     public IReadOnlyList<RuleBindingRevision> RevisionHistory => _revisionHistory.AsReadOnly();
 
     public static Result<RuleBinding> Create(
@@ -80,12 +87,12 @@ public sealed partial class RuleBinding : AggregateRoot<RuleBindingId>
         int priority,
         bool enabled,
         RuleBindingFailureBehavior failureBehavior,
-        Guid createdByUserId,
+        RuleSubjectReference createdBySubject,
         DateTime createdAt)
     {
         Result<RuleDefinitionKey> key = RuleDefinitionKey.Create(definitionKey.Value);
-        if (workspaceId == Guid.Empty || createdByUserId == Guid.Empty)
-            return Result.Failure<RuleBinding>(ErrorCodes.InvalidInput, "Workspace and acting user are required.");
+        if (workspaceId == Guid.Empty || createdBySubject.Id == Guid.Empty || !Enum.IsDefined(createdBySubject.Kind))
+            return Result.Failure<RuleBinding>(ErrorCodes.InvalidInput, "Workspace and acting subject are required.");
         if (key.IsFailure)
             return Result.Failure<RuleBinding>(ErrorCodes.InvalidInput, key.Error);
         Result common = ValidateCommon(definitionVersion, targetType, targetId, useCaseOrTrigger, inputMappings, priority, failureBehavior);
@@ -103,9 +110,26 @@ public sealed partial class RuleBinding : AggregateRoot<RuleBindingId>
                 priority,
                 enabled,
                 failureBehavior,
-                createdByUserId,
+                createdBySubject,
                 createdAt);
     }
+
+    public static Result ValidateInstallationCandidate(
+        int definitionVersion,
+        string targetType,
+        string targetId,
+        string useCaseOrTrigger,
+        IReadOnlyDictionary<string, RuleInputMapping> inputMappings,
+        int priority,
+        RuleBindingFailureBehavior failureBehavior) =>
+        ValidateCommon(
+            definitionVersion,
+            targetType,
+            targetId,
+            useCaseOrTrigger,
+            inputMappings,
+            priority,
+            failureBehavior);
 
     public Result Update(
         int expectedRevision,
@@ -118,11 +142,13 @@ public sealed partial class RuleBinding : AggregateRoot<RuleBindingId>
         int priority,
         bool enabled,
         RuleBindingFailureBehavior failureBehavior,
-        Guid updatedByUserId,
+        RuleSubjectReference updatedBySubject,
         DateTime updatedAt)
     {
-        if (updatedByUserId == Guid.Empty)
-            return Result.Failure(ErrorCodes.InvalidInput, "Acting user is required.");
+        if (IsInstalled)
+            return Result.Failure(ErrorCodes.Conflict, "Installed rule bindings are immutable.");
+        if (updatedBySubject.Id == Guid.Empty || !Enum.IsDefined(updatedBySubject.Kind))
+            return Result.Failure(ErrorCodes.InvalidInput, "Acting subject is required.");
         if (expectedRevision != Revision)
             return Result.Failure(ErrorCodes.Conflict, "The rule binding has changed.");
         Result<RuleDefinitionKey> key = RuleDefinitionKey.Create(definitionKey.Value);
@@ -142,9 +168,52 @@ public sealed partial class RuleBinding : AggregateRoot<RuleBindingId>
         Enabled = enabled;
         FailureBehavior = failureBehavior;
         Revision += 1;
-        UpdatedByUserId = updatedByUserId;
+        UpdatedBySubject = updatedBySubject;
         UpdatedAt = updatedAt;
-        _revisionHistory.Add(CreateRevision(updatedByUserId, updatedAt));
+        _revisionHistory.Add(CreateRevision(updatedBySubject, updatedAt));
+        return Result.Success();
+    }
+
+    public Result AdvanceInstallationReceipt(
+        Guid solutionVersionId,
+        string componentKey,
+        string componentHash,
+        Guid operationId,
+        Guid stepId,
+        long leaseEpoch)
+    {
+        if (solutionVersionId == Guid.Empty || operationId == Guid.Empty || stepId == Guid.Empty ||
+            string.IsNullOrWhiteSpace(componentKey) || componentKey != componentKey.Trim() ||
+            componentKey.Length > 200 || componentHash.Length != 64 ||
+            componentHash.Any(character => !char.IsAsciiHexDigit(character)) ||
+            !StringComparer.Ordinal.Equals(componentHash, componentHash.ToLowerInvariant()) ||
+            leaseEpoch <= 0)
+        {
+            return Result.Failure(ErrorCodes.InvalidInput, "Installation receipt is invalid.");
+        }
+
+        if (!IsInstalled)
+        {
+            InstalledSolutionVersionId = solutionVersionId;
+            InstalledComponentKey = componentKey;
+            InstalledComponentHash = componentHash;
+            InstalledOperationId = operationId;
+            InstalledStepId = stepId;
+            InstalledLeaseEpoch = leaseEpoch;
+            return Result.Success();
+        }
+
+        if (InstalledSolutionVersionId != solutionVersionId ||
+            !StringComparer.Ordinal.Equals(InstalledComponentKey, componentKey) ||
+            !StringComparer.Ordinal.Equals(InstalledComponentHash, componentHash) ||
+            InstalledOperationId != operationId || InstalledStepId != stepId)
+        {
+            return Result.Failure(ErrorCodes.Conflict, "Installed rule binding provenance is immutable.");
+        }
+        if (leaseEpoch < InstalledLeaseEpoch!.Value)
+            return Result.Failure(ErrorCodes.Conflict, "Installation receipt lease is stale.");
+
+        InstalledLeaseEpoch = leaseEpoch;
         return Result.Success();
     }
 
@@ -158,11 +227,11 @@ public sealed partial class RuleBinding : AggregateRoot<RuleBindingId>
             .SingleOrDefault(candidate => candidate.Revision == requestedRevision);
         return historical ??
             (requestedRevision == Revision
-                ? CreateRevision(UpdatedByUserId, UpdatedAt)
+                ? CreateRevision(UpdatedBySubject, UpdatedAt)
                 : null);
     }
 
-    private RuleBindingRevision CreateRevision(Guid updatedByUserId, DateTime updatedAt) =>
+    private RuleBindingRevision CreateRevision(RuleSubjectReference updatedBySubject, DateTime updatedAt) =>
         new(
             Revision,
             DefinitionKey,
@@ -174,7 +243,7 @@ public sealed partial class RuleBinding : AggregateRoot<RuleBindingId>
             Priority,
             Enabled,
             FailureBehavior,
-            updatedByUserId,
+            updatedBySubject,
             updatedAt);
 
     private static Result ValidateCommon(

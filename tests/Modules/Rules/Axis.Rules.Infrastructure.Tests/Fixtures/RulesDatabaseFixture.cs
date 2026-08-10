@@ -21,6 +21,9 @@ public sealed class RulesDatabaseFixture : IAsyncLifetime
         return new RulesDbContext(options);
     }
 
+    public Task<string> CreateDatabaseAsync(string databaseName) =>
+        PostgresModuleTestDatabase.CreateAsync(_postgres.GetConnectionString(), databaseName);
+
     public async ValueTask InitializeAsync()
     {
         await _postgres.StartAsync();

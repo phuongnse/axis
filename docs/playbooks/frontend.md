@@ -6,9 +6,7 @@ Use `$axis-frontend-feature` for SPA feature work. Use `$axis-frontend-foundatio
 
 ## UX-first product UI
 
-Build the workflow, not a landing page or explanation page. Visible copy should help users act and avoid internal architecture terms.
-
-On localized surfaces, user-facing product copy must use the frontend translation layer instead of component-local static text. Keep non-product constants, routes, and protocol values separate from visible copy.
+Build the workflow, not a landing page or explanation page. Visible copy should help users act and avoid internal architecture terms. On localized surfaces, user-facing product copy must use the frontend translation layer instead of component-local static text. Keep non-product constants, routes, and protocol values separate from visible copy.
 
 Every route must expose an obvious next navigation path. Auth and public standalone screens declare route-level escape targets with `routeNavigation = publicRouteNavigation(...)` and render a visible sign-in, registration, back, or home-style link in every loading, success, and error state. Redirect-only route entries that render no screen state are exempt. Authenticated screens satisfy this through the app shell navigation and sign-out.
 
@@ -54,33 +52,28 @@ Use TanStack Router patterns already in the app. Classify every route as authent
 
 ## Component design
 
-Use the approved design system first. Product UI uses the interaction-consistent shadcn primitive when one exists; native fallback variants require a documented platform-native behavior need and explicit sign-off. Select triggers and options use the same user-facing display-label source; never expose raw protocol values as the selected label. Use icons for iconable actions, labels/tooltips for clarity, and stable dimensions for fixed controls.
+Follow the phase model in the [Axis UI Constitution](../foundations/visual-system/axis-visual-system.md). `frontend/ui-foundation.json` records only the current phase plus golden archetype and route. `defined` and `reference-ready` allow golden-reference work only; `accepted` allows bounded migrations; `adopted` alone allows a system-wide completion claim. Run `python scripts/axis.py check ui-foundation` for every frontend UI change.
 
-Treat design-system component visuals as owned by the component contract. Feature code uses defaults and documented props; it does not locally alter component visual treatment through style overrides, selectors, or wrapper styling. If the requested UI needs a visual deviation or component API change, stop before implementation, name the deviation, and get explicit user sign-off; this applies even when the broader change is standard-tier.
+Choose semantic meaning before a component. Product UI uses an accessible reviewed primitive when one maps that meaning; native fallback behavior requires an accepted platform need. Selected values and options use the same display-label source, icons support rather than replace accessible names, and fixed controls retain stable geometry.
+
+Treat component visuals as mappings of the constitution, not independent conventions. Feature code uses defaults and documented props; it does not locally alter visual treatment through style overrides, selectors, or wrapper styling. If no semantic role fits, return to `$axis-ui-system` before implementation instead of creating a component-local rule.
 
 Use these ownership layers:
 
 - **Upstream zone** — `frontend/src/components/ui` plus baseline-tracked shadcn support files contain reviewed registry source. Keep registry-default visuals and APIs; do not add product variants, business logic, feature/shared imports, or internal styling. `frontend/ui-baseline.json` records the approved snapshot and the reason/sign-off reference for each explicit exception.
-- **Theme zone** — [theme/axis-theme.json](../../theme/axis-theme.json) owns approved semantic values for web and email projections. `frontend/src/theme.generated.css` is generated and committed; `frontend/src/index.css` owns imports and base styles only. Consumers use semantic utilities; new tokens use background/foreground pairs and require sign-off.
+- **Theme zone** — [theme/axis-theme.json](../../theme/axis-theme.json) owns reusable color, typography, spacing, density, radius, elevation, icon, motion, and layer values. Generated CSS and runtime TypeScript are committed; `frontend/src/index.css` owns imports and base styles only. Consumers use semantic roles rather than copying current values.
 - **App-pattern zone** — `frontend/src/components/shared` owns reusable Axis composition and adapters. Give them narrow Axis-owned props such as product state, not provider variants, types, selectors, or DOM assumptions.
 - **Feature zone** — feature components compose defaults and app patterns. Consumer `className` is outer layout-only and must not alter primitive visuals.
 
+Dependency flows downward through the constitution, theme, upstream primitives, app patterns, page archetypes, app shell, and feature composition. Features do not own reusable values, global timing, scroll containers, overlay mechanics, focus recovery, control visuals, or alternate page anatomies. The app shell owns stable viewport and context-transition mechanics; the active page archetype owns route geometry; the feature owns product state and composition.
+
 [docs/playbooks/client-experience.md](./client-experience.md) owns the self-directed experience contract, view hierarchy, relationship selection, semantic component choice, and pre-JSX audit. Feature code must not import raw `Badge`.
 
-Every interactive surface follows one state-role hierarchy:
+The [Axis UI Constitution](../foundations/visual-system/axis-visual-system.md#interaction-state-model) owns the single interaction-state hierarchy and async grammar. Registry primitives and app patterns map those roles; `frontend/src/components/shared/interactionStates.ts` is only a code adapter. Compare equivalent meaning across overlays, navigation, collections, forms, and feedback; do not turn an implementation detail into durable guidance.
 
-| State role | Examples | Visual contract | Relative emphasis |
-|---|---|---|---|
-| Transient item | pointer hover, keyboard highlight, open item context | `accent` pair | lower |
-| Persistent item | selected, current, toggled | `secondary` pair, retained on hover | higher than transient |
-| Keyboard focus | `focus-visible` | ring, independent of fill | accessibility-owned |
-| Disabled or destructive | unavailable or dangerous action | owning semantic pair/opacity | meaning-owned |
+[docs/playbooks/client-experience.md](./client-experience.md#semantic-component-selection) owns semantic feedback, state-label, metadata, relationship, and action selection. Feature code consumes those meanings and never imports raw provider components to create another vocabulary.
 
-Persistent item emphasis must exceed transient item emphasis in light and dark mode. Compare equivalent state roles across overlays, navigation, collections/tables, and form options; action variants keep their component contract. Outside registry primitives, `frontend/src/components/shared/interactionStates.ts` is the only visual-state class owner; other shared, feature, and route code composes it without local state colors. Stacked single-choice options use `OptionList` for full-width, inline-start content.
-
-Full page, form, dialog, and menu informational, success, warning, and destructive feedback uses the app-owned `StatusNotice` pattern so text, icon, and semantic tone stay aligned; feature and shared consumers do not import raw `Alert`. Feedback directly attached to the compact `InlinePromptAction` pattern uses its shared feedback component at the same type scale; lifecycle labels use `StatusBadge` with published as success, draft/unpublished as neutral, and archived as muted.
-
-Use `$axis-ui-system` for token/customization decisions, registry diffs, baseline refreshes, or provider changes. Never bulk-overwrite unrelated registry components. A reviewed upstream sync and matching baseline refresh need provenance but no additional sign-off when they introduce no customization or exception. Explicit sign-off is required for semantic-token visual changes, cross-feature visual/API conventions, primitive exceptions, style/base/provider or major-library changes, and all customizations.
+Use `$axis-ui-system` for constitution/theme decisions, registry diffs, baseline refreshes, or provider changes. Never bulk-overwrite unrelated registry components. A reviewed upstream sync and matching baseline refresh need provenance when they introduce no customization; constitution, semantic-value, provider, primitive-exception, or cross-feature convention changes require the Design Gate and applicable sign-off.
 
 ## Styling
 

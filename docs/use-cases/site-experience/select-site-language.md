@@ -10,15 +10,27 @@ Let a visitor or authenticated user view supported web surfaces in a supported l
 
 - Visitor or authenticated user
 
+## Preconditions
+
+- The web surface and at least the product fallback language are available.
+
 ## Trigger
 
 - User opens any web route.
 - User changes the site language from a language control.
 
+## Success guarantee
+
+- The supported selected language applies immediately; an authenticated explicit choice is persisted as the user-level preference.
+
+## Minimal guarantee
+
+- Missing, unsupported, unreadable, or unsaved preference data leaves a usable supported language and preserves route and in-progress form state.
+
 ## Main flow
 
 1. User opens a web route.
-2. System applies an initial supported language before React renders, using saved browser preference when present, then browser language, then the product fallback language.
+2. System applies an initial supported language before the application renders, using saved browser preference when present, then browser language, then the product fallback language.
 3. If the user is authenticated, system loads the Identity-owned user profile language preference.
 4. If the authenticated profile has a supported language preference, system applies that server value and mirrors it to browser storage for the next page load.
 5. User opens the language control and chooses a supported language.
@@ -41,7 +53,7 @@ Let a visitor or authenticated user view supported web surfaces in a supported l
 - **AC-001** User can choose a supported language from public auth screens and authenticated app screens.
 - **AC-002** A selected language applies immediately without changing route, clearing entered form data, or requiring a full page reload.
 - **AC-003** Initial page load resolves a supported language from saved browser preference, then browser language, then the product fallback language.
-- **AC-004** Initial page load sets document language metadata before React renders when a supported browser preference is available.
+- **AC-004** Initial page load sets document language metadata before the application renders when a supported browser preference is available.
 - **AC-005** Authenticated users can persist a supported language as a user-level profile preference owned by the Identity module.
 - **AC-006** Authenticated profile reads expose the server-persisted language preference when one exists.
 - **AC-007** When an authenticated server preference exists, the frontend treats it as the source of truth and mirrors it to browser storage for the next load.
@@ -86,7 +98,7 @@ Let a visitor or authenticated user view supported web surfaces in a supported l
 
 | Screen | Required contract |
 |---|---|
-| App boot | Resolve initial language before React renders from supported browser preference, browser language, or the product fallback language. |
+| App boot | Resolve initial language before application render from supported browser preference, browser language, or the product fallback language. |
 | Public auth screens | Render supported copy in the selected language and allow unauthenticated language selection without an API call. |
 | Authenticated app shell | Load server-persisted user language when available, apply it as source of truth, and expose language selection in an authenticated surface. |
 | Language persistence state | Show pending, retry, and non-blocking failure states without clearing route or form state. Successful saves do not need a visible confirmation message. |

@@ -8,13 +8,28 @@ Evaluate exact published rule versions through one deterministic, pure engine. E
 
 ## Primary actor
 
-- A consumer module evaluating an applied rule binding
-- A signed-in workspace user simulating a rule during authoring
+- Authorized Rules consumer requesting deterministic evaluation
+
+## Supporting actors
+
+- A workspace user may supply typed samples while authoring; a consumer module supplies typed context for an applied binding.
+
+## Preconditions
+
+- The caller supplies an exact eligible Rule version or binding and typed input context within the allowed evaluation limits.
 
 ## Trigger
 
 - A consumer needs to evaluate an exact published rule version before committing its own transaction.
 - A user simulates a draft or published rule during authoring.
+
+## Success guarantee
+
+- The caller receives deterministic typed outputs and safe ordered diagnostics for the exact requested version without consumer-state mutation.
+
+## Minimal guarantee
+
+- Invalid input, unsupported language, unresolved version, complexity overflow, or evaluator failure returns a stable failure and never becomes a successful match or business decision.
 
 ## Main flow
 
@@ -91,4 +106,4 @@ Required UI quality: input controls are labelled and keyboard reachable, values 
 >
 > **Verification:** AT-001 through AT-007 are mapped to current source and passing domain, application, API, contract, focused frontend, and browser evidence in the sibling sidecar.
 >
-> **Decisions:** The evaluator returns a positive-assertion Boolean match, not Validation or Decision behavior. `true` always means the rule's stated assertion is satisfied; consumers decide the transaction response. The authenticated public evaluation boundary accepts one exact binding plus typed context while deriving workspace, actor, and correlation from server request state; it never evaluates caller-selected raw definition references as a consumer operation. Draft and exact-version simulation share the same evaluator and distinguish non-match, invalid sample, and evaluator failure. The old purpose/scope/context/outcome contract is retired without compatibility shims.
+> **Decisions:** Evaluation returns a positive-assertion Boolean match rather than a consumer business decision. Draft and exact-version simulation distinguish non-match, invalid sample, and evaluator failure. [Rules architecture](../../ARCHITECTURE.md#rules-boundary) owns the pure evaluator, typed boundary, exact-version resolution, and consumer separation.

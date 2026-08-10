@@ -18,3 +18,22 @@
     @apply font-sans;
   }
 }
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    /* biome-ignore lint/complexity/noImportantStyles: The user motion preference must override component scrolling. */
+    scroll-behavior: auto !important;
+    /* biome-ignore lint/complexity/noImportantStyles: The user motion preference must override component animation. */
+    animation-duration: 0.01ms !important;
+    /* biome-ignore lint/complexity/noImportantStyles: The user motion preference must override component animation. */
+    animation-delay: 0ms !important;
+    /* biome-ignore lint/complexity/noImportantStyles: The user motion preference must override component animation. */
+    animation-iteration-count: 1 !important;
+    /* biome-ignore lint/complexity/noImportantStyles: The user motion preference must override component transitions. */
+    transition-duration: 0.01ms !important;
+    /* biome-ignore lint/complexity/noImportantStyles: The user motion preference must override component transitions. */
+    transition-delay: 0ms !important;
+  }
+}

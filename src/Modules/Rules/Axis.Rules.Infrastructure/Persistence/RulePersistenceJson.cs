@@ -96,7 +96,8 @@ internal static class RulePersistenceJson
                 revision.Priority,
                 revision.Enabled,
                 (ContractRuleBindingFailureBehavior)revision.FailureBehavior,
-                revision.UpdatedByUserId,
+                revision.UpdatedBySubject.Kind,
+                revision.UpdatedBySubject.Id,
                 revision.UpdatedAt))
             .ToArray();
         return JsonSerializer.Serialize(serialized, Options);
@@ -124,7 +125,7 @@ internal static class RulePersistenceJson
                 revision.Priority,
                 revision.Enabled,
                 (DomainBindingFailureBehavior)revision.FailureBehavior,
-                revision.UpdatedByUserId,
+                new RuleSubjectReference(revision.UpdatedBySubjectKind, revision.UpdatedBySubjectId),
                 revision.UpdatedAt));
         }
         return result;
@@ -277,7 +278,8 @@ internal static class RulePersistenceJson
         int Priority,
         bool Enabled,
         ContractRuleBindingFailureBehavior FailureBehavior,
-        Guid UpdatedByUserId,
+        RuleSubjectKind UpdatedBySubjectKind,
+        Guid UpdatedBySubjectId,
         DateTime UpdatedAt);
 
     private enum ContractRuleBindingFailureBehavior

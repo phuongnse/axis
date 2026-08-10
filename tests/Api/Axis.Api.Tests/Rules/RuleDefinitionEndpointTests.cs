@@ -5,7 +5,9 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Axis.Api.Tests.Helpers;
+using Axis.Authorization.Contracts;
 using Axis.Identity.Domain.Legal;
+using Axis.Rules.Application;
 using Axis.Rules.Contracts;
 using FluentAssertions;
 using Microsoft.AspNetCore.WebUtilities;
@@ -25,6 +27,51 @@ public sealed class RuleDefinitionEndpointTests(ApiTestFixture fixture)
         HttpResponseMessage response = await anonymousClient.GetAsync("/api/rules", TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task RuleActions_WhenKeylessManageDenied_ReturnsFalse()
+    {
+        string accessToken = await CreateVerifiedSessionTokenAsync(UniqueEmail());
+        await fixture.SetProductAuthorizationTestDecisionAsync(
+            _ => ProductAuthorizationDecision.Denied,
+            TestContext.Current.CancellationToken);
+
+        HttpResponseMessage response = await SendWithBearerAsync(
+            HttpMethod.Get,
+            "/api/rules/actions",
+            accessToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        JsonElement actions = await response.Content.ReadFromJsonAsync<JsonElement>(Json, TestContext.Current.CancellationToken);
+        actions.GetProperty("canStartCreate").GetBoolean().Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task RuleActions_WhenKeylessManageOnly_AllowsProjectionButDeniesKeyedCreate()
+    {
+        string accessToken = await CreateVerifiedSessionTokenAsync(UniqueEmail());
+        await fixture.SetProductAuthorizationTestDecisionAsync(
+            request => request.ActionKey == RuleProductActions.DefinitionManage
+                && request.ResourceKey is null
+                    ? new ProductAuthorizationDecision(true, ProductActionScope.None)
+                    : ProductAuthorizationDecision.Denied,
+            TestContext.Current.CancellationToken);
+
+        HttpResponseMessage actionsResponse = await SendWithBearerAsync(
+            HttpMethod.Get,
+            "/api/rules/actions",
+            accessToken);
+        actionsResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        JsonElement actions = await actionsResponse.Content.ReadFromJsonAsync<JsonElement>(Json, TestContext.Current.CancellationToken);
+        actions.GetProperty("canStartCreate").GetBoolean().Should().BeTrue();
+
+        HttpResponseMessage createResponse = await SendWithBearerAsync(
+            HttpMethod.Post,
+            "/api/rules",
+            accessToken,
+            new { name = "Ungranted Rule", description = "Must remain exact-key authorized." });
+        createResponse.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
     [Fact]
@@ -95,6 +142,92 @@ public sealed class RuleDefinitionEndpointTests(ApiTestFixture fixture)
         binding.GetProperty("revision").GetInt32().Should().Be(1);
         binding.GetProperty("createdAt").GetDateTime().Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromMinutes(1));
         binding.GetProperty("updatedAt").GetDateTime().Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromMinutes(1));
+    }
+
+    [Fact]
+    public async Task RuleBindingAuthorization_WhenRetargetDeniedOrUnavailable_DoesNotMutate()
+    {
+        string accessToken = await CreateVerifiedSessionTokenAsync(UniqueEmail());
+        object mappings = new
+        {
+            value = new
+            {
+                kind = "Literal",
+                contextKey = (string?)null,
+                literalValues = new[] { "Approved" },
+            },
+        };
+        HttpResponseMessage createResponse = await SendWithBearerAsync(
+            HttpMethod.Post,
+            "/api/rule-bindings",
+            accessToken,
+            new
+            {
+                definitionKey = RuleDefinitionKeys.Required,
+                definitionVersion = 1,
+                targetType = "neutral-consumer",
+                targetId = "authorization-stable",
+                useCaseOrTrigger = "validate",
+                inputMappings = mappings,
+            });
+        createResponse.StatusCode.Should().Be(HttpStatusCode.Created);
+        JsonElement created = await createResponse.Content.ReadFromJsonAsync<JsonElement>(Json, TestContext.Current.CancellationToken);
+        Guid bindingId = created.GetProperty("id").GetGuid();
+        int revision = created.GetProperty("revision").GetInt32();
+
+        await fixture.SetProductAuthorizationTestDecisionAsync(
+            request => request.ActionKey == RuleProductActions.BindingManage
+                && request.ResourceKey == RuleDefinitionKeys.Required
+                    ? new ProductAuthorizationDecision(true, ProductActionScope.None)
+                    : ProductAuthorizationDecision.Denied,
+            TestContext.Current.CancellationToken);
+        HttpResponseMessage denied = await SendWithBearerAsync(
+            HttpMethod.Put,
+            $"/api/rule-bindings/{bindingId:D}",
+            accessToken,
+            new
+            {
+                expectedRevision = revision,
+                definitionKey = RuleDefinitionKeys.TextLength,
+                definitionVersion = 1,
+                targetType = "neutral-consumer",
+                targetId = "denied-retarget",
+                useCaseOrTrigger = "validate",
+                inputMappings = mappings,
+            });
+        denied.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+
+        await fixture.SetProductAuthorizationTestDecisionAsync(
+            _ => ProductAuthorizationDecision.Unavailable,
+            TestContext.Current.CancellationToken);
+        HttpResponseMessage unavailable = await SendWithBearerAsync(
+            HttpMethod.Put,
+            $"/api/rule-bindings/{bindingId:D}",
+            accessToken,
+            new
+            {
+                expectedRevision = revision,
+                definitionKey = RuleDefinitionKeys.Required,
+                definitionVersion = 1,
+                targetType = "neutral-consumer",
+                targetId = "unavailable-update",
+                useCaseOrTrigger = "validate",
+                inputMappings = mappings,
+            });
+        unavailable.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
+
+        await fixture.SetProductAuthorizationTestDecisionAsync(
+            _ => new ProductAuthorizationDecision(true, ProductActionScope.None),
+            TestContext.Current.CancellationToken);
+        HttpResponseMessage readResponse = await SendWithBearerAsync(
+            HttpMethod.Get,
+            $"/api/rule-bindings/{bindingId:D}",
+            accessToken);
+        readResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        JsonElement unchanged = await readResponse.Content.ReadFromJsonAsync<JsonElement>(Json, TestContext.Current.CancellationToken);
+        unchanged.GetProperty("definitionKey").GetString().Should().Be(RuleDefinitionKeys.Required);
+        unchanged.GetProperty("targetId").GetString().Should().Be("authorization-stable");
+        unchanged.GetProperty("revision").GetInt32().Should().Be(revision);
     }
 
     [Fact]
@@ -800,6 +933,8 @@ public sealed class RuleDefinitionEndpointTests(ApiTestFixture fixture)
         await RegisterAsync(email);
         HttpResponseMessage verifyResponse = await VerifyEmailAsync(CapturedToken(email));
         verifyResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        await fixture.EnableProductAuthorizationTestAccessAsync(
+            TestContext.Current.CancellationToken);
 
         string verifier = CreateCodeVerifier();
         string state = Guid.NewGuid().ToString("N");

@@ -1,5 +1,44 @@
 namespace Axis.Mcp.Tools;
 
+public sealed record CreateOrganizationWorkspaceInput(
+    string Name,
+    string IdempotencyKey);
+
+public sealed record InviteWorkspaceMemberInput(
+    string Email,
+    string RequestedRole);
+
+public sealed record ChangeWorkspaceInvitationInput(int ExpectedRevision);
+
+public sealed record CreateServiceIdentityInput(string ClientId);
+
+public sealed record AddServiceIdentityKeyInput(
+    int ExpectedRevision,
+    string PublicJwk);
+
+public sealed record SubjectReferenceInput(
+    string Kind,
+    Guid SubjectId);
+
+public sealed record AssignProductRoleInput(
+    SubjectReferenceInput Target,
+    Guid PolicyVersionId,
+    string RoleKey,
+    string IdempotencyKey,
+    int? ExpectedRevision = null);
+
+public sealed record RevokeProductRoleInput(
+    SubjectReferenceInput Target,
+    Guid PolicyVersionId,
+    string RoleKey,
+    string IdempotencyKey,
+    int ExpectedRevision);
+
+public sealed record PublishSolutionVersionInput(string PackageFilePath);
+
+public sealed record InstallSolutionVersionInput(
+    string IdempotencyKey);
+
 public sealed record RuleDraftInput(
     string Label,
     IReadOnlyList<string> Types,

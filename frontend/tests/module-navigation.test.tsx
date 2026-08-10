@@ -109,14 +109,29 @@ describe('module navigation', () => {
 
     render(<ModuleNavigation context={{ pathname: '/rules' }} items={items} />);
 
-    expect(screen.getByRole('navigation', { name: 'Modules' })).toBeInTheDocument();
+    const navigation = screen.getByRole('navigation', { name: 'Modules' });
+    expect(navigation).toHaveClass('bg-card');
+    expect(navigation).not.toHaveClass('bg-card/80', 'backdrop-blur');
     expect(screen.getByText('Workspace')).toBeInTheDocument();
     const businessObjectsLink = screen.getByRole('link', { name: 'Business objects' });
     expect(businessObjectsLink).toHaveAttribute('href', '/business-objects');
     expect(businessObjectsLink).toHaveClass(
+      'min-h-axis-touch-target',
+      'min-w-axis-touch-target',
+      'md:min-h-0',
+      'md:min-w-0',
+      'md:w-full',
+    );
+    const navigationIcon = businessObjectsLink.querySelector('svg');
+    expect(navigationIcon).toHaveClass('size-axis-icon-navigation');
+    expect(businessObjectsLink).toHaveClass(
       'hover:bg-accent',
       'hover:text-accent-foreground',
       'dark:hover:bg-accent',
+      'transition-colors',
+      'duration-axis-state',
+      'ease-axis-state',
+      'motion-reduce:transition-none',
     );
     expect(businessObjectsLink).not.toHaveClass('dark:hover:bg-muted/50');
     const rulesLink = screen.getByRole('link', { name: 'Rules' });
@@ -131,10 +146,55 @@ describe('module navigation', () => {
     expect(rulesLink).toHaveAttribute('aria-current', 'page');
   });
 
-  it('registers Business Objects and Rules as workspace navigation contributions', () => {
+  it('registers all workspace module navigation contributions in registry order', () => {
     expect(moduleNavigationContributions.map((item) => item.id)).toEqual([
+      'identity.memberships',
+      'identity.service-identities',
+      'authorization.product-roles',
       'businessObjects.definitions',
       'rules.fieldDefinitions',
+      'solutions.management',
     ]);
+  });
+
+  it('renders only production contributions returned by the server availability projection', () => {
+    const visible = visibleModuleNavigationContributions(moduleNavigationContributions, {
+      pathname: '/business-objects',
+      availableContributionIds: new Set(['identity.memberships', 'businessObjects.definitions']),
+    });
+
+    expect(visible.map((item) => item.id)).toEqual([
+      'identity.memberships',
+      'businessObjects.definitions',
+    ]);
+  });
+
+  it('reveals the active item when the responsive navigation viewport changes', () => {
+    const items = visibleModuleNavigationContributions(moduleNavigationContributions, {
+      pathname: '/rules',
+      availableContributionIds: new Set(['businessObjects.definitions', 'rules.fieldDefinitions']),
+    });
+    const scrollIntoView = vi.fn();
+    const originalScrollIntoView = Object.getOwnPropertyDescriptor(
+      HTMLElement.prototype,
+      'scrollIntoView',
+    );
+    Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
+      configurable: true,
+      value: scrollIntoView,
+    });
+
+    try {
+      render(<ModuleNavigation context={{ pathname: '/rules' }} items={items} />);
+
+      expect(scrollIntoView).toHaveBeenCalledWith({ block: 'nearest', inline: 'center' });
+      expect(screen.getByRole('link', { name: 'Rules' })).toHaveAttribute('aria-current', 'page');
+    } finally {
+      if (originalScrollIntoView) {
+        Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', originalScrollIntoView);
+      } else {
+        Reflect.deleteProperty(HTMLElement.prototype, 'scrollIntoView');
+      }
+    }
   });
 });

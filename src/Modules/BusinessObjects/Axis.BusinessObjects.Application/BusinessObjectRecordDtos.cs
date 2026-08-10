@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using Axis.BusinessObjects.Domain.Aggregates;
+using Axis.Identity.Contracts;
 
 namespace Axis.BusinessObjects.Application;
 
@@ -60,14 +61,14 @@ public sealed record BusinessObjectRecordDetailDto(
     [property: Required]
     IReadOnlyList<BusinessObjectRecordRuleEvaluationDto> RuleEvaluations,
     [property: Required]
-    Guid CreatedByUserId,
+    SubjectReferenceDto CreatedBySubject,
     [property: Required]
     DateTime CreatedAt,
     [property: Required]
-    Guid UpdatedByUserId,
+    SubjectReferenceDto UpdatedBySubject,
     [property: Required]
     DateTime UpdatedAt,
-    Guid? SubmittedByUserId,
+    SubjectReferenceDto? SubmittedBySubject,
     DateTime? SubmittedAt);
 
 public sealed record BusinessObjectRecordListItemDto(

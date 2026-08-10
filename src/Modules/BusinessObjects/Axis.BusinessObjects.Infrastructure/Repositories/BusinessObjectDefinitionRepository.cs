@@ -30,6 +30,16 @@ internal sealed class BusinessObjectDefinitionRepository(BusinessObjectsDbContex
                 definition => definition.Key == key && definition.WorkspaceId == workspaceId,
                 ct);
 
+    public async Task<BusinessObjectDefinition?> GetInstalledByComponentKeyAsync(
+        Guid workspaceId,
+        string componentKey,
+        CancellationToken ct = default) =>
+        await DefinitionsWithGraph()
+            .FirstOrDefaultAsync(
+                definition => definition.WorkspaceId == workspaceId &&
+                    definition.InstalledComponentKey == componentKey,
+                ct);
+
     public async Task<BusinessObjectDefinitionVersion?> GetPublishedVersionByIdForWorkspaceAsync(
         BusinessObjectDefinitionVersionId id,
         Guid workspaceId,
@@ -62,10 +72,13 @@ internal sealed class BusinessObjectDefinitionRepository(BusinessObjectsDbContex
     public async Task<int> CountForWorkspaceAsync(
         Guid workspaceId,
         string? searchQuery = null,
+        bool publishedOnly = false,
         CancellationToken ct = default) =>
         await Search(
-                context.BusinessObjectDefinitions.AsNoTracking()
-                    .Where(definition => definition.WorkspaceId == workspaceId),
+                FilterVisibility(
+                    context.BusinessObjectDefinitions.AsNoTracking()
+                        .Where(definition => definition.WorkspaceId == workspaceId),
+                    publishedOnly),
                 searchQuery)
             .CountAsync(ct);
 
@@ -74,16 +87,26 @@ internal sealed class BusinessObjectDefinitionRepository(BusinessObjectsDbContex
         int page,
         int pageSize,
         string? searchQuery = null,
+        bool publishedOnly = false,
         CancellationToken ct = default) =>
         await Order(
                 Search(
-                    context.BusinessObjectDefinitions.AsNoTracking()
-                        .Where(definition => definition.WorkspaceId == workspaceId),
+                    FilterVisibility(
+                        context.BusinessObjectDefinitions.AsNoTracking()
+                            .Where(definition => definition.WorkspaceId == workspaceId),
+                        publishedOnly),
                     searchQuery),
                 searchQuery)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .ToListAsync(ct);
+
+    private static IQueryable<BusinessObjectDefinition> FilterVisibility(
+        IQueryable<BusinessObjectDefinition> definitions,
+        bool publishedOnly) =>
+        publishedOnly
+            ? definitions.Where(definition => definition.Status == BusinessObjectDefinitionStatus.Published)
+            : definitions;
 
     private static IQueryable<BusinessObjectDefinition> Search(
         IQueryable<BusinessObjectDefinition> definitions,

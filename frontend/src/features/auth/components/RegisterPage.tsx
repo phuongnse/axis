@@ -3,8 +3,8 @@ import { UserPlus } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { Controller } from 'react-hook-form';
 import { Trans, useTranslation } from 'react-i18next';
+import { AsyncButton } from '@/components/shared/AsyncButton';
 import { StatusNotice } from '@/components/shared/StatusNotice';
-import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
@@ -169,10 +169,17 @@ export function RegisterPage() {
 
         {submitError ? <StatusNotice tone="destructive">{submitError}</StatusNotice> : null}
 
-        <Button type="submit" size="lg" className="w-full" disabled={loading}>
-          <UserPlus className="size-4" aria-hidden />
-          {loading ? t('auth.creatingAccount') : t('auth.createAccount')}
-        </Button>
+        <AsyncButton
+          type="submit"
+          size="lg"
+          className="w-full"
+          disabled={loading}
+          icon={<UserPlus aria-hidden />}
+          pending={loading}
+          pendingLabel={t('auth.creatingAccount')}
+        >
+          {t('auth.createAccount')}
+        </AsyncButton>
       </form>
     </AuthCard>
   );

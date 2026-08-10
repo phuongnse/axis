@@ -22,10 +22,7 @@ public class WorkspaceRepositoryTests(IdentityDatabaseFixture db) : IAsyncLifeti
     public async ValueTask DisposeAsync() => await _ctx.DisposeAsync();
 
     private static Workspace MakeWorkspace(string slug = "test-workspace") =>
-        Workspace.Create(
-            "Test Workspace",
-            WorkspaceSlug.Create(slug).Value,
-            Email.Create("owner@example.com").Value);
+        Workspace.CreatePersonal("Test Workspace", WorkspaceSlug.Create(slug).Value);
 
     [Fact]
     public async Task AddAsync_WhenEntityIsValid_PersistsAndCanBeRetrievedById()
@@ -40,7 +37,6 @@ public class WorkspaceRepositoryTests(IdentityDatabaseFixture db) : IAsyncLifeti
         loaded.Should().NotBeNull();
         loaded!.Name.Should().Be(workspace.Name);
         loaded.Slug.Value.Should().Be("workspace-add-get");
-        loaded.OwnerEmail.Value.Should().Be("owner@example.com");
         loaded.Status.Should().Be(WorkspaceStatus.PendingVerification);
     }
 
@@ -60,23 +56,26 @@ public class WorkspaceRepositoryTests(IdentityDatabaseFixture db) : IAsyncLifeti
     }
 
     [Fact]
-    public async Task GetPersonalByOwnerUserIdAsync_WhenPersonalWorkspaceExists_ReturnsOwnedWorkspace()
+    public async Task GetByIdAsync_WhenOrganizationWorkspaceExists_RetainsOrganizationParent()
     {
-        Guid ownerUserId = Guid.NewGuid();
-        Workspace workspace = Workspace.CreatePersonal(
-            "Jane Doe",
-            WorkspaceSlug.Create("jane-doe").Value,
-            Email.Create("jane@example.com").Value,
-            ownerUserId);
+        Organization organization = Organization.Create("Acme");
+        _ctx.Organizations.Add(organization);
+        await _ctx.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        Workspace workspace = Workspace.CreateOrganization(
+            "Acme",
+            WorkspaceSlug.Create($"organization-parent-{Guid.NewGuid():N}").Value,
+            organization.Id);
         await _sut.AddAsync(workspace, TestContext.Current.CancellationToken);
         await _ctx.SaveChangesAsync(TestContext.Current.CancellationToken);
 
-        Workspace? loaded = await _sut.GetPersonalByOwnerUserIdAsync(
-            ownerUserId,
+        Workspace? loaded = await _sut.GetByIdAsync(
+            workspace.Id,
             TestContext.Current.CancellationToken);
 
         loaded.Should().NotBeNull();
         loaded!.Id.Should().Be(workspace.Id);
+        loaded.OrganizationId.Should().Be(organization.Id);
     }
 
     [Fact]

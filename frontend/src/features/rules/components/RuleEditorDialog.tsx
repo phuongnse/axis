@@ -1,8 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Archive, Lightbulb, Plus, Save, Trash2 } from 'lucide-react';
+import { Archive, Lightbulb, Pause, Play, Plus, RefreshCw, Save, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
+import { AsyncButton } from '@/components/shared/AsyncButton';
+import { AsyncContent } from '@/components/shared/AsyncContent';
 import { ManagedDialog, ManagedDialogBody } from '@/components/shared/ManagedDialog';
 import { ManagedDialogTabs } from '@/components/shared/ManagedDialogTabs';
 import { StatusBadge } from '@/components/shared/StatusBadge';
@@ -112,6 +114,10 @@ export function RuleEditorDialog({
     queryFn: () => getRuleDefinition(definitionKey as string),
     enabled: open && !creating,
   });
+  const detailErrorStatus =
+    detailQuery.error instanceof ApiError ? detailQuery.error.status : undefined;
+  const detailTemporarilyUnavailable = detailErrorStatus === 503;
+  const detailActionUnavailable = detailErrorStatus === 403 || detailErrorStatus === 404;
   const languageQuery = useQuery({ ...ruleExpressionLanguageQueryOptions(), enabled: open });
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -368,7 +374,14 @@ export function RuleEditorDialog({
     },
     onError: (cause) => {
       if (cause instanceof ApiError && cause.status === 409) setStale(true);
-      setError(cause instanceof Error ? cause.message : t('rules.saveError'));
+      setError(
+        readRuleMutationError(
+          cause,
+          t('rules.saveError'),
+          t('rules.authorizationUnavailableDescription'),
+          t('rules.authorizationTemporarilyUnavailableDescription'),
+        ),
+      );
     },
   });
 
@@ -463,13 +476,22 @@ export function RuleEditorDialog({
     },
     onError: (cause) => {
       if (cause instanceof ApiError && cause.status === 409) setStale(true);
-      setError(cause instanceof Error ? cause.message : t('rules.lifecycleError'));
+      setError(
+        readRuleMutationError(
+          cause,
+          t('rules.lifecycleError'),
+          t('rules.authorizationUnavailableDescription'),
+          t('rules.authorizationTemporarilyUnavailableDescription'),
+        ),
+      );
     },
   });
 
   const detail = detailQuery.data ?? createdDraft;
-  const canEditDraft = detail ? detail.actions?.canEditDraft === true : creating;
-  const readOnly = Boolean(detail && !canEditDraft);
+  const canEditDraft =
+    !detailQuery.isError && (detail ? detail.actions?.canEditDraft === true : creating);
+  const readOnly =
+    detailQuery.isError || Boolean(detail && !canEditDraft) || (!creating && !detail);
   const dirty =
     canEditDraft &&
     snapshotRef.current !==
@@ -505,9 +527,15 @@ export function RuleEditorDialog({
       }}
       dirty={dirty}
       closeDisabled={saveMutation.isPending || lifecycleMutation.isPending}
-      title={detail?.name ?? (creating ? t('rules.createTitle') : t('rules.editorTitle'))}
+      title={
+        !detailQuery.isError && detail?.name
+          ? detail.name
+          : creating
+            ? t('rules.createTitle')
+            : t('rules.editorTitle')
+      }
       titleAccessory={
-        detail?.origin ? (
+        detail?.origin && !detailQuery.isError ? (
           <>
             <RuleOriginBadge origin={detail.origin} />
             <StatusBadge
@@ -530,7 +558,7 @@ export function RuleEditorDialog({
             {t('app.close')}
           </Button>
         ) : (
-          <Button
+          <AsyncButton
             type="button"
             onClick={() => saveMutation.mutate()}
             disabled={
@@ -542,21 +570,60 @@ export function RuleEditorDialog({
               diagnostics.length > 0 ||
               !name.trim()
             }
+            icon={<Save aria-hidden />}
+            pending={saveMutation.isPending}
+            pendingLabel={t('rules.saving')}
           >
-            <Save data-icon="inline-start" />
             {t('rules.save')}
-          </Button>
+          </AsyncButton>
         )
       }
     >
       <ManagedDialogBody>
-        {detailQuery.isLoading ? <p role="status">{t('rules.loadingRule')}</p> : null}
-        {error ? (
-          <p role="alert" className="text-sm text-destructive">
-            {error}
-          </p>
+        <AsyncContent
+          pending={detailQuery.isPending}
+          error={detailQuery.isError}
+          pendingLabel={t('rules.loadingRule')}
+        >
+          <span />
+        </AsyncContent>
+        {detailQuery.isError ? (
+          <StatusNotice
+            tone={
+              detailActionUnavailable || detailTemporarilyUnavailable ? 'warning' : 'destructive'
+            }
+            title={
+              detailTemporarilyUnavailable
+                ? t('rules.authorizationTemporarilyUnavailableTitle')
+                : detailActionUnavailable
+                  ? t('rules.authorizationUnavailableTitle')
+                  : t('rules.loadErrorTitle')
+            }
+          >
+            <span>
+              {detailTemporarilyUnavailable
+                ? t('rules.authorizationTemporarilyUnavailableDescription')
+                : detailActionUnavailable
+                  ? t('rules.authorizationUnavailableDescription')
+                  : t('rules.loadErrorBody')}
+            </span>
+            {detailTemporarilyUnavailable ? (
+              <>
+                {' '}
+                <Button
+                  type="button"
+                  variant="link"
+                  disabled={detailQuery.isFetching}
+                  onClick={() => void detailQuery.refetch()}
+                >
+                  {t('app.retry')}
+                </Button>
+              </>
+            ) : null}
+          </StatusNotice>
         ) : null}
-        {!detailQuery.isLoading || creating ? (
+        {error ? <StatusNotice tone="destructive">{error}</StatusNotice> : null}
+        {creating || (!detailQuery.isPending && !detailQuery.isError && detail) ? (
           <ManagedDialogTabs
             label={t('rules.definitionSections')}
             generalLabel={t('dialog.general')}
@@ -688,11 +755,14 @@ export function RuleEditorDialog({
                       <Field>
                         <div className="flex items-center justify-between gap-3">
                           <FieldLabel htmlFor="rule-dsl">{t('rules.expressionSyntax')}</FieldLabel>
-                          <Button
+                          <AsyncButton
                             type="button"
                             variant="outline"
                             size="sm"
                             disabled={completionMutation.isPending || !dsl}
+                            icon={<Lightbulb aria-hidden />}
+                            pending={completionMutation.isPending}
+                            pendingLabel={t('rules.loadingSuggestions')}
                             onClick={() =>
                               completionMutation.mutate({
                                 generation: projectionGenerationRef.current,
@@ -704,9 +774,8 @@ export function RuleEditorDialog({
                               })
                             }
                           >
-                            <Lightbulb data-icon="inline-start" />
                             {t('rules.showSuggestions')}
-                          </Button>
+                          </AsyncButton>
                         </div>
                         <Textarea
                           ref={dslRef}
@@ -871,14 +940,17 @@ export function RuleEditorDialog({
         {stale ? (
           <StatusNotice tone="warning">
             {t('rules.staleChanges')}{' '}
-            <Button
+            <AsyncButton
               type="button"
               variant="link"
               disabled={refreshMutation.isPending}
               onClick={() => refreshMutation.mutate()}
+              icon={<RefreshCw aria-hidden />}
+              pending={refreshMutation.isPending}
+              pendingLabel={t('rules.refreshing')}
             >
               {t('rules.refetch')}
-            </Button>
+            </AsyncButton>
           </StatusNotice>
         ) : null}
         {detail && !readOnly ? (
@@ -886,44 +958,59 @@ export function RuleEditorDialog({
             <VersionHistory versions={detail.versions ?? []} activeVersion={detail.activeVersion} />
             <div className="flex flex-wrap gap-2">
               {detail.actions?.canCreateVersion ? (
-                <Button
+                <AsyncButton
                   type="button"
                   variant="secondary"
                   disabled={authoringBlocked}
                   onClick={() => setLifecycleAction('version')}
+                  icon={<Plus aria-hidden />}
+                  pending={lifecycleMutation.isPending && lifecycleMutation.variables === 'version'}
+                  pendingLabel={t('rules.updatingLifecycle')}
                 >
                   {t('rules.createVersion')}
-                </Button>
+                </AsyncButton>
               ) : null}
               {detail.actions?.canActivateVersion ? (
-                <Button
+                <AsyncButton
                   type="button"
                   disabled={authoringBlocked}
                   onClick={() => setLifecycleAction('activate')}
+                  icon={<Play aria-hidden />}
+                  pending={
+                    lifecycleMutation.isPending && lifecycleMutation.variables === 'activate'
+                  }
+                  pendingLabel={t('rules.updatingLifecycle')}
                 >
                   {t('rules.activate')}
-                </Button>
+                </AsyncButton>
               ) : null}
               {detail.actions?.canDeactivate ? (
-                <Button
+                <AsyncButton
                   type="button"
                   variant="outline"
                   disabled={stale || refreshMutation.isPending || hydrationCondition != null}
                   onClick={() => setLifecycleAction('deactivate')}
+                  icon={<Pause aria-hidden />}
+                  pending={
+                    lifecycleMutation.isPending && lifecycleMutation.variables === 'deactivate'
+                  }
+                  pendingLabel={t('rules.updatingLifecycle')}
                 >
                   {t('rules.deactivate')}
-                </Button>
+                </AsyncButton>
               ) : null}
               {detail.actions?.canArchive ? (
-                <Button
+                <AsyncButton
                   type="button"
                   variant="destructive"
                   disabled={stale || refreshMutation.isPending || hydrationCondition != null}
                   onClick={() => setArchiveOpen(true)}
+                  icon={<Archive aria-hidden />}
+                  pending={lifecycleMutation.isPending && lifecycleMutation.variables === 'archive'}
+                  pendingLabel={t('rules.updatingLifecycle')}
                 >
-                  <Archive aria-hidden />
                   {t('rules.archive')}
-                </Button>
+                </AsyncButton>
               ) : null}
             </div>
           </div>
@@ -1020,6 +1107,19 @@ function RuleDetail({ label, value }: { label: string; value: string }) {
   );
 }
 
+function readRuleMutationError(
+  error: unknown,
+  fallback: string,
+  actionUnavailable: string,
+  temporarilyUnavailable: string,
+): string {
+  if (error instanceof ApiError) {
+    if (error.status === 403 || error.status === 404) return actionUnavailable;
+    if (error.status === 503) return temporarilyUnavailable;
+  }
+  return error instanceof Error ? error.message : fallback;
+}
+
 function VersionHistory({
   versions,
   activeVersion,
@@ -1075,9 +1175,17 @@ function RuleSimulationPanel({
           <h3 className="text-sm font-semibold">{t('rules.simulation')}</h3>
           <p className="text-sm text-muted-foreground">{t('rules.simulationHelp')}</p>
         </div>
-        <Button type="button" variant="outline" onClick={onSimulate} disabled={pending || disabled}>
+        <AsyncButton
+          type="button"
+          variant="outline"
+          onClick={onSimulate}
+          disabled={pending || disabled}
+          icon={<Play aria-hidden />}
+          pending={pending}
+          pendingLabel={t('rules.simulating')}
+        >
           {t('rules.runSimulation')}
-        </Button>
+        </AsyncButton>
       </div>
       {inputs.length ? (
         <div className="grid gap-3 sm:grid-cols-2">

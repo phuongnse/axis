@@ -28,7 +28,7 @@ public sealed class SearchRuleExpressionGuideHandlerTests
     public async Task Search_WhenInputsAreProvided_BuildsInputGuide()
     {
         RuleExpressionGuideService service = new(_context.TextSearch);
-        SearchRuleExpressionGuideHandler sut = new(_context.CurrentUser, service);
+        SearchRuleExpressionGuideHandler sut = new(_context.CurrentUser, _context.CurrentSubject, _context.Authorization, service);
 
         Result<RuleExpressionGuideDto> result = await sut.Handle(
             new SearchRuleExpressionGuideQuery(new(
@@ -55,7 +55,7 @@ public sealed class SearchRuleExpressionGuideHandlerTests
                 Arg.Any<CancellationToken>())
             .Returns([new RuleTextSearchMatch("Function:Length", 1)]);
         RuleExpressionGuideService service = new(_context.TextSearch);
-        SearchRuleExpressionGuideHandler sut = new(_context.CurrentUser, service);
+        SearchRuleExpressionGuideHandler sut = new(_context.CurrentUser, _context.CurrentSubject, _context.Authorization, service);
 
         Result<RuleExpressionGuideDto> result = await sut.Handle(
             new SearchRuleExpressionGuideQuery(new(1, null, [], "lenght", "en")),

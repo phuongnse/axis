@@ -14,6 +14,7 @@ public static class ErrorCodes
     public const string FieldValidation = "field_validation";
     public const string InvalidInput = "invalid_input";
     public const string RateLimited = "rate_limited";
+    public const string Unavailable = "unavailable";
 }
 
 /// <summary>

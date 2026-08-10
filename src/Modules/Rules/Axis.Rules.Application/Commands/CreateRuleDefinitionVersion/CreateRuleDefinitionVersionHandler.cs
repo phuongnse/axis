@@ -1,3 +1,5 @@
+using Axis.Authorization.Contracts;
+using Axis.Identity.Contracts;
 using Axis.Rules.Application.Repositories;
 using Axis.Rules.Application.Services;
 using Axis.Rules.Contracts;
@@ -11,6 +13,8 @@ namespace Axis.Rules.Application.Commands.CreateRuleDefinitionVersion;
 
 public sealed class CreateRuleDefinitionVersionHandler(
     ICurrentUser currentUser,
+    ICurrentSubject currentSubject,
+    IProductAuthorizationService authorization,
     IRuleDefinitionRepository repository,
     IUnitOfWork unitOfWork)
     : ICommandHandler<CreateRuleDefinitionVersionCommand, RuleDefinitionDetailDto>
@@ -21,18 +25,25 @@ public sealed class CreateRuleDefinitionVersionHandler(
     {
         if (currentUser.workspaceId is not Guid workspaceId)
             return RuleDefinitionFailures.MissingWorkspace<RuleDefinitionDetailDto>();
-        if (currentUser.UserId is not Guid userId)
-            return RuleDefinitionFailures.MissingUser<RuleDefinitionDetailDto>();
-
         Result<RuleDefinitionKey> key = RuleDefinitionKey.Create(command.DefinitionKey);
         if (key.IsFailure)
             return RuleDefinitionFailures.NotFound<RuleDefinitionDetailDto>();
+
+        ProductAuthorizationDecision decision = await RuleAuthorization.AuthorizeAsync(
+                authorization, workspaceId, currentSubject.Subject,
+                RuleProductActions.DefinitionManage, RuleProductActions.DefinitionResourceType,
+                key.Value.Value, null, cancellationToken);
+        if (!decision.IsAllowed)
+            return RuleDefinitionFailures.Authorization<RuleDefinitionDetailDto>(decision);
 
         RuleDefinition? definition = await repository.GetByKeyForWorkspaceAsync(key.Value, workspaceId, cancellationToken);
         if (definition is null)
             return RuleDefinitionFailures.NotFound<RuleDefinitionDetailDto>();
 
-        Result<RuleDefinitionVersion> created = definition.CreateVersion(command.ExpectedRevision, userId, DateTime.UtcNow);
+        Result<RuleDefinitionVersion> created = definition.CreateVersion(
+            command.ExpectedRevision,
+            RuleSubjectReferenceMapper.ToDomain(currentSubject.Subject),
+            DateTime.UtcNow);
         if (created.IsFailure)
             return created.ErrorCode == ErrorCodes.Conflict
                 ? RuleDefinitionFailures.Conflict<RuleDefinitionDetailDto>(created.Error)
@@ -40,6 +51,6 @@ public sealed class CreateRuleDefinitionVersionHandler(
 
         try { await unitOfWork.SaveChangesAsync(cancellationToken); }
         catch (ConcurrencyException) { return RuleDefinitionFailures.Conflict<RuleDefinitionDetailDto>("The rule definition has changed."); }
-        return RuleContractMapper.ToDetailDto(definition);
+        return RuleContractMapper.ToDetailDto(definition, canManage: true);
     }
 }

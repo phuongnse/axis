@@ -11,6 +11,7 @@ namespace Axis.Identity.Application.Commands.SignInUser;
 public sealed class SignInUserHandler(
     IUserRepository userRepo,
     IWorkspaceRepository workspaceRepo,
+    IWorkspaceMembershipRepository workspaceMemberships,
     IPasswordHasher hasher)
     : ICommandHandler<SignInUserCommand, SignInSuccessDto>
 {
@@ -51,9 +52,16 @@ public sealed class SignInUserHandler(
                 IdentityProblemCodes.SignInVerificationRequired);
         }
 
-        Workspace? personalWorkspace = await workspaceRepo.GetPersonalByOwnerUserIdAsync(
-            user.Id,
-            cancellationToken);
+        Workspace? personalWorkspace = null;
+        foreach (WorkspaceMembership membership in await workspaceMemberships.ListActiveForUserAsync(user.Id, cancellationToken))
+        {
+            Workspace? candidate = await workspaceRepo.GetByIdAsync(membership.WorkspaceId, cancellationToken);
+            if (membership.Role == WorkspaceMembershipRole.Owner && candidate?.Type == WorkspaceType.Personal)
+            {
+                personalWorkspace = candidate;
+                break;
+            }
+        }
         if (personalWorkspace is null || !personalWorkspace.AllowsSignIn())
         {
             return Result.Failure<SignInSuccessDto>(

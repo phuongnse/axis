@@ -5,11 +5,14 @@ using Axis.BusinessObjects.Application.Repositories;
 using Axis.BusinessObjects.Application.Services;
 using Axis.BusinessObjects.Domain.Aggregates;
 using Axis.BusinessObjects.Domain.ValueObjects;
+using Axis.Identity.Contracts;
 using Axis.Rules.Contracts;
 using Axis.Shared.Application.Identity;
 using Axis.Shared.Domain.Primitives;
 using FluentAssertions;
 using NSubstitute;
+using DomainSubjectReference = Axis.BusinessObjects.Domain.ValueObjects.SubjectReference;
+using IdentitySubjectReference = Axis.Identity.Contracts.SubjectReference;
 
 namespace Axis.BusinessObjects.Application.Tests;
 
@@ -42,7 +45,13 @@ public sealed class BusinessObjectRecordApplicationTests
                 Arg.Any<CancellationToken>())
             .Returns(definition);
 
-        SaveBusinessObjectRecordHandler sut = new(currentUser, records, definitions, unitOfWork);
+        SaveBusinessObjectRecordHandler sut = new(
+            currentUser,
+            new FakeCurrentSubject(),
+            BusinessObjectRecordHandlerTestContext.AllowedAuthorization(),
+            records,
+            definitions,
+            unitOfWork);
         Result<BusinessObjectRecordDetailDto> result = await sut.Handle(
             new SaveBusinessObjectRecordCommand(
                 RecordId,
@@ -185,6 +194,8 @@ public sealed class BusinessObjectRecordApplicationTests
         return (
             new SubmitBusinessObjectRecordHandler(
                 new FakeCurrentUser(),
+                new FakeCurrentSubject(),
+                BusinessObjectRecordHandlerTestContext.AllowedAuthorization(),
                 records,
                 definitions,
                 new BusinessObjectRecordRuleEvaluator(bindingEvaluator),
@@ -208,7 +219,7 @@ public sealed class BusinessObjectRecordApplicationTests
             "record-1",
             "hash-1",
             values,
-            UserId,
+            DomainSubjectReference.Human(UserId),
             Now);
         result.IsSuccess.Should().BeTrue();
         return result.Value;
@@ -235,7 +246,7 @@ public sealed class BusinessObjectRecordApplicationTests
                 rules)],
             expectedRevision: 1,
             Now).IsSuccess.Should().BeTrue();
-        definition.Publish(2, UserId, Now).IsSuccess.Should().BeTrue();
+        definition.Publish(2, DomainSubjectReference.Human(UserId), Now).IsSuccess.Should().BeTrue();
         return definition.Versions.Single();
     }
 
@@ -243,5 +254,10 @@ public sealed class BusinessObjectRecordApplicationTests
     {
         public Guid? UserId => BusinessObjectRecordApplicationTests.UserId;
         public Guid? workspaceId => BusinessObjectRecordApplicationTests.WorkspaceId;
+    }
+
+    private sealed class FakeCurrentSubject : ICurrentSubject
+    {
+        public IdentitySubjectReference Subject => IdentitySubjectReference.Human(UserId);
     }
 }

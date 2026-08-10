@@ -8,12 +8,19 @@ public sealed class CapturingEmailSender : IEmailSender
 {
     private readonly ConcurrentDictionary<string, string> _verificationTokensByEmail = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, string> _verificationLanguagesByEmail = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, InvitationDeliveryMessage> _workspaceInvitationsByEmail =
+        new(StringComparer.OrdinalIgnoreCase);
 
     public string? GetVerificationToken(string email) =>
         _verificationTokensByEmail.TryGetValue(email, out string? token) ? token : null;
 
     public string? GetVerificationLanguage(string email) =>
         _verificationLanguagesByEmail.TryGetValue(email, out string? language) ? language : null;
+
+    public InvitationDeliveryMessage? GetWorkspaceInvitation(string email) =>
+        _workspaceInvitationsByEmail.TryGetValue(email, out InvitationDeliveryMessage? message)
+            ? message
+            : null;
 
     public Task SendVerificationEmailAsync(
         string toEmail,
@@ -23,6 +30,14 @@ public sealed class CapturingEmailSender : IEmailSender
     {
         _verificationTokensByEmail[toEmail] = verificationToken;
         _verificationLanguagesByEmail[toEmail] = language;
+        return Task.CompletedTask;
+    }
+
+    public Task SendWorkspaceInvitationEmailAsync(
+        InvitationDeliveryMessage message,
+        CancellationToken ct = default)
+    {
+        _workspaceInvitationsByEmail[message.RecipientEmail] = message;
         return Task.CompletedTask;
     }
 }

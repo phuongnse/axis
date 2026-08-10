@@ -20,6 +20,8 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\..\..\src\Modules\Authorization\Axis.Authorization.Contracts\Axis.Authorization.Contracts.csproj" />
+    <ProjectReference Include="..\..\..\..\src\Modules\Identity\Axis.Identity.Contracts\Axis.Identity.Contracts.csproj" />
     <ProjectReference Include="..\..\..\..\src\Modules\Rules\Axis.Rules.Application\Axis.Rules.Application.csproj" />
     <ProjectReference Include="..\..\..\..\src\Modules\Rules\Axis.Rules.Contracts\Axis.Rules.Contracts.csproj" />
   </ItemGroup>

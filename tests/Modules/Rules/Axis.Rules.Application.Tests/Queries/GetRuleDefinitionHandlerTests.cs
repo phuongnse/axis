@@ -20,7 +20,7 @@ public sealed class GetRuleDefinitionHandlerTests
                 RuleDefinitionHandlerTestContext.WorkspaceId,
                 Arg.Any<CancellationToken>())
             .Returns(definition);
-        GetRuleDefinitionHandler sut = new(_context.CurrentUser, _context.Repository);
+        GetRuleDefinitionHandler sut = new(_context.CurrentUser, _context.CurrentSubject, _context.Authorization, _context.Repository);
 
         Result<RuleDefinitionDetailDto> result = await sut.Handle(
             new GetRuleDefinitionQuery(definition.Key.Value),
@@ -33,7 +33,7 @@ public sealed class GetRuleDefinitionHandlerTests
     [Fact]
     public async Task Get_WhenSystemDefinitionExists_ReturnsExecutableReadOnlyDetail()
     {
-        GetRuleDefinitionHandler sut = new(_context.CurrentUser, _context.Repository);
+        GetRuleDefinitionHandler sut = new(_context.CurrentUser, _context.CurrentSubject, _context.Authorization, _context.Repository);
 
         Result<RuleDefinitionDetailDto> result = await sut.Handle(
             new GetRuleDefinitionQuery(RuleDefinitionKeys.Required),
@@ -47,6 +47,7 @@ public sealed class GetRuleDefinitionHandlerTests
         result.Value.Condition!.Left!.Kind.Should().Be(RuleOperandKind.Function);
         result.Value.Condition.Left.Function.Should().Be(RuleExpressionFunction.IsBlank);
         result.Value.Condition.Should().NotBeNull();
+        result.Value.Versions.Should().OnlyContain(version => version.PublishedBySubject == null);
         await _context.Repository.DidNotReceiveWithAnyArgs()
             .GetByKeyForWorkspaceAsync(default, default, TestContext.Current.CancellationToken);
     }
@@ -57,6 +58,8 @@ public sealed class GetRuleDefinitionHandlerTests
         Axis.Rules.Domain.RuleDefinition definition = RuleDefinitionHandlerTestContext.DraftDefinition();
         GetRuleDefinitionHandler sut = new(
             _context.CurrentUser,
+            _context.CurrentSubject,
+            _context.Authorization,
             _context.Repository);
 
         Result<RuleDefinitionDetailDto> result = await sut.Handle(

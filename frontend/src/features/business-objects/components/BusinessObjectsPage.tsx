@@ -12,11 +12,15 @@ import {
   type DataTableQueryState,
 } from '@/components/shared/data-table';
 import { useManagedWindowActions } from '@/components/shared/ManagedWindowManager';
+import { PageAction } from '@/components/shared/PageLayout';
+import { ResourceWorkspace } from '@/components/shared/ResourceWorkspace';
 import { StatusBadge } from '@/components/shared/StatusBadge';
-import { Button } from '@/components/ui/button';
+import { StatusNotice } from '@/components/shared/StatusNotice';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
+import { ApiError } from '@/lib/api';
 import {
   type BusinessObjectDefinitionListItem,
+  businessObjectDefinitionCollectionActionsQueryOptions,
   businessObjectDefinitionDetailQueryOptions,
   businessObjectDefinitionsDefaultPageSize,
   businessObjectDefinitionsListQueryOptions,
@@ -43,6 +47,10 @@ export function BusinessObjectsPage() {
       i18n.language,
     ),
   );
+  const collectionActionsQuery = useQuery(businessObjectDefinitionCollectionActionsQueryOptions());
+  const canStartCreate = collectionActionsQuery.data?.canStartCreate === true;
+  const actionsUnavailable =
+    collectionActionsQuery.error instanceof ApiError && collectionActionsQuery.error.status === 503;
   const definitions = definitionsQuery.data?.items ?? [];
   const tableQuery = useMemo<DataTableQueryState>(
     () => ({
@@ -79,9 +87,12 @@ export function BusinessObjectsPage() {
   useEffect(() => {
     if (!search.dialog) return;
     if (search.dialog === 'create') {
-      openWindow(businessObjectCreateWindowDescriptor(t('businessObjects.defineTitle')));
+      if (collectionActionsQuery.isPending || collectionActionsQuery.isError) return;
+      if (canStartCreate) {
+        openWindow(businessObjectCreateWindowDescriptor(t('businessObjects.defineTitle')));
+      }
     } else if (search.recordId) {
-      if (launchDefinitionQuery.isLoading) return;
+      if (launchDefinitionQuery.isPending) return;
       const definition = definitions.find((candidate) => candidate.id === search.recordId);
       openWindow(
         businessObjectDefinitionWindowDescriptor({
@@ -102,9 +113,12 @@ export function BusinessObjectsPage() {
       search: (current) => ({ ...current, dialog: undefined, recordId: undefined }),
     });
   }, [
+    canStartCreate,
+    collectionActionsQuery.isError,
+    collectionActionsQuery.isPending,
     definitions,
     launchDefinitionQuery.data?.name,
-    launchDefinitionQuery.isLoading,
+    launchDefinitionQuery.isPending,
     navigate,
     openWindow,
     search.dialog,
@@ -125,12 +139,12 @@ export function BusinessObjectsPage() {
       {
         id: 'name',
         accessorKey: 'name',
-        size: 320,
+        size: 280,
         minSize: 220,
         enableSorting: false,
         meta: { label: t('businessObjects.name') },
         cell: ({ row }) => (
-          <Button
+          <PageAction
             type="button"
             variant="link"
             onFocus={() => prefetchDefinition(row.original.id)}
@@ -138,13 +152,13 @@ export function BusinessObjectsPage() {
             onClick={() => openDefinition(row.original)}
           >
             {row.original.name}
-          </Button>
+          </PageAction>
         ),
       },
       {
         id: 'key',
         accessorKey: 'objectKey',
-        size: 240,
+        size: 200,
         minSize: 180,
         enableSorting: false,
         meta: { label: t('businessObjects.objectKey') },
@@ -152,7 +166,7 @@ export function BusinessObjectsPage() {
       {
         id: 'status',
         accessorKey: 'status',
-        size: 160,
+        size: 150,
         minSize: 140,
         enableSorting: false,
         meta: { label: t('businessObjects.status'), searchable: false },
@@ -161,7 +175,7 @@ export function BusinessObjectsPage() {
       {
         id: 'version',
         accessorKey: 'latestPublishedVersionNumber',
-        size: 140,
+        size: 130,
         minSize: 120,
         enableSorting: false,
         meta: { label: t('businessObjects.version'), searchable: false },
@@ -175,7 +189,7 @@ export function BusinessObjectsPage() {
       {
         id: 'updated',
         accessorKey: 'updatedAt',
-        size: 220,
+        size: 190,
         minSize: 180,
         enableSorting: false,
         meta: { label: t('businessObjects.updated'), searchable: false },
@@ -227,29 +241,32 @@ export function BusinessObjectsPage() {
       grouping: false,
       columnControls: true,
       enableColumnResizing: true,
-      renderToolbarActions: () => (
-        <Button
-          type="button"
-          size="sm"
-          onClick={() => {
-            openWindow(businessObjectCreateWindowDescriptor(t('businessObjects.defineTitle')));
-          }}
-        >
-          <Plus aria-hidden />
-          {t('businessObjects.new')}
-        </Button>
-      ),
-      loading: definitionsQuery.isFetching,
+      renderToolbarActions: canStartCreate
+        ? () => (
+            <PageAction
+              type="button"
+              size="sm"
+              onClick={() => {
+                openWindow(businessObjectCreateWindowDescriptor(t('businessObjects.defineTitle')));
+              }}
+            >
+              <Plus aria-hidden />
+              {t('businessObjects.new')}
+            </PageAction>
+          )
+        : undefined,
+      loading: definitionsQuery.isPending,
       error: definitionsQuery.isError,
       onRetry: () => void definitionsQuery.refetch(),
     };
   }, [
+    canStartCreate,
     dateFormatter,
     definitions,
     definitionsQuery.data?.pageSize,
     definitionsQuery.data?.totalCount,
     definitionsQuery.isError,
-    definitionsQuery.isFetching,
+    definitionsQuery.isPending,
     definitionsQuery.refetch,
     navigate,
     openDefinition,
@@ -261,20 +278,27 @@ export function BusinessObjectsPage() {
   ]);
 
   return (
-    <div className="flex h-full min-h-0 w-full min-w-0 flex-col gap-4 overflow-hidden p-4 sm:p-6 lg:p-8">
-      <header className="min-w-0 shrink-0">
-        <h1 className="font-heading text-2xl font-semibold text-foreground">
-          {t('businessObjects.title')}
-        </h1>
-        <p className="mt-1 max-w-3xl text-sm leading-6 text-muted-foreground">
-          {t('businessObjects.pageDescription')}
-        </p>
-      </header>
-
-      <div className="min-h-0 flex-1">
-        <DataTable definition={tableDefinition} />
-      </div>
-    </div>
+    <ResourceWorkspace
+      title={t('businessObjects.title')}
+      description={t('businessObjects.pageDescription')}
+      status={
+        actionsUnavailable ? (
+          <StatusNotice tone="warning" title={t('businessObjects.actionsUnavailableTitle')}>
+            <span>{t('businessObjects.actionsUnavailableDescription')}</span>{' '}
+            <PageAction
+              type="button"
+              variant="link"
+              disabled={collectionActionsQuery.isFetching}
+              onClick={() => void collectionActionsQuery.refetch()}
+            >
+              {t('app.retry')}
+            </PageAction>
+          </StatusNotice>
+        ) : undefined
+      }
+    >
+      <DataTable definition={tableDefinition} />
+    </ResourceWorkspace>
   );
 }
 

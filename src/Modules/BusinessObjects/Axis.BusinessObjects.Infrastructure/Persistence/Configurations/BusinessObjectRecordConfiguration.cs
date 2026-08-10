@@ -72,9 +72,15 @@ internal sealed class BusinessObjectRecordConfiguration : IEntityTypeConfigurati
             .HasMaxLength(32)
             .IsRequired();
         builder.Property(record => record.Revision).HasColumnName("revision").IsRequired();
-        builder.Property(record => record.CreatedByUserId).HasColumnName("created_by_user_id").IsRequired();
-        builder.Property(record => record.UpdatedByUserId).HasColumnName("updated_by_user_id").IsRequired();
-        builder.Property(record => record.SubmittedByUserId).HasColumnName("submitted_by_user_id");
+        Subject(builder.ComplexProperty(record => record.Owner), "owner");
+        Subject(builder.ComplexProperty(record => record.CreatedBySubject), "created_by_subject");
+        Subject(builder.ComplexProperty(record => record.UpdatedBySubject), "updated_by_subject");
+        builder.Property(record => record.SubmittedBySubject)
+            .HasColumnName("submitted_by_subject")
+            .HasMaxLength(64)
+            .HasConversion(
+                value => value.HasValue ? value.Value.Kind + ":" + value.Value.Id : null,
+                value => string.IsNullOrWhiteSpace(value) ? null : ParseSubject(value));
         builder.Property(record => record.CreatedAt).HasColumnName("created_at").IsRequired();
         builder.Property(record => record.UpdatedAt).HasColumnName("updated_at").IsRequired();
         builder.Property(record => record.SubmittedAt).HasColumnName("submitted_at");
@@ -99,5 +105,19 @@ internal sealed class BusinessObjectRecordConfiguration : IEntityTypeConfigurati
             .IsUnique();
         builder.HasIndex(record => new { record.WorkspaceId, record.ObjectKey, record.UpdatedAt });
         builder.HasIndex(record => new { record.WorkspaceId, record.DefinitionVersionId });
+    }
+
+    private static void Subject(ComplexPropertyBuilder<SubjectReference> subject, string prefix)
+    {
+        subject.Property(value => value.Kind).HasColumnName(prefix + "_kind").HasConversion<string>().HasMaxLength(16).IsRequired();
+        subject.Property(value => value.Id).HasColumnName(prefix + "_id").IsRequired();
+    }
+
+    private static SubjectReference? ParseSubject(string value)
+    {
+        string[] pieces = value.Split(':', 2, StringSplitOptions.TrimEntries);
+        return pieces.Length == 2 && Enum.TryParse(pieces[0], out SubjectKind kind) && Guid.TryParse(pieces[1], out Guid id)
+            ? new SubjectReference(kind, id)
+            : throw new InvalidOperationException("Persisted subject reference is invalid.");
     }
 }

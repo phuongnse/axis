@@ -21,7 +21,7 @@ namespace Axis.Rules.Application;
 
 internal static class RuleContractMapper
 {
-    public static RuleDefinitionSummaryDto ToSummaryDto(RuleDefinition definition) =>
+    public static RuleDefinitionSummaryDto ToSummaryDto(RuleDefinition definition, bool canManage = false) =>
         new(
             definition.Key.Value,
             definition.Name,
@@ -35,10 +35,10 @@ internal static class RuleContractMapper
             definition.Inputs.Select(ToDto).ToArray(),
             ToDto(definition.Output),
             definition.Origin == DomainOrigin.BuiltIn ? null : definition.UpdatedAt,
-            ToActions(definition),
+            ToActions(definition, canManage),
             definition.Documentation is null ? null : ToDto(definition.Documentation));
 
-    public static RuleDefinitionDetailDto ToDetailDto(RuleDefinition definition) =>
+    public static RuleDefinitionDetailDto ToDetailDto(RuleDefinition definition, bool canManage = false) =>
         new(
             definition.Key.Value,
             definition.Name,
@@ -56,7 +56,7 @@ internal static class RuleContractMapper
             definition.Origin == DomainOrigin.BuiltIn ? null : definition.CreatedAt,
             definition.Origin == DomainOrigin.BuiltIn ? null : definition.UpdatedAt,
             definition.ArchivedAt,
-            ToActions(definition),
+            ToActions(definition, canManage),
             definition.Documentation is null ? null : ToDto(definition.Documentation));
 
     public static RuleDefinitionVersionDto ToDto(RuleDefinitionVersion version) =>
@@ -68,7 +68,7 @@ internal static class RuleContractMapper
             version.Inputs.Select(ToDto).ToArray(),
             ToDto(version.Output),
             ToDto(version.Condition),
-            version.PublishedByUserId,
+            version.PublishedBySubject is { } subject ? RuleSubjectReferenceMapper.ToDto(subject) : null,
             version.PublishedAt);
 
     private static ContractLifecycleStatus ToLifecycleStatus(RuleDefinition definition) =>
@@ -80,9 +80,9 @@ internal static class RuleContractMapper
                     ? ContractLifecycleStatus.Inactive
                     : ContractLifecycleStatus.Draft;
 
-    private static RuleDefinitionActionsDto ToActions(RuleDefinition definition)
+    private static RuleDefinitionActionsDto ToActions(RuleDefinition definition, bool canManage)
     {
-        bool mutable = definition.Origin == DomainOrigin.Workspace && definition.ArchivedAt is null;
+        bool mutable = canManage && definition.Origin == DomainOrigin.Workspace && definition.ArchivedAt is null;
         return new RuleDefinitionActionsDto(
             CanEditDraft: mutable,
             CanCreateVersion: mutable && definition.Condition is not null,

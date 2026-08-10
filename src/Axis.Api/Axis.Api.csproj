@@ -7,7 +7,16 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Modules\Audit\Axis.Audit.Infrastructure\Axis.Audit.Infrastructure.csproj" />
     <ProjectReference Include="..\Modules\Identity\Axis.Identity.Infrastructure\Axis.Identity.Infrastructure.csproj" />
+    <ProjectReference Include="..\Modules\Identity\Axis.Identity.Contracts\Axis.Identity.Contracts.csproj" />
+    <ProjectReference Include="..\Modules\Authorization\Axis.Authorization.Infrastructure\Axis.Authorization.Infrastructure.csproj" />
+    <ProjectReference Include="..\Modules\Authorization\Axis.Authorization.Application\Axis.Authorization.Application.csproj" />
+    <ProjectReference Include="..\Modules\Authorization\Axis.Authorization.Contracts\Axis.Authorization.Contracts.csproj" />
+    <ProjectReference Include="..\Modules\Solutions\Axis.Solutions.Infrastructure\Axis.Solutions.Infrastructure.csproj" />
+    <ProjectReference Include="..\Modules\Solutions\Axis.Solutions.Application\Axis.Solutions.Application.csproj" />
+    <ProjectReference Include="..\Modules\Solutions\Axis.Solutions.Contracts\Axis.Solutions.Contracts.csproj" />
+    <ProjectReference Include="..\Modules\BusinessObjects\Axis.BusinessObjects.Contracts\Axis.BusinessObjects.Contracts.csproj" />
     <ProjectReference Include="..\Modules\BusinessObjects\Axis.BusinessObjects.Infrastructure\Axis.BusinessObjects.Infrastructure.csproj" />
     <ProjectReference Include="..\Modules\Rules\Axis.Rules.Infrastructure\Axis.Rules.Infrastructure.csproj" />
   </ItemGroup>

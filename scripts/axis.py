@@ -50,10 +50,31 @@ RENOVATE_CONFIG_PATH = ROOT / ".github" / "renovate.json5"
 LOCAL_DEV_ENV_FILE = ROOT / ".env.local"
 LOCAL_DEV_PROJECT_NAME = "axis"
 LOCAL_DEV_POSTGRES_VOLUME = f"{LOCAL_DEV_PROJECT_NAME}_postgres_data"
+LOCAL_DEV_TOPOLOGY_STATE = ROOT / ".local" / "local-dev-topology.json"
 API_PROJECT = ROOT / "src" / "Axis.Api" / "Axis.Api.csproj"
 MCP_PROJECT = ROOT / "src" / "Axis.Mcp" / "Axis.Mcp.csproj"
 FRONTEND_DIR = ROOT / "frontend"
 MIGRATION_TARGETS: dict[str, tuple[Path, str, str]] = {
+    "audit": (
+        ROOT
+        / "src"
+        / "Modules"
+        / "Audit"
+        / "Axis.Audit.Infrastructure"
+        / "Axis.Audit.Infrastructure.csproj",
+        "AuditDbContext",
+        "ConnectionStrings__Audit",
+    ),
+    "authorization": (
+        ROOT
+        / "src"
+        / "Modules"
+        / "Authorization"
+        / "Axis.Authorization.Infrastructure"
+        / "Axis.Authorization.Infrastructure.csproj",
+        "AuthorizationDbContext",
+        "ConnectionStrings__Authorization",
+    ),
     "business-objects": (
         ROOT
         / "src"
@@ -83,6 +104,16 @@ MIGRATION_TARGETS: dict[str, tuple[Path, str, str]] = {
         / "Axis.Rules.Infrastructure.csproj",
         "RulesDbContext",
         "ConnectionStrings__Rules",
+    ),
+    "solutions": (
+        ROOT
+        / "src"
+        / "Modules"
+        / "Solutions"
+        / "Axis.Solutions.Infrastructure"
+        / "Axis.Solutions.Infrastructure.csproj",
+        "SolutionsDbContext",
+        "ConnectionStrings__Solutions",
     ),
 }
 DESIGN_TIME_CONNECTION_STRING = (
@@ -118,6 +149,7 @@ import doc_drift_domains  # noqa: E402
 from axis_dependency_policy import evaluate_npm_audit  # noqa: E402
 from axis_frontend_policy import (  # noqa: E402
     check_frontend_quality,
+    check_ui_foundation,
     frontend_component_file_name_issues,
     frontend_e2e_structure_issues,
     frontend_form_schema_type_issues,
@@ -125,6 +157,7 @@ from axis_frontend_policy import (  # noqa: E402
     frontend_tailwind_opacity_issues,
     frontend_test_async_boundary_issues,
     frontend_ui_system_issues,
+    ui_foundation_issues,
 )
 
 
@@ -953,6 +986,17 @@ def check_frontend_vulnerable_packages(_args: argparse.Namespace | None = None) 
         suffix = f": {detail}" if detail else ""
         print(
             f"check-frontend-vulnerable-packages: FAIL - expected valid npm audit JSON{suffix}",
+            file=sys.stderr,
+        )
+        return 1
+    if isinstance(report, dict) and "auditReportVersion" not in report:
+        audit_error = report.get("message") or report.get("error")
+        if isinstance(audit_error, dict):
+            audit_error = audit_error.get("summary") or audit_error.get("message")
+        detail = " ".join(str(audit_error).split())[:500] if audit_error else "unknown audit error"
+        print(
+            "check-frontend-vulnerable-packages: FAIL - "
+            f"npm audit did not return a vulnerability report: {detail}",
             file=sys.stderr,
         )
         return 1
@@ -2460,7 +2504,11 @@ def doc_drift_checker_names(paths: list[str]) -> set[str]:
     if any(path.startswith(("src/", "tests/")) and path.endswith(".cs") for path in paths):
         names.add("check-ef-domain-mapping")
     if any(is_frontend_path(path) for path in paths):
-        names.update({"check-frontend-api-contracts", "check-frontend-quality"})
+        names.update(
+            {"check-frontend-api-contracts", "check-frontend-quality", "check-ui-foundation"}
+        )
+    if "docs/foundations/visual-system/axis-visual-system.md" in paths:
+        names.add("check-ui-foundation")
     if any(
         path in {
             "frontend/components.json",
@@ -2565,6 +2613,7 @@ def check_doc_drift(_args: argparse.Namespace | None = None) -> int:
         ("check-ui-baseline", check_ui_baseline),
         ("check-theme", check_theme),
         ("check-frontend-quality", check_frontend_quality),
+        ("check-ui-foundation", check_ui_foundation),
         ("check-use-case-docs.py", lambda _=None: run_module_check("check-use-case-docs.py", [])),
         ("check-foundation-docs.py", lambda _=None: run_module_check("check-foundation-docs.py", [])),
         ("check-doc-link-targets.py", lambda _=None: run_module_check("check-doc-link-targets.py", [])),
@@ -3055,6 +3104,9 @@ def explicit_confirmation(
 
 
 def dotnet_command(args: argparse.Namespace) -> int:
+    if args.dotnet_command == "run-api":
+        require_local_dev_topology("dotnet run-api", ())
+
     rc = check_dotnet_sdk()
     if rc != 0:
         return rc
@@ -3064,11 +3116,21 @@ def dotnet_command(args: argparse.Namespace) -> int:
     if dotnet_args and dotnet_args[0] == "--":
         dotnet_args = dotnet_args[1:]
     if command == "restore":
-        return run([exe("dotnet"), "restore", "Axis.sln", *dotnet_args], check=False).returncode
+        target = "Axis.sln"
+        if dotnet_args and Path(dotnet_args[0]).suffix.lower() in {".csproj", ".sln"}:
+            target = dotnet_args.pop(0)
+            if dotnet_args and dotnet_args[0] == "--":
+                dotnet_args = dotnet_args[1:]
+        return run([exe("dotnet"), "restore", target, *dotnet_args], check=False).returncode
     if command == "restore-tools":
         return run([exe("dotnet"), "tool", "restore", *dotnet_args], check=False).returncode
     if command == "build":
-        return run([exe("dotnet"), "build", "Axis.sln", "--nologo", *dotnet_args], check=False).returncode
+        target = "Axis.sln"
+        if dotnet_args and Path(dotnet_args[0]).suffix.lower() in {".csproj", ".sln"}:
+            target = dotnet_args.pop(0)
+            if dotnet_args and dotnet_args[0] == "--":
+                dotnet_args = dotnet_args[1:]
+        return run([exe("dotnet"), "build", target, "--nologo", *dotnet_args], check=False).returncode
     if command == "test":
         target = "Axis.sln"
         if dotnet_args and Path(dotnet_args[0]).suffix.lower() in {".csproj", ".sln"}:
@@ -3077,7 +3139,12 @@ def dotnet_command(args: argparse.Namespace) -> int:
                 dotnet_args = dotnet_args[1:]
         return run([exe("dotnet"), "test", target, "--nologo", *dotnet_args], check=False).returncode
     if command == "format":
-        format_args = ["format", "Axis.sln"]
+        target = "Axis.sln"
+        if dotnet_args and Path(dotnet_args[0]).suffix.lower() in {".csproj", ".sln"}:
+            target = dotnet_args.pop(0)
+            if dotnet_args and dotnet_args[0] == "--":
+                dotnet_args = dotnet_args[1:]
+        format_args = ["format", target]
         if args.check:
             format_args.append("--verify-no-changes")
         format_args.extend(dotnet_args)
@@ -3166,18 +3233,28 @@ def migration_command(args: argparse.Namespace) -> int:
     rc = check_dotnet_sdk()
     if rc != 0:
         return rc
-    if args.migration_command != "add":
+    if args.migration_command not in {"add", "remove"}:
         raise CheckError(f"Unknown migration command: {args.migration_command}")
-    if MIGRATION_NAME_RE.fullmatch(args.name) is None:
+    if args.migration_command == "add" and MIGRATION_NAME_RE.fullmatch(args.name) is None:
         raise CheckError("migration add: name must be PascalCase letters and digits")
 
     project, context, connection_key = MIGRATION_TARGETS[args.module]
-    return run(
+    build = run(
         [
             exe("dotnet"),
-            "ef",
-            "migrations",
-            "add",
+            "build",
+            str(project),
+            "--nologo",
+            "-m:1",
+        ],
+        check=False,
+    )
+    if build.returncode != 0:
+        return build.returncode
+
+    ef_args = [exe("dotnet"), "ef", "migrations", args.migration_command]
+    if args.migration_command == "add":
+        ef_args.extend([
             args.name,
             "--project",
             str(project),
@@ -3187,7 +3264,21 @@ def migration_command(args: argparse.Namespace) -> int:
             context,
             "--output-dir",
             "Migrations",
-        ],
+            "--no-build",
+        ])
+    else:
+        ef_args.extend([
+            "--project",
+            str(project),
+            "--startup-project",
+            str(project),
+            "--context",
+            context,
+            "--force",
+            "--no-build",
+        ])
+    return run(
+        ef_args,
         check=False,
         env={connection_key: DESIGN_TIME_CONNECTION_STRING},
     ).returncode
@@ -3229,6 +3320,24 @@ def frontend_test_path(value: str) -> str:
     return normalized
 
 
+def frontend_format_path(value: str) -> str:
+    path = Path(value)
+    normalized = path.as_posix()
+    candidate = FRONTEND_DIR / path
+    if (
+        value.startswith("-")
+        or path.is_absolute()
+        or ".." in path.parts
+        or not candidate.is_file()
+        or not candidate.resolve().is_relative_to(FRONTEND_DIR.resolve())
+        or path.suffix not in {".css", ".js", ".json", ".jsonc", ".jsx", ".ts", ".tsx"}
+    ):
+        raise argparse.ArgumentTypeError(
+            "frontend format paths must name existing frontend-relative source files"
+        )
+    return normalized
+
+
 def frontend_command(args: argparse.Namespace) -> int:
     command = args.frontend_command
     rc = check_frontend_toolchain()
@@ -3247,6 +3356,10 @@ def frontend_command(args: argparse.Namespace) -> int:
         return run_frontend_npm(["exec", "--", "playwright", "install", "chromium"]).returncode
     if command == "ci":
         return run_frontend_npm(["run", "ci"]).returncode
+    if command == "format":
+        return run_frontend_npm(
+            ["exec", "--", "biome", "check", "--write", *args.source_paths]
+        ).returncode
     if command == "test":
         npm_args = ["run", "test"]
         vitest_args = list(getattr(args, "test_paths", []))
@@ -3820,7 +3933,7 @@ def generate_api_contracts(_args: argparse.Namespace | None = None) -> int:
             return rc
     commands = [
         ([exe("dotnet"), "tool", "restore"], ROOT, None),
-        ([exe("dotnet"), "build", "src/Axis.Api/Axis.Api.csproj", "--nologo"], ROOT, None),
+        ([exe("dotnet"), "build", "src/Axis.Api/Axis.Api.csproj", "--nologo", "-m:1"], ROOT, None),
         (
             [
                 exe("dotnet"),
@@ -3834,14 +3947,39 @@ def generate_api_contracts(_args: argparse.Namespace | None = None) -> int:
                 "v1",
             ],
             ROOT / "src" / "Axis.Api",
-            {"ASPNETCORE_ENVIRONMENT": "Testing", "DOTNET_ENVIRONMENT": "Testing"},
+            {
+                "ASPNETCORE_ENVIRONMENT": "Testing",
+                "DOTNET_ENVIRONMENT": "Testing",
+                "Redis__ConnectionString": "localhost:6379,abortConnect=false,connectTimeout=1000,syncTimeout=1000",
+            },
         ),
     ]
     for command, cwd, env in commands:
         result = run(command, cwd=cwd, env=env, check=False)
         if result.returncode != 0:
             return result.returncode
+    sync_solution_openapi_digest()
     return run_frontend_npm(["run", "gen:api-types"]).returncode
+
+
+def sync_solution_openapi_digest(
+    openapi_path: Path = ROOT / "openapi.json",
+    settings_path: Path = ROOT / "src" / "Axis.Api" / "appsettings.json",
+) -> None:
+    digest = hashlib.sha256(openapi_path.read_bytes()).hexdigest()
+    content = settings_path.read_text(encoding="utf-8")
+    updated, count = re.subn(
+        r'("AxisOpenApiSha256"\s*:\s*")[0-9a-f]{64}(")',
+        rf"\g<1>{digest}\g<2>",
+        content,
+        count=1,
+    )
+    if count != 1:
+        raise CheckError(
+            "src/Axis.Api/appsettings.json must declare one Solutions:AxisOpenApiSha256 value"
+        )
+    if updated != content:
+        settings_path.write_text(updated, encoding="utf-8")
 
 
 def install_hooks(_args: argparse.Namespace | None = None) -> int:
@@ -4023,6 +4161,119 @@ def resolve_local_dev_compose_overlays(values: Iterable[str]) -> tuple[Path, ...
     return tuple(overlays)
 
 
+def read_local_dev_topology() -> tuple[Path, ...] | None:
+    if not LOCAL_DEV_TOPOLOGY_STATE.is_file():
+        return None
+    try:
+        state = json.loads(LOCAL_DEV_TOPOLOGY_STATE.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise CheckError(
+            f"local-dev deployment topology state is invalid: {LOCAL_DEV_TOPOLOGY_STATE}"
+        ) from exc
+    values = state.get("composeOverlays") if isinstance(state, dict) else None
+    if (
+        not isinstance(state, dict)
+        or state.get("version") != 1
+        or not isinstance(values, list)
+        or not values
+    ):
+        raise CheckError(
+            f"local-dev deployment topology state is invalid: {LOCAL_DEV_TOPOLOGY_STATE}"
+        )
+    overlays: list[Path] = []
+    for value in values:
+        if not isinstance(value, str) or not Path(value).is_absolute():
+            raise CheckError(
+                f"local-dev deployment topology state is invalid: {LOCAL_DEV_TOPOLOGY_STATE}"
+            )
+        overlays.append(Path(value).resolve(strict=False))
+    return tuple(overlays)
+
+
+def write_local_dev_topology(overlays: tuple[Path, ...]) -> None:
+    if not overlays:
+        LOCAL_DEV_TOPOLOGY_STATE.unlink(missing_ok=True)
+        return
+    LOCAL_DEV_TOPOLOGY_STATE.parent.mkdir(parents=True, exist_ok=True)
+    LOCAL_DEV_TOPOLOGY_STATE.write_text(
+        json.dumps(
+            {
+                "version": 1,
+                "composeOverlays": [str(overlay) for overlay in overlays],
+            },
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+
+def claim_local_dev_topology(overlays: tuple[Path, ...]) -> None:
+    if overlays and read_local_dev_topology() is None:
+        write_local_dev_topology(overlays)
+
+
+def discover_local_dev_compose_overlays() -> tuple[Path, ...] | None:
+    config_files = run_optional(
+        [
+            exe("docker"),
+            "inspect",
+            "--format",
+            '{{ index .Config.Labels "com.docker.compose.project.config_files" }}',
+            f"{LOCAL_DEV_PROJECT_NAME}_api",
+        ],
+        timeout=DOCKER_PROBE_TIMEOUT_SECONDS,
+    )
+    if config_files is None:
+        raise CheckError("local-dev could not inspect the active deployment topology")
+    if config_files.returncode != 0:
+        if "no such object" in config_files.stderr.lower():
+            return None
+        raise CheckError("local-dev could not inspect the active deployment topology")
+    files = tuple(
+        Path(value).resolve(strict=False)
+        for value in config_files.stdout.strip().split(",")
+        if value
+    )
+    current_base = LOCAL_DEV_COMPOSE_FILE.resolve(strict=False)
+    if not files:
+        raise CheckError("local-dev active deployment topology metadata is invalid")
+    if files[0] != current_base:
+        if len(files) == 1 and not files[0].exists() and files[0].name == current_base.name:
+            return ()
+        raise CheckError("local-dev active deployment topology metadata is invalid")
+    return files[1:]
+
+
+def require_local_dev_topology(
+    action: str,
+    overlays: tuple[Path, ...],
+    *,
+    discover: bool = False,
+) -> None:
+    expected = read_local_dev_topology()
+    if expected is None and discover:
+        active_overlays = discover_local_dev_compose_overlays()
+        if active_overlays:
+            write_local_dev_topology(active_overlays)
+            expected = active_overlays
+    if expected is None or expected == overlays:
+        return
+    overlay_args = " ".join(
+        f"--compose-overlay {shlex.quote(str(overlay))}" for overlay in expected
+    )
+    remediation = (
+        "Use the owning product's local-dev wrapper or rerun Axis with the exact ordered "
+        f"overlay arguments: `{overlay_args}`."
+    )
+    if action == "dotnet run-api":
+        remediation += " Host-native run-api cannot prove overlay-owned deployment values."
+    raise CheckError(
+        f"{action}: deployment topology mismatch; persistent local data requires the "
+        f"recorded Compose overlays. {remediation}"
+    )
+
+
 def local_dev_env_args() -> list[str]:
     if LOCAL_DEV_ENV_FILE.is_file():
         return ["--env-file", str(LOCAL_DEV_ENV_FILE)]
@@ -4086,6 +4337,7 @@ def run_local_dev_browser(
     service: str = "e2e",
     build_services: Iterable[str] = (),
 ) -> int:
+    overlays = tuple(overlays)
     runtime_services = list(build_services)
     if runtime_services:
         runtime_build = run(
@@ -4097,6 +4349,7 @@ def run_local_dev_browser(
     up = run(local_dev_up_args(overlays=overlays), check=False)
     if up.returncode != 0:
         return up.returncode
+    claim_local_dev_topology(overlays)
     build = run(
         local_dev_compose_args(
             "--profile",
@@ -4562,12 +4815,26 @@ def local_dev(args: argparse.Namespace) -> int:
         return local_dev_untrust_certs(args)
 
     overlays = resolve_local_dev_compose_overlays(overlay_values)
+    command = args.local_dev_command
+    read_only = command in {"status", "logs"} or (
+        command == "observability"
+        and args.observability_command in {"status", "logs"}
+    )
+    replaces_topology = command == "reset-all"
+    if not read_only and not replaces_topology:
+        require_local_dev_topology(f"local-dev {command}", overlays)
 
     rc = require_docker_compose("local-dev")
     if rc != 0:
         return rc
 
-    command = args.local_dev_command
+    if not read_only and not replaces_topology:
+        require_local_dev_topology(
+            f"local-dev {command}",
+            overlays,
+            discover=True,
+        )
+
     if command == "up":
         result = run(
             local_dev_up_args(*args.services, build=args.build, overlays=overlays),
@@ -4575,6 +4842,7 @@ def local_dev(args: argparse.Namespace) -> int:
         )
         if result.returncode != 0:
             return result.returncode
+        claim_local_dev_topology(overlays)
         print("local-dev up: ready")
         if not args.services:
             print("web: https://localhost:3000")
@@ -4594,7 +4862,10 @@ def local_dev(args: argparse.Namespace) -> int:
             ):
                 return 1
             compose.append("--volumes")
-        return run(local_dev_compose_args(*compose, overlays=overlays), check=False).returncode
+        result = run(local_dev_compose_args(*compose, overlays=overlays), check=False)
+        if result.returncode == 0 and args.volumes:
+            write_local_dev_topology(())
+        return result.returncode
 
     if command in {"start", "stop", "restart"}:
         return run(
@@ -4606,14 +4877,17 @@ def local_dev(args: argparse.Namespace) -> int:
         if not args.services:
             print("local-dev recreate: name at least one service", file=sys.stderr)
             return 1
-        return run(
+        result = run(
             local_dev_up_args(
                 *args.services,
                 force_recreate=True,
                 overlays=overlays,
             ),
             check=False,
-        ).returncode
+        )
+        if result.returncode == 0:
+            claim_local_dev_topology(overlays)
+        return result.returncode
 
     if command == "status":
         return run(local_dev_compose_args("ps", overlays=overlays), check=False).returncode
@@ -4727,7 +5001,10 @@ def local_dev(args: argparse.Namespace) -> int:
             if remove_output:
                 print(remove_output, file=sys.stderr)
             return remove.returncode
-        return run(local_dev_up_args(overlays=overlays), check=False).returncode
+        up = run(local_dev_up_args(overlays=overlays), check=False)
+        if up.returncode == 0:
+            claim_local_dev_topology(overlays)
+        return up.returncode
 
     if command == "reset-all":
         if not explicit_confirmation(
@@ -4736,13 +5013,25 @@ def local_dev(args: argparse.Namespace) -> int:
             target="all Axis local-development volumes",
         ):
             return 1
+        previous_topology = read_local_dev_topology()
+        if previous_topology is None:
+            previous_topology = discover_local_dev_compose_overlays()
+            if previous_topology:
+                write_local_dev_topology(previous_topology)
         down = run(
-            local_dev_compose_args("down", "--volumes", overlays=overlays),
+            local_dev_compose_args(
+                "down",
+                "--volumes",
+                overlays=previous_topology or overlays,
+            ),
             check=False,
         )
         if down.returncode != 0:
             return down.returncode
-        return run(local_dev_up_args(overlays=overlays), check=False).returncode
+        up = run(local_dev_up_args(overlays=overlays), check=False)
+        if up.returncode == 0:
+            write_local_dev_topology(overlays)
+        return up.returncode
 
     raise CheckError(f"Unknown local-dev command: {command}")
 
@@ -5387,6 +5676,12 @@ def build_parser(
     migration_add.add_argument("module", choices=sorted(MIGRATION_TARGETS))
     migration_add.add_argument("name", help="PascalCase migration name")
     migration_add.set_defaults(func=migration_command)
+    migration_remove = migration_sub.add_parser(
+        "remove",
+        help="Remove the latest unpublished migration for one Axis module",
+    )
+    migration_remove.add_argument("module", choices=sorted(MIGRATION_TARGETS))
+    migration_remove.set_defaults(func=migration_command)
 
     frontend_parser = sub.add_parser("frontend", help="Run repository-standard frontend commands")
     frontend_sub = frontend_parser.add_subparsers(dest="frontend_command", required=True)
@@ -5403,6 +5698,17 @@ def build_parser(
     frontend_sync_lock.set_defaults(func=frontend_command)
     frontend_sub.add_parser("install-browsers", help="Install Playwright Chromium").set_defaults(func=frontend_command)
     frontend_sub.add_parser("ci", help="Run frontend type-check and lint gates").set_defaults(func=frontend_command)
+    frontend_format = frontend_sub.add_parser(
+        "format",
+        help="Apply Biome formatting and safe fixes to selected frontend source files",
+    )
+    frontend_format.add_argument(
+        "source_paths",
+        nargs="+",
+        type=frontend_format_path,
+        help="Existing frontend-relative source files",
+    )
+    frontend_format.set_defaults(func=frontend_command)
     frontend_test = frontend_sub.add_parser("test", help="Run all or selected frontend unit tests")
     frontend_test.add_argument(
         "test_paths",
@@ -5541,6 +5847,10 @@ def build_parser(
     check_sub.add_parser("ui-baseline", help="Check the approved frontend UI baseline").set_defaults(func=check_ui_baseline)
     check_sub.add_parser("theme", help="Check canonical theme generated artifacts").set_defaults(func=check_theme)
     check_sub.add_parser("frontend-quality", help="Run deterministic frontend policy checks").set_defaults(func=check_frontend_quality)
+    check_sub.add_parser(
+        "ui-foundation",
+        help="Validate the active UI constitution phase and status boundary",
+    ).set_defaults(func=check_ui_foundation)
     check_sub.add_parser("local-dev-docs", help="Check local-development docs against Compose").set_defaults(
         func=lambda _args: run_module_check("check-local-dev-docs.py", [])
     )

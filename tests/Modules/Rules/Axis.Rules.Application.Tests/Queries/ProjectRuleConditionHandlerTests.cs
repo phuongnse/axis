@@ -14,6 +14,8 @@ public sealed class ProjectRuleConditionHandlerTests
     {
         ProjectRuleConditionHandler sut = new(
             _context.CurrentUser,
+            _context.CurrentSubject,
+            _context.Authorization,
             new RuleConditionProjectionService());
 
         Result<RuleConditionProjectionDto> result = await sut.Handle(
@@ -43,6 +45,8 @@ public sealed class ProjectRuleConditionHandlerTests
     {
         ProjectRuleConditionHandler sut = new(
             _context.CurrentUser,
+            _context.CurrentSubject,
+            _context.Authorization,
             new RuleConditionProjectionService());
 
         Result<RuleConditionProjectionDto> result = await sut.Handle(
@@ -247,6 +251,8 @@ public sealed class ProjectRuleConditionHandlerTests
     {
         ProjectRuleConditionHandler sut = new(
             _context.CurrentUser,
+            _context.CurrentSubject,
+            _context.Authorization,
             new RuleConditionProjectionService());
         RuleConditionNodeDto condition = new(
             "value-missing",
@@ -274,6 +280,8 @@ public sealed class ProjectRuleConditionHandlerTests
     {
         ProjectRuleConditionHandler sut = new(
             _context.CurrentUser,
+            _context.CurrentSubject,
+            _context.Authorization,
             new RuleConditionProjectionService());
         RuleConditionNodeDto invalid = RuleDefinitionHandlerTestContext.ConditionDto() with
         {

@@ -10,7 +10,22 @@ internal sealed class BusinessObjectDefinitionConfiguration : IEntityTypeConfigu
 {
     public void Configure(EntityTypeBuilder<BusinessObjectDefinition> builder)
     {
-        builder.ToTable("business_object_definitions");
+        builder.ToTable("business_object_definitions", table => table.HasCheckConstraint(
+            "CK_business_object_definitions_installed_provenance",
+            """
+            (installed_solution_version_id IS NULL AND installed_component_key IS NULL AND
+             installed_component_hash IS NULL AND installed_operation_id IS NULL AND
+             installed_step_id IS NULL AND installed_lease_epoch IS NULL)
+            OR
+            (installed_solution_version_id IS NOT NULL AND installed_component_key IS NOT NULL AND
+             installed_component_hash IS NOT NULL AND installed_operation_id IS NOT NULL AND
+             installed_step_id IS NOT NULL AND installed_lease_epoch > 0 AND
+             installed_component_key ~ '^[a-z][a-z0-9_.:@-]{0,199}$' AND
+             installed_component_hash ~ '^[0-9a-f]{64}$' AND
+             installed_solution_version_id <> '00000000-0000-0000-0000-000000000000'::uuid AND
+             installed_operation_id <> '00000000-0000-0000-0000-000000000000'::uuid AND
+             installed_step_id <> '00000000-0000-0000-0000-000000000000'::uuid)
+            """));
         builder.HasKey(definition => definition.Id);
 
         builder.Property(definition => definition.Id)
@@ -27,7 +42,7 @@ internal sealed class BusinessObjectDefinitionConfiguration : IEntityTypeConfigu
 
         builder.Property(definition => definition.Name)
             .HasColumnName("name")
-            .HasMaxLength(200)
+            .HasMaxLength(256)
             .IsRequired();
 
         builder.Property(definition => definition.Key)
@@ -57,6 +72,22 @@ internal sealed class BusinessObjectDefinitionConfiguration : IEntityTypeConfigu
             .HasColumnName("updated_at")
             .IsRequired();
 
+        builder.Property(definition => definition.InstalledSolutionVersionId)
+            .HasColumnName("installed_solution_version_id");
+        builder.Property(definition => definition.InstalledComponentKey)
+            .HasColumnName("installed_component_key")
+            .HasMaxLength(200);
+        builder.Property(definition => definition.InstalledComponentHash)
+            .HasColumnName("installed_component_hash")
+            .HasMaxLength(64);
+        builder.Property(definition => definition.InstalledOperationId)
+            .HasColumnName("installed_operation_id");
+        builder.Property(definition => definition.InstalledStepId)
+            .HasColumnName("installed_step_id");
+        builder.Property(definition => definition.InstalledLeaseEpoch)
+            .HasColumnName("installed_lease_epoch");
+        builder.Ignore(definition => definition.IsInstalled);
+
         builder.Property<string>("SearchTitle")
             .HasColumnName("search_title")
             .HasComputedColumnSql(
@@ -77,6 +108,10 @@ internal sealed class BusinessObjectDefinitionConfiguration : IEntityTypeConfigu
 
         builder.HasIndex(definition => new { definition.WorkspaceId, definition.Key })
             .IsUnique();
+
+        builder.HasIndex(definition => new { definition.WorkspaceId, definition.InstalledComponentKey })
+            .IsUnique()
+            .HasFilter("installed_component_key IS NOT NULL");
 
         builder.HasIndex("SearchTitle")
             .HasDatabaseName("ix_business_object_definitions_search_title")

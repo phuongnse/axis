@@ -29,13 +29,62 @@ public sealed class BusinessObjectRecordRepositoryTests(BusinessObjectsDatabaseF
     public async ValueTask DisposeAsync() => await _context.DisposeAsync();
 
     [Fact]
+    public async Task ListOwnedForWorkspaceAsync_WhenOwnersDiffer_FiltersBeforeMaterialization()
+    {
+        Guid workspaceId = Guid.NewGuid();
+        Guid humanId = Guid.NewGuid();
+        Guid serviceId = Guid.NewGuid();
+        BusinessObjectDefinitionKey objectKey = BusinessObjectDefinitionKey.Create(UniqueKey("owned_record")).Value;
+        BusinessObjectRecord humanRecord = CreateRecord(
+            workspaceId,
+            SubjectReference.Human(humanId),
+            objectKey,
+            "human-record");
+        BusinessObjectRecord serviceRecord = CreateRecord(
+            workspaceId,
+            SubjectReference.Service(serviceId),
+            objectKey,
+            "service-record");
+        await _repository.AddAsync(humanRecord, TestContext.Current.CancellationToken);
+        await _repository.AddAsync(serviceRecord, TestContext.Current.CancellationToken);
+        await _unitOfWork.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        IReadOnlyList<BusinessObjectRecord> humanRecords = await _repository.ListOwnedForWorkspaceAsync(
+            workspaceId,
+            SubjectReference.Human(humanId),
+            objectKey,
+            1,
+            10,
+            TestContext.Current.CancellationToken);
+        IReadOnlyList<BusinessObjectRecord> serviceRecords = await _repository.ListOwnedForWorkspaceAsync(
+            workspaceId,
+            SubjectReference.Service(serviceId),
+            objectKey,
+            1,
+            10,
+            TestContext.Current.CancellationToken);
+
+        humanRecords.Should().ContainSingle(record => record.Id == humanRecord.Id);
+        serviceRecords.Should().ContainSingle(record => record.Id == serviceRecord.Id);
+        (await _repository.CountOwnedForWorkspaceAsync(
+            workspaceId,
+            SubjectReference.Human(humanId),
+            objectKey,
+            TestContext.Current.CancellationToken)).Should().Be(1);
+    }
+
+    [Fact]
     public async Task AddAsync_WhenRecordContainsValuesAndEvidence_RoundTripsAndSupportsWorkspaceQueries()
     {
         Guid workspaceId = Guid.NewGuid();
         Guid userId = Guid.NewGuid();
         BusinessObjectDefinitionKey objectKey = BusinessObjectDefinitionKey.Create(
             UniqueKey("business_record")).Value;
-        BusinessObjectRecord record = CreateRecord(workspaceId, userId, objectKey, "record-1");
+        BusinessObjectRecord record = CreateRecord(
+            workspaceId,
+            SubjectReference.Human(userId),
+            objectKey,
+            "record-1");
         record.Submit(
             expectedRevision: 1,
             values: record.Values,
@@ -47,7 +96,7 @@ public sealed class BusinessObjectRecordRepositoryTests(BusinessObjectsDatabaseF
                 1,
                 true,
                 [new("required-check", true)])],
-            userId,
+            SubjectReference.Human(userId),
             DateTime.UtcNow).IsSuccess.Should().BeTrue();
 
         await _repository.AddAsync(record, TestContext.Current.CancellationToken);
@@ -83,7 +132,7 @@ public sealed class BusinessObjectRecordRepositoryTests(BusinessObjectsDatabaseF
 
     private static BusinessObjectRecord CreateRecord(
         Guid workspaceId,
-        Guid userId,
+        SubjectReference owner,
         BusinessObjectDefinitionKey objectKey,
         string idempotencyKey)
     {
@@ -98,7 +147,7 @@ public sealed class BusinessObjectRecordRepositoryTests(BusinessObjectsDatabaseF
             {
                 ["display_name"] = ["Ada Lovelace"],
             },
-            userId,
+            owner,
             DateTime.UtcNow);
         result.IsSuccess.Should().BeTrue();
         return result.Value;

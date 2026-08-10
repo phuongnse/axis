@@ -1,3 +1,5 @@
+using Axis.Authorization.Contracts;
+using Axis.Identity.Contracts;
 using Axis.Rules.Application.Repositories;
 using Axis.Rules.Application.Services;
 using Axis.Rules.Contracts;
@@ -11,6 +13,8 @@ namespace Axis.Rules.Application.Commands.CreateRuleDefinition;
 
 public sealed class CreateRuleDefinitionHandler(
     ICurrentUser currentUser,
+    ICurrentSubject currentSubject,
+    IProductAuthorizationService authorization,
     IRuleDefinitionRepository repository,
     IUnitOfWork unitOfWork)
     : ICommandHandler<CreateRuleDefinitionCommand, RuleDefinitionDetailDto>
@@ -21,12 +25,16 @@ public sealed class CreateRuleDefinitionHandler(
     {
         if (currentUser.workspaceId is not Guid workspaceId)
             return RuleDefinitionFailures.MissingWorkspace<RuleDefinitionDetailDto>();
-        if (currentUser.UserId is not Guid userId)
-            return RuleDefinitionFailures.MissingUser<RuleDefinitionDetailDto>();
-
         Result<RuleDefinitionKey> key = RuleDefinitionKey.CreateWorkspaceFromName(command.Name);
         if (key.IsFailure)
             return RuleDefinitionFailures.Invalid<RuleDefinitionDetailDto>(key.Error);
+
+        ProductAuthorizationDecision decision = await RuleAuthorization.AuthorizeAsync(
+                authorization, workspaceId, currentSubject.Subject,
+                RuleProductActions.DefinitionManage, RuleProductActions.DefinitionResourceType,
+                key.Value.Value, null, cancellationToken);
+        if (!decision.IsAllowed)
+            return RuleDefinitionFailures.Authorization<RuleDefinitionDetailDto>(decision);
 
         if (BuiltInRuleCatalog.Definitions.Any(definition => definition.Key == key.Value) ||
             await repository.KeyExistsAsync(key.Value, workspaceId, cancellationToken))
@@ -39,7 +47,7 @@ public sealed class CreateRuleDefinitionHandler(
             key.Value,
             command.Name,
             command.Description,
-            userId,
+            RuleSubjectReferenceMapper.ToDomain(currentSubject.Subject),
             DateTime.UtcNow);
         if (definition.IsFailure)
             return RuleDefinitionFailures.Invalid<RuleDefinitionDetailDto>(definition.Error);
@@ -54,6 +62,6 @@ public sealed class CreateRuleDefinitionHandler(
             return RuleDefinitionFailures.DuplicateKey<RuleDefinitionDetailDto>();
         }
 
-        return RuleContractMapper.ToDetailDto(definition.Value);
+        return RuleContractMapper.ToDetailDto(definition.Value, canManage: true);
     }
 }

@@ -1,10 +1,11 @@
 export const transientItemHighlight =
-  'hover:bg-accent hover:text-accent-foreground focus-visible:bg-accent focus-visible:text-accent-foreground dark:hover:bg-accent dark:hover:text-accent-foreground';
+  'hover:bg-accent hover:text-accent-foreground focus-visible:bg-accent focus-visible:text-accent-foreground dark:hover:bg-accent dark:hover:text-accent-foreground transition-colors duration-axis-state ease-axis-state motion-reduce:transition-none';
 
 export const persistentItemHighlight =
   'bg-secondary text-secondary-foreground hover:bg-secondary hover:text-secondary-foreground dark:hover:bg-secondary dark:hover:text-secondary-foreground';
 
-export const selectedItemHighlight = 'aria-selected:bg-accent aria-selected:text-accent-foreground';
+export const selectedItemHighlight =
+  'aria-selected:bg-secondary aria-selected:text-secondary-foreground';
 
 export const keyboardFocusRing = 'focus-visible:ring-2 focus-visible:ring-ring';
 

@@ -1,0 +1,500 @@
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { MailPlus, RefreshCw, UserMinus } from 'lucide-react';
+import { type FormEvent, useEffect, useId, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { AsyncButton } from '@/components/shared/AsyncButton';
+import { ManagedDialog, ManagedDialogBody } from '@/components/shared/ManagedDialog';
+import type {
+  ManagedWindowDescriptor,
+  ManagedWindowRendererProps,
+  ManagedWindowRendererRegistry,
+} from '@/components/shared/ManagedWindowManager';
+import { useCurrentManagedWindow } from '@/components/shared/ManagedWindowManager';
+import { StatusBadge } from '@/components/shared/StatusBadge';
+import { StatusNotice, type StatusNoticeTone } from '@/components/shared/StatusNotice';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
+import { Button } from '@/components/ui/button';
+import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field';
+import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { ApiError } from '@/lib/api';
+import type { WorkspaceInvitationLifecycleDto } from '@/lib/api-generated';
+import {
+  inviteWorkspaceMember,
+  resendWorkspaceInvitation,
+  revokeWorkspaceInvitation,
+  workspaceInvitationKeys,
+} from './api';
+
+const MEMBERSHIP_INVITE_KIND = 'memberships.invite';
+const MEMBERSHIP_INVITATION_KIND = 'memberships.invitation';
+type WorkspaceRole = 'Administrator' | 'Member';
+type Feedback = { tone: StatusNoticeTone; title: string; body: string };
+
+export function membershipInviteWindowDescriptor(title: string): ManagedWindowDescriptor {
+  return {
+    id: 'memberships:invite',
+    kind: MEMBERSHIP_INVITE_KIND,
+    resourceKey: 'invite',
+    title,
+  };
+}
+
+export function membershipInvitationWindowDescriptor(
+  invitation: WorkspaceInvitationLifecycleDto,
+  title: string,
+): ManagedWindowDescriptor {
+  return {
+    id: `memberships:${invitation.invitationId}`,
+    kind: MEMBERSHIP_INVITATION_KIND,
+    resourceKey: invitation.invitationId ?? title,
+    title,
+    payload: invitation,
+  };
+}
+
+export const membershipsManagedWindowRenderers: ManagedWindowRendererRegistry = {
+  [MEMBERSHIP_INVITE_KIND]: MembershipInviteWindowRenderer,
+  [MEMBERSHIP_INVITATION_KIND]: MembershipInvitationWindowRenderer,
+};
+
+function MembershipInviteWindowRenderer() {
+  const { windowId, closeWindow } = useCurrentManagedWindow();
+  return <MembershipInviteDialog onClose={() => closeWindow(windowId)} />;
+}
+
+function MembershipInvitationWindowRenderer({ descriptor }: ManagedWindowRendererProps) {
+  const { t } = useTranslation();
+  const { windowId, closeWindow } = useCurrentManagedWindow();
+  const invitation = readInvitation(descriptor);
+  if (!invitation) {
+    return (
+      <ManagedDialog
+        open
+        title={descriptor.title}
+        onOpenChange={(open) => {
+          if (!open) closeWindow(windowId);
+        }}
+        footer={
+          <Button type="button" variant="outline" onClick={() => closeWindow(windowId)}>
+            {t('app.close')}
+          </Button>
+        }
+      >
+        <ManagedDialogBody>
+          <p role="alert">{t('dialog.unavailable')}</p>
+        </ManagedDialogBody>
+      </ManagedDialog>
+    );
+  }
+  return (
+    <MembershipInvitationDialog
+      initialInvitation={invitation}
+      onClose={() => closeWindow(windowId)}
+    />
+  );
+}
+
+function MembershipInviteDialog({ onClose }: { onClose: () => void }) {
+  const { t } = useTranslation();
+  const queryClient = useQueryClient();
+  const baseId = useId();
+  const formId = `${baseId}-form`;
+  const emailId = `${baseId}-email`;
+  const roleId = `${baseId}-role`;
+  const [email, setEmail] = useState('');
+  const [role, setRole] = useState<WorkspaceRole>('Member');
+  const [emailError, setEmailError] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<Feedback | null>(null);
+  const [discardOpen, setDiscardOpen] = useState(false);
+  const dirty = Boolean(email.trim()) || role !== 'Member';
+  const mutation = useMutation({
+    mutationFn: inviteWorkspaceMember,
+    onSuccess: async (result) => {
+      setEmail('');
+      setRole('Member');
+      setEmailError(null);
+      setFeedback({
+        tone: 'success',
+        title: t('memberships.inviteSucceeded'),
+        body:
+          result.outcome === 'ExistingMember'
+            ? t('memberships.existingMember')
+            : result.outcome === 'CanonicalPending'
+              ? t('memberships.canonicalPending')
+              : t('memberships.deliveryQueued'),
+      });
+      await queryClient.invalidateQueries({ queryKey: workspaceInvitationKeys.all });
+    },
+    onError: (error) => {
+      if (invitationEmailCode(error)) {
+        setEmailError(t('memberships.emailInvalid'));
+        return;
+      }
+      setFeedback(problemFeedback(error, t));
+    },
+  });
+
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setFeedback(null);
+    const normalized = email.trim();
+    if (!normalized.includes('@')) {
+      setEmailError(t('memberships.emailInvalid'));
+      return;
+    }
+    setEmailError(null);
+    mutation.mutate({ email: normalized, requestedRole: role });
+  }
+
+  function requestClose() {
+    if (dirty) setDiscardOpen(true);
+    else onClose();
+  }
+
+  return (
+    <>
+      <ManagedDialog
+        open
+        title={t('memberships.invite')}
+        description={t('memberships.description')}
+        onOpenChange={(open) => {
+          if (!open) requestClose();
+        }}
+        closeDisabled={mutation.isPending}
+        dirty={dirty}
+        footer={
+          <>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={mutation.isPending}
+              onClick={requestClose}
+            >
+              {t('app.cancel')}
+            </Button>
+            <AsyncButton
+              type="submit"
+              form={formId}
+              disabled={mutation.isPending || !email.trim()}
+              icon={<MailPlus aria-hidden />}
+              pending={mutation.isPending}
+              pendingLabel={t('memberships.inviting')}
+            >
+              {t('memberships.invite')}
+            </AsyncButton>
+          </>
+        }
+      >
+        <form id={formId} className="contents" onSubmit={submit} noValidate>
+          <ManagedDialogBody className="space-y-4">
+            {feedback ? (
+              <div aria-live="polite">
+                <StatusNotice tone={feedback.tone} title={feedback.title}>
+                  {feedback.body}
+                </StatusNotice>
+              </div>
+            ) : null}
+            <Field data-invalid={Boolean(emailError)}>
+              <FieldLabel htmlFor={emailId}>{t('memberships.email')}</FieldLabel>
+              <Input
+                id={emailId}
+                type="email"
+                autoComplete="email"
+                value={email}
+                aria-invalid={Boolean(emailError)}
+                disabled={mutation.isPending}
+                onChange={(event) => {
+                  setEmail(event.target.value);
+                  setEmailError(null);
+                }}
+              />
+              {emailError ? (
+                <FieldError>{emailError}</FieldError>
+              ) : (
+                <FieldDescription>{t('memberships.emailHelp')}</FieldDescription>
+              )}
+            </Field>
+            <Field>
+              <FieldLabel htmlFor={roleId}>{t('memberships.role')}</FieldLabel>
+              <Select
+                value={role}
+                onValueChange={(value) => setRole(value as WorkspaceRole)}
+                disabled={mutation.isPending}
+              >
+                <SelectTrigger id={roleId} className="w-full">
+                  <SelectValue>{t(`memberships.role${role}`)}</SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Member">{t('memberships.roleMember')}</SelectItem>
+                  <SelectItem value="Administrator">
+                    {t('memberships.roleAdministrator')}
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+              <FieldDescription>{t('memberships.roleHelp')}</FieldDescription>
+            </Field>
+          </ManagedDialogBody>
+        </form>
+      </ManagedDialog>
+      <AlertDialog open={discardOpen} onOpenChange={setDiscardOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('memberships.discardInviteTitle')}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t('memberships.discardInviteDescription')}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t('memberships.keepEditing')}</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              onClick={() => {
+                setDiscardOpen(false);
+                onClose();
+              }}
+            >
+              {t('memberships.discardInvite')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
+}
+
+function MembershipInvitationDialog({
+  initialInvitation,
+  onClose,
+}: {
+  initialInvitation: WorkspaceInvitationLifecycleDto;
+  onClose: () => void;
+}) {
+  const { t, i18n } = useTranslation();
+  const queryClient = useQueryClient();
+  const [invitation, setInvitation] = useState(initialInvitation);
+  const [feedback, setFeedback] = useState<Feedback | null>(null);
+  const dateFormatter = new Intl.DateTimeFormat(i18n.language, {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  });
+  useEffect(() => {
+    if ((initialInvitation.revision ?? 0) >= (invitation.revision ?? 0)) {
+      setInvitation(initialInvitation);
+    }
+  }, [initialInvitation, invitation.revision]);
+  const resendMutation = useMutation({
+    mutationFn: ({ invitationId, revision }: { invitationId: string; revision: number }) =>
+      resendWorkspaceInvitation(invitationId, { expectedRevision: revision }),
+    onSuccess: async (result) => {
+      setInvitation(result);
+      setFeedback({
+        tone: 'success',
+        title: t('memberships.resendSucceeded'),
+        body: t('memberships.resendSucceededDescription'),
+      });
+      await queryClient.invalidateQueries({ queryKey: workspaceInvitationKeys.all });
+    },
+    onError: (error) => setFeedback(problemFeedback(error, t)),
+  });
+  const revokeMutation = useMutation({
+    mutationFn: ({ invitationId, revision }: { invitationId: string; revision: number }) =>
+      revokeWorkspaceInvitation(invitationId, { expectedRevision: revision }),
+    onSuccess: async (result) => {
+      setInvitation(result);
+      setFeedback({
+        tone: 'success',
+        title: t('memberships.revokeSucceeded'),
+        body: t('memberships.revokeSucceededDescription'),
+      });
+      await queryClient.invalidateQueries({ queryKey: workspaceInvitationKeys.all });
+    },
+    onError: (error) => setFeedback(problemFeedback(error, t)),
+  });
+  const invitationId = invitation.invitationId;
+  const revision = invitation.revision;
+  const pending = invitation.status === 'Pending';
+  const actionable = pending && invitationId !== undefined && revision !== undefined;
+  const busy = resendMutation.isPending || revokeMutation.isPending;
+  const title = invitation.recipientEmail ?? t('memberships.recipientRemoved');
+
+  return (
+    <ManagedDialog
+      open
+      title={title}
+      description={t('memberships.description')}
+      titleAccessory={
+        <StatusBadge tone={statusTone(invitation.status)}>
+          {t(`memberships.status${invitation.status ?? 'Pending'}`)}
+        </StatusBadge>
+      }
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
+      closeDisabled={busy}
+      footer={
+        <>
+          <Button type="button" variant="outline" disabled={busy} onClick={onClose}>
+            {t('app.close')}
+          </Button>
+          {actionable ? (
+            <AsyncButton
+              type="button"
+              variant="secondary"
+              disabled={busy}
+              onClick={() => resendMutation.mutate({ invitationId, revision })}
+              icon={<RefreshCw aria-hidden />}
+              pending={resendMutation.isPending}
+              pendingLabel={t('memberships.resending')}
+            >
+              {t('memberships.resend')}
+            </AsyncButton>
+          ) : null}
+          {actionable ? (
+            <AlertDialog>
+              <AlertDialogTrigger
+                render={
+                  <AsyncButton
+                    type="button"
+                    variant="destructive"
+                    disabled={busy}
+                    icon={<UserMinus aria-hidden />}
+                    pending={revokeMutation.isPending}
+                    pendingLabel={t('memberships.revoking')}
+                  >
+                    {t('memberships.revoke')}
+                  </AsyncButton>
+                }
+              />
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>{t('memberships.revokeConfirmTitle')}</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    {t('memberships.revokeConfirmDescription')}
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>{t('app.cancel')}</AlertDialogCancel>
+                  <AlertDialogAction
+                    variant="destructive"
+                    onClick={() => revokeMutation.mutate({ invitationId, revision })}
+                  >
+                    {t('memberships.revoke')}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          ) : null}
+        </>
+      }
+    >
+      <ManagedDialogBody className="space-y-4">
+        {feedback ? (
+          <div aria-live="polite">
+            <StatusNotice tone={feedback.tone} title={feedback.title}>
+              {feedback.body}
+            </StatusNotice>
+          </div>
+        ) : null}
+        <dl className="grid gap-4 text-sm sm:grid-cols-2">
+          <Fact label={t('memberships.email')} value={title} />
+          <Fact
+            label={t('memberships.role')}
+            value={t(`memberships.role${invitation.requestedRole ?? 'Member'}`)}
+          />
+          <Fact
+            label={t('memberships.status')}
+            value={t(`memberships.status${invitation.status ?? 'Pending'}`)}
+          />
+          <Fact
+            label={t('memberships.delivery')}
+            value={t(`memberships.delivery${invitation.deliveryStatus ?? 'Pending'}`)}
+          />
+          <Fact
+            label={t('memberships.expires')}
+            value={
+              invitation.expiresAt
+                ? dateFormatter.format(new Date(invitation.expiresAt))
+                : t('memberships.notAvailable')
+            }
+          />
+        </dl>
+      </ManagedDialogBody>
+    </ManagedDialog>
+  );
+}
+
+function readInvitation(
+  descriptor: ManagedWindowDescriptor,
+): WorkspaceInvitationLifecycleDto | null {
+  if (typeof descriptor.payload !== 'object' || descriptor.payload === null) return null;
+  if (!('invitationId' in descriptor.payload)) return null;
+  return descriptor.payload as WorkspaceInvitationLifecycleDto;
+}
+
+function Fact({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0">
+      <dt className="font-medium text-muted-foreground">{label}</dt>
+      <dd className="break-words text-foreground">{value}</dd>
+    </div>
+  );
+}
+
+function statusTone(status: string | undefined) {
+  if (status === 'Accepted') return 'success' as const;
+  if (status === 'Pending') return 'info' as const;
+  return 'muted' as const;
+}
+
+function invitationEmailCode(error: unknown): boolean {
+  if (!(error instanceof ApiError) || typeof error.data !== 'object' || error.data === null)
+    return false;
+  const codes = (error.data as { errorCodes?: Record<string, string[]> }).errorCodes?.email ?? [];
+  return codes.includes('identity.invitation.emailInvalid');
+}
+
+function problemFeedback(error: unknown, t: (key: string) => string): Feedback {
+  if (error instanceof ApiError && error.status === 429) {
+    return {
+      tone: 'warning',
+      title: t('memberships.rateLimited'),
+      body: t('memberships.rateLimitedDescription'),
+    };
+  }
+  if (error instanceof ApiError && error.status === 409) {
+    return {
+      tone: 'warning',
+      title: t('memberships.changed'),
+      body: t('memberships.changedDescription'),
+    };
+  }
+  if (error instanceof ApiError && (error.status === 403 || error.status === 404)) {
+    return {
+      tone: 'destructive',
+      title: t('memberships.forbidden'),
+      body: t('memberships.forbiddenDescription'),
+    };
+  }
+  return {
+    tone: 'destructive',
+    title: t('memberships.actionFailed'),
+    body: t('memberships.actionFailedDescription'),
+  };
+}

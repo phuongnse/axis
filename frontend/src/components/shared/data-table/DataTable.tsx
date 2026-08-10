@@ -26,13 +26,13 @@ import {
   ChevronUp,
   EyeOff,
   ListX,
-  LoaderCircle,
   Pin,
   PinOff,
   RefreshCw,
   TriangleAlert,
 } from 'lucide-react';
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { AsyncButton } from '@/components/shared/AsyncButton';
 import {
   persistentItemHighlight,
   transientItemHighlight,
@@ -70,6 +70,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { usePendingVisibility } from '@/hooks/usePendingVisibility';
 import { cn } from '@/lib/utils';
 import { DataTableToolbar } from './DataTableToolbar';
 import {
@@ -115,6 +116,8 @@ export function DataTable<TData>({ definition }: { definition: DataTableDefiniti
       source.mode === 'client' && source.pagination ? (source.pagination.pageSize ?? 20) : 20,
   }));
   const scrollRef = useRef<HTMLDivElement>(null);
+  const showInitialLoading = usePendingVisibility(Boolean(definition.loading));
+  const initialLoading = !definition.error && (Boolean(definition.loading) || showInitialLoading);
 
   const updateQuery = useCallback(
     (next: DataTableQueryState) => {
@@ -271,17 +274,17 @@ export function DataTable<TData>({ definition }: { definition: DataTableDefiniti
 
   const selectedRows = table.getSelectedRowModel().flatRows;
   const hasRows = rows.length > 0;
-  const renderVirtualRows = virtualized && hasRows && !definition.loading && !definition.error;
+  const renderVirtualRows = virtualized && hasRows && !initialLoading && !definition.error;
   const hasQuery = Boolean(query.globalFilter) || countFilterConditions(query.filterExpression) > 0;
   const visibleColumnCount = Math.max(table.getVisibleLeafColumns().length, 1);
 
   return (
     <section
       aria-label={definition.ariaLabel}
-      aria-busy={definition.loading || undefined}
+      aria-busy={initialLoading || undefined}
       data-slot="data-table"
       data-mode={source.mode}
-      className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-sm border border-border bg-card"
+      className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-axis-flat border border-border bg-card shadow-axis-none"
     >
       <DataTableToolbar
         table={table}
@@ -329,7 +332,7 @@ export function DataTable<TData>({ definition }: { definition: DataTableDefiniti
               ))}
             </colgroup>
           ) : null}
-          <TableHeader className={cn('sticky top-0 z-20 bg-card', virtualized && 'grid')}>
+          <TableHeader className={cn('sticky top-0 z-axis-sticky bg-card', virtualized && 'grid')}>
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id} className={cn(virtualized && 'flex w-full')}>
                 {headerGroup.headers.map((header) => (
@@ -376,10 +379,11 @@ export function DataTable<TData>({ definition }: { definition: DataTableDefiniti
             className={cn(virtualized && 'relative grid')}
             style={renderVirtualRows ? { height: rowVirtualizer.getTotalSize() } : undefined}
           >
-            {definition.loading ? (
+            {initialLoading ? (
               <LoadingRows
                 columns={table.getVisibleLeafColumns()}
                 messages={messages}
+                visible={showInitialLoading}
                 virtualized={virtualized}
               />
             ) : definition.error ? (
@@ -690,16 +694,21 @@ function StateRow({
 function LoadingRows<TData>({
   columns,
   messages,
+  visible,
   virtualized,
 }: {
   columns: readonly Column<TData, unknown>[];
   messages: DataTableMessages;
+  visible: boolean;
   virtualized: boolean;
 }) {
   return (
     <>
       {loadingRowIds.map((rowId, row) => (
-        <TableRow key={`loading-${rowId}`} className={cn(virtualized && 'flex w-full')}>
+        <TableRow
+          key={`loading-${rowId}`}
+          className={cn(!visible && 'invisible', virtualized && 'flex w-full')}
+        >
           {columns.map((columnDefinition, column) => (
             <TableCell
               key={`loading-${rowId}-${columnDefinition.id}`}
@@ -836,18 +845,17 @@ function DataTableFooter<TData>({
       ) : source.mode === 'infinite' ? (
         <div className="ml-auto flex items-center gap-2">
           {source.hasNextPage ? (
-            <Button
+            <AsyncButton
               type="button"
               variant="outline"
               size="sm"
-              disabled={source.isFetchingNextPage}
+              icon={<ChevronDown />}
+              pending={source.isFetchingNextPage}
+              pendingLabel={messages.loadingMore}
               onClick={() => void source.fetchNextPage()}
             >
-              {source.isFetchingNextPage ? (
-                <LoaderCircle className="animate-spin" aria-hidden />
-              ) : null}
-              {source.isFetchingNextPage ? messages.loadingMore : messages.loadMore}
-            </Button>
+              {messages.loadMore}
+            </AsyncButton>
           ) : (
             <span className="text-xs text-muted-foreground">{messages.endOfList}</span>
           )}

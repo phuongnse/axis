@@ -31,6 +31,7 @@ internal static class ProblemDetailsDefaults
             ErrorCodes.InvalidInput => "common.invalidInput",
             ErrorCodes.PlanLimit => "common.planLimit",
             ErrorCodes.RateLimited => RateLimitedCode,
+            ErrorCodes.Unavailable => "common.unavailable",
             _ => "common.businessRule",
         };
 

@@ -10,7 +10,8 @@ namespace Axis.Identity.Application.Commands.VerifyEmail;
 public sealed class VerifyEmailHandler(
     IEmailVerificationTokenStore tokenStore,
     IUserRepository userRepo,
-    IWorkspaceRepository WorkspaceRepo,
+    IWorkspaceRepository workspaceRepo,
+    IWorkspaceMembershipRepository workspaceMemberships,
     IUnitOfWork uow)
     : ICommandHandler<VerifyEmailCommand, VerifyEmailSuccessDto>
 {
@@ -78,7 +79,16 @@ public sealed class VerifyEmailHandler(
                 IdentityProblemCodes.EmailVerificationAlreadyUsedToken);
         }
 
-        Workspace? personalWorkspace = await WorkspaceRepo.GetPersonalByOwnerUserIdAsync(user.Id, cancellationToken);
+        Workspace? personalWorkspace = null;
+        foreach (WorkspaceMembership membership in await workspaceMemberships.ListActiveForUserAsync(user.Id, cancellationToken))
+        {
+            Workspace? candidate = await workspaceRepo.GetByIdAsync(membership.WorkspaceId, cancellationToken);
+            if (membership.Role == WorkspaceMembershipRole.Owner && candidate?.Type == WorkspaceType.Personal)
+            {
+                personalWorkspace = candidate;
+                break;
+            }
+        }
         if (personalWorkspace is null)
         {
             return Result.Failure<VerifyEmailSuccessDto>(

@@ -1,4 +1,4 @@
-import { expect, type Locator, type Page, test } from '@playwright/test';
+import { expect, type Locator, type Page, type TestInfo, test } from '@playwright/test';
 
 const profile = {
   id: '11111111-1111-4111-8111-111111111111',
@@ -19,6 +19,7 @@ const profile = {
   ],
 };
 const definitionId = '33333333-3333-4333-8333-333333333333';
+const secondDefinitionId = '77777777-7777-4777-8777-777777777777';
 const fieldId = '44444444-4444-4444-8444-444444444444';
 const versionId = '55555555-5555-4555-8555-555555555555';
 const bindingId = '66666666-6666-4666-8666-666666666666';
@@ -102,10 +103,12 @@ interface BusinessObjectDefinitionRequest {
 type TestTheme = 'light' | 'dark';
 
 interface MockBusinessObjectDefinitionApiOptions {
+  canStartCreate?: boolean;
   createDefinitionFailure?: {
     status: number;
     body: unknown;
   };
+  initialDefinitions?: BusinessObjectDefinitionDetail[];
 }
 
 interface MockBusinessObjectDefinitionRequest {
@@ -119,18 +122,20 @@ type BusinessObjectDefinitionRequests = (() => string[]) & {
 };
 
 function unpublishedDetail({
+  id = definitionId,
   name,
   objectKey,
   revision,
   fields = [],
 }: {
+  id?: string;
   name: string;
   objectKey: string;
   revision: number;
   fields?: BusinessObjectFieldRequest[];
 }) {
   return {
-    id: definitionId,
+    id,
     workspaceId: profile.workspaceId,
     name,
     objectKey,
@@ -139,6 +144,7 @@ function unpublishedDetail({
     latestPublishedVersionNumber: null as number | null,
     createdAt: now,
     updatedAt: now,
+    actions: { canSave: true, canPublish: true },
     fields: fields.map((field, index) => ({
       id: index === 0 ? fieldId : `44444444-4444-4444-8444-${String(index).padStart(12, '0')}`,
       order: index,
@@ -147,7 +153,7 @@ function unpublishedDetail({
     latestPublishedVersion: null as {
       id: string;
       versionNumber: number;
-      publishedByUserId: string;
+      publishedBySubject: { kind: 'Human'; subjectId: string };
       publishedAt: string;
       fields: unknown[];
     } | null,
@@ -179,17 +185,19 @@ function publishedDetail(definition: BusinessObjectDefinitionDetail) {
 
   return {
     ...unpublishedDetail({
+      id: definition.id,
       name: definition.name,
       objectKey: definition.objectKey,
       revision: definition.revision,
       fields,
     }),
     status: 'Published',
+    actions: { canSave: false, canPublish: false },
     latestPublishedVersionNumber: 1,
     latestPublishedVersion: {
       id: versionId,
       versionNumber: 1,
-      publishedByUserId: profile.id,
+      publishedBySubject: { kind: 'Human', subjectId: profile.id },
       publishedAt: now,
       fields: fields.map((field, index) => ({
         id: index === 0 ? fieldId : `44444444-4444-4444-8444-${String(index).padStart(12, '0')}`,
@@ -202,16 +210,20 @@ function publishedDetail(definition: BusinessObjectDefinitionDetail) {
 
 async function mockAuthenticatedSession(
   page: Page,
-  options: { theme?: TestTheme } = {},
+  options: { language?: 'en' | 'vi'; theme?: TestTheme } = {},
 ): Promise<void> {
+  const language = options.language ?? 'en';
   const theme = options.theme ?? 'light';
-  const sessionProfile = { ...profile, theme };
+  const sessionProfile = { ...profile, language, theme };
 
-  await page.addInitScript((selectedTheme) => {
-    (window as Window & { __AXIS_DISABLE_DEVTOOLS__?: boolean }).__AXIS_DISABLE_DEVTOOLS__ = true;
-    localStorage.setItem('axis.language', 'en');
-    localStorage.setItem('axis.theme', selectedTheme);
-  }, theme);
+  await page.addInitScript(
+    ({ selectedLanguage, selectedTheme }) => {
+      (window as Window & { __AXIS_DISABLE_DEVTOOLS__?: boolean }).__AXIS_DISABLE_DEVTOOLS__ = true;
+      localStorage.setItem('axis.language', selectedLanguage);
+      localStorage.setItem('axis.theme', selectedTheme);
+    },
+    { selectedLanguage: language, selectedTheme: theme },
+  );
 
   await page.route('**/api/auth/session', async (route) => {
     await route.fulfill({
@@ -238,6 +250,40 @@ async function mockAuthenticatedSession(
     });
   });
 
+  await page.route('**/api/workspace-context/eligible', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([
+        {
+          workspaceId: sessionProfile.workspaceId,
+          name: 'Test workspace',
+          slug: 'test-workspace',
+          type: 'Organization',
+          organizationId: '33333333-3333-4333-8333-333333333333',
+          isCurrent: true,
+        },
+      ]),
+    });
+  });
+
+  await page.route('**/api/module-navigation', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        availableContributionIds: [
+          'identity.memberships',
+          'identity.service-identities',
+          'authorization.product-roles',
+          'businessObjects.definitions',
+          'rules.fieldDefinitions',
+          'solutions.management',
+        ],
+      }),
+    });
+  });
+
   await page.route('**/api/auth/sign-out', async (route) => {
     await route.fulfill({ status: 204 });
   });
@@ -247,13 +293,18 @@ async function mockBusinessObjectDefinitionApi(
   page: Page,
   options: MockBusinessObjectDefinitionApiOptions = {},
 ): Promise<BusinessObjectDefinitionRequests> {
-  let currentDefinition = unpublishedDetail({
-    name: 'Customer',
-    objectKey: 'customer',
-    revision: 1,
-  });
-  let hasDefinition = false;
+  const definitions = new Map(
+    (options.initialDefinitions ?? []).map((definition) => [definition.id, definition]),
+  );
   const requests: MockBusinessObjectDefinitionRequest[] = [];
+
+  await page.route('**/api/rules/actions', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ canStartCreate: true }),
+    });
+  });
 
   await page.route('**/api/rules?**', async (route) => {
     await route.fulfill({
@@ -290,20 +341,25 @@ async function mockBusinessObjectDefinitionApi(
     const requestEntry: MockBusinessObjectDefinitionRequest = { method, path: url.pathname };
     requests.push(requestEntry);
 
+    if (method === 'GET' && url.pathname === '/api/business-object-definitions/actions') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ canStartCreate: options.canStartCreate ?? true }),
+      });
+      return;
+    }
+
     if (method === 'GET' && url.pathname === '/api/business-object-definitions') {
-      const candidates = hasDefinition
-        ? [
-            {
-              id: currentDefinition.id,
-              name: currentDefinition.name,
-              objectKey: currentDefinition.objectKey,
-              status: currentDefinition.status,
-              revision: currentDefinition.revision,
-              latestPublishedVersionNumber: currentDefinition.latestPublishedVersionNumber,
-              updatedAt: currentDefinition.updatedAt,
-            },
-          ]
-        : [];
+      const candidates = [...definitions.values()].map((definition) => ({
+        id: definition.id,
+        name: definition.name,
+        objectKey: definition.objectKey,
+        status: definition.status,
+        revision: definition.revision,
+        latestPublishedVersionNumber: definition.latestPublishedVersionNumber,
+        updatedAt: definition.updatedAt,
+      }));
       const query = url.searchParams.get('query')?.trim().toLocaleLowerCase();
       const items = query
         ? candidates.filter((definition) =>
@@ -321,11 +377,17 @@ async function mockBusinessObjectDefinitionApi(
       return;
     }
 
-    if (method === 'GET' && url.pathname === `/api/business-object-definitions/${definitionId}`) {
+    const detailMatch = url.pathname.match(/^\/api\/business-object-definitions\/([^/]+)$/);
+    if (method === 'GET' && detailMatch) {
+      const definition = definitions.get(detailMatch[1]);
+      if (!definition) {
+        await route.fulfill({ status: 404, body: `${method} ${url.pathname}` });
+        return;
+      }
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify(currentDefinition),
+        body: JSON.stringify(definition),
       });
       return;
     }
@@ -342,52 +404,65 @@ async function mockBusinessObjectDefinitionApi(
 
       const body = request.postDataJSON() as BusinessObjectDefinitionRequest;
       requestEntry.body = body;
-      currentDefinition = unpublishedDetail({
+      const definition = unpublishedDetail({
         name: body.name,
         objectKey: deriveObjectKey(body.name),
         revision: 1,
       });
-      hasDefinition = true;
+      definitions.set(definition.id, definition);
       await route.fulfill({
         status: 201,
         contentType: 'application/json',
-        body: JSON.stringify(currentDefinition),
+        body: JSON.stringify(definition),
       });
       return;
     }
 
-    if (
-      method === 'PUT' &&
-      url.pathname === `/api/business-object-definitions/${definitionId}/unpublished`
-    ) {
+    const saveMatch = url.pathname.match(
+      /^\/api\/business-object-definitions\/([^/]+)\/unpublished$/,
+    );
+    if (method === 'PUT' && saveMatch) {
+      const currentDefinition = definitions.get(saveMatch[1]);
+      if (!currentDefinition) {
+        await route.fulfill({ status: 404, body: `${method} ${url.pathname}` });
+        return;
+      }
       const body = request.postDataJSON() as BusinessObjectDefinitionRequest;
       requestEntry.body = body;
-      currentDefinition = unpublishedDetail({
+      const definition = unpublishedDetail({
+        id: currentDefinition.id,
         name: body.name,
         objectKey: currentDefinition.objectKey,
-        revision: 2,
+        revision: currentDefinition.revision + 1,
         fields: body.fields?.map((field) => ({
           ...field,
           rules: field.rules?.map((rule) => ({ ...rule, bindingRevision: 1 })),
         })),
       });
+      definitions.set(definition.id, definition);
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify(currentDefinition),
+        body: JSON.stringify(definition),
       });
       return;
     }
 
-    if (
-      method === 'POST' &&
-      url.pathname === `/api/business-object-definitions/${definitionId}/publish`
-    ) {
-      currentDefinition = publishedDetail(currentDefinition);
+    const publishMatch = url.pathname.match(
+      /^\/api\/business-object-definitions\/([^/]+)\/publish$/,
+    );
+    if (method === 'POST' && publishMatch) {
+      const currentDefinition = definitions.get(publishMatch[1]);
+      if (!currentDefinition) {
+        await route.fulfill({ status: 404, body: `${method} ${url.pathname}` });
+        return;
+      }
+      const definition = publishedDetail(currentDefinition);
+      definitions.set(definition.id, definition);
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify(currentDefinition),
+        body: JSON.stringify(definition),
       });
       return;
     }
@@ -612,7 +687,319 @@ async function expectDarkReadableContrast(locator: Locator): Promise<void> {
     .toBe(true);
 }
 
+function seededDefinitions(count: number): BusinessObjectDefinitionDetail[] {
+  return Array.from({ length: count }, (_, index) =>
+    unpublishedDetail({
+      id: index === 0 ? definitionId : `80000000-0000-4000-8000-${String(index).padStart(12, '0')}`,
+      name: index === 0 ? 'Customer' : `Definition ${String(index + 1).padStart(2, '0')}`,
+      objectKey: index === 0 ? 'customer' : `definition_${index + 1}`,
+      revision: 1,
+    }),
+  );
+}
+
+async function attachGoldenScreenshot(page: Page, testInfo: TestInfo, name: string): Promise<void> {
+  await page.evaluate(() => {
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+    document
+      .querySelector<HTMLElement>('[data-slot="module-navigation-items"] [aria-current="page"]')
+      ?.scrollIntoView({ block: 'nearest', inline: 'center' });
+  });
+  await page.mouse.move(1, 1);
+  await testInfo.attach(name, {
+    body: await page.screenshot({ animations: 'disabled', caret: 'hide', scale: 'css' }),
+    contentType: 'image/png',
+  });
+}
+
+async function expectDataTableFitsHorizontally(page: Page): Promise<void> {
+  const viewport = page.locator('[data-slot="data-table-viewport"]');
+  await expect
+    .poll(() => viewport.evaluate((element) => element.scrollWidth <= element.clientWidth))
+    .toBe(true);
+}
+
+async function expectActiveModuleNavigationItemIsRevealed(page: Page): Promise<void> {
+  const activeItem = page.locator('[data-slot="module-navigation-items"] [aria-current="page"]');
+  await expect
+    .poll(() =>
+      activeItem.evaluate((element) => {
+        const viewport = element.closest('[data-slot="module-navigation-items"]');
+        if (!viewport) return false;
+        const itemBox = element.getBoundingClientRect();
+        const viewportBox = viewport.getBoundingClientRect();
+        return itemBox.left >= viewportBox.left && itemBox.right <= viewportBox.right;
+      }),
+    )
+    .toBe(true);
+}
+
+async function expectDataTableScrollsInternally(
+  page: Page,
+  options: { horizontally?: boolean } = {},
+): Promise<void> {
+  const viewport = page.locator('[data-slot="data-table-viewport"]');
+  await expect(viewport).toBeVisible();
+  await expect
+    .poll(() => viewport.evaluate((element) => element.scrollHeight > element.clientHeight))
+    .toBe(true);
+  await viewport.evaluate((element) => element.scrollTo({ top: element.scrollHeight }));
+  await expect.poll(() => viewport.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
+
+  if (options.horizontally) {
+    await expect
+      .poll(() => viewport.evaluate((element) => element.scrollWidth > element.clientWidth))
+      .toBe(true);
+    await viewport.evaluate((element) => element.scrollTo({ left: element.scrollWidth }));
+    await expect.poll(() => viewport.evaluate((element) => element.scrollLeft)).toBeGreaterThan(0);
+  }
+
+  await viewport.evaluate((element) => element.scrollTo({ left: 0, top: 0 }));
+}
+
+async function expectReducedMotion(locator: Locator): Promise<void> {
+  await expect
+    .poll(() =>
+      locator.evaluate((root) => {
+        const milliseconds = (value: string) =>
+          value.split(',').map((part) => {
+            const duration = part.trim();
+            return duration.endsWith('ms')
+              ? Number.parseFloat(duration)
+              : Number.parseFloat(duration) * 1000;
+          });
+        const elements = [root, ...root.querySelectorAll('*')];
+        return Math.max(
+          ...elements.flatMap((element) => {
+            const style = getComputedStyle(element);
+            return [
+              ...milliseconds(style.animationDuration),
+              ...milliseconds(style.transitionDuration),
+            ];
+          }),
+        );
+      }),
+    )
+    .toBeLessThanOrEqual(0.1);
+}
+
 test.describe('define business object', () => {
+  test('denied create affordance blocks toolbar and deep-link launch', async ({ page }) => {
+    await mockAuthenticatedSession(page);
+    await mockBusinessObjectDefinitionApi(page, { canStartCreate: false });
+
+    await page.goto('/business-objects?dialog=create');
+
+    await expect(page).toHaveURL(/\/business-objects\?page=1$/);
+    await expect(page.getByRole('button', { name: 'New definition' })).toHaveCount(0);
+    await expect(page.getByRole('dialog', { name: 'Define business object' })).toHaveCount(0);
+  });
+
+  test('AT-004 golden reference visual matrix stays touch-safe and motion-safe', async ({
+    page,
+  }, testInfo) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await mockAuthenticatedSession(page, { language: 'vi', theme: 'light' });
+    await mockBusinessObjectDefinitionApi(page, { initialDefinitions: seededDefinitions(20) });
+    await page.route('**/api/users/me/preferences/theme', async (route) => {
+      const theme = JSON.parse(route.request().postData() ?? '{}').theme ?? 'light';
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ theme }),
+      });
+    });
+
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await page.goto('/business-objects');
+
+    await expect(page.locator('html')).toHaveAttribute('lang', 'vi');
+    await expect(page.locator('html')).not.toHaveClass(/dark/);
+    await expect(
+      page.getByRole('heading', { name: 'Business objects', exact: true }),
+    ).toBeVisible();
+    const description = page.getByText('Định nghĩa contract dữ liệu dùng lại trong workspace.', {
+      exact: false,
+    });
+    await expect(description).toBeVisible();
+    const catalog = page.getByRole('region', { name: 'Danh sách định nghĩa' });
+    const toolbar = catalog.locator('[data-slot="data-table-toolbar"]');
+    await expect(toolbar).toBeVisible();
+    await expect(toolbar.getByLabel('Tìm business object')).toBeVisible();
+    await expect(toolbar.locator('[data-slot="data-table-toolbar-actions"]')).toBeVisible();
+    await expectDataTableScrollsInternally(page);
+    await expectDataTableFitsHorizontally(page);
+    await expectNoDesktopDocumentScroll(page);
+    await expectNoPageOverflow(page);
+    await attachGoldenScreenshot(page, testInfo, 'business-objects-light-desktop-vi');
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    const newDefinition = page.getByRole('button', { name: 'Định nghĩa mới' });
+    await expect(newDefinition).toBeVisible();
+    const actionBox = await newDefinition.boundingBox();
+    expect(actionBox?.width ?? 0).toBeGreaterThanOrEqual(44);
+    expect(actionBox?.height ?? 0).toBeGreaterThanOrEqual(44);
+    await newDefinition.focus();
+    await expect(newDefinition).toBeFocused();
+    await expect(page.getByRole('link', { name: 'Business objects', exact: true })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+    await expect
+      .poll(() => description.evaluate((element) => element.scrollWidth <= element.clientWidth))
+      .toBe(true);
+    await expect
+      .poll(() => toolbar.evaluate((element) => element.scrollWidth <= element.clientWidth))
+      .toBe(true);
+    await expectDataTableScrollsInternally(page, { horizontally: true });
+    await expectActiveModuleNavigationItemIsRevealed(page);
+    await expectNoDesktopDocumentScroll(page);
+    await expectNoPageOverflow(page);
+    await attachGoldenScreenshot(page, testInfo, 'business-objects-light-compact-vi');
+
+    const rulesLink = page.getByRole('link', { name: 'Rules' });
+    const restingBackground = await rulesLink.evaluate(
+      (element) => getComputedStyle(element).backgroundColor,
+    );
+    await rulesLink.hover();
+    await expect
+      .poll(() => rulesLink.evaluate((element) => getComputedStyle(element).backgroundColor))
+      .not.toBe(restingBackground);
+    await expectReducedMotion(rulesLink);
+
+    await page.getByRole('button', { name: 'Menu tài khoản' }).click();
+    const accountMenu = page.locator('[data-slot="popover-content"][aria-label="Menu tài khoản"]');
+    await expect(accountMenu).toBeVisible();
+    await expectReducedMotion(accountMenu);
+    await page.getByRole('button', { name: 'Tối' }).click();
+    await expect(page.locator('html')).toHaveClass(/dark/);
+    await page.keyboard.press('Escape');
+    await expect(newDefinition).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Business objects', exact: true })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+    await expectNoPageOverflow(page);
+    await attachGoldenScreenshot(page, testInfo, 'business-objects-dark-compact-vi');
+
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await expectDataTableScrollsInternally(page);
+    await expectDataTableFitsHorizontally(page);
+    await expectNoDesktopDocumentScroll(page);
+    await expectNoPageOverflow(page);
+    await attachGoldenScreenshot(page, testInfo, 'business-objects-dark-desktop-vi');
+  });
+
+  test('AT-005 golden reference integrates independent managed definition windows', async ({
+    page,
+  }) => {
+    await mockAuthenticatedSession(page);
+    await mockBusinessObjectDefinitionApi(page, {
+      initialDefinitions: [
+        unpublishedDetail({ name: 'Customer', objectKey: 'customer', revision: 1 }),
+        unpublishedDetail({
+          id: secondDefinitionId,
+          name: 'Order',
+          objectKey: 'order',
+          revision: 1,
+        }),
+      ],
+    });
+
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.goto('/business-objects');
+    const catalog = page.getByRole('region', { name: 'Definitions' });
+    await catalog.getByRole('button', { name: 'Customer', exact: true }).click();
+    const customerDialog = page.getByRole('dialog', { name: 'Customer' });
+    await expect(customerDialog).toBeVisible();
+    await customerDialog.getByRole('button', { name: 'Minimize dialog' }).click();
+    await expect(customerDialog).toBeHidden();
+
+    await catalog.getByRole('button', { name: 'Order', exact: true }).click();
+    const orderDialog = page.getByRole('dialog', { name: 'Order' });
+    await expect(orderDialog).toBeVisible();
+    await page.getByRole('button', { name: 'Windows (2)' }).click();
+    await page.getByRole('menuitem', { name: /Customer/ }).click();
+    await expect(customerDialog).toBeVisible();
+
+    const customerWindow = page.locator(
+      `[data-slot="managed-dialog-window"][data-window-id="business-objects:${definitionId}"]`,
+    );
+    const orderWindow = page.locator(
+      `[data-slot="managed-dialog-window"][data-window-id="business-objects:${secondDefinitionId}"]`,
+    );
+    const [customerBox, orderBox] = await Promise.all([
+      customerWindow.boundingBox(),
+      orderWindow.boundingBox(),
+    ]);
+    if (!customerBox || !orderBox) throw new Error('Managed definition window geometry missing');
+    expect(
+      Math.min(customerBox.x + customerBox.width, orderBox.x + orderBox.width) -
+        Math.max(customerBox.x, orderBox.x),
+    ).toBeGreaterThan(0);
+    expect(
+      Math.min(customerBox.y + customerBox.height, orderBox.y + orderBox.height) -
+        Math.max(customerBox.y, orderBox.y),
+    ).toBeGreaterThan(0);
+    await expect(customerWindow).toHaveAttribute('data-active', 'true');
+
+    await page.getByRole('button', { name: 'Windows (2)' }).click();
+    await page.getByRole('menuitem', { name: /Order/ }).click();
+    await expect(orderWindow).toHaveAttribute('data-active', 'true');
+    await orderWindow.getByLabel('Name', { exact: true }).focus();
+    await page.keyboard.press('Shift+Tab');
+    expect(await orderWindow.evaluate((window) => window.contains(document.activeElement))).toBe(
+      true,
+    );
+
+    await orderWindow.getByRole('button', { name: 'Minimize dialog' }).click();
+    const orderDock = page.locator(
+      `[data-slot="managed-window-dock"][data-window-id="business-objects:${secondDefinitionId}"]`,
+    );
+    await expect(orderDock).toBeVisible();
+    await orderDock.locator('[data-action="restore"]').click();
+    await expect(orderWindow).toBeVisible();
+    await orderWindow.getByLabel('Name', { exact: true }).focus();
+    await page.keyboard.press('Escape');
+    await expect(orderWindow).toBeHidden();
+    await expect(customerWindow).toBeVisible();
+
+    const customerName = customerWindow.getByLabel('Name', { exact: true });
+    await customerName.fill('Customer draft');
+    await expect(customerName).toHaveValue('Customer draft');
+    await customerWindow.getByRole('button', { name: 'Minimize dialog' }).click();
+    await page.getByRole('link', { name: 'Rules' }).click();
+    await expect(page).toHaveURL(/\/rules\?page=1$/);
+    await expect(page.getByRole('heading', { name: 'Rules', exact: true })).toBeVisible();
+    await page.getByRole('link', { name: 'Business objects', exact: true }).click();
+    await expect(page).toHaveURL(/\/business-objects\?page=1$/);
+
+    await page.getByRole('button', { name: 'Windows (1)' }).click();
+    const customerMenuItem = page.getByRole('menuitem', { name: /Customer/ });
+    await expect(
+      customerMenuItem.locator('[data-slot="managed-window-dirty-indicator"]'),
+    ).toBeVisible();
+    await customerMenuItem.click();
+    await expect(customerWindow).toBeVisible();
+    await expect(customerName).toHaveValue('Customer draft');
+    await customerName.focus();
+    await page.keyboard.press('Escape');
+
+    const discardDialog = page.getByRole('alertdialog', { name: 'Discard unsaved changes?' });
+    await expect(discardDialog).toBeVisible();
+    expect(await discardDialog.evaluate((dialog) => dialog.contains(document.activeElement))).toBe(
+      true,
+    );
+    await page.keyboard.press('Escape');
+    await expect(discardDialog).toBeHidden();
+    await expect(customerWindow).toBeVisible();
+    await expect(customerName).toHaveValue('Customer draft');
+    expect(await customerWindow.evaluate((window) => window.contains(document.activeElement))).toBe(
+      true,
+    );
+    await expectNoPageOverflow(page);
+  });
+
   test('managed draft survives navigation and sign-out clears the window workspace', async ({
     page,
   }) => {

@@ -10,6 +10,7 @@ services:
       - "127.0.0.1:5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./infra/postgres/init.d:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U axis -d axis"]
       interval: 5s
@@ -66,6 +67,8 @@ services:
       - --no-hot-reload
       - run
       - --no-launch-profile
+    ulimits:
+      core: 0
     depends_on:
       postgres:
         condition: service_healthy
@@ -82,8 +85,12 @@ services:
       Kestrel__Certificates__Default__Path: "/https/localhost.pem"
       Kestrel__Certificates__Default__KeyPath: "/https/localhost-key.pem"
       ConnectionStrings__Identity: "Host=postgres;Port=5432;Database=axis_identity;Username=axis;Password=axis_dev_pass"
+      ConnectionStrings__Authorization: "Host=postgres;Port=5432;Database=axis_authorization;Username=axis;Password=axis_dev_pass"
       ConnectionStrings__BusinessObjects: "Host=postgres;Port=5432;Database=axis_business_objects;Username=axis;Password=axis_dev_pass"
       ConnectionStrings__Rules: "Host=postgres;Port=5432;Database=axis_rules;Username=axis;Password=axis_dev_pass"
+      ConnectionStrings__Audit: "Host=postgres;Port=5432;Database=axis_audit;Username=axis;Password=axis_dev_pass"
+      ConnectionStrings__Solutions: "Host=postgres;Port=5432;Database=axis_solutions;Username=axis;Password=axis_dev_pass"
+      Audit__MaxPendingAgeSeconds: "300"
       Redis__ConnectionString: "redis:6379"
       App__BaseUrl: "${APP_BASE_URL:-https://localhost:3000}"
       Email__Host: maildev

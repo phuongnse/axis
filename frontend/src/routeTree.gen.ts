@@ -15,9 +15,16 @@ import { Route as GuestRouteImport } from './routes/_guest'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as GuestSignInRouteImport } from './routes/_guest/sign-in'
+import { Route as AuthenticatedSolutionsRouteImport } from './routes/_authenticated/solutions'
+import { Route as AuthenticatedServiceIdentitiesRouteImport } from './routes/_authenticated/service-identities'
 import { Route as AuthenticatedRulesRouteImport } from './routes/_authenticated/rules'
+import { Route as AuthenticatedProductRoleAssignmentsRouteImport } from './routes/_authenticated/product-role-assignments'
+import { Route as AuthenticatedMembershipsRouteImport } from './routes/_authenticated/memberships'
 import { Route as AuthenticatedBusinessObjectsRouteImport } from './routes/_authenticated/business-objects'
 
+const InvitationsAcceptLazyRouteImport = createFileRoute(
+  '/invitations/accept',
+)()
 const GuestRegisterLazyRouteImport = createFileRoute('/_guest/register')()
 const AuthenticatedDashboardLazyRouteImport = createFileRoute(
   '/_authenticated/dashboard',
@@ -40,6 +47,13 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const InvitationsAcceptLazyRoute = InvitationsAcceptLazyRouteImport.update({
+  id: '/invitations/accept',
+  path: '/invitations/accept',
+  getParentRoute: () => rootRouteImport,
+} as any).lazy(() =>
+  import('./routes/invitations.accept.lazy').then((d) => d.Route),
+)
 const GuestRegisterLazyRoute = GuestRegisterLazyRouteImport.update({
   id: '/register',
   path: '/register',
@@ -62,6 +76,23 @@ const GuestSignInRoute = GuestSignInRouteImport.update({
 } as any).lazy(() =>
   import('./routes/_guest/sign-in.lazy').then((d) => d.Route),
 )
+const AuthenticatedSolutionsRoute = AuthenticatedSolutionsRouteImport.update({
+  id: '/solutions',
+  path: '/solutions',
+  getParentRoute: () => AuthenticatedRoute,
+} as any).lazy(() =>
+  import('./routes/_authenticated/solutions.lazy').then((d) => d.Route),
+)
+const AuthenticatedServiceIdentitiesRoute =
+  AuthenticatedServiceIdentitiesRouteImport.update({
+    id: '/service-identities',
+    path: '/service-identities',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any).lazy(() =>
+    import('./routes/_authenticated/service-identities.lazy').then(
+      (d) => d.Route,
+    ),
+  )
 const AuthenticatedRulesRoute = AuthenticatedRulesRouteImport.update({
   id: '/rules',
   path: '/rules',
@@ -69,6 +100,24 @@ const AuthenticatedRulesRoute = AuthenticatedRulesRouteImport.update({
 } as any).lazy(() =>
   import('./routes/_authenticated/rules.lazy').then((d) => d.Route),
 )
+const AuthenticatedProductRoleAssignmentsRoute =
+  AuthenticatedProductRoleAssignmentsRouteImport.update({
+    id: '/product-role-assignments',
+    path: '/product-role-assignments',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any).lazy(() =>
+    import('./routes/_authenticated/product-role-assignments.lazy').then(
+      (d) => d.Route,
+    ),
+  )
+const AuthenticatedMembershipsRoute =
+  AuthenticatedMembershipsRouteImport.update({
+    id: '/memberships',
+    path: '/memberships',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any).lazy(() =>
+    import('./routes/_authenticated/memberships.lazy').then((d) => d.Route),
+  )
 const AuthenticatedBusinessObjectsRoute =
   AuthenticatedBusinessObjectsRouteImport.update({
     id: '/business-objects',
@@ -98,20 +147,30 @@ const GuestAuthVerifyLazyRoute = GuestAuthVerifyLazyRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/business-objects': typeof AuthenticatedBusinessObjectsRoute
+  '/memberships': typeof AuthenticatedMembershipsRoute
+  '/product-role-assignments': typeof AuthenticatedProductRoleAssignmentsRoute
   '/rules': typeof AuthenticatedRulesRoute
+  '/service-identities': typeof AuthenticatedServiceIdentitiesRoute
+  '/solutions': typeof AuthenticatedSolutionsRoute
   '/sign-in': typeof GuestSignInRoute
   '/dashboard': typeof AuthenticatedDashboardLazyRoute
   '/register': typeof GuestRegisterLazyRoute
+  '/invitations/accept': typeof InvitationsAcceptLazyRoute
   '/auth/verify': typeof GuestAuthVerifyLazyRoute
   '/register/confirmation': typeof GuestRegisterConfirmationLazyRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/business-objects': typeof AuthenticatedBusinessObjectsRoute
+  '/memberships': typeof AuthenticatedMembershipsRoute
+  '/product-role-assignments': typeof AuthenticatedProductRoleAssignmentsRoute
   '/rules': typeof AuthenticatedRulesRoute
+  '/service-identities': typeof AuthenticatedServiceIdentitiesRoute
+  '/solutions': typeof AuthenticatedSolutionsRoute
   '/sign-in': typeof GuestSignInRoute
   '/dashboard': typeof AuthenticatedDashboardLazyRoute
   '/register': typeof GuestRegisterLazyRoute
+  '/invitations/accept': typeof InvitationsAcceptLazyRoute
   '/auth/verify': typeof GuestAuthVerifyLazyRoute
   '/register/confirmation': typeof GuestRegisterConfirmationLazyRoute
 }
@@ -121,10 +180,15 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteWithChildren
   '/_guest': typeof GuestRouteWithChildren
   '/_authenticated/business-objects': typeof AuthenticatedBusinessObjectsRoute
+  '/_authenticated/memberships': typeof AuthenticatedMembershipsRoute
+  '/_authenticated/product-role-assignments': typeof AuthenticatedProductRoleAssignmentsRoute
   '/_authenticated/rules': typeof AuthenticatedRulesRoute
+  '/_authenticated/service-identities': typeof AuthenticatedServiceIdentitiesRoute
+  '/_authenticated/solutions': typeof AuthenticatedSolutionsRoute
   '/_guest/sign-in': typeof GuestSignInRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardLazyRoute
   '/_guest/register': typeof GuestRegisterLazyRoute
+  '/invitations/accept': typeof InvitationsAcceptLazyRoute
   '/_guest/auth/verify': typeof GuestAuthVerifyLazyRoute
   '/_guest/register_/confirmation': typeof GuestRegisterConfirmationLazyRoute
 }
@@ -133,20 +197,30 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/business-objects'
+    | '/memberships'
+    | '/product-role-assignments'
     | '/rules'
+    | '/service-identities'
+    | '/solutions'
     | '/sign-in'
     | '/dashboard'
     | '/register'
+    | '/invitations/accept'
     | '/auth/verify'
     | '/register/confirmation'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/business-objects'
+    | '/memberships'
+    | '/product-role-assignments'
     | '/rules'
+    | '/service-identities'
+    | '/solutions'
     | '/sign-in'
     | '/dashboard'
     | '/register'
+    | '/invitations/accept'
     | '/auth/verify'
     | '/register/confirmation'
   id:
@@ -155,10 +229,15 @@ export interface FileRouteTypes {
     | '/_authenticated'
     | '/_guest'
     | '/_authenticated/business-objects'
+    | '/_authenticated/memberships'
+    | '/_authenticated/product-role-assignments'
     | '/_authenticated/rules'
+    | '/_authenticated/service-identities'
+    | '/_authenticated/solutions'
     | '/_guest/sign-in'
     | '/_authenticated/dashboard'
     | '/_guest/register'
+    | '/invitations/accept'
     | '/_guest/auth/verify'
     | '/_guest/register_/confirmation'
   fileRoutesById: FileRoutesById
@@ -167,6 +246,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
   GuestRoute: typeof GuestRouteWithChildren
+  InvitationsAcceptLazyRoute: typeof InvitationsAcceptLazyRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -192,6 +272,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/invitations/accept': {
+      id: '/invitations/accept'
+      path: '/invitations/accept'
+      fullPath: '/invitations/accept'
+      preLoaderRoute: typeof InvitationsAcceptLazyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_guest/register': {
       id: '/_guest/register'
       path: '/register'
@@ -213,11 +300,39 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof GuestSignInRouteImport
       parentRoute: typeof GuestRoute
     }
+    '/_authenticated/solutions': {
+      id: '/_authenticated/solutions'
+      path: '/solutions'
+      fullPath: '/solutions'
+      preLoaderRoute: typeof AuthenticatedSolutionsRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/service-identities': {
+      id: '/_authenticated/service-identities'
+      path: '/service-identities'
+      fullPath: '/service-identities'
+      preLoaderRoute: typeof AuthenticatedServiceIdentitiesRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/rules': {
       id: '/_authenticated/rules'
       path: '/rules'
       fullPath: '/rules'
       preLoaderRoute: typeof AuthenticatedRulesRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/product-role-assignments': {
+      id: '/_authenticated/product-role-assignments'
+      path: '/product-role-assignments'
+      fullPath: '/product-role-assignments'
+      preLoaderRoute: typeof AuthenticatedProductRoleAssignmentsRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/memberships': {
+      id: '/_authenticated/memberships'
+      path: '/memberships'
+      fullPath: '/memberships'
+      preLoaderRoute: typeof AuthenticatedMembershipsRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/business-objects': {
@@ -246,13 +361,22 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedRouteChildren {
   AuthenticatedBusinessObjectsRoute: typeof AuthenticatedBusinessObjectsRoute
+  AuthenticatedMembershipsRoute: typeof AuthenticatedMembershipsRoute
+  AuthenticatedProductRoleAssignmentsRoute: typeof AuthenticatedProductRoleAssignmentsRoute
   AuthenticatedRulesRoute: typeof AuthenticatedRulesRoute
+  AuthenticatedServiceIdentitiesRoute: typeof AuthenticatedServiceIdentitiesRoute
+  AuthenticatedSolutionsRoute: typeof AuthenticatedSolutionsRoute
   AuthenticatedDashboardLazyRoute: typeof AuthenticatedDashboardLazyRoute
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedBusinessObjectsRoute: AuthenticatedBusinessObjectsRoute,
+  AuthenticatedMembershipsRoute: AuthenticatedMembershipsRoute,
+  AuthenticatedProductRoleAssignmentsRoute:
+    AuthenticatedProductRoleAssignmentsRoute,
   AuthenticatedRulesRoute: AuthenticatedRulesRoute,
+  AuthenticatedServiceIdentitiesRoute: AuthenticatedServiceIdentitiesRoute,
+  AuthenticatedSolutionsRoute: AuthenticatedSolutionsRoute,
   AuthenticatedDashboardLazyRoute: AuthenticatedDashboardLazyRoute,
 }
 
@@ -280,6 +404,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
   GuestRoute: GuestRouteWithChildren,
+  InvitationsAcceptLazyRoute: InvitationsAcceptLazyRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

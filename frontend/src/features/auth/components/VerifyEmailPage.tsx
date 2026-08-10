@@ -1,12 +1,13 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Link } from '@tanstack/react-router';
-import { ArrowRight, Loader2, Mail } from 'lucide-react';
+import { ArrowRight, Mail } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { type FieldPath, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
+import { AsyncButton } from '@/components/shared/AsyncButton';
+import { AsyncContent } from '@/components/shared/AsyncContent';
 import { StatusNotice, type StatusNoticeTone } from '@/components/shared/StatusNotice';
-import { Button } from '@/components/ui/button';
 import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { AuthCard } from '@/features/auth/components/AuthCard';
@@ -132,19 +133,17 @@ function VerifyEmailOutcome({
                 <FieldError id="resend-email-error">{errors.email.message}</FieldError>
               ) : null}
             </Field>
-            <Button
+            <AsyncButton
               type="submit"
               size="lg"
               className="w-full"
               disabled={kind === 'rate_limited' || resendLoading}
+              icon={<Mail aria-hidden />}
+              pending={resendLoading}
+              pendingLabel={t('auth.sending')}
             >
-              {resendLoading ? (
-                <Loader2 className="size-4 animate-spin" aria-hidden />
-              ) : (
-                <Mail className="size-4" aria-hidden />
-              )}
-              {resendLoading ? t('auth.sending') : t('auth.resendVerification')}
-            </Button>
+              {t('auth.resendVerification')}
+            </AsyncButton>
           </form>
         ) : null}
       </div>
@@ -218,10 +217,9 @@ export function VerifyEmailPage() {
           </>
         }
       >
-        <div className="flex items-center gap-3 text-sm text-muted-foreground">
-          <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-          <span>{t('verify.confirming')}</span>
-        </div>
+        <AsyncContent pending pendingLabel={t('verify.confirming')}>
+          <span />
+        </AsyncContent>
       </AuthCard>
     );
   }
@@ -252,20 +250,18 @@ export function VerifyEmailPage() {
       >
         <div className="space-y-4" aria-live="polite">
           <StatusNotice tone="success">{t('verify.success.body')}</StatusNotice>
-          <Button
+          <AsyncButton
             type="button"
             size="lg"
             className="w-full"
             onClick={continueToDashboard}
             disabled={handoffStarted}
+            icon={<ArrowRight aria-hidden />}
+            pending={handoffStarted}
+            pendingLabel={t('verify.success.continuing')}
           >
-            {handoffStarted ? (
-              <Loader2 className="size-4 animate-spin" aria-hidden />
-            ) : (
-              <ArrowRight className="size-4" aria-hidden />
-            )}
-            {handoffStarted ? t('verify.success.continuing') : t('verify.success.action')}
-          </Button>
+            {t('verify.success.action')}
+          </AsyncButton>
         </div>
       </AuthCard>
     );
@@ -283,10 +279,9 @@ export function VerifyEmailPage() {
         </>
       }
     >
-      <div className="flex items-center gap-3 text-sm text-muted-foreground">
-        <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-        <span>{t('verify.completing')}</span>
-      </div>
+      <AsyncContent pending pendingLabel={t('verify.completing')}>
+        <span />
+      </AsyncContent>
     </AuthCard>
   );
 }

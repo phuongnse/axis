@@ -1,5 +1,7 @@
 using System.Globalization;
 using System.Net;
+using System.Security.Cryptography;
+using System.Text;
 using Axis.Identity.Application.Services;
 using MailKit.Net.Smtp;
 using Microsoft.Extensions.Configuration;
@@ -63,6 +65,18 @@ internal sealed class MailKitEmailSender(IConfiguration configuration) : IEmailS
         await SendAsync(toEmail, content, ct);
     }
 
+    public async Task SendWorkspaceInvitationEmailAsync(
+        InvitationDeliveryMessage message,
+        CancellationToken ct = default)
+    {
+        VerificationEmailContent content = BuildWorkspaceInvitationEmail(configuration, message);
+        await SendAsync(
+            message.RecipientEmail,
+            content,
+            ct,
+            DeterministicMessageId(message.DeliveryCorrelation));
+    }
+
     internal static string BuildVerificationLink(IConfiguration configuration, string verificationToken) =>
         $"{GetBaseUrl(configuration)}/auth/verify?token={Uri.EscapeDataString(verificationToken)}";
 
@@ -107,6 +121,65 @@ internal sealed class MailKitEmailSender(IConfiguration configuration) : IEmailS
         string html = BuildHtml(email, escapedVerificationLink, escapedBrandLogoUrl);
 
         return new VerificationEmailContent(template.Subject, plainText, html);
+    }
+
+    internal static VerificationEmailContent BuildWorkspaceInvitationEmail(
+        IConfiguration configuration,
+        InvitationDeliveryMessage message)
+    {
+        bool vietnamese = LocaleCandidates(message.Language)
+            .First()
+            .StartsWith(VietnameseLanguage, StringComparison.OrdinalIgnoreCase);
+        string role = message.RequestedRole == "Administrator"
+            ? vietnamese ? "Quản trị viên Workspace" : "Workspace administrator"
+            : vietnamese ? "Thành viên Workspace" : "Workspace member";
+        string actionUrl = $"{GetBaseUrl(configuration)}/invitations/accept#token={Uri.EscapeDataString(message.RawToken)}";
+        string expiry = message.ExpiresAt.ToUniversalTime().ToString("yyyy-MM-dd HH:mm 'UTC'", CultureInfo.InvariantCulture);
+        TransactionalEmail email = vietnamese
+            ? new TransactionalEmail(
+                VietnameseLanguage,
+                $"Lời mời tham gia {message.WorkspaceName}",
+                $"{message.InviterName} đã mời bạn tham gia một Workspace được quản trị.",
+                "Quyền truy cập Workspace",
+                $"Tham gia {message.WorkspaceName}",
+                $"{message.InviterName} đã mời bạn tham gia Workspace {message.WorkspaceName} thuộc {message.OrganizationName} với vai trò {role}.",
+                $"{message.InviterName} đã mời bạn tham gia Workspace {message.WorkspaceName} thuộc {message.OrganizationName} với vai trò {role}.",
+                "Xem và chấp nhận lời mời",
+                actionUrl,
+                "Nếu nút không hoạt động, hãy sao chép liên kết bảo mật này vào trình duyệt:",
+                $"Liên kết hết hạn lúc {expiry}.",
+                "Lưu ý bảo mật",
+                "Chỉ chấp nhận nếu bạn nhận ra tổ chức, Workspace và người mời. Liên kết chỉ dùng một lần; Axis sẽ yêu cầu bạn đăng nhập bằng đúng địa chỉ email nhận thư.",
+                $"Gửi đến {message.RecipientEmail} cho lời mời Workspace {message.WorkspaceName}.",
+                "Mọi quyền được bảo lưu.",
+                DateTime.UtcNow.Year.ToString(CultureInfo.InvariantCulture),
+                "\u00A9")
+            : new TransactionalEmail(
+                DefaultLanguage,
+                $"Invitation to join {message.WorkspaceName}",
+                $"{message.InviterName} invited you to a governed Workspace.",
+                "Workspace access",
+                $"Join {message.WorkspaceName}",
+                $"{message.InviterName} invited you to join {message.WorkspaceName} in {message.OrganizationName} as {role}.",
+                $"{message.InviterName} invited you to join {message.WorkspaceName} in {message.OrganizationName} as {role}.",
+                "Review and accept invitation",
+                actionUrl,
+                "Button unavailable? Copy this secure invitation link into your browser:",
+                $"This link expires at {expiry}.",
+                "Security note",
+                "Accept only if you recognize the organization, Workspace, and inviter. This link works once; Axis will require the account matching this recipient address.",
+                $"Sent to {message.RecipientEmail} for the {message.WorkspaceName} Workspace invitation.",
+                "All rights reserved.",
+                DateTime.UtcNow.Year.ToString(CultureInfo.InvariantCulture),
+                "\u00A9");
+
+        return new VerificationEmailContent(
+            email.Subject,
+            BuildPlainText(email),
+            BuildHtml(
+                email,
+                WebUtility.HtmlEncode(actionUrl),
+                WebUtility.HtmlEncode(BuildBrandLogoUrl(configuration))));
     }
 
     private static string BuildPlainText(TransactionalEmail email) =>
@@ -237,7 +310,11 @@ internal sealed class MailKitEmailSender(IConfiguration configuration) : IEmailS
             : new MailboxAddress(fromName.Trim(), fromAddress.Trim());
     }
 
-    private async Task SendAsync(string toEmail, VerificationEmailContent content, CancellationToken ct)
+    private async Task SendAsync(
+        string toEmail,
+        VerificationEmailContent content,
+        CancellationToken ct,
+        string? messageId = null)
     {
         IConfigurationSection email = configuration.GetSection("Email");
         IConfigurationSection smtp = email.GetSection("Smtp");
@@ -249,6 +326,8 @@ internal sealed class MailKitEmailSender(IConfiguration configuration) : IEmailS
         string password = FirstConfigured(email["Password"], smtp["Password"]) ?? string.Empty;
 
         MimeMessage message = new MimeMessage();
+        if (messageId is not null)
+            message.MessageId = messageId;
         message.From.Add(from);
         message.To.Add(MailboxAddress.Parse(toEmail));
         message.Subject = content.Subject;
@@ -267,6 +346,9 @@ internal sealed class MailKitEmailSender(IConfiguration configuration) : IEmailS
         await client.SendAsync(message, ct);
         await client.DisconnectAsync(quit: true, ct);
     }
+
+    private static string DeterministicMessageId(string correlation) =>
+        $"<{Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(correlation))).ToLowerInvariant()}@axis.delivery>";
 
     private static string? FirstConfigured(params string?[] values)
     {

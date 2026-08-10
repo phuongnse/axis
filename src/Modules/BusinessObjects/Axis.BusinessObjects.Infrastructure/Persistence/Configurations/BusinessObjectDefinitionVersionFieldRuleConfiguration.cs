@@ -37,6 +37,9 @@ internal sealed class BusinessObjectDefinitionVersionFieldRuleConfiguration
         builder.Property<int>(nameof(BusinessObjectDefinitionVersionFieldRule.Order))
             .HasColumnName("sort_order")
             .IsRequired();
+        builder.Property<string?>(nameof(BusinessObjectDefinitionVersionFieldRule.BindingKey))
+            .HasColumnName("installed_binding_key")
+            .HasMaxLength(200);
 
         builder.HasIndex("BusinessObjectDefinitionVersionFieldId", nameof(BusinessObjectDefinitionVersionFieldRule.BindingId))
             .IsUnique();

@@ -2,6 +2,52 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <meta name="referrer" content="no-referrer" />
+    <script>
+      (() => {
+        if (window.location.pathname !== '/invitations/accept') return;
+
+        const rawFragment = window.location.hash;
+        window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}`);
+        let token = null;
+        try {
+          token = rawFragment.startsWith('#token=')
+            ? decodeURIComponent(rawFragment.slice('#token='.length))
+            : null;
+        } catch {
+          token = null;
+        }
+        if (!token) return;
+
+        window.__axisInvitationBootstrap = (async () => {
+          try {
+            const sessionResponse = await fetch('/api/auth/session', {
+              credentials: 'include',
+              headers: { Accept: 'application/json' },
+              referrerPolicy: 'no-referrer',
+            });
+            if (!sessionResponse.ok) return { status: 'failed' };
+            const session = await sessionResponse.json();
+            if (typeof session.csrfToken !== 'string') return { status: 'failed' };
+
+            const exchangeResponse = await fetch('/api/internal/workspace-invitations/exchange', {
+              method: 'POST',
+              credentials: 'include',
+              headers: {
+                Accept: 'application/json',
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': session.csrfToken,
+              },
+              body: JSON.stringify({ token }),
+              referrerPolicy: 'no-referrer',
+            });
+            return { status: exchangeResponse.ok ? 'exchanged' : 'failed' };
+          } catch {
+            return { status: 'failed' };
+          }
+        })();
+      })();
+    </script>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Axis Platform</title>

@@ -10,15 +10,27 @@ Let a visitor or authenticated user choose how supported web surfaces resolve li
 
 - Visitor or authenticated user
 
+## Preconditions
+
+- The web surface and product fallback theme mode are available.
+
 ## Trigger
 
 - User opens any web route.
 - User changes the site theme from a preferences control.
 
+## Success guarantee
+
+- The selected supported theme behavior applies immediately; an authenticated explicit choice is persisted as the user-level preference.
+
+## Minimal guarantee
+
+- Missing, unsupported, unreadable, or unsaved preference data leaves a usable theme and preserves route and in-progress form state.
+
 ## Main flow
 
 1. User opens a web route.
-2. System applies an initial supported theme mode before React renders, using a saved browser preference when present and supported, then the product fallback theme mode.
+2. System applies an initial supported theme mode before the application renders, using a saved browser preference when present and supported, then the product fallback theme mode.
 3. When the active mode is system, system resolves light or dark presentation from the browser color-scheme preference.
 4. If the user is authenticated, system loads the Identity-owned user profile theme preference.
 5. If the authenticated profile has a supported theme preference, system applies that server value and mirrors it to browser storage for the next page load.
@@ -42,7 +54,7 @@ Let a visitor or authenticated user choose how supported web surfaces resolve li
 *Happy path*
 - **AC-001** User can choose supported theme modes from public auth screens and authenticated app screens.
 - **AC-002** A selected theme mode applies immediately without changing route, clearing entered form data, or requiring a full page reload.
-- **AC-003** Initial page load applies a supported saved browser theme mode before React renders.
+- **AC-003** Initial page load applies a supported saved browser theme mode before the application renders.
 - **AC-004** When no supported saved value exists, initial page load uses the product fallback theme mode.
 - **AC-005** System mode resolves light or dark presentation from the browser color-scheme preference.
 - **AC-006** Supported theme mode values are exactly `light`, `dark`, and `system`, with `system` as the product fallback.
@@ -89,7 +101,7 @@ Let a visitor or authenticated user choose how supported web surfaces resolve li
 
 | Screen | Required contract |
 |---|---|
-| App boot | Resolve initial theme before React renders from supported browser preference or the product fallback theme mode. |
+| App boot | Resolve initial theme before application render from supported browser preference or the product fallback theme mode. |
 | Public auth screens | Render the preferences control and allow unauthenticated theme selection without an API call. |
 | Authenticated app shell | Load server-persisted user theme when available, apply it as source of truth, and expose theme selection in an authenticated surface. |
 | Theme persistence state | Show pending, retry, and non-blocking failure states without clearing route or form state. Successful saves do not need a visible confirmation message. |

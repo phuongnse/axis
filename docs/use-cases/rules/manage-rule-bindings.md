@@ -8,13 +8,29 @@ Let a workspace manage reusable connections between one exact published Rule ver
 
 ## Primary actor
 
-- Signed-in workspace user for binding lifecycle and usage discovery
-- A consumer module for typed context construction and evaluation
+- Signed-in workspace user managing a reusable Rule connection
+
+## Supporting actors
+
+- A consumer module supplies its typed context schema and later resolves the stored binding.
+
+## Preconditions
+
+- An exact published Rule version is available to the current Workspace.
+- The consumer target and typed context contract are known without making them part of the Rule definition.
 
 ## Trigger
 
 - A workspace needs to connect one exact published Rule version to a reusable consumer target.
 - A user needs to inspect, change, disable, or remove one application of a Rule without changing the Rule definition.
+
+## Success guarantee
+
+- One independently versioned binding connects the exact Rule version to the consumer target and can be read and evaluated without changing either owner.
+
+## Minimal guarantee
+
+- Invalid, stale, disabled, deleted, or cross-Workspace binding work changes neither the Rule definition nor another binding or consumer target.
 
 ## Main flow
 
@@ -90,4 +106,4 @@ Required UI quality: use existing shadcn/Tailwind primitives, preserve filters, 
 >
 > **Verification:** AT-001 through AT-007 are mapped to current domain, application, infrastructure, API, architecture, and focused frontend evidence in the sibling sidecar; the recorded suites pass at the current checkpoint.
 >
-> **Decisions:** Bindings are first-class Rules data. They reference exact immutable versions, keep consumer targets opaque, allow omitted optional inputs, and do not create foreign keys into consumer modules. New or retargeted bindings require the exact active version; binding-owned maintenance that preserves the exact version remains independent after deactivation, and historical revisions remain evaluable for published consumer snapshots. Consumers supply transient context schemas for attachment validation; Rules never persists them. No supported production consumer or data requires compatibility for the replaced binding surface, so it uses a clean cutover with no compatibility paths and no reduction in production quality.
+> **Decisions:** A binding is independently manageable Rules data tied to one exact version and opaque consumer target. New or retargeted bindings require current eligibility, while existing exact-version maintenance and historical evaluation follow the stated lifecycle outcomes. [Rules architecture](../../ARCHITECTURE.md#rules-boundary) owns storage, consumer separation, and typed-context realization.

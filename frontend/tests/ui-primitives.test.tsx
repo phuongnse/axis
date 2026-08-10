@@ -331,6 +331,29 @@ describe('Select', () => {
     ).toHaveAttribute('data-align-trigger', 'false');
   });
 
+  it('expresses the current option with persistent fill and no trailing checkmark', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <Select defaultValue="decimal">
+        <SelectTrigger aria-label="Field type">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="text">Text</SelectItem>
+          <SelectItem value="decimal">Decimal</SelectItem>
+        </SelectContent>
+      </Select>,
+    );
+
+    await user.click(screen.getByRole('combobox', { name: 'Field type' }));
+
+    const selected = await screen.findByRole('option', { name: 'Decimal' });
+    expect(selected).toHaveAttribute('aria-selected', 'true');
+    expect(selected).toHaveClass('data-selected:bg-secondary');
+    expect(selected.querySelector('svg')).toBeNull();
+  });
+
   it('links a select trigger to its label', () => {
     render(
       <>

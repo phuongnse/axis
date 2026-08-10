@@ -2,6 +2,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Axis.Identity.Domain\Axis.Identity.Domain.csproj" />
+    <ProjectReference Include="..\Axis.Identity.Contracts\Axis.Identity.Contracts.csproj" />
+    <ProjectReference Include="..\..\Audit\Axis.Audit.Contracts\Axis.Audit.Contracts.csproj" />
     <ProjectReference Include="..\..\..\Shared\Axis.Shared.Domain\Axis.Shared.Domain.csproj" />
     <ProjectReference Include="..\..\..\Shared\Axis.Shared.Application\Axis.Shared.Application.csproj" />
   </ItemGroup>

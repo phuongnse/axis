@@ -1,3 +1,4 @@
+using Axis.Authorization.Contracts;
 using Axis.Rules.Application.Commands.DeleteRuleBinding;
 using Axis.Rules.Application.Repositories;
 using Axis.Rules.Domain;
@@ -20,7 +21,7 @@ public sealed class DeleteRuleBindingHandlerTests
                 RuleDefinitionHandlerTestContext.WorkspaceId,
                 Arg.Any<CancellationToken>())
             .Returns(binding);
-        DeleteRuleBindingHandler handler = new(context.CurrentUser, bindings, context.UnitOfWork);
+        DeleteRuleBindingHandler handler = new(context.CurrentUser, context.CurrentSubject, context.Authorization, bindings, context.UnitOfWork);
 
         Result result = await handler.Handle(
             new DeleteRuleBindingCommand(binding.Id.Value, binding.Revision),
@@ -28,6 +29,40 @@ public sealed class DeleteRuleBindingHandlerTests
 
         result.IsSuccess.Should().BeTrue();
         bindings.Received(1).Remove(binding);
+        await context.Authorization.Received(1).AuthorizeAsync(
+            Arg.Is<ProductAuthorizationRequest>(request => request.ResourceKey == binding.DefinitionKey.Value),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Handle_WhenAuthorizationUnavailable_DoesNotRemoveBinding()
+    {
+        RuleBinding binding = RuleBindingHandlerTestData.Binding();
+        IRuleBindingRepository bindings = Substitute.For<IRuleBindingRepository>();
+        RuleDefinitionHandlerTestContext context = new();
+        bindings.GetByIdForWorkspaceAsync(
+                binding.Id,
+                RuleDefinitionHandlerTestContext.WorkspaceId,
+                Arg.Any<CancellationToken>())
+            .Returns(binding);
+        context.Authorization.AuthorizeAsync(
+                Arg.Any<ProductAuthorizationRequest>(),
+                Arg.Any<CancellationToken>())
+            .Returns(ProductAuthorizationDecision.Unavailable);
+        DeleteRuleBindingHandler handler = new(
+            context.CurrentUser,
+            context.CurrentSubject,
+            context.Authorization,
+            bindings,
+            context.UnitOfWork);
+
+        Result result = await handler.Handle(
+            new DeleteRuleBindingCommand(binding.Id.Value, binding.Revision),
+            TestContext.Current.CancellationToken);
+
+        result.ErrorCode.Should().Be(ErrorCodes.Unavailable);
+        bindings.DidNotReceive().Remove(Arg.Any<RuleBinding>());
+        await context.UnitOfWork.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -41,13 +76,46 @@ public sealed class DeleteRuleBindingHandlerTests
                 RuleDefinitionHandlerTestContext.WorkspaceId,
                 Arg.Any<CancellationToken>())
             .Returns(binding);
-        DeleteRuleBindingHandler handler = new(context.CurrentUser, bindings, context.UnitOfWork);
+        DeleteRuleBindingHandler handler = new(context.CurrentUser, context.CurrentSubject, context.Authorization, bindings, context.UnitOfWork);
 
         Result result = await handler.Handle(
             new DeleteRuleBindingCommand(binding.Id.Value, binding.Revision + 1),
             CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
+        result.ErrorCode.Should().Be(ErrorCodes.Conflict);
+        bindings.DidNotReceive().Remove(Arg.Any<RuleBinding>());
+    }
+
+    [Fact]
+    public async Task Handle_WhenBindingWasInstalled_ReturnsConflictWithoutRemovingBinding()
+    {
+        RuleBinding binding = RuleBindingHandlerTestData.Binding();
+        binding.AdvanceInstallationReceipt(
+            Guid.NewGuid(),
+            "field.required@1:business-object-field:invoice.field-1:record-save",
+            new string('a', 64),
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            1).IsSuccess.Should().BeTrue();
+        IRuleBindingRepository bindings = Substitute.For<IRuleBindingRepository>();
+        RuleDefinitionHandlerTestContext context = new();
+        bindings.GetByIdForWorkspaceAsync(
+                binding.Id,
+                RuleDefinitionHandlerTestContext.WorkspaceId,
+                Arg.Any<CancellationToken>())
+            .Returns(binding);
+        DeleteRuleBindingHandler handler = new(
+            context.CurrentUser,
+            context.CurrentSubject,
+            context.Authorization,
+            bindings,
+            context.UnitOfWork);
+
+        Result result = await handler.Handle(
+            new DeleteRuleBindingCommand(binding.Id.Value, binding.Revision),
+            TestContext.Current.CancellationToken);
+
         result.ErrorCode.Should().Be(ErrorCodes.Conflict);
         bindings.DidNotReceive().Remove(Arg.Any<RuleBinding>());
     }

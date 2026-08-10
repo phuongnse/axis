@@ -19,7 +19,7 @@ public sealed class SimulateRuleDefinitionHandlerTests
                 RuleDefinitionHandlerTestContext.WorkspaceId,
                 Arg.Any<CancellationToken>())
             .Returns(definition);
-        SimulateRuleDefinitionHandler sut = new(_context.CurrentUser, _context.Repository);
+        SimulateRuleDefinitionHandler sut = new(_context.CurrentUser, _context.CurrentSubject, _context.Authorization, _context.Repository);
 
         Result<RuleSimulationResultDto> result = await sut.Handle(
             new SimulateRuleDefinitionQuery(
@@ -46,7 +46,7 @@ public sealed class SimulateRuleDefinitionHandlerTests
                 RuleDefinitionHandlerTestContext.WorkspaceId,
                 Arg.Any<CancellationToken>())
             .Returns(definition);
-        SimulateRuleDefinitionHandler sut = new(_context.CurrentUser, _context.Repository);
+        SimulateRuleDefinitionHandler sut = new(_context.CurrentUser, _context.CurrentSubject, _context.Authorization, _context.Repository);
 
         Result<RuleSimulationResultDto> result = await sut.Handle(
             new SimulateRuleDefinitionQuery(
@@ -74,7 +74,7 @@ public sealed class SimulateRuleDefinitionHandlerTests
                 RuleDefinitionHandlerTestContext.WorkspaceId,
                 Arg.Any<CancellationToken>())
             .Returns(definition);
-        SimulateRuleDefinitionHandler sut = new(_context.CurrentUser, _context.Repository);
+        SimulateRuleDefinitionHandler sut = new(_context.CurrentUser, _context.CurrentSubject, _context.Authorization, _context.Repository);
 
         Result<RuleSimulationResultDto> result = await sut.Handle(
             new SimulateRuleDefinitionQuery(
@@ -102,7 +102,7 @@ public sealed class SimulateRuleDefinitionHandlerTests
                 RuleDefinitionHandlerTestContext.WorkspaceId,
                 Arg.Any<CancellationToken>())
             .Returns(definition);
-        SimulateRuleDefinitionHandler sut = new(_context.CurrentUser, _context.Repository);
+        SimulateRuleDefinitionHandler sut = new(_context.CurrentUser, _context.CurrentSubject, _context.Authorization, _context.Repository);
 
         Result<RuleSimulationResultDto> result = await sut.Handle(
             new SimulateRuleDefinitionQuery(

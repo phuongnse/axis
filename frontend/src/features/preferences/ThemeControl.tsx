@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Monitor, Moon, RotateCcw, Sun } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { AsyncContent } from '@/components/shared/AsyncContent';
 import { OptionList, OptionListItem } from '@/components/shared/OptionList';
 import { Button } from '@/components/ui/button';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
@@ -72,8 +73,7 @@ export function ThemeControl({
   });
 
   const shouldPersistToServer = authenticated && getBrowserSessionStatus() === 'authenticated';
-  const showSaveStatus = authenticated && (mutation.isPending || mutation.isError);
-  const statusId = showSaveStatus ? 'theme-save-status' : undefined;
+  const statusId = authenticated ? 'theme-save-status' : undefined;
 
   function chooseTheme(nextThemeMode: ThemeMode) {
     setThemeMode(nextThemeMode);
@@ -100,13 +100,23 @@ export function ThemeControl({
   return (
     <div
       className={cn(
-        isMenu ? 'relative grid gap-2' : 'flex flex-wrap items-center justify-end gap-2',
+        isMenu
+          ? 'relative grid gap-axis-inline'
+          : 'flex flex-wrap items-center justify-end gap-axis-inline',
         className,
       )}
     >
-      <fieldset aria-describedby={statusId} className={cn(isMenu && 'grid gap-1')}>
+      <fieldset
+        aria-busy={mutation.isPending || undefined}
+        aria-describedby={statusId}
+        className={cn(isMenu && 'grid gap-axis-inline')}
+      >
         <legend
-          className={cn(isMenu ? 'mb-1 px-1 text-xs font-medium text-muted-foreground' : 'sr-only')}
+          className={cn(
+            isMenu
+              ? 'px-axis-inline text-axis-metadata font-axis-label text-muted-foreground'
+              : 'sr-only',
+          )}
         >
           {t('app.theme')}
         </legend>
@@ -121,8 +131,12 @@ export function ThemeControl({
               const label = t(item.labelKey);
 
               return (
-                <OptionListItem key={item.value} value={item.value}>
-                  <Icon aria-hidden />
+                <OptionListItem
+                  key={item.value}
+                  icon={<Icon />}
+                  pending={mutation.isPending && latestServerThemeRef.current === item.value}
+                  value={item.value}
+                >
                   {label}
                 </OptionListItem>
               );
@@ -157,17 +171,17 @@ export function ThemeControl({
         )}
       </fieldset>
 
-      {showSaveStatus ? (
-        <div
+      {authenticated ? (
+        <AsyncContent
           id={statusId}
           className={cn(
-            'min-h-4 text-xs text-muted-foreground',
-            isMenu && 'px-1',
-            isMenu && mutation.isPending && 'pointer-events-none absolute top-0 right-1',
+            'min-h-5 text-axis-metadata text-muted-foreground',
+            isMenu && 'px-axis-inline sr-only',
           )}
-          aria-live="polite"
+          error={mutation.isError}
+          pending={mutation.isPending}
+          pendingLabel={t('app.saving')}
         >
-          {mutation.isPending ? t('app.saving') : null}
           {mutation.isError ? (
             <span className="inline-flex items-center gap-1 text-destructive">
               {t('app.themeSaveFailed')}
@@ -177,7 +191,7 @@ export function ThemeControl({
               </Button>
             </span>
           ) : null}
-        </div>
+        </AsyncContent>
       ) : null}
     </div>
   );

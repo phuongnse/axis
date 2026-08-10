@@ -2,5 +2,5 @@ using Axis.Shared.Application.CQRS;
 
 namespace Axis.BusinessObjects.Application.Commands.CreateBusinessObjectDefinition;
 
-public sealed record CreateBusinessObjectDefinitionCommand(string Name)
+public sealed record CreateBusinessObjectDefinitionCommand(string Name, string? CorrelationId = null)
     : ICommand<BusinessObjectDefinitionDetailDto>;

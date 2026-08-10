@@ -1,5 +1,6 @@
 using Axis.Rules.Application.Repositories;
 using Axis.Rules.Contracts;
+using Axis.Rules.Domain;
 using FluentAssertions;
 using NSubstitute;
 
@@ -109,7 +110,7 @@ public sealed class RuleEvaluatorTests
     public async Task EvaluateAsync_WhenWorkspaceRuleIsArchived_ResolvesItsExactPublishedVersion()
     {
         Axis.Rules.Domain.RuleDefinition definition = RuleDefinitionHandlerTestContext.VersionedDefinition();
-        definition.Archive(definition.Revision, RuleDefinitionHandlerTestContext.UserId, DateTime.UtcNow)
+        definition.Archive(definition.Revision, RuleSubjectReference.Human(RuleDefinitionHandlerTestContext.UserId), DateTime.UtcNow)
             .IsSuccess.Should().BeTrue();
         IRuleDefinitionRepository repository = Substitute.For<IRuleDefinitionRepository>();
         repository.GetByKeyForWorkspaceAsync(

@@ -45,11 +45,17 @@ public sealed class RegisterUserFlowTests(ApiTestFixture fixture)
         user.AcceptedPrivacyVersion.Should().Be(WellKnownLegalDocuments.PrivacyVersion);
         user.LegalAcceptedAt.Should().NotBeNull();
 
+        WorkspaceMembership personalMembership = await db.WorkspaceMemberships.SingleAsync(
+            membership => membership.UserId == user.Id &&
+                membership.Role == WorkspaceMembershipRole.Owner &&
+                membership.Status == MembershipStatus.Active,
+            TestContext.Current.CancellationToken);
         Workspace personalWorkspace = await db.Workspaces.SingleAsync(
-            w => w.OwnerUserId == user.Id && w.Type == WorkspaceType.Personal,
+            workspace => workspace.Id == personalMembership.WorkspaceId &&
+                workspace.Type == WorkspaceType.Personal,
             TestContext.Current.CancellationToken);
         personalWorkspace.Name.Should().Be("Alice Smith");
-        personalWorkspace.OwnerEmail.Should().Be(normalizedEmail);
+        personalWorkspace.OrganizationId.Should().BeNull();
         personalWorkspace.Status.Should().Be(WorkspaceStatus.PendingVerification);
         personalWorkspace.AcceptedTermsVersion.Should().Be(WellKnownLegalDocuments.TermsVersion);
         personalWorkspace.AcceptedPrivacyVersion.Should().Be(WellKnownLegalDocuments.PrivacyVersion);

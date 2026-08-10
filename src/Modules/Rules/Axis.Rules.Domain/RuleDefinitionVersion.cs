@@ -14,7 +14,12 @@ public sealed class RuleDefinitionVersion : Entity<RuleDefinitionVersionId>
     public RuleConditionNode Condition { get; private set; }
     public RuleOutputContract Output { get; private set; }
     public IReadOnlyList<RuleInputDefinition> Inputs => _inputs.AsReadOnly();
-    public Guid PublishedByUserId { get; private set; }
+    private RuleSubjectKind? PublishedBySubjectKind { get; set; }
+    private Guid? PublishedBySubjectId { get; set; }
+    public RuleSubjectReference? PublishedBySubject =>
+        PublishedBySubjectKind is RuleSubjectKind kind && PublishedBySubjectId is Guid id
+            ? new RuleSubjectReference(kind, id)
+            : null;
     public DateTime PublishedAt { get; private set; }
 
     private RuleDefinitionVersion()
@@ -36,7 +41,7 @@ public sealed class RuleDefinitionVersion : Entity<RuleDefinitionVersionId>
         IReadOnlyList<RuleInputDefinition> inputs,
         RuleConditionNode condition,
         RuleOutputContract output,
-        Guid publishedByUserId,
+        RuleSubjectReference? publishedBySubject,
         DateTime publishedAt)
         : base(id)
     {
@@ -48,14 +53,15 @@ public sealed class RuleDefinitionVersion : Entity<RuleDefinitionVersionId>
         _inputs.AddRange(inputs);
         Condition = condition;
         Output = output;
-        PublishedByUserId = publishedByUserId;
+        PublishedBySubjectKind = publishedBySubject?.Kind;
+        PublishedBySubjectId = publishedBySubject?.Id;
         PublishedAt = publishedAt;
     }
 
     internal static RuleDefinitionVersion Create(
         RuleDefinition definition,
         int version,
-        Guid publishedByUserId,
+        RuleSubjectReference? publishedBySubject,
         DateTime publishedAt) =>
         new(
             RuleDefinitionVersionId.New(),
@@ -67,6 +73,6 @@ public sealed class RuleDefinitionVersion : Entity<RuleDefinitionVersionId>
             definition.Inputs.ToArray(),
             definition.Condition!,
             definition.Output,
-            publishedByUserId,
+            publishedBySubject,
             publishedAt);
 }

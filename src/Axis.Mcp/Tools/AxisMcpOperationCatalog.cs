@@ -11,6 +11,7 @@ public static class AxisMcpOperationCatalog
         new Dictionary<string, string>(StringComparer.Ordinal)
         {
             ["ListBusinessObjectDefinitions"] = "axis_list_business_object_definitions",
+            ["GetBusinessObjectDefinitionCollectionActions"] = "axis_get_business_object_definition_collection_actions",
             ["CreateBusinessObjectDefinition"] = "axis_create_business_object_definition",
             ["GetBusinessObjectDefinition"] = "axis_get_business_object_definition",
             ["SaveUnpublishedBusinessObjectDefinition"] = "axis_save_unpublished_business_object_definition",
@@ -24,9 +25,24 @@ public static class AxisMcpOperationCatalog
             ["GetMe"] = "axis_get_current_user",
             ["UpdateLanguagePreference"] = "axis_update_language_preference",
             ["UpdateThemePreference"] = "axis_update_theme_preference",
+            ["CreateOrganizationWorkspace"] = "axis_create_organization_workspace",
+            ["InviteWorkspaceMember"] = "axis_invite_workspace_member",
+            ["ListWorkspaceInvitations"] = "axis_list_workspace_invitations",
+            ["ResendWorkspaceInvitation"] = "axis_resend_workspace_invitation",
+            ["RevokeWorkspaceInvitation"] = "axis_revoke_workspace_invitation",
+            ["CreateServiceIdentity"] = "axis_create_service_identity",
+            ["ListServiceIdentities"] = "axis_list_service_identities",
+            ["GetServiceIdentity"] = "axis_get_service_identity",
+            ["AddServiceIdentityKey"] = "axis_add_service_identity_key",
+            ["RevokeServiceIdentityKey"] = "axis_revoke_service_identity_key",
+            ["RevokeServiceIdentity"] = "axis_revoke_service_identity",
+            ["AssignProductRole"] = "axis_assign_product_role",
+            ["RevokeProductRole"] = "axis_revoke_product_role",
+            ["ListProductRoleAssignments"] = "axis_list_product_role_assignments",
             ["GetRuleBinding"] = "axis_get_rule_binding",
             ["ListRuleBindingUsage"] = "axis_list_rule_binding_usage",
             ["ListRuleDefinitions"] = "axis_list_rules",
+            ["GetRuleDefinitionCollectionActions"] = "axis_get_rule_definition_collection_actions",
             ["CreateRuleDefinition"] = "axis_create_rule_definition",
             ["GetRuleExpressionLanguage"] = "axis_get_rule_expression_language",
             ["ProjectRuleCondition"] = "axis_project_rule_condition",
@@ -45,6 +61,13 @@ public static class AxisMcpOperationCatalog
             ["UpdateRuleBinding"] = "axis_update_rule_binding",
             ["DeleteRuleBinding"] = "axis_delete_rule_binding",
             ["EvaluateRuleBinding"] = "axis_evaluate_rule_binding",
+            ["PublishSolutionVersion"] = "axis_publish_solution_version",
+            ["ListSolutionVersions"] = "axis_list_solution_versions",
+            ["GetSolutionVersionStatus"] = "axis_get_solution_version_status",
+            ["InstallSolutionVersion"] = "axis_install_solution_version",
+            ["ListSolutionInstallations"] = "axis_list_solution_installations",
+            ["GetSolutionOperationStatus"] = "axis_get_solution_installation_status",
+            ["ResumeSolutionInstallation"] = "axis_resume_solution_installation",
         };
 
     public static IReadOnlySet<string> BlockedOperationIds { get; } =
@@ -61,5 +84,6 @@ public static class AxisMcpOperationCatalog
             "SignOutUser",
             "RegisterUser",
             "GetBrowserSession",
+            "GetModuleNavigationAvailability",
         };
 }

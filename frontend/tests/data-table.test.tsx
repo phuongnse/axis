@@ -1,7 +1,7 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   countFilterConditions,
   createEmptyFilterExpression,
@@ -203,6 +203,28 @@ function clientDefinition(
 }
 
 describe('DataTable', () => {
+  afterEach(() => vi.useRealTimers());
+
+  it('reserves initial rows, delays skeletons, and does not use background refresh as loading', async () => {
+    vi.useFakeTimers();
+    const definition = clientDefinition({ loading: true });
+    const { rerender } = render(<DataTable definition={definition} />);
+    const table = screen.getByRole('region', { name: 'Records' });
+
+    expect(table).toHaveAttribute('aria-busy', 'true');
+    expect(table.querySelector('tbody tr')).toHaveClass('invisible');
+
+    await act(async () => vi.advanceTimersByTimeAsync(300));
+    expect(table.querySelector('tbody tr')).not.toHaveClass('invisible');
+
+    rerender(<DataTable definition={clientDefinition({ loading: false })} />);
+    expect(screen.queryByText('Alpha')).not.toBeInTheDocument();
+
+    await act(async () => vi.advanceTimersByTimeAsync(400));
+    expect(screen.getByText('Alpha')).toBeInTheDocument();
+    expect(table).not.toHaveAttribute('aria-busy');
+  });
+
   it('renders, sorts, and uses numbered client pagination without implicit search', async () => {
     const user = userEvent.setup();
     render(

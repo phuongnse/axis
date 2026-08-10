@@ -53,7 +53,7 @@ function BusinessObjectDefinitionWindowRenderer({ descriptor }: ManagedWindowRen
       mode={payload.mode}
       recordId={payload.recordId}
       ruleDefinitions={rulesQuery.data?.items ?? []}
-      ruleCatalogLoading={rulesQuery.isLoading}
+      ruleCatalogLoading={rulesQuery.isPending}
       ruleCatalogUnavailable={rulesQuery.isError}
       onCreated={(recordId, title) => {
         replaceWindow(

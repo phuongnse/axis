@@ -23,7 +23,7 @@ const systemRule = (definitionKey: string, name: string, targetTypeKeys: string[
   definitionKey,
   name,
   description: `${name} validation.`,
-  origin: 'System',
+  origin: 'BuiltIn',
   status: 'Published',
   expressionLanguageVersion: 1,
   latestPublishedVersion: 1,
@@ -93,6 +93,49 @@ async function mockAuthenticatedSession(page: Page): Promise<void> {
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify(profile),
+    });
+  });
+
+  await page.route('**/api/workspace-context/eligible', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([
+        {
+          workspaceId: profile.workspaces[0].id,
+          name: profile.workspaces[0].name,
+          slug: profile.workspaces[0].slug,
+          type: profile.workspaces[0].type,
+          organizationId: null,
+          isCurrent: true,
+        },
+      ]),
+    });
+  });
+
+  await page.route('**/api/module-navigation', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        availableContributionIds: ['businessObjects.definitions', 'rules.fieldDefinitions'],
+      }),
+    });
+  });
+
+  await page.route('**/api/business-object-definitions/actions', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ canStartCreate: true }),
+    });
+  });
+
+  await page.route('**/api/rules/actions', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ canStartCreate: true }),
     });
   });
 
@@ -184,10 +227,7 @@ async function expectShellRegionsFitViewport(page: Page): Promise<void> {
   }
 }
 
-async function expectRouteViewportTouchesMain(
-  page: Page,
-  expectedPaddingBottom: string,
-): Promise<void> {
+async function expectRouteViewportTouchesMain(page: Page): Promise<void> {
   await expect
     .poll(async () =>
       page.evaluate(() => {
@@ -204,7 +244,6 @@ async function expectRouteViewportTouchesMain(
 
         return {
           mainPadding: getComputedStyle(main).padding,
-          routePaddingBottom: getComputedStyle(routeRoot).paddingBottom,
           touchesBottom: Math.abs(routeBox.bottom - mainBox.bottom) <= tolerance,
           touchesRight: Math.abs(routeBox.right - mainBox.right) <= tolerance,
           touchesTop: Math.abs(routeBox.top - mainBox.top) <= tolerance,
@@ -213,7 +252,6 @@ async function expectRouteViewportTouchesMain(
     )
     .toEqual({
       mainPadding: '0px',
-      routePaddingBottom: expectedPaddingBottom,
       touchesBottom: true,
       touchesRight: true,
       touchesTop: true,
@@ -381,6 +419,293 @@ test.describe('app frame', () => {
     }
   });
 
+  test('AT-003 both Workspace directions keep the account view and scroll geometry stable', async ({
+    page,
+  }) => {
+    const personalWorkspace = {
+      workspaceId: '22222222-2222-4222-8222-222222222222',
+      name: 'Personal workspace',
+      slug: 'personal-workspace',
+      type: 'Personal' as const,
+      organizationId: null,
+    };
+    const organizationWorkspace = {
+      workspaceId: '33333333-3333-4333-8333-333333333333',
+      name: 'Axis Reference Product',
+      slug: 'axis-reference-product',
+      type: 'Organization' as const,
+      organizationId: '44444444-4444-4444-8444-444444444444',
+    };
+    let currentWorkspaceId = organizationWorkspace.workspaceId;
+    let targetWorkspaceId = personalWorkspace.workspaceId;
+    let releaseConfirmation!: () => void;
+    let releaseSessionRestore!: () => void;
+    let sessionRestoreStarted!: () => void;
+    let confirmationGate!: Promise<void>;
+    let sessionRestoreGate!: Promise<void>;
+    let sessionRestoreRequest!: Promise<void>;
+    const armTransitionGates = () => {
+      confirmationGate = new Promise<void>((resolve) => {
+        releaseConfirmation = resolve;
+      });
+      sessionRestoreGate = new Promise<void>((resolve) => {
+        releaseSessionRestore = resolve;
+      });
+      sessionRestoreRequest = new Promise<void>((resolve) => {
+        sessionRestoreStarted = resolve;
+      });
+    };
+    armTransitionGates();
+    let holdNextSessionRestore = false;
+    const workspaces = [personalWorkspace, organizationWorkspace];
+    const administratorContributions = [
+      'identity.memberships',
+      'identity.service-identities',
+      'authorization.product-roles',
+      'solutions.management',
+    ];
+    const productContributions = [
+      ...administratorContributions.slice(0, 3),
+      'businessObjects.definitions',
+      'rules.fieldDefinitions',
+      administratorContributions[3],
+    ];
+
+    await page.addInitScript(() => {
+      (window as Window & { __AXIS_DISABLE_DEVTOOLS__?: boolean }).__AXIS_DISABLE_DEVTOOLS__ = true;
+      localStorage.setItem('axis.language', 'en');
+      localStorage.setItem('axis.theme', 'light');
+    });
+    await page.route('**/api/auth/session', async (route) => {
+      if (holdNextSessionRestore) {
+        holdNextSessionRestore = false;
+        sessionRestoreStarted();
+        await sessionRestoreGate;
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          authenticated: true,
+          csrfToken: 'app-frame-csrf-token',
+          user: {
+            userId: profile.id,
+            workspaceId: currentWorkspaceId,
+            email: profile.email,
+            name: profile.fullName,
+          },
+        }),
+      });
+    });
+    await page.route('**/api/users/me', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          ...profile,
+          workspaceId: currentWorkspaceId,
+          workspaces: workspaces.map((workspace) => ({
+            id: workspace.workspaceId,
+            name: workspace.name,
+            slug: workspace.slug,
+            type: workspace.type,
+            isCurrent: workspace.workspaceId === currentWorkspaceId,
+          })),
+        }),
+      });
+    });
+    await page.route('**/api/workspace-context/eligible', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(
+          workspaces.map((workspace) => ({
+            ...workspace,
+            isCurrent: workspace.workspaceId === currentWorkspaceId,
+          })),
+        ),
+      });
+    });
+    await page.route('**/api/workspace-context/begin', async (route) => {
+      const request = JSON.parse(route.request().postData() ?? '{}') as {
+        targetWorkspaceId?: string;
+      };
+      targetWorkspaceId = request.targetWorkspaceId ?? targetWorkspaceId;
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          transitionId: '55555555-5555-4555-8555-555555555555',
+          status: 'Pending',
+          expiresAt: '2026-08-09T12:00:00Z',
+          authoritativeWorkspaceId: null,
+        }),
+      });
+    });
+    await page.route('**/api/workspace-context/confirm', async (route) => {
+      await confirmationGate;
+      currentWorkspaceId = targetWorkspaceId;
+      holdNextSessionRestore = true;
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          transitionId: '55555555-5555-4555-8555-555555555555',
+          status: 'Completed',
+          expiresAt: '2026-08-09T12:00:00Z',
+          authoritativeWorkspaceId: currentWorkspaceId,
+        }),
+      });
+    });
+    await page.route('**/api/workspace-context/recover', async (route) => {
+      await route.fulfill({ status: 500, contentType: 'application/problem+json', body: '{}' });
+    });
+    await page.route('**/api/module-navigation', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          availableContributionIds:
+            currentWorkspaceId === organizationWorkspace.workspaceId
+              ? productContributions
+              : administratorContributions,
+        }),
+      });
+    });
+
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await page.goto('/dashboard', { waitUntil: 'domcontentloaded' });
+    await expectAppFrameReady(page, 'Dashboard');
+    const moduleNavigation = page.getByRole('navigation', { name: 'Modules' });
+    await expect(moduleNavigation).toBeVisible();
+    await expect(moduleNavigation.getByRole('link', { name: 'Business objects' })).toBeVisible();
+    const accountTrigger = page.getByRole('button', { name: 'Account menu' });
+    await expect(accountTrigger).toContainText(organizationWorkspace.name);
+    await accountTrigger.click();
+    const accountView = page.locator('[data-slot="popover-content"][aria-label="Account menu"]');
+    await expect(accountView).toBeVisible();
+    await accountView.evaluate((element) =>
+      Promise.all(element.getAnimations({ subtree: true }).map((animation) => animation.finished)),
+    );
+    await page.evaluate(() => {
+      const probe = window as Window & {
+        __axisAccountGeometry?: Array<{
+          documentScroll: boolean;
+          height: number;
+          mainLeft: number;
+          mainWidth: number;
+          menuScroll: boolean;
+        }>;
+        __axisStopAccountGeometry?: boolean;
+      };
+      probe.__axisAccountGeometry = [];
+      probe.__axisStopAccountGeometry = false;
+      const sample = () => {
+        const menu = document.querySelector<HTMLElement>(
+          '[data-slot="popover-content"][aria-label="Account menu"]',
+        );
+        if (menu) {
+          const mainRect = document.querySelector('main')?.getBoundingClientRect();
+          probe.__axisAccountGeometry?.push({
+            documentScroll: document.documentElement.scrollHeight > window.innerHeight + 1,
+            height: menu.getBoundingClientRect().height,
+            mainLeft: mainRect?.left ?? -1,
+            mainWidth: mainRect?.width ?? -1,
+            menuScroll: menu.scrollHeight > menu.clientHeight + 1,
+          });
+        }
+        if (!probe.__axisStopAccountGeometry) requestAnimationFrame(sample);
+      };
+      requestAnimationFrame(sample);
+    });
+
+    await accountView.getByRole('button', { name: personalWorkspace.name }).click();
+    await expect(accountView.getByText('Switching Workspace...')).toBeAttached();
+    await expect(accountTrigger).toHaveAttribute('aria-expanded', 'true');
+    await expect(accountView).toBeVisible();
+
+    releaseConfirmation();
+    await sessionRestoreRequest;
+    const refreshStatus = page.getByText('Refreshing Workspace');
+    await expect(refreshStatus).toBeVisible();
+    await expect(moduleNavigation).toBeVisible();
+    await expect(moduleNavigation.getByRole('link', { name: 'Business objects' })).toBeVisible();
+    await expect(accountView.getByRole('button', { name: personalWorkspace.name })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+    await expect(accountTrigger).toContainText(profile.fullName);
+    await expect(accountTrigger).toHaveAttribute('aria-expanded', 'true');
+    await expectNoDocumentScroll(page);
+
+    releaseSessionRestore();
+    await expect(
+      accountView.getByRole('button', { name: organizationWorkspace.name }),
+    ).toBeEnabled();
+    await expect(refreshStatus).toBeHidden();
+    await expect(moduleNavigation).toBeVisible();
+    await expect(moduleNavigation.getByRole('link', { name: 'Business objects' })).toHaveCount(0);
+    await expect(accountView).toBeVisible();
+    await expect(accountTrigger).toContainText(profile.fullName);
+    await expect(accountTrigger).toHaveAttribute('aria-expanded', 'true');
+    await expectNoDocumentScroll(page);
+
+    armTransitionGates();
+    await accountView.getByRole('button', { name: organizationWorkspace.name }).click();
+    await expect(accountView.getByText('Switching Workspace...')).toBeAttached();
+    await expect(accountTrigger).toHaveAttribute('aria-expanded', 'true');
+    await expect(accountView).toBeVisible();
+
+    releaseConfirmation();
+    await sessionRestoreRequest;
+    await expect(refreshStatus).toBeVisible();
+    await expect(moduleNavigation).toBeVisible();
+    await expect(moduleNavigation.getByRole('link', { name: 'Business objects' })).toHaveCount(0);
+    await expect(
+      accountView.getByRole('button', { name: organizationWorkspace.name }),
+    ).toHaveAttribute('aria-current', 'page');
+    await expect(accountTrigger).toContainText(organizationWorkspace.name);
+    await expect(accountTrigger).toHaveAttribute('aria-expanded', 'true');
+    await expectNoDocumentScroll(page);
+
+    releaseSessionRestore();
+    await expect(accountView.getByRole('button', { name: personalWorkspace.name })).toBeEnabled();
+    await expect(refreshStatus).toBeHidden();
+    await expect(moduleNavigation).toBeVisible();
+    await expect(moduleNavigation.getByRole('link', { name: 'Business objects' })).toBeVisible();
+    await expect(accountView).toBeVisible();
+    await expect(accountTrigger).toContainText(organizationWorkspace.name);
+    await expect(accountTrigger).toHaveAttribute('aria-expanded', 'true');
+    await expectNoDocumentScroll(page);
+
+    const geometry = await page.evaluate(() => {
+      const probe = window as Window & {
+        __axisAccountGeometry?: Array<{
+          documentScroll: boolean;
+          height: number;
+          mainLeft: number;
+          mainWidth: number;
+          menuScroll: boolean;
+        }>;
+        __axisStopAccountGeometry?: boolean;
+      };
+      probe.__axisStopAccountGeometry = true;
+      return probe.__axisAccountGeometry ?? [];
+    });
+    expect(geometry.length).toBeGreaterThan(1);
+    expect(geometry.some((sample) => sample.documentScroll)).toBe(false);
+    expect(new Set(geometry.map((sample) => sample.menuScroll))).toEqual(new Set([false]));
+    expect(Math.max(...geometry.map((sample) => sample.height))).toBeLessThanOrEqual(
+      Math.min(...geometry.map((sample) => sample.height)) + 1,
+    );
+    expect(Math.max(...geometry.map((sample) => sample.mainLeft))).toBeLessThanOrEqual(
+      Math.min(...geometry.map((sample) => sample.mainLeft)) + 1,
+    );
+    expect(Math.max(...geometry.map((sample) => sample.mainWidth))).toBeLessThanOrEqual(
+      Math.min(...geometry.map((sample) => sample.mainWidth)) + 1,
+    );
+  });
+
   test('AT-002 desktop and mobile frame render without console errors or document overflow', async ({
     page,
   }) => {
@@ -425,7 +750,13 @@ test.describe('app frame', () => {
     await expect(page.getByRole('contentinfo')).toContainText('2026');
     await expectShellRegionsFitViewport(page);
     await page.getByRole('button', { name: 'Account menu' }).click();
-    await expect(page.getByText(profile.fullName)).toHaveCount(1);
+    const accountIdentity = page.getByRole('region', { name: 'Account' });
+    await expect(accountIdentity.getByText(profile.fullName)).toBeVisible();
+    await expect(accountIdentity.getByText(profile.email)).toBeVisible();
+    await expect(page.getByRole('region', { name: 'Workspace', exact: true })).toBeVisible();
+    await expect(page.getByText('Choose Workspace', { exact: true })).toHaveCount(0);
+    await expect(page.getByText('Personal Workspace', { exact: true })).toHaveCount(0);
+    await expect(page.getByText('Organization Workspaces', { exact: true })).toHaveCount(0);
     await expect(page.getByText('Preferences')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible();
     const accountMenu = page.locator('[data-slot="popover-content"][aria-label="Account menu"]');
@@ -433,12 +764,13 @@ test.describe('app frame', () => {
       Promise.all(element.getAnimations({ subtree: true }).map((animation) => animation.finished)),
     );
     const initialMenuBox = await accountMenu.boundingBox();
-    await page.getByRole('button', { name: 'Dark' }).click();
-    await expect(page.getByText('Saving...')).toBeVisible();
+    const darkOption = page.getByRole('button', { name: 'Dark' });
+    await darkOption.click();
+    await expect(darkOption.locator('[data-slot="spinner"]')).toBeVisible();
     const pendingMenuBox = await accountMenu.boundingBox();
     expect(Math.round(pendingMenuBox?.height ?? 0)).toBe(Math.round(initialMenuBox?.height ?? 0));
     completeThemeSave?.();
-    await expect(page.getByText('Saving...')).toBeHidden();
+    await expect(darkOption.locator('[data-slot="spinner"]')).toBeHidden();
     const savedMenuBox = await accountMenu.boundingBox();
     expect(Math.round(savedMenuBox?.height ?? 0)).toBe(Math.round(initialMenuBox?.height ?? 0));
     await expectNoPageOverflow(page);
@@ -448,7 +780,7 @@ test.describe('app frame', () => {
     await page.getByRole('link', { name: 'Rules' }).click();
     await expect(page).toHaveURL(/\/rules(?:\?.*)?$/);
     await expect(page.getByRole('heading', { name: 'Rules', exact: true })).toBeVisible();
-    await expectRouteViewportTouchesMain(page, '32px');
+    await expectRouteViewportTouchesMain(page);
     await expectNoPageOverflow(page);
     await expectNoDocumentScroll(page);
     await expectRulesCatalogScrolls(page);
@@ -476,7 +808,7 @@ test.describe('app frame', () => {
     await page.getByRole('link', { name: 'Rules' }).click();
     await expect(page).toHaveURL(/\/rules(?:\?.*)?$/);
     await expect(page.getByRole('heading', { name: 'Rules', exact: true })).toBeVisible();
-    await expectRouteViewportTouchesMain(page, '16px');
+    await expectRouteViewportTouchesMain(page);
     await expectNoPageOverflow(page);
     await expectNoDocumentScroll(page);
     await expectRulesCatalogScrolls(page);

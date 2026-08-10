@@ -16,6 +16,13 @@ public sealed class BusinessObjectDefinition : AggregateRoot<BusinessObjectDefin
     public int? LatestPublishedVersionNumber { get; private set; }
     public DateTime CreatedAt { get; private set; }
     public DateTime UpdatedAt { get; private set; }
+    public Guid? InstalledSolutionVersionId { get; private set; }
+    public string? InstalledComponentKey { get; private set; }
+    public string? InstalledComponentHash { get; private set; }
+    public Guid? InstalledOperationId { get; private set; }
+    public Guid? InstalledStepId { get; private set; }
+    public long? InstalledLeaseEpoch { get; private set; }
+    public bool IsInstalled => InstalledSolutionVersionId.HasValue;
     public IReadOnlyList<BusinessObjectFieldDefinition> Fields => _fields.AsReadOnly();
     public IReadOnlyList<BusinessObjectDefinitionVersion> Versions => _versions.AsReadOnly();
 
@@ -65,6 +72,9 @@ public sealed class BusinessObjectDefinition : AggregateRoot<BusinessObjectDefin
         int expectedRevision,
         DateTime updatedAt)
     {
+        if (IsInstalled)
+            return Result.Failure(ErrorCodes.Conflict, "Installed business object definitions are immutable.");
+
         if (Status != BusinessObjectDefinitionStatus.Unpublished)
             return Result.Failure(ErrorCodes.Conflict, "Published definitions cannot be edited by this use case.");
 
@@ -88,11 +98,18 @@ public sealed class BusinessObjectDefinition : AggregateRoot<BusinessObjectDefin
 
     public Result<BusinessObjectDefinitionVersion> Publish(
         int expectedRevision,
-        Guid publishedByUserId,
+        SubjectReference publishedBySubject,
         DateTime publishedAt)
     {
-        if (publishedByUserId == Guid.Empty)
-            return Result.Failure<BusinessObjectDefinitionVersion>("Publishing user is required.");
+        if (IsInstalled)
+        {
+            return Result.Failure<BusinessObjectDefinitionVersion>(
+                ErrorCodes.Conflict,
+                "Installed business object definitions are immutable.");
+        }
+
+        if (publishedBySubject.Id == Guid.Empty || !Enum.IsDefined(publishedBySubject.Kind))
+            return Result.Failure<BusinessObjectDefinitionVersion>("Publishing subject is required.");
 
         if (Status != BusinessObjectDefinitionStatus.Unpublished)
             return Result.Failure<BusinessObjectDefinitionVersion>(
@@ -113,13 +130,59 @@ public sealed class BusinessObjectDefinition : AggregateRoot<BusinessObjectDefin
         BusinessObjectDefinitionVersion version = BusinessObjectDefinitionVersion.Create(
             this,
             firstPublishedVersion,
-            publishedByUserId,
+            publishedBySubject,
             publishedAt);
         _versions.Add(version);
         Status = BusinessObjectDefinitionStatus.Published;
         LatestPublishedVersionNumber = firstPublishedVersion;
         UpdatedAt = publishedAt;
         return version;
+    }
+
+    public Result AdvanceInstallationReceipt(
+        Guid solutionVersionId,
+        string componentKey,
+        string componentHash,
+        Guid operationId,
+        Guid stepId,
+        long leaseEpoch)
+    {
+        if (solutionVersionId == Guid.Empty || operationId == Guid.Empty || stepId == Guid.Empty ||
+            string.IsNullOrWhiteSpace(componentKey) || componentKey != componentKey.Trim() ||
+            componentKey.Length > 200 || componentHash is not { Length: 64 } ||
+            componentHash.Any(character => !char.IsAsciiHexDigit(character)) ||
+            !StringComparer.Ordinal.Equals(componentHash, componentHash.ToLowerInvariant()) ||
+            leaseEpoch <= 0)
+        {
+            return Result.Failure(ErrorCodes.InvalidInput, "Installation receipt is invalid.");
+        }
+
+        if (!IsInstalled)
+        {
+            if (Status != BusinessObjectDefinitionStatus.Published)
+                return Result.Failure(ErrorCodes.Conflict, "Only a published definition can be installed.");
+
+            InstalledSolutionVersionId = solutionVersionId;
+            InstalledComponentKey = componentKey;
+            InstalledComponentHash = componentHash;
+            InstalledOperationId = operationId;
+            InstalledStepId = stepId;
+            InstalledLeaseEpoch = leaseEpoch;
+            return Result.Success();
+        }
+
+        if (InstalledSolutionVersionId != solutionVersionId ||
+            !StringComparer.Ordinal.Equals(InstalledComponentKey, componentKey) ||
+            !StringComparer.Ordinal.Equals(InstalledComponentHash, componentHash) ||
+            InstalledOperationId != operationId || InstalledStepId != stepId)
+        {
+            return Result.Failure(ErrorCodes.Conflict, "Installed business object provenance is immutable.");
+        }
+        if (leaseEpoch < InstalledLeaseEpoch!.Value)
+            return Result.Failure(ErrorCodes.Conflict, "Installation receipt lease is stale.");
+
+        InstalledLeaseEpoch = leaseEpoch;
+        return Result.Success();
     }
 
     private Result<IReadOnlyList<BusinessObjectFieldDefinition>> CreateUnpublishedFields(
@@ -213,7 +276,7 @@ public sealed class BusinessObjectDefinition : AggregateRoot<BusinessObjectDefin
     }
 
     private static Result ValidateName(string name) =>
-        string.IsNullOrWhiteSpace(name) || name.Trim().Length > 200
+        string.IsNullOrWhiteSpace(name) || name.Trim().Length > 256
             ? Result.Failure(ErrorCodes.InvalidInput, "Object definition name is required.")
             : Result.Success();
 }

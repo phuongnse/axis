@@ -10,3 +10,4 @@ Data Display foundations own reusable, typed presentation and interaction contra
 |---|---|
 | [docs/foundations/data-display/collection-page.md](./collection-page.md) | Done |
 | [docs/foundations/data-display/data-table.md](./data-table.md) | Done |
+| [docs/foundations/data-display/detail-sections.md](./detail-sections.md) | Done |

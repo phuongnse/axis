@@ -89,7 +89,7 @@ public sealed class BusinessObjectRecordValueValidatorTests
         saved.IsSuccess.Should().BeTrue();
         definition.Publish(
             expectedRevision: 2,
-            BusinessObjectRecordHandlerTestContext.UserId,
+            SubjectReference.Human(BusinessObjectRecordHandlerTestContext.UserId),
             BusinessObjectRecordHandlerTestContext.Now).IsSuccess.Should().BeTrue();
         return definition.Versions.Single();
     }

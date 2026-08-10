@@ -13,18 +13,16 @@ public sealed class GetUserTokenClaimsHandlerTests
 {
     private readonly IUserRepository _userRepo = Substitute.For<IUserRepository>();
     private readonly IWorkspaceRepository _workspaceRepo = Substitute.For<IWorkspaceRepository>();
+    private readonly IWorkspaceMembershipRepository _workspaceMembershipRepo = Substitute.For<IWorkspaceMembershipRepository>();
 
     private GetUserTokenClaimsHandler CreateHandler() => new(
         _userRepo,
-        _workspaceRepo);
+        _workspaceRepo,
+        _workspaceMembershipRepo);
 
     private static Workspace ActiveWorkspace(Guid ownerUserId)
     {
-        Workspace workspace = Workspace.CreatePersonal(
-            "Ada Lovelace",
-            WorkspaceSlug.Create("ada-lovelace").Value,
-            Email.Create("ada@example.com").Value,
-            ownerUserId);
+        Workspace workspace = Workspace.CreatePersonal("Ada Lovelace", WorkspaceSlug.Create("ada-lovelace").Value);
         workspace.ActivateAfterOwnerVerification();
         return workspace;
     }
@@ -49,7 +47,9 @@ public sealed class GetUserTokenClaimsHandlerTests
         User user = User.Create("Ada Lovelace", Email.Create("ada@example.com").Value);
         Workspace workspace = ActiveWorkspace(user.Id);
         _userRepo.GetByIdPlatformWideAsync(user.Id, Arg.Any<CancellationToken>()).Returns(user);
-        _workspaceRepo.GetPersonalByOwnerUserIdAsync(user.Id, Arg.Any<CancellationToken>()).Returns(workspace);
+        _workspaceMembershipRepo.ListActiveForUserAsync(user.Id, Arg.Any<CancellationToken>()).Returns([WorkspaceMembership.CreatePersonalOwner(workspace.Id, user.Id)]);
+        _workspaceMembershipRepo.GetActiveAsync(workspace.Id, user.Id, Arg.Any<CancellationToken>()).Returns(WorkspaceMembership.CreatePersonalOwner(workspace.Id, user.Id));
+        _workspaceRepo.GetByIdAsync(workspace.Id, Arg.Any<CancellationToken>()).Returns(workspace);
 
         Result<UserTokenClaimsDto> result = await CreateHandler().Handle(
             new GetUserTokenClaimsQuery(user.Id, workspaceId: null),
@@ -82,6 +82,7 @@ public sealed class GetUserTokenClaimsHandlerTests
         Workspace workspace = ActiveWorkspace(user.Id);
         _userRepo.GetByIdPlatformWideAsync(user.Id, Arg.Any<CancellationToken>()).Returns(user);
         _workspaceRepo.GetByIdAsync(workspace.Id, Arg.Any<CancellationToken>()).Returns(workspace);
+        _workspaceMembershipRepo.GetActiveAsync(workspace.Id, user.Id, Arg.Any<CancellationToken>()).Returns(WorkspaceMembership.CreatePersonalOwner(workspace.Id, user.Id));
 
         Result<UserTokenClaimsDto> result = await CreateHandler().Handle(
             new GetUserTokenClaimsQuery(user.Id, workspace.Id),

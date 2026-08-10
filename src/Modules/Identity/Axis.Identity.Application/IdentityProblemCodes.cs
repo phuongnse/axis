@@ -36,4 +36,26 @@ public static class IdentityProblemCodes
     public const string PreferenceLanguageUnsupported = "identity.preferences.languageUnsupported";
     public const string PreferenceThemeRequired = "identity.preferences.themeRequired";
     public const string PreferenceThemeUnsupported = "identity.preferences.themeUnsupported";
+
+    public const string CreateOrganizationNameRequired =
+        "identity.createOrganization.nameRequired";
+    public const string CreateOrganizationNameLength =
+        "identity.createOrganization.nameLength";
+
+    public const string InvitationEmailInvalid = "identity.invitation.emailInvalid";
+    public const string InvitationRoleUnsupported = "identity.invitation.roleUnsupported";
+    public const string InvitationWorkspaceIneligible = "identity.invitation.workspaceIneligible";
+    public const string InvitationForbidden = "identity.invitation.forbidden";
+    public const string InvitationRateLimited = "identity.invitation.rateLimited";
+    public const string InvitationConflict = "identity.invitation.conflict";
+    public const string InvitationInvalid = "identity.invitation.invalid";
+    public const string InvitationAuditUnavailable = "identity.invitation.auditUnavailable";
+    public const string InvitationReadBackFailed = "identity.invitation.readBackFailed";
+    public const string InvitationNotFound = "identity.invitation.notFound";
+    public const string InvitationNotPending = "identity.invitation.notPending";
+    public const string InvitationPageInvalid = "identity.invitation.pageInvalid";
+    public const string InvitationAccessInvalid = "identity.invitation.accessInvalid";
+    public const string InvitationAccountMismatch = "identity.invitation.accountMismatch";
+    public const string InvitationAuthorityStale = "identity.invitation.authorityStale";
+    public const string InvitationMembershipSuspended = "identity.invitation.membershipSuspended";
 }

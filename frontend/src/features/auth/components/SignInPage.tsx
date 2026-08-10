@@ -1,5 +1,6 @@
 import { LogIn } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { AsyncButton } from '@/components/shared/AsyncButton';
 import {
   InlinePromptAction,
   InlinePromptActionButton,
@@ -7,7 +8,6 @@ import {
   InlinePromptActionLink,
 } from '@/components/shared/InlinePromptAction';
 import { StatusNotice } from '@/components/shared/StatusNotice';
-import { Button } from '@/components/ui/button';
 import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { AuthCard } from '@/features/auth/components/AuthCard';
@@ -75,16 +75,17 @@ export function SignInPage() {
                 <InlinePromptAction prompt={t('auth.confirm.didNotReceive')}>
                   <InlinePromptActionButton
                     type="button"
-                    aria-busy={resendSending}
-                    aria-label={resendSending ? t('auth.sending') : t('auth.resendVerification')}
+                    aria-label={t('auth.resendVerification')}
                     disabled={resendDisabled}
+                    pending={resendSending}
+                    pendingLabel={t('auth.sending')}
                     onClick={() => {
                       if (verificationEmail) {
                         void resend(verificationEmail).catch(() => undefined);
                       }
                     }}
                   >
-                    {resendSending ? t('auth.sending') : t('auth.resendEmail')}
+                    {t('auth.resendEmail')}
                   </InlinePromptActionButton>
                 </InlinePromptAction>
 
@@ -134,10 +135,17 @@ export function SignInPage() {
           ) : null}
         </Field>
 
-        <Button type="submit" size="lg" className="w-full" disabled={loading || rateLimited}>
-          <LogIn className="size-4" aria-hidden />
-          {loading ? t('auth.signingIn') : t('auth.signIn')}
-        </Button>
+        <AsyncButton
+          type="submit"
+          size="lg"
+          className="w-full"
+          disabled={loading || rateLimited}
+          icon={<LogIn aria-hidden />}
+          pending={loading}
+          pendingLabel={t('auth.signingIn')}
+        >
+          {t('auth.signIn')}
+        </AsyncButton>
       </form>
     </AuthCard>
   );

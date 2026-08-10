@@ -37,6 +37,19 @@ public class OpenApiDocumentTests(ApiTestFixture fixture)
         }
     }
 
+    [Fact]
+    public void OpenApiDocument_WhenGenerated_DoesNotPublishBrowserWorkspaceTransitionOperations()
+    {
+        using IServiceScope scope = fixture.CreateScope();
+        ISwaggerProvider provider = scope.ServiceProvider.GetRequiredService<ISwaggerProvider>();
+
+        OpenApiDocument doc = provider.GetSwagger("v1");
+
+        doc.Paths.Keys.Should().NotContain(path => path.StartsWith(
+            "/api/workspace-context",
+            StringComparison.Ordinal));
+    }
+
     private static string RepoRoot()
     {
         DirectoryInfo? dir = new(AppContext.BaseDirectory);

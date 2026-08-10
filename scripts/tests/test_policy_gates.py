@@ -17,6 +17,7 @@ SCRIPTS = ROOT / "scripts"
 if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
 
+import acceptance_evidence  # noqa: E402
 import axis  # noqa: E402
 import axis_repo  # noqa: E402
 import doc_drift_domains  # noqa: E402
@@ -251,6 +252,33 @@ N/A
         self.assertIn("must include `[reason: ...]`", "\n".join(check_pr.validate("fix: x", body)))
 
 
+class TestAcceptanceEvidenceCommands(unittest.TestCase):
+    def test_browser_e2e_command_accepts_global_compose_overlays(self) -> None:
+        commands = (
+            "python scripts/axis.py local-dev e2e -- e2e/sample.pw.ts",
+            "python scripts/axis.py local-dev --compose-overlay product.yml e2e -- e2e/sample.pw.ts",
+            "python scripts/axis.py local-dev --compose-overlay first.yml --compose-overlay second.yaml e2e",
+        )
+
+        for command in commands:
+            with self.subTest(command=command):
+                self.assertTrue(acceptance_evidence.is_browser_e2e_command(command))
+
+    def test_browser_e2e_command_rejects_invalid_global_arguments(self) -> None:
+        commands = (
+            "python scripts/axis.py local-dev --compose-overlay",
+            "python scripts/axis.py local-dev --compose-overlay e2e",
+            "python scripts/axis.py local-dev --compose-overlay --unknown e2e",
+            "python scripts/axis.py local-dev --unknown value e2e",
+            "python scripts/axis.py local-dev status -- e2e",
+            'python scripts/axis.py frontend test sample.test.tsx -t "local-dev e2e"',
+        )
+
+        for command in commands:
+            with self.subTest(command=command):
+                self.assertFalse(acceptance_evidence.is_browser_e2e_command(command))
+
+
 class TestUseCaseDocsGate(unittest.TestCase):
     def issues_for_document(
         self,
@@ -325,18 +353,192 @@ class TestUseCaseDocsGate(unittest.TestCase):
             "\n".join(issues).replace("\\", "/"),
         )
 
+    def test_use_case_inventory_layout_rejects_hub_without_a_direct_spec(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            use_cases = root / "docs" / "use-cases"
+            domain = use_cases / "supporting-domain"
+            domain.mkdir(parents=True)
+            (use_cases / "README.md").write_text("# Use Cases\n", encoding="utf-8")
+            (domain / "README.md").write_text("# Supporting Domain\n", encoding="utf-8")
+
+            original_root = check_use_case_docs.ROOT
+            original_use_cases = check_use_case_docs.USE_CASES
+            check_use_case_docs.ROOT = root
+            check_use_case_docs.USE_CASES = use_cases
+            try:
+                issues = check_use_case_docs.check_use_case_inventory_layout()
+            finally:
+                check_use_case_docs.ROOT = original_root
+                check_use_case_docs.USE_CASES = original_use_cases
+
+        self.assertIn("domain hub must own at least one direct use-case spec", "\n".join(issues))
+
+    def test_use_case_inventories_require_exact_links_and_derived_status(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            use_cases = root / "docs" / "use-cases"
+            domain = use_cases / "example"
+            domain.mkdir(parents=True)
+            (use_cases / "README.md").write_text(
+                """## Current Use Cases
+
+| Domain | Use case | Status |
+|---|---|---|
+| [Example](./example/README.md) | [Wrong](./example/wrong.md) | Not started |
+""",
+                encoding="utf-8",
+            )
+            (domain / "README.md").write_text(
+                """## Current Use Cases
+
+| Use case | Status |
+|---|---|
+| [Sample](./sample.md) | Not started |
+""",
+                encoding="utf-8",
+            )
+            sample = domain / "sample.md"
+            sample.write_text(
+                """> **Implementation status**
+>
+> | Layer | Status |
+> |---|---|
+> | Application | Done |
+""",
+                encoding="utf-8",
+            )
+            original_root = check_use_case_docs.ROOT
+            original_use_cases = check_use_case_docs.USE_CASES
+            check_use_case_docs.ROOT = root
+            check_use_case_docs.USE_CASES = use_cases
+            try:
+                issues = check_use_case_docs.validate_use_case_inventories([sample])
+            finally:
+                check_use_case_docs.ROOT = original_root
+                check_use_case_docs.USE_CASES = original_use_cases
+
+        joined = "\n".join(issues)
+        self.assertIn("status for `./sample.md` must be `Done`", joined)
+        self.assertIn("is missing `./example/sample.md`", joined)
+        self.assertIn("references non-spec `./example/wrong.md`", joined)
+
+    def test_supporting_domain_status_is_derived_from_owning_use_case_layer(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            use_cases = root / "docs" / "use-cases"
+            owner_dir = use_cases / "identity-governance"
+            support_dir = use_cases / "audit"
+            owner_dir.mkdir(parents=True)
+            support_dir.mkdir(parents=True)
+            (use_cases / "README.md").write_text(
+                """## Supporting Domains
+
+| Domain | Layer | Responsibilities |
+|---|---|---|
+| [Audit](./audit/README.md) | Audit | Audit projection. |
+""",
+                encoding="utf-8",
+            )
+            owner = owner_dir / "create-workspace.md"
+            owner.write_text(
+                """> **Implementation status**
+>
+> | Layer | Status |
+> |---|---|
+> | Audit | Partial |
+""",
+                encoding="utf-8",
+            )
+            (support_dir / "README.md").write_text(
+                """## Supporting Responsibilities
+
+| Owning use case | Layer | Responsibility | Status |
+|---|---|---|---|
+| [Create](../identity-governance/create-workspace.md) | Audit | Project creation outcome. | Not started |
+""",
+                encoding="utf-8",
+            )
+
+            original_root = check_use_case_docs.ROOT
+            original_use_cases = check_use_case_docs.USE_CASES
+            check_use_case_docs.ROOT = root
+            check_use_case_docs.USE_CASES = use_cases
+            try:
+                issues = check_use_case_docs.validate_supporting_domain_inventories([owner])
+            finally:
+                check_use_case_docs.ROOT = original_root
+                check_use_case_docs.USE_CASES = original_use_cases
+
+        self.assertIn(
+            "status for `../identity-governance/create-workspace.md` layer `Audit` must be `Partial`, found `Not started`",
+            "\n".join(issues),
+        )
+
+    def test_supporting_domain_requires_every_owner_of_its_declared_layer(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            use_cases = root / "docs" / "use-cases"
+            owner_dir = use_cases / "identity-governance"
+            support_dir = use_cases / "audit"
+            owner_dir.mkdir(parents=True)
+            support_dir.mkdir(parents=True)
+            (use_cases / "README.md").write_text(
+                """## Supporting Domains
+
+| Domain | Layer | Responsibilities |
+|---|---|---|
+| [Audit](./audit/README.md) | Audit | Audit projection. |
+""",
+                encoding="utf-8",
+            )
+            owner_template = """> **Implementation status**
+>
+> | Layer | Status |
+> |---|---|
+> | Audit | Partial |
+"""
+            first_owner = owner_dir / "create-workspace.md"
+            second_owner = owner_dir / "switch-workspace.md"
+            first_owner.write_text(owner_template, encoding="utf-8")
+            second_owner.write_text(owner_template, encoding="utf-8")
+            (support_dir / "README.md").write_text(
+                """## Supporting Responsibilities
+
+| Owning use case | Layer | Responsibility | Status |
+|---|---|---|---|
+| [Create](../identity-governance/create-workspace.md) | Audit | Project creation outcome. | Partial |
+""",
+                encoding="utf-8",
+            )
+
+            original_root = check_use_case_docs.ROOT
+            original_use_cases = check_use_case_docs.USE_CASES
+            check_use_case_docs.ROOT = root
+            check_use_case_docs.USE_CASES = use_cases
+            try:
+                issues = check_use_case_docs.validate_supporting_domain_inventories([first_owner, second_owner])
+            finally:
+                check_use_case_docs.ROOT = original_root
+                check_use_case_docs.USE_CASES = original_use_cases
+
+        self.assertIn(
+            "missing supporting responsibility for `../identity-governance/switch-workspace.md` layer `Audit`",
+            "\n".join(issues),
+        )
+
     def issues_for_use_case(self, callout: str, ac_line: str = "- **AC-001** Works.") -> list[str]:
-        matrix = (
-            ""
-            if "## Acceptance Test Matrix" in callout
-            else """## Acceptance Test Matrix
+        if "## Acceptance Test Matrix" in callout:
+            matrix, status = callout.split("> **Implementation status**", maxsplit=1)
+            callout = "> **Implementation status**" + status
+        else:
+            matrix = """## Acceptance Test Matrix
 
 | ID | Boundary | Scenario | Covers AC | Verification | Required |
 |---|---|---|---|---|---|
 | AT-001 | Browser journey | User completes flow | AC-001 | Browser automation | Yes |
 
 """
-        )
         return self.issues_for_document(
             f"""# Sample use case
 
@@ -348,9 +550,21 @@ Ship user value.
 
 - User
 
+## Preconditions
+
+- User can start the flow.
+
 ## Trigger
 
 - User starts the flow.
+
+## Success guarantee
+
+- The requested outcome is durable.
+
+## Minimal guarantee
+
+- Failure leaves the current state safe.
 
 ## Main flow
 
@@ -397,6 +611,103 @@ Ship user value.
         )
 
         self.assertIn("missing implementation status deferred follow-ups section", "\n".join(issues))
+
+    def test_rejects_missing_use_case_guarantee_sections(self) -> None:
+        content = """# Sample use case
+
+## Purpose
+
+Ship user value.
+
+## Primary actor
+
+- User
+
+## Trigger
+
+- User starts the flow.
+
+## Main flow
+
+1. User starts.
+
+## Alternate / error flows
+
+- None.
+
+## Acceptance Criteria
+
+- **AC-001** Works.
+
+## Acceptance Test Matrix
+
+| ID | Boundary | Scenario | Covers AC | Verification | Required |
+|---|---|---|---|---|---|
+| AT-001 | Browser journey | User completes flow | AC-001 | Browser automation | Yes |
+
+## Out Of Scope
+
+- N/A.
+"""
+        issues = self.issues_for_document(content)
+
+        joined = "\n".join(issues)
+        self.assertIn("missing preconditions section", joined)
+        self.assertIn("missing success guarantee section", joined)
+        self.assertIn("missing minimal guarantee section", joined)
+
+    def test_rejects_use_case_sections_out_of_order(self) -> None:
+        content = """# Sample use case
+
+## Purpose
+
+Ship user value.
+
+## Preconditions
+
+- User can start.
+
+## Primary actor
+
+- User
+
+## Trigger
+
+- User starts.
+
+## Success guarantee
+
+- Outcome is durable.
+
+## Minimal guarantee
+
+- Failure is safe.
+
+## Main flow
+
+1. User completes the goal.
+
+## Alternate / error flows
+
+- Failure stays safe.
+
+## Acceptance Criteria
+
+- **AC-001** Works.
+
+## Acceptance Test Matrix
+
+| ID | Boundary | Scenario | Covers AC | Verification | Required |
+|---|---|---|---|---|---|
+| AT-001 | Browser journey | User completes flow | AC-001 | Browser automation | Yes |
+
+## Out Of Scope
+
+- N/A.
+"""
+        issues = self.issues_for_document(content)
+
+        self.assertIn("canonical use-case order", "\n".join(issues))
 
     def test_rejects_empty_status_sections(self) -> None:
         issues = self.issues_for_use_case(
@@ -640,9 +951,21 @@ Ship user value.
 
 - User
 
+## Preconditions
+
+- User can start the flow.
+
 ## Trigger
 
 - User starts the flow.
+
+## Success guarantee
+
+- The requested outcome is durable.
+
+## Minimal guarantee
+
+- Failure leaves the current state safe.
 
 ## Main flow
 
@@ -751,6 +1074,55 @@ Ship user value.
         )
 
         self.assertEqual([], issues)
+
+    def test_accepts_mcp_boundary_with_contract_evidence(self) -> None:
+        issues = self.issues_for_document(
+            self.complete_use_case_document(
+                """| ID | Boundary | Scenario | Covers AC | Verification | Required |
+|---|---|---|---|---|---|
+| AT-001 | API/MCP boundaries | API and typed MCP stay aligned | AC-001 | API integration test + MCP contract test | Yes |"""
+            ),
+            evidence_doc="""# Sample Evidence
+
+> **Navigation**: [docs/use-cases/example/sample.md](./sample.md)
+
+## Acceptance Evidence
+
+| AT ID | Evidence | Commands |
+|---|---|---|
+| AT-001 | `tests/Api/Axis.Api.Tests/Identity/SampleTests.cs`, `tests/Tools/Axis.Mcp.Tests/McpApiCoverageTests.cs` | `python scripts/axis.py dotnet test tests/Api/Axis.Api.Tests/Axis.Api.Tests.csproj`, `python scripts/axis.py check mcp-api-coverage`, `python scripts/axis.py check mcp-contracts`, `python scripts/axis.py check mcp-tool-safety` |
+""",
+            evidence_files=(
+                "tests/Api/Axis.Api.Tests/Identity/SampleTests.cs",
+                "tests/Tools/Axis.Mcp.Tests/McpApiCoverageTests.cs",
+            ),
+        )
+
+        self.assertEqual([], issues)
+
+    def test_mcp_contract_evidence_requires_all_mcp_gates(self) -> None:
+        issues = self.issues_for_document(
+            self.complete_use_case_document(
+                """| ID | Boundary | Scenario | Covers AC | Verification | Required |
+|---|---|---|---|---|---|
+| AT-001 | API/MCP boundaries | API and typed MCP stay aligned | AC-001 | MCP contract test | Yes |"""
+            ),
+            evidence_doc="""# Sample Evidence
+
+> **Navigation**: [docs/use-cases/example/sample.md](./sample.md)
+
+## Acceptance Evidence
+
+| AT ID | Evidence | Commands |
+|---|---|---|
+| AT-001 | `tests/Tools/Axis.Mcp.Tests/McpApiCoverageTests.cs` | `python scripts/axis.py check mcp-api-coverage` |
+""",
+            evidence_files=("tests/Tools/Axis.Mcp.Tests/McpApiCoverageTests.cs",),
+        )
+
+        joined = "\n".join(issues)
+        self.assertIn("python scripts/axis.py check mcp-contracts", joined)
+        self.assertIn("python scripts/axis.py check mcp-tool-safety", joined)
 
     def test_accepts_immutable_external_browser_evidence(self) -> None:
         checkpoint = "6eb817c02fda580fc9afee0c37b2b7e0a8c4735c"
@@ -1043,6 +1415,37 @@ Ship user value.
         self.assertIn("invalid Verification `Jest`", joined)
         self.assertIn("Required must be `Yes` or `No`", joined)
 
+    def test_accepts_cross_layer_and_architecture_boundaries(self) -> None:
+        issues = self.issues_for_use_case(
+            """## Acceptance Test Matrix
+
+| ID | Boundary | Scenario | Covers AC | Verification | Required |
+|---|---|---|---|---|---|
+| AT-001 | API/Infrastructure boundaries | Runtime and persistence cooperate | AC-001 | API integration test | Yes |
+| AT-002 | Architecture boundary | Public dependency direction is preserved | AC-001 | Architecture test | No |
+
+> **Implementation status**
+>
+> | Layer | Status |
+> |-------|--------|
+> | Domain | N/A |
+> | Application | N/A |
+> | Infrastructure | N/A |
+> | API | N/A |
+> | Frontend | N/A |
+>
+> **Gaps vs spec:** none.
+>
+> **Deferred follow-ups:** N/A.
+>
+> **Verification:** N/A.
+>
+> **Decisions:** N/A.
+"""
+        )
+
+        self.assertNotIn("invalid Boundary", "\n".join(issues))
+
     def test_rejects_acceptance_matrix_mixed_id_prefixes(self) -> None:
         issues = self.issues_for_use_case(
             """## Acceptance Test Matrix
@@ -1224,18 +1627,17 @@ class TestFoundationDocsGate(unittest.TestCase):
 
 Provide an app frame.
 
-## Primary actor
+## Consumers
 
-- Signed-in user
+- Authenticated routes
 
-## Trigger
+## Activation
 
-- User opens an authenticated route.
+- An authenticated route renders.
 
-## Main flow
+## Guarantees
 
-1. System renders the route.
-2. System renders the frame.
+- The frame renders the route safely.
 
 ## Alternate / error flows
 
@@ -1399,6 +1801,184 @@ Provide an app frame.
         )
 
         self.assertNotIn("complete foundation docs must include acceptance evidence sidecar", "\n".join(issues))
+
+    def test_rejects_legacy_foundation_flow_sections(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            path = root / "docs" / "foundations" / "app-shell" / "app-frame.md"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(
+                """# App Frame
+
+## Purpose
+
+Provide an app frame.
+
+## Primary actor
+
+- User
+
+## Trigger
+
+- User opens a route.
+
+## Main flow
+
+1. System renders the frame.
+
+## Alternate / error flows
+
+- None.
+
+## Acceptance Criteria
+
+- **AC-001** Frame renders.
+
+## Acceptance Test Matrix
+
+| ID | Boundary | Scenario | Covers AC | Verification | Required |
+|---|---|---|---|---|---|
+| AT-001 | UI component | Frame renders. | AC-001 | UI component test | Yes |
+
+## Out Of Scope
+
+- N/A.
+""",
+                encoding="utf-8",
+            )
+            original_root = check_foundation_docs.ROOT
+            check_foundation_docs.ROOT = root
+            try:
+                issues = check_foundation_docs.validate_sections(check_foundation_docs.foundation_document(path))
+            finally:
+                check_foundation_docs.ROOT = original_root
+
+        joined = "\n".join(issues)
+        self.assertIn("missing consumers section", joined)
+        self.assertIn("missing activation section", joined)
+        self.assertIn("missing guarantees section", joined)
+
+    def test_rejects_foundation_sections_out_of_order(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            path = root / "docs" / "foundations" / "app-shell" / "app-frame.md"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(
+                """# App Frame
+
+## Purpose
+
+Provide an app frame.
+
+## Activation
+
+- An authenticated route renders.
+
+## Consumers
+
+- Authenticated routes
+
+## Guarantees
+
+- The frame renders safely.
+
+## Alternate / error flows
+
+- None.
+
+## Acceptance Criteria
+
+- **AC-001** Frame renders.
+
+## Acceptance Test Matrix
+
+| ID | Boundary | Scenario | Covers AC | Verification | Required |
+|---|---|---|---|---|---|
+| AT-001 | UI component | Frame renders. | AC-001 | UI component test | Yes |
+
+## Out Of Scope
+
+- N/A.
+""",
+                encoding="utf-8",
+            )
+            original_root = check_foundation_docs.ROOT
+            check_foundation_docs.ROOT = root
+            try:
+                issues = check_foundation_docs.validate_sections(check_foundation_docs.foundation_document(path))
+            finally:
+                check_foundation_docs.ROOT = original_root
+
+        self.assertIn("canonical foundation order", "\n".join(issues))
+
+    def test_foundation_inventories_require_exact_links_and_derived_status(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            foundations = root / "docs" / "foundations"
+            surface = foundations / "app-shell"
+            surface.mkdir(parents=True)
+            (foundations / "README.md").write_text(
+                """## Current Foundations
+
+| Surface | Foundation | Status |
+|---|---|---|
+| [App Shell](./app-shell/README.md) | [Wrong](./app-shell/wrong.md) | Not started |
+""",
+                encoding="utf-8",
+            )
+            (surface / "README.md").write_text(
+                """## Foundations
+
+| Foundation | Status |
+|---|---|
+| [App Frame](./app-frame.md) | Not started |
+""",
+                encoding="utf-8",
+            )
+            app_frame = surface / "app-frame.md"
+            app_frame.write_text(
+                """> **Implementation status**
+>
+> | Layer | Status |
+> |---|---|
+> | Frontend | Done |
+""",
+                encoding="utf-8",
+            )
+            original_root = check_foundation_docs.ROOT
+            original_foundations = check_foundation_docs.FOUNDATIONS
+            check_foundation_docs.ROOT = root
+            check_foundation_docs.FOUNDATIONS = foundations
+            try:
+                issues = check_foundation_docs.validate_foundation_inventories([app_frame])
+            finally:
+                check_foundation_docs.ROOT = original_root
+                check_foundation_docs.FOUNDATIONS = original_foundations
+
+        joined = "\n".join(issues)
+        self.assertIn("status for `./app-frame.md` must be `Done`", joined)
+        self.assertIn("is missing `./app-shell/app-frame.md`", joined)
+        self.assertIn("references non-spec `./app-shell/wrong.md`", joined)
+
+    def test_foundation_status_details_are_strict_only_for_changed_paths(self) -> None:
+        content = """> **Implementation status**
+>
+> | Layer | Status |
+> |---|---|
+> | Frontend | Done |
+"""
+        doc = check_foundation_docs.FoundationDocument(
+            path=ROOT / "docs" / "foundations" / "app-shell" / "sample.md",
+            text=content,
+            sections={},
+            h2_headings=[],
+        )
+
+        self.assertEqual([], check_foundation_docs.validate_implementation_status(doc, strict_status=False))
+        self.assertIn(
+            "missing implementation status gaps vs spec section",
+            "\n".join(check_foundation_docs.validate_implementation_status(doc, strict_status=True)),
+        )
 
 
 class TestDocDriftRatchets(unittest.TestCase):
@@ -2309,6 +2889,7 @@ class TestVulnerablePackageGate(unittest.TestCase):
                 self.assertEqual(1, axis.check_frontend_vulnerable_packages())
 
         self.assertIn("high vulnerabilities cannot be accepted", stderr.getvalue())
+        self.assertIn("GHSA-frvp-7c67-39w9", stderr.getvalue())
 
     def test_frontend_gate_rejects_new_unaccepted_moderate_advisory(self) -> None:
         report = self.frontend_audit_report()
@@ -2445,6 +3026,28 @@ class TestVulnerablePackageGate(unittest.TestCase):
             self.assertEqual(1, axis.check_frontend_vulnerable_packages())
 
         self.assertIn("valid npm audit JSON", stderr.getvalue())
+
+    def test_frontend_gate_reports_structured_npm_audit_failure(self) -> None:
+        with (
+            mock.patch.object(axis, "check_frontend_toolchain", return_value=0),
+            mock.patch.object(
+                axis,
+                "run_frontend_npm",
+                return_value=axis.subprocess.CompletedProcess(
+                    [],
+                    1,
+                    stdout=json.dumps({"message": "registry unavailable", "error": {}}),
+                    stderr="",
+                ),
+            ),
+            contextlib.redirect_stderr(io.StringIO()) as stderr,
+        ):
+            self.assertEqual(1, axis.check_frontend_vulnerable_packages())
+
+        self.assertIn(
+            "npm audit did not return a vulnerability report: registry unavailable",
+            stderr.getvalue(),
+        )
 
     def test_frontend_gate_rejects_unexpected_npm_audit_exit_code(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -3750,6 +4353,45 @@ class TestScriptsStandardGate(unittest.TestCase):
 
 
 class TestLocalDevCli(unittest.TestCase):
+    def setUp(self) -> None:
+        self.real_discover_local_dev_compose_overlays = (
+            axis.discover_local_dev_compose_overlays
+        )
+        self.topology_temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.topology_temp.cleanup)
+        self.topology_root = Path(self.topology_temp.name)
+        self.topology_state = self.topology_root / "local-dev-topology.json"
+        topology_state = mock.patch.object(
+            axis,
+            "LOCAL_DEV_TOPOLOGY_STATE",
+            self.topology_state,
+        )
+        topology_state.start()
+        self.addCleanup(topology_state.stop)
+        topology_discovery = mock.patch.object(
+            axis,
+            "discover_local_dev_compose_overlays",
+            return_value=None,
+        )
+        topology_discovery.start()
+        self.addCleanup(topology_discovery.stop)
+
+    def make_overlay(self, name: str = "product.yml") -> Path:
+        overlay = self.topology_root / name
+        overlay.write_text("services: {}\n", encoding="utf-8")
+        return overlay
+
+    def write_topology_state(self, overlays: list[Path]) -> None:
+        self.topology_state.write_text(
+            json.dumps(
+                {
+                    "version": 1,
+                    "composeOverlays": [str(overlay.resolve()) for overlay in overlays],
+                }
+            ),
+            encoding="utf-8",
+        )
+
     def test_compose_app_base_url_allows_human_local_dev_default(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             compose = Path(temp) / "docker-compose.yml"
@@ -3958,6 +4600,29 @@ class TestLocalDevCli(unittest.TestCase):
 
         return calls
 
+    def run_local_dev_with_codes(
+        self,
+        args: axis.argparse.Namespace,
+        *return_codes: int,
+    ) -> tuple[int, list[list[str]]]:
+        calls: list[list[str]] = []
+        codes = iter(return_codes)
+
+        def fake_run(command: list[str], **_kwargs):
+            calls.append(command)
+            return axis.subprocess.CompletedProcess(
+                command,
+                next(codes),
+                stdout="",
+                stderr="",
+            )
+
+        with (
+            mock.patch.object(axis, "_docker_compose_ok", return_value=True),
+            mock.patch.object(axis, "run", side_effect=fake_run),
+        ):
+            return axis.local_dev(args), calls
+
     def test_up_uses_axis_project_and_committed_compose_file(self) -> None:
         calls = self.run_local_dev(
             axis.argparse.Namespace(local_dev_command="up", build=False, services=[])
@@ -4043,6 +4708,272 @@ class TestLocalDevCli(unittest.TestCase):
                 )
 
         docker_compose_ok.assert_not_called()
+
+    def test_overlay_topology_survives_down_and_blocks_bare_reconciliation_before_docker(self) -> None:
+        overlay = self.make_overlay()
+        overlay_args = [str(overlay)]
+        self.run_local_dev(
+            axis.argparse.Namespace(
+                local_dev_command="up",
+                build=False,
+                services=[],
+                compose_overlays=overlay_args,
+            )
+        )
+        self.run_local_dev(
+            axis.argparse.Namespace(
+                local_dev_command="down",
+                volumes=False,
+                compose_overlays=overlay_args,
+            )
+        )
+        self.assertEqual(
+            {"version": 1, "composeOverlays": [str(overlay.resolve())]},
+            json.loads(self.topology_state.read_text(encoding="utf-8")),
+        )
+        self.run_local_dev(axis.argparse.Namespace(local_dev_command="status"))
+        self.run_local_dev(
+            axis.argparse.Namespace(local_dev_command="logs", follow=False, services=[])
+        )
+
+        bare_commands = (
+            axis.argparse.Namespace(local_dev_command="up", build=False, services=[]),
+            axis.argparse.Namespace(local_dev_command="e2e", e2e_args=[]),
+            axis.argparse.Namespace(local_dev_command="recreate", services=["api"]),
+        )
+        for args in bare_commands:
+            with (
+                self.subTest(command=args.local_dev_command),
+                mock.patch.object(axis, "_docker_compose_ok") as docker_compose_ok,
+                mock.patch.object(axis, "run") as run,
+                self.assertRaisesRegex(axis.CheckError, "deployment topology mismatch"),
+            ):
+                axis.local_dev(args)
+            docker_compose_ok.assert_not_called()
+            run.assert_not_called()
+
+    def test_matching_ordered_overlay_topology_is_allowed(self) -> None:
+        first = self.make_overlay()
+        second = self.make_overlay("environment.yaml")
+        self.write_topology_state([first, second])
+        calls = self.run_local_dev(
+            axis.argparse.Namespace(
+                local_dev_command="up",
+                build=False,
+                services=[],
+                compose_overlays=[str(first), str(second)],
+            )
+        )
+        self.assertEqual([str(first), "-f", str(second)], calls[0][7:10])
+
+        with (
+            mock.patch.object(axis, "_docker_compose_ok") as docker_compose_ok,
+            mock.patch.object(axis, "run") as run,
+            self.assertRaisesRegex(axis.CheckError, "deployment topology mismatch"),
+        ):
+            axis.local_dev(
+                axis.argparse.Namespace(
+                    local_dev_command="up",
+                    build=False,
+                    services=[],
+                    compose_overlays=[str(second), str(first)],
+                )
+            )
+        docker_compose_ok.assert_not_called()
+        run.assert_not_called()
+
+    def test_active_overlay_topology_is_adopted_before_bare_reconciliation(self) -> None:
+        overlay = self.make_overlay()
+        with (
+            mock.patch.object(axis, "_docker_compose_ok", return_value=True),
+            mock.patch.object(
+                axis,
+                "discover_local_dev_compose_overlays",
+                return_value=(overlay.resolve(),),
+            ),
+            mock.patch.object(axis, "run") as run,
+            self.assertRaisesRegex(axis.CheckError, "deployment topology mismatch"),
+        ):
+            axis.local_dev(
+                axis.argparse.Namespace(
+                    local_dev_command="up",
+                    build=False,
+                    services=[],
+                )
+            )
+
+        run.assert_not_called()
+        self.assertTrue(self.topology_state.is_file())
+
+    def test_base_topology_allows_the_first_explicit_overlay_claim(self) -> None:
+        overlay = self.make_overlay()
+        with mock.patch.object(
+            axis,
+            "discover_local_dev_compose_overlays",
+            return_value=(),
+        ):
+            self.run_local_dev(
+                axis.argparse.Namespace(
+                    local_dev_command="up",
+                    build=False,
+                    services=[],
+                    compose_overlays=[str(overlay)],
+                )
+            )
+
+        self.assertEqual((overlay.resolve(),), axis.read_local_dev_topology())
+
+    def test_failed_first_overlay_up_does_not_claim_topology(self) -> None:
+        overlay = self.make_overlay()
+        result, _ = self.run_local_dev_with_codes(
+            axis.argparse.Namespace(
+                local_dev_command="up",
+                build=False,
+                services=[],
+                compose_overlays=[str(overlay)],
+            ),
+            1,
+        )
+
+        self.assertEqual(1, result)
+        self.assertFalse(self.topology_state.exists())
+
+    def test_e2e_claims_first_overlay_only_after_stack_up_succeeds(self) -> None:
+        overlay = self.make_overlay()
+
+        def run_e2e(build_services: list[str], *return_codes: int) -> int:
+            result, _ = self.run_local_dev_with_codes(
+                axis.argparse.Namespace(
+                    local_dev_command="e2e",
+                    build_services=build_services,
+                    e2e_args=[],
+                    compose_overlays=[str(overlay)],
+                ),
+                *return_codes,
+            )
+            return result
+
+        self.assertEqual(1, run_e2e(["api"], 1))
+        self.assertFalse(self.topology_state.exists())
+
+        self.assertEqual(1, run_e2e([], 0, 1))
+        self.assertEqual((overlay.resolve(),), axis.read_local_dev_topology())
+
+    def test_active_overlay_topology_is_read_from_compose_container_metadata(self) -> None:
+        overlay = self.topology_root / "product.yml"
+        result = axis.subprocess.CompletedProcess(
+            [],
+            0,
+            stdout=f"{axis.LOCAL_DEV_COMPOSE_FILE},{overlay}\n",
+            stderr="",
+        )
+        with mock.patch.object(axis, "run_optional", return_value=result) as run_optional:
+            self.assertEqual(
+                (overlay.resolve(),),
+                self.real_discover_local_dev_compose_overlays(),
+            )
+
+        self.assertEqual("inspect", run_optional.call_args.args[0][1])
+        missing = axis.subprocess.CompletedProcess(
+            [],
+            1,
+            stdout="",
+            stderr="error: no such object: axis_api",
+        )
+        with mock.patch.object(axis, "run_optional", return_value=missing):
+            self.assertIsNone(self.real_discover_local_dev_compose_overlays())
+
+    def test_relocated_base_topology_is_adopted_only_without_overlays(self) -> None:
+        relocated_base = self.topology_root / "moved" / axis.LOCAL_DEV_COMPOSE_FILE.name
+        base_only = axis.subprocess.CompletedProcess(
+            [],
+            0,
+            stdout=f"{relocated_base}\n",
+            stderr="",
+        )
+        with mock.patch.object(axis, "run_optional", return_value=base_only):
+            self.assertEqual((), self.real_discover_local_dev_compose_overlays())
+
+        with_overlay = axis.subprocess.CompletedProcess(
+            [],
+            0,
+            stdout=f"{relocated_base},{self.make_overlay()}\n",
+            stderr="",
+        )
+        with (
+            mock.patch.object(axis, "run_optional", return_value=with_overlay),
+            self.assertRaisesRegex(axis.CheckError, "topology metadata is invalid"),
+        ):
+            self.real_discover_local_dev_compose_overlays()
+
+    def test_reset_all_replaces_topology_state_only_after_success(self) -> None:
+        overlay = self.make_overlay()
+        self.write_topology_state([overlay])
+        result, calls = self.run_local_dev_with_codes(
+            axis.argparse.Namespace(local_dev_command="reset-all", yes=True),
+            0,
+            1,
+        )
+        self.assertEqual(1, result)
+        self.assertIn(str(overlay), calls[0])
+        self.assertTrue(self.topology_state.is_file())
+
+        self.run_local_dev(
+            axis.argparse.Namespace(local_dev_command="reset-all", yes=True)
+        )
+        self.assertFalse(self.topology_state.exists())
+
+    def test_failed_first_overlay_reset_all_does_not_claim_topology(self) -> None:
+        overlay = self.make_overlay()
+        result, _ = self.run_local_dev_with_codes(
+            axis.argparse.Namespace(
+                local_dev_command="reset-all",
+                yes=True,
+                compose_overlays=[str(overlay)],
+            ),
+            0,
+            1,
+        )
+
+        self.assertEqual(1, result)
+        self.assertFalse(self.topology_state.exists())
+
+    def test_down_volumes_clears_topology_only_after_success(self) -> None:
+        overlay = self.make_overlay()
+        self.write_topology_state([overlay])
+        args = axis.argparse.Namespace(
+            local_dev_command="down",
+            volumes=True,
+            compose_overlays=[str(overlay)],
+        )
+
+        with mock.patch.object(axis, "_docker_compose_ok", return_value=True):
+            self.assertEqual(1, axis.local_dev(axis.argparse.Namespace(**vars(args), yes=False)))
+        self.assertTrue(self.topology_state.is_file())
+
+        result, _ = self.run_local_dev_with_codes(
+            axis.argparse.Namespace(**vars(args), yes=True),
+            1,
+        )
+        self.assertEqual(1, result)
+        self.assertTrue(self.topology_state.is_file())
+
+        self.run_local_dev(axis.argparse.Namespace(**vars(args), yes=True))
+        self.assertFalse(self.topology_state.exists())
+
+    def test_run_api_is_blocked_when_local_data_requires_compose_overlays(self) -> None:
+        self.write_topology_state([self.make_overlay()])
+        with (
+            mock.patch.object(axis, "check_dotnet_sdk") as check_dotnet_sdk,
+            mock.patch.object(axis, "run") as run,
+            self.assertRaisesRegex(axis.CheckError, "deployment topology mismatch"),
+        ):
+            axis.dotnet_command(
+                axis.argparse.Namespace(dotnet_command="run-api", dotnet_args=[])
+            )
+
+        check_dotnet_sdk.assert_not_called()
+        run.assert_not_called()
 
     def test_up_reports_ready_urls_and_host_trust_followup(self) -> None:
         with (
@@ -4405,6 +5336,20 @@ class TestLocalDevShellArgv(unittest.TestCase):
 
 
 class TestGitWorkflows(unittest.TestCase):
+    def test_secret_scan_pins_runtime_and_keeps_full_verified_scan(self) -> None:
+        workflow = (ROOT / ".github" / "workflows" / "build-and-test.yml").read_text(encoding="utf-8")
+        secret_scan = workflow.split("  secret-scan:\n", maxsplit=1)[1]
+
+        self.assertIn(
+            "uses: trufflesecurity/trufflehog@37b77001d0174ebec2fcca2bd83ff83a6d45a3ab",
+            secret_scan,
+        )
+        self.assertIn("base: ${{ github.event.pull_request.base.sha }}", secret_scan)
+        self.assertIn("head: ${{ github.event.pull_request.head.sha }}", secret_scan)
+        self.assertIn("version: 3.95.3", secret_scan)
+        extra_args = next(line.strip() for line in secret_scan.splitlines() if "extra_args:" in line)
+        self.assertEqual("extra_args: --only-verified", extra_args)
+
     def test_sync_fast_forwards_existing_branch(self) -> None:
         calls: list[list[str]] = []
 
@@ -4720,6 +5665,98 @@ class TestAxisCommandWrappers(unittest.TestCase):
 
         self.assertEqual(["dotnet", "build", "Axis.sln", "--nologo", "--no-restore"], calls[0])
 
+    def test_dotnet_restore_accepts_project_target(self) -> None:
+        project = "src/Modules/BusinessObjects/Axis.BusinessObjects.Contracts/Axis.BusinessObjects.Contracts.csproj"
+        calls = self.run_with_fake_process(
+            axis.dotnet_command,
+            axis.argparse.Namespace(
+                dotnet_command="restore",
+                dotnet_args=[project, "--", "--locked-mode"],
+            ),
+        )
+
+        self.assertEqual(
+            ["dotnet", "restore", project, "--locked-mode"],
+            calls[0],
+        )
+
+    def test_api_contract_generation_builds_only_api_serially(self) -> None:
+        calls: list[list[str]] = []
+
+        def fake_run(command: list[str], **_kwargs):
+            calls.append(command)
+            return axis.subprocess.CompletedProcess(command, 0)
+
+        with (
+            mock.patch.object(axis, "check_dotnet_sdk", return_value=0),
+            mock.patch.object(axis, "check_frontend_toolchain", return_value=0),
+            mock.patch.object(axis, "run", side_effect=fake_run),
+            mock.patch.object(axis, "run_frontend_npm", return_value=axis.subprocess.CompletedProcess([], 0)),
+            mock.patch.object(axis, "sync_solution_openapi_digest") as sync_digest,
+            mock.patch.object(axis, "exe", side_effect=lambda name: name),
+            contextlib.redirect_stdout(io.StringIO()),
+        ):
+            self.assertEqual(0, axis.generate_api_contracts())
+
+        self.assertEqual(
+            ["dotnet", "build", "src/Axis.Api/Axis.Api.csproj", "--nologo", "-m:1"],
+            calls[1],
+        )
+        sync_digest.assert_called_once_with()
+
+    def test_solution_openapi_digest_sync_updates_only_configured_digest(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            openapi = root / "openapi.json"
+            settings = root / "appsettings.json"
+            openapi.write_bytes(b'{"openapi":"3.0.1"}')
+            settings.write_text(
+                '{\n  "Solutions": {\n    "AxisOpenApiSha256": "' + "0" * 64 + '"\n  }\n}\n',
+                encoding="utf-8",
+            )
+
+            axis.sync_solution_openapi_digest(openapi, settings)
+
+            expected = hashlib.sha256(openapi.read_bytes()).hexdigest()
+            self.assertIn(expected, settings.read_text(encoding="utf-8"))
+
+    def test_dotnet_build_accepts_project_target(self) -> None:
+        project = "src/Modules/Identity/Axis.Identity.Domain/Axis.Identity.Domain.csproj"
+        calls = self.run_with_fake_process(
+            axis.dotnet_command,
+            axis.argparse.Namespace(
+                dotnet_command="build",
+                dotnet_args=[project, "--", "--no-restore"],
+            ),
+        )
+
+        self.assertEqual(
+            ["dotnet", "build", project, "--nologo", "--no-restore"],
+            calls[0],
+        )
+
+    def test_dotnet_format_accepts_project_target(self) -> None:
+        project = "tests/Api/Axis.Api.Tests/Axis.Api.Tests.csproj"
+        calls = self.run_with_fake_process(
+            axis.dotnet_command,
+            axis.argparse.Namespace(
+                dotnet_command="format",
+                dotnet_args=[project, "--", "--no-restore"],
+                check=True,
+            ),
+        )
+
+        self.assertEqual(
+            [
+                "dotnet",
+                "format",
+                project,
+                "--verify-no-changes",
+                "--no-restore",
+            ],
+            calls[0],
+        )
+
     def test_mcp_serve_keeps_wrapper_diagnostics_off_protocol_stdout(self) -> None:
         calls: list[list[str]] = []
         environments: list[dict[str, str]] = []
@@ -4985,6 +6022,16 @@ class TestAxisCommandWrappers(unittest.TestCase):
 
     def test_migration_add_uses_owned_module_contracts(self) -> None:
         targets = {
+            "audit": (
+                "Audit/Axis.Audit.Infrastructure/"
+                "Axis.Audit.Infrastructure.csproj",
+                "AuditDbContext",
+            ),
+            "authorization": (
+                "Authorization/Axis.Authorization.Infrastructure/"
+                "Axis.Authorization.Infrastructure.csproj",
+                "AuthorizationDbContext",
+            ),
             "business-objects": (
                 "BusinessObjects/Axis.BusinessObjects.Infrastructure/"
                 "Axis.BusinessObjects.Infrastructure.csproj",
@@ -4999,6 +6046,11 @@ class TestAxisCommandWrappers(unittest.TestCase):
                 "Rules/Axis.Rules.Infrastructure/"
                 "Axis.Rules.Infrastructure.csproj",
                 "RulesDbContext",
+            ),
+            "solutions": (
+                "Solutions/Axis.Solutions.Infrastructure/"
+                "Axis.Solutions.Infrastructure.csproj",
+                "SolutionsDbContext",
             ),
         }
         for module, (project_suffix, context) in targets.items():
@@ -5016,6 +6068,16 @@ class TestAxisCommandWrappers(unittest.TestCase):
                 self.assertEqual(
                     [
                         "dotnet",
+                        "build",
+                        project,
+                        "--nologo",
+                        "-m:1",
+                    ],
+                    calls[0],
+                )
+                self.assertEqual(
+                    [
+                        "dotnet",
                         "ef",
                         "migrations",
                         "add",
@@ -5028,8 +6090,9 @@ class TestAxisCommandWrappers(unittest.TestCase):
                         context,
                         "--output-dir",
                         "Migrations",
+                        "--no-build",
                     ],
-                    calls[0],
+                    calls[1],
                 )
 
     def test_cli_routes_finite_migration_add(self) -> None:
@@ -5045,6 +6108,59 @@ class TestAxisCommandWrappers(unittest.TestCase):
         args = migration.call_args.args[0]
         self.assertEqual("rules", args.module)
         self.assertEqual("AddDecisionTables", args.name)
+
+    def test_migration_remove_uses_owned_module_contract(self) -> None:
+        calls = self.run_with_fake_process(
+            axis.migration_command,
+            axis.argparse.Namespace(
+                migration_command="remove",
+                module="business-objects",
+            ),
+        )
+
+        project = str(
+            axis.ROOT
+            / "src"
+            / "Modules"
+            / "BusinessObjects"
+            / "Axis.BusinessObjects.Infrastructure"
+            / "Axis.BusinessObjects.Infrastructure.csproj"
+        )
+        self.assertEqual(
+            ["dotnet", "build", project, "--nologo", "-m:1"],
+            calls[0],
+        )
+        self.assertEqual(
+            [
+                "dotnet",
+                "ef",
+                "migrations",
+                "remove",
+                "--project",
+                project,
+                "--startup-project",
+                project,
+                "--context",
+                "BusinessObjectsDbContext",
+                "--force",
+                "--no-build",
+            ],
+            calls[1],
+        )
+
+    def test_cli_routes_finite_migration_remove(self) -> None:
+        with (
+            mock.patch.object(axis, "migration_command", return_value=0) as migration,
+            contextlib.redirect_stdout(io.StringIO()),
+        ):
+            self.assertEqual(
+                0,
+                axis.main(["migration", "remove", "business-objects"]),
+            )
+
+        args = migration.call_args.args[0]
+        self.assertEqual("remove", args.migration_command)
+        self.assertEqual("business-objects", args.module)
 
     def test_migration_add_uses_non_routable_design_time_connection(self) -> None:
         with (
@@ -5118,6 +6234,46 @@ class TestAxisCommandWrappers(unittest.TestCase):
             contextlib.redirect_stderr(io.StringIO()),
         ):
             axis.main(["frontend", "test", "--watch"])
+
+    def test_frontend_format_maps_only_selected_source_paths(self) -> None:
+        calls = self.run_with_fake_process(
+            axis.frontend_command,
+            axis.argparse.Namespace(
+                frontend_command="format",
+                source_paths=["src/features/solutions/page.tsx", "src/index.css"],
+            ),
+        )
+
+        self.assertEqual(
+            [
+                "npm",
+                "exec",
+                "--",
+                "biome",
+                "check",
+                "--write",
+                "src/features/solutions/page.tsx",
+                "src/index.css",
+            ],
+            calls[0],
+        )
+
+    def test_frontend_format_rejects_flags_and_non_source_paths(self) -> None:
+        with (
+            self.assertRaises(SystemExit),
+            contextlib.redirect_stderr(io.StringIO()),
+        ):
+            axis.main(["frontend", "format", "--write"])
+
+        with tempfile.TemporaryDirectory() as temp:
+            frontend = Path(temp)
+            (frontend / "README.md").write_text("not source", encoding="utf-8")
+            with (
+                mock.patch.object(axis, "FRONTEND_DIR", frontend),
+                self.assertRaises(SystemExit),
+                contextlib.redirect_stderr(io.StringIO()),
+            ):
+                axis.main(["frontend", "format", "README.md"])
 
     def test_frontend_gen_api_types_check_generates_without_diffing_head(self) -> None:
         calls = self.run_with_fake_process(
@@ -6054,6 +7210,62 @@ class TestRepoSkillsGate(unittest.TestCase):
             {path.removesuffix(".toml") for path in project_orchestration.project_agent_role_files()},
             set(allowed),
         )
+
+    def test_named_agent_hook_allows_spawn_role_prefix_with_exact_profile(self) -> None:
+        specs = {
+            "axis_scout": {"model": "gpt-5.6-luna", "reasoning": "high"},
+        }
+        for tool_name in ("spawn_agent", "collaboration.spawn_agent"):
+            self.assertIsNone(
+                named_agent_hook.policy_decision(
+                    {
+                        "hook_event_name": "PreToolUse",
+                        "tool_name": tool_name,
+                        "tool_input": {
+                            "task_name": "axis_scout__route_inventory",
+                            "model": "gpt-5.6-luna",
+                            "reasoning_effort": "high",
+                        },
+                    },
+                    allowed_agent_types=frozenset(specs),
+                    agent_specs=specs,
+                )
+            )
+
+    def test_named_agent_hook_rejects_spawn_without_role_or_exact_profile(self) -> None:
+        specs = {
+            "axis_investigator": {"model": "gpt-5.6-terra", "reasoning": "high"},
+        }
+        invalid_inputs = (
+            {
+                "task_name": "authorization_inventory",
+                "model": "gpt-5.6-terra",
+                "reasoning_effort": "high",
+            },
+            {
+                "task_name": "axis_investigator__authorization_inventory",
+                "model": "gpt-5.6-sol",
+                "reasoning_effort": "high",
+            },
+            {
+                "task_name": "axis_investigator__authorization_inventory",
+                "model": "gpt-5.6-terra",
+                "reasoning_effort": "medium",
+            },
+        )
+
+        for tool_input in invalid_inputs:
+            decision = named_agent_hook.policy_decision(
+                {
+                    "hook_event_name": "PreToolUse",
+                    "tool_name": "spawn_agent",
+                    "tool_input": tool_input,
+                },
+                allowed_agent_types=frozenset(specs),
+                agent_specs=specs,
+            )
+
+            self.assertEqual("deny", decision["hookSpecificOutput"]["permissionDecision"])
 
 
 class TestDoctorPythonPackageChecks(unittest.TestCase):

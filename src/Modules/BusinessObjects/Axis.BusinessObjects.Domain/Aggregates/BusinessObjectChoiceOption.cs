@@ -29,8 +29,8 @@ public sealed class BusinessObjectChoiceOption : Entity<BusinessObjectChoiceOpti
         if (key.IsFailure)
             return Result.Failure<BusinessObjectChoiceOption>(key.Error);
 
-        if (string.IsNullOrWhiteSpace(spec.Label) || spec.Label.Trim().Length > 200)
-            return Result.Failure<BusinessObjectChoiceOption>("Choice option label is required and cannot exceed 200 characters.");
+        if (string.IsNullOrWhiteSpace(spec.Label) || spec.Label.Trim().Length > 256)
+            return Result.Failure<BusinessObjectChoiceOption>("Choice option label is required and cannot exceed 256 characters.");
 
         if (spec.Order < 0)
             return Result.Failure<BusinessObjectChoiceOption>("Choice option order cannot be negative.");

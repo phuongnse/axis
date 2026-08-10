@@ -24,7 +24,7 @@ public sealed class ListRuleBindingUsageHandlerTests
                 RuleDefinitionHandlerTestContext.WorkspaceId,
                 Arg.Any<CancellationToken>())
             .Returns([binding]);
-        ListRuleBindingUsageHandler handler = new(context.CurrentUser, bindings);
+        ListRuleBindingUsageHandler handler = new(context.CurrentUser, context.CurrentSubject, context.Authorization, bindings);
 
         Result<IReadOnlyList<RuleBindingUsageDto>> result = await handler.Handle(
             new ListRuleBindingUsageQuery("field.required", 1),

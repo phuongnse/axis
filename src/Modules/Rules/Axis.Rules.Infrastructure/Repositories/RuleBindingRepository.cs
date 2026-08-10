@@ -47,5 +47,31 @@ internal sealed class RuleBindingRepository(RulesDbContext context) : IRuleBindi
             .ThenBy(binding => binding.UseCaseOrTrigger)
             .ToListAsync(cancellationToken);
 
+    public Task<RuleBinding?> GetByIdentityForWorkspaceAsync(
+        Guid workspaceId,
+        RuleDefinitionKey definitionKey,
+        int definitionVersion,
+        string targetType,
+        string targetId,
+        string useCaseOrTrigger,
+        CancellationToken cancellationToken = default) =>
+        context.RuleBindings.SingleOrDefaultAsync(
+            binding => binding.WorkspaceId == workspaceId &&
+                binding.DefinitionKey == definitionKey &&
+                binding.DefinitionVersion == definitionVersion &&
+                binding.TargetType == targetType &&
+                binding.TargetId == targetId &&
+                binding.UseCaseOrTrigger == useCaseOrTrigger,
+            cancellationToken);
+
+    public Task<RuleBinding?> GetInstalledByComponentKeyAsync(
+        Guid workspaceId,
+        string componentKey,
+        CancellationToken cancellationToken = default) =>
+        context.RuleBindings.SingleOrDefaultAsync(
+            binding => binding.WorkspaceId == workspaceId &&
+                binding.InstalledComponentKey == componentKey,
+            cancellationToken);
+
     public void Remove(RuleBinding binding) => context.RuleBindings.Remove(binding);
 }

@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { GitBranch, LogIn, LogOut, type LucideIcon } from 'lucide-react';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { AsyncContent } from '@/components/shared/AsyncContent';
 import { MetadataTag } from '@/components/shared/MetadataTag';
 import {
   projectRuleCondition,
@@ -180,11 +181,11 @@ export function RuleLogicPreview({
     staleTime: Number.POSITIVE_INFINITY,
   });
   if (!condition) return <p className="text-sm text-muted-foreground">{t('rules.notSet')}</p>;
-  if (projectionQuery.isLoading)
+  if (projectionQuery.isPending)
     return (
-      <p role="status" className="text-sm text-muted-foreground">
-        {t('rules.referenceLoading')}
-      </p>
+      <AsyncContent pending pendingLabel={t('rules.referenceLoading')}>
+        <span />
+      </AsyncContent>
     );
   if (!projectionQuery.data?.display)
     return (

@@ -1,0 +1,7 @@
+using Axis.Identity.Domain.Aggregates;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Builders;
+namespace Axis.Identity.Infrastructure.Persistence.Configurations;
+
+internal sealed class WorkspaceMembershipConfiguration : IEntityTypeConfiguration<WorkspaceMembership>
+{ public void Configure(EntityTypeBuilder<WorkspaceMembership> builder) { builder.ToTable("workspace_memberships"); builder.HasKey(x => x.Id); builder.Property(x => x.Id).HasColumnName("id").ValueGeneratedNever(); builder.Property(x => x.WorkspaceId).HasColumnName("workspace_id"); builder.Property(x => x.UserId).HasColumnName("user_id"); builder.Property(x => x.Role).HasColumnName("role").HasConversion<string>(); builder.Property(x => x.Status).HasColumnName("status").HasConversion<string>(); builder.Property(x => x.Revision).HasColumnName("revision").IsConcurrencyToken(); builder.HasIndex(x => new { x.WorkspaceId, x.UserId }).IsUnique(); builder.HasIndex(x => new { x.UserId, x.Status }); builder.HasIndex(x => new { x.WorkspaceId, x.Role }).IsUnique().HasFilter("role = 'Owner' AND status = 'Active'"); builder.HasOne<Workspace>().WithMany().HasForeignKey(x => x.WorkspaceId).OnDelete(DeleteBehavior.Restrict); builder.HasOne<User>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Restrict); } }

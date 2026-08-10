@@ -13,11 +13,17 @@ import {
   type DataTableQueryState,
 } from '@/components/shared/data-table';
 import { useManagedWindowActions } from '@/components/shared/ManagedWindowManager';
+import { PageAction, PageHeader, PageLayout } from '@/components/shared/PageLayout';
 import { StatusBadge, type StatusBadgeTone } from '@/components/shared/StatusBadge';
-import { Button } from '@/components/ui/button';
+import { StatusNotice } from '@/components/shared/StatusNotice';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
+import { ApiError } from '@/lib/api';
 import { referenceContent } from '@/lib/reference-metadata';
-import { type RuleDefinitionSummary, ruleDefinitionsListQueryOptions } from '../api';
+import {
+  type RuleDefinitionSummary,
+  ruleDefinitionCollectionActionsQueryOptions,
+  ruleDefinitionsListQueryOptions,
+} from '../api';
 import { ruleCreateWindowDescriptor, ruleDefinitionWindowDescriptor } from '../managed-windows';
 import { RuleOriginBadge } from './RuleOriginBadge';
 
@@ -38,6 +44,10 @@ export function RulesPage() {
       language: i18n.language,
     }),
   );
+  const collectionActionsQuery = useQuery(ruleDefinitionCollectionActionsQueryOptions());
+  const canStartCreate = collectionActionsQuery.data?.canStartCreate === true;
+  const actionsUnavailable =
+    collectionActionsQuery.error instanceof ApiError && collectionActionsQuery.error.status === 503;
   const definitions = definitionsQuery.data?.items ?? [];
   const tableQuery = useMemo<DataTableQueryState>(
     () => ({
@@ -55,11 +65,12 @@ export function RulesPage() {
   useEffect(() => {
     if (!search.dialog) return;
     if (search.dialog === 'create') {
-      openWindow(ruleCreateWindowDescriptor(t('rules.createTitle')));
+      if (collectionActionsQuery.isPending || collectionActionsQuery.isError) return;
+      if (canStartCreate) openWindow(ruleCreateWindowDescriptor(t('rules.createTitle')));
       void navigate({ replace: true, search: {} });
       return;
     }
-    if (!search.definitionKey || definitionsQuery.isLoading) return;
+    if (!search.definitionKey || definitionsQuery.isPending) return;
     const definition =
       selectedDefinition ??
       ({ definitionKey: search.definitionKey, origin: 'Workspace' } as RuleDefinitionSummary);
@@ -72,7 +83,10 @@ export function RulesPage() {
     if (descriptor) openWindow(descriptor);
     void navigate({ replace: true, search: {} });
   }, [
-    definitionsQuery.isLoading,
+    canStartCreate,
+    collectionActionsQuery.isError,
+    collectionActionsQuery.isPending,
+    definitionsQuery.isPending,
     navigate,
     openWindow,
     search.definitionKey,
@@ -185,24 +199,27 @@ export function RulesPage() {
       globalSearch: true,
       columnControls: true,
       grouping: false,
-      renderToolbarActions: () => (
-        <Button
-          type="button"
-          size="sm"
-          onClick={() => openWindow(ruleCreateWindowDescriptor(t('rules.createTitle')))}
-        >
-          <Plus aria-hidden />
-          {t('rules.newRule')}
-        </Button>
-      ),
-      loading: definitionsQuery.isFetching,
+      renderToolbarActions: canStartCreate
+        ? () => (
+            <PageAction
+              type="button"
+              size="sm"
+              onClick={() => openWindow(ruleCreateWindowDescriptor(t('rules.createTitle')))}
+            >
+              <Plus aria-hidden />
+              {t('rules.newRule')}
+            </PageAction>
+          )
+        : undefined,
+      loading: definitionsQuery.isPending,
       error: definitionsQuery.isError,
       onRetry: () => void definitionsQuery.refetch(),
     };
   }, [
+    canStartCreate,
     definitions,
     definitionsQuery.isError,
-    definitionsQuery.isFetching,
+    definitionsQuery.isPending,
     definitionsQuery.refetch,
     definitionsQuery.data?.pageSize,
     definitionsQuery.data?.totalCount,
@@ -215,22 +232,27 @@ export function RulesPage() {
   ]);
 
   return (
-    <div className="flex h-full min-h-0 w-full min-w-0 flex-col gap-4 overflow-hidden p-4 sm:p-6 lg:p-8">
-      <header className="min-w-0 shrink-0">
-        <div className="min-w-0">
-          <h1 className="font-heading text-2xl font-semibold text-foreground">
-            {t('rules.title')}
-          </h1>
-          <p className="mt-1 max-w-3xl text-sm leading-6 text-muted-foreground">
-            {t('rules.pageDescription')}
-          </p>
-        </div>
-      </header>
+    <PageLayout scrollMode="contained">
+      <PageHeader title={t('rules.title')} description={t('rules.pageDescription')} />
+
+      {actionsUnavailable ? (
+        <StatusNotice tone="warning" title={t('rules.actionsUnavailableTitle')}>
+          <span>{t('rules.actionsUnavailableDescription')}</span>{' '}
+          <PageAction
+            type="button"
+            variant="link"
+            disabled={collectionActionsQuery.isFetching}
+            onClick={() => void collectionActionsQuery.refetch()}
+          >
+            {t('app.retry')}
+          </PageAction>
+        </StatusNotice>
+      ) : null}
 
       <div className="min-h-0 flex-1">
         <DataTable definition={tableDefinition} />
       </div>
-    </div>
+    </PageLayout>
   );
 }
 
@@ -246,15 +268,9 @@ function RuleIdentityCell({
   return (
     <div className="min-w-0 whitespace-normal">
       {onOpen ? (
-        <Button
-          data-slot="rule-table-value"
-          type="button"
-          variant="link"
-          className="h-auto p-0"
-          onClick={onOpen}
-        >
+        <PageAction data-slot="rule-table-value" type="button" variant="link" onClick={onOpen}>
           {name}
-        </Button>
+        </PageAction>
       ) : (
         <p data-slot="rule-table-value" className="font-semibold text-foreground">
           {name}

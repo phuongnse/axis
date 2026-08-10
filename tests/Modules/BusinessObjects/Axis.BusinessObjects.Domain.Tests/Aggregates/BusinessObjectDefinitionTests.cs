@@ -32,7 +32,7 @@ public sealed class BusinessObjectDefinitionTests
     {
         Result<BusinessObjectDefinition> result = BusinessObjectDefinition.CreateUnpublished(
             WorkspaceId,
-            new string('n', 201),
+            new string('n', 257),
             BusinessObjectDefinitionKey.Create("customer").Value,
             Now);
 
@@ -47,7 +47,7 @@ public sealed class BusinessObjectDefinitionTests
 
         Result result = definition.SaveUnpublished(
             "Customer",
-            [Field("name", new string('l', 201), order: 0)],
+            [Field("name", new string('l', 257), order: 0)],
             expectedRevision: 1,
             Now);
 
@@ -334,7 +334,7 @@ public sealed class BusinessObjectDefinitionTests
 
         Result<BusinessObjectDefinitionVersion> result = definition.Publish(
             expectedRevision: 2,
-            UserId,
+            SubjectReference.Human(UserId),
             Now.AddMinutes(2));
 
         result.IsSuccess.Should().BeTrue();
@@ -342,7 +342,7 @@ public sealed class BusinessObjectDefinitionTests
         version.VersionNumber.Should().Be(1);
         version.Name.Should().Be("Customer");
         version.Key.Value.Should().Be("customer");
-        version.PublishedByUserId.Should().Be(UserId);
+        version.PublishedBySubject.Should().Be(SubjectReference.Human(UserId));
         version.PublishedAt.Should().Be(Now.AddMinutes(2));
         version.Fields.Select(field => field.Key.Value)
             .Should().Equal("name", "credit_limit", "opened_on");
@@ -378,7 +378,7 @@ public sealed class BusinessObjectDefinitionTests
 
         Result<BusinessObjectDefinitionVersion> result = definition.Publish(
             expectedRevision: 2,
-            UserId,
+            SubjectReference.Human(UserId),
             Now.AddMinutes(2));
 
         result.IsSuccess.Should().BeTrue();
@@ -402,11 +402,104 @@ public sealed class BusinessObjectDefinitionTests
 
         Result<BusinessObjectDefinitionVersion> result = definition.Publish(
             expectedRevision: 1,
-            UserId,
+            SubjectReference.Human(UserId),
             Now);
 
         result.IsFailure.Should().BeTrue();
         result.ErrorCode.Should().Be(ErrorCodes.InvalidInput);
+    }
+
+    [Fact]
+    public void AdvanceInstallationReceipt_WhenReceiptRetries_EnforcesImmutableIdentityAndMonotonicEpoch()
+    {
+        BusinessObjectDefinition definition = CreateUnpublished();
+        definition.SaveUnpublished(
+            "Customer",
+            ValidFields(),
+            expectedRevision: 1,
+            Now).IsSuccess.Should().BeTrue();
+        definition.Publish(
+            expectedRevision: 2,
+            SubjectReference.Human(UserId),
+            Now).IsSuccess.Should().BeTrue();
+        Guid solutionVersionId = Guid.NewGuid();
+        Guid operationId = Guid.NewGuid();
+        Guid stepId = Guid.NewGuid();
+
+        definition.AdvanceInstallationReceipt(
+            solutionVersionId,
+            "customer",
+            new string('a', 64),
+            operationId,
+            stepId,
+            3).IsSuccess.Should().BeTrue();
+        definition.AdvanceInstallationReceipt(
+            solutionVersionId,
+            "customer",
+            new string('a', 64),
+            operationId,
+            stepId,
+            3).IsSuccess.Should().BeTrue();
+        definition.AdvanceInstallationReceipt(
+            solutionVersionId,
+            "customer",
+            new string('a', 64),
+            operationId,
+            stepId,
+            4).IsSuccess.Should().BeTrue();
+
+        Result stale = definition.AdvanceInstallationReceipt(
+            solutionVersionId,
+            "customer",
+            new string('a', 64),
+            operationId,
+            stepId,
+            3);
+        Result conflict = definition.AdvanceInstallationReceipt(
+            solutionVersionId,
+            "customer",
+            new string('a', 64),
+            Guid.NewGuid(),
+            stepId,
+            5);
+
+        definition.InstalledLeaseEpoch.Should().Be(4);
+        stale.IsFailure.Should().BeTrue();
+        stale.Error.Should().Contain("stale");
+        conflict.IsFailure.Should().BeTrue();
+        conflict.Error.Should().Contain("immutable");
+    }
+
+    [Fact]
+    public void SaveUnpublished_WhenDefinitionIsInstalled_RejectsOrdinaryMutation()
+    {
+        BusinessObjectDefinition definition = CreateUnpublished();
+        definition.SaveUnpublished(
+            "Customer",
+            ValidFields(),
+            expectedRevision: 1,
+            Now).IsSuccess.Should().BeTrue();
+        definition.Publish(
+            expectedRevision: 2,
+            SubjectReference.Human(UserId),
+            Now).IsSuccess.Should().BeTrue();
+        definition.AdvanceInstallationReceipt(
+            Guid.NewGuid(),
+            "customer",
+            new string('a', 64),
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            1).IsSuccess.Should().BeTrue();
+
+        Result result = definition.SaveUnpublished(
+            "Changed",
+            ValidFields(),
+            expectedRevision: definition.Revision,
+            Now.AddMinutes(1));
+
+        result.IsFailure.Should().BeTrue();
+        result.ErrorCode.Should().Be(ErrorCodes.Conflict);
+        result.Error.Should().Contain("Installed");
     }
 
     private static BusinessObjectDefinition CreateUnpublished()

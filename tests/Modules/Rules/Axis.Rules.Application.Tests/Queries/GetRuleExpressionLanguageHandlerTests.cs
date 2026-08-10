@@ -12,7 +12,8 @@ public sealed class GetRuleExpressionLanguageHandlerTests
     [Fact]
     public async Task Get_WhenRequested_ReturnsVersionedTypedCapabilitiesAndLimits()
     {
-        GetRuleExpressionLanguageHandler sut = new();
+        RuleDefinitionHandlerTestContext context = new();
+        GetRuleExpressionLanguageHandler sut = new(context.CurrentUser, context.CurrentSubject, context.Authorization);
 
         Result<RuleExpressionLanguageDto> result = await sut.Handle(
             new GetRuleExpressionLanguageQuery(),

@@ -5,4 +5,5 @@ namespace Axis.BusinessObjects.Domain.Aggregates;
 public sealed record BusinessObjectFieldRuleSpec(
     Guid BindingId,
     BusinessObjectFieldRuleId? Id = null,
-    int BindingRevision = 1);
+    int BindingRevision = 1,
+    string? BindingKey = null);

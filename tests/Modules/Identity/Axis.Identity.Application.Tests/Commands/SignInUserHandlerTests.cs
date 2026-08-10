@@ -16,9 +16,10 @@ public class SignInUserHandlerTests
 {
     private readonly IUserRepository _userRepo = Substitute.For<IUserRepository>();
     private readonly IWorkspaceRepository _workspaceRepo = Substitute.For<IWorkspaceRepository>();
+    private readonly IWorkspaceMembershipRepository _workspaceMembershipRepo = Substitute.For<IWorkspaceMembershipRepository>();
     private readonly IPasswordHasher _hasher = Substitute.For<IPasswordHasher>();
 
-    private SignInUserHandler CreateHandler() => new(_userRepo, _workspaceRepo, _hasher);
+    private SignInUserHandler CreateHandler() => new(_userRepo, _workspaceRepo, _workspaceMembershipRepo, _hasher);
 
     private static User MakeVerifiedUser(string email = "alice@acme.com")
     {
@@ -30,11 +31,7 @@ public class SignInUserHandlerTests
 
     private static Workspace MakeActivePersonalWorkspace(User user)
     {
-        Workspace workspace = Workspace.CreatePersonal(
-            user.FullName,
-            WorkspaceSlug.Create("alice-smith").Value,
-            user.Email,
-            user.Id);
+        Workspace workspace = Workspace.CreatePersonal(user.FullName, WorkspaceSlug.Create("alice-smith").Value);
         workspace.ActivateAfterOwnerVerification();
         return workspace;
     }
@@ -52,8 +49,8 @@ public class SignInUserHandlerTests
         Workspace workspace = MakeActivePersonalWorkspace(user);
         _userRepo.FindByEmailGloballyAsync(Arg.Any<Email>(), Arg.Any<CancellationToken>())
             .Returns(user);
-        _workspaceRepo.GetPersonalByOwnerUserIdAsync(user.Id, Arg.Any<CancellationToken>())
-            .Returns(workspace);
+        _workspaceMembershipRepo.ListActiveForUserAsync(user.Id, Arg.Any<CancellationToken>()).Returns([WorkspaceMembership.CreatePersonalOwner(workspace.Id, user.Id)]);
+        _workspaceRepo.GetByIdAsync(workspace.Id, Arg.Any<CancellationToken>()).Returns(workspace);
         _hasher.Verify("maple river sunrise", "hashed_password").Returns(true);
 
         Result<SignInSuccessDto> result = await CreateHandler().Handle(
@@ -98,7 +95,7 @@ public class SignInUserHandlerTests
         result.ErrorCode.Should().Be(ErrorCodes.BusinessRule);
         result.ProblemCode.Should().Be(IdentityProblemCodes.SignInInvalidCredentials);
         result.Error.Should().Be(SignInUserHandler.GenericCredentialError);
-        await _workspaceRepo.DidNotReceive().GetPersonalByOwnerUserIdAsync(
+        await _workspaceMembershipRepo.DidNotReceive().ListActiveForUserAsync(
             Arg.Any<Guid>(), Arg.Any<CancellationToken>());
     }
 
@@ -119,7 +116,7 @@ public class SignInUserHandlerTests
         result.ErrorCode.Should().Be(ErrorCodes.BusinessRule);
         result.ProblemCode.Should().Be(IdentityProblemCodes.SignInVerificationRequired);
         result.Error.Should().Be(SignInUserHandler.VerificationRequiredError);
-        await _workspaceRepo.DidNotReceive().GetPersonalByOwnerUserIdAsync(
+        await _workspaceMembershipRepo.DidNotReceive().ListActiveForUserAsync(
             Arg.Any<Guid>(), Arg.Any<CancellationToken>());
     }
 
@@ -127,16 +124,12 @@ public class SignInUserHandlerTests
     public async Task SignInUser_WhenPersonalWorkspaceIsUnavailable_ReturnsAccountUnavailable()
     {
         User user = MakeVerifiedUser();
-        Workspace workspace = Workspace.CreatePersonal(
-            user.FullName,
-            WorkspaceSlug.Create("alice-smith").Value,
-            user.Email,
-            user.Id);
+        Workspace workspace = Workspace.CreatePersonal(user.FullName, WorkspaceSlug.Create("alice-smith").Value);
         _userRepo.FindByEmailGloballyAsync(Arg.Any<Email>(), Arg.Any<CancellationToken>())
             .Returns(user);
         _hasher.Verify("maple river sunrise", "hashed_password").Returns(true);
-        _workspaceRepo.GetPersonalByOwnerUserIdAsync(user.Id, Arg.Any<CancellationToken>())
-            .Returns(workspace);
+        _workspaceMembershipRepo.ListActiveForUserAsync(user.Id, Arg.Any<CancellationToken>()).Returns([WorkspaceMembership.CreatePersonalOwner(workspace.Id, user.Id)]);
+        _workspaceRepo.GetByIdAsync(workspace.Id, Arg.Any<CancellationToken>()).Returns(workspace);
 
         Result<SignInSuccessDto> result = await CreateHandler().Handle(
             new SignInUserCommand("alice@acme.com", "maple river sunrise"),
@@ -156,8 +149,8 @@ public class SignInUserHandlerTests
         _userRepo.FindByEmailGloballyAsync(Arg.Any<Email>(), Arg.Any<CancellationToken>())
             .Returns(user);
         _hasher.Verify(Arg.Any<string>(), Arg.Any<string>()).Returns(true);
-        _workspaceRepo.GetPersonalByOwnerUserIdAsync(user.Id, Arg.Any<CancellationToken>())
-            .Returns(workspace);
+        _workspaceMembershipRepo.ListActiveForUserAsync(user.Id, Arg.Any<CancellationToken>()).Returns([WorkspaceMembership.CreatePersonalOwner(workspace.Id, user.Id)]);
+        _workspaceRepo.GetByIdAsync(workspace.Id, Arg.Any<CancellationToken>()).Returns(workspace);
 
         await CreateHandler().Handle(
             new SignInUserCommand("  Alice@Acme.COM  ", "maple river sunrise"),
@@ -176,8 +169,8 @@ public class SignInUserHandlerTests
         _userRepo.FindByEmailGloballyAsync(Arg.Any<Email>(), Arg.Any<CancellationToken>())
             .Returns(user);
         _hasher.Verify("  maple river sunrise  ", "hashed_password").Returns(true);
-        _workspaceRepo.GetPersonalByOwnerUserIdAsync(user.Id, Arg.Any<CancellationToken>())
-            .Returns(workspace);
+        _workspaceMembershipRepo.ListActiveForUserAsync(user.Id, Arg.Any<CancellationToken>()).Returns([WorkspaceMembership.CreatePersonalOwner(workspace.Id, user.Id)]);
+        _workspaceRepo.GetByIdAsync(workspace.Id, Arg.Any<CancellationToken>()).Returns(workspace);
 
         Result<SignInSuccessDto> result = await CreateHandler().Handle(
             new SignInUserCommand("alice@acme.com", "  maple river sunrise  "),

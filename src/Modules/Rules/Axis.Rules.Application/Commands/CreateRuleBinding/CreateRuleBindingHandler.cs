@@ -1,3 +1,5 @@
+using Axis.Authorization.Contracts;
+using Axis.Identity.Contracts;
 using Axis.Rules.Application.Repositories;
 using Axis.Rules.Application.Services;
 using Axis.Rules.Contracts;
@@ -12,6 +14,8 @@ namespace Axis.Rules.Application.Commands.CreateRuleBinding;
 
 public sealed class CreateRuleBindingHandler(
     ICurrentUser currentUser,
+    ICurrentSubject currentSubject,
+    IProductAuthorizationService authorization,
     IRuleDefinitionRepository definitionRepository,
     IRuleBindingRepository bindingRepository,
     IUnitOfWork unitOfWork)
@@ -23,13 +27,21 @@ public sealed class CreateRuleBindingHandler(
     {
         if (currentUser.workspaceId is not Guid workspaceId)
             return RuleDefinitionFailures.MissingWorkspace<RuleBindingDto>();
-        if (currentUser.UserId is not Guid userId)
-            return RuleDefinitionFailures.MissingUser<RuleBindingDto>();
 
         Result<RuleDefinitionKey> key = RuleDefinitionKey.Create(command.Request.DefinitionKey);
+        if (key.IsFailure)
+            return RuleDefinitionFailures.Invalid<RuleBindingDto>(key.Error);
+
+        ProductAuthorizationDecision decision = await RuleAuthorization.AuthorizeAsync(
+                authorization, workspaceId, currentSubject.Subject,
+                RuleProductActions.BindingManage, RuleProductActions.BindingResourceType,
+                key.Value.Value, null, cancellationToken);
+        if (!decision.IsAllowed)
+            return RuleDefinitionFailures.Authorization<RuleBindingDto>(decision);
+
         Result<IReadOnlyDictionary<string, RuleInputMapping>> mappings = RuleBindingContractMapper.ToDomain(command.Request.InputMappings);
-        if (key.IsFailure || mappings.IsFailure)
-            return RuleDefinitionFailures.Invalid<RuleBindingDto>(key.IsFailure ? key.Error : mappings.Error);
+        if (mappings.IsFailure)
+            return RuleDefinitionFailures.Invalid<RuleBindingDto>(mappings.Error);
 
         Result<RuleDefinitionVersion> version = await ResolveVersionAsync(
             workspaceId,
@@ -46,6 +58,18 @@ public sealed class CreateRuleBindingHandler(
         Result valid = RuleBindingValidator.Validate(version.Value, mappings.Value);
         if (valid.IsFailure)
             return RuleDefinitionFailures.Invalid<RuleBindingDto>(valid.Error);
+        if (await bindingRepository.GetByIdentityForWorkspaceAsync(
+                workspaceId,
+                key.Value,
+                command.Request.DefinitionVersion,
+                command.Request.TargetType.Trim(),
+                command.Request.TargetId.Trim(),
+                command.Request.UseCaseOrTrigger.Trim(),
+                cancellationToken) is { IsInstalled: true })
+        {
+            return RuleDefinitionFailures.Conflict<RuleBindingDto>(
+                "Installed rule binding identities are immutable.");
+        }
 
         Result<RuleBinding> binding = RuleBinding.Create(
             workspaceId,
@@ -58,7 +82,7 @@ public sealed class CreateRuleBindingHandler(
             command.Request.Priority,
             command.Request.Enabled,
             (DomainFailureBehavior)command.Request.FailureBehavior,
-            userId,
+            RuleSubjectReferenceMapper.ToDomain(currentSubject.Subject),
             DateTime.UtcNow);
         if (binding.IsFailure)
             return RuleDefinitionFailures.Invalid<RuleBindingDto>(binding.Error);

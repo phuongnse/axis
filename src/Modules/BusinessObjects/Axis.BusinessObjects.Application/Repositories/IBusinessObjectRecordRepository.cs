@@ -25,4 +25,16 @@ public interface IBusinessObjectRecordRepository
         Guid workspaceId,
         BusinessObjectDefinitionKey? objectKey,
         CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<BusinessObjectRecord>> ListOwnedForWorkspaceAsync(
+        Guid workspaceId,
+        SubjectReference owner,
+        BusinessObjectDefinitionKey? objectKey,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken = default);
+    Task<int> CountOwnedForWorkspaceAsync(
+        Guid workspaceId,
+        SubjectReference owner,
+        BusinessObjectDefinitionKey? objectKey,
+        CancellationToken cancellationToken = default);
 }

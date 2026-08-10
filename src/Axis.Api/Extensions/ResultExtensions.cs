@@ -49,6 +49,7 @@ public static class ResultExtensions
             ErrorCodes.PlanLimit => StatusCodes.Status402PaymentRequired,
             ErrorCodes.InvalidInput => StatusCodes.Status400BadRequest,
             ErrorCodes.RateLimited => StatusCodes.Status429TooManyRequests,
+            ErrorCodes.Unavailable => StatusCodes.Status503ServiceUnavailable,
             _ => StatusCodes.Status422UnprocessableEntity,
         };
 

@@ -45,5 +45,9 @@ internal sealed class BusinessObjectFieldRuleConfiguration : IEntityTypeConfigur
             .HasColumnName("sort_order")
             .IsRequired();
 
+        builder.Property<string?>(nameof(BusinessObjectFieldRule.BindingKey))
+            .HasColumnName("installed_binding_key")
+            .HasMaxLength(200);
+
     }
 }

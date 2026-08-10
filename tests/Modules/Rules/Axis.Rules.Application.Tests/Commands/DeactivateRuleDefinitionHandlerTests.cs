@@ -15,7 +15,7 @@ public sealed class DeactivateRuleDefinitionHandlerTests
         Axis.Rules.Domain.RuleDefinition definition = RuleDefinitionHandlerTestContext.ActiveDefinition();
         context.Repository.GetByKeyForWorkspaceAsync(definition.Key, RuleDefinitionHandlerTestContext.WorkspaceId, Arg.Any<CancellationToken>())
             .Returns(definition);
-        DeactivateRuleDefinitionHandler sut = new(context.CurrentUser, context.Repository, context.UnitOfWork);
+        DeactivateRuleDefinitionHandler sut = new(context.CurrentUser, context.CurrentSubject, context.Authorization, context.Repository, context.UnitOfWork);
 
         Result<RuleDefinitionDetailDto> result = await sut.Handle(new DeactivateRuleDefinitionCommand(definition.Key.Value, definition.Revision), CancellationToken.None);
 

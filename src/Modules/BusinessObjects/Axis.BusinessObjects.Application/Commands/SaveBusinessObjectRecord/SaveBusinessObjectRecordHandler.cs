@@ -1,7 +1,9 @@
+using Axis.Authorization.Contracts;
 using Axis.BusinessObjects.Application.Repositories;
 using Axis.BusinessObjects.Application.Services;
 using Axis.BusinessObjects.Domain.Aggregates;
 using Axis.BusinessObjects.Domain.ValueObjects;
+using Axis.Identity.Contracts;
 using Axis.Shared.Application;
 using Axis.Shared.Application.CQRS;
 using Axis.Shared.Application.Identity;
@@ -11,6 +13,8 @@ namespace Axis.BusinessObjects.Application.Commands.SaveBusinessObjectRecord;
 
 public sealed class SaveBusinessObjectRecordHandler(
     ICurrentUser currentUser,
+    ICurrentSubject currentSubject,
+    IProductAuthorizationService authorization,
     IBusinessObjectRecordRepository recordRepository,
     IBusinessObjectDefinitionRepository definitionRepository,
     IUnitOfWork unitOfWork)
@@ -22,7 +26,7 @@ public sealed class SaveBusinessObjectRecordHandler(
     {
         if (currentUser.workspaceId is not Guid workspaceId)
             return BusinessObjectRecordFailures.MissingWorkspace<BusinessObjectRecordDetailDto>();
-        if (currentUser.UserId is not Guid userId)
+        if (currentSubject.Subject.Id == Guid.Empty || !Enum.IsDefined(currentSubject.Subject.Kind))
             return BusinessObjectRecordFailures.MissingUser<BusinessObjectRecordDetailDto>();
 
         BusinessObjectRecord? record = await recordRepository.GetByIdForWorkspaceAsync(
@@ -30,6 +34,23 @@ public sealed class SaveBusinessObjectRecordHandler(
             workspaceId,
             cancellationToken);
         if (record is null)
+            return BusinessObjectRecordFailures.NotFound<BusinessObjectRecordDetailDto>();
+
+        ProductAuthorizationDecision decision = await BusinessObjectAuthorization.AuthorizeAsync(
+            authorization,
+            workspaceId,
+            currentSubject.Subject,
+            BusinessObjectProductActions.RecordSave,
+            BusinessObjectProductActions.RecordResourceType,
+            record.ObjectKey.Value,
+            command.CorrelationId,
+            cancellationToken);
+        if (!decision.IsAllowed)
+            return decision.IsUnavailable
+                ? BusinessObjectRecordFailures.AuthorizationUnavailable<BusinessObjectRecordDetailDto>()
+                : BusinessObjectRecordFailures.Forbidden<BusinessObjectRecordDetailDto>();
+        if (decision.Scope == ProductActionScope.Own
+            && record.Owner != SubjectReferenceMapper.ToDomain(currentSubject.Subject))
             return BusinessObjectRecordFailures.NotFound<BusinessObjectRecordDetailDto>();
         BusinessObjectDefinitionVersion? definition = await definitionRepository
             .GetPublishedVersionByIdForWorkspaceAsync(record.DefinitionVersionId, workspaceId, cancellationToken);
@@ -46,7 +67,7 @@ public sealed class SaveBusinessObjectRecordHandler(
         Result saved = record.SaveDraft(
             command.ExpectedRevision,
             validValues.Value,
-            userId,
+            SubjectReferenceMapper.ToDomain(currentSubject.Subject),
             DateTime.UtcNow);
         if (saved.IsFailure)
             return saved.ErrorCode == ErrorCodes.Conflict

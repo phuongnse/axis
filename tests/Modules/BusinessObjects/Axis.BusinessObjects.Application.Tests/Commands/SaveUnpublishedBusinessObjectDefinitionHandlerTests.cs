@@ -25,6 +25,8 @@ public sealed class SaveUnpublishedBusinessObjectDefinitionHandlerTests
             .Returns(definition);
         SaveUnpublishedBusinessObjectDefinitionHandler sut = new(
             _context.CurrentUser,
+            _context.CurrentSubject,
+            _context.Authorization,
             _context.Repository,
             _context.UnitOfWork,
             _context.InputPlanner);
@@ -64,6 +66,8 @@ public sealed class SaveUnpublishedBusinessObjectDefinitionHandlerTests
             .Returns(definition);
         SaveUnpublishedBusinessObjectDefinitionHandler sut = new(
             _context.CurrentUser,
+            _context.CurrentSubject,
+            _context.Authorization,
             _context.Repository,
             _context.UnitOfWork,
             _context.InputPlanner);
@@ -115,6 +119,8 @@ public sealed class SaveUnpublishedBusinessObjectDefinitionHandlerTests
             .Returns(definition);
         SaveUnpublishedBusinessObjectDefinitionHandler sut = new(
             _context.CurrentUser,
+            _context.CurrentSubject,
+            _context.Authorization,
             _context.Repository,
             _context.UnitOfWork,
             _context.InputPlanner);
@@ -158,6 +164,8 @@ public sealed class SaveUnpublishedBusinessObjectDefinitionHandlerTests
                 "Rule binding consumer context type does not match the rule input.")));
         SaveUnpublishedBusinessObjectDefinitionHandler sut = new(
             _context.CurrentUser,
+            _context.CurrentSubject,
+            _context.Authorization,
             _context.Repository,
             _context.UnitOfWork,
             _context.InputPlanner);
@@ -193,6 +201,8 @@ public sealed class SaveUnpublishedBusinessObjectDefinitionHandlerTests
             .Returns(definition);
         SaveUnpublishedBusinessObjectDefinitionHandler sut = new(
             _context.CurrentUser,
+            _context.CurrentSubject,
+            _context.Authorization,
             _context.Repository,
             _context.UnitOfWork,
             _context.InputPlanner);

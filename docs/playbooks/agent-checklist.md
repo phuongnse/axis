@@ -23,7 +23,11 @@ AC map: `AC | kind | surface | proving test or exact deferral`.
 
 No blank in-scope rows; required AT rows name verification categories; incomplete in-scope ACs block `Done`.
 
+Confirm one primary actor goal, explicit preconditions/success/minimal guarantees, implementation-agnostic flows, one owner for shared invariants, independently reportable AC outcomes, and cohesive AT scenarios. Title conjunctions, alternate actors, implementation nouns, and clause counts are review signals rather than deterministic failures.
+
 Acceptance evidence proves the production semantics of the implemented slice. Local/test adapters may change infrastructure values, but evidence that bypasses or substitutes the required trust, persistence, concurrency, failure, or recovery boundary is invalid.
+
+For a high-risk security or privacy protocol, confirm the current threat model names assets, entry points, trust boundaries, abuse cases, mitigations, and tests; a failure-mode list alone is not sufficient.
 
 ## Review Verification
 

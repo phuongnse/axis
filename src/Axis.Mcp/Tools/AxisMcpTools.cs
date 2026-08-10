@@ -51,6 +51,12 @@ public sealed class AxisMcpTools(AxisApiClient api)
         return api.GetJsonAsync($"api/rules/{Uri.EscapeDataString(definitionKey)}", cancellationToken);
     }
 
+    [McpServerTool(Name = "axis_get_rule_definition_collection_actions")]
+    [Description("[READ] Get the authenticated subject's available rule-definition collection actions.")]
+    public Task<string> GetRuleDefinitionCollectionActionsAsync(
+        CancellationToken cancellationToken = default) =>
+        api.GetJsonAsync("api/rules/actions", cancellationToken);
+
     [McpServerTool(Name = "axis_project_rule_condition")]
     [Description("[READ] Validate a typed rule condition and return the server-owned visual and textual projection. This does not persist anything.")]
     public Task<string> ProjectRuleConditionAsync(
@@ -103,6 +109,12 @@ public sealed class AxisMcpTools(AxisApiClient api)
             $"api/business-object-definitions/{definitionId:D}",
             cancellationToken);
     }
+
+    [McpServerTool(Name = "axis_get_business_object_definition_collection_actions")]
+    [Description("[READ] Get the authenticated subject's available business-object definition collection actions.")]
+    public Task<string> GetBusinessObjectDefinitionCollectionActionsAsync(
+        CancellationToken cancellationToken = default) =>
+        api.GetJsonAsync("api/business-object-definitions/actions", cancellationToken);
 
     private static void ValidatePage(int page, int pageSize)
     {

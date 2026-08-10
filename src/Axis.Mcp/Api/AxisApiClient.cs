@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -16,21 +17,83 @@ public sealed class AxisApiClient(
     };
 
     public Task<string> GetJsonAsync(string path, CancellationToken cancellationToken) =>
-        SendJsonAsync(HttpMethod.Get, path, body: null, cancellationToken);
+        SendJsonAsync(HttpMethod.Get, path, body: null, idempotencyKey: null, cancellationToken);
 
     public Task<string> PostJsonAsync(string path, object body, CancellationToken cancellationToken) =>
-        SendJsonAsync(HttpMethod.Post, path, body, cancellationToken);
+        SendJsonAsync(HttpMethod.Post, path, body, idempotencyKey: null, cancellationToken);
+
+    public Task<string> PostAsync(string path, CancellationToken cancellationToken) =>
+        SendJsonAsync(HttpMethod.Post, path, body: null, idempotencyKey: null, cancellationToken);
+
+    public Task<string> PostIdempotentJsonAsync(
+        string path,
+        object body,
+        string idempotencyKey,
+        CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(idempotencyKey);
+        return SendJsonAsync(HttpMethod.Post, path, body, idempotencyKey.Trim(), cancellationToken);
+    }
+
+    public Task<string> PostIdempotentAsync(
+        string path,
+        string idempotencyKey,
+        CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(idempotencyKey);
+        return SendJsonAsync(
+            HttpMethod.Post,
+            path,
+            body: null,
+            idempotencyKey.Trim(),
+            cancellationToken);
+    }
 
     public Task<string> PutJsonAsync(string path, object body, CancellationToken cancellationToken) =>
-        SendJsonAsync(HttpMethod.Put, path, body, cancellationToken);
+        SendJsonAsync(HttpMethod.Put, path, body, idempotencyKey: null, cancellationToken);
 
     public Task<string> DeleteJsonAsync(string path, object body, CancellationToken cancellationToken) =>
-        SendJsonAsync(HttpMethod.Delete, path, body, cancellationToken);
+        SendJsonAsync(HttpMethod.Delete, path, body, idempotencyKey: null, cancellationToken);
 
-    private async Task<string> SendJsonAsync(
+    public Task<string> PostBinaryAsync(
+        string path,
+        byte[] content,
+        string mediaType,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(content);
+        ArgumentException.ThrowIfNullOrWhiteSpace(mediaType);
+        return SendAsync(
+            HttpMethod.Post,
+            path,
+            () =>
+            {
+                ByteArrayContent body = new(content);
+                body.Headers.ContentType = new MediaTypeHeaderValue(mediaType);
+                return body;
+            },
+            idempotencyKey: null,
+            cancellationToken);
+    }
+
+    private Task<string> SendJsonAsync(
         HttpMethod method,
         string path,
         object? body,
+        string? idempotencyKey,
+        CancellationToken cancellationToken) =>
+        SendAsync(
+            method,
+            path,
+            () => body is null ? null : JsonContent.Create(body, options: JsonOptions),
+            idempotencyKey,
+            cancellationToken);
+
+    private async Task<string> SendAsync(
+        HttpMethod method,
+        string path,
+        Func<HttpContent?> contentFactory,
+        string? idempotencyKey,
         CancellationToken cancellationToken)
     {
         Uri requestUri = BuildRelativeUri(path);
@@ -41,8 +104,9 @@ public sealed class AxisApiClient(
             using HttpRequestMessage request = new(method, requestUri);
             request.Headers.Authorization = new("Bearer", accessToken);
             request.Headers.Accept.ParseAdd("application/json");
-            if (body is not null)
-                request.Content = JsonContent.Create(body, options: JsonOptions);
+            if (idempotencyKey is not null)
+                request.Headers.Add("Idempotency-Key", idempotencyKey);
+            request.Content = contentFactory();
 
             using HttpResponseMessage response = await httpClient.SendAsync(
                 request,

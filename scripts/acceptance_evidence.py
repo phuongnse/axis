@@ -36,7 +36,15 @@ def axis_command_args(command: str) -> list[str] | None:
 
 def is_browser_e2e_command(command: str) -> bool:
     args = axis_command_args(command)
-    return args is not None and args[:2] == ["local-dev", "e2e"]
+    if args is None or not args or args[0] != "local-dev":
+        return False
+
+    index = 1
+    while index < len(args) and args[index] == "--compose-overlay":
+        if index + 1 >= len(args) or not args[index + 1] or args[index + 1].startswith("-"):
+            return False
+        index += 2
+    return index < len(args) and args[index] == "e2e"
 
 
 def is_frontend_component_test_command(command: str) -> bool:

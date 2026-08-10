@@ -10,9 +10,22 @@ Register a standalone Axis Platform user with email/password so the user can ver
 
 - Self-service user
 
+## Preconditions
+
+- The user is not authenticated and has no required external setup context.
+- The current user-level legal documents and supported site language are available.
+
 ## Trigger
 
 - User opens `/register` without any external setup context.
+
+## Success guarantee
+
+- A verified standalone account, personal Workspace, legal acceptance, and opaque server session exist, and the user reaches the dashboard.
+
+## Minimal guarantee
+
+- Invalid, duplicate, expired, rate-limited, or failed input establishes no authenticated session and returns a recoverable non-sensitive state.
 
 ## Main flow
 
@@ -54,7 +67,7 @@ Register a standalone Axis Platform user with email/password so the user can ver
 - **AC-015** Standalone registration leaves the account independent of team/setup context.
 - **AC-016** Registration, confirmation, and verification journeys provide a recoverable path when the user cannot complete the current step.
 - **AC-017** Registration captures the selected supported site language as the account's initial user-level language preference; missing language input uses the product fallback language, and unsupported language input is rejected.
-- **AC-018** Verification session establishment preserves the cookie flags, Redis ticket, rotation, antiforgery, idle/absolute lifetime, fail-closed, and no-browser-token invariants owned by sign-in.
+- **AC-018** Verification session establishment preserves the cookie, rotation, antiforgery, lifetime, fail-closed, and no-browser-token guarantees owned by sign-in.
 
 ## Acceptance Test Matrix
 
@@ -99,7 +112,7 @@ sequenceDiagram
   participant API as API
   participant Identity as Identity
   participant Mail as SMTP / Maildev
-  participant Session as Redis session store
+  participant Session as Server session store
 
   User->>Web: Open /register
   User->>Web: Submit registration form
@@ -137,4 +150,4 @@ sequenceDiagram
 >
 > **Verification:** See [register-user.evidence.md](./register-user.evidence.md) for the browser, API, application, infrastructure, and UI proof covering every required AT.
 >
-> **Decisions:** Screen flow owns the product contract; required UI quality owns accessibility. Registration uses one user-facing full-name field end-to-end. Resend rate limiting is part of resend behavior, not token resolution. Public auth screens expose escape navigation. Successful verification reuses the sign-in use case's same-origin opaque session contract and cannot retain a separate browser-auth path.
+> **Decisions:** Registration uses one user-facing full-name field end-to-end. Resend rate limiting is part of resend behavior, not token resolution. Public auth screens expose escape navigation. Successful verification reuses the sign-in use case's same-origin opaque session contract; [Identity Access architecture](../../architecture/identity-access.md#browser-session-realization) owns its realization, and no separate browser-auth path remains.

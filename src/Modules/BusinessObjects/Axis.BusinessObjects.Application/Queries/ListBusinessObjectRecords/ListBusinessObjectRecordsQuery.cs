@@ -7,5 +7,6 @@ namespace Axis.BusinessObjects.Application.Queries.ListBusinessObjectRecords;
 public sealed record ListBusinessObjectRecordsQuery(
     int Page,
     int PageSize,
-    string? ObjectKey = null)
+    string? ObjectKey = null,
+    string? CorrelationId = null)
     : IQuery<Result<PagedResult<BusinessObjectRecordListItemDto>>>;

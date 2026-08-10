@@ -1,7 +1,9 @@
+using Axis.Authorization.Contracts;
 using Axis.BusinessObjects.Application.Repositories;
 using Axis.BusinessObjects.Application.Services;
 using Axis.BusinessObjects.Domain.Aggregates;
 using Axis.BusinessObjects.Domain.ValueObjects;
+using Axis.Identity.Contracts;
 using Axis.Shared.Application;
 using Axis.Shared.Application.CQRS;
 using Axis.Shared.Application.Identity;
@@ -11,6 +13,8 @@ namespace Axis.BusinessObjects.Application.Commands.CreateBusinessObjectDefiniti
 
 public sealed class CreateBusinessObjectDefinitionHandler(
     ICurrentUser currentUser,
+    ICurrentSubject currentSubject,
+    IProductAuthorizationService authorization,
     IBusinessObjectDefinitionRepository repository,
     IUnitOfWork unitOfWork)
     : ICommandHandler<CreateBusinessObjectDefinitionCommand, BusinessObjectDefinitionDetailDto>
@@ -21,10 +25,24 @@ public sealed class CreateBusinessObjectDefinitionHandler(
     {
         if (currentUser.workspaceId is not Guid workspaceId)
             return BusinessObjectDefinitionFailures.MissingWorkspace<BusinessObjectDefinitionDetailDto>();
+        if (currentSubject.Subject.Id == Guid.Empty || !Enum.IsDefined(currentSubject.Subject.Kind))
+            return BusinessObjectDefinitionFailures.MissingUser<BusinessObjectDefinitionDetailDto>();
 
         Result<BusinessObjectDefinitionKey> key = BusinessObjectDefinitionKey.CreateFromName(command.Name);
         if (key.IsFailure)
             return BusinessObjectDefinitionFailures.Invalid<BusinessObjectDefinitionDetailDto>(key.Error);
+
+        ProductAuthorizationDecision decision = await BusinessObjectAuthorization.AuthorizeAsync(
+            authorization,
+            workspaceId,
+            currentSubject.Subject,
+            BusinessObjectProductActions.DefinitionManage,
+            BusinessObjectProductActions.DefinitionResourceType,
+            key.Value.Value,
+            command.CorrelationId,
+            cancellationToken);
+        if (!decision.IsAllowed)
+            return BusinessObjectDefinitionFailures.Authorization<BusinessObjectDefinitionDetailDto>(decision);
 
         if (await repository.ObjectKeyExistsAsync(workspaceId, key.Value, ct: cancellationToken))
             return BusinessObjectDefinitionFailures.DuplicateObjectKey<BusinessObjectDefinitionDetailDto>();
@@ -48,6 +66,6 @@ public sealed class CreateBusinessObjectDefinitionHandler(
             return BusinessObjectDefinitionFailures.DuplicateObjectKey<BusinessObjectDefinitionDetailDto>();
         }
 
-        return BusinessObjectDefinitionMapper.ToDetailDto(definition.Value);
+        return BusinessObjectDefinitionMapper.ToDetailDto(definition.Value, canManage: true);
     }
 }

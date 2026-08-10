@@ -4,7 +4,7 @@
 
 ## Acceptance Evidence
 
-The evidence below records the current proof boundary for the generic Draft → Submitted record lifecycle. Product-owned UI and browser evidence belong to the independently versioned consumer under [docs/use-cases/solutions/provision-reference-solution.md](../solutions/provision-reference-solution.md), not to this API-test evidence table.
+The evidence below records the current proof boundary for the generic Draft → Submitted record lifecycle. Product-owned UI and browser evidence belong to the independently versioned consumer under [docs/use-cases/solutions/validate-reference-product-lifecycle.md](../solutions/validate-reference-product-lifecycle.md), not to this API-test evidence table.
 
 | AT ID | Evidence | Commands |
 |---|---|---|
@@ -23,7 +23,7 @@ The evidence below records the current proof boundary for the generic Draft → 
 
 - The supported Codex client reloaded the app-managed MCP server, exposed the current 27-tool write registry, completed authenticated `tools/call`, and read the submitted record back in the same client session.
 - A standalone protocol run proves the bridge protocol only and does not satisfy that supported-client boundary.
-- Product UI, provisioning, and browser runtime evidence are owned by the independently versioned reference solution; Axis does not retain a duplicate product journey.
+- Product UI and browser runtime evidence are owned by the independently versioned reference solution after signed installation; Axis does not retain a duplicate product journey.
 
 ## Supported-client runtime evidence
 
@@ -37,6 +37,6 @@ The evidence below records the current proof boundary for the generic Draft → 
 ## Verification summary
 
 - `python scripts/axis.py verify` passes at the current Axis checkpoint, including the API, architecture, Business Objects, Identity, MCP, frontend, policy, repository-skill, and documentation gates. The frontend unit suite passes all 27 files and 157 tests.
-- The product-identity sweep across Axis source, tests, frontend, and scripts returns no matches; clean-cutover ownership and external-product proof remain in [docs/use-cases/solutions/provision-reference-solution.evidence.md](../solutions/provision-reference-solution.evidence.md).
-- The independently versioned reference solution is fixed at commit `6eb817c02fda580fc9afee0c37b2b7e0a8c4735c`, with its generated client aligned to the current Axis OpenAPI contract and its blank-workspace acceptance journey passing.
+- The product-identity sweep across Axis source, tests, frontend, and scripts returns no matches; external-product proof remains in [docs/use-cases/solutions/validate-reference-product-lifecycle.md](../solutions/validate-reference-product-lifecycle.md).
+- The independently versioned reference solution is fixed at commit `26fdf0216f25670634fa4e32189b0dbd2e6676ed`, with its generated client aligned to Axis OpenAPI SHA-256 `09a2eb4f03605b6e7751f10fd13cafdffefad480dca9be2607d9ddfb8da0de5c` and its blank-Workspace acceptance journey passing.
 - The MCP supported-client runtime boundary passes with current write-registry discovery, authenticated mutation, exact rule evidence, and same-session persisted read-back.

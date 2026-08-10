@@ -2,40 +2,26 @@ version = 1
 
 [runtime]
 primary_model = "gpt-5.6-sol"
-primary_reasoning = "high"
+primary_reasoning = "xhigh"
 max_concurrent_threads = 2
 allow_default_delegate = false
 
-[profile_providers]
-minimality = "ponytail:ponytail"
-compression = "caveman:caveman"
-
 [agents.axis_scout]
 model = "gpt-5.6-luna"
-reasoning = "medium"
-minimality = "off"
-compression = "full"
+reasoning = "high"
 
 [agents.axis_investigator]
 model = "gpt-5.6-terra"
-reasoning = "medium"
-minimality = "off"
-compression = "lite"
+reasoning = "high"
 
 [agents.axis_planner]
 model = "gpt-5.6-sol"
-reasoning = "high"
-minimality = "full"
-compression = "lite"
+reasoning = "xhigh"
 
 [agents.axis_worker]
-model = "gpt-5.6-terra"
-reasoning = "medium"
-minimality = "full"
-compression = "full"
+model = "gpt-5.6-sol"
+reasoning = "high"
 
 [agents.axis_reviewer]
 model = "gpt-5.6-sol"
-reasoning = "high"
-minimality = "lite"
-compression = "lite"
+reasoning = "xhigh"

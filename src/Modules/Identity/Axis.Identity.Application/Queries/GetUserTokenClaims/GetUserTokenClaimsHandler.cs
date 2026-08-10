@@ -7,7 +7,8 @@ namespace Axis.Identity.Application.Queries.GetUserTokenClaims;
 
 public sealed class GetUserTokenClaimsHandler(
     IUserRepository userRepo,
-    IWorkspaceRepository workspaceRepo)
+    IWorkspaceRepository workspaceRepo,
+    IWorkspaceMembershipRepository workspaceMemberships)
     : IQueryHandler<GetUserTokenClaimsQuery, Result<UserTokenClaimsDto>>
 {
     public async Task<Result<UserTokenClaimsDto>> Handle(
@@ -22,11 +23,13 @@ public sealed class GetUserTokenClaimsHandler(
                 "The account is no longer active.");
         }
 
-        Workspace? workspace = query.workspaceId is Guid workspaceId
+        Guid? requestedWorkspaceId = query.workspaceId ?? (await workspaceMemberships.ListActiveForUserAsync(user.Id, cancellationToken))
+            .FirstOrDefault(membership => membership.Role == WorkspaceMembershipRole.Owner)?.WorkspaceId;
+        Workspace? workspace = requestedWorkspaceId is Guid workspaceId
             ? await workspaceRepo.GetByIdAsync(workspaceId, cancellationToken)
-            : await workspaceRepo.GetPersonalByOwnerUserIdAsync(user.Id, cancellationToken);
+            : null;
 
-        if (query.workspaceId.HasValue && (workspace is null || workspace.OwnerUserId != user.Id))
+        if (requestedWorkspaceId.HasValue && (workspace is null || await workspaceMemberships.GetActiveAsync(workspace.Id, user.Id, cancellationToken) is null))
         {
             return Result.Failure<UserTokenClaimsDto>(
                 ErrorCodes.BusinessRule,

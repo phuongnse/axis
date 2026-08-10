@@ -8,16 +8,33 @@ Let a local Axis MCP client obtain an access token through the existing browser 
 
 ## Primary actor
 
-- Local Axis MCP client and the account owner completing browser sign-in
+- Account owner authorizing a local Axis MCP client
+
+## Supporting actors
+
+- The local MCP client initiates OAuth Authorization Code with PKCE and receives the registered loopback callback.
+
+## Preconditions
+
+- The local client is registered with the approved public client identity and loopback redirect contract.
+- The account owner has a sign-in-eligible Axis account.
 
 ## Trigger
 
 - An MCP tool call starts without a valid in-memory access token.
 
+## Success guarantee
+
+- The initiating client receives an access token bound to the approved authorization request and can retry the original authenticated operation once.
+
+## Minimal guarantee
+
+- Invalid, expired, mismatched, replayed, abandoned, or failed authorization issues no access token and never redirects to an attacker-controlled location.
+
 ## Main flow
 
 1. MCP creates an OAuth Authorization Code + PKCE request and opens the configured Axis authorization endpoint.
-2. OpenIddict validates and stores the request as a short-lived request token, exposing its opaque OAuth `request_uri` together with the public `client_id` required to bind that handle to the initiating client.
+2. The authorization server validates and stores the request behind a short-lived opaque OAuth `request_uri` bound to the initiating public `client_id`.
 3. If the browser session is absent, Axis redirects to the configured SPA `/sign-in` route with the opaque handle and validated public client identifier.
 4. The account owner signs in through the existing email/password form; recoverable credential errors retain the pending authorization request.
 5. After the browser session is established, the SPA resumes only the fixed `/connect/authorize?client_id=...&request_uri=...` endpoint.
@@ -38,7 +55,7 @@ Let a local Axis MCP client obtain an access token through the existing browser 
 
 - **AC-001** An unauthenticated interactive MCP authorization request redirects to the configured SPA sign-in route instead of ending at a raw `401` page.
 - **AC-002** The browser handoff carries only the opaque, short-lived authorization-request handle and its validated public client identifier; redirect URI, state, PKCE challenge, scopes, and other raw OAuth request fields are not copied into the SPA URL.
-- **AC-003** After successful sign-in, the SPA resumes the fixed API authorization endpoint with the exact handle/client pair, OpenIddict verifies their binding, and the registered MCP loopback callback receives the authorization code and original state.
+- **AC-003** After successful sign-in, the SPA resumes the fixed API authorization endpoint with the exact handle/client pair, the server verifies their binding, and the registered MCP loopback callback receives the authorization code and original state.
 - **AC-004** MCP validates the callback state, exchanges the code with its original PKCE verifier, and the original authenticated tool operation can continue.
 
 ### Validation & errors
@@ -50,7 +67,7 @@ Let a local Axis MCP client obtain an access token through the existing browser 
 
 ### Edge cases
 
-- **AC-009** A normal SPA sign-in with no pending MCP request still completes the existing browser PKCE/dashboard handoff and does not use the MCP continuation path.
+- **AC-009** A normal SPA sign-in with no pending MCP request completes the existing server-session dashboard handoff and does not use the MCP continuation path.
 - **AC-010** The MCP bridge does not expose password, email-verification, or arbitrary OAuth-request tools; browser authorization remains the credential boundary.
 
 ## Acceptance Test Matrix
@@ -60,7 +77,7 @@ Let a local Axis MCP client obtain an access token through the existing browser 
 | AT-001 | API boundary | Interactive unauthenticated authorization redirects to configured sign-in with an opaque handle | AC-001, AC-002 | API integration test | Yes |
 | AT-002 | API boundary | Cached request resumes to the exact registered callback after a browser session is established | AC-003 | API integration test | Yes |
 | AT-003 | Browser journey | Local MCP authorization uses the existing sign-in screen and reaches the loopback callback | AC-001, AC-003, AC-004 | Browser automation | Yes |
-| AT-004 | UI component | Pending authorization survives recoverable sign-in failures and resumes without a second SPA PKCE flow | AC-003, AC-006 | UI component test | Yes |
+| AT-004 | UI component | Pending authorization survives recoverable sign-in failures and resumes without starting another authorization flow | AC-003, AC-006 | UI component test | Yes |
 | AT-005 | API boundary | Silent authorization returns `login_required` without sign-in UI | AC-005 | API integration test | Yes |
 | AT-006 | API boundary | Missing or mismatched client identifiers and invalid, expired, tampered, and replayed handles fail closed | AC-007 | API integration test | Yes |
 | AT-007 | Infrastructure boundary | Request-token expiry or callback failure does not issue a token and remains bounded | AC-008 | API integration test | Yes |
@@ -82,13 +99,6 @@ Let a local Axis MCP client obtain an access token through the existing browser 
 
 The existing sign-in labels, validation, focus, keyboard, localization, loading, and recovery behavior remain in force. The pending MCP authorization may expose only the opaque handle and public client identifier required by the authorization protocol; it must not expose other raw OAuth parameters or a user-editable destination. A successful technical handoff must not flash a dashboard or callback screen before the authorization endpoint resumes.
 
-## Decisions
-
-- The API/OpenIddict server owns request validation, request caching, redirect-URI validation, PKCE, state, scopes, and callback construction.
-- The SPA owns only the sign-in screen and bounded continuation of the server-validated opaque request handle and public client identifier; it never reconstructs or defaults either value and never carries the remaining OAuth request.
-- MCP owns the PKCE verifier, callback listener, state check, token exchange, and one authentication refresh; it does not own browser credentials.
-- OpenIddict owns authorization-request persistence and binds each standard OAuth `request_uri` to the regular public `client_id`; request tokens use an absolute five-minute lifetime matching the local MCP authorization wait window.
-
 > **Implementation status**
 >
 > | Layer | Status |
@@ -102,8 +112,8 @@ The existing sign-in labels, validation, focus, keyboard, localization, loading,
 >
 > **Gaps vs spec:** None.
 >
-> **Deferred follow-ups:** Reauthentication semantics for `prompt=login`, replacing the fixed MCP loopback callback port with an ephemeral port, and OpenIddict package lifecycle review remain outside this checkpoint.
+> **Deferred follow-ups:** Reauthentication semantics for `prompt=login` and replacing the fixed MCP loopback callback port with an ephemeral port remain outside this checkpoint.
 >
 > **Verification:** See [authorize-local-mcp-client.evidence.md](./authorize-local-mcp-client.evidence.md). API, frontend component, durable browser, MCP contract, and supported app-managed happy-path, callback-failure, bounded-timeout, port-release, and authenticated-recovery evidence passes.
 >
-> **Decisions:** OpenIddict owns request validation, token-store persistence, and `client_id` binding; the SPA carries only the validated public client identifier and opaque OAuth `request_uri`; MCP remains the credential-free PKCE client and does not expose account or OAuth-request tools.
+> **Decisions:** This use case owns the account owner's authorization journey and protocol-visible outcomes. [Identity Access architecture](../../architecture/identity-access.md#local-mcp-authorization-realization) owns provider realization and the browser, authorization-server, and MCP trust boundaries.

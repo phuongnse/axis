@@ -1,5 +1,6 @@
 import { Link } from '@tanstack/react-router';
-import { Blocks, ListChecks } from 'lucide-react';
+import { Blocks, Bot, KeyRound, ListChecks, PackageOpen, Users } from 'lucide-react';
+import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { buttonVariants } from '@/components/ui/button';
 import type {
@@ -17,12 +18,37 @@ interface ModuleNavigationProps {
 
 const iconByToken: Record<ModuleNavigationIcon, typeof Blocks> = {
   businessObjects: Blocks,
+  memberships: Users,
+  productRoles: KeyRound,
   rules: ListChecks,
+  serviceIdentities: Bot,
+  solutions: PackageOpen,
 };
 
 export function ModuleNavigation({ context, items }: ModuleNavigationProps) {
   const { t } = useTranslation();
   const groups = groupItems(items);
+  const activeItemId = items.find((item) => item.isActive(context))?.id;
+  const navigationItemsRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const navigationItems = navigationItemsRef.current;
+    if (!navigationItems || !activeItemId) return;
+
+    const revealActiveItem = () => {
+      const activeItem = navigationItems.querySelector<HTMLElement>('[aria-current="page"]');
+      if (typeof activeItem?.scrollIntoView === 'function') {
+        activeItem.scrollIntoView({ block: 'nearest', inline: 'center' });
+      }
+    };
+
+    revealActiveItem();
+    if (typeof ResizeObserver === 'undefined') return;
+
+    const observer = new ResizeObserver(revealActiveItem);
+    observer.observe(navigationItems);
+    return () => observer.disconnect();
+  }, [activeItemId]);
 
   if (items.length === 0) {
     return null;
@@ -31,15 +57,19 @@ export function ModuleNavigation({ context, items }: ModuleNavigationProps) {
   return (
     <nav
       aria-label={t('nav.modules')}
-      className="min-h-0 shrink-0 border-b border-border bg-card/80 md:w-60 md:border-r md:border-b-0"
+      className="min-h-0 shrink-0 border-b border-border bg-card md:w-60 md:border-r md:border-b-0"
     >
-      <div className="flex min-w-0 gap-2 overflow-x-auto px-4 py-2 md:h-full md:min-h-0 md:flex-col md:gap-4 md:overflow-x-hidden md:overflow-y-auto md:px-3 md:py-4">
+      <div
+        ref={navigationItemsRef}
+        data-slot="module-navigation-items"
+        className="flex min-w-0 gap-axis-inline overflow-x-auto px-axis-page-compact py-axis-inline md:h-full md:min-h-0 md:flex-col md:gap-axis-region md:overflow-x-hidden md:overflow-y-auto md:px-3 md:py-axis-region"
+      >
         {groups.map((group) => (
-          <div key={group.id} className="flex min-w-max gap-2 md:min-w-0 md:flex-col">
-            <p className="hidden px-2 text-xs font-medium text-muted-foreground md:block">
+          <div key={group.id} className="flex min-w-max gap-axis-inline md:min-w-0 md:flex-col">
+            <p className="hidden px-axis-inline text-axis-metadata font-axis-label text-muted-foreground md:block">
               {t(group.labelKey)}
             </p>
-            <div className="flex gap-2 md:flex-col">
+            <div className="flex gap-axis-inline md:flex-col">
               {group.items.map((item) => {
                 const Icon = iconByToken[item.icon];
                 const active = item.isActive(context);
@@ -51,12 +81,12 @@ export function ModuleNavigation({ context, items }: ModuleNavigationProps) {
                     aria-current={active ? 'page' : undefined}
                     className={cn(
                       buttonVariants({ variant: 'ghost' }),
-                      'md:w-full md:justify-start',
+                      'min-h-axis-touch-target min-w-axis-touch-target md:min-h-0 md:min-w-0 md:w-full md:justify-start',
                       transientItemHighlight,
                       active && persistentItemHighlight,
                     )}
                   >
-                    <Icon className="size-4 shrink-0" aria-hidden />
+                    <Icon className="size-axis-icon-navigation shrink-0" aria-hidden />
                     <span className="truncate">{t(item.labelKey)}</span>
                   </Link>
                 );

@@ -8,6 +8,13 @@ test.describe('local dev smoke', () => {
 
     await expect(page).toHaveURL(/\/sign-in$/);
     await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible();
+    await expect(page.locator('[data-slot="entry-layout"]')).toBeVisible();
+    await expect(page.getByRole('main')).toHaveAttribute('data-slot', 'entry-content');
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= document.documentElement.clientWidth,
+      ),
+    ).toBe(true);
     await expect(page.getByRole('link', { name: 'Create account' })).toHaveAttribute(
       'href',
       '/register',

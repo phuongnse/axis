@@ -80,6 +80,350 @@ describe('BusinessObjectsPage', () => {
     ).toEqual(fieldRuleDefinitions);
   });
 
+  it('composes the proving resource workspace from shared page patterns', async () => {
+    const detail = definitionDetail();
+    vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL) => {
+      const path = requestPath(input);
+      if (isRulesRequest(input)) return jsonResponse(fieldRuleDefinitions);
+      if (isDefinitionActionsRequest(input)) return allowedDefinitionActions();
+      if (path === '/api/business-object-definitions') return jsonResponse(pageWith(detail));
+      throw new Error(`Unexpected fetch: ${path}`);
+    });
+
+    await renderPage();
+
+    const page = document.querySelector<HTMLElement>('[data-slot="page-layout"]');
+    const workspace = document.querySelector<HTMLElement>('[data-slot="resource-workspace"]');
+    const header = document.querySelector<HTMLElement>('[data-slot="page-header"]');
+    const title = await screen.findByRole('heading', { level: 1, name: 'Business objects' });
+    const table = screen.getByRole('region', { name: 'Definitions' });
+    const recordAction = await within(table).findByRole('button', { name: 'Customer' });
+    const createAction = await within(table).findByRole('button', { name: 'New definition' });
+
+    expect(page).toHaveAttribute('data-scroll-mode', 'contained');
+    expect(page).toHaveClass(
+      'h-full',
+      'min-h-0',
+      'gap-axis-region',
+      'p-axis-page-compact',
+      'sm:p-axis-page-default',
+      'lg:p-axis-page-wide',
+    );
+    expect(page?.parentElement).not.toHaveClass(
+      'p-axis-page-compact',
+      'sm:p-axis-page-default',
+      'lg:p-axis-page-wide',
+      'font-heading',
+    );
+    expect(page).toContainElement(workspace);
+    expect(header?.parentElement).toBe(workspace);
+    expect(title).toHaveAttribute('data-slot', 'page-title');
+    expect(title.closest('[data-slot="page-header"]')).toBe(header);
+    expect(workspace?.querySelectorAll('[data-slot="page-layout"]')).toHaveLength(0);
+    expect(page?.querySelectorAll('[data-slot="page-header"]')).toHaveLength(1);
+    expect(page?.querySelectorAll('[data-slot="data-table"]')).toHaveLength(1);
+    expect(within(table).queryByRole('columnheader', { name: 'Actions' })).not.toBeInTheDocument();
+    expectPageActionSizing(recordAction);
+    expectPageActionSizing(createAction);
+  });
+
+  it('keeps collection loading and retryable list failure inside the stable page', async () => {
+    const user = userEvent.setup();
+    const detail = definitionDetail();
+    let listReads = 0;
+    let resolveInitialList!: (response: Response) => void;
+    const initialList = new Promise<Response>((resolve) => {
+      resolveInitialList = resolve;
+    });
+    vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL) => {
+      const path = requestPath(input);
+      if (isRulesRequest(input)) return jsonResponse(fieldRuleDefinitions);
+      if (isDefinitionActionsRequest(input)) return allowedDefinitionActions();
+      if (path === '/api/business-object-definitions') {
+        listReads += 1;
+        return listReads === 1 ? initialList : jsonResponse(pageWith(detail));
+      }
+      throw new Error(`Unexpected fetch: ${path}`);
+    });
+
+    await renderPage();
+
+    const page = document.querySelector<HTMLElement>('[data-slot="page-layout"]');
+    const table = screen.getByRole('region', { name: 'Definitions' });
+    expect(table).toHaveAttribute('aria-busy', 'true');
+    expect(within(table).getAllByText('Loading rows')).not.toHaveLength(0);
+
+    await act(async () => resolveInitialList(jsonResponse({ title: 'List failed' }, 500)));
+
+    const error = await within(table).findByRole('alert');
+    expect(error).toHaveTextContent('Unable to load business objects');
+    expect(error).toHaveTextContent('Check the connection and try again.');
+    expect(page).toContainElement(error);
+    await user.click(within(error).getByRole('button', { name: 'Retry' }));
+
+    expect(await within(table).findByRole('button', { name: 'Customer' })).toBeVisible();
+    expect(table).not.toHaveAttribute('aria-busy');
+    expect(listReads).toBe(2);
+    expect(document.querySelector('[data-slot="page-layout"]')).toBe(page);
+  });
+
+  it('keeps the empty collection inside the resource workspace with its authorized next action', async () => {
+    vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL) => {
+      const path = requestPath(input);
+      if (isRulesRequest(input)) return jsonResponse(fieldRuleDefinitions);
+      if (isDefinitionActionsRequest(input)) return allowedDefinitionActions();
+      if (path === '/api/business-object-definitions') return jsonResponse(emptyPage());
+      throw new Error(`Unexpected fetch: ${path}`);
+    });
+
+    await renderPage();
+
+    const workspace = document.querySelector('[data-slot="resource-workspace"]');
+    const table = screen.getByRole('region', { name: 'Definitions' });
+    expect(workspace).toContainElement(table);
+    await waitFor(() => expect(table).not.toHaveAttribute('aria-busy'));
+    expect(within(table).getByText('No business objects')).toBeVisible();
+    expect(
+      within(table).getByText(
+        'Start a definition to capture the structure and rules for a reusable business object.',
+      ),
+    ).toBeVisible();
+    expect(within(table).getByRole('button', { name: 'New definition' })).toBeEnabled();
+  });
+
+  it('hides create and consumes a denied create deep link', async () => {
+    let resolveActions!: (response: Response) => void;
+    const actionsResponse = new Promise<Response>((resolve) => {
+      resolveActions = resolve;
+    });
+    vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL) => {
+      const path = requestPath(input);
+      if (isRulesRequest(input)) return jsonResponse(fieldRuleDefinitions);
+      if (path === '/api/business-object-definitions/actions') {
+        return actionsResponse;
+      }
+      if (path === '/api/business-object-definitions') return jsonResponse(emptyPage());
+      throw new Error(`Unexpected fetch: ${path}`);
+    });
+
+    const router = await renderPage('/business-objects?page=1&dialog=create');
+
+    await waitFor(() =>
+      expect(
+        vi
+          .mocked(fetch)
+          .mock.calls.some(
+            ([input]) => requestPath(input) === '/api/business-object-definitions/actions',
+          ),
+      ).toBe(true),
+    );
+    expect(screen.queryByRole('button', { name: 'New definition' })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('dialog', { name: 'Define business object' }),
+    ).not.toBeInTheDocument();
+    await act(async () => resolveActions(jsonResponse({ canStartCreate: false })));
+    await waitFor(() => expect(router.state.location.search).toEqual({ page: 1 }));
+    expect(screen.queryByRole('button', { name: 'New definition' })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('dialog', { name: 'Define business object' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('keeps a create deep link retryable while authorization is unavailable', async () => {
+    const user = userEvent.setup();
+    let actionReads = 0;
+    vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL) => {
+      const path = requestPath(input);
+      if (isRulesRequest(input)) return jsonResponse(fieldRuleDefinitions);
+      if (path === '/api/business-object-definitions/actions') {
+        actionReads += 1;
+        return actionReads === 1
+          ? jsonResponse({ title: 'Unavailable' }, 503)
+          : jsonResponse({ canStartCreate: true });
+      }
+      if (path === '/api/business-object-definitions') return jsonResponse(emptyPage());
+      throw new Error(`Unexpected fetch: ${path}`);
+    });
+
+    const router = await renderPage('/business-objects?page=1&dialog=create');
+
+    const notice = await screen.findByRole('alert');
+    expect(notice).toHaveTextContent('Business object actions are temporarily unavailable');
+    expect(router.state.location.search).toEqual({ page: 1, dialog: 'create' });
+    const retry = within(notice).getByRole('button', { name: 'Retry' });
+    expectPageActionSizing(retry);
+    await user.click(retry);
+    expect(await screen.findByRole('dialog', { name: 'Define business object' })).toBeVisible();
+    await waitFor(() => expect(router.state.location.search).toEqual({ page: 1 }));
+  });
+
+  it('uses server actions to deny business object save and publish controls', async () => {
+    const deniedDetail = {
+      ...definitionDetail(),
+      actions: { canSave: false, canPublish: false },
+    };
+    vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL) => {
+      const path = requestPath(input);
+      if (isRulesRequest(input)) return jsonResponse(fieldRuleDefinitions);
+      if (path === '/api/business-object-definitions/actions') {
+        return jsonResponse({ canStartCreate: true });
+      }
+      if (path === `/api/business-object-definitions/${definitionId}`) {
+        return jsonResponse(deniedDetail);
+      }
+      if (path === '/api/business-object-definitions') return jsonResponse(pageWith(deniedDetail));
+      throw new Error(`Unexpected fetch: ${path}`);
+    });
+
+    await renderPage(
+      `/business-objects?page=1&dialog=edit&recordId=${encodeURIComponent(definitionId)}`,
+    );
+
+    const dialog = await screen.findByRole('dialog', { name: 'Customer' });
+    expect(within(dialog).queryByRole('button', { name: 'Save changes' })).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole('button', { name: 'Publish' })).not.toBeInTheDocument();
+    expect(within(dialog).getByRole('button', { name: 'Close' })).toBeEnabled();
+  });
+
+  it.each([
+    403, 404,
+  ])('keeps a %s detail response non-disclosing and non-interactive', async (status) => {
+    const detail = definitionDetail();
+    vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL) => {
+      const path = requestPath(input);
+      if (isRulesRequest(input)) return jsonResponse(fieldRuleDefinitions);
+      if (isDefinitionActionsRequest(input)) return allowedDefinitionActions();
+      if (path === `/api/business-object-definitions/${definitionId}`) {
+        return jsonResponse({ detail: 'Secret authorization detail' }, status);
+      }
+      if (path === '/api/business-object-definitions') return jsonResponse(pageWith(detail));
+      throw new Error(`Unexpected fetch: ${path}`);
+    });
+
+    await renderPage();
+    await userEvent.click(await screen.findByRole('button', { name: 'Customer' }));
+
+    const dialog = await screen.findByRole('dialog', { name: 'Business object definition' });
+    const notice = await within(dialog).findByRole('alert');
+    expect(notice).toHaveTextContent('Action unavailable');
+    expect(notice).toHaveTextContent('This action is not available.');
+    expect(notice).not.toHaveTextContent('Secret authorization detail');
+    expect(within(dialog).queryByRole('textbox')).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole('button', { name: 'Save changes' })).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole('button', { name: 'Publish' })).not.toBeInTheDocument();
+    expect(
+      vi.mocked(fetch).mock.calls.some(([, init]) => init?.method && init.method !== 'GET'),
+    ).toBe(false);
+  });
+
+  it('retries a temporarily unavailable business object detail without exposing controls', async () => {
+    const user = userEvent.setup();
+    const detail = definitionDetail();
+    let detailAvailable = false;
+    vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL) => {
+      const path = requestPath(input);
+      if (isRulesRequest(input)) return jsonResponse(fieldRuleDefinitions);
+      if (isDefinitionActionsRequest(input)) return allowedDefinitionActions();
+      if (path === `/api/business-object-definitions/${definitionId}`) {
+        return detailAvailable
+          ? jsonResponse(detail)
+          : jsonResponse({ detail: 'Private dependency detail' }, 503);
+      }
+      if (path === '/api/business-object-definitions') return jsonResponse(pageWith(detail));
+      throw new Error(`Unexpected fetch: ${path}`);
+    });
+
+    await renderPage();
+    const recordButton = await screen.findByRole('button', { name: 'Customer' });
+    await act(async () => recordButton.click());
+
+    const dialog = await screen.findByRole('dialog', { name: 'Business object definition' });
+    const notice = await within(dialog).findByRole('alert');
+    expect(notice).toHaveTextContent('Business object temporarily unavailable');
+    expect(notice).not.toHaveTextContent('Private dependency detail');
+    expect(within(dialog).queryByRole('textbox')).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole('button', { name: 'Save changes' })).not.toBeInTheDocument();
+    detailAvailable = true;
+    await user.click(within(notice).getByRole('button', { name: 'Retry' }));
+    expect(await within(dialog).findByLabelText('Name')).toHaveValue('Customer');
+    expect(within(dialog).getByRole('button', { name: 'Save changes' })).toBeDisabled();
+  });
+
+  it.each([
+    [403, 'This action is not available.'],
+    [404, 'This action is not available.'],
+    [503, 'Authorization is temporarily unavailable. Try again.'],
+  ])('maps a %s save failure to safe copy', async (status, expectedMessage) => {
+    const user = userEvent.setup();
+    const detail = definitionDetail();
+    vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const path = requestPath(input);
+      if (isRulesRequest(input)) return jsonResponse(fieldRuleDefinitions);
+      if (isDefinitionActionsRequest(input)) return allowedDefinitionActions();
+      if (path === '/api/business-object-definitions') return jsonResponse(pageWith(detail));
+      if (path === `/api/business-object-definitions/${definitionId}`) {
+        return jsonResponse(detail);
+      }
+      if (
+        path === `/api/business-object-definitions/${definitionId}/unpublished` &&
+        init?.method === 'PUT'
+      ) {
+        return jsonResponse({ detail: 'Private mutation detail' }, status);
+      }
+      throw new Error(`Unexpected fetch: ${init?.method ?? 'GET'} ${path}`);
+    });
+
+    await renderPage();
+    await user.click(await screen.findByRole('button', { name: 'Customer' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Customer' });
+    const name = within(dialog).getByLabelText('Name');
+    await user.clear(name);
+    await user.type(name, 'Updated customer');
+    await user.click(within(dialog).getByRole('button', { name: 'Save changes' }));
+
+    const notice = await within(dialog).findByRole('alert');
+    expect(notice).toHaveTextContent(expectedMessage);
+    expect(notice).not.toHaveTextContent('Private mutation detail');
+  });
+
+  it('keeps form labels scoped to each concurrent definition window', async () => {
+    const user = userEvent.setup();
+    const detail = definitionDetail();
+    vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL) => {
+      const path = requestPath(input);
+      if (isRulesRequest(input)) return jsonResponse(fieldRuleDefinitions);
+      if (isDefinitionActionsRequest(input)) return allowedDefinitionActions();
+      if (path === '/api/business-object-definitions') return jsonResponse(pageWith(detail));
+      if (path === `/api/business-object-definitions/${definitionId}`) {
+        return jsonResponse(detail);
+      }
+      throw new Error(`Unexpected fetch: ${path}`);
+    });
+
+    await renderPage();
+    await user.click(await screen.findByRole('button', { name: 'Customer' }));
+    await user.click(screen.getByRole('button', { name: 'New definition' }));
+
+    const editDialog = await screen.findByRole('dialog', { name: 'Customer' });
+    const createDialog = await screen.findByRole('dialog', { name: 'Define business object' });
+    const inputs = (
+      [
+        [editDialog, 'Name'],
+        [editDialog, 'Object key'],
+        [createDialog, 'Name'],
+        [createDialog, 'Object key'],
+      ] as const
+    ).map(([dialog, label]) => {
+      const input = within(dialog).getByLabelText(label);
+      const labelElement = within(dialog).getByText(label, { selector: 'label' });
+      expect(dialog).toContainElement(input);
+      expect(labelElement).toHaveAttribute('for', input.id);
+      return input;
+    });
+
+    expect(new Set(inputs.map((input) => input.id)).size).toBe(inputs.length);
+  });
+
   it('prefetches a definition and opens its managed window without another detail request', async () => {
     const user = userEvent.setup();
     const detail = definitionDetail();
@@ -87,6 +431,7 @@ describe('BusinessObjectsPage', () => {
     vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL) => {
       const path = requestPath(input);
       if (isRulesRequest(input)) return jsonResponse(fieldRuleDefinitions);
+      if (isDefinitionActionsRequest(input)) return allowedDefinitionActions();
       if (path === `/api/business-object-definitions/${definitionId}`) {
         detailRequests += 1;
         return jsonResponse(detail);
@@ -147,6 +492,7 @@ describe('BusinessObjectsPage', () => {
     vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL) => {
       const path = requestPath(input);
       if (isRulesRequest(input)) return jsonResponse(fieldRuleDefinitions);
+      if (isDefinitionActionsRequest(input)) return allowedDefinitionActions();
       if (path === `/api/business-object-definitions/${definitionId}`) {
         return jsonResponse(detail);
       }
@@ -203,6 +549,7 @@ describe('BusinessObjectsPage', () => {
       const path = requestPath(input);
       const method = init?.method ?? 'GET';
       if (isRulesRequest(input)) return jsonResponse(fieldRuleDefinitions);
+      if (isDefinitionActionsRequest(input)) return allowedDefinitionActions();
       if (path === '/api/business-object-definitions' && method === 'GET') {
         return jsonResponse(pageWith(detail));
       }
@@ -263,6 +610,7 @@ describe('BusinessObjectsPage', () => {
       const path = requestPath(input);
       const method = init?.method ?? 'GET';
       if (isRulesRequest(input)) return jsonResponse(fieldRuleDefinitions);
+      if (isDefinitionActionsRequest(input)) return allowedDefinitionActions();
       if (path === '/api/business-object-definitions' && method === 'GET') {
         return jsonResponse(pageWith(detail));
       }
@@ -299,6 +647,7 @@ describe('BusinessObjectsPage', () => {
     vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL) => {
       const path = requestPath(input);
       if (isRulesRequest(input)) return jsonResponse(fieldRuleDefinitions);
+      if (isDefinitionActionsRequest(input)) return allowedDefinitionActions();
       if (path === `/api/business-object-definitions/${definitionId}`) return detailResponse;
       if (path === '/api/business-object-definitions') return jsonResponse(emptyPage());
       throw new Error(`Unexpected fetch: ${path}`);
@@ -336,6 +685,7 @@ describe('BusinessObjectsPage', () => {
       const path = requestPath(input);
       const method = init?.method ?? 'GET';
       if (isRulesRequest(input)) return jsonResponse(fieldRuleDefinitions);
+      if (isDefinitionActionsRequest(input)) return allowedDefinitionActions();
       if (path === '/api/business-object-definitions' && method === 'GET') {
         return jsonResponse(emptyPage());
       }
@@ -362,6 +712,7 @@ describe('BusinessObjectsPage', () => {
       const path = requestPath(input);
       const method = init?.method ?? 'GET';
       if (isRulesRequest(input)) return jsonResponse(fieldRuleDefinitions);
+      if (isDefinitionActionsRequest(input)) return allowedDefinitionActions();
       if (path === '/api/business-object-definitions' && method === 'GET') {
         return jsonResponse(pageWith(detail));
       }
@@ -452,6 +803,7 @@ describe('BusinessObjectsPage', () => {
       const path = requestPath(input);
       const method = init?.method ?? 'GET';
       if (isRulesRequest(input)) return jsonResponse(definitions);
+      if (isDefinitionActionsRequest(input)) return allowedDefinitionActions();
       if (path === '/api/business-object-definitions' && method === 'GET') {
         return jsonResponse(pageWith(detail));
       }
@@ -531,6 +883,7 @@ describe('BusinessObjectsPage', () => {
     vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL) => {
       const path = requestPath(input);
       if (isRulesRequest(input)) return jsonResponse(definitions);
+      if (isDefinitionActionsRequest(input)) return allowedDefinitionActions();
       if (path === '/api/business-object-definitions') return jsonResponse(pageWith(detail));
       if (path === `/api/business-object-definitions/${definitionId}`) return jsonResponse(detail);
       throw new Error(`Unexpected fetch: ${path}`);
@@ -568,6 +921,7 @@ describe('BusinessObjectsPage', () => {
     vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL, _init?: RequestInit) => {
       const path = requestPath(input);
       if (isRulesRequest(input)) return jsonResponse(fieldRuleDefinitions);
+      if (isDefinitionActionsRequest(input)) return allowedDefinitionActions();
       if (path === '/api/business-object-definitions') return jsonResponse(pageWith(detail));
       if (path === `/api/business-object-definitions/${definitionId}`) return jsonResponse(detail);
       requests.push(path);
@@ -600,6 +954,7 @@ describe('BusinessObjectsPage', () => {
     vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL) => {
       const path = requestPath(input);
       if (isRulesRequest(input)) return jsonResponse(definitions);
+      if (isDefinitionActionsRequest(input)) return allowedDefinitionActions();
       if (path === '/api/business-object-definitions') return jsonResponse(pageWith(detail));
       if (path === `/api/business-object-definitions/${definitionId}`) return jsonResponse(detail);
       requests.push(path);
@@ -656,6 +1011,7 @@ describe('BusinessObjectsPage', () => {
     vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL) => {
       const path = requestPath(input);
       if (isRulesRequest(input)) return jsonResponse(definitions);
+      if (isDefinitionActionsRequest(input)) return allowedDefinitionActions();
       if (path === '/api/business-object-definitions') return jsonResponse(pageWith(detail));
       if (path === `/api/business-object-definitions/${definitionId}`) return jsonResponse(detail);
       throw new Error(`Unexpected fetch: ${path}`);
@@ -770,8 +1126,26 @@ function isRulesRequest(input: RequestInfo | URL): boolean {
   return requestPath(input) === '/api/rules';
 }
 
+function isDefinitionActionsRequest(input: RequestInfo | URL): boolean {
+  return requestPath(input) === '/api/business-object-definitions/actions';
+}
+
+function allowedDefinitionActions() {
+  return jsonResponse({ canStartCreate: true });
+}
+
 function emptyPage() {
   return { items: [], totalCount: 0, page: 1, pageSize: 20 };
+}
+
+function expectPageActionSizing(action: HTMLElement) {
+  expect(action).toHaveAttribute('data-slot', 'button');
+  expect(action).toHaveClass(
+    'min-h-axis-touch-target',
+    'min-w-axis-touch-target',
+    'sm:min-h-axis-compact-control',
+    'sm:min-w-axis-compact-control',
+  );
 }
 
 function pageWith(detail: ReturnType<typeof definitionDetail>) {
@@ -810,6 +1184,7 @@ function definitionDetail({
     latestPublishedVersionNumber: null,
     createdAt: now,
     updatedAt: now,
+    actions: { canSave: true, canPublish: true },
     fields: fields ?? [
       {
         id: fieldId,

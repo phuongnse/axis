@@ -85,11 +85,17 @@ internal sealed class RuleDefinitionConfiguration : IEntityTypeConfiguration<Rul
             .HasConversion(OutputConverter)
             .IsRequired()
             .Metadata.SetValueComparer(OutputComparer);
-        builder.Property(definition => definition.CreatedByUserId).HasColumnName("created_by_user_id").IsRequired();
-        builder.Property(definition => definition.UpdatedByUserId).HasColumnName("updated_by_user_id").IsRequired();
+        Subject(builder.ComplexProperty(definition => definition.CreatedBySubject), "created_by_subject");
+        Subject(builder.ComplexProperty(definition => definition.UpdatedBySubject), "updated_by_subject");
         builder.Property(definition => definition.CreatedAt).HasColumnName("created_at").IsRequired();
         builder.Property(definition => definition.UpdatedAt).HasColumnName("updated_at").IsRequired();
-        builder.Property(definition => definition.ArchivedByUserId).HasColumnName("archived_by_user_id");
+        builder.Ignore(definition => definition.ArchivedBySubject);
+        builder.Property<RuleSubjectKind?>("ArchivedBySubjectKind")
+            .HasColumnName("archived_by_subject_kind")
+            .HasConversion<string>()
+            .HasMaxLength(16);
+        builder.Property<Guid?>("ArchivedBySubjectId")
+            .HasColumnName("archived_by_subject_id");
         builder.Property(definition => definition.ArchivedAt).HasColumnName("archived_at");
 
         builder.Property<string>("SearchTitle")
@@ -115,4 +121,11 @@ internal sealed class RuleDefinitionConfiguration : IEntityTypeConfiguration<Rul
             .IsRequired();
         builder.Navigation(definition => definition.Versions).HasField("_versions").UsePropertyAccessMode(PropertyAccessMode.Field);
     }
+
+    private static void Subject(ComplexPropertyBuilder<RuleSubjectReference> subject, string prefix)
+    {
+        subject.Property(value => value.Kind).HasColumnName(prefix + "_kind").HasConversion<string>().HasMaxLength(16).IsRequired();
+        subject.Property(value => value.Id).HasColumnName(prefix + "_id").IsRequired();
+    }
+
 }

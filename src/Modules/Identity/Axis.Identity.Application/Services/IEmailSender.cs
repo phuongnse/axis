@@ -7,4 +7,8 @@ public interface IEmailSender
         string verificationToken,
         string language,
         CancellationToken ct = default);
+
+    Task SendWorkspaceInvitationEmailAsync(
+        InvitationDeliveryMessage message,
+        CancellationToken ct = default);
 }

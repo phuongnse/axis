@@ -1,3 +1,4 @@
+using Axis.Authorization.Contracts;
 using Axis.Shared.Domain.Primitives;
 
 namespace Axis.Rules.Application;
@@ -15,6 +16,28 @@ internal static class RuleDefinitionFailures
             ErrorCodes.Forbidden,
             "Current user scope is required.",
             RulesProblemCodes.UserScopeRequired);
+
+    public static Result<T> Forbidden<T>() =>
+        Result.Failure<T>(ErrorCodes.Forbidden, "The requested rule operation is not allowed.");
+
+    public static Result Forbidden() =>
+        Result.Failure(ErrorCodes.Forbidden, "The requested rule operation is not allowed.");
+
+    public static Result<T> Authorization<T>(ProductAuthorizationDecision decision) =>
+        decision.IsUnavailable
+            ? Result.Failure<T>(
+                ErrorCodes.Unavailable,
+                "Product authorization is temporarily unavailable.",
+                RulesProblemCodes.AuthorizationUnavailable)
+            : Forbidden<T>();
+
+    public static Result Authorization(ProductAuthorizationDecision decision) =>
+        decision.IsUnavailable
+            ? Result.Failure(
+                ErrorCodes.Unavailable,
+                "Product authorization is temporarily unavailable.",
+                RulesProblemCodes.AuthorizationUnavailable)
+            : Forbidden();
 
     public static Result<T> NotFound<T>() =>
         Result.Failure<T>(

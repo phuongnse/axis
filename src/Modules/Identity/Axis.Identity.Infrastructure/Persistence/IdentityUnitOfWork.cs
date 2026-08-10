@@ -7,6 +7,8 @@ namespace Axis.Identity.Infrastructure.Persistence;
 
 internal sealed class IdentityUnitOfWork(IdentityDbContext context) : IUnitOfWork
 {
+    public void ClearTracking() => context.ChangeTracker.Clear();
+
     public async Task<int> SaveChangesAsync(CancellationToken ct = default)
     {
         try

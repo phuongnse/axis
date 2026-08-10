@@ -1,10 +1,14 @@
+using Axis.Authorization.Contracts;
 using Axis.BusinessObjects.Application.Repositories;
 using Axis.BusinessObjects.Domain.Aggregates;
 using Axis.BusinessObjects.Domain.ValueObjects;
+using Axis.Identity.Contracts;
 using Axis.Shared.Application.Identity;
 using Axis.Shared.Domain.Primitives;
 using FluentAssertions;
 using NSubstitute;
+using DomainSubjectReference = Axis.BusinessObjects.Domain.ValueObjects.SubjectReference;
+using IdentitySubjectReference = Axis.Identity.Contracts.SubjectReference;
 
 namespace Axis.BusinessObjects.Application.Tests;
 
@@ -42,7 +46,7 @@ internal static class BusinessObjectRecordHandlerTestContext
             [new BusinessObjectFieldDefinitionSpec(fieldKey, fieldLabel, 0, fieldType, rules)],
             expectedRevision: 1,
             Now).IsSuccess.Should().BeTrue();
-        definition.Publish(2, UserId, Now).IsSuccess.Should().BeTrue();
+        definition.Publish(2, DomainSubjectReference.Human(UserId), Now).IsSuccess.Should().BeTrue();
         return definition;
     }
 
@@ -60,7 +64,7 @@ internal static class BusinessObjectRecordHandlerTestContext
             idempotencyKey,
             payloadHash,
             values,
-            UserId,
+            DomainSubjectReference.Human(UserId),
             Now);
         result.IsSuccess.Should().BeTrue();
         return result.Value;
@@ -70,6 +74,21 @@ internal static class BusinessObjectRecordHandlerTestContext
     {
         public Guid? UserId => BusinessObjectRecordHandlerTestContext.UserId;
         public Guid? workspaceId => BusinessObjectRecordHandlerTestContext.WorkspaceId;
+    }
+
+    public sealed class FakeCurrentSubject : ICurrentSubject
+    {
+        public IdentitySubjectReference Subject { get; set; } = IdentitySubjectReference.Human(UserId);
+    }
+
+    public static IProductAuthorizationService AllowedAuthorization(ProductActionScope scope = ProductActionScope.Own)
+    {
+        IProductAuthorizationService authorization = Substitute.For<IProductAuthorizationService>();
+        authorization.AuthorizeAsync(
+                Arg.Any<ProductAuthorizationRequest>(),
+                Arg.Any<CancellationToken>())
+            .Returns(new ProductAuthorizationDecision(true, scope));
+        return authorization;
     }
 
     public static void ConfigureRecord(

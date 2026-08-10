@@ -1,3 +1,4 @@
+using Axis.Api.Authorization;
 using Axis.Api.Extensions;
 using Axis.Api.Middleware;
 using Axis.Rules.Application;
@@ -20,33 +21,41 @@ public static class RuleBindingEndpoints
     public static IEndpointRouteBuilder MapRuleBindingEndpoints(this IEndpointRouteBuilder app)
     {
         RouteGroupBuilder bindings = app.MapGroup("/api/rule-bindings")
-            .RequireAuthorization()
+            .RequireAuthorization(AxisApiServiceExtensions.WorkspaceAccessPolicy)
             .RequireRateLimiting(AxisApiServiceExtensions.RulesRateLimiterPolicy)
             .WithTags("Rules");
 
         bindings.MapPost("", Create)
+            .WithMetadata(ServiceProductEndpointMetadata.Instance)
             .WithName("CreateRuleBinding")
             .WithSummary("Bind an exact rule version to a consumer target")
             .Produces<RuleBindingDto>(StatusCodes.Status201Created)
-            .ProducesProblem(400).ProducesProblem(401).ProducesProblem(403).ProducesProblem(404).ProducesProblem(409);
+            .ProducesProblem(400).ProducesProblem(401).ProducesProblem(403).ProducesProblem(404).ProducesProblem(409)
+            .ProducesProblem(StatusCodes.Status503ServiceUnavailable);
 
         bindings.MapGet("/{bindingId:guid}", Get)
+            .WithMetadata(ServiceProductEndpointMetadata.Instance)
             .WithName("GetRuleBinding")
             .WithSummary("Get a rule binding")
             .Produces<RuleBindingDto>()
-            .ProducesProblem(401).ProducesProblem(403).ProducesProblem(404);
+            .ProducesProblem(401).ProducesProblem(403).ProducesProblem(404)
+            .ProducesProblem(StatusCodes.Status503ServiceUnavailable);
 
         bindings.MapPut("/{bindingId:guid}", Update)
+            .WithMetadata(ServiceProductEndpointMetadata.Instance)
             .WithName("UpdateRuleBinding")
             .WithSummary("Update a rule binding without changing the rule definition")
             .Produces<RuleBindingDto>()
-            .ProducesProblem(400).ProducesProblem(401).ProducesProblem(403).ProducesProblem(404).ProducesProblem(409);
+            .ProducesProblem(400).ProducesProblem(401).ProducesProblem(403).ProducesProblem(404).ProducesProblem(409)
+            .ProducesProblem(StatusCodes.Status503ServiceUnavailable);
 
         bindings.MapDelete("/{bindingId:guid}", Delete)
+            .WithMetadata(ServiceProductEndpointMetadata.Instance)
             .WithName("DeleteRuleBinding")
             .WithSummary("Remove a rule binding without removing its rule definition")
             .Produces(StatusCodes.Status204NoContent)
-            .ProducesProblem(400).ProducesProblem(401).ProducesProblem(403).ProducesProblem(404).ProducesProblem(409);
+            .ProducesProblem(400).ProducesProblem(401).ProducesProblem(403).ProducesProblem(404).ProducesProblem(409)
+            .ProducesProblem(StatusCodes.Status503ServiceUnavailable);
 
         bindings.MapPost("/{bindingId:guid}/evaluate", Evaluate)
             .WithName("EvaluateRuleBinding")
@@ -55,13 +64,15 @@ public static class RuleBindingEndpoints
             .ProducesProblem(400).ProducesProblem(401).ProducesProblem(403).ProducesProblem(404).ProducesProblem(422);
 
         app.MapGet("/api/rules/{definitionKey}/bindings", ListUsage)
-            .RequireAuthorization()
+            .RequireAuthorization(AxisApiServiceExtensions.WorkspaceAccessPolicy)
+            .WithMetadata(ServiceProductEndpointMetadata.Instance)
             .RequireRateLimiting(AxisApiServiceExtensions.RulesRateLimiterPolicy)
             .WithName("ListRuleBindingUsage")
             .WithTags("Rules")
             .WithSummary("Show where an exact rule version is currently used")
             .Produces<IReadOnlyList<RuleBindingUsageDto>>()
-            .ProducesProblem(400).ProducesProblem(401).ProducesProblem(403);
+            .ProducesProblem(400).ProducesProblem(401).ProducesProblem(403)
+            .ProducesProblem(StatusCodes.Status503ServiceUnavailable);
 
         return app;
     }

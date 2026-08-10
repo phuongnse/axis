@@ -4,7 +4,9 @@ namespace Axis.BusinessObjects.Application;
 
 internal static class BusinessObjectDefinitionMapper
 {
-    public static BusinessObjectDefinitionDetailDto ToDetailDto(BusinessObjectDefinition definition)
+    public static BusinessObjectDefinitionDetailDto ToDetailDto(
+        BusinessObjectDefinition definition,
+        bool canManage = false)
     {
         BusinessObjectDefinitionVersion? latestVersion = definition.Versions
             .OrderByDescending(version => version.VersionNumber)
@@ -21,7 +23,10 @@ internal static class BusinessObjectDefinitionMapper
             definition.CreatedAt,
             definition.UpdatedAt,
             definition.Fields.OrderBy(field => field.Order).Select(ToFieldDto).ToArray(),
-            latestVersion is null ? null : ToVersionDto(latestVersion));
+            latestVersion is null ? null : ToVersionDto(latestVersion),
+            new BusinessObjectDefinitionActionsDto(
+                CanSave: canManage && !definition.IsInstalled && definition.Status == BusinessObjectDefinitionStatus.Unpublished,
+                CanPublish: canManage && !definition.IsInstalled && definition.Status == BusinessObjectDefinitionStatus.Unpublished && definition.Fields.Count > 0));
     }
 
     public static BusinessObjectDefinitionListItemDto ToListItemDto(BusinessObjectDefinition definition) =>
@@ -39,7 +44,7 @@ internal static class BusinessObjectDefinitionMapper
             version.Id.Value,
             version.SourceDefinitionId.Value,
             version.VersionNumber,
-            version.PublishedByUserId,
+            SubjectReferenceMapper.ToDto(version.PublishedBySubject),
             version.PublishedAt,
             version.Fields.OrderBy(field => field.Order).Select(ToVersionFieldDto).ToArray());
 

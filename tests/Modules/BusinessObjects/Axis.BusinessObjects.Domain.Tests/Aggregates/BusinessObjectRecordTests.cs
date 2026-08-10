@@ -37,12 +37,12 @@ public sealed class BusinessObjectRecordTests
                 ["display_name"] = ["Grace Hopper"],
                 ["quantity"] = ["12000"],
             },
-            updatedByUserId: OtherUserId,
+            updatedBySubject: SubjectReference.Human(OtherUserId),
             updatedAt: Now.AddMinutes(1));
 
         result.IsSuccess.Should().BeTrue();
         record.Revision.Should().Be(2);
-        record.UpdatedByUserId.Should().Be(OtherUserId);
+        record.UpdatedBySubject.Should().Be(SubjectReference.Human(OtherUserId));
         record.PayloadHash.Should().Be("hash-1");
         record.Values["display_name"].Should().Equal("Grace Hopper");
     }
@@ -59,7 +59,7 @@ public sealed class BusinessObjectRecordTests
             {
                 ["display_name"] = ["Grace Hopper"],
             },
-            updatedByUserId: OtherUserId,
+            updatedBySubject: SubjectReference.Human(OtherUserId),
             updatedAt: Now.AddMinutes(1));
 
         result.IsFailure.Should().BeTrue();
@@ -88,20 +88,20 @@ public sealed class BusinessObjectRecordTests
                     true,
                     [new("required-check", true)]),
             ],
-            submittedByUserId: OtherUserId,
+            submittedBySubject: SubjectReference.Human(OtherUserId),
             submittedAt: Now.AddMinutes(2));
 
         submit.IsSuccess.Should().BeTrue();
         record.Status.Should().Be(BusinessObjectRecordStatus.Submitted);
         record.Revision.Should().Be(2);
-        record.SubmittedByUserId.Should().Be(OtherUserId);
+        record.SubmittedBySubject.Should().Be(SubjectReference.Human(OtherUserId));
         record.SubmittedAt.Should().Be(Now.AddMinutes(2));
         record.RuleEvaluations.Should().ContainSingle();
 
         Result saveAfterSubmit = record.SaveDraft(
             expectedRevision: 2,
             values: record.Values,
-            updatedByUserId: OtherUserId,
+            updatedBySubject: SubjectReference.Human(OtherUserId),
             updatedAt: Now.AddMinutes(3));
 
         saveAfterSubmit.IsFailure.Should().BeTrue();
@@ -122,7 +122,7 @@ public sealed class BusinessObjectRecordTests
             {
                 [" "] = ["invalid"],
             },
-            UserId,
+            SubjectReference.Human(UserId),
             Now);
 
         result.IsFailure.Should().BeTrue();
@@ -142,7 +142,7 @@ public sealed class BusinessObjectRecordTests
             {
                 ["display_name"] = ["Ada Lovelace"],
             },
-            UserId,
+            SubjectReference.Human(UserId),
             Now);
 
         result.IsSuccess.Should().BeTrue();

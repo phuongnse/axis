@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 2,
+  "phase": "reference-ready",
+  "goldenReference": {
+    "archetype": "resource-workspace",
+    "route": "/business-objects"
+  }
+}

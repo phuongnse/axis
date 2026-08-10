@@ -5,84 +5,48 @@ namespace Axis.Identity.Domain.Aggregates;
 
 public sealed class Workspace : AggregateRoot<Guid>
 {
-    public const int DeletionGracePeriodDays = 30;
     public const int MinNameLength = 2;
     public const int MaxNameLength = 100;
 
+    private Workspace(Guid id, string name, WorkspaceSlug slug, WorkspaceType type, Guid? organizationId)
+        : base(id)
+    {
+        Name = NormalizeName(name);
+        Slug = slug;
+        Type = type;
+        OrganizationId = organizationId;
+        Status = WorkspaceStatus.Active;
+        CreatedAt = DateTime.UtcNow;
+        Revision = 1;
+    }
+
     public string Name { get; private set; }
     public WorkspaceSlug Slug { get; private set; }
-    public Email OwnerEmail { get; private set; }
-    public Guid? OwnerUserId { get; private set; }
+    public Guid? OrganizationId { get; private set; }
     public WorkspaceType Type { get; private set; }
     public WorkspaceStatus Status { get; private set; }
     public DateTime CreatedAt { get; private set; }
     public string? AcceptedTermsVersion { get; private set; }
     public string? AcceptedPrivacyVersion { get; private set; }
     public DateTime? LegalAcceptedAt { get; private set; }
+    public int Revision { get; private set; }
 
-    private Workspace(
-        Guid id,
-        string name,
-        WorkspaceSlug slug,
-        Email ownerEmail,
-        Guid? ownerUserId,
-        WorkspaceType type,
-        DateTime createdAt)
-        : base(id)
+    public static Workspace CreatePersonal(string name, WorkspaceSlug slug)
     {
-        Name = name;
-        Slug = slug;
-        OwnerEmail = ownerEmail;
-        OwnerUserId = ownerUserId;
-        Type = type;
-        Status = WorkspaceStatus.Active;
-        CreatedAt = createdAt;
-    }
-
-    public static Workspace Create(string name, WorkspaceSlug slug, Email ownerEmail)
-    {
-        return CreatePersonal(name, slug, ownerEmail, Guid.NewGuid());
-    }
-
-    public static Workspace CreatePersonal(
-        string name,
-        WorkspaceSlug slug,
-        Email ownerEmail,
-        Guid ownerUserId)
-    {
-        if (ownerUserId == Guid.Empty)
-            throw new ArgumentException("Owner user is required.", nameof(ownerUserId));
-
-        Workspace workspace = CreateWorkspace(
-            name,
-            slug,
-            ownerEmail,
-            ownerUserId,
-            WorkspaceType.Personal);
+        Workspace workspace = new(Guid.NewGuid(), name, slug, WorkspaceType.Personal, null);
         workspace.Status = WorkspaceStatus.PendingVerification;
         return workspace;
     }
 
-    private static Workspace CreateWorkspace(
-        string name,
-        WorkspaceSlug slug,
-        Email ownerEmail,
-        Guid? ownerUserId,
-        WorkspaceType type)
+    public static Workspace CreateOrganization(string name, WorkspaceSlug slug, Guid organizationId)
     {
-        if (string.IsNullOrWhiteSpace(name))
-            throw new ArgumentException("Workspace name is required.", nameof(name));
+        if (organizationId == Guid.Empty)
+            throw new ArgumentException("Organization is required.", nameof(organizationId));
 
-        Workspace workspace = new Workspace(
-            Guid.NewGuid(),
-            name.Trim(),
-            slug,
-            ownerEmail,
-            ownerUserId,
-            type,
-            DateTime.UtcNow);
-        return workspace;
+        return new Workspace(Guid.NewGuid(), name, slug, WorkspaceType.Organization, organizationId);
     }
+
+    public bool AllowsSignIn() => Status is WorkspaceStatus.Active;
 
     public void RecordLegalAcceptance(string termsVersion, string privacyVersion)
     {
@@ -105,8 +69,23 @@ public sealed class Workspace : AggregateRoot<Guid>
             throw new InvalidOperationException("Only pending Workspaces can be activated.");
 
         Status = WorkspaceStatus.Active;
+        Revision++;
     }
 
-    public bool AllowsSignIn() =>
-        Status is WorkspaceStatus.Active;
+    public void SetStatus(WorkspaceStatus status, int expectedRevision)
+    {
+        if (expectedRevision != Revision)
+            throw new InvalidOperationException("Workspace revision is stale.");
+
+        Status = status;
+        Revision++;
+    }
+
+    private static string NormalizeName(string name)
+    {
+        string normalized = name?.Trim().Normalize() ?? string.Empty;
+        if (normalized.Length is < MinNameLength or > MaxNameLength)
+            throw new ArgumentException($"Workspace name must be between {MinNameLength} and {MaxNameLength} characters.", nameof(name));
+        return normalized;
+    }
 }
