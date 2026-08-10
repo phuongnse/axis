@@ -41,11 +41,8 @@ internal sealed class IdentityAuthorizationAdministratorAuthority(
         SubjectReference actor,
         CancellationToken cancellationToken = default) =>
         actor.Kind == SubjectKind.Human
-        && await memberships.GetActiveAsync(workspaceId, actor.Id, cancellationToken) is
-        {
-            Status: MembershipStatus.Active,
-            Role: WorkspaceMembershipRole.Administrator,
-        };
+        && (await memberships.GetActiveAsync(workspaceId, actor.Id, cancellationToken))
+            ?.HasLifecycleAdministratorAuthority is true;
 }
 
 internal sealed class IdentitySolutionAuthority(
@@ -62,11 +59,7 @@ internal sealed class IdentitySolutionAuthority(
             || await memberships.GetActiveAsync(
                 targetWorkspaceId,
                 actor.SubjectId,
-                cancellationToken) is not
-                {
-                    Status: MembershipStatus.Active,
-                    Role: WorkspaceMembershipRole.Administrator,
-                })
+                cancellationToken) is not { HasLifecycleAdministratorAuthority: true })
         {
             throw new SolutionPackageException("solutions.authorization.denied");
         }

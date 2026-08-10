@@ -6,15 +6,15 @@
 
 ## Purpose
 
-Allow a Workspace Administrator to publish one trusted, immutable signed solution package so it can later be installed into authorized Workspaces without exposing raw package bytes by default.
+Allow a Workspace lifecycle administrator to publish one trusted, immutable signed solution package so it can later be installed into authorized Workspaces without exposing raw package bytes by default.
 
 ## Primary actor
 
-- Authenticated Workspace Administrator publishing a solution release
+- Authenticated Workspace lifecycle administrator publishing a solution release
 
 ## Preconditions
 
-- The actor has current-Workspace Administrator authority.
+- The actor is the active `Owner` of the current personal Workspace or an active `Administrator` of the current organization Workspace.
 - A deployment-valid trusted-publisher configuration contains the non-revoked publisher key used to sign the exact package.
 - The uploaded package is within the declared package, component, inventory, dependency, exact Axis OpenAPI digest, and signature contract.
 
@@ -35,7 +35,7 @@ Allow a Workspace Administrator to publish one trusted, immutable signed solutio
 1. The administrator opens the Solutions publishing experience and selects an exact signed package.
 2. The experience identifies the target package and explains that publishing verifies publisher trust and creates an immutable version; it does not expose package contents from prior releases.
 3. The administrator confirms publication.
-4. Axis authenticates and authorizes the current Workspace Administrator, verifies the exact signed package and its declared exact committed Axis OpenAPI digest, inventory, dependencies, hashes, and trusted non-revoked publisher.
+4. Axis authenticates and authorizes the current Workspace lifecycle administrator, verifies the exact signed package and its declared exact committed Axis OpenAPI digest, inventory, dependencies, hashes, and trusted non-revoked publisher.
 5. Axis records the immutable version or returns an existing exact version for an idempotent repeat, with the required audit outcome.
 6. The experience reads back the safe version projection and shows its identity, package hash, publisher/key, Axis OpenAPI digest, provenance, and publish status.
 
@@ -52,7 +52,7 @@ Allow a Workspace Administrator to publish one trusted, immutable signed solutio
 
 *Happy path*
 
-- **AC-001** A current-Workspace Administrator can publish a package only after Axis authenticates, authorizes, and verifies the exact DSSE envelope and its exact deterministic UTF-8 Axis solution JSON payload.
+- **AC-001** The active `Owner` of a current personal Workspace or an active `Administrator` of a current organization Workspace can publish a package only after Axis authenticates, authorizes, and verifies the exact DSSE envelope and its exact deterministic UTF-8 Axis solution JSON payload.
 - **AC-002** The manifest contains solution/version identity, the exact committed Axis OpenAPI SHA-256 digest, publisher/key identity, provenance/source revision/build metadata, and an ordered typed component inventory with hashes and dependencies.
 - **AC-003** Axis accepts only a valid `ES256` DSSE PAE signature from a currently trusted, non-revoked deployment-configured public key.
 - **AC-004** A successful publish persists one immutable version identified by solution key, exact SemVer, and package hash, atomically records a redacted audit outcome, and exposes safe identity/provenance/trust/hash read-back without raw package bytes by default.
@@ -83,7 +83,7 @@ Allow a Workspace Administrator to publish one trusted, immutable signed solutio
 | AT-001 | Application boundary | Exact v1 byte schema, deterministic payload, typed component schema, limits, DAG, DSSE v1.0.2 PAE/base64 vectors, and ES256 verification accept only conformance vectors before a command mutation | AC-001, AC-002, AC-003, AC-006, AC-007, AC-011, AC-016 | Application test + API integration test | Yes |
 | AT-002 | Infrastructure boundary | Immutable version uniqueness, exact retry, conflicting bytes, exact envelope-byte retention, audit-outbox atomicity/read-back, and safe projection persistence | AC-004, AC-005, AC-009, AC-010, AC-013 | Infrastructure integration test | Yes |
 | AT-003 | Application boundary | Ledger reconciliation activates a valid revision atomically across replicas; rejects invalid config, missing/revived/substituted keys; and blocks unknown/revoked publication | AC-003, AC-008, AC-009, AC-012 | Application test | Yes |
-| AT-004 | API boundary | Authenticated administrator publish/read-back enforces Workspace authority, stable safe errors, no raw package default, and generated contract parity | AC-001, AC-004, AC-006, AC-010 | API integration test | Yes |
+| AT-004 | API boundary | Authenticated personal `Owner` and organization `Administrator` publish/read-back authority succeeds, while organization `Member` and inactive membership deny with stable safe errors, no raw package default, and generated contract parity | AC-001, AC-004, AC-006, AC-010 | Domain test + API integration test | Yes |
 | AT-005 | Browser journey | Publishing identifies the immutable release, confirms the consequence, shows safe success read-back, and supports validation/trust/conflict/retry states with keyboard and screen-reader recovery | AC-004, AC-005, AC-006, AC-009 | UI component test + Browser automation | Yes |
 | AT-006 | API/MCP boundaries | MCP local-path regular-file/size checks upload bytes without raw-content output, while API/MCP expose no publisher mutation or excluded lifecycle/compatibility behavior | AC-014, AC-015, AC-016, AC-017 | Architecture test + MCP contract test | Yes |
 

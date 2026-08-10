@@ -4,11 +4,11 @@
 
 ## Purpose
 
-Let an active Workspace administrator create and irrevocably revoke a non-human service identity and its public signing keys for exactly one current Workspace.
+Let an active Workspace lifecycle administrator create and irrevocably revoke a non-human service identity and its public signing keys for exactly one current Workspace.
 
 ## Primary actor
 
-- Active Workspace administrator
+- Active Workspace lifecycle administrator
 
 ## Supporting actors
 
@@ -18,7 +18,7 @@ Let an active Workspace administrator create and irrevocably revoke a non-human 
 
 ## Preconditions
 
-- The administrator has active `Administrator` Workspace membership in the current Workspace.
+- The administrator is the active `Owner` of the current personal Workspace or an active `Administrator` of the current organization Workspace.
 - The target service identity has no authority before this journey creates its active Workspace grant.
 
 ## Trigger
@@ -64,7 +64,7 @@ Shared lifecycle, assertion, immediate-revocation, concurrency, and audit realiz
 
 *Validation and recovery*
 
-- **AC-005** Only an active current-Workspace administrator can create, add, read, or revoke service-identity authority; identity lifecycle roles, product roles, Organization membership, and client claims do not substitute for that authority.
+- **AC-005** Only the active `Owner` of the current personal Workspace or an active `Administrator` of the current organization Workspace can create, add, read, or revoke service-identity authority; `Member`, inactive membership, product roles, Organization membership, and client claims do not substitute for that authority.
 - **AC-006** Missing, malformed, private, unsupported, or non-ES256 JWK input and a duplicate active `kid` fail before mutation without exposing existing key material.
 - **AC-007** A service identity cannot be created under more than one current Workspace, cannot receive a cross-Workspace grant, and does not create human membership, product role, Team, or Group authority.
 - **AC-008** Idempotent retry and concurrent lifecycle actions preserve one canonical outcome, unique active-key identity, and irreversible revoke behavior without silent overwrite or resurrection.
@@ -84,7 +84,7 @@ Shared lifecycle, assertion, immediate-revocation, concurrency, and audit realiz
 |---|---|---|---|---|---|
 | AT-001 | Application boundary | A service identity has exactly one Workspace grant; add/revoke key and identity invariants preserve unique active `kid` and irreversible lifecycle state | AC-001, AC-002, AC-004, AC-007 | Domain test + Application test | Yes |
 | AT-002 | Application/Infrastructure boundaries | Valid JWK lifecycle, canonical retry, concurrent add/revoke, audit persistence, and read-back complete atomically or fail closed | AC-002, AC-003, AC-008, AC-009 | Application test + Infrastructure integration test | Yes |
-| AT-003 | API boundary | Missing authority, malformed/private/non-ES256 JWK, duplicate `kid`, and cross-Workspace access deny without mutation or disclosure | AC-005, AC-006, AC-011 | API integration test | Yes |
+| AT-003 | API boundary | Active personal `Owner` and organization `Administrator` authority succeeds, while organization `Member`, inactive membership, malformed/private/non-ES256 JWK, duplicate `kid`, and cross-Workspace access deny without unintended mutation or disclosure | AC-005, AC-006, AC-011 | Domain test + API integration test | Yes |
 | AT-004 | API/Application boundaries | Revoked key or identity, including its intrinsic grant, immediately removes service authority and cannot be reactivated by retry or concurrency | AC-004, AC-008 | API integration test + Application test | Yes |
 | AT-005 | Infrastructure boundary | Lifecycle successes, denials, and failures are redacted, correlated, append-only, and readable without credentials or key material | AC-009, AC-010 | Infrastructure integration test | Yes |
 | AT-006 | Browser journey | Administrator manages keys and revocation with accessible pending, success, conflict, and recovery states | AC-003, AC-012 | Browser automation | Yes |

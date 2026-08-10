@@ -158,6 +158,34 @@ public sealed class ProductRoleAssignmentEndpointTests(ApiTestFixture fixture)
     }
 
     [Fact]
+    public async Task AssignProductRole_WhenPersonalOwner_AssignsInstalledRoleToSelf()
+    {
+        PersonalWorkspaceOwnerApiTestSession.OwnerContext owner =
+            await PersonalWorkspaceOwnerApiTestSession.CreateAsync(fixture);
+        Guid policyVersionId = Guid.NewGuid();
+        await SeedPolicyAsync(owner.WorkspaceId, policyVersionId);
+
+        HttpResponseMessage response = await SendMutationAsync(
+            "/api/product-role-assignments/assign",
+            AssignmentBody(owner.UserId, policyVersionId, "caseworker"),
+            Guid.NewGuid().ToString("N"));
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        JsonElement body = await ReadJsonAsync(response);
+        body.GetProperty("workspaceId").GetGuid().Should().Be(owner.WorkspaceId);
+        body.GetProperty("subject").GetProperty("subjectId").GetGuid().Should().Be(owner.UserId);
+        body.GetProperty("roleKey").GetString().Should().Be("caseworker");
+
+        HttpResponseMessage management = await fixture.Client.GetAsync(
+            "/api/product-role-assignments?language=en",
+            TestContext.Current.CancellationToken);
+        management.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await ReadJsonAsync(management)).GetProperty("subjects").EnumerateArray()
+            .Should().Contain(value =>
+                value.GetProperty("subject").GetProperty("subjectId").GetGuid() == owner.UserId);
+    }
+
+    [Fact]
     public async Task AssignProductRole_WhenIdempotencyKeyMissing_ReturnsStableBadRequest()
     {
         WorkspaceAdministratorApiTestSession.AdministratorContext administrator =

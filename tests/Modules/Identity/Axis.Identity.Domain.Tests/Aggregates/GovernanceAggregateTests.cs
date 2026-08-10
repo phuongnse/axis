@@ -20,6 +20,34 @@ public sealed class GovernanceAggregateTests
         act.Should().Throw<ArgumentOutOfRangeException>();
     }
 
+    [Theory]
+    [InlineData(WorkspaceMembershipRole.Owner, true)]
+    [InlineData(WorkspaceMembershipRole.Administrator, true)]
+    [InlineData(WorkspaceMembershipRole.Member, false)]
+    public void WorkspaceMembership_WhenActive_UsesRoleContextualLifecycleAuthority(
+        WorkspaceMembershipRole role,
+        bool expected)
+    {
+        WorkspaceMembership membership = role == WorkspaceMembershipRole.Owner
+            ? WorkspaceMembership.CreatePersonalOwner(Guid.NewGuid(), Guid.NewGuid())
+            : WorkspaceMembership.CreateOrganizationMember(Guid.NewGuid(), Guid.NewGuid(), role);
+
+        membership.HasLifecycleAdministratorAuthority.Should().Be(expected);
+    }
+
+    [Fact]
+    public void OrganizationAdministrator_WhenSuspended_LosesLifecycleAuthority()
+    {
+        WorkspaceMembership membership = WorkspaceMembership.CreateOrganizationMember(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            WorkspaceMembershipRole.Administrator);
+
+        membership.Suspend(membership.Revision);
+
+        membership.HasLifecycleAdministratorAuthority.Should().BeFalse();
+    }
+
     [Fact]
     public void Transition_WhenCompletedThenCompensated_RejectsSecondTerminalState()
     {

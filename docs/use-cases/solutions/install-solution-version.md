@@ -6,15 +6,15 @@
 
 ## Purpose
 
-Allow a current-Workspace Administrator to install one already published trusted solution version through a durable, resumable operation that applies each typed component safely and reports its exact outcome.
+Allow a current-Workspace lifecycle administrator to install one already published trusted solution version through a durable, resumable operation that applies each typed component safely and reports its exact outcome.
 
 ## Primary actor
 
-- Authenticated current-Workspace Administrator installing a published solution version
+- Authenticated current-Workspace lifecycle administrator installing a published solution version
 
 ## Preconditions
 
-- The administrator can access the current Workspace.
+- The administrator is the active `Owner` of the current personal Workspace or an active `Administrator` of the current organization Workspace.
 - The selected immutable solution version exists, targets the exact current committed Axis OpenAPI digest, and its publisher/key remains trusted and non-revoked.
 - The current Workspace has no installed version for that solution identity under the current installation contract.
 
@@ -53,7 +53,7 @@ Allow a current-Workspace Administrator to install one already published trusted
 
 *Happy path*
 
-- **AC-001** A current-Workspace Administrator can create a scoped-idempotent installation operation only for an existing compatible immutable version whose publisher/key is trusted and non-revoked at installation time.
+- **AC-001** The active `Owner` of a current personal Workspace or an active `Administrator` of a current organization Workspace can create a scoped-idempotent installation operation only for an existing compatible immutable version whose publisher/key is trusted and non-revoked at installation time.
 - **AC-002** The installation pins the exact selected version and creates a durable operation with a deterministic topological plan over the declared typed component dependency DAG.
 - **AC-003** Solutions applies every component solely through its owning public Contracts adapter; the first adapter set is Authorization policy, Business Object definition, and Rule binding to an existing immutable built-in Rule definition.
 - **AC-004** Every plan entry is idempotently applied and read back through its adapter; it becomes confirmed only if the read-back matches the declared exact component hash.
@@ -83,7 +83,7 @@ Allow a current-Workspace Administrator to install one already published trusted
 
 | ID | Boundary | Scenario | Covers AC | Verification | Required |
 |---|---|---|---|---|---|
-| AT-001 | Application boundary | Current-Workspace authority, compatible trusted version revalidation, scoped idempotency, immutable version pinning, deterministic topological plan, and safe rejection paths | AC-001, AC-002, AC-010 | Application test | Yes |
+| AT-001 | Application boundary | Personal `Owner` and organization `Administrator` current-Workspace authority, organization `Member` denial, compatible trusted version revalidation, scoped idempotency, immutable version pinning, deterministic topological plan, and safe rejection paths | AC-001, AC-002, AC-010 | Domain test + Application test | Yes |
 | AT-002 | Application boundary | Every required adapter validates/plans its typed document before confirmation; invalid last component proves zero module mutations and Solutions reaches no module internals/stores | AC-003, AC-011, AC-018 | Application test | Yes |
 | AT-003 | Application/Infrastructure boundaries | Apply plus exact-hash read-back/provenance confirms each step; injected apply/read-back/interruption failure records state and resumes without duplicate confirmed effects | AC-004, AC-005, AC-006, AC-007, AC-012, AC-013 | Application test + Infrastructure integration test | Yes |
 | AT-004 | Infrastructure boundary | Migration-backed operation, installation, step, idempotency, ledger/reconciliation, revision, fencing receipt, state transitions, and audit-outbox persistence survive response loss; lease expiry atomically reclaims `Running`/`Applying` to `Pending`, then read-back confirms, reapplies missing content, or blocks mismatch | AC-005, AC-007, AC-008, AC-013, AC-014, AC-015 | Infrastructure integration test | Yes |

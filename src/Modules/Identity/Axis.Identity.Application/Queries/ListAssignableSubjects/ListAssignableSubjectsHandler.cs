@@ -16,14 +16,14 @@ public sealed class ListAssignableSubjectsHandler(
         ListAssignableSubjectsQuery query,
         CancellationToken cancellationToken)
     {
-        if (!await CreateServiceIdentityHandler.IsAdministrator(
+        if (!await CreateServiceIdentityHandler.HasLifecycleAdministratorAuthorityAsync(
                 memberships,
                 query.WorkspaceId,
                 query.ActorUserId,
                 cancellationToken))
             return Result.Failure<IReadOnlyList<AssignableSubjectDto>>(
                 ErrorCodes.Forbidden,
-                "Active Workspace Administrator membership is required.");
+                "Active Workspace lifecycle-administrator authority is required.");
 
         IReadOnlyList<ActiveWorkspaceHumanProjection> humans =
             await memberships.ListActiveForWorkspaceAsync(query.WorkspaceId, cancellationToken);

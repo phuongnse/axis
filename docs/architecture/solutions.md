@@ -21,7 +21,7 @@ The normative package bytes, component schemas, and DSSE vectors are owned by [d
 
 ## Package trust and publication
 
-- The publish command is an authenticated Workspace Administrator lifecycle operation. Authorization is evaluated before any package or version information is disclosed or changed.
+- The publish command is an authenticated Workspace lifecycle-administrator operation under [Identity Governance](./identity-governance.md#model-invariants). Authorization is evaluated before any package or version information is disclosed or changed.
 - Solutions retains the exact uploaded DSSE envelope bytes in PostgreSQL `bytea`; no serialization, normalization, or reconstruction may replace those bytes. The payload must be exact UTF-8 deterministic Axis solution JSON.
 - Verification fails closed before mutation: envelope structure and payload extraction, deterministic JSON/schema validity, declared identity and exact current committed Axis OpenAPI SHA-256 digest, package limits, ordered inventory/dependency validity, component hashes, DSSE PAE construction, ECDSA P-256/SHA-256 (`ES256`) signature, and currently trusted non-revoked publisher/key must all match.
 - Limits are 10 MiB maximum package, 1 MiB maximum decoded component, 256 components, 512 dependency edges, and dependency-DAG depth 32. Package dependencies are not supported by the current package contract.
@@ -37,7 +37,7 @@ The normative package bytes, component schemas, and DSSE vectors are owned by [d
 
 ## Installation orchestration
 
-- Installation is an authenticated current-Workspace Administrator operation with an idempotency key scoped to the Workspace and canonical request. Exact retry returns the durable operation; key reuse with different content conflicts. A Workspace can have at most one installation for a semantic solution key across all versions; another-version installation conflicts before adapter mutation.
+- Installation is an authenticated current-Workspace lifecycle-administrator operation with an idempotency key scoped to the Workspace and canonical request. Exact retry returns the durable operation; key reuse with different content conflicts. A Workspace can have at most one installation for a semantic solution key across all versions; another-version installation conflicts before adapter mutation.
 - Installation revalidates the version's publisher trust and exact current committed Axis OpenAPI SHA-256 digest before creating work. It creates a durable resumable operation with a deterministic topological component plan. The installation pins the exact solution version and may not be silently retargeted.
 - Before confirmation or the first apply, every adapter validates and plans every typed component. Solutions persists the complete ordered plan, component hashes/dependencies, and operation state successfully before any module mutation; an invalid final component therefore yields zero module mutations.
 - Each plan entry invokes only the owning module's public Contracts adapter. The adapter owns typed document validation, module authorization assumptions, idempotent application, and read-back projection; Solutions owns orchestration and never accesses a module database or internal store.

@@ -10,7 +10,7 @@ This file owns the Authorization module's durable policy, assignment, and enforc
 - `Axis.Identity.Contracts` exposes `SubjectReference` as discriminated `Human` or `Service` plus a `Guid`, its wire projection `SubjectReferenceDto { kind: "Human"|"Service", subjectId: Guid }`, and the active-authority read contract. `Axis.Authorization.Contracts` exposes typed policy-component installation and action-decision contracts. Product modules map that subject reference into their own persisted actor/owner representation and never reference Identity or Authorization internals.
 - A policy is a versioned Solution component identified by semantic policy, role, action, and resource keys. A product role is a policy-defined semantic key, not an Identity lifecycle role. `Administrator`, `Applicant`, and `Caseworker` are roles in the reference solution only and have no platform-wide lifecycle meaning.
 - Policies are installed only through the Solutions adapter. Authorization exposes no policy-authoring operation or UI and no mutable in-place policy behavior. A policy version remains immutable once installed; a changed product policy is a new versioned Solution component.
-- An active Workspace `Administrator` may create or revoke one or more exact product-role assignments for an active human or service subject in that Workspace. Assignments never create membership, service grants, Identity authority, or cross-Workspace access. Revocation removes the assignment authority immediately.
+- An active Workspace lifecycle administrator, resolved under [Identity Governance](./identity-governance.md#model-invariants), may create or revoke one or more exact product-role assignments for an active human or service subject in that Workspace. Assignments never create membership, service grants, Identity authority, or cross-Workspace access. Revocation removes the assignment authority immediately.
 
 ## Evaluation and enforcement
 
@@ -61,8 +61,8 @@ The reference policy grants product `Administrator` definition read/manage, Rule
 | Entry points | Solution policy installation, product-role assignment and revocation, and every policy-governed product operation. |
 | Trust boundaries | Authenticated caller to API, API to Authorization, Authorization to its store and Audit contract, and Solutions adapter to Authorization. |
 | Abuse cases | Lifecycle-role conflation, forged UI projection, stale grant or assignment, unknown subject kind, cross-Workspace probing, `Own`/`All` confusion, policy substitution, duplicate assignment, and audit omission. |
-| Mitigations | Server-side exact-key evaluation, active Workspace-access recheck, immutable policy versions, optimistic concurrency, non-disclosing denial, deny-by-default resolution, idempotent audit delivery, and redaction validation. |
-| Evidence | Owning AT rows prove positive and negative role outcomes, policy/version/assignment staleness, `Own` versus `All`, cross-Workspace non-disclosure, concurrent lifecycle changes, audit read-back, and client projection cannot bypass server enforcement. |
+| Mitigations | Server-side exact-key evaluation, active role-contextual lifecycle-administrator and Workspace-access rechecks, immutable policy versions, optimistic concurrency, non-disclosing denial, deny-by-default resolution, idempotent audit delivery, and redaction validation. |
+| Evidence | Owning AT rows prove personal-Owner and organization-Administrator lifecycle authority, organization-Member denial, positive and negative product-role outcomes, policy/version/assignment staleness, `Own` versus `All`, cross-Workspace non-disclosure, concurrent lifecycle changes, audit read-back, and client projection cannot bypass server enforcement. |
 
 ## Explicit exclusions
 

@@ -22,6 +22,10 @@ public sealed class WorkspaceMembership : AggregateRoot<Guid>
     public WorkspaceMembershipRole Role { get; private set; }
     public MembershipStatus Status { get; private set; }
     public int Revision { get; private set; }
+    public bool HasLifecycleAdministratorAuthority =>
+        Status == MembershipStatus.Active
+        && Role is WorkspaceMembershipRole.Owner or WorkspaceMembershipRole.Administrator;
+
     public static WorkspaceMembership CreatePersonalOwner(Guid workspaceId, Guid userId) =>
         new(workspaceId, userId, WorkspaceMembershipRole.Owner);
 

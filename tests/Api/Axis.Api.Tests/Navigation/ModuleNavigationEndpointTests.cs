@@ -81,6 +81,30 @@ public sealed class ModuleNavigationEndpointTests(ApiTestFixture fixture)
     }
 
     [Fact]
+    public async Task ModuleNavigation_WhenPersonalOwner_ReturnsLifecycleSurfacesWithoutMembershipInvitations()
+    {
+        await PersonalWorkspaceOwnerApiTestSession.CreateAsync(fixture);
+        await fixture.SetProductAuthorizationTestDecisionAsync(
+            _ => ProductAuthorizationDecision.Denied,
+            TestContext.Current.CancellationToken);
+
+        HttpResponseMessage response = await fixture.Client.GetAsync(
+            "/api/module-navigation",
+            TestContext.Current.CancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        JsonElement body = await response.Content.ReadFromJsonAsync<JsonElement>(
+            ApiTestFixture.JsonOptions,
+            TestContext.Current.CancellationToken);
+        body.GetProperty("availableContributionIds").EnumerateArray()
+            .Select(value => value.GetString())
+            .Should().Equal(
+                "identity.service-identities",
+                "authorization.product-roles",
+                "solutions.management");
+    }
+
+    [Fact]
     public async Task ModuleNavigation_WhenAnonymous_ReturnsUnauthorized()
     {
         using HttpClient anonymous = fixture.CreateAnonymousClient();

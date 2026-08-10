@@ -4,7 +4,6 @@ using System.Security.Cryptography;
 using System.Text.Json;
 using Axis.Api.Tests.Administration;
 using Axis.Api.Tests.Helpers;
-using Axis.Identity.Domain.Legal;
 using Axis.Identity.Infrastructure.Persistence;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
@@ -117,47 +116,36 @@ public sealed class ServiceIdentityEndpointTests(ApiTestFixture fixture)
     }
 
     [Fact]
-    public async Task ServiceIdentityCreate_WhenPersonalOwner_DeniesWithoutMutation()
+    public async Task ServiceIdentityCreate_WhenPersonalOwner_PersistsWorkspaceScopedIdentity()
     {
-        const string password = "maple river sunrise";
-        string email = $"personal-owner-{Guid.NewGuid():N}@example.com";
-        string clientId = $"forbidden-{Guid.NewGuid():N}";
-        using HttpRequestMessage register = new(HttpMethod.Post, "/api/users/register")
-        {
-            Content = JsonContent.Create(new
-            {
-                fullName = "Personal Owner",
-                email,
-                password,
-                passwordConfirmation = password,
-                acceptedTermsVersion = WellKnownLegalDocuments.TermsVersion,
-                acceptedPrivacyVersion = WellKnownLegalDocuments.PrivacyVersion,
-            }, options: Json),
-        };
-        register.Headers.Add("Idempotency-Key", Guid.NewGuid().ToString("N"));
-        (await fixture.SendBrowserMutationAsync(
-            register,
-            TestContext.Current.CancellationToken)).StatusCode.Should().Be(HttpStatusCode.OK);
-        (await fixture.PostBrowserJsonAsync(
-            "/api/auth/verify-email",
-            new { token = fixture.EmailCapture.GetVerificationToken(email) },
-            TestContext.Current.CancellationToken)).StatusCode.Should().Be(HttpStatusCode.OK);
+        PersonalWorkspaceOwnerApiTestSession.OwnerContext owner =
+            await PersonalWorkspaceOwnerApiTestSession.CreateAsync(fixture);
+        string clientId = $"personal-{Guid.NewGuid():N}";
 
-        HttpResponseMessage denied = await fixture.PostBrowserJsonAsync(
+        HttpResponseMessage created = await fixture.PostBrowserJsonAsync(
             "/api/service-identities",
             new { clientId },
             TestContext.Current.CancellationToken);
-        denied.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        created.StatusCode.Should().Be(HttpStatusCode.OK);
+        JsonElement body = await ReadJsonAsync(created);
+        body.GetProperty("workspaceId").GetGuid().Should().Be(owner.WorkspaceId);
+
+        HttpResponseMessage listed = await fixture.Client.GetAsync(
+            "/api/service-identities",
+            TestContext.Current.CancellationToken);
+        listed.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await ReadJsonAsync(listed)).EnumerateArray()
+            .Should().Contain(value => value.GetProperty("clientId").GetString() == clientId);
 
         using IServiceScope scope = fixture.CreateScope();
         IdentityDbContext db = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
         (await db.ServiceIdentities.AnyAsync(
-            value => value.ClientId == clientId,
-            TestContext.Current.CancellationToken)).Should().BeFalse();
+            value => value.ClientId == clientId && value.WorkspaceId == owner.WorkspaceId,
+            TestContext.Current.CancellationToken)).Should().BeTrue();
         (await db.IdentityAuditOutboxRecords.AnyAsync(
             value => value.Action == "service_identity.create_denied"
-                && value.Outcome == "authority_denied",
-            TestContext.Current.CancellationToken)).Should().BeTrue();
+                && value.ActorId == owner.UserId,
+            TestContext.Current.CancellationToken)).Should().BeFalse();
     }
 
     private static string PublicJwk(ECDsa key, string kid, bool includePrivate = false)

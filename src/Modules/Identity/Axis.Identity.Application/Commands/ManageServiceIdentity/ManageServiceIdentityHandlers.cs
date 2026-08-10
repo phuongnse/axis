@@ -23,7 +23,11 @@ public sealed class CreateServiceIdentityHandler(
         CreateServiceIdentityCommand command,
         CancellationToken ct)
     {
-        if (!await IsAdministrator(memberships, command.WorkspaceId, command.ActorUserId, ct))
+        if (!await HasLifecycleAdministratorAuthorityAsync(
+                memberships,
+                command.WorkspaceId,
+                command.ActorUserId,
+                ct))
         {
             return await PersistDenied(
                 command.ActorUserId,
@@ -93,15 +97,16 @@ public sealed class CreateServiceIdentityHandler(
             ct);
     }
 
-    internal static bool IsAdmin(WorkspaceMembership? membership) =>
-        membership is { Status: MembershipStatus.Active, Role: WorkspaceMembershipRole.Administrator };
+    internal static bool HasLifecycleAdministratorAuthority(WorkspaceMembership? membership) =>
+        membership?.HasLifecycleAdministratorAuthority is true;
 
-    internal static async Task<bool> IsAdministrator(
+    internal static async Task<bool> HasLifecycleAdministratorAuthorityAsync(
         IWorkspaceMembershipRepository memberships,
         Guid workspaceId,
         Guid actorId,
         CancellationToken ct) =>
-        IsAdmin(await memberships.GetActiveAsync(workspaceId, actorId, ct));
+        HasLifecycleAdministratorAuthority(
+            await memberships.GetActiveAsync(workspaceId, actorId, ct));
 
     internal static AuditEventV1 Event(
         Guid actor,
@@ -381,7 +386,11 @@ public sealed class AddServiceIdentityKeyHandler(
         ServiceIdentity? identity = await identities.GetAsync(c.WorkspaceId, c.ServiceIdentityId, ct);
         if (identity is null)
             return CreateServiceIdentityHandler.Conflict();
-        if (!await CreateServiceIdentityHandler.IsAdministrator(memberships, c.WorkspaceId, c.ActorUserId, ct))
+        if (!await CreateServiceIdentityHandler.HasLifecycleAdministratorAuthorityAsync(
+                memberships,
+                c.WorkspaceId,
+                c.ActorUserId,
+                ct))
         {
             return await CreateServiceIdentityHandler.PersistDenied(
                 c.ActorUserId,
@@ -486,7 +495,11 @@ public sealed class RevokeServiceIdentityKeyHandler(
         ServiceIdentity? identity = await identities.GetAsync(c.WorkspaceId, c.ServiceIdentityId, ct);
         if (identity is null)
             return CreateServiceIdentityHandler.Conflict();
-        if (!await CreateServiceIdentityHandler.IsAdministrator(memberships, c.WorkspaceId, c.ActorUserId, ct))
+        if (!await CreateServiceIdentityHandler.HasLifecycleAdministratorAuthorityAsync(
+                memberships,
+                c.WorkspaceId,
+                c.ActorUserId,
+                ct))
         {
             return await CreateServiceIdentityHandler.PersistDenied(
                 c.ActorUserId,
@@ -569,7 +582,11 @@ public sealed class RevokeServiceIdentityHandler(
         ServiceIdentity? identity = await identities.GetAsync(c.WorkspaceId, c.ServiceIdentityId, ct);
         if (identity is null)
             return CreateServiceIdentityHandler.Conflict();
-        if (!await CreateServiceIdentityHandler.IsAdministrator(memberships, c.WorkspaceId, c.ActorUserId, ct))
+        if (!await CreateServiceIdentityHandler.HasLifecycleAdministratorAuthorityAsync(
+                memberships,
+                c.WorkspaceId,
+                c.ActorUserId,
+                ct))
         {
             return await CreateServiceIdentityHandler.PersistDenied(
                 c.ActorUserId,

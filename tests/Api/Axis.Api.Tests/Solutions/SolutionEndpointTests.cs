@@ -163,6 +163,18 @@ public sealed class SolutionEndpointTests(ApiTestFixture fixture)
     }
 
     [Fact]
+    public async Task SolutionVersions_WhenPersonalOwner_ReturnsCurrentLifecycleView()
+    {
+        await PersonalWorkspaceOwnerApiTestSession.CreateAsync(fixture);
+
+        HttpResponseMessage response = await fixture.Client.GetAsync(
+            "/api/solutions/versions",
+            TestContext.Current.CancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact]
     public async Task PublishSolutionVersion_WhenPayloadIsUnsafe_RejectsBeforePackageProcessing()
     {
         await WorkspaceAdministratorApiTestSession.CreateAdministratorAsync(fixture);

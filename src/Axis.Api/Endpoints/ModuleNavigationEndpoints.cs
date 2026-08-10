@@ -3,8 +3,10 @@ using Axis.Api.Infrastructure;
 using Axis.Authorization.Application;
 using Axis.Authorization.Contracts;
 using Axis.BusinessObjects.Application;
+using Axis.Identity.Application.Queries.ListEligibleWorkspaces;
 using Axis.Identity.Contracts;
 using Axis.Rules.Application;
+using MediatR;
 
 namespace Axis.Api.Endpoints;
 
@@ -37,17 +39,31 @@ public static class ModuleNavigationEndpoints
         ICurrentSubject currentSubject,
         IAuthorizationAdministratorAuthority administrators,
         IProductAuthorizationService authorization,
+        ISender sender,
         CancellationToken cancellationToken)
     {
-        bool isWorkspaceAdministrator = await administrators.IsAdministratorAsync(
+        bool isLifecycleAdministrator = await administrators.IsAdministratorAsync(
             currentUser.WorkspaceId,
             currentSubject.Subject,
             cancellationToken);
+        bool isOrganizationAdministrator = false;
+        if (isLifecycleAdministrator && currentSubject.Subject.Kind == SubjectKind.Human)
+        {
+            IReadOnlyList<EligibleWorkspaceDto> workspaces = await sender.Send(
+                new ListEligibleWorkspacesQuery(
+                    currentSubject.Subject.Id,
+                    currentUser.WorkspaceId),
+                cancellationToken);
+            isOrganizationAdministrator = workspaces
+                .SingleOrDefault(workspace => workspace.IsCurrent)
+                ?.OrganizationId is not null;
+        }
 
         List<string> availableContributionIds = [];
-        if (isWorkspaceAdministrator)
-        {
+        if (isOrganizationAdministrator)
             availableContributionIds.Add(MembershipsContribution);
+        if (isLifecycleAdministrator)
+        {
             availableContributionIds.Add(ServiceIdentitiesContribution);
             availableContributionIds.Add(ProductRolesContribution);
         }
@@ -74,7 +90,7 @@ public static class ModuleNavigationEndpoints
         if (rulesDecision.IsAllowed)
             availableContributionIds.Add(RulesContribution);
 
-        if (isWorkspaceAdministrator)
+        if (isLifecycleAdministrator)
             availableContributionIds.Add(SolutionsContribution);
 
         return Results.Ok(new ModuleNavigationAvailabilityDto(availableContributionIds));

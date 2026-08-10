@@ -4,11 +4,11 @@
 
 ## Purpose
 
-Let an active Workspace administrator assign or revoke one or more exact installed product roles for an active human or service subject in the current Workspace.
+Let an active Workspace lifecycle administrator assign or revoke one or more exact installed product roles for an active human or service subject in the current Workspace.
 
 ## Primary actor
 
-- Active Workspace administrator
+- Active Workspace lifecycle administrator
 
 ## Supporting actors
 
@@ -18,7 +18,7 @@ Let an active Workspace administrator assign or revoke one or more exact install
 
 ## Preconditions
 
-- The actor has active `Administrator` Workspace membership in the current Workspace.
+- The actor is the active `Owner` of the current personal Workspace or an active `Administrator` of the current organization Workspace.
 - The target is an active human Workspace member or an active service identity with an active grant in that Workspace.
 - The selected product roles are present in an installed current Solution policy for that Workspace.
 
@@ -37,7 +37,7 @@ Let an active Workspace administrator assign or revoke one or more exact install
 ## Main flow
 
 1. Lifecycle administrator performs two explicit bootstrap steps: installs the applicable Solution policy and, only after installation succeeds, explicitly assigns exact initial product roles. Installation never derives an assignment from an Identity lifecycle role.
-2. An active Workspace administrator opens product-role assignment management for the current Workspace.
+2. An active Workspace lifecycle administrator opens product-role assignment management for the current Workspace.
 3. System shows only active current-Workspace human and service subjects and installed product roles with server-projected product-owned localized presentation for the exact current UI language or `en` fallback.
 4. Administrator selects one or more exact product roles for one subject and confirms assignment or revocation.
 5. System revalidates actor authority, current Workspace, subject activity, installed policy version, exact role keys, and concurrency state.
@@ -58,8 +58,8 @@ Policy and assignment realization is owned by [Authorization architecture](../..
 *Happy path*
 
 - **AC-001** Lifecycle administrator bootstrap explicitly installs a Solution and then explicitly assigns its initial product roles; installation itself creates no assignment, while `Administrator`, `Applicant`, and `Caseworker` remain reference-solution product-role keys rather than global or Identity lifecycle roles.
-- **AC-002** An active current-Workspace administrator can assign one or more exact installed product roles to one active human Workspace member or one active service subject in that Workspace.
-- **AC-003** An active current-Workspace administrator can revoke an exact product-role assignment, and the role no longer grants product authority immediately.
+- **AC-002** The active `Owner` of a current personal Workspace or an active `Administrator` of a current organization Workspace can assign one or more exact installed product roles to one active human Workspace member or one active service subject in that Workspace.
+- **AC-003** The same active Workspace lifecycle administrator can revoke an exact product-role assignment, and the role no longer grants product authority immediately.
 - **AC-004** Assignment management reads current subject, exact product-role key, policy/version identity, status, and canonical mutation result without credentials or cross-Workspace information.
 
 *Validation and recovery*
@@ -81,9 +81,9 @@ Policy and assignment realization is owned by [Authorization architecture](../..
 
 | ID | Boundary | Scenario | Covers AC | Verification | Required |
 |---|---|---|---|---|---|
-| AT-001 | API boundary | Signed Solution installation creates no assignment; a later explicit administrator request assigns one exact installed role without changing Identity lifecycle authority | AC-001, AC-002, AC-005, AC-007 | API integration test | Yes |
+| AT-001 | API boundary | Signed Solution installation creates no assignment; a later explicit personal `Owner` or organization `Administrator` request assigns one exact installed role without changing Identity lifecycle authority | AC-001, AC-002, AC-005, AC-007 | API integration test | Yes |
 | AT-002 | Application/Infrastructure boundaries | Assignment, equivalent retry, stale revision, and concurrent assign/revoke preserve one canonical active authority outcome with audit read-back | AC-003, AC-004, AC-008, AC-009 | Application test + Infrastructure integration test | Yes |
-| AT-003 | API boundary | Missing actor/subject activity, unknown subject kind, unknown/stale policy/role, and cross-Workspace target deny without mutation or disclosure | AC-006 | API integration test | Yes |
+| AT-003 | API boundary | Organization `Member`, missing actor/subject activity, unknown subject kind, unknown/stale policy/role, and cross-Workspace target deny without mutation or disclosure | AC-006 | Domain test + API integration test | Yes |
 | AT-004 | API/Application boundaries | Revoked assignments deny the formerly permitted product operation immediately despite stale client state or projected UI affordance | AC-003, AC-010 | API integration test + Application test | Yes |
 | AT-005 | Browser journey | Administrator assigns and revokes exact roles with accessible selection, pending, conflict, and recovery states | AC-004, AC-010, AC-011 | Browser automation | Yes |
 | AT-006 | Infrastructure boundary | Assignment, revocation, denial, and failure audit outcomes are correlated, append-only, and redacted | AC-009 | Infrastructure integration test | Yes |

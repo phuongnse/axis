@@ -14,14 +14,14 @@ public sealed class ListServiceIdentitiesHandler(
         ListServiceIdentitiesQuery query,
         CancellationToken cancellationToken)
     {
-        if (!await CreateServiceIdentityHandler.IsAdministrator(
+        if (!await CreateServiceIdentityHandler.HasLifecycleAdministratorAuthorityAsync(
                 memberships,
                 query.WorkspaceId,
                 query.ActorUserId,
                 cancellationToken))
             return Result.Failure<IReadOnlyList<ServiceIdentityDto>>(
                 ErrorCodes.Forbidden,
-                "Active Workspace Administrator membership is required.");
+                "Active Workspace lifecycle-administrator authority is required.");
 
         IReadOnlyList<Domain.Aggregates.ServiceIdentity> values =
             await identities.ListAsync(query.WorkspaceId, cancellationToken);
