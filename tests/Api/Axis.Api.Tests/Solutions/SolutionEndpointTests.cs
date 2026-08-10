@@ -87,7 +87,7 @@ public sealed class SolutionEndpointTests(ApiTestFixture fixture)
             await WorkspaceAdministratorApiTestSession.CreateAdministratorAsync(fixture);
 
         Guid publishedVersionId = await SeedVersionAsync();
-        Guid seededOperationId = await SeedInstallationAsync(
+        Guid seededOperationId = await SeedBlockedInstallationAsync(
             administrator.WorkspaceId,
             publishedVersionId);
         HttpResponseMessage versions = await fixture.Client.GetAsync(
@@ -114,13 +114,13 @@ public sealed class SolutionEndpointTests(ApiTestFixture fixture)
         listBody.ValueKind.Should().Be(JsonValueKind.Array);
         listBody.EnumerateArray().Should().Contain(value =>
             value.GetProperty("operationId").GetGuid() == seededOperationId &&
-            value.GetProperty("operationStatus").GetString() == "Pending");
+            value.GetProperty("operationStatus").GetString() == "Blocked");
 
-        HttpResponseMessage pendingResume = await fixture.PostBrowserAsync(
+        HttpResponseMessage blockedResume = await fixture.PostBrowserAsync(
             $"/api/solutions/operations/{seededOperationId}/resume",
             cancellationToken: TestContext.Current.CancellationToken);
-        pendingResume.StatusCode.Should().Be(HttpStatusCode.Conflict);
-        (await ReadJsonAsync(pendingResume)).GetProperty("code").GetString()
+        blockedResume.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await ReadJsonAsync(blockedResume)).GetProperty("code").GetString()
             .Should().Be("solutions.install.operation_not_resumable");
 
         Guid unavailableVersionId = Guid.NewGuid();
@@ -441,7 +441,7 @@ public sealed class SolutionEndpointTests(ApiTestFixture fixture)
         return versionId;
     }
 
-    private async Task<Guid> SeedInstallationAsync(Guid workspaceId, Guid versionId)
+    private async Task<Guid> SeedBlockedInstallationAsync(Guid workspaceId, Guid versionId)
     {
         Guid installationId = Guid.NewGuid();
         Guid operationId = Guid.NewGuid();
@@ -460,7 +460,7 @@ public sealed class SolutionEndpointTests(ApiTestFixture fixture)
                 (id, workspace_id, solution_key, solution_version_id, provisioning_status,
                  compliance_status, created_at, updated_at, revision)
             VALUES
-                ({installationId}, {workspaceId}, {solutionKey}, {versionId}, {"Installing"},
+                ({installationId}, {workspaceId}, {solutionKey}, {versionId}, {"Failed"},
                  {"Compliant"}, {now}, {now}, {0})
             """, TestContext.Current.CancellationToken);
         await db.Database.ExecuteSqlInterpolatedAsync($"""
@@ -472,7 +472,7 @@ public sealed class SolutionEndpointTests(ApiTestFixture fixture)
             VALUES
                 ({operationId}, {workspaceId}, {actorSubjectId}, {"Human"}, {"test-correlation"},
                  {installationId}, {suffix}, {hash},
-                 {"Pending"}, {0L}, {null}, {null}, {now}, {now}, {0})
+                 {"Blocked"}, {0L}, {null}, {"solutions.component.invalid"}, {now}, {now}, {0})
             """, TestContext.Current.CancellationToken);
         return operationId;
     }
