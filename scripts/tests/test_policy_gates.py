@@ -4883,6 +4883,29 @@ class TestLocalDevCli(unittest.TestCase):
         with mock.patch.object(axis, "run_optional", return_value=missing):
             self.assertIsNone(self.real_discover_local_dev_compose_overlays())
 
+    def test_relocated_base_topology_is_adopted_only_without_overlays(self) -> None:
+        relocated_base = self.topology_root / "moved" / axis.LOCAL_DEV_COMPOSE_FILE.name
+        base_only = axis.subprocess.CompletedProcess(
+            [],
+            0,
+            stdout=f"{relocated_base}\n",
+            stderr="",
+        )
+        with mock.patch.object(axis, "run_optional", return_value=base_only):
+            self.assertEqual((), self.real_discover_local_dev_compose_overlays())
+
+        with_overlay = axis.subprocess.CompletedProcess(
+            [],
+            0,
+            stdout=f"{relocated_base},{self.make_overlay()}\n",
+            stderr="",
+        )
+        with (
+            mock.patch.object(axis, "run_optional", return_value=with_overlay),
+            self.assertRaisesRegex(axis.CheckError, "topology metadata is invalid"),
+        ):
+            self.real_discover_local_dev_compose_overlays()
+
     def test_reset_all_replaces_topology_state_only_after_success(self) -> None:
         overlay = self.make_overlay()
         self.write_topology_state([overlay])

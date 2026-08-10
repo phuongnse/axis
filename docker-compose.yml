@@ -67,6 +67,8 @@ services:
       - --no-hot-reload
       - run
       - --no-launch-profile
+    ulimits:
+      core: 0
     depends_on:
       postgres:
         condition: service_healthy

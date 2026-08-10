@@ -4235,7 +4235,12 @@ def discover_local_dev_compose_overlays() -> tuple[Path, ...] | None:
         for value in config_files.stdout.strip().split(",")
         if value
     )
-    if not files or files[0] != LOCAL_DEV_COMPOSE_FILE.resolve(strict=False):
+    current_base = LOCAL_DEV_COMPOSE_FILE.resolve(strict=False)
+    if not files:
+        raise CheckError("local-dev active deployment topology metadata is invalid")
+    if files[0] != current_base:
+        if len(files) == 1 and not files[0].exists() and files[0].name == current_base.name:
+            return ()
         raise CheckError("local-dev active deployment topology metadata is invalid")
     return files[1:]
 
