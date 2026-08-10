@@ -85,7 +85,7 @@
     "src/hooks/use-mobile.ts": "58b2cc5fa259358e9192125abf072c832144193d87f3d66a90b13089a0196cef",
     "src/index.css": "74005dbb989d6d9147e1f68f798656ad54a990faf94b8ea17423048e6e1f57e5",
     "src/lib/utils.ts": "74e8fe9d0d680c442ed6adb13e7d119d6c210c19ae6c114313b2a72552be0883",
-    "src/theme.generated.css": "1eac54086f4edc899cdb4d94519240d7191a4a0813088f343a1f0c643af5089a"
+    "src/theme.generated.css": "3584e1cc1ea03bf752d5509d6ca1e528612706e79c4fd398fb3e3b229f8d9079"
   },
   "registry": "@shadcn",
   "schemaVersion": 2,

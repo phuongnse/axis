@@ -13,7 +13,7 @@ function EntryLayout({ children, utilities }: EntryLayoutProps) {
   return (
     <div
       data-slot="entry-layout"
-      className="flex min-h-dvh w-full min-w-0 flex-col overflow-x-hidden bg-background p-4 sm:p-6 lg:p-8"
+      className="flex min-h-dvh w-full min-w-0 flex-col overflow-x-hidden bg-background p-axis-page-compact sm:p-axis-page-default lg:p-axis-page-wide"
     >
       {utilities ? (
         <div data-slot="entry-utilities" className="flex shrink-0 justify-end">
@@ -22,7 +22,7 @@ function EntryLayout({ children, utilities }: EntryLayoutProps) {
       ) : null}
       <main
         data-slot="entry-content"
-        className="mx-auto flex w-full max-w-lg flex-1 items-center justify-center py-4"
+        className="mx-auto flex w-full max-w-lg flex-1 items-center justify-center py-axis-region"
       >
         {children}
       </main>
@@ -38,7 +38,12 @@ interface PageLayoutProps {
 type PageActionProps = Omit<ComponentProps<typeof Button>, 'className'>;
 
 function PageAction(props: PageActionProps) {
-  return <Button {...props} className="min-h-11 min-w-11 sm:min-h-8 sm:min-w-8" />;
+  return (
+    <Button
+      {...props}
+      className="min-h-axis-touch-target min-w-axis-touch-target sm:min-h-axis-compact-control sm:min-w-axis-compact-control"
+    />
+  );
 }
 
 type PageActionElement = ReactElement<PageActionProps, typeof PageAction>;
@@ -49,7 +54,7 @@ function PageLayout({ children, scrollMode }: PageLayoutProps) {
     <div
       data-slot="page-layout"
       data-scroll-mode={scrollMode}
-      className={`flex h-full min-h-0 w-full min-w-0 flex-col gap-4 p-4 sm:p-6 lg:p-8 ${
+      className={`flex h-full min-h-0 w-full min-w-0 flex-col gap-axis-region p-axis-page-compact sm:p-axis-page-default lg:p-axis-page-wide ${
         scrollMode === 'contained' ? 'overflow-hidden' : 'overflow-x-hidden overflow-y-auto'
       }`}
     >
@@ -68,16 +73,19 @@ function PageHeader({ title, description, actions }: PageHeaderProps) {
   return (
     <header
       data-slot="page-header"
-      className="flex min-w-0 shrink-0 flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"
+      className="flex min-w-0 shrink-0 flex-col gap-axis-region sm:flex-row sm:items-start sm:justify-between"
     >
       <div data-slot="page-header-content" className="min-w-0 space-y-1">
-        <h1 data-slot="page-title" className="font-heading text-2xl font-semibold text-foreground">
+        <h1
+          data-slot="page-title"
+          className="font-heading text-axis-page-title font-axis-page-title text-foreground"
+        >
           {title}
         </h1>
         {description ? (
           <p
             data-slot="page-description"
-            className="max-w-3xl text-sm leading-6 text-muted-foreground"
+            className="max-w-3xl text-axis-body font-axis-body text-muted-foreground"
           >
             {description}
           </p>
@@ -86,7 +94,7 @@ function PageHeader({ title, description, actions }: PageHeaderProps) {
       {actions ? (
         <div
           data-slot="page-actions"
-          className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end"
+          className="flex w-full flex-wrap items-center gap-axis-inline sm:w-auto sm:justify-end"
         >
           {actions}
         </div>
@@ -106,23 +114,30 @@ function SectionHeader({ actions, description, id, title }: SectionHeaderProps) 
   return (
     <div
       data-slot="section-header"
-      className="flex min-w-0 flex-wrap items-start justify-between gap-3"
+      className="flex min-w-0 flex-wrap items-start justify-between gap-axis-region"
     >
       <div data-slot="section-header-content" className="min-w-0 space-y-1">
-        <h2 id={id} data-slot="section-title" className="font-heading text-lg font-medium">
+        <h2
+          id={id}
+          data-slot="section-title"
+          className="font-heading text-axis-section-title font-axis-section-title"
+        >
           {title}
         </h2>
         {description ? (
           <p
             data-slot="section-description"
-            className="max-w-3xl break-words text-sm text-muted-foreground"
+            className="max-w-3xl break-words text-axis-body font-axis-body text-muted-foreground"
           >
             {description}
           </p>
         ) : null}
       </div>
       {actions ? (
-        <div data-slot="section-actions" className="flex shrink-0 flex-wrap items-center gap-2">
+        <div
+          data-slot="section-actions"
+          className="flex shrink-0 flex-wrap items-center gap-axis-inline"
+        >
           {actions}
         </div>
       ) : null}

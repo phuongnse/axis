@@ -117,15 +117,17 @@ describe('WorkspaceControl', () => {
     vi.mocked(listEligibleWorkspaces).mockResolvedValue([personalWorkspace, organizationWorkspace]);
   });
 
-  it('groups eligible choices, marks current, and prevents a competing switch while pending', async () => {
+  it('presents one flat Workspace choice set, marks current, and prevents a competing switch while pending', async () => {
     const user = userEvent.setup();
     const onWorkspaceChange = vi.fn(async () => 'entered' as WorkspaceChangeResult);
     const view = renderControl(onWorkspaceChange);
 
-    const workspaceSection = screen.getByRole('region', { name: 'Choose Workspace' });
+    const workspaceSection = screen.getByRole('region', { name: 'Workspace' });
     await screen.findByRole('button', { name: 'Personal workspace' });
-    expect(screen.getByRole('region', { name: 'Personal Workspace' })).toBeInTheDocument();
-    expect(screen.getByRole('region', { name: 'Organization Workspaces' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Eligible Workspaces' })).toBeInTheDocument();
+    expect(screen.queryByText('Choose Workspace')).not.toBeInTheDocument();
+    expect(screen.queryByText('Personal Workspace')).not.toBeInTheDocument();
+    expect(screen.queryByText('Organization Workspaces')).not.toBeInTheDocument();
     const currentWorkspace = screen.getByRole('button', { name: 'Personal workspace' });
     expect(currentWorkspace).toHaveAttribute('aria-current', 'page');
     expect(currentWorkspace).toHaveClass('bg-secondary', 'disabled:opacity-100');

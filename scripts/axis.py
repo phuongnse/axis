@@ -5844,7 +5844,7 @@ def build_parser(
     check_sub.add_parser("frontend-quality", help="Run deterministic frontend policy checks").set_defaults(func=check_frontend_quality)
     check_sub.add_parser(
         "ui-foundation",
-        help="Validate the active UI foundation phase and draft-consumer boundary",
+        help="Validate the active UI constitution phase and status boundary",
     ).set_defaults(func=check_ui_foundation)
     check_sub.add_parser("local-dev-docs", help="Check local-development docs against Compose").set_defaults(
         func=lambda _args: run_module_check("check-local-dev-docs.py", [])

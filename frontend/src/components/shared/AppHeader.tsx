@@ -38,15 +38,15 @@ export function AppHeader({
 
   return (
     <header className="shrink-0 border-b border-border bg-card">
-      <div className="flex min-h-16 w-full min-w-0 flex-wrap items-center gap-3 px-4 py-3 sm:px-6 lg:px-8">
-        <Link to="/dashboard" className="flex min-w-0 items-center gap-3">
+      <div className="flex min-h-16 w-full min-w-0 flex-wrap items-center gap-axis-region px-axis-page-compact py-3 sm:px-axis-page-default lg:px-axis-page-wide">
+        <Link to="/dashboard" className="flex min-w-0 items-center gap-axis-region">
           <img src="/axis-logo.svg" alt="" className="size-11 shrink-0" width={44} height={44} />
-          <span className="block min-w-0 truncate text-xs uppercase tracking-widest text-muted-foreground">
+          <span className="block min-w-0 truncate text-axis-metadata font-axis-metadata uppercase tracking-widest text-muted-foreground">
             {pageTitle}
           </span>
         </Link>
 
-        <div className="ml-auto flex min-w-0 shrink items-center gap-2">
+        <div className="ml-auto flex min-w-0 shrink items-center gap-axis-inline">
           <AppActionsMenu
             onSignOut={onSignOut}
             onRetryWorkspaceContext={onRetryWorkspaceContext}

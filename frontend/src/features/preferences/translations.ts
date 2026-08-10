@@ -204,8 +204,6 @@ export const translations = {
     'memberships.tableLabel': 'Workspace invitation outcomes',
     'memberships.title': 'Workspace memberships',
 
-    'workspace.choose': 'Choose Workspace',
-    'workspace.chooseDescription': 'Only Workspaces available to your account are shown.',
     'workspace.control': 'Workspace control',
     'workspace.create': 'Create Organization',
     'workspace.createFailed': 'The Organization could not be created. Retry this request.',
@@ -218,6 +216,7 @@ export const translations = {
       'Creation is complete. Your current Workspace stays active until you choose Enter Workspace.',
     'workspace.enterWorkspace': 'Enter Workspace',
     'workspace.initialWorkspace': 'Initial Workspace: {name}',
+    'workspace.label': 'Workspace',
     'workspace.loading': 'Loading eligible Workspaces...',
     'workspace.organizationCreated': 'Organization created',
     'workspace.organizationCreatedDescription':
@@ -226,8 +225,6 @@ export const translations = {
     'workspace.organizationNameHelp': 'Use a name people will recognize. 2–100 characters.',
     'workspace.organizationNameLength': 'Enter an Organization name between 2 and 100 characters.',
     'workspace.organizationNameRequired': 'Organization name is required.',
-    'workspace.organizations': 'Organization Workspaces',
-    'workspace.personal': 'Personal Workspace',
     'workspace.refreshFailedDescription':
       'The new Workspace context could not be loaded. Retry the refresh or sign out.',
     'workspace.refreshFailedTitle': 'Workspace refresh needs attention',
@@ -1025,8 +1022,6 @@ export const translations = {
     'memberships.tableLabel': 'Kết quả lời mời Workspace',
     'memberships.title': 'Membership Workspace',
 
-    'workspace.choose': 'Chọn Workspace',
-    'workspace.chooseDescription': 'Chỉ hiển thị những Workspace tài khoản của bạn có thể dùng.',
     'workspace.control': 'Điều khiển Workspace',
     'workspace.create': 'Tạo Organization',
     'workspace.createFailed': 'Không thể tạo Organization. Hãy thử lại yêu cầu này.',
@@ -1039,6 +1034,7 @@ export const translations = {
       'Đã tạo xong. Workspace hiện tại vẫn hoạt động cho đến khi bạn chọn Vào Workspace.',
     'workspace.enterWorkspace': 'Vào Workspace',
     'workspace.initialWorkspace': 'Workspace ban đầu: {name}',
+    'workspace.label': 'Workspace',
     'workspace.loading': 'Đang tải Workspace có thể dùng...',
     'workspace.organizationCreated': 'Đã tạo Organization',
     'workspace.organizationCreatedDescription': 'Organization và Workspace ban đầu đã sẵn sàng.',
@@ -1046,8 +1042,6 @@ export const translations = {
     'workspace.organizationNameHelp': 'Dùng tên mọi người dễ nhận biết, từ 2–100 ký tự.',
     'workspace.organizationNameLength': 'Nhập tên Organization từ 2 đến 100 ký tự.',
     'workspace.organizationNameRequired': 'Tên Organization là bắt buộc.',
-    'workspace.organizations': 'Các Workspace tổ chức',
-    'workspace.personal': 'Workspace cá nhân',
     'workspace.refreshFailedDescription':
       'Không thể tải ngữ cảnh Workspace mới. Hãy thử tải lại hoặc đăng xuất.',
     'workspace.refreshFailedTitle': 'Cần xử lý việc tải lại Workspace',

@@ -45,7 +45,7 @@ describe('ProductRoleAssignmentsPage', () => {
     api.revoke.mockResolvedValue({ ...management().assignments[0], isActive: false, revision: 5 });
   });
 
-  it('composes the frozen resource workspace and revokes from a managed assignment window', async () => {
+  it('composes the shared resource workspace and revokes from a managed assignment window', async () => {
     const user = userEvent.setup();
     renderPage();
 
@@ -59,7 +59,12 @@ describe('ProductRoleAssignmentsPage', () => {
     expect(page?.querySelectorAll('[data-slot="page-header"]')).toHaveLength(1);
     expect(page?.querySelectorAll('[data-slot="data-table"]')).toHaveLength(1);
     expect(within(table).queryByRole('columnheader', { name: 'Actions' })).not.toBeInTheDocument();
-    expect(assign).toHaveClass('min-h-11', 'min-w-11', 'sm:min-h-8', 'sm:min-w-8');
+    expect(assign).toHaveClass(
+      'min-h-axis-touch-target',
+      'min-w-axis-touch-target',
+      'sm:min-h-axis-compact-control',
+      'sm:min-w-axis-compact-control',
+    );
     expect(within(table).getByText('Reviews submitted cases.')).toBeInTheDocument();
 
     await user.click(within(table).getByRole('button', { name: 'Alex Nguyen' }));

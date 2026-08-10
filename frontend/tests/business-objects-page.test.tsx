@@ -101,8 +101,20 @@ describe('BusinessObjectsPage', () => {
     const createAction = await within(table).findByRole('button', { name: 'New definition' });
 
     expect(page).toHaveAttribute('data-scroll-mode', 'contained');
-    expect(page).toHaveClass('h-full', 'min-h-0', 'gap-4', 'p-4', 'sm:p-6', 'lg:p-8');
-    expect(page?.parentElement).not.toHaveClass('p-4', 'sm:p-6', 'lg:p-8', 'font-heading');
+    expect(page).toHaveClass(
+      'h-full',
+      'min-h-0',
+      'gap-axis-region',
+      'p-axis-page-compact',
+      'sm:p-axis-page-default',
+      'lg:p-axis-page-wide',
+    );
+    expect(page?.parentElement).not.toHaveClass(
+      'p-axis-page-compact',
+      'sm:p-axis-page-default',
+      'lg:p-axis-page-wide',
+      'font-heading',
+    );
     expect(page).toContainElement(workspace);
     expect(header?.parentElement).toBe(workspace);
     expect(title).toHaveAttribute('data-slot', 'page-title');
@@ -1128,7 +1140,12 @@ function emptyPage() {
 
 function expectPageActionSizing(action: HTMLElement) {
   expect(action).toHaveAttribute('data-slot', 'button');
-  expect(action).toHaveClass('min-h-11', 'min-w-11', 'sm:min-h-8', 'sm:min-w-8');
+  expect(action).toHaveClass(
+    'min-h-axis-touch-target',
+    'min-w-axis-touch-target',
+    'sm:min-h-axis-compact-control',
+    'sm:min-w-axis-compact-control',
+  );
 }
 
 function pageWith(detail: ReturnType<typeof definitionDetail>) {

@@ -108,17 +108,23 @@ export function LanguageControl({
   return (
     <div
       className={cn(
-        isMenu ? 'relative grid gap-2' : 'flex flex-wrap items-center justify-end gap-2',
+        isMenu
+          ? 'relative grid gap-axis-inline'
+          : 'flex flex-wrap items-center justify-end gap-axis-inline',
         className,
       )}
     >
       <fieldset
         aria-busy={mutation.isPending || undefined}
         aria-describedby={statusId}
-        className={cn(isMenu && 'grid gap-1')}
+        className={cn(isMenu && 'grid gap-axis-inline')}
       >
         <legend
-          className={cn(isMenu ? 'mb-1 px-1 text-xs font-medium text-muted-foreground' : 'sr-only')}
+          className={cn(
+            isMenu
+              ? 'px-axis-inline text-axis-metadata font-axis-label text-muted-foreground'
+              : 'sr-only',
+          )}
         >
           {t('app.language')}
         </legend>
@@ -160,7 +166,10 @@ export function LanguageControl({
       {authenticated ? (
         <AsyncContent
           id={statusId}
-          className={cn('min-h-5 text-xs text-muted-foreground', isMenu && 'px-1 sr-only')}
+          className={cn(
+            'min-h-5 text-axis-metadata text-muted-foreground',
+            isMenu && 'px-axis-inline sr-only',
+          )}
           error={mutation.isError}
           pending={mutation.isPending}
           pendingLabel={t('app.saving')}

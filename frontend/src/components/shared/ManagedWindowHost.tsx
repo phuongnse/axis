@@ -54,7 +54,7 @@ export function ManagedWindowHost() {
       <div
         ref={manager.setPortalContainer}
         data-slot="managed-window-expanded-layer"
-        className="pointer-events-none absolute inset-0 z-40 overflow-hidden"
+        className="pointer-events-none absolute inset-0 z-axis-modal overflow-hidden"
       />
 
       {entries.map(([windowId, entry]) => {
@@ -91,7 +91,7 @@ export function ManagedWindowHost() {
       {hasWindows ? (
         <div
           data-slot="managed-window-tray"
-          className="pointer-events-none absolute inset-x-3 bottom-2 z-50 flex h-12 min-w-0 items-stretch justify-end gap-2"
+          className="pointer-events-none absolute inset-x-3 bottom-2 z-axis-managed flex h-12 min-w-0 items-stretch justify-end gap-axis-inline"
         >
           <WindowMenu
             label={t('dialog.windows', { count: entries.length })}
@@ -119,7 +119,7 @@ export function ManagedWindowHost() {
               data-slot="managed-window-dock"
               data-window-id={windowId}
               data-dialog-preset={entry.preset}
-              className="pointer-events-auto flex min-w-0 max-w-64 flex-1 items-center overflow-hidden rounded-xl bg-popover text-sm text-popover-foreground shadow-xl ring-1 ring-foreground/10 sm:w-64 sm:flex-none"
+              className="pointer-events-auto flex min-w-0 max-w-64 flex-1 items-center overflow-hidden rounded-axis-managed bg-popover text-axis-body font-axis-body text-popover-foreground shadow-axis-dock ring-1 ring-foreground/10 sm:w-64 sm:flex-none"
             >
               <Button
                 data-action="restore"

@@ -60,7 +60,7 @@ describe('MembershipManagementPage', () => {
     api.revoke.mockResolvedValue({ ...pendingInvitation(), status: 'Revoked', revision: 3 });
   });
 
-  it('composes the frozen resource workspace and launches the invitation task in a managed window', async () => {
+  it('composes the shared resource workspace and launches the invitation task in a managed window', async () => {
     const user = userEvent.setup();
     api.list.mockResolvedValue({
       items: [pendingInvitation()],
@@ -78,7 +78,12 @@ describe('MembershipManagementPage', () => {
     expect(page?.querySelectorAll('[data-slot="page-header"]')).toHaveLength(1);
     expect(page?.querySelectorAll('[data-slot="data-table"]')).toHaveLength(1);
     expect(within(table).queryByRole('columnheader', { name: 'Actions' })).not.toBeInTheDocument();
-    expect(invite).toHaveClass('min-h-11', 'min-w-11', 'sm:min-h-8', 'sm:min-w-8');
+    expect(invite).toHaveClass(
+      'min-h-axis-touch-target',
+      'min-w-axis-touch-target',
+      'sm:min-h-axis-compact-control',
+      'sm:min-w-axis-compact-control',
+    );
 
     await user.click(invite);
     expect(await screen.findByRole('dialog', { name: 'Invite member' })).toBeVisible();

@@ -18,7 +18,10 @@ export function ResourceWorkspace({
 }: ResourceWorkspaceProps) {
   return (
     <PageLayout scrollMode="contained">
-      <div data-slot="resource-workspace" className="flex min-h-0 min-w-0 flex-1 flex-col gap-4">
+      <div
+        data-slot="resource-workspace"
+        className="flex min-h-0 min-w-0 flex-1 flex-col gap-axis-region"
+      >
         <PageHeader title={title} description={description} actions={actions} />
         {status}
         <div data-slot="resource-workspace-content" className="min-h-0 min-w-0 flex-1">

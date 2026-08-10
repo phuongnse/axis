@@ -15,7 +15,7 @@ Foundation contracts are the source of truth for enabling surfaces that are not 
 | [docs/foundations/data-display/README.md](./data-display/README.md) | [docs/foundations/data-display/detail-sections.md](./data-display/detail-sections.md) | Done |
 | [docs/foundations/overlays/README.md](./overlays/README.md) | [docs/foundations/overlays/managed-dialog.md](./overlays/managed-dialog.md) | Done |
 | [docs/foundations/search/README.md](./search/README.md) | [docs/foundations/search/search-experience.md](./search/search-experience.md) | Done |
-| [docs/foundations/visual-system/README.md](./visual-system/README.md) | [docs/foundations/visual-system/axis-visual-system.md](./visual-system/axis-visual-system.md) | Done |
+| [docs/foundations/visual-system/README.md](./visual-system/README.md) | [docs/foundations/visual-system/axis-visual-system.md](./visual-system/axis-visual-system.md) | Partial |
 
 ## Rule
 

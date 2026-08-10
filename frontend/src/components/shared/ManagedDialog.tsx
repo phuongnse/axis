@@ -300,7 +300,7 @@ export function ManagedDialog({
               event.preventDefault();
               toggleMaximize();
             }}
-            className="pointer-events-auto overflow-hidden rounded-xl bg-popover text-sm text-popover-foreground shadow-lg ring-1 ring-foreground/10"
+            className="pointer-events-auto overflow-hidden rounded-axis-managed bg-popover text-axis-body font-axis-body text-popover-foreground shadow-axis-managed ring-1 ring-foreground/10"
             style={{ display: 'flex', flexDirection: 'column' }}
           >
             <div

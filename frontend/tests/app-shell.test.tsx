@@ -264,14 +264,20 @@ describe('AppShell', () => {
     expect(accountMenu).toHaveAttribute('aria-expanded', 'true');
     expect(screen.queryByText('Profile')).not.toBeInTheDocument();
     expect(accountMenu.querySelector('.lucide-building-2')).not.toBeNull();
-    expect(screen.queryByText('AL')).not.toBeInTheDocument();
-    expect(screen.queryByText('Ada Lovelace')).not.toBeInTheDocument();
+    const accountIdentity = screen.getByRole('region', { name: 'Account' });
+    expect(accountIdentity).toHaveTextContent('AL');
+    expect(accountIdentity).toHaveTextContent('Ada Lovelace');
+    expect(accountIdentity).toHaveTextContent('ada@example.com');
     expect(screen.getByText('Preferences')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Simulate Workspace change' })).toBeInTheDocument();
     expect(screen.getByText('Language control')).toBeInTheDocument();
     expect(screen.getByText('Theme control')).toBeInTheDocument();
     const signOut = screen.getByRole('button', { name: 'Sign out' });
-    expect(signOut).toHaveClass('text-destructive', 'h-7');
+    expect(signOut).toHaveClass(
+      'text-destructive',
+      'min-h-axis-touch-target',
+      'sm:min-h-axis-compact-control',
+    );
 
     expect(screen.queryByRole('navigation')).not.toBeInTheDocument();
 
@@ -667,7 +673,9 @@ describe('AppShell', () => {
 
     await user.click(screen.getByRole('button', { name: 'Open test window' }));
     const dialog = await screen.findByRole('dialog', { name: 'Persistent test window' });
-    expect(dialog.querySelector('[data-slot="managed-dialog-window"]')).toHaveClass('shadow-lg');
+    expect(dialog.querySelector('[data-slot="managed-dialog-window"]')).toHaveClass(
+      'shadow-axis-managed',
+    );
     expect(dialog.querySelector('[data-slot="managed-dialog-header"]')).toHaveClass('items-center');
   });
 

@@ -31,7 +31,7 @@ export function AsyncButton({
     >
       <span
         data-slot="async-button-icon"
-        className="flex size-4 shrink-0 items-center justify-center"
+        className="flex size-axis-icon-control shrink-0 items-center justify-center"
         aria-hidden
       >
         {showPending ? <Spinner /> : icon}

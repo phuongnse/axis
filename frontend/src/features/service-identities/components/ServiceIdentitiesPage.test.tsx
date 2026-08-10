@@ -65,7 +65,7 @@ describe('ServiceIdentitiesPage', () => {
     api.revoke.mockResolvedValue(identity({ status: 'Revoked', revision: 3 }));
   });
 
-  it('composes the frozen resource workspace and creates from a managed window', async () => {
+  it('composes the shared resource workspace and creates from a managed window', async () => {
     const user = userEvent.setup();
     const queryClient = renderPage();
     const invalidate = vi.spyOn(queryClient, 'invalidateQueries');
@@ -77,7 +77,12 @@ describe('ServiceIdentitiesPage', () => {
     expect(page?.querySelectorAll('[data-slot="page-header"]')).toHaveLength(1);
     expect(page?.querySelectorAll('[data-slot="data-table"]')).toHaveLength(1);
     expect(within(table).queryByRole('columnheader', { name: 'Actions' })).not.toBeInTheDocument();
-    expect(create).toHaveClass('min-h-11', 'min-w-11', 'sm:min-h-8', 'sm:min-w-8');
+    expect(create).toHaveClass(
+      'min-h-axis-touch-target',
+      'min-w-axis-touch-target',
+      'sm:min-h-axis-compact-control',
+      'sm:min-w-axis-compact-control',
+    );
 
     await user.click(create);
     const dialog = await screen.findByRole('dialog', { name: 'Create service identity' });

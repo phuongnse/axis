@@ -62,14 +62,14 @@ export function ModuleNavigation({ context, items }: ModuleNavigationProps) {
       <div
         ref={navigationItemsRef}
         data-slot="module-navigation-items"
-        className="flex min-w-0 gap-2 overflow-x-auto px-4 py-2 md:h-full md:min-h-0 md:flex-col md:gap-4 md:overflow-x-hidden md:overflow-y-auto md:px-3 md:py-4"
+        className="flex min-w-0 gap-axis-inline overflow-x-auto px-axis-page-compact py-axis-inline md:h-full md:min-h-0 md:flex-col md:gap-axis-region md:overflow-x-hidden md:overflow-y-auto md:px-3 md:py-axis-region"
       >
         {groups.map((group) => (
-          <div key={group.id} className="flex min-w-max gap-2 md:min-w-0 md:flex-col">
-            <p className="hidden px-2 text-xs font-medium text-muted-foreground md:block">
+          <div key={group.id} className="flex min-w-max gap-axis-inline md:min-w-0 md:flex-col">
+            <p className="hidden px-axis-inline text-axis-metadata font-axis-label text-muted-foreground md:block">
               {t(group.labelKey)}
             </p>
-            <div className="flex gap-2 md:flex-col">
+            <div className="flex gap-axis-inline md:flex-col">
               {group.items.map((item) => {
                 const Icon = iconByToken[item.icon];
                 const active = item.isActive(context);
@@ -81,12 +81,12 @@ export function ModuleNavigation({ context, items }: ModuleNavigationProps) {
                     aria-current={active ? 'page' : undefined}
                     className={cn(
                       buttonVariants({ variant: 'ghost' }),
-                      'min-h-11 min-w-11 md:min-h-0 md:min-w-0 md:w-full md:justify-start',
+                      'min-h-axis-touch-target min-w-axis-touch-target md:min-h-0 md:min-w-0 md:w-full md:justify-start',
                       transientItemHighlight,
                       active && persistentItemHighlight,
                     )}
                   >
-                    <Icon className="size-5 shrink-0" aria-hidden />
+                    <Icon className="size-axis-icon-navigation shrink-0" aria-hidden />
                     <span className="truncate">{t(item.labelKey)}</span>
                   </Link>
                 );

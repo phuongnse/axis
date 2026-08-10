@@ -58,7 +58,9 @@ export function AppActionsMenu({
     queryFn: getCurrentUserProfile,
     enabled: authenticated,
   });
-  const profileLabel = firstNonEmpty(profileQuery.data?.fullName, profileQuery.data?.email);
+  const profileName = firstNonEmpty(profileQuery.data?.fullName);
+  const profileEmail = firstNonEmpty(profileQuery.data?.email);
+  const profileLabel = firstNonEmpty(profileName, profileEmail);
   const profileDisplay = profileLabel ? sessionDisplayFromLabel(profileLabel) : null;
   const displayName = profileDisplay?.userLabel ?? userLabel ?? t('nav.user');
   const displayInitials = profileDisplay?.userInitials ?? userInitials ?? '?';
@@ -85,7 +87,7 @@ export function AppActionsMenu({
             type="button"
             variant="ghost"
             size="lg"
-            className={`min-h-11 max-w-64 gap-2 px-2 text-foreground ${transientItemHighlight}`}
+            className={`min-h-axis-touch-target max-w-64 gap-axis-inline px-axis-inline text-foreground ${transientItemHighlight}`}
             aria-label={t('nav.accountMenu')}
             title={t('nav.accountMenu')}
           >
@@ -108,6 +110,24 @@ export function AppActionsMenu({
         className="max-h-(--available-height) w-80 max-w-full overflow-y-auto"
         aria-label={t('nav.accountMenu')}
       >
+        <section
+          data-slot="account-identity"
+          aria-label={t('app.account')}
+          className="flex min-w-0 items-center gap-axis-inline px-axis-inline py-axis-inline"
+        >
+          <AccountAvatar initials={displayInitials} size="md" />
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-axis-label font-axis-label">{displayName}</div>
+            {profileName && profileEmail ? (
+              <div className="truncate text-axis-metadata text-muted-foreground">
+                {profileEmail}
+              </div>
+            ) : null}
+          </div>
+        </section>
+
+        <Separator />
+
         <WorkspaceControl
           contextState={workspaceContext}
           onRetryContext={onRetryWorkspaceContext}
@@ -116,8 +136,8 @@ export function AppActionsMenu({
 
         <Separator />
 
-        <section aria-label={t('app.preferences')} className="grid gap-3">
-          <div className="flex items-center gap-2 px-1 text-xs font-medium text-muted-foreground">
+        <section aria-label={t('app.preferences')} className="grid gap-axis-region">
+          <div className="flex items-center gap-axis-inline px-axis-inline text-axis-metadata font-axis-label text-muted-foreground">
             <Settings2 className="size-3.5" aria-hidden />
             {t('app.preferences')}
           </div>
@@ -127,12 +147,12 @@ export function AppActionsMenu({
 
         <Separator />
 
-        <section aria-label={t('app.account')} className="grid gap-2">
+        <div className="grid gap-axis-inline">
           <AsyncButton
             type="button"
             variant="destructive"
             size="sm"
-            className="w-full"
+            className="min-h-axis-touch-target w-full justify-start sm:min-h-axis-compact-control"
             icon={<LogOut />}
             pending={signingOut}
             pendingLabel={t('nav.signingOut')}
@@ -143,7 +163,7 @@ export function AppActionsMenu({
           {signOutError ? (
             <StatusNotice tone="destructive">{t('nav.signOutFailed')}</StatusNotice>
           ) : null}
-        </section>
+        </div>
       </PopoverContent>
     </Popover>
   );

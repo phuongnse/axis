@@ -27,7 +27,12 @@ describe('OptionList', () => {
     const dark = screen.getByRole('button', { name: 'Dark' });
 
     expect(group).toHaveClass('w-full');
-    expect(system).toHaveClass('w-full', 'justify-start');
+    expect(system).toHaveClass(
+      'w-full',
+      'justify-start',
+      'min-h-axis-touch-target',
+      'sm:min-h-axis-compact-control',
+    );
     expect(system).toHaveClass(
       'aria-pressed:bg-secondary',
       'aria-pressed:text-secondary-foreground',

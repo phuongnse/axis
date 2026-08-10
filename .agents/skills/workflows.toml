@@ -45,8 +45,8 @@ evidence = "validated-remote-state"
 
 [workflows.ui-design]
 initial = "requested"
-terminal_states = ["frozen"]
-states = ["requested", "authorized", "defined", "reference-ready", "frozen"]
+terminal_states = ["adopted"]
+states = ["requested", "authorized", "defined", "reference-ready", "accepted", "adopted"]
 
 [[workflows.ui-design.transitions]]
 id = "authorize-ui-design"
@@ -77,8 +77,22 @@ owner = "skill:axis-ui-system"
 evidence = "requested-visual-contract-change"
 
 [[workflows.ui-design.transitions]]
-id = "freeze-ui-system"
+id = "accept-ui-system"
 from = "reference-ready"
-to = "frozen"
+to = "accepted"
 owner = "skill:axis-ui-system"
 evidence = "explicit-user-visual-acceptance"
+
+[[workflows.ui-design.transitions]]
+id = "revise-accepted-ui-system"
+from = "accepted"
+to = "defined"
+owner = "skill:axis-ui-system"
+evidence = "approved-visual-contract-change"
+
+[[workflows.ui-design.transitions]]
+id = "complete-ui-adoption"
+from = "accepted"
+to = "adopted"
+owner = "skill:axis-ui-system"
+evidence = "active-surface-conformance-and-current-evidence"

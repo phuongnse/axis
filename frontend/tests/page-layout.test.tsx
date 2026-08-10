@@ -33,9 +33,9 @@ describe('EntryLayout', () => {
       'flex-col',
       'overflow-x-hidden',
       'bg-background',
-      'p-4',
-      'sm:p-6',
-      'lg:p-8',
+      'p-axis-page-compact',
+      'sm:p-axis-page-default',
+      'lg:p-axis-page-wide',
     );
     expect(utilities).toContainElement(screen.getByRole('button', { name: 'Preferences' }));
     expect(content).toHaveAttribute('data-slot', 'entry-content');
@@ -47,7 +47,7 @@ describe('EntryLayout', () => {
       'flex-1',
       'items-center',
       'justify-center',
-      'py-4',
+      'py-axis-region',
     );
     expect(content).toHaveTextContent('Entry content');
   });
@@ -77,10 +77,10 @@ describe('PageLayout', () => {
       'w-full',
       'min-w-0',
       'flex-col',
-      'gap-4',
-      'p-4',
-      'sm:p-6',
-      'lg:p-8',
+      'gap-axis-region',
+      'p-axis-page-compact',
+      'sm:p-axis-page-default',
+      'lg:p-axis-page-wide',
       ...overflowClasses,
     );
     expect(page).not.toHaveClass(...excludedOverflowClasses);
@@ -112,29 +112,39 @@ describe('PageHeader', () => {
       'min-w-0',
       'shrink-0',
       'flex-col',
-      'gap-4',
+      'gap-axis-region',
       'sm:flex-row',
       'sm:items-start',
       'sm:justify-between',
     );
     expect(heading).toHaveAttribute('data-slot', 'page-title');
-    expect(heading).toHaveClass('font-heading', 'text-2xl', 'font-semibold', 'text-foreground');
+    expect(heading).toHaveClass(
+      'font-heading',
+      'text-axis-page-title',
+      'font-axis-page-title',
+      'text-foreground',
+    );
     expect(description).toHaveAttribute('data-slot', 'page-description');
-    expect(description).toHaveClass('max-w-3xl', 'text-sm', 'leading-6', 'text-muted-foreground');
+    expect(description).toHaveClass(
+      'max-w-3xl',
+      'text-axis-body',
+      'font-axis-body',
+      'text-muted-foreground',
+    );
     expect(actions).toHaveClass(
       'flex',
       'w-full',
       'flex-wrap',
       'items-center',
-      'gap-2',
+      'gap-axis-inline',
       'sm:w-auto',
       'sm:justify-end',
     );
     expect(screen.getByRole('button', { name: 'Create' })).toHaveClass(
-      'min-h-11',
-      'min-w-11',
-      'sm:min-h-8',
-      'sm:min-w-8',
+      'min-h-axis-touch-target',
+      'min-w-axis-touch-target',
+      'sm:min-h-axis-compact-control',
+      'sm:min-w-axis-compact-control',
     );
   });
 
@@ -186,10 +196,10 @@ describe('PageAction', () => {
     expect(action).toHaveAttribute('href', '/business-objects/new');
     expect(action).toHaveClass(
       'h-8',
-      'min-h-11',
-      'min-w-11',
-      'sm:min-h-8',
-      'sm:min-w-8',
+      'min-h-axis-touch-target',
+      'min-w-axis-touch-target',
+      'sm:min-h-axis-compact-control',
+      'sm:min-w-axis-compact-control',
       'border-border',
     );
   });
@@ -214,9 +224,16 @@ describe('SectionHeader', () => {
     const title = screen.getByRole('heading', { level: 2, name: 'Release' });
     const description = screen.getByText('Inspect immutable release facts.');
 
-    expect(header).toHaveClass('flex', 'min-w-0', 'flex-wrap', 'justify-between', 'gap-3');
+    expect(header).toHaveClass(
+      'flex',
+      'min-w-0',
+      'flex-wrap',
+      'items-start',
+      'justify-between',
+      'gap-axis-region',
+    );
     expect(title).toHaveAttribute('id', 'release-title');
-    expect(title).toHaveClass('font-heading', 'text-lg', 'font-medium');
+    expect(title).toHaveClass('font-heading', 'text-axis-section-title', 'font-axis-section-title');
     expect(description).toHaveAttribute('data-slot', 'section-description');
     expect(container.querySelector('[data-slot="section-actions"]')).toHaveTextContent('Trusted');
   });

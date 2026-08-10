@@ -23,7 +23,7 @@ const systemRule = (definitionKey: string, name: string, targetTypeKeys: string[
   definitionKey,
   name,
   description: `${name} validation.`,
-  origin: 'System',
+  origin: 'BuiltIn',
   status: 'Published',
   expressionLanguageVersion: 1,
   latestPublishedVersion: 1,
@@ -93,6 +93,49 @@ async function mockAuthenticatedSession(page: Page): Promise<void> {
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify(profile),
+    });
+  });
+
+  await page.route('**/api/workspace-context/eligible', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([
+        {
+          workspaceId: profile.workspaces[0].id,
+          name: profile.workspaces[0].name,
+          slug: profile.workspaces[0].slug,
+          type: profile.workspaces[0].type,
+          organizationId: null,
+          isCurrent: true,
+        },
+      ]),
+    });
+  });
+
+  await page.route('**/api/module-navigation', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        availableContributionIds: ['businessObjects.definitions', 'rules.fieldDefinitions'],
+      }),
+    });
+  });
+
+  await page.route('**/api/business-object-definitions/actions', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ canStartCreate: true }),
+    });
+  });
+
+  await page.route('**/api/rules/actions', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ canStartCreate: true }),
     });
   });
 
@@ -184,10 +227,7 @@ async function expectShellRegionsFitViewport(page: Page): Promise<void> {
   }
 }
 
-async function expectRouteViewportTouchesMain(
-  page: Page,
-  expectedPaddingBottom: string,
-): Promise<void> {
+async function expectRouteViewportTouchesMain(page: Page): Promise<void> {
   await expect
     .poll(async () =>
       page.evaluate(() => {
@@ -204,7 +244,6 @@ async function expectRouteViewportTouchesMain(
 
         return {
           mainPadding: getComputedStyle(main).padding,
-          routePaddingBottom: getComputedStyle(routeRoot).paddingBottom,
           touchesBottom: Math.abs(routeBox.bottom - mainBox.bottom) <= tolerance,
           touchesRight: Math.abs(routeBox.right - mainBox.right) <= tolerance,
           touchesTop: Math.abs(routeBox.top - mainBox.top) <= tolerance,
@@ -213,7 +252,6 @@ async function expectRouteViewportTouchesMain(
     )
     .toEqual({
       mainPadding: '0px',
-      routePaddingBottom: expectedPaddingBottom,
       touchesBottom: true,
       touchesRight: true,
       touchesTop: true,
@@ -712,7 +750,13 @@ test.describe('app frame', () => {
     await expect(page.getByRole('contentinfo')).toContainText('2026');
     await expectShellRegionsFitViewport(page);
     await page.getByRole('button', { name: 'Account menu' }).click();
-    await expect(page.getByText(profile.fullName)).toHaveCount(1);
+    const accountIdentity = page.getByRole('region', { name: 'Account' });
+    await expect(accountIdentity.getByText(profile.fullName)).toBeVisible();
+    await expect(accountIdentity.getByText(profile.email)).toBeVisible();
+    await expect(page.getByRole('region', { name: 'Workspace', exact: true })).toBeVisible();
+    await expect(page.getByText('Choose Workspace', { exact: true })).toHaveCount(0);
+    await expect(page.getByText('Personal Workspace', { exact: true })).toHaveCount(0);
+    await expect(page.getByText('Organization Workspaces', { exact: true })).toHaveCount(0);
     await expect(page.getByText('Preferences')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible();
     const accountMenu = page.locator('[data-slot="popover-content"][aria-label="Account menu"]');
@@ -720,12 +764,13 @@ test.describe('app frame', () => {
       Promise.all(element.getAnimations({ subtree: true }).map((animation) => animation.finished)),
     );
     const initialMenuBox = await accountMenu.boundingBox();
-    await page.getByRole('button', { name: 'Dark' }).click();
-    await expect(page.getByText('Saving...')).toBeVisible();
+    const darkOption = page.getByRole('button', { name: 'Dark' });
+    await darkOption.click();
+    await expect(darkOption.locator('[data-slot="spinner"]')).toBeVisible();
     const pendingMenuBox = await accountMenu.boundingBox();
     expect(Math.round(pendingMenuBox?.height ?? 0)).toBe(Math.round(initialMenuBox?.height ?? 0));
     completeThemeSave?.();
-    await expect(page.getByText('Saving...')).toBeHidden();
+    await expect(darkOption.locator('[data-slot="spinner"]')).toBeHidden();
     const savedMenuBox = await accountMenu.boundingBox();
     expect(Math.round(savedMenuBox?.height ?? 0)).toBe(Math.round(initialMenuBox?.height ?? 0));
     await expectNoPageOverflow(page);
@@ -735,7 +780,7 @@ test.describe('app frame', () => {
     await page.getByRole('link', { name: 'Rules' }).click();
     await expect(page).toHaveURL(/\/rules(?:\?.*)?$/);
     await expect(page.getByRole('heading', { name: 'Rules', exact: true })).toBeVisible();
-    await expectRouteViewportTouchesMain(page, '32px');
+    await expectRouteViewportTouchesMain(page);
     await expectNoPageOverflow(page);
     await expectNoDocumentScroll(page);
     await expectRulesCatalogScrolls(page);
@@ -763,7 +808,7 @@ test.describe('app frame', () => {
     await page.getByRole('link', { name: 'Rules' }).click();
     await expect(page).toHaveURL(/\/rules(?:\?.*)?$/);
     await expect(page.getByRole('heading', { name: 'Rules', exact: true })).toBeVisible();
-    await expectRouteViewportTouchesMain(page, '16px');
+    await expectRouteViewportTouchesMain(page);
     await expectNoPageOverflow(page);
     await expectNoDocumentScroll(page);
     await expectRulesCatalogScrolls(page);

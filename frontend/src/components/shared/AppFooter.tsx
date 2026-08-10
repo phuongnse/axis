@@ -9,7 +9,7 @@ export function AppFooter() {
 
   return (
     <footer className="shrink-0 border-t border-border bg-card">
-      <div className="flex w-full min-w-0 flex-col gap-2 px-4 py-4 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
+      <div className="flex w-full min-w-0 flex-col gap-axis-inline px-axis-page-compact py-axis-region text-axis-metadata font-axis-metadata text-muted-foreground sm:flex-row sm:items-center sm:justify-between sm:px-axis-page-default lg:px-axis-page-wide">
         <p className="font-medium">{t('nav.version', { version: APP_VERSION })}</p>
 
         <p className="inline-flex items-center gap-1.5 font-medium">

@@ -284,7 +284,7 @@ export function DataTable<TData>({ definition }: { definition: DataTableDefiniti
       aria-busy={initialLoading || undefined}
       data-slot="data-table"
       data-mode={source.mode}
-      className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-sm border border-border bg-card"
+      className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-axis-flat border border-border bg-card shadow-axis-none"
     >
       <DataTableToolbar
         table={table}
@@ -332,7 +332,7 @@ export function DataTable<TData>({ definition }: { definition: DataTableDefiniti
               ))}
             </colgroup>
           ) : null}
-          <TableHeader className={cn('sticky top-0 z-20 bg-card', virtualized && 'grid')}>
+          <TableHeader className={cn('sticky top-0 z-axis-sticky bg-card', virtualized && 'grid')}>
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id} className={cn(virtualized && 'flex w-full')}>
                 {headerGroup.headers.map((header) => (

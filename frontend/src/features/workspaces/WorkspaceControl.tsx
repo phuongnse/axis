@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { ArrowRight, Building2, Plus, UserRound } from 'lucide-react';
+import { ArrowRight, Building2, PanelsTopLeft, Plus, UserRound } from 'lucide-react';
 import type { FormEvent } from 'react';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -82,20 +82,17 @@ export function WorkspaceControl({
   return (
     <>
       <section
-        className="grid gap-3"
-        aria-label={t('workspace.choose')}
+        className="grid gap-axis-region"
+        aria-label={t('workspace.label')}
         aria-busy={switching || undefined}
       >
-        <div className="grid gap-0.5 px-1">
-          <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-            <Building2 className="size-3.5" aria-hidden />
-            {t('workspace.choose')}
-          </div>
-          <p className="text-xs text-muted-foreground">{t('workspace.chooseDescription')}</p>
+        <div className="flex items-center gap-axis-inline px-axis-inline text-axis-metadata font-axis-label text-muted-foreground">
+          <PanelsTopLeft className="size-3.5" aria-hidden />
+          {t('workspace.label')}
         </div>
 
         <AsyncContent
-          className="min-h-10"
+          className="min-h-axis-default-control"
           pending={eligibleQuery.isPending}
           error={eligibleQuery.isError}
           pendingLabel={t('workspace.loading')}
@@ -112,7 +109,7 @@ export function WorkspaceControl({
               </Button>
             </StatusNotice>
           ) : eligibleQuery.data ? (
-            <WorkspaceGroups
+            <WorkspaceOptions
               workspaces={workspaces}
               switchingWorkspaceId={contextState.targetWorkspaceId}
               switching={switching}
@@ -124,8 +121,8 @@ export function WorkspaceControl({
         <Button
           type="button"
           size="sm"
-          variant="outline"
-          className="w-full"
+          variant="ghost"
+          className={`min-h-axis-touch-target w-full justify-start sm:min-h-axis-compact-control ${transientItemHighlight}`}
           disabled={switching}
           onClick={() => {
             setCreateOpen(true);
@@ -135,7 +132,7 @@ export function WorkspaceControl({
           {t('workspace.createOrganization')}
         </Button>
 
-        <div aria-live="polite" className="grid gap-2">
+        <div aria-live="polite" className="grid gap-axis-inline">
           {switching ? <span className="sr-only">{t('workspace.switching')}</span> : null}
           {switchOutcomeUnknown ? (
             <StatusNotice tone="warning">
@@ -169,7 +166,7 @@ export function WorkspaceControl({
   );
 }
 
-function WorkspaceGroups({
+function WorkspaceOptions({
   workspaces,
   switchingWorkspaceId,
   switching,
@@ -183,48 +180,11 @@ function WorkspaceGroups({
   const { t } = useTranslation();
   const personal = workspaces.filter((workspace) => workspace.type === 'Personal');
   const organizations = workspaces.filter((workspace) => workspace.type === 'Organization');
+  const orderedWorkspaces = [...personal, ...organizations];
 
   return (
-    <section className="grid max-h-72 gap-3 overflow-y-auto" aria-label={t('workspace.eligible')}>
-      <WorkspaceGroup
-        label={t('workspace.personal')}
-        workspaces={personal}
-        switchingWorkspaceId={switchingWorkspaceId}
-        switching={switching}
-        onSelect={onSelect}
-      />
-      {organizations.length > 0 ? (
-        <WorkspaceGroup
-          label={t('workspace.organizations')}
-          workspaces={organizations}
-          switchingWorkspaceId={switchingWorkspaceId}
-          switching={switching}
-          onSelect={onSelect}
-        />
-      ) : null}
-    </section>
-  );
-}
-
-function WorkspaceGroup({
-  label,
-  workspaces,
-  switchingWorkspaceId,
-  switching,
-  onSelect,
-}: {
-  label: string;
-  workspaces: EligibleWorkspace[];
-  switchingWorkspaceId: string | null;
-  switching: boolean;
-  onSelect: (workspace: EligibleWorkspace) => void;
-}) {
-  if (workspaces.length === 0) return null;
-
-  return (
-    <section className="grid gap-1" aria-label={label}>
-      <h3 className="px-2 text-xs font-medium text-muted-foreground">{label}</h3>
-      {workspaces.map((workspace) => {
+    <section className="grid max-h-72 gap-1 overflow-y-auto" aria-label={t('workspace.eligible')}>
+      {orderedWorkspaces.map((workspace) => {
         const WorkspaceIcon = workspace.type === 'Personal' ? UserRound : Building2;
         const switchingThisWorkspace = switching && switchingWorkspaceId === workspace.workspaceId;
 
@@ -235,7 +195,7 @@ function WorkspaceGroup({
             variant="ghost"
             size="sm"
             className={cn(
-              'w-full justify-start',
+              'min-h-axis-touch-target w-full justify-start sm:min-h-axis-compact-control',
               workspace.isCurrent ? persistentItemHighlight : transientItemHighlight,
               workspace.isCurrent && 'disabled:opacity-100',
             )}

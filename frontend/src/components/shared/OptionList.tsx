@@ -50,7 +50,7 @@ export function OptionItemContent({ children, icon, pending = false }: OptionIte
     <>
       <span
         data-slot="option-item-icon"
-        className="flex size-4 shrink-0 items-center justify-center text-xs font-semibold leading-none"
+        className="flex size-axis-icon-control shrink-0 items-center justify-center text-axis-metadata font-axis-label leading-none"
         aria-hidden
       >
         {showPending ? <Spinner className="size-3.5" /> : icon}
@@ -65,7 +65,11 @@ export function OptionItemContent({ children, icon, pending = false }: OptionIte
 export function OptionListItem({ children, icon, pending = false, value }: OptionListItemProps) {
   return (
     <ToggleGroupItem
-      className={cn('w-full justify-start', transientItemHighlight, toggledItemHighlight)}
+      className={cn(
+        'min-h-axis-touch-target w-full justify-start sm:min-h-axis-compact-control',
+        transientItemHighlight,
+        toggledItemHighlight,
+      )}
       value={value}
     >
       <OptionItemContent icon={icon} pending={pending}>

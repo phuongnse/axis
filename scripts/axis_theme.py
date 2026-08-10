@@ -10,8 +10,47 @@ from typing import Any
 
 THEME_SOURCE = Path("theme/axis-theme.json")
 WEB_THEME_OUTPUT = Path("frontend/src/theme.generated.css")
+WEB_THEME_RUNTIME_OUTPUT = Path("frontend/src/theme.generated.ts")
 EMAIL_THEME_OUTPUT = Path(
     "src/Modules/Identity/Axis.Identity.Infrastructure/Services/TransactionalEmailTheme.g.cs"
+)
+
+TYPOGRAPHY_ROLES = (
+    "metadata",
+    "body",
+    "label",
+    "componentTitle",
+    "sectionTitle",
+    "pageTitle",
+)
+SPACING_ROLES = ("inline", "region", "section", "pageCompact", "pageDefault", "pageWide")
+DENSITY_ROLES = ("compactControl", "defaultControl", "touchTarget")
+RADIUS_ROLES = ("flat", "control", "floating", "managed")
+ELEVATION_ROLES = ("none", "floating", "managed", "dock")
+ICON_ROLES = ("control", "navigation", "empty")
+MOTION_STRING_ROLES = ("stateDuration", "floatingDuration", "easing")
+MOTION_MILLISECOND_ROLES = (
+    "feedbackDelayMs",
+    "feedbackMinimumMs",
+    "contextDelayMs",
+    "contextMinimumMs",
+)
+LAYER_ROLES = ("base", "sticky", "floating", "modal", "managed", "notification")
+TEXT_CONTRAST_PAIRS = (
+    ("foreground", "background"),
+    ("card-foreground", "card"),
+    ("popover-foreground", "popover"),
+    ("primary-foreground", "primary"),
+    ("secondary-foreground", "secondary"),
+    ("muted-foreground", "background"),
+    ("accent-foreground", "accent"),
+    ("destructive", "background"),
+    ("info-foreground", "info"),
+    ("success-foreground", "success"),
+    ("warning-foreground", "warning"),
+    ("sidebar-foreground", "sidebar"),
+    ("sidebar-primary-foreground", "sidebar-primary"),
+    ("sidebar-accent-foreground", "sidebar-accent"),
 )
 
 REQUIRED_COLOR_TOKENS = (
@@ -59,6 +98,14 @@ _OKLCH_RE = re.compile(
     r"(?P<chroma>[+-]?(?:\d+(?:\.\d*)?|\.\d+))\s+"
     r"(?P<hue>[+-]?(?:\d+(?:\.\d*)?|\.\d+))\s*\)$"
 )
+_REM_RE = re.compile(r"^(?P<value>\d+(?:\.\d+)?)rem$")
+_MILLISECOND_RE = re.compile(r"^(?P<value>\d+(?:\.\d+)?)ms$")
+_CUBIC_BEZIER_RE = re.compile(
+    r"^cubic-bezier\(\s*(?P<x1>[+-]?(?:\d+(?:\.\d*)?|\.\d+))\s*,\s*"
+    r"(?P<y1>[+-]?(?:\d+(?:\.\d*)?|\.\d+))\s*,\s*"
+    r"(?P<x2>[+-]?(?:\d+(?:\.\d*)?|\.\d+))\s*,\s*"
+    r"(?P<y2>[+-]?(?:\d+(?:\.\d*)?|\.\d+))\s*\)$"
+)
 
 
 class ThemeValidationError(ValueError):
@@ -90,6 +137,52 @@ def _nonempty_string(value: Any, label: str) -> str:
     if any(character in value for character in ("\n", "\r", "{", "}", ";")):
         raise ThemeValidationError(f"{label} contains unsupported control characters")
     return value.strip()
+
+
+def _exact_string_roles(value: Any, roles: tuple[str, ...], label: str) -> dict[str, Any]:
+    mapping = _mapping(value, label)
+    _exact_keys(mapping, set(roles), label)
+    for role in roles:
+        _nonempty_string(mapping[role], f"{label}.{role}")
+    return mapping
+
+
+def _nonnegative_integer(value: Any, label: str) -> int:
+    if not isinstance(value, int) or isinstance(value, bool) or value < 0:
+        raise ThemeValidationError(f"{label} must be a non-negative integer")
+    return value
+
+
+def _positive_rem(value: Any, label: str) -> float:
+    text = _nonempty_string(value, label)
+    match = _REM_RE.fullmatch(text)
+    if match is None or (parsed := float(match.group("value"))) <= 0:
+        raise ThemeValidationError(f"{label} must be a positive `rem` value")
+    return parsed
+
+
+def _positive_milliseconds(value: Any, label: str) -> float:
+    text = _nonempty_string(value, label)
+    match = _MILLISECOND_RE.fullmatch(text)
+    if match is None or (parsed := float(match.group("value"))) <= 0:
+        raise ThemeValidationError(f"{label} must be a positive `ms` value")
+    return parsed
+
+
+def _cubic_bezier(value: Any, label: str) -> tuple[float, float, float, float]:
+    text = _nonempty_string(value, label)
+    match = _CUBIC_BEZIER_RE.fullmatch(text)
+    if match is None:
+        raise ThemeValidationError(f"{label} must use `cubic-bezier(x1, y1, x2, y2)` syntax")
+    points = tuple(float(match.group(name)) for name in ("x1", "y1", "x2", "y2"))
+    if not 0 <= points[0] <= 1 or not 0 <= points[2] <= 1:
+        raise ThemeValidationError(f"{label} x control points must be between 0 and 1")
+    return points
+
+
+def _require_increasing(values: list[float], label: str) -> None:
+    if values != sorted(set(values)):
+        raise ThemeValidationError(f"{label} must increase by semantic depth")
 
 
 def _parse_oklch(value: Any, label: str) -> tuple[float, float, float]:
@@ -124,9 +217,9 @@ def load_theme(root: Path) -> dict[str, Any]:
         raise ThemeValidationError(f"invalid canonical theme JSON: {exc}") from exc
 
     theme = _mapping(value, "theme")
-    _exact_keys(theme, {"schemaVersion", "typography", "radius", "colors"}, "theme")
-    if theme["schemaVersion"] != 1:
-        raise ThemeValidationError("theme schemaVersion must be 1")
+    _exact_keys(theme, {"schemaVersion", "typography", "ui", "colors"}, "theme")
+    if theme["schemaVersion"] != 2:
+        raise ThemeValidationError("theme schemaVersion must be 2")
 
     typography = _mapping(theme["typography"], "typography")
     _exact_keys(typography, {"web", "email"}, "typography")
@@ -137,7 +230,122 @@ def load_theme(root: Path) -> dict[str, Any]:
     _nonempty_string(web["sans"], "typography.web.sans")
     _nonempty_string(web["heading"], "typography.web.heading")
     _nonempty_string(email["sans"], "typography.email.sans")
-    _nonempty_string(theme["radius"], "radius")
+    ui = _mapping(theme["ui"], "ui")
+    _exact_keys(
+        ui,
+        {
+            "typographyRoles",
+            "spacingRoles",
+            "densityRoles",
+            "radiusRoles",
+            "elevationRoles",
+            "iconRoles",
+            "motionRoles",
+            "layerRoles",
+        },
+        "ui",
+    )
+
+    typography_roles = _mapping(ui["typographyRoles"], "ui.typographyRoles")
+    _exact_keys(typography_roles, set(TYPOGRAPHY_ROLES), "ui.typographyRoles")
+    for role in TYPOGRAPHY_ROLES:
+        definition = _mapping(typography_roles[role], f"ui.typographyRoles.{role}")
+        _exact_keys(definition, {"size", "lineHeight", "weight"}, f"ui.typographyRoles.{role}")
+        size = _positive_rem(definition["size"], f"ui.typographyRoles.{role}.size")
+        line_height = _positive_rem(
+            definition["lineHeight"],
+            f"ui.typographyRoles.{role}.lineHeight",
+        )
+        if line_height < size:
+            raise ThemeValidationError(
+                f"ui.typographyRoles.{role}.lineHeight must not be smaller than its size"
+            )
+        weight = definition["weight"]
+        if not isinstance(weight, int) or isinstance(weight, bool) or weight not in range(100, 1000, 100):
+            raise ThemeValidationError(
+                f"ui.typographyRoles.{role}.weight must be a font weight from 100 through 900"
+            )
+
+    spacing = _exact_string_roles(ui["spacingRoles"], SPACING_ROLES, "ui.spacingRoles")
+    spacing_values = {
+        role: _positive_rem(spacing[role], f"ui.spacingRoles.{role}") for role in SPACING_ROLES
+    }
+    _require_increasing(
+        [spacing_values[role] for role in ("inline", "region", "section")],
+        "ui spacing relationship roles",
+    )
+    _require_increasing(
+        [spacing_values[role] for role in ("pageCompact", "pageDefault", "pageWide")],
+        "ui page spacing roles",
+    )
+
+    density = _exact_string_roles(ui["densityRoles"], DENSITY_ROLES, "ui.densityRoles")
+    _require_increasing(
+        [_positive_rem(density[role], f"ui.densityRoles.{role}") for role in DENSITY_ROLES],
+        "ui density roles",
+    )
+
+    radii = _exact_string_roles(ui["radiusRoles"], RADIUS_ROLES, "ui.radiusRoles")
+    _require_increasing(
+        [_positive_rem(radii[role], f"ui.radiusRoles.{role}") for role in RADIUS_ROLES],
+        "ui radius roles",
+    )
+
+    elevation = _exact_string_roles(
+        ui["elevationRoles"],
+        ELEVATION_ROLES,
+        "ui.elevationRoles",
+    )
+    if elevation["none"] != "none" or any(elevation[role] == "none" for role in ELEVATION_ROLES[1:]):
+        raise ThemeValidationError(
+            "ui.elevationRoles must reserve `none` for the none role"
+        )
+    if len(set(elevation.values())) != len(ELEVATION_ROLES):
+        raise ThemeValidationError("ui.elevationRoles must be unique by semantic depth")
+
+    icons = _exact_string_roles(ui["iconRoles"], ICON_ROLES, "ui.iconRoles")
+    _require_increasing(
+        [_positive_rem(icons[role], f"ui.iconRoles.{role}") for role in ICON_ROLES],
+        "ui icon roles",
+    )
+
+    motion = _mapping(ui["motionRoles"], "ui.motionRoles")
+    _exact_keys(
+        motion,
+        set(MOTION_STRING_ROLES) | set(MOTION_MILLISECOND_ROLES),
+        "ui.motionRoles",
+    )
+    state_duration = _positive_milliseconds(
+        motion["stateDuration"],
+        "ui.motionRoles.stateDuration",
+    )
+    floating_duration = _positive_milliseconds(
+        motion["floatingDuration"],
+        "ui.motionRoles.floatingDuration",
+    )
+    if floating_duration > state_duration:
+        raise ThemeValidationError(
+            "ui.motionRoles.floatingDuration must not exceed stateDuration"
+        )
+    _cubic_bezier(motion["easing"], "ui.motionRoles.easing")
+    for role in MOTION_MILLISECOND_ROLES:
+        _nonnegative_integer(motion[role], f"ui.motionRoles.{role}")
+    if motion["feedbackMinimumMs"] < motion["feedbackDelayMs"]:
+        raise ThemeValidationError(
+            "ui.motionRoles.feedbackMinimumMs must not be smaller than feedbackDelayMs"
+        )
+    if motion["contextMinimumMs"] < motion["contextDelayMs"]:
+        raise ThemeValidationError(
+            "ui.motionRoles.contextMinimumMs must not be smaller than contextDelayMs"
+        )
+
+    layers = _mapping(ui["layerRoles"], "ui.layerRoles")
+    _exact_keys(layers, set(LAYER_ROLES), "ui.layerRoles")
+    for role in LAYER_ROLES:
+        _nonnegative_integer(layers[role], f"ui.layerRoles.{role}")
+    layer_values = [layers[role] for role in LAYER_ROLES]
+    if layer_values != sorted(set(layer_values)):
+        raise ThemeValidationError("ui.layerRoles must be unique and increase by semantic depth")
 
     colors = _mapping(theme["colors"], "colors")
     _exact_keys(colors, {"light", "dark"}, "colors")
@@ -154,6 +362,16 @@ def load_theme(root: Path) -> dict[str, Any]:
             )
         for token in REQUIRED_COLOR_TOKENS:
             _parse_oklch(scheme[token], f"colors.{scheme_name}.{token}")
+        for foreground, background in TEXT_CONTRAST_PAIRS:
+            contrast = _contrast_ratio(scheme[foreground], scheme[background])
+            if contrast < 4.5:
+                raise ThemeValidationError(
+                    f"colors.{scheme_name}.{foreground} on {background} must have at least 4.5:1 contrast"
+                )
+        if _contrast_ratio(scheme["ring"], scheme["background"]) < 3:
+            raise ThemeValidationError(
+                f"colors.{scheme_name}.ring on background must have at least 3:1 contrast"
+            )
 
     return theme
 
@@ -161,6 +379,15 @@ def load_theme(root: Path) -> dict[str, Any]:
 def _render_web_theme(theme: dict[str, Any]) -> str:
     typography = theme["typography"]["web"]
     colors = theme["colors"]
+    ui = theme["ui"]
+    type_roles = ui["typographyRoles"]
+    spacing_roles = ui["spacingRoles"]
+    density_roles = ui["densityRoles"]
+    radius_roles = ui["radiusRoles"]
+    elevation_roles = ui["elevationRoles"]
+    icon_roles = ui["iconRoles"]
+    motion_roles = ui["motionRoles"]
+    layer_roles = ui["layerRoles"]
     lines = [
         "/* <auto-generated>",
         " * Generated from theme/axis-theme.json by `python scripts/axis.py generate theme`.",
@@ -172,15 +399,42 @@ def _render_web_theme(theme: dict[str, Any]) -> str:
         f"  --font-sans: {typography['sans']};",
     ]
     lines.extend(f"  --color-{token}: var(--{token});" for token in REQUIRED_COLOR_TOKENS)
+    for role in TYPOGRAPHY_ROLES:
+        token = _camel_to_kebab(role)
+        definition = type_roles[role]
+        lines.extend(
+            (
+                f"  --text-axis-{token}: {definition['size']};",
+                f"  --text-axis-{token}--line-height: {definition['lineHeight']};",
+                f"  --font-weight-axis-{token}: {definition['weight']};",
+            )
+        )
+    for role in SPACING_ROLES:
+        lines.append(f"  --spacing-axis-{_camel_to_kebab(role)}: {spacing_roles[role]};")
+    for role in DENSITY_ROLES:
+        lines.append(f"  --spacing-axis-{_camel_to_kebab(role)}: {density_roles[role]};")
+    for role in ICON_ROLES:
+        lines.append(f"  --spacing-axis-icon-{_camel_to_kebab(role)}: {icon_roles[role]};")
+    for role in RADIUS_ROLES:
+        lines.append(f"  --radius-axis-{_camel_to_kebab(role)}: {radius_roles[role]};")
+    for role in ELEVATION_ROLES:
+        lines.append(f"  --shadow-axis-{_camel_to_kebab(role)}: {elevation_roles[role]};")
+    for role in LAYER_ROLES:
+        lines.append(f"  --z-axis-{_camel_to_kebab(role)}: {layer_roles[role]};")
     lines.extend(
         (
-            "  --radius-sm: calc(var(--radius) * 0.6);",
-            "  --radius-md: calc(var(--radius) * 0.8);",
-            "  --radius-lg: var(--radius);",
-            "  --radius-xl: calc(var(--radius) * 1.4);",
-            "  --radius-2xl: calc(var(--radius) * 1.8);",
-            "  --radius-3xl: calc(var(--radius) * 2.2);",
-            "  --radius-4xl: calc(var(--radius) * 2.6);",
+            f"  --transition-duration-axis-state: {motion_roles['stateDuration']};",
+            f"  --transition-duration-axis-floating: {motion_roles['floatingDuration']};",
+            f"  --ease-axis-state: {motion_roles['easing']};",
+            f"  --default-transition-duration: {motion_roles['stateDuration']};",
+            f"  --default-transition-timing-function: {motion_roles['easing']};",
+            "  --radius-sm: var(--radius-axis-flat);",
+            "  --radius-md: var(--radius-axis-control);",
+            "  --radius-lg: var(--radius-axis-control);",
+            "  --radius-xl: var(--radius-axis-floating);",
+            "  --radius-2xl: var(--radius-axis-managed);",
+            "  --radius-3xl: var(--radius-axis-managed);",
+            "  --radius-4xl: var(--radius-axis-managed);",
             "}",
             "",
         )
@@ -189,9 +443,35 @@ def _render_web_theme(theme: dict[str, Any]) -> str:
         lines.append(f"{selector} {{")
         scheme = colors[scheme_name]
         lines.extend(f"  --{token}: {scheme[token]};" for token in REQUIRED_COLOR_TOKENS)
-        lines.append(f"  --radius: {theme['radius']};")
+        lines.append(f"  --radius: {radius_roles['control']};")
         lines.extend(("}", ""))
     return "\n".join(lines)
+
+
+def _camel_to_kebab(value: str) -> str:
+    return re.sub(r"(?<!^)(?=[A-Z])", "-", value).lower()
+
+
+def _render_web_theme_runtime(theme: dict[str, Any]) -> str:
+    motion = theme["ui"]["motionRoles"]
+    return "\n".join(
+        (
+            "// <auto-generated />",
+            "// Generated from theme/axis-theme.json by `python scripts/axis.py generate theme`.",
+            "",
+            "export const axisUiTiming = {",
+            "  feedback: {",
+            f"    delayMs: {motion['feedbackDelayMs']},",
+            f"    minimumMs: {motion['feedbackMinimumMs']},",
+            "  },",
+            "  contextTransition: {",
+            f"    delayMs: {motion['contextDelayMs']},",
+            f"    minimumMs: {motion['contextMinimumMs']},",
+            "  },",
+            "} as const;",
+            "",
+        )
+    )
 
 
 def _linear_to_srgb(value: float) -> float:
@@ -217,6 +497,25 @@ def _oklch_to_srgb(value: str) -> tuple[float, float, float]:
     green = -1.2684380046 * l_value + 2.6097574011 * m_value - 0.3413193965 * s_value
     blue = -0.0041960863 * l_value - 0.7034186147 * m_value + 1.707614701 * s_value
     return tuple(max(0.0, min(1.0, _linear_to_srgb(channel))) for channel in (red, green, blue))
+
+
+def _relative_luminance(rgb: tuple[float, float, float]) -> float:
+    linear = tuple(
+        channel / 12.92 if channel <= 0.04045 else ((channel + 0.055) / 1.055) ** 2.4
+        for channel in rgb
+    )
+    return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2]
+
+
+def _contrast_ratio(foreground: str, background: str) -> float:
+    values = sorted(
+        (
+            _relative_luminance(_oklch_to_srgb(foreground)),
+            _relative_luminance(_oklch_to_srgb(background)),
+        ),
+        reverse=True,
+    )
+    return (values[0] + 0.05) / (values[1] + 0.05)
 
 
 def _rgb_to_hex(rgb: tuple[float, float, float]) -> str:
@@ -276,6 +575,7 @@ def render_theme_artifacts(root: Path) -> dict[Path, str]:
     theme = load_theme(root)
     return {
         WEB_THEME_OUTPUT: _render_web_theme(theme),
+        WEB_THEME_RUNTIME_OUTPUT: _render_web_theme_runtime(theme),
         EMAIL_THEME_OUTPUT: _render_email_theme(theme),
     }
 
@@ -318,6 +618,7 @@ def is_theme_path(path: str) -> bool:
     return normalized in {
         str(THEME_SOURCE),
         str(WEB_THEME_OUTPUT),
+        str(WEB_THEME_RUNTIME_OUTPUT),
         str(EMAIL_THEME_OUTPUT),
         "frontend/src/index.css",
         "scripts/axis_theme.py",

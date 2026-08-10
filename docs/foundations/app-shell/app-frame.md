@@ -17,7 +17,7 @@ Provide the shared frame for authenticated Axis Platform routes without owning d
 ## Guarantees
 
 - Renders authenticated route content within shared top-bar, main-content, and footer regions.
-- Presents product identity, page context, profile context, preferences, and sign-out entry points without taking ownership of their workflows.
+- Presents product identity, page context, signed-in identity, eligible Workspace context, preferences, and sign-out entry points without taking ownership of their workflows.
 - Keeps route content full-width and leaves route-specific layout decisions to the consuming route.
 - Presents version and copyright metadata in the footer.
 
@@ -31,7 +31,7 @@ Provide the shared frame for authenticated Axis Platform routes without owning d
 ## Acceptance Criteria
 
 - **AC-001** Authenticated routes render page content inside the shared app frame.
-- **AC-002** The frame exposes a top bar with product identity, page context, profile context, and one account-actions entry point that groups preferences and sign-out.
+- **AC-002** The frame exposes a top bar with product identity, page context, and one account-actions entry point ordered as signed-in identity, one flat eligible-Workspace choice set, preferences, then spatially separated sign-out.
 - **AC-003** The frame exposes footer app metadata with version information and Axis Platform copyright.
 
 *Quality*
@@ -42,8 +42,8 @@ Provide the shared frame for authenticated Axis Platform routes without owning d
 
 | ID | Boundary | Scenario | Covers AC | Verification | Required |
 |---|---|---|---|---|---|
-| AT-001 | UI component | App frame renders top bar, main content, footer metadata, and grouped account actions without a placeholder route navigation bar. | AC-001, AC-002, AC-003, AC-006 | UI component test | Yes |
-| AT-002 | Browser journey | Desktop and mobile frame render an empty route surface, footer metadata, and account actions without a placeholder route navigation bar, console errors, document-level overflow, or shell-level content width caps. | AC-001, AC-002, AC-003, AC-005 | Browser automation | Yes |
+| AT-001 | UI component | App frame renders top bar, main content, footer metadata, and the ordered account surface with stable semantic interaction rows without a placeholder route navigation bar. | AC-001, AC-002, AC-003, AC-006 | UI component test | Yes |
+| AT-002 | Browser journey | Desktop and mobile frame render an empty route surface, footer metadata, and the ordered account surface without a placeholder route navigation bar, console errors, document-level overflow, or shell-level content width caps. | AC-001, AC-002, AC-003, AC-005 | Browser automation | Yes |
 | AT-003 | Static frontend | Frame code typechecks, lints, and keeps localized copy keys valid. | AC-006 | Frontend CI | Yes |
 
 ## Out Of Scope
@@ -62,7 +62,7 @@ Provide the shared frame for authenticated Axis Platform routes without owning d
 |---|---|
 | Authenticated app frame | Render top bar, main content, and footer around authenticated route content. |
 | Top bar | Show the Axis Platform brand mark, page context, and a compact account trigger with profile context across the available viewport width. |
-| Account actions menu | Show language/theme preferences and sign-out without repeating profile summary or adding profile editing behavior. |
+| Account actions menu | Orient with the signed-in human identity, present one flat eligible-Workspace choice set with the current state, then language/theme preferences and a spatially separated sign-out action. Do not add profile editing or duplicate Personal/Organization grouping labels already conveyed by each option icon. |
 | Main content | Preserve the owning route content in a full-width, non-document-scrolling region, including an empty route surface when no product screen exists yet. |
 | Footer | Show version information on the left and Axis Platform copyright metadata on the right across the available viewport width. |
 
@@ -76,7 +76,7 @@ Required UI quality: frame landmarks and controls must be keyboard-reachable, vi
 > | Frontend | Done |
 > | Tests | Done |
 >
-> **Implemented:** Authenticated routes render inside the shared App Frame with top bar, full-width main content, and footer. The frame exposes profile context, groups preferences and sign-out, keeps visible copy localized, preserves an empty route surface, contains document-level overflow, does not impose route-content width caps, and shows footer version and copyright metadata. Placeholder route navigation remains absent until visible contributions exist.
+> **Implemented:** Authenticated routes render inside the shared App Frame with top bar, full-width main content, and footer. The frame exposes the signed-in identity, one flat eligible-Workspace choice set, preferences, and separated sign-out in semantic order; keeps visible copy localized; preserves an empty route surface; contains document-level overflow; does not impose route-content width caps; and shows footer version and copyright metadata. Placeholder route navigation remains absent until visible contributions exist.
 >
 > **Gaps vs spec:** N/A.
 >

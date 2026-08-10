@@ -542,7 +542,7 @@ describe('RulesPage', () => {
     expect(notice).not.toHaveTextContent('Private lifecycle detail');
   });
 
-  it('composes the frozen resource workspace for built-in and workspace rules', async () => {
+  it('composes the shared resource workspace for built-in and workspace rules', async () => {
     vi.mocked(fetch).mockImplementation((input) => Promise.resolve(respondForRules(input)));
 
     await renderWithRouter(<RulesPage />, { path: '/rules', authenticatedPath: 'rules' });
@@ -555,7 +555,14 @@ describe('RulesPage', () => {
     const createAction = within(catalog).getByRole('button', { name: 'New rule' });
 
     expect(page).toHaveAttribute('data-scroll-mode', 'contained');
-    expect(page).toHaveClass('h-full', 'min-h-0', 'gap-4', 'p-4', 'sm:p-6', 'lg:p-8');
+    expect(page).toHaveClass(
+      'h-full',
+      'min-h-0',
+      'gap-axis-region',
+      'p-axis-page-compact',
+      'sm:p-axis-page-default',
+      'lg:p-axis-page-wide',
+    );
     expect(header?.parentElement).toBe(page);
     expect(title).toHaveAttribute('data-slot', 'page-title');
     expect(title.closest('[data-slot="page-header"]')).toBe(header);
@@ -565,8 +572,14 @@ describe('RulesPage', () => {
     expect(
       within(catalog).queryByRole('columnheader', { name: 'Actions' }),
     ).not.toBeInTheDocument();
-    expect(recordAction).toHaveClass('min-h-11', 'min-w-11', 'sm:min-h-8', 'sm:min-w-8');
-    expect(createAction).toHaveClass('min-h-11', 'min-w-11', 'sm:min-h-8', 'sm:min-w-8');
+    for (const action of [recordAction, createAction]) {
+      expect(action).toHaveClass(
+        'min-h-axis-touch-target',
+        'min-w-axis-touch-target',
+        'sm:min-h-axis-compact-control',
+        'sm:min-w-axis-compact-control',
+      );
+    }
     expect(within(catalog).getByRole('button', { name: 'Credit threshold' })).toBeInTheDocument();
     expect(within(catalog).getByText('Value, Threshold')).toBeInTheDocument();
     expect(within(catalog).getByRole('columnheader', { name: 'Inputs' })).toBeInTheDocument();
