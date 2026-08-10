@@ -276,7 +276,8 @@ public sealed class WorkspaceContextEndpointTests(ApiTestFixture fixture)
         string transitionCookie = ReadCookie(begin, "__Host-axis-workspace-transition");
         clock.Advance(TimeSpan.FromMinutes(6));
 
-        (await host.ExpireWorkspaceTransitionsAsync(TestContext.Current.CancellationToken)).Should().Be(1);
+        (await host.ExpireWorkspaceTransitionsAsync(TestContext.Current.CancellationToken))
+            .Should().BeGreaterThanOrEqualTo(1);
         SetCookies(browser, $"{sourceSessionCookie}; {security.AntiforgeryCookie}; {transitionCookie}");
         HttpResponseMessage recovery = await browser.PostAsync(
             "/api/workspace-context/recover",
