@@ -112,7 +112,10 @@ describe('SignInPage', () => {
 
     await waitFor(() => expect(completePostSignInFlow).toHaveBeenCalledWith());
     expect(navigateMock).toHaveBeenCalledWith({ to: '/dashboard', replace: true });
-    expect(screen.getByRole('button', { name: /signing in/i })).toBeDisabled();
+    const signIn = screen.getByRole('button', { name: 'Sign in' });
+    expect(signIn).toBeDisabled();
+    expect(signIn).toHaveAttribute('aria-busy', 'true');
+    expect(screen.getByRole('status')).toHaveTextContent('Signing in');
     expect(signInBody?.email).toBe('alex@example.com');
     expect(signInBody?.password).toBe('  maple river sunrise  ');
   });

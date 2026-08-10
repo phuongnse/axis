@@ -116,23 +116,21 @@ describe('module navigation', () => {
     const businessObjectsLink = screen.getByRole('link', { name: 'Business objects' });
     expect(businessObjectsLink).toHaveAttribute('href', '/business-objects');
     expect(businessObjectsLink).toHaveClass(
-      'h-8',
-      'min-h-11',
-      'min-w-11',
+      'min-h-axis-touch-target',
+      'min-w-axis-touch-target',
       'md:min-h-0',
       'md:min-w-0',
       'md:w-full',
     );
     const navigationIcon = businessObjectsLink.querySelector('svg');
-    expect(navigationIcon).toHaveClass('size-5');
-    expect(navigationIcon).not.toHaveClass('size-4');
+    expect(navigationIcon).toHaveClass('size-axis-icon-navigation');
     expect(businessObjectsLink).toHaveClass(
       'hover:bg-accent',
       'hover:text-accent-foreground',
       'dark:hover:bg-accent',
       'transition-colors',
-      'duration-150',
-      'ease-out',
+      'duration-axis-state',
+      'ease-axis-state',
       'motion-reduce:transition-none',
     );
     expect(businessObjectsLink).not.toHaveClass('dark:hover:bg-muted/50');
