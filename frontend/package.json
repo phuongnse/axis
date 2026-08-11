@@ -15,7 +15,7 @@
     "preview": "vite preview",
     "shadcn": "shadcn",
     "test": "vitest run",
-    "test:axis-style-consumption": "node --test scripts/check-axis-style-consumption.test.mjs",
+    "test:axis-style-consumption": "node --test scripts/check-axis-style-consumption.fixtures.mjs",
     "check:axis-style-consumption": "node scripts/check-axis-style-consumption.mjs",
     "test:e2e": "playwright test",
     "gen:api-types": "openapi-ts -i ../openapi.json -o src/lib/api-generated -p @hey-api/typescript"
