@@ -279,6 +279,7 @@ test.describe('register user', () => {
     expect(from?.address).toBe('noreply@axis.localhost');
     expect(from?.name).toBe('Axis Platform');
     expect(message.subject).toBeTruthy();
+    expect(message.html ?? '').toContain('<html lang="vi">');
     expect(message.html ?? '').toContain('data-template="axis-transactional-email"');
     expect(message.html ?? '').toContain('/axis-logo.svg');
     expect(message.html ?? '').toContain('letter-spacing:0.18em');
