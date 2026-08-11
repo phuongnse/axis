@@ -1,4 +1,5 @@
 import { expect, type Locator, type Page, test } from '@playwright/test';
+import { expectCanonicalTestLanguage } from './canonical-test-language';
 
 const profile = {
   id: '11111111-1111-4111-8111-111111111111',
@@ -315,6 +316,7 @@ async function colorDistance(page: Page, first: string, second: string) {
 }
 
 async function expectAccountSurfaceScreenshot(page: Page, name: string): Promise<void> {
+  await expectCanonicalTestLanguage(page);
   const accountSurface = page.locator('[data-slot="account-surface"]');
   await expect(accountSurface).toBeVisible();
   await expect(accountSurface).toHaveAttribute('data-axis-surface-id', 'account-actions');
@@ -487,7 +489,7 @@ test.describe('app frame', () => {
     }
   });
 
-  test('AT-004 account surface visual contract covers EN light and dark desktop and compact while VI remains layout-safe', async ({
+  test('AT-004 account surface visual contract covers canonical EN light and dark desktop and compact', async ({
     page,
   }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
@@ -513,7 +515,7 @@ test.describe('app frame', () => {
     await page.goto('/dashboard', { waitUntil: 'domcontentloaded' });
     await expectAppFrameReady(page, 'Dashboard');
     await page.getByRole('button', { name: 'Account menu' }).click();
-    await expect(page.getByRole('button', { name: 'Personal workspace' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Personal' })).toBeVisible();
     await expect(page.locator('html')).toHaveAttribute('lang', 'en');
     await expect(page.locator('html')).not.toHaveClass(/dark/);
     await expectAccountRegionRhythmAndActionAffordance(page);
@@ -526,38 +528,9 @@ test.describe('app frame', () => {
     await expect(darkDesktopOption).not.toHaveAttribute('aria-busy');
     await expectAccountSurfaceScreenshot(page, 'account-surface-dark-desktop-en');
 
-    const vietnameseOption = page.getByRole('button', { name: 'Vietnamese' });
-    await invokePreferenceAction(page, vietnameseOption, 'language');
-    await expect(page.locator('html')).toHaveAttribute('lang', 'vi');
-    const selectedVietnameseOption = page.getByRole('button', { name: 'Tiếng Việt' });
-    await expect(selectedVietnameseOption).toHaveAttribute('aria-pressed', 'true');
-    await expect(selectedVietnameseOption).not.toHaveAttribute('aria-busy');
-    await expectAccountRegionRhythmAndActionAffordance(page);
-    await expectNoPageOverflow(page);
-
-    const lightVietnameseOption = page.getByRole('button', { name: 'Sáng' });
-    await invokePreferenceAction(page, lightVietnameseOption, 'theme');
-    await expect(page.locator('html')).not.toHaveClass(/dark/);
-    await expect(lightVietnameseOption).toHaveAttribute('aria-pressed', 'true');
-    await expect(lightVietnameseOption).not.toHaveAttribute('aria-busy');
-
     await page.setViewportSize({ width: 390, height: 844 });
     await expectAccountRegionRhythmAndActionAffordance(page);
     await expectNoPageOverflow(page);
-
-    const darkVietnameseOption = page.getByRole('button', { name: 'Tối' });
-    await invokePreferenceAction(page, darkVietnameseOption, 'theme');
-    await expect(page.locator('html')).toHaveClass(/dark/);
-    await expect(darkVietnameseOption).toHaveAttribute('aria-pressed', 'true');
-    await expect(darkVietnameseOption).not.toHaveAttribute('aria-busy');
-    await expectNoPageOverflow(page);
-
-    const englishOption = page.getByRole('button', { name: 'Tiếng Anh' });
-    await invokePreferenceAction(page, englishOption, 'language');
-    await expect(page.locator('html')).toHaveAttribute('lang', 'en');
-    const selectedEnglishOption = page.getByRole('button', { name: 'English' });
-    await expect(selectedEnglishOption).toHaveAttribute('aria-pressed', 'true');
-    await expect(selectedEnglishOption).not.toHaveAttribute('aria-busy');
     await expectAccountSurfaceScreenshot(page, 'account-surface-dark-compact-en');
 
     const lightCompactOption = page.getByRole('button', { name: 'Light' });
@@ -820,9 +793,7 @@ test.describe('app frame', () => {
       requestAnimationFrame(sample);
     });
 
-    const personalWorkspaceOption = accountView.getByRole('button', {
-      name: personalWorkspace.name,
-    });
+    const personalWorkspaceOption = accountView.getByRole('button', { name: 'Personal' });
     await personalWorkspaceOption.click();
     expect(await personalWorkspaceOption.getAttribute('aria-busy')).toBe('true');
     expect(await settledVisualState(personalWorkspaceOption)).toEqual(organizationCurrentState);
@@ -838,10 +809,7 @@ test.describe('app frame', () => {
     await expect(refreshStatus).toBeVisible();
     await expect(moduleNavigation).toBeVisible();
     await expect(moduleNavigation.getByRole('link', { name: 'Business objects' })).toBeVisible();
-    await expect(accountView.getByRole('button', { name: personalWorkspace.name })).toHaveAttribute(
-      'aria-current',
-      'page',
-    );
+    await expect(personalWorkspaceOption).toHaveAttribute('aria-current', 'page');
     await expect(accountTrigger).toContainText(profile.fullName);
     await expect(accountTrigger).toHaveAttribute('aria-expanded', 'true');
     await expectNoDocumentScroll(page);
@@ -882,7 +850,7 @@ test.describe('app frame', () => {
     await expectNoDocumentScroll(page);
 
     releaseSessionRestore();
-    await expect(accountView.getByRole('button', { name: personalWorkspace.name })).toBeEnabled();
+    await expect(personalWorkspaceOption).toBeEnabled();
     await expect(refreshStatus).toBeHidden();
     await expect(moduleNavigation).toBeVisible();
     await expect(moduleNavigation.getByRole('link', { name: 'Business objects' })).toBeVisible();

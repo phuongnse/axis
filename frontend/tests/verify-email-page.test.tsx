@@ -107,36 +107,6 @@ describe('VerifyEmailPage', () => {
     expect(navigateMock).toHaveBeenCalledWith({ to: '/dashboard', replace: true });
   });
 
-  it('localizes the verified handoff state in the selected language', async () => {
-    vi.mocked(fetch).mockResolvedValueOnce({
-      ok: true,
-      status: 200,
-      text: () =>
-        Promise.resolve(
-          JSON.stringify({
-            sessionEstablished: true,
-            nextStep: 'Dashboard',
-          }),
-        ),
-    } as unknown as Response);
-    vi.mocked(fetch).mockResolvedValueOnce(authenticatedSessionResponse());
-    await changeSiteLanguage('vi', { persist: false });
-
-    await renderWithRouter(<VerifyEmailPage />, { path: '/auth/verify?token=valid-token' });
-
-    expect(
-      await screen.findByRole('heading', { name: 'Email đã được xác minh' }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(
-        'Email của bạn đã được xác minh và tài khoản đã sẵn sàng. Bạn có thể tiếp tục ngay hoặc chúng tôi sẽ tự đưa bạn đến bảng điều khiển sau vài giây.',
-      ),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole('button', { name: 'Tiếp tục đến bảng điều khiển' }),
-    ).toBeInTheDocument();
-  });
-
   it('submits a verification token only once under React StrictMode', async () => {
     vi.mocked(fetch).mockResolvedValueOnce({
       ok: true,

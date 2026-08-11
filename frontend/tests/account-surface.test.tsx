@@ -58,7 +58,7 @@ function renderAccountSurface(overrides: Partial<ComponentProps<typeof AccountSu
           current: true,
           id: 'personal-workspace',
           kind: 'person',
-          label: 'Personal workspace',
+          label: 'Personal',
         },
         {
           current: false,
@@ -114,7 +114,7 @@ describe('AccountSurface', () => {
       'preferences',
       'actions',
     ]);
-    expect(screen.getByRole('button', { name: 'Personal workspace' })).toHaveAttribute(
+    expect(screen.getByRole('button', { name: 'Personal' })).toHaveAttribute(
       'aria-current',
       'page',
     );

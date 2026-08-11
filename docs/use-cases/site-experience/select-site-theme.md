@@ -107,7 +107,7 @@ Let a visitor or authenticated user choose how supported web surfaces resolve li
 | Theme persistence state | Show pending, retry, and non-blocking failure states without clearing route or form state. Successful saves do not need a visible confirmation message. |
 | System theme mode | Follow browser color-scheme preference and update the resolved presentation when that preference changes. |
 
-Required UI quality: theme controls must have programmatic labels, keyboard access, focus visibility, visible selected state, stable overlay behavior, and copy that fits in every supported language on supported mobile and desktop viewports.
+Required UI quality: theme controls must have programmatic labels, keyboard access, focus visibility, visible selected state, and stable overlay behavior. UI copy and perceptual evidence use the canonical English test locale owned by [docs/playbooks/frontend.md](../../playbooks/frontend.md#ux-first-product-ui).
 
 > **Implementation status**
 >

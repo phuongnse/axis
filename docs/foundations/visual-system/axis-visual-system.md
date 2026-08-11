@@ -143,7 +143,7 @@ Requested and authorized work remains task-local. Contracts enter `frontend/ui-f
 > | Frontend | Partial |
 > | Tests | Partial |
 >
-> **Gaps vs spec:** Account is the only manifest contract at `enforced`, backed by its version-controlled EN light/dark × desktop/compact baseline set and current comparison run; VI behavior and layout remain covered by structural browser assertions without creating a second mutable visual source of truth. Authenticated Frame, Entry, Resource Workspace, Managed Task Window, and Process Workbench remain explicitly `defined` until each has equivalent perceptual evidence; their existing component and browser journeys do not advance this visual-system lifecycle state by themselves. Authenticated Frame's owning App Frame foundation remains `Done` under its own acceptance matrix; the stricter cross-mode perceptual claim here is intentionally separate.
+> **Gaps vs spec:** Account is the only manifest contract at `enforced`, backed by its version-controlled canonical EN light/dark × desktop/compact baseline set and current comparison run. Authenticated Frame, Entry, Resource Workspace, Managed Task Window, and Process Workbench remain explicitly `defined` until each has equivalent perceptual evidence; their existing component and browser journeys do not advance this visual-system lifecycle state by themselves. Authenticated Frame's owning App Frame foundation remains `Done` under its own acceptance matrix; the stricter cross-mode perceptual claim here is intentionally separate.
 >
 > **Deferred follow-ups:** N/A; missing contract evidence remains current work and cannot be converted into an exception.
 >

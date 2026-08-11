@@ -26,7 +26,7 @@ Provide the shared frame for authenticated Axis Platform routes without owning d
 | Region | Relationship | Presentation contract |
 |---|---|---|
 | Signed-in identity | Orientation | Leading-aligned identity content with one owner-controlled region inset. |
-| Workspace and preferences | Choices | Section labels and option rows share one leading scan axis; each region owns its symmetric inset and compact internal rhythm. |
+| Workspace and preferences | Choices | Section labels and option rows share one leading scan axis; each region owns its symmetric inset and compact internal rhythm. The personal Workspace uses the localized `Personal` relationship label, while Organization workspaces retain their projected names. |
 | Standalone section actions | Action | Create Organization and sign-out share centered geometry; destructive tone changes emphasis, not placement. |
 | Feedback and recovery | Result and action | Feedback stays adjacent to its owning region without changing action names, geometry, or the surface scroll owner. |
 
@@ -73,7 +73,7 @@ Separators mark major region boundaries and do not supply layout spacing. Featur
 |---|---|
 | Authenticated app frame | Render top bar, main content, and footer around authenticated route content. |
 | Top bar | Show the Axis Platform brand mark, page context, and a compact account trigger with profile context across the available viewport width. |
-| Account actions menu | Orient with the signed-in human identity, present one flat eligible-Workspace choice set with the current state, then language/theme preferences and a spatially separated sign-out action. Keep choices leading-aligned and render Create Organization plus sign-out as the same centered standalone-action role with independent tone. Do not add profile editing or duplicate Personal/Organization grouping labels already conveyed by each option icon. |
+| Account actions menu | Orient with the signed-in human identity, present one flat eligible-Workspace choice set with the current state, then language/theme preferences and a spatially separated sign-out action. Label the personal relationship `Personal` through the frontend translation layer instead of repeating the signed-in person's name; retain projected names for Organization workspaces. Keep choices leading-aligned and render Create Organization plus sign-out as the same centered standalone-action role with independent tone. Do not add profile editing or separate Personal/Organization grouping labels already conveyed by each option icon. |
 | Main content | Preserve the owning route content in a full-width, non-document-scrolling region, including an empty route surface when no product screen exists yet. |
 | Footer | Show version information on the left and Axis Platform copyright metadata on the right across the available viewport width. |
 

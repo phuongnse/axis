@@ -1,4 +1,5 @@
 import { expect, type Locator, type Page, type TestInfo, test } from '@playwright/test';
+import { expectCanonicalTestLanguage } from './canonical-test-language';
 
 const profile = {
   id: '11111111-1111-4111-8111-111111111111',
@@ -699,6 +700,7 @@ function seededDefinitions(count: number): BusinessObjectDefinitionDetail[] {
 }
 
 async function attachGoldenScreenshot(page: Page, testInfo: TestInfo, name: string): Promise<void> {
+  await expectCanonicalTestLanguage(page);
   await page.evaluate(() => {
     if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
     document
@@ -795,11 +797,11 @@ test.describe('define business object', () => {
     await expect(page.getByRole('dialog', { name: 'Define business object' })).toHaveCount(0);
   });
 
-  test('AT-004 resource workspace visual matrix stays touch-safe and motion-safe', async ({
+  test('AT-004 canonical EN resource workspace visual matrix stays touch-safe and motion-safe', async ({
     page,
   }, testInfo) => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
-    await mockAuthenticatedSession(page, { language: 'vi', theme: 'light' });
+    await mockAuthenticatedSession(page, { language: 'en', theme: 'light' });
     await mockBusinessObjectDefinitionApi(page, { initialDefinitions: seededDefinitions(20) });
     await page.route('**/api/users/me/preferences/theme', async (route) => {
       const theme = JSON.parse(route.request().postData() ?? '{}').theme ?? 'light';
@@ -813,28 +815,28 @@ test.describe('define business object', () => {
     await page.setViewportSize({ width: 1280, height: 720 });
     await page.goto('/business-objects');
 
-    await expect(page.locator('html')).toHaveAttribute('lang', 'vi');
+    await expect(page.locator('html')).toHaveAttribute('lang', 'en');
     await expect(page.locator('html')).not.toHaveClass(/dark/);
     await expect(
       page.getByRole('heading', { name: 'Business objects', exact: true }),
     ).toBeVisible();
-    const description = page.getByText('Định nghĩa contract dữ liệu dùng lại trong workspace.', {
-      exact: false,
-    });
+    const description = page.getByText(
+      'Define reusable data contracts for this workspace. Unpublished definitions stay editable; published versions are stable.',
+    );
     await expect(description).toBeVisible();
-    const catalog = page.getByRole('region', { name: 'Danh sách định nghĩa' });
+    const catalog = page.getByRole('region', { name: 'Definitions' });
     const toolbar = catalog.locator('[data-slot="data-table-toolbar"]');
     await expect(toolbar).toBeVisible();
-    await expect(toolbar.getByLabel('Tìm business object')).toBeVisible();
+    await expect(toolbar.getByLabel('Search business objects')).toBeVisible();
     await expect(toolbar.locator('[data-slot="data-table-toolbar-actions"]')).toBeVisible();
     await expectDataTableScrollsInternally(page);
     await expectDataTableFitsHorizontally(page);
     await expectNoDesktopDocumentScroll(page);
     await expectNoPageOverflow(page);
-    await attachGoldenScreenshot(page, testInfo, 'business-objects-light-desktop-vi');
+    await attachGoldenScreenshot(page, testInfo, 'business-objects-light-desktop-en');
 
     await page.setViewportSize({ width: 390, height: 844 });
-    const newDefinition = page.getByRole('button', { name: 'Định nghĩa mới' });
+    const newDefinition = page.getByRole('button', { name: 'New definition' });
     await expect(newDefinition).toBeVisible();
     const actionBox = await newDefinition.boundingBox();
     expect(actionBox?.width ?? 0).toBeGreaterThanOrEqual(44);
@@ -855,7 +857,7 @@ test.describe('define business object', () => {
     await expectActiveModuleNavigationItemIsRevealed(page);
     await expectNoDesktopDocumentScroll(page);
     await expectNoPageOverflow(page);
-    await attachGoldenScreenshot(page, testInfo, 'business-objects-light-compact-vi');
+    await attachGoldenScreenshot(page, testInfo, 'business-objects-light-compact-en');
 
     const rulesLink = page.getByRole('link', { name: 'Rules' });
     const restingBackground = await rulesLink.evaluate(
@@ -867,11 +869,11 @@ test.describe('define business object', () => {
       .not.toBe(restingBackground);
     await expectReducedMotion(rulesLink);
 
-    await page.getByRole('button', { name: 'Menu tài khoản' }).click();
-    const accountMenu = page.locator('[data-slot="popover-content"][aria-label="Menu tài khoản"]');
+    await page.getByRole('button', { name: 'Account menu' }).click();
+    const accountMenu = page.locator('[data-axis-surface-id="account-actions"]');
     await expect(accountMenu).toBeVisible();
     await expectReducedMotion(accountMenu);
-    await page.getByRole('button', { name: 'Tối' }).click();
+    await page.getByRole('button', { name: 'Dark' }).click();
     await expect(page.locator('html')).toHaveClass(/dark/);
     await page.keyboard.press('Escape');
     await expect(newDefinition).toBeVisible();
@@ -880,14 +882,14 @@ test.describe('define business object', () => {
       'page',
     );
     await expectNoPageOverflow(page);
-    await attachGoldenScreenshot(page, testInfo, 'business-objects-dark-compact-vi');
+    await attachGoldenScreenshot(page, testInfo, 'business-objects-dark-compact-en');
 
     await page.setViewportSize({ width: 1280, height: 720 });
     await expectDataTableScrollsInternally(page);
     await expectDataTableFitsHorizontally(page);
     await expectNoDesktopDocumentScroll(page);
     await expectNoPageOverflow(page);
-    await attachGoldenScreenshot(page, testInfo, 'business-objects-dark-desktop-vi');
+    await attachGoldenScreenshot(page, testInfo, 'business-objects-dark-desktop-en');
   });
 
   test('AT-005 resource workspace integrates independent managed definition windows', async ({

@@ -103,7 +103,7 @@ Let a visitor or authenticated user view supported web surfaces in a supported l
 | Authenticated app shell | Load server-persisted user language when available, apply it as source of truth, and expose language selection in an authenticated surface. |
 | Language persistence state | Show pending, retry, and non-blocking failure states without clearing route or form state. Successful saves do not need a visible confirmation message. |
 
-Required UI quality: language controls must have programmatic labels, keyboard access, focus visibility, visible selected state, stable overlay behavior, and copy that fits in every supported language on supported mobile and desktop viewports.
+Required UI quality: language controls must have programmatic labels, keyboard access, focus visibility, visible selected state, and stable overlay behavior. UI copy and perceptual evidence use the canonical English test locale; localization evidence separately proves supported-locale catalog parity, selection, persistence, and document state without asserting secondary-locale wording.
 
 ## Diagrams
 

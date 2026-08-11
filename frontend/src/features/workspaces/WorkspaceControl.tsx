@@ -60,6 +60,7 @@ export function useWorkspaceControl({
   onRetryContext,
   onWorkspaceChange,
 }: WorkspaceControlProps): WorkspaceControlModel {
+  const { t } = useTranslation();
   const [createOpen, setCreateOpen] = useState(false);
   const eligibleQuery = useQuery({
     queryKey: workspaceKeys.eligible,
@@ -102,7 +103,7 @@ export function useWorkspaceControl({
         current: workspace.isCurrent,
         id: workspace.workspaceId,
         kind: workspace.type === 'Personal' ? 'person' : 'organization',
-        label: workspace.name,
+        label: workspace.type === 'Personal' ? t('workspace.personal') : workspace.name,
         pending: switching && contextState.targetWorkspaceId === workspace.workspaceId,
       })),
     },

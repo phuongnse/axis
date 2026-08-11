@@ -4,7 +4,6 @@ import { useTranslation } from 'react-i18next';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useAuthStore } from '@/features/auth/auth-store';
 import {
-  changeSiteLanguage,
   PreferencesMenu,
   PreferencesProfileSync,
   resolveInitialThemeMode,
@@ -278,18 +277,5 @@ describe('theme preferences', () => {
     expect(localStorage.getItem(THEME_STORAGE_KEY)).toBe('dark');
     expect(await screen.findByText('Theme not saved across devices.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /retry/i })).toBeInTheDocument();
-  });
-
-  it('localizes theme controls inside the preferences menu', async () => {
-    const user = userEvent.setup();
-    await changeSiteLanguage('vi', { persist: false });
-    await renderWithRouter(<PreferencesMenu />, { path: '/register' });
-
-    await user.click(screen.getByRole('button', { name: 'Tùy chọn' }));
-
-    expect(screen.getByText('Giao diện')).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Tối' }));
-
-    expect(document.documentElement.dataset.themeMode).toBe('dark');
   });
 });

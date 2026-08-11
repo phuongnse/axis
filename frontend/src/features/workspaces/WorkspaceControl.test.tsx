@@ -129,6 +129,10 @@ function renderControl(
   return { ...view, onRetryContext, onWorkspaceChange };
 }
 
+function findCurrentWorkspaceOption() {
+  return screen.findByRole('button', { current: 'page' });
+}
+
 describe('useWorkspaceControl', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -163,18 +167,27 @@ describe('useWorkspaceControl', () => {
     vi.mocked(listEligibleWorkspaces).mockResolvedValue([personalWorkspace, organizationWorkspace]);
   });
 
+  it('uses the canonical personal relationship label and preserves Organization names', async () => {
+    vi.mocked(listEligibleWorkspaces).mockResolvedValue([
+      { ...personalWorkspace, name: 'Phương' },
+      organizationWorkspace,
+    ]);
+
+    renderControl();
+
+    expect(await screen.findByRole('button', { name: 'Personal' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Acme Operations' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Phương' })).not.toBeInTheDocument();
+  });
+
   it('presents one flat Workspace choice set, marks current, and prevents a competing switch while pending', async () => {
     const user = userEvent.setup();
     const onWorkspaceChange = vi.fn(async () => 'entered' as WorkspaceChangeResult);
     const view = renderControl(onWorkspaceChange);
 
     const workspaceSection = screen.getByRole('region', { name: 'Workspace' });
-    await screen.findByRole('button', { name: 'Personal workspace' });
+    const currentWorkspace = await findCurrentWorkspaceOption();
     expect(screen.getByRole('region', { name: 'Eligible Workspaces' })).toBeInTheDocument();
-    expect(screen.queryByText('Choose Workspace')).not.toBeInTheDocument();
-    expect(screen.queryByText('Personal Workspace')).not.toBeInTheDocument();
-    expect(screen.queryByText('Organization Workspaces')).not.toBeInTheDocument();
-    const currentWorkspace = screen.getByRole('button', { name: 'Personal workspace' });
     expect(currentWorkspace).toHaveAttribute('aria-current', 'page');
     const organizationChoice = screen.getByRole('button', { name: 'Acme Operations' });
 
@@ -201,19 +214,16 @@ describe('useWorkspaceControl', () => {
     expect(screen.getByRole('button', { name: 'Acme Operations' })).not.toHaveAttribute(
       'aria-current',
     );
-    expect(screen.getByRole('button', { name: 'Personal workspace' })).toHaveAttribute(
-      'aria-current',
-      'page',
-    );
+    expect(currentWorkspace).toHaveAttribute('aria-current', 'page');
     expect(await screen.findByText('Switching Workspace...')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Personal workspace' })).toBeDisabled();
+    expect(currentWorkspace).toBeDisabled();
   });
 
   it('does not flash loading feedback when eligible Workspaces resolve quickly', async () => {
     renderControl();
 
     expect(screen.queryByText('Loading eligible Workspaces...')).not.toBeInTheDocument();
-    expect(await screen.findByRole('button', { name: 'Personal workspace' })).toBeInTheDocument();
+    expect(await findCurrentWorkspaceOption()).toBeInTheDocument();
     expect(screen.queryByText('Loading eligible Workspaces...')).not.toBeInTheDocument();
   });
 
@@ -226,7 +236,7 @@ describe('useWorkspaceControl', () => {
     });
     const { onWorkspaceChange } = renderControl();
 
-    await screen.findByRole('button', { name: 'Personal workspace' });
+    await findCurrentWorkspaceOption();
     await user.click(screen.getByRole('button', { name: 'Create Organization' }));
     const name = screen.getByRole('textbox', { name: 'Organization name' });
     await user.type(name, 'A');
@@ -286,7 +296,7 @@ describe('useWorkspaceControl', () => {
       onRetryContext,
     );
 
-    await screen.findByRole('button', { name: 'Personal workspace' });
+    await findCurrentWorkspaceOption();
     expect(screen.getByText(/could not be confirmed/i)).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Retry refresh' }));
 
@@ -303,7 +313,7 @@ describe('useWorkspaceControl', () => {
       },
     );
 
-    await screen.findByRole('button', { name: 'Personal workspace' });
+    await findCurrentWorkspaceOption();
     expect(screen.getByText(/Workspace did not change/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Acme Operations' })).toBeEnabled();
   });
@@ -321,7 +331,7 @@ describe('useWorkspaceControl', () => {
       onRetryContext,
     );
 
-    await screen.findByRole('button', { name: 'Personal workspace' });
+    await findCurrentWorkspaceOption();
     expect(document.body).toHaveTextContent(/new Workspace context could not be loaded/i);
     await user.click(screen.getByRole('button', { name: 'Retry refresh' }));
 
