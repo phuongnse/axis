@@ -20,7 +20,7 @@ Define one product-level visual and interaction grammar so Axis remains coherent
 ## Guarantees
 
 - Axis is a calm, precise, data-first enterprise workspace. Neutral hierarchy carries structure; brand color marks primary intent; semantic color communicates meaning.
-- [theme/axis-theme.json](../../../theme/axis-theme.json) is the sole machine-readable source for reusable visual values and timing. The generated CSS and runtime projection are the only implementation inputs for those values.
+- [theme/axis-theme.json](../../../theme/axis-theme.json) is the sole machine-readable source for reusable visual values and timing. The generated CSS and typed runtime projection are the only implementation inputs for those values.
 - This constitution owns semantic roles and invariants. Upstream primitives own accessible mechanics; app patterns map roles to reusable composition; features own product state, content, relationships, and outer layout only.
 - Equivalent meaning looks and behaves equivalently across navigation, tables, forms, menus, windows, dialogs, and compact or desktop layouts.
 - A component may change provider, markup, or internal implementation without changing product meaning. A component-specific test proves its mapping; it cannot establish a new product convention.
@@ -53,7 +53,7 @@ Dependencies flow in that order only. A feature cannot import a lower-level prov
 | Motion | state, floating, content-pending, context | Motion communicates causality, uses opacity or transform, is interruptible, and respects reduced motion. |
 | Layer | base, sticky, floating, modal, managed, notification | Layer order is semantic and finite; components do not invent numeric stacking values. |
 
-Exact role values live only in [theme/axis-theme.json](../../../theme/axis-theme.json). Product code consumes generated semantic names rather than copying their current numbers.
+Exact role values live only in [theme/axis-theme.json](../../../theme/axis-theme.json). The generator projects those roles into CSS, the typed `axisStyles` runtime contract, and its Tailwind merge semantics so independent roles are preserved and equivalent roles resolve deterministically. Authored product code composes that typed contract with standard utilities; it does not spell reusable `*-axis-*` utilities or copy their current values. The parser-backed consumption gate prevents that bypass, while the generated contract—not a deny-list of class names—remains the source of truth.
 
 ## Interaction state model
 
@@ -121,8 +121,8 @@ Requested and authorized work remains task-local. Contracts enter `frontend/ui-f
 
 | ID | Boundary | Scenario | Covers AC | Verification | Required |
 |---|---|---|---|---|---|
-| AT-001 | Static frontend | Strict semantic schema deterministically projects CSS and runtime values and rejects missing, unknown, or stale roles. | AC-001, AC-002, AC-003 | Frontend CI | Yes |
-| AT-002 | Static frontend | Ownership checks reject hard-coded semantic values, provider leakage, feature-local interaction visuals, and manifest/status drift. | AC-001, AC-006, AC-007 | Frontend CI | Yes |
+| AT-001 | Static frontend | Strict semantic schema deterministically projects CSS and a typed runtime style contract and rejects missing, unknown, or stale roles. | AC-001, AC-002, AC-003 | Frontend CI | Yes |
+| AT-002 | Static frontend | Ownership checks reject bypass of the generated style contract, hard-coded semantic values, provider leakage, feature-local interaction visuals, and manifest/status drift. | AC-001, AC-006, AC-007 | Frontend CI | Yes |
 | AT-003 | UI component | Representative role mappings prove hierarchy, state priority, async geometry, scroll ownership, accessibility, and reduced motion without establishing component-local policy. | AC-002, AC-003, AC-004, AC-005 | UI component test | Yes |
 | AT-004 | Layout smoke | Each registered surface contract proves its representative states in light/dark and desktop/compact layouts without document overflow or console errors. | AC-002, AC-004, AC-005 | Browser automation | Yes |
 | AT-005 | Browser journey | Pointer and keyboard task flow proves independent managed work, focus, draft, pending, recovery, navigation, and context continuity. | AC-003, AC-004, AC-005 | Browser automation | Yes |
@@ -143,7 +143,7 @@ Requested and authorized work remains task-local. Contracts enter `frontend/ui-f
 > | Frontend | Partial |
 > | Tests | Partial |
 >
-> **Gaps vs spec:** Account is the only manifest contract at `enforced`, backed by its version-controlled light/dark × desktop/compact × EN/VI baseline set and current comparison run. Authenticated Frame, Entry, Resource Workspace, Managed Task Window, and Process Workbench remain explicitly `defined` until each has equivalent perceptual evidence; their existing component and browser journeys do not advance this visual-system lifecycle state by themselves. Authenticated Frame's owning App Frame foundation remains `Done` under its own acceptance matrix; the stricter cross-mode perceptual claim here is intentionally separate.
+> **Gaps vs spec:** Account is the only manifest contract at `enforced`, backed by its version-controlled EN light/dark × desktop/compact baseline set and current comparison run; VI behavior and layout remain covered by structural browser assertions without creating a second mutable visual source of truth. Authenticated Frame, Entry, Resource Workspace, Managed Task Window, and Process Workbench remain explicitly `defined` until each has equivalent perceptual evidence; their existing component and browser journeys do not advance this visual-system lifecycle state by themselves. Authenticated Frame's owning App Frame foundation remains `Done` under its own acceptance matrix; the stricter cross-mode perceptual claim here is intentionally separate.
 >
 > **Deferred follow-ups:** N/A; missing contract evidence remains current work and cannot be converted into an exception.
 >

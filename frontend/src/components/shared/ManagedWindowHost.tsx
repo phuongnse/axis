@@ -22,6 +22,8 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { cn } from '@/lib/utils';
+import { axisStyles } from '@/theme.generated';
 
 export function ManagedWindowHost() {
   const { t } = useTranslation();
@@ -54,7 +56,10 @@ export function ManagedWindowHost() {
       <div
         ref={manager.setPortalContainer}
         data-slot="managed-window-expanded-layer"
-        className="pointer-events-none absolute inset-0 z-axis-modal overflow-hidden"
+        className={cn(
+          'pointer-events-none absolute inset-0 overflow-hidden',
+          axisStyles.layer.modal,
+        )}
       />
 
       {entries.map(([windowId, entry]) => {
@@ -92,7 +97,11 @@ export function ManagedWindowHost() {
       {hasWindows ? (
         <div
           data-slot="managed-window-tray"
-          className="pointer-events-none absolute inset-x-3 bottom-2 z-axis-managed flex h-12 min-w-0 items-stretch justify-end gap-axis-inline"
+          className={cn(
+            'pointer-events-none absolute inset-x-3 bottom-2 flex h-12 min-w-0 items-stretch justify-end',
+            axisStyles.layer.managed,
+            axisStyles.spacing.gap.inline,
+          )}
         >
           <WindowMenu
             label={t('dialog.windows', { count: entries.length })}
@@ -120,7 +129,13 @@ export function ManagedWindowHost() {
               data-slot="managed-window-dock"
               data-window-id={windowId}
               data-dialog-preset={entry.preset}
-              className="pointer-events-auto flex min-w-0 max-w-64 flex-1 items-center overflow-hidden rounded-axis-managed bg-popover text-axis-body font-axis-body text-popover-foreground shadow-axis-dock ring-1 ring-foreground/10 sm:w-64 sm:flex-none"
+              className={cn(
+                'pointer-events-auto flex min-w-0 max-w-64 flex-1 items-center overflow-hidden bg-popover text-popover-foreground ring-1 ring-foreground/10 sm:w-64 sm:flex-none',
+                axisStyles.radius.managed,
+                axisStyles.typography.scale.body,
+                axisStyles.typography.weight.body,
+                axisStyles.elevation.dock,
+              )}
             >
               <Button
                 data-action="restore"

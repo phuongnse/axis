@@ -1,6 +1,8 @@
 import type { ComponentProps, ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
+import { cn } from '@/lib/utils';
+import { axisStyles } from '@/theme.generated';
 
 type AsyncButtonProps = Omit<ComponentProps<typeof Button>, 'children'> & {
   children: string;
@@ -27,7 +29,7 @@ export function AsyncButton({
     >
       <span
         data-slot="async-button-icon"
-        className="flex size-axis-icon-control shrink-0 items-center justify-center"
+        className={cn('flex shrink-0 items-center justify-center', axisStyles.icon.size.control)}
         aria-hidden
       >
         {pending ? <Spinner /> : icon}

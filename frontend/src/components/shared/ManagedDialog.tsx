@@ -28,6 +28,7 @@ import {
 } from '@/components/ui/dialog';
 import { type SurfaceIdFor, surfaceContractAttributes } from '@/lib/ui-foundation';
 import { cn } from '@/lib/utils';
+import { axisStyles } from '@/theme.generated';
 
 const COMPACT_VIEWPORT_WIDTH = 640;
 const WINDOWED_DIALOG_WIDTH_SCALE = 0.5;
@@ -304,7 +305,13 @@ export function ManagedDialog({
               event.preventDefault();
               toggleMaximize();
             }}
-            className="pointer-events-auto overflow-hidden rounded-axis-managed bg-popover text-axis-body font-axis-body text-popover-foreground shadow-axis-managed ring-1 ring-foreground/10"
+            className={cn(
+              'pointer-events-auto overflow-hidden bg-popover text-popover-foreground ring-1 ring-foreground/10',
+              axisStyles.radius.managed,
+              axisStyles.typography.scale.body,
+              axisStyles.typography.weight.body,
+              axisStyles.elevation.managed,
+            )}
             style={{ display: 'flex', flexDirection: 'column' }}
           >
             <div

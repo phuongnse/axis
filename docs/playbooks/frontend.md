@@ -61,7 +61,7 @@ Treat component visuals as mappings of the constitution, not independent convent
 Use these ownership layers:
 
 - **Upstream zone** — `frontend/src/components/ui` plus baseline-tracked shadcn support files contain reviewed registry source. Keep registry-default visuals and APIs; do not add product variants, business logic, feature/shared imports, or internal styling. `frontend/ui-baseline.json` records the approved snapshot and the reason/sign-off reference for each explicit exception.
-- **Theme zone** — [theme/axis-theme.json](../../theme/axis-theme.json) owns reusable color, typography, spacing, density, radius, elevation, icon, motion, and layer values. Generated CSS and runtime TypeScript are committed; `frontend/src/index.css` owns imports and base styles only. Consumers use semantic roles rather than copying current values.
+- **Theme zone** — [theme/axis-theme.json](../../theme/axis-theme.json) owns reusable color, typography, spacing, density, radius, elevation, icon, motion, and layer values. Generated CSS, typed runtime roles, and their merge semantics are committed; `frontend/src/index.css` owns imports and base styles only. Authored consumers compose the generated `axisStyles` roles with standard utilities rather than copying values or spelling reusable `*-axis-*` utilities.
 - **App-pattern zone** — `frontend/src/components/shared` owns reusable Axis composition and adapters. Give a surface owner narrow semantic props: leaf content stays inside owner-rendered anatomy; regions with their own states, relationships, or actions use typed models rendered by the owner.
 - **Feature zone** — feature components compose defaults and app patterns. They provide product data, state, and commands; they do not pass visual or mechanical capability across a surface boundary.
 
@@ -77,7 +77,7 @@ Use `$axis-ui-system` for constitution/theme decisions, registry diffs, baseline
 
 ## Styling
 
-Use Tailwind utilities consistently. Outside the upstream and theme zones, use semantic tokens and standard utilities only: no hard-coded palette utilities, arbitrary Tailwind values, component-local colors, selector-based custom CSS, or one-off visual systems. Remove obsolete styling and component API surface when the UI path that used them is removed or replaced.
+Use Tailwind utilities consistently. Outside the upstream and theme zones, compose reusable visual roles through the generated typed `axisStyles` contract and use standard utilities for local structure. Do not author raw `*-axis-*` utility strings, hard-coded palette utilities, arbitrary Tailwind values, component-local colors, selector-based custom CSS, or one-off visual systems. The AST consumption gate prevents raw semantic-role bypass; role validity and exact class projection remain owned by the theme schema and generator. Remove obsolete styling and component API surface when the UI path that used them is removed or replaced.
 
 ## Security
 

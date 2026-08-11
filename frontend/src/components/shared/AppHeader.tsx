@@ -15,6 +15,8 @@ import {
   type WorkspaceChangeResult,
   type WorkspaceContextState,
 } from '@/features/workspaces/WorkspaceControl';
+import { cn } from '@/lib/utils';
+import { axisStyles } from '@/theme.generated';
 
 interface AppHeaderProps {
   onSignOut: () => void;
@@ -85,15 +87,37 @@ export function AppHeader({
   return (
     <>
       <header className="shrink-0 border-b border-border bg-card">
-        <div className="flex min-h-16 w-full min-w-0 flex-wrap items-center gap-axis-region px-axis-page-compact py-3 sm:px-axis-page-default lg:px-axis-page-wide">
-          <Link to="/dashboard" className="flex min-w-0 items-center gap-axis-region">
+        <div
+          className={cn(
+            'flex min-h-16 w-full min-w-0 flex-wrap items-center py-3',
+            axisStyles.spacing.gap.region,
+            axisStyles.spacing.padding.inline.pageCompact,
+            axisStyles.spacing.padding.inline.pageDefaultAtSmall,
+            axisStyles.spacing.padding.inline.pageWideAtLarge,
+          )}
+        >
+          <Link
+            to="/dashboard"
+            className={cn('flex min-w-0 items-center', axisStyles.spacing.gap.region)}
+          >
             <img src="/axis-logo.svg" alt="" className="size-11 shrink-0" width={44} height={44} />
-            <span className="block min-w-0 truncate text-axis-metadata font-axis-metadata uppercase tracking-widest text-muted-foreground">
+            <span
+              className={cn(
+                'block min-w-0 truncate uppercase tracking-widest text-muted-foreground',
+                axisStyles.typography.scale.metadata,
+                axisStyles.typography.weight.metadata,
+              )}
+            >
               {pageTitle}
             </span>
           </Link>
 
-          <div className="ml-auto flex min-w-0 shrink items-center gap-axis-inline">
+          <div
+            className={cn(
+              'ml-auto flex min-w-0 shrink items-center',
+              axisStyles.spacing.gap.inline,
+            )}
+          >
             <AccountSurface
               surfaceId="account-actions"
               identity={{

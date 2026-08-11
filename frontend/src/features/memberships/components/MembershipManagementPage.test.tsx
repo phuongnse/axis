@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ManagedWindowHost } from '@/components/shared/ManagedWindowHost';
 import { ManagedWindowProvider } from '@/components/shared/ManagedWindowManager';
+import { axisStyles } from '@/theme.generated';
 import {
   inviteWorkspaceMember,
   resendWorkspaceInvitation,
@@ -83,10 +84,10 @@ describe('MembershipManagementPage', () => {
     expect(content?.querySelectorAll('[data-slot="data-table"]')).toHaveLength(1);
     expect(within(table).queryByRole('columnheader', { name: 'Actions' })).not.toBeInTheDocument();
     expect(invite).toHaveClass(
-      'min-h-axis-touch-target',
-      'min-w-axis-touch-target',
-      'sm:min-h-axis-compact-control',
-      'sm:min-w-axis-compact-control',
+      axisStyles.density.minHeight.touchTarget,
+      axisStyles.density.minWidth.touchTarget,
+      axisStyles.density.minHeight.compactControlAtSmall,
+      axisStyles.density.minWidth.compactControlAtSmall,
     );
 
     await user.click(invite);

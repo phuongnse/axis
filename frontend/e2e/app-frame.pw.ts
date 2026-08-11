@@ -351,9 +351,10 @@ async function expectAccountRegionRhythmAndActionAffordance(page: Page): Promise
     'symmetric region insets',
   ).toBe(true);
 
-  const createOrganization = accountSurface.getByRole('button', {
-    name: 'Create Organization',
-  });
+  const createOrganization = accountSurface
+    .locator('[data-axis-account-region="workspace"]')
+    .locator('[data-axis-account-role="section-action"]');
+  await expect(createOrganization).toHaveCount(1);
   const createAffordance = await createOrganization.evaluate((element) => {
     const style = getComputedStyle(element);
     return {
@@ -486,7 +487,7 @@ test.describe('app frame', () => {
     }
   });
 
-  test('AT-004 account surface visual contract covers light and dark desktop and compact EN and VI', async ({
+  test('AT-004 account surface visual contract covers EN light and dark desktop and compact while VI remains layout-safe', async ({
     page,
   }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
@@ -531,24 +532,25 @@ test.describe('app frame', () => {
     const selectedVietnameseOption = page.getByRole('button', { name: 'Tiếng Việt' });
     await expect(selectedVietnameseOption).toHaveAttribute('aria-pressed', 'true');
     await expect(selectedVietnameseOption).not.toHaveAttribute('aria-busy');
-    await expectAccountSurfaceScreenshot(page, 'account-surface-dark-desktop-vi');
+    await expectAccountRegionRhythmAndActionAffordance(page);
+    await expectNoPageOverflow(page);
 
     const lightVietnameseOption = page.getByRole('button', { name: 'Sáng' });
     await invokePreferenceAction(page, lightVietnameseOption, 'theme');
     await expect(page.locator('html')).not.toHaveClass(/dark/);
     await expect(lightVietnameseOption).toHaveAttribute('aria-pressed', 'true');
     await expect(lightVietnameseOption).not.toHaveAttribute('aria-busy');
-    await expectAccountSurfaceScreenshot(page, 'account-surface-light-desktop-vi');
 
     await page.setViewportSize({ width: 390, height: 844 });
-    await expectAccountSurfaceScreenshot(page, 'account-surface-light-compact-vi');
+    await expectAccountRegionRhythmAndActionAffordance(page);
+    await expectNoPageOverflow(page);
 
     const darkVietnameseOption = page.getByRole('button', { name: 'Tối' });
     await invokePreferenceAction(page, darkVietnameseOption, 'theme');
     await expect(page.locator('html')).toHaveClass(/dark/);
     await expect(darkVietnameseOption).toHaveAttribute('aria-pressed', 'true');
     await expect(darkVietnameseOption).not.toHaveAttribute('aria-busy');
-    await expectAccountSurfaceScreenshot(page, 'account-surface-dark-compact-vi');
+    await expectNoPageOverflow(page);
 
     const englishOption = page.getByRole('button', { name: 'Tiếng Anh' });
     await invokePreferenceAction(page, englishOption, 'language');

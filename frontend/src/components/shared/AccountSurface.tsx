@@ -25,6 +25,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Separator } from '@/components/ui/separator';
 import { type SurfaceIdFor, surfaceContractAttributes } from '@/lib/ui-foundation';
 import { cn } from '@/lib/utils';
+import { axisStyles } from '@/theme.generated';
 
 export interface AccountSurfaceIdentity {
   displayName: string;
@@ -91,8 +92,11 @@ export interface AccountSurfaceProps {
   workspace: AccountWorkspaceModel;
 }
 
-const accountSectionActionGeometry =
-  'min-h-axis-touch-target w-full justify-center sm:min-h-axis-compact-control';
+const accountSectionActionGeometry = cn(
+  axisStyles.density.minHeight.touchTarget,
+  'w-full justify-center',
+  axisStyles.density.minHeight.compactControlAtSmall,
+);
 
 function AccountWorkspaceOptionButton({
   busy,
@@ -113,7 +117,10 @@ function AccountWorkspaceOptionButton({
       variant="ghost"
       size="sm"
       className={cn(
-        'min-h-axis-touch-target w-full justify-start px-axis-inline sm:min-h-axis-compact-control',
+        axisStyles.density.minHeight.touchTarget,
+        'w-full justify-start',
+        axisStyles.spacing.padding.inline.inline,
+        axisStyles.density.minHeight.compactControlAtSmall,
         emphasized ? persistentItemHighlight : transientItemHighlight,
         emphasized && 'disabled:opacity-100',
       )}
@@ -144,17 +151,25 @@ export function AccountWorkspaceSection({
   return (
     <section
       data-axis-account-region="workspace"
-      className="grid gap-axis-inline p-axis-region"
+      className={cn('grid', axisStyles.spacing.gap.inline, axisStyles.spacing.padding.all.region)}
       aria-label={t('workspace.label')}
       aria-busy={busy || undefined}
     >
-      <div className="flex items-center gap-axis-inline px-axis-inline text-axis-metadata font-axis-label text-muted-foreground">
+      <div
+        className={cn(
+          'flex items-center text-muted-foreground',
+          axisStyles.spacing.gap.inline,
+          axisStyles.spacing.padding.inline.inline,
+          axisStyles.typography.scale.metadata,
+          axisStyles.typography.weight.label,
+        )}
+      >
         <PanelsTopLeft className="size-3.5" aria-hidden />
         {t('workspace.label')}
       </div>
 
       <AsyncContent
-        className="min-h-axis-default-control"
+        className={axisStyles.density.minHeight.defaultControl}
         pending={loadState === 'loading'}
         error={loadState === 'error'}
         pendingLabel={t('workspace.loading')}
@@ -166,7 +181,10 @@ export function AccountWorkspaceSection({
             </Button>
           </StatusNotice>
         ) : loadState === 'ready' ? (
-          <section className="grid gap-axis-inline" aria-label={t('workspace.eligible')}>
+          <section
+            className={cn('grid', axisStyles.spacing.gap.inline)}
+            aria-label={t('workspace.eligible')}
+          >
             {options.map((workspace) => (
               <AccountWorkspaceOptionButton
                 key={workspace.id}
@@ -189,7 +207,7 @@ export function AccountWorkspaceSection({
         onClick={onCreate}
       >
         <span
-          className="flex size-axis-icon-control shrink-0 items-center justify-center"
+          className={cn('flex shrink-0 items-center justify-center', axisStyles.icon.size.control)}
           aria-hidden
         >
           <Plus className="size-3.5" />
@@ -197,7 +215,7 @@ export function AccountWorkspaceSection({
         {t('workspace.createOrganization')}
       </Button>
 
-      <div aria-live="polite" className="grid gap-axis-inline">
+      <div aria-live="polite" className={cn('grid', axisStyles.spacing.gap.inline)}>
         {busy ? <span className="sr-only">{t('workspace.switching')}</span> : null}
         {feedback === 'outcome-unknown' ? (
           <StatusNotice tone="warning">
@@ -239,11 +257,16 @@ function AccountPreferenceGroup({
       aria-labelledby={labelId}
       aria-busy={pending || undefined}
       aria-describedby={hasStatus ? statusId : undefined}
-      className="grid gap-axis-inline"
+      className={cn('grid', axisStyles.spacing.gap.inline)}
     >
       <div
         id={labelId}
-        className="px-axis-inline text-axis-metadata font-axis-label text-muted-foreground"
+        className={cn(
+          'text-muted-foreground',
+          axisStyles.spacing.padding.inline.inline,
+          axisStyles.typography.scale.metadata,
+          axisStyles.typography.weight.label,
+        )}
       >
         {model.label}
       </div>
@@ -305,7 +328,13 @@ export function AccountSurface({
             type="button"
             variant="ghost"
             size="lg"
-            className={`min-h-axis-touch-target max-w-64 gap-axis-inline px-axis-inline text-foreground ${transientItemHighlight}`}
+            className={cn(
+              axisStyles.density.minHeight.touchTarget,
+              'max-w-64 text-foreground',
+              axisStyles.spacing.gap.inline,
+              axisStyles.spacing.padding.inline.inline,
+              transientItemHighlight,
+            )}
             aria-label={t('nav.accountMenu')}
             title={t('nav.accountMenu')}
           >
@@ -334,13 +363,30 @@ export function AccountSurface({
           data-slot="account-identity"
           data-axis-account-region="identity"
           aria-label={t('app.account')}
-          className="flex min-w-0 items-center gap-axis-inline p-axis-region"
+          className={cn(
+            'flex min-w-0 items-center',
+            axisStyles.spacing.gap.inline,
+            axisStyles.spacing.padding.all.region,
+          )}
         >
           <AccountAvatar initials={identity.initials} size="md" />
           <div className="min-w-0 flex-1">
-            <div className="truncate text-axis-label font-axis-label">{identity.displayName}</div>
+            <div
+              className={cn(
+                'truncate',
+                axisStyles.typography.scale.label,
+                axisStyles.typography.weight.label,
+              )}
+            >
+              {identity.displayName}
+            </div>
             {identity.secondaryLabel ? (
-              <div className="truncate text-axis-metadata text-muted-foreground">
+              <div
+                className={cn(
+                  'truncate text-muted-foreground',
+                  axisStyles.typography.scale.metadata,
+                )}
+              >
                 {identity.secondaryLabel}
               </div>
             ) : null}
@@ -356,13 +402,25 @@ export function AccountSurface({
         <section
           data-axis-account-region="preferences"
           aria-label={t('app.preferences')}
-          className="grid gap-axis-region p-axis-region"
+          className={cn(
+            'grid',
+            axisStyles.spacing.gap.region,
+            axisStyles.spacing.padding.all.region,
+          )}
         >
-          <div className="flex items-center gap-axis-inline px-axis-inline text-axis-metadata font-axis-label text-muted-foreground">
+          <div
+            className={cn(
+              'flex items-center text-muted-foreground',
+              axisStyles.spacing.gap.inline,
+              axisStyles.spacing.padding.inline.inline,
+              axisStyles.typography.scale.metadata,
+              axisStyles.typography.weight.label,
+            )}
+          >
             <Settings2 className="size-3.5" aria-hidden />
             {t('app.preferences')}
           </div>
-          <div className="grid gap-axis-region">
+          <div className={cn('grid', axisStyles.spacing.gap.region)}>
             <AccountPreferenceGroup kind="language" model={preferences.language} />
             <AccountPreferenceGroup kind="theme" model={preferences.theme} />
           </div>
@@ -370,7 +428,14 @@ export function AccountSurface({
 
         <Separator />
 
-        <div data-axis-account-region="actions" className="grid gap-axis-inline p-axis-region">
+        <div
+          data-axis-account-region="actions"
+          className={cn(
+            'grid',
+            axisStyles.spacing.gap.inline,
+            axisStyles.spacing.padding.all.region,
+          )}
+        >
           <AsyncButton
             type="button"
             variant="destructive"

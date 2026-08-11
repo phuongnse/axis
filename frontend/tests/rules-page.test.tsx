@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useAuthStore } from '@/features/auth/auth-store';
 import { RulesPage } from '@/features/rules';
+import { axisStyles } from '@/theme.generated';
 import { renderWithRouter } from './render-with-router';
 
 function jsonResponse(data: unknown, status = 200): Response {
@@ -560,10 +561,10 @@ describe('RulesPage', () => {
     expect(page).toHaveClass(
       'h-full',
       'min-h-0',
-      'gap-axis-region',
-      'p-axis-page-compact',
-      'sm:p-axis-page-default',
-      'lg:p-axis-page-wide',
+      axisStyles.spacing.gap.region,
+      axisStyles.spacing.padding.all.pageCompact,
+      axisStyles.spacing.padding.all.pageDefaultAtSmall,
+      axisStyles.spacing.padding.all.pageWideAtLarge,
     );
     expect(page).toContainElement(workspace);
     expect(header?.parentElement).toBe(workspace);
@@ -578,10 +579,10 @@ describe('RulesPage', () => {
     ).not.toBeInTheDocument();
     for (const action of [recordAction, createAction]) {
       expect(action).toHaveClass(
-        'min-h-axis-touch-target',
-        'min-w-axis-touch-target',
-        'sm:min-h-axis-compact-control',
-        'sm:min-w-axis-compact-control',
+        axisStyles.density.minHeight.touchTarget,
+        axisStyles.density.minWidth.touchTarget,
+        axisStyles.density.minHeight.compactControlAtSmall,
+        axisStyles.density.minWidth.compactControlAtSmall,
       );
     }
     expect(within(catalog).getByRole('button', { name: 'Credit threshold' })).toBeInTheDocument();

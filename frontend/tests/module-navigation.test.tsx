@@ -7,6 +7,7 @@ import {
   visibleModuleNavigationContributions,
 } from '@/lib/module-navigation';
 import { moduleNavigationContributions } from '@/lib/module-navigation-registry';
+import { axisStyles } from '@/theme.generated';
 
 vi.mock('@tanstack/react-router', () => ({
   Link: ({
@@ -116,21 +117,21 @@ describe('module navigation', () => {
     const businessObjectsLink = screen.getByRole('link', { name: 'Business objects' });
     expect(businessObjectsLink).toHaveAttribute('href', '/business-objects');
     expect(businessObjectsLink).toHaveClass(
-      'min-h-axis-touch-target',
-      'min-w-axis-touch-target',
+      axisStyles.density.minHeight.touchTarget,
+      axisStyles.density.minWidth.touchTarget,
       'md:min-h-0',
       'md:min-w-0',
       'md:w-full',
     );
     const navigationIcon = businessObjectsLink.querySelector('svg');
-    expect(navigationIcon).toHaveClass('size-axis-icon-navigation');
+    expect(navigationIcon).toHaveClass(axisStyles.icon.size.navigation);
     expect(businessObjectsLink).toHaveClass(
       'hover:bg-accent',
       'hover:text-accent-foreground',
       'dark:hover:bg-accent',
       'transition-colors',
-      'duration-axis-state',
-      'ease-axis-state',
+      axisStyles.motion.duration.state,
+      axisStyles.motion.easing.state,
       'motion-reduce:transition-none',
     );
     expect(businessObjectsLink).not.toHaveClass('dark:hover:bg-muted/50');

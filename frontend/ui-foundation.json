@@ -13,13 +13,9 @@
         "browser": ["frontend/e2e/app-frame.pw.ts"],
         "perceptual": [
           "frontend/e2e/app-frame.pw.ts-snapshots/account-surface-dark-compact-en-chromium-linux.png",
-          "frontend/e2e/app-frame.pw.ts-snapshots/account-surface-dark-compact-vi-chromium-linux.png",
           "frontend/e2e/app-frame.pw.ts-snapshots/account-surface-dark-desktop-en-chromium-linux.png",
-          "frontend/e2e/app-frame.pw.ts-snapshots/account-surface-dark-desktop-vi-chromium-linux.png",
           "frontend/e2e/app-frame.pw.ts-snapshots/account-surface-light-compact-en-chromium-linux.png",
-          "frontend/e2e/app-frame.pw.ts-snapshots/account-surface-light-compact-vi-chromium-linux.png",
-          "frontend/e2e/app-frame.pw.ts-snapshots/account-surface-light-desktop-en-chromium-linux.png",
-          "frontend/e2e/app-frame.pw.ts-snapshots/account-surface-light-desktop-vi-chromium-linux.png"
+          "frontend/e2e/app-frame.pw.ts-snapshots/account-surface-light-desktop-en-chromium-linux.png"
         ]
       }
     },

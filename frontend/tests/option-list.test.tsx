@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { Monitor, Moon } from 'lucide-react';
 import { describe, expect, it, vi } from 'vitest';
 import { OptionList, OptionListItem } from '@/components/shared/OptionList';
+import { axisStyles } from '@/theme.generated';
 
 describe('OptionList', () => {
   it('renders full-width, start-aligned options and reports selection', async () => {
@@ -28,8 +29,8 @@ describe('OptionList', () => {
     expect(system).toHaveClass(
       'w-full',
       'justify-start',
-      'min-h-axis-touch-target',
-      'sm:min-h-axis-compact-control',
+      axisStyles.density.minHeight.touchTarget,
+      axisStyles.density.minHeight.compactControlAtSmall,
     );
     expect(system).toHaveClass(
       'aria-pressed:bg-secondary',

@@ -1,5 +1,11 @@
-export const transientItemHighlight =
-  'hover:bg-accent hover:text-accent-foreground focus-visible:bg-accent focus-visible:text-accent-foreground dark:hover:bg-accent dark:hover:text-accent-foreground transition-colors duration-axis-state ease-axis-state motion-reduce:transition-none';
+import { cn } from '@/lib/utils';
+import { axisStyles } from '@/theme.generated';
+
+export const transientItemHighlight = cn(
+  'hover:bg-accent hover:text-accent-foreground focus-visible:bg-accent focus-visible:text-accent-foreground dark:hover:bg-accent dark:hover:text-accent-foreground transition-colors motion-reduce:transition-none',
+  axisStyles.motion.duration.state,
+  axisStyles.motion.easing.state,
+);
 
 export const persistentItemHighlight =
   'bg-secondary text-secondary-foreground hover:bg-secondary hover:text-secondary-foreground dark:hover:bg-secondary dark:hover:text-secondary-foreground';

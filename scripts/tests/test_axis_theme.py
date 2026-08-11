@@ -246,9 +246,132 @@ class TestAxisTheme(unittest.TestCase):
             self.assertIn("--z-axis-notification: 60;", web)
             self.assertIn("content: {\n    delayMs: 300", runtime)
             self.assertIn("minimumMs: 600", runtime)
+            self.assertIn(
+                """export const axisStyles = {
+  typography: {
+    scale: {
+      metadata: 'text-axis-metadata',
+      body: 'text-axis-body',
+      label: 'text-axis-label',
+      componentTitle: 'text-axis-component-title',
+      sectionTitle: 'text-axis-section-title',
+      pageTitle: 'text-axis-page-title',
+    },
+    weight: {
+      metadata: 'font-axis-metadata',
+      body: 'font-axis-body',
+      label: 'font-axis-label',
+      componentTitle: 'font-axis-component-title',
+      sectionTitle: 'font-axis-section-title',
+      pageTitle: 'font-axis-page-title',
+    },
+  },
+  spacing: {
+    gap: {
+      inline: 'gap-axis-inline',
+      region: 'gap-axis-region',
+      regionAtMedium: 'md:gap-axis-region',
+    },
+    padding: {
+      all: {
+        region: 'p-axis-region',
+        pageCompact: 'p-axis-page-compact',
+        pageDefaultAtSmall: 'sm:p-axis-page-default',
+        pageWideAtLarge: 'lg:p-axis-page-wide',
+      },
+      inline: {
+        inline: 'px-axis-inline',
+        pageCompact: 'px-axis-page-compact',
+        pageDefaultAtSmall: 'sm:px-axis-page-default',
+        pageWideAtLarge: 'lg:px-axis-page-wide',
+      },
+      block: {
+        inline: 'py-axis-inline',
+        region: 'py-axis-region',
+        regionAtMedium: 'md:py-axis-region',
+      },
+      bottom: {
+        inline: 'pb-axis-inline',
+      },
+    },
+  },
+  density: {
+    minHeight: {
+      touchTarget: 'min-h-axis-touch-target',
+      defaultControl: 'min-h-axis-default-control',
+      compactControlAtSmall: 'sm:min-h-axis-compact-control',
+    },
+    minWidth: {
+      touchTarget: 'min-w-axis-touch-target',
+      compactControlAtSmall: 'sm:min-w-axis-compact-control',
+    },
+  },
+  icon: {
+    size: {
+      control: 'size-axis-icon-control',
+      navigation: 'size-axis-icon-navigation',
+      empty: 'size-axis-icon-empty',
+    },
+  },
+  radius: {
+    flat: 'rounded-axis-flat',
+    control: 'rounded-axis-control',
+    floating: 'rounded-axis-floating',
+    managed: 'rounded-axis-managed',
+  },
+  elevation: {
+    none: 'shadow-axis-none',
+    floating: 'shadow-axis-floating',
+    managed: 'shadow-axis-managed',
+    dock: 'shadow-axis-dock',
+  },
+  layer: {
+    base: 'z-axis-base',
+    sticky: 'z-axis-sticky',
+    floating: 'z-axis-floating',
+    modal: 'z-axis-modal',
+    managed: 'z-axis-managed',
+    notification: 'z-axis-notification',
+  },
+  motion: {
+    duration: {
+      state: 'duration-axis-state',
+      floating: 'duration-axis-floating',
+    },
+    easing: {
+      state: 'ease-axis-state',
+    },
+  },
+} as const;""",
+                runtime,
+            )
+            self.assertIn("export const axisTailwindMergeExtension = {", runtime)
+            self.assertIn("      'axis-page-title',\n      ],", runtime)
+            self.assertIn("        'axis-icon-empty',\n      ],", runtime)
+            self.assertIn(
+                "      radius: ['axis-flat', 'axis-control', 'axis-floating', 'axis-managed'],",
+                runtime,
+            )
+            self.assertIn(
+                "      duration: [{ duration: ['axis-state', 'axis-floating'] }],",
+                runtime,
+            )
             self.assertIn('PrimaryColor = "#ffffff"', email)
             self.assertIn('PrimaryForegroundColor = "#000000"', email)
             self.assertIn("Segoe UI", email)
+
+    def test_render_runtime_rejects_canonical_style_role_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            self.write_source(root)
+            theme = axis_theme.load_theme(root)
+
+            with mock.patch.object(axis_theme, "ICON_ROLES", (*axis_theme.ICON_ROLES, "invented")):
+                with self.assertRaisesRegex(
+                    axis_theme.ThemeValidationError,
+                    "axisStyles icon role mapping must match canonical roles",
+                ):
+                    axis_theme._render_web_theme_runtime(theme)
 
     def test_theme_artifact_issues_reports_missing_and_stale_outputs(self) -> None:
         with tempfile.TemporaryDirectory() as temp:

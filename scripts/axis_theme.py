@@ -36,6 +36,56 @@ MOTION_MILLISECOND_ROLES = (
     "contextMinimumMs",
 )
 LAYER_ROLES = ("base", "sticky", "floating", "modal", "managed", "notification")
+AXIS_STYLE_TYPOGRAPHY_ROLE_MAP = {
+    "metadata": "metadata",
+    "body": "body",
+    "label": "label",
+    "componentTitle": "componentTitle",
+    "sectionTitle": "sectionTitle",
+    "pageTitle": "pageTitle",
+}
+AXIS_STYLE_SPACING_ROLE_MAP = {
+    "inline": "inline",
+    "region": "region",
+    "pageCompact": "pageCompact",
+    "pageDefaultAtSmall": "pageDefault",
+    "pageWideAtLarge": "pageWide",
+}
+AXIS_STYLE_DENSITY_ROLE_MAP = {
+    "touchTarget": "touchTarget",
+    "defaultControl": "defaultControl",
+    "compactControlAtSmall": "compactControl",
+}
+AXIS_STYLE_ICON_ROLE_MAP = {
+    "control": "control",
+    "navigation": "navigation",
+    "empty": "empty",
+}
+AXIS_STYLE_RADIUS_ROLE_MAP = {
+    "flat": "flat",
+    "control": "control",
+    "floating": "floating",
+    "managed": "managed",
+}
+AXIS_STYLE_ELEVATION_ROLE_MAP = {
+    "none": "none",
+    "floating": "floating",
+    "managed": "managed",
+    "dock": "dock",
+}
+AXIS_STYLE_LAYER_ROLE_MAP = {
+    "base": "base",
+    "sticky": "sticky",
+    "floating": "floating",
+    "modal": "modal",
+    "managed": "managed",
+    "notification": "notification",
+}
+AXIS_STYLE_MOTION_ROLE_MAP = {
+    "state": "stateDuration",
+    "floating": "floatingDuration",
+    "easing": "easing",
+}
 TEXT_CONTRAST_PAIRS = (
     ("foreground", "background"),
     ("card-foreground", "card"),
@@ -451,10 +501,199 @@ def _camel_to_kebab(value: str) -> str:
     return re.sub(r"(?<!^)(?=[A-Z])", "-", value).lower()
 
 
+def _require_axis_style_role_mappings() -> None:
+    exact_mappings = (
+        ("typography", AXIS_STYLE_TYPOGRAPHY_ROLE_MAP, TYPOGRAPHY_ROLES),
+        ("density", AXIS_STYLE_DENSITY_ROLE_MAP, DENSITY_ROLES),
+        ("icon", AXIS_STYLE_ICON_ROLE_MAP, ICON_ROLES),
+        ("radius", AXIS_STYLE_RADIUS_ROLE_MAP, RADIUS_ROLES),
+        ("elevation", AXIS_STYLE_ELEVATION_ROLE_MAP, ELEVATION_ROLES),
+        ("layer", AXIS_STYLE_LAYER_ROLE_MAP, LAYER_ROLES),
+        ("motion", AXIS_STYLE_MOTION_ROLE_MAP, MOTION_STRING_ROLES),
+    )
+    for label, mapping, canonical_roles in exact_mappings:
+        if set(mapping.values()) != set(canonical_roles):
+            raise ThemeValidationError(
+                f"axisStyles {label} role mapping must match canonical roles"
+            )
+
+    projected_spacing_roles = set(AXIS_STYLE_SPACING_ROLE_MAP.values())
+    canonical_spacing_roles = set(SPACING_ROLES)
+    if projected_spacing_roles != canonical_spacing_roles - {"section"}:
+        raise ThemeValidationError(
+            "axisStyles spacing role mapping must match canonical consumer roles"
+        )
+
+
+def _axis_utility(prefix: str, role: str) -> str:
+    return f"{prefix}-axis-{_camel_to_kebab(role)}"
+
+
+def _responsive(variant: str, utility: str) -> str:
+    return f"{variant}:{utility}"
+
+
+def _motion_duration_utility(api_role: str) -> str:
+    canonical_role = AXIS_STYLE_MOTION_ROLE_MAP[api_role]
+    suffix = "Duration"
+    if not canonical_role.endswith(suffix):
+        raise ThemeValidationError(
+            f"axisStyles motion duration role {canonical_role} must end in {suffix}"
+        )
+    return _axis_utility("duration", canonical_role.removesuffix(suffix))
+
+
+def _axis_style_projection() -> dict[str, Any]:
+    _require_axis_style_role_mappings()
+    typography_scale = {
+        key: _axis_utility("text", role)
+        for key, role in AXIS_STYLE_TYPOGRAPHY_ROLE_MAP.items()
+    }
+    typography_weight = {
+        key: _axis_utility("font", role)
+        for key, role in AXIS_STYLE_TYPOGRAPHY_ROLE_MAP.items()
+    }
+    spacing = AXIS_STYLE_SPACING_ROLE_MAP
+    density = AXIS_STYLE_DENSITY_ROLE_MAP
+    return {
+        "typography": {
+            "scale": typography_scale,
+            "weight": typography_weight,
+        },
+        "spacing": {
+            "gap": {
+                "inline": _axis_utility("gap", spacing["inline"]),
+                "region": _axis_utility("gap", spacing["region"]),
+                "regionAtMedium": _responsive(
+                    "md", _axis_utility("gap", spacing["region"])
+                ),
+            },
+            "padding": {
+                "all": {
+                    "region": _axis_utility("p", spacing["region"]),
+                    "pageCompact": _axis_utility("p", spacing["pageCompact"]),
+                    "pageDefaultAtSmall": _responsive(
+                        "sm", _axis_utility("p", spacing["pageDefaultAtSmall"])
+                    ),
+                    "pageWideAtLarge": _responsive(
+                        "lg", _axis_utility("p", spacing["pageWideAtLarge"])
+                    ),
+                },
+                "inline": {
+                    "inline": _axis_utility("px", spacing["inline"]),
+                    "pageCompact": _axis_utility("px", spacing["pageCompact"]),
+                    "pageDefaultAtSmall": _responsive(
+                        "sm", _axis_utility("px", spacing["pageDefaultAtSmall"])
+                    ),
+                    "pageWideAtLarge": _responsive(
+                        "lg", _axis_utility("px", spacing["pageWideAtLarge"])
+                    ),
+                },
+                "block": {
+                    "inline": _axis_utility("py", spacing["inline"]),
+                    "region": _axis_utility("py", spacing["region"]),
+                    "regionAtMedium": _responsive(
+                        "md", _axis_utility("py", spacing["region"])
+                    ),
+                },
+                "bottom": {
+                    "inline": _axis_utility("pb", spacing["inline"]),
+                },
+            },
+        },
+        "density": {
+            "minHeight": {
+                "touchTarget": _axis_utility("min-h", density["touchTarget"]),
+                "defaultControl": _axis_utility("min-h", density["defaultControl"]),
+                "compactControlAtSmall": _responsive(
+                    "sm", _axis_utility("min-h", density["compactControlAtSmall"])
+                ),
+            },
+            "minWidth": {
+                "touchTarget": _axis_utility("min-w", density["touchTarget"]),
+                "compactControlAtSmall": _responsive(
+                    "sm", _axis_utility("min-w", density["compactControlAtSmall"])
+                ),
+            },
+        },
+        "icon": {
+            "size": {
+                key: f"size-axis-icon-{_camel_to_kebab(role)}"
+                for key, role in AXIS_STYLE_ICON_ROLE_MAP.items()
+            },
+        },
+        "radius": {
+            key: _axis_utility("rounded", role)
+            for key, role in AXIS_STYLE_RADIUS_ROLE_MAP.items()
+        },
+        "elevation": {
+            key: _axis_utility("shadow", role)
+            for key, role in AXIS_STYLE_ELEVATION_ROLE_MAP.items()
+        },
+        "layer": {
+            key: _axis_utility("z", role)
+            for key, role in AXIS_STYLE_LAYER_ROLE_MAP.items()
+        },
+        "motion": {
+            "duration": {
+                "state": _motion_duration_utility("state"),
+                "floating": _motion_duration_utility("floating"),
+            },
+            "easing": {
+                "state": _axis_utility("ease", "state"),
+            },
+        },
+    }
+
+
+def _render_typescript_object(value: dict[str, Any], level: int = 0) -> list[str]:
+    indentation = "  " * level
+    lines = ["{"]
+    for key, item in value.items():
+        item_indentation = "  " * (level + 1)
+        if isinstance(item, dict):
+            rendered = _render_typescript_object(item, level + 1)
+            lines.append(f"{item_indentation}{key}: {rendered[0]}")
+            lines.extend(rendered[1:-1])
+            lines.append(f"{rendered[-1]},")
+        else:
+            lines.append(f"{item_indentation}{key}: '{item}',")
+    lines.append(f"{indentation}}}")
+    return lines
+
+
+def _render_typescript_string_array(
+    values: tuple[str, ...], *, indentation: int = 0, multiline: bool = False
+) -> str:
+    if not multiline:
+        return "[" + ", ".join(f"'{value}'" for value in values) + "]"
+    outer_indent = " " * indentation
+    item_indent = " " * (indentation + 2)
+    items = "\n".join(f"{item_indent}'{value}'," for value in values)
+    return f"[\n{items}\n{outer_indent}]"
+
+
+def _axis_tailwind_merge_theme() -> dict[str, tuple[str, ...]]:
+    def axis_role(role: str) -> str:
+        return f"axis-{_camel_to_kebab(role)}"
+
+    return {
+        "text": tuple(axis_role(role) for role in TYPOGRAPHY_ROLES),
+        "font-weight": tuple(axis_role(role) for role in TYPOGRAPHY_ROLES),
+        "spacing": (
+            *(axis_role(role) for role in SPACING_ROLES),
+            *(axis_role(role) for role in DENSITY_ROLES),
+            *(f"axis-icon-{_camel_to_kebab(role)}" for role in ICON_ROLES),
+        ),
+        "radius": tuple(axis_role(role) for role in RADIUS_ROLES),
+        "shadow": tuple(axis_role(role) for role in ELEVATION_ROLES),
+        "ease": ("axis-state",),
+    }
+
+
 def _render_web_theme_runtime(theme: dict[str, Any]) -> str:
     motion = theme["ui"]["motionRoles"]
-    return "\n".join(
-        (
+    lines = [
             "// <auto-generated />",
             "// Generated from theme/axis-theme.json by `python scripts/axis.py generate theme`.",
             "",
@@ -469,8 +708,46 @@ def _render_web_theme_runtime(theme: dict[str, Any]) -> str:
             "  },",
             "} as const;",
             "",
+    ]
+    rendered_styles = _render_typescript_object(_axis_style_projection())
+    lines.append(f"export const axisStyles = {rendered_styles[0]}")
+    lines.extend(rendered_styles[1:-1])
+    lines.extend((f"{rendered_styles[-1]} as const;", ""))
+
+    merge_theme = _axis_tailwind_merge_theme()
+    lines.extend(
+        (
+            "export const axisTailwindMergeExtension = {",
+            "  extend: {",
+            "    theme: {",
+            f"      text: {_render_typescript_string_array(merge_theme['text'], indentation=6, multiline=True)},",
+            f"      'font-weight': {_render_typescript_string_array(merge_theme['font-weight'], indentation=6, multiline=True)},",
+            f"      spacing: {_render_typescript_string_array(merge_theme['spacing'], indentation=6, multiline=True)},",
+            f"      radius: {_render_typescript_string_array(merge_theme['radius'])},",
+            f"      shadow: {_render_typescript_string_array(merge_theme['shadow'])},",
+            f"      ease: {_render_typescript_string_array(merge_theme['ease'])},",
+            "    },",
+            "    classGroups: {",
+            "      z: [",
+            "        {",
+            "          z: [",
+            "            'axis-base',",
+            "            'axis-sticky',",
+            "            'axis-floating',",
+            "            'axis-modal',",
+            "            'axis-managed',",
+            "            'axis-notification',",
+            "          ],",
+            "        },",
+            "      ],",
+            "      duration: [{ duration: ['axis-state', 'axis-floating'] }],",
+            "    },",
+            "  },",
+            "} as const;",
+            "",
         )
     )
+    return "\n".join(lines)
 
 
 def _linear_to_srgb(value: float) -> float:
@@ -620,6 +897,8 @@ def is_theme_path(path: str) -> bool:
         str(WEB_THEME_RUNTIME_OUTPUT),
         str(EMAIL_THEME_OUTPUT),
         "frontend/src/index.css",
+        "frontend/scripts/check-axis-style-consumption.mjs",
+        "frontend/scripts/check-axis-style-consumption.test.mjs",
         "scripts/axis_theme.py",
         "scripts/tests/test_axis_theme.py",
     }

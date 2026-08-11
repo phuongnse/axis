@@ -19,6 +19,7 @@ import {
   useThemePreference,
 } from '@/features/preferences/theme-store';
 import { cn } from '@/lib/utils';
+import { axisStyles } from '@/theme.generated';
 
 interface ThemeControlProps {
   authenticated?: boolean;
@@ -143,21 +144,22 @@ export function ThemeControl({
     <div
       className={cn(
         isMenu
-          ? 'relative grid gap-axis-inline'
-          : 'flex flex-wrap items-center justify-end gap-axis-inline',
+          ? cn('relative grid', axisStyles.spacing.gap.inline)
+          : cn('flex flex-wrap items-center justify-end', axisStyles.spacing.gap.inline),
         className,
       )}
     >
       <fieldset
         aria-busy={mutation.isPending || undefined}
         aria-describedby={statusId}
-        className={cn(isMenu && 'grid gap-axis-inline')}
+        className={cn(isMenu && 'grid', isMenu && axisStyles.spacing.gap.inline)}
       >
         <legend
           className={cn(
-            isMenu
-              ? 'px-axis-inline text-axis-metadata font-axis-label text-muted-foreground'
-              : 'sr-only',
+            isMenu ? 'text-muted-foreground' : 'sr-only',
+            isMenu && axisStyles.spacing.padding.inline.inline,
+            isMenu && axisStyles.typography.scale.metadata,
+            isMenu && axisStyles.typography.weight.label,
           )}
         >
           {t('app.theme')}
@@ -217,8 +219,10 @@ export function ThemeControl({
         <AsyncContent
           id={statusId}
           className={cn(
-            'min-h-5 text-axis-metadata text-muted-foreground',
-            isMenu && 'px-axis-inline sr-only',
+            'min-h-5 text-muted-foreground',
+            axisStyles.typography.scale.metadata,
+            isMenu && axisStyles.spacing.padding.inline.inline,
+            isMenu && 'sr-only',
           )}
           error={mutation.isError}
           pending={mutation.isPending}

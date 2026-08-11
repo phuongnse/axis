@@ -19,6 +19,7 @@ import { ruleDefinitionQueryKeys } from '@/features/rules';
 import { managedWindowRenderers } from '@/lib/managed-window-registry';
 import type { MyRouterContext } from '@/routes/__root';
 import { loadBusinessObjectDefinitionsRoute } from '@/routes/_authenticated/business-objects';
+import { axisStyles } from '@/theme.generated';
 
 const definitionId = '33333333-3333-4333-8333-333333333333';
 const fieldId = '55555555-5555-4555-8555-555555555555';
@@ -104,15 +105,15 @@ describe('BusinessObjectsPage', () => {
     expect(page).toHaveClass(
       'h-full',
       'min-h-0',
-      'gap-axis-region',
-      'p-axis-page-compact',
-      'sm:p-axis-page-default',
-      'lg:p-axis-page-wide',
+      axisStyles.spacing.gap.region,
+      axisStyles.spacing.padding.all.pageCompact,
+      axisStyles.spacing.padding.all.pageDefaultAtSmall,
+      axisStyles.spacing.padding.all.pageWideAtLarge,
     );
     expect(page?.parentElement).not.toHaveClass(
-      'p-axis-page-compact',
-      'sm:p-axis-page-default',
-      'lg:p-axis-page-wide',
+      axisStyles.spacing.padding.all.pageCompact,
+      axisStyles.spacing.padding.all.pageDefaultAtSmall,
+      axisStyles.spacing.padding.all.pageWideAtLarge,
       'font-heading',
     );
     expect(page).toContainElement(workspace);
@@ -1141,10 +1142,10 @@ function emptyPage() {
 function expectPageActionSizing(action: HTMLElement) {
   expect(action).toHaveAttribute('data-slot', 'button');
   expect(action).toHaveClass(
-    'min-h-axis-touch-target',
-    'min-w-axis-touch-target',
-    'sm:min-h-axis-compact-control',
-    'sm:min-w-axis-compact-control',
+    axisStyles.density.minHeight.touchTarget,
+    axisStyles.density.minWidth.touchTarget,
+    axisStyles.density.minHeight.compactControlAtSmall,
+    axisStyles.density.minWidth.compactControlAtSmall,
   );
 }
 

@@ -16,6 +16,7 @@ import {
 } from '@/features/workspaces/api';
 import { invalidateClientRequestSession } from '@/lib/api';
 import type { ModuleNavigationContribution } from '@/lib/module-navigation';
+import { axisStyles } from '@/theme.generated';
 import { AppShell } from '../src/components/shared/AppShell';
 import { ManagedDialog, ManagedDialogBody } from '../src/components/shared/ManagedDialog';
 import {
@@ -709,7 +710,7 @@ describe('AppShell', () => {
     await user.click(screen.getByRole('button', { name: 'Open test window' }));
     const dialog = await screen.findByRole('dialog', { name: 'Persistent test window' });
     expect(dialog.querySelector('[data-slot="managed-dialog-window"]')).toHaveClass(
-      'shadow-axis-managed',
+      axisStyles.elevation.managed,
     );
     expect(dialog.querySelector('[data-slot="managed-dialog-header"]')).toHaveClass('items-center');
   });

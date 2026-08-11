@@ -11,10 +11,12 @@
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
     "format": "biome format --write .",
-    "ci": "tsc -b --noEmit && biome ci .",
+    "ci": "npm run test:axis-style-consumption && npm run check:axis-style-consumption && tsc -b --noEmit && biome ci .",
     "preview": "vite preview",
     "shadcn": "shadcn",
     "test": "vitest run",
+    "test:axis-style-consumption": "node --test scripts/check-axis-style-consumption.test.mjs",
+    "check:axis-style-consumption": "node scripts/check-axis-style-consumption.mjs",
     "test:e2e": "playwright test",
     "gen:api-types": "openapi-ts -i ../openapi.json -o src/lib/api-generated -p @hey-api/typescript"
   },

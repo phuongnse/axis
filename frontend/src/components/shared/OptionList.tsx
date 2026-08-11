@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { Spinner } from '@/components/ui/spinner';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { cn } from '@/lib/utils';
+import { axisStyles } from '@/theme.generated';
 import { toggledItemHighlight, transientItemHighlight } from './interactionStates';
 
 interface OptionListProps {
@@ -47,7 +48,12 @@ export function OptionItemContent({ busy = false, children, icon }: OptionItemCo
     <>
       <span
         data-slot="option-item-icon"
-        className="flex size-axis-icon-control shrink-0 items-center justify-center text-axis-metadata font-axis-label leading-none"
+        className={cn(
+          'flex shrink-0 items-center justify-center leading-none',
+          axisStyles.icon.size.control,
+          axisStyles.typography.scale.metadata,
+          axisStyles.typography.weight.label,
+        )}
         aria-hidden
       >
         {busy ? <Spinner className="size-3.5" /> : icon}
@@ -64,7 +70,10 @@ export function OptionListItem({ children, icon, pending = false, value }: Optio
     <ToggleGroupItem
       aria-busy={pending || undefined}
       className={cn(
-        'min-h-axis-touch-target w-full justify-start px-axis-inline sm:min-h-axis-compact-control',
+        axisStyles.density.minHeight.touchTarget,
+        'w-full justify-start',
+        axisStyles.spacing.padding.inline.inline,
+        axisStyles.density.minHeight.compactControlAtSmall,
         transientItemHighlight,
         toggledItemHighlight,
       )}
