@@ -898,7 +898,7 @@ def is_theme_path(path: str) -> bool:
         str(EMAIL_THEME_OUTPUT),
         "frontend/src/index.css",
         "frontend/scripts/check-axis-style-consumption.mjs",
-        "frontend/scripts/check-axis-style-consumption.test.mjs",
+        "frontend/scripts/check-axis-style-consumption.fixtures.mjs",
         "scripts/axis_theme.py",
         "scripts/tests/test_axis_theme.py",
     }

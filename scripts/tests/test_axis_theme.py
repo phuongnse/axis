@@ -373,6 +373,18 @@ class TestAxisTheme(unittest.TestCase):
                 ):
                     axis_theme._render_web_theme_runtime(theme)
 
+    def test_style_consumption_guard_is_owned_by_theme_routing(self) -> None:
+        self.assertTrue(
+            axis_theme.is_theme_path(
+                "frontend/scripts/check-axis-style-consumption.fixtures.mjs"
+            )
+        )
+        self.assertFalse(
+            axis_theme.is_theme_path(
+                "frontend/scripts/check-axis-style-consumption.test.mjs"
+            )
+        )
+
     def test_theme_artifact_issues_reports_missing_and_stale_outputs(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
