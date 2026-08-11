@@ -52,8 +52,8 @@
       "stateDuration": "150ms",
       "floatingDuration": "100ms",
       "easing": "cubic-bezier(0, 0, 0.2, 1)",
-      "feedbackDelayMs": 300,
-      "feedbackMinimumMs": 400,
+      "contentDelayMs": 300,
+      "contentMinimumMs": 400,
       "contextDelayMs": 500,
       "contextMinimumMs": 600
     },

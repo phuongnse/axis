@@ -1,15 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
-import { ArrowRight, Building2, PanelsTopLeft, Plus, UserRound } from 'lucide-react';
-import type { FormEvent } from 'react';
+import { ArrowRight, Plus } from 'lucide-react';
+import type { FormEvent, ReactNode } from 'react';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import type { AccountWorkspaceModel } from '@/components/shared/AccountSurface';
 import { AsyncButton } from '@/components/shared/AsyncButton';
-import { AsyncContent } from '@/components/shared/AsyncContent';
-import {
-  persistentItemHighlight,
-  transientItemHighlight,
-} from '@/components/shared/interactionStates';
-import { OptionItemContent } from '@/components/shared/OptionList';
 import { StatusNotice } from '@/components/shared/StatusNotice';
 import { Button } from '@/components/ui/button';
 import {
@@ -23,7 +18,6 @@ import {
 import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { ApiError } from '@/lib/api';
-import { cn } from '@/lib/utils';
 import {
   type CreatedOrganizationWorkspace,
   createOrganizationIdempotencyKey,
@@ -43,7 +37,7 @@ export interface WorkspaceContextState {
   targetWorkspaceId: string | null;
 }
 
-interface WorkspaceControlProps {
+export interface WorkspaceControlProps {
   contextState: WorkspaceContextState;
   onRetryContext: () => Promise<void>;
   onWorkspaceChange: (
@@ -56,12 +50,16 @@ interface RetryIdentity {
   normalizedName: string;
 }
 
-export function WorkspaceControl({
+export interface WorkspaceControlModel {
+  overlay: ReactNode;
+  workspace: AccountWorkspaceModel;
+}
+
+export function useWorkspaceControl({
   contextState,
   onRetryContext,
   onWorkspaceChange,
-}: WorkspaceControlProps) {
-  const { t } = useTranslation();
+}: WorkspaceControlProps): WorkspaceControlModel {
   const [createOpen, setCreateOpen] = useState(false);
   const eligibleQuery = useQuery({
     queryKey: workspaceKeys.eligible,
@@ -79,81 +77,36 @@ export function WorkspaceControl({
     if (result === 'entered') setCreateOpen(false);
   }
 
-  return (
-    <>
-      <section
-        className="grid gap-axis-region"
-        aria-label={t('workspace.label')}
-        aria-busy={switching || undefined}
-      >
-        <div className="flex items-center gap-axis-inline px-axis-inline text-axis-metadata font-axis-label text-muted-foreground">
-          <PanelsTopLeft className="size-3.5" aria-hidden />
-          {t('workspace.label')}
-        </div>
+  const orderedWorkspaces = [
+    ...workspaces.filter((workspace) => workspace.type === 'Personal'),
+    ...workspaces.filter((workspace) => workspace.type === 'Organization'),
+  ];
 
-        <AsyncContent
-          className="min-h-axis-default-control"
-          pending={eligibleQuery.isPending}
-          error={eligibleQuery.isError}
-          pendingLabel={t('workspace.loading')}
-        >
-          {eligibleQuery.isError ? (
-            <StatusNotice tone="destructive" title={t('workspace.unavailable')}>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                onClick={() => eligibleQuery.refetch()}
-              >
-                {t('app.retry')}
-              </Button>
-            </StatusNotice>
-          ) : eligibleQuery.data ? (
-            <WorkspaceOptions
-              workspaces={workspaces}
-              switchingWorkspaceId={contextState.targetWorkspaceId}
-              switching={switching}
-              onSelect={switchWorkspace}
-            />
-          ) : null}
-        </AsyncContent>
-
-        <Button
-          type="button"
-          size="sm"
-          variant="ghost"
-          className={`min-h-axis-touch-target w-full justify-start sm:min-h-axis-compact-control ${transientItemHighlight}`}
-          disabled={switching}
-          onClick={() => {
-            setCreateOpen(true);
-          }}
-        >
-          <Plus className="size-3.5" aria-hidden />
-          {t('workspace.createOrganization')}
-        </Button>
-
-        <div aria-live="polite" className="grid gap-axis-inline">
-          {switching ? <span className="sr-only">{t('workspace.switching')}</span> : null}
-          {switchOutcomeUnknown ? (
-            <StatusNotice tone="warning">
-              <span>{t('workspace.switchOutcomeUnknown')}</span>{' '}
-              <Button type="button" variant="link" onClick={() => void onRetryContext()}>
-                {t('workspace.retryRefresh')}
-              </Button>
-            </StatusNotice>
-          ) : contextState.failure === 'refresh-failed' ? (
-            <StatusNotice tone="destructive">
-              <span>{t('workspace.refreshFailedDescription')}</span>{' '}
-              <Button type="button" variant="link" onClick={() => void onRetryContext()}>
-                {t('workspace.retryRefresh')}
-              </Button>
-            </StatusNotice>
-          ) : switchError ? (
-            <StatusNotice tone="destructive">{t('workspace.switchFailed')}</StatusNotice>
-          ) : null}
-        </div>
-      </section>
-
+  return {
+    workspace: {
+      busy: switching,
+      feedback: contextState.failure,
+      loadState: eligibleQuery.isError
+        ? 'error'
+        : eligibleQuery.data !== undefined
+          ? 'ready'
+          : 'loading',
+      onCreate: () => setCreateOpen(true),
+      onRetryContext: () => void onRetryContext(),
+      onRetryLoad: () => void eligibleQuery.refetch(),
+      onSelect: (workspaceId) => {
+        const target = workspaces.find((workspace) => workspace.workspaceId === workspaceId);
+        if (target) void switchWorkspace(target);
+      },
+      options: orderedWorkspaces.map((workspace) => ({
+        current: workspace.isCurrent,
+        id: workspace.workspaceId,
+        kind: workspace.type === 'Personal' ? 'person' : 'organization',
+        label: workspace.name,
+        pending: switching && contextState.targetWorkspaceId === workspace.workspaceId,
+      })),
+    },
+    overlay: (
       <CreateOrganizationDialog
         open={createOpen}
         switchError={switchError}
@@ -162,58 +115,8 @@ export function WorkspaceControl({
         onOpenChange={setCreateOpen}
         onEnter={switchWorkspace}
       />
-    </>
-  );
-}
-
-function WorkspaceOptions({
-  workspaces,
-  switchingWorkspaceId,
-  switching,
-  onSelect,
-}: {
-  workspaces: EligibleWorkspace[];
-  switchingWorkspaceId: string | null;
-  switching: boolean;
-  onSelect: (workspace: EligibleWorkspace) => void;
-}) {
-  const { t } = useTranslation();
-  const personal = workspaces.filter((workspace) => workspace.type === 'Personal');
-  const organizations = workspaces.filter((workspace) => workspace.type === 'Organization');
-  const orderedWorkspaces = [...personal, ...organizations];
-
-  return (
-    <section className="grid max-h-72 gap-1 overflow-y-auto" aria-label={t('workspace.eligible')}>
-      {orderedWorkspaces.map((workspace) => {
-        const WorkspaceIcon = workspace.type === 'Personal' ? UserRound : Building2;
-        const switchingThisWorkspace = switching && switchingWorkspaceId === workspace.workspaceId;
-
-        return (
-          <Button
-            key={workspace.workspaceId}
-            type="button"
-            variant="ghost"
-            size="sm"
-            className={cn(
-              'min-h-axis-touch-target w-full justify-start sm:min-h-axis-compact-control',
-              workspace.isCurrent ? persistentItemHighlight : transientItemHighlight,
-              workspace.isCurrent && 'disabled:opacity-100',
-            )}
-            disabled={workspace.isCurrent || switching}
-            aria-current={workspace.isCurrent ? 'page' : undefined}
-            onClick={() => onSelect(workspace)}
-          >
-            <OptionItemContent
-              icon={<WorkspaceIcon className="size-3.5" />}
-              pending={switchingThisWorkspace}
-            >
-              {workspace.name}
-            </OptionItemContent>
-          </Button>
-        );
-      })}
-    </section>
-  );
+    ),
+  };
 }
 
 function CreateOrganizationDialog({
@@ -358,6 +261,7 @@ function CreateOrganizationDialog({
           </Button>
           {created ? (
             <AsyncButton
+              key="enter-workspace"
               type="button"
               icon={<ArrowRight />}
               pending={switching}
@@ -368,6 +272,7 @@ function CreateOrganizationDialog({
             </AsyncButton>
           ) : (
             <AsyncButton
+              key="create-organization"
               type="submit"
               form="create-organization-form"
               disabled={!name.trim()}

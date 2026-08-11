@@ -94,8 +94,8 @@ class TestAxisTheme(unittest.TestCase):
                     "stateDuration": "150ms",
                     "floatingDuration": "100ms",
                     "easing": "cubic-bezier(0, 0, 0.2, 1)",
-                    "feedbackDelayMs": 300,
-                    "feedbackMinimumMs": 400,
+                    "contentDelayMs": 300,
+                    "contentMinimumMs": 400,
                     "contextDelayMs": 500,
                     "contextMinimumMs": 600,
                 },
@@ -189,7 +189,7 @@ class TestAxisTheme(unittest.TestCase):
             ("radiusRoles", "control", "0.1rem", "increase by semantic depth"),
             ("motionRoles", "floatingDuration", "200ms", "must not exceed stateDuration"),
             ("motionRoles", "easing", "linear", "must use `cubic-bezier"),
-            ("motionRoles", "feedbackMinimumMs", 200, "must not be smaller"),
+            ("motionRoles", "contentMinimumMs", 200, "must not be smaller"),
         )
         for group, role, value, message in invalid_cases:
             with self.subTest(group=group, role=role), tempfile.TemporaryDirectory() as temp:
@@ -244,7 +244,7 @@ class TestAxisTheme(unittest.TestCase):
             self.assertIn("--spacing-axis-touch-target: 2.75rem;", web)
             self.assertIn("--radius-axis-managed: 1rem;", web)
             self.assertIn("--z-axis-notification: 60;", web)
-            self.assertIn("delayMs: 300", runtime)
+            self.assertIn("content: {\n    delayMs: 300", runtime)
             self.assertIn("minimumMs: 600", runtime)
             self.assertIn('PrimaryColor = "#ffffff"', email)
             self.assertIn('PrimaryForegroundColor = "#000000"', email)

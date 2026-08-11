@@ -1,6 +1,11 @@
 import { render, screen } from '@testing-library/react';
+import type { ReactNode } from 'react';
 import { describe, expect, expectTypeOf, it, vi } from 'vitest';
-import type { AccountSurfaceProps } from '../src/components/shared/AccountSurface';
+import type {
+  AccountPreferencesModel,
+  AccountSurfaceProps,
+  AccountWorkspaceModel,
+} from '../src/components/shared/AccountSurface';
 import type { AppShellProps } from '../src/components/shared/AppShell';
 import {
   AuthenticatedFrame,
@@ -19,10 +24,9 @@ import {
   surfaceContractAttributes,
 } from '../src/lib/ui-foundation';
 
-type VisualEscapeHatch<T> = Extract<
-  keyof T,
-  'className' | 'scrollMode' | 'variant' | `${string}ClassName`
->;
+type UnboundedContentSlot<T> = {
+  [Key in keyof T]-?: ReactNode extends NonNullable<T[Key]> ? Key : never;
+}[keyof T];
 
 vi.mock('@/features/preferences', () => ({
   PreferencesMenu: () => <div data-slot="test-preferences">Preferences</div>,
@@ -122,13 +126,31 @@ describe('surface contracts', () => {
     expect(layout).toContainElement(screen.getByRole('region', { name: 'Release pipeline' }));
   });
 
-  it('keeps surface APIs semantic and closes visual escape hatches', () => {
-    expectTypeOf<VisualEscapeHatch<AccountSurfaceProps>>().toEqualTypeOf<never>();
-    expectTypeOf<VisualEscapeHatch<AppShellProps>>().toEqualTypeOf<never>();
-    expectTypeOf<VisualEscapeHatch<AuthenticatedFrameProps>>().toEqualTypeOf<never>();
-    expectTypeOf<VisualEscapeHatch<EntrySurfaceProps>>().toEqualTypeOf<never>();
-    expectTypeOf<VisualEscapeHatch<ManagedDialogProps>>().toEqualTypeOf<never>();
-    expectTypeOf<VisualEscapeHatch<ProcessWorkbenchProps>>().toEqualTypeOf<never>();
-    expectTypeOf<VisualEscapeHatch<ResourceWorkspaceProps>>().toEqualTypeOf<never>();
+  it('classifies generic content capabilities at every finite owner boundary', () => {
+    expectTypeOf<AccountSurfaceProps['workspace']>().toEqualTypeOf<AccountWorkspaceModel>();
+    expectTypeOf<AccountSurfaceProps['preferences']>().toEqualTypeOf<AccountPreferencesModel>();
+    expectTypeOf<UnboundedContentSlot<AccountSurfaceProps>>().toEqualTypeOf<never>();
+    expectTypeOf<UnboundedContentSlot<AppShellProps>>().toEqualTypeOf<'children'>();
+    expectTypeOf<UnboundedContentSlot<AuthenticatedFrameProps>>().toEqualTypeOf<
+      | 'children'
+      | 'contextSurface'
+      | 'footer'
+      | 'header'
+      | 'managedWindows'
+      | 'navigation'
+      | 'notifications'
+    >();
+    expectTypeOf<UnboundedContentSlot<EntrySurfaceProps>>().toEqualTypeOf<
+      'banner' | 'children' | 'footer' | 'utilities'
+    >();
+    expectTypeOf<UnboundedContentSlot<ManagedDialogProps>>().toEqualTypeOf<
+      'children' | 'description' | 'footer' | 'titleAccessory'
+    >();
+    expectTypeOf<UnboundedContentSlot<ProcessWorkbenchProps>>().toEqualTypeOf<
+      'children' | 'description' | 'title'
+    >();
+    expectTypeOf<UnboundedContentSlot<ResourceWorkspaceProps>>().toEqualTypeOf<
+      'children' | 'description' | 'status' | 'title'
+    >();
   });
 });

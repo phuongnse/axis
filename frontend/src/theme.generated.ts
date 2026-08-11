@@ -2,7 +2,7 @@
 // Generated from theme/axis-theme.json by `python scripts/axis.py generate theme`.
 
 export const axisUiTiming = {
-  feedback: {
+  content: {
     delayMs: 300,
     minimumMs: 400,
   },

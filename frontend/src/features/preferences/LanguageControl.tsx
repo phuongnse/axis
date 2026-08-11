@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { RotateCcw } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import type { AccountPreferenceGroupModel } from '@/components/shared/AccountSurface';
 import { AsyncContent } from '@/components/shared/AsyncContent';
 import { OptionList, OptionListItem } from '@/components/shared/OptionList';
 import { Button } from '@/components/ui/button';
@@ -35,11 +36,7 @@ const languageBadges = {
   vi: 'VI',
 } satisfies Record<SupportedLanguage, string>;
 
-export function LanguageControl({
-  authenticated = false,
-  className,
-  variant = 'segmented',
-}: LanguageControlProps) {
+function useLanguagePreferenceState(authenticated: boolean) {
   const queryClient = useQueryClient();
   const { i18n, t } = useTranslation();
   const language = currentSiteLanguage();
@@ -76,8 +73,6 @@ export function LanguageControl({
   });
 
   const shouldPersistToServer = authenticated && getBrowserSessionStatus() === 'authenticated';
-  const statusId = authenticated ? 'language-save-status' : undefined;
-
   function chooseLanguage(nextLanguage: SupportedLanguage) {
     void changeSiteLanguage(nextLanguage);
     setLastFailedLanguage(null);
@@ -100,10 +95,54 @@ export function LanguageControl({
     }
   }
 
-  const isMenu = variant === 'menu';
   const activeLanguage = isSupportedLanguage(i18n.resolvedLanguage)
     ? i18n.resolvedLanguage
     : language;
+
+  return {
+    activeLanguage,
+    chooseLanguage,
+    chooseToggleLanguage,
+    latestServerLanguageRef,
+    mutation,
+    retrySave,
+    t,
+  };
+}
+
+export function useAccountLanguagePreferenceModel(): AccountPreferenceGroupModel {
+  const { activeLanguage, chooseLanguage, latestServerLanguageRef, mutation, retrySave, t } =
+    useLanguagePreferenceState(true);
+
+  return {
+    feedback: mutation.isError
+      ? { message: t('app.languageSaveFailed'), retryLabel: t('app.retry') }
+      : null,
+    label: t('app.language'),
+    onRetry: retrySave,
+    onSelect: (value) => {
+      if (isSupportedLanguage(value)) chooseLanguage(value);
+    },
+    options: supportedLanguages.map((item) => ({
+      icon: languageBadges[item.value],
+      label: t(languageLabelKeys[item.value]),
+      pending: mutation.isPending && latestServerLanguageRef.current === item.value,
+      value: item.value,
+    })),
+    pendingLabel: t('app.saving'),
+    value: activeLanguage,
+  };
+}
+
+export function LanguageControl({
+  authenticated = false,
+  className,
+  variant = 'segmented',
+}: LanguageControlProps) {
+  const { activeLanguage, chooseToggleLanguage, latestServerLanguageRef, mutation, retrySave, t } =
+    useLanguagePreferenceState(authenticated);
+  const statusId = authenticated ? 'language-save-status' : undefined;
+  const isMenu = variant === 'menu';
 
   return (
     <div

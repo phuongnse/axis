@@ -5,12 +5,15 @@ import { AccountSurface } from '@/components/shared/AccountSurface';
 import { useAuthStore } from '@/features/auth/auth-store';
 import { sessionDisplayFromLabel } from '@/features/auth/session-display';
 import { dashboardQueryKeys, getCurrentUserProfile } from '@/features/dashboard/api';
-import { LanguageControl, ThemeControl } from '@/features/preferences';
+import {
+  useAccountLanguagePreferenceModel,
+  useAccountThemePreferenceModel,
+} from '@/features/preferences';
 import type { CreatedOrganizationWorkspace, EligibleWorkspace } from '@/features/workspaces/api';
 import {
+  useWorkspaceControl,
   type WorkspaceChangeResult,
   type WorkspaceContextState,
-  WorkspaceControl,
 } from '@/features/workspaces/WorkspaceControl';
 
 interface AppHeaderProps {
@@ -71,47 +74,46 @@ export function AppHeader({
       : displayName;
   const transitionLocked =
     workspaceContext.phase === 'switching' || workspaceContext.phase === 'refreshing';
+  const workspaceControl = useWorkspaceControl({
+    contextState: workspaceContext,
+    onRetryContext: onRetryWorkspaceContext,
+    onWorkspaceChange,
+  });
+  const languagePreference = useAccountLanguagePreferenceModel();
+  const themePreference = useAccountThemePreferenceModel();
 
   return (
-    <header className="shrink-0 border-b border-border bg-card">
-      <div className="flex min-h-16 w-full min-w-0 flex-wrap items-center gap-axis-region px-axis-page-compact py-3 sm:px-axis-page-default lg:px-axis-page-wide">
-        <Link to="/dashboard" className="flex min-w-0 items-center gap-axis-region">
-          <img src="/axis-logo.svg" alt="" className="size-11 shrink-0" width={44} height={44} />
-          <span className="block min-w-0 truncate text-axis-metadata font-axis-metadata uppercase tracking-widest text-muted-foreground">
-            {pageTitle}
-          </span>
-        </Link>
+    <>
+      <header className="shrink-0 border-b border-border bg-card">
+        <div className="flex min-h-16 w-full min-w-0 flex-wrap items-center gap-axis-region px-axis-page-compact py-3 sm:px-axis-page-default lg:px-axis-page-wide">
+          <Link to="/dashboard" className="flex min-w-0 items-center gap-axis-region">
+            <img src="/axis-logo.svg" alt="" className="size-11 shrink-0" width={44} height={44} />
+            <span className="block min-w-0 truncate text-axis-metadata font-axis-metadata uppercase tracking-widest text-muted-foreground">
+              {pageTitle}
+            </span>
+          </Link>
 
-        <div className="ml-auto flex min-w-0 shrink items-center gap-axis-inline">
-          <AccountSurface
-            surfaceId="account-actions"
-            identity={{
-              displayName,
-              initials: displayInitials,
-              secondaryLabel: profileName && profileEmail ? profileEmail : undefined,
-              triggerKind: currentWorkspace?.type === 'Organization' ? 'organization' : 'person',
-              triggerLabel,
-            }}
-            onSignOut={onSignOut}
-            preferenceControls={
-              <>
-                <LanguageControl authenticated variant="menu" />
-                <ThemeControl authenticated variant="menu" />
-              </>
-            }
-            signOutError={signOutError}
-            signingOut={signingOut}
-            transitionLocked={transitionLocked}
-            workspace={
-              <WorkspaceControl
-                contextState={workspaceContext}
-                onRetryContext={onRetryWorkspaceContext}
-                onWorkspaceChange={onWorkspaceChange}
-              />
-            }
-          />
+          <div className="ml-auto flex min-w-0 shrink items-center gap-axis-inline">
+            <AccountSurface
+              surfaceId="account-actions"
+              identity={{
+                displayName,
+                initials: displayInitials,
+                secondaryLabel: profileName && profileEmail ? profileEmail : undefined,
+                triggerKind: currentWorkspace?.type === 'Organization' ? 'organization' : 'person',
+                triggerLabel,
+              }}
+              onSignOut={onSignOut}
+              preferences={{ language: languagePreference, theme: themePreference }}
+              signOutError={signOutError}
+              signingOut={signingOut}
+              transitionLocked={transitionLocked}
+              workspace={workspaceControl.workspace}
+            />
+          </div>
         </div>
-      </div>
-    </header>
+      </header>
+      {workspaceControl.overlay}
+    </>
   );
 }

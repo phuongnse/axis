@@ -1,12 +1,10 @@
-import { act, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Monitor, Moon } from 'lucide-react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { OptionList, OptionListItem } from '@/components/shared/OptionList';
 
 describe('OptionList', () => {
-  afterEach(() => vi.useRealTimers());
-
   it('renders full-width, start-aligned options and reports selection', async () => {
     const user = userEvent.setup();
     const onValueChange = vi.fn();
@@ -56,9 +54,8 @@ describe('OptionList', () => {
     expect(onValueChange).toHaveBeenCalledWith('dark');
   });
 
-  it('replaces the leading icon only after the shared pending threshold', () => {
-    vi.useFakeTimers();
-    render(
+  it('replaces the leading icon immediately for a pending user action', () => {
+    const { rerender } = render(
       <OptionList label="Theme" value="dark" onValueChange={vi.fn()}>
         <OptionListItem icon={<Moon />} pending value="dark">
           Dark
@@ -69,9 +66,20 @@ describe('OptionList', () => {
     const icon = screen
       .getByRole('button', { name: 'Dark' })
       .querySelector('[data-slot="option-item-icon"]');
-    expect(icon?.querySelector('.lucide-moon')).not.toBeNull();
-
-    act(() => vi.advanceTimersByTime(300));
+    expect(screen.getByRole('button', { name: 'Dark' })).toHaveAttribute('aria-busy', 'true');
+    expect(screen.getByRole('button', { name: 'Dark' })).toBeDisabled();
     expect(icon?.querySelector('[data-slot="spinner"]')).not.toBeNull();
+
+    rerender(
+      <OptionList label="Theme" value="dark" onValueChange={vi.fn()}>
+        <OptionListItem icon={<Moon />} value="dark">
+          Dark
+        </OptionListItem>
+      </OptionList>,
+    );
+
+    expect(screen.getByRole('button', { name: 'Dark' })).not.toHaveAttribute('aria-busy');
+    expect(screen.getByRole('button', { name: 'Dark' })).toBeEnabled();
+    expect(icon?.querySelector('.lucide-moon')).not.toBeNull();
   });
 });

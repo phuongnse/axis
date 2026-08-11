@@ -1,16 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
 import { axisUiTiming } from '@/theme.generated';
 
-export type PendingFeedbackKind = 'feedback' | 'context-transition';
+export type PendingFeedbackKind = 'content' | 'context-transition';
 
 const pendingFeedbackTimings = {
-  feedback: axisUiTiming.feedback,
+  content: axisUiTiming.content,
   'context-transition': axisUiTiming.contextTransition,
 } as const satisfies Record<PendingFeedbackKind, { delayMs: number; minimumMs: number }>;
 
 export function usePendingVisibility(
   pending: boolean,
-  kind: PendingFeedbackKind = 'feedback',
+  kind: PendingFeedbackKind = 'content',
 ): boolean {
   const { delayMs, minimumMs } = pendingFeedbackTimings[kind];
   const [visible, setVisible] = useState(false);

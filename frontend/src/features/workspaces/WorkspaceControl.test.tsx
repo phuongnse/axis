@@ -3,15 +3,15 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { AccountSurface } from '@/components/shared/AccountSurface';
-import { transientItemHighlight } from '@/components/shared/interactionStates';
+import { AccountSurface, AccountWorkspaceSection } from '@/components/shared/AccountSurface';
 import { useAuthStore } from '@/features/auth/auth-store';
 import { getCurrentUserProfile } from '@/features/dashboard/api';
 import { createOrganizationWorkspace, listEligibleWorkspaces } from './api';
 import {
+  useWorkspaceControl,
   type WorkspaceChangeResult,
   type WorkspaceContextState,
-  WorkspaceControl,
+  type WorkspaceControlProps,
 } from './WorkspaceControl';
 
 vi.mock('@/features/dashboard/api', () => ({
@@ -61,6 +61,57 @@ function TestBoundary({ children }: { children: ReactNode }) {
   );
 }
 
+function WorkspaceControlHarness(props: WorkspaceControlProps) {
+  const control = useWorkspaceControl(props);
+  return (
+    <>
+      <AccountWorkspaceSection {...control.workspace} />
+      {control.overlay}
+    </>
+  );
+}
+
+function AccountWorkspaceHarness(props: WorkspaceControlProps) {
+  const control = useWorkspaceControl(props);
+  return (
+    <>
+      <AccountSurface
+        surfaceId="account-actions"
+        identity={{
+          displayName: 'Ada Lovelace',
+          initials: 'AL',
+          secondaryLabel: 'ada@example.com',
+          triggerKind: 'person',
+          triggerLabel: 'Ada Lovelace',
+        }}
+        onSignOut={vi.fn()}
+        preferences={{
+          language: {
+            feedback: null,
+            label: 'Language',
+            onRetry: vi.fn(),
+            onSelect: vi.fn(),
+            options: [],
+            pendingLabel: 'Saving...',
+            value: 'en',
+          },
+          theme: {
+            feedback: null,
+            label: 'Theme',
+            onRetry: vi.fn(),
+            onSelect: vi.fn(),
+            options: [],
+            pendingLabel: 'Saving...',
+            value: 'system',
+          },
+        }}
+        workspace={control.workspace}
+      />
+      {control.overlay}
+    </>
+  );
+}
+
 function renderControl(
   onWorkspaceChange = vi.fn(async () => 'entered' as WorkspaceChangeResult),
   contextState: WorkspaceContextState = idleContext,
@@ -68,7 +119,7 @@ function renderControl(
 ) {
   const view = render(
     <TestBoundary>
-      <WorkspaceControl
+      <WorkspaceControlHarness
         contextState={contextState}
         onRetryContext={onRetryContext}
         onWorkspaceChange={onWorkspaceChange}
@@ -78,7 +129,7 @@ function renderControl(
   return { ...view, onRetryContext, onWorkspaceChange };
 }
 
-describe('WorkspaceControl', () => {
+describe('useWorkspaceControl', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(getCurrentUserProfile).mockResolvedValue({
@@ -125,18 +176,13 @@ describe('WorkspaceControl', () => {
     expect(screen.queryByText('Organization Workspaces')).not.toBeInTheDocument();
     const currentWorkspace = screen.getByRole('button', { name: 'Personal workspace' });
     expect(currentWorkspace).toHaveAttribute('aria-current', 'page');
-    expect(currentWorkspace).toHaveClass('bg-secondary', 'disabled:opacity-100');
-    expect(currentWorkspace.querySelector('.lucide-user-round')).not.toBeNull();
-    expect(currentWorkspace.querySelector('.lucide-check')).toBeNull();
     const organizationChoice = screen.getByRole('button', { name: 'Acme Operations' });
-    expect(organizationChoice.querySelector('.lucide-building-2')).not.toBeNull();
-    expect(organizationChoice).toHaveClass(...transientItemHighlight.split(' '));
 
     await user.click(organizationChoice);
     expect(onWorkspaceChange).toHaveBeenCalledWith(organizationWorkspace);
     view.rerender(
       <TestBoundary>
-        <WorkspaceControl
+        <WorkspaceControlHarness
           contextState={{
             failure: null,
             phase: 'switching',
@@ -148,9 +194,18 @@ describe('WorkspaceControl', () => {
       </TestBoundary>,
     );
     expect(workspaceSection).toHaveAttribute('aria-busy', 'true');
-    expect(await screen.findByText('Switching Workspace...')).toHaveClass('sr-only');
-    const visualStatus = workspaceSection.querySelector('[role="status"]:not(.sr-only)');
-    expect(visualStatus?.closest('[data-slot="option-item-icon"]')).not.toBeNull();
+    expect(screen.getByRole('button', { name: 'Acme Operations' })).toHaveAttribute(
+      'aria-busy',
+      'true',
+    );
+    expect(screen.getByRole('button', { name: 'Acme Operations' })).not.toHaveAttribute(
+      'aria-current',
+    );
+    expect(screen.getByRole('button', { name: 'Personal workspace' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+    expect(await screen.findByText('Switching Workspace...')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Personal workspace' })).toBeDisabled();
   });
 
@@ -204,24 +259,10 @@ describe('WorkspaceControl', () => {
     const user = userEvent.setup();
     render(
       <TestBoundary>
-        <AccountSurface
-          surfaceId="account-actions"
-          identity={{
-            displayName: 'Ada Lovelace',
-            initials: 'AL',
-            secondaryLabel: 'ada@example.com',
-            triggerKind: 'person',
-            triggerLabel: 'Ada Lovelace',
-          }}
-          onSignOut={vi.fn()}
-          preferenceControls={null}
-          workspace={
-            <WorkspaceControl
-              contextState={idleContext}
-              onRetryContext={vi.fn(async () => undefined)}
-              onWorkspaceChange={vi.fn(async () => 'entered' as WorkspaceChangeResult)}
-            />
-          }
+        <AccountWorkspaceHarness
+          contextState={idleContext}
+          onRetryContext={vi.fn(async () => undefined)}
+          onWorkspaceChange={vi.fn(async () => 'entered' as WorkspaceChangeResult)}
         />
       </TestBoundary>,
     );

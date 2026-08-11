@@ -30,8 +30,8 @@ ELEVATION_ROLES = ("none", "floating", "managed", "dock")
 ICON_ROLES = ("control", "navigation", "empty")
 MOTION_STRING_ROLES = ("stateDuration", "floatingDuration", "easing")
 MOTION_MILLISECOND_ROLES = (
-    "feedbackDelayMs",
-    "feedbackMinimumMs",
+    "contentDelayMs",
+    "contentMinimumMs",
     "contextDelayMs",
     "contextMinimumMs",
 )
@@ -330,14 +330,13 @@ def load_theme(root: Path) -> dict[str, Any]:
     _cubic_bezier(motion["easing"], "ui.motionRoles.easing")
     for role in MOTION_MILLISECOND_ROLES:
         _nonnegative_integer(motion[role], f"ui.motionRoles.{role}")
-    if motion["feedbackMinimumMs"] < motion["feedbackDelayMs"]:
-        raise ThemeValidationError(
-            "ui.motionRoles.feedbackMinimumMs must not be smaller than feedbackDelayMs"
-        )
-    if motion["contextMinimumMs"] < motion["contextDelayMs"]:
-        raise ThemeValidationError(
-            "ui.motionRoles.contextMinimumMs must not be smaller than contextDelayMs"
-        )
+    for timing_role in ("content", "context"):
+        delay_role = f"{timing_role}DelayMs"
+        minimum_role = f"{timing_role}MinimumMs"
+        if motion[minimum_role] < motion[delay_role]:
+            raise ThemeValidationError(
+                f"ui.motionRoles.{minimum_role} must not be smaller than {delay_role}"
+            )
 
     layers = _mapping(ui["layerRoles"], "ui.layerRoles")
     _exact_keys(layers, set(LAYER_ROLES), "ui.layerRoles")
@@ -460,9 +459,9 @@ def _render_web_theme_runtime(theme: dict[str, Any]) -> str:
             "// Generated from theme/axis-theme.json by `python scripts/axis.py generate theme`.",
             "",
             "export const axisUiTiming = {",
-            "  feedback: {",
-            f"    delayMs: {motion['feedbackDelayMs']},",
-            f"    minimumMs: {motion['feedbackMinimumMs']},",
+            "  content: {",
+            f"    delayMs: {motion['contentDelayMs']},",
+            f"    minimumMs: {motion['contentMinimumMs']},",
             "  },",
             "  contextTransition: {",
             f"    delayMs: {motion['contextDelayMs']},",

@@ -62,8 +62,8 @@ Use these ownership layers:
 
 - **Upstream zone** — `frontend/src/components/ui` plus baseline-tracked shadcn support files contain reviewed registry source. Keep registry-default visuals and APIs; do not add product variants, business logic, feature/shared imports, or internal styling. `frontend/ui-baseline.json` records the approved snapshot and the reason/sign-off reference for each explicit exception.
 - **Theme zone** — [theme/axis-theme.json](../../theme/axis-theme.json) owns reusable color, typography, spacing, density, radius, elevation, icon, motion, and layer values. Generated CSS and runtime TypeScript are committed; `frontend/src/index.css` owns imports and base styles only. Consumers use semantic roles rather than copying current values.
-- **App-pattern zone** — `frontend/src/components/shared` owns reusable Axis composition and adapters. Give them narrow Axis-owned props such as product state, not provider variants, types, selectors, or DOM assumptions.
-- **Feature zone** — feature components compose defaults and app patterns. Consumer `className` is outer layout-only and must not alter primitive visuals.
+- **App-pattern zone** — `frontend/src/components/shared` owns reusable Axis composition and adapters. Give a surface owner narrow semantic props: leaf content stays inside owner-rendered anatomy; regions with their own states, relationships, or actions use typed models rendered by the owner.
+- **Feature zone** — feature components compose defaults and app patterns. They provide product data, state, and commands; they do not pass visual or mechanical capability across a surface boundary.
 
 Dependency flows downward through the constitution, theme, upstream primitives, app patterns, page archetypes, app shell, and feature composition. Features do not own reusable values, global timing, scroll containers, overlay mechanics, focus recovery, control visuals, or alternate page anatomies. The app shell owns stable viewport and context-transition mechanics; the active page archetype owns route geometry; the feature owns product state and composition.
 

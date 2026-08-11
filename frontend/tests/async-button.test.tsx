@@ -1,13 +1,10 @@
-import { act, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { Save } from 'lucide-react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { AsyncButton } from '@/components/shared/AsyncButton';
 
 describe('AsyncButton', () => {
-  afterEach(() => vi.useRealTimers());
-
-  it('locks immediately, keeps its label stable, and delays visual pending feedback', () => {
-    vi.useFakeTimers();
+  it('mirrors authoritative pending immediately while keeping its label stable', () => {
     const { rerender } = render(
       <AsyncButton icon={<Save />} pending={false} pendingLabel="Saving">
         Save
@@ -28,9 +25,6 @@ describe('AsyncButton', () => {
     expect(button).toHaveAccessibleName('Save');
     expect(button).toHaveTextContent('Save');
     expect(screen.getByRole('status')).toHaveTextContent('Saving');
-    expect(iconSlot?.querySelector('[data-slot="spinner"]')).toBeNull();
-
-    act(() => vi.advanceTimersByTime(300));
     expect(iconSlot?.querySelector('[data-slot="spinner"]')).not.toBeNull();
 
     rerender(
@@ -38,12 +32,8 @@ describe('AsyncButton', () => {
         Save
       </AsyncButton>,
     );
-    act(() => vi.advanceTimersByTime(399));
-    expect(button).toBeDisabled();
-    expect(iconSlot?.querySelector('[data-slot="spinner"]')).not.toBeNull();
-
-    act(() => vi.advanceTimersByTime(1));
     expect(button).not.toBeDisabled();
+    expect(button).not.toHaveAttribute('aria-busy');
     expect(iconSlot?.querySelector('.lucide-save')).not.toBeNull();
   });
 });

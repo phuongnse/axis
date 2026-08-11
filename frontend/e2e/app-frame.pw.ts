@@ -319,7 +319,7 @@ async function expectAccountSurfaceScreenshot(page: Page, name: string): Promise
   await expect(accountSurface).toBeVisible();
   await expect(accountSurface).toHaveAttribute('data-axis-surface-id', 'account-actions');
   await expect(accountSurface).toHaveAttribute('data-axis-surface-contract', 'account-surface');
-  await expect(accountSurface.locator('fieldset[aria-busy="true"]')).toHaveCount(0);
+  await expect(accountSurface.locator('[aria-busy="true"]')).toHaveCount(0);
   await accountSurface.evaluate((element) =>
     Promise.all(element.getAnimations({ subtree: true }).map((animation) => animation.finished)),
   );
@@ -329,6 +329,54 @@ async function expectAccountSurfaceScreenshot(page: Page, name: string): Promise
     caret: 'hide',
     scale: 'css',
   });
+}
+
+async function expectAccountRegionRhythmAndActionAffordance(page: Page): Promise<void> {
+  const accountSurface = page.locator('[data-slot="account-surface"]');
+  const regions = accountSurface.locator('[data-axis-account-region]');
+  const regionInsets = await regions.evaluateAll((elements) =>
+    elements.map((element) => {
+      const style = getComputedStyle(element);
+      return {
+        end: Number.parseFloat(style.paddingInlineEnd),
+        start: Number.parseFloat(style.paddingInlineStart),
+      };
+    }),
+  );
+  expect(regionInsets).toHaveLength(4);
+  expect(new Set(regionInsets.map(({ start }) => start)).size, 'one region leading inset').toBe(1);
+  expect(new Set(regionInsets.map(({ end }) => end)).size, 'one region trailing inset').toBe(1);
+  expect(
+    regionInsets.every(({ end, start }) => end === start),
+    'symmetric region insets',
+  ).toBe(true);
+
+  const createOrganization = accountSurface.getByRole('button', {
+    name: 'Create Organization',
+  });
+  const createAffordance = await createOrganization.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return {
+      borderColor: style.borderInlineStartColor,
+      borderWidth: Number.parseFloat(style.borderInlineStartWidth),
+    };
+  });
+  expect(createAffordance.borderWidth, 'Create Organization resting boundary').toBeGreaterThan(0);
+  expect(createAffordance.borderColor, 'Create Organization resting boundary').not.toBe(
+    'rgba(0, 0, 0, 0)',
+  );
+}
+
+async function invokePreferenceAction(
+  page: Page,
+  action: Locator,
+  preference: 'language' | 'theme',
+): Promise<void> {
+  const response = page.waitForResponse((candidate) =>
+    new URL(candidate.url()).pathname.endsWith(`/api/users/me/preferences/${preference}`),
+  );
+  await action.click();
+  expect((await response).ok()).toBe(true);
 }
 
 test.describe('app frame', () => {
@@ -467,55 +515,105 @@ test.describe('app frame', () => {
     await expect(page.getByRole('button', { name: 'Personal workspace' })).toBeVisible();
     await expect(page.locator('html')).toHaveAttribute('lang', 'en');
     await expect(page.locator('html')).not.toHaveClass(/dark/);
+    await expectAccountRegionRhythmAndActionAffordance(page);
     await expectAccountSurfaceScreenshot(page, 'account-surface-light-desktop-en');
 
-    await page.getByRole('button', { name: 'Dark' }).click();
+    const darkDesktopOption = page.getByRole('button', { name: 'Dark' });
+    await invokePreferenceAction(page, darkDesktopOption, 'theme');
     await expect(page.locator('html')).toHaveClass(/dark/);
-    await expect(page.getByRole('button', { name: 'Dark' })).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    );
+    await expect(darkDesktopOption).toHaveAttribute('aria-pressed', 'true');
+    await expect(darkDesktopOption).not.toHaveAttribute('aria-busy');
     await expectAccountSurfaceScreenshot(page, 'account-surface-dark-desktop-en');
 
-    await page.getByRole('button', { name: 'Vietnamese' }).click();
+    const vietnameseOption = page.getByRole('button', { name: 'Vietnamese' });
+    await invokePreferenceAction(page, vietnameseOption, 'language');
     await expect(page.locator('html')).toHaveAttribute('lang', 'vi');
-    await expect(page.getByRole('button', { name: 'Tiếng Việt' })).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    );
+    const selectedVietnameseOption = page.getByRole('button', { name: 'Tiếng Việt' });
+    await expect(selectedVietnameseOption).toHaveAttribute('aria-pressed', 'true');
+    await expect(selectedVietnameseOption).not.toHaveAttribute('aria-busy');
     await expectAccountSurfaceScreenshot(page, 'account-surface-dark-desktop-vi');
 
-    await page.getByRole('button', { name: 'Sáng' }).click();
+    const lightVietnameseOption = page.getByRole('button', { name: 'Sáng' });
+    await invokePreferenceAction(page, lightVietnameseOption, 'theme');
     await expect(page.locator('html')).not.toHaveClass(/dark/);
-    await expect(page.getByRole('button', { name: 'Sáng' })).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    );
+    await expect(lightVietnameseOption).toHaveAttribute('aria-pressed', 'true');
+    await expect(lightVietnameseOption).not.toHaveAttribute('aria-busy');
     await expectAccountSurfaceScreenshot(page, 'account-surface-light-desktop-vi');
 
     await page.setViewportSize({ width: 390, height: 844 });
     await expectAccountSurfaceScreenshot(page, 'account-surface-light-compact-vi');
 
-    await page.getByRole('button', { name: 'Tối' }).click();
+    const darkVietnameseOption = page.getByRole('button', { name: 'Tối' });
+    await invokePreferenceAction(page, darkVietnameseOption, 'theme');
     await expect(page.locator('html')).toHaveClass(/dark/);
-    await expect(page.getByRole('button', { name: 'Tối' })).toHaveAttribute('aria-pressed', 'true');
+    await expect(darkVietnameseOption).toHaveAttribute('aria-pressed', 'true');
+    await expect(darkVietnameseOption).not.toHaveAttribute('aria-busy');
     await expectAccountSurfaceScreenshot(page, 'account-surface-dark-compact-vi');
 
-    await page.getByRole('button', { name: 'Tiếng Anh' }).click();
+    const englishOption = page.getByRole('button', { name: 'Tiếng Anh' });
+    await invokePreferenceAction(page, englishOption, 'language');
     await expect(page.locator('html')).toHaveAttribute('lang', 'en');
-    await expect(page.getByRole('button', { name: 'English' })).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    );
+    const selectedEnglishOption = page.getByRole('button', { name: 'English' });
+    await expect(selectedEnglishOption).toHaveAttribute('aria-pressed', 'true');
+    await expect(selectedEnglishOption).not.toHaveAttribute('aria-busy');
     await expectAccountSurfaceScreenshot(page, 'account-surface-dark-compact-en');
 
-    await page.getByRole('button', { name: 'Light' }).click();
+    const lightCompactOption = page.getByRole('button', { name: 'Light' });
+    await invokePreferenceAction(page, lightCompactOption, 'theme');
     await expect(page.locator('html')).not.toHaveClass(/dark/);
-    await expect(page.getByRole('button', { name: 'Light' })).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    );
+    await expect(lightCompactOption).toHaveAttribute('aria-pressed', 'true');
+    await expect(lightCompactOption).not.toHaveAttribute('aria-busy');
     await expectAccountSurfaceScreenshot(page, 'account-surface-light-compact-en');
+  });
+
+  test('AT-002 compact Account keeps a long Workspace set keyboard-reachable', async ({ page }) => {
+    await mockAuthenticatedSession(page);
+    await page.unroute('**/api/workspace-context/eligible');
+    await page.route('**/api/workspace-context/eligible', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify([
+          {
+            workspaceId: profile.workspaces[0].id,
+            name: profile.workspaces[0].name,
+            slug: profile.workspaces[0].slug,
+            type: profile.workspaces[0].type,
+            organizationId: null,
+            isCurrent: true,
+          },
+          ...Array.from({ length: 12 }, (_, index) => ({
+            workspaceId: `33333333-3333-4333-8333-${String(index + 1).padStart(12, '0')}`,
+            name: `Organization Workspace ${String(index + 1).padStart(2, '0')}`,
+            slug: `organization-workspace-${index + 1}`,
+            type: 'Organization',
+            organizationId: `44444444-4444-4444-8444-${String(index + 1).padStart(12, '0')}`,
+            isCurrent: false,
+          })),
+        ]),
+      });
+    });
+    await page.setViewportSize({ width: 390, height: 600 });
+    await page.goto('/dashboard', { waitUntil: 'domcontentloaded' });
+    await expectAppFrameReady(page, 'Dashboard');
+
+    await page.getByRole('button', { name: 'Account menu' }).click();
+    const firstOrganization = page.getByRole('button', {
+      name: 'Organization Workspace 01',
+    });
+    const signOut = page.getByRole('button', { name: 'Sign out' });
+    await expect(firstOrganization).toBeVisible();
+    await firstOrganization.focus();
+
+    for (let attempt = 0; attempt < 32; attempt += 1) {
+      if (await signOut.evaluate((element) => element === document.activeElement)) break;
+      await page.keyboard.press('Tab');
+    }
+
+    await expect(signOut).toBeFocused();
+    await expect(signOut).toBeInViewport();
+    await expectNoPageOverflow(page);
+    await expectNoDocumentScroll(page);
   });
 
   test('AT-003 both Workspace directions keep the account view and scroll geometry stable', async ({
@@ -686,6 +784,10 @@ test.describe('app frame', () => {
     await accountView.evaluate((element) =>
       Promise.all(element.getAnimations({ subtree: true }).map((animation) => animation.finished)),
     );
+    const organizationWorkspaceOption = accountView.getByRole('button', {
+      name: organizationWorkspace.name,
+    });
+    const organizationCurrentState = await settledVisualState(organizationWorkspaceOption);
     await page.evaluate(() => {
       const probe = window as Window & {
         __axisAccountGeometry?: Array<{
@@ -716,7 +818,14 @@ test.describe('app frame', () => {
       requestAnimationFrame(sample);
     });
 
-    await accountView.getByRole('button', { name: personalWorkspace.name }).click();
+    const personalWorkspaceOption = accountView.getByRole('button', {
+      name: personalWorkspace.name,
+    });
+    await personalWorkspaceOption.click();
+    expect(await personalWorkspaceOption.getAttribute('aria-busy')).toBe('true');
+    expect(await settledVisualState(personalWorkspaceOption)).toEqual(organizationCurrentState);
+    await expect(personalWorkspaceOption).not.toHaveAttribute('aria-current');
+    await expect(organizationWorkspaceOption).toHaveAttribute('aria-current', 'page');
     await expect(accountView.getByText('Switching Workspace...')).toBeAttached();
     await expect(accountTrigger).toHaveAttribute('aria-expanded', 'true');
     await expect(accountView).toBeVisible();
@@ -748,7 +857,12 @@ test.describe('app frame', () => {
     await expectNoDocumentScroll(page);
 
     armTransitionGates();
-    await accountView.getByRole('button', { name: organizationWorkspace.name }).click();
+    const personalCurrentState = await settledVisualState(personalWorkspaceOption);
+    await organizationWorkspaceOption.click();
+    expect(await organizationWorkspaceOption.getAttribute('aria-busy')).toBe('true');
+    expect(await settledVisualState(organizationWorkspaceOption)).toEqual(personalCurrentState);
+    await expect(organizationWorkspaceOption).not.toHaveAttribute('aria-current');
+    await expect(personalWorkspaceOption).toHaveAttribute('aria-current', 'page');
     await expect(accountView.getByText('Switching Workspace...')).toBeAttached();
     await expect(accountTrigger).toHaveAttribute('aria-expanded', 'true');
     await expect(accountView).toBeVisible();
@@ -816,9 +930,14 @@ test.describe('app frame', () => {
 
     await mockAuthenticatedSession(page);
     let completeThemeSave: (() => void) | undefined;
+    let markThemeSaveStarted: (() => void) | undefined;
+    const themeSaveStarted = new Promise<void>((resolve) => {
+      markThemeSaveStarted = resolve;
+    });
     await page.route('**/api/users/me/preferences/theme', async (route) => {
       await new Promise<void>((resolve) => {
         completeThemeSave = resolve;
+        markThemeSaveStarted?.();
       });
       await route.fulfill({
         status: 200,
@@ -863,11 +982,12 @@ test.describe('app frame', () => {
     const initialMenuBox = await accountMenu.boundingBox();
     const darkOption = page.getByRole('button', { name: 'Dark' });
     await darkOption.click();
-    await expect(darkOption.locator('[data-slot="spinner"]')).toBeVisible();
+    expect(await darkOption.getAttribute('aria-busy')).toBe('true');
     const pendingMenuBox = await accountMenu.boundingBox();
     expect(Math.round(pendingMenuBox?.height ?? 0)).toBe(Math.round(initialMenuBox?.height ?? 0));
+    await themeSaveStarted;
     completeThemeSave?.();
-    await expect(darkOption.locator('[data-slot="spinner"]')).toBeHidden();
+    await expect(darkOption).not.toHaveAttribute('aria-busy', 'true');
     const savedMenuBox = await accountMenu.boundingBox();
     expect(Math.round(savedMenuBox?.height ?? 0)).toBe(Math.round(initialMenuBox?.height ?? 0));
     await expectNoPageOverflow(page);

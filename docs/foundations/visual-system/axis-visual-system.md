@@ -32,10 +32,10 @@ Define one product-level visual and interaction grammar so Axis remains coherent
 | Constitution and theme | Semantic roles, reusable values, interaction-state grammar, and cross-surface invariants | JSX, provider APIs, feature state, or screen-specific choices |
 | Accessible primitives | Provider mechanics, semantics, focus behavior, and registry provenance | Product variants, page anatomy, or business meaning |
 | Surface contracts | A finite set of frame, entry, resource, workbench, managed-task, and account anatomies with narrow semantic slots | Free-form visual overrides, feature data access, or alternate local anatomies |
-| Feature composition | Product state, content, relationships, authorized actions, and recovery inside declared slots | Scroll ownership, reusable visual values, overlay mechanics, or contract variants |
+| Feature composition | Product state, content, relationships, authorized actions, and recovery inside declared slots | Surface anatomy, reusable visual or mechanical capabilities, or contract variants |
 | Conformance system | Active-consumer ownership, contract API tests, focused state/a11y tests, browser journeys, and visual comparisons | Product design decisions or manual approval as a substitute for evidence |
 
-Dependencies flow in that order only. A feature cannot import a lower-level provider to recreate a higher-level contract. Surface-owner props expose semantic content and product state, not `className`, provider variants, scroll modes, selectors, or DOM assumptions.
+Dependencies flow in that order only. A feature cannot import a lower-level provider to recreate a higher-level contract. A surface-owner API exposes meaning, not visual or mechanical capability: leaf content slots are rendered inside anatomy owned by the surface, while a reusable region with its own states, relationships, or actions crosses the boundary as a typed semantic model and is rendered by the owner. Generic JSX cannot stand in for subsystem anatomy. This ownership rule governs all styling and mechanics without creating a policy per CSS property, component, or DOM symptom. Component evidence proves semantic API, state, and ownership; browser and visual evidence prove rendered geometry and perceptual equivalence. Implementation-level selectors may diagnose a failure but are not durable conformance evidence.
 
 `frontend/ui-foundation.json` records enforced contract specs and evidence; it is not a catalog of source paths or screen designs. Its contract keys are imported as TypeScript types by `frontend/src/lib/ui-foundation.ts`, which maps finite active surface ids to those contracts. `frontend/src/lib/active-surface-registry.ts` must then exhaustively bind real owner and implementation symbols. Every surface owner requires a contract-compatible id and emits both ids for rendered evidence. Parser-backed module restrictions keep owners independent of feature and route state. This makes registration and dependency direction part of composition instead of inferring them from filenames or raw source text. A new consumer of an unchanged enforced contract needs typed registration, rendered conformance, and product-state evidence, not bespoke visual approval. Changing the shared owner or constitution reopens the contract lifecycle for every affected consumer.
 
@@ -50,7 +50,7 @@ Dependencies flow in that order only. A feature cannot import a lower-level prov
 | Radius | flat, control, floating, managed | Radius communicates boundary depth, not decoration. Features do not choose a new tier. |
 | Elevation | none, floating, managed, dock | Elevation follows surface depth and remains equivalent in light and dark modes. |
 | Icon | control, navigation, empty | Use one vector family and one size/stroke role at each hierarchy. Icons support meaning and never replace an accessible name. |
-| Motion | state, floating, pending, context | Motion communicates causality, uses opacity or transform, is interruptible, and respects reduced motion. |
+| Motion | state, floating, content-pending, context | Motion communicates causality, uses opacity or transform, is interruptible, and respects reduced motion. |
 | Layer | base, sticky, floating, modal, managed, notification | Layer order is semantic and finite; components do not invent numeric stacking values. |
 
 Exact role values live only in [theme/axis-theme.json](../../../theme/axis-theme.json). Product code consumes generated semantic names rather than copying their current numbers.
@@ -64,11 +64,11 @@ Exact role values live only in [theme/axis-theme.json](../../../theme/axis-theme
 | Persistent | Selected, current, expanded, or toggled | Stronger persistent surface retained through hover. Choice semantics determine whether a native indicator is also required. |
 | Focus | Keyboard position | Visible semantic ring independent of fill, color, and selection. |
 | Disabled | Unavailable action | Semantic disabled state and native non-interactive behavior; never opacity alone. |
-| Busy | Authoritative work in progress | Lock only the affected boundary immediately; delay visual feedback; keep geometry and labels stable. |
+| Busy | Authoritative work in progress | Lock only the affected boundary and mirror user-invoked action feedback for exactly the authoritative pending interval. A choice transition emphasizes its target immediately without claiming selected or current semantics before authority accepts it. Delay passive content or context feedback by its semantic threshold; keep geometry and labels stable. |
 | Destructive | Irreversible or harmful consequence | Destructive semantic pair plus explicit language; never color alone. |
 | Feedback | Information, success, warning, or failure | Semantic pair, text, accessible announcement, and recovery when recovery exists. |
 
-Initial loading reserves the owning region and does not render empty content first. Background refresh preserves current content and scroll position. User actions keep labels and bounds stable. Context transitions keep the authenticated frame and account context mounted, make stale content inert, and obscure it only after the shared delay. Fast operations therefore complete without spinner flashes, layout shifts, or transient document scrollbars.
+Initial loading reserves the owning region and does not render empty content first; its visual indicator appears only after the content threshold. Background refresh preserves current content and scroll position. User actions lock their boundary and replace the stable icon slot with pending feedback immediately, then restore it as soon as authoritative work ends. Context transitions keep the authenticated frame and account context mounted, make stale content inert, and obscure it only after the context threshold. Fast passive loads therefore complete without spinner flashes, while invoked actions remain truthful without label shifts, layout shifts, or transient document scrollbars.
 
 ## Layout and composition
 

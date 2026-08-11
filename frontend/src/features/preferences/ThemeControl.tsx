@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Monitor, Moon, RotateCcw, Sun } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import type { AccountPreferenceGroupModel } from '@/components/shared/AccountSurface';
 import { AsyncContent } from '@/components/shared/AsyncContent';
 import { OptionList, OptionListItem } from '@/components/shared/OptionList';
 import { Button } from '@/components/ui/button';
@@ -31,17 +32,12 @@ const themeModeIcons = {
   dark: Moon,
 } satisfies Record<ThemeMode, typeof Monitor>;
 
-export function ThemeControl({
-  authenticated = false,
-  className,
-  variant = 'segmented',
-}: ThemeControlProps) {
+function useThemePreferenceState(authenticated: boolean) {
   const queryClient = useQueryClient();
   const { t } = useTranslation();
   const { mode } = useThemePreference();
   const [lastFailedTheme, setLastFailedTheme] = useState<ThemeMode | null>(null);
   const latestServerThemeRef = useRef<ThemeMode | null>(null);
-  const isMenu = variant === 'menu';
 
   const mutation = useMutation({
     mutationFn: updateThemePreference,
@@ -73,8 +69,6 @@ export function ThemeControl({
   });
 
   const shouldPersistToServer = authenticated && getBrowserSessionStatus() === 'authenticated';
-  const statusId = authenticated ? 'theme-save-status' : undefined;
-
   function chooseTheme(nextThemeMode: ThemeMode) {
     setThemeMode(nextThemeMode);
     setLastFailedTheme(null);
@@ -96,6 +90,54 @@ export function ThemeControl({
       chooseTheme(nextThemeMode);
     }
   }
+
+  return {
+    chooseTheme,
+    chooseToggleTheme,
+    latestServerThemeRef,
+    mode,
+    mutation,
+    retrySave,
+    t,
+  };
+}
+
+export function useAccountThemePreferenceModel(): AccountPreferenceGroupModel {
+  const { chooseTheme, latestServerThemeRef, mode, mutation, retrySave, t } =
+    useThemePreferenceState(true);
+
+  return {
+    feedback: mutation.isError
+      ? { message: t('app.themeSaveFailed'), retryLabel: t('app.retry') }
+      : null,
+    label: t('app.theme'),
+    onRetry: retrySave,
+    onSelect: (value) => {
+      if (isSupportedThemeMode(value)) chooseTheme(value);
+    },
+    options: supportedThemeModes.map((item) => {
+      const Icon = themeModeIcons[item.value];
+      return {
+        icon: <Icon />,
+        label: t(item.labelKey),
+        pending: mutation.isPending && latestServerThemeRef.current === item.value,
+        value: item.value,
+      };
+    }),
+    pendingLabel: t('app.saving'),
+    value: mode,
+  };
+}
+
+export function ThemeControl({
+  authenticated = false,
+  className,
+  variant = 'segmented',
+}: ThemeControlProps) {
+  const { chooseToggleTheme, latestServerThemeRef, mode, mutation, retrySave, t } =
+    useThemePreferenceState(authenticated);
+  const statusId = authenticated ? 'theme-save-status' : undefined;
+  const isMenu = variant === 'menu';
 
   return (
     <div
