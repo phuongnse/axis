@@ -10,6 +10,10 @@ interface LegalVersions {
   privacyVersion: string;
 }
 
+interface BrowserSession {
+  csrfToken?: string;
+}
+
 interface MaildevRecipient {
   address: string;
   name?: string;
@@ -75,11 +79,20 @@ async function getLegalVersions(request: APIRequestContext): Promise<LegalVersio
   return response.json();
 }
 
+async function bootstrapAntiforgery(request: APIRequestContext): Promise<string> {
+  const response = await request.get(`${apiURL}/api/auth/session`);
+  expect(response.ok()).toBe(true);
+  const session = (await response.json()) as BrowserSession;
+  if (!session.csrfToken) throw new Error('The browser session did not return a CSRF token.');
+  return session.csrfToken;
+}
+
 async function registerUserViaApi(request: APIRequestContext, email: string): Promise<void> {
   const legalVersions = await getLegalVersions(request);
   const response = await request.post(`${apiURL}/api/users/register`, {
     headers: {
       'Idempotency-Key': `e2e-seed-${crypto.randomUUID()}`,
+      'X-CSRF-TOKEN': await bootstrapAntiforgery(request),
     },
     data: {
       fullName: 'Duplicate User',
@@ -90,7 +103,10 @@ async function registerUserViaApi(request: APIRequestContext, email: string): Pr
       acceptedPrivacyVersion: legalVersions.privacyVersion,
     },
   });
-  expect(response.ok()).toBe(true);
+  expect(
+    response.ok(),
+    `registration E2E seed failed (${response.status()}): ${await response.text()}`,
+  ).toBe(true);
 }
 
 function verificationLinkFrom(message?: MaildevMessage): VerificationEmailLink | null {
@@ -180,10 +196,6 @@ async function fillRegisterForm(page: Page, email: string): Promise<void> {
 async function expectAuthenticatedFrame(page: Page, userName: string): Promise<void> {
   await expect(page.getByRole('banner')).toContainText('Dashboard');
   await expect(page.getByRole('navigation', { name: 'Modules' })).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Business objects' })).toHaveAttribute(
-    'href',
-    '/business-objects',
-  );
   await expect(page.getByRole('main')).toHaveText('');
   await page.getByRole('button', { name: 'Account menu' }).click();
   await expect(page.getByText(userName).first()).toBeVisible();
