@@ -20,6 +20,7 @@ import {
 import type { ResourceWorkspaceProps } from '../src/components/shared/ResourceWorkspace';
 import {
   activeSurfaceContracts,
+  type EnforcedSurfaceContractId,
   type SurfaceIdFor,
   surfaceContractAttributes,
 } from '../src/lib/ui-foundation';
@@ -36,6 +37,7 @@ describe('surface contracts', () => {
   it('binds active surface ids to finite contracts at compile time', () => {
     expect(activeSurfaceContracts['account-actions']).toBe('account-surface');
     expect(activeSurfaceContracts['solution-delivery']).toBe('process-workbench');
+    expectTypeOf<EnforcedSurfaceContractId>().toEqualTypeOf<'account-surface'>();
     expectTypeOf<SurfaceIdFor<'entry-surface'>>().toEqualTypeOf<
       | 'email-confirmation'
       | 'invitation-acceptance'

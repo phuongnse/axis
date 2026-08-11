@@ -2,6 +2,8 @@ import type uiFoundationManifest from '../../ui-foundation.json';
 
 type SurfaceContractId = keyof typeof uiFoundationManifest.contracts;
 
+type EnforcedSurfaceContractId = keyof typeof uiFoundationManifest.enforcedContracts;
+
 const activeSurfaceContracts = {
   'account-actions': 'account-surface',
   'authenticated-frame': 'authenticated-frame',
@@ -49,6 +51,7 @@ function surfaceContractAttributes<Contract extends SurfaceContractId>(
 export {
   type ActiveSurfaceId,
   activeSurfaceContracts,
+  type EnforcedSurfaceContractId,
   type SurfaceContractId,
   type SurfaceIdFor,
   surfaceContractAttributes,

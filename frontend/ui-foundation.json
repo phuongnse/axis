@@ -1,7 +1,8 @@
 {
-  "schemaVersion": 4,
+  "schemaVersion": 5,
   "contracts": {
     "account-surface": {
+      "state": "enforced",
       "spec": "docs/foundations/app-shell/app-frame.md",
       "evidence": {
         "component": [
@@ -9,20 +10,33 @@
           "frontend/tests/app-shell.test.tsx",
           "frontend/tests/surface-contracts.test.tsx"
         ],
-        "browser": ["frontend/e2e/app-frame.pw.ts"]
+        "browser": ["frontend/e2e/app-frame.pw.ts"],
+        "perceptual": [
+          "frontend/e2e/app-frame.pw.ts-snapshots/account-surface-dark-compact-en-chromium-linux.png",
+          "frontend/e2e/app-frame.pw.ts-snapshots/account-surface-dark-compact-vi-chromium-linux.png",
+          "frontend/e2e/app-frame.pw.ts-snapshots/account-surface-dark-desktop-en-chromium-linux.png",
+          "frontend/e2e/app-frame.pw.ts-snapshots/account-surface-dark-desktop-vi-chromium-linux.png",
+          "frontend/e2e/app-frame.pw.ts-snapshots/account-surface-light-compact-en-chromium-linux.png",
+          "frontend/e2e/app-frame.pw.ts-snapshots/account-surface-light-compact-vi-chromium-linux.png",
+          "frontend/e2e/app-frame.pw.ts-snapshots/account-surface-light-desktop-en-chromium-linux.png",
+          "frontend/e2e/app-frame.pw.ts-snapshots/account-surface-light-desktop-vi-chromium-linux.png"
+        ]
       }
     },
     "authenticated-frame": {
+      "state": "defined",
       "spec": "docs/foundations/app-shell/app-frame.md",
       "evidence": {
         "component": [
           "frontend/tests/app-shell.test.tsx",
           "frontend/tests/surface-contracts.test.tsx"
         ],
-        "browser": ["frontend/e2e/app-frame.pw.ts"]
+        "browser": ["frontend/e2e/app-frame.pw.ts"],
+        "perceptual": []
       }
     },
     "entry-surface": {
+      "state": "defined",
       "spec": "docs/foundations/visual-system/axis-visual-system.md",
       "evidence": {
         "component": [
@@ -30,10 +44,12 @@
           "frontend/tests/sign-in-page.test.tsx",
           "frontend/tests/surface-contracts.test.tsx"
         ],
-        "browser": ["frontend/e2e/register-user.pw.ts", "frontend/e2e/sign-in-user.pw.ts"]
+        "browser": ["frontend/e2e/register-user.pw.ts", "frontend/e2e/sign-in-user.pw.ts"],
+        "perceptual": []
       }
     },
     "managed-task-window": {
+      "state": "defined",
       "spec": "docs/foundations/overlays/managed-dialog.md",
       "evidence": {
         "component": [
@@ -41,20 +57,24 @@
           "frontend/tests/business-objects-page.test.tsx",
           "frontend/tests/surface-contracts.test.tsx"
         ],
-        "browser": ["frontend/e2e/define-business-object.pw.ts"]
+        "browser": ["frontend/e2e/define-business-object.pw.ts"],
+        "perceptual": []
       }
     },
     "process-workbench": {
+      "state": "defined",
       "spec": "docs/foundations/visual-system/axis-visual-system.md",
       "evidence": {
         "component": [
           "frontend/src/features/solutions/components/SolutionsPage.test.tsx",
           "frontend/tests/surface-contracts.test.tsx"
         ],
-        "browser": ["frontend/e2e/product-delivery-governance.pw.ts"]
+        "browser": ["frontend/e2e/product-delivery-governance.pw.ts"],
+        "perceptual": []
       }
     },
     "resource-workspace": {
+      "state": "defined",
       "spec": "docs/foundations/data-display/collection-page.md",
       "evidence": {
         "component": [
@@ -62,8 +82,12 @@
           "frontend/tests/business-objects-page.test.tsx",
           "frontend/tests/surface-contracts.test.tsx"
         ],
-        "browser": ["frontend/e2e/define-business-object.pw.ts"]
+        "browser": ["frontend/e2e/define-business-object.pw.ts"],
+        "perceptual": []
       }
     }
+  },
+  "enforcedContracts": {
+    "account-surface": true
   }
 }

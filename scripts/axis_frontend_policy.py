@@ -14,9 +14,11 @@ from axis_repo import ROOT, iter_files
 UI_FOUNDATION_MANIFEST_KEYS = {
     "schemaVersion",
     "contracts",
+    "enforcedContracts",
 }
-UI_CONTRACT_KEYS = {"spec", "evidence"}
-UI_EVIDENCE_KEYS = {"component", "browser"}
+UI_CONTRACT_KEYS = {"state", "spec", "evidence"}
+UI_CONTRACT_STATES = {"defined", "verified", "enforced"}
+UI_EVIDENCE_KEYS = {"component", "browser", "perceptual"}
 UI_CONTRACT_ID = re.compile(r"^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$")
 
 
@@ -54,8 +56,8 @@ def ui_foundation_issues(root: Path = ROOT) -> list[str]:
             "frontend/ui-foundation.json: missing keys: " + ", ".join(missing_keys)
         )
 
-    if manifest.get("schemaVersion") != 4:
-        issues.append("frontend/ui-foundation.json: `schemaVersion` must be 4")
+    if manifest.get("schemaVersion") != 5:
+        issues.append("frontend/ui-foundation.json: `schemaVersion` must be 5")
 
     def checked_path(value: object, field: str, suffix: str) -> Path | None:
         if not isinstance(value, str) or not value.strip():
@@ -108,6 +110,12 @@ def ui_foundation_issues(root: Path = ROOT) -> list[str]:
                     f"frontend/ui-foundation.json: `{prefix}` is missing keys: "
                     + ", ".join(missing)
                 )
+            state = contract.get("state")
+            if not isinstance(state, str) or state not in UI_CONTRACT_STATES:
+                issues.append(
+                    f"frontend/ui-foundation.json: `{prefix}.state` must be one of: "
+                    + ", ".join(sorted(UI_CONTRACT_STATES))
+                )
             spec = checked_path(contract.get("spec"), f"{prefix}.spec", ".md")
             if spec is not None:
                 spec_relative = spec.relative_to(root).as_posix()
@@ -135,11 +143,25 @@ def ui_foundation_issues(root: Path = ROOT) -> list[str]:
                 )
             for kind in sorted(UI_EVIDENCE_KEYS):
                 paths = evidence.get(kind)
-                if not isinstance(paths, list) or not paths:
+                if not isinstance(paths, list):
+                    issues.append(
+                        f"frontend/ui-foundation.json: `{prefix}.evidence.{kind}` must be a list"
+                    )
+                    continue
+                if kind != "perceptual" and not paths:
                     issues.append(
                         f"frontend/ui-foundation.json: `{prefix}.evidence.{kind}` must be a non-empty list"
                     )
-                    continue
+                if (
+                    kind == "perceptual"
+                    and isinstance(state, str)
+                    and state in {"verified", "enforced"}
+                    and not paths
+                ):
+                    issues.append(
+                        f"frontend/ui-foundation.json: `{prefix}` cannot be `{state}` without "
+                        "version-controlled perceptual evidence"
+                    )
                 if len(paths) != len(set(path for path in paths if isinstance(path, str))):
                     issues.append(
                         f"frontend/ui-foundation.json: `{prefix}.evidence.{kind}` contains duplicates"
@@ -148,7 +170,13 @@ def ui_foundation_issues(root: Path = ROOT) -> list[str]:
                     evidence_path = checked_path(
                         path,
                         f"{prefix}.evidence.{kind}[{index}]",
-                        ".tsx" if kind == "component" else ".ts",
+                        (
+                            ".tsx"
+                            if kind == "component"
+                            else ".png"
+                            if kind == "perceptual"
+                            else ".ts"
+                        ),
                     )
                     if evidence_path is None:
                         continue
@@ -172,6 +200,50 @@ def ui_foundation_issues(root: Path = ROOT) -> list[str]:
                             "frontend/ui-foundation.json: browser evidence must be a "
                             f"frontend/e2e .pw.ts file: {evidence_relative}"
                         )
+                    if kind == "perceptual" and not (
+                        evidence_relative.startswith("frontend/e2e/")
+                        and "-snapshots/" in evidence_relative
+                        and evidence_relative.endswith(".png")
+                    ):
+                        issues.append(
+                            "frontend/ui-foundation.json: perceptual evidence must be a "
+                            f"version-controlled frontend/e2e snapshot: {evidence_relative}"
+                        )
+
+    enforced_contracts = manifest.get("enforcedContracts")
+    if not isinstance(enforced_contracts, dict):
+        issues.append("frontend/ui-foundation.json: `enforcedContracts` must be an object")
+        enforced_contracts = {}
+    else:
+        if list(enforced_contracts) != sorted(enforced_contracts):
+            issues.append(
+                "frontend/ui-foundation.json: `enforcedContracts` must be sorted by contract id"
+            )
+        for contract_id, marker in enforced_contracts.items():
+            prefix = f"enforcedContracts.{contract_id}"
+            if marker is not True:
+                issues.append(f"frontend/ui-foundation.json: `{prefix}` must be `true`")
+            if contract_id not in contracts:
+                issues.append(
+                    f"frontend/ui-foundation.json: `{prefix}` has no matching contract"
+                )
+
+    enforced_ids = set(enforced_contracts)
+    for contract_id, contract in contracts.items():
+        if not isinstance(contract, dict):
+            continue
+        state = contract.get("state")
+        registered = contract_id in enforced_ids
+        if state == "enforced" and not registered:
+            issues.append(
+                f"frontend/ui-foundation.json: `contracts.{contract_id}` is `enforced` "
+                "but missing from `enforcedContracts`"
+            )
+        if state != "enforced" and registered:
+            issues.append(
+                f"frontend/ui-foundation.json: `contracts.{contract_id}` is registered as "
+                f"enforced while its state is `{state}`"
+            )
 
     return issues
 

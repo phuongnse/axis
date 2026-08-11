@@ -518,16 +518,19 @@ class TestUiFoundationContracts(unittest.TestCase):
             manifest_path = root / "frontend/ui-foundation.json"
             manifest_path.parent.mkdir(parents=True, exist_ok=True)
             manifest = {
-                "schemaVersion": 4,
+                "schemaVersion": 5,
                 "contracts": {
                     "resource-workspace": {
+                        "state": "defined",
                         "spec": "docs/foundations/data-display/collection-page.md",
                         "evidence": {
                             "component": ["frontend/tests/resource-workspace.test.tsx"],
                             "browser": ["frontend/e2e/resource-workspace.pw.ts"],
+                            "perceptual": [],
                         },
                     }
                 },
+                "enforcedContracts": {},
             }
             manifest.update(manifest_changes or {})
             manifest_path.write_text(f"{json.dumps(manifest)}\n", encoding="utf-8")
@@ -557,16 +560,100 @@ class TestUiFoundationContracts(unittest.TestCase):
         self.assertEqual([], self.issues_for_foundation())
 
     def test_rejects_unknown_schema(self) -> None:
-        issues = self.issues_for_foundation(manifest_changes={"schemaVersion": 3})
-        self.assertIn("`schemaVersion` must be 4", "\n".join(issues))
+        issues = self.issues_for_foundation(manifest_changes={"schemaVersion": 4})
+        self.assertIn("`schemaVersion` must be 5", "\n".join(issues))
+
+    def test_rejects_unknown_contract_state(self) -> None:
+        contracts = {
+            "resource-workspace": {
+                "state": "accepted",
+                "spec": "docs/foundations/data-display/collection-page.md",
+                "evidence": {
+                    "component": ["frontend/tests/resource-workspace.test.tsx"],
+                    "browser": ["frontend/e2e/resource-workspace.pw.ts"],
+                    "perceptual": [],
+                },
+            }
+        }
+        issues = self.issues_for_foundation(manifest_changes={"contracts": contracts})
+        self.assertIn("state` must be one of: defined, enforced, verified", "\n".join(issues))
+
+    def test_rejects_advanced_state_without_perceptual_evidence(self) -> None:
+        for state in ("verified", "enforced"):
+            with self.subTest(state=state):
+                contracts = {
+                    "resource-workspace": {
+                        "state": state,
+                        "spec": "docs/foundations/data-display/collection-page.md",
+                        "evidence": {
+                            "component": ["frontend/tests/resource-workspace.test.tsx"],
+                            "browser": ["frontend/e2e/resource-workspace.pw.ts"],
+                            "perceptual": [],
+                        },
+                    }
+                }
+                issues = self.issues_for_foundation(manifest_changes={"contracts": contracts})
+                self.assertIn(
+                    f"cannot be `{state}` without version-controlled perceptual evidence",
+                    "\n".join(issues),
+                )
+
+    def test_accepts_enforced_contract_with_versioned_perceptual_evidence(self) -> None:
+        snapshot = (
+            "frontend/e2e/resource-workspace.pw.ts-snapshots/"
+            "resource-workspace-light-desktop-en-chromium-linux.png"
+        )
+        contracts = {
+            "resource-workspace": {
+                "state": "enforced",
+                "spec": "docs/foundations/data-display/collection-page.md",
+                "evidence": {
+                    "component": ["frontend/tests/resource-workspace.test.tsx"],
+                    "browser": ["frontend/e2e/resource-workspace.pw.ts"],
+                    "perceptual": [snapshot],
+                },
+            }
+        }
+        self.assertEqual(
+            [],
+            self.issues_for_foundation(
+                manifest_changes={
+                    "contracts": contracts,
+                    "enforcedContracts": {"resource-workspace": True},
+                },
+                files={snapshot: "snapshot"},
+            ),
+        )
+
+    def test_rejects_enforced_registry_state_drift(self) -> None:
+        enforced_contract = {
+            "resource-workspace": {
+                "state": "enforced",
+                "spec": "docs/foundations/data-display/collection-page.md",
+                "evidence": {
+                    "component": ["frontend/tests/resource-workspace.test.tsx"],
+                    "browser": ["frontend/e2e/resource-workspace.pw.ts"],
+                    "perceptual": [],
+                },
+            }
+        }
+        issues = self.issues_for_foundation(manifest_changes={"contracts": enforced_contract})
+        self.assertIn("missing from `enforcedContracts`", "\n".join(issues))
+
+        issues = self.issues_for_foundation(
+            manifest_changes={"enforcedContracts": {"resource-workspace": True}}
+        )
+        self.assertIn("registered as enforced while its state is `defined`", "\n".join(issues))
 
     def test_rejects_missing_evidence_file(self) -> None:
         contracts = {
             "resource-workspace": {
+                "state": "defined",
                 "spec": "docs/foundations/data-display/collection-page.md",
                 "evidence": {
                     "component": ["frontend/tests/missing.test.tsx"],
                     "browser": ["frontend/e2e/resource-workspace.pw.ts"],
+                    "perceptual": [],
                 },
             }
         }
@@ -576,10 +663,12 @@ class TestUiFoundationContracts(unittest.TestCase):
     def test_rejects_evidence_outside_owned_test_roots(self) -> None:
         contracts = {
             "resource-workspace": {
+                "state": "defined",
                 "spec": "docs/foundations/data-display/collection-page.md",
                 "evidence": {
                     "component": ["frontend/src/components/shared/ResourceWorkspace.tsx"],
                     "browser": ["frontend/src/browser-proof.ts"],
+                    "perceptual": [],
                 },
             }
         }
