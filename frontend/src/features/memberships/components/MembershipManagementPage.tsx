@@ -11,7 +11,8 @@ import {
   type DataTableQueryState,
 } from '@/components/shared/data-table';
 import { useManagedWindowActions } from '@/components/shared/ManagedWindowManager';
-import { PageAction, PageHeader, PageLayout } from '@/components/shared/PageLayout';
+import { PageAction } from '@/components/shared/PageLayout';
+import { ResourceWorkspace } from '@/components/shared/ResourceWorkspace';
 import { StatusBadge, type StatusBadgeTone } from '@/components/shared/StatusBadge';
 import type { WorkspaceInvitationLifecycleDto } from '@/lib/api-generated';
 import { workspaceInvitationsQueryOptions } from '../api';
@@ -173,12 +174,13 @@ export function MembershipManagementPage() {
   ]);
 
   return (
-    <PageLayout scrollMode="contained">
-      <PageHeader title={t('memberships.title')} description={t('memberships.description')} />
-      <div className="min-h-0 flex-1">
-        <DataTable definition={tableDefinition} />
-      </div>
-    </PageLayout>
+    <ResourceWorkspace
+      surfaceId="membership-management"
+      title={t('memberships.title')}
+      description={t('memberships.description')}
+    >
+      <DataTable definition={tableDefinition} />
+    </ResourceWorkspace>
   );
 }
 

@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Monitor, Moon, RotateCcw, Sun } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import type { AccountPreferenceGroupModel } from '@/components/shared/AccountSurface';
 import { AsyncContent } from '@/components/shared/AsyncContent';
 import { OptionList, OptionListItem } from '@/components/shared/OptionList';
 import { Button } from '@/components/ui/button';
@@ -18,6 +19,7 @@ import {
   useThemePreference,
 } from '@/features/preferences/theme-store';
 import { cn } from '@/lib/utils';
+import { axisStyles } from '@/theme.generated';
 
 interface ThemeControlProps {
   authenticated?: boolean;
@@ -31,17 +33,12 @@ const themeModeIcons = {
   dark: Moon,
 } satisfies Record<ThemeMode, typeof Monitor>;
 
-export function ThemeControl({
-  authenticated = false,
-  className,
-  variant = 'segmented',
-}: ThemeControlProps) {
+function useThemePreferenceState(authenticated: boolean) {
   const queryClient = useQueryClient();
   const { t } = useTranslation();
   const { mode } = useThemePreference();
   const [lastFailedTheme, setLastFailedTheme] = useState<ThemeMode | null>(null);
   const latestServerThemeRef = useRef<ThemeMode | null>(null);
-  const isMenu = variant === 'menu';
 
   const mutation = useMutation({
     mutationFn: updateThemePreference,
@@ -73,8 +70,6 @@ export function ThemeControl({
   });
 
   const shouldPersistToServer = authenticated && getBrowserSessionStatus() === 'authenticated';
-  const statusId = authenticated ? 'theme-save-status' : undefined;
-
   function chooseTheme(nextThemeMode: ThemeMode) {
     setThemeMode(nextThemeMode);
     setLastFailedTheme(null);
@@ -97,25 +92,74 @@ export function ThemeControl({
     }
   }
 
+  return {
+    chooseTheme,
+    chooseToggleTheme,
+    latestServerThemeRef,
+    mode,
+    mutation,
+    retrySave,
+    t,
+  };
+}
+
+export function useAccountThemePreferenceModel(): AccountPreferenceGroupModel {
+  const { chooseTheme, latestServerThemeRef, mode, mutation, retrySave, t } =
+    useThemePreferenceState(true);
+
+  return {
+    feedback: mutation.isError
+      ? { message: t('app.themeSaveFailed'), retryLabel: t('app.retry') }
+      : null,
+    label: t('app.theme'),
+    onRetry: retrySave,
+    onSelect: (value) => {
+      if (isSupportedThemeMode(value)) chooseTheme(value);
+    },
+    options: supportedThemeModes.map((item) => {
+      const Icon = themeModeIcons[item.value];
+      return {
+        icon: <Icon />,
+        label: t(item.labelKey),
+        pending: mutation.isPending && latestServerThemeRef.current === item.value,
+        value: item.value,
+      };
+    }),
+    pendingLabel: t('app.saving'),
+    value: mode,
+  };
+}
+
+export function ThemeControl({
+  authenticated = false,
+  className,
+  variant = 'segmented',
+}: ThemeControlProps) {
+  const { chooseToggleTheme, latestServerThemeRef, mode, mutation, retrySave, t } =
+    useThemePreferenceState(authenticated);
+  const statusId = authenticated ? 'theme-save-status' : undefined;
+  const isMenu = variant === 'menu';
+
   return (
     <div
       className={cn(
         isMenu
-          ? 'relative grid gap-axis-inline'
-          : 'flex flex-wrap items-center justify-end gap-axis-inline',
+          ? cn('relative grid', axisStyles.spacing.gap.inline)
+          : cn('flex flex-wrap items-center justify-end', axisStyles.spacing.gap.inline),
         className,
       )}
     >
       <fieldset
         aria-busy={mutation.isPending || undefined}
         aria-describedby={statusId}
-        className={cn(isMenu && 'grid gap-axis-inline')}
+        className={cn(isMenu && 'grid', isMenu && axisStyles.spacing.gap.inline)}
       >
         <legend
           className={cn(
-            isMenu
-              ? 'px-axis-inline text-axis-metadata font-axis-label text-muted-foreground'
-              : 'sr-only',
+            isMenu ? 'text-muted-foreground' : 'sr-only',
+            isMenu && axisStyles.spacing.padding.inline.inline,
+            isMenu && axisStyles.typography.scale.metadata,
+            isMenu && axisStyles.typography.weight.label,
           )}
         >
           {t('app.theme')}
@@ -175,8 +219,10 @@ export function ThemeControl({
         <AsyncContent
           id={statusId}
           className={cn(
-            'min-h-5 text-axis-metadata text-muted-foreground',
-            isMenu && 'px-axis-inline sr-only',
+            'min-h-5 text-muted-foreground',
+            axisStyles.typography.scale.metadata,
+            isMenu && axisStyles.spacing.padding.inline.inline,
+            isMenu && 'sr-only',
           )}
           error={mutation.isError}
           pending={mutation.isPending}

@@ -3675,7 +3675,10 @@ def verify(args: argparse.Namespace) -> int:
                 if changed_e2e_tests:
                     step(
                         "frontend e2e (changed test files)",
-                        lambda: run_local_dev_browser(changed_e2e_tests),
+                        lambda: run_local_dev_browser(
+                            changed_e2e_tests,
+                            overlays=read_local_dev_topology() or (),
+                        ),
                     )
             else:
                 step(
@@ -4330,12 +4333,61 @@ def compose_service_name(value: str) -> str:
     return value
 
 
+def local_dev_snapshot_output(value: str) -> Path:
+    relative = Path(value)
+    normalized = relative.as_posix()
+    if (
+        value.startswith("-")
+        or relative.is_absolute()
+        or ".." in relative.parts
+        or normalized != value
+        or relative.parent != Path("e2e")
+        or not relative.name.endswith(".pw.ts-snapshots")
+    ):
+        raise argparse.ArgumentTypeError(
+            "snapshot output must name one frontend-relative "
+            "e2e/<test>.pw.ts-snapshots directory"
+        )
+    output = FRONTEND_DIR / relative
+    test_path = FRONTEND_DIR / "e2e" / relative.name.removesuffix("-snapshots")
+    if not output.resolve().is_relative_to(FRONTEND_DIR.resolve()):
+        raise argparse.ArgumentTypeError("snapshot output must remain inside frontend/e2e")
+    if not test_path.is_file():
+        raise argparse.ArgumentTypeError(
+            "snapshot output must belong to an existing frontend/e2e Playwright test"
+        )
+    if output.exists() and not output.is_dir():
+        raise argparse.ArgumentTypeError("snapshot output must be a directory")
+    return output
+
+
+def local_dev_snapshot_run_args(snapshot_output: Path) -> list[str]:
+    relative = snapshot_output.resolve().relative_to(FRONTEND_DIR.resolve()).as_posix()
+    args = [
+        "--volume",
+        f"{snapshot_output.resolve()}:/work/frontend/{relative}",
+    ]
+    getuid = getattr(os, "getuid", None)
+    getgid = getattr(os, "getgid", None)
+    if callable(getuid) and callable(getgid):
+        args.extend(
+            [
+                "--user",
+                f"{getuid()}:{getgid()}",
+                "--env",
+                "HOME=/tmp/axis-e2e-home",
+            ]
+        )
+    return args
+
+
 def run_local_dev_browser(
     playwright_args: list[str],
     *,
     overlays: Iterable[Path] = (),
     service: str = "e2e",
     build_services: Iterable[str] = (),
+    snapshot_output: Path | None = None,
 ) -> int:
     overlays = tuple(overlays)
     runtime_services = list(build_services)
@@ -4362,17 +4414,12 @@ def run_local_dev_browser(
     )
     if build.returncode != 0:
         return build.returncode
+    run_args = ["--profile", "e2e", "run", "--rm", "--no-deps"]
+    if snapshot_output is not None:
+        run_args.extend(local_dev_snapshot_run_args(snapshot_output))
+    run_args.extend([service, *playwright_args])
     return run(
-        local_dev_compose_args(
-            "--profile",
-            "e2e",
-            "run",
-            "--rm",
-            "--no-deps",
-            service,
-            *playwright_args,
-            overlays=overlays,
-        ),
+        local_dev_compose_args(*run_args, overlays=overlays),
         check=False,
     ).returncode
 
@@ -4929,11 +4976,23 @@ def local_dev(args: argparse.Namespace) -> int:
 
     if command == "e2e":
         e2e_args = passthrough_args(getattr(args, "e2e_args", []))
+        service = getattr(args, "service", "e2e")
+        snapshot_output = getattr(args, "snapshot_output", None)
+        if snapshot_output is not None:
+            if service != "e2e":
+                raise CheckError("snapshot output is supported only by the Axis `e2e` service")
+            if not any(
+                value == "--update-snapshots" or value.startswith("--update-snapshots=")
+                for value in e2e_args
+            ):
+                raise CheckError("snapshot output requires Playwright `--update-snapshots`")
+            snapshot_output.mkdir(parents=True, exist_ok=True)
         return run_local_dev_browser(
             e2e_args,
             overlays=overlays,
-            service=getattr(args, "service", "e2e"),
+            service=service,
             build_services=getattr(args, "build_services", []),
+            snapshot_output=snapshot_output,
         )
 
     if command == "smoke":
@@ -5789,6 +5848,14 @@ def build_parser(
         metavar="compose-service",
         help="Build this changed runtime service before E2E; repeat for each service",
     )
+    local_e2e.add_argument(
+        "--snapshot-output",
+        type=local_dev_snapshot_output,
+        help=(
+            "Persist an intentional Playwright snapshot update to one "
+            "e2e/<test>.pw.ts-snapshots directory"
+        ),
+    )
     local_e2e.add_argument("e2e_args", nargs=argparse.REMAINDER)
     local_e2e.set_defaults(func=local_dev)
     local_smoke = local_dev_sub.add_parser("smoke", help="Run local stack smoke checks")
@@ -5849,7 +5916,7 @@ def build_parser(
     check_sub.add_parser("frontend-quality", help="Run deterministic frontend policy checks").set_defaults(func=check_frontend_quality)
     check_sub.add_parser(
         "ui-foundation",
-        help="Validate the active UI constitution phase and status boundary",
+        help="Validate enforced UI metadata and typed active-surface sources",
     ).set_defaults(func=check_ui_foundation)
     check_sub.add_parser("local-dev-docs", help="Check local-development docs against Compose").set_defaults(
         func=lambda _args: run_module_check("check-local-dev-docs.py", [])

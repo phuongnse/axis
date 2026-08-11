@@ -2,7 +2,7 @@
 set -eu
 
 mkdir -p /tmp/axis-e2e/test-results /tmp/axis-e2e/playwright-report
-sh ./scripts/import-browser-ca.sh /home/pwuser/.pki/nssdb /https/rootCA.pem
+sh ./scripts/import-browser-ca.sh "$HOME/.pki/nssdb" /https/rootCA.pem
 
 node ./scripts/wait-for-e2e-targets.mjs
 

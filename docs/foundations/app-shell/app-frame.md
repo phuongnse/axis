@@ -21,6 +21,17 @@ Provide the shared frame for authenticated Axis Platform routes without owning d
 - Keeps route content full-width and leaves route-specific layout decisions to the consuming route.
 - Presents version and copyright metadata in the footer.
 
+### Account surface anatomy
+
+| Region | Relationship | Presentation contract |
+|---|---|---|
+| Signed-in identity | Orientation | Leading-aligned identity content with one owner-controlled region inset. |
+| Workspace and preferences | Choices | Section labels and option rows share one leading scan axis; each region owns its symmetric inset and compact internal rhythm. The personal Workspace uses the localized `Personal` relationship label, while Organization workspaces retain their projected names. |
+| Standalone section actions | Action | Create Organization and sign-out share centered geometry; destructive tone changes emphasis, not placement. |
+| Feedback and recovery | Result and action | Feedback stays adjacent to its owning region without changing action names, geometry, or the surface scroll owner. |
+
+Separators mark major region boundaries and do not supply layout spacing. Feature content supplies state and commands; the Account surface owns every region inset, gap, alignment, and action placement.
+
 ## Alternate / error flows
 
 - Narrow viewport: frame content reflows without horizontal page overflow.
@@ -31,7 +42,7 @@ Provide the shared frame for authenticated Axis Platform routes without owning d
 ## Acceptance Criteria
 
 - **AC-001** Authenticated routes render page content inside the shared app frame.
-- **AC-002** The frame exposes a top bar with product identity, page context, and one account-actions entry point ordered as signed-in identity, one flat eligible-Workspace choice set, preferences, then spatially separated sign-out.
+- **AC-002** The frame exposes a top bar with product identity, page context, and one account-actions entry point ordered as signed-in identity, one flat eligible-Workspace choice set, preferences, then spatially separated sign-out; option rows retain a leading scan axis while standalone section actions share centered geometry independent of tone.
 - **AC-003** The frame exposes footer app metadata with version information and Axis Platform copyright.
 
 *Quality*
@@ -62,7 +73,7 @@ Provide the shared frame for authenticated Axis Platform routes without owning d
 |---|---|
 | Authenticated app frame | Render top bar, main content, and footer around authenticated route content. |
 | Top bar | Show the Axis Platform brand mark, page context, and a compact account trigger with profile context across the available viewport width. |
-| Account actions menu | Orient with the signed-in human identity, present one flat eligible-Workspace choice set with the current state, then language/theme preferences and a spatially separated sign-out action. Do not add profile editing or duplicate Personal/Organization grouping labels already conveyed by each option icon. |
+| Account actions menu | Orient with the signed-in human identity, present one flat eligible-Workspace choice set with the current state, then language/theme preferences and a spatially separated sign-out action. Label the personal relationship `Personal` through the frontend translation layer instead of repeating the signed-in person's name; retain projected names for Organization workspaces. Keep choices leading-aligned and render Create Organization plus sign-out as the same centered standalone-action role with independent tone. Do not add profile editing or separate Personal/Organization grouping labels already conveyed by each option icon. |
 | Main content | Preserve the owning route content in a full-width, non-document-scrolling region, including an empty route surface when no product screen exists yet. |
 | Footer | Show version information on the left and Axis Platform copyright metadata on the right across the available viewport width. |
 
@@ -84,4 +95,4 @@ Required UI quality: frame landmarks and controls must be keyboard-reachable, vi
 >
 > **Verification:** Required AT rows are covered by UI component test, Playwright browser automation, and frontend CI.
 >
-> **Decisions:** App Frame is a foundation contract, not a use case. Authenticated use cases may rely on its page chrome, frame structure, and document-scroll containment; route-specific layout, profile behavior, sign-out lifecycle, and global module navigation remain owned elsewhere. Global sidebar behavior is owned by [docs/foundations/app-shell/module-navigation.md](./module-navigation.md) and does not render before visible contributions exist.
+> **Decisions:** App Frame is a foundation contract, not a use case. `AuthenticatedFrame` owns the product-neutral anatomy and semantic slots; `AppShell` is the application adapter that composes session, Workspace, navigation, and recovery state into those slots. Authenticated use cases may rely on its page chrome, frame structure, and document-scroll containment; route-specific layout, profile behavior, sign-out lifecycle, and global module navigation remain owned elsewhere. Global sidebar behavior is owned by [docs/foundations/app-shell/module-navigation.md](./module-navigation.md) and does not render before visible contributions exist.

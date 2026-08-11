@@ -13,7 +13,8 @@ import {
   type DataTableQueryState,
 } from '@/components/shared/data-table';
 import { useManagedWindowActions } from '@/components/shared/ManagedWindowManager';
-import { PageAction, PageHeader, PageLayout } from '@/components/shared/PageLayout';
+import { PageAction } from '@/components/shared/PageLayout';
+import { ResourceWorkspace } from '@/components/shared/ResourceWorkspace';
 import { StatusBadge, type StatusBadgeTone } from '@/components/shared/StatusBadge';
 import { StatusNotice } from '@/components/shared/StatusNotice';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
@@ -232,27 +233,28 @@ export function RulesPage() {
   ]);
 
   return (
-    <PageLayout scrollMode="contained">
-      <PageHeader title={t('rules.title')} description={t('rules.pageDescription')} />
-
-      {actionsUnavailable ? (
-        <StatusNotice tone="warning" title={t('rules.actionsUnavailableTitle')}>
-          <span>{t('rules.actionsUnavailableDescription')}</span>{' '}
-          <PageAction
-            type="button"
-            variant="link"
-            disabled={collectionActionsQuery.isFetching}
-            onClick={() => void collectionActionsQuery.refetch()}
-          >
-            {t('app.retry')}
-          </PageAction>
-        </StatusNotice>
-      ) : null}
-
-      <div className="min-h-0 flex-1">
-        <DataTable definition={tableDefinition} />
-      </div>
-    </PageLayout>
+    <ResourceWorkspace
+      surfaceId="rule-definitions"
+      title={t('rules.title')}
+      description={t('rules.pageDescription')}
+      status={
+        actionsUnavailable ? (
+          <StatusNotice tone="warning" title={t('rules.actionsUnavailableTitle')}>
+            <span>{t('rules.actionsUnavailableDescription')}</span>{' '}
+            <PageAction
+              type="button"
+              variant="link"
+              disabled={collectionActionsQuery.isFetching}
+              onClick={() => void collectionActionsQuery.refetch()}
+            >
+              {t('app.retry')}
+            </PageAction>
+          </StatusNotice>
+        ) : undefined
+      }
+    >
+      <DataTable definition={tableDefinition} />
+    </ResourceWorkspace>
   );
 }
 

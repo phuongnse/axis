@@ -10,6 +10,7 @@ describe('ResourceWorkspace', () => {
   it('owns the contained resource-page anatomy and named slots', () => {
     const { container } = render(
       <ResourceWorkspace
+        surfaceId="business-object-definitions"
         title="Business objects"
         description="Manage definitions."
         actions={<PageAction>Create</PageAction>}
@@ -24,6 +25,8 @@ describe('ResourceWorkspace', () => {
     const content = container.querySelector('[data-slot="resource-workspace-content"]');
 
     expect(layout).toHaveAttribute('data-scroll-mode', 'contained');
+    expect(workspace).toHaveAttribute('data-axis-surface-contract', 'resource-workspace');
+    expect(workspace).toHaveAttribute('data-axis-surface-id', 'business-object-definitions');
     expect(layout).toContainElement(workspace);
     expect(workspace).toContainElement(screen.getByRole('heading', { name: 'Business objects' }));
     expect(workspace).toContainElement(screen.getByRole('status'));

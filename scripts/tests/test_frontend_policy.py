@@ -505,120 +505,195 @@ class TestFrontendUiSystemPolicy(unittest.TestCase):
         self.assertEqual([], issues)
 
 
-class TestUiFoundationPhase(unittest.TestCase):
+class TestUiFoundationContracts(unittest.TestCase):
     def issues_for_foundation(
         self,
         *,
-        phase: str = "defined",
-        frontend_status: str = "Partial",
+        manifest_changes: dict[str, object] | None = None,
         files: dict[str, str] | None = None,
-        schema_version: int = 2,
-        checker=axis.ui_foundation_issues,
+        missing_files: set[str] | None = None,
     ) -> list[str]:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             manifest_path = root / "frontend/ui-foundation.json"
             manifest_path.parent.mkdir(parents=True, exist_ok=True)
             manifest = {
-                "schemaVersion": schema_version,
-                "phase": phase,
-                "goldenReference": {
-                    "archetype": "resource-workspace",
-                    "route": "/business-objects",
+                "schemaVersion": 5,
+                "contracts": {
+                    "resource-workspace": {
+                        "state": "defined",
+                        "spec": "docs/foundations/data-display/collection-page.md",
+                        "evidence": {
+                            "component": ["frontend/tests/resource-workspace.test.tsx"],
+                            "browser": ["frontend/e2e/resource-workspace.pw.ts"],
+                            "perceptual": [],
+                        },
+                    }
                 },
+                "enforcedContracts": {},
             }
+            manifest.update(manifest_changes or {})
             manifest_path.write_text(f"{json.dumps(manifest)}\n", encoding="utf-8")
 
-            contract_path = root / "docs/foundations/visual-system/axis-visual-system.md"
-            contract_path.parent.mkdir(parents=True, exist_ok=True)
-            contract_path.write_text(
-                "## Implementation status\n\n"
-                "| Layer | Status |\n"
-                "|---|---|\n"
-                "| Contract | Done |\n"
-                f"| Frontend | {frontend_status} |\n"
-                "| Tests | Partial |\n",
-                encoding="utf-8",
-            )
-
-            for relative_path, content in (files or {}).items():
+            default_files = {
+                "frontend/src/lib/ui-foundation.ts": "export {};\n",
+                "frontend/src/lib/active-surface-registry.ts": "export {};\n",
+                "docs/foundations/data-display/collection-page.md": "# Collection Page\n",
+                "frontend/tests/resource-workspace.test.tsx": "export {};\n",
+                "frontend/e2e/resource-workspace.pw.ts": "export {};\n",
+                "frontend/src/features/rules/components/RulesPage.tsx": (
+                    "import { ResourceWorkspace } from '@/components/shared/ResourceWorkspace';\n"
+                    "export function RulesPage() { return <ResourceWorkspace />; }\n"
+                ),
+            }
+            default_files.update(files or {})
+            for relative_path, content in default_files.items():
+                if relative_path in (missing_files or set()):
+                    continue
                 path = root / relative_path
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_text(content, encoding="utf-8")
 
-            return checker(root=root)
+            return axis.ui_foundation_issues(root=root)
 
-    def test_accepts_defined_manifest_without_component_or_source_allowlists(self) -> None:
+    def test_accepts_contract_and_owned_evidence(self) -> None:
         self.assertEqual([], self.issues_for_foundation())
 
-    def test_rejects_retired_component_and_source_allowlists(self) -> None:
-        issues = self.issues_for_foundation()
-        self.assertEqual([], issues)
+    def test_rejects_unknown_schema(self) -> None:
+        issues = self.issues_for_foundation(manifest_changes={"schemaVersion": 4})
+        self.assertIn("`schemaVersion` must be 5", "\n".join(issues))
 
-        with tempfile.TemporaryDirectory() as temp:
-            root = Path(temp)
-            manifest_path = root / "frontend/ui-foundation.json"
-            manifest_path.parent.mkdir(parents=True, exist_ok=True)
-            manifest_path.write_text(
-                json.dumps(
-                    {
-                        "schemaVersion": 2,
-                        "phase": "defined",
-                        "goldenReference": {
-                            "archetype": "resource-workspace",
-                            "route": "/business-objects",
-                            "sourceRoots": ["src/features/business-objects"],
+    def test_rejects_unknown_contract_state(self) -> None:
+        contracts = {
+            "resource-workspace": {
+                "state": "accepted",
+                "spec": "docs/foundations/data-display/collection-page.md",
+                "evidence": {
+                    "component": ["frontend/tests/resource-workspace.test.tsx"],
+                    "browser": ["frontend/e2e/resource-workspace.pw.ts"],
+                    "perceptual": [],
+                },
+            }
+        }
+        issues = self.issues_for_foundation(manifest_changes={"contracts": contracts})
+        self.assertIn("state` must be one of: defined, enforced, verified", "\n".join(issues))
+
+    def test_rejects_advanced_state_without_perceptual_evidence(self) -> None:
+        for state in ("verified", "enforced"):
+            with self.subTest(state=state):
+                contracts = {
+                    "resource-workspace": {
+                        "state": state,
+                        "spec": "docs/foundations/data-display/collection-page.md",
+                        "evidence": {
+                            "component": ["frontend/tests/resource-workspace.test.tsx"],
+                            "browser": ["frontend/e2e/resource-workspace.pw.ts"],
+                            "perceptual": [],
                         },
-                        "draftSharedModules": ["@/components/shared/AsyncButton"],
                     }
-                ),
-                encoding="utf-8",
-            )
-            contract_path = root / "docs/foundations/visual-system/axis-visual-system.md"
-            contract_path.parent.mkdir(parents=True, exist_ok=True)
-            contract_path.write_text("| Frontend | Partial |\n", encoding="utf-8")
+                }
+                issues = self.issues_for_foundation(manifest_changes={"contracts": contracts})
+                self.assertIn(
+                    f"cannot be `{state}` without version-controlled perceptual evidence",
+                    "\n".join(issues),
+                )
 
-            joined = "\n".join(axis.ui_foundation_issues(root))
+    def test_accepts_enforced_contract_with_versioned_perceptual_evidence(self) -> None:
+        snapshot = (
+            "frontend/e2e/resource-workspace.pw.ts-snapshots/"
+            "resource-workspace-light-desktop-en-chromium-linux.png"
+        )
+        contracts = {
+            "resource-workspace": {
+                "state": "enforced",
+                "spec": "docs/foundations/data-display/collection-page.md",
+                "evidence": {
+                    "component": ["frontend/tests/resource-workspace.test.tsx"],
+                    "browser": ["frontend/e2e/resource-workspace.pw.ts"],
+                    "perceptual": [snapshot],
+                },
+            }
+        }
+        self.assertEqual(
+            [],
+            self.issues_for_foundation(
+                manifest_changes={
+                    "contracts": contracts,
+                    "enforcedContracts": {"resource-workspace": True},
+                },
+                files={snapshot: "snapshot"},
+            ),
+        )
 
-        self.assertIn("unexpected keys: draftSharedModules", joined)
-        self.assertIn("goldenReference` has unexpected keys: sourceRoots", joined)
+    def test_rejects_enforced_registry_state_drift(self) -> None:
+        enforced_contract = {
+            "resource-workspace": {
+                "state": "enforced",
+                "spec": "docs/foundations/data-display/collection-page.md",
+                "evidence": {
+                    "component": ["frontend/tests/resource-workspace.test.tsx"],
+                    "browser": ["frontend/e2e/resource-workspace.pw.ts"],
+                    "perceptual": [],
+                },
+            }
+        }
+        issues = self.issues_for_foundation(manifest_changes={"contracts": enforced_contract})
+        self.assertIn("missing from `enforcedContracts`", "\n".join(issues))
 
-    def test_rejects_done_frontend_status_before_complete_adoption(self) -> None:
-        issues = self.issues_for_foundation(frontend_status="Done")
-
-        self.assertIn("cannot claim `Frontend | Done` before phase `adopted`", "\n".join(issues))
-
-    def test_accepts_done_status_only_after_complete_adoption(self) -> None:
         issues = self.issues_for_foundation(
-            phase="adopted",
-            frontend_status="Done",
+            manifest_changes={"enforcedContracts": {"resource-workspace": True}}
         )
+        self.assertIn("registered as enforced while its state is `defined`", "\n".join(issues))
 
-        self.assertEqual([], issues)
+    def test_rejects_missing_evidence_file(self) -> None:
+        contracts = {
+            "resource-workspace": {
+                "state": "defined",
+                "spec": "docs/foundations/data-display/collection-page.md",
+                "evidence": {
+                    "component": ["frontend/tests/missing.test.tsx"],
+                    "browser": ["frontend/e2e/resource-workspace.pw.ts"],
+                    "perceptual": [],
+                },
+            }
+        }
+        issues = self.issues_for_foundation(manifest_changes={"contracts": contracts})
+        self.assertIn("does not exist: frontend/tests/missing.test.tsx", "\n".join(issues))
 
-    def test_ui_policy_applies_semantic_ownership_repo_wide_during_definition(self) -> None:
-        legacy_source = (
-            "import { Spinner } from '@/components/ui/spinner';\n"
-            "export function RulesPage() { return <Spinner className='animate-spin' />; }\n"
-        )
-        golden_source = legacy_source.replace("RulesPage", "BusinessObjectsPage")
-
-        defined_issues = self.issues_for_foundation(
+    def test_rejects_evidence_outside_owned_test_roots(self) -> None:
+        contracts = {
+            "resource-workspace": {
+                "state": "defined",
+                "spec": "docs/foundations/data-display/collection-page.md",
+                "evidence": {
+                    "component": ["frontend/src/components/shared/ResourceWorkspace.tsx"],
+                    "browser": ["frontend/src/browser-proof.ts"],
+                    "perceptual": [],
+                },
+            }
+        }
+        issues = self.issues_for_foundation(
+            manifest_changes={"contracts": contracts},
             files={
-                "frontend/src/features/rules/components/RulesPage.tsx": legacy_source,
-                "frontend/src/features/business-objects/components/BusinessObjectsPage.tsx": golden_source,
+                "frontend/src/browser-proof.ts": "export {};\n",
+                "frontend/src/components/shared/ResourceWorkspace.tsx": "export {};\n",
             },
-            checker=axis.frontend_ui_system_issues,
         )
-        self.assertIn("frontend/src/features/rules", "\n".join(defined_issues))
-        self.assertIn("frontend/src/features/business-objects", "\n".join(defined_issues))
+        joined = "\n".join(issues)
+        self.assertIn("component evidence must be a frontend .test.tsx file", joined)
+        self.assertIn("browser evidence must be a frontend/e2e .pw.ts file", joined)
 
-    def test_rejects_unknown_schema_and_phase(self) -> None:
-        schema_issues = self.issues_for_foundation(schema_version=1)
-        phase_issues = self.issues_for_foundation(phase="migrating")
+    def test_rejects_missing_typed_foundation_source(self) -> None:
+        issues = self.issues_for_foundation(
+            missing_files={"frontend/src/lib/active-surface-registry.ts"}
+        )
 
-        self.assertIn("`schemaVersion` must be 2", "\n".join(schema_issues))
-        self.assertIn("unknown `phase`", "\n".join(phase_issues))
+        self.assertIn("typed UI foundation source is missing", "\n".join(issues))
+
+    def test_rejects_legacy_path_based_surface_inventory(self) -> None:
+        issues = self.issues_for_foundation(manifest_changes={"surfaces": []})
+
+        self.assertIn("unexpected keys: surfaces", "\n".join(issues))
 
 
 class TestUiBaseline(unittest.TestCase):

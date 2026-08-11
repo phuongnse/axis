@@ -279,6 +279,7 @@ export function BusinessObjectsPage() {
 
   return (
     <ResourceWorkspace
+      surfaceId="business-object-definitions"
       title={t('businessObjects.title')}
       description={t('businessObjects.pageDescription')}
       status={

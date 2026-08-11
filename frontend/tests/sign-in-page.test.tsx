@@ -31,11 +31,6 @@ async function fillSignInForm(user: ReturnType<typeof userEvent.setup>) {
   await user.type(screen.getByLabelText('Password'), '  maple river sunrise  ');
 }
 
-async function fillVietnameseSignInForm(user: ReturnType<typeof userEvent.setup>) {
-  await user.type(screen.getByLabelText('Địa chỉ email'), '  alex@example.com  ');
-  await user.type(screen.getByLabelText('Mật khẩu'), '  maple river sunrise  ');
-}
-
 describe('SignInPage', () => {
   beforeEach(() => {
     vi.stubGlobal('fetch', vi.fn());
@@ -60,24 +55,6 @@ describe('SignInPage', () => {
 
     expect(screen.getByText('Email address is required')).toBeInTheDocument();
     expect(screen.getByText('Password is required')).toBeInTheDocument();
-  });
-
-  it('updates client validation errors when language changes', async () => {
-    const user = userEvent.setup();
-    await renderWithRouter(<SignInPage />, { path: '/sign-in' });
-
-    await user.click(screen.getByRole('button', { name: /sign in/i }));
-
-    expect(screen.getByText('Email address is required')).toBeInTheDocument();
-    expect(screen.getByLabelText('Email address')).toHaveAttribute('aria-invalid', 'true');
-
-    await user.click(screen.getByRole('button', { name: 'Preferences' }));
-    await user.click(screen.getByRole('button', { name: 'Vietnamese' }));
-
-    expect(await screen.findByText('Email là bắt buộc')).toBeInTheDocument();
-    expect(screen.getByText('Mật khẩu là bắt buộc')).toBeInTheDocument();
-    expect(screen.queryByText('Email address is required')).not.toBeInTheDocument();
-    expect(screen.getByLabelText('Địa chỉ email')).toHaveAttribute('aria-invalid', 'true');
   });
 
   it('submits trimmed email and exact password then opens the authenticated workspace', async () => {
@@ -242,63 +219,6 @@ describe('SignInPage', () => {
       Node.DOCUMENT_POSITION_FOLLOWING,
     );
     expect(screen.getByRole('button', { name: /sign in/i })).toBeEnabled();
-  });
-
-  it('localizes generic credential form alerts in the selected language', async () => {
-    const user = userEvent.setup();
-    vi.mocked(fetch).mockResolvedValueOnce({
-      ok: false,
-      status: 422,
-      statusText: 'Unprocessable Entity',
-      json: () =>
-        Promise.resolve({
-          code: 'identity.signIn.invalidCredentials',
-          detail: 'Do not show this backend fallback.',
-        }),
-    } as unknown as Response);
-
-    await renderWithRouter(<SignInPage />, { path: '/sign-in' });
-
-    await user.click(screen.getByRole('button', { name: 'Preferences' }));
-    await user.click(screen.getByRole('button', { name: 'Vietnamese' }));
-    await fillVietnameseSignInForm(user);
-    await user.click(screen.getByRole('button', { name: 'Đăng nhập' }));
-
-    const alert = await screen.findByRole('alert');
-    expect(alert).toHaveTextContent('Không thể đăng nhập');
-    expect(alert).toHaveTextContent('Email hoặc mật khẩu không đúng.');
-    expect(alert).not.toHaveTextContent('Email or password is incorrect.');
-    expect(alert.compareDocumentPosition(screen.getByLabelText('Địa chỉ email'))).toBe(
-      Node.DOCUMENT_POSITION_FOLLOWING,
-    );
-  });
-
-  it('updates submitted credential alerts when language changes after failure', async () => {
-    const user = userEvent.setup();
-    vi.mocked(fetch).mockResolvedValueOnce({
-      ok: false,
-      status: 422,
-      statusText: 'Unprocessable Entity',
-      json: () =>
-        Promise.resolve({
-          code: 'identity.signIn.invalidCredentials',
-          detail: 'Do not show this backend fallback.',
-        }),
-    } as unknown as Response);
-
-    await renderWithRouter(<SignInPage />, { path: '/sign-in' });
-
-    await fillSignInForm(user);
-    await user.click(screen.getByRole('button', { name: /sign in/i }));
-
-    expect(await screen.findByText('Email or password is incorrect.')).toBeInTheDocument();
-
-    await user.click(screen.getByRole('button', { name: 'Preferences' }));
-    await user.click(screen.getByRole('button', { name: 'Vietnamese' }));
-
-    expect(await screen.findByText('Email hoặc mật khẩu không đúng.')).toBeInTheDocument();
-    expect(screen.queryByText('Email or password is incorrect.')).not.toBeInTheDocument();
-    expect(screen.getByLabelText('Địa chỉ email')).toHaveValue('alex@example.com');
   });
 
   it('shows verification-required state and resends verification email', async () => {

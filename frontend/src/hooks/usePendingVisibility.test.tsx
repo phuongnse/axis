@@ -4,7 +4,7 @@ import { type PendingFeedbackKind, usePendingVisibility } from './usePendingVisi
 
 function PendingProbe({
   pending,
-  kind = 'feedback',
+  kind = 'content',
 }: {
   pending: boolean;
   kind?: PendingFeedbackKind;
@@ -19,7 +19,7 @@ describe('usePendingVisibility', () => {
     vi.useRealTimers();
   });
 
-  it('never reveals feedback when work finishes inside the shared delay', () => {
+  it('never reveals content feedback when work finishes inside the shared delay', () => {
     vi.useFakeTimers();
     const { rerender } = render(<PendingProbe pending={false} />);
 
@@ -32,7 +32,7 @@ describe('usePendingVisibility', () => {
     expect(screen.getByLabelText('pending visibility')).toHaveTextContent('hidden');
   });
 
-  it('keeps revealed feedback stable for the shared minimum duration', () => {
+  it('keeps revealed content feedback stable for the shared minimum duration', () => {
     vi.useFakeTimers();
     const { rerender } = render(<PendingProbe pending />);
 

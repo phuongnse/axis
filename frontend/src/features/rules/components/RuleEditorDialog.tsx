@@ -521,6 +521,7 @@ export function RuleEditorDialog({
   };
   return (
     <ManagedDialog
+      surfaceId="rule-editor"
       open={open}
       onOpenChange={(nextOpen) => {
         if (!nextOpen) requestClose();

@@ -1,8 +1,8 @@
 import type { ReactNode } from 'react';
 import { Spinner } from '@/components/ui/spinner';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
-import { usePendingVisibility } from '@/hooks/usePendingVisibility';
 import { cn } from '@/lib/utils';
+import { axisStyles } from '@/theme.generated';
 import { toggledItemHighlight, transientItemHighlight } from './interactionStates';
 
 interface OptionListProps {
@@ -20,9 +20,9 @@ interface OptionListItemProps {
 }
 
 interface OptionItemContentProps {
+  busy?: boolean;
   children: ReactNode;
   icon: ReactNode;
-  pending?: boolean;
 }
 
 export function OptionList({ children, label, onValueChange, value }: OptionListProps) {
@@ -43,17 +43,20 @@ export function OptionList({ children, label, onValueChange, value }: OptionList
   );
 }
 
-export function OptionItemContent({ children, icon, pending = false }: OptionItemContentProps) {
-  const showPending = usePendingVisibility(pending);
-
+export function OptionItemContent({ busy = false, children, icon }: OptionItemContentProps) {
   return (
     <>
       <span
         data-slot="option-item-icon"
-        className="flex size-axis-icon-control shrink-0 items-center justify-center text-axis-metadata font-axis-label leading-none"
+        className={cn(
+          'flex shrink-0 items-center justify-center leading-none',
+          axisStyles.icon.size.control,
+          axisStyles.typography.scale.metadata,
+          axisStyles.typography.weight.label,
+        )}
         aria-hidden
       >
-        {showPending ? <Spinner className="size-3.5" /> : icon}
+        {busy ? <Spinner className="size-3.5" /> : icon}
       </span>
       <span data-slot="option-item-label" className="min-w-0 flex-1 truncate text-left">
         {children}
@@ -65,14 +68,19 @@ export function OptionItemContent({ children, icon, pending = false }: OptionIte
 export function OptionListItem({ children, icon, pending = false, value }: OptionListItemProps) {
   return (
     <ToggleGroupItem
+      aria-busy={pending || undefined}
       className={cn(
-        'min-h-axis-touch-target w-full justify-start sm:min-h-axis-compact-control',
+        axisStyles.density.minHeight.touchTarget,
+        'w-full justify-start',
+        axisStyles.spacing.padding.inline.inline,
+        axisStyles.density.minHeight.compactControlAtSmall,
         transientItemHighlight,
         toggledItemHighlight,
       )}
+      disabled={pending}
       value={value}
     >
-      <OptionItemContent icon={icon} pending={pending}>
+      <OptionItemContent busy={pending} icon={icon}>
         {children}
       </OptionItemContent>
     </ToggleGroupItem>

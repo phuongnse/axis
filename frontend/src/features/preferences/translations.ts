@@ -225,6 +225,7 @@ export const translations = {
     'workspace.organizationNameHelp': 'Use a name people will recognize. 2–100 characters.',
     'workspace.organizationNameLength': 'Enter an Organization name between 2 and 100 characters.',
     'workspace.organizationNameRequired': 'Organization name is required.',
+    'workspace.personal': 'Personal',
     'workspace.refreshFailedDescription':
       'The new Workspace context could not be loaded. Retry the refresh or sign out.',
     'workspace.refreshFailedTitle': 'Workspace refresh needs attention',
@@ -1042,6 +1043,7 @@ export const translations = {
     'workspace.organizationNameHelp': 'Dùng tên mọi người dễ nhận biết, từ 2–100 ký tự.',
     'workspace.organizationNameLength': 'Nhập tên Organization từ 2 đến 100 ký tự.',
     'workspace.organizationNameRequired': 'Tên Organization là bắt buộc.',
+    'workspace.personal': 'Cá nhân',
     'workspace.refreshFailedDescription':
       'Không thể tải ngữ cảnh Workspace mới. Hãy thử tải lại hoặc đăng xuất.',
     'workspace.refreshFailedTitle': 'Cần xử lý việc tải lại Workspace',

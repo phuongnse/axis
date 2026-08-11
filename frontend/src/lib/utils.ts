@@ -1,6 +1,10 @@
 import { type ClassValue, clsx } from 'clsx';
-import { twMerge } from 'tailwind-merge';
+import { extendTailwindMerge } from 'tailwind-merge';
+
+import { axisTailwindMergeExtension } from '@/theme.generated';
+
+const mergeAxisClassNames = extendTailwindMerge(axisTailwindMergeExtension);
 
 export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs));
+  return mergeAxisClassNames(clsx(inputs));
 }

@@ -12,6 +12,7 @@ import {
   SectionHeader,
   type SectionHeaderProps,
 } from '../src/components/shared/PageLayout';
+import { axisStyles } from '../src/theme.generated';
 
 describe('EntryLayout', () => {
   it('owns the full-viewport entry anatomy and optional utilities without horizontal overflow', () => {
@@ -33,9 +34,9 @@ describe('EntryLayout', () => {
       'flex-col',
       'overflow-x-hidden',
       'bg-background',
-      'p-axis-page-compact',
-      'sm:p-axis-page-default',
-      'lg:p-axis-page-wide',
+      axisStyles.spacing.padding.all.pageCompact,
+      axisStyles.spacing.padding.all.pageDefaultAtSmall,
+      axisStyles.spacing.padding.all.pageWideAtLarge,
     );
     expect(utilities).toContainElement(screen.getByRole('button', { name: 'Preferences' }));
     expect(content).toHaveAttribute('data-slot', 'entry-content');
@@ -47,7 +48,7 @@ describe('EntryLayout', () => {
       'flex-1',
       'items-center',
       'justify-center',
-      'py-axis-region',
+      axisStyles.spacing.padding.block.region,
     );
     expect(content).toHaveTextContent('Entry content');
   });
@@ -77,10 +78,10 @@ describe('PageLayout', () => {
       'w-full',
       'min-w-0',
       'flex-col',
-      'gap-axis-region',
-      'p-axis-page-compact',
-      'sm:p-axis-page-default',
-      'lg:p-axis-page-wide',
+      axisStyles.spacing.gap.region,
+      axisStyles.spacing.padding.all.pageCompact,
+      axisStyles.spacing.padding.all.pageDefaultAtSmall,
+      axisStyles.spacing.padding.all.pageWideAtLarge,
       ...overflowClasses,
     );
     expect(page).not.toHaveClass(...excludedOverflowClasses);
@@ -112,7 +113,7 @@ describe('PageHeader', () => {
       'min-w-0',
       'shrink-0',
       'flex-col',
-      'gap-axis-region',
+      axisStyles.spacing.gap.region,
       'sm:flex-row',
       'sm:items-start',
       'sm:justify-between',
@@ -120,15 +121,15 @@ describe('PageHeader', () => {
     expect(heading).toHaveAttribute('data-slot', 'page-title');
     expect(heading).toHaveClass(
       'font-heading',
-      'text-axis-page-title',
-      'font-axis-page-title',
+      axisStyles.typography.scale.pageTitle,
+      axisStyles.typography.weight.pageTitle,
       'text-foreground',
     );
     expect(description).toHaveAttribute('data-slot', 'page-description');
     expect(description).toHaveClass(
       'max-w-3xl',
-      'text-axis-body',
-      'font-axis-body',
+      axisStyles.typography.scale.body,
+      axisStyles.typography.weight.body,
       'text-muted-foreground',
     );
     expect(actions).toHaveClass(
@@ -136,15 +137,15 @@ describe('PageHeader', () => {
       'w-full',
       'flex-wrap',
       'items-center',
-      'gap-axis-inline',
+      axisStyles.spacing.gap.inline,
       'sm:w-auto',
       'sm:justify-end',
     );
     expect(screen.getByRole('button', { name: 'Create' })).toHaveClass(
-      'min-h-axis-touch-target',
-      'min-w-axis-touch-target',
-      'sm:min-h-axis-compact-control',
-      'sm:min-w-axis-compact-control',
+      axisStyles.density.minHeight.touchTarget,
+      axisStyles.density.minWidth.touchTarget,
+      axisStyles.density.minHeight.compactControlAtSmall,
+      axisStyles.density.minWidth.compactControlAtSmall,
     );
   });
 
@@ -196,10 +197,10 @@ describe('PageAction', () => {
     expect(action).toHaveAttribute('href', '/business-objects/new');
     expect(action).toHaveClass(
       'h-8',
-      'min-h-axis-touch-target',
-      'min-w-axis-touch-target',
-      'sm:min-h-axis-compact-control',
-      'sm:min-w-axis-compact-control',
+      axisStyles.density.minHeight.touchTarget,
+      axisStyles.density.minWidth.touchTarget,
+      axisStyles.density.minHeight.compactControlAtSmall,
+      axisStyles.density.minWidth.compactControlAtSmall,
       'border-border',
     );
   });
@@ -230,10 +231,14 @@ describe('SectionHeader', () => {
       'flex-wrap',
       'items-start',
       'justify-between',
-      'gap-axis-region',
+      axisStyles.spacing.gap.region,
     );
     expect(title).toHaveAttribute('id', 'release-title');
-    expect(title).toHaveClass('font-heading', 'text-axis-section-title', 'font-axis-section-title');
+    expect(title).toHaveClass(
+      'font-heading',
+      axisStyles.typography.scale.sectionTitle,
+      axisStyles.typography.weight.sectionTitle,
+    );
     expect(description).toHaveAttribute('data-slot', 'section-description');
     expect(container.querySelector('[data-slot="section-actions"]')).toHaveTextContent('Trusted');
   });

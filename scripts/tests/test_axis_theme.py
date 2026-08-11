@@ -94,8 +94,8 @@ class TestAxisTheme(unittest.TestCase):
                     "stateDuration": "150ms",
                     "floatingDuration": "100ms",
                     "easing": "cubic-bezier(0, 0, 0.2, 1)",
-                    "feedbackDelayMs": 300,
-                    "feedbackMinimumMs": 400,
+                    "contentDelayMs": 300,
+                    "contentMinimumMs": 400,
                     "contextDelayMs": 500,
                     "contextMinimumMs": 600,
                 },
@@ -189,7 +189,7 @@ class TestAxisTheme(unittest.TestCase):
             ("radiusRoles", "control", "0.1rem", "increase by semantic depth"),
             ("motionRoles", "floatingDuration", "200ms", "must not exceed stateDuration"),
             ("motionRoles", "easing", "linear", "must use `cubic-bezier"),
-            ("motionRoles", "feedbackMinimumMs", 200, "must not be smaller"),
+            ("motionRoles", "contentMinimumMs", 200, "must not be smaller"),
         )
         for group, role, value, message in invalid_cases:
             with self.subTest(group=group, role=role), tempfile.TemporaryDirectory() as temp:
@@ -244,11 +244,146 @@ class TestAxisTheme(unittest.TestCase):
             self.assertIn("--spacing-axis-touch-target: 2.75rem;", web)
             self.assertIn("--radius-axis-managed: 1rem;", web)
             self.assertIn("--z-axis-notification: 60;", web)
-            self.assertIn("delayMs: 300", runtime)
+            self.assertIn("content: {\n    delayMs: 300", runtime)
             self.assertIn("minimumMs: 600", runtime)
+            self.assertIn(
+                """export const axisStyles = {
+  typography: {
+    scale: {
+      metadata: 'text-axis-metadata',
+      body: 'text-axis-body',
+      label: 'text-axis-label',
+      componentTitle: 'text-axis-component-title',
+      sectionTitle: 'text-axis-section-title',
+      pageTitle: 'text-axis-page-title',
+    },
+    weight: {
+      metadata: 'font-axis-metadata',
+      body: 'font-axis-body',
+      label: 'font-axis-label',
+      componentTitle: 'font-axis-component-title',
+      sectionTitle: 'font-axis-section-title',
+      pageTitle: 'font-axis-page-title',
+    },
+  },
+  spacing: {
+    gap: {
+      inline: 'gap-axis-inline',
+      region: 'gap-axis-region',
+      regionAtMedium: 'md:gap-axis-region',
+    },
+    padding: {
+      all: {
+        region: 'p-axis-region',
+        pageCompact: 'p-axis-page-compact',
+        pageDefaultAtSmall: 'sm:p-axis-page-default',
+        pageWideAtLarge: 'lg:p-axis-page-wide',
+      },
+      inline: {
+        inline: 'px-axis-inline',
+        pageCompact: 'px-axis-page-compact',
+        pageDefaultAtSmall: 'sm:px-axis-page-default',
+        pageWideAtLarge: 'lg:px-axis-page-wide',
+      },
+      block: {
+        inline: 'py-axis-inline',
+        region: 'py-axis-region',
+        regionAtMedium: 'md:py-axis-region',
+      },
+      bottom: {
+        inline: 'pb-axis-inline',
+      },
+    },
+  },
+  density: {
+    minHeight: {
+      touchTarget: 'min-h-axis-touch-target',
+      defaultControl: 'min-h-axis-default-control',
+      compactControlAtSmall: 'sm:min-h-axis-compact-control',
+    },
+    minWidth: {
+      touchTarget: 'min-w-axis-touch-target',
+      compactControlAtSmall: 'sm:min-w-axis-compact-control',
+    },
+  },
+  icon: {
+    size: {
+      control: 'size-axis-icon-control',
+      navigation: 'size-axis-icon-navigation',
+      empty: 'size-axis-icon-empty',
+    },
+  },
+  radius: {
+    flat: 'rounded-axis-flat',
+    control: 'rounded-axis-control',
+    floating: 'rounded-axis-floating',
+    managed: 'rounded-axis-managed',
+  },
+  elevation: {
+    none: 'shadow-axis-none',
+    floating: 'shadow-axis-floating',
+    managed: 'shadow-axis-managed',
+    dock: 'shadow-axis-dock',
+  },
+  layer: {
+    base: 'z-axis-base',
+    sticky: 'z-axis-sticky',
+    floating: 'z-axis-floating',
+    modal: 'z-axis-modal',
+    managed: 'z-axis-managed',
+    notification: 'z-axis-notification',
+  },
+  motion: {
+    duration: {
+      state: 'duration-axis-state',
+      floating: 'duration-axis-floating',
+    },
+    easing: {
+      state: 'ease-axis-state',
+    },
+  },
+} as const;""",
+                runtime,
+            )
+            self.assertIn("export const axisTailwindMergeExtension = {", runtime)
+            self.assertIn("      'axis-page-title',\n      ],", runtime)
+            self.assertIn("        'axis-icon-empty',\n      ],", runtime)
+            self.assertIn(
+                "      radius: ['axis-flat', 'axis-control', 'axis-floating', 'axis-managed'],",
+                runtime,
+            )
+            self.assertIn(
+                "      duration: [{ duration: ['axis-state', 'axis-floating'] }],",
+                runtime,
+            )
             self.assertIn('PrimaryColor = "#ffffff"', email)
             self.assertIn('PrimaryForegroundColor = "#000000"', email)
             self.assertIn("Segoe UI", email)
+
+    def test_render_runtime_rejects_canonical_style_role_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            self.write_source(root)
+            theme = axis_theme.load_theme(root)
+
+            with mock.patch.object(axis_theme, "ICON_ROLES", (*axis_theme.ICON_ROLES, "invented")):
+                with self.assertRaisesRegex(
+                    axis_theme.ThemeValidationError,
+                    "axisStyles icon role mapping must match canonical roles",
+                ):
+                    axis_theme._render_web_theme_runtime(theme)
+
+    def test_style_consumption_guard_is_owned_by_theme_routing(self) -> None:
+        self.assertTrue(
+            axis_theme.is_theme_path(
+                "frontend/scripts/check-axis-style-consumption.fixtures.mjs"
+            )
+        )
+        self.assertFalse(
+            axis_theme.is_theme_path(
+                "frontend/scripts/check-axis-style-consumption.test.mjs"
+            )
+        )
 
     def test_theme_artifact_issues_reports_missing_and_stale_outputs(self) -> None:
         with tempfile.TemporaryDirectory() as temp:

@@ -2,12 +2,164 @@
 // Generated from theme/axis-theme.json by `python scripts/axis.py generate theme`.
 
 export const axisUiTiming = {
-  feedback: {
+  content: {
     delayMs: 300,
     minimumMs: 400,
   },
   contextTransition: {
     delayMs: 500,
     minimumMs: 600,
+  },
+} as const;
+
+export const axisStyles = {
+  typography: {
+    scale: {
+      metadata: 'text-axis-metadata',
+      body: 'text-axis-body',
+      label: 'text-axis-label',
+      componentTitle: 'text-axis-component-title',
+      sectionTitle: 'text-axis-section-title',
+      pageTitle: 'text-axis-page-title',
+    },
+    weight: {
+      metadata: 'font-axis-metadata',
+      body: 'font-axis-body',
+      label: 'font-axis-label',
+      componentTitle: 'font-axis-component-title',
+      sectionTitle: 'font-axis-section-title',
+      pageTitle: 'font-axis-page-title',
+    },
+  },
+  spacing: {
+    gap: {
+      inline: 'gap-axis-inline',
+      region: 'gap-axis-region',
+      regionAtMedium: 'md:gap-axis-region',
+    },
+    padding: {
+      all: {
+        region: 'p-axis-region',
+        pageCompact: 'p-axis-page-compact',
+        pageDefaultAtSmall: 'sm:p-axis-page-default',
+        pageWideAtLarge: 'lg:p-axis-page-wide',
+      },
+      inline: {
+        inline: 'px-axis-inline',
+        pageCompact: 'px-axis-page-compact',
+        pageDefaultAtSmall: 'sm:px-axis-page-default',
+        pageWideAtLarge: 'lg:px-axis-page-wide',
+      },
+      block: {
+        inline: 'py-axis-inline',
+        region: 'py-axis-region',
+        regionAtMedium: 'md:py-axis-region',
+      },
+      bottom: {
+        inline: 'pb-axis-inline',
+      },
+    },
+  },
+  density: {
+    minHeight: {
+      touchTarget: 'min-h-axis-touch-target',
+      defaultControl: 'min-h-axis-default-control',
+      compactControlAtSmall: 'sm:min-h-axis-compact-control',
+    },
+    minWidth: {
+      touchTarget: 'min-w-axis-touch-target',
+      compactControlAtSmall: 'sm:min-w-axis-compact-control',
+    },
+  },
+  icon: {
+    size: {
+      control: 'size-axis-icon-control',
+      navigation: 'size-axis-icon-navigation',
+      empty: 'size-axis-icon-empty',
+    },
+  },
+  radius: {
+    flat: 'rounded-axis-flat',
+    control: 'rounded-axis-control',
+    floating: 'rounded-axis-floating',
+    managed: 'rounded-axis-managed',
+  },
+  elevation: {
+    none: 'shadow-axis-none',
+    floating: 'shadow-axis-floating',
+    managed: 'shadow-axis-managed',
+    dock: 'shadow-axis-dock',
+  },
+  layer: {
+    base: 'z-axis-base',
+    sticky: 'z-axis-sticky',
+    floating: 'z-axis-floating',
+    modal: 'z-axis-modal',
+    managed: 'z-axis-managed',
+    notification: 'z-axis-notification',
+  },
+  motion: {
+    duration: {
+      state: 'duration-axis-state',
+      floating: 'duration-axis-floating',
+    },
+    easing: {
+      state: 'ease-axis-state',
+    },
+  },
+} as const;
+
+export const axisTailwindMergeExtension = {
+  extend: {
+    theme: {
+      text: [
+        'axis-metadata',
+        'axis-body',
+        'axis-label',
+        'axis-component-title',
+        'axis-section-title',
+        'axis-page-title',
+      ],
+      'font-weight': [
+        'axis-metadata',
+        'axis-body',
+        'axis-label',
+        'axis-component-title',
+        'axis-section-title',
+        'axis-page-title',
+      ],
+      spacing: [
+        'axis-inline',
+        'axis-region',
+        'axis-section',
+        'axis-page-compact',
+        'axis-page-default',
+        'axis-page-wide',
+        'axis-compact-control',
+        'axis-default-control',
+        'axis-touch-target',
+        'axis-icon-control',
+        'axis-icon-navigation',
+        'axis-icon-empty',
+      ],
+      radius: ['axis-flat', 'axis-control', 'axis-floating', 'axis-managed'],
+      shadow: ['axis-none', 'axis-floating', 'axis-managed', 'axis-dock'],
+      ease: ['axis-state'],
+    },
+    classGroups: {
+      z: [
+        {
+          z: [
+            'axis-base',
+            'axis-sticky',
+            'axis-floating',
+            'axis-modal',
+            'axis-managed',
+            'axis-notification',
+          ],
+        },
+      ],
+      duration: [{ duration: ['axis-state', 'axis-floating'] }],
+    },
   },
 } as const;

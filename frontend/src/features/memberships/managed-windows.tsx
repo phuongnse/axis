@@ -86,6 +86,7 @@ function MembershipInvitationWindowRenderer({ descriptor }: ManagedWindowRendere
   if (!invitation) {
     return (
       <ManagedDialog
+        surfaceId="membership-windows"
         open
         title={descriptor.title}
         onOpenChange={(open) => {
@@ -171,6 +172,7 @@ function MembershipInviteDialog({ onClose }: { onClose: () => void }) {
   return (
     <>
       <ManagedDialog
+        surfaceId="membership-windows"
         open
         title={t('memberships.invite')}
         description={t('memberships.description')}
@@ -336,6 +338,7 @@ function MembershipInvitationDialog({
 
   return (
     <ManagedDialog
+      surfaceId="membership-windows"
       open
       title={title}
       description={t('memberships.description')}

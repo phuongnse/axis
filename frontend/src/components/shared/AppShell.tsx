@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 
 import { AppFooter } from '@/components/shared/AppFooter';
 import { AppHeader } from '@/components/shared/AppHeader';
+import { AuthenticatedFrame } from '@/components/shared/AuthenticatedFrame';
 import { ManagedWindowHost } from '@/components/shared/ManagedWindowHost';
 import {
   ManagedWindowProvider,
@@ -42,21 +43,24 @@ import {
   moduleNavigationAvailabilityQueryOptions,
 } from '@/lib/module-navigation-api';
 import { moduleNavigationContributions } from '@/lib/module-navigation-registry';
+import type { SurfaceIdFor } from '@/lib/ui-foundation';
 
-interface AppShellProps {
+export interface AppShellProps {
   children: ReactNode;
   navigationContributions?: readonly ModuleNavigationContribution[];
+  surfaceId: SurfaceIdFor<'authenticated-frame'>;
   windowRenderers?: ManagedWindowRendererRegistry;
 }
 
 export function AppShell({
   children,
   navigationContributions = moduleNavigationContributions,
+  surfaceId,
   windowRenderers = managedWindowRenderers,
 }: AppShellProps) {
   return (
     <ManagedWindowProvider renderers={windowRenderers}>
-      <AppShellContent navigationContributions={navigationContributions}>
+      <AppShellContent navigationContributions={navigationContributions} surfaceId={surfaceId}>
         {children}
       </AppShellContent>
     </ManagedWindowProvider>
@@ -66,9 +70,11 @@ export function AppShell({
 function AppShellContent({
   children,
   navigationContributions,
+  surfaceId,
 }: {
   children: ReactNode;
   navigationContributions: readonly ModuleNavigationContribution[];
+  surfaceId: SurfaceIdFor<'authenticated-frame'>;
 }) {
   const navigate = useNavigate();
   const router = useRouter();
@@ -301,56 +307,37 @@ function AppShellContent({
   const workspaceInteractionBlocked = workspaceContentBlocked || showWorkspaceTransition;
 
   return (
-    <div className="flex h-dvh min-h-0 flex-col overflow-hidden bg-background text-foreground">
+    <>
       <PreferencesProfileSync />
-      <AppHeader
-        onSignOut={handleSignOut}
-        onRetryWorkspaceContext={retryWorkspaceContext}
-        onWorkspaceChange={handleWorkspaceChange}
-        signOutError={signOutError}
-        signingOut={signingOut}
-        workspaceContext={workspaceContext}
-      />
-      <div data-slot="authenticated-work-area" className="relative min-h-0 min-w-0 flex-1">
-        <div className="flex h-full min-h-0 min-w-0 flex-col md:flex-row">
-          <div
-            data-slot="module-navigation-boundary"
-            className="contents"
-            inert={workspaceInteractionBlocked}
-          >
-            <ModuleNavigation context={navigationContext} items={visibleNavigationItems} />
-          </div>
-          <main
-            className="relative flex min-h-0 w-full min-w-0 flex-1 overflow-hidden bg-background"
-            aria-busy={workspaceContext.phase === 'refreshing' || undefined}
-          >
-            <div
-              data-slot="authenticated-route-content"
-              className={`flex h-full min-h-0 w-full min-w-0 flex-1 ${
-                workspaceSurfaceVisible ? 'invisible pointer-events-none' : ''
-              }`}
-              inert={workspaceInteractionBlocked}
-            >
-              {children}
-            </div>
-            {workspaceSurfaceVisible ? (
-              <div
-                data-slot="workspace-context-surface"
-                className="absolute inset-0 flex items-center justify-center overflow-hidden bg-background p-6"
-                aria-live="polite"
-              >
-                {showWorkspaceTransition ? (
-                  <PendingIndicator>{t('workspace.refreshingTitle')}</PendingIndicator>
-                ) : null}
-              </div>
-            ) : null}
-          </main>
-        </div>
-        <ManagedWindowHost />
-        <Toaster />
-      </div>
-      <AppFooter />
-    </div>
+      <AuthenticatedFrame
+        surfaceId={surfaceId}
+        contentBlocked={workspaceInteractionBlocked}
+        contentBusy={workspaceContext.phase === 'refreshing'}
+        contentObscured={workspaceSurfaceVisible}
+        contextSurfaceVisible={workspaceSurfaceVisible}
+        contextSurface={
+          showWorkspaceTransition ? (
+            <PendingIndicator>{t('workspace.refreshingTitle')}</PendingIndicator>
+          ) : undefined
+        }
+        header={
+          <AppHeader
+            onSignOut={handleSignOut}
+            onRetryWorkspaceContext={retryWorkspaceContext}
+            onWorkspaceChange={handleWorkspaceChange}
+            signOutError={signOutError}
+            signingOut={signingOut}
+            workspaceContext={workspaceContext}
+          />
+        }
+        navigation={<ModuleNavigation context={navigationContext} items={visibleNavigationItems} />}
+        managedWindows={<ManagedWindowHost />}
+        notifications={<Toaster />}
+        footer={<AppFooter />}
+      >
+        {children}
+      </AuthenticatedFrame>
+    </>
   );
 }
 

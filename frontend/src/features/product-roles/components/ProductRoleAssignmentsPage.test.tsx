@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ManagedWindowHost } from '@/components/shared/ManagedWindowHost';
 import { ManagedWindowProvider } from '@/components/shared/ManagedWindowManager';
+import { axisStyles } from '@/theme.generated';
 import { assignProductRole, revokeProductRole } from '../api';
 import { productRolesManagedWindowRenderers } from '../managed-windows';
 import { ProductRoleAssignmentsPage } from './ProductRoleAssignmentsPage';
@@ -50,20 +51,24 @@ describe('ProductRoleAssignmentsPage', () => {
     renderPage();
 
     const page = document.querySelector<HTMLElement>('[data-slot="page-layout"]');
+    const workspace = document.querySelector<HTMLElement>('[data-slot="resource-workspace"]');
+    const content = document.querySelector<HTMLElement>('[data-slot="resource-workspace-content"]');
     const table = await screen.findByRole('region', {
       name: 'Current product-role assignments',
     });
     const assign = await within(table).findByRole('button', { name: 'Assign role' });
 
     expect(page).toHaveAttribute('data-scroll-mode', 'contained');
-    expect(page?.querySelectorAll('[data-slot="page-header"]')).toHaveLength(1);
-    expect(page?.querySelectorAll('[data-slot="data-table"]')).toHaveLength(1);
+    expect(page).toContainElement(workspace);
+    expect(workspace?.querySelectorAll('[data-slot="page-header"]')).toHaveLength(1);
+    expect(content).toContainElement(table);
+    expect(content?.querySelectorAll('[data-slot="data-table"]')).toHaveLength(1);
     expect(within(table).queryByRole('columnheader', { name: 'Actions' })).not.toBeInTheDocument();
     expect(assign).toHaveClass(
-      'min-h-axis-touch-target',
-      'min-w-axis-touch-target',
-      'sm:min-h-axis-compact-control',
-      'sm:min-w-axis-compact-control',
+      axisStyles.density.minHeight.touchTarget,
+      axisStyles.density.minWidth.touchTarget,
+      axisStyles.density.minHeight.compactControlAtSmall,
+      axisStyles.density.minWidth.compactControlAtSmall,
     );
     expect(within(table).getByText('Reviews submitted cases.')).toBeInTheDocument();
 

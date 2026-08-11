@@ -1,4 +1,4 @@
-import { screen, waitFor } from '@testing-library/react';
+import { act, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -87,25 +87,6 @@ describe('RegisterPage', () => {
     expect(
       screen.getByText('You must accept the Terms of Service and Privacy Policy'),
     ).toBeInTheDocument();
-  });
-
-  it('updates client validation errors when language changes', async () => {
-    const user = userEvent.setup();
-    await renderWithRouter(<RegisterPage />, { path: '/register' });
-
-    await user.click(await screen.findByRole('button', { name: /create account/i }));
-
-    expect(screen.getByText('Full name is required')).toBeInTheDocument();
-    expect(screen.getByText('Email address is required')).toBeInTheDocument();
-    expect(screen.getByLabelText('Email address')).toHaveAttribute('aria-invalid', 'true');
-
-    await user.click(screen.getByRole('button', { name: 'Preferences' }));
-    await user.click(screen.getByRole('button', { name: 'Vietnamese' }));
-
-    expect(await screen.findByText('Họ và tên là bắt buộc')).toBeInTheDocument();
-    expect(screen.getByText('Email là bắt buộc')).toBeInTheDocument();
-    expect(screen.queryByText('Full name is required')).not.toBeInTheDocument();
-    expect(screen.getByLabelText('Địa chỉ email')).toHaveAttribute('aria-invalid', 'true');
   });
 
   it('offers a sign-in link so registration is not a dead end', async () => {
@@ -282,19 +263,21 @@ describe('RegisterPage', () => {
       }
       return Promise.reject(new Error(`Unexpected fetch: ${url}`));
     });
-    await changeSiteLanguage('vi');
-
     await renderWithRouter(<RegisterPage />, { path: '/register' });
 
-    await user.type(screen.getByLabelText('Họ và tên'), 'Alex Brown');
-    await user.type(screen.getByLabelText('Địa chỉ email'), 'alex@example.com');
-    await user.type(screen.getByLabelText('Mật khẩu', { exact: true }), 'maple river sunrise');
-    await user.type(
-      screen.getByLabelText('Xác nhận mật khẩu', { exact: true }),
-      'maple river sunrise',
-    );
-    await user.click(screen.getByRole('checkbox', { name: /điều khoản dịch vụ/i }));
-    await user.click(screen.getByRole('button', { name: /tạo tài khoản/i }));
+    const fullName = screen.getByLabelText('Full name');
+    const email = screen.getByLabelText('Email address');
+    const passwordInput = screen.getByLabelText('Password', { exact: true });
+    const passwordConfirmation = screen.getByLabelText('Confirm password', { exact: true });
+    const legalAcceptance = screen.getByRole('checkbox', { name: /terms of service/i });
+    const createAccount = screen.getByRole('button', { name: /create account/i });
+    await user.type(fullName, 'Alex Brown');
+    await user.type(email, 'alex@example.com');
+    await user.type(passwordInput, 'maple river sunrise');
+    await user.type(passwordConfirmation, 'maple river sunrise');
+    await user.click(legalAcceptance);
+    await act(() => changeSiteLanguage('vi'));
+    await user.click(createAccount);
 
     await waitFor(() => {
       expect(registerBody?.preferredLanguage).toBe('vi');
@@ -381,53 +364,6 @@ describe('RegisterPage', () => {
     expect(screen.getByRole('button', { name: /create account/i })).toBeEnabled();
   });
 
-  it('updates duplicate email errors when language changes after submit', async () => {
-    const user = userEvent.setup();
-    vi.mocked(fetch).mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
-      const url = typeof input === 'string' ? input : input.toString();
-      if (url.includes('/api/legal/versions')) {
-        return Promise.resolve({
-          ok: true,
-          status: 200,
-          text: () => Promise.resolve(JSON.stringify(LEGAL_VERSIONS)),
-        } as unknown as Response);
-      }
-      if (url.includes('/api/users/register') && init?.method === 'POST') {
-        return Promise.resolve({
-          ok: false,
-          status: 409,
-          statusText: 'Conflict',
-          json: () =>
-            Promise.resolve({
-              code: 'identity.register.emailAlreadyExists',
-              detail: 'Do not show this backend fallback.',
-            }),
-        } as unknown as Response);
-      }
-      return Promise.reject(new Error(`Unexpected fetch: ${url}`));
-    });
-
-    await renderWithRouter(<RegisterPage />, { path: '/register' });
-
-    await fillRegisterForm(user);
-    await user.click(screen.getByRole('button', { name: /create account/i }));
-
-    expect(
-      await screen.findByText('An account with this email already exists. Sign in instead.'),
-    ).toBeInTheDocument();
-
-    await user.click(screen.getByRole('button', { name: 'Preferences' }));
-    await user.click(screen.getByRole('button', { name: 'Vietnamese' }));
-
-    expect(
-      await screen.findByText('Email này đã có tài khoản. Hãy đăng nhập.'),
-    ).toBeInTheDocument();
-    expect(
-      screen.queryByText('An account with this email already exists. Sign in instead.'),
-    ).not.toBeInTheDocument();
-    expect(screen.getByLabelText('Địa chỉ email')).toHaveAttribute('aria-invalid', 'true');
-  });
-
   it('shows generic server error when API returns 5xx', async () => {
     const user = userEvent.setup();
     vi.mocked(fetch).mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
@@ -458,10 +394,6 @@ describe('RegisterPage', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Something went wrong, please try again',
     );
-    await user.click(screen.getByRole('button', { name: 'Preferences' }));
-    await user.click(screen.getByRole('button', { name: 'Vietnamese' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent('Đã xảy ra lỗi, vui lòng thử lại');
-    expect(screen.queryByText('Something went wrong, please try again')).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /tạo tài khoản/i })).toBeEnabled();
+    expect(screen.getByRole('button', { name: /create account/i })).toBeEnabled();
   });
 });

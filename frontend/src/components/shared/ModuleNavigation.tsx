@@ -9,6 +9,7 @@ import type {
   VisibleModuleNavigationContribution,
 } from '@/lib/module-navigation';
 import { cn } from '@/lib/utils';
+import { axisStyles } from '@/theme.generated';
 import { persistentItemHighlight, transientItemHighlight } from './interactionStates';
 
 interface ModuleNavigationProps {
@@ -62,14 +63,31 @@ export function ModuleNavigation({ context, items }: ModuleNavigationProps) {
       <div
         ref={navigationItemsRef}
         data-slot="module-navigation-items"
-        className="flex min-w-0 gap-axis-inline overflow-x-auto px-axis-page-compact py-axis-inline md:h-full md:min-h-0 md:flex-col md:gap-axis-region md:overflow-x-hidden md:overflow-y-auto md:px-3 md:py-axis-region"
+        className={cn(
+          'flex min-w-0 overflow-x-auto md:h-full md:min-h-0 md:flex-col md:overflow-x-hidden md:overflow-y-auto md:px-3',
+          axisStyles.spacing.gap.inline,
+          axisStyles.spacing.padding.inline.pageCompact,
+          axisStyles.spacing.padding.block.inline,
+          axisStyles.spacing.gap.regionAtMedium,
+          axisStyles.spacing.padding.block.regionAtMedium,
+        )}
       >
         {groups.map((group) => (
-          <div key={group.id} className="flex min-w-max gap-axis-inline md:min-w-0 md:flex-col">
-            <p className="hidden px-axis-inline text-axis-metadata font-axis-label text-muted-foreground md:block">
+          <div
+            key={group.id}
+            className={cn('flex min-w-max md:min-w-0 md:flex-col', axisStyles.spacing.gap.inline)}
+          >
+            <p
+              className={cn(
+                'hidden text-muted-foreground md:block',
+                axisStyles.spacing.padding.inline.inline,
+                axisStyles.typography.scale.metadata,
+                axisStyles.typography.weight.label,
+              )}
+            >
               {t(group.labelKey)}
             </p>
-            <div className="flex gap-axis-inline md:flex-col">
+            <div className={cn('flex md:flex-col', axisStyles.spacing.gap.inline)}>
               {group.items.map((item) => {
                 const Icon = iconByToken[item.icon];
                 const active = item.isActive(context);
@@ -81,12 +99,14 @@ export function ModuleNavigation({ context, items }: ModuleNavigationProps) {
                     aria-current={active ? 'page' : undefined}
                     className={cn(
                       buttonVariants({ variant: 'ghost' }),
-                      'min-h-axis-touch-target min-w-axis-touch-target md:min-h-0 md:min-w-0 md:w-full md:justify-start',
+                      axisStyles.density.minHeight.touchTarget,
+                      axisStyles.density.minWidth.touchTarget,
+                      'md:min-h-0 md:min-w-0 md:w-full md:justify-start',
                       transientItemHighlight,
                       active && persistentItemHighlight,
                     )}
                   >
-                    <Icon className="size-axis-icon-navigation shrink-0" aria-hidden />
+                    <Icon className={cn('shrink-0', axisStyles.icon.size.navigation)} aria-hidden />
                     <span className="truncate">{t(item.labelKey)}</span>
                   </Link>
                 );

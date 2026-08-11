@@ -3,15 +3,15 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { AppActionsMenu } from '@/components/shared/AppActionsMenu';
-import { transientItemHighlight } from '@/components/shared/interactionStates';
+import { AccountSurface, AccountWorkspaceSection } from '@/components/shared/AccountSurface';
 import { useAuthStore } from '@/features/auth/auth-store';
 import { getCurrentUserProfile } from '@/features/dashboard/api';
 import { createOrganizationWorkspace, listEligibleWorkspaces } from './api';
 import {
+  useWorkspaceControl,
   type WorkspaceChangeResult,
   type WorkspaceContextState,
-  WorkspaceControl,
+  type WorkspaceControlProps,
 } from './WorkspaceControl';
 
 vi.mock('@/features/dashboard/api', () => ({
@@ -20,11 +20,6 @@ vi.mock('@/features/dashboard/api', () => ({
     currentUser: () => ['dashboard', 'current-user'] as const,
   },
   getCurrentUserProfile: vi.fn(),
-}));
-
-vi.mock('@/features/preferences', () => ({
-  LanguageControl: () => <div>Language control</div>,
-  ThemeControl: () => <div>Theme control</div>,
 }));
 
 vi.mock('./api', () => ({
@@ -66,6 +61,57 @@ function TestBoundary({ children }: { children: ReactNode }) {
   );
 }
 
+function WorkspaceControlHarness(props: WorkspaceControlProps) {
+  const control = useWorkspaceControl(props);
+  return (
+    <>
+      <AccountWorkspaceSection {...control.workspace} />
+      {control.overlay}
+    </>
+  );
+}
+
+function AccountWorkspaceHarness(props: WorkspaceControlProps) {
+  const control = useWorkspaceControl(props);
+  return (
+    <>
+      <AccountSurface
+        surfaceId="account-actions"
+        identity={{
+          displayName: 'Ada Lovelace',
+          initials: 'AL',
+          secondaryLabel: 'ada@example.com',
+          triggerKind: 'person',
+          triggerLabel: 'Ada Lovelace',
+        }}
+        onSignOut={vi.fn()}
+        preferences={{
+          language: {
+            feedback: null,
+            label: 'Language',
+            onRetry: vi.fn(),
+            onSelect: vi.fn(),
+            options: [],
+            pendingLabel: 'Saving...',
+            value: 'en',
+          },
+          theme: {
+            feedback: null,
+            label: 'Theme',
+            onRetry: vi.fn(),
+            onSelect: vi.fn(),
+            options: [],
+            pendingLabel: 'Saving...',
+            value: 'system',
+          },
+        }}
+        workspace={control.workspace}
+      />
+      {control.overlay}
+    </>
+  );
+}
+
 function renderControl(
   onWorkspaceChange = vi.fn(async () => 'entered' as WorkspaceChangeResult),
   contextState: WorkspaceContextState = idleContext,
@@ -73,7 +119,7 @@ function renderControl(
 ) {
   const view = render(
     <TestBoundary>
-      <WorkspaceControl
+      <WorkspaceControlHarness
         contextState={contextState}
         onRetryContext={onRetryContext}
         onWorkspaceChange={onWorkspaceChange}
@@ -83,7 +129,11 @@ function renderControl(
   return { ...view, onRetryContext, onWorkspaceChange };
 }
 
-describe('WorkspaceControl', () => {
+function findCurrentWorkspaceOption() {
+  return screen.findByRole('button', { current: 'page' });
+}
+
+describe('useWorkspaceControl', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(getCurrentUserProfile).mockResolvedValue({
@@ -117,31 +167,35 @@ describe('WorkspaceControl', () => {
     vi.mocked(listEligibleWorkspaces).mockResolvedValue([personalWorkspace, organizationWorkspace]);
   });
 
+  it('uses the canonical personal relationship label and preserves Organization names', async () => {
+    vi.mocked(listEligibleWorkspaces).mockResolvedValue([
+      { ...personalWorkspace, name: 'Phương' },
+      organizationWorkspace,
+    ]);
+
+    renderControl();
+
+    expect(await screen.findByRole('button', { name: 'Personal' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Acme Operations' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Phương' })).not.toBeInTheDocument();
+  });
+
   it('presents one flat Workspace choice set, marks current, and prevents a competing switch while pending', async () => {
     const user = userEvent.setup();
     const onWorkspaceChange = vi.fn(async () => 'entered' as WorkspaceChangeResult);
     const view = renderControl(onWorkspaceChange);
 
     const workspaceSection = screen.getByRole('region', { name: 'Workspace' });
-    await screen.findByRole('button', { name: 'Personal workspace' });
+    const currentWorkspace = await findCurrentWorkspaceOption();
     expect(screen.getByRole('region', { name: 'Eligible Workspaces' })).toBeInTheDocument();
-    expect(screen.queryByText('Choose Workspace')).not.toBeInTheDocument();
-    expect(screen.queryByText('Personal Workspace')).not.toBeInTheDocument();
-    expect(screen.queryByText('Organization Workspaces')).not.toBeInTheDocument();
-    const currentWorkspace = screen.getByRole('button', { name: 'Personal workspace' });
     expect(currentWorkspace).toHaveAttribute('aria-current', 'page');
-    expect(currentWorkspace).toHaveClass('bg-secondary', 'disabled:opacity-100');
-    expect(currentWorkspace.querySelector('.lucide-user-round')).not.toBeNull();
-    expect(currentWorkspace.querySelector('.lucide-check')).toBeNull();
     const organizationChoice = screen.getByRole('button', { name: 'Acme Operations' });
-    expect(organizationChoice.querySelector('.lucide-building-2')).not.toBeNull();
-    expect(organizationChoice).toHaveClass(...transientItemHighlight.split(' '));
 
     await user.click(organizationChoice);
     expect(onWorkspaceChange).toHaveBeenCalledWith(organizationWorkspace);
     view.rerender(
       <TestBoundary>
-        <WorkspaceControl
+        <WorkspaceControlHarness
           contextState={{
             failure: null,
             phase: 'switching',
@@ -153,17 +207,23 @@ describe('WorkspaceControl', () => {
       </TestBoundary>,
     );
     expect(workspaceSection).toHaveAttribute('aria-busy', 'true');
-    expect(await screen.findByText('Switching Workspace...')).toHaveClass('sr-only');
-    const visualStatus = workspaceSection.querySelector('[role="status"]:not(.sr-only)');
-    expect(visualStatus?.closest('[data-slot="option-item-icon"]')).not.toBeNull();
-    expect(screen.getByRole('button', { name: 'Personal workspace' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Acme Operations' })).toHaveAttribute(
+      'aria-busy',
+      'true',
+    );
+    expect(screen.getByRole('button', { name: 'Acme Operations' })).not.toHaveAttribute(
+      'aria-current',
+    );
+    expect(currentWorkspace).toHaveAttribute('aria-current', 'page');
+    expect(await screen.findByText('Switching Workspace...')).toBeInTheDocument();
+    expect(currentWorkspace).toBeDisabled();
   });
 
   it('does not flash loading feedback when eligible Workspaces resolve quickly', async () => {
     renderControl();
 
     expect(screen.queryByText('Loading eligible Workspaces...')).not.toBeInTheDocument();
-    expect(await screen.findByRole('button', { name: 'Personal workspace' })).toBeInTheDocument();
+    expect(await findCurrentWorkspaceOption()).toBeInTheDocument();
     expect(screen.queryByText('Loading eligible Workspaces...')).not.toBeInTheDocument();
   });
 
@@ -176,7 +236,7 @@ describe('WorkspaceControl', () => {
     });
     const { onWorkspaceChange } = renderControl();
 
-    await screen.findByRole('button', { name: 'Personal workspace' });
+    await findCurrentWorkspaceOption();
     await user.click(screen.getByRole('button', { name: 'Create Organization' }));
     const name = screen.getByRole('textbox', { name: 'Organization name' });
     await user.type(name, 'A');
@@ -209,11 +269,10 @@ describe('WorkspaceControl', () => {
     const user = userEvent.setup();
     render(
       <TestBoundary>
-        <AppActionsMenu
-          onSignOut={vi.fn()}
-          onRetryWorkspaceContext={vi.fn(async () => undefined)}
+        <AccountWorkspaceHarness
+          contextState={idleContext}
+          onRetryContext={vi.fn(async () => undefined)}
           onWorkspaceChange={vi.fn(async () => 'entered' as WorkspaceChangeResult)}
-          workspaceContext={idleContext}
         />
       </TestBoundary>,
     );
@@ -237,7 +296,7 @@ describe('WorkspaceControl', () => {
       onRetryContext,
     );
 
-    await screen.findByRole('button', { name: 'Personal workspace' });
+    await findCurrentWorkspaceOption();
     expect(screen.getByText(/could not be confirmed/i)).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Retry refresh' }));
 
@@ -254,7 +313,7 @@ describe('WorkspaceControl', () => {
       },
     );
 
-    await screen.findByRole('button', { name: 'Personal workspace' });
+    await findCurrentWorkspaceOption();
     expect(screen.getByText(/Workspace did not change/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Acme Operations' })).toBeEnabled();
   });
@@ -272,7 +331,7 @@ describe('WorkspaceControl', () => {
       onRetryContext,
     );
 
-    await screen.findByRole('button', { name: 'Personal workspace' });
+    await findCurrentWorkspaceOption();
     expect(document.body).toHaveTextContent(/new Workspace context could not be loaded/i);
     await user.click(screen.getByRole('button', { name: 'Retry refresh' }));
 

@@ -18,7 +18,7 @@ export function AsyncContent({
   className,
   error = false,
   id,
-  kind = 'feedback',
+  kind = 'content',
   pending,
   pendingLabel,
 }: AsyncContentProps) {

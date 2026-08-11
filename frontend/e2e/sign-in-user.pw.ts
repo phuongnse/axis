@@ -337,49 +337,17 @@ test.describe('sign in user', () => {
     await resendAction.hover();
     await expect(resendAction).toHaveCSS('text-decoration-line', 'underline');
 
-    await page.getByRole('button', { name: 'Preferences' }).click();
-    await page.getByRole('button', { name: 'Vietnamese' }).click();
-    await page.keyboard.press('Escape');
-
-    await expect(verificationNotice).toContainText('Email chưa xác minh');
-    await expect(page.getByText('Chưa nhận được email?')).toBeVisible();
-    const vietnameseResendAction = page.getByRole('button', {
-      name: 'Gửi lại email xác minh',
-    });
-    await expect(vietnameseResendAction).toHaveText('Gửi lại email');
-
-    await vietnameseResendAction.click();
+    await resendAction.click();
     const feedback = page.getByRole('status');
-    await expect(feedback).toHaveText('Đã gửi email xác minh.');
+    await expect(feedback).toHaveText('Verification email sent.');
     expect(
       await feedback.evaluate((element) => ({
         fontSize: getComputedStyle(element).fontSize,
         successTone: element.classList.contains('text-success'),
       })),
     ).toEqual({ fontSize: '12px', successTone: true });
-    await expect(verificationNotice).not.toContainText('Đã gửi email xác minh.');
+    await expect(verificationNotice).not.toContainText('Verification email sent.');
     await expect(page.getByRole('alert')).toHaveCount(1);
-  });
-
-  test('AT-004 validation errors relocalize and visibly mark invalid fields', async ({ page }) => {
-    await page.goto('/sign-in');
-    await page.getByRole('button', { name: /sign in/i }).click();
-
-    const emailInput = page.getByLabel('Email address');
-    await expect(page.getByText('Email address is required')).toBeVisible();
-    await expect(page.getByText('Password is required')).toBeVisible();
-    await expect(emailInput).toHaveAttribute('aria-invalid', 'true');
-    await expect(emailInput).toHaveClass(/border-destructive/);
-
-    await page.getByRole('button', { name: 'Preferences' }).click();
-    await page.getByRole('button', { name: 'Vietnamese' }).click();
-
-    const localizedEmailInput = page.getByLabel('Địa chỉ email');
-    await expect(page.getByText('Email là bắt buộc')).toBeVisible();
-    await expect(page.getByText('Mật khẩu là bắt buộc')).toBeVisible();
-    await expect(page.getByText('Email address is required')).toHaveCount(0);
-    await expect(localizedEmailInput).toHaveAttribute('aria-invalid', 'true');
-    await expect(localizedEmailInput).toHaveClass(/border-destructive/);
   });
 
   test('AT-013 protected route reload restores from the browser authorization session', async ({

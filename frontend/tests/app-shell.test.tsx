@@ -16,6 +16,7 @@ import {
 } from '@/features/workspaces/api';
 import { invalidateClientRequestSession } from '@/lib/api';
 import type { ModuleNavigationContribution } from '@/lib/module-navigation';
+import { axisStyles } from '@/theme.generated';
 import { AppShell } from '../src/components/shared/AppShell';
 import { ManagedDialog, ManagedDialogBody } from '../src/components/shared/ManagedDialog';
 import {
@@ -65,7 +66,7 @@ vi.mock('@/lib/api', async (importActual) => {
 });
 
 vi.mock('@/features/workspaces/WorkspaceControl', () => ({
-  WorkspaceControl: ({
+  useWorkspaceControl: ({
     contextState,
     onRetryContext,
     onWorkspaceChange,
@@ -80,33 +81,38 @@ vi.mock('@/features/workspaces/WorkspaceControl', () => ({
       organizationId: null;
       isCurrent: false;
     }) => Promise<unknown>;
-  }) => (
-    <>
-      <button
-        type="button"
-        onClick={() =>
-          onWorkspaceChange({
-            workspaceId: '33333333-3333-4333-8333-333333333333',
-            name: 'Personal workspace',
-            slug: 'personal-workspace',
-            type: 'Personal',
-            organizationId: null,
-            isCurrent: false,
-          })
-        }
-      >
-        Simulate Workspace change
-      </button>
+  }) => ({
+    workspace: {
+      busy: contextState.phase === 'switching' || contextState.phase === 'refreshing',
+      feedback: contextState.failure,
+      loadState: 'ready',
+      onCreate: vi.fn(),
+      onRetryContext,
+      onRetryLoad: vi.fn(),
+      onSelect: () =>
+        onWorkspaceChange({
+          workspaceId: '33333333-3333-4333-8333-333333333333',
+          name: 'Personal workspace',
+          slug: 'personal-workspace',
+          type: 'Personal',
+          organizationId: null,
+          isCurrent: false,
+        }),
+      options: [
+        {
+          current: false,
+          id: '33333333-3333-4333-8333-333333333333',
+          kind: 'person',
+          label: 'Simulate Workspace change',
+        },
+      ],
+    },
+    overlay: (
       <output data-testid="workspace-context-state">
         {contextState.phase}:{contextState.failure ?? 'none'}
       </output>
-      {contextState.failure === 'refresh-failed' || contextState.failure === 'outcome-unknown' ? (
-        <button type="button" onClick={onRetryContext}>
-          Retry refresh
-        </button>
-      ) : null}
-    </>
-  ),
+    ),
+  }),
 }));
 
 vi.mock('@/features/workspaces/api', async (importActual) => {
@@ -124,8 +130,31 @@ vi.mock('@/features/preferences', async (importActual) => {
 
   return {
     ...actual,
-    LanguageControl: () => <div>Language control</div>,
-    ThemeControl: () => <div>Theme control</div>,
+    useAccountLanguagePreferenceModel: () => ({
+      feedback: null,
+      label: 'Language',
+      onRetry: vi.fn(),
+      onSelect: vi.fn(),
+      options: [
+        { icon: 'EN', label: 'English', value: 'en' },
+        { icon: 'VI', label: 'Vietnamese', value: 'vi' },
+      ],
+      pendingLabel: 'Saving...',
+      value: 'en',
+    }),
+    useAccountThemePreferenceModel: () => ({
+      feedback: null,
+      label: 'Theme',
+      onRetry: vi.fn(),
+      onSelect: vi.fn(),
+      options: [
+        { icon: 'S', label: 'System', value: 'system' },
+        { icon: 'L', label: 'Light', value: 'light' },
+        { icon: 'D', label: 'Dark', value: 'dark' },
+      ],
+      pendingLabel: 'Saving...',
+      value: 'system',
+    }),
     PreferencesProfileSync: () => null,
   };
 });
@@ -241,42 +270,39 @@ describe('AppShell', () => {
 
     render(
       <QueryClientProvider client={queryClient}>
-        <AppShell navigationContributions={[]}>
+        <AppShell surfaceId="authenticated-frame" navigationContributions={[]}>
           <section aria-label="Work area">Frame content</section>
         </AppShell>
       </QueryClientProvider>,
     );
 
+    const frame = document.querySelector('[data-axis-surface-id="authenticated-frame"]');
+    expect(frame).toHaveAttribute('data-axis-surface-contract', 'authenticated-frame');
     const appHeader = screen.getByRole('banner');
     expect(appHeader).toHaveTextContent('Dashboard');
     expect(appHeader).toHaveClass('bg-card');
     expect(appHeader).not.toHaveClass('bg-card/95', 'backdrop-blur');
     expect(await screen.findByText('Ada Lovelace')).toBeInTheDocument();
     const accountMenu = screen.getByRole('button', { name: 'Account menu' });
-    expect(accountMenu).toHaveClass('h-9', 'hover:bg-accent', 'dark:hover:bg-accent');
-    expect(accountMenu).not.toHaveClass('border-border', 'bg-background');
-    expect(accountMenu.querySelector('[data-slot="avatar"]')).toHaveAttribute(
-      'data-size',
-      'default',
-    );
     await waitFor(() => expect(accountMenu).toHaveTextContent('Axis Reference Product'));
     await user.click(accountMenu);
     expect(accountMenu).toHaveAttribute('aria-expanded', 'true');
+    const accountSurface = document.querySelector('[data-slot="account-surface"]');
+    expect(accountSurface).toHaveAttribute('aria-label', 'Account menu');
+    expect(accountSurface).toHaveAttribute('data-axis-surface-contract', 'account-surface');
+    expect(accountSurface).toHaveAttribute('data-axis-surface-id', 'account-actions');
     expect(screen.queryByText('Profile')).not.toBeInTheDocument();
-    expect(accountMenu.querySelector('.lucide-building-2')).not.toBeNull();
     const accountIdentity = screen.getByRole('region', { name: 'Account' });
     expect(accountIdentity).toHaveTextContent('AL');
     expect(accountIdentity).toHaveTextContent('Ada Lovelace');
     expect(accountIdentity).toHaveTextContent('ada@example.com');
     expect(screen.getByText('Preferences')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Simulate Workspace change' })).toBeInTheDocument();
-    expect(screen.getByText('Language control')).toBeInTheDocument();
-    expect(screen.getByText('Theme control')).toBeInTheDocument();
-    const signOut = screen.getByRole('button', { name: 'Sign out' });
-    expect(signOut).toHaveClass(
-      'text-destructive',
-      'min-h-axis-touch-target',
-      'sm:min-h-axis-compact-control',
+    expect(screen.getByRole('group', { name: 'Language' })).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'Theme' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Sign out' })).toHaveAttribute(
+      'data-axis-account-role',
+      'section-action',
     );
 
     expect(screen.queryByRole('navigation')).not.toBeInTheDocument();
@@ -318,7 +344,7 @@ describe('AppShell', () => {
 
     render(
       <QueryClientProvider client={queryClient}>
-        <AppShell navigationContributions={[]}>
+        <AppShell surfaceId="authenticated-frame" navigationContributions={[]}>
           <section aria-label="Work area">Rules content</section>
         </AppShell>
       </QueryClientProvider>,
@@ -352,7 +378,7 @@ describe('AppShell', () => {
 
     render(
       <QueryClientProvider client={queryClient}>
-        <AppShell navigationContributions={[]}>
+        <AppShell surfaceId="authenticated-frame" navigationContributions={[]}>
           <section>Frame content</section>
         </AppShell>
       </QueryClientProvider>,
@@ -360,9 +386,7 @@ describe('AppShell', () => {
 
     const accountMenu = screen.getByRole('button', { name: 'Account menu' });
     await waitFor(() => expect(accountMenu).toHaveTextContent('Ada Lovelace'));
-    expect(accountMenu).toHaveClass('hover:bg-accent', 'focus-visible:bg-accent');
     expect(accountMenu).toHaveTextContent('AL');
-    expect(accountMenu.querySelector('.lucide-building-2')).toBeNull();
     expect(accountMenu).not.toHaveTextContent('Personal workspace');
   });
 
@@ -396,7 +420,7 @@ describe('AppShell', () => {
 
     render(
       <QueryClientProvider client={queryClient}>
-        <AppShell navigationContributions={contributions}>
+        <AppShell surfaceId="authenticated-frame" navigationContributions={contributions}>
           <section aria-label="Work area">Frame content</section>
         </AppShell>
       </QueryClientProvider>,
@@ -413,7 +437,11 @@ describe('AppShell', () => {
     });
     const shell = (content: ReactNode) => (
       <QueryClientProvider client={queryClient}>
-        <AppShell navigationContributions={[]} windowRenderers={testWindowRenderers}>
+        <AppShell
+          surfaceId="authenticated-frame"
+          navigationContributions={[]}
+          windowRenderers={testWindowRenderers}
+        >
           {content}
         </AppShell>
       </QueryClientProvider>
@@ -440,7 +468,7 @@ describe('AppShell', () => {
     expect(screen.queryByRole('button', { name: 'Windows (1)' })).not.toBeInTheDocument();
   });
 
-  it('keeps the account view and shell geometry stable through the authoritative context cutover', async () => {
+  it('keeps the account surface and shell geometry stable through the authoritative context cutover', async () => {
     const user = userEvent.setup();
     let resolveSessionRestore!: (authenticated: boolean) => void;
     vi.mocked(restoreBrowserSession).mockReturnValue(
@@ -507,7 +535,11 @@ describe('AppShell', () => {
 
     render(
       <QueryClientProvider client={queryClient}>
-        <AppShell navigationContributions={[]} windowRenderers={testWindowRenderers}>
+        <AppShell
+          surfaceId="authenticated-frame"
+          navigationContributions={[]}
+          windowRenderers={testWindowRenderers}
+        >
           <TestWindowLauncher />
         </AppShell>
       </QueryClientProvider>,
@@ -601,7 +633,7 @@ describe('AppShell', () => {
 
     render(
       <QueryClientProvider client={queryClient}>
-        <AppShell navigationContributions={[]}>
+        <AppShell surfaceId="authenticated-frame" navigationContributions={[]}>
           <section>Stable route content</section>
         </AppShell>
       </QueryClientProvider>,
@@ -626,7 +658,7 @@ describe('AppShell', () => {
 
     render(
       <QueryClientProvider client={queryClient}>
-        <AppShell navigationContributions={[]}>
+        <AppShell surfaceId="authenticated-frame" navigationContributions={[]}>
           <section>Source route content</section>
         </AppShell>
       </QueryClientProvider>,
@@ -665,7 +697,11 @@ describe('AppShell', () => {
 
     render(
       <QueryClientProvider client={queryClient}>
-        <AppShell navigationContributions={[]} windowRenderers={testWindowRenderers}>
+        <AppShell
+          surfaceId="authenticated-frame"
+          navigationContributions={[]}
+          windowRenderers={testWindowRenderers}
+        >
           <TestWindowLauncher />
         </AppShell>
       </QueryClientProvider>,
@@ -674,7 +710,7 @@ describe('AppShell', () => {
     await user.click(screen.getByRole('button', { name: 'Open test window' }));
     const dialog = await screen.findByRole('dialog', { name: 'Persistent test window' });
     expect(dialog.querySelector('[data-slot="managed-dialog-window"]')).toHaveClass(
-      'shadow-axis-managed',
+      axisStyles.elevation.managed,
     );
     expect(dialog.querySelector('[data-slot="managed-dialog-header"]')).toHaveClass('items-center');
   });
@@ -687,7 +723,11 @@ describe('AppShell', () => {
 
     render(
       <QueryClientProvider client={queryClient}>
-        <AppShell navigationContributions={[]} windowRenderers={testWindowRenderers}>
+        <AppShell
+          surfaceId="authenticated-frame"
+          navigationContributions={[]}
+          windowRenderers={testWindowRenderers}
+        >
           <TestWindowLauncher />
         </AppShell>
       </QueryClientProvider>,
@@ -708,7 +748,7 @@ describe('AppShell', () => {
 
     render(
       <QueryClientProvider client={queryClient}>
-        <AppShell navigationContributions={[]} windowRenderers={{}}>
+        <AppShell surfaceId="authenticated-frame" navigationContributions={[]} windowRenderers={{}}>
           <TestWindowLauncher />
         </AppShell>
       </QueryClientProvider>,
@@ -755,7 +795,11 @@ describe('AppShell', () => {
     try {
       render(
         <QueryClientProvider client={queryClient}>
-          <AppShell navigationContributions={[]} windowRenderers={testWindowRenderers}>
+          <AppShell
+            surfaceId="authenticated-frame"
+            navigationContributions={[]}
+            windowRenderers={testWindowRenderers}
+          >
             <SizingTestWindowLauncher />
           </AppShell>
         </QueryClientProvider>,
@@ -815,7 +859,7 @@ describe('AppShell', () => {
 
     render(
       <QueryClientProvider client={queryClient}>
-        <AppShell navigationContributions={[]}>
+        <AppShell surfaceId="authenticated-frame" navigationContributions={[]}>
           <section aria-label="Work area">Frame content</section>
         </AppShell>
       </QueryClientProvider>,
@@ -852,7 +896,7 @@ describe('AppShell', () => {
 
     render(
       <QueryClientProvider client={queryClient}>
-        <AppShell navigationContributions={[]}>
+        <AppShell surfaceId="authenticated-frame" navigationContributions={[]}>
           <section aria-label="Work area">Frame content</section>
         </AppShell>
       </QueryClientProvider>,
@@ -886,7 +930,7 @@ describe('AppShell', () => {
 
     render(
       <QueryClientProvider client={queryClient}>
-        <AppShell navigationContributions={[]}>
+        <AppShell surfaceId="authenticated-frame" navigationContributions={[]}>
           <section aria-label="Work area">Frame content</section>
         </AppShell>
       </QueryClientProvider>,
@@ -927,6 +971,7 @@ function TestWindowRenderer() {
   const { windowId, closeWindow } = useCurrentManagedWindow();
   return (
     <ManagedDialog
+      surfaceId="managed-window-host"
       open
       title="Persistent test window"
       onOpenChange={(open) => {
@@ -990,6 +1035,7 @@ function SizingTestWindowRenderer({ descriptor }: ManagedWindowRendererProps) {
   const payload = descriptor.payload as SizingTestPayload;
   return (
     <ManagedDialog
+      surfaceId="managed-window-host"
       open
       title={descriptor.title}
       description="Sizing test window description"

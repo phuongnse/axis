@@ -338,6 +338,7 @@ export function BusinessObjectDefinitionDialog({
   return (
     <>
       <ManagedDialog
+        surfaceId="business-object-editor"
         open={open}
         onOpenChange={(nextOpen) => {
           if (!nextOpen) requestClose();

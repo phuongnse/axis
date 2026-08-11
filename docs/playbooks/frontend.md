@@ -8,6 +8,8 @@ Use `$axis-frontend-feature` for SPA feature work. Use `$axis-frontend-foundatio
 
 Build the workflow, not a landing page or explanation page. Visible copy should help users act and avoid internal architecture terms. On localized surfaces, user-facing product copy must use the frontend translation layer instead of component-local static text. Keep non-product constants, routes, and protocol values separate from visible copy.
 
+Frontend UI, accessible-name, and perceptual evidence uses the product `DEFAULT_LANGUAGE` (`en`) as its sole canonical copy locale. Assert literal copy only when that English copy or accessible name is the contract under test; interaction tests use roles, states, relationships, and fixture-owned business values. Localization-owner tests may exercise other supported locale identifiers to prove catalog parity, selection, persistence, and document state, but do not assert secondary-locale wording or create per-locale screenshots.
+
 Every route must expose an obvious next navigation path. Auth and public standalone screens declare route-level escape targets with `routeNavigation = publicRouteNavigation(...)` and render a visible sign-in, registration, back, or home-style link in every loading, success, and error state. Redirect-only route entries that render no screen state are exempt. Authenticated screens satisfy this through the app shell navigation and sign-out.
 
 Technical handoff routes should complete successful handoffs before rendering standalone UI. Use visible handoff screens only when the user needs to read a durable result, wait for a deliberately held confirmation, or recover from an error.
@@ -16,7 +18,7 @@ Technical handoff routes should complete successful handoffs before rendering st
 
 Design from small screens up. Keep cards and controls at restrained radius unless the owning use case says otherwise.
 
-For localized surfaces, validate copy fit in the supported languages named by the owning use case at mobile and desktop sizes. Prefer responsive layout capacity and design-system improvements over language-specific copy or styling hacks.
+Localized surfaces remain structurally responsive to variable copy and must not introduce language-specific layout or styling branches. Canonical mobile and desktop UI evidence remains English-only.
 
 Fixed-shell product screens must not create document or app-shell scrolling. Constrain overflow to explicit internal regions, and give dense repeat-edit regions a focus/maximized state when they need more working area while keeping authenticated navigation context visible.
 
@@ -52,7 +54,7 @@ Use TanStack Router patterns already in the app. Classify every route as authent
 
 ## Component design
 
-Follow the phase model in the [Axis UI Constitution](../foundations/visual-system/axis-visual-system.md). `frontend/ui-foundation.json` records only the current phase plus golden archetype and route. `defined` and `reference-ready` allow golden-reference work only; `accepted` allows bounded migrations; `adopted` alone allows a system-wide completion claim. Run `python scripts/axis.py check ui-foundation` for every frontend UI change.
+Follow the contract lifecycle and one-way [UI architecture](../foundations/visual-system/axis-visual-system.md#architecture). `frontend/ui-foundation.json` records defined-or-later lifecycle state plus spec/evidence metadata; its contract keys become the TypeScript contract-id union and its checked `enforcedContracts` registry becomes the enforced-contract union. `frontend/src/lib/ui-foundation.ts` binds each finite active surface id to that catalog, while `frontend/src/lib/active-surface-registry.ts` exhaustively inventories real owner and implementation symbols. Surface owners require the compatible typed id, emit rendered contract metadata, and are kept feature/route independent by Biome's parsed import rule; filename conventions, path strings, and raw-source scans are not conformance. A new consumer of an unchanged enforced contract does not need bespoke visual approval, but it does need typed registration plus focused rendered and product-state evidence. Run `python scripts/axis.py check ui-foundation` and `python scripts/axis.py frontend ci` for every frontend UI change; never advance manifest state or the enforced registry without its required version-controlled perceptual evidence.
 
 Choose semantic meaning before a component. Product UI uses an accessible reviewed primitive when one maps that meaning; native fallback behavior requires an accepted platform need. Selected values and options use the same display-label source, icons support rather than replace accessible names, and fixed controls retain stable geometry.
 
@@ -61,9 +63,9 @@ Treat component visuals as mappings of the constitution, not independent convent
 Use these ownership layers:
 
 - **Upstream zone** — `frontend/src/components/ui` plus baseline-tracked shadcn support files contain reviewed registry source. Keep registry-default visuals and APIs; do not add product variants, business logic, feature/shared imports, or internal styling. `frontend/ui-baseline.json` records the approved snapshot and the reason/sign-off reference for each explicit exception.
-- **Theme zone** — [theme/axis-theme.json](../../theme/axis-theme.json) owns reusable color, typography, spacing, density, radius, elevation, icon, motion, and layer values. Generated CSS and runtime TypeScript are committed; `frontend/src/index.css` owns imports and base styles only. Consumers use semantic roles rather than copying current values.
-- **App-pattern zone** — `frontend/src/components/shared` owns reusable Axis composition and adapters. Give them narrow Axis-owned props such as product state, not provider variants, types, selectors, or DOM assumptions.
-- **Feature zone** — feature components compose defaults and app patterns. Consumer `className` is outer layout-only and must not alter primitive visuals.
+- **Theme zone** — [theme/axis-theme.json](../../theme/axis-theme.json) owns reusable color, typography, spacing, density, radius, elevation, icon, motion, and layer values. Generated CSS, typed runtime roles, and their merge semantics are committed; `frontend/src/index.css` owns imports and base styles only. Authored consumers compose the generated `axisStyles` roles with standard utilities rather than copying values or spelling reusable `*-axis-*` utilities.
+- **App-pattern zone** — `frontend/src/components/shared` owns reusable Axis composition and adapters. Give a surface owner narrow semantic props: leaf content stays inside owner-rendered anatomy; regions with their own states, relationships, or actions use typed models rendered by the owner.
+- **Feature zone** — feature components compose defaults and app patterns. They provide product data, state, and commands; they do not pass visual or mechanical capability across a surface boundary.
 
 Dependency flows downward through the constitution, theme, upstream primitives, app patterns, page archetypes, app shell, and feature composition. Features do not own reusable values, global timing, scroll containers, overlay mechanics, focus recovery, control visuals, or alternate page anatomies. The app shell owns stable viewport and context-transition mechanics; the active page archetype owns route geometry; the feature owns product state and composition.
 
@@ -77,7 +79,7 @@ Use `$axis-ui-system` for constitution/theme decisions, registry diffs, baseline
 
 ## Styling
 
-Use Tailwind utilities consistently. Outside the upstream and theme zones, use semantic tokens and standard utilities only: no hard-coded palette utilities, arbitrary Tailwind values, component-local colors, selector-based custom CSS, or one-off visual systems. Remove obsolete styling and component API surface when the UI path that used them is removed or replaced.
+Use Tailwind utilities consistently. Outside the upstream and theme zones, compose reusable visual roles through the generated typed `axisStyles` contract and use standard utilities for local structure. Do not author raw `*-axis-*` utility strings, hard-coded palette utilities, arbitrary Tailwind values, component-local colors, selector-based custom CSS, or one-off visual systems. The AST consumption gate prevents raw semantic-role bypass; role validity and exact class projection remain owned by the theme schema and generator. Remove obsolete styling and component API surface when the UI path that used them is removed or replaced.
 
 ## Security
 

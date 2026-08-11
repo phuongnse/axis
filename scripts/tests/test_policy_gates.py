@@ -3965,9 +3965,10 @@ class TestReviewVerificationGates(unittest.TestCase):
             calls,
         )
 
-    def test_runs_changed_frontend_e2e_file_for_e2e_only_change(self) -> None:
+    def test_runs_changed_frontend_e2e_file_with_recorded_topology_for_e2e_only_change(self) -> None:
         calls: list[str] = []
         browser_runner = mock.Mock(return_value=0)
+        product_overlay = Path("/workspace/product.compose.yml")
 
         with (
             mock.patch.object(axis, "verify_scope_paths", return_value=("working tree", ["frontend/e2e/register.pw.ts"])),
@@ -3983,6 +3984,7 @@ class TestReviewVerificationGates(unittest.TestCase):
                 side_effect=lambda: calls.append("audit") or 0,
             ),
             mock.patch.object(axis, "frontend_toolchain_env", return_value={}),
+            mock.patch.object(axis, "read_local_dev_topology", return_value=(product_overlay,)),
             mock.patch.object(axis, "run_local_dev_browser", browser_runner),
             mock.patch.object(
                 axis,
@@ -4003,7 +4005,10 @@ class TestReviewVerificationGates(unittest.TestCase):
             ],
             calls,
         )
-        browser_runner.assert_called_once_with(["e2e/register.pw.ts"])
+        browser_runner.assert_called_once_with(
+            ["e2e/register.pw.ts"],
+            overlays=(product_overlay,),
+        )
 
     def test_runs_related_dotnet_projects_for_source_change(self) -> None:
         calls: list[str] = []
@@ -5118,6 +5123,88 @@ class TestLocalDevCli(unittest.TestCase):
             ],
             calls[2][1:],
         )
+
+    def test_e2e_persists_one_intentional_snapshot_update_as_the_host_user(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            frontend = Path(temp) / "frontend"
+            test_path = frontend / "e2e" / "app-frame.pw.ts"
+            test_path.parent.mkdir(parents=True)
+            test_path.write_text("export {};\n", encoding="utf-8")
+            with (
+                mock.patch.object(axis, "FRONTEND_DIR", frontend),
+                mock.patch.object(axis.os, "getuid", return_value=1000),
+                mock.patch.object(axis.os, "getgid", return_value=1000),
+            ):
+                snapshot_output = axis.local_dev_snapshot_output(
+                    "e2e/app-frame.pw.ts-snapshots"
+                )
+                calls = self.run_local_dev(
+                    axis.argparse.Namespace(
+                        local_dev_command="e2e",
+                        service="e2e",
+                        snapshot_output=snapshot_output,
+                        e2e_args=[
+                            "--",
+                            "e2e/app-frame.pw.ts",
+                            "--update-snapshots",
+                        ],
+                    )
+                )
+                self.assertTrue(snapshot_output.is_dir())
+                self.assertEqual(
+                    [
+                        "--volume",
+                        f"{snapshot_output.resolve()}:/work/frontend/e2e/app-frame.pw.ts-snapshots",
+                        "--user",
+                        "1000:1000",
+                        "--env",
+                        "HOME=/tmp/axis-e2e-home",
+                        "e2e",
+                        "e2e/app-frame.pw.ts",
+                        "--update-snapshots",
+                    ],
+                    calls[2][-9:],
+                )
+
+    def test_snapshot_output_rejects_non_test_and_broad_paths(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            frontend = Path(temp) / "frontend"
+            (frontend / "e2e").mkdir(parents=True)
+            with mock.patch.object(axis, "FRONTEND_DIR", frontend):
+                for invalid in (
+                    "e2e",
+                    "e2e/snapshots",
+                    "tests/app-frame.pw.ts-snapshots",
+                    "e2e/missing.pw.ts-snapshots",
+                ):
+                    with self.subTest(invalid=invalid), self.assertRaises(
+                        axis.argparse.ArgumentTypeError
+                    ):
+                        axis.local_dev_snapshot_output(invalid)
+
+    def test_snapshot_output_requires_update_mode_and_axis_service(self) -> None:
+        snapshot_output = axis.FRONTEND_DIR / "e2e" / "app-frame.pw.ts-snapshots"
+        for service, e2e_args, expected in (
+            ("e2e", ["e2e/app-frame.pw.ts"], "requires Playwright"),
+            (
+                "consumer-e2e",
+                ["e2e/app-frame.pw.ts", "--update-snapshots"],
+                "supported only by the Axis",
+            ),
+        ):
+            with (
+                self.subTest(service=service),
+                mock.patch.object(axis, "_docker_compose_ok", return_value=True),
+                self.assertRaisesRegex(axis.CheckError, expected),
+            ):
+                axis.local_dev(
+                    axis.argparse.Namespace(
+                        local_dev_command="e2e",
+                        service=service,
+                        snapshot_output=snapshot_output,
+                        e2e_args=e2e_args,
+                    )
+                )
 
     def test_e2e_builds_and_runs_an_overlay_owned_verification_service(self) -> None:
         calls = self.run_local_dev(

@@ -1,4 +1,4 @@
-import { cleanup, screen, waitFor } from '@testing-library/react';
+import { cleanup, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useTranslation } from 'react-i18next';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -9,7 +9,9 @@ import {
   PreferencesMenu,
   PreferencesProfileSync,
   resolveInitialLanguage,
+  supportedLanguages,
 } from '@/features/preferences';
+import { translations } from '@/features/preferences/translations';
 import { renderWithRouter } from './render-with-router';
 
 function setNavigatorLanguages(languages: string[]) {
@@ -65,14 +67,7 @@ function TranslatedFormHarness() {
 }
 
 function TranslatedProfileHarness() {
-  const { t } = useTranslation();
-
-  return (
-    <>
-      <PreferencesProfileSync />
-      <p>{t('dashboard.accountReady')}</p>
-    </>
-  );
+  return <PreferencesProfileSync />;
 }
 
 describe('language preferences', () => {
@@ -86,6 +81,19 @@ describe('language preferences', () => {
     useAuthStore.getState().clearSession();
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
+  });
+
+  it('keeps every supported locale catalog structurally aligned with canonical English', () => {
+    const canonicalKeys = Object.keys(translations.en).sort();
+
+    expect(Object.keys(translations).sort()).toEqual(
+      supportedLanguages.map((language) => language.value).sort(),
+    );
+    for (const { value } of supportedLanguages) {
+      const catalog = translations[value];
+      expect(Object.keys(catalog).sort()).toEqual(canonicalKeys);
+      expect(Object.values(catalog).every((entry) => entry.trim().length > 0)).toBe(true);
+    }
   });
 
   it('resolves stored language before browser language and ignores unsupported storage values', () => {
@@ -107,11 +115,12 @@ describe('language preferences', () => {
     expect(resolveInitialLanguage()).toBe('vi');
   });
 
-  it('updates public copy, document metadata, and storage without clearing form state or calling the API', async () => {
+  it('updates locale state and storage without clearing form state or calling the API', async () => {
     const user = userEvent.setup();
     await renderWithRouter(<TranslatedFormHarness />, { path: '/register' });
 
-    await user.type(screen.getByLabelText('Email address'), 'alex@example.com');
+    const email = screen.getByLabelText('Email address');
+    await user.type(email, 'alex@example.com');
     expect(screen.queryByRole('button', { name: 'VI' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'EN' })).not.toBeInTheDocument();
 
@@ -121,9 +130,7 @@ describe('language preferences', () => {
     expect(screen.getByText('VI')).toHaveAttribute('aria-hidden', 'true');
     await user.click(screen.getByRole('button', { name: 'Vietnamese' }));
 
-    expect(screen.getByLabelText('Địa chỉ email')).toHaveValue('alex@example.com');
-    expect(screen.getByRole('button', { name: 'Tiếng Anh' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Tiếng Việt' })).toBeInTheDocument();
+    expect(email).toHaveValue('alex@example.com');
     expect(document.documentElement.lang).toBe('vi');
     expect(localStorage.getItem(LANGUAGE_STORAGE_KEY)).toBe('vi');
     expect(fetch).not.toHaveBeenCalled();
@@ -152,7 +159,6 @@ describe('language preferences', () => {
     await renderWithRouter(<TranslatedProfileHarness />, { path: '/dashboard' });
 
     await waitFor(() => expect(localStorage.getItem(LANGUAGE_STORAGE_KEY)).toBe('vi'));
-    expect(await screen.findByText('Tài khoản đã sẵn sàng')).toBeInTheDocument();
     expect(document.documentElement.lang).toBe('vi');
   });
 
@@ -171,8 +177,9 @@ describe('language preferences', () => {
 
     expect(document.documentElement.lang).toBe('vi');
     expect(localStorage.getItem(LANGUAGE_STORAGE_KEY)).toBe('vi');
-    expect(await screen.findByText('Chưa lưu ngôn ngữ trên các thiết bị.')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /thử lại/i })).toBeInTheDocument();
+    const saveStatus = document.querySelector<HTMLElement>('#language-save-status');
+    await waitFor(() => expect(saveStatus).not.toBeEmptyDOMElement());
+    expect(within(saveStatus as HTMLElement).getByRole('button')).toBeEnabled();
 
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
     const request = vi.mocked(fetch).mock.calls[0][1];
@@ -200,18 +207,22 @@ describe('language preferences', () => {
       path: '/dashboard',
     });
 
+    const languageFieldset = screen
+      .getByText('Language', { selector: 'legend' })
+      .closest('fieldset');
+    expect(languageFieldset).not.toBeNull();
+    const languageGroup = within(languageFieldset as HTMLFieldSetElement).getByRole('group');
     await user.click(screen.getByRole('button', { name: 'Vietnamese' }));
+    expect(languageFieldset).toHaveAttribute('aria-busy', 'true');
+    const saveStatus = document.querySelector<HTMLElement>('#language-save-status');
+    await waitFor(() => expect(saveStatus).not.toBeEmptyDOMElement());
+    expect(saveStatus).toHaveClass('sr-only');
     expect(
-      screen.getByText('Ngôn ngữ', { selector: 'legend' }).closest('fieldset'),
-    ).toHaveAttribute('aria-busy', 'true');
-    expect(screen.queryByText('Đang lưu...')).not.toBeInTheDocument();
-    expect((await screen.findByText('Đang lưu...')).closest('#language-save-status')).toHaveClass(
-      'sr-only',
-    );
-    expect(
-      screen.getByRole('button', { name: 'Tiếng Việt' }).querySelector('[data-slot="spinner"]'),
+      within(languageGroup)
+        .getByRole('button', { pressed: true })
+        .querySelector('[data-slot="spinner"]'),
     ).not.toBeNull();
-    await user.click(screen.getByRole('button', { name: 'Tiếng Anh' }));
+    await user.click(within(languageGroup).getByRole('button', { pressed: false }));
 
     let staleResponseParsed = false;
 

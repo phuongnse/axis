@@ -1,13 +1,14 @@
 import { useTranslation } from 'react-i18next';
+import { EntrySurface } from '@/components/shared/EntrySurface';
 import {
   InlinePromptAction,
   InlinePromptActionButton,
   InlinePromptActionLink,
 } from '@/components/shared/InlinePromptAction';
 import { StatusNotice } from '@/components/shared/StatusNotice';
-import { AuthCard } from '@/features/auth/components/AuthCard';
 import { useResendVerification } from '@/features/auth/hooks/useResendVerification';
 import { loadRegistrationContext } from '@/features/auth/registration-context';
+import { PreferencesMenu } from '@/features/preferences';
 
 export function EmailConfirmationPage() {
   const { t } = useTranslation();
@@ -21,7 +22,9 @@ export function EmailConfirmationPage() {
   }
 
   return (
-    <AuthCard
+    <EntrySurface
+      surfaceId="email-confirmation"
+      utilities={<PreferencesMenu />}
       title={t('auth.confirm.title')}
       footer={
         <InlinePromptAction prompt={t('auth.confirm.useAnother')}>
@@ -82,6 +85,6 @@ export function EmailConfirmationPage() {
           )}
         </InlinePromptAction>
       </div>
-    </AuthCard>
+    </EntrySurface>
   );
 }

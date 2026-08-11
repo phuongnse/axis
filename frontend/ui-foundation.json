@@ -1,8 +1,89 @@
 {
-  "schemaVersion": 2,
-  "phase": "reference-ready",
-  "goldenReference": {
-    "archetype": "resource-workspace",
-    "route": "/business-objects"
+  "schemaVersion": 5,
+  "contracts": {
+    "account-surface": {
+      "state": "enforced",
+      "spec": "docs/foundations/app-shell/app-frame.md",
+      "evidence": {
+        "component": [
+          "frontend/tests/account-surface.test.tsx",
+          "frontend/tests/app-shell.test.tsx",
+          "frontend/tests/surface-contracts.test.tsx"
+        ],
+        "browser": ["frontend/e2e/app-frame.pw.ts"],
+        "perceptual": [
+          "frontend/e2e/app-frame.pw.ts-snapshots/account-surface-dark-compact-en-chromium-linux.png",
+          "frontend/e2e/app-frame.pw.ts-snapshots/account-surface-dark-desktop-en-chromium-linux.png",
+          "frontend/e2e/app-frame.pw.ts-snapshots/account-surface-light-compact-en-chromium-linux.png",
+          "frontend/e2e/app-frame.pw.ts-snapshots/account-surface-light-desktop-en-chromium-linux.png"
+        ]
+      }
+    },
+    "authenticated-frame": {
+      "state": "defined",
+      "spec": "docs/foundations/app-shell/app-frame.md",
+      "evidence": {
+        "component": [
+          "frontend/tests/app-shell.test.tsx",
+          "frontend/tests/surface-contracts.test.tsx"
+        ],
+        "browser": ["frontend/e2e/app-frame.pw.ts"],
+        "perceptual": []
+      }
+    },
+    "entry-surface": {
+      "state": "defined",
+      "spec": "docs/foundations/visual-system/axis-visual-system.md",
+      "evidence": {
+        "component": [
+          "frontend/tests/register-page.test.tsx",
+          "frontend/tests/sign-in-page.test.tsx",
+          "frontend/tests/surface-contracts.test.tsx"
+        ],
+        "browser": ["frontend/e2e/register-user.pw.ts", "frontend/e2e/sign-in-user.pw.ts"],
+        "perceptual": []
+      }
+    },
+    "managed-task-window": {
+      "state": "defined",
+      "spec": "docs/foundations/overlays/managed-dialog.md",
+      "evidence": {
+        "component": [
+          "frontend/tests/managed-dialog-tabs.test.tsx",
+          "frontend/tests/business-objects-page.test.tsx",
+          "frontend/tests/surface-contracts.test.tsx"
+        ],
+        "browser": ["frontend/e2e/define-business-object.pw.ts"],
+        "perceptual": []
+      }
+    },
+    "process-workbench": {
+      "state": "defined",
+      "spec": "docs/foundations/visual-system/axis-visual-system.md",
+      "evidence": {
+        "component": [
+          "frontend/src/features/solutions/components/SolutionsPage.test.tsx",
+          "frontend/tests/surface-contracts.test.tsx"
+        ],
+        "browser": ["frontend/e2e/product-delivery-governance.pw.ts"],
+        "perceptual": []
+      }
+    },
+    "resource-workspace": {
+      "state": "defined",
+      "spec": "docs/foundations/data-display/collection-page.md",
+      "evidence": {
+        "component": [
+          "frontend/tests/resource-workspace.test.tsx",
+          "frontend/tests/business-objects-page.test.tsx",
+          "frontend/tests/surface-contracts.test.tsx"
+        ],
+        "browser": ["frontend/e2e/define-business-object.pw.ts"],
+        "perceptual": []
+      }
+    }
+  },
+  "enforcedContracts": {
+    "account-surface": true
   }
 }

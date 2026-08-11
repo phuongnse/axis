@@ -11,7 +11,8 @@ import {
   type DataTableQueryState,
 } from '@/components/shared/data-table';
 import { useManagedWindowActions } from '@/components/shared/ManagedWindowManager';
-import { PageAction, PageHeader, PageLayout } from '@/components/shared/PageLayout';
+import { PageAction } from '@/components/shared/PageLayout';
+import { ResourceWorkspace } from '@/components/shared/ResourceWorkspace';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import type {
   AssignableSubjectDto,
@@ -188,12 +189,13 @@ export function ProductRoleAssignmentsPage() {
   ]);
 
   return (
-    <PageLayout scrollMode="contained">
-      <PageHeader title={t('productRoles.title')} description={t('productRoles.description')} />
-      <div className="min-h-0 flex-1">
-        <DataTable definition={tableDefinition} />
-      </div>
-    </PageLayout>
+    <ResourceWorkspace
+      surfaceId="organization-role-assignments"
+      title={t('productRoles.title')}
+      description={t('productRoles.description')}
+    >
+      <DataTable definition={tableDefinition} />
+    </ResourceWorkspace>
   );
 }
 

@@ -3,7 +3,6 @@ import type { ComponentProps, ReactNode } from 'react';
 
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
-import { usePendingVisibility } from '@/hooks/usePendingVisibility';
 import { cn } from '@/lib/utils';
 
 const inlineActionClassName = 'h-auto border-0 p-0 text-xs';
@@ -49,24 +48,21 @@ function InlinePromptActionButton({
   pendingLabel,
   ...props
 }: InlinePromptActionButtonProps) {
-  const showPending = usePendingVisibility(pending);
-  const busy = pending || showPending;
-
   return (
     <Button
       variant="link"
       className={inlineActionClassName}
-      aria-busy={busy || undefined}
-      disabled={disabled || busy}
+      aria-busy={pending || undefined}
+      disabled={disabled || pending}
       {...props}
     >
       {pendingLabel !== undefined ? (
         <span className="flex size-3.5 shrink-0 items-center justify-center" aria-hidden>
-          {showPending ? <Spinner className="size-3" /> : null}
+          {pending ? <Spinner className="size-3" /> : null}
         </span>
       ) : null}
       {children}
-      {busy && pendingLabel ? (
+      {pending && pendingLabel ? (
         <span className="sr-only" role="status">
           {pendingLabel}
         </span>
