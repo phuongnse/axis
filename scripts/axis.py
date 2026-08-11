@@ -3675,7 +3675,10 @@ def verify(args: argparse.Namespace) -> int:
                 if changed_e2e_tests:
                     step(
                         "frontend e2e (changed test files)",
-                        lambda: run_local_dev_browser(changed_e2e_tests),
+                        lambda: run_local_dev_browser(
+                            changed_e2e_tests,
+                            overlays=read_local_dev_topology() or (),
+                        ),
                     )
             else:
                 step(

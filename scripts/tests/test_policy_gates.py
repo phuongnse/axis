@@ -3965,9 +3965,10 @@ class TestReviewVerificationGates(unittest.TestCase):
             calls,
         )
 
-    def test_runs_changed_frontend_e2e_file_for_e2e_only_change(self) -> None:
+    def test_runs_changed_frontend_e2e_file_with_recorded_topology_for_e2e_only_change(self) -> None:
         calls: list[str] = []
         browser_runner = mock.Mock(return_value=0)
+        product_overlay = Path("/workspace/product.compose.yml")
 
         with (
             mock.patch.object(axis, "verify_scope_paths", return_value=("working tree", ["frontend/e2e/register.pw.ts"])),
@@ -3983,6 +3984,7 @@ class TestReviewVerificationGates(unittest.TestCase):
                 side_effect=lambda: calls.append("audit") or 0,
             ),
             mock.patch.object(axis, "frontend_toolchain_env", return_value={}),
+            mock.patch.object(axis, "read_local_dev_topology", return_value=(product_overlay,)),
             mock.patch.object(axis, "run_local_dev_browser", browser_runner),
             mock.patch.object(
                 axis,
@@ -4003,7 +4005,10 @@ class TestReviewVerificationGates(unittest.TestCase):
             ],
             calls,
         )
-        browser_runner.assert_called_once_with(["e2e/register.pw.ts"])
+        browser_runner.assert_called_once_with(
+            ["e2e/register.pw.ts"],
+            overlays=(product_overlay,),
+        )
 
     def test_runs_related_dotnet_projects_for_source_change(self) -> None:
         calls: list[str] = []
