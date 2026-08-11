@@ -26,6 +26,7 @@ import {
   DialogPortal,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { type SurfaceIdFor, surfaceContractAttributes } from '@/lib/ui-foundation';
 import { cn } from '@/lib/utils';
 
 const COMPACT_VIEWPORT_WIDTH = 640;
@@ -44,29 +45,31 @@ type WorkArea = {
 
 const ManagedDialogFullscreenContext = createContext(false);
 
+export interface ManagedDialogProps {
+  children: ReactNode;
+  closeDisabled?: boolean;
+  description?: ReactNode;
+  dirty?: boolean;
+  footer: ReactNode;
+  onOpenChange: (open: boolean) => void;
+  open: boolean;
+  surfaceId: SurfaceIdFor<'managed-task-window'>;
+  title: string;
+  titleAccessory?: ReactNode;
+}
+
 export function ManagedDialog({
   open,
+  surfaceId,
   onOpenChange,
   title,
   description,
   titleAccessory,
   children,
   footer,
-  footerClassName,
   closeDisabled = false,
   dirty = false,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  title: string;
-  description?: ReactNode;
-  titleAccessory?: ReactNode;
-  children: ReactNode;
-  footer: ReactNode;
-  footerClassName?: string;
-  closeDisabled?: boolean;
-  dirty?: boolean;
-}) {
+}: ManagedDialogProps) {
   const { t } = useTranslation();
   const {
     windowId,
@@ -267,6 +270,7 @@ export function ManagedDialog({
           style={{ zIndex: entry.zIndex }}
         >
           <Rnd
+            {...surfaceContractAttributes('managed-task-window', surfaceId)}
             data-slot="managed-dialog-window"
             data-window-id={windowId}
             data-dialog-preset={effectivePreset}
@@ -362,7 +366,7 @@ export function ManagedDialog({
             </div>
             <ManagedDialogFullscreenContext.Provider value={effectivePreset === 'fullscreen'}>
               {children}
-              <ManagedDialogFooter className={footerClassName}>{footer}</ManagedDialogFooter>
+              <ManagedDialogFooter>{footer}</ManagedDialogFooter>
             </ManagedDialogFullscreenContext.Provider>
           </Rnd>
         </DialogPopup>

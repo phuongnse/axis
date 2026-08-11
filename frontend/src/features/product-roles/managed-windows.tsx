@@ -186,6 +186,7 @@ function ProductRoleAssignDialog({
   return (
     <>
       <ManagedDialog
+        surfaceId="product-role-windows"
         open
         title={t('productRoles.assignTitle')}
         description={t('productRoles.assignDescription')}
@@ -365,6 +366,7 @@ function ProductRoleAssignmentDialog({
 
   return (
     <ManagedDialog
+      surfaceId="product-role-windows"
       open
       title={subjectName}
       description={t('productRoles.currentDescription')}
@@ -446,6 +448,7 @@ function UnavailableDialog({ title, onClose }: { title: string; onClose: () => v
   const { t } = useTranslation();
   return (
     <ManagedDialog
+      surfaceId="product-role-windows"
       open
       title={title}
       onOpenChange={(open) => {

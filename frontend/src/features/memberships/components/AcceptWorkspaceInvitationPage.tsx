@@ -4,10 +4,11 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AsyncButton } from '@/components/shared/AsyncButton';
 import { AsyncContent } from '@/components/shared/AsyncContent';
+import { EntrySurface } from '@/components/shared/EntrySurface';
 import { StatusNotice } from '@/components/shared/StatusNotice';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { restoreBrowserSession, signOutUser } from '@/features/auth/api';
-import { AuthCard } from '@/features/auth/components/AuthCard';
+import { PreferencesMenu } from '@/features/preferences';
 import { ApiError } from '@/lib/api';
 import {
   acceptWorkspaceInvitation,
@@ -97,17 +98,25 @@ export function AcceptWorkspaceInvitationPage() {
 
   if (state.kind === 'loading') {
     return (
-      <AuthCard title={t('invitationAccept.loadingTitle')}>
+      <EntrySurface
+        surfaceId="invitation-acceptance"
+        utilities={<PreferencesMenu />}
+        title={t('invitationAccept.loadingTitle')}
+      >
         <AsyncContent pending pendingLabel={t('invitationAccept.loading')}>
           <span />
         </AsyncContent>
-      </AuthCard>
+      </EntrySurface>
     );
   }
 
   if (state.kind === 'guest') {
     return (
-      <AuthCard title={t('invitationAccept.authenticateTitle')}>
+      <EntrySurface
+        surfaceId="invitation-acceptance"
+        utilities={<PreferencesMenu />}
+        title={t('invitationAccept.authenticateTitle')}
+      >
         <div className="space-y-4">
           <StatusNotice tone="info">{t('invitationAccept.authenticateBody')}</StatusNotice>
           <Link to="/sign-in" className={buttonVariants({ size: 'lg', className: 'w-full' })}>
@@ -121,13 +130,17 @@ export function AcceptWorkspaceInvitationPage() {
             {t('auth.createAccount')}
           </Link>
         </div>
-      </AuthCard>
+      </EntrySurface>
     );
   }
 
   if (state.kind === 'wrong-account') {
     return (
-      <AuthCard title={t('invitationAccept.wrongAccountTitle')}>
+      <EntrySurface
+        surfaceId="invitation-acceptance"
+        utilities={<PreferencesMenu />}
+        title={t('invitationAccept.wrongAccountTitle')}
+      >
         <div className="space-y-4">
           <StatusNotice tone="warning">{t('invitationAccept.wrongAccountBody')}</StatusNotice>
           <AsyncButton
@@ -143,34 +156,46 @@ export function AcceptWorkspaceInvitationPage() {
             {t('invitationAccept.useAnotherAccount')}
           </AsyncButton>
         </div>
-      </AuthCard>
+      </EntrySurface>
     );
   }
 
   if (state.kind === 'invalid') {
     return (
-      <AuthCard title={t('invitationAccept.invalidTitle')}>
+      <EntrySurface
+        surfaceId="invitation-acceptance"
+        utilities={<PreferencesMenu />}
+        title={t('invitationAccept.invalidTitle')}
+      >
         <StatusNotice tone="warning">{t('invitationAccept.invalidBody')}</StatusNotice>
-      </AuthCard>
+      </EntrySurface>
     );
   }
 
   if (state.kind === 'error') {
     return (
-      <AuthCard title={t('invitationAccept.errorTitle')}>
+      <EntrySurface
+        surfaceId="invitation-acceptance"
+        utilities={<PreferencesMenu />}
+        title={t('invitationAccept.errorTitle')}
+      >
         <div className="space-y-4">
           <StatusNotice tone="destructive">{t('invitationAccept.errorBody')}</StatusNotice>
           <Button type="button" variant="outline" onClick={() => window.location.reload()}>
             {t('app.retry')}
           </Button>
         </div>
-      </AuthCard>
+      </EntrySurface>
     );
   }
 
   if (state.kind === 'success') {
     return (
-      <AuthCard title={t('invitationAccept.successTitle')}>
+      <EntrySurface
+        surfaceId="invitation-acceptance"
+        utilities={<PreferencesMenu />}
+        title={t('invitationAccept.successTitle')}
+      >
         <div className="space-y-4">
           <StatusNotice tone="success">{t('invitationAccept.successBody')}</StatusNotice>
           <AsyncButton
@@ -186,7 +211,7 @@ export function AcceptWorkspaceInvitationPage() {
             {t('invitationAccept.enterWorkspace')}
           </AsyncButton>
         </div>
-      </AuthCard>
+      </EntrySurface>
     );
   }
 
@@ -195,7 +220,11 @@ export function AcceptWorkspaceInvitationPage() {
     timeStyle: 'short',
   }).format(new Date(state.invitation.expiresAt));
   return (
-    <AuthCard title={t('invitationAccept.reviewTitle')}>
+    <EntrySurface
+      surfaceId="invitation-acceptance"
+      utilities={<PreferencesMenu />}
+      title={t('invitationAccept.reviewTitle')}
+    >
       <div className="space-y-5">
         <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
           <dt className="text-muted-foreground">{t('invitationAccept.organization')}</dt>
@@ -222,6 +251,6 @@ export function AcceptWorkspaceInvitationPage() {
           {t('invitationAccept.accept')}
         </AsyncButton>
       </div>
-    </AuthCard>
+    </EntrySurface>
   );
 }

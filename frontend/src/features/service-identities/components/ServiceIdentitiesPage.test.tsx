@@ -70,12 +70,16 @@ describe('ServiceIdentitiesPage', () => {
     const queryClient = renderPage();
     const invalidate = vi.spyOn(queryClient, 'invalidateQueries');
     const page = document.querySelector<HTMLElement>('[data-slot="page-layout"]');
+    const workspace = document.querySelector<HTMLElement>('[data-slot="resource-workspace"]');
+    const content = document.querySelector<HTMLElement>('[data-slot="resource-workspace-content"]');
     const table = await screen.findByRole('region', { name: 'Service identities' });
     const create = await within(table).findByRole('button', { name: 'Create service identity' });
 
     expect(page).toHaveAttribute('data-scroll-mode', 'contained');
-    expect(page?.querySelectorAll('[data-slot="page-header"]')).toHaveLength(1);
-    expect(page?.querySelectorAll('[data-slot="data-table"]')).toHaveLength(1);
+    expect(page).toContainElement(workspace);
+    expect(workspace?.querySelectorAll('[data-slot="page-header"]')).toHaveLength(1);
+    expect(content).toContainElement(table);
+    expect(content?.querySelectorAll('[data-slot="data-table"]')).toHaveLength(1);
     expect(within(table).queryByRole('columnheader', { name: 'Actions' })).not.toBeInTheDocument();
     expect(create).toHaveClass(
       'min-h-axis-touch-target',

@@ -548,6 +548,8 @@ describe('RulesPage', () => {
     await renderWithRouter(<RulesPage />, { path: '/rules', authenticatedPath: 'rules' });
 
     const page = document.querySelector<HTMLElement>('[data-slot="page-layout"]');
+    const workspace = document.querySelector<HTMLElement>('[data-slot="resource-workspace"]');
+    const content = document.querySelector<HTMLElement>('[data-slot="resource-workspace-content"]');
     const header = document.querySelector<HTMLElement>('[data-slot="page-header"]');
     const title = await screen.findByRole('heading', { level: 1, name: 'Rules' });
     const catalog = await screen.findByRole('region', { name: 'Rules catalog' });
@@ -563,12 +565,14 @@ describe('RulesPage', () => {
       'sm:p-axis-page-default',
       'lg:p-axis-page-wide',
     );
-    expect(header?.parentElement).toBe(page);
+    expect(page).toContainElement(workspace);
+    expect(header?.parentElement).toBe(workspace);
     expect(title).toHaveAttribute('data-slot', 'page-title');
     expect(title.closest('[data-slot="page-header"]')).toBe(header);
     expect(page?.querySelectorAll('[data-slot="page-layout"]')).toHaveLength(0);
-    expect(page?.querySelectorAll('[data-slot="page-header"]')).toHaveLength(1);
-    expect(page?.querySelectorAll('[data-slot="data-table"]')).toHaveLength(1);
+    expect(workspace?.querySelectorAll('[data-slot="page-header"]')).toHaveLength(1);
+    expect(content).toContainElement(catalog);
+    expect(content?.querySelectorAll('[data-slot="data-table"]')).toHaveLength(1);
     expect(
       within(catalog).queryByRole('columnheader', { name: 'Actions' }),
     ).not.toBeInTheDocument();

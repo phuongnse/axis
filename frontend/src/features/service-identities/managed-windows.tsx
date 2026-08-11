@@ -120,6 +120,7 @@ function ServiceIdentityCreateDialog({ onClose }: { onClose: () => void }) {
   return (
     <>
       <ManagedDialog
+        surfaceId="service-identity-windows"
         open
         title={t('serviceIdentities.create')}
         description={t('serviceIdentities.description')}
@@ -286,6 +287,7 @@ function ServiceIdentityDialog({
   return (
     <>
       <ManagedDialog
+        surfaceId="service-identity-windows"
         open
         title={identity.clientId ?? t('serviceIdentities.notAvailable')}
         description={identity.id}
@@ -550,6 +552,7 @@ function UnavailableDialog({ title, onClose }: { title: string; onClose: () => v
   const { t } = useTranslation();
   return (
     <ManagedDialog
+      surfaceId="service-identity-windows"
       open
       title={title}
       onOpenChange={(open) => {

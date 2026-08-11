@@ -241,12 +241,14 @@ describe('AppShell', () => {
 
     render(
       <QueryClientProvider client={queryClient}>
-        <AppShell navigationContributions={[]}>
+        <AppShell surfaceId="authenticated-frame" navigationContributions={[]}>
           <section aria-label="Work area">Frame content</section>
         </AppShell>
       </QueryClientProvider>,
     );
 
+    const frame = document.querySelector('[data-axis-surface-id="authenticated-frame"]');
+    expect(frame).toHaveAttribute('data-axis-surface-contract', 'authenticated-frame');
     const appHeader = screen.getByRole('banner');
     expect(appHeader).toHaveTextContent('Dashboard');
     expect(appHeader).toHaveClass('bg-card');
@@ -262,6 +264,10 @@ describe('AppShell', () => {
     await waitFor(() => expect(accountMenu).toHaveTextContent('Axis Reference Product'));
     await user.click(accountMenu);
     expect(accountMenu).toHaveAttribute('aria-expanded', 'true');
+    const accountSurface = document.querySelector('[data-slot="account-surface"]');
+    expect(accountSurface).toHaveAttribute('aria-label', 'Account menu');
+    expect(accountSurface).toHaveAttribute('data-axis-surface-contract', 'account-surface');
+    expect(accountSurface).toHaveAttribute('data-axis-surface-id', 'account-actions');
     expect(screen.queryByText('Profile')).not.toBeInTheDocument();
     expect(accountMenu.querySelector('.lucide-building-2')).not.toBeNull();
     const accountIdentity = screen.getByRole('region', { name: 'Account' });
@@ -318,7 +324,7 @@ describe('AppShell', () => {
 
     render(
       <QueryClientProvider client={queryClient}>
-        <AppShell navigationContributions={[]}>
+        <AppShell surfaceId="authenticated-frame" navigationContributions={[]}>
           <section aria-label="Work area">Rules content</section>
         </AppShell>
       </QueryClientProvider>,
@@ -352,7 +358,7 @@ describe('AppShell', () => {
 
     render(
       <QueryClientProvider client={queryClient}>
-        <AppShell navigationContributions={[]}>
+        <AppShell surfaceId="authenticated-frame" navigationContributions={[]}>
           <section>Frame content</section>
         </AppShell>
       </QueryClientProvider>,
@@ -396,7 +402,7 @@ describe('AppShell', () => {
 
     render(
       <QueryClientProvider client={queryClient}>
-        <AppShell navigationContributions={contributions}>
+        <AppShell surfaceId="authenticated-frame" navigationContributions={contributions}>
           <section aria-label="Work area">Frame content</section>
         </AppShell>
       </QueryClientProvider>,
@@ -413,7 +419,11 @@ describe('AppShell', () => {
     });
     const shell = (content: ReactNode) => (
       <QueryClientProvider client={queryClient}>
-        <AppShell navigationContributions={[]} windowRenderers={testWindowRenderers}>
+        <AppShell
+          surfaceId="authenticated-frame"
+          navigationContributions={[]}
+          windowRenderers={testWindowRenderers}
+        >
           {content}
         </AppShell>
       </QueryClientProvider>
@@ -440,7 +450,7 @@ describe('AppShell', () => {
     expect(screen.queryByRole('button', { name: 'Windows (1)' })).not.toBeInTheDocument();
   });
 
-  it('keeps the account view and shell geometry stable through the authoritative context cutover', async () => {
+  it('keeps the account surface and shell geometry stable through the authoritative context cutover', async () => {
     const user = userEvent.setup();
     let resolveSessionRestore!: (authenticated: boolean) => void;
     vi.mocked(restoreBrowserSession).mockReturnValue(
@@ -507,7 +517,11 @@ describe('AppShell', () => {
 
     render(
       <QueryClientProvider client={queryClient}>
-        <AppShell navigationContributions={[]} windowRenderers={testWindowRenderers}>
+        <AppShell
+          surfaceId="authenticated-frame"
+          navigationContributions={[]}
+          windowRenderers={testWindowRenderers}
+        >
           <TestWindowLauncher />
         </AppShell>
       </QueryClientProvider>,
@@ -601,7 +615,7 @@ describe('AppShell', () => {
 
     render(
       <QueryClientProvider client={queryClient}>
-        <AppShell navigationContributions={[]}>
+        <AppShell surfaceId="authenticated-frame" navigationContributions={[]}>
           <section>Stable route content</section>
         </AppShell>
       </QueryClientProvider>,
@@ -626,7 +640,7 @@ describe('AppShell', () => {
 
     render(
       <QueryClientProvider client={queryClient}>
-        <AppShell navigationContributions={[]}>
+        <AppShell surfaceId="authenticated-frame" navigationContributions={[]}>
           <section>Source route content</section>
         </AppShell>
       </QueryClientProvider>,
@@ -665,7 +679,11 @@ describe('AppShell', () => {
 
     render(
       <QueryClientProvider client={queryClient}>
-        <AppShell navigationContributions={[]} windowRenderers={testWindowRenderers}>
+        <AppShell
+          surfaceId="authenticated-frame"
+          navigationContributions={[]}
+          windowRenderers={testWindowRenderers}
+        >
           <TestWindowLauncher />
         </AppShell>
       </QueryClientProvider>,
@@ -687,7 +705,11 @@ describe('AppShell', () => {
 
     render(
       <QueryClientProvider client={queryClient}>
-        <AppShell navigationContributions={[]} windowRenderers={testWindowRenderers}>
+        <AppShell
+          surfaceId="authenticated-frame"
+          navigationContributions={[]}
+          windowRenderers={testWindowRenderers}
+        >
           <TestWindowLauncher />
         </AppShell>
       </QueryClientProvider>,
@@ -708,7 +730,7 @@ describe('AppShell', () => {
 
     render(
       <QueryClientProvider client={queryClient}>
-        <AppShell navigationContributions={[]} windowRenderers={{}}>
+        <AppShell surfaceId="authenticated-frame" navigationContributions={[]} windowRenderers={{}}>
           <TestWindowLauncher />
         </AppShell>
       </QueryClientProvider>,
@@ -755,7 +777,11 @@ describe('AppShell', () => {
     try {
       render(
         <QueryClientProvider client={queryClient}>
-          <AppShell navigationContributions={[]} windowRenderers={testWindowRenderers}>
+          <AppShell
+            surfaceId="authenticated-frame"
+            navigationContributions={[]}
+            windowRenderers={testWindowRenderers}
+          >
             <SizingTestWindowLauncher />
           </AppShell>
         </QueryClientProvider>,
@@ -815,7 +841,7 @@ describe('AppShell', () => {
 
     render(
       <QueryClientProvider client={queryClient}>
-        <AppShell navigationContributions={[]}>
+        <AppShell surfaceId="authenticated-frame" navigationContributions={[]}>
           <section aria-label="Work area">Frame content</section>
         </AppShell>
       </QueryClientProvider>,
@@ -852,7 +878,7 @@ describe('AppShell', () => {
 
     render(
       <QueryClientProvider client={queryClient}>
-        <AppShell navigationContributions={[]}>
+        <AppShell surfaceId="authenticated-frame" navigationContributions={[]}>
           <section aria-label="Work area">Frame content</section>
         </AppShell>
       </QueryClientProvider>,
@@ -886,7 +912,7 @@ describe('AppShell', () => {
 
     render(
       <QueryClientProvider client={queryClient}>
-        <AppShell navigationContributions={[]}>
+        <AppShell surfaceId="authenticated-frame" navigationContributions={[]}>
           <section aria-label="Work area">Frame content</section>
         </AppShell>
       </QueryClientProvider>,
@@ -927,6 +953,7 @@ function TestWindowRenderer() {
   const { windowId, closeWindow } = useCurrentManagedWindow();
   return (
     <ManagedDialog
+      surfaceId="managed-window-host"
       open
       title="Persistent test window"
       onOpenChange={(open) => {
@@ -990,6 +1017,7 @@ function SizingTestWindowRenderer({ descriptor }: ManagedWindowRendererProps) {
   const payload = descriptor.payload as SizingTestPayload;
   return (
     <ManagedDialog
+      surfaceId="managed-window-host"
       open
       title={descriptor.title}
       description="Sizing test window description"

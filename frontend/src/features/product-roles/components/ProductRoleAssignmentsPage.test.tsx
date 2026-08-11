@@ -50,14 +50,18 @@ describe('ProductRoleAssignmentsPage', () => {
     renderPage();
 
     const page = document.querySelector<HTMLElement>('[data-slot="page-layout"]');
+    const workspace = document.querySelector<HTMLElement>('[data-slot="resource-workspace"]');
+    const content = document.querySelector<HTMLElement>('[data-slot="resource-workspace-content"]');
     const table = await screen.findByRole('region', {
       name: 'Current product-role assignments',
     });
     const assign = await within(table).findByRole('button', { name: 'Assign role' });
 
     expect(page).toHaveAttribute('data-scroll-mode', 'contained');
-    expect(page?.querySelectorAll('[data-slot="page-header"]')).toHaveLength(1);
-    expect(page?.querySelectorAll('[data-slot="data-table"]')).toHaveLength(1);
+    expect(page).toContainElement(workspace);
+    expect(workspace?.querySelectorAll('[data-slot="page-header"]')).toHaveLength(1);
+    expect(content).toContainElement(table);
+    expect(content?.querySelectorAll('[data-slot="data-table"]')).toHaveLength(1);
     expect(within(table).queryByRole('columnheader', { name: 'Actions' })).not.toBeInTheDocument();
     expect(assign).toHaveClass(
       'min-h-axis-touch-target',

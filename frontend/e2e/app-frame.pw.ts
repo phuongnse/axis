@@ -260,6 +260,10 @@ async function expectRouteViewportTouchesMain(page: Page): Promise<void> {
 
 async function expectAppFrameReady(page: Page, title: string): Promise<void> {
   await expect(page.getByRole('banner')).toContainText(title, { timeout: 15_000 });
+  await expect(page.locator('[data-axis-surface-id="authenticated-frame"]')).toHaveAttribute(
+    'data-axis-surface-contract',
+    'authenticated-frame',
+  );
 }
 
 async function visualState(locator: Locator) {
@@ -310,6 +314,23 @@ async function colorDistance(page: Page, first: string, second: string) {
   );
 }
 
+async function expectAccountSurfaceScreenshot(page: Page, name: string): Promise<void> {
+  const accountSurface = page.locator('[data-slot="account-surface"]');
+  await expect(accountSurface).toBeVisible();
+  await expect(accountSurface).toHaveAttribute('data-axis-surface-id', 'account-actions');
+  await expect(accountSurface).toHaveAttribute('data-axis-surface-contract', 'account-surface');
+  await expect(accountSurface.locator('fieldset[aria-busy="true"]')).toHaveCount(0);
+  await accountSurface.evaluate((element) =>
+    Promise.all(element.getAnimations({ subtree: true }).map((animation) => animation.finished)),
+  );
+  await page.mouse.move(1, 1);
+  await expect(accountSurface).toHaveScreenshot(`${name}.png`, {
+    animations: 'disabled',
+    caret: 'hide',
+    scale: 'css',
+  });
+}
+
 test.describe('app frame', () => {
   test('interaction states share one convention across overlays, navigation, and table menus', async ({
     page,
@@ -349,9 +370,7 @@ test.describe('app frame', () => {
       const selectedOptionHoverState = await hoveredVisualState(
         page.getByRole('button', { name: 'English' }),
       );
-      const optionSurfaceState = await visualState(
-        page.locator('[data-slot="popover-content"][aria-label="Account menu"]'),
-      );
+      const optionSurfaceState = await visualState(page.locator('[data-slot="account-surface"]'));
       const optionHoverState = await hoveredVisualState(
         page.getByRole('button', { name: 'Vietnamese' }),
       );
@@ -417,6 +436,86 @@ test.describe('app frame', () => {
         transientDistance * 1.25,
       );
     }
+  });
+
+  test('AT-004 account surface visual contract covers light and dark desktop and compact EN and VI', async ({
+    page,
+  }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await mockAuthenticatedSession(page);
+    await page.route('**/api/users/me/preferences/language', async (route) => {
+      const language = JSON.parse(route.request().postData() ?? '{}').language ?? 'en';
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ language }),
+      });
+    });
+    await page.route('**/api/users/me/preferences/theme', async (route) => {
+      const theme = JSON.parse(route.request().postData() ?? '{}').theme ?? 'light';
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ theme }),
+      });
+    });
+
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await page.goto('/dashboard', { waitUntil: 'domcontentloaded' });
+    await expectAppFrameReady(page, 'Dashboard');
+    await page.getByRole('button', { name: 'Account menu' }).click();
+    await expect(page.getByRole('button', { name: 'Personal workspace' })).toBeVisible();
+    await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+    await expect(page.locator('html')).not.toHaveClass(/dark/);
+    await expectAccountSurfaceScreenshot(page, 'account-surface-light-desktop-en');
+
+    await page.getByRole('button', { name: 'Dark' }).click();
+    await expect(page.locator('html')).toHaveClass(/dark/);
+    await expect(page.getByRole('button', { name: 'Dark' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    await expectAccountSurfaceScreenshot(page, 'account-surface-dark-desktop-en');
+
+    await page.getByRole('button', { name: 'Vietnamese' }).click();
+    await expect(page.locator('html')).toHaveAttribute('lang', 'vi');
+    await expect(page.getByRole('button', { name: 'Tiếng Việt' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    await expectAccountSurfaceScreenshot(page, 'account-surface-dark-desktop-vi');
+
+    await page.getByRole('button', { name: 'Sáng' }).click();
+    await expect(page.locator('html')).not.toHaveClass(/dark/);
+    await expect(page.getByRole('button', { name: 'Sáng' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    await expectAccountSurfaceScreenshot(page, 'account-surface-light-desktop-vi');
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await expectAccountSurfaceScreenshot(page, 'account-surface-light-compact-vi');
+
+    await page.getByRole('button', { name: 'Tối' }).click();
+    await expect(page.locator('html')).toHaveClass(/dark/);
+    await expect(page.getByRole('button', { name: 'Tối' })).toHaveAttribute('aria-pressed', 'true');
+    await expectAccountSurfaceScreenshot(page, 'account-surface-dark-compact-vi');
+
+    await page.getByRole('button', { name: 'Tiếng Anh' }).click();
+    await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+    await expect(page.getByRole('button', { name: 'English' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    await expectAccountSurfaceScreenshot(page, 'account-surface-dark-compact-en');
+
+    await page.getByRole('button', { name: 'Light' }).click();
+    await expect(page.locator('html')).not.toHaveClass(/dark/);
+    await expect(page.getByRole('button', { name: 'Light' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    await expectAccountSurfaceScreenshot(page, 'account-surface-light-compact-en');
   });
 
   test('AT-003 both Workspace directions keep the account view and scroll geometry stable', async ({
@@ -582,7 +681,7 @@ test.describe('app frame', () => {
     const accountTrigger = page.getByRole('button', { name: 'Account menu' });
     await expect(accountTrigger).toContainText(organizationWorkspace.name);
     await accountTrigger.click();
-    const accountView = page.locator('[data-slot="popover-content"][aria-label="Account menu"]');
+    const accountView = page.locator('[data-slot="account-surface"]');
     await expect(accountView).toBeVisible();
     await accountView.evaluate((element) =>
       Promise.all(element.getAnimations({ subtree: true }).map((animation) => animation.finished)),
@@ -601,9 +700,7 @@ test.describe('app frame', () => {
       probe.__axisAccountGeometry = [];
       probe.__axisStopAccountGeometry = false;
       const sample = () => {
-        const menu = document.querySelector<HTMLElement>(
-          '[data-slot="popover-content"][aria-label="Account menu"]',
-        );
+        const menu = document.querySelector<HTMLElement>('[data-slot="account-surface"]');
         if (menu) {
           const mainRect = document.querySelector('main')?.getBoundingClientRect();
           probe.__axisAccountGeometry?.push({
@@ -759,7 +856,7 @@ test.describe('app frame', () => {
     await expect(page.getByText('Organization Workspaces', { exact: true })).toHaveCount(0);
     await expect(page.getByText('Preferences')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible();
-    const accountMenu = page.locator('[data-slot="popover-content"][aria-label="Account menu"]');
+    const accountMenu = page.locator('[data-slot="account-surface"]');
     await accountMenu.evaluate((element) =>
       Promise.all(element.getAnimations({ subtree: true }).map((animation) => animation.finished)),
     );

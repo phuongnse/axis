@@ -25,6 +25,20 @@ Define one product-level visual and interaction grammar so Axis remains coherent
 - Equivalent meaning looks and behaves equivalently across navigation, tables, forms, menus, windows, dialogs, and compact or desktop layouts.
 - A component may change provider, markup, or internal implementation without changing product meaning. A component-specific test proves its mapping; it cannot establish a new product convention.
 
+## Architecture
+
+| Layer | Owns | Must not own |
+|---|---|---|
+| Constitution and theme | Semantic roles, reusable values, interaction-state grammar, and cross-surface invariants | JSX, provider APIs, feature state, or screen-specific choices |
+| Accessible primitives | Provider mechanics, semantics, focus behavior, and registry provenance | Product variants, page anatomy, or business meaning |
+| Surface contracts | A finite set of frame, entry, resource, workbench, managed-task, and account anatomies with narrow semantic slots | Free-form visual overrides, feature data access, or alternate local anatomies |
+| Feature composition | Product state, content, relationships, authorized actions, and recovery inside declared slots | Scroll ownership, reusable visual values, overlay mechanics, or contract variants |
+| Conformance system | Active-consumer ownership, contract API tests, focused state/a11y tests, browser journeys, and visual comparisons | Product design decisions or manual approval as a substitute for evidence |
+
+Dependencies flow in that order only. A feature cannot import a lower-level provider to recreate a higher-level contract. Surface-owner props expose semantic content and product state, not `className`, provider variants, scroll modes, selectors, or DOM assumptions.
+
+`frontend/ui-foundation.json` records enforced contract specs and evidence; it is not a catalog of source paths or screen designs. Its contract keys are imported as TypeScript types by `frontend/src/lib/ui-foundation.ts`, which maps finite active surface ids to those contracts. `frontend/src/lib/active-surface-registry.ts` must then exhaustively bind real owner and implementation symbols. Every surface owner requires a contract-compatible id and emits both ids for rendered evidence. Parser-backed module restrictions keep owners independent of feature and route state. This makes registration and dependency direction part of composition instead of inferring them from filenames or raw source text. A new consumer of an unchanged enforced contract needs typed registration, rendered conformance, and product-state evidence, not bespoke visual approval. Changing the shared owner or constitution reopens the contract lifecycle for every affected consumer.
+
 ## Semantic grammar
 
 | Axis | Roles | Invariant |
@@ -70,21 +84,20 @@ Initial loading reserves the owning region and does not render empty content fir
 1. Select the semantic role before selecting a component.
 2. Reuse an accessible upstream primitive or existing app pattern when it maps the role.
 3. Keep component internals and provider variants local to their owner; keep feature styling to outer relationship layout.
-4. When no role fits, stop. Extend this constitution and the canonical theme only if the need is cross-feature; otherwise record an explicitly accepted bounded exception.
+4. When no role fits, stop. Extend this constitution and the canonical theme only if the need is cross-feature; otherwise record a bounded exception with one owner and proving evidence.
 5. Remove the retired mapping when replacing a convention. Do not keep parallel visual paths, compatibility wrappers, or feature-local fallbacks without a real supported consumer constraint.
 
-## Phase model
+## Contract lifecycle
 
-| Phase | Meaning | Allowed work |
+| State | Meaning | Required evidence |
 |---|---|---|
-| `requested` | Direction proposed | Read-only discovery. |
-| `authorized` | Design Gate and required sign-off current | Constitution and value design. |
-| `defined` | Constitution and semantic values are current | Golden-reference implementation only. |
-| `reference-ready` | Running golden reference and focused browser evidence exist | User visual review; no unrelated migration. |
-| `accepted` | User accepted the running reference | Bounded active-surface migrations. |
-| `adopted` | Every active supported surface conforms with current evidence | Completion claim and normal feature consumption. |
+| `requested` | A new or changed shared contract is proposed | Read-only inventory and owning requirements. |
+| `authorized` | Design Gate and required sign-off are current | Owner, invariants, clean-cutover decision, and verification plan. |
+| `defined` | The durable contract and machine-readable owner are current | Semantic, anatomy, state, responsive, accessibility, and evidence matrices. |
+| `verified` | The owner passes focused component, browser, accessibility, responsive, and visual evidence | Current deterministic and runtime proof. |
+| `enforced` | Every active consumer is compiler-bound to its owner contract, rendered evidence confirms that boundary, and retired compositions are absent | Passing typecheck, conformance evidence, and retirement sweep. |
 
-Acceptance freezes the direction; it does not claim system-wide adoption. Any accepted direction change returns to `defined` and invalidates affected browser evidence.
+Only `enforced` contracts belong in `frontend/ui-foundation.json`. Proposal and migration state remains task-local. Revising an enforced contract returns to `authorized` and lands as one clean replacement; a screenshot or manual review can inform the contract but cannot substitute for conformance evidence.
 
 ## Alternate / error flows
 
@@ -92,16 +105,16 @@ Acceptance freezes the direction; it does not claim system-wide adoption. Any ac
 - Permission and missing states remain non-disclosing. Unavailable states are distinguishable and recoverable when retry can help.
 - Long-lived drafts survive supported navigation and window focus changes; dirty dismissal is explicit.
 - Reduced motion removes spatial transition while preserving immediate state and focus. Localization may change copy length but not role, hierarchy, or behavior.
-- Unsupported compact geometry, contrast, focus, overflow, or provider behavior blocks acceptance or adoption; it is not deferred as polish.
+- Unsupported compact geometry, contrast, focus, overflow, or provider behavior blocks contract verification and enforcement; it is not deferred as polish.
 
 ## Acceptance Criteria
 
 - **AC-001** One semantic constitution and canonical theme own every reusable visual value, interaction role, timing, and layer; no component or feature creates a parallel convention.
 - **AC-002** Equivalent hierarchy, state, feedback, density, surface depth, icon role, and motion remain perceptually equivalent in light/dark and desktop/compact modes.
 - **AC-003** Async initial load, refresh, action, and context transition preserve geometry, content continuity, scroll ownership, focus, and accessible status without fast-operation flashing.
-- **AC-004** Every route uses one approved archetype and one scroll owner; resource management is collection-first with managed task windows unless an accepted workbench exception applies.
+- **AC-004** Every route uses one approved archetype and one scroll owner; resource management is collection-first with managed task windows unless a documented workbench contract applies.
 - **AC-005** Keyboard, screen reader, contrast, localization, touch target, reduced motion, responsive overflow, and focus recovery meet the enterprise accessibility baseline.
-- **AC-006** The phase machine separates definition, running reference, visual acceptance, and complete adoption; status and evidence never advance ahead of the current phase.
+- **AC-006** The contract lifecycle separates authorization, definition, verification, and enforcement; supported surfaces cannot bypass their registered owner or retain a legacy composition.
 - **AC-007** Component/provider replacement preserves semantic roles and removes the retired mapping unless an evidence-backed compatibility constraint exists.
 
 ## Acceptance Test Matrix
@@ -111,9 +124,9 @@ Acceptance freezes the direction; it does not claim system-wide adoption. Any ac
 | AT-001 | Static frontend | Strict semantic schema deterministically projects CSS and runtime values and rejects missing, unknown, or stale roles. | AC-001, AC-002, AC-003 | Frontend CI | Yes |
 | AT-002 | Static frontend | Ownership checks reject hard-coded semantic values, provider leakage, feature-local interaction visuals, and manifest/status drift. | AC-001, AC-006, AC-007 | Frontend CI | Yes |
 | AT-003 | UI component | Representative role mappings prove hierarchy, state priority, async geometry, scroll ownership, accessibility, and reduced motion without establishing component-local policy. | AC-002, AC-003, AC-004, AC-005 | UI component test | Yes |
-| AT-004 | Layout smoke | The golden resource workspace proves complete states in light/dark and desktop/compact layouts without document overflow or console errors. | AC-002, AC-004, AC-005 | Browser-capable visual smoke | Yes |
+| AT-004 | Layout smoke | Each registered surface contract proves its representative states in light/dark and desktop/compact layouts without document overflow or console errors. | AC-002, AC-004, AC-005 | Browser automation | Yes |
 | AT-005 | Browser journey | Pointer and keyboard task flow proves independent managed work, focus, draft, pending, recovery, navigation, and context continuity. | AC-003, AC-004, AC-005 | Browser automation | Yes |
-| AT-006 | Static frontend | Active-surface inventory and focused evidence prove every supported surface maps the accepted roles with no parallel convention or unresolved exception. | AC-001, AC-006, AC-007 | UI component test + Frontend CI | Yes |
+| AT-006 | UI component | The typed active-surface catalog maps finite ids to contracts, the real-symbol inventory is complete, and owner markers confirm composition without filename or source-text inference. | AC-001, AC-006, AC-007 | UI component test + Frontend CI | Yes |
 
 ## Out Of Scope
 
@@ -130,10 +143,10 @@ Acceptance freezes the direction; it does not claim system-wide adoption. Any ac
 > | Frontend | Partial |
 > | Tests | Partial |
 >
-> **Gaps vs spec:** Explicit user visual acceptance and complete active-surface adoption remain.
+> **Gaps vs spec:** Account now has a version-controlled eight-way light/dark × desktop/compact × EN/VI baseline set and a current comparison run. Entry, Resource Workspace, Managed Task Window, and Process Workbench also require equivalent version-controlled perceptual baselines before Tests can be `Done`.
 >
-> **Deferred follow-ups:** N/A; acceptance and adoption are current required phases, not deferred work.
+> **Deferred follow-ups:** N/A; missing contract evidence remains current work and cannot be converted into an exception.
 >
-> **Verification:** Current verification is recorded in [docs/foundations/visual-system/axis-visual-system.evidence.md](./axis-visual-system.evidence.md); stale evidence from the retired contract does not advance the phase.
+> **Verification:** Current verification is recorded in [docs/foundations/visual-system/axis-visual-system.evidence.md](./axis-visual-system.evidence.md); stale or unregistered consumer evidence does not establish enforcement.
 >
-> **Decisions:** The constitution owns semantic invariants, the canonical theme owns reusable values, and components remain replaceable mappings. `frontend/ui-foundation.json` records phase plus golden archetype/route only. Business Objects remains the proving resource workspace; the Account clean cutover and fresh browser evidence return the phase to `reference-ready` for user visual review.
+> **Decisions:** The constitution owns semantic invariants, the canonical theme owns reusable values, contract owners own reusable surface anatomy, and features own product state and declared slots. `frontend/ui-foundation.json` owns contract/evidence metadata; the typed catalog and real-symbol registry own active consumers. No filename convention, source-text pattern, screen, or manual approval is a parallel source of truth.

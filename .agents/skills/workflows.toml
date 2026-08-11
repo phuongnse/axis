@@ -45,8 +45,8 @@ evidence = "validated-remote-state"
 
 [workflows.ui-design]
 initial = "requested"
-terminal_states = ["adopted"]
-states = ["requested", "authorized", "defined", "reference-ready", "accepted", "adopted"]
+terminal_states = ["enforced"]
+states = ["requested", "authorized", "defined", "verified", "enforced"]
 
 [[workflows.ui-design.transitions]]
 id = "authorize-ui-design"
@@ -60,39 +60,25 @@ id = "define-ui-system"
 from = "authorized"
 to = "defined"
 owner = "skill:axis-ui-system"
-evidence = "current-owned-visual-contract"
+evidence = "current-contract-spec-and-compiler-bound-owner-symbol"
 
 [[workflows.ui-design.transitions]]
-id = "build-golden-reference"
+id = "verify-ui-contract"
 from = "defined"
-to = "reference-ready"
+to = "verified"
 owner = "skill:axis-ui-system"
-evidence = "running-golden-reference-and-focused-browser-evidence"
+evidence = "component-browser-accessibility-and-visual-contract-evidence"
 
 [[workflows.ui-design.transitions]]
-id = "revise-golden-reference"
-from = "reference-ready"
-to = "defined"
+id = "enforce-ui-contract"
+from = "verified"
+to = "enforced"
 owner = "skill:axis-ui-system"
-evidence = "requested-visual-contract-change"
+evidence = "typed-active-consumers-rendered-owner-evidence-and-passing-conformance-policy"
 
 [[workflows.ui-design.transitions]]
-id = "accept-ui-system"
-from = "reference-ready"
-to = "accepted"
+id = "revise-enforced-ui-contract"
+from = "enforced"
+to = "authorized"
 owner = "skill:axis-ui-system"
-evidence = "explicit-user-visual-acceptance"
-
-[[workflows.ui-design.transitions]]
-id = "revise-accepted-ui-system"
-from = "accepted"
-to = "defined"
-owner = "skill:axis-ui-system"
-evidence = "approved-visual-contract-change"
-
-[[workflows.ui-design.transitions]]
-id = "complete-ui-adoption"
-from = "accepted"
-to = "adopted"
-owner = "skill:axis-ui-system"
-evidence = "active-surface-conformance-and-current-evidence"
+evidence = "approved-contract-revision-and-clean-cutover-plan"

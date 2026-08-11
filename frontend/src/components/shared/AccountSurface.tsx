@@ -1,6 +1,5 @@
-import { useQuery } from '@tanstack/react-query';
 import { Building2, ChevronDown, LogOut, Settings2 } from 'lucide-react';
-import { useState } from 'react';
+import { type ReactNode, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AccountAvatar } from '@/components/shared/AccountAvatar';
 import { AsyncButton } from '@/components/shared/AsyncButton';
@@ -10,74 +9,45 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Separator } from '@/components/ui/separator';
-import { useAuthStore } from '@/features/auth/auth-store';
-import { sessionDisplayFromLabel } from '@/features/auth/session-display';
-import { dashboardQueryKeys, getCurrentUserProfile } from '@/features/dashboard/api';
-import { LanguageControl, ThemeControl } from '@/features/preferences';
-import type { CreatedOrganizationWorkspace, EligibleWorkspace } from '@/features/workspaces/api';
-import {
-  type WorkspaceChangeResult,
-  type WorkspaceContextState,
-  WorkspaceControl,
-} from '@/features/workspaces/WorkspaceControl';
+import { type SurfaceIdFor, surfaceContractAttributes } from '@/lib/ui-foundation';
 
-interface AppActionsMenuProps {
+export interface AccountSurfaceIdentity {
+  displayName: string;
+  initials: string;
+  secondaryLabel?: string;
+  triggerKind: 'organization' | 'person';
+  triggerLabel: string;
+}
+
+export interface AccountSurfaceProps {
+  identity: AccountSurfaceIdentity;
   onSignOut: () => void;
-  onRetryWorkspaceContext: () => Promise<void>;
-  onWorkspaceChange: (
-    target: EligibleWorkspace | CreatedOrganizationWorkspace,
-  ) => Promise<WorkspaceChangeResult>;
+  preferenceControls: ReactNode;
   signOutError?: boolean;
   signingOut?: boolean;
-  workspaceContext: WorkspaceContextState;
+  surfaceId: SurfaceIdFor<'account-surface'>;
+  transitionLocked?: boolean;
+  workspace: ReactNode;
 }
 
-function firstNonEmpty(...values: Array<string | null | undefined>): string | null {
-  for (const value of values) {
-    const trimmed = value?.trim();
-    if (trimmed) return trimmed;
-  }
-  return null;
-}
-
-export function AppActionsMenu({
+export function AccountSurface({
+  identity,
   onSignOut,
-  onRetryWorkspaceContext,
-  onWorkspaceChange,
+  preferenceControls,
   signOutError = false,
   signingOut = false,
-  workspaceContext,
-}: AppActionsMenuProps) {
+  surfaceId,
+  transitionLocked = false,
+  workspace,
+}: AccountSurfaceProps) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
-  const authenticated = useAuthStore((state) => state.browserSessionStatus === 'authenticated');
-  const userLabel = useAuthStore((state) => state.userLabel);
-  const userInitials = useAuthStore((state) => state.userInitials);
-  const profileQuery = useQuery({
-    queryKey: dashboardQueryKeys.currentUser(),
-    queryFn: getCurrentUserProfile,
-    enabled: authenticated,
-  });
-  const profileName = firstNonEmpty(profileQuery.data?.fullName);
-  const profileEmail = firstNonEmpty(profileQuery.data?.email);
-  const profileLabel = firstNonEmpty(profileName, profileEmail);
-  const profileDisplay = profileLabel ? sessionDisplayFromLabel(profileLabel) : null;
-  const displayName = profileDisplay?.userLabel ?? userLabel ?? t('nav.user');
-  const displayInitials = profileDisplay?.userInitials ?? userInitials ?? '?';
-  const currentWorkspace = profileQuery.data?.workspaces?.find((workspace) => workspace.isCurrent);
-  const currentWorkspaceName = firstNonEmpty(currentWorkspace?.name);
-  const topBarLabel =
-    currentWorkspace?.type === 'Organization' && currentWorkspaceName
-      ? currentWorkspaceName
-      : displayName;
-  const contextTransitionActive =
-    workspaceContext.phase === 'switching' || workspaceContext.phase === 'refreshing';
 
   return (
     <Popover
       open={open}
       onOpenChange={(nextOpen) => {
-        if (!nextOpen && contextTransitionActive) return;
+        if (!nextOpen && transitionLocked) return;
         setOpen(nextOpen);
       }}
     >
@@ -91,21 +61,23 @@ export function AppActionsMenu({
             aria-label={t('nav.accountMenu')}
             title={t('nav.accountMenu')}
           >
-            {currentWorkspace?.type === 'Organization' ? (
+            {identity.triggerKind === 'organization' ? (
               <Avatar aria-hidden>
                 <AvatarFallback>
                   <Building2 className="size-4" />
                 </AvatarFallback>
               </Avatar>
             ) : (
-              <AccountAvatar initials={displayInitials} size="md" />
+              <AccountAvatar initials={identity.initials} size="md" />
             )}
-            <span className="hidden min-w-0 truncate sm:inline">{topBarLabel}</span>
+            <span className="hidden min-w-0 truncate sm:inline">{identity.triggerLabel}</span>
             <ChevronDown className="size-3.5 text-muted-foreground" aria-hidden />
           </Button>
         }
       />
       <PopoverContent
+        {...surfaceContractAttributes('account-surface', surfaceId)}
+        data-slot="account-surface"
         align="end"
         className="max-h-(--available-height) w-80 max-w-full overflow-y-auto"
         aria-label={t('nav.accountMenu')}
@@ -115,12 +87,12 @@ export function AppActionsMenu({
           aria-label={t('app.account')}
           className="flex min-w-0 items-center gap-axis-inline px-axis-inline py-axis-inline"
         >
-          <AccountAvatar initials={displayInitials} size="md" />
+          <AccountAvatar initials={identity.initials} size="md" />
           <div className="min-w-0 flex-1">
-            <div className="truncate text-axis-label font-axis-label">{displayName}</div>
-            {profileName && profileEmail ? (
+            <div className="truncate text-axis-label font-axis-label">{identity.displayName}</div>
+            {identity.secondaryLabel ? (
               <div className="truncate text-axis-metadata text-muted-foreground">
-                {profileEmail}
+                {identity.secondaryLabel}
               </div>
             ) : null}
           </div>
@@ -128,11 +100,7 @@ export function AppActionsMenu({
 
         <Separator />
 
-        <WorkspaceControl
-          contextState={workspaceContext}
-          onRetryContext={onRetryWorkspaceContext}
-          onWorkspaceChange={onWorkspaceChange}
-        />
+        {workspace}
 
         <Separator />
 
@@ -141,8 +109,7 @@ export function AppActionsMenu({
             <Settings2 className="size-3.5" aria-hidden />
             {t('app.preferences')}
           </div>
-          <LanguageControl authenticated variant="menu" />
-          <ThemeControl authenticated variant="menu" />
+          {preferenceControls}
         </section>
 
         <Separator />

@@ -11,20 +11,13 @@ from pathlib import Path
 from axis_repo import ROOT, iter_files
 
 
-UI_FOUNDATION_PHASES = {
-    "requested",
-    "authorized",
-    "defined",
-    "reference-ready",
-    "accepted",
-    "adopted",
-}
 UI_FOUNDATION_MANIFEST_KEYS = {
     "schemaVersion",
-    "phase",
-    "goldenReference",
+    "contracts",
 }
-UI_GOLDEN_REFERENCE_KEYS = {"archetype", "route"}
+UI_CONTRACT_KEYS = {"spec", "evidence"}
+UI_EVIDENCE_KEYS = {"component", "browser"}
+UI_CONTRACT_ID = re.compile(r"^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$")
 
 
 def rel(path: Path) -> str:
@@ -33,7 +26,6 @@ def rel(path: Path) -> str:
 
 def ui_foundation_issues(root: Path = ROOT) -> list[str]:
     manifest_path = root / "frontend" / "ui-foundation.json"
-    contract_path = root / "docs" / "foundations" / "visual-system" / "axis-visual-system.md"
     if not manifest_path.is_file():
         return ["frontend/ui-foundation.json: active UI foundation state is missing"]
 
@@ -45,6 +37,12 @@ def ui_foundation_issues(root: Path = ROOT) -> list[str]:
         return ["frontend/ui-foundation.json: root value must be an object"]
 
     issues: list[str] = []
+    for typed_source in (
+        "frontend/src/lib/ui-foundation.ts",
+        "frontend/src/lib/active-surface-registry.ts",
+    ):
+        if not (root / typed_source).is_file():
+            issues.append(f"{typed_source}: typed UI foundation source is missing")
     unexpected_keys = sorted(set(manifest) - UI_FOUNDATION_MANIFEST_KEYS)
     missing_keys = sorted(UI_FOUNDATION_MANIFEST_KEYS - set(manifest))
     if unexpected_keys:
@@ -56,67 +54,125 @@ def ui_foundation_issues(root: Path = ROOT) -> list[str]:
             "frontend/ui-foundation.json: missing keys: " + ", ".join(missing_keys)
         )
 
-    if manifest.get("schemaVersion") != 2:
-        issues.append("frontend/ui-foundation.json: `schemaVersion` must be 2")
+    if manifest.get("schemaVersion") != 4:
+        issues.append("frontend/ui-foundation.json: `schemaVersion` must be 4")
 
-    phase = manifest.get("phase")
-    if phase not in UI_FOUNDATION_PHASES:
-        issues.append(
-            "frontend/ui-foundation.json: unknown `phase`; use one of "
-            f"{sorted(UI_FOUNDATION_PHASES)}"
-        )
+    def checked_path(value: object, field: str, suffix: str) -> Path | None:
+        if not isinstance(value, str) or not value.strip():
+            issues.append(f"frontend/ui-foundation.json: `{field}` must be a non-empty string")
+            return None
+        relative = Path(value)
+        if (
+            relative.is_absolute()
+            or ".." in relative.parts
+            or relative.as_posix() != value
+            or relative.suffix != suffix
+        ):
+            issues.append(
+                f"frontend/ui-foundation.json: `{field}` must be a normalized repo-relative {suffix} path"
+            )
+            return None
+        resolved = root / relative
+        if not resolved.is_file():
+            issues.append(f"frontend/ui-foundation.json: `{field}` does not exist: {value}")
+            return None
+        return resolved
 
-    golden_reference = manifest.get("goldenReference")
-    if not isinstance(golden_reference, dict):
-        issues.append("frontend/ui-foundation.json: `goldenReference` must be an object")
+    contracts = manifest.get("contracts")
+    if not isinstance(contracts, dict) or not contracts:
+        issues.append("frontend/ui-foundation.json: `contracts` must be a non-empty object")
+        contracts = {}
     else:
-        unexpected_golden_keys = sorted(set(golden_reference) - UI_GOLDEN_REFERENCE_KEYS)
-        missing_golden_keys = sorted(UI_GOLDEN_REFERENCE_KEYS - set(golden_reference))
-        if unexpected_golden_keys:
+        if list(contracts) != sorted(contracts):
             issues.append(
-                "frontend/ui-foundation.json: `goldenReference` has unexpected keys: "
-                + ", ".join(unexpected_golden_keys)
+                "frontend/ui-foundation.json: `contracts` must be sorted by contract id"
             )
-        if missing_golden_keys:
-            issues.append(
-                "frontend/ui-foundation.json: `goldenReference` is missing keys: "
-                + ", ".join(missing_golden_keys)
-            )
-        for field in ("archetype", "route"):
-            value = golden_reference.get(field)
-            if not isinstance(value, str) or not value.strip():
+        for contract_id, contract in contracts.items():
+            prefix = f"contracts.{contract_id}"
+            if not isinstance(contract_id, str) or not UI_CONTRACT_ID.fullmatch(contract_id):
                 issues.append(
-                    f"frontend/ui-foundation.json: `goldenReference.{field}` must be a non-empty string"
+                    f"frontend/ui-foundation.json: contract id `{contract_id}` must use kebab-case"
                 )
+            if not isinstance(contract, dict):
+                issues.append(f"frontend/ui-foundation.json: `{prefix}` must be an object")
+                continue
+            unexpected = sorted(set(contract) - UI_CONTRACT_KEYS)
+            missing = sorted(UI_CONTRACT_KEYS - set(contract))
+            if unexpected:
+                issues.append(
+                    f"frontend/ui-foundation.json: `{prefix}` has unexpected keys: "
+                    + ", ".join(unexpected)
+                )
+            if missing:
+                issues.append(
+                    f"frontend/ui-foundation.json: `{prefix}` is missing keys: "
+                    + ", ".join(missing)
+                )
+            spec = checked_path(contract.get("spec"), f"{prefix}.spec", ".md")
+            if spec is not None:
+                spec_relative = spec.relative_to(root).as_posix()
+                if not spec_relative.startswith("docs/foundations/"):
+                    issues.append(
+                        "frontend/ui-foundation.json: contract spec must live under "
+                        f"docs/foundations: {spec_relative}"
+                    )
 
-    if not contract_path.is_file():
-        issues.append(
-            "docs/foundations/visual-system/axis-visual-system.md: visual-system contract is missing"
-        )
-    else:
-        try:
-            contract = contract_path.read_text(encoding="utf-8")
-        except OSError as exc:
-            issues.append(
-                "docs/foundations/visual-system/axis-visual-system.md: "
-                f"cannot read visual-system contract: {exc}"
-            )
-        else:
-            frontend_status = re.search(
-                r"^[>| ]*\|\s*Frontend\s*\|\s*(?P<status>[A-Za-z-]+)\s*\|",
-                contract,
-                re.MULTILINE,
-            )
-            if frontend_status is None:
+            evidence = contract.get("evidence")
+            if not isinstance(evidence, dict):
+                issues.append(f"frontend/ui-foundation.json: `{prefix}.evidence` must be an object")
+                continue
+            unexpected_evidence = sorted(set(evidence) - UI_EVIDENCE_KEYS)
+            missing_evidence = sorted(UI_EVIDENCE_KEYS - set(evidence))
+            if unexpected_evidence:
                 issues.append(
-                    "docs/foundations/visual-system/axis-visual-system.md: "
-                    "implementation status must contain a Frontend row"
+                    f"frontend/ui-foundation.json: `{prefix}.evidence` has unexpected keys: "
+                    + ", ".join(unexpected_evidence)
                 )
-            elif phase != "adopted" and frontend_status.group("status") == "Done":
+            if missing_evidence:
                 issues.append(
-                    "docs/foundations/visual-system/axis-visual-system.md: "
-                    "cannot claim `Frontend | Done` before phase `adopted`"
+                    f"frontend/ui-foundation.json: `{prefix}.evidence` is missing keys: "
+                    + ", ".join(missing_evidence)
                 )
+            for kind in sorted(UI_EVIDENCE_KEYS):
+                paths = evidence.get(kind)
+                if not isinstance(paths, list) or not paths:
+                    issues.append(
+                        f"frontend/ui-foundation.json: `{prefix}.evidence.{kind}` must be a non-empty list"
+                    )
+                    continue
+                if len(paths) != len(set(path for path in paths if isinstance(path, str))):
+                    issues.append(
+                        f"frontend/ui-foundation.json: `{prefix}.evidence.{kind}` contains duplicates"
+                    )
+                for index, path in enumerate(paths):
+                    evidence_path = checked_path(
+                        path,
+                        f"{prefix}.evidence.{kind}[{index}]",
+                        ".tsx" if kind == "component" else ".ts",
+                    )
+                    if evidence_path is None:
+                        continue
+                    evidence_relative = evidence_path.relative_to(root).as_posix()
+                    if kind == "component" and not (
+                        evidence_relative.endswith(".test.tsx")
+                        and (
+                            evidence_relative.startswith("frontend/src/")
+                            or evidence_relative.startswith("frontend/tests/")
+                        )
+                    ):
+                        issues.append(
+                            "frontend/ui-foundation.json: component evidence must be a "
+                            f"frontend .test.tsx file: {evidence_relative}"
+                        )
+                    if kind == "browser" and not (
+                        evidence_relative.startswith("frontend/e2e/")
+                        and evidence_relative.endswith(".pw.ts")
+                    ):
+                        issues.append(
+                            "frontend/ui-foundation.json: browser evidence must be a "
+                            f"frontend/e2e .pw.ts file: {evidence_relative}"
+                        )
+
     return issues
 
 

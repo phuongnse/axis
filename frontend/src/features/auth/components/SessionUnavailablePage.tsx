@@ -1,8 +1,9 @@
 import { useTranslation } from 'react-i18next';
 
+import { EntrySurface } from '@/components/shared/EntrySurface';
 import { StatusNotice } from '@/components/shared/StatusNotice';
 import { Button } from '@/components/ui/button';
-import { AuthCard } from '@/features/auth/components/AuthCard';
+import { PreferencesMenu } from '@/features/preferences';
 
 interface SessionUnavailablePageProps {
   onRetry: () => void;
@@ -12,7 +13,11 @@ export function SessionUnavailablePage({ onRetry }: SessionUnavailablePageProps)
   const { t } = useTranslation();
 
   return (
-    <AuthCard title={t('auth.sessionUnavailableTitle')}>
+    <EntrySurface
+      surfaceId="session-unavailable"
+      utilities={<PreferencesMenu />}
+      title={t('auth.sessionUnavailableTitle')}
+    >
       <div className="space-y-4">
         <StatusNotice tone="warning" title={t('auth.sessionUnavailableTitle')}>
           {t('auth.sessionUnavailableBody')}
@@ -21,6 +26,6 @@ export function SessionUnavailablePage({ onRetry }: SessionUnavailablePageProps)
           {t('auth.sessionUnavailableRetry')}
         </Button>
       </div>
-    </AuthCard>
+    </EntrySurface>
   );
 }

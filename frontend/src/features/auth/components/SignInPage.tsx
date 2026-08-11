@@ -1,6 +1,7 @@
 import { LogIn } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { AsyncButton } from '@/components/shared/AsyncButton';
+import { EntrySurface } from '@/components/shared/EntrySurface';
 import {
   InlinePromptAction,
   InlinePromptActionButton,
@@ -10,9 +11,9 @@ import {
 import { StatusNotice } from '@/components/shared/StatusNotice';
 import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
-import { AuthCard } from '@/features/auth/components/AuthCard';
 import { useResendVerification } from '@/features/auth/hooks/useResendVerification';
 import { useSignIn } from '@/features/auth/hooks/useSignIn';
+import { PreferencesMenu } from '@/features/preferences';
 
 function SignInFooter({ t }: { t: ReturnType<typeof useTranslation>['t'] }) {
   return (
@@ -56,7 +57,12 @@ export function SignInPage() {
           : null;
 
   return (
-    <AuthCard title={t('auth.signIn')} footer={<SignInFooter t={t} />}>
+    <EntrySurface
+      surfaceId="sign-in"
+      utilities={<PreferencesMenu />}
+      title={t('auth.signIn')}
+      footer={<SignInFooter t={t} />}
+    >
       <form className="space-y-4" onSubmit={handleSubmit(submit)} noValidate>
         {authorizationRequestError ? (
           <StatusNotice tone="destructive" title={t('auth.signInErrorTitle')}>
@@ -147,6 +153,6 @@ export function SignInPage() {
           {t('auth.signIn')}
         </AsyncButton>
       </form>
-    </AuthCard>
+    </EntrySurface>
   );
 }

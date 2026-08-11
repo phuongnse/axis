@@ -1,8 +1,69 @@
 {
-  "schemaVersion": 2,
-  "phase": "reference-ready",
-  "goldenReference": {
-    "archetype": "resource-workspace",
-    "route": "/business-objects"
+  "schemaVersion": 4,
+  "contracts": {
+    "account-surface": {
+      "spec": "docs/foundations/app-shell/app-frame.md",
+      "evidence": {
+        "component": [
+          "frontend/tests/account-surface.test.tsx",
+          "frontend/tests/app-shell.test.tsx",
+          "frontend/tests/surface-contracts.test.tsx"
+        ],
+        "browser": ["frontend/e2e/app-frame.pw.ts"]
+      }
+    },
+    "authenticated-frame": {
+      "spec": "docs/foundations/app-shell/app-frame.md",
+      "evidence": {
+        "component": [
+          "frontend/tests/app-shell.test.tsx",
+          "frontend/tests/surface-contracts.test.tsx"
+        ],
+        "browser": ["frontend/e2e/app-frame.pw.ts"]
+      }
+    },
+    "entry-surface": {
+      "spec": "docs/foundations/visual-system/axis-visual-system.md",
+      "evidence": {
+        "component": [
+          "frontend/tests/register-page.test.tsx",
+          "frontend/tests/sign-in-page.test.tsx",
+          "frontend/tests/surface-contracts.test.tsx"
+        ],
+        "browser": ["frontend/e2e/register-user.pw.ts", "frontend/e2e/sign-in-user.pw.ts"]
+      }
+    },
+    "managed-task-window": {
+      "spec": "docs/foundations/overlays/managed-dialog.md",
+      "evidence": {
+        "component": [
+          "frontend/tests/managed-dialog-tabs.test.tsx",
+          "frontend/tests/business-objects-page.test.tsx",
+          "frontend/tests/surface-contracts.test.tsx"
+        ],
+        "browser": ["frontend/e2e/define-business-object.pw.ts"]
+      }
+    },
+    "process-workbench": {
+      "spec": "docs/foundations/visual-system/axis-visual-system.md",
+      "evidence": {
+        "component": [
+          "frontend/src/features/solutions/components/SolutionsPage.test.tsx",
+          "frontend/tests/surface-contracts.test.tsx"
+        ],
+        "browser": ["frontend/e2e/product-delivery-governance.pw.ts"]
+      }
+    },
+    "resource-workspace": {
+      "spec": "docs/foundations/data-display/collection-page.md",
+      "evidence": {
+        "component": [
+          "frontend/tests/resource-workspace.test.tsx",
+          "frontend/tests/business-objects-page.test.tsx",
+          "frontend/tests/surface-contracts.test.tsx"
+        ],
+        "browser": ["frontend/e2e/define-business-object.pw.ts"]
+      }
+    }
   }
 }

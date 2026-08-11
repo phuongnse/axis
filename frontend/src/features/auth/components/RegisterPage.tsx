@@ -4,13 +4,14 @@ import type { ReactNode } from 'react';
 import { Controller } from 'react-hook-form';
 import { Trans, useTranslation } from 'react-i18next';
 import { AsyncButton } from '@/components/shared/AsyncButton';
+import { EntrySurface } from '@/components/shared/EntrySurface';
 import { StatusNotice } from '@/components/shared/StatusNotice';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
-import { AuthCard } from '@/features/auth/components/AuthCard';
 import { PasswordCriteria } from '@/features/auth/components/PasswordCriteria';
 import { useRegister } from '@/features/auth/hooks/useRegister';
+import { PreferencesMenu } from '@/features/preferences';
 
 interface LegalLinkProps {
   children?: ReactNode;
@@ -43,7 +44,9 @@ export function RegisterPage() {
   const password = watch('password');
 
   return (
-    <AuthCard
+    <EntrySurface
+      surfaceId="registration"
+      utilities={<PreferencesMenu />}
       title={t('auth.register.title')}
       footer={
         <>
@@ -181,6 +184,6 @@ export function RegisterPage() {
           {t('auth.createAccount')}
         </AsyncButton>
       </form>
-    </AuthCard>
+    </EntrySurface>
   );
 }

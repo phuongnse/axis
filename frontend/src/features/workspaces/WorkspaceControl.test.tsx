@@ -3,7 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { AppActionsMenu } from '@/components/shared/AppActionsMenu';
+import { AccountSurface } from '@/components/shared/AccountSurface';
 import { transientItemHighlight } from '@/components/shared/interactionStates';
 import { useAuthStore } from '@/features/auth/auth-store';
 import { getCurrentUserProfile } from '@/features/dashboard/api';
@@ -20,11 +20,6 @@ vi.mock('@/features/dashboard/api', () => ({
     currentUser: () => ['dashboard', 'current-user'] as const,
   },
   getCurrentUserProfile: vi.fn(),
-}));
-
-vi.mock('@/features/preferences', () => ({
-  LanguageControl: () => <div>Language control</div>,
-  ThemeControl: () => <div>Theme control</div>,
 }));
 
 vi.mock('./api', () => ({
@@ -209,11 +204,24 @@ describe('WorkspaceControl', () => {
     const user = userEvent.setup();
     render(
       <TestBoundary>
-        <AppActionsMenu
+        <AccountSurface
+          surfaceId="account-actions"
+          identity={{
+            displayName: 'Ada Lovelace',
+            initials: 'AL',
+            secondaryLabel: 'ada@example.com',
+            triggerKind: 'person',
+            triggerLabel: 'Ada Lovelace',
+          }}
           onSignOut={vi.fn()}
-          onRetryWorkspaceContext={vi.fn(async () => undefined)}
-          onWorkspaceChange={vi.fn(async () => 'entered' as WorkspaceChangeResult)}
-          workspaceContext={idleContext}
+          preferenceControls={null}
+          workspace={
+            <WorkspaceControl
+              contextState={idleContext}
+              onRetryContext={vi.fn(async () => undefined)}
+              onWorkspaceChange={vi.fn(async () => 'entered' as WorkspaceChangeResult)}
+            />
+          }
         />
       </TestBoundary>,
     );

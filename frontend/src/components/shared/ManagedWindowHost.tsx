@@ -65,6 +65,7 @@ export function ManagedWindowHost() {
               <Renderer descriptor={entry.descriptor} />
             ) : (
               <ManagedDialog
+                surfaceId="managed-window-host"
                 open
                 title={entry.title}
                 description={t('dialog.unavailableDescription')}

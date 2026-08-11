@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AsyncButton } from '@/components/shared/AsyncButton';
 import { AsyncContent } from '@/components/shared/AsyncContent';
-import { PageHeader, PageLayout } from '@/components/shared/PageLayout';
+import { ProcessWorkbench } from '@/components/shared/ProcessWorkbench';
 import { StatusBadge, type StatusBadgeTone } from '@/components/shared/StatusBadge';
 import { StatusNotice, type StatusNoticeTone } from '@/components/shared/StatusNotice';
 import {
@@ -159,9 +159,11 @@ export function SolutionsPage() {
   }
 
   return (
-    <PageLayout scrollMode="route">
-      <PageHeader title={t('solutions.title')} description={t('solutions.description')} />
-
+    <ProcessWorkbench
+      surfaceId="solution-delivery"
+      title={t('solutions.title')}
+      description={t('solutions.description')}
+    >
       {feedback ? (
         <div aria-live="polite">
           <StatusNotice tone={feedback.tone} title={feedback.title}>
@@ -406,7 +408,7 @@ export function SolutionsPage() {
         onRetry={() => void installationsQuery.refetch()}
         onOpenOperation={setOperationId}
       />
-    </PageLayout>
+    </ProcessWorkbench>
   );
 }
 

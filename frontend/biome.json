@@ -38,6 +38,33 @@
           }
         }
       }
+    },
+    {
+      "includes": [
+        "src/components/shared/AccountSurface.tsx",
+        "src/components/shared/AuthenticatedFrame.tsx",
+        "src/components/shared/EntrySurface.tsx",
+        "src/components/shared/ManagedDialog.tsx",
+        "src/components/shared/ProcessWorkbench.tsx",
+        "src/components/shared/ResourceWorkspace.tsx"
+      ],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["@/features/**", "@/routes/**"],
+                    "message": "Surface contract owners must remain product-state independent."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
     }
   ],
   "linter": {

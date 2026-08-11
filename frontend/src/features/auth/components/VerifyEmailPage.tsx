@@ -7,17 +7,17 @@ import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 import { AsyncButton } from '@/components/shared/AsyncButton';
 import { AsyncContent } from '@/components/shared/AsyncContent';
+import { EntrySurface } from '@/components/shared/EntrySurface';
 import { StatusNotice, type StatusNoticeTone } from '@/components/shared/StatusNotice';
 import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
-import { AuthCard } from '@/features/auth/components/AuthCard';
 import { useRefreshClientValidationErrors } from '@/features/auth/hooks/useRefreshClientValidationErrors';
 import { useResendVerification } from '@/features/auth/hooks/useResendVerification';
 import { useVerifyEmail } from '@/features/auth/hooks/useVerifyEmail';
 import { loadRegistrationContext } from '@/features/auth/registration-context';
 import type { VerifyEmailErrorKind } from '@/features/auth/types';
 import { useQueryParam } from '@/features/auth/use-query-param';
-import { currentSiteLanguage } from '@/features/preferences';
+import { currentSiteLanguage, PreferencesMenu } from '@/features/preferences';
 
 type Translate = ReturnType<typeof useTranslation>['t'];
 
@@ -102,7 +102,12 @@ function VerifyEmailOutcome({
     );
 
   return (
-    <AuthCard title={config.title} footer={footer}>
+    <EntrySurface
+      surfaceId="verify-email"
+      utilities={<PreferencesMenu />}
+      title={config.title}
+      footer={footer}
+    >
       <div className="space-y-4">
         <StatusNotice tone={config.tone}>{config.body}</StatusNotice>
 
@@ -147,7 +152,7 @@ function VerifyEmailOutcome({
           </form>
         ) : null}
       </div>
-    </AuthCard>
+    </EntrySurface>
   );
 }
 
@@ -206,7 +211,9 @@ export function VerifyEmailPage() {
 
   if (loading) {
     return (
-      <AuthCard
+      <EntrySurface
+        surfaceId="verify-email"
+        utilities={<PreferencesMenu />}
         title={t('verify.title')}
         footer={
           <>
@@ -220,7 +227,7 @@ export function VerifyEmailPage() {
         <AsyncContent pending pendingLabel={t('verify.confirming')}>
           <span />
         </AsyncContent>
-      </AuthCard>
+      </EntrySurface>
     );
   }
 
@@ -237,7 +244,9 @@ export function VerifyEmailPage() {
 
   if (sessionEstablished) {
     return (
-      <AuthCard
+      <EntrySurface
+        surfaceId="verify-email"
+        utilities={<PreferencesMenu />}
         title={t('verify.success.title')}
         footer={
           <>
@@ -263,12 +272,14 @@ export function VerifyEmailPage() {
             {t('verify.success.action')}
           </AsyncButton>
         </div>
-      </AuthCard>
+      </EntrySurface>
     );
   }
 
   return (
-    <AuthCard
+    <EntrySurface
+      surfaceId="verify-email"
+      utilities={<PreferencesMenu />}
       title={t('verify.title')}
       footer={
         <>
@@ -282,6 +293,6 @@ export function VerifyEmailPage() {
       <AsyncContent pending pendingLabel={t('verify.completing')}>
         <span />
       </AsyncContent>
-    </AuthCard>
+    </EntrySurface>
   );
 }

@@ -49,7 +49,7 @@ function AuthenticatedRouteError({ error, reset }: { error: Error; reset: () => 
 
 function AuthenticatedLayout() {
   return (
-    <AppShell>
+    <AppShell surfaceId="authenticated-frame">
       <Outlet />
     </AppShell>
   );

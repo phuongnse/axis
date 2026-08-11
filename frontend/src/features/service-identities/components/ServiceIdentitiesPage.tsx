@@ -11,7 +11,8 @@ import {
   type DataTableQueryState,
 } from '@/components/shared/data-table';
 import { useManagedWindowActions } from '@/components/shared/ManagedWindowManager';
-import { PageAction, PageHeader, PageLayout } from '@/components/shared/PageLayout';
+import { PageAction } from '@/components/shared/PageLayout';
+import { ResourceWorkspace } from '@/components/shared/ResourceWorkspace';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import type { ServiceIdentityDto } from '@/lib/api-generated';
 import { serviceIdentitiesQueryOptions } from '../api';
@@ -157,14 +158,12 @@ export function ServiceIdentitiesPage() {
   ]);
 
   return (
-    <PageLayout scrollMode="contained">
-      <PageHeader
-        title={t('serviceIdentities.title')}
-        description={t('serviceIdentities.description')}
-      />
-      <div className="min-h-0 flex-1">
-        <DataTable definition={tableDefinition} />
-      </div>
-    </PageLayout>
+    <ResourceWorkspace
+      surfaceId="service-identities"
+      title={t('serviceIdentities.title')}
+      description={t('serviceIdentities.description')}
+    >
+      <DataTable definition={tableDefinition} />
+    </ResourceWorkspace>
   );
 }

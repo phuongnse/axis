@@ -795,7 +795,7 @@ test.describe('define business object', () => {
     await expect(page.getByRole('dialog', { name: 'Define business object' })).toHaveCount(0);
   });
 
-  test('AT-004 golden reference visual matrix stays touch-safe and motion-safe', async ({
+  test('AT-004 resource workspace visual matrix stays touch-safe and motion-safe', async ({
     page,
   }, testInfo) => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
@@ -890,7 +890,7 @@ test.describe('define business object', () => {
     await attachGoldenScreenshot(page, testInfo, 'business-objects-dark-desktop-vi');
   });
 
-  test('AT-005 golden reference integrates independent managed definition windows', async ({
+  test('AT-005 resource workspace integrates independent managed definition windows', async ({
     page,
   }) => {
     await mockAuthenticatedSession(page);
