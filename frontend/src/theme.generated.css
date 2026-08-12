@@ -81,12 +81,12 @@
   --shadow-axis-floating: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
   --shadow-axis-managed: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
   --shadow-axis-dock: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
-  --z-axis-base: 0;
-  --z-axis-sticky: 10;
-  --z-axis-floating: 30;
-  --z-axis-modal: 40;
-  --z-axis-managed: 50;
-  --z-axis-notification: 60;
+  --z-index-axis-base: 0;
+  --z-index-axis-sticky: 10;
+  --z-index-axis-floating: 30;
+  --z-index-axis-modal: 40;
+  --z-index-axis-managed: 50;
+  --z-index-axis-notification: 60;
   --transition-duration-axis-state: 150ms;
   --transition-duration-axis-floating: 100ms;
   --ease-axis-state: cubic-bezier(0, 0, 0.2, 1);

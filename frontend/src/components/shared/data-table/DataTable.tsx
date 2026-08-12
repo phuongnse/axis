@@ -80,6 +80,7 @@ import {
   filterData,
   pruneFilterExpression,
 } from './filtering';
+import { dataTableCheckboxHitArea, dataTableTargetGeometry } from './geometry';
 import type { DataTableDefinition, DataTableMessages, DataTableQueryState } from './types';
 
 const selectionColumnId = '__selection';
@@ -162,6 +163,7 @@ export function DataTable<TData>({ definition }: { definition: DataTableDefiniti
             aria-label={messages.selectAllRows}
             checked={table.getIsAllPageRowsSelected()}
             indeterminate={table.getIsSomePageRowsSelected()}
+            className={dataTableCheckboxHitArea}
             onCheckedChange={(checked) => table.toggleAllPageRowsSelected(Boolean(checked))}
           />
         ),
@@ -170,6 +172,7 @@ export function DataTable<TData>({ definition }: { definition: DataTableDefiniti
             aria-label={messages.selectRow}
             checked={row.getIsSelected()}
             disabled={!row.getCanSelect()}
+            className={dataTableCheckboxHitArea}
             onCheckedChange={(checked) => row.toggleSelected(Boolean(checked))}
           />
         ),
@@ -409,7 +412,12 @@ export function DataTable<TData>({ definition }: { definition: DataTableDefiniti
                   </EmptyHeader>
                   {definition.onRetry ? (
                     <EmptyContent>
-                      <Button type="button" variant="outline" onClick={definition.onRetry}>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className={dataTableTargetGeometry}
+                        onClick={definition.onRetry}
+                      >
                         <RefreshCw aria-hidden />
                         {messages.retry}
                       </Button>
@@ -489,7 +497,7 @@ function DataTableColumnHeader<TData>({
           type="button"
           variant="ghost"
           size="sm"
-          className="-ml-2 min-w-0 justify-start px-2"
+          className={cn(dataTableTargetGeometry, '-ml-2 justify-start px-2')}
           aria-label={`${column.columnDef.meta?.label ?? column.id}: ${
             sorted === 'asc'
               ? messages.sortDescending
@@ -529,6 +537,7 @@ function DataTableColumnHeader<TData>({
                 type="button"
                 variant="ghost"
                 size="icon-xs"
+                className={dataTableTargetGeometry}
                 aria-label={`${column.columnDef.meta?.label ?? column.id}: ${messages.columns}`}
               />
             }
@@ -641,6 +650,7 @@ function DataRow<TData>({
                     type="button"
                     variant="ghost"
                     size="icon-xs"
+                    className={dataTableTargetGeometry}
                     aria-label={row.getIsExpanded() ? messages.collapseRow : messages.expandRow}
                     onClick={row.getToggleExpandedHandler()}
                   >
@@ -775,6 +785,7 @@ function DataTableFooter<TData>({
               type="button"
               variant="ghost"
               size="icon-sm"
+              className={dataTableTargetGeometry}
               aria-label={messages.firstPage}
               disabled={!table.getCanPreviousPage()}
               onClick={() => table.firstPage()}
@@ -785,6 +796,7 @@ function DataTableFooter<TData>({
               type="button"
               variant="ghost"
               size="icon-sm"
+              className={dataTableTargetGeometry}
               aria-label={messages.previousPage}
               disabled={!table.getCanPreviousPage()}
               onClick={() => table.previousPage()}
@@ -797,6 +809,7 @@ function DataTableFooter<TData>({
                 type="button"
                 variant={index === page - 1 ? 'default' : 'outline'}
                 size="icon-sm"
+                className={dataTableTargetGeometry}
                 aria-current={index === page - 1 ? 'page' : undefined}
                 aria-label={messages.pageStatus(index + 1, pageCount)}
                 onClick={() => table.setPageIndex(index)}
@@ -808,6 +821,7 @@ function DataTableFooter<TData>({
               type="button"
               variant="ghost"
               size="icon-sm"
+              className={dataTableTargetGeometry}
               aria-label={messages.nextPage}
               disabled={!table.getCanNextPage()}
               onClick={() => table.nextPage()}
@@ -818,6 +832,7 @@ function DataTableFooter<TData>({
               type="button"
               variant="ghost"
               size="icon-sm"
+              className={dataTableTargetGeometry}
               aria-label={messages.lastPage}
               disabled={!table.getCanNextPage()}
               onClick={() => table.lastPage()}
@@ -833,7 +848,11 @@ function DataTableFooter<TData>({
               value={String(table.getState().pagination.pageSize)}
               onValueChange={(value) => value && table.setPageSize(Number(value))}
             >
-              <SelectTrigger size="sm" aria-label={messages.rowsPerPage}>
+              <SelectTrigger
+                size="sm"
+                aria-label={messages.rowsPerPage}
+                className={dataTableTargetGeometry}
+              >
                 <SelectValue>{String(table.getState().pagination.pageSize)}</SelectValue>
               </SelectTrigger>
               <SelectContent align="end">
@@ -859,6 +878,7 @@ function DataTableFooter<TData>({
               icon={<ChevronDown />}
               pending={source.isFetchingNextPage}
               pendingLabel={messages.loadingMore}
+              className={dataTableTargetGeometry}
               onClick={() => void source.fetchNextPage()}
             >
               {messages.loadMore}

@@ -336,7 +336,10 @@ async function expectShellRegionsFitViewport(page: Page): Promise<void> {
   const viewportWidth = await page.evaluate(() => window.innerWidth);
   const regions = [
     { name: 'top bar content', locator: page.locator('header > div') },
-    { name: 'module navigation', locator: page.getByRole('navigation', { name: 'Modules' }) },
+    {
+      name: 'module navigation',
+      locator: page.locator('[data-slot="module-navigation-boundary"] nav'),
+    },
     { name: 'main content', locator: page.getByRole('main') },
     { name: 'footer content', locator: page.locator('footer > div') },
   ];
@@ -440,11 +443,13 @@ async function colorDistance(page: Page, first: string, second: string) {
   );
 }
 
-async function expectAccountTextContrast(page: Page): Promise<void> {
-  const surface = page.locator('[data-slot="account-surface"]');
+async function expectVisibleTextContrast(
+  root: Locator,
+  minimumTextNodeCount: number,
+): Promise<void> {
   await expect
     .poll(async () => {
-      const results = await surface.evaluate((root) => {
+      const results = await root.evaluate((root) => {
         const canvas = document.createElement('canvas');
         canvas.width = 1;
         canvas.height = 1;
@@ -525,10 +530,18 @@ async function expectAccountTextContrast(page: Page): Promise<void> {
 
       return {
         failures: results.filter(({ ratio }) => ratio < 4.5),
-        hasCoverage: results.length > 10,
+        hasCoverage: results.length >= minimumTextNodeCount,
       };
     })
     .toEqual({ failures: [], hasCoverage: true });
+}
+
+async function expectAccountTextContrast(page: Page): Promise<void> {
+  await expectVisibleTextContrast(page.locator('[data-slot="account-surface"]'), 10);
+}
+
+async function expectAuthenticatedFrameTextContrast(page: Page): Promise<void> {
+  await expectVisibleTextContrast(page.locator('[data-axis-surface-id="authenticated-frame"]'), 6);
 }
 
 async function expectAccountSurfaceScreenshot(page: Page, name: string): Promise<void> {
@@ -543,6 +556,47 @@ async function expectAccountSurfaceScreenshot(page: Page, name: string): Promise
   );
   await page.mouse.move(1, 1);
   await expect(accountSurface).toHaveScreenshot(`${name}.png`, {
+    animations: 'disabled',
+    caret: 'hide',
+    scale: 'css',
+  });
+}
+
+async function expectAuthenticatedFrameTargetGeometry(
+  page: Page,
+  minimumHeight: 32 | 44,
+): Promise<void> {
+  const frame = page.locator('[data-axis-surface-id="authenticated-frame"]');
+  const targets = frame.getByRole('link').or(frame.getByRole('button'));
+  const measurements = await targets.evaluateAll((elements) =>
+    elements.map((element) => ({
+      height: element.getBoundingClientRect().height,
+      name: element.getAttribute('aria-label') ?? element.textContent?.trim() ?? '',
+    })),
+  );
+
+  expect(measurements.length).toBeGreaterThan(3);
+  expect(
+    measurements.every(({ height }) => height >= minimumHeight - 1),
+    `all authenticated-frame targets meet the ${minimumHeight}px target: ${JSON.stringify(measurements)}`,
+  ).toBe(true);
+}
+
+async function expectAuthenticatedFrameScreenshot(
+  page: Page,
+  name: string,
+  { canonicalLanguage = true }: { canonicalLanguage?: boolean } = {},
+): Promise<void> {
+  if (canonicalLanguage) await expectCanonicalTestLanguage(page);
+  const frame = page.locator('[data-axis-surface-id="authenticated-frame"]');
+  await expect(frame).toBeVisible();
+  await expect(frame).toHaveAttribute('data-axis-surface-contract', 'authenticated-frame');
+  await expect(frame.locator('[data-slot="account-surface"]')).toHaveCount(0);
+  await frame.evaluate((element) =>
+    Promise.all(element.getAnimations({ subtree: true }).map((animation) => animation.finished)),
+  );
+  await page.mouse.move(1, 1);
+  await expect(frame).toHaveScreenshot(`${name}.png`, {
     animations: 'disabled',
     caret: 'hide',
     scale: 'css',
@@ -761,6 +815,110 @@ test.describe('app frame', () => {
     await expect(lightCompactOption).toHaveAttribute('aria-pressed', 'true');
     await expect(lightCompactOption).not.toHaveAttribute('aria-busy');
     await expectAccountSurfaceScreenshot(page, 'account-surface-light-compact-en');
+    expect(runtimeErrors).toEqual([]);
+  });
+
+  test('AT-005 authenticated frame visual contract covers canonical EN light and dark desktop and compact', async ({
+    page,
+  }) => {
+    const runtimeErrors = observeUnexpectedRuntimeErrors(page);
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await mockAuthenticatedSession(page, { userProfile: longIdentityProfile });
+    await page.route('**/api/users/me/preferences/language', async (route) => {
+      const language = JSON.parse(route.request().postData() ?? '{}').language ?? 'en';
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ language }),
+      });
+    });
+    await page.route('**/api/users/me/preferences/theme', async (route) => {
+      const theme = JSON.parse(route.request().postData() ?? '{}').theme ?? 'light';
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ theme }),
+      });
+    });
+
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await page.goto('/dashboard', { waitUntil: 'domcontentloaded' });
+    await expectAppFrameReady(page, 'Dashboard');
+    await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+    await expect(page.locator('html')).not.toHaveClass(/dark/);
+    await expect(page.getByRole('main')).toHaveText('');
+    await expectShellRegionsFitViewport(page);
+    await expectNoPageOverflow(page);
+    await expectNoDocumentScroll(page);
+    await expectAuthenticatedFrameTargetGeometry(page, 32);
+    await expectAuthenticatedFrameTextContrast(page);
+
+    const frame = page.locator('[data-axis-surface-id="authenticated-frame"]');
+    const ariaTree = await frame.ariaSnapshot();
+    for (const semanticEntry of ['banner', 'navigation "Modules"', 'main', 'contentinfo']) {
+      expect(ariaTree).toContain(semanticEntry);
+    }
+    const rulesLink = page.getByRole('link', { name: 'Rules' });
+    await rulesLink.focus();
+    await expectVisibleFocusIndicator(rulesLink);
+    await expect(rulesLink).toBeInViewport();
+    await expectAuthenticatedFrameScreenshot(page, 'authenticated-frame-light-desktop-en');
+
+    await page.getByRole('button', { name: /Account menu/ }).click();
+    await invokePreferenceAction(page, page.getByRole('button', { name: 'Dark' }), 'theme');
+    await expect(page.locator('html')).toHaveClass(/dark/);
+    await page.keyboard.press('Escape');
+    await rulesLink.focus();
+    await expectVisibleFocusIndicator(rulesLink);
+    await expectAuthenticatedFrameTextContrast(page);
+    await expectAuthenticatedFrameScreenshot(page, 'authenticated-frame-dark-desktop-en');
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await expectShellRegionsFitViewport(page);
+    await expectNoPageOverflow(page);
+    await expectNoDocumentScroll(page);
+    await expectAuthenticatedFrameTargetGeometry(page, 44);
+    await expectAuthenticatedFrameScreenshot(page, 'authenticated-frame-dark-compact-en');
+
+    await page.getByRole('button', { name: /Account menu/ }).click();
+    await invokePreferenceAction(page, page.getByRole('button', { name: 'Light' }), 'theme');
+    await expect(page.locator('html')).not.toHaveClass(/dark/);
+    await page.keyboard.press('Escape');
+    await rulesLink.focus();
+    await expectVisibleFocusIndicator(rulesLink);
+    await expectAuthenticatedFrameScreenshot(page, 'authenticated-frame-light-compact-en');
+
+    expect(runtimeErrors).toEqual([]);
+  });
+
+  test('AT-002 Authenticated Frame reflows at the VI 320 CSS pixel boundary', async ({ page }) => {
+    const runtimeErrors = observeUnexpectedRuntimeErrors(page);
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await mockAuthenticatedSession(page, {
+      language: 'vi',
+      userProfile: longIdentityProfile,
+    });
+    await page.setViewportSize({ width: 320, height: 900 });
+    await page.goto('/dashboard', { waitUntil: 'domcontentloaded' });
+    await expectAppFrameReady(page, 'Bảng điều khiển');
+    await expect(page.locator('html')).toHaveAttribute('lang', 'vi');
+    await page.evaluate(() => {
+      for (const element of document.querySelectorAll<HTMLElement>(
+        '[data-axis-surface-id="authenticated-frame"], [data-axis-surface-id="authenticated-frame"] *',
+      )) {
+        element.style.setProperty('letter-spacing', '0.12em', 'important');
+        element.style.setProperty('line-height', '1.5', 'important');
+        element.style.setProperty('word-spacing', '0.16em', 'important');
+      }
+    });
+    await expectShellRegionsFitViewport(page);
+    await expectNoPageOverflow(page);
+    await expectNoDocumentScroll(page);
+    await expectAuthenticatedFrameTargetGeometry(page, 44);
+    await expectAuthenticatedFrameTextContrast(page);
+    await expectAuthenticatedFrameScreenshot(page, 'authenticated-frame-light-compact-vi-reflow', {
+      canonicalLanguage: false,
+    });
     expect(runtimeErrors).toEqual([]);
   });
 

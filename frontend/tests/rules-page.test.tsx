@@ -669,8 +669,14 @@ describe('RulesPage', () => {
     expect(within(details).getByText('Expression language')).toBeVisible();
     const footer = details.querySelector('[data-slot="managed-dialog-footer"]');
     expect(footer).not.toBeNull();
-    expect(within(footer as HTMLElement).getAllByRole('button')).toHaveLength(1);
-    expect(within(footer as HTMLElement).getByRole('button', { name: 'Close' })).toBeVisible();
+    const footerActions = within(footer as HTMLElement).getByRole('button', {
+      name: 'Close',
+    }).parentElement;
+    expect(footerActions).toHaveAttribute('data-slot', 'managed-dialog-footer-actions');
+    expect(within(footerActions as HTMLElement).getAllByRole('button')).toHaveLength(1);
+    expect(
+      within(footer as HTMLElement).getByRole('button', { name: 'Windows (1)' }),
+    ).toBeVisible();
   });
 
   it('edits a binding with its current revision', async () => {
@@ -987,7 +993,12 @@ describe('RulesPage', () => {
         ),
     ).toBe(false);
 
-    await user.click(within(editor).getByRole('button', { name: 'Close dialog' }));
+    const footer = editor.querySelector('[data-slot="managed-dialog-footer"]');
+    expect(footer).not.toBeNull();
+    expect(
+      within(footer as HTMLElement).getByRole('button', { name: 'Save draft' }),
+    ).toBeDisabled();
+    await user.click(within(footer as HTMLElement).getByRole('button', { name: 'Cancel' }));
     const discard = await screen.findByRole('alertdialog', { name: 'Discard unsaved changes?' });
     await user.click(within(discard).getByRole('button', { name: 'Keep editing' }));
     expect(editor).toBeVisible();

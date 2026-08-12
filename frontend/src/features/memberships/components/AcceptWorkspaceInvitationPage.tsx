@@ -1,12 +1,15 @@
-import { Link, useNavigate } from '@tanstack/react-router';
+import { useNavigate } from '@tanstack/react-router';
 import { ArrowRight, LogOut, UserPlus } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { AsyncButton } from '@/components/shared/AsyncButton';
 import { AsyncContent } from '@/components/shared/AsyncContent';
-import { EntrySurface } from '@/components/shared/EntrySurface';
+import {
+  EntryAction,
+  EntryActionLink,
+  EntryAsyncAction,
+  EntrySurface,
+} from '@/components/shared/EntrySurface';
 import { StatusNotice } from '@/components/shared/StatusNotice';
-import { Button, buttonVariants } from '@/components/ui/button';
 import { restoreBrowserSession, signOutUser } from '@/features/auth/api';
 import { PreferencesMenu } from '@/features/preferences';
 import { ApiError } from '@/lib/api';
@@ -119,16 +122,11 @@ export function AcceptWorkspaceInvitationPage() {
       >
         <div className="space-y-4">
           <StatusNotice tone="info">{t('invitationAccept.authenticateBody')}</StatusNotice>
-          <Link to="/sign-in" className={buttonVariants({ size: 'lg', className: 'w-full' })}>
-            {t('auth.signIn')}
-          </Link>
-          <Link
-            to="/register"
-            className={buttonVariants({ variant: 'outline', size: 'lg', className: 'w-full' })}
-          >
+          <EntryActionLink to="/sign-in">{t('auth.signIn')}</EntryActionLink>
+          <EntryActionLink to="/register" variant="outline">
             <UserPlus aria-hidden />
             {t('auth.createAccount')}
-          </Link>
+          </EntryActionLink>
         </div>
       </EntrySurface>
     );
@@ -143,10 +141,9 @@ export function AcceptWorkspaceInvitationPage() {
       >
         <div className="space-y-4">
           <StatusNotice tone="warning">{t('invitationAccept.wrongAccountBody')}</StatusNotice>
-          <AsyncButton
+          <EntryAsyncAction
             type="button"
             size="lg"
-            className="w-full"
             disabled={actionPending}
             onClick={() => void switchAccount()}
             icon={<LogOut aria-hidden />}
@@ -154,7 +151,7 @@ export function AcceptWorkspaceInvitationPage() {
             pendingLabel={t('invitationAccept.switchingAccount')}
           >
             {t('invitationAccept.useAnotherAccount')}
-          </AsyncButton>
+          </EntryAsyncAction>
         </div>
       </EntrySurface>
     );
@@ -181,9 +178,9 @@ export function AcceptWorkspaceInvitationPage() {
       >
         <div className="space-y-4">
           <StatusNotice tone="destructive">{t('invitationAccept.errorBody')}</StatusNotice>
-          <Button type="button" variant="outline" onClick={() => window.location.reload()}>
+          <EntryAction type="button" variant="outline" onClick={() => window.location.reload()}>
             {t('app.retry')}
-          </Button>
+          </EntryAction>
         </div>
       </EntrySurface>
     );
@@ -198,10 +195,9 @@ export function AcceptWorkspaceInvitationPage() {
       >
         <div className="space-y-4">
           <StatusNotice tone="success">{t('invitationAccept.successBody')}</StatusNotice>
-          <AsyncButton
+          <EntryAsyncAction
             type="button"
             size="lg"
-            className="w-full"
             disabled={actionPending}
             onClick={() => void enterWorkspace(state.acceptance.workspaceId)}
             icon={<ArrowRight aria-hidden />}
@@ -209,7 +205,7 @@ export function AcceptWorkspaceInvitationPage() {
             pendingLabel={t('invitationAccept.enteringWorkspace')}
           >
             {t('invitationAccept.enterWorkspace')}
-          </AsyncButton>
+          </EntryAsyncAction>
         </div>
       </EntrySurface>
     );
@@ -238,10 +234,9 @@ export function AcceptWorkspaceInvitationPage() {
           <dt className="text-muted-foreground">{t('invitationAccept.expires')}</dt>
           <dd>{expiresAt}</dd>
         </dl>
-        <AsyncButton
+        <EntryAsyncAction
           type="button"
           size="lg"
-          className="w-full"
           disabled={actionPending}
           onClick={() => void accept()}
           icon={<UserPlus aria-hidden />}
@@ -249,7 +244,7 @@ export function AcceptWorkspaceInvitationPage() {
           pendingLabel={t('invitationAccept.accepting')}
         >
           {t('invitationAccept.accept')}
-        </AsyncButton>
+        </EntryAsyncAction>
       </div>
     </EntrySurface>
   );

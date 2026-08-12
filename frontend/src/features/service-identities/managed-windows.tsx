@@ -3,7 +3,12 @@ import { KeyRound, Plus, ShieldX } from 'lucide-react';
 import { type FormEvent, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AsyncButton } from '@/components/shared/AsyncButton';
-import { ManagedDialog, ManagedDialogBody } from '@/components/shared/ManagedDialog';
+import {
+  ManagedDialog,
+  ManagedDialogAction,
+  ManagedDialogAsyncAction,
+  ManagedDialogBody,
+} from '@/components/shared/ManagedDialog';
 import {
   type ManagedWindowDescriptor,
   type ManagedWindowRendererProps,
@@ -23,7 +28,6 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { Button } from '@/components/ui/button';
 import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -131,15 +135,15 @@ function ServiceIdentityCreateDialog({ onClose }: { onClose: () => void }) {
         }}
         footer={
           <>
-            <Button
+            <ManagedDialogAction
               type="button"
               variant="outline"
               disabled={mutation.isPending}
               onClick={requestClose}
             >
               {t('app.cancel')}
-            </Button>
-            <AsyncButton
+            </ManagedDialogAction>
+            <ManagedDialogAsyncAction
               type="submit"
               form={formId}
               disabled={mutation.isPending || !value.trim()}
@@ -148,7 +152,7 @@ function ServiceIdentityCreateDialog({ onClose }: { onClose: () => void }) {
               pendingLabel={t('serviceIdentities.creating')}
             >
               {t('serviceIdentities.create')}
-            </AsyncButton>
+            </ManagedDialogAsyncAction>
           </>
         }
       >
@@ -303,14 +307,19 @@ function ServiceIdentityDialog({
         }}
         footer={
           <>
-            <Button type="button" variant="outline" disabled={busy} onClick={requestClose}>
+            <ManagedDialogAction
+              type="button"
+              variant="outline"
+              disabled={busy}
+              onClick={requestClose}
+            >
               {t('app.close')}
-            </Button>
+            </ManagedDialogAction>
             {active && identityReady ? (
               <AlertDialog>
                 <AlertDialogTrigger
                   render={
-                    <AsyncButton
+                    <ManagedDialogAsyncAction
                       type="button"
                       variant="destructive"
                       disabled={busy}
@@ -319,7 +328,7 @@ function ServiceIdentityDialog({
                       pendingLabel={t('serviceIdentities.revokingIdentity')}
                     >
                       {t('serviceIdentities.revokeIdentity')}
-                    </AsyncButton>
+                    </ManagedDialogAsyncAction>
                   }
                 />
                 <AlertDialogContent>
@@ -559,9 +568,9 @@ function UnavailableDialog({ title, onClose }: { title: string; onClose: () => v
         if (!open) onClose();
       }}
       footer={
-        <Button type="button" variant="outline" onClick={onClose}>
+        <ManagedDialogAction type="button" variant="outline" onClick={onClose}>
           {t('app.close')}
-        </Button>
+        </ManagedDialogAction>
       }
     >
       <ManagedDialogBody>

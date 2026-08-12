@@ -469,7 +469,7 @@ def _render_web_theme(theme: dict[str, Any]) -> str:
     for role in ELEVATION_ROLES:
         lines.append(f"  --shadow-axis-{_camel_to_kebab(role)}: {elevation_roles[role]};")
     for role in LAYER_ROLES:
-        lines.append(f"  --z-axis-{_camel_to_kebab(role)}: {layer_roles[role]};")
+        lines.append(f"  --z-index-axis-{_camel_to_kebab(role)}: {layer_roles[role]};")
     lines.extend(
         (
             f"  --transition-duration-axis-state: {motion_roles['stateDuration']};",

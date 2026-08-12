@@ -1,6 +1,6 @@
 import type { Table } from '@tanstack/react-table';
 import { Filter, Group, RotateCcw, Search, Settings2 } from 'lucide-react';
-import type { ReactNode } from 'react';
+import type { PageActionChild } from '@/components/shared/PageLayout';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -16,6 +16,7 @@ import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/in
 import { Popover, PopoverContent, PopoverTitle, PopoverTrigger } from '@/components/ui/popover';
 import { DataTableFilterBuilder, type DataTableFilterField } from './DataTableFilterBuilder';
 import { countFilterConditions, createEmptyFilterExpression } from './filtering';
+import { dataTableControlHeight, dataTableTargetGeometry } from './geometry';
 import type { DataTableFilterGroup, DataTableMessages } from './types';
 
 interface DataTableToolbarProps<TData> {
@@ -26,7 +27,7 @@ interface DataTableToolbarProps<TData> {
   grouping: boolean;
   filterExpression: DataTableFilterGroup;
   onFilterExpressionChange: (expression: DataTableFilterGroup) => void;
-  actions?: ReactNode;
+  actions?: PageActionChild | readonly PageActionChild[];
 }
 
 export function DataTableToolbar<TData>({
@@ -73,11 +74,12 @@ export function DataTableToolbar<TData>({
     >
       {globalSearch ? (
         <div className="min-w-48 flex-1 sm:max-w-sm">
-          <InputGroup>
+          <InputGroup className={dataTableControlHeight}>
             <InputGroupAddon>
               <Search aria-hidden />
             </InputGroupAddon>
             <InputGroupInput
+              className={dataTableControlHeight}
               value={String(table.getState().globalFilter ?? '')}
               onChange={(event) => table.setGlobalFilter(event.target.value)}
               placeholder={messages.searchPlaceholder}
@@ -91,7 +93,13 @@ export function DataTableToolbar<TData>({
         <Popover>
           <PopoverTrigger
             render={
-              <Button type="button" variant="outline" size="sm" aria-label={messages.filters} />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                aria-label={messages.filters}
+                className={dataTableTargetGeometry}
+              />
             }
           >
             <Filter aria-hidden />
@@ -109,7 +117,13 @@ export function DataTableToolbar<TData>({
             <div className="flex items-center justify-between gap-3">
               <PopoverTitle>{messages.filters}</PopoverTitle>
               {hasQuery ? (
-                <Button type="button" variant="ghost" size="xs" onClick={clearFilters}>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="xs"
+                  className={dataTableTargetGeometry}
+                  onClick={clearFilters}
+                >
                   <RotateCcw aria-hidden />
                   {messages.clearFilters}
                 </Button>
@@ -126,7 +140,13 @@ export function DataTableToolbar<TData>({
       ) : null}
 
       {hasQuery ? (
-        <Button type="button" variant="ghost" size="sm" onClick={clearFilters}>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className={dataTableTargetGeometry}
+          onClick={clearFilters}
+        >
           <RotateCcw aria-hidden />
           <span className="hidden sm:inline">{messages.clearFilters}</span>
         </Button>
@@ -134,7 +154,16 @@ export function DataTableToolbar<TData>({
 
       {grouping && groupableColumns.length > 0 ? (
         <DropdownMenu>
-          <DropdownMenuTrigger render={<Button type="button" variant="outline" size="sm" />}>
+          <DropdownMenuTrigger
+            render={
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className={dataTableTargetGeometry}
+              />
+            }
+          >
             <Group aria-hidden />
             {messages.grouping}
           </DropdownMenuTrigger>
@@ -160,7 +189,16 @@ export function DataTableToolbar<TData>({
 
       {columnControls && hideableColumns.length > 0 ? (
         <DropdownMenu>
-          <DropdownMenuTrigger render={<Button type="button" variant="outline" size="sm" />}>
+          <DropdownMenuTrigger
+            render={
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className={dataTableTargetGeometry}
+              />
+            }
+          >
             <Settings2 aria-hidden />
             {messages.columns}
           </DropdownMenuTrigger>

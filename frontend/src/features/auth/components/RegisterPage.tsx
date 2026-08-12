@@ -3,12 +3,15 @@ import { UserPlus } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { Controller } from 'react-hook-form';
 import { Trans, useTranslation } from 'react-i18next';
-import { AsyncButton } from '@/components/shared/AsyncButton';
-import { EntrySurface } from '@/components/shared/EntrySurface';
+import {
+  EntryAsyncAction,
+  EntryConsentCheckbox,
+  EntryConsentLabel,
+  EntryInput,
+  EntrySurface,
+} from '@/components/shared/EntrySurface';
 import { StatusNotice } from '@/components/shared/StatusNotice';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field';
-import { Input } from '@/components/ui/input';
 import { PasswordCriteria } from '@/features/auth/components/PasswordCriteria';
 import { useRegister } from '@/features/auth/hooks/useRegister';
 import { PreferencesMenu } from '@/features/preferences';
@@ -24,7 +27,7 @@ function LegalLink({ children, href }: LegalLinkProps) {
       href={href}
       target="_blank"
       rel="noopener noreferrer"
-      className="whitespace-nowrap font-medium text-primary hover:underline"
+      className="font-medium text-primary hover:underline"
     >
       {children}
     </a>
@@ -60,7 +63,7 @@ export function RegisterPage() {
       <form className="space-y-4" onSubmit={handleSubmit(submit)} noValidate>
         <Field data-invalid={errors.fullName ? true : undefined}>
           <FieldLabel htmlFor="fullName">{t('auth.fullName')}</FieldLabel>
-          <Input
+          <EntryInput
             id="fullName"
             autoComplete="name"
             required
@@ -76,7 +79,7 @@ export function RegisterPage() {
 
         <Field data-invalid={errors.email ? true : undefined}>
           <FieldLabel htmlFor="email">{t('auth.email')}</FieldLabel>
-          <Input
+          <EntryInput
             id="email"
             type="email"
             autoComplete="email"
@@ -91,7 +94,7 @@ export function RegisterPage() {
 
         <Field data-invalid={errors.password ? true : undefined}>
           <FieldLabel htmlFor="password">{t('auth.password')}</FieldLabel>
-          <Input
+          <EntryInput
             id="password"
             type="password"
             autoComplete="new-password"
@@ -113,7 +116,7 @@ export function RegisterPage() {
 
         <Field data-invalid={errors.passwordConfirmation ? true : undefined}>
           <FieldLabel htmlFor="passwordConfirmation">{t('auth.passwordConfirmation')}</FieldLabel>
-          <Input
+          <EntryInput
             id="passwordConfirmation"
             type="password"
             autoComplete="new-password"
@@ -142,7 +145,7 @@ export function RegisterPage() {
           render={({ field }) => (
             <Field data-invalid={errors.acceptedTerms ? true : undefined}>
               <div className="flex items-start gap-2">
-                <Checkbox
+                <EntryConsentCheckbox
                   id="acceptedTerms"
                   name={field.name}
                   checked={field.value}
@@ -153,15 +156,17 @@ export function RegisterPage() {
                   aria-invalid={errors.acceptedTerms ? true : undefined}
                   aria-required="true"
                 />
-                <FieldLabel htmlFor="acceptedTerms">
-                  <Trans
-                    i18nKey="auth.termsAgreement"
-                    components={{
-                      terms: <LegalLink href="/legal/terms" />,
-                      privacy: <LegalLink href="/legal/privacy" />,
-                    }}
-                  />
-                </FieldLabel>
+                <EntryConsentLabel htmlFor="acceptedTerms">
+                  <span className="min-w-0">
+                    <Trans
+                      i18nKey="auth.termsAgreement"
+                      components={{
+                        terms: <LegalLink href="/legal/terms" />,
+                        privacy: <LegalLink href="/legal/privacy" />,
+                      }}
+                    />
+                  </span>
+                </EntryConsentLabel>
               </div>
               {errors.acceptedTerms ? (
                 <FieldError id="acceptedTerms-error">{errors.acceptedTerms.message}</FieldError>
@@ -172,17 +177,16 @@ export function RegisterPage() {
 
         {submitError ? <StatusNotice tone="destructive">{submitError}</StatusNotice> : null}
 
-        <AsyncButton
+        <EntryAsyncAction
           type="submit"
           size="lg"
-          className="w-full"
           disabled={loading}
           icon={<UserPlus aria-hidden />}
           pending={loading}
           pendingLabel={t('auth.creatingAccount')}
         >
           {t('auth.createAccount')}
-        </AsyncButton>
+        </EntryAsyncAction>
       </form>
     </EntrySurface>
   );

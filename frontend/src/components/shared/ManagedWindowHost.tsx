@@ -1,27 +1,20 @@
-import { Layers3Icon, Maximize2Icon, XIcon } from 'lucide-react';
+import { Maximize2Icon, XIcon } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  opaquePopoverTriggerSurface,
-  persistentItemHighlight,
-} from '@/components/shared/interactionStates';
-import { ManagedDialog, ManagedDialogBody } from '@/components/shared/ManagedDialog';
+  ManagedDialog,
+  ManagedDialogAction,
+  ManagedDialogBody,
+  ManagedDialogIconAction,
+  ManagedWindowMenu,
+} from '@/components/shared/ManagedDialog';
 import {
-  type ManagedWindowEntry,
   ManagedWindowRendererScope,
   useManagedWindowActions,
   useManagedWindowHostContext,
   useManagedWindowStore,
 } from '@/components/shared/ManagedWindowManager';
 import { Button } from '@/components/ui/button';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { axisStyles } from '@/theme.generated';
 
@@ -45,7 +38,7 @@ export function ManagedWindowHost() {
     hostWidth < 640 ? 1 : Math.max(1, Math.min(3, Math.floor((hostWidth - 240) / 272)));
   const visibleDocks = docked.slice(-visibleDockCount);
   const hiddenDocks = docked.slice(0, Math.max(0, docked.length - visibleDockCount));
-  const hasWindows = entries.length > 0;
+  const hasExpandedWindow = entries.some(([, entry]) => entry.mode === 'expanded');
 
   return (
     <div
@@ -78,9 +71,13 @@ export function ManagedWindowHost() {
                   if (!open) closeWindow(windowId);
                 }}
                 footer={
-                  <Button type="button" variant="outline" onClick={() => closeWindow(windowId)}>
+                  <ManagedDialogAction
+                    type="button"
+                    variant="outline"
+                    onClick={() => closeWindow(windowId)}
+                  >
                     {t('app.close')}
-                  </Button>
+                  </ManagedDialogAction>
                 }
               >
                 <ManagedDialogBody>
@@ -94,7 +91,7 @@ export function ManagedWindowHost() {
         );
       })}
 
-      {hasWindows ? (
+      {docked.length > 0 ? (
         <div
           data-slot="managed-window-tray"
           className={cn(
@@ -103,18 +100,20 @@ export function ManagedWindowHost() {
             axisStyles.spacing.gap.inline,
           )}
         >
-          <WindowMenu
-            label={t('dialog.windows', { count: entries.length })}
-            entries={entries}
-            activeWindowId={activeWindowId}
-            onSelect={(windowId, entry) => {
-              if (entry.mode === 'docked') restoreWindow(windowId);
-              else focusWindow(windowId);
-            }}
-          />
+          {!hasExpandedWindow ? (
+            <ManagedWindowMenu
+              label={t('dialog.windows', { count: entries.length })}
+              entries={entries}
+              activeWindowId={activeWindowId}
+              onSelect={(windowId, entry) => {
+                if (entry.mode === 'docked') restoreWindow(windowId);
+                else focusWindow(windowId);
+              }}
+            />
+          ) : null}
 
           {hiddenDocks.length > 0 ? (
-            <WindowMenu
+            <ManagedWindowMenu
               label={t('dialog.moreWindows', { count: hiddenDocks.length })}
               compactLabel={`+${hiddenDocks.length}`}
               entries={hiddenDocks}
@@ -153,7 +152,7 @@ export function ManagedWindowHost() {
                   </span>
                 ) : null}
               </Button>
-              <Button
+              <ManagedDialogIconAction
                 type="button"
                 variant="ghost"
                 size="icon-sm"
@@ -162,8 +161,8 @@ export function ManagedWindowHost() {
                 onClick={() => restoreWindow(windowId)}
               >
                 <Maximize2Icon />
-              </Button>
-              <Button
+              </ManagedDialogIconAction>
+              <ManagedDialogIconAction
                 type="button"
                 variant="ghost"
                 size="icon-sm"
@@ -173,73 +172,12 @@ export function ManagedWindowHost() {
                 onClick={() => requestClose(windowId)}
               >
                 <XIcon />
-              </Button>
+              </ManagedDialogIconAction>
             </div>
           ))}
         </div>
       ) : null}
     </div>
-  );
-}
-
-function WindowMenu({
-  label,
-  compactLabel,
-  entries,
-  activeWindowId,
-  onSelect,
-}: {
-  label: string;
-  compactLabel?: string;
-  entries: readonly (readonly [string, ManagedWindowEntry])[];
-  activeWindowId: string | null;
-  onSelect: (windowId: string, entry: ManagedWindowEntry) => void;
-}) {
-  const { t } = useTranslation();
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger
-        aria-label={compactLabel ? label : undefined}
-        title={compactLabel ? label : undefined}
-        render={
-          <Button
-            type="button"
-            variant="outline"
-            className={`pointer-events-auto h-full shrink-0 ${opaquePopoverTriggerSurface}`}
-          />
-        }
-      >
-        {compactLabel ? null : <Layers3Icon />}
-        <span>{compactLabel ?? label}</span>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent side="top" align="end" className="w-72">
-        <DropdownMenuGroup>
-          <DropdownMenuLabel>{label}</DropdownMenuLabel>
-          {entries.map(([windowId, entry]) => {
-            const active = windowId === activeWindowId;
-            return (
-              <DropdownMenuItem
-                key={windowId}
-                aria-current={active ? 'true' : undefined}
-                className={active ? persistentItemHighlight : undefined}
-                onClick={() => onSelect(windowId, entry)}
-              >
-                <span className="min-w-0 flex-1 truncate">{entry.title}</span>
-                {entry.dirty ? (
-                  <span data-slot="managed-window-dirty-indicator" title={t('dialog.unsaved')}>
-                    <span aria-hidden="true">•</span>
-                    <span className="sr-only">{t('dialog.unsaved')}</span>
-                  </span>
-                ) : null}
-                <span className="text-xs text-muted-foreground">
-                  {entry.mode === 'docked' ? t('dialog.minimized') : t('dialog.expanded')}
-                </span>
-              </DropdownMenuItem>
-            );
-          })}
-        </DropdownMenuGroup>
-      </DropdownMenuContent>
-    </DropdownMenu>
   );
 }
 

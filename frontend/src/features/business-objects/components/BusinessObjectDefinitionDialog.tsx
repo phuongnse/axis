@@ -5,9 +5,13 @@ import { type ReactNode, useEffect, useId, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
-import { AsyncButton } from '@/components/shared/AsyncButton';
 import { AsyncContent } from '@/components/shared/AsyncContent';
-import { ManagedDialog, ManagedDialogBody } from '@/components/shared/ManagedDialog';
+import {
+  ManagedDialog,
+  ManagedDialogAction,
+  ManagedDialogAsyncAction,
+  ManagedDialogBody,
+} from '@/components/shared/ManagedDialog';
 import { ManagedDialogTabs } from '@/components/shared/ManagedDialogTabs';
 import { MetadataTag } from '@/components/shared/MetadataTag';
 import { StatusBadge } from '@/components/shared/StatusBadge';
@@ -364,11 +368,16 @@ export function BusinessObjectDefinitionDialog({
         dirty={!readOnly && form.formState.isDirty}
         footer={
           <>
-            <Button type="button" variant="outline" disabled={busy} onClick={requestClose}>
+            <ManagedDialogAction
+              type="button"
+              variant="outline"
+              disabled={busy}
+              onClick={requestClose}
+            >
               {exitLabel}
-            </Button>
+            </ManagedDialogAction>
             {mode === 'create' ? (
-              <AsyncButton
+              <ManagedDialogAsyncAction
                 type="submit"
                 form={formId}
                 icon={<Plus />}
@@ -376,12 +385,12 @@ export function BusinessObjectDefinitionDialog({
                 pendingLabel={t('businessObjects.creating')}
               >
                 {t('businessObjects.create')}
-              </AsyncButton>
+              </ManagedDialogAsyncAction>
             ) : null}
             {mode === 'edit' && (canSave || canPublish) ? (
               <>
                 {canSave ? (
-                  <AsyncButton
+                  <ManagedDialogAsyncAction
                     type="submit"
                     form={formId}
                     variant="secondary"
@@ -391,10 +400,10 @@ export function BusinessObjectDefinitionDialog({
                     pendingLabel={t('businessObjects.saving')}
                   >
                     {t('businessObjects.save')}
-                  </AsyncButton>
+                  </ManagedDialogAsyncAction>
                 ) : null}
                 {canPublish ? (
-                  <AsyncButton
+                  <ManagedDialogAsyncAction
                     type="button"
                     disabled={busy || form.formState.isDirty || fields.length === 0}
                     icon={<UploadCloud />}
@@ -403,7 +412,7 @@ export function BusinessObjectDefinitionDialog({
                     onClick={() => setPublishOpen(true)}
                   >
                     {t('businessObjects.publish')}
-                  </AsyncButton>
+                  </ManagedDialogAsyncAction>
                 ) : null}
               </>
             ) : null}

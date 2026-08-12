@@ -6,6 +6,7 @@ import { LanguageControl } from '@/features/preferences/LanguageControl';
 import { ThemeControl } from '@/features/preferences/ThemeControl';
 import { useThemePreference } from '@/features/preferences/theme-store';
 import { cn } from '@/lib/utils';
+import { axisStyles } from '@/theme.generated';
 
 interface PreferencesMenuProps {
   authenticated?: boolean;
@@ -25,6 +26,12 @@ export function PreferencesMenu({ authenticated = false, className }: Preference
               type="button"
               variant="outline"
               size="sm"
+              className={cn(
+                axisStyles.density.minHeight.touchTarget,
+                axisStyles.density.minWidth.touchTarget,
+                axisStyles.density.minHeight.compactControlAtSmall,
+                axisStyles.density.minWidth.compactControlAtSmall,
+              )}
               aria-label={t('app.preferences')}
               title={t('app.preferences')}
             />

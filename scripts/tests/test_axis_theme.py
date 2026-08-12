@@ -243,7 +243,8 @@ class TestAxisTheme(unittest.TestCase):
             self.assertIn("--text-axis-page-title: 1.5rem;", web)
             self.assertIn("--spacing-axis-touch-target: 2.75rem;", web)
             self.assertIn("--radius-axis-managed: 1rem;", web)
-            self.assertIn("--z-axis-notification: 60;", web)
+            self.assertIn("--z-index-axis-notification: 60;", web)
+            self.assertNotIn("--z-axis-notification", web)
             self.assertIn("content: {\n    delayMs: 300", runtime)
             self.assertIn("minimumMs: 600", runtime)
             self.assertIn(

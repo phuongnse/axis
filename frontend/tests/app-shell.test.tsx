@@ -449,13 +449,36 @@ describe('AppShell', () => {
     const view = render(shell(<TestWindowLauncher />));
 
     await user.click(screen.getByRole('button', { name: 'Open test window' }));
-    expect(await screen.findByRole('dialog', { name: 'Persistent test window' })).toBeVisible();
-    expect(screen.getByRole('button', { name: 'Windows (1)' })).toBeVisible();
+    const dialog = await screen.findByRole('dialog', { name: 'Persistent test window' });
+    expect(dialog).toBeVisible();
+    const footer = dialog.querySelector<HTMLElement>('[data-slot="managed-dialog-footer"]');
+    expect(footer).not.toBeNull();
+    expect(
+      within(footer as HTMLElement).getByRole('button', { name: 'Windows (1)' }),
+    ).toBeVisible();
+    expect(document.querySelector('[data-slot="managed-window-tray"]')).toBeNull();
 
     view.rerender(shell(<section>Another authenticated route</section>));
     expect(screen.getByRole('dialog', { name: 'Persistent test window' })).toBeVisible();
     toast.success('Persistent window saved');
     expect(await screen.findByText('Persistent window saved')).toBeVisible();
+
+    await user.click(within(dialog).getByRole('button', { name: 'Minimize dialog' }));
+    expect(
+      screen.queryByRole('dialog', { name: 'Persistent test window' }),
+    ).not.toBeInTheDocument();
+    const tray = document.querySelector<HTMLElement>('[data-slot="managed-window-tray"]');
+    expect(tray).not.toBeNull();
+    await user.click(within(tray as HTMLElement).getByRole('button', { name: 'Windows (1)' }));
+    await user.click(await screen.findByRole('menuitem', { name: /Persistent test window/ }));
+    const restoredDialog = await screen.findByRole('dialog', { name: 'Persistent test window' });
+    expect(
+      within(
+        restoredDialog.querySelector<HTMLElement>(
+          '[data-slot="managed-dialog-footer"]',
+        ) as HTMLElement,
+      ).getByRole('button', { name: 'Windows (1)' }),
+    ).toBeVisible();
 
     await user.click(screen.getByRole('button', { name: /Account menu/ }));
     await user.click(screen.getByRole('button', { name: 'Sign out' }));
@@ -712,7 +735,32 @@ describe('AppShell', () => {
     expect(dialog.querySelector('[data-slot="managed-dialog-window"]')).toHaveClass(
       axisStyles.elevation.managed,
     );
-    expect(dialog.querySelector('[data-slot="managed-dialog-header"]')).toHaveClass('items-center');
+    expect(dialog.querySelector('[data-slot="managed-dialog-header"]')).toHaveClass(
+      'flex',
+      'flex-col',
+    );
+    expect(dialog.querySelector('[data-slot="managed-dialog-header-primary"]')).toHaveClass(
+      'flex-col',
+      'sm:flex-row',
+      'sm:items-start',
+      'sm:justify-between',
+    );
+    expect(dialog.querySelector('[data-slot="managed-dialog-header-controls"]')).toHaveClass(
+      'self-center',
+      'sm:self-start',
+    );
+    const headerButtons = dialog.querySelectorAll(
+      '[data-slot="managed-dialog-header"] [data-slot="button"]',
+    );
+    expect(headerButtons).toHaveLength(4);
+    for (const button of headerButtons) {
+      expect(button).toHaveClass(
+        axisStyles.density.minHeight.touchTarget,
+        axisStyles.density.minWidth.touchTarget,
+        axisStyles.density.minHeight.compactControlAtSmall,
+        axisStyles.density.minWidth.compactControlAtSmall,
+      );
+    }
   });
 
   it('keeps the Windows trigger fully opaque in dark mode', async () => {
@@ -736,6 +784,12 @@ describe('AppShell', () => {
     await user.click(screen.getByRole('button', { name: 'Open test window' }));
     const windowsTrigger = await screen.findByRole('button', { name: 'Windows (1)' });
 
+    expect(windowsTrigger).toHaveClass(
+      axisStyles.density.minHeight.touchTarget,
+      axisStyles.density.minWidth.touchTarget,
+      axisStyles.density.minHeight.compactControlAtSmall,
+      axisStyles.density.minWidth.compactControlAtSmall,
+    );
     expect(windowsTrigger).toHaveClass('bg-popover', 'dark:bg-popover', 'dark:hover:bg-muted');
     expect(windowsTrigger).not.toHaveClass('dark:bg-input/30', 'dark:hover:bg-input/50');
   });
@@ -758,9 +812,16 @@ describe('AppShell', () => {
     const dialog = await screen.findByRole('dialog', { name: 'Persistent test window' });
     const footer = dialog.querySelector('[data-slot="managed-dialog-footer"]');
     expect(footer).not.toBeNull();
-    expect(within(footer as HTMLElement).getByRole('button', { name: 'Close' })).toBeEnabled();
+    const close = within(footer as HTMLElement).getByRole('button', { name: 'Close' });
+    expect(close).toBeEnabled();
+    expect(close).toHaveClass(
+      axisStyles.density.minHeight.touchTarget,
+      axisStyles.density.minWidth.touchTarget,
+      axisStyles.density.minHeight.compactControlAtSmall,
+      axisStyles.density.minWidth.compactControlAtSmall,
+    );
 
-    await user.click(within(footer as HTMLElement).getByRole('button', { name: 'Close' }));
+    await user.click(close);
     await waitFor(() =>
       expect(
         screen.queryByRole('dialog', { name: 'Persistent test window' }),
@@ -808,8 +869,12 @@ describe('AppShell', () => {
       await user.click(screen.getByRole('button', { name: 'Open overflowing window' }));
       const overflowingDialog = await screen.findByRole('dialog', { name: 'Overflowing window' });
       expect(overflowingDialog.querySelector('[data-slot="managed-dialog-header"]')).toHaveClass(
-        'items-center',
+        'flex',
+        'flex-col',
       );
+      expect(
+        overflowingDialog.querySelector('[data-slot="managed-dialog-header-primary"]'),
+      ).toHaveClass('flex-col', 'sm:flex-row', 'sm:items-start', 'sm:justify-between');
       const overflowingWindow = overflowingDialog.querySelector(
         '[data-slot="managed-dialog-window"]',
       );

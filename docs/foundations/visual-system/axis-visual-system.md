@@ -82,6 +82,12 @@ Initial loading reserves the owning region and does not render empty content fir
 - Entry and informational pages may use a focused anatomy while retaining the same semantic roles and state model.
 - Compact layouts preserve task priority, touch targets, labels, and recovery; desktop layouts increase density without changing meaning.
 
+### Entry Surface contract
+
+`EntrySurface` is the sole focused public-entry owner. `EntryLayout` owns the document-height canvas, responsive page gutters, top-end utilities, one `main` region, one centered width boundary, horizontal-overflow prevention, and document vertical scrolling for tall content. `EntrySurface` owns one Card with ordered brand/title, optional banner, leaf content, and optional footer regions. The typed `surfaceId` identifies one of email confirmation, invitation acceptance, registration, session unavailable, sign-in, or email verification; feature consumers supply product state and text without recreating that anatomy.
+
+Entry form controls use owner-provided input, primary-action, navigation-action, async-action, and consent-label mappings. They preserve the `touch-target` role in compact layouts and return to `compact-control` density from the small breakpoint. Inline text links retain native link semantics and the WCAG inline-target exception. Public Preferences remains outside the Card but inside the Entry layout, and uses the same responsive density. Registration is the maximal visual representative because it exercises utilities, title, all form roles, consent/legal content, primary action, footer, tall-document scrolling, and localized reflow. Consumer-specific loading, validation, retry, success, authorization, invitation, and authentication behavior remains owned by the relevant use case.
+
 ## Conformance and exceptions
 
 1. Select the semantic role before selecting a component.
@@ -146,6 +152,7 @@ Only entries whose state is `enforced` and whose id is present in `enforcedContr
 | AT-004 | Layout smoke | Each registered surface contract proves its representative states in light/dark and desktop/compact layouts without document overflow or console errors. | AC-002, AC-004, AC-005 | Browser automation | Yes |
 | AT-005 | Browser journey | Pointer and keyboard task flow proves independent managed work, focus, draft, pending, recovery, navigation, and context continuity. | AC-003, AC-004, AC-005 | Browser automation | Yes |
 | AT-006 | UI component | The typed active-surface catalog maps finite ids to contracts, the real-symbol inventory is complete, and owner markers confirm composition without filename or source-text inference. | AC-001, AC-006, AC-007 | UI component test + Frontend CI | Yes |
+| AT-007 | UI component | The complete Entry Surface owner and six-consumer inventory proves one clean-cutover anatomy, criterion-level standards applicability, responsive/touch density, consumer state coverage, and accepted review disposition without absorbing authentication or invitation semantics. | AC-001, AC-002, AC-003, AC-004, AC-005, AC-006, AC-007 | UI component test + Browser automation | Yes |
 
 ## Out Of Scope
 
@@ -162,7 +169,7 @@ Only entries whose state is `enforced` and whose id is present in `enforcedContr
 > | Frontend | Partial |
 > | Tests | Partial |
 >
-> **Gaps vs spec:** Account is the first `axis-ui-v1` enforced contract: all eighteen requirements are acceptance-traced and its five version-controlled captures are accepted. Its human-facing roll-up is `Complete`. The other five contracts classify all profile requirements as gaps. Existing component, browser, or perceptual artifacts do not advance their lifecycle state until requirement traces and project-owner acceptance are current. Authenticated Frame's owning App Frame foundation remains `Done` under its own acceptance matrix; the stricter profile lifecycle here is intentionally separate.
+> **Gaps vs spec:** Account, Authenticated Frame, Entry Surface, and Resource Workspace are enforced `axis-ui-v1` contracts: each has all eighteen requirements acceptance-traced and five version-controlled captures accepted. Their human-facing roll-up is `Complete`. Managed Task Window is a technically complete candidate with fifteen non-review requirements covered and the three standards requirements intentionally pending project-owner review. Process Workbench still classifies all profile requirements as gaps. Existing evidence does not advance any lifecycle state without complete requirement traces and the review required by that state.
 >
 > **Deferred follow-ups:** N/A; missing contract evidence remains current work and cannot be converted into an exception.
 >

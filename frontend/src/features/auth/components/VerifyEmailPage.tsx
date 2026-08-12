@@ -5,12 +5,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { type FieldPath, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
-import { AsyncButton } from '@/components/shared/AsyncButton';
 import { AsyncContent } from '@/components/shared/AsyncContent';
-import { EntrySurface } from '@/components/shared/EntrySurface';
+import { EntryAsyncAction, EntryInput, EntrySurface } from '@/components/shared/EntrySurface';
 import { StatusNotice, type StatusNoticeTone } from '@/components/shared/StatusNotice';
 import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field';
-import { Input } from '@/components/ui/input';
 import { useRefreshClientValidationErrors } from '@/features/auth/hooks/useRefreshClientValidationErrors';
 import { useResendVerification } from '@/features/auth/hooks/useResendVerification';
 import { useVerifyEmail } from '@/features/auth/hooks/useVerifyEmail';
@@ -119,7 +117,7 @@ function VerifyEmailOutcome({
           >
             <Field data-invalid={errors.email ? true : undefined}>
               <FieldLabel htmlFor="resend-email">{t('auth.email')}</FieldLabel>
-              <Input
+              <EntryInput
                 id="resend-email"
                 type="email"
                 autoComplete="email"
@@ -138,17 +136,16 @@ function VerifyEmailOutcome({
                 <FieldError id="resend-email-error">{errors.email.message}</FieldError>
               ) : null}
             </Field>
-            <AsyncButton
+            <EntryAsyncAction
               type="submit"
               size="lg"
-              className="w-full"
               disabled={kind === 'rate_limited' || resendLoading}
               icon={<Mail aria-hidden />}
               pending={resendLoading}
               pendingLabel={t('auth.sending')}
             >
               {t('auth.resendVerification')}
-            </AsyncButton>
+            </EntryAsyncAction>
           </form>
         ) : null}
       </div>
@@ -259,10 +256,9 @@ export function VerifyEmailPage() {
       >
         <div className="space-y-4" aria-live="polite">
           <StatusNotice tone="success">{t('verify.success.body')}</StatusNotice>
-          <AsyncButton
+          <EntryAsyncAction
             type="button"
             size="lg"
-            className="w-full"
             onClick={continueToDashboard}
             disabled={handoffStarted}
             icon={<ArrowRight aria-hidden />}
@@ -270,7 +266,7 @@ export function VerifyEmailPage() {
             pendingLabel={t('verify.success.continuing')}
           >
             {t('verify.success.action')}
-          </AsyncButton>
+          </EntryAsyncAction>
         </div>
       </EntrySurface>
     );

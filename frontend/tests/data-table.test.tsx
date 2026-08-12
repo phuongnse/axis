@@ -11,7 +11,8 @@ import {
   type DataTableMessages,
   type DataTableQueryState,
 } from '@/components/shared/data-table';
-import { Button } from '@/components/ui/button';
+import { PageAction } from '@/components/shared/PageLayout';
+import { axisStyles } from '@/theme.generated';
 
 interface Item {
   id: string;
@@ -231,10 +232,10 @@ describe('DataTable', () => {
       <DataTable
         definition={clientDefinition({
           renderToolbarActions: ({ rows, queryState }) => (
-            <Button type="button" variant="outline">
+            <PageAction type="button" variant="outline">
               Export {rows.length} rows with {countFilterConditions(queryState.filterExpression)}{' '}
               filters
-            </Button>
+            </PageAction>
           ),
         })}
       />,
@@ -250,6 +251,12 @@ describe('DataTable', () => {
     ).toBeInTheDocument();
     const nameHeader = within(table).getByRole('columnheader', { name: /Name/ });
     const nameSort = within(nameHeader).getByRole('button', { name: 'Name: Sort ascending' });
+    expect(nameSort).toHaveClass(
+      axisStyles.density.minHeight.touchTarget,
+      axisStyles.density.minWidth.touchTarget,
+      axisStyles.density.minHeight.compactControlAtSmall,
+      axisStyles.density.minWidth.compactControlAtSmall,
+    );
     expect(nameHeader).toHaveClass('first:pl-3');
     expect(nameHeader.querySelector('[data-slot="data-table-column-label"]')).not.toBeNull();
     const alphaCell = within(table).getByText('Alpha').closest('td');
@@ -393,9 +400,9 @@ describe('DataTable', () => {
           initialState: { grouping: ['department'], expanded: true },
           renderDetail: (row) => <div>{row.original.name} detail</div>,
           renderBulkActions: (rows, clear) => (
-            <Button type="button" onClick={clear}>
+            <PageAction type="button" onClick={clear}>
               Archive {rows.length}
-            </Button>
+            </PageAction>
           ),
         })}
       />,

@@ -11,6 +11,7 @@ import {
   THEME_STORAGE_KEY,
   ThemeControl,
 } from '@/features/preferences';
+import { axisStyles } from '@/theme.generated';
 import { renderWithRouter } from './render-with-router';
 
 function jsonResponse(data: unknown): Response {
@@ -157,6 +158,12 @@ describe('theme preferences', () => {
     expect(trigger).toHaveTextContent('Preferences');
     expect(trigger).not.toHaveTextContent('EN');
     expect(trigger).not.toHaveTextContent('English');
+    expect(trigger).toHaveClass(
+      axisStyles.density.minHeight.touchTarget,
+      axisStyles.density.minWidth.touchTarget,
+      axisStyles.density.minHeight.compactControlAtSmall,
+      axisStyles.density.minWidth.compactControlAtSmall,
+    );
 
     await user.click(trigger);
 

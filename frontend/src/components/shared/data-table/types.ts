@@ -11,6 +11,7 @@ import type {
   VisibilityState,
 } from '@tanstack/react-table';
 import type { ReactNode } from 'react';
+import type { PageActionChild } from '@/components/shared/PageLayout';
 
 export interface DataTableFilterOption {
   value: string;
@@ -217,8 +218,13 @@ export interface DataTableDefinition<TData> {
   enableRowSelection?: boolean | ((row: Row<TData>) => boolean);
   getSubRows?: (row: TData) => TData[] | undefined;
   renderDetail?: (row: Row<TData>) => ReactNode;
-  renderToolbarActions?: (context: DataTableToolbarActionContext<TData>) => ReactNode;
-  renderBulkActions?: (rows: readonly Row<TData>[], clearSelection: () => void) => ReactNode;
+  renderToolbarActions?: (
+    context: DataTableToolbarActionContext<TData>,
+  ) => PageActionChild | readonly PageActionChild[];
+  renderBulkActions?: (
+    rows: readonly Row<TData>[],
+    clearSelection: () => void,
+  ) => PageActionChild | readonly PageActionChild[];
   loading?: boolean;
   error?: boolean;
   onRetry?: () => void;

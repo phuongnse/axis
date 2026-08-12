@@ -1,4 +1,4 @@
-import { expect, type Locator, type Page, type TestInfo, test } from '@playwright/test';
+import { expect, type Locator, type Page, test } from '@playwright/test';
 import { expectCanonicalTestLanguage } from './canonical-test-language';
 
 const profile = {
@@ -699,8 +699,19 @@ function seededDefinitions(count: number): BusinessObjectDefinitionDetail[] {
   );
 }
 
-async function attachGoldenScreenshot(page: Page, testInfo: TestInfo, name: string): Promise<void> {
-  await expectCanonicalTestLanguage(page);
+async function expectResourceWorkspaceScreenshot(
+  page: Page,
+  name: string,
+  { canonicalLanguage = true }: { canonicalLanguage?: boolean } = {},
+): Promise<void> {
+  if (canonicalLanguage) await expectCanonicalTestLanguage(page);
+  const workspace = page.locator('[data-slot="resource-workspace"]');
+  await expect(workspace).toBeVisible();
+  await expect(workspace).toHaveAttribute('data-axis-surface-contract', 'resource-workspace');
+  await expect(workspace).toHaveAttribute('data-axis-surface-id', 'business-object-definitions');
+  await page.evaluate(() =>
+    Promise.all(document.getAnimations({ subtree: true }).map((animation) => animation.finished)),
+  );
   await page.evaluate(() => {
     if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
     document
@@ -708,10 +719,266 @@ async function attachGoldenScreenshot(page: Page, testInfo: TestInfo, name: stri
       ?.scrollIntoView({ block: 'nearest', inline: 'center' });
   });
   await page.mouse.move(1, 1);
-  await testInfo.attach(name, {
-    body: await page.screenshot({ animations: 'disabled', caret: 'hide', scale: 'css' }),
-    contentType: 'image/png',
+  await expect(page).toHaveScreenshot(`${name}.png`, {
+    animations: 'disabled',
+    caret: 'hide',
+    fullPage: true,
+    scale: 'css',
   });
+}
+
+async function expectManagedTaskWindowScreenshot(
+  page: Page,
+  name: string,
+  { canonicalLanguage = true }: { canonicalLanguage?: boolean } = {},
+): Promise<void> {
+  if (canonicalLanguage) await expectCanonicalTestLanguage(page);
+  const activeWindow = page.locator('[data-slot="managed-dialog-window"][data-active="true"]');
+  await expect(activeWindow).toBeVisible();
+  await expect(activeWindow).toHaveAttribute('data-axis-surface-contract', 'managed-task-window');
+  await expect(activeWindow).toHaveAttribute('data-axis-surface-id', 'business-object-editor');
+  await page.evaluate(() =>
+    Promise.all(document.getAnimations({ subtree: true }).map((animation) => animation.finished)),
+  );
+  await page.evaluate(() => {
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+  });
+  await page.mouse.move(1, 1);
+  await expect(page).toHaveScreenshot(`${name}.png`, {
+    animations: 'disabled',
+    caret: 'hide',
+    fullPage: true,
+    scale: 'css',
+  });
+}
+
+async function expectManagedTaskWindowTargetGeometry(
+  page: Page,
+  minimumSize: 32 | 44,
+): Promise<void> {
+  const targets = page.locator(
+    '[data-slot="managed-dialog-window"][data-active="true"] [data-slot="managed-dialog-header"] [data-slot="button"], ' +
+      '[data-slot="managed-dialog-window"][data-active="true"] [data-slot="managed-dialog-footer"] [data-slot="button"], ' +
+      '[data-slot="managed-dialog-window"][data-active="true"] [data-slot="managed-dialog-footer"] [data-slot="dropdown-menu-trigger"], ' +
+      '[data-slot="managed-window-tray"] [data-slot="button"], ' +
+      '[data-slot="managed-window-tray"] [data-slot="dropdown-menu-trigger"]',
+  );
+  const measurements = await targets.evaluateAll((elements) =>
+    elements.map((element) => {
+      const bounds = element.getBoundingClientRect();
+      return {
+        height: bounds.height,
+        name: element.getAttribute('aria-label') ?? element.textContent?.trim() ?? '',
+        width: bounds.width,
+      };
+    }),
+  );
+  expect(measurements.length).toBeGreaterThan(0);
+  for (const measurement of measurements) {
+    expect(measurement.width, `${measurement.name} width`).toBeGreaterThanOrEqual(minimumSize);
+    expect(measurement.height, `${measurement.name} height`).toBeGreaterThanOrEqual(minimumSize);
+  }
+}
+
+async function expectManagedTaskWindowDesktopGeometry(
+  page: Page,
+  activeWindow: Locator,
+): Promise<void> {
+  const workArea = page.locator('[data-slot="managed-window-expanded-layer"]');
+  const [workAreaBox, initialBox, minimum] = await Promise.all([
+    workArea.boundingBox(),
+    activeWindow.boundingBox(),
+    activeWindow.evaluate((element) => {
+      const style = getComputedStyle(element);
+      return {
+        height: Number.parseFloat(style.minHeight),
+        width: Number.parseFloat(style.minWidth),
+      };
+    }),
+  ]);
+  if (!workAreaBox || !initialBox)
+    throw new Error('Managed task window work-area geometry missing');
+  expect(initialBox.width).toBeCloseTo(workAreaBox.width * 0.5, 0);
+  expect(initialBox.height).toBeCloseTo(workAreaBox.height * 0.75, 0);
+  expect(minimum.width).toBeCloseTo(workAreaBox.width * 0.35, 0);
+  expect(minimum.height).toBeCloseTo(workAreaBox.height * 0.5, 0);
+
+  await activeWindow.getByRole('button', { name: 'Maximize dialog' }).click();
+  await expect
+    .poll(async () => (await activeWindow.boundingBox())?.width)
+    .toBeCloseTo(workAreaBox.width, 0);
+  await expect
+    .poll(async () => (await activeWindow.boundingBox())?.height)
+    .toBeCloseTo(workAreaBox.height, 0);
+  await expect
+    .poll(async () => (await activeWindow.boundingBox())?.x)
+    .toBeCloseTo(workAreaBox.x, 0);
+  await expect
+    .poll(async () => (await activeWindow.boundingBox())?.y)
+    .toBeCloseTo(workAreaBox.y, 0);
+  await activeWindow.getByRole('button', { name: 'Restore dialog size' }).click();
+  await expect.poll(async () => await activeWindow.boundingBox()).toEqual(initialBox);
+
+  const header = activeWindow.locator('[data-slot="managed-dialog-header"]');
+  await header.dblclick({ position: { x: 24, y: 24 } });
+  await expect(activeWindow).toHaveAttribute('data-dialog-preset', 'fullscreen');
+  await header.dblclick({ position: { x: 24, y: 24 } });
+  await expect.poll(async () => await activeWindow.boundingBox()).toEqual(initialBox);
+}
+
+async function expectManagedTaskWindowHeaderControlGeometry(
+  activeWindow: Locator,
+  mode: 'compact' | 'desktop',
+): Promise<void> {
+  const header = activeWindow.locator('[data-slot="managed-dialog-header"]');
+  const primary = header.locator('[data-slot="managed-dialog-header-primary"]');
+  const identity = header.locator('[data-slot="managed-dialog-header-identity"]');
+  const controls = header.locator('[data-slot="managed-dialog-header-controls"]');
+  const description = header.locator('[data-slot="dialog-description"]');
+  const [headerBox, primaryBox, identityBox, controlsBox, descriptionBox] = await Promise.all([
+    header.boundingBox(),
+    primary.boundingBox(),
+    identity.boundingBox(),
+    controls.boundingBox(),
+    description.boundingBox(),
+  ]);
+  if (!headerBox || !primaryBox || !identityBox || !controlsBox || !descriptionBox)
+    throw new Error('Managed task window header geometry missing');
+
+  if (mode === 'desktop') {
+    expect(controlsBox.y).toBeCloseTo(primaryBox.y, 0);
+    expect(controlsBox.x).toBeGreaterThan(identityBox.x);
+    return;
+  }
+
+  expect(identityBox.y + identityBox.height).toBeLessThanOrEqual(controlsBox.y);
+  expect(controlsBox.y + controlsBox.height).toBeLessThanOrEqual(descriptionBox.y);
+  expect(
+    Math.abs(controlsBox.x + controlsBox.width / 2 - (headerBox.x + headerBox.width / 2)),
+  ).toBeLessThanOrEqual(1);
+}
+
+async function openOverlappingManagedDefinitionWindows(page: Page): Promise<{
+  catalog: Locator;
+  customerWindow: Locator;
+  definitionTwoWindow: Locator;
+}> {
+  const catalog = page.getByRole('region', { name: 'Definitions' });
+  await catalog.getByRole('button', { name: 'Customer', exact: true }).click();
+  const customerWindow = page
+    .getByRole('dialog', { name: 'Customer' })
+    .locator('[data-slot="managed-dialog-window"]');
+  await expect(customerWindow).toBeVisible();
+
+  const header = customerWindow.locator('[data-slot="managed-dialog-header"]');
+  const headerBox = await header.boundingBox();
+  if (!headerBox) throw new Error('Managed task window header geometry missing');
+  await page.mouse.move(headerBox.x + headerBox.width / 2, headerBox.y + headerBox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(
+    headerBox.x + headerBox.width / 2 + 120,
+    headerBox.y + headerBox.height / 2 + 24,
+    { steps: 6 },
+  );
+  await page.mouse.up();
+
+  await catalog.getByRole('button', { name: 'Definition 02', exact: true }).click();
+  const definitionTwoWindow = page
+    .getByRole('dialog', { name: 'Definition 02' })
+    .locator('[data-slot="managed-dialog-window"]');
+  await expect(definitionTwoWindow).toBeVisible();
+  await expect(definitionTwoWindow).toHaveAttribute('data-active', 'true');
+
+  const [customerBox, definitionTwoBox] = await Promise.all([
+    customerWindow.boundingBox(),
+    definitionTwoWindow.boundingBox(),
+  ]);
+  if (!customerBox || !definitionTwoBox) throw new Error('Managed task window geometry missing');
+  expect(
+    Math.min(customerBox.x + customerBox.width, definitionTwoBox.x + definitionTwoBox.width) -
+      Math.max(customerBox.x, definitionTwoBox.x),
+  ).toBeGreaterThan(0);
+  expect(
+    Math.min(customerBox.y + customerBox.height, definitionTwoBox.y + definitionTwoBox.height) -
+      Math.max(customerBox.y, definitionTwoBox.y),
+  ).toBeGreaterThan(0);
+
+  return { catalog, customerWindow, definitionTwoWindow };
+}
+
+async function prepareCompactManagedTaskWindowCandidate(
+  page: Page,
+  catalog: Locator,
+  definitionTwoWindow: Locator,
+): Promise<void> {
+  await definitionTwoWindow.getByRole('button', { name: 'Minimize dialog' }).click();
+  await catalog.getByRole('button', { name: 'Definition 03', exact: true }).click();
+  const definitionThreeWindow = page
+    .getByRole('dialog', { name: 'Definition 03' })
+    .locator('[data-slot="managed-dialog-window"]');
+  await definitionThreeWindow.getByRole('button', { name: 'Minimize dialog' }).click();
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(definitionTwoWindow).toBeHidden();
+  await expect(page.getByRole('dialog', { name: 'Customer' })).toBeVisible();
+  const activeFooter = page.locator(
+    '[data-slot="managed-dialog-window"][data-active="true"] [data-slot="managed-dialog-footer"]',
+  );
+  const activeWindow = page.locator('[data-slot="managed-dialog-window"][data-active="true"]');
+  await expectManagedTaskWindowHeaderControlGeometry(activeWindow, 'compact');
+  const windowsTrigger = activeFooter.getByRole('button', { name: 'Windows (3)' });
+  await expect(windowsTrigger).toBeVisible();
+  await expect(
+    page.locator('[data-slot="managed-window-tray"]').getByText('+1', { exact: true }),
+  ).toBeVisible();
+  await expect(page.locator('[data-slot="managed-window-dock"]')).toHaveCount(1);
+  await expect(
+    page.locator('[data-slot="managed-window-tray"]').getByRole('button', { name: 'Windows (3)' }),
+  ).toHaveCount(0);
+
+  const footerButtons = page.locator(
+    '[data-slot="managed-dialog-window"][data-active="true"] [data-slot="managed-dialog-footer"] [data-slot="button"], ' +
+      '[data-slot="managed-dialog-window"][data-active="true"] [data-slot="managed-dialog-footer"] [data-slot="dropdown-menu-trigger"]',
+  );
+  const tray = page.locator('[data-slot="managed-window-tray"]');
+  const [buttonBoxes, trayBox] = await Promise.all([
+    footerButtons.evaluateAll((buttons) =>
+      buttons.map((button) => {
+        const bounds = button.getBoundingClientRect();
+        return { bottom: bounds.bottom, top: bounds.top };
+      }),
+    ),
+    tray.boundingBox(),
+  ]);
+  if (!trayBox) throw new Error('Managed task window tray geometry missing');
+  for (const buttonBox of buttonBoxes) {
+    expect(buttonBox.bottom).toBeLessThanOrEqual(trayBox.y);
+  }
+  const trayTarget = tray.locator('[data-slot="button"]').first();
+  await expect
+    .poll(() =>
+      trayTarget.evaluate((button) => {
+        const bounds = button.getBoundingClientRect();
+        const topmost = document.elementFromPoint(
+          bounds.left + bounds.width / 2,
+          bounds.top + bounds.height / 2,
+        );
+        const tray = button.closest<HTMLElement>('[data-slot="managed-window-tray"]');
+        const expandedLayer = document.querySelector<HTMLElement>(
+          '[data-slot="managed-window-expanded-layer"]',
+        );
+        return {
+          expandedLayerZIndex: expandedLayer ? getComputedStyle(expandedLayer).zIndex : null,
+          trayIsTopmost: Boolean(topmost?.closest('[data-slot="managed-window-tray"]')),
+          trayZIndex: tray ? getComputedStyle(tray).zIndex : null,
+        };
+      }),
+    )
+    .toEqual({
+      expandedLayerZIndex: '40',
+      trayIsTopmost: true,
+      trayZIndex: '50',
+    });
 }
 
 async function expectDataTableFitsHorizontally(page: Page): Promise<void> {
@@ -719,6 +986,60 @@ async function expectDataTableFitsHorizontally(page: Page): Promise<void> {
   await expect
     .poll(() => viewport.evaluate((element) => element.scrollWidth <= element.clientWidth))
     .toBe(true);
+}
+
+async function expectResourceWorkspaceTargetGeometry(
+  page: Page,
+  minimumSize: 32 | 44,
+): Promise<void> {
+  const targets = page
+    .locator('[data-slot="resource-workspace"]')
+    .locator(
+      '[data-slot="button"]:not([data-slot="data-table-resizer"]), [data-slot="input-group-control"], [data-slot="select-trigger"]',
+    );
+  const measurements = await targets.evaluateAll((elements) =>
+    elements.map((element) => {
+      const bounds = element.getBoundingClientRect();
+      return {
+        height: bounds.height,
+        name:
+          element.getAttribute('aria-label') ??
+          element.textContent?.trim() ??
+          element.getAttribute('data-slot') ??
+          '',
+        slot: element.getAttribute('data-slot'),
+        width: bounds.width,
+      };
+    }),
+  );
+
+  expect(measurements.length).toBeGreaterThanOrEqual(10);
+  expect(
+    measurements.every(({ height }) => height >= minimumSize - 1),
+    `Resource Workspace targets meet the ${minimumSize}px height: ${JSON.stringify(measurements)}`,
+  ).toBe(true);
+  expect(
+    measurements
+      .filter(({ slot }) => slot === 'button')
+      .every(({ width }) => width >= minimumSize - 1),
+    `Resource Workspace buttons meet the ${minimumSize}px width: ${JSON.stringify(measurements)}`,
+  ).toBe(true);
+}
+
+async function expectVisibleFocusIndicator(target: Locator): Promise<void> {
+  const focusStyle = await target.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return {
+      boxShadow: style.boxShadow,
+      outlineStyle: style.outlineStyle,
+      outlineWidth: Number.parseFloat(style.outlineWidth),
+    };
+  });
+  expect(
+    focusStyle.boxShadow !== 'none' ||
+      (focusStyle.outlineStyle !== 'none' && focusStyle.outlineWidth > 0),
+    JSON.stringify(focusStyle),
+  ).toBe(true);
 }
 
 async function expectActiveModuleNavigationItemIsRevealed(page: Page): Promise<void> {
@@ -799,7 +1120,7 @@ test.describe('define business object', () => {
 
   test('AT-004 canonical EN resource workspace visual matrix stays touch-safe and motion-safe', async ({
     page,
-  }, testInfo) => {
+  }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await mockAuthenticatedSession(page, { language: 'en', theme: 'light' });
     await mockBusinessObjectDefinitionApi(page, { initialDefinitions: seededDefinitions(20) });
@@ -831,9 +1152,20 @@ test.describe('define business object', () => {
     await expect(toolbar.locator('[data-slot="data-table-toolbar-actions"]')).toBeVisible();
     await expectDataTableScrollsInternally(page);
     await expectDataTableFitsHorizontally(page);
+    await expectResourceWorkspaceTargetGeometry(page, 32);
     await expectNoDesktopDocumentScroll(page);
     await expectNoPageOverflow(page);
-    await attachGoldenScreenshot(page, testInfo, 'business-objects-light-desktop-en');
+    const ariaTree = await page.locator('[data-slot="resource-workspace"]').ariaSnapshot();
+    for (const semanticEntry of [
+      'heading "Business objects"',
+      'region "Definitions"',
+      'textbox "Search business objects"',
+      'button "New definition"',
+      'table',
+    ]) {
+      expect(ariaTree).toContain(semanticEntry);
+    }
+    await expectResourceWorkspaceScreenshot(page, 'resource-workspace-light-desktop-en');
 
     await page.setViewportSize({ width: 390, height: 844 });
     const newDefinition = page.getByRole('button', { name: 'New definition' });
@@ -843,6 +1175,7 @@ test.describe('define business object', () => {
     expect(actionBox?.height ?? 0).toBeGreaterThanOrEqual(44);
     await newDefinition.focus();
     await expect(newDefinition).toBeFocused();
+    await expectVisibleFocusIndicator(newDefinition);
     await expect(page.getByRole('link', { name: 'Business objects', exact: true })).toHaveAttribute(
       'aria-current',
       'page',
@@ -854,10 +1187,11 @@ test.describe('define business object', () => {
       .poll(() => toolbar.evaluate((element) => element.scrollWidth <= element.clientWidth))
       .toBe(true);
     await expectDataTableScrollsInternally(page, { horizontally: true });
+    await expectResourceWorkspaceTargetGeometry(page, 44);
     await expectActiveModuleNavigationItemIsRevealed(page);
     await expectNoDesktopDocumentScroll(page);
     await expectNoPageOverflow(page);
-    await attachGoldenScreenshot(page, testInfo, 'business-objects-light-compact-en');
+    await expectResourceWorkspaceScreenshot(page, 'resource-workspace-light-compact-en');
 
     const rulesLink = page.getByRole('link', { name: 'Rules' });
     const restingBackground = await rulesLink.evaluate(
@@ -881,15 +1215,145 @@ test.describe('define business object', () => {
       'aria-current',
       'page',
     );
+    await expectResourceWorkspaceTargetGeometry(page, 44);
+    await expectDarkReadableContrast(description);
     await expectNoPageOverflow(page);
-    await attachGoldenScreenshot(page, testInfo, 'business-objects-dark-compact-en');
+    await expectResourceWorkspaceScreenshot(page, 'resource-workspace-dark-compact-en');
 
     await page.setViewportSize({ width: 1280, height: 720 });
     await expectDataTableScrollsInternally(page);
     await expectDataTableFitsHorizontally(page);
+    await expectResourceWorkspaceTargetGeometry(page, 32);
     await expectNoDesktopDocumentScroll(page);
     await expectNoPageOverflow(page);
-    await attachGoldenScreenshot(page, testInfo, 'business-objects-dark-desktop-en');
+    await expectResourceWorkspaceScreenshot(page, 'resource-workspace-dark-desktop-en');
+  });
+
+  test('AT-004 Resource Workspace reflows localized collection content at the 320 CSS pixel boundary', async ({
+    page,
+  }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await mockAuthenticatedSession(page, { language: 'vi', theme: 'light' });
+    await mockBusinessObjectDefinitionApi(page, { initialDefinitions: seededDefinitions(20) });
+    await page.setViewportSize({ width: 320, height: 900 });
+    await page.goto('/business-objects', { waitUntil: 'domcontentloaded' });
+
+    await expect(page.locator('html')).toHaveAttribute('lang', 'vi');
+    await expect(
+      page.getByRole('heading', { name: 'Business objects', exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByText(
+        'Định nghĩa contract dữ liệu dùng lại trong workspace. Định nghĩa chưa publish còn chỉnh được; bản publish là phiên bản ổn định.',
+      ),
+    ).toBeVisible();
+    await page.evaluate(() => {
+      for (const element of document.querySelectorAll<HTMLElement>(
+        '[data-slot="resource-workspace"], [data-slot="resource-workspace"] *',
+      )) {
+        element.style.setProperty('letter-spacing', '0.12em', 'important');
+        element.style.setProperty('line-height', '1.5', 'important');
+        element.style.setProperty('word-spacing', '0.16em', 'important');
+      }
+    });
+
+    await expectDataTableScrollsInternally(page, { horizontally: true });
+    await expectResourceWorkspaceTargetGeometry(page, 44);
+    await expectActiveModuleNavigationItemIsRevealed(page);
+    await expectNoDesktopDocumentScroll(page);
+    await expectNoPageOverflow(page);
+    const search = page.getByLabel('Tìm business object');
+    await search.focus();
+    await expectVisibleFocusIndicator(search);
+    await expectResourceWorkspaceScreenshot(page, 'resource-workspace-light-compact-vi-reflow', {
+      canonicalLanguage: false,
+    });
+  });
+
+  for (const theme of ['light', 'dark'] as const) {
+    test(`AT-004 Managed Task Window ${theme} desktop and compact candidate stays layered and touch-safe`, async ({
+      page,
+    }) => {
+      await page.emulateMedia({ reducedMotion: 'reduce' });
+      await mockAuthenticatedSession(page, { language: 'en', theme });
+      await mockBusinessObjectDefinitionApi(page, { initialDefinitions: seededDefinitions(3) });
+      await page.setViewportSize({ width: 1280, height: 720 });
+      await page.goto('/business-objects');
+
+      await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+      if (theme === 'dark') await expect(page.locator('html')).toHaveClass(/dark/);
+      else await expect(page.locator('html')).not.toHaveClass(/dark/);
+
+      const { catalog, customerWindow, definitionTwoWindow } =
+        await openOverlappingManagedDefinitionWindows(page);
+      await expect(customerWindow).not.toHaveAttribute('data-active', 'true');
+      await expectManagedTaskWindowDesktopGeometry(page, definitionTwoWindow);
+      await expectManagedTaskWindowHeaderControlGeometry(definitionTwoWindow, 'desktop');
+      await expect(
+        definitionTwoWindow
+          .locator('[data-slot="managed-dialog-footer"]')
+          .getByRole('button', { name: 'Windows (2)' }),
+      ).toBeVisible();
+      await expect(page.locator('[data-slot="managed-window-tray"]')).toHaveCount(0);
+      await expectManagedTaskWindowTargetGeometry(page, 32);
+      await expectReducedMotion(definitionTwoWindow);
+      const ariaTree = await definitionTwoWindow.ariaSnapshot();
+      for (const semanticEntry of [
+        'heading "Definition 02"',
+        'tab "General"',
+        'tab "Fields"',
+        'textbox "Name"',
+        'button "Windows (2)"',
+        'button "Cancel"',
+        'button "Save changes"',
+        'button "Publish"',
+      ]) {
+        expect(ariaTree).toContain(semanticEntry);
+      }
+      await expectNoDesktopDocumentScroll(page);
+      await expectNoPageOverflow(page);
+      await expectManagedTaskWindowScreenshot(page, `managed-task-window-${theme}-desktop-en`);
+
+      await prepareCompactManagedTaskWindowCandidate(page, catalog, definitionTwoWindow);
+      await expectManagedTaskWindowTargetGeometry(page, 44);
+      await expectNoDesktopDocumentScroll(page);
+      await expectNoPageOverflow(page);
+      await expectManagedTaskWindowScreenshot(page, `managed-task-window-${theme}-compact-en`);
+    });
+  }
+
+  test('AT-004 Managed Task Window reflows VI at the 320 CSS pixel boundary', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await mockAuthenticatedSession(page, { language: 'vi', theme: 'light' });
+    await mockBusinessObjectDefinitionApi(page, { initialDefinitions: seededDefinitions(1) });
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await page.goto('/business-objects');
+
+    const catalog = page.getByRole('region', { name: 'Định nghĩa' });
+    await catalog.getByRole('button', { name: 'Customer', exact: true }).click();
+    await page.setViewportSize({ width: 320, height: 900 });
+    await expect(page.locator('html')).toHaveAttribute('lang', 'vi');
+    await page.evaluate(() => {
+      for (const element of document.querySelectorAll<HTMLElement>(
+        '[data-slot="managed-dialog-window"], [data-slot="managed-dialog-window"] *',
+      )) {
+        element.style.setProperty('letter-spacing', '0.12em', 'important');
+        element.style.setProperty('line-height', '1.5', 'important');
+        element.style.setProperty('word-spacing', '0.16em', 'important');
+      }
+    });
+
+    await expectManagedTaskWindowHeaderControlGeometry(
+      page.locator('[data-slot="managed-dialog-window"][data-active="true"]'),
+      'compact',
+    );
+    await expectManagedTaskWindowTargetGeometry(page, 44);
+    await expectReducedMotion(page.locator('[data-slot="managed-dialog-window"]'));
+    await expectNoDesktopDocumentScroll(page);
+    await expectNoPageOverflow(page);
+    await expectManagedTaskWindowScreenshot(page, 'managed-task-window-light-compact-vi-reflow', {
+      canonicalLanguage: false,
+    });
   });
 
   test('AT-005 resource workspace integrates independent managed definition windows', async ({

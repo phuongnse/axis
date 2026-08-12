@@ -349,6 +349,25 @@ async function mockAuthenticatedSession(page: Page): Promise<void> {
       ]),
     });
   });
+  await page.route('**/api/module-navigation', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        availableContributionIds: [
+          'identity.memberships',
+          'identity.service-identities',
+          'authorization.product-roles',
+          'businessObjects.definitions',
+          'rules.fieldDefinitions',
+          'solutions.management',
+        ],
+      }),
+    });
+  });
+  await page.route('**/api/auth/sign-out', async (route) => {
+    await route.fulfill({ status: 204 });
+  });
 }
 
 async function mockRulesApi(page: Page, canStartCreate = true): Promise<CapturedRequest[]> {

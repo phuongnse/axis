@@ -1,7 +1,6 @@
 import { LogIn } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { AsyncButton } from '@/components/shared/AsyncButton';
-import { EntrySurface } from '@/components/shared/EntrySurface';
+import { EntryAsyncAction, EntryInput, EntrySurface } from '@/components/shared/EntrySurface';
 import {
   InlinePromptAction,
   InlinePromptActionButton,
@@ -10,7 +9,6 @@ import {
 } from '@/components/shared/InlinePromptAction';
 import { StatusNotice } from '@/components/shared/StatusNotice';
 import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field';
-import { Input } from '@/components/ui/input';
 import { useResendVerification } from '@/features/auth/hooks/useResendVerification';
 import { useSignIn } from '@/features/auth/hooks/useSignIn';
 import { PreferencesMenu } from '@/features/preferences';
@@ -111,7 +109,7 @@ export function SignInPage() {
 
         <Field data-invalid={errors.email ? true : undefined}>
           <FieldLabel htmlFor="email">{t('auth.email')}</FieldLabel>
-          <Input
+          <EntryInput
             id="email"
             type="email"
             autoComplete="email"
@@ -126,7 +124,7 @@ export function SignInPage() {
 
         <Field data-invalid={errors.password ? true : undefined}>
           <FieldLabel htmlFor="password">{t('auth.password')}</FieldLabel>
-          <Input
+          <EntryInput
             id="password"
             type="password"
             autoComplete="current-password"
@@ -141,17 +139,16 @@ export function SignInPage() {
           ) : null}
         </Field>
 
-        <AsyncButton
+        <EntryAsyncAction
           type="submit"
           size="lg"
-          className="w-full"
           disabled={loading || rateLimited}
           icon={<LogIn aria-hidden />}
           pending={loading}
           pendingLabel={t('auth.signingIn')}
         >
           {t('auth.signIn')}
-        </AsyncButton>
+        </EntryAsyncAction>
       </form>
     </EntrySurface>
   );

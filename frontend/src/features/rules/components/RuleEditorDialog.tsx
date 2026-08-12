@@ -5,7 +5,12 @@ import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { AsyncButton } from '@/components/shared/AsyncButton';
 import { AsyncContent } from '@/components/shared/AsyncContent';
-import { ManagedDialog, ManagedDialogBody } from '@/components/shared/ManagedDialog';
+import {
+  ManagedDialog,
+  ManagedDialogAction,
+  ManagedDialogAsyncAction,
+  ManagedDialogBody,
+} from '@/components/shared/ManagedDialog';
 import { ManagedDialogTabs } from '@/components/shared/ManagedDialogTabs';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { StatusNotice } from '@/components/shared/StatusNotice';
@@ -555,28 +560,38 @@ export function RuleEditorDialog({
       }
       footer={
         readOnly ? (
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+          <ManagedDialogAction type="button" variant="outline" onClick={() => onOpenChange(false)}>
             {t('app.close')}
-          </Button>
+          </ManagedDialogAction>
         ) : (
-          <AsyncButton
-            type="button"
-            onClick={() => saveMutation.mutate()}
-            disabled={
-              saveMutation.isPending ||
-              stale ||
-              refreshMutation.isPending ||
-              hydrationCondition != null ||
-              projectMutation.isPending ||
-              diagnostics.length > 0 ||
-              !name.trim()
-            }
-            icon={<Save aria-hidden />}
-            pending={saveMutation.isPending}
-            pendingLabel={t('rules.saving')}
-          >
-            {t('rules.save')}
-          </AsyncButton>
+          <>
+            <ManagedDialogAction
+              type="button"
+              variant="outline"
+              disabled={saveMutation.isPending || lifecycleMutation.isPending}
+              onClick={requestClose}
+            >
+              {t('app.cancel')}
+            </ManagedDialogAction>
+            <ManagedDialogAsyncAction
+              type="button"
+              onClick={() => saveMutation.mutate()}
+              disabled={
+                saveMutation.isPending ||
+                stale ||
+                refreshMutation.isPending ||
+                hydrationCondition != null ||
+                projectMutation.isPending ||
+                diagnostics.length > 0 ||
+                !name.trim()
+              }
+              icon={<Save aria-hidden />}
+              pending={saveMutation.isPending}
+              pendingLabel={t('rules.saving')}
+            >
+              {t('rules.save')}
+            </ManagedDialogAsyncAction>
+          </>
         )
       }
     >

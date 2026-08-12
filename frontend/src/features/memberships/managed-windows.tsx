@@ -2,8 +2,12 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { MailPlus, RefreshCw, UserMinus } from 'lucide-react';
 import { type FormEvent, useEffect, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { AsyncButton } from '@/components/shared/AsyncButton';
-import { ManagedDialog, ManagedDialogBody } from '@/components/shared/ManagedDialog';
+import {
+  ManagedDialog,
+  ManagedDialogAction,
+  ManagedDialogAsyncAction,
+  ManagedDialogBody,
+} from '@/components/shared/ManagedDialog';
 import type {
   ManagedWindowDescriptor,
   ManagedWindowRendererProps,
@@ -23,7 +27,6 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { Button } from '@/components/ui/button';
 import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import {
@@ -93,9 +96,13 @@ function MembershipInvitationWindowRenderer({ descriptor }: ManagedWindowRendere
           if (!open) closeWindow(windowId);
         }}
         footer={
-          <Button type="button" variant="outline" onClick={() => closeWindow(windowId)}>
+          <ManagedDialogAction
+            type="button"
+            variant="outline"
+            onClick={() => closeWindow(windowId)}
+          >
             {t('app.close')}
-          </Button>
+          </ManagedDialogAction>
         }
       >
         <ManagedDialogBody>
@@ -183,15 +190,15 @@ function MembershipInviteDialog({ onClose }: { onClose: () => void }) {
         dirty={dirty}
         footer={
           <>
-            <Button
+            <ManagedDialogAction
               type="button"
               variant="outline"
               disabled={mutation.isPending}
               onClick={requestClose}
             >
               {t('app.cancel')}
-            </Button>
-            <AsyncButton
+            </ManagedDialogAction>
+            <ManagedDialogAsyncAction
               type="submit"
               form={formId}
               disabled={mutation.isPending || !email.trim()}
@@ -200,7 +207,7 @@ function MembershipInviteDialog({ onClose }: { onClose: () => void }) {
               pendingLabel={t('memberships.inviting')}
             >
               {t('memberships.invite')}
-            </AsyncButton>
+            </ManagedDialogAsyncAction>
           </>
         }
       >
@@ -353,11 +360,11 @@ function MembershipInvitationDialog({
       closeDisabled={busy}
       footer={
         <>
-          <Button type="button" variant="outline" disabled={busy} onClick={onClose}>
+          <ManagedDialogAction type="button" variant="outline" disabled={busy} onClick={onClose}>
             {t('app.close')}
-          </Button>
+          </ManagedDialogAction>
           {actionable ? (
-            <AsyncButton
+            <ManagedDialogAsyncAction
               type="button"
               variant="secondary"
               disabled={busy}
@@ -367,13 +374,13 @@ function MembershipInvitationDialog({
               pendingLabel={t('memberships.resending')}
             >
               {t('memberships.resend')}
-            </AsyncButton>
+            </ManagedDialogAsyncAction>
           ) : null}
           {actionable ? (
             <AlertDialog>
               <AlertDialogTrigger
                 render={
-                  <AsyncButton
+                  <ManagedDialogAsyncAction
                     type="button"
                     variant="destructive"
                     disabled={busy}
@@ -382,7 +389,7 @@ function MembershipInvitationDialog({
                     pendingLabel={t('memberships.revoking')}
                   >
                     {t('memberships.revoke')}
-                  </AsyncButton>
+                  </ManagedDialogAsyncAction>
                 }
               />
               <AlertDialogContent>

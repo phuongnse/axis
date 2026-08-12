@@ -45,6 +45,7 @@ Provide a consistent enterprise collection workspace in which one primary data t
 - **AC-009** Window tabs group sections of the same record only and do not introduce a second primary collection workspace.
 - **AC-010** The foundation is product-neutral and does not own feature DTOs, authorization, mutations, localized copy, record validation, or window mechanics.
 - **AC-011** A consumer may use a dedicated record route only when its documented workflow requires multi-record comparison, long-running work, or a layout that cannot remain usable in the managed-window contract.
+- **AC-012** The shared Resource Workspace owner provides one localized page context, optional status, one primary table, app-owned responsive density, and internal data overflow across registered consumers without absorbing managed-window or feature semantics.
 
 ## Acceptance Test Matrix
 
@@ -55,6 +56,7 @@ Provide a consistent enterprise collection workspace in which one primary data t
 | AT-003 | UI component | Loading, unavailable data, validation, unsaved dismissal, concurrency conflict, save, route navigation, and sibling-window changes retain recoverable record state. | AC-004, AC-006, AC-008, AC-009 | UI component test | Yes |
 | AT-004 | Browser journey | Direct URL, refresh, Back/Forward, authenticated navigation, multiple record windows, internal scrolling, stable actions, and desktop/compact layout behave without draft loss, overflow, or console errors. | AC-002, AC-003, AC-004, AC-006, AC-007, AC-008, AC-009 | Browser automation | Yes |
 | AT-005 | Static frontend | Shared collection and managed-window contracts remain product-neutral, localized consumers typecheck, and dedicated routes remain limited to documented workflow needs. | AC-005, AC-010, AC-011 | Frontend CI | Yes |
+| AT-006 | UI component | The complete Resource Workspace owner and five-consumer inventory proves one clean-cutover page/table anatomy, criterion-level standards applicability, responsive internal overflow, 32/44 CSS-pixel control density, localized 320 CSS-pixel reflow, component state coverage, and project-owner review disposition without absorbing managed-window or feature semantics. | AC-001, AC-004, AC-005, AC-007, AC-010, AC-012 | UI component test + Browser automation | Yes |
 
 ## Out Of Scope
 
