@@ -37,7 +37,7 @@ describe('surface contracts', () => {
   it('binds active surface ids to finite contracts at compile time', () => {
     expect(activeSurfaceContracts['account-actions']).toBe('account-surface');
     expect(activeSurfaceContracts['solution-delivery']).toBe('process-workbench');
-    expectTypeOf<EnforcedSurfaceContractId>().toEqualTypeOf<'account-surface'>();
+    expectTypeOf<EnforcedSurfaceContractId>().toEqualTypeOf<never>();
     expectTypeOf<SurfaceIdFor<'entry-surface'>>().toEqualTypeOf<
       | 'email-confirmation'
       | 'invitation-acceptance'

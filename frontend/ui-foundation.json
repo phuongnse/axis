@@ -1,89 +1,434 @@
 {
-  "schemaVersion": 5,
+  "schemaVersion": 7,
   "contracts": {
     "account-surface": {
       "state": "enforced",
       "spec": "docs/foundations/app-shell/app-frame.md",
+      "coverageProfile": "axis-ui-v1",
+      "acceptance": {
+        "status": "accepted"
+      },
       "evidence": {
+        "assessment": ["docs/foundations/app-shell/account-surface.assessment.md"],
         "component": [
           "frontend/tests/account-surface.test.tsx",
           "frontend/tests/app-shell.test.tsx",
           "frontend/tests/surface-contracts.test.tsx"
         ],
         "browser": ["frontend/e2e/app-frame.pw.ts"],
-        "perceptual": [
-          "frontend/e2e/app-frame.pw.ts-snapshots/account-surface-dark-compact-en-chromium-linux.png",
-          "frontend/e2e/app-frame.pw.ts-snapshots/account-surface-dark-desktop-en-chromium-linux.png",
-          "frontend/e2e/app-frame.pw.ts-snapshots/account-surface-light-compact-en-chromium-linux.png",
-          "frontend/e2e/app-frame.pw.ts-snapshots/account-surface-light-desktop-en-chromium-linux.png"
-        ]
+        "perceptual": {
+          "status": "accepted",
+          "artifacts": [
+            "frontend/e2e/app-frame.pw.ts-snapshots/account-surface-dark-compact-en-chromium-linux.png",
+            "frontend/e2e/app-frame.pw.ts-snapshots/account-surface-dark-desktop-en-chromium-linux.png",
+            "frontend/e2e/app-frame.pw.ts-snapshots/account-surface-light-compact-en-chromium-linux.png",
+            "frontend/e2e/app-frame.pw.ts-snapshots/account-surface-light-compact-vi-reflow-chromium-linux.png",
+            "frontend/e2e/app-frame.pw.ts-snapshots/account-surface-light-desktop-en-chromium-linux.png"
+          ]
+        },
+        "coverage": {
+          "covered": {
+            "behavior.anatomy-layout": {
+              "acceptance": [
+                "docs/foundations/app-shell/app-frame.md#AT-001",
+                "docs/foundations/app-shell/app-frame.md#AT-002"
+              ],
+              "evidence": [
+                "frontend/e2e/app-frame.pw.ts",
+                "frontend/tests/account-surface.test.tsx",
+                "frontend/tests/app-shell.test.tsx"
+              ],
+              "modes": ["compact", "desktop"]
+            },
+            "behavior.interaction-focus-keyboard": {
+              "acceptance": [
+                "docs/foundations/app-shell/app-frame.md#AT-001",
+                "docs/foundations/app-shell/app-frame.md#AT-002"
+              ],
+              "evidence": [
+                "frontend/e2e/app-frame.pw.ts",
+                "frontend/tests/account-surface.test.tsx",
+                "frontend/tests/app-shell.test.tsx"
+              ],
+              "modes": ["keyboard", "pointer"]
+            },
+            "behavior.localization-content-resilience": {
+              "acceptance": [
+                "docs/foundations/app-shell/app-frame.md#AT-001",
+                "docs/foundations/app-shell/app-frame.md#AT-002"
+              ],
+              "evidence": [
+                "frontend/e2e/app-frame.pw.ts",
+                "frontend/tests/account-surface.test.tsx",
+                "frontend/tests/app-shell.test.tsx"
+              ],
+              "modes": ["compact", "desktop", "locale", "zoom-reflow"]
+            },
+            "behavior.responsive-scroll-overflow": {
+              "acceptance": ["docs/foundations/app-shell/app-frame.md#AT-002"],
+              "evidence": ["frontend/e2e/app-frame.pw.ts"],
+              "modes": ["compact", "desktop", "zoom-reflow"]
+            },
+            "behavior.state-feedback-async-recovery": {
+              "acceptance": [
+                "docs/foundations/app-shell/app-frame.md#AT-001",
+                "docs/foundations/app-shell/app-frame.md#AT-002"
+              ],
+              "evidence": [
+                "frontend/e2e/app-frame.pw.ts",
+                "frontend/tests/account-surface.test.tsx",
+                "frontend/tests/app-shell.test.tsx"
+              ],
+              "modes": ["keyboard", "pointer"]
+            },
+            "lifecycle.consumer-ownership-adoption": {
+              "acceptance": ["docs/foundations/app-shell/app-frame.md#AT-001"],
+              "evidence": [
+                "frontend/tests/app-shell.test.tsx",
+                "frontend/tests/surface-contracts.test.tsx"
+              ],
+              "modes": []
+            },
+            "lifecycle.retirement-compatibility": {
+              "acceptance": ["docs/foundations/app-shell/app-frame.md#AT-004"],
+              "evidence": [
+                "docs/foundations/app-shell/account-surface.assessment.md",
+                "frontend/tests/surface-contracts.test.tsx"
+              ],
+              "modes": []
+            },
+            "standard.human-centred-evaluation": {
+              "acceptance": ["docs/foundations/app-shell/app-frame.md#AT-004"],
+              "evidence": ["docs/foundations/app-shell/account-surface.assessment.md"],
+              "modes": []
+            },
+            "standard.interaction-principles": {
+              "acceptance": [
+                "docs/foundations/app-shell/app-frame.md#AT-001",
+                "docs/foundations/app-shell/app-frame.md#AT-002",
+                "docs/foundations/app-shell/app-frame.md#AT-004"
+              ],
+              "evidence": [
+                "docs/foundations/app-shell/account-surface.assessment.md",
+                "frontend/e2e/app-frame.pw.ts",
+                "frontend/tests/account-surface.test.tsx"
+              ],
+              "modes": ["keyboard", "pointer"]
+            },
+            "standard.wcag-2-2-aa": {
+              "acceptance": [
+                "docs/foundations/app-shell/app-frame.md#AT-001",
+                "docs/foundations/app-shell/app-frame.md#AT-002",
+                "docs/foundations/app-shell/app-frame.md#AT-004"
+              ],
+              "evidence": [
+                "docs/foundations/app-shell/account-surface.assessment.md",
+                "frontend/e2e/app-frame.pw.ts",
+                "frontend/tests/account-surface.test.tsx"
+              ],
+              "modes": [
+                "compact",
+                "desktop",
+                "keyboard",
+                "locale",
+                "reduced-motion",
+                "screen-reader",
+                "zoom-reflow"
+              ]
+            },
+            "visual.color-tone-contrast": {
+              "acceptance": ["docs/foundations/visual-system/axis-visual-system.md#AT-004"],
+              "evidence": [
+                "frontend/e2e/app-frame.pw.ts-snapshots/account-surface-dark-compact-en-chromium-linux.png",
+                "frontend/e2e/app-frame.pw.ts-snapshots/account-surface-dark-desktop-en-chromium-linux.png",
+                "frontend/e2e/app-frame.pw.ts-snapshots/account-surface-light-compact-en-chromium-linux.png",
+                "frontend/e2e/app-frame.pw.ts-snapshots/account-surface-light-desktop-en-chromium-linux.png"
+              ],
+              "modes": ["dark", "light"]
+            },
+            "visual.density-touch-target": {
+              "acceptance": [
+                "docs/foundations/app-shell/app-frame.md#AT-001",
+                "docs/foundations/app-shell/app-frame.md#AT-002"
+              ],
+              "evidence": [
+                "frontend/e2e/app-frame.pw.ts",
+                "frontend/tests/account-surface.test.tsx"
+              ],
+              "modes": ["compact", "desktop", "keyboard", "pointer"]
+            },
+            "visual.elevation-layer": {
+              "acceptance": ["docs/foundations/visual-system/axis-visual-system.md#AT-004"],
+              "evidence": [
+                "frontend/e2e/app-frame.pw.ts-snapshots/account-surface-dark-compact-en-chromium-linux.png",
+                "frontend/e2e/app-frame.pw.ts-snapshots/account-surface-dark-desktop-en-chromium-linux.png",
+                "frontend/e2e/app-frame.pw.ts-snapshots/account-surface-light-compact-en-chromium-linux.png",
+                "frontend/e2e/app-frame.pw.ts-snapshots/account-surface-light-desktop-en-chromium-linux.png"
+              ],
+              "modes": ["dark", "light"]
+            },
+            "visual.iconography": {
+              "acceptance": [
+                "docs/foundations/app-shell/app-frame.md#AT-001",
+                "docs/foundations/visual-system/axis-visual-system.md#AT-004"
+              ],
+              "evidence": [
+                "frontend/e2e/app-frame.pw.ts-snapshots/account-surface-dark-compact-en-chromium-linux.png",
+                "frontend/e2e/app-frame.pw.ts-snapshots/account-surface-dark-desktop-en-chromium-linux.png",
+                "frontend/e2e/app-frame.pw.ts-snapshots/account-surface-light-compact-en-chromium-linux.png",
+                "frontend/e2e/app-frame.pw.ts-snapshots/account-surface-light-desktop-en-chromium-linux.png",
+                "frontend/tests/account-surface.test.tsx"
+              ],
+              "modes": ["compact", "dark", "desktop", "light"]
+            },
+            "visual.motion": {
+              "acceptance": [
+                "docs/foundations/app-shell/app-frame.md#AT-001",
+                "docs/foundations/visual-system/axis-visual-system.md#AT-004"
+              ],
+              "evidence": [
+                "frontend/e2e/app-frame.pw.ts",
+                "frontend/tests/account-surface.test.tsx",
+                "frontend/tests/app-shell.test.tsx"
+              ],
+              "modes": ["keyboard", "pointer", "reduced-motion"]
+            },
+            "visual.spacing": {
+              "acceptance": ["docs/foundations/app-shell/app-frame.md#AT-004"],
+              "evidence": [
+                "frontend/e2e/app-frame.pw.ts-snapshots/account-surface-dark-compact-en-chromium-linux.png",
+                "frontend/e2e/app-frame.pw.ts-snapshots/account-surface-dark-desktop-en-chromium-linux.png",
+                "frontend/e2e/app-frame.pw.ts-snapshots/account-surface-light-compact-en-chromium-linux.png",
+                "frontend/e2e/app-frame.pw.ts-snapshots/account-surface-light-compact-vi-reflow-chromium-linux.png",
+                "frontend/e2e/app-frame.pw.ts-snapshots/account-surface-light-desktop-en-chromium-linux.png"
+              ],
+              "modes": ["compact", "desktop", "zoom-reflow"]
+            },
+            "visual.surface-border-radius": {
+              "acceptance": ["docs/foundations/visual-system/axis-visual-system.md#AT-004"],
+              "evidence": [
+                "frontend/e2e/app-frame.pw.ts-snapshots/account-surface-dark-compact-en-chromium-linux.png",
+                "frontend/e2e/app-frame.pw.ts-snapshots/account-surface-dark-desktop-en-chromium-linux.png",
+                "frontend/e2e/app-frame.pw.ts-snapshots/account-surface-light-compact-en-chromium-linux.png",
+                "frontend/e2e/app-frame.pw.ts-snapshots/account-surface-light-desktop-en-chromium-linux.png"
+              ],
+              "modes": ["dark", "light"]
+            },
+            "visual.typography-hierarchy": {
+              "acceptance": ["docs/foundations/app-shell/app-frame.md#AT-004"],
+              "evidence": [
+                "frontend/e2e/app-frame.pw.ts-snapshots/account-surface-dark-compact-en-chromium-linux.png",
+                "frontend/e2e/app-frame.pw.ts-snapshots/account-surface-dark-desktop-en-chromium-linux.png",
+                "frontend/e2e/app-frame.pw.ts-snapshots/account-surface-light-compact-en-chromium-linux.png",
+                "frontend/e2e/app-frame.pw.ts-snapshots/account-surface-light-compact-vi-reflow-chromium-linux.png",
+                "frontend/e2e/app-frame.pw.ts-snapshots/account-surface-light-desktop-en-chromium-linux.png"
+              ],
+              "modes": ["compact", "dark", "desktop", "light", "locale", "zoom-reflow"]
+            }
+          },
+          "gaps": [],
+          "notApplicable": {}
+        }
       }
     },
     "authenticated-frame": {
       "state": "defined",
       "spec": "docs/foundations/app-shell/app-frame.md",
+      "coverageProfile": "axis-ui-v1",
+      "acceptance": { "status": "pending" },
       "evidence": {
+        "assessment": [],
         "component": [
           "frontend/tests/app-shell.test.tsx",
           "frontend/tests/surface-contracts.test.tsx"
         ],
         "browser": ["frontend/e2e/app-frame.pw.ts"],
-        "perceptual": []
+        "perceptual": { "status": "missing", "artifacts": [] },
+        "coverage": {
+          "covered": {},
+          "gaps": [
+            "behavior.anatomy-layout",
+            "behavior.interaction-focus-keyboard",
+            "behavior.localization-content-resilience",
+            "behavior.responsive-scroll-overflow",
+            "behavior.state-feedback-async-recovery",
+            "lifecycle.consumer-ownership-adoption",
+            "lifecycle.retirement-compatibility",
+            "standard.human-centred-evaluation",
+            "standard.interaction-principles",
+            "standard.wcag-2-2-aa",
+            "visual.color-tone-contrast",
+            "visual.density-touch-target",
+            "visual.elevation-layer",
+            "visual.iconography",
+            "visual.motion",
+            "visual.spacing",
+            "visual.surface-border-radius",
+            "visual.typography-hierarchy"
+          ],
+          "notApplicable": {}
+        }
       }
     },
     "entry-surface": {
       "state": "defined",
       "spec": "docs/foundations/visual-system/axis-visual-system.md",
+      "coverageProfile": "axis-ui-v1",
+      "acceptance": { "status": "pending" },
       "evidence": {
+        "assessment": [],
         "component": [
           "frontend/tests/register-page.test.tsx",
           "frontend/tests/sign-in-page.test.tsx",
           "frontend/tests/surface-contracts.test.tsx"
         ],
         "browser": ["frontend/e2e/register-user.pw.ts", "frontend/e2e/sign-in-user.pw.ts"],
-        "perceptual": []
+        "perceptual": { "status": "missing", "artifacts": [] },
+        "coverage": {
+          "covered": {},
+          "gaps": [
+            "behavior.anatomy-layout",
+            "behavior.interaction-focus-keyboard",
+            "behavior.localization-content-resilience",
+            "behavior.responsive-scroll-overflow",
+            "behavior.state-feedback-async-recovery",
+            "lifecycle.consumer-ownership-adoption",
+            "lifecycle.retirement-compatibility",
+            "standard.human-centred-evaluation",
+            "standard.interaction-principles",
+            "standard.wcag-2-2-aa",
+            "visual.color-tone-contrast",
+            "visual.density-touch-target",
+            "visual.elevation-layer",
+            "visual.iconography",
+            "visual.motion",
+            "visual.spacing",
+            "visual.surface-border-radius",
+            "visual.typography-hierarchy"
+          ],
+          "notApplicable": {}
+        }
       }
     },
     "managed-task-window": {
       "state": "defined",
       "spec": "docs/foundations/overlays/managed-dialog.md",
+      "coverageProfile": "axis-ui-v1",
+      "acceptance": { "status": "pending" },
       "evidence": {
+        "assessment": [],
         "component": [
           "frontend/tests/managed-dialog-tabs.test.tsx",
           "frontend/tests/business-objects-page.test.tsx",
           "frontend/tests/surface-contracts.test.tsx"
         ],
         "browser": ["frontend/e2e/define-business-object.pw.ts"],
-        "perceptual": []
+        "perceptual": { "status": "missing", "artifacts": [] },
+        "coverage": {
+          "covered": {},
+          "gaps": [
+            "behavior.anatomy-layout",
+            "behavior.interaction-focus-keyboard",
+            "behavior.localization-content-resilience",
+            "behavior.responsive-scroll-overflow",
+            "behavior.state-feedback-async-recovery",
+            "lifecycle.consumer-ownership-adoption",
+            "lifecycle.retirement-compatibility",
+            "standard.human-centred-evaluation",
+            "standard.interaction-principles",
+            "standard.wcag-2-2-aa",
+            "visual.color-tone-contrast",
+            "visual.density-touch-target",
+            "visual.elevation-layer",
+            "visual.iconography",
+            "visual.motion",
+            "visual.spacing",
+            "visual.surface-border-radius",
+            "visual.typography-hierarchy"
+          ],
+          "notApplicable": {}
+        }
       }
     },
     "process-workbench": {
       "state": "defined",
       "spec": "docs/foundations/visual-system/axis-visual-system.md",
+      "coverageProfile": "axis-ui-v1",
+      "acceptance": { "status": "pending" },
       "evidence": {
+        "assessment": [],
         "component": [
           "frontend/src/features/solutions/components/SolutionsPage.test.tsx",
           "frontend/tests/surface-contracts.test.tsx"
         ],
         "browser": ["frontend/e2e/product-delivery-governance.pw.ts"],
-        "perceptual": []
+        "perceptual": { "status": "missing", "artifacts": [] },
+        "coverage": {
+          "covered": {},
+          "gaps": [
+            "behavior.anatomy-layout",
+            "behavior.interaction-focus-keyboard",
+            "behavior.localization-content-resilience",
+            "behavior.responsive-scroll-overflow",
+            "behavior.state-feedback-async-recovery",
+            "lifecycle.consumer-ownership-adoption",
+            "lifecycle.retirement-compatibility",
+            "standard.human-centred-evaluation",
+            "standard.interaction-principles",
+            "standard.wcag-2-2-aa",
+            "visual.color-tone-contrast",
+            "visual.density-touch-target",
+            "visual.elevation-layer",
+            "visual.iconography",
+            "visual.motion",
+            "visual.spacing",
+            "visual.surface-border-radius",
+            "visual.typography-hierarchy"
+          ],
+          "notApplicable": {}
+        }
       }
     },
     "resource-workspace": {
       "state": "defined",
       "spec": "docs/foundations/data-display/collection-page.md",
+      "coverageProfile": "axis-ui-v1",
+      "acceptance": { "status": "pending" },
       "evidence": {
+        "assessment": [],
         "component": [
           "frontend/tests/resource-workspace.test.tsx",
           "frontend/tests/business-objects-page.test.tsx",
           "frontend/tests/surface-contracts.test.tsx"
         ],
         "browser": ["frontend/e2e/define-business-object.pw.ts"],
-        "perceptual": []
+        "perceptual": { "status": "missing", "artifacts": [] },
+        "coverage": {
+          "covered": {},
+          "gaps": [
+            "behavior.anatomy-layout",
+            "behavior.interaction-focus-keyboard",
+            "behavior.localization-content-resilience",
+            "behavior.responsive-scroll-overflow",
+            "behavior.state-feedback-async-recovery",
+            "lifecycle.consumer-ownership-adoption",
+            "lifecycle.retirement-compatibility",
+            "standard.human-centred-evaluation",
+            "standard.interaction-principles",
+            "standard.wcag-2-2-aa",
+            "visual.color-tone-contrast",
+            "visual.density-touch-target",
+            "visual.elevation-layer",
+            "visual.iconography",
+            "visual.motion",
+            "visual.spacing",
+            "visual.surface-border-radius",
+            "visual.typography-hierarchy"
+          ],
+          "notApplicable": {}
+        }
       }
     }
   },
-  "enforcedContracts": {
-    "account-surface": true
-  }
+  "enforcedContracts": { "account-surface": true }
 }

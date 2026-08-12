@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import type { ComponentProps } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { AccountSurface } from '@/components/shared/AccountSurface';
+import { axisStyles } from '@/theme.generated';
 
 const identity = {
   displayName: 'Ada Lovelace',
@@ -79,8 +80,15 @@ describe('AccountSurface', () => {
     const user = userEvent.setup();
     renderAccountSurface();
 
-    const trigger = screen.getByRole('button', { name: 'Account menu' });
+    const trigger = screen.getByRole('button', { name: /Account menu/ });
     expect(trigger).toHaveTextContent('Axis Reference Product');
+    expect(trigger).toHaveClass(
+      axisStyles.typography.scale.label,
+      axisStyles.typography.weight.label,
+      axisStyles.density.minHeight.touchTarget,
+      axisStyles.density.minHeight.compactControlAtSmall,
+    );
+    expect(trigger.querySelector('.lucide-chevron-down')).toHaveClass(axisStyles.icon.size.control);
     await user.click(trigger);
 
     const surface = document.querySelector<HTMLElement>('[data-slot="account-surface"]');
@@ -96,6 +104,7 @@ describe('AccountSurface', () => {
 
     expect(accountIdentity).toHaveTextContent('Ada Lovelace');
     expect(accountIdentity).toHaveTextContent('ada@example.com');
+    expect(accountIdentity).toHaveClass('items-start');
     expect(accountIdentity.compareDocumentPosition(workspace)).toBe(
       Node.DOCUMENT_POSITION_FOLLOWING,
     );
@@ -105,6 +114,25 @@ describe('AccountSurface', () => {
     expect(screen.getByRole('group', { name: 'Theme' })).toBeVisible();
     expect(createOrganization).toHaveAttribute('data-axis-account-role', 'section-action');
     expect(signOut).toHaveAttribute('data-axis-account-role', 'section-action');
+    expect(signOut).toHaveClass(
+      'border-destructive/30',
+      'text-foreground',
+      'dark:border-destructive/40',
+    );
+    for (const action of [createOrganization, signOut]) {
+      expect(action).toHaveClass(
+        axisStyles.typography.scale.label,
+        axisStyles.typography.weight.label,
+        axisStyles.density.minHeight.touchTarget,
+        axisStyles.density.minHeight.compactControlAtSmall,
+      );
+    }
+    expect(workspace.querySelector('.lucide-panels-top-left')).toHaveClass(
+      axisStyles.icon.size.control,
+    );
+    expect(preferences.querySelector('.lucide-settings-2')).toHaveClass(
+      axisStyles.icon.size.control,
+    );
     const regions = Array.from(
       surface?.querySelectorAll<HTMLElement>('[data-axis-account-region]') ?? [],
     );
@@ -121,11 +149,37 @@ describe('AccountSurface', () => {
     expect(screen.getByRole('button', { name: 'Axis Reference Product' })).toBeEnabled();
   });
 
+  it('uses the Axis identity hierarchy without clipping long account content', async () => {
+    const user = userEvent.setup();
+    const displayName = 'Alexandria Catherine Montgomery-Sanchez';
+    const secondaryLabel =
+      'alexandria.montgomery-sanchez@enterprise-reference-platform.example.com';
+    renderAccountSurface({
+      identity: { ...identity, displayName, secondaryLabel },
+    });
+
+    await user.click(screen.getByRole('button', { name: /Account menu/ }));
+
+    expect(screen.getByText(displayName)).toHaveClass(
+      axisStyles.typography.scale.label,
+      axisStyles.typography.weight.label,
+      'whitespace-normal',
+      'wrap-anywhere',
+    );
+    expect(screen.getByText(displayName)).not.toHaveClass('truncate');
+    expect(screen.getByText(secondaryLabel)).toHaveClass(
+      axisStyles.typography.scale.metadata,
+      'whitespace-normal',
+      'wrap-anywhere',
+    );
+    expect(screen.getByText(secondaryLabel)).not.toHaveClass('truncate');
+  });
+
   it('keeps the surface open while its authoritative context transition is locked', async () => {
     const user = userEvent.setup();
     renderAccountSurface({ transitionLocked: true });
 
-    const trigger = screen.getByRole('button', { name: 'Account menu' });
+    const trigger = screen.getByRole('button', { name: /Account menu/ });
     await user.click(trigger);
     expect(trigger).toHaveAttribute('aria-expanded', 'true');
 
@@ -147,7 +201,7 @@ describe('AccountSurface', () => {
       },
     });
 
-    await user.click(screen.getByRole('button', { name: 'Account menu' }));
+    await user.click(screen.getByRole('button', { name: /Account menu/ }));
     await user.click(screen.getByRole('button', { name: 'Vietnamese' }));
     expect(onSelect).toHaveBeenCalledWith('vi');
 
@@ -187,7 +241,14 @@ describe('AccountSurface', () => {
       />,
     );
     expect(screen.getByRole('alert')).toHaveTextContent('Language could not be saved.');
-    await user.click(screen.getByRole('button', { name: 'Retry' }));
+    const retry = screen.getByRole('button', { name: 'Retry' });
+    expect(retry).toHaveClass(
+      axisStyles.typography.scale.label,
+      axisStyles.typography.weight.label,
+      axisStyles.density.minHeight.touchTarget,
+      axisStyles.density.minHeight.compactControlAtSmall,
+    );
+    await user.click(retry);
     expect(onRetry).toHaveBeenCalledOnce();
   });
 
@@ -196,7 +257,7 @@ describe('AccountSurface', () => {
     const onSignOut = vi.fn();
     const view = renderAccountSurface({ onSignOut, signOutError: true });
 
-    await user.click(screen.getByRole('button', { name: 'Account menu' }));
+    await user.click(screen.getByRole('button', { name: /Account menu/ }));
     const signOut = screen.getByRole('button', { name: 'Sign out' });
     expect(screen.getByRole('alert')).toHaveTextContent('Sign out did not complete. Try again.');
     await user.click(signOut);

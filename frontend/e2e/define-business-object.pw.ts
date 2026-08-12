@@ -869,7 +869,7 @@ test.describe('define business object', () => {
       .not.toBe(restingBackground);
     await expectReducedMotion(rulesLink);
 
-    await page.getByRole('button', { name: 'Account menu' }).click();
+    await page.getByRole('button', { name: /Account menu/ }).click();
     const accountMenu = page.locator('[data-axis-surface-id="account-actions"]');
     await expect(accountMenu).toBeVisible();
     await expectReducedMotion(accountMenu);
@@ -1043,7 +1043,7 @@ test.describe('define business object', () => {
     await expect(dialog).toBeVisible();
     await expect(dialog.getByLabel('Name', { exact: true })).toHaveValue('Customer draft');
 
-    await page.getByRole('button', { name: 'Account menu' }).click();
+    await page.getByRole('button', { name: /Account menu/ }).click();
     await page.getByRole('button', { name: 'Sign out' }).click();
     await expect(page).toHaveURL(/\/sign-in$/);
     await expect(page.getByRole('button', { name: 'Windows (1)' })).toHaveCount(0);

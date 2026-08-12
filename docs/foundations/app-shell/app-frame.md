@@ -14,6 +14,13 @@ Provide the shared frame for authenticated Axis Platform routes without owning d
 
 - An authenticated route renders inside the application frame.
 
+## Current review unit
+
+- **Boundary:** the complete `account-surface` owner and its `account-actions` consumer, including the trigger, signed-in identity, eligible-Workspace choices, preference choices, feedback/recovery, and sign-out handoff.
+- **Why this is one unit:** these regions share one owner, contract marker, responsive/scroll boundary, invalidation set, perceptual matrix, and project-owner acceptance decision. Typography, spacing, density, iconography, tone, state, and accessibility are concerns within that surface rather than separate review units.
+- **Excluded owners:** App Header composition outside the Account trigger, module navigation, Dashboard content, Account profile workflow, and sign-out session behavior. Dashboard main content remains empty.
+- **Stop/reopen conditions:** a new Account region or semantic role, a change to the visual constitution/profile/theme, a second active consumer, an unexpected baseline or gate failure, or project-owner feedback that changes the contract.
+
 ## Guarantees
 
 - Renders authenticated route content within shared top-bar, main-content, and footer regions.
@@ -32,6 +39,8 @@ Provide the shared frame for authenticated Axis Platform routes without owning d
 
 Separators mark major region boundaries and do not supply layout spacing. Feature content supplies state and commands; the Account surface owns every region inset, gap, alignment, and action placement.
 
+Account text uses the canonical Axis label and metadata roles; user-provided identity content wraps without clipping or changing the surface's scroll ownership. Compact controls retain the touch-target role, desktop controls retain the compact-control role, icons use the control-icon role, and destructive meaning may tint the boundary/icon without reducing readable text contrast. The trigger's accessible name includes its visible context label. The surface preserves semantic regions, groups, current/pending state, recovery announcements, keyboard reachability, focus visibility, reduced-motion behavior, and one-dimensional reflow at the 320 CSS-pixel boundary with WCAG text-spacing overrides.
+
 ## Alternate / error flows
 
 - Narrow viewport: frame content reflows without horizontal page overflow.
@@ -44,18 +53,21 @@ Separators mark major region boundaries and do not supply layout spacing. Featur
 - **AC-001** Authenticated routes render page content inside the shared app frame.
 - **AC-002** The frame exposes a top bar with product identity, page context, and one account-actions entry point ordered as signed-in identity, one flat eligible-Workspace choice set, preferences, then spatially separated sign-out; option rows retain a leading scan axis while standalone section actions share centered geometry independent of tone.
 - **AC-003** The frame exposes footer app metadata with version information and Axis Platform copyright.
+- **AC-004** The complete Account surface uses canonical Axis typography, spacing, density, icon, tone, depth, motion, and state roles; long localized/user-provided content wraps without clipping, compact targets remain at least 44 CSS pixels high, desktop targets remain at least 32 CSS pixels high, and its light/dark × desktop/compact plus VI reflow candidates remain deterministic.
 
 *Quality*
 - **AC-005** The frame fits supported desktop and mobile widths without horizontal page overflow, document-level scrolling, or a maximum content width on authenticated routes.
 - **AC-006** Visible frame copy uses the frontend translation layer.
+- **AC-007** The scoped Dashboard page and Account interaction preserve page title/language, landmarks, semantic names/roles/values, label-in-name, meaningful order, keyboard operation, visible/unobscured focus, status announcements, readable contrast, reduced motion, text spacing, and one-dimensional reflow; criterion-level applicability and retirement decisions are recorded without claiming product-wide certification.
 
 ## Acceptance Test Matrix
 
 | ID | Boundary | Scenario | Covers AC | Verification | Required |
 |---|---|---|---|---|---|
-| AT-001 | UI component | App frame renders top bar, main content, footer metadata, and the ordered account surface with stable semantic interaction rows without a placeholder route navigation bar. | AC-001, AC-002, AC-003, AC-006 | UI component test | Yes |
-| AT-002 | Browser journey | Desktop and mobile frame render an empty route surface, footer metadata, and the ordered account surface without a placeholder route navigation bar, console errors, document-level overflow, or shell-level content width caps. | AC-001, AC-002, AC-003, AC-005 | Browser automation | Yes |
+| AT-001 | UI component | App frame renders top bar, main content, footer metadata, and the complete ordered Account surface with canonical semantic typography, icon, target, state, long-content, recovery, and ownership mappings without a placeholder route navigation bar. | AC-001, AC-002, AC-003, AC-004, AC-006, AC-007 | UI component test | Yes |
+| AT-002 | Browser journey | Desktop, compact, and 320 CSS-pixel VI reflow modes render an empty Dashboard route and the complete Account surface without console errors, page/surface overflow, document scrolling, obscured keyboard focus, clipped long identity content, undersized targets, or shell-level width caps; text-spacing stress and the semantic accessibility tree remain intact. | AC-001, AC-002, AC-003, AC-004, AC-005, AC-006, AC-007 | Browser automation | Yes |
 | AT-003 | Static frontend | Frame code typechecks, lints, and keeps localized copy keys valid. | AC-006 | Frontend CI | Yes |
+| AT-004 | Static frontend | The scoped Dashboard page plus complete Account process is assessed criterion-by-criterion against applicable WCAG 2.2 A/AA requirements, interaction/human-centred principles, ownership, clean cutover, and candidate perceptual evidence; project-owner acceptance remains a separate lifecycle decision. | AC-002, AC-004, AC-005, AC-006, AC-007 | Frontend CI | Yes |
 
 ## Out Of Scope
 
@@ -87,12 +99,12 @@ Required UI quality: frame landmarks and controls must be keyboard-reachable, vi
 > | Frontend | Done |
 > | Tests | Done |
 >
-> **Implemented:** Authenticated routes render inside the shared App Frame with top bar, full-width main content, and footer. The frame exposes the signed-in identity, one flat eligible-Workspace choice set, preferences, and separated sign-out in semantic order; keeps visible copy localized; preserves an empty route surface; contains document-level overflow; does not impose route-content width caps; and shows footer version and copyright metadata. Placeholder route navigation remains absent until visible contributions exist.
+> **Implemented:** Authenticated routes render inside the shared App Frame with top bar, full-width main content, and footer. The frame exposes the signed-in identity, one flat eligible-Workspace choice set, preferences, and separated sign-out in semantic order; keeps visible copy localized; preserves an empty Dashboard route surface; contains document-level overflow; does not impose route-content width caps; and shows footer version and copyright metadata. The Account owner now also binds semantic typography/icon/target roles, wraps long identity content, includes visible context in the trigger name, and survives VI, text-spacing, and 320 CSS-pixel reflow. Placeholder route navigation remains absent until visible contributions exist.
 >
-> **Gaps vs spec:** N/A.
+> **Gaps vs spec:** N/A for `account-surface`; all current `axis-ui-v1` requirements are acceptance-traced and the owner is enforced. Other App Frame concerns remain governed by their independently owned contracts.
 >
 > **Deferred follow-ups:** N/A.
 >
-> **Verification:** Required AT rows are covered by UI component test, Playwright browser automation, and frontend CI.
+> **Verification:** Required AT rows are covered by UI component tests, Playwright browser automation, frontend CI, five accepted version-controlled captures, project-owner review, and [the scoped standards assessment](./account-surface.assessment.md). A passing checker establishes trace integrity, not product-wide standards certification.
 >
 > **Decisions:** App Frame is a foundation contract, not a use case. `AuthenticatedFrame` owns the product-neutral anatomy and semantic slots; `AppShell` is the application adapter that composes session, Workspace, navigation, and recovery state into those slots. Authenticated use cases may rely on its page chrome, frame structure, and document-scroll containment; route-specific layout, profile behavior, sign-out lifecycle, and global module navigation remain owned elsewhere. Global sidebar behavior is owned by [docs/foundations/app-shell/module-navigation.md](./module-navigation.md) and does not render before visible contributions exist.

@@ -14,6 +14,8 @@ Review checklist only. Workflow lives in repo skills ([`.agents/skills/README.md
 - Map applicable enterprise-production concerns to an owning contract and current proof; a required security, isolation, data, recovery, deployment, operability, capacity, accessibility, maintenance, or compatibility concern cannot be deferred as incremental delivery.
 - Resolve or explicitly defer lower-layer gaps before API work.
 - For a retirement, confirm the Design Gate chose clean cutover or named a real compatibility constraint; do not infer compatibility.
+- For visible UI, confirm one review unit is declared at the largest coherent owner/contract/invalidation/review boundary; do not fragment one owner by typography, spacing, or individual region without an explicit independent-ownership, acceptance, verification, or rollback rationale. Confirm the current versioned profile is an exact covered/gap/not-applicable partition, every covered requirement traces to owning acceptance and evidence, candidate evidence is not recorded as accepted, and no next independently owned consumer is bundled before project-owner acceptance.
+- Report that UI unit to the project owner with one roll-up only: `In progress`, `Awaiting review`, or `Complete`. Keep raw lifecycle/review/perceptual values as audit detail, not three reviewer-facing statuses.
 
 ## Acceptance Coverage
 

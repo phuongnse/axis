@@ -283,7 +283,7 @@ describe('AppShell', () => {
     expect(appHeader).toHaveClass('bg-card');
     expect(appHeader).not.toHaveClass('bg-card/95', 'backdrop-blur');
     expect(await screen.findByText('Ada Lovelace')).toBeInTheDocument();
-    const accountMenu = screen.getByRole('button', { name: 'Account menu' });
+    const accountMenu = screen.getByRole('button', { name: /Account menu/ });
     await waitFor(() => expect(accountMenu).toHaveTextContent('Axis Reference Product'));
     await user.click(accountMenu);
     expect(accountMenu).toHaveAttribute('aria-expanded', 'true');
@@ -384,7 +384,7 @@ describe('AppShell', () => {
       </QueryClientProvider>,
     );
 
-    const accountMenu = screen.getByRole('button', { name: 'Account menu' });
+    const accountMenu = screen.getByRole('button', { name: /Account menu/ });
     await waitFor(() => expect(accountMenu).toHaveTextContent('Ada Lovelace'));
     expect(accountMenu).toHaveTextContent('AL');
     expect(accountMenu).not.toHaveTextContent('Personal workspace');
@@ -457,7 +457,7 @@ describe('AppShell', () => {
     toast.success('Persistent window saved');
     expect(await screen.findByText('Persistent window saved')).toBeVisible();
 
-    await user.click(screen.getByRole('button', { name: 'Account menu' }));
+    await user.click(screen.getByRole('button', { name: /Account menu/ }));
     await user.click(screen.getByRole('button', { name: 'Sign out' }));
 
     await waitFor(() =>
@@ -548,7 +548,7 @@ describe('AppShell', () => {
     await user.click(screen.getByRole('button', { name: 'Open test window' }));
     expect(await screen.findByRole('dialog', { name: 'Persistent test window' })).toBeVisible();
 
-    const accountMenu = screen.getByRole('button', { name: 'Account menu' });
+    const accountMenu = screen.getByRole('button', { name: /Account menu/ });
     await user.click(accountMenu);
     await user.click(screen.getByRole('button', { name: 'Simulate Workspace change' }));
 
@@ -639,7 +639,7 @@ describe('AppShell', () => {
       </QueryClientProvider>,
     );
 
-    await user.click(screen.getByRole('button', { name: 'Account menu' }));
+    await user.click(screen.getByRole('button', { name: /Account menu/ }));
     await user.click(screen.getByRole('button', { name: 'Simulate Workspace change' }));
 
     await waitFor(() => expect(routerInvalidateMock).toHaveBeenCalledOnce());
@@ -664,7 +664,7 @@ describe('AppShell', () => {
       </QueryClientProvider>,
     );
 
-    await user.click(screen.getByRole('button', { name: 'Account menu' }));
+    await user.click(screen.getByRole('button', { name: /Account menu/ }));
     await user.click(screen.getByRole('button', { name: 'Simulate Workspace change' }));
 
     await waitFor(() =>
@@ -682,7 +682,7 @@ describe('AppShell', () => {
     expect(document.querySelector('[data-slot="authenticated-route-content"]')).toHaveClass(
       'invisible',
     );
-    expect(screen.getByRole('button', { name: 'Account menu' })).toHaveAttribute(
+    expect(screen.getByRole('button', { name: /Account menu/ })).toHaveAttribute(
       'aria-expanded',
       'true',
     );
@@ -865,7 +865,7 @@ describe('AppShell', () => {
       </QueryClientProvider>,
     );
 
-    await user.click(screen.getByRole('button', { name: 'Account menu' }));
+    await user.click(screen.getByRole('button', { name: /Account menu/ }));
     await user.click(screen.getByRole('button', { name: 'Sign out' }));
 
     await waitFor(() => expect(signOutUser).toHaveBeenCalledTimes(1));
@@ -902,7 +902,7 @@ describe('AppShell', () => {
       </QueryClientProvider>,
     );
 
-    await user.click(screen.getByRole('button', { name: 'Account menu' }));
+    await user.click(screen.getByRole('button', { name: /Account menu/ }));
     const signOutButton = screen.getByRole('button', { name: 'Sign out' });
     await user.click(signOutButton);
 
@@ -936,7 +936,7 @@ describe('AppShell', () => {
       </QueryClientProvider>,
     );
 
-    await user.click(screen.getByRole('button', { name: 'Account menu' }));
+    await user.click(screen.getByRole('button', { name: /Account menu/ }));
     await user.click(screen.getByRole('button', { name: 'Sign out' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent(

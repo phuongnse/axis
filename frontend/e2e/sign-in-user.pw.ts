@@ -115,7 +115,7 @@ async function expectAuthenticatedFrame(page: Page, userName: string): Promise<v
     '/business-objects',
   );
   await expect(page.getByRole('main')).toHaveText('');
-  await page.getByRole('button', { name: 'Account menu' }).click();
+  await page.getByRole('button', { name: /Account menu/ }).click();
   await expect(page.getByText(userName).first()).toBeVisible();
   await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible();
   await page.keyboard.press('Escape');

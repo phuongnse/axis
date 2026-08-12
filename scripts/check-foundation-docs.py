@@ -264,7 +264,11 @@ def iter_foundation_files() -> list[Path]:
         if not surface_dir.is_dir() or surface_dir.name.startswith("_"):
             continue
         for foundation in sorted(surface_dir.glob("*.md")):
-            if foundation.name != "README.md" and not foundation.name.endswith(".evidence.md"):
+            if (
+                foundation.name != "README.md"
+                and not foundation.name.endswith(".assessment.md")
+                and not foundation.name.endswith(".evidence.md")
+            ):
                 files.append(foundation)
     return files
 

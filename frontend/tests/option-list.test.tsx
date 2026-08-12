@@ -48,6 +48,13 @@ describe('OptionList', () => {
     expect(system.firstElementChild).toHaveAttribute('data-slot', 'option-item-icon');
     expect(system.firstElementChild?.querySelector('.lucide-monitor')).not.toBeNull();
     expect(system.lastElementChild).toHaveAttribute('data-slot', 'option-item-label');
+    expect(system.lastElementChild).toHaveClass(
+      axisStyles.typography.scale.label,
+      axisStyles.typography.weight.label,
+      'whitespace-normal',
+      'break-words',
+    );
+    expect(system.lastElementChild).not.toHaveClass('truncate');
     expect(system.querySelector('.lucide-check')).toBeNull();
 
     await user.click(dark);

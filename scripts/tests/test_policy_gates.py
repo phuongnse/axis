@@ -1602,6 +1602,27 @@ Ship user value.
 
 
 class TestFoundationDocsGate(unittest.TestCase):
+    def test_assessment_artifacts_are_not_foundation_specs(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            foundation_root = root / "docs" / "foundations"
+            surface = foundation_root / "app-shell"
+            surface.mkdir(parents=True)
+            (surface / "app-frame.md").write_text("# App Frame\n", encoding="utf-8")
+            (surface / "app-frame.assessment.md").write_text(
+                "# App Frame Assessment\n", encoding="utf-8"
+            )
+
+            original_root = check_foundation_docs.ROOT
+            original_foundations = check_foundation_docs.FOUNDATIONS
+            check_foundation_docs.ROOT = root
+            check_foundation_docs.FOUNDATIONS = foundation_root
+            try:
+                self.assertEqual([surface / "app-frame.md"], check_foundation_docs.iter_foundation_files())
+            finally:
+                check_foundation_docs.ROOT = original_root
+                check_foundation_docs.FOUNDATIONS = original_foundations
+
     def issues_for_foundation(
         self,
         *,

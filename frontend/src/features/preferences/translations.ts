@@ -105,6 +105,7 @@ export const translations = {
     'dashboard.workspaceType': 'Workspace type',
 
     'nav.accountMenu': 'Account menu',
+    'nav.accountMenuContext': 'Account menu: {context}',
     'nav.copyright': 'copyright',
     'nav.group.workspace': 'Workspace',
     'nav.modules': 'Modules',
@@ -924,6 +925,7 @@ export const translations = {
     'dashboard.workspaceType': 'Loại không gian',
 
     'nav.accountMenu': 'Menu tài khoản',
+    'nav.accountMenuContext': 'Menu tài khoản: {context}',
     'nav.copyright': 'bản quyền',
     'nav.group.workspace': 'Không gian',
     'nav.modules': 'Phân hệ',

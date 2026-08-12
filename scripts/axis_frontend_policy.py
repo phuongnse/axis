@@ -8,6 +8,12 @@ import re
 import sys
 from pathlib import Path
 
+from acceptance_evidence import at_ids_for_cell
+from acceptance_evidence import evidence_file_for
+from acceptance_evidence import first_markdown_table
+from acceptance_evidence import inline_code_values
+from acceptance_evidence import record_for_row
+from acceptance_evidence import split_h2_sections
 from axis_repo import ROOT, iter_files
 
 
@@ -16,10 +22,89 @@ UI_FOUNDATION_MANIFEST_KEYS = {
     "contracts",
     "enforcedContracts",
 }
-UI_CONTRACT_KEYS = {"state", "spec", "evidence"}
+UI_CONTRACT_KEYS = {"state", "spec", "coverageProfile", "acceptance", "evidence"}
 UI_CONTRACT_STATES = {"defined", "verified", "enforced"}
-UI_EVIDENCE_KEYS = {"component", "browser", "perceptual"}
+UI_ACCEPTANCE_KEYS = {"status"}
+UI_ACCEPTANCE_STATES = {"pending", "accepted"}
+UI_EVIDENCE_KEYS = {"assessment", "component", "browser", "perceptual", "coverage"}
+UI_PERCEPTUAL_KEYS = {"status", "artifacts"}
+UI_PERCEPTUAL_STATES = {"missing", "candidate", "accepted"}
+UI_COVERAGE_KEYS = {"covered", "gaps", "notApplicable"}
+UI_COVERED_REQUIREMENT_KEYS = {"acceptance", "evidence", "modes"}
+UI_COVERAGE_PROFILE_KEYS = {
+    "schemaVersion",
+    "profileId",
+    "modes",
+    "invalidationTriggers",
+    "requirements",
+}
+UI_PROFILE_REQUIREMENT_KEYS = {
+    "category",
+    "evidenceKinds",
+    "requiredModes",
+    "invalidatedBy",
+    "allowNotApplicable",
+}
+UI_PROFILE_CATEGORIES = {"standard", "visual", "behavior", "lifecycle"}
+UI_PROFILE_EVIDENCE_KINDS = {
+    "assessment",
+    "browser",
+    "component",
+    "perceptual",
+    "review",
+}
+UI_REQUIRED_INVALIDATION_TRIGGERS = {
+    "acceptance",
+    "constitution",
+    "consumer",
+    "evidence",
+    "surface-owner",
+    "theme",
+}
+UI_REQUIRED_PROFILE_REQUIREMENTS = {
+    "lifecycle.consumer-ownership-adoption": {
+        "evidenceKinds": {"component"},
+        "requiredModes": set(),
+        "invalidatedBy": {"consumer", "evidence", "surface-owner"},
+    },
+    "lifecycle.retirement-compatibility": {
+        "evidenceKinds": {"assessment", "component"},
+        "requiredModes": set(),
+        "invalidatedBy": {"constitution", "consumer", "evidence", "surface-owner"},
+    },
+    "standard.human-centred-evaluation": {
+        "evidenceKinds": {"assessment", "review"},
+        "requiredModes": set(),
+        "invalidatedBy": UI_REQUIRED_INVALIDATION_TRIGGERS,
+    },
+    "standard.interaction-principles": {
+        "evidenceKinds": {"assessment", "browser", "component", "review"},
+        "requiredModes": {"keyboard", "pointer"},
+        "invalidatedBy": UI_REQUIRED_INVALIDATION_TRIGGERS,
+    },
+    "standard.wcag-2-2-aa": {
+        "evidenceKinds": {"assessment", "browser", "component", "review"},
+        "requiredModes": {
+            "compact",
+            "desktop",
+            "keyboard",
+            "locale",
+            "reduced-motion",
+            "screen-reader",
+            "zoom-reflow",
+        },
+        "invalidatedBy": UI_REQUIRED_INVALIDATION_TRIGGERS,
+    },
+}
 UI_CONTRACT_ID = re.compile(r"^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$")
+UI_PROFILE_ID = re.compile(r"^[a-z][a-z0-9]*(?:-[a-z0-9]+)*-v[1-9][0-9]*$")
+UI_REQUIREMENT_ID = re.compile(
+    r"^(?:standard|visual|behavior|lifecycle)[.][a-z][a-z0-9]*(?:-[a-z0-9]+)*$"
+)
+UI_DIMENSION_ID = re.compile(r"^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$")
+UI_ACCEPTANCE_REFERENCE = re.compile(
+    r"^(?P<path>docs/foundations/[A-Za-z0-9_./-]+[.]md)#(?P<at_id>AT-[0-9]{3})$"
+)
 
 
 def rel(path: Path) -> str:
@@ -39,6 +124,229 @@ def ui_foundation_issues(root: Path = ROOT) -> list[str]:
         return ["frontend/ui-foundation.json: root value must be an object"]
 
     issues: list[str] = []
+
+    def checked_string_list(
+        value: object,
+        field: str,
+        *,
+        allowed: set[str] | None = None,
+        non_empty: bool = False,
+    ) -> list[str]:
+        if not isinstance(value, list):
+            issues.append(f"{field} must be a list")
+            return []
+        if any(not isinstance(item, str) or not item for item in value):
+            issues.append(f"{field} must contain only non-empty strings")
+            return [item for item in value if isinstance(item, str) and item]
+        if non_empty and not value:
+            issues.append(f"{field} must be non-empty")
+        if value != sorted(value):
+            issues.append(f"{field} must be sorted")
+        if len(value) != len(set(value)):
+            issues.append(f"{field} contains duplicates")
+        if allowed is not None:
+            unknown = sorted(set(value) - allowed)
+            if unknown:
+                issues.append(f"{field} contains unknown values: {', '.join(unknown)}")
+        return value
+
+    profile_path = root / "frontend" / "ui-coverage-profile.json"
+    profile: object = None
+    if not profile_path.is_file():
+        issues.append("frontend/ui-coverage-profile.json: governed UI coverage profile is missing")
+    else:
+        try:
+            profile = json.loads(profile_path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError) as exc:
+            issues.append(f"frontend/ui-coverage-profile.json: cannot read profile: {exc}")
+
+    profile_id: object = None
+    profile_modes: set[str] = set()
+    profile_triggers: set[str] = set()
+    profile_requirements: dict[str, dict[str, object]] = {}
+    if not isinstance(profile, dict):
+        issues.append("frontend/ui-coverage-profile.json: root value must be an object")
+    else:
+        unexpected_profile = sorted(set(profile) - UI_COVERAGE_PROFILE_KEYS)
+        missing_profile = sorted(UI_COVERAGE_PROFILE_KEYS - set(profile))
+        if unexpected_profile:
+            issues.append(
+                "frontend/ui-coverage-profile.json: unexpected keys: "
+                + ", ".join(unexpected_profile)
+            )
+        if missing_profile:
+            issues.append(
+                "frontend/ui-coverage-profile.json: missing keys: "
+                + ", ".join(missing_profile)
+            )
+        if profile.get("schemaVersion") != 1:
+            issues.append("frontend/ui-coverage-profile.json: `schemaVersion` must be 1")
+        profile_id = profile.get("profileId")
+        if not isinstance(profile_id, str) or not UI_PROFILE_ID.fullmatch(profile_id):
+            issues.append(
+                "frontend/ui-coverage-profile.json: `profileId` must be a versioned kebab-case id"
+            )
+        modes = checked_string_list(
+            profile.get("modes"),
+            "frontend/ui-coverage-profile.json: `modes`",
+            non_empty=True,
+        )
+        profile_modes = set(modes)
+        for mode in modes:
+            if not UI_DIMENSION_ID.fullmatch(mode):
+                issues.append(
+                    f"frontend/ui-coverage-profile.json: mode `{mode}` must use kebab-case"
+                )
+        triggers = checked_string_list(
+            profile.get("invalidationTriggers"),
+            "frontend/ui-coverage-profile.json: `invalidationTriggers`",
+            non_empty=True,
+        )
+        profile_triggers = set(triggers)
+        missing_required_triggers = sorted(
+            UI_REQUIRED_INVALIDATION_TRIGGERS - profile_triggers
+        )
+        if missing_required_triggers:
+            issues.append(
+                "frontend/ui-coverage-profile.json: `invalidationTriggers` is missing "
+                "baseline triggers: " + ", ".join(missing_required_triggers)
+            )
+        for trigger in triggers:
+            if not UI_DIMENSION_ID.fullmatch(trigger):
+                issues.append(
+                    "frontend/ui-coverage-profile.json: invalidation trigger "
+                    f"`{trigger}` must use kebab-case"
+                )
+        requirements = profile.get("requirements")
+        if not isinstance(requirements, dict) or not requirements:
+            issues.append(
+                "frontend/ui-coverage-profile.json: `requirements` must be a non-empty object"
+            )
+        else:
+            if list(requirements) != sorted(requirements):
+                issues.append(
+                    "frontend/ui-coverage-profile.json: `requirements` must be sorted by id"
+                )
+            for requirement_id, requirement in requirements.items():
+                requirement_prefix = f"requirements.{requirement_id}"
+                if (
+                    not isinstance(requirement_id, str)
+                    or not UI_REQUIREMENT_ID.fullmatch(requirement_id)
+                ):
+                    issues.append(
+                        "frontend/ui-coverage-profile.json: requirement id "
+                        f"`{requirement_id}` must use `<category>.<kebab-case>`"
+                    )
+                if not isinstance(requirement, dict):
+                    issues.append(
+                        f"frontend/ui-coverage-profile.json: `{requirement_prefix}` must be an object"
+                    )
+                    continue
+                profile_requirements[requirement_id] = requirement
+                unexpected_requirement = sorted(
+                    set(requirement) - UI_PROFILE_REQUIREMENT_KEYS
+                )
+                missing_requirement = sorted(
+                    UI_PROFILE_REQUIREMENT_KEYS - set(requirement)
+                )
+                if unexpected_requirement:
+                    issues.append(
+                        f"frontend/ui-coverage-profile.json: `{requirement_prefix}` has unexpected keys: "
+                        + ", ".join(unexpected_requirement)
+                    )
+                if missing_requirement:
+                    issues.append(
+                        f"frontend/ui-coverage-profile.json: `{requirement_prefix}` is missing keys: "
+                        + ", ".join(missing_requirement)
+                    )
+                category = requirement.get("category")
+                if category not in UI_PROFILE_CATEGORIES:
+                    issues.append(
+                        f"frontend/ui-coverage-profile.json: `{requirement_prefix}.category` "
+                        "must be one of: " + ", ".join(sorted(UI_PROFILE_CATEGORIES))
+                    )
+                elif isinstance(requirement_id, str) and requirement_id.split(".", 1)[0] != category:
+                    issues.append(
+                        f"frontend/ui-coverage-profile.json: `{requirement_prefix}.category` "
+                        "must match its id prefix"
+                    )
+                checked_string_list(
+                    requirement.get("evidenceKinds"),
+                    f"frontend/ui-coverage-profile.json: `{requirement_prefix}.evidenceKinds`",
+                    allowed=UI_PROFILE_EVIDENCE_KINDS,
+                    non_empty=True,
+                )
+                checked_string_list(
+                    requirement.get("requiredModes"),
+                    f"frontend/ui-coverage-profile.json: `{requirement_prefix}.requiredModes`",
+                    allowed=profile_modes,
+                )
+                checked_string_list(
+                    requirement.get("invalidatedBy"),
+                    f"frontend/ui-coverage-profile.json: `{requirement_prefix}.invalidatedBy`",
+                    allowed=profile_triggers,
+                    non_empty=True,
+                )
+                if not isinstance(requirement.get("allowNotApplicable"), bool):
+                    issues.append(
+                        f"frontend/ui-coverage-profile.json: `{requirement_prefix}.allowNotApplicable` "
+                        "must be a boolean"
+                    )
+            present_categories = {
+                requirement.get("category")
+                for requirement in profile_requirements.values()
+                if isinstance(requirement, dict)
+            }
+            missing_categories = sorted(UI_PROFILE_CATEGORIES - present_categories)
+            if missing_categories:
+                issues.append(
+                    "frontend/ui-coverage-profile.json: `requirements` is missing "
+                    "baseline categories: " + ", ".join(missing_categories)
+                )
+            missing_baseline_requirements = sorted(
+                set(UI_REQUIRED_PROFILE_REQUIREMENTS) - set(profile_requirements)
+            )
+            if missing_baseline_requirements:
+                issues.append(
+                    "frontend/ui-coverage-profile.json: `requirements` is missing "
+                    "baseline requirements: "
+                    + ", ".join(missing_baseline_requirements)
+                )
+            for requirement_id, baseline in UI_REQUIRED_PROFILE_REQUIREMENTS.items():
+                requirement = profile_requirements.get(requirement_id)
+                if requirement is None:
+                    continue
+                missing_kinds = sorted(
+                    baseline["evidenceKinds"]
+                    - set(requirement.get("evidenceKinds", []))
+                )
+                if missing_kinds:
+                    issues.append(
+                        "frontend/ui-coverage-profile.json: "
+                        f"`requirements.{requirement_id}.evidenceKinds` is missing "
+                        "baseline evidence kinds: " + ", ".join(missing_kinds)
+                    )
+                missing_modes = sorted(
+                    baseline["requiredModes"]
+                    - set(requirement.get("requiredModes", []))
+                )
+                if missing_modes:
+                    issues.append(
+                        "frontend/ui-coverage-profile.json: "
+                        f"`requirements.{requirement_id}.requiredModes` is missing "
+                        "baseline modes: " + ", ".join(missing_modes)
+                    )
+                missing_invalidations = sorted(
+                    baseline["invalidatedBy"]
+                    - set(requirement.get("invalidatedBy", []))
+                )
+                if missing_invalidations:
+                    issues.append(
+                        "frontend/ui-coverage-profile.json: "
+                        f"`requirements.{requirement_id}.invalidatedBy` is missing "
+                        "baseline triggers: " + ", ".join(missing_invalidations)
+                    )
+
     for typed_source in (
         "frontend/src/lib/ui-foundation.ts",
         "frontend/src/lib/active-surface-registry.ts",
@@ -56,8 +364,8 @@ def ui_foundation_issues(root: Path = ROOT) -> list[str]:
             "frontend/ui-foundation.json: missing keys: " + ", ".join(missing_keys)
         )
 
-    if manifest.get("schemaVersion") != 5:
-        issues.append("frontend/ui-foundation.json: `schemaVersion` must be 5")
+    if manifest.get("schemaVersion") != 7:
+        issues.append("frontend/ui-foundation.json: `schemaVersion` must be 7")
 
     def checked_path(value: object, field: str, suffix: str) -> Path | None:
         if not isinstance(value, str) or not value.strip():
@@ -79,6 +387,60 @@ def ui_foundation_issues(root: Path = ROOT) -> list[str]:
             issues.append(f"frontend/ui-foundation.json: `{field}` does not exist: {value}")
             return None
         return resolved
+
+    def acceptance_reference_evidence(reference: object, field: str) -> set[str]:
+        if not isinstance(reference, str):
+            issues.append(f"frontend/ui-foundation.json: `{field}` must be a string")
+            return set()
+        match = UI_ACCEPTANCE_REFERENCE.fullmatch(reference)
+        if match is None:
+            issues.append(
+                f"frontend/ui-foundation.json: `{field}` must use "
+                "`docs/foundations/<spec>.md#AT-NNN`"
+            )
+            return set()
+        owner_relative = Path(match.group("path"))
+        if ".." in owner_relative.parts or owner_relative.as_posix() != match.group("path"):
+            issues.append(
+                f"frontend/ui-foundation.json: `{field}` must use a normalized foundation path"
+            )
+            return set()
+        owner_path = root / owner_relative
+        if not owner_path.is_file():
+            issues.append(
+                f"frontend/ui-foundation.json: `{field}` references missing foundation spec"
+            )
+            return set()
+        at_id = match.group("at_id")
+        owner_text = owner_path.read_text(encoding="utf-8")
+        if re.search(rf"^[|]\s*{re.escape(at_id)}\s*[|]", owner_text, re.MULTILINE) is None:
+            issues.append(
+                f"frontend/ui-foundation.json: `{field}` references unknown acceptance id"
+            )
+            return set()
+        sidecar_path = evidence_file_for(owner_path)
+        if not sidecar_path.is_file():
+            issues.append(
+                f"frontend/ui-foundation.json: `{field}` has no acceptance evidence sidecar"
+            )
+            return set()
+        sections = split_h2_sections(sidecar_path.read_text(encoding="utf-8"))
+        table = first_markdown_table(sections.get("Acceptance Evidence", ""))
+        if table is None:
+            issues.append(
+                f"frontend/ui-foundation.json: `{field}` has no Acceptance Evidence table"
+            )
+            return set()
+        traced_evidence: set[str] = set()
+        for row in table.rows:
+            record = record_for_row(table, row)
+            if at_id in at_ids_for_cell(record.get("AT ID", "")):
+                traced_evidence.update(inline_code_values(record.get("Evidence", "")))
+        if not traced_evidence:
+            issues.append(
+                f"frontend/ui-foundation.json: `{field}` has no matching Acceptance Evidence row"
+            )
+        return traced_evidence
 
     contracts = manifest.get("contracts")
     if not isinstance(contracts, dict) or not contracts:
@@ -116,6 +478,56 @@ def ui_foundation_issues(root: Path = ROOT) -> list[str]:
                     f"frontend/ui-foundation.json: `{prefix}.state` must be one of: "
                     + ", ".join(sorted(UI_CONTRACT_STATES))
                 )
+
+            contract_profile = contract.get("coverageProfile")
+            if contract_profile != profile_id:
+                issues.append(
+                    f"frontend/ui-foundation.json: `{prefix}.coverageProfile` must match "
+                    "frontend/ui-coverage-profile.json `profileId`"
+                )
+
+            acceptance = contract.get("acceptance")
+            acceptance_status: object = None
+            if not isinstance(acceptance, dict):
+                issues.append(
+                    f"frontend/ui-foundation.json: `{prefix}.acceptance` must be an object"
+                )
+            else:
+                unexpected_acceptance = sorted(set(acceptance) - UI_ACCEPTANCE_KEYS)
+                missing_acceptance = sorted(UI_ACCEPTANCE_KEYS - set(acceptance))
+                if unexpected_acceptance:
+                    issues.append(
+                        f"frontend/ui-foundation.json: `{prefix}.acceptance` has unexpected keys: "
+                        + ", ".join(unexpected_acceptance)
+                    )
+                if missing_acceptance:
+                    issues.append(
+                        f"frontend/ui-foundation.json: `{prefix}.acceptance` is missing keys: "
+                        + ", ".join(missing_acceptance)
+                    )
+                acceptance_status = acceptance.get("status")
+                if (
+                    not isinstance(acceptance_status, str)
+                    or acceptance_status not in UI_ACCEPTANCE_STATES
+                ):
+                    issues.append(
+                        f"frontend/ui-foundation.json: `{prefix}.acceptance.status` must be one of: "
+                        + ", ".join(sorted(UI_ACCEPTANCE_STATES))
+                    )
+                if state == "defined" and acceptance_status == "accepted":
+                    issues.append(
+                        f"frontend/ui-foundation.json: `{prefix}` cannot retain accepted review "
+                        "while its state is `defined`"
+                    )
+                if (
+                    isinstance(state, str)
+                    and state in {"verified", "enforced"}
+                    and acceptance_status != "accepted"
+                ):
+                    issues.append(
+                        f"frontend/ui-foundation.json: `{prefix}` cannot be `{state}` without "
+                        "accepted review state"
+                    )
             spec = checked_path(contract.get("spec"), f"{prefix}.spec", ".md")
             if spec is not None:
                 spec_relative = spec.relative_to(root).as_posix()
@@ -141,26 +553,23 @@ def ui_foundation_issues(root: Path = ROOT) -> list[str]:
                     f"frontend/ui-foundation.json: `{prefix}.evidence` is missing keys: "
                     + ", ".join(missing_evidence)
                 )
-            for kind in sorted(UI_EVIDENCE_KEYS):
+            declared_evidence: set[str] = set()
+            evidence_by_kind: dict[str, set[str]] = {
+                "assessment": set(),
+                "browser": set(),
+                "component": set(),
+                "perceptual": set(),
+            }
+            for kind in ("assessment", "browser", "component"):
                 paths = evidence.get(kind)
                 if not isinstance(paths, list):
                     issues.append(
                         f"frontend/ui-foundation.json: `{prefix}.evidence.{kind}` must be a list"
                     )
                     continue
-                if kind != "perceptual" and not paths:
+                if kind != "assessment" and not paths:
                     issues.append(
                         f"frontend/ui-foundation.json: `{prefix}.evidence.{kind}` must be a non-empty list"
-                    )
-                if (
-                    kind == "perceptual"
-                    and isinstance(state, str)
-                    and state in {"verified", "enforced"}
-                    and not paths
-                ):
-                    issues.append(
-                        f"frontend/ui-foundation.json: `{prefix}` cannot be `{state}` without "
-                        "version-controlled perceptual evidence"
                     )
                 if len(paths) != len(set(path for path in paths if isinstance(path, str))):
                     issues.append(
@@ -170,17 +579,21 @@ def ui_foundation_issues(root: Path = ROOT) -> list[str]:
                     evidence_path = checked_path(
                         path,
                         f"{prefix}.evidence.{kind}[{index}]",
-                        (
-                            ".tsx"
-                            if kind == "component"
-                            else ".png"
-                            if kind == "perceptual"
-                            else ".ts"
-                        ),
+                        ".md" if kind == "assessment" else ".tsx" if kind == "component" else ".ts",
                     )
                     if evidence_path is None:
                         continue
                     evidence_relative = evidence_path.relative_to(root).as_posix()
+                    declared_evidence.add(evidence_relative)
+                    evidence_by_kind[kind].add(evidence_relative)
+                    if kind == "assessment" and not (
+                        evidence_relative.startswith("docs/foundations/")
+                        and evidence_relative.endswith(".assessment.md")
+                    ):
+                        issues.append(
+                            "frontend/ui-foundation.json: assessment evidence must be a "
+                            f"docs/foundations .assessment.md file: {evidence_relative}"
+                        )
                     if kind == "component" and not (
                         evidence_relative.endswith(".test.tsx")
                         and (
@@ -200,7 +613,72 @@ def ui_foundation_issues(root: Path = ROOT) -> list[str]:
                             "frontend/ui-foundation.json: browser evidence must be a "
                             f"frontend/e2e .pw.ts file: {evidence_relative}"
                         )
-                    if kind == "perceptual" and not (
+
+            perceptual = evidence.get("perceptual")
+            perceptual_status: object = None
+            if not isinstance(perceptual, dict):
+                issues.append(
+                    f"frontend/ui-foundation.json: `{prefix}.evidence.perceptual` must be an object"
+                )
+            else:
+                unexpected_perceptual = sorted(set(perceptual) - UI_PERCEPTUAL_KEYS)
+                missing_perceptual = sorted(UI_PERCEPTUAL_KEYS - set(perceptual))
+                if unexpected_perceptual:
+                    issues.append(
+                        f"frontend/ui-foundation.json: `{prefix}.evidence.perceptual` has unexpected keys: "
+                        + ", ".join(unexpected_perceptual)
+                    )
+                if missing_perceptual:
+                    issues.append(
+                        f"frontend/ui-foundation.json: `{prefix}.evidence.perceptual` is missing keys: "
+                        + ", ".join(missing_perceptual)
+                    )
+                perceptual_status = perceptual.get("status")
+                if (
+                    not isinstance(perceptual_status, str)
+                    or perceptual_status not in UI_PERCEPTUAL_STATES
+                ):
+                    issues.append(
+                        f"frontend/ui-foundation.json: `{prefix}.evidence.perceptual.status` "
+                        "must be one of: "
+                        + ", ".join(sorted(UI_PERCEPTUAL_STATES))
+                    )
+                artifacts = perceptual.get("artifacts")
+                if not isinstance(artifacts, list):
+                    issues.append(
+                        f"frontend/ui-foundation.json: `{prefix}.evidence.perceptual.artifacts` "
+                        "must be a list"
+                    )
+                    artifacts = []
+                if perceptual_status == "missing" and artifacts:
+                    issues.append(
+                        f"frontend/ui-foundation.json: `{prefix}.evidence.perceptual` missing state "
+                        "requires an empty artifact list"
+                    )
+                if perceptual_status in {"candidate", "accepted"} and not artifacts:
+                    issues.append(
+                        f"frontend/ui-foundation.json: `{prefix}.evidence.perceptual` "
+                        f"{perceptual_status} state requires version-controlled artifacts"
+                    )
+                if len(artifacts) != len(
+                    set(path for path in artifacts if isinstance(path, str))
+                ):
+                    issues.append(
+                        f"frontend/ui-foundation.json: `{prefix}.evidence.perceptual.artifacts` "
+                        "contains duplicates"
+                    )
+                for index, path in enumerate(artifacts):
+                    evidence_path = checked_path(
+                        path,
+                        f"{prefix}.evidence.perceptual.artifacts[{index}]",
+                        ".png",
+                    )
+                    if evidence_path is None:
+                        continue
+                    evidence_relative = evidence_path.relative_to(root).as_posix()
+                    declared_evidence.add(evidence_relative)
+                    evidence_by_kind["perceptual"].add(evidence_relative)
+                    if not (
                         evidence_relative.startswith("frontend/e2e/")
                         and "-snapshots/" in evidence_relative
                         and evidence_relative.endswith(".png")
@@ -209,6 +687,195 @@ def ui_foundation_issues(root: Path = ROOT) -> list[str]:
                             "frontend/ui-foundation.json: perceptual evidence must be a "
                             f"version-controlled frontend/e2e snapshot: {evidence_relative}"
                         )
+                if (
+                    isinstance(state, str)
+                    and state in {"verified", "enforced"}
+                    and perceptual_status != "accepted"
+                ):
+                    issues.append(
+                        f"frontend/ui-foundation.json: `{prefix}` cannot be `{state}` without "
+                        "accepted perceptual evidence"
+                    )
+                if perceptual_status == "accepted" and acceptance_status != "accepted":
+                    issues.append(
+                        f"frontend/ui-foundation.json: `{prefix}` cannot mark perceptual evidence "
+                        "accepted without accepted review state"
+                    )
+
+            coverage = evidence.get("coverage")
+            if not isinstance(coverage, dict):
+                issues.append(
+                    f"frontend/ui-foundation.json: `{prefix}.evidence.coverage` must be an object"
+                )
+            else:
+                unexpected_coverage = sorted(set(coverage) - UI_COVERAGE_KEYS)
+                missing_coverage = sorted(UI_COVERAGE_KEYS - set(coverage))
+                if unexpected_coverage:
+                    issues.append(
+                        f"frontend/ui-foundation.json: `{prefix}.evidence.coverage` has unexpected keys: "
+                        + ", ".join(unexpected_coverage)
+                    )
+                if missing_coverage:
+                    issues.append(
+                        f"frontend/ui-foundation.json: `{prefix}.evidence.coverage` is missing keys: "
+                        + ", ".join(missing_coverage)
+                    )
+                covered = coverage.get("covered")
+                gaps = coverage.get("gaps")
+                not_applicable = coverage.get("notApplicable")
+                if not isinstance(covered, dict):
+                    issues.append(
+                        f"frontend/ui-foundation.json: `{prefix}.evidence.coverage.covered` "
+                        "must be an object"
+                    )
+                    covered = {}
+                elif list(covered) != sorted(covered):
+                    issues.append(
+                        f"frontend/ui-foundation.json: `{prefix}.evidence.coverage.covered` "
+                        "must be sorted by requirement id"
+                    )
+                checked_gaps = checked_string_list(
+                    gaps,
+                    f"frontend/ui-foundation.json: `{prefix}.evidence.coverage.gaps`",
+                    allowed=set(profile_requirements),
+                )
+                if not isinstance(not_applicable, dict):
+                    issues.append(
+                        f"frontend/ui-foundation.json: `{prefix}.evidence.coverage.notApplicable` "
+                        "must be an object"
+                    )
+                    not_applicable = {}
+                elif list(not_applicable) != sorted(not_applicable):
+                    issues.append(
+                        f"frontend/ui-foundation.json: `{prefix}.evidence.coverage.notApplicable` "
+                        "must be sorted by requirement id"
+                    )
+
+                covered_ids = set(covered)
+                gap_ids = set(checked_gaps)
+                not_applicable_ids = set(not_applicable)
+                classified_ids = covered_ids | gap_ids | not_applicable_ids
+                duplicated_ids = sorted(
+                    (covered_ids & gap_ids)
+                    | (covered_ids & not_applicable_ids)
+                    | (gap_ids & not_applicable_ids)
+                )
+                if duplicated_ids:
+                    issues.append(
+                        f"frontend/ui-foundation.json: `{prefix}.evidence.coverage` classifies "
+                        "requirements more than once: " + ", ".join(duplicated_ids)
+                    )
+                unknown_ids = sorted(classified_ids - set(profile_requirements))
+                if unknown_ids:
+                    issues.append(
+                        f"frontend/ui-foundation.json: `{prefix}.evidence.coverage` contains "
+                        "unknown requirements: " + ", ".join(unknown_ids)
+                    )
+                unclassified_ids = sorted(set(profile_requirements) - classified_ids)
+                if unclassified_ids:
+                    issues.append(
+                        f"frontend/ui-foundation.json: `{prefix}.evidence.coverage` leaves "
+                        "requirements unclassified: " + ", ".join(unclassified_ids)
+                    )
+                if state in {"verified", "enforced"} and gap_ids:
+                    issues.append(
+                        f"frontend/ui-foundation.json: `{prefix}` cannot be `{state}` with "
+                        "coverage gaps: " + ", ".join(sorted(gap_ids))
+                    )
+
+                for requirement_id, rationale in not_applicable.items():
+                    requirement = profile_requirements.get(requirement_id)
+                    if requirement is not None and requirement.get("allowNotApplicable") is not True:
+                        issues.append(
+                            f"frontend/ui-foundation.json: `{prefix}.evidence.coverage.notApplicable."
+                            f"{requirement_id}` is forbidden by the active profile"
+                        )
+                    if not isinstance(rationale, str) or not rationale.strip():
+                        issues.append(
+                            f"frontend/ui-foundation.json: `{prefix}.evidence.coverage.notApplicable."
+                            f"{requirement_id}` must give a non-empty rationale"
+                        )
+
+                for requirement_id, entry in covered.items():
+                    requirement_prefix = (
+                        f"{prefix}.evidence.coverage.covered.{requirement_id}"
+                    )
+                    requirement = profile_requirements.get(requirement_id)
+                    if not isinstance(entry, dict):
+                        issues.append(
+                            f"frontend/ui-foundation.json: `{requirement_prefix}` must be an object"
+                        )
+                        continue
+                    unexpected_entry = sorted(set(entry) - UI_COVERED_REQUIREMENT_KEYS)
+                    missing_entry = sorted(UI_COVERED_REQUIREMENT_KEYS - set(entry))
+                    if unexpected_entry:
+                        issues.append(
+                            f"frontend/ui-foundation.json: `{requirement_prefix}` has unexpected keys: "
+                            + ", ".join(unexpected_entry)
+                        )
+                    if missing_entry:
+                        issues.append(
+                            f"frontend/ui-foundation.json: `{requirement_prefix}` is missing keys: "
+                            + ", ".join(missing_entry)
+                        )
+                    acceptance_references = checked_string_list(
+                        entry.get("acceptance"),
+                        f"frontend/ui-foundation.json: `{requirement_prefix}.acceptance`",
+                        non_empty=True,
+                    )
+                    traced_evidence: set[str] = set()
+                    for index, reference in enumerate(acceptance_references):
+                        traced_evidence.update(
+                            acceptance_reference_evidence(
+                                reference,
+                                f"{requirement_prefix}.acceptance[{index}]",
+                            )
+                        )
+                    coverage_evidence = checked_string_list(
+                        entry.get("evidence"),
+                        f"frontend/ui-foundation.json: `{requirement_prefix}.evidence`",
+                    )
+                    for index, reference in enumerate(coverage_evidence):
+                        if reference not in declared_evidence:
+                            issues.append(
+                                f"frontend/ui-foundation.json: "
+                                f"`{requirement_prefix}.evidence[{index}]` must reference "
+                                "declared contract evidence"
+                            )
+                        if reference not in traced_evidence:
+                            issues.append(
+                                f"frontend/ui-foundation.json: "
+                                f"`{requirement_prefix}.evidence[{index}]` is not traced by "
+                                "the declared acceptance evidence"
+                            )
+                    coverage_modes = checked_string_list(
+                        entry.get("modes"),
+                        f"frontend/ui-foundation.json: `{requirement_prefix}.modes`",
+                        allowed=profile_modes,
+                    )
+                    if requirement is None:
+                        continue
+                    required_modes = set(requirement.get("requiredModes", []))
+                    missing_modes = sorted(required_modes - set(coverage_modes))
+                    if missing_modes:
+                        issues.append(
+                            f"frontend/ui-foundation.json: `{requirement_prefix}` is missing "
+                            "required modes: " + ", ".join(missing_modes)
+                        )
+                    evidence_kinds = set(requirement.get("evidenceKinds", []))
+                    for evidence_kind in sorted(evidence_kinds):
+                        if evidence_kind == "review":
+                            if acceptance_status != "accepted":
+                                issues.append(
+                                    f"frontend/ui-foundation.json: `{requirement_prefix}` requires "
+                                    "accepted project-owner review"
+                                )
+                            continue
+                        if not (set(coverage_evidence) & evidence_by_kind[evidence_kind]):
+                            issues.append(
+                                f"frontend/ui-foundation.json: `{requirement_prefix}` requires "
+                                f"`{evidence_kind}` evidence"
+                            )
 
     enforced_contracts = manifest.get("enforcedContracts")
     if not isinstance(enforced_contracts, dict):
