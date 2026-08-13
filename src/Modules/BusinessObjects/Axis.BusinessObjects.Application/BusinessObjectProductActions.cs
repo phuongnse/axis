@@ -7,9 +7,7 @@ public static class BusinessObjectProductActions
 {
     public const string DefinitionResourceType = "business-object.definition";
     public const string RecordResourceType = "business-object.record";
-    public const string DefinitionRead = "business-object.definition.read";
     public const string DefinitionReadPublished = "business-object.definition.read-published";
-    public const string DefinitionManage = "business-object.definition.manage";
     public const string RecordCreate = "business-object.record.create";
     public const string RecordList = "business-object.record.list";
     public const string RecordRead = "business-object.record.read";
@@ -18,9 +16,7 @@ public static class BusinessObjectProductActions
 
     public static IReadOnlyList<ProductActionDescriptor> Descriptors { get; } = Array.AsReadOnly<ProductActionDescriptor>(
     [
-        new(DefinitionRead, DefinitionResourceType, ProductActionKind.NonRecord),
         new(DefinitionReadPublished, DefinitionResourceType, ProductActionKind.NonRecord),
-        new(DefinitionManage, DefinitionResourceType, ProductActionKind.NonRecord),
         new(RecordCreate, RecordResourceType, ProductActionKind.Record),
         new(RecordList, RecordResourceType, ProductActionKind.Record),
         new(RecordRead, RecordResourceType, ProductActionKind.Record),
@@ -31,6 +27,25 @@ public static class BusinessObjectProductActions
 
 public static class BusinessObjectAuthorization
 {
+    public static async Task<WorkspaceProductBuilderDecision> AuthorizeBuilderAsync(
+        IWorkspaceProductBuilderAuthorization authorization,
+        Guid workspaceId,
+        SubjectReference subject,
+        CancellationToken cancellationToken)
+    {
+        if (subject.Id == Guid.Empty || subject.Kind != SubjectKind.Human)
+            return WorkspaceProductBuilderDecision.Denied;
+
+        try
+        {
+            return await authorization.AuthorizeAsync(workspaceId, subject, cancellationToken);
+        }
+        catch
+        {
+            return WorkspaceProductBuilderDecision.Unavailable;
+        }
+    }
+
     public static async Task<ProductAuthorizationDecision> AuthorizeAsync(
         IProductAuthorizationService authorization,
         Guid workspaceId,

@@ -68,7 +68,7 @@ public sealed class CreateOrganizationWorkspaceHandlerTests
                 record.Key == "key" && record.CanonicalRequest == "Acme"),
             Arg.Any<CancellationToken>());
         await organizationMemberships.Received(1).AddAsync(Arg.Is<OrganizationMembership>(x => x.UserId == user.Id && x.Role == OrganizationMembershipRole.Owner), Arg.Any<CancellationToken>());
-        await workspaceMemberships.Received(1).AddAsync(Arg.Is<WorkspaceMembership>(x => x.UserId == user.Id && x.Role == WorkspaceMembershipRole.Administrator), Arg.Any<CancellationToken>());
+        await workspaceMemberships.Received(1).AddAsync(Arg.Is<WorkspaceMembership>(x => x.UserId == user.Id && x.Role == WorkspaceMembershipRole.Administrator && x.IsProductBuilder), Arg.Any<CancellationToken>());
         await audit.Received(1).EnqueueAsync(
             Arg.Is<AuditEventV1>(entry =>
                 entry.ActorId == user.Id
@@ -193,10 +193,7 @@ public sealed class CreateOrganizationWorkspaceHandlerTests
                 winnerWorkspace.Id,
                 user.Id,
                 Arg.Any<CancellationToken>())
-            .Returns(WorkspaceMembership.CreateOrganizationMember(
-                winnerWorkspace.Id,
-                user.Id,
-                WorkspaceMembershipRole.Administrator));
+            .Returns(WorkspaceMembership.CreateOrganizationCreator(winnerWorkspace.Id, user.Id));
         audit.GetAsync(winnerOrganization.Id, Arg.Any<CancellationToken>()).Returns(
             CreationAudit(user.Id, winnerOrganization.Id, winnerWorkspace.Id));
 
@@ -257,10 +254,7 @@ public sealed class CreateOrganizationWorkspaceHandlerTests
                 workspace.Id,
                 user.Id,
                 Arg.Any<CancellationToken>())
-            .Returns(WorkspaceMembership.CreateOrganizationMember(
-                workspace.Id,
-                user.Id,
-                WorkspaceMembershipRole.Administrator));
+            .Returns(WorkspaceMembership.CreateOrganizationCreator(workspace.Id, user.Id));
         IIdentityAuditOutbox audit = Substitute.For<IIdentityAuditOutbox>();
         audit.GetAsync(organization.Id, Arg.Any<CancellationToken>()).Returns(
             new IdentityAuditOutboxEntry(

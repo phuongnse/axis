@@ -85,10 +85,7 @@ public sealed class CreateOrganizationWorkspaceHandler(
             ct);
         await workspaces.AddAsync(workspace, ct);
         await workspaceMemberships.AddAsync(
-            WorkspaceMembership.CreateOrganizationMember(
-                workspace.Id,
-                user.Id,
-                WorkspaceMembershipRole.Administrator),
+            WorkspaceMembership.CreateOrganizationCreator(workspace.Id, user.Id),
             ct);
         await idempotency.AddAsync(
             user.Id,
@@ -183,6 +180,7 @@ public sealed class CreateOrganizationWorkspaceHandler(
             {
                 Role: WorkspaceMembershipRole.Administrator,
                 Status: MembershipStatus.Active,
+                IsProductBuilder: true,
             }
             || retry is null
             || !StringComparer.Ordinal.Equals(retry.CanonicalRequest, canonicalRequest)

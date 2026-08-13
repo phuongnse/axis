@@ -49,6 +49,62 @@ public sealed class GovernanceAggregateTests
     }
 
     [Fact]
+    public void WorkspaceMembership_ProductBuilderState_IsExplicitAndIndependentOfRole()
+    {
+        WorkspaceMembership creator = WorkspaceMembership.CreateOrganizationCreator(
+            Guid.NewGuid(),
+            Guid.NewGuid());
+        WorkspaceMembership administrator = WorkspaceMembership.CreateOrganizationMember(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            WorkspaceMembershipRole.Administrator);
+        WorkspaceMembership member = WorkspaceMembership.CreateOrganizationMember(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            WorkspaceMembershipRole.Member);
+
+        creator.IsProductBuilder.Should().BeTrue();
+        administrator.IsProductBuilder.Should().BeFalse();
+        member.SetProductBuilder(true, member.Revision);
+        member.IsProductBuilder.Should().BeTrue();
+        member.Role.Should().Be(WorkspaceMembershipRole.Member);
+    }
+
+    [Fact]
+    public void WorkspaceMembership_ProductBuilderLifecycle_PreservesOnSuspensionAndClearsOnRemoval()
+    {
+        WorkspaceMembership membership = WorkspaceMembership.CreateOrganizationMember(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            WorkspaceMembershipRole.Member);
+        membership.SetProductBuilder(true, membership.Revision);
+
+        membership.Suspend(membership.Revision);
+        membership.IsProductBuilder.Should().BeTrue();
+        Action changeWhileSuspended = () => membership.SetProductBuilder(false, membership.Revision);
+        changeWhileSuspended.Should().Throw<InvalidOperationException>();
+        membership.Reactivate(membership.Revision);
+        membership.IsProductBuilder.Should().BeTrue();
+        membership.Remove(membership.Revision);
+        membership.IsProductBuilder.Should().BeFalse();
+        membership.RestoreFromInvitation(WorkspaceMembershipRole.Member, membership.Revision);
+        membership.IsProductBuilder.Should().BeFalse();
+    }
+
+    [Fact]
+    public void WorkspaceMembership_EquivalentProductBuilderState_ReturnsCanonicalRevision()
+    {
+        WorkspaceMembership membership = WorkspaceMembership.CreateOrganizationMember(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            WorkspaceMembershipRole.Member);
+
+        membership.SetProductBuilder(false, membership.Revision);
+
+        membership.Revision.Should().Be(1);
+    }
+
+    [Fact]
     public void Transition_WhenCompletedThenCompensated_RejectsSecondTerminalState()
     {
         DateTime now = DateTime.UtcNow;

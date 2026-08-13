@@ -60,7 +60,8 @@ public sealed class CreateOrganizationWorkspaceEndpointTests(ApiTestFixture fixt
         (await db.WorkspaceMemberships.CountAsync(
             membership => membership.WorkspaceId == workspaceId
                 && membership.UserId == user.Id
-                && membership.Role == WorkspaceMembershipRole.Administrator,
+                && membership.Role == WorkspaceMembershipRole.Administrator
+                && membership.IsProductBuilder,
             TestContext.Current.CancellationToken)).Should().Be(1);
     }
 

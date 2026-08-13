@@ -1,4 +1,4 @@
-using Axis.Authorization.Contracts;
+using Axis.Identity.Contracts;
 using Axis.Rules.Application.Commands.CreateRuleBinding;
 using Axis.Rules.Application.Repositories;
 using Axis.Rules.Contracts;
@@ -41,15 +41,15 @@ public sealed class CreateRuleBindingHandlerTests
     }
 
     [Fact]
-    public async Task Handle_WhenAuthorizationUnavailable_UsesRequestedDefinitionKeyWithoutMutation()
+    public async Task Handle_WhenBuilderAuthorizationUnavailable_DoesNotMutate()
     {
         IRuleBindingRepository bindings = Substitute.For<IRuleBindingRepository>();
         RuleDefinitionHandlerTestContext context = new();
-        ProductAuthorizationRequest? observed = null;
         context.Authorization.AuthorizeAsync(
-                Arg.Do<ProductAuthorizationRequest>(request => observed = request),
+                Arg.Any<Guid>(),
+                Arg.Any<SubjectReference>(),
                 Arg.Any<CancellationToken>())
-            .Returns(ProductAuthorizationDecision.Unavailable);
+            .Returns(WorkspaceProductBuilderDecision.Unavailable);
         CreateRuleBindingHandler handler = new(
             context.CurrentUser,
             context.CurrentSubject,
@@ -63,7 +63,6 @@ public sealed class CreateRuleBindingHandlerTests
             TestContext.Current.CancellationToken);
 
         result.ErrorCode.Should().Be(ErrorCodes.Unavailable);
-        observed!.ResourceKey.Should().Be(RuleDefinitionKeys.Required);
         await context.Repository.DidNotReceive().GetByKeyForWorkspaceAsync(
             Arg.Any<RuleDefinitionKey>(),
             Arg.Any<Guid>(),

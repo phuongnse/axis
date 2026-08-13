@@ -110,6 +110,7 @@ internal static class AxisApiApplicationExtensions
         app.MapOrganizationEndpoints();
         app.MapWorkspaceInvitationAcceptanceEndpoints();
         app.MapWorkspaceInvitationEndpoints();
+        app.MapWorkspaceProductBuilderEndpoints();
         app.MapServiceIdentityEndpoints();
         app.MapProductRoleAssignmentEndpoints();
         app.MapSolutionEndpoints();

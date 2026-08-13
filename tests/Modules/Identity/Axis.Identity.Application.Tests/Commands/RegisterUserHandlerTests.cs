@@ -83,7 +83,10 @@ public class RegisterUserHandlerTests
                 && w.Status == WorkspaceStatus.PendingVerification),
             Arg.Any<CancellationToken>());
         await _workspaceMembershipRepo.Received(1).AddAsync(
-            Arg.Is<WorkspaceMembership>(m => m.UserId != Guid.Empty && m.Role == WorkspaceMembershipRole.Owner),
+            Arg.Is<WorkspaceMembership>(m =>
+                m.UserId != Guid.Empty
+                && m.Role == WorkspaceMembershipRole.Owner
+                && m.IsProductBuilder),
             Arg.Any<CancellationToken>());
         await _verificationTokenStore.Received(1).CreateAsync(
             Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>());

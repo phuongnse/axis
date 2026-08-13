@@ -1,4 +1,5 @@
 using Axis.Authorization.Contracts;
+using Axis.Identity.Contracts;
 using Axis.Shared.Domain.Primitives;
 
 namespace Axis.BusinessObjects.Application;
@@ -28,6 +29,14 @@ internal static class BusinessObjectDefinitionFailures
             ? Result.Failure<T>(
                 ErrorCodes.Unavailable,
                 "Product authorization is temporarily unavailable.",
+                BusinessObjectsProblemCodes.AuthorizationUnavailable)
+            : Forbidden<T>();
+
+    public static Result<T> Authorization<T>(WorkspaceProductBuilderDecision decision) =>
+        decision.IsUnavailable
+            ? Result.Failure<T>(
+                ErrorCodes.Unavailable,
+                "Product Builder authorization is temporarily unavailable.",
                 BusinessObjectsProblemCodes.AuthorizationUnavailable)
             : Forbidden<T>();
 

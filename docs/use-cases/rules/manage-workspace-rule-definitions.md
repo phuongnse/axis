@@ -4,15 +4,15 @@
 
 ## Purpose
 
-Let a signed-in workspace user create, validate, test, version, activate, deactivate, and inspect reusable rules without first creating a consumer target.
+Let a Workspace Product Builder create, validate, test, version, activate, deactivate, and inspect reusable rules without first creating a consumer target or installing a product policy.
 
 ## Primary actor
 
-- Signed-in workspace user
+- Active human Workspace Product Builder
 
 ## Preconditions
 
-- The user has an authorized current Workspace and access to the Rules collection.
+- The user has an active current Workspace membership with explicit Product Builder authority.
 
 ## Trigger
 
@@ -74,7 +74,7 @@ Let a signed-in workspace user create, validate, test, version, activate, deacti
 - **AC-015** Draft and lifecycle mutations require the caller's last-seen revision and reject stale writes without overwrite.
 - **AC-016** Immutable versions cannot be edited in place, and lifecycle changes never rewrite historical content.
 - **AC-017** Rules cannot execute arbitrary code or JavaScript, access files, network services, secrets, arbitrary databases, nondeterministic time, or randomness, or produce side effects.
-- **AC-018** Workspace definitions, drafts, samples, versions, activation, and usage are isolated and authorized without resource disclosure.
+- **AC-018** Workspace definitions, drafts, samples, versions, activation, and usage are isolated by Workspace and require Product Builder authority as their single authoring decision without resource disclosure.
 
 *Edge cases*
 
@@ -87,7 +87,7 @@ Let a signed-in workspace user create, validate, test, version, activate, deacti
 | ID | Boundary | Scenario | Covers AC | Verification | Required |
 |---|---|---|---|---|---|
 | AT-001 | Domain boundary | Stable typed inputs, canonical AST, immutable versions, separate activation, limits, and deterministic Boolean semantics preserve all definition invariants | AC-002, AC-003, AC-006, AC-007, AC-008, AC-012, AC-014, AC-016, AC-017, AC-021 | Domain test | Yes |
-| AT-002 | Application boundary | Independent definition lifecycle creates, tests, versions, activates, deactivates, audits, and rejects stale or cross-workspace mutations without a consumer target | AC-001, AC-005, AC-007, AC-008, AC-015, AC-018, AC-021 | Application test | Yes |
+| AT-002 | Application boundary | Independent definition lifecycle creates, tests, versions, activates, deactivates, audits, and rejects non-builder, stale, or cross-Workspace operations without a consumer target | AC-001, AC-005, AC-007, AC-008, AC-015, AC-018, AC-021 | Application test | Yes |
 | AT-003 | Application boundary | One language service parses, validates, formats, autocompletes, and explains DSL and visual projections while persisting only the canonical AST | AC-003, AC-004, AC-009, AC-012, AC-013, AC-014 | Application test | Yes |
 | AT-004 | API boundary | Definition lifecycle, language, testing, activation, version history, and usage contracts expose generated frontend parity without consumer fields or localized stored logic | AC-001, AC-004, AC-005, AC-006, AC-008, AC-009, AC-018, AC-020 | API integration test | Yes |
 | AT-005 | Application boundary | Rules has no dependency on consumer modules and built-in/workspace definitions use the same public semantic contract | AC-010, AC-019, AC-020 | Architecture test | Yes |
@@ -129,4 +129,4 @@ Required UI quality: use the existing shadcn and Tailwind system only; keep labe
 >
 > **Verification:** AT-001 through AT-007 are mapped to current source and passing domain, application, infrastructure, API, architecture, contract, focused frontend, and browser evidence in the sibling sidecar.
 >
-> **Decisions:** The current authoring capability is a bounded positive-assertion Boolean Rule. Version creation, activation, deactivation, and archive remain distinct user actions, and input keys stay stable while labels remain editable. [Rules architecture](../../ARCHITECTURE.md#rules-boundary) owns the canonical logic, version, projection, and consumer-neutral realization; retired alternate semantic surfaces are not retained.
+> **Decisions:** The current authoring capability is a bounded positive-assertion Boolean Rule. Identity-owned Product Builder authority is its sole human authoring boundary and is independent of installed product policy. Version creation, activation, deactivation, and archive remain distinct user actions, and input keys stay stable while labels remain editable. [Rules architecture](../../ARCHITECTURE.md#rules-boundary) owns the canonical logic, version, projection, and consumer-neutral realization; retired alternate semantic surfaces are not retained.

@@ -58,4 +58,11 @@ public static class IdentityProblemCodes
     public const string InvitationAccountMismatch = "identity.invitation.accountMismatch";
     public const string InvitationAuthorityStale = "identity.invitation.authorityStale";
     public const string InvitationMembershipSuspended = "identity.invitation.membershipSuspended";
+
+    public const string ProductBuilderInvalid = "identity.productBuilder.invalid";
+    public const string ProductBuilderForbidden = "identity.productBuilder.forbidden";
+    public const string ProductBuilderNotFound = "identity.productBuilder.notFound";
+    public const string ProductBuilderConflict = "identity.productBuilder.conflict";
+    public const string ProductBuilderAuditUnavailable = "identity.productBuilder.auditUnavailable";
+    public const string ProductBuilderReadBackFailed = "identity.productBuilder.readBackFailed";
 }

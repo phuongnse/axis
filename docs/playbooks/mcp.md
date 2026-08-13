@@ -38,6 +38,7 @@ The coverage catalog classifies every committed OpenAPI operation and is updated
 
 - Rule tools expose typed lifecycle, authoring, simulation, binding, and evaluation operations; destructive writes pass the API's expected revision.
 - Service-identity tools list/read non-secret state and create/add/revoke without credentials or private keys; product-role tools list and mutate exact `{kind, subjectId}` references without caller-supplied user or Workspace scope.
+- Workspace-governance tools list Product Builder authority and grant or revoke it for an explicit active human member while deriving the governing Workspace and administrator authority from OAuth claims; mutations forward the current membership revision.
 - Solutions tools list/read safe version and installation status, publish only a bounded regular local package file, and pass exact version/operation identifiers plus API idempotency to install/resume operations. Package bytes never appear in tool output, and no publisher-management or generic proxy tool exists.
 - Account/browser-bootstrap operations remain internal to browser/OAuth session handling.
 

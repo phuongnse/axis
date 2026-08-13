@@ -29,6 +29,21 @@ internal sealed class WorkspaceMembershipRepository(IdentityDbContext context)
                     && x.Status == MembershipStatus.Active,
                 ct);
 
+    public Task<WorkspaceMembership?> GetActiveHumanAsync(
+        Guid workspaceId,
+        Guid userId,
+        CancellationToken ct = default) =>
+        context.WorkspaceMemberships
+            .Where(x => x.WorkspaceId == workspaceId
+                && x.UserId == userId
+                && x.Status == MembershipStatus.Active)
+            .Join(
+                context.Users.Where(user => user.Status == UserStatus.Active),
+                membership => membership.UserId,
+                user => user.Id,
+                (membership, _) => membership)
+            .FirstOrDefaultAsync(ct);
+
     public async Task<IReadOnlyList<WorkspaceMembership>> ListActiveForUserAsync(
         Guid userId,
         CancellationToken ct = default) =>
@@ -47,13 +62,16 @@ internal sealed class WorkspaceMembershipRepository(IdentityDbContext context)
                 context.Users.Where(user => user.Status == UserStatus.Active),
                 membership => membership.UserId,
                 user => user.Id,
-                (_, user) => user)
-            .OrderBy(user => user.FullName)
-            .ThenBy(user => user.Id)
-            .Select(user => new ActiveWorkspaceHumanProjection(
-                user.Id,
-                user.FullName,
-                user.Email.Value))
+                (membership, user) => new { membership, user })
+            .OrderBy(value => value.user.FullName)
+            .ThenBy(value => value.user.Id)
+            .Select(value => new ActiveWorkspaceHumanProjection(
+                value.user.Id,
+                value.user.FullName,
+                value.user.Email.Value,
+                value.membership.Role,
+                value.membership.IsProductBuilder,
+                value.membership.Revision))
             .ToListAsync(ct);
 
     public Task<bool> HasActivePersonalOwnerWorkspaceAsync(

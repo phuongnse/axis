@@ -4,15 +4,15 @@
 
 ## Purpose
 
-Let a signed-in workspace user configure enterprise field types, type-specific field configuration, and reusable rule bindings on an unpublished business object definition so each published version carries an explicit, stable record contract.
+Let a Workspace Product Builder configure enterprise field types, type-specific field configuration, and reusable rule bindings on an unpublished business object definition so each published version carries an explicit, stable record contract.
 
 ## Primary actor
 
-- Signed-in workspace user
+- Active human Workspace Product Builder
 
 ## Preconditions
 
-- An unpublished Business Object definition exists in the current Workspace and the user can edit it.
+- An unpublished Business Object definition exists in the current Workspace and the user has explicit Product Builder authority.
 - Any reusable Rule version selected for binding is discoverable to the current Workspace.
 
 ## Trigger
@@ -73,7 +73,7 @@ Let a signed-in workspace user configure enterprise field types, type-specific f
 - **AC-014** Applied rules cannot execute arbitrary code, perform external I/O, use nondeterministic time or randomness, or trigger side effects as part of definition configuration.
 
 *Edge cases*
-- **AC-015** Current workspace scope is required for save, publish, list, and load operations; unavailable and cross-workspace access is rejected without mutation or disclosure.
+- **AC-015** Active human Product Builder authority in the current Workspace is required for authoring save, publish, list, and load operations; missing or unavailable authority and cross-Workspace access are rejected without mutation or disclosure.
 - **AC-016** Business Objects owns fields, choice configuration, the transient target-context schema, and applied snapshots; Rules owns reusable definitions, versions, binding mappings, compatibility validation, and deterministic evaluation contracts. The transient consumer schema is never persisted by Rules.
 - **AC-017** Mutable field, option, and applied-rule entities use identities distinct from immutable published snapshots, and every published snapshot retains its source entity identity.
 - **AC-018** The initial Business Objects schema contains only the approved `Choice` plus `Single` or `Multiple` contract and uses one clean initial migration without compatibility aliases.
@@ -89,7 +89,7 @@ Let a signed-in workspace user configure enterprise field types, type-specific f
 | AT-004 | Application/Infrastructure boundaries | Publishing preserves immutable type configuration and exact applied rule versions atomically | AC-006, AC-008, AC-019 | Application test + Infrastructure integration test | Yes |
 | AT-005 | Infrastructure boundary | The clean initial schema enforces distinct current/snapshot identities, source references, choice configuration, constraints, and no retired compatibility residue | AC-017, AC-018, AC-019 | Infrastructure integration test | Yes |
 | AT-006 | API boundary | Object definition endpoints expose canonical type configuration and applied rule versions with generated frontend parity | AC-001, AC-002, AC-003, AC-004, AC-006, AC-009 | API integration test | Yes |
-| AT-007 | API/Application boundaries | Missing, unavailable, and cross-workspace scope is rejected without mutation or disclosure | AC-015, AC-016 | API integration test + Application test | Yes |
+| AT-007 | API/Application boundaries | Missing or unavailable Product Builder authority and cross-Workspace scope are rejected without mutation or disclosure | AC-015, AC-016 | API integration test + Application test | Yes |
 | AT-008 | UI component | Field editor supports Date, DateTime, Choice configuration, compatible rules, and contextual validation | AC-001, AC-002, AC-003, AC-004, AC-005, AC-009, AC-010, AC-011, AC-012 | UI component test | Yes |
 | AT-009 | Browser journey | User configures and publishes typed fields and rules without console errors, document scrolling, or horizontal overflow | AC-001, AC-003, AC-005, AC-007, AC-008, AC-015 | Browser automation | Yes |
 | AT-010 | Application boundary | Business Objects depends on Rules contracts only and no rule execution or type configuration leaks into shared infrastructure | AC-014, AC-016 | Architecture test | Yes |
@@ -158,4 +158,4 @@ sequenceDiagram
 >
 > **Verification:** Acceptance proof is tracked in the sibling evidence sidecar.
 >
-> **Decisions:** Date is calendar-only; DateTime requires explicit-offset semantics. `Choice` with immutable `Single` or `Multiple` selection mode is the initial selection contract, and static options remain field configuration rather than Rules. Applied Rules use exact immutable versions and metadata-driven input contracts. [Business Objects architecture](../../architecture/business-objects.md#rules-integration) and [Rules architecture](../../ARCHITECTURE.md#rules-boundary) own the cross-module realization.
+> **Decisions:** Date is calendar-only; DateTime requires explicit-offset semantics. `Choice` with immutable `Single` or `Multiple` selection mode is the initial selection contract, and static options remain field configuration rather than Rules. Applied Rules use exact immutable versions and metadata-driven input contracts. Identity-owned Product Builder authority governs this authoring surface independently of installed product policy. [Business Objects architecture](../../architecture/business-objects.md#rules-integration) and [Rules architecture](../../ARCHITECTURE.md#rules-boundary) own the cross-module realization.

@@ -4,11 +4,14 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ManagedWindowHost } from '@/components/shared/ManagedWindowHost';
 import { ManagedWindowProvider } from '@/components/shared/ManagedWindowManager';
+import { ApiError } from '@/lib/api';
 import { axisStyles } from '@/theme.generated';
 import {
+  grantWorkspaceProductBuilder,
   inviteWorkspaceMember,
   resendWorkspaceInvitation,
   revokeWorkspaceInvitation,
+  revokeWorkspaceProductBuilder,
 } from '../api';
 import { membershipsManagedWindowRenderers } from '../managed-windows';
 import { MembershipManagementPage } from './MembershipManagementPage';
@@ -18,10 +21,14 @@ const api = vi.hoisted(() => ({
   invite: vi.fn(),
   resend: vi.fn(),
   revoke: vi.fn(),
+  productBuilders: vi.fn(),
+  grantProductBuilder: vi.fn(),
+  revokeProductBuilder: vi.fn(),
 }));
 
 vi.mock('../api', () => ({
   workspaceInvitationKeys: { all: ['workspace-invitations'] },
+  workspaceProductBuilderKeys: { all: ['workspace-product-builders'] },
   workspaceInvitationsQueryOptions: (page = 1, pageSize = 20) => ({
     queryKey: ['workspace-invitations', 'list', page, pageSize],
     queryFn: () => api.list(page, pageSize),
@@ -29,6 +36,12 @@ vi.mock('../api', () => ({
   inviteWorkspaceMember: api.invite,
   resendWorkspaceInvitation: api.resend,
   revokeWorkspaceInvitation: api.revoke,
+  workspaceProductBuildersQueryOptions: () => ({
+    queryKey: ['workspace-product-builders'],
+    queryFn: () => api.productBuilders(),
+  }),
+  grantWorkspaceProductBuilder: api.grantProductBuilder,
+  revokeWorkspaceProductBuilder: api.revokeProductBuilder,
 }));
 
 function renderPage() {
@@ -59,6 +72,86 @@ describe('MembershipManagementPage', () => {
     });
     api.resend.mockResolvedValue({ ...pendingInvitation(), revision: 3 });
     api.revoke.mockResolvedValue({ ...pendingInvitation(), status: 'Revoked', revision: 3 });
+    api.productBuilders.mockResolvedValue([productBuilderMember()]);
+    api.grantProductBuilder.mockResolvedValue({
+      ...productBuilderMember(),
+      isProductBuilder: true,
+      membershipRevision: 2,
+    });
+    api.revokeProductBuilder.mockResolvedValue({
+      ...productBuilderMember(),
+      isProductBuilder: false,
+      membershipRevision: 3,
+    });
+  });
+
+  it('manages Product Builder independently from the Workspace lifecycle role', async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(screen.getByRole('tab', { name: 'Members' }));
+    const table = await screen.findByRole('region', {
+      name: 'Active Workspace member authoring authority',
+    });
+    expect(within(table).getByText('Workspace member')).toBeVisible();
+    expect(within(table).getByText('Not granted')).toBeVisible();
+
+    await user.click(within(table).getByRole('button', { name: 'Builder Member' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Builder Member' });
+    await user.click(within(dialog).getByRole('button', { name: 'Grant Product Builder' }));
+    await waitFor(() =>
+      expect(grantWorkspaceProductBuilder).toHaveBeenCalledWith('builder-user', {
+        expectedRevision: 1,
+      }),
+    );
+    expect(await within(dialog).findByText('Product Builder granted')).toBeVisible();
+
+    await user.click(within(dialog).getByRole('button', { name: 'Revoke Product Builder' }));
+    const confirmation = await screen.findByRole('alertdialog', {
+      name: 'Revoke Product Builder?',
+    });
+    await user.click(within(confirmation).getByRole('button', { name: 'Revoke Product Builder' }));
+    await waitFor(() =>
+      expect(revokeWorkspaceProductBuilder).toHaveBeenCalledWith('builder-user', {
+        expectedRevision: 2,
+      }),
+    );
+  });
+
+  it('refreshes the authoritative member revision before retrying a Product Builder conflict', async () => {
+    const user = userEvent.setup();
+    api.productBuilders
+      .mockResolvedValueOnce([productBuilderMember()])
+      .mockResolvedValueOnce([{ ...productBuilderMember(), membershipRevision: 4 }]);
+    api.grantProductBuilder
+      .mockRejectedValueOnce(new ApiError(409, { code: 'identity.membership.revisionConflict' }))
+      .mockResolvedValueOnce({
+        ...productBuilderMember(),
+        isProductBuilder: true,
+        membershipRevision: 5,
+      });
+    renderPage();
+
+    await user.click(screen.getByRole('tab', { name: 'Members' }));
+    const table = await screen.findByRole('region', {
+      name: 'Active Workspace member authoring authority',
+    });
+    await user.click(within(table).getByRole('button', { name: 'Builder Member' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Builder Member' });
+
+    await user.click(within(dialog).getByRole('button', { name: 'Grant Product Builder' }));
+    expect(await within(dialog).findByText('Membership changed')).toBeVisible();
+    await waitFor(() => expect(api.productBuilders).toHaveBeenCalledTimes(2));
+
+    await user.click(within(dialog).getByRole('button', { name: 'Grant Product Builder' }));
+    await waitFor(() => {
+      expect(grantWorkspaceProductBuilder).toHaveBeenNthCalledWith(1, 'builder-user', {
+        expectedRevision: 1,
+      });
+      expect(grantWorkspaceProductBuilder).toHaveBeenNthCalledWith(2, 'builder-user', {
+        expectedRevision: 4,
+      });
+    });
   });
 
   it('composes the shared resource workspace and launches the invitation task in a managed window', async () => {
@@ -249,5 +342,17 @@ function pendingInvitation() {
     createdAt: '2026-08-06T10:00:00Z',
     expiresAt: '2026-08-13T10:00:00Z',
     revision: 2,
+  };
+}
+
+function productBuilderMember() {
+  return {
+    userId: 'builder-user',
+    displayName: 'Builder Member',
+    email: 'builder@example.com',
+    workspaceRole: 'Member',
+    isProductBuilder: false,
+    membershipRevision: 1,
+    canChange: true,
   };
 }

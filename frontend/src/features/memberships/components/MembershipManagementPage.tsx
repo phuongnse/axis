@@ -15,16 +15,23 @@ import { useManagedWindowActions } from '@/components/shared/ManagedWindowManage
 import { PageAction } from '@/components/shared/PageLayout';
 import { ResourceWorkspace } from '@/components/shared/ResourceWorkspace';
 import { StatusBadge, type StatusBadgeState } from '@/components/shared/StatusBadge';
-import type { WorkspaceInvitationLifecycleDto } from '@/lib/api-generated';
-import { workspaceInvitationsQueryOptions } from '../api';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import type {
+  WorkspaceInvitationLifecycleDto,
+  WorkspaceProductBuilderDto,
+} from '@/lib/api-generated';
+import { workspaceInvitationsQueryOptions, workspaceProductBuildersQueryOptions } from '../api';
 import {
   membershipInvitationWindowDescriptor,
   membershipInviteWindowDescriptor,
+  membershipProductBuilderWindowDescriptor,
 } from '../managed-windows';
 
 export function MembershipManagementPage() {
   const { t, i18n } = useTranslation();
   const { openWindow } = useManagedWindowActions();
+  const productBuildersQuery = useQuery(workspaceProductBuildersQueryOptions());
+  const members = productBuildersQuery.data ?? [];
   const [invitationPagination, setInvitationPagination] = useState({ pageIndex: 0, pageSize: 20 });
   const invitationsQuery = useQuery(
     workspaceInvitationsQueryOptions(
@@ -37,7 +44,7 @@ export function MembershipManagementPage() {
     () => new Intl.DateTimeFormat(i18n.language, { dateStyle: 'medium', timeStyle: 'short' }),
     [i18n.language],
   );
-  const tableQuery = useMemo<DataTableQueryState>(
+  const memberTableQuery = useMemo<DataTableQueryState>(
     () => ({
       globalFilter: '',
       filterExpression: createEmptyFilterExpression(),
@@ -46,7 +53,109 @@ export function MembershipManagementPage() {
     }),
     [],
   );
-  const tableDefinition = useMemo<DataTableDefinition<WorkspaceInvitationLifecycleDto>>(() => {
+  const invitationTableQuery = useMemo<DataTableQueryState>(
+    () => ({
+      globalFilter: '',
+      filterExpression: createEmptyFilterExpression(),
+      sorting: [],
+      grouping: [],
+    }),
+    [],
+  );
+  const memberTableDefinition = useMemo<DataTableDefinition<WorkspaceProductBuilderDto>>(() => {
+    const columns: DataTableColumnDef<WorkspaceProductBuilderDto>[] = [
+      {
+        id: 'member',
+        accessorKey: 'displayName',
+        size: 260,
+        minSize: 220,
+        enableSorting: false,
+        meta: { label: t('memberships.productBuilderMember') },
+        cell: ({ row }) => {
+          const title = row.original.displayName ?? t('memberships.productBuilderUnknownMember');
+          return (
+            <DataTableRecordAction
+              onClick={() =>
+                openWindow(membershipProductBuilderWindowDescriptor(row.original, title))
+              }
+            >
+              {title}
+            </DataTableRecordAction>
+          );
+        },
+      },
+      {
+        id: 'email',
+        accessorKey: 'email',
+        size: 260,
+        minSize: 220,
+        enableSorting: false,
+        meta: { label: t('memberships.email') },
+        cell: ({ row }) => row.original.email ?? t('memberships.notAvailable'),
+      },
+      {
+        id: 'role',
+        accessorKey: 'workspaceRole',
+        size: 190,
+        minSize: 170,
+        enableSorting: false,
+        meta: { label: t('memberships.role') },
+        cell: ({ row }) => t(`memberships.role${row.original.workspaceRole ?? 'Member'}`),
+      },
+      {
+        id: 'productBuilder',
+        accessorKey: 'isProductBuilder',
+        size: 170,
+        minSize: 150,
+        enableSorting: false,
+        meta: { label: t('memberships.productBuilder') },
+        cell: ({ row }) => (
+          <StatusBadge state={row.original.isProductBuilder ? 'positive' : 'inactive'}>
+            {row.original.isProductBuilder
+              ? t('memberships.productBuilderActive')
+              : t('memberships.productBuilderInactive')}
+          </StatusBadge>
+        ),
+      },
+    ];
+
+    return {
+      ariaLabel: t('memberships.productBuilderTableLabel'),
+      source: {
+        mode: 'client',
+        data: members,
+        pagination: { pageSize: 20, pageSizeOptions: [20, 50, 100] },
+      },
+      columns,
+      messages: createDataTableMessages(t, {
+        searchLabel: t('memberships.productBuilderTableLabel'),
+        searchPlaceholder: t('memberships.productBuilderSearch'),
+        emptyTitle: t('memberships.productBuilderEmpty'),
+        emptyDescription: t('memberships.productBuilderEmptyDescription'),
+        errorTitle: t('memberships.productBuilderLoadFailed'),
+        errorDescription: t('memberships.productBuilderLoadFailedDescription'),
+      }),
+      getRowId: (member) => member.userId ?? member.email ?? 'workspace-member',
+      queryState: memberTableQuery,
+      onQueryStateChange: () => undefined,
+      columnControls: true,
+      grouping: false,
+      loading: productBuildersQuery.isPending,
+      error: productBuildersQuery.isError,
+      onRetry: () => void productBuildersQuery.refetch(),
+    };
+  }, [
+    memberTableQuery,
+    members,
+    openWindow,
+    productBuildersQuery.isError,
+    productBuildersQuery.isPending,
+    productBuildersQuery.refetch,
+    t,
+  ]);
+  const invitationTableDefinition = useMemo<
+    DataTableDefinition<WorkspaceInvitationLifecycleDto>
+  >(() => {
     const columns: DataTableColumnDef<WorkspaceInvitationLifecycleDto>[] = [
       {
         id: 'email',
@@ -138,7 +247,7 @@ export function MembershipManagementPage() {
       }),
       getRowId: (invitation) =>
         invitation.invitationId ?? invitation.recipientEmail ?? 'workspace-invitation',
-      queryState: tableQuery,
+      queryState: invitationTableQuery,
       onQueryStateChange: () => undefined,
       columnControls: true,
       grouping: false,
@@ -169,7 +278,7 @@ export function MembershipManagementPage() {
     invitationsQuery.refetch,
     openWindow,
     t,
-    tableQuery,
+    invitationTableQuery,
   ]);
 
   return (
@@ -178,7 +287,18 @@ export function MembershipManagementPage() {
       title={t('memberships.title')}
       description={t('memberships.description')}
     >
-      <DataTable definition={tableDefinition} />
+      <Tabs defaultValue="invitations" className="h-full min-h-0">
+        <TabsList variant="line" aria-label={t('memberships.sections')}>
+          <TabsTrigger value="members">{t('memberships.membersTab')}</TabsTrigger>
+          <TabsTrigger value="invitations">{t('memberships.invitationsTab')}</TabsTrigger>
+        </TabsList>
+        <TabsContent value="members" className="min-h-0">
+          <DataTable definition={memberTableDefinition} />
+        </TabsContent>
+        <TabsContent value="invitations" className="min-h-0">
+          <DataTable definition={invitationTableDefinition} />
+        </TabsContent>
+      </Tabs>
     </ResourceWorkspace>
   );
 }

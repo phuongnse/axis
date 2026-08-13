@@ -4,7 +4,11 @@ namespace Axis.Identity.Domain.Aggregates;
 
 public sealed class WorkspaceMembership : AggregateRoot<Guid>
 {
-    private WorkspaceMembership(Guid workspaceId, Guid userId, WorkspaceMembershipRole role)
+    private WorkspaceMembership(
+        Guid workspaceId,
+        Guid userId,
+        WorkspaceMembershipRole role,
+        bool isProductBuilder)
         : base(Guid.NewGuid())
     {
         if (workspaceId == Guid.Empty || userId == Guid.Empty)
@@ -14,6 +18,7 @@ public sealed class WorkspaceMembership : AggregateRoot<Guid>
         UserId = userId;
         Role = role;
         Status = MembershipStatus.Active;
+        IsProductBuilder = isProductBuilder;
         Revision = 1;
     }
 
@@ -21,13 +26,14 @@ public sealed class WorkspaceMembership : AggregateRoot<Guid>
     public Guid UserId { get; private set; }
     public WorkspaceMembershipRole Role { get; private set; }
     public MembershipStatus Status { get; private set; }
+    public bool IsProductBuilder { get; private set; }
     public int Revision { get; private set; }
     public bool HasLifecycleAdministratorAuthority =>
         Status == MembershipStatus.Active
         && Role is WorkspaceMembershipRole.Owner or WorkspaceMembershipRole.Administrator;
 
     public static WorkspaceMembership CreatePersonalOwner(Guid workspaceId, Guid userId) =>
-        new(workspaceId, userId, WorkspaceMembershipRole.Owner);
+        new(workspaceId, userId, WorkspaceMembershipRole.Owner, isProductBuilder: true);
 
     public static WorkspaceMembership CreateOrganizationMember(Guid workspaceId, Guid userId, WorkspaceMembershipRole role)
     {
@@ -36,7 +42,21 @@ public sealed class WorkspaceMembership : AggregateRoot<Guid>
                 nameof(role),
                 "Organization Workspace memberships cannot be owners.");
 
-        return new(workspaceId, userId, role);
+        return new(workspaceId, userId, role, isProductBuilder: false);
+    }
+
+    public static WorkspaceMembership CreateOrganizationCreator(Guid workspaceId, Guid userId) =>
+        new(workspaceId, userId, WorkspaceMembershipRole.Administrator, isProductBuilder: true);
+
+    public void SetProductBuilder(bool enabled, int expectedRevision)
+    {
+        EnsureOrganizationMembership();
+        EnsureActive(expectedRevision);
+        if (IsProductBuilder == enabled)
+            return;
+
+        IsProductBuilder = enabled;
+        Revision++;
     }
 
     public void Suspend(int expectedRevision)
@@ -76,6 +96,7 @@ public sealed class WorkspaceMembership : AggregateRoot<Guid>
     {
         EnsureOrganizationMembership();
         EnsureActive(expectedRevision);
+        IsProductBuilder = false;
         Status = MembershipStatus.Removed;
         Revision++;
     }

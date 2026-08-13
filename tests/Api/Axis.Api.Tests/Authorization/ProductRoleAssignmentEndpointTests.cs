@@ -14,7 +14,6 @@ using Axis.Identity.Domain.Aggregates;
 using Axis.Identity.Domain.ValueObjects;
 using Axis.Identity.Infrastructure.Persistence;
 using Axis.Rules.Contracts;
-using Axis.Rules.Infrastructure.Persistence;
 using Axis.Shared.Domain.Primitives;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
@@ -326,14 +325,6 @@ public sealed class ProductRoleAssignmentEndpointTests(ApiTestFixture fixture)
             new { expectedRevision = 1 },
             TestContext.Current.CancellationToken)).StatusCode.Should().Be(HttpStatusCode.NotFound);
 
-        int bindingCount = await CountRuleBindingsAsync(administrator.WorkspaceId);
-        HttpResponseMessage ungrantedBinding = await fixture.PostBrowserJsonAsync(
-            "/api/rule-bindings",
-            RuleBindingBody(RuleDefinitionKeys.TextLength, "ungranted-binding"),
-            TestContext.Current.CancellationToken);
-        ungrantedBinding.StatusCode.Should().Be(HttpStatusCode.Forbidden);
-        (await CountRuleBindingsAsync(administrator.WorkspaceId)).Should().Be(bindingCount);
-
         HttpResponseMessage createdBindingResponse = await fixture.PostBrowserJsonAsync(
             "/api/rule-bindings",
             RuleBindingBody(RuleDefinitionKeys.Required, "authorized-binding"),
@@ -420,22 +411,9 @@ public sealed class ProductRoleAssignmentEndpointTests(ApiTestFixture fixture)
                 Role("Caseworker"),
             ],
             [
-                Grant("Administrator", "business-object.definition.manage", "business-object.definition", "loan_application"),
-                Grant("Administrator", "business-object.definition.read", "business-object.definition", "loan_application"),
+                Grant("Administrator", "business-object.definition.read-published", "business-object.definition", "loan_application"),
                 Grant("Administrator", "business-object.record.list", "business-object.record", "loan_application", ProductActionScope.All),
                 Grant("Administrator", "business-object.record.read", "business-object.record", "loan_application", ProductActionScope.All),
-                Grant("Administrator", "rule.binding.manage", "rule.binding", RuleDefinitionKeys.NumericRange),
-                Grant("Administrator", "rule.binding.manage", "rule.binding", RuleDefinitionKeys.Required),
-                Grant("Administrator", "rule.binding.manage", "rule.binding", RuleDefinitionKeys.TextFormat),
-                Grant("Administrator", "rule.binding.read", "rule.binding", RuleDefinitionKeys.NumericRange),
-                Grant("Administrator", "rule.binding.read", "rule.binding", RuleDefinitionKeys.Required),
-                Grant("Administrator", "rule.binding.read", "rule.binding", RuleDefinitionKeys.TextFormat),
-                Grant("Administrator", "rule.definition.manage", "rule.definition", RuleDefinitionKeys.NumericRange),
-                Grant("Administrator", "rule.definition.manage", "rule.definition", RuleDefinitionKeys.Required),
-                Grant("Administrator", "rule.definition.manage", "rule.definition", RuleDefinitionKeys.TextFormat),
-                Grant("Administrator", "rule.definition.read", "rule.definition", RuleDefinitionKeys.NumericRange),
-                Grant("Administrator", "rule.definition.read", "rule.definition", RuleDefinitionKeys.Required),
-                Grant("Administrator", "rule.definition.read", "rule.definition", RuleDefinitionKeys.TextFormat),
                 Grant("Applicant", "business-object.definition.read-published", "business-object.definition", "loan_application"),
                 Grant("Applicant", "business-object.record.create", "business-object.record", "loan_application", ProductActionScope.Own),
                 Grant("Applicant", "business-object.record.read", "business-object.record", "loan_application", ProductActionScope.Own),
@@ -500,15 +478,6 @@ public sealed class ProductRoleAssignmentEndpointTests(ApiTestFixture fixture)
         await db.BusinessObjectRecords.AddAsync(record.Value, TestContext.Current.CancellationToken);
         await db.SaveChangesAsync(TestContext.Current.CancellationToken);
         return record.Value.Id.Value;
-    }
-
-    private async Task<int> CountRuleBindingsAsync(Guid workspaceId)
-    {
-        using IServiceScope scope = fixture.CreateScope();
-        RulesDbContext db = scope.ServiceProvider.GetRequiredService<RulesDbContext>();
-        return await db.RuleBindings.CountAsync(
-            binding => binding.WorkspaceId == workspaceId,
-            TestContext.Current.CancellationToken);
     }
 
     private static object RuleBindingBody(

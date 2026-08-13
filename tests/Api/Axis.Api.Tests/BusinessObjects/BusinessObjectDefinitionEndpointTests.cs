@@ -8,6 +8,7 @@ using Axis.Api.Tests.Helpers;
 using Axis.Authorization.Contracts;
 using Axis.BusinessObjects.Application;
 using Axis.BusinessObjects.Domain.Aggregates;
+using Axis.Identity.Contracts;
 using Axis.Identity.Domain.Legal;
 using Axis.Rules.Contracts;
 using FluentAssertions;
@@ -31,23 +32,21 @@ public sealed class BusinessObjectDefinitionEndpointTests(ApiTestFixture fixture
     }
 
     [Fact]
-    public async Task DefinitionActions_WhenKeylessManageOnly_AllowsProjectionButDeniesKeyedCreate()
+    public async Task DefinitionAuthoring_WhenNonBuilder_ReturnsForbidden()
     {
         string accessToken = await CreateVerifiedSessionTokenAsync(UniqueEmail());
         await fixture.SetProductAuthorizationTestDecisionAsync(
-            request => request.ActionKey == BusinessObjectProductActions.DefinitionManage
-                && request.ResourceKey is null
-                    ? new ProductAuthorizationDecision(true, ProductActionScope.None)
-                    : ProductAuthorizationDecision.Denied,
+            _ => ProductAuthorizationDecision.Denied,
+            TestContext.Current.CancellationToken);
+        await fixture.SetWorkspaceProductBuilderTestDecisionAsync(
+            WorkspaceProductBuilderDecision.Denied,
             TestContext.Current.CancellationToken);
 
         HttpResponseMessage actionsResponse = await SendWithBearerAsync(
             HttpMethod.Get,
             "/api/business-object-definitions/actions",
             accessToken);
-        actionsResponse.StatusCode.Should().Be(HttpStatusCode.OK);
-        JsonElement actions = await actionsResponse.Content.ReadFromJsonAsync<JsonElement>(Json, TestContext.Current.CancellationToken);
-        actions.GetProperty("canStartCreate").GetBoolean().Should().BeTrue();
+        actionsResponse.StatusCode.Should().Be(HttpStatusCode.Forbidden);
 
         HttpResponseMessage createResponse = await SendWithBearerAsync(
             HttpMethod.Post,
@@ -61,8 +60,8 @@ public sealed class BusinessObjectDefinitionEndpointTests(ApiTestFixture fixture
     public async Task DefinitionActions_WhenAuthorizationUnavailable_ReturnsServiceUnavailable()
     {
         string accessToken = await CreateVerifiedSessionTokenAsync(UniqueEmail());
-        await fixture.SetProductAuthorizationTestDecisionAsync(
-            _ => ProductAuthorizationDecision.Unavailable,
+        await fixture.SetWorkspaceProductBuilderTestDecisionAsync(
+            WorkspaceProductBuilderDecision.Unavailable,
             TestContext.Current.CancellationToken);
 
         HttpResponseMessage response = await SendWithBearerAsync(
@@ -80,6 +79,66 @@ public sealed class BusinessObjectDefinitionEndpointTests(ApiTestFixture fixture
             accessToken,
             new { name = "Unavailable Definition" });
         createResponse.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
+    }
+
+    [Fact]
+    public async Task PublishedDefinition_WhenNonBuilderHasPublishedRead_ReturnsRuntimeOnlyProjection()
+    {
+        string accessToken = await CreateVerifiedSessionTokenAsync(UniqueEmail());
+        Guid definitionId = await CreateUnpublishedAsync(
+            accessToken,
+            ObjectNameFromKey(UniqueKey("runtime")));
+        HttpResponseMessage saveResponse = await SaveWithOneFieldAsync(
+            accessToken,
+            definitionId,
+            expectedRevision: 1,
+            fieldKey: "name");
+        saveResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        HttpResponseMessage publishResponse = await SendWithBearerAsync(
+            HttpMethod.Post,
+            $"/api/business-object-definitions/{definitionId:D}/publish",
+            accessToken,
+            new { expectedRevision = 2 });
+        publishResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        await fixture.SetWorkspaceProductBuilderTestDecisionAsync(
+            WorkspaceProductBuilderDecision.Denied,
+            TestContext.Current.CancellationToken);
+        await fixture.SetProductAuthorizationTestDecisionAsync(
+            request => request.ActionKey == BusinessObjectProductActions.DefinitionReadPublished
+                    ? new ProductAuthorizationDecision(true, ProductActionScope.None)
+                    : ProductAuthorizationDecision.Denied,
+            TestContext.Current.CancellationToken);
+
+        HttpResponseMessage getResponse = await SendWithBearerAsync(
+            HttpMethod.Get,
+            $"/api/business-object-definitions/{definitionId:D}",
+            accessToken);
+        getResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        JsonElement detail = await getResponse.Content.ReadFromJsonAsync<JsonElement>(
+            Json,
+            TestContext.Current.CancellationToken);
+        detail.GetProperty("status").GetString().Should().Be(nameof(BusinessObjectDefinitionStatus.Published));
+        detail.GetProperty("actions").GetProperty("canSave").GetBoolean().Should().BeFalse();
+        detail.GetProperty("actions").GetProperty("canPublish").GetBoolean().Should().BeFalse();
+
+        HttpResponseMessage listResponse = await SendWithBearerAsync(
+            HttpMethod.Get,
+            "/api/business-object-definitions?page=1&pageSize=100",
+            accessToken);
+        listResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        JsonElement list = await listResponse.Content.ReadFromJsonAsync<JsonElement>(
+            Json,
+            TestContext.Current.CancellationToken);
+        list.GetProperty("items").EnumerateArray()
+            .Should().Contain(item => item.GetProperty("id").GetGuid() == definitionId);
+
+        HttpResponseMessage createResponse = await SendWithBearerAsync(
+            HttpMethod.Post,
+            "/api/business-object-definitions",
+            accessToken,
+            new { name = "Runtime Reader Cannot Author" });
+        createResponse.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
     [Fact]

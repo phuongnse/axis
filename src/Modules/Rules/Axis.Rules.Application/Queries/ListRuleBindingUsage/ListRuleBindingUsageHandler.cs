@@ -1,4 +1,3 @@
-using Axis.Authorization.Contracts;
 using Axis.Identity.Contracts;
 using Axis.Rules.Application.Repositories;
 using Axis.Rules.Contracts;
@@ -12,7 +11,7 @@ namespace Axis.Rules.Application.Queries.ListRuleBindingUsage;
 public sealed class ListRuleBindingUsageHandler(
     ICurrentUser currentUser,
     ICurrentSubject currentSubject,
-    IProductAuthorizationService authorization,
+    IWorkspaceProductBuilderAuthorization authorization,
     IRuleBindingRepository repository)
     : IQueryHandler<ListRuleBindingUsageQuery, Result<IReadOnlyList<RuleBindingUsageDto>>>
 {
@@ -25,10 +24,8 @@ public sealed class ListRuleBindingUsageHandler(
         Result<RuleDefinitionKey> key = RuleDefinitionKey.Create(query.DefinitionKey);
         if (key.IsFailure || query.Version <= 0)
             return Result.Failure<IReadOnlyList<RuleBindingUsageDto>>(ErrorCodes.InvalidInput, "Rule version reference is invalid.");
-        ProductAuthorizationDecision decision = await RuleAuthorization.AuthorizeAsync(
-                authorization, workspaceId, currentSubject.Subject,
-                RuleProductActions.BindingRead, RuleProductActions.BindingResourceType,
-                key.Value.Value, null, cancellationToken);
+        WorkspaceProductBuilderDecision decision = await RuleAuthorization.AuthorizeAsync(
+            authorization, workspaceId, currentSubject.Subject, cancellationToken);
         if (!decision.IsAllowed)
             return RuleDefinitionFailures.Authorization<IReadOnlyList<RuleBindingUsageDto>>(decision);
         IReadOnlyList<RuleBinding> bindings = await repository.ListByDefinitionAsync(

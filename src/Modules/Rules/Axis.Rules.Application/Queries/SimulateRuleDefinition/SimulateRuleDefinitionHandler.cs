@@ -1,4 +1,3 @@
-using Axis.Authorization.Contracts;
 using Axis.Identity.Contracts;
 using Axis.Rules.Application.Repositories;
 using Axis.Rules.Contracts;
@@ -12,7 +11,7 @@ namespace Axis.Rules.Application.Queries.SimulateRuleDefinition;
 public sealed class SimulateRuleDefinitionHandler(
     ICurrentUser currentUser,
     ICurrentSubject currentSubject,
-    IProductAuthorizationService authorization,
+    IWorkspaceProductBuilderAuthorization authorization,
     IRuleDefinitionRepository repository)
     : IQueryHandler<SimulateRuleDefinitionQuery, Result<RuleSimulationResultDto>>
 {
@@ -27,10 +26,8 @@ public sealed class SimulateRuleDefinitionHandler(
         if (key.IsFailure)
             return RuleDefinitionFailures.NotFound<RuleSimulationResultDto>();
 
-        ProductAuthorizationDecision decision = await RuleAuthorization.AuthorizeAsync(
-                authorization, workspaceId, currentSubject.Subject,
-                RuleProductActions.DefinitionRead, RuleProductActions.DefinitionResourceType,
-                key.Value.Value, query.CorrelationId, cancellationToken);
+        WorkspaceProductBuilderDecision decision = await RuleAuthorization.AuthorizeAsync(
+            authorization, workspaceId, currentSubject.Subject, cancellationToken);
         if (!decision.IsAllowed)
             return RuleDefinitionFailures.Authorization<RuleSimulationResultDto>(decision);
 

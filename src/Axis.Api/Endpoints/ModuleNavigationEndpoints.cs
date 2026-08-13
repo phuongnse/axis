@@ -1,11 +1,8 @@
 using Axis.Api.Extensions;
 using Axis.Api.Infrastructure;
 using Axis.Authorization.Application;
-using Axis.Authorization.Contracts;
-using Axis.BusinessObjects.Application;
 using Axis.Identity.Application.Queries.ListEligibleWorkspaces;
 using Axis.Identity.Contracts;
-using Axis.Rules.Application;
 using MediatR;
 
 namespace Axis.Api.Endpoints;
@@ -34,11 +31,10 @@ public static class ModuleNavigationEndpoints
     }
 
     private static async Task<IResult> GetAvailability(
-        HttpContext context,
         CurrentUser currentUser,
         ICurrentSubject currentSubject,
         IAuthorizationAdministratorAuthority administrators,
-        IProductAuthorizationService authorization,
+        IWorkspaceProductBuilderAuthorization productBuilderAuthorization,
         ISender sender,
         CancellationToken cancellationToken)
     {
@@ -68,27 +64,16 @@ public static class ModuleNavigationEndpoints
             availableContributionIds.Add(ProductRolesContribution);
         }
 
-        if (await CanBrowseBusinessObjectsAsync(
-                currentUser.WorkspaceId,
-                currentSubject,
-                authorization,
-                context.TraceIdentifier,
-                cancellationToken))
-        {
-            availableContributionIds.Add(BusinessObjectsContribution);
-        }
-
-        ProductAuthorizationDecision rulesDecision = await RuleAuthorization.AuthorizeAsync(
-            authorization,
+        WorkspaceProductBuilderDecision builderDecision = await AuthorizeProductBuilderAsync(
+            productBuilderAuthorization,
             currentUser.WorkspaceId,
             currentSubject.Subject,
-            RuleProductActions.DefinitionRead,
-            RuleProductActions.DefinitionResourceType,
-            null,
-            context.TraceIdentifier,
             cancellationToken);
-        if (rulesDecision.IsAllowed)
+        if (builderDecision.IsAllowed)
+        {
+            availableContributionIds.Add(BusinessObjectsContribution);
             availableContributionIds.Add(RulesContribution);
+        }
 
         if (isLifecycleAdministrator)
             availableContributionIds.Add(SolutionsContribution);
@@ -96,37 +81,20 @@ public static class ModuleNavigationEndpoints
         return Results.Ok(new ModuleNavigationAvailabilityDto(availableContributionIds));
     }
 
-    private static async Task<bool> CanBrowseBusinessObjectsAsync(
+    private static async Task<WorkspaceProductBuilderDecision> AuthorizeProductBuilderAsync(
+        IWorkspaceProductBuilderAuthorization authorization,
         Guid workspaceId,
-        ICurrentSubject currentSubject,
-        IProductAuthorizationService authorization,
-        string correlationId,
+        SubjectReference subject,
         CancellationToken cancellationToken)
     {
-        ProductAuthorizationDecision decision = await BusinessObjectAuthorization.AuthorizeAsync(
-            authorization,
-            workspaceId,
-            currentSubject.Subject,
-            BusinessObjectProductActions.DefinitionRead,
-            BusinessObjectProductActions.DefinitionResourceType,
-            null,
-            correlationId,
-            cancellationToken);
-        if (decision.IsAllowed)
-            return true;
-        if (decision.IsUnavailable)
-            return false;
-
-        decision = await BusinessObjectAuthorization.AuthorizeAsync(
-            authorization,
-            workspaceId,
-            currentSubject.Subject,
-            BusinessObjectProductActions.DefinitionReadPublished,
-            BusinessObjectProductActions.DefinitionResourceType,
-            null,
-            correlationId,
-            cancellationToken);
-        return decision.IsAllowed;
+        try
+        {
+            return await authorization.AuthorizeAsync(workspaceId, subject, cancellationToken);
+        }
+        catch
+        {
+            return WorkspaceProductBuilderDecision.Unavailable;
+        }
     }
 }
 

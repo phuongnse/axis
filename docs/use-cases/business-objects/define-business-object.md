@@ -4,15 +4,15 @@
 
 ## Purpose
 
-Define and publish a workspace-scoped business object definition so published versions provide a stable record contract.
+Let a Workspace Product Builder define and publish a workspace-scoped business object definition so published versions provide a stable record contract.
 
 ## Primary actor
 
-- Signed-in workspace user
+- Active human Workspace Product Builder
 
 ## Preconditions
 
-- The user has an active, authorized current Workspace.
+- The user has an active current Workspace membership with explicit Product Builder authority.
 
 ## Trigger
 
@@ -65,7 +65,7 @@ Define and publish a workspace-scoped business object definition so published ve
 - **AC-012** Stale unpublished changes and concurrent publish attempts fail without silently overwriting newer definition state.
 
 *Edge cases*
-- **AC-013** An authenticated current workspace scope is required to create, save, publish, list, or load object definitions; missing or unavailable workspace scope is rejected without mutation.
+- **AC-013** An authenticated active human Product Builder in the current Workspace is required to create, save, publish, or load unpublished object definitions; missing, denied, or unavailable authority is rejected without mutation.
 - **AC-014** Object definitions are isolated by workspace; users cannot create, publish, list, load, or mutate definitions outside the current workspace scope, and cross-workspace access returns a not-found style outcome.
 - **AC-015** The Business Objects module owns business object definitions and published versions, uses `workspaceId` only as an external scope identifier, and does not own workspace lifecycle.
 - **AC-016** Defining business objects does not create records, workflow definitions, workflow states, reports, automations, or permissions beyond the current authenticated workspace boundary.
@@ -83,7 +83,7 @@ Define and publish a workspace-scoped business object definition so published ve
 | AT-005 | Application boundary | Duplicate or malformed object and field keys fail with validation errors before persistence | AC-009, AC-010 | Application test | Yes |
 | AT-006 | Application boundary | Duplicate identities and unpublished definitions without fields cannot publish | AC-011 | Application test | Yes |
 | AT-007 | Application/Infrastructure boundaries | Stale unpublished saves, concurrent publish attempts, and persistence failures fail without overwriting newer definition state | AC-012, AC-018 | Application test + Infrastructure integration test | Yes |
-| AT-008 | API/Application boundaries | Missing workspace scope, unavailable workspace scope, and cross-workspace definition access are rejected without mutation or resource disclosure | AC-013, AC-014 | API integration test + Application test | Yes |
+| AT-008 | API/Application boundaries | Missing Workspace or Product Builder authority, unavailable authority, and cross-Workspace definition access are rejected without mutation or resource disclosure | AC-013, AC-014 | API integration test + Application test | Yes |
 | AT-009 | Domain boundary | Business Objects boundaries keep workspace lifecycle outside the module and prevent Identity internals from becoming business-object dependencies | AC-015 | Architecture test | Yes |
 | AT-010 | API boundary | Object definition endpoints expose the approved request and response contract without advanced field, record, or workflow artifacts | AC-003, AC-016 | API integration test | Yes |
 | AT-011 | UI component | Business object definition screens expose server-owned search, unpublished definition creation, text field editing, validation errors, publish action, pagination, and definition availability states | AC-001, AC-002, AC-003, AC-007, AC-008, AC-009, AC-010, AC-011 | UI component test | Yes |
@@ -103,7 +103,7 @@ Define and publish a workspace-scoped business object definition so published ve
 
 | Screen | Required contract |
 |---|---|
-| Authenticated navigation | Expose a visible Business Objects navigation contribution when the current workspace can use the module; global navigation rendering remains owned by the module-navigation foundation. |
+| Authenticated navigation | Expose the Business Objects authoring contribution only from the server-projected Product Builder decision; global navigation rendering remains owned by the module-navigation foundation. |
 | Business object collection | Render one primary table with name, key, unpublished/published availability, latest version context, paging, and consumer-defined actions without an action column. |
 | Definition window | Open or focus stable create/view/edit identities through [Collection Page](../../foundations/data-display/collection-page.md), consume [Detail Sections](../../foundations/data-display/detail-sections.md) with General first and definition-owned sections after it, capture the definition name, display a read-only derived stable business object key, and keep revision state in sync after saves. |
 | Field definition editor | Let the user add, order, remove, and rename text fields while keeping stable field keys visible, validated, and saved against the current revision. |
@@ -153,4 +153,4 @@ sequenceDiagram
 >
 > **Verification:** Acceptance proof is tracked in the sibling evidence sidecar.
 >
-> **Decisions:** This use case owns creation and first publication of a definition with stable object and field identity. [Configure Field Types And Rules](./configure-field-rules.md) owns advanced field configuration; later published versions require a separate use case. [Business Objects architecture](../../architecture/business-objects.md) owns the model, revision, snapshot, isolation, and persistence realization.
+> **Decisions:** This use case owns creation and first publication of a definition with stable object and field identity. Identity-owned Product Builder authority is the only authoring authority; exact product policy remains responsible only for published-definition runtime reads and record operations. [Configure Field Types And Rules](./configure-field-rules.md) owns advanced field configuration; later published versions require a separate use case. [Business Objects architecture](../../architecture/business-objects.md) owns the model, revision, snapshot, isolation, and persistence realization.

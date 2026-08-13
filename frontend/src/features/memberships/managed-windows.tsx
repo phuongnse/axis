@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { MailPlus, RefreshCw, UserMinus } from 'lucide-react';
+import { MailPlus, RefreshCw, ShieldCheck, ShieldMinus, UserMinus } from 'lucide-react';
 import { type FormEvent, useEffect, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -37,16 +37,24 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { ApiError } from '@/lib/api';
-import type { WorkspaceInvitationLifecycleDto } from '@/lib/api-generated';
+import type {
+  WorkspaceInvitationLifecycleDto,
+  WorkspaceProductBuilderDto,
+} from '@/lib/api-generated';
 import {
+  grantWorkspaceProductBuilder,
   inviteWorkspaceMember,
   resendWorkspaceInvitation,
   revokeWorkspaceInvitation,
+  revokeWorkspaceProductBuilder,
   workspaceInvitationKeys,
+  workspaceProductBuilderKeys,
+  workspaceProductBuildersQueryOptions,
 } from './api';
 
 const MEMBERSHIP_INVITE_KIND = 'memberships.invite';
 const MEMBERSHIP_INVITATION_KIND = 'memberships.invitation';
+const MEMBERSHIP_PRODUCT_BUILDER_KIND = 'memberships.product-builder';
 type WorkspaceRole = 'Administrator' | 'Member';
 type Feedback = { tone: StatusNoticeTone; title: string; body: string };
 
@@ -72,9 +80,23 @@ export function membershipInvitationWindowDescriptor(
   };
 }
 
+export function membershipProductBuilderWindowDescriptor(
+  member: WorkspaceProductBuilderDto,
+  title: string,
+): ManagedWindowDescriptor {
+  return {
+    id: `memberships:product-builder:${member.userId}`,
+    kind: MEMBERSHIP_PRODUCT_BUILDER_KIND,
+    resourceKey: member.userId ?? title,
+    title,
+    payload: member,
+  };
+}
+
 export const membershipsManagedWindowRenderers: ManagedWindowRendererRegistry = {
   [MEMBERSHIP_INVITE_KIND]: MembershipInviteWindowRenderer,
   [MEMBERSHIP_INVITATION_KIND]: MembershipInvitationWindowRenderer,
+  [MEMBERSHIP_PRODUCT_BUILDER_KIND]: MembershipProductBuilderWindowRenderer,
 };
 
 function MembershipInviteWindowRenderer() {
@@ -116,6 +138,225 @@ function MembershipInvitationWindowRenderer({ descriptor }: ManagedWindowRendere
       initialInvitation={invitation}
       onClose={() => closeWindow(windowId)}
     />
+  );
+}
+
+function MembershipProductBuilderWindowRenderer({ descriptor }: ManagedWindowRendererProps) {
+  const { t } = useTranslation();
+  const { windowId, closeWindow } = useCurrentManagedWindow();
+  const member = readProductBuilder(descriptor);
+  if (!member) {
+    return (
+      <ManagedDialog
+        surfaceId="membership-windows"
+        open
+        title={descriptor.title}
+        onOpenChange={(open) => {
+          if (!open) closeWindow(windowId);
+        }}
+        footer={
+          <ManagedDialogAction
+            type="button"
+            variant="outline"
+            onClick={() => closeWindow(windowId)}
+          >
+            {t('app.close')}
+          </ManagedDialogAction>
+        }
+      >
+        <ManagedDialogBody>
+          <p role="alert">{t('dialog.unavailable')}</p>
+        </ManagedDialogBody>
+      </ManagedDialog>
+    );
+  }
+  return (
+    <MembershipProductBuilderDialog initialMember={member} onClose={() => closeWindow(windowId)} />
+  );
+}
+
+function MembershipProductBuilderDialog({
+  initialMember,
+  onClose,
+}: {
+  initialMember: WorkspaceProductBuilderDto;
+  onClose: () => void;
+}) {
+  const { t } = useTranslation();
+  const queryClient = useQueryClient();
+  const [member, setMember] = useState(initialMember);
+  const [feedback, setFeedback] = useState<Feedback | null>(null);
+  useEffect(() => {
+    if ((initialMember.membershipRevision ?? 0) >= (member.membershipRevision ?? 0)) {
+      setMember(initialMember);
+    }
+  }, [initialMember, member.membershipRevision]);
+
+  const mutation = useMutation({
+    mutationFn: ({
+      enabled,
+      userId,
+      revision,
+    }: {
+      enabled: boolean;
+      userId: string;
+      revision: number;
+    }) =>
+      enabled
+        ? grantWorkspaceProductBuilder(userId, { expectedRevision: revision })
+        : revokeWorkspaceProductBuilder(userId, { expectedRevision: revision }),
+    onSuccess: async (result) => {
+      setMember(result);
+      setFeedback({
+        tone: 'success',
+        title: result.isProductBuilder
+          ? t('memberships.productBuilderGranted')
+          : t('memberships.productBuilderRevoked'),
+        body: result.isProductBuilder
+          ? t('memberships.productBuilderGrantedDescription')
+          : t('memberships.productBuilderRevokedDescription'),
+      });
+      await queryClient.invalidateQueries({ queryKey: workspaceProductBuilderKeys.all });
+    },
+    onError: async (error, variables) => {
+      setFeedback(productBuilderProblemFeedback(error, t));
+      if (!(error instanceof ApiError) || error.status !== 409) return;
+
+      try {
+        const members = await queryClient.fetchQuery(workspaceProductBuildersQueryOptions());
+        const currentMember = members.find((candidate) => candidate.userId === variables.userId);
+        if (currentMember) {
+          setMember(currentMember);
+        }
+      } catch {
+        setFeedback({
+          tone: 'warning',
+          title: t('memberships.productBuilderUnavailable'),
+          body: t('memberships.productBuilderUnavailableDescription'),
+        });
+      }
+    },
+  });
+
+  const userId = member.userId;
+  const revision = member.membershipRevision;
+  const actionable = member.canChange === true && userId !== undefined && revision !== undefined;
+  const enabled = member.isProductBuilder === true;
+  const title = member.displayName ?? t('memberships.productBuilderUnknownMember');
+
+  return (
+    <ManagedDialog
+      surfaceId="membership-windows"
+      open
+      title={title}
+      description={t('memberships.productBuilderDescription')}
+      titleAccessory={
+        <StatusBadge state={enabled ? 'positive' : 'inactive'}>
+          {enabled
+            ? t('memberships.productBuilderActive')
+            : t('memberships.productBuilderInactive')}
+        </StatusBadge>
+      }
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
+      closeDisabled={mutation.isPending}
+      footer={
+        <>
+          <ManagedDialogAction
+            type="button"
+            variant="outline"
+            disabled={mutation.isPending}
+            onClick={onClose}
+          >
+            {t('app.close')}
+          </ManagedDialogAction>
+          {actionable && !enabled ? (
+            <ManagedDialogAsyncAction
+              type="button"
+              disabled={mutation.isPending}
+              icon={<ShieldCheck aria-hidden />}
+              pending={mutation.isPending}
+              pendingLabel={t('memberships.productBuilderGranting')}
+              onClick={() => mutation.mutate({ enabled: true, userId, revision })}
+            >
+              {t('memberships.productBuilderGrant')}
+            </ManagedDialogAsyncAction>
+          ) : null}
+          {actionable && enabled ? (
+            <AlertDialog>
+              <AlertDialogTrigger
+                render={
+                  <ManagedDialogAsyncAction
+                    type="button"
+                    variant="destructive"
+                    disabled={mutation.isPending}
+                    icon={<ShieldMinus aria-hidden />}
+                    pending={mutation.isPending}
+                    pendingLabel={t('memberships.productBuilderRevoking')}
+                  >
+                    {t('memberships.productBuilderRevoke')}
+                  </ManagedDialogAsyncAction>
+                }
+              />
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>
+                    {t('memberships.productBuilderRevokeConfirmTitle')}
+                  </AlertDialogTitle>
+                  <AlertDialogDescription>
+                    {t('memberships.productBuilderRevokeConfirmDescription')}
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>{t('app.cancel')}</AlertDialogCancel>
+                  <AlertDialogAction
+                    variant="destructive"
+                    onClick={() => mutation.mutate({ enabled: false, userId, revision })}
+                  >
+                    {t('memberships.productBuilderRevoke')}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          ) : null}
+        </>
+      }
+    >
+      <ManagedDialogBody className="space-y-4">
+        {feedback ? (
+          <div aria-live="polite">
+            <StatusNotice tone={feedback.tone} title={feedback.title}>
+              {feedback.body}
+            </StatusNotice>
+          </div>
+        ) : null}
+        <dl className="grid gap-4 text-sm sm:grid-cols-2">
+          <Fact label={t('memberships.productBuilderMember')} value={title} />
+          <Fact
+            label={t('memberships.email')}
+            value={member.email ?? t('memberships.notAvailable')}
+          />
+          <Fact
+            label={t('memberships.role')}
+            value={t(`memberships.role${member.workspaceRole ?? 'Member'}`)}
+          />
+          <Fact
+            label={t('memberships.productBuilder')}
+            value={
+              enabled
+                ? t('memberships.productBuilderActive')
+                : t('memberships.productBuilderInactive')
+            }
+          />
+        </dl>
+        {!actionable ? (
+          <StatusNotice tone="info" title={t('memberships.productBuilderProtected')}>
+            {t('memberships.productBuilderProtectedDescription')}
+          </StatusNotice>
+        ) : null}
+      </ManagedDialogBody>
+    </ManagedDialog>
   );
 }
 
@@ -458,6 +699,14 @@ function readInvitation(
   return descriptor.payload as WorkspaceInvitationLifecycleDto;
 }
 
+function readProductBuilder(
+  descriptor: ManagedWindowDescriptor,
+): WorkspaceProductBuilderDto | null {
+  if (typeof descriptor.payload !== 'object' || descriptor.payload === null) return null;
+  if (!('userId' in descriptor.payload)) return null;
+  return descriptor.payload as WorkspaceProductBuilderDto;
+}
+
 function Fact({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0">
@@ -507,6 +756,35 @@ function problemFeedback(error: unknown, t: (key: string) => string): Feedback {
   return {
     tone: 'destructive',
     title: t('memberships.actionFailed'),
+    body: t('memberships.actionFailedDescription'),
+  };
+}
+
+function productBuilderProblemFeedback(error: unknown, t: (key: string) => string): Feedback {
+  if (error instanceof ApiError && error.status === 409) {
+    return {
+      tone: 'warning',
+      title: t('memberships.productBuilderChanged'),
+      body: t('memberships.productBuilderChangedDescription'),
+    };
+  }
+  if (error instanceof ApiError && (error.status === 403 || error.status === 404)) {
+    return {
+      tone: 'destructive',
+      title: t('memberships.forbidden'),
+      body: t('memberships.productBuilderForbiddenDescription'),
+    };
+  }
+  if (error instanceof ApiError && error.status === 503) {
+    return {
+      tone: 'warning',
+      title: t('memberships.productBuilderUnavailable'),
+      body: t('memberships.productBuilderUnavailableDescription'),
+    };
+  }
+  return {
+    tone: 'destructive',
+    title: t('memberships.productBuilderActionFailed'),
     body: t('memberships.actionFailedDescription'),
   };
 }

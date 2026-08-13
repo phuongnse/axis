@@ -12,6 +12,7 @@ namespace Axis.BusinessObjects.Application.Queries.GetBusinessObjectDefinition;
 public sealed class GetBusinessObjectDefinitionHandler(
     ICurrentUser currentUser,
     ICurrentSubject currentSubject,
+    IWorkspaceProductBuilderAuthorization productBuilderAuthorization,
     IProductAuthorizationService authorization,
     IBusinessObjectDefinitionRepository repository)
     : IQueryHandler<GetBusinessObjectDefinitionQuery, Result<BusinessObjectDefinitionDetailDto>>
@@ -33,48 +34,30 @@ public sealed class GetBusinessObjectDefinitionHandler(
         if (definition is null)
             return BusinessObjectDefinitionFailures.NotFound<BusinessObjectDefinitionDetailDto>();
 
-        ProductAuthorizationDecision decision = await BusinessObjectAuthorization.AuthorizeAsync(
-            authorization,
+        WorkspaceProductBuilderDecision builderDecision = await BusinessObjectAuthorization.AuthorizeBuilderAsync(
+            productBuilderAuthorization,
             workspaceId,
             currentSubject.Subject,
-            BusinessObjectProductActions.DefinitionRead,
-            BusinessObjectProductActions.DefinitionResourceType,
-            definition.Key.Value,
-            query.CorrelationId,
             cancellationToken);
-        if (decision.IsUnavailable)
-            return BusinessObjectDefinitionFailures.Authorization<BusinessObjectDefinitionDetailDto>(decision);
-        if (!decision.IsAllowed && definition.Status == BusinessObjectDefinitionStatus.Published)
-        {
-            decision = await BusinessObjectAuthorization.AuthorizeAsync(
-                authorization,
-                workspaceId,
-                currentSubject.Subject,
-                BusinessObjectProductActions.DefinitionReadPublished,
-                BusinessObjectProductActions.DefinitionResourceType,
-                definition.Key.Value,
-                query.CorrelationId,
-                cancellationToken);
-        }
-
-        if (decision.IsUnavailable)
-            return BusinessObjectDefinitionFailures.Authorization<BusinessObjectDefinitionDetailDto>(decision);
-
-        if (!decision.IsAllowed)
+        if (builderDecision.IsUnavailable)
+            return BusinessObjectDefinitionFailures.Authorization<BusinessObjectDefinitionDetailDto>(builderDecision);
+        if (builderDecision.IsAllowed)
+            return BusinessObjectDefinitionMapper.ToDetailDto(definition, canManage: true);
+        if (definition.Status != BusinessObjectDefinitionStatus.Published)
             return BusinessObjectDefinitionFailures.Forbidden<BusinessObjectDefinitionDetailDto>();
 
-        ProductAuthorizationDecision manageDecision = await BusinessObjectAuthorization.AuthorizeAsync(
+        ProductAuthorizationDecision publishedReadDecision = await BusinessObjectAuthorization.AuthorizeAsync(
             authorization,
             workspaceId,
             currentSubject.Subject,
-            BusinessObjectProductActions.DefinitionManage,
+            BusinessObjectProductActions.DefinitionReadPublished,
             BusinessObjectProductActions.DefinitionResourceType,
             definition.Key.Value,
             query.CorrelationId,
             cancellationToken);
-        if (manageDecision.IsUnavailable)
-            return BusinessObjectDefinitionFailures.Authorization<BusinessObjectDefinitionDetailDto>(manageDecision);
+        if (!publishedReadDecision.IsAllowed)
+            return BusinessObjectDefinitionFailures.Authorization<BusinessObjectDefinitionDetailDto>(publishedReadDecision);
 
-        return BusinessObjectDefinitionMapper.ToDetailDto(definition, manageDecision.IsAllowed);
+        return BusinessObjectDefinitionMapper.ToDetailDto(definition, canManage: false);
     }
 }

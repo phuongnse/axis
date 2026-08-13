@@ -1,5 +1,8 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { workspaceInvitationsQueryOptions } from '@/features/memberships';
+import {
+  workspaceInvitationsQueryOptions,
+  workspaceProductBuildersQueryOptions,
+} from '@/features/memberships';
 import type { MyRouterContext } from '../__root';
 
 export const Route = createFileRoute('/_authenticated/memberships')({
@@ -7,5 +10,8 @@ export const Route = createFileRoute('/_authenticated/memberships')({
 });
 
 export function loadMembershipsRoute({ queryClient }: MyRouterContext) {
-  return queryClient.ensureQueryData(workspaceInvitationsQueryOptions());
+  return Promise.all([
+    queryClient.ensureQueryData(workspaceProductBuildersQueryOptions()),
+    queryClient.ensureQueryData(workspaceInvitationsQueryOptions()),
+  ]);
 }

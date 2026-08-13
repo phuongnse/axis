@@ -1,4 +1,3 @@
-using Axis.Authorization.Contracts;
 using Axis.Identity.Contracts;
 using Axis.Rules.Application.Repositories;
 using Axis.Rules.Application.Services;
@@ -14,7 +13,7 @@ namespace Axis.Rules.Application.Commands.ArchiveRuleDefinition;
 public sealed class ArchiveRuleDefinitionHandler(
     ICurrentUser currentUser,
     ICurrentSubject currentSubject,
-    IProductAuthorizationService authorization,
+    IWorkspaceProductBuilderAuthorization authorization,
     IRuleDefinitionRepository repository,
     IUnitOfWork unitOfWork)
     : ICommandHandler<ArchiveRuleDefinitionCommand, RuleDefinitionDetailDto>
@@ -29,10 +28,8 @@ public sealed class ArchiveRuleDefinitionHandler(
         if (key.IsFailure)
             return RuleDefinitionFailures.NotFound<RuleDefinitionDetailDto>();
 
-        ProductAuthorizationDecision decision = await RuleAuthorization.AuthorizeAsync(
-                authorization, workspaceId, currentSubject.Subject,
-                RuleProductActions.DefinitionManage, RuleProductActions.DefinitionResourceType,
-                key.Value.Value, null, cancellationToken);
+        WorkspaceProductBuilderDecision decision = await RuleAuthorization.AuthorizeAsync(
+            authorization, workspaceId, currentSubject.Subject, cancellationToken);
         if (!decision.IsAllowed)
             return RuleDefinitionFailures.Authorization<RuleDefinitionDetailDto>(decision);
 

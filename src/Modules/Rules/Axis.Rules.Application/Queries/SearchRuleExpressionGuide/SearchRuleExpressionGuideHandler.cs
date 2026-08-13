@@ -1,4 +1,3 @@
-using Axis.Authorization.Contracts;
 using Axis.Identity.Contracts;
 using Axis.Rules.Contracts;
 using Axis.Shared.Application.CQRS;
@@ -10,7 +9,7 @@ namespace Axis.Rules.Application.Queries.SearchRuleExpressionGuide;
 public sealed class SearchRuleExpressionGuideHandler(
     ICurrentUser currentUser,
     ICurrentSubject currentSubject,
-    IProductAuthorizationService authorization,
+    IWorkspaceProductBuilderAuthorization authorization,
     RuleExpressionGuideService guide)
     : IQueryHandler<SearchRuleExpressionGuideQuery, Result<RuleExpressionGuideDto>>
 {
@@ -25,10 +24,8 @@ public sealed class SearchRuleExpressionGuideHandler(
     {
         if (currentUser.workspaceId is not Guid workspaceId)
             return RuleDefinitionFailures.MissingWorkspace<RuleExpressionGuideDto>();
-        ProductAuthorizationDecision decision = await RuleAuthorization.AuthorizeAsync(
-                authorization, workspaceId, currentSubject.Subject,
-                RuleProductActions.DefinitionRead, RuleProductActions.DefinitionResourceType,
-                null, null, cancellationToken);
+        WorkspaceProductBuilderDecision decision = await RuleAuthorization.AuthorizeAsync(
+            authorization, workspaceId, currentSubject.Subject, cancellationToken);
         if (!decision.IsAllowed)
             return RuleDefinitionFailures.Authorization<RuleExpressionGuideDto>(decision);
         return await guide.SearchAsync(workspaceId, query.Request, cancellationToken);
