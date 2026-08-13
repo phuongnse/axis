@@ -1,4 +1,3 @@
-using Axis.Authorization.Contracts;
 using Axis.Identity.Contracts;
 using Axis.Rules.Application.Repositories;
 using Axis.Rules.Application.Services;
@@ -13,7 +12,7 @@ namespace Axis.Rules.Application.Commands.DeleteRuleBinding;
 public sealed class DeleteRuleBindingHandler(
     ICurrentUser currentUser,
     ICurrentSubject currentSubject,
-    IProductAuthorizationService authorization,
+    IWorkspaceProductBuilderAuthorization authorization,
     IRuleBindingRepository repository,
     IUnitOfWork unitOfWork)
     : ICommandHandler<DeleteRuleBindingCommand>
@@ -28,10 +27,8 @@ public sealed class DeleteRuleBindingHandler(
             RuleBindingId.From(command.BindingId), workspaceId, cancellationToken);
         if (binding is null)
             return Result.Failure(ErrorCodes.NotFound, "Rule binding was not found.");
-        ProductAuthorizationDecision decision = await RuleAuthorization.AuthorizeAsync(
-                authorization, workspaceId, currentSubject.Subject,
-                RuleProductActions.BindingManage, RuleProductActions.BindingResourceType,
-                binding.DefinitionKey.Value, null, cancellationToken);
+        WorkspaceProductBuilderDecision decision = await RuleAuthorization.AuthorizeAsync(
+            authorization, workspaceId, currentSubject.Subject, cancellationToken);
         if (!decision.IsAllowed)
             return RuleDefinitionFailures.Authorization(decision);
         if (binding.IsInstalled)

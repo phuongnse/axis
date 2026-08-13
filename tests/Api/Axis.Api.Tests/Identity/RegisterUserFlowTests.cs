@@ -54,6 +54,7 @@ public sealed class RegisterUserFlowTests(ApiTestFixture fixture)
             workspace => workspace.Id == personalMembership.WorkspaceId &&
                 workspace.Type == WorkspaceType.Personal,
             TestContext.Current.CancellationToken);
+        personalMembership.IsProductBuilder.Should().BeTrue();
         personalWorkspace.Name.Should().Be("Alice Smith");
         personalWorkspace.OrganizationId.Should().BeNull();
         personalWorkspace.Status.Should().Be(WorkspaceStatus.PendingVerification);

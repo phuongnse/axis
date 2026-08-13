@@ -7,7 +7,7 @@ namespace Axis.Solutions.Infrastructure.Tests.Fixtures;
 
 public sealed class SolutionsDatabaseFixture : IAsyncLifetime
 {
-    private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder().WithImage("postgres:16-alpine").Build();
+    private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:16-alpine").Build();
     private string _connectionString = null!;
     public string ConnectionString => _connectionString;
     public SolutionsDbContext CreateContext() => new(new DbContextOptionsBuilder<SolutionsDbContext>().UseNpgsql(_connectionString).Options);

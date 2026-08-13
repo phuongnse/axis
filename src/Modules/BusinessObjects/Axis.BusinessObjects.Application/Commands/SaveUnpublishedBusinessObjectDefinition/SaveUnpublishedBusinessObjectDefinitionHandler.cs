@@ -1,4 +1,3 @@
-using Axis.Authorization.Contracts;
 using Axis.BusinessObjects.Application.Repositories;
 using Axis.BusinessObjects.Application.Services;
 using Axis.BusinessObjects.Domain.Aggregates;
@@ -14,7 +13,7 @@ namespace Axis.BusinessObjects.Application.Commands.SaveUnpublishedBusinessObjec
 public sealed class SaveUnpublishedBusinessObjectDefinitionHandler(
     ICurrentUser currentUser,
     ICurrentSubject currentSubject,
-    IProductAuthorizationService authorization,
+    IWorkspaceProductBuilderAuthorization authorization,
     IBusinessObjectDefinitionRepository repository,
     IUnitOfWork unitOfWork,
     IBusinessObjectDefinitionInputPlanner inputPlanner)
@@ -35,14 +34,10 @@ public sealed class SaveUnpublishedBusinessObjectDefinitionHandler(
         if (definition is null)
             return BusinessObjectDefinitionFailures.NotFound<BusinessObjectDefinitionDetailDto>();
 
-        ProductAuthorizationDecision decision = await BusinessObjectAuthorization.AuthorizeAsync(
+        WorkspaceProductBuilderDecision decision = await BusinessObjectAuthorization.AuthorizeBuilderAsync(
             authorization,
             workspaceId,
             currentSubject.Subject,
-            BusinessObjectProductActions.DefinitionManage,
-            BusinessObjectProductActions.DefinitionResourceType,
-            definition.Key.Value,
-            command.CorrelationId,
             cancellationToken);
         if (!decision.IsAllowed)
             return BusinessObjectDefinitionFailures.Authorization<BusinessObjectDefinitionDetailDto>(decision);

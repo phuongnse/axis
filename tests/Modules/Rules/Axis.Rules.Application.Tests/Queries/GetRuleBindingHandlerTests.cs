@@ -1,4 +1,4 @@
-using Axis.Authorization.Contracts;
+using Axis.Identity.Contracts;
 using Axis.Rules.Application.Queries.GetRuleBinding;
 using Axis.Rules.Application.Repositories;
 using Axis.Rules.Contracts;
@@ -51,26 +51,27 @@ public sealed class GetRuleBindingHandlerTests
         result.IsFailure.Should().BeTrue();
         result.ErrorCode.Should().Be(ErrorCodes.NotFound);
         await context.Authorization.DidNotReceive().AuthorizeAsync(
-            Arg.Any<ProductAuthorizationRequest>(),
+            Arg.Any<Guid>(),
+            Arg.Any<SubjectReference>(),
             Arg.Any<CancellationToken>());
     }
 
     [Fact]
-    public async Task Handle_WhenAuthorizationUnavailable_UsesPersistedDefinitionKey()
+    public async Task Handle_WhenBuilderAuthorizationUnavailable_ReturnsUnavailable()
     {
         RuleBinding binding = RuleBindingHandlerTestData.Binding();
         IRuleBindingRepository bindings = Substitute.For<IRuleBindingRepository>();
         RuleDefinitionHandlerTestContext context = new();
-        ProductAuthorizationRequest? observed = null;
         bindings.GetByIdForWorkspaceAsync(
                 binding.Id,
                 RuleDefinitionHandlerTestContext.WorkspaceId,
                 Arg.Any<CancellationToken>())
             .Returns(binding);
         context.Authorization.AuthorizeAsync(
-                Arg.Do<ProductAuthorizationRequest>(request => observed = request),
+                Arg.Any<Guid>(),
+                Arg.Any<SubjectReference>(),
                 Arg.Any<CancellationToken>())
-            .Returns(ProductAuthorizationDecision.Unavailable);
+            .Returns(WorkspaceProductBuilderDecision.Unavailable);
         GetRuleBindingHandler handler = new(context.CurrentUser, context.CurrentSubject, context.Authorization, bindings);
 
         Result<RuleBindingDto> result = await handler.Handle(
@@ -78,6 +79,5 @@ public sealed class GetRuleBindingHandlerTests
             TestContext.Current.CancellationToken);
 
         result.ErrorCode.Should().Be(ErrorCodes.Unavailable);
-        observed!.ResourceKey.Should().Be(binding.DefinitionKey.Value);
     }
 }

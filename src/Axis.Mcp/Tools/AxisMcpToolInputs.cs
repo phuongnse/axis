@@ -10,6 +10,8 @@ public sealed record InviteWorkspaceMemberInput(
 
 public sealed record ChangeWorkspaceInvitationInput(int ExpectedRevision);
 
+public sealed record ChangeWorkspaceProductBuilderInput(int ExpectedRevision);
+
 public sealed record CreateServiceIdentityInput(string ClientId);
 
 public sealed record AddServiceIdentityKeyInput(

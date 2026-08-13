@@ -9,6 +9,10 @@ public interface IWorkspaceMembershipRepository
         Guid workspaceId,
         Guid userId,
         CancellationToken ct = default);
+    Task<WorkspaceMembership?> GetActiveHumanAsync(
+        Guid workspaceId,
+        Guid userId,
+        CancellationToken ct = default);
     Task<WorkspaceMembership?> GetAsync(
         Guid workspaceId,
         Guid userId,
@@ -42,4 +46,7 @@ public sealed record EligibleWorkspaceProjection(
 public sealed record ActiveWorkspaceHumanProjection(
     Guid UserId,
     string DisplayName,
-    string Email);
+    string Email,
+    WorkspaceMembershipRole WorkspaceRole = WorkspaceMembershipRole.Member,
+    bool IsProductBuilder = false,
+    int MembershipRevision = 1);

@@ -48,6 +48,48 @@ public class ModuleBoundaryTests
     }
 
     [Fact]
+    public void Identity_WhenInspected_ReferencesOnlyOwnedAndSharedContractAssemblies()
+    {
+        IReadOnlyDictionary<string, string[]> allowedAxisReferences =
+            new Dictionary<string, string[]>(StringComparer.Ordinal)
+            {
+                ["Contracts"] = [],
+                ["Domain"] = ["Axis.Shared.Domain"],
+                ["Application"] =
+                [
+                    "Axis.Audit.Contracts",
+                    "Axis.Identity.Contracts",
+                    "Axis.Identity.Domain",
+                    "Axis.Shared.Application",
+                    "Axis.Shared.Domain",
+                ],
+                ["Infrastructure"] =
+                [
+                    "Axis.Audit.Contracts",
+                    "Axis.Identity.Application",
+                    "Axis.Identity.Contracts",
+                    "Axis.Identity.Domain",
+                    "Axis.Shared.Application",
+                    "Axis.Shared.Domain",
+                    "Axis.Shared.Infrastructure",
+                ],
+            };
+
+        foreach (string layer in Conventions.LayerNames)
+        {
+            Assembly? identityAssembly = Conventions.TryLoadModuleLayer("Identity", layer);
+            if (identityAssembly is null)
+                continue;
+
+            identityAssembly.GetReferencedAssemblies()
+                .Select(reference => reference.Name)
+                .Where(name => name?.StartsWith("Axis.", StringComparison.Ordinal) is true)
+                .Should().OnlyContain(name =>
+                    allowedAxisReferences[layer].Contains(name, StringComparer.Ordinal));
+        }
+    }
+
+    [Fact]
     public void SolutionsApplication_WhenInspected_ReferencesOnlyOwnedAndPublicContractAssemblies()
     {
         Assembly application = Conventions.TryLoad("Axis.Solutions.Application")

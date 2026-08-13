@@ -6,6 +6,7 @@ using System.Text;
 using System.Text.Json;
 using Axis.Api.Tests.Helpers;
 using Axis.Authorization.Contracts;
+using Axis.Identity.Contracts;
 using Axis.Identity.Domain.Legal;
 using Axis.Rules.Application;
 using Axis.Rules.Contracts;
@@ -30,11 +31,11 @@ public sealed class RuleDefinitionEndpointTests(ApiTestFixture fixture)
     }
 
     [Fact]
-    public async Task RuleActions_WhenKeylessManageDenied_ReturnsFalse()
+    public async Task RuleAuthoring_WhenNonBuilder_ReturnsForbidden()
     {
         string accessToken = await CreateVerifiedSessionTokenAsync(UniqueEmail());
-        await fixture.SetProductAuthorizationTestDecisionAsync(
-            _ => ProductAuthorizationDecision.Denied,
+        await fixture.SetWorkspaceProductBuilderTestDecisionAsync(
+            WorkspaceProductBuilderDecision.Denied,
             TestContext.Current.CancellationToken);
 
         HttpResponseMessage response = await SendWithBearerAsync(
@@ -42,20 +43,55 @@ public sealed class RuleDefinitionEndpointTests(ApiTestFixture fixture)
             "/api/rules/actions",
             accessToken);
 
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
-        JsonElement actions = await response.Content.ReadFromJsonAsync<JsonElement>(Json, TestContext.Current.CancellationToken);
-        actions.GetProperty("canStartCreate").GetBoolean().Should().BeFalse();
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+
+        HttpResponseMessage createResponse = await SendWithBearerAsync(
+            HttpMethod.Post,
+            "/api/rules",
+            accessToken,
+            new { name = "Denied Rule", description = "Product Builder authority is required." });
+        createResponse.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+
+        HttpResponseMessage authoringResponse = await SendWithBearerAsync(
+            HttpMethod.Post,
+            "/api/rules/authoring/complete",
+            accessToken,
+            new
+            {
+                text = "gre",
+                cursor = 3,
+                inputs = Array.Empty<object>(),
+                expressionLanguageVersion = 1,
+            });
+        authoringResponse.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
     [Fact]
-    public async Task RuleActions_WhenKeylessManageOnly_AllowsProjectionButDeniesKeyedCreate()
+    public async Task RuleActions_WhenBuilderAuthorizationUnavailable_ReturnsServiceUnavailable()
+    {
+        string accessToken = await CreateVerifiedSessionTokenAsync(UniqueEmail());
+        await fixture.SetWorkspaceProductBuilderTestDecisionAsync(
+            WorkspaceProductBuilderDecision.Unavailable,
+            TestContext.Current.CancellationToken);
+
+        HttpResponseMessage response = await SendWithBearerAsync(
+            HttpMethod.Get,
+            "/api/rules/actions",
+            accessToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
+        JsonElement problem = await response.Content.ReadFromJsonAsync<JsonElement>(
+            Json,
+            TestContext.Current.CancellationToken);
+        problem.GetProperty("code").GetString().Should().Be(RulesProblemCodes.AuthorizationUnavailable);
+    }
+
+    [Fact]
+    public async Task RuleAuthoring_WhenBuilderHasNoProductGrant_AllowsProjectionAndCreate()
     {
         string accessToken = await CreateVerifiedSessionTokenAsync(UniqueEmail());
         await fixture.SetProductAuthorizationTestDecisionAsync(
-            request => request.ActionKey == RuleProductActions.DefinitionManage
-                && request.ResourceKey is null
-                    ? new ProductAuthorizationDecision(true, ProductActionScope.None)
-                    : ProductAuthorizationDecision.Denied,
+            _ => ProductAuthorizationDecision.Denied,
             TestContext.Current.CancellationToken);
 
         HttpResponseMessage actionsResponse = await SendWithBearerAsync(
@@ -70,8 +106,8 @@ public sealed class RuleDefinitionEndpointTests(ApiTestFixture fixture)
             HttpMethod.Post,
             "/api/rules",
             accessToken,
-            new { name = "Ungranted Rule", description = "Must remain exact-key authorized." });
-        createResponse.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+            new { name = $"Builder Rule {Guid.NewGuid():N}", description = "Builder authority is sufficient." });
+        createResponse.StatusCode.Should().Be(HttpStatusCode.Created);
     }
 
     [Fact]
@@ -175,11 +211,8 @@ public sealed class RuleDefinitionEndpointTests(ApiTestFixture fixture)
         Guid bindingId = created.GetProperty("id").GetGuid();
         int revision = created.GetProperty("revision").GetInt32();
 
-        await fixture.SetProductAuthorizationTestDecisionAsync(
-            request => request.ActionKey == RuleProductActions.BindingManage
-                && request.ResourceKey == RuleDefinitionKeys.Required
-                    ? new ProductAuthorizationDecision(true, ProductActionScope.None)
-                    : ProductAuthorizationDecision.Denied,
+        await fixture.SetWorkspaceProductBuilderTestDecisionAsync(
+            WorkspaceProductBuilderDecision.Denied,
             TestContext.Current.CancellationToken);
         HttpResponseMessage denied = await SendWithBearerAsync(
             HttpMethod.Put,
@@ -197,8 +230,8 @@ public sealed class RuleDefinitionEndpointTests(ApiTestFixture fixture)
             });
         denied.StatusCode.Should().Be(HttpStatusCode.Forbidden);
 
-        await fixture.SetProductAuthorizationTestDecisionAsync(
-            _ => ProductAuthorizationDecision.Unavailable,
+        await fixture.SetWorkspaceProductBuilderTestDecisionAsync(
+            WorkspaceProductBuilderDecision.Unavailable,
             TestContext.Current.CancellationToken);
         HttpResponseMessage unavailable = await SendWithBearerAsync(
             HttpMethod.Put,
@@ -216,8 +249,8 @@ public sealed class RuleDefinitionEndpointTests(ApiTestFixture fixture)
             });
         unavailable.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
 
-        await fixture.SetProductAuthorizationTestDecisionAsync(
-            _ => new ProductAuthorizationDecision(true, ProductActionScope.None),
+        await fixture.SetWorkspaceProductBuilderTestDecisionAsync(
+            WorkspaceProductBuilderDecision.Allowed,
             TestContext.Current.CancellationToken);
         HttpResponseMessage readResponse = await SendWithBearerAsync(
             HttpMethod.Get,

@@ -1,4 +1,4 @@
-using Axis.Authorization.Contracts;
+using Axis.Identity.Contracts;
 using Axis.Rules.Application.Commands.UpdateRuleBinding;
 using Axis.Rules.Application.Repositories;
 using Axis.Rules.Contracts;
@@ -55,30 +55,28 @@ public sealed class UpdateRuleBindingHandlerTests
     }
 
     [Theory]
-    [InlineData(ProductAuthorizationDecisionStatus.Denied, ErrorCodes.Forbidden)]
-    [InlineData(ProductAuthorizationDecisionStatus.Unavailable, ErrorCodes.Unavailable)]
-    public async Task Handle_WhenRetargetAuthorizationFails_AuthorizesOldThenNewAndDoesNotMutate(
-        ProductAuthorizationDecisionStatus status,
+    [InlineData(WorkspaceProductBuilderDecisionStatus.Denied, ErrorCodes.Forbidden)]
+    [InlineData(WorkspaceProductBuilderDecisionStatus.Unavailable, ErrorCodes.Unavailable)]
+    public async Task Handle_WhenBuilderAuthorizationFails_DoesNotMutate(
+        WorkspaceProductBuilderDecisionStatus status,
         string expectedErrorCode)
     {
         RuleBinding binding = RuleBindingHandlerTestData.Binding();
         int originalRevision = binding.Revision;
         IRuleBindingRepository bindings = Substitute.For<IRuleBindingRepository>();
         RuleDefinitionHandlerTestContext context = new();
-        List<string?> observedKeys = [];
         bindings.GetByIdForWorkspaceAsync(
                 binding.Id,
                 RuleDefinitionHandlerTestContext.WorkspaceId,
                 Arg.Any<CancellationToken>())
             .Returns(binding);
         context.Authorization.AuthorizeAsync(
-                Arg.Do<ProductAuthorizationRequest>(request => observedKeys.Add(request.ResourceKey)),
+                Arg.Any<Guid>(),
+                Arg.Any<SubjectReference>(),
                 Arg.Any<CancellationToken>())
-            .Returns(call => call.Arg<ProductAuthorizationRequest>().ResourceKey == binding.DefinitionKey.Value
-                ? new ProductAuthorizationDecision(true, ProductActionScope.None)
-                : status == ProductAuthorizationDecisionStatus.Unavailable
-                    ? ProductAuthorizationDecision.Unavailable
-                    : ProductAuthorizationDecision.Denied);
+            .Returns(status == WorkspaceProductBuilderDecisionStatus.Unavailable
+                ? WorkspaceProductBuilderDecision.Unavailable
+                : WorkspaceProductBuilderDecision.Denied);
         UpdateRuleBindingHandler handler = new(
             context.CurrentUser,
             context.CurrentSubject,
@@ -101,7 +99,6 @@ public sealed class UpdateRuleBindingHandlerTests
             TestContext.Current.CancellationToken);
 
         result.ErrorCode.Should().Be(expectedErrorCode);
-        observedKeys.Should().Equal(RuleDefinitionKeys.Required, RuleDefinitionKeys.TextLength);
         binding.DefinitionKey.Value.Should().Be(RuleDefinitionKeys.Required);
         binding.Revision.Should().Be(originalRevision);
         await context.UnitOfWork.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());

@@ -1,6 +1,3 @@
-using Axis.Identity.Application.Services;
-using Axis.Identity.Domain.Aggregates;
-using Axis.Identity.Domain.ValueObjects;
 using Axis.Identity.Infrastructure.Persistence;
 using Axis.Testing;
 using FluentAssertions;
@@ -17,9 +14,10 @@ public sealed class IdentityGovernanceMigrationTests : IAsyncLifetime
     private const string PlatformAuditMigration = "20260806150336_AllowPlatformScopedAuditEvents";
     private const string SinglePendingInvitationMigration =
         "20260806154703_EnforceSinglePendingWorkspaceInvitationRecipient";
+    private const string PreProductBuilderMigration =
+        "20260807062221_ConstrainServiceIdentityClientIds";
 
-    private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder()
-        .WithImage("postgres:16-alpine")
+    private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:16-alpine")
         .Build();
 
     public async ValueTask InitializeAsync() => await _postgres.StartAsync();
@@ -52,6 +50,10 @@ public sealed class IdentityGovernanceMigrationTests : IAsyncLifetime
         memberships[0].Role.Should().Be("Owner");
         memberships[0].Status.Should().Be("Active");
         memberships[0].Revision.Should().Be(1);
+        (await ScalarAsync(
+            connectionString,
+            "SELECT is_product_builder FROM workspace_memberships WHERE workspace_id = @workspaceId",
+            ("workspaceId", workspaceId))).Should().Be(true);
         (await ScalarAsync(connectionString,
             "SELECT organization_id FROM workspaces WHERE id = @workspaceId",
             ("workspaceId", workspaceId))).Should().BeNull();
@@ -86,6 +88,67 @@ public sealed class IdentityGovernanceMigrationTests : IAsyncLifetime
             connectionString,
             "next_attempt_at",
             "identity_audit_outbox")).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task MigrateAsync_WhenOrganizationCreatorExists_BackfillsCreatorOnly()
+    {
+        string connectionString = await PostgresModuleTestDatabase.CreateAsync(
+            _postgres.GetConnectionString(),
+            $"axis_identity_builder_migration_{Guid.NewGuid():N}");
+        await using (IdentityDbContext context = CreateContext(connectionString))
+            await context.Database.MigrateAsync(PreProductBuilderMigration, TestContext.Current.CancellationToken);
+        Guid creatorId = Guid.NewGuid();
+        Guid otherAdministratorId = Guid.NewGuid();
+        Guid organizationId = Guid.NewGuid();
+        Guid workspaceId = Guid.NewGuid();
+        await using (NpgsqlConnection connection = new(connectionString))
+        {
+            await connection.OpenAsync(TestContext.Current.CancellationToken);
+            await ExecuteAsync(connection,
+                """
+                INSERT INTO users (id, full_name, email, status, is_email_verified, created_at)
+                VALUES
+                    (@creatorId, 'Creator', @creatorEmail, 'Active', true, now()),
+                    (@otherId, 'Administrator', @otherEmail, 'Active', true, now());
+                INSERT INTO organizations (id, name, created_at, revision)
+                VALUES (@organizationId, 'Builder Organization', now(), 1);
+                INSERT INTO workspaces (id, name, slug, organization_id, type, status, created_at, revision)
+                VALUES (@workspaceId, 'Builder Workspace', @slug, @organizationId, 'Organization', 'Active', now(), 1);
+                INSERT INTO organization_memberships (id, organization_id, user_id, role, status, revision)
+                VALUES
+                    (@creatorOrganizationMembershipId, @organizationId, @creatorId, 'Owner', 'Active', 1),
+                    (@otherOrganizationMembershipId, @organizationId, @otherId, 'Administrator', 'Active', 1);
+                INSERT INTO workspace_memberships (id, workspace_id, user_id, role, status, revision)
+                VALUES
+                    (@creatorWorkspaceMembershipId, @workspaceId, @creatorId, 'Administrator', 'Active', 1),
+                    (@otherWorkspaceMembershipId, @workspaceId, @otherId, 'Administrator', 'Active', 1);
+                """,
+                ("creatorId", creatorId),
+                ("creatorEmail", $"creator-{creatorId:N}@example.com"),
+                ("otherId", otherAdministratorId),
+                ("otherEmail", $"administrator-{otherAdministratorId:N}@example.com"),
+                ("organizationId", organizationId),
+                ("workspaceId", workspaceId),
+                ("slug", $"builder-{workspaceId:N}"),
+                ("creatorOrganizationMembershipId", Guid.NewGuid()),
+                ("otherOrganizationMembershipId", Guid.NewGuid()),
+                ("creatorWorkspaceMembershipId", Guid.NewGuid()),
+                ("otherWorkspaceMembershipId", Guid.NewGuid()));
+        }
+
+        await MigrateToLatestAsync(connectionString);
+
+        (await ScalarAsync(
+            connectionString,
+            "SELECT is_product_builder FROM workspace_memberships WHERE workspace_id = @workspaceId AND user_id = @userId",
+            ("workspaceId", workspaceId),
+            ("userId", creatorId))).Should().Be(true);
+        (await ScalarAsync(
+            connectionString,
+            "SELECT is_product_builder FROM workspace_memberships WHERE workspace_id = @workspaceId AND user_id = @userId",
+            ("workspaceId", workspaceId),
+            ("userId", otherAdministratorId))).Should().Be(false);
     }
 
     [Theory]
@@ -201,57 +264,87 @@ public sealed class IdentityGovernanceMigrationTests : IAsyncLifetime
         string connectionString = await PostgresModuleTestDatabase.CreateAsync(
             _postgres.GetConnectionString(),
             databaseName);
-        User inviter = User.Create(
-            "Invitation Administrator",
-            Email.Create($"migration-admin-{Guid.NewGuid():N}@example.com").Value);
-        inviter.VerifyEmail();
-        Organization organization = Organization.Create("Invitation Migration Organization");
-        Workspace workspace = Workspace.CreateOrganization(
-            "Invitation Migration Workspace",
-            WorkspaceSlug.Create($"invitation-migration-{Guid.NewGuid():N}").Value,
-            organization.Id);
+        Guid inviterId = Guid.NewGuid();
+        Guid organizationId = Guid.NewGuid();
+        Guid workspaceId = Guid.NewGuid();
         DateTime now = DateTime.UtcNow;
 
-        await using (IdentityDbContext seed = CreateContext(connectionString))
+        await using (IdentityDbContext migrationContext = CreateContext(connectionString))
         {
-            await seed.Database.MigrateAsync(
+            await migrationContext.Database.MigrateAsync(
                 PlatformAuditMigration,
                 TestContext.Current.CancellationToken);
-            seed.Users.Add(inviter);
-            seed.Organizations.Add(organization);
-            seed.Workspaces.Add(workspace);
-            seed.OrganizationMemberships.Add(OrganizationMembership.Create(
-                organization.Id,
-                inviter.Id,
-                OrganizationMembershipRole.Administrator));
-            seed.WorkspaceMemberships.Add(WorkspaceMembership.CreateOrganizationMember(
-                workspace.Id,
-                inviter.Id,
-                WorkspaceMembershipRole.Administrator));
-            seed.WorkspaceInvitations.AddRange(
-                WorkspaceInvitation.Create(
-                    organization.Id,
-                    workspace.Id,
-                    inviter.Id,
-                    "conflicting-recipient@example.com",
-                    WorkspaceMembershipRole.Member,
-                    now,
-                    now.AddDays(7),
-                    OpaqueTokenGenerator.Create().TokenHash,
-                    "member-envelope",
-                    "member-delivery"),
-                WorkspaceInvitation.Create(
-                    organization.Id,
-                    workspace.Id,
-                    inviter.Id,
-                    "conflicting-recipient@example.com",
-                    WorkspaceMembershipRole.Administrator,
-                    now,
-                    now.AddDays(7),
-                    OpaqueTokenGenerator.Create().TokenHash,
-                    "administrator-envelope",
-                    "administrator-delivery"));
-            await seed.SaveChangesAsync(TestContext.Current.CancellationToken);
+        }
+        await using (NpgsqlConnection connection = new(connectionString))
+        {
+            await connection.OpenAsync(TestContext.Current.CancellationToken);
+            await ExecuteAsync(
+                connection,
+                """
+                INSERT INTO users (id, full_name, email, status, is_email_verified, created_at)
+                VALUES (@inviterId, 'Invitation Administrator', @email, 'Active', true, @now);
+                INSERT INTO organizations (id, name, created_at, revision)
+                VALUES (@organizationId, 'Invitation Migration Organization', @now, 1);
+                INSERT INTO workspaces (id, name, slug, organization_id, type, status, created_at, revision)
+                VALUES (
+                    @workspaceId,
+                    'Invitation Migration Workspace',
+                    @slug,
+                    @organizationId,
+                    'Organization',
+                    'Active',
+                    @now,
+                    1);
+                INSERT INTO organization_memberships (id, organization_id, user_id, role, status, revision)
+                VALUES (@organizationMembershipId, @organizationId, @inviterId, 'Administrator', 'Active', 1);
+                INSERT INTO workspace_memberships (id, workspace_id, user_id, role, status, revision)
+                VALUES (@workspaceMembershipId, @workspaceId, @inviterId, 'Administrator', 'Active', 1);
+                INSERT INTO workspace_invitations (
+                    id,
+                    organization_id,
+                    workspace_id,
+                    inviter_user_id,
+                    normalized_email,
+                    requested_role,
+                    status,
+                    created_at,
+                    expires_at,
+                    revision)
+                VALUES
+                    (
+                        @memberInvitationId,
+                        @organizationId,
+                        @workspaceId,
+                        @inviterId,
+                        'conflicting-recipient@example.com',
+                        'Member',
+                        'Pending',
+                        @now,
+                        @expiresAt,
+                        1),
+                    (
+                        @administratorInvitationId,
+                        @organizationId,
+                        @workspaceId,
+                        @inviterId,
+                        'conflicting-recipient@example.com',
+                        'Administrator',
+                        'Pending',
+                        @now,
+                        @expiresAt,
+                        1);
+                """,
+                ("inviterId", inviterId),
+                ("email", $"migration-admin-{inviterId:N}@example.com"),
+                ("organizationId", organizationId),
+                ("workspaceId", workspaceId),
+                ("slug", $"invitation-migration-{workspaceId:N}"),
+                ("organizationMembershipId", Guid.NewGuid()),
+                ("workspaceMembershipId", Guid.NewGuid()),
+                ("memberInvitationId", Guid.NewGuid()),
+                ("administratorInvitationId", Guid.NewGuid()),
+                ("now", now),
+                ("expiresAt", now.AddDays(7)));
         }
 
         Func<Task> act = () => MigrateToLatestAsync(connectionString);
@@ -269,7 +362,7 @@ public sealed class IdentityGovernanceMigrationTests : IAsyncLifetime
         (await ScalarAsync(
             connectionString,
             "SELECT count(*) FROM workspace_invitations WHERE workspace_id = @workspaceId",
-            ("workspaceId", workspace.Id))).Should().Be(2L);
+            ("workspaceId", workspaceId))).Should().Be(2L);
     }
 
     private async Task<string> CreateLegacyDatabaseAsync()

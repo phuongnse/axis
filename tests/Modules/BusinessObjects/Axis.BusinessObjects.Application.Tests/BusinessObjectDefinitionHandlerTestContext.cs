@@ -20,7 +20,7 @@ internal sealed class BusinessObjectDefinitionHandlerTestContext
 
     public IBusinessObjectDefinitionRepository Repository { get; } = Substitute.For<IBusinessObjectDefinitionRepository>();
     public IUnitOfWork UnitOfWork { get; } = Substitute.For<IUnitOfWork>();
-    public IProductAuthorizationService Authorization { get; } = Substitute.For<IProductAuthorizationService>();
+    public IDefinitionAuthorization Authorization { get; } = Substitute.For<IDefinitionAuthorization>();
     public IRuleBindingReferenceValidator BindingValidator { get; } =
         Substitute.For<IRuleBindingReferenceValidator>();
     public IBusinessObjectDefinitionInputPlanner InputPlanner =>
@@ -41,6 +41,11 @@ internal sealed class BusinessObjectDefinitionHandlerTestContext
                 Arg.Any<ProductAuthorizationRequest>(),
                 Arg.Any<CancellationToken>())
             .Returns(new ProductAuthorizationDecision(true, ProductActionScope.None));
+        Authorization.AuthorizeAsync(
+                Arg.Any<Guid>(),
+                Arg.Any<IdentitySubjectReference>(),
+                Arg.Any<CancellationToken>())
+            .Returns(WorkspaceProductBuilderDecision.Allowed);
         BindingValidator.ValidateAsync(
                 Arg.Any<RuleBindingReferenceValidationRequest>(),
                 Arg.Any<CancellationToken>())
@@ -97,6 +102,10 @@ internal sealed class BusinessObjectDefinitionHandlerTestContext
         public IdentitySubjectReference Subject { get; set; }
     }
 }
+
+public interface IDefinitionAuthorization :
+    IProductAuthorizationService,
+    IWorkspaceProductBuilderAuthorization;
 
 internal static class TestBindingIds
 {

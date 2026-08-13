@@ -389,8 +389,7 @@ internal static class AxisApiServiceExtensions
         IConfiguration configuration,
         IHostEnvironment environment)
     {
-        foreach (ProductActionDescriptor descriptor in
-                 BusinessObjectProductActions.Descriptors.Concat(RuleProductActions.Descriptors))
+        foreach (ProductActionDescriptor descriptor in BusinessObjectProductActions.Descriptors)
         {
             services.AddSingleton(descriptor);
         }

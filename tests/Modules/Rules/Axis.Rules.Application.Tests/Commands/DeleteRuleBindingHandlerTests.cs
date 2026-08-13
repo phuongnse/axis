@@ -1,4 +1,4 @@
-using Axis.Authorization.Contracts;
+using Axis.Identity.Contracts;
 using Axis.Rules.Application.Commands.DeleteRuleBinding;
 using Axis.Rules.Application.Repositories;
 using Axis.Rules.Domain;
@@ -30,7 +30,8 @@ public sealed class DeleteRuleBindingHandlerTests
         result.IsSuccess.Should().BeTrue();
         bindings.Received(1).Remove(binding);
         await context.Authorization.Received(1).AuthorizeAsync(
-            Arg.Is<ProductAuthorizationRequest>(request => request.ResourceKey == binding.DefinitionKey.Value),
+            RuleDefinitionHandlerTestContext.WorkspaceId,
+            context.CurrentSubject.Subject,
             Arg.Any<CancellationToken>());
     }
 
@@ -46,9 +47,10 @@ public sealed class DeleteRuleBindingHandlerTests
                 Arg.Any<CancellationToken>())
             .Returns(binding);
         context.Authorization.AuthorizeAsync(
-                Arg.Any<ProductAuthorizationRequest>(),
+                Arg.Any<Guid>(),
+                Arg.Any<SubjectReference>(),
                 Arg.Any<CancellationToken>())
-            .Returns(ProductAuthorizationDecision.Unavailable);
+            .Returns(WorkspaceProductBuilderDecision.Unavailable);
         DeleteRuleBindingHandler handler = new(
             context.CurrentUser,
             context.CurrentSubject,

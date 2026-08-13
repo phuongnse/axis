@@ -18,6 +18,7 @@ Use cases are the product source of truth. Each use case owns one independently 
 | [docs/use-cases/identity-governance/README.md](./identity-governance/README.md) | [docs/use-cases/identity-governance/invite-workspace-member.md](./identity-governance/invite-workspace-member.md) | Done |
 | [docs/use-cases/identity-governance/README.md](./identity-governance/README.md) | [docs/use-cases/identity-governance/accept-workspace-invitation.md](./identity-governance/accept-workspace-invitation.md) | Done |
 | [docs/use-cases/identity-governance/README.md](./identity-governance/README.md) | [docs/use-cases/identity-governance/manage-workspace-service-identities.md](./identity-governance/manage-workspace-service-identities.md) | Done |
+| [docs/use-cases/identity-governance/README.md](./identity-governance/README.md) | [docs/use-cases/identity-governance/manage-workspace-product-builders.md](./identity-governance/manage-workspace-product-builders.md) | Done |
 | [docs/use-cases/authorization/README.md](./authorization/README.md) | [docs/use-cases/authorization/manage-product-role-assignments.md](./authorization/manage-product-role-assignments.md) | Done |
 | [docs/use-cases/authorization/README.md](./authorization/README.md) | [docs/use-cases/authorization/access-product-by-policy.md](./authorization/access-product-by-policy.md) | Done |
 | [docs/use-cases/business-objects/README.md](./business-objects/README.md) | [docs/use-cases/business-objects/configure-field-rules.md](./business-objects/configure-field-rules.md) | Done |

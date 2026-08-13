@@ -1,4 +1,3 @@
-using Axis.Authorization.Contracts;
 using Axis.Identity.Contracts;
 using Axis.Rules.Application.Repositories;
 using Axis.Rules.Contracts;
@@ -12,7 +11,7 @@ namespace Axis.Rules.Application.Queries.GetRuleDefinition;
 public sealed class GetRuleDefinitionHandler(
     ICurrentUser currentUser,
     ICurrentSubject currentSubject,
-    IProductAuthorizationService authorization,
+    IWorkspaceProductBuilderAuthorization authorization,
     IRuleDefinitionRepository repository)
     : IQueryHandler<GetRuleDefinitionQuery, Result<RuleDefinitionDetailDto>>
 {
@@ -27,19 +26,10 @@ public sealed class GetRuleDefinitionHandler(
         if (key.IsFailure)
             return RuleDefinitionFailures.NotFound<RuleDefinitionDetailDto>();
 
-        ProductAuthorizationDecision readDecision = await RuleAuthorization.AuthorizeAsync(
-                authorization, workspaceId, currentSubject.Subject,
-                RuleProductActions.DefinitionRead, RuleProductActions.DefinitionResourceType,
-                key.Value.Value, null, cancellationToken);
-        if (!readDecision.IsAllowed)
-            return RuleDefinitionFailures.Authorization<RuleDefinitionDetailDto>(readDecision);
-
-        ProductAuthorizationDecision manageDecision = await RuleAuthorization.AuthorizeAsync(
-            authorization, workspaceId, currentSubject.Subject,
-            RuleProductActions.DefinitionManage, RuleProductActions.DefinitionResourceType,
-            key.Value.Value, null, cancellationToken);
-        if (manageDecision.IsUnavailable)
-            return RuleDefinitionFailures.Authorization<RuleDefinitionDetailDto>(manageDecision);
+        WorkspaceProductBuilderDecision decision = await RuleAuthorization.AuthorizeAsync(
+            authorization, workspaceId, currentSubject.Subject, cancellationToken);
+        if (!decision.IsAllowed)
+            return RuleDefinitionFailures.Authorization<RuleDefinitionDetailDto>(decision);
 
         RuleDefinition? builtIn = BuiltInRuleCatalog.Definitions
             .Where(definition => definition.Key == key.Value)
@@ -53,6 +43,6 @@ public sealed class GetRuleDefinitionHandler(
             cancellationToken);
         return definition is null
             ? RuleDefinitionFailures.NotFound<RuleDefinitionDetailDto>()
-            : RuleContractMapper.ToDetailDto(definition, manageDecision.IsAllowed);
+            : RuleContractMapper.ToDetailDto(definition, canManage: true);
     }
 }

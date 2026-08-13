@@ -167,6 +167,50 @@ public sealed class AxisMcpToolTests
     }
 
     [Fact]
+    public async Task IdentityTools_WhenProductBuilderIsManaged_UseCurrentMembershipRevision()
+    {
+        RecordingHandler handler = new("{\"membershipRevision\":4}");
+        using HttpClient httpClient = new(handler)
+        {
+            BaseAddress = new Uri("https://localhost:5281/"),
+        };
+        AxisApiClient api = new(httpClient, new FixedAccessTokenProvider("test-token"));
+        AxisMcpIdentityTools tools = new(
+            api,
+            new Axis.Mcp.Configuration.AxisMcpMutationGuard(
+                Axis.Mcp.Configuration.AxisMcpOptions.Create(
+                    new Uri("https://localhost:5281/"),
+                    ".dev-certs/rootCA.pem",
+                    "write")));
+        Guid targetUserId = Guid.Parse("11111111-1111-1111-1111-111111111111");
+
+        await tools.GrantWorkspaceProductBuilderAsync(
+            targetUserId,
+            new ChangeWorkspaceProductBuilderInput(2),
+            TestContext.Current.CancellationToken);
+        Assert.Equal(HttpMethod.Post, handler.Method);
+        Assert.Equal(
+            $"/api/workspace-product-builders/{targetUserId:D}/grant",
+            handler.RequestUri!.PathAndQuery);
+        Assert.Equal("{\"expectedRevision\":2}", handler.RequestBody);
+        Assert.DoesNotContain("workspaceId", handler.RequestBody, StringComparison.Ordinal);
+
+        await tools.RevokeWorkspaceProductBuilderAsync(
+            targetUserId,
+            new ChangeWorkspaceProductBuilderInput(3),
+            TestContext.Current.CancellationToken);
+        Assert.Equal(
+            $"/api/workspace-product-builders/{targetUserId:D}/revoke",
+            handler.RequestUri!.PathAndQuery);
+        Assert.Equal("{\"expectedRevision\":3}", handler.RequestBody);
+
+        AxisMcpIdentityReadTools readTools = new(api);
+        await readTools.ListWorkspaceProductBuildersAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(HttpMethod.Get, handler.Method);
+        Assert.Equal("/api/workspace-product-builders", handler.RequestUri!.PathAndQuery);
+    }
+
+    [Fact]
     public async Task DeleteRuleBinding_WhenInvoked_SendsExpectedRevision()
     {
         RecordingHandler handler = new(string.Empty);

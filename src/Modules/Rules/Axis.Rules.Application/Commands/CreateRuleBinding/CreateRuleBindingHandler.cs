@@ -1,4 +1,3 @@
-using Axis.Authorization.Contracts;
 using Axis.Identity.Contracts;
 using Axis.Rules.Application.Repositories;
 using Axis.Rules.Application.Services;
@@ -15,7 +14,7 @@ namespace Axis.Rules.Application.Commands.CreateRuleBinding;
 public sealed class CreateRuleBindingHandler(
     ICurrentUser currentUser,
     ICurrentSubject currentSubject,
-    IProductAuthorizationService authorization,
+    IWorkspaceProductBuilderAuthorization authorization,
     IRuleDefinitionRepository definitionRepository,
     IRuleBindingRepository bindingRepository,
     IUnitOfWork unitOfWork)
@@ -32,10 +31,8 @@ public sealed class CreateRuleBindingHandler(
         if (key.IsFailure)
             return RuleDefinitionFailures.Invalid<RuleBindingDto>(key.Error);
 
-        ProductAuthorizationDecision decision = await RuleAuthorization.AuthorizeAsync(
-                authorization, workspaceId, currentSubject.Subject,
-                RuleProductActions.BindingManage, RuleProductActions.BindingResourceType,
-                key.Value.Value, null, cancellationToken);
+        WorkspaceProductBuilderDecision decision = await RuleAuthorization.AuthorizeAsync(
+            authorization, workspaceId, currentSubject.Subject, cancellationToken);
         if (!decision.IsAllowed)
             return RuleDefinitionFailures.Authorization<RuleBindingDto>(decision);
 

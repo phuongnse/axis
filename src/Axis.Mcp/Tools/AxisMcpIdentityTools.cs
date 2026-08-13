@@ -73,6 +73,36 @@ public sealed class AxisMcpIdentityTools(
             cancellationToken);
     }
 
+    [McpServerTool(Name = "axis_grant_workspace_product_builder")]
+    [Description("[WRITE] Grant generic Product Builder authority to another active human member in the authenticated Workspace. The current membership revision is required.")]
+    public Task<string> GrantWorkspaceProductBuilderAsync(
+        Guid userId,
+        ChangeWorkspaceProductBuilderInput input,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(input);
+        mutationGuard.EnsureEnabled("GrantWorkspaceProductBuilder");
+        return api.PostJsonAsync(
+            $"api/workspace-product-builders/{userId:D}/grant",
+            new ChangeWorkspaceProductBuilderRequest(input.ExpectedRevision),
+            cancellationToken);
+    }
+
+    [McpServerTool(Name = "axis_revoke_workspace_product_builder")]
+    [Description("[WRITE/DESTRUCTIVE] Revoke generic Product Builder authority from another active human member in the authenticated Workspace. The current membership revision is required.")]
+    public Task<string> RevokeWorkspaceProductBuilderAsync(
+        Guid userId,
+        ChangeWorkspaceProductBuilderInput input,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(input);
+        mutationGuard.EnsureEnabled("RevokeWorkspaceProductBuilder");
+        return api.PostJsonAsync(
+            $"api/workspace-product-builders/{userId:D}/revoke",
+            new ChangeWorkspaceProductBuilderRequest(input.ExpectedRevision),
+            cancellationToken);
+    }
+
     [McpServerTool(Name = "axis_update_language_preference")]
     [Description("[WRITE] Update the authenticated user's language preference. The user and workspace are derived from OAuth claims.")]
     public Task<string> UpdateLanguagePreferenceAsync(
@@ -106,11 +136,18 @@ public sealed class AxisMcpIdentityTools(
     private sealed record CreateOrganizationWorkspaceRequest(string Name);
     private sealed record InviteWorkspaceMemberRequest(string Email, string RequestedRole);
     private sealed record ChangeWorkspaceInvitationRequest(int ExpectedRevision);
+    private sealed record ChangeWorkspaceProductBuilderRequest(int ExpectedRevision);
 }
 
 [McpServerToolType]
 public sealed class AxisMcpIdentityReadTools(AxisApiClient api)
 {
+    [McpServerTool(Name = "axis_list_workspace_product_builders")]
+    [Description("[READ] List active human members and their generic Product Builder authority in the authenticated Workspace.")]
+    public Task<string> ListWorkspaceProductBuildersAsync(
+        CancellationToken cancellationToken = default) =>
+        api.GetJsonAsync("api/workspace-product-builders", cancellationToken);
+
     [McpServerTool(Name = "axis_list_workspace_invitations")]
     [Description("[READ] List non-secret invitation lifecycle outcomes for the active Organization Workspace. Authority is derived from OAuth claims.")]
     public Task<string> ListWorkspaceInvitationsAsync(

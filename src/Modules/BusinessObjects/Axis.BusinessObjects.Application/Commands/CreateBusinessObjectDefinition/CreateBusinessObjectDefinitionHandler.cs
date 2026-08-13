@@ -1,4 +1,3 @@
-using Axis.Authorization.Contracts;
 using Axis.BusinessObjects.Application.Repositories;
 using Axis.BusinessObjects.Application.Services;
 using Axis.BusinessObjects.Domain.Aggregates;
@@ -14,7 +13,7 @@ namespace Axis.BusinessObjects.Application.Commands.CreateBusinessObjectDefiniti
 public sealed class CreateBusinessObjectDefinitionHandler(
     ICurrentUser currentUser,
     ICurrentSubject currentSubject,
-    IProductAuthorizationService authorization,
+    IWorkspaceProductBuilderAuthorization authorization,
     IBusinessObjectDefinitionRepository repository,
     IUnitOfWork unitOfWork)
     : ICommandHandler<CreateBusinessObjectDefinitionCommand, BusinessObjectDefinitionDetailDto>
@@ -32,14 +31,10 @@ public sealed class CreateBusinessObjectDefinitionHandler(
         if (key.IsFailure)
             return BusinessObjectDefinitionFailures.Invalid<BusinessObjectDefinitionDetailDto>(key.Error);
 
-        ProductAuthorizationDecision decision = await BusinessObjectAuthorization.AuthorizeAsync(
+        WorkspaceProductBuilderDecision decision = await BusinessObjectAuthorization.AuthorizeBuilderAsync(
             authorization,
             workspaceId,
             currentSubject.Subject,
-            BusinessObjectProductActions.DefinitionManage,
-            BusinessObjectProductActions.DefinitionResourceType,
-            key.Value.Value,
-            command.CorrelationId,
             cancellationToken);
         if (!decision.IsAllowed)
             return BusinessObjectDefinitionFailures.Authorization<BusinessObjectDefinitionDetailDto>(decision);

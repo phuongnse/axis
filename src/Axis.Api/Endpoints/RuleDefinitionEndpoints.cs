@@ -1,7 +1,6 @@
 using Axis.Api.Authorization;
 using Axis.Api.Extensions;
 using Axis.Api.Middleware;
-using Axis.Authorization.Contracts;
 using Axis.Identity.Contracts;
 using Axis.Rules.Application;
 using Axis.Rules.Application.Commands.ActivateRuleDefinitionVersion;
@@ -192,14 +191,16 @@ public static class RuleDefinitionEndpoints
             .Produces<RuleAuthoringProjectionDto>()
             .ProducesProblem(400)
             .ProducesProblem(401)
-            .ProducesProblem(403);
+            .ProducesProblem(403)
+            .ProducesProblem(StatusCodes.Status503ServiceUnavailable);
 
         group.MapPost("/authoring/complete", CompleteAuthoring)
             .WithName("CompleteRuleAuthoring")
             .WithSummary("Complete the rule authoring language at a cursor position")
             .Produces<IReadOnlyList<RuleAuthoringCompletionDto>>()
             .ProducesProblem(401)
-            .ProducesProblem(403);
+            .ProducesProblem(403)
+            .ProducesProblem(StatusCodes.Status503ServiceUnavailable);
 
         return app;
     }
@@ -238,8 +239,7 @@ public static class RuleDefinitionEndpoints
     private static async Task<IResult> Actions(
         ICurrentUser currentUser,
         ICurrentSubject currentSubject,
-        IProductAuthorizationService authorization,
-        HttpContext context,
+        IWorkspaceProductBuilderAuthorization authorization,
         CancellationToken cancellationToken)
     {
         if (currentUser.workspaceId is not Guid workspaceId)
@@ -248,22 +248,25 @@ public static class RuleDefinitionEndpoints
                 "Current workspace scope is required.",
                 RulesProblemCodes.WorkspaceScopeRequired).ToProblemDetails();
 
-        ProductAuthorizationDecision decision = await RuleAuthorization.AuthorizeAsync(
+        WorkspaceProductBuilderDecision decision = await RuleAuthorization.AuthorizeAsync(
             authorization,
             workspaceId,
             currentSubject.Subject,
-            RuleProductActions.DefinitionManage,
-            RuleProductActions.DefinitionResourceType,
-            resourceKey: null,
-            CorrelationId(context),
             cancellationToken);
 
-        return decision.IsUnavailable
-            ? Result.Failure<RuleDefinitionCollectionActionsDto>(
-                ErrorCodes.Unavailable,
-                "Product authorization is temporarily unavailable.",
-                RulesProblemCodes.AuthorizationUnavailable).ToProblemDetails()
-            : Results.Ok(new RuleDefinitionCollectionActionsDto(decision.IsAllowed));
+        if (!decision.IsAllowed)
+        {
+            return decision.IsUnavailable
+                ? Result.Failure<RuleDefinitionCollectionActionsDto>(
+                    ErrorCodes.Unavailable,
+                    "Product Builder authorization is temporarily unavailable.",
+                    RulesProblemCodes.AuthorizationUnavailable).ToProblemDetails()
+                : Result.Failure<RuleDefinitionCollectionActionsDto>(
+                    ErrorCodes.Forbidden,
+                    "Product Builder authority is required.").ToProblemDetails();
+        }
+
+        return Results.Ok(new RuleDefinitionCollectionActionsDto(true));
     }
 
     private static async Task<IResult> GetExpressionLanguage(
@@ -398,23 +401,77 @@ public static class RuleDefinitionEndpoints
         return result.IsFailure ? result.ToProblemDetails() : Results.Ok(result.Value);
     }
 
-    private static IResult ProjectAuthoring(
+    private static async Task<IResult> ProjectAuthoring(
         [FromBody] ProjectRuleAuthoringRequest request,
-        RuleAuthoringLanguageService authoring) =>
-        Results.Ok(authoring.Project(
+        ICurrentUser currentUser,
+        ICurrentSubject currentSubject,
+        IWorkspaceProductBuilderAuthorization authorization,
+        RuleAuthoringLanguageService authoring,
+        CancellationToken cancellationToken)
+    {
+        Result? failure = await AuthorizeProductBuilderAsync(
+            currentUser, currentSubject, authorization, cancellationToken);
+        if (failure is not null)
+            return failure.ToProblemDetails();
+
+        return Results.Ok(authoring.Project(
             request.Source,
             request.Inputs,
             request.ExpressionLanguageVersion,
             request.Language));
+    }
 
-    private static IResult CompleteAuthoring(
+    private static async Task<IResult> CompleteAuthoring(
         [FromBody] CompleteRuleAuthoringRequest request,
-        RuleAuthoringLanguageService authoring) =>
-        Results.Ok(authoring.Complete(
+        ICurrentUser currentUser,
+        ICurrentSubject currentSubject,
+        IWorkspaceProductBuilderAuthorization authorization,
+        RuleAuthoringLanguageService authoring,
+        CancellationToken cancellationToken)
+    {
+        Result? failure = await AuthorizeProductBuilderAsync(
+            currentUser, currentSubject, authorization, cancellationToken);
+        if (failure is not null)
+            return failure.ToProblemDetails();
+
+        return Results.Ok(authoring.Complete(
             request.Text,
             request.Cursor,
             request.Inputs,
             request.ExpressionLanguageVersion));
+    }
+
+    private static async Task<Result?> AuthorizeProductBuilderAsync(
+        ICurrentUser currentUser,
+        ICurrentSubject currentSubject,
+        IWorkspaceProductBuilderAuthorization authorization,
+        CancellationToken cancellationToken)
+    {
+        if (currentUser.workspaceId is not Guid workspaceId)
+        {
+            return Result.Failure(
+                ErrorCodes.Forbidden,
+                "Current workspace scope is required.",
+                RulesProblemCodes.WorkspaceScopeRequired);
+        }
+
+        WorkspaceProductBuilderDecision decision = await RuleAuthorization.AuthorizeAsync(
+            authorization,
+            workspaceId,
+            currentSubject.Subject,
+            cancellationToken);
+        if (decision.IsAllowed)
+            return null;
+
+        return decision.IsUnavailable
+            ? Result.Failure(
+                ErrorCodes.Unavailable,
+                "Product Builder authorization is temporarily unavailable.",
+                RulesProblemCodes.AuthorizationUnavailable)
+            : Result.Failure(
+                ErrorCodes.Forbidden,
+                "Product Builder authority is required.");
+    }
 
     private static string CorrelationId(HttpContext context) =>
         context.Items.TryGetValue(CorrelationIdMiddleware.HttpContextItemKey, out object? value) && value is string correlationId

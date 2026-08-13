@@ -11,6 +11,7 @@ using Axis.Authorization.Infrastructure.Persistence;
 using Axis.BusinessObjects.Infrastructure.Persistence;
 using Axis.Identity.Application.Repositories;
 using Axis.Identity.Application.Services;
+using Axis.Identity.Contracts;
 using Axis.Identity.Domain.Aggregates;
 using Axis.Identity.Infrastructure.Persistence;
 using Axis.Identity.Infrastructure.Repositories;
@@ -39,12 +40,12 @@ public sealed class ApiTestFixture : IAsyncLifetime
 {
     private readonly ConcurrentDictionary<(Guid WorkspaceId, Guid SubjectId), Func<ProductAuthorizationRequest, ProductAuthorizationDecision>>
         _productAuthorizationTestAccess = new();
-    private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder()
-        .WithImage("postgres:16-alpine")
+    private readonly ConcurrentDictionary<(Guid WorkspaceId, Guid SubjectId), WorkspaceProductBuilderDecision>
+        _productBuilderTestAccess = new();
+    private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:16-alpine")
         .Build();
 
-    private readonly RedisContainer _redis = new RedisBuilder()
-        .WithImage("redis:7-alpine")
+    private readonly RedisContainer _redis = new RedisBuilder("redis:7-alpine")
         .Build();
 
     private readonly DirectoryInfo _dataProtectionKeysDirectory = new(
@@ -177,6 +178,9 @@ public sealed class ApiTestFixture : IAsyncLifetime
 
             builder.ConfigureTestServices(services =>
             {
+                ServiceDescriptor productBuilderDescriptor = services.Last(descriptor =>
+                    descriptor.ServiceType == typeof(IWorkspaceProductBuilderAuthorization));
+
                 services.AddDataProtection()
                     .PersistKeysToFileSystem(_dataProtectionKeysDirectory)
                     .SetApplicationName("Axis.Api.Tests");
@@ -231,6 +235,12 @@ public sealed class ApiTestFixture : IAsyncLifetime
                             provider.GetRequiredService<TimeProvider>()),
                         provider.GetRequiredService<IProductActionDescriptorRegistry>(),
                         _productAuthorizationTestAccess));
+
+                services.RemoveAll<IWorkspaceProductBuilderAuthorization>();
+                services.AddScoped<IWorkspaceProductBuilderAuthorization>(provider =>
+                    new OptInWorkspaceProductBuilderAuthorization(
+                        CreateService<IWorkspaceProductBuilderAuthorization>(productBuilderDescriptor, provider),
+                        _productBuilderTestAccess));
 
                 ServiceDescriptor? openIddictSeederDescriptor = services.FirstOrDefault(
                     d => d.ImplementationType == typeof(OpenIddictSeeder));
@@ -365,6 +375,16 @@ public sealed class ApiTestFixture : IAsyncLifetime
             (user.GetProperty("workspaceId").GetGuid(), user.GetProperty("userId").GetGuid())] = decide;
     }
 
+    public async Task SetWorkspaceProductBuilderTestDecisionAsync(
+        WorkspaceProductBuilderDecision decision,
+        CancellationToken cancellationToken = default)
+    {
+        JsonElement session = await RefreshBrowserSecurityContextAsync(cancellationToken);
+        JsonElement user = session.GetProperty("user");
+        _productBuilderTestAccess[
+            (user.GetProperty("workspaceId").GetGuid(), user.GetProperty("userId").GetGuid())] = decision;
+    }
+
     public async Task<HttpResponseMessage> SendBrowserMutationAsync(
         HttpRequestMessage request,
         CancellationToken cancellationToken = default)
@@ -447,6 +467,35 @@ public sealed class ApiTestFixture : IAsyncLifetime
 
             return inner.AuthorizeAsync(request, cancellationToken);
         }
+    }
+
+    private sealed class OptInWorkspaceProductBuilderAuthorization(
+        IWorkspaceProductBuilderAuthorization inner,
+        ConcurrentDictionary<(Guid WorkspaceId, Guid SubjectId), WorkspaceProductBuilderDecision> access)
+        : IWorkspaceProductBuilderAuthorization
+    {
+        public Task<WorkspaceProductBuilderDecision> AuthorizeAsync(
+            Guid workspaceId,
+            Axis.Identity.Contracts.SubjectReference subject,
+            CancellationToken cancellationToken = default) =>
+            access.TryGetValue((workspaceId, subject.Id), out WorkspaceProductBuilderDecision decision)
+                ? Task.FromResult(decision)
+                : inner.AuthorizeAsync(workspaceId, subject, cancellationToken);
+    }
+
+    private static TService CreateService<TService>(
+        ServiceDescriptor descriptor,
+        IServiceProvider provider)
+        where TService : class
+    {
+        if (descriptor.ImplementationInstance is TService instance)
+            return instance;
+        if (descriptor.ImplementationFactory is not null)
+            return (TService)descriptor.ImplementationFactory(provider);
+        if (descriptor.ImplementationType is not null)
+            return (TService)ActivatorUtilities.CreateInstance(provider, descriptor.ImplementationType);
+
+        throw new InvalidOperationException($"Cannot construct {typeof(TService).Name} for the API test host.");
     }
 }
 

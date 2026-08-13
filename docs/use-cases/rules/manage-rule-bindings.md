@@ -4,11 +4,11 @@
 
 ## Purpose
 
-Let a workspace manage reusable connections between one exact published Rule version and any consumer target without making the Rule definition depend on that consumer.
+Let a Workspace Product Builder manage reusable connections between one exact published Rule version and any consumer target without making the Rule definition depend on that consumer.
 
 ## Primary actor
 
-- Signed-in workspace user managing a reusable Rule connection
+- Active human Workspace Product Builder managing a reusable Rule connection
 
 ## Supporting actors
 
@@ -18,6 +18,7 @@ Let a workspace manage reusable connections between one exact published Rule ver
 
 - An exact published Rule version is available to the current Workspace.
 - The consumer target and typed context contract are known without making them part of the Rule definition.
+- The user has an active current Workspace membership with explicit Product Builder authority.
 
 ## Trigger
 
@@ -60,14 +61,14 @@ Let a workspace manage reusable connections between one exact published Rule ver
 - **AC-006** Consumers persist binding IDs, supply a transient consumer-neutral context schema when attaching them, and use the public typed context adapter at runtime; Rules neither persists that schema nor depends on Object, Workflow, or another consumer domain type.
 - **AC-007** Binding evaluation maps explicit consumer sources into rule inputs and returns deterministic, typed, explainable outputs; consumers own authorization, transactions, and result handling.
 - **AC-008** Users can discover usage for an exact version from the Rules collection dialog, including target, trigger, priority, enabled state, and binding ID.
-- **AC-009** Binding lifecycle and usage are workspace-isolated and generated REST/OpenAPI contracts remain in parity with the SPA client.
+- **AC-009** Binding lifecycle and usage are Workspace-isolated, require Product Builder authority as their single authoring decision, and keep generated REST/OpenAPI contracts in parity with the SPA client.
 
 ## Acceptance Test Matrix
 
 | ID | Boundary | Scenario | Covers AC | Verification | Required |
 |---|---|---|---|---|---|
 | AT-001 | Domain boundary | Binding creation, exact-version identity, target neutrality, mapping invariants, and stale revision rejection | AC-001, AC-002, AC-003, AC-005 | Domain test | Yes |
-| AT-002 | Application boundary | Binding create/update/delete and exact-version usage discovery are workspace-isolated and independent of definition lifecycle | AC-001, AC-004, AC-005, AC-009 | Application test | Yes |
+| AT-002 | Application boundary | Binding create/update/delete and exact-version usage discovery are Product-Builder-only, reject non-builder and cross-Workspace access, and remain independent of definition lifecycle | AC-001, AC-004, AC-005, AC-009 | Application test | Yes |
 | AT-003 | Application boundary | Neutral consumer typed context maps through a binding into the pure evaluator with deterministic result forwarding | AC-006, AC-007 | Application test | Yes |
 | AT-004 | Infrastructure boundary | Bindings persist with JSON mappings, concurrency, and target/version indexes through the Rules migration | AC-001, AC-002, AC-009 | Infrastructure integration test | Yes |
 | AT-005 | API boundary | CRUD and exact-version usage endpoints expose generated DTO parity and retain the definition after binding deletion | AC-001, AC-004, AC-008, AC-009 | API integration test | Yes |
@@ -106,4 +107,4 @@ Required UI quality: use existing shadcn/Tailwind primitives, preserve filters, 
 >
 > **Verification:** AT-001 through AT-007 are mapped to current domain, application, infrastructure, API, architecture, and focused frontend evidence in the sibling sidecar; the recorded suites pass at the current checkpoint.
 >
-> **Decisions:** A binding is independently manageable Rules data tied to one exact version and opaque consumer target. New or retargeted bindings require current eligibility, while existing exact-version maintenance and historical evaluation follow the stated lifecycle outcomes. [Rules architecture](../../ARCHITECTURE.md#rules-boundary) owns storage, consumer separation, and typed-context realization.
+> **Decisions:** A binding is independently manageable Rules data tied to one exact version and opaque consumer target. Identity-owned Product Builder authority governs its human authoring lifecycle independently of installed product policy. New or retargeted bindings require current eligibility, while existing exact-version maintenance and historical evaluation follow the stated lifecycle outcomes. [Rules architecture](../../ARCHITECTURE.md#rules-boundary) owns storage, consumer separation, and typed-context realization.

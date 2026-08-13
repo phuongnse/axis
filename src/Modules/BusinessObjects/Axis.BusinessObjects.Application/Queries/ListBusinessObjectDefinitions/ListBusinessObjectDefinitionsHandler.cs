@@ -12,6 +12,7 @@ namespace Axis.BusinessObjects.Application.Queries.ListBusinessObjectDefinitions
 public sealed class ListBusinessObjectDefinitionsHandler(
     ICurrentUser currentUser,
     ICurrentSubject currentSubject,
+    IWorkspaceProductBuilderAuthorization productBuilderAuthorization,
     IProductAuthorizationService authorization,
     IBusinessObjectDefinitionRepository repository)
     : IQueryHandler<ListBusinessObjectDefinitionsQuery, Result<PagedResult<BusinessObjectDefinitionListItemDto>>>
@@ -25,21 +26,17 @@ public sealed class ListBusinessObjectDefinitionsHandler(
         if (currentSubject.Subject.Id == Guid.Empty || !Enum.IsDefined(currentSubject.Subject.Kind))
             return BusinessObjectDefinitionFailures.MissingUser<PagedResult<BusinessObjectDefinitionListItemDto>>();
 
-        ProductAuthorizationDecision decision = await BusinessObjectAuthorization.AuthorizeAsync(
-            authorization,
+        WorkspaceProductBuilderDecision builderDecision = await BusinessObjectAuthorization.AuthorizeBuilderAsync(
+            productBuilderAuthorization,
             workspaceId,
             currentSubject.Subject,
-            BusinessObjectProductActions.DefinitionRead,
-            BusinessObjectProductActions.DefinitionResourceType,
-            null,
-            query.CorrelationId,
             cancellationToken);
-        bool publishedOnly = !decision.IsAllowed;
-        if (decision.IsUnavailable)
-            return BusinessObjectDefinitionFailures.Authorization<PagedResult<BusinessObjectDefinitionListItemDto>>(decision);
+        bool publishedOnly = !builderDecision.IsAllowed;
+        if (builderDecision.IsUnavailable)
+            return BusinessObjectDefinitionFailures.Authorization<PagedResult<BusinessObjectDefinitionListItemDto>>(builderDecision);
         if (publishedOnly)
         {
-            decision = await BusinessObjectAuthorization.AuthorizeAsync(
+            ProductAuthorizationDecision publishedReadDecision = await BusinessObjectAuthorization.AuthorizeAsync(
                 authorization,
                 workspaceId,
                 currentSubject.Subject,
@@ -48,9 +45,9 @@ public sealed class ListBusinessObjectDefinitionsHandler(
                 null,
                 query.CorrelationId,
                 cancellationToken);
+            if (!publishedReadDecision.IsAllowed)
+                return BusinessObjectDefinitionFailures.Authorization<PagedResult<BusinessObjectDefinitionListItemDto>>(publishedReadDecision);
         }
-        if (!decision.IsAllowed)
-            return BusinessObjectDefinitionFailures.Authorization<PagedResult<BusinessObjectDefinitionListItemDto>>(decision);
 
         int totalCount = await repository.CountForWorkspaceAsync(
             workspaceId,

@@ -77,6 +77,7 @@
 - Keep [scripts/hooks/pre-push](../../scripts/hooks/pre-push) non-executable in the worktree; installation writes the executable copy under `.git/hooks`.
 - Deterministic guards must parse explicit structure, configuration, graphs, source symbols, or executable behavior. Do not infer semantic compliance from prose keywords, fragments, or wording.
 - New deterministic guards encode reusable current invariants. Keep incident details in regression fixtures, not guard rules or retired artifact names.
+- Clean cutovers over finite contracts use exact positive assertions for the current registry, package contents, dependency graph, or wire surface; unexpected extras fail generically. The one-time retired-identifier sweep stays in task or review evidence and is never copied into repository tests, fixtures, scripts, or guidance.
 - Command tests prove supported subcommands and current behavior.
 - Removed or renamed commands, markers, headings, and artifacts get a one-time `rg` sweep plus current owner links, not permanent denylist checks.
 - Diff-aware checks include PR range plus staged, unstaged, and untracked files.

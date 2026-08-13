@@ -16,7 +16,6 @@ using Axis.Identity.Domain.Aggregates;
 using Axis.Identity.Domain.ValueObjects;
 using Axis.Identity.Infrastructure.Persistence;
 using Axis.Identity.Infrastructure.Services;
-using Axis.Rules.Application;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using BusinessObjectRecordId = Axis.BusinessObjects.Domain.ValueObjects.BusinessObjectRecordId;
@@ -168,7 +167,7 @@ public sealed class ServiceIdentityTokenFlowTests(ApiTestFixture fixture)
         using HttpResponseMessage ruleReadResponse = await client.SendAsync(
             ruleRead,
             cancellationToken);
-        ruleReadResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        ruleReadResponse.StatusCode.Should().Be(HttpStatusCode.Forbidden);
 
         using HttpRequestMessage ungovernedRuleRoute = new(
             HttpMethod.Post,
@@ -310,13 +309,7 @@ public sealed class ServiceIdentityTokenFlowTests(ApiTestFixture fixture)
                 BusinessObjectProductActions.RecordCreate,
                 BusinessObjectProductActions.RecordResourceType,
                 "loan_application",
-                ProductActionScope.Own),
-             new(
-                 "ServiceCreator",
-                 RuleProductActions.DefinitionRead,
-                 RuleProductActions.DefinitionResourceType,
-                 null,
-                 ProductActionScope.None)]);
+                ProductActionScope.Own)]);
         ProductPolicyInstallResult policyResult = await policies.InstallAsync(
             new InstallProductPolicyRequest(
                 serviceIdentity.WorkspaceId,

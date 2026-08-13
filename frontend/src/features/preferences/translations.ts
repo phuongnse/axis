@@ -157,7 +157,7 @@ export const translations = {
     'memberships.deliveryPending': 'Pending delivery',
     'memberships.deliveryQueued': 'A recoverable invitation delivery has been queued.',
     'memberships.description':
-      'Invite real users and review non-secret invitation lifecycle outcomes for the active Workspace.',
+      'Manage active members, independent Product Builder authority, and invitation outcomes for this Workspace.',
     'memberships.discardInvite': 'Discard invitation',
     'memberships.discardInviteDescription':
       'The recipient and Workspace role entered in this window will be lost.',
@@ -179,6 +179,48 @@ export const translations = {
     'memberships.loadFailedDescription': 'Retry the current Workspace invitation list.',
     'memberships.nav': 'Memberships',
     'memberships.notAvailable': 'Not available',
+    'memberships.invitationsTab': 'Invitations',
+    'memberships.membersTab': 'Members',
+    'memberships.productBuilder': 'Product Builder',
+    'memberships.productBuilderActionFailed': 'Product Builder action failed',
+    'memberships.productBuilderActive': 'Granted',
+    'memberships.productBuilderChanged': 'Membership changed',
+    'memberships.productBuilderChangedDescription':
+      'Reload the current member revision before trying again.',
+    'memberships.productBuilderDescription':
+      'Product Builder is independent of the Workspace lifecycle role and installed product roles.',
+    'memberships.productBuilderEmpty': 'No active Workspace members',
+    'memberships.productBuilderEmptyDescription':
+      'Active human members will appear here when they join this Workspace.',
+    'memberships.productBuilderForbiddenDescription':
+      'Only an active Workspace administrator can change another active member.',
+    'memberships.productBuilderGrant': 'Grant Product Builder',
+    'memberships.productBuilderGranted': 'Product Builder granted',
+    'memberships.productBuilderGrantedDescription':
+      'The member can use the Workspace product-authoring capability after authoritative refresh.',
+    'memberships.productBuilderGranting': 'Granting Product Builder…',
+    'memberships.productBuilderInactive': 'Not granted',
+    'memberships.productBuilderLoadFailed': 'Unable to load active members',
+    'memberships.productBuilderLoadFailedDescription':
+      'Retry the server-authoritative Product Builder list for this Workspace.',
+    'memberships.productBuilderMember': 'Member',
+    'memberships.productBuilderProtected': 'Authority protected',
+    'memberships.productBuilderProtectedDescription':
+      'You cannot change your own Product Builder authority from this surface.',
+    'memberships.productBuilderRevoke': 'Revoke Product Builder',
+    'memberships.productBuilderRevokeConfirmDescription':
+      'This member will lose product-authoring access immediately. Their Workspace role and installed product roles will not change.',
+    'memberships.productBuilderRevokeConfirmTitle': 'Revoke Product Builder?',
+    'memberships.productBuilderRevoked': 'Product Builder revoked',
+    'memberships.productBuilderRevokedDescription':
+      'Product-authoring access was removed without changing lifecycle or product roles.',
+    'memberships.productBuilderRevoking': 'Revoking Product Builder…',
+    'memberships.productBuilderSearch': 'Search active Workspace members',
+    'memberships.productBuilderTableLabel': 'Active Workspace member authoring authority',
+    'memberships.productBuilderUnavailable': 'Product Builder service unavailable',
+    'memberships.productBuilderUnavailableDescription':
+      'Required persistence or audit work could not be confirmed. Try again later.',
+    'memberships.productBuilderUnknownMember': 'Unavailable member',
     'memberships.rateLimited': 'Please wait',
     'memberships.rateLimitedDescription': 'This invitation action reached its current rate limit.',
     'memberships.recipientRemoved': 'Recipient details removed',
@@ -202,6 +244,7 @@ export const translations = {
     'memberships.statusExpired': 'Expired',
     'memberships.statusPending': 'Pending',
     'memberships.statusRevoked': 'Revoked',
+    'memberships.sections': 'Membership sections',
     'memberships.tableLabel': 'Workspace invitation outcomes',
     'memberships.title': 'Workspace memberships',
 
@@ -977,7 +1020,7 @@ export const translations = {
     'memberships.deliveryPending': 'Đang chờ gửi',
     'memberships.deliveryQueued': 'Công việc gửi lời mời có thể phục hồi đã được xếp hàng.',
     'memberships.description':
-      'Mời người dùng thật và xem trạng thái vòng đời không chứa bí mật của lời mời trong Workspace hiện tại.',
+      'Quản lý thành viên đang hoạt động, quyền Product Builder độc lập và kết quả lời mời của Workspace này.',
     'memberships.discardInvite': 'Bỏ lời mời',
     'memberships.discardInviteDescription':
       'Người nhận và vai trò Workspace đã nhập trong cửa sổ này sẽ bị mất.',
@@ -999,6 +1042,49 @@ export const translations = {
     'memberships.loadFailedDescription': 'Thử tải lại danh sách lời mời của Workspace hiện tại.',
     'memberships.nav': 'Thành viên',
     'memberships.notAvailable': 'Không có',
+    'memberships.invitationsTab': 'Lời mời',
+    'memberships.membersTab': 'Thành viên',
+    'memberships.productBuilder': 'Product Builder',
+    'memberships.productBuilderActionFailed': 'Thao tác Product Builder thất bại',
+    'memberships.productBuilderActive': 'Đã cấp',
+    'memberships.productBuilderChanged': 'Membership đã thay đổi',
+    'memberships.productBuilderChangedDescription':
+      'Tải lại revision hiện tại của thành viên trước khi thử lại.',
+    'memberships.productBuilderDescription':
+      'Product Builder độc lập với vai trò vòng đời Workspace và các vai trò sản phẩm đã cài đặt.',
+    'memberships.productBuilderEmpty': 'Không có thành viên Workspace đang hoạt động',
+    'memberships.productBuilderEmptyDescription':
+      'Thành viên con người đang hoạt động sẽ xuất hiện tại đây sau khi tham gia Workspace.',
+    'memberships.productBuilderForbiddenDescription':
+      'Chỉ quản trị viên Workspace đang hoạt động mới có thể thay đổi một thành viên đang hoạt động khác.',
+    'memberships.productBuilderGrant': 'Cấp Product Builder',
+    'memberships.productBuilderGranted': 'Đã cấp Product Builder',
+    'memberships.productBuilderGrantedDescription':
+      'Thành viên có thể dùng capability authoring sản phẩm của Workspace sau khi làm mới trạng thái từ server.',
+    'memberships.productBuilderGranting': 'Đang cấp Product Builder…',
+    'memberships.productBuilderInactive': 'Chưa cấp',
+    'memberships.productBuilderLoadFailed': 'Không tải được thành viên đang hoạt động',
+    'memberships.productBuilderLoadFailedDescription':
+      'Thử tải lại danh sách Product Builder do server xác nhận cho Workspace này.',
+    'memberships.productBuilderMember': 'Thành viên',
+    'memberships.productBuilderProtected': 'Quyền được bảo vệ',
+    'memberships.productBuilderProtectedDescription':
+      'Bạn không thể thay đổi quyền Product Builder của chính mình từ màn hình này.',
+    'memberships.productBuilderRevoke': 'Thu hồi Product Builder',
+    'memberships.productBuilderRevokeConfirmDescription':
+      'Thành viên này sẽ mất quyền authoring sản phẩm ngay lập tức. Vai trò Workspace và vai trò sản phẩm đã cài đặt của họ không thay đổi.',
+    'memberships.productBuilderRevokeConfirmTitle': 'Thu hồi Product Builder?',
+    'memberships.productBuilderRevoked': 'Đã thu hồi Product Builder',
+    'memberships.productBuilderRevokedDescription':
+      'Quyền authoring sản phẩm đã bị gỡ mà không thay đổi vai trò vòng đời hoặc vai trò sản phẩm.',
+    'memberships.productBuilderRevoking': 'Đang thu hồi Product Builder…',
+    'memberships.productBuilderSearch': 'Tìm thành viên Workspace đang hoạt động',
+    'memberships.productBuilderTableLabel':
+      'Quyền authoring của thành viên Workspace đang hoạt động',
+    'memberships.productBuilderUnavailable': 'Dịch vụ Product Builder không khả dụng',
+    'memberships.productBuilderUnavailableDescription':
+      'Không thể xác nhận công việc lưu trữ hoặc audit bắt buộc. Hãy thử lại sau.',
+    'memberships.productBuilderUnknownMember': 'Thành viên không khả dụng',
     'memberships.rateLimited': 'Vui lòng chờ',
     'memberships.rateLimitedDescription': 'Thao tác lời mời này đã đạt giới hạn hiện tại.',
     'memberships.recipientRemoved': 'Đã xóa thông tin người nhận',
@@ -1022,6 +1108,7 @@ export const translations = {
     'memberships.statusExpired': 'Đã hết hạn',
     'memberships.statusPending': 'Đang chờ',
     'memberships.statusRevoked': 'Đã thu hồi',
+    'memberships.sections': 'Các phần membership',
     'memberships.tableLabel': 'Kết quả lời mời Workspace',
     'memberships.title': 'Membership Workspace',
 

@@ -1,4 +1,3 @@
-using Axis.Authorization.Contracts;
 using Axis.Identity.Contracts;
 using Axis.Rules.Application.Repositories;
 using Axis.Rules.Application.Search;
@@ -27,13 +26,17 @@ internal sealed class RuleDefinitionHandlerTestContext
         CurrentUser.UserId.Returns(UserId);
         CurrentUser.workspaceId.Returns(WorkspaceId);
         CurrentSubject.Subject.Returns(SubjectReference.Human(UserId));
-        Authorization.AuthorizeAsync(Arg.Any<ProductAuthorizationRequest>(), Arg.Any<CancellationToken>())
-            .Returns(new ProductAuthorizationDecision(true, ProductActionScope.None));
+        Authorization.AuthorizeAsync(
+                Arg.Any<Guid>(),
+                Arg.Any<SubjectReference>(),
+                Arg.Any<CancellationToken>())
+            .Returns(WorkspaceProductBuilderDecision.Allowed);
     }
 
     public ICurrentUser CurrentUser { get; } = Substitute.For<ICurrentUser>();
     public ICurrentSubject CurrentSubject { get; } = Substitute.For<ICurrentSubject>();
-    public IProductAuthorizationService Authorization { get; } = Substitute.For<IProductAuthorizationService>();
+    public IWorkspaceProductBuilderAuthorization Authorization { get; } =
+        Substitute.For<IWorkspaceProductBuilderAuthorization>();
     public IRuleDefinitionRepository Repository { get; } = Substitute.For<IRuleDefinitionRepository>();
     public IRuleCatalogSearchProvider CatalogSearch { get; } = Substitute.For<IRuleCatalogSearchProvider>();
     public IRuleTextSearchProvider TextSearch { get; } = Substitute.For<IRuleTextSearchProvider>();

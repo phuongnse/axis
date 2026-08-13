@@ -1,6 +1,5 @@
 using Axis.Api.Authorization;
 using Axis.Api.Extensions;
-using Axis.Authorization.Contracts;
 using Axis.BusinessObjects.Application;
 using Axis.BusinessObjects.Application.Commands.CreateBusinessObjectDefinition;
 using Axis.BusinessObjects.Application.Commands.PublishBusinessObjectDefinition;
@@ -120,8 +119,7 @@ public static class BusinessObjectDefinitionEndpoints
     private static async Task<IResult> Actions(
         ICurrentUser currentUser,
         ICurrentSubject currentSubject,
-        IProductAuthorizationService authorization,
-        HttpContext context,
+        IWorkspaceProductBuilderAuthorization authorization,
         CancellationToken ct)
     {
         if (currentUser.workspaceId is not Guid workspaceId)
@@ -130,22 +128,25 @@ public static class BusinessObjectDefinitionEndpoints
                 "Current workspace scope is required.",
                 BusinessObjectsProblemCodes.WorkspaceScopeRequired).ToProblemDetails();
 
-        ProductAuthorizationDecision decision = await BusinessObjectAuthorization.AuthorizeAsync(
+        WorkspaceProductBuilderDecision decision = await BusinessObjectAuthorization.AuthorizeBuilderAsync(
             authorization,
             workspaceId,
             currentSubject.Subject,
-            BusinessObjectProductActions.DefinitionManage,
-            BusinessObjectProductActions.DefinitionResourceType,
-            resourceKey: null,
-            context.TraceIdentifier,
             ct);
 
-        return decision.IsUnavailable
-            ? Result.Failure<BusinessObjectDefinitionCollectionActionsDto>(
-                ErrorCodes.Unavailable,
-                "Product authorization is temporarily unavailable.",
-                BusinessObjectsProblemCodes.AuthorizationUnavailable).ToProblemDetails()
-            : Results.Ok(new BusinessObjectDefinitionCollectionActionsDto(decision.IsAllowed));
+        if (!decision.IsAllowed)
+        {
+            return Result.Failure<BusinessObjectDefinitionCollectionActionsDto>(
+                decision.IsUnavailable ? ErrorCodes.Unavailable : ErrorCodes.Forbidden,
+                decision.IsUnavailable
+                    ? "Product Builder authorization is temporarily unavailable."
+                    : "Product Builder authority is required.",
+                decision.IsUnavailable
+                    ? BusinessObjectsProblemCodes.AuthorizationUnavailable
+                    : BusinessObjectsProblemCodes.AccessDenied).ToProblemDetails();
+        }
+
+        return Results.Ok(new BusinessObjectDefinitionCollectionActionsDto(true));
     }
 
     private static async Task<IResult> Get(

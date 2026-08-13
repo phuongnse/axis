@@ -1,5 +1,6 @@
 using Axis.Identity.Application.Repositories;
 using Axis.Identity.Application.Services;
+using Axis.Identity.Contracts;
 using Axis.Identity.Infrastructure.Persistence;
 using Axis.Identity.Infrastructure.Repositories;
 using Axis.Identity.Infrastructure.Services;
@@ -35,6 +36,7 @@ public static class IdentityInfrastructureExtensions
         services.AddScoped<IOrganizationRepository, OrganizationRepository>();
         services.AddScoped<IOrganizationMembershipRepository, OrganizationMembershipRepository>();
         services.AddScoped<IWorkspaceMembershipRepository, WorkspaceMembershipRepository>();
+        services.AddScoped<IWorkspaceProductBuilderAuthorization, WorkspaceProductBuilderAuthorization>();
         services.AddScoped<IWorkspaceContextTransitionRepository, WorkspaceContextTransitionRepository>();
         services.AddScoped<IWorkspaceInvitationRepository, WorkspaceInvitationRepository>();
         services.AddScoped<IServiceIdentityRepository, ServiceIdentityRepository>();

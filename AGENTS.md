@@ -22,7 +22,7 @@ Do not invent IDs, endpoints, tables, or product behavior. If code and docs conf
 - Keep database schema changes migration-backed and reviewable.
 - Tech-stack changes need explicit approval and a [docs/TECH_STACK.md](./docs/TECH_STACK.md) update.
 - Before taking an alternate path after a failure, compare it with the owning contract's owner, required boundary, invariants, and evidence. If the path changes any of them merely to keep progressing instead of repairing the root cause, it is a workaround: stop and reopen the Design Gate rather than implement it.
-- Compatibility is a product constraint, not an automatic implementation goal. When the owning contract and current product phase require no compatibility, replace the old surface cleanly; do not add shims, dual paths, flags, fallback behavior, or ongoing tests and guidance that keep retired identifiers or concepts alive.
+- Compatibility is a product constraint, not an automatic implementation goal. When the owning contract and current product phase require no compatibility, replace the old surface cleanly; do not add shims, dual paths, flags, fallback behavior, or ongoing tests and guidance that keep retired identifiers or concepts alive. Protect finite replacement surfaces with exact positive invariants over the current registry, package, graph, or contract so extra entries fail without naming retired ones; keep the retired-identifier sweep as transient task or review evidence, never as a committed denylist.
 
 ## Operating Rules
 

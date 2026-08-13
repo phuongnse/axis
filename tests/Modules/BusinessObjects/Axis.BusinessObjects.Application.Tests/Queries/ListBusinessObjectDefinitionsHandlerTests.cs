@@ -2,6 +2,7 @@ using Axis.Authorization.Contracts;
 using Axis.BusinessObjects.Application;
 using Axis.BusinessObjects.Application.Queries.ListBusinessObjectDefinitions;
 using Axis.BusinessObjects.Domain.Aggregates;
+using Axis.Identity.Contracts;
 using Axis.Shared.Application;
 using Axis.Shared.Domain.Primitives;
 using FluentAssertions;
@@ -15,10 +16,10 @@ public sealed class ListBusinessObjectDefinitionsHandlerTests
     public async Task ListBusinessObjectDefinitions_WhenOnlyPublishedReadIsAllowed_FiltersBeforeMaterialization()
     {
         _context.Authorization.AuthorizeAsync(
-                Arg.Is<ProductAuthorizationRequest>(request =>
-                    request.ActionKey == BusinessObjectProductActions.DefinitionRead),
+                BusinessObjectDefinitionHandlerTestContext.WorkspaceId,
+                _context.CurrentSubject.Subject,
                 Arg.Any<CancellationToken>())
-            .Returns(ProductAuthorizationDecision.Denied);
+            .Returns(WorkspaceProductBuilderDecision.Denied);
         _context.Authorization.AuthorizeAsync(
                 Arg.Is<ProductAuthorizationRequest>(request =>
                     request.ActionKey == BusinessObjectProductActions.DefinitionReadPublished),
@@ -41,6 +42,7 @@ public sealed class ListBusinessObjectDefinitionsHandlerTests
         ListBusinessObjectDefinitionsHandler sut = new(
             _context.CurrentUser,
             _context.CurrentSubject,
+            _context.Authorization,
             _context.Authorization,
             _context.Repository);
 
@@ -83,6 +85,7 @@ public sealed class ListBusinessObjectDefinitionsHandlerTests
             _context.CurrentUser,
             _context.CurrentSubject,
             _context.Authorization,
+            _context.Authorization,
             _context.Repository);
 
         Result<PagedResult<BusinessObjectDefinitionListItemDto>> result = await sut.Handle(
@@ -94,5 +97,38 @@ public sealed class ListBusinessObjectDefinitionsHandlerTests
         result.Value.Page.Should().Be(1);
         result.Value.PageSize.Should().Be(20);
         result.Value.Items.Select(item => item.ObjectKey).Should().Equal("customer", "invoice");
+    }
+
+    [Fact]
+    public async Task ListBusinessObjectDefinitions_WhenBuilderAndPublishedReadAreDenied_ReturnsForbidden()
+    {
+        _context.Authorization.AuthorizeAsync(
+                Arg.Any<Guid>(),
+                Arg.Any<SubjectReference>(),
+                Arg.Any<CancellationToken>())
+            .Returns(WorkspaceProductBuilderDecision.Denied);
+        _context.Authorization.AuthorizeAsync(
+                Arg.Any<ProductAuthorizationRequest>(),
+                Arg.Any<CancellationToken>())
+            .Returns(ProductAuthorizationDecision.Denied);
+        ListBusinessObjectDefinitionsHandler sut = new(
+            _context.CurrentUser,
+            _context.CurrentSubject,
+            _context.Authorization,
+            _context.Authorization,
+            _context.Repository);
+
+        Result<PagedResult<BusinessObjectDefinitionListItemDto>> result = await sut.Handle(
+            new ListBusinessObjectDefinitionsQuery(1, 20),
+            TestContext.Current.CancellationToken);
+
+        result.ErrorCode.Should().Be(ErrorCodes.Forbidden);
+        await _context.Repository.DidNotReceive().ListForWorkspaceAsync(
+            Arg.Any<Guid>(),
+            Arg.Any<int>(),
+            Arg.Any<int>(),
+            Arg.Any<string?>(),
+            Arg.Any<bool>(),
+            TestContext.Current.CancellationToken);
     }
 }

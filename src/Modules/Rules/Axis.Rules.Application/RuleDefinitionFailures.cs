@@ -1,4 +1,4 @@
-using Axis.Authorization.Contracts;
+using Axis.Identity.Contracts;
 using Axis.Shared.Domain.Primitives;
 
 namespace Axis.Rules.Application;
@@ -23,7 +23,7 @@ internal static class RuleDefinitionFailures
     public static Result Forbidden() =>
         Result.Failure(ErrorCodes.Forbidden, "The requested rule operation is not allowed.");
 
-    public static Result<T> Authorization<T>(ProductAuthorizationDecision decision) =>
+    public static Result<T> Authorization<T>(WorkspaceProductBuilderDecision decision) =>
         decision.IsUnavailable
             ? Result.Failure<T>(
                 ErrorCodes.Unavailable,
@@ -31,7 +31,7 @@ internal static class RuleDefinitionFailures
                 RulesProblemCodes.AuthorizationUnavailable)
             : Forbidden<T>();
 
-    public static Result Authorization(ProductAuthorizationDecision decision) =>
+    public static Result Authorization(WorkspaceProductBuilderDecision decision) =>
         decision.IsUnavailable
             ? Result.Failure(
                 ErrorCodes.Unavailable,
