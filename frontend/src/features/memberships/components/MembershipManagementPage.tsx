@@ -9,11 +9,12 @@ import {
   type DataTableColumnDef,
   type DataTableDefinition,
   type DataTableQueryState,
+  DataTableRecordAction,
 } from '@/components/shared/data-table';
 import { useManagedWindowActions } from '@/components/shared/ManagedWindowManager';
 import { PageAction } from '@/components/shared/PageLayout';
 import { ResourceWorkspace } from '@/components/shared/ResourceWorkspace';
-import { StatusBadge, type StatusBadgeTone } from '@/components/shared/StatusBadge';
+import { StatusBadge, type StatusBadgeState } from '@/components/shared/StatusBadge';
 import type { WorkspaceInvitationLifecycleDto } from '@/lib/api-generated';
 import { workspaceInvitationsQueryOptions } from '../api';
 import {
@@ -57,13 +58,11 @@ export function MembershipManagementPage() {
         cell: ({ row }) => {
           const email = row.original.recipientEmail ?? t('memberships.recipientRemoved');
           return row.original.invitationId ? (
-            <PageAction
-              type="button"
-              variant="link"
+            <DataTableRecordAction
               onClick={() => openWindow(membershipInvitationWindowDescriptor(row.original, email))}
             >
               {email}
-            </PageAction>
+            </DataTableRecordAction>
           ) : (
             email
           );
@@ -86,7 +85,7 @@ export function MembershipManagementPage() {
         enableSorting: false,
         meta: { label: t('memberships.status') },
         cell: ({ row }) => (
-          <StatusBadge tone={statusTone(row.original.status)}>
+          <StatusBadge state={invitationState(row.original.status)}>
             {t(`memberships.status${row.original.status ?? 'Pending'}`)}
           </StatusBadge>
         ),
@@ -99,7 +98,7 @@ export function MembershipManagementPage() {
         enableSorting: false,
         meta: { label: t('memberships.delivery') },
         cell: ({ row }) => (
-          <StatusBadge tone={deliveryTone(row.original.deliveryStatus)}>
+          <StatusBadge state={deliveryState(row.original.deliveryStatus)}>
             {t(`memberships.delivery${row.original.deliveryStatus ?? 'Pending'}`)}
           </StatusBadge>
         ),
@@ -184,14 +183,17 @@ export function MembershipManagementPage() {
   );
 }
 
-function statusTone(status: string | undefined): StatusBadgeTone {
-  if (status === 'Accepted') return 'success';
-  if (status === 'Pending') return 'info';
-  return 'muted';
+function invitationState(status: string | undefined): StatusBadgeState {
+  if (status === 'Accepted') return 'positive';
+  if (status === 'Pending') return 'informative';
+  if (status === 'Expired') return 'caution';
+  if (status === 'Revoked') return 'inactive';
+  return 'neutral';
 }
 
-function deliveryTone(status: string | undefined): StatusBadgeTone {
-  if (status === 'Delivered') return 'success';
-  if (status === 'Pending') return 'info';
-  return 'muted';
+function deliveryState(status: string | undefined): StatusBadgeState {
+  if (status === 'Delivered') return 'positive';
+  if (status === 'Pending') return 'informative';
+  if (status === 'Failed') return 'critical';
+  return 'neutral';
 }

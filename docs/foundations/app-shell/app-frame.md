@@ -66,13 +66,13 @@ Account text uses the canonical Axis label and metadata roles; user-provided ide
 - **AC-001** Authenticated routes render page content inside the shared app frame.
 - **AC-002** The frame exposes a top bar with product identity, page context, and one account-actions entry point ordered as signed-in identity, one flat eligible-Workspace choice set, preferences, then spatially separated sign-out; option rows retain a leading scan axis while standalone section actions share centered geometry independent of tone.
 - **AC-003** The frame exposes footer app metadata with version information and Axis Platform copyright.
-- **AC-004** The complete Account surface uses canonical Axis typography, spacing, density, icon, tone, depth, motion, and state roles; long localized/user-provided content wraps without clipping, compact targets remain at least 44 CSS pixels high, desktop targets remain at least 32 CSS pixels high, and its light/dark × desktop/compact plus VI reflow candidates remain deterministic.
+- **AC-004** The complete Account surface uses canonical Axis typography, spacing, density, icon, tone, depth, motion, and state roles; long localized/user-provided content wraps without clipping, compact targets remain at least 44 CSS pixels high, desktop targets remain at least 32 CSS pixels high, and its light/dark × desktop/compact plus VI reflow captures remain deterministic.
 
 *Quality*
 - **AC-005** The frame fits supported desktop and mobile widths without horizontal page overflow, document-level scrolling, or a maximum content width on authenticated routes.
 - **AC-006** Visible frame copy uses the frontend translation layer.
 - **AC-007** The scoped Dashboard page and Account interaction preserve page title/language, landmarks, semantic names/roles/values, label-in-name, meaningful order, keyboard operation, visible/unobscured focus, status announcements, readable contrast, reduced motion, text spacing, and one-dimensional reflow; criterion-level applicability and retirement decisions are recorded without claiming product-wide certification.
-- **AC-008** The complete Authenticated Frame uses canonical Axis typography, spacing, density, icon, tone, depth, motion, and state roles; retains banner/navigation/main/contentinfo order, readable contrast, 32 CSS-pixel desktop and 44 CSS-pixel compact targets, viewport/document-scroll containment, and deterministic light/dark × desktop/compact plus VI reflow candidates.
+- **AC-008** The complete Authenticated Frame uses canonical Axis typography, spacing, density, icon, tone, depth, motion, and state roles; retains banner/navigation/main/contentinfo order, readable contrast, 32 CSS-pixel desktop and 44 CSS-pixel compact targets, viewport/document-scroll containment, and deterministic light/dark × desktop/compact plus VI reflow captures.
 
 ## Acceptance Test Matrix
 
@@ -115,12 +115,12 @@ Required UI quality: frame landmarks and controls must be keyboard-reachable, vi
 > | Frontend | Done |
 > | Tests | Done |
 >
-> **Implemented:** Authenticated routes render inside the shared App Frame with a stable header, responsive module-navigation boundary, full-width main/content-transition boundary, global layer hosts, and footer. The frame keeps visible copy localized, preserves an empty Dashboard route surface, contains document-level overflow, does not impose route-content width caps, and retains one semantic and responsive owner across light/dark, desktop/compact, and VI reflow modes. Account remains an independently enforced owner whose popup anatomy is unchanged by this review unit.
+> **Implemented:** Authenticated routes render inside the shared App Frame with a stable header, responsive module-navigation boundary, full-width main/content-transition boundary, global layer hosts, and footer. The frame keeps visible copy localized, preserves an empty Dashboard route surface, contains document-level overflow, does not impose route-content width caps, and retains one semantic and responsive owner across light/dark, desktop/compact, and VI reflow modes. Account remains an independently owned popup anatomy within the accepted theme review unit.
 >
-> **Gaps vs spec:** N/A for `authenticated-frame` and `account-surface`; both owners cover all current `axis-ui-v1` requirements and are enforced. Other surfaces remain governed by their independently owned contracts.
+> **Gaps vs spec:** None for `authenticated-frame` or `account-surface`; both have complete 18/18 accepted evidence and enforced ownership. Other surfaces remain governed by their independently owned contracts.
 >
 > **Deferred follow-ups:** N/A.
 >
-> **Verification:** Authenticated Frame component/runtime ownership, browser semantics, geometry, contrast, responsive overflow, document-scroll containment, localization, text spacing, five accepted version-controlled captures, and the scoped standards review are recorded with [the accepted assessment](./authenticated-frame.assessment.md). Account verification remains recorded separately in [its accepted assessment](./account-surface.assessment.md). A passing checker establishes trace integrity, not product-wide standards certification.
+> **Verification:** Authenticated Frame component/runtime ownership, browser semantics, geometry, contrast, responsive overflow, document-scroll containment, localization, text spacing, and five accepted captures are recorded with [the scoped assessment](./authenticated-frame.assessment.md). Account verification remains recorded separately in [its scoped assessment](./account-surface.assessment.md). A passing checker establishes trace integrity, not project-owner acceptance or product-wide standards certification.
 >
 > **Decisions:** App Frame is a foundation contract, not a use case. `AuthenticatedFrame` owns the product-neutral anatomy and semantic slots; `AppShell` is the application adapter that composes session, Workspace, navigation, and recovery state into those slots. Authenticated use cases may rely on its page chrome, frame structure, and document-scroll containment; route-specific layout, profile behavior, sign-out lifecycle, and global module navigation remain owned elsewhere. Global sidebar behavior is owned by [docs/foundations/app-shell/module-navigation.md](./module-navigation.md) and does not render before visible contributions exist.

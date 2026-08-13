@@ -9,6 +9,7 @@ import {
   type DataTableColumnDef,
   type DataTableDefinition,
   type DataTableQueryState,
+  DataTableRecordAction,
 } from '@/components/shared/data-table';
 import { useManagedWindowActions } from '@/components/shared/ManagedWindowManager';
 import { PageAction } from '@/components/shared/PageLayout';
@@ -57,9 +58,7 @@ export function ProductRoleAssignmentsPage() {
           const role = findRole(roles, row.original);
           return (
             <div className="min-w-0">
-              <PageAction
-                type="button"
-                variant="link"
+              <DataTableRecordAction
                 onClick={() =>
                   openWindow(
                     productRoleAssignmentWindowDescriptor(row.original, subject, role, title),
@@ -67,7 +66,7 @@ export function ProductRoleAssignmentsPage() {
                 }
               >
                 {title}
-              </PageAction>
+              </DataTableRecordAction>
               {subject?.secondaryLabel ? (
                 <p className="truncate text-xs text-muted-foreground">{subject.secondaryLabel}</p>
               ) : null}
@@ -118,7 +117,7 @@ export function ProductRoleAssignmentsPage() {
         minSize: 120,
         enableSorting: false,
         meta: { label: t('productRoles.status') },
-        cell: () => <StatusBadge tone="success">{t('productRoles.active')}</StatusBadge>,
+        cell: () => <StatusBadge state="positive">{t('productRoles.active')}</StatusBadge>,
       },
     ];
 

@@ -15,7 +15,7 @@ import {
   type ManagedWindowRendererRegistry,
   useCurrentManagedWindow,
 } from '@/components/shared/ManagedWindowManager';
-import { StatusBadge, type StatusBadgeTone } from '@/components/shared/StatusBadge';
+import { StatusBadge, type StatusBadgeState } from '@/components/shared/StatusBadge';
 import { StatusNotice, type StatusNoticeTone } from '@/components/shared/StatusNotice';
 import {
   AlertDialog,
@@ -296,7 +296,7 @@ function ServiceIdentityDialog({
         title={identity.clientId ?? t('serviceIdentities.notAvailable')}
         description={identity.id}
         titleAccessory={
-          <StatusBadge tone={active ? 'success' : 'muted'}>
+          <StatusBadge state={active ? 'positive' : 'inactive'}>
             {active ? t('serviceIdentities.active') : t('serviceIdentities.inactive')}
           </StatusBadge>
         }
@@ -475,7 +475,7 @@ function ServiceKey({
           <p className="break-all font-medium">{serviceKey.kid}</p>
           <p className="break-all text-xs text-muted-foreground">{serviceKey.thumbprint}</p>
         </div>
-        <StatusBadge tone={keyTone(serviceKey.status)}>
+        <StatusBadge state={keyState(serviceKey.status)}>
           {active ? t('serviceIdentities.active') : t('serviceIdentities.revokedStatus')}
         </StatusBadge>
       </div>
@@ -595,8 +595,8 @@ function readIdentity(descriptor: ManagedWindowDescriptor): ServiceIdentityDto |
   return identity?.id ? identity : null;
 }
 
-function keyTone(status: string | undefined): StatusBadgeTone {
-  return status === 'Active' ? 'success' : 'muted';
+function keyState(status: string | undefined): StatusBadgeState {
+  return status === 'Active' ? 'positive' : 'inactive';
 }
 
 function validatePublicJwk(

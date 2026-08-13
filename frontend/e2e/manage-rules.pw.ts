@@ -863,8 +863,10 @@ test('rule catalog exposes inputs and read-only built-in details', async ({ page
   await expect(details.getByText('customer.status')).toBeVisible();
   await expect(details.getByText('field-validation')).toBeVisible();
   const footer = page.locator('[data-slot="managed-dialog-footer"]');
-  await expect(footer.getByRole('button')).toHaveCount(1);
-  await expect(footer.getByRole('button', { name: 'Close' })).toBeVisible();
+  await expect(footer.getByRole('button', { name: 'Windows (1)' })).toBeVisible();
+  const footerActions = footer.locator('[data-slot="managed-dialog-footer-actions"]');
+  await expect(footerActions.getByRole('button')).toHaveCount(1);
+  await expect(footerActions.getByRole('button', { name: 'Close' })).toBeVisible();
   await details.getByRole('tab', { name: 'System info' }).click();
   await expect(details.getByText('field.required')).toBeVisible();
   await expect(details.getByText('Expression language')).toBeVisible();

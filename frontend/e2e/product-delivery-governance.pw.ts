@@ -559,6 +559,10 @@ test('solution management proves publish AT-005 and install AT-007 recovery', as
       await fulfillJson(route, 200, versions);
       return;
     }
+    if (request.method() === 'GET' && path === '/api/solutions/versions/solution-version-1') {
+      await fulfillJson(route, 200, version);
+      return;
+    }
     if (request.method() === 'GET' && path === '/api/solutions/installations') {
       await fulfillJson(route, 200, installation());
       return;
@@ -612,27 +616,33 @@ test('solution management proves publish AT-005 and install AT-007 recovery', as
   await expect(page.getByRole('heading', { name: 'Solutions', exact: true })).toBeVisible();
   await expect(page.locator('[data-slot="page-layout"]')).toHaveAttribute(
     'data-scroll-mode',
-    'route',
+    'contained',
   );
-  await expect(page.getByRole('heading', { name: 'Publish signed version' })).toHaveAttribute(
-    'data-slot',
-    'section-title',
-  );
+  const collection = page.getByRole('region', { name: 'Solution versions' });
+  await expect(collection).toBeVisible();
+  await expect(collection.getByRole('button', { name: 'Publish package' })).toBeVisible();
+  await expect(page.getByRole('tab')).toHaveCount(0);
   expect(
     await page.evaluate(
       () => document.documentElement.scrollHeight <= document.documentElement.clientHeight,
     ),
   ).toBe(true);
 
+  const publishEntry = page.getByRole('button', { name: 'Publish package' });
+  await publishEntry.focus();
+  await page.keyboard.press('Enter');
+  const publishWindow = page.getByRole('dialog', { name: 'Publish signed version' });
+  await expect(
+    publishWindow.locator('[data-axis-surface-contract="managed-task-window"]'),
+  ).toHaveAttribute('data-axis-surface-id', 'solution-delivery-windows');
+
   const packageBytes = 'signed-envelope-browser-evidence';
-  await page.getByLabel('Signed solution package').setInputFiles({
+  await publishWindow.getByLabel('Signed solution package').setInputFiles({
     name: 'invoice-operations.axis-solution',
     mimeType: 'application/vnd.dsse.envelope.v1+json',
     buffer: Buffer.from(packageBytes),
   });
-  const publishPackage = page
-    .getByLabel('Publish signed version')
-    .getByRole('button', { name: 'Publish package' });
+  const publishPackage = publishWindow.getByRole('button', { name: 'Publish package' });
   await publishPackage.focus();
   await page.keyboard.press('Enter');
   let confirmation = page.getByRole('alertdialog', { name: 'Publish this signed package?' });
@@ -655,7 +665,7 @@ test('solution management proves publish AT-005 and install AT-007 recovery', as
   ).toBeVisible();
   await expect(page.getByText('publisher-private-diagnostic')).toHaveCount(0);
   await expect(page.getByText(/Selected invoice-operations\.axis-solution/)).toBeVisible();
-  const retryPublish = page.getByRole('button', { name: 'Retry' });
+  const retryPublish = publishWindow.getByRole('button', { name: 'Retry' });
   await expect(retryPublish).toBeEnabled();
   await retryPublish.focus();
   await expect(retryPublish).toBeFocused();
@@ -666,23 +676,26 @@ test('solution management proves publish AT-005 and install AT-007 recovery', as
       'The exact immutable version already existed; its canonical safe result was returned.',
     ),
   ).toBeVisible();
-  const release = page.getByRole('region', { name: 'Selected release' });
-  await expect(release).toContainText('invoice-operations');
-  await expect(release).toContainText('1.0.0');
-  await expect(release).toContainText('package-sha256-safe-readback');
-  await expect(release).toContainText('axis-reference-publisher');
-  await expect(release).toContainText('publisher-key-2026-08');
-  await expect(release).toContainText('axis-openapi-sha256');
+  await expect(publishWindow).toContainText('invoice-operations');
+  await expect(publishWindow).toContainText('1.0.0');
+  await expect(publishWindow).toContainText('package-sha256-safe-readback');
+  await expect(publishWindow).toContainText('axis-reference-publisher');
+  await expect(publishWindow).toContainText('publisher-key-2026-08');
+  await expect(publishWindow).toContainText('axis-openapi-sha256');
   await expect(page.getByText(packageBytes)).toHaveCount(0);
 
-  const installVersion = page.getByRole('button', { name: 'Install version' });
+  await publishWindow.getByRole('button', { name: 'View release' }).click();
+  const release = page.getByRole('dialog', { name: 'invoice-operations 1.0.0' });
+  await expect(release).toContainText('Ordered component plan');
+
+  const installVersion = release.getByRole('button', { name: 'Install version' });
   await installVersion.focus();
   await page.keyboard.press('Enter');
   confirmation = page.getByRole('alertdialog', { name: 'Install this immutable version?' });
   await expect(confirmation).toContainText('invoice-operations 1.0.0');
   await confirmation.getByRole('button', { name: 'Install version' }).focus();
   await page.keyboard.press('Enter');
-  const progress = page.getByRole('region', { name: 'Installation progress' });
+  const progress = page.getByRole('dialog', { name: 'Installation · invoice-operations 1.0.0' });
   await expect(progress).toContainText('Failed');
   await expect(progress).toContainText('invoice-policy');
   await expect(progress).toContainText('Confirmed');
@@ -702,9 +715,11 @@ test('solution management proves publish AT-005 and install AT-007 recovery', as
   await expect(page.getByText('Resume accepted')).toBeVisible();
   await expect(progress).toContainText('Succeeded');
   await expect(progress.getByText('Confirmed')).toHaveCount(3);
-  const installations = page.getByRole('region', { name: 'Workspace installations' });
-  await expect(installations).toContainText('Installed');
-  await expect(installations).toContainText('Compliant');
+
+  await progress.getByRole('button', { name: 'Close' }).last().click();
+  await release.getByRole('button', { name: 'Close' }).last().click();
+  await expect(collection).toContainText('Installed');
+  await expect(collection).toContainText('Compliant');
 
   expect(publishedBytes).toEqual([packageBytes, packageBytes]);
   expect(publishContentTypes).toEqual([

@@ -4,6 +4,7 @@ import { membershipsManagedWindowRenderers } from '@/features/memberships';
 import { productRolesManagedWindowRenderers } from '@/features/product-roles';
 import { rulesManagedWindowRenderers } from '@/features/rules';
 import { serviceIdentitiesManagedWindowRenderers } from '@/features/service-identities';
+import { solutionsManagedWindowRenderers } from '@/features/solutions';
 
 export const managedWindowRenderers: ManagedWindowRendererRegistry = {
   ...businessObjectsManagedWindowRenderers,
@@ -11,4 +12,5 @@ export const managedWindowRenderers: ManagedWindowRendererRegistry = {
   ...productRolesManagedWindowRenderers,
   ...rulesManagedWindowRenderers,
   ...serviceIdentitiesManagedWindowRenderers,
+  ...solutionsManagedWindowRenderers,
 };

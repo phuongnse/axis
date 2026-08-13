@@ -238,7 +238,9 @@ async function expectEntrySurfaceScreenshot(
   await expect(surface).toHaveAttribute('data-axis-surface-contract', 'entry-surface');
   await expect(surface).toHaveAttribute('data-axis-surface-id', 'registration');
   await layout.evaluate((element) =>
-    Promise.all(element.getAnimations({ subtree: true }).map((animation) => animation.finished)),
+    Promise.allSettled(
+      element.getAnimations({ subtree: true }).map((animation) => animation.finished),
+    ),
   );
   await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
   await page.mouse.move(1, 1);

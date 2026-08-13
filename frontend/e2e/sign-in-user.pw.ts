@@ -9,6 +9,10 @@ interface LegalVersions {
   privacyVersion: string;
 }
 
+interface BrowserSession {
+  csrfToken?: string;
+}
+
 interface MaildevRecipient {
   address: string;
 }
@@ -34,11 +38,20 @@ async function getLegalVersions(request: APIRequestContext): Promise<LegalVersio
   return response.json();
 }
 
+async function bootstrapAntiforgery(request: APIRequestContext): Promise<string> {
+  const response = await request.get(`${apiURL}/api/auth/session`);
+  expect(response.ok()).toBe(true);
+  const session = (await response.json()) as BrowserSession;
+  if (!session.csrfToken) throw new Error('The browser session did not return a CSRF token.');
+  return session.csrfToken;
+}
+
 async function registerUserViaApi(request: APIRequestContext, email: string): Promise<void> {
   const legalVersions = await getLegalVersions(request);
   const response = await request.post(`${apiURL}/api/users/register`, {
     headers: {
       'Idempotency-Key': `e2e-sign-in-${crypto.randomUUID()}`,
+      'X-CSRF-TOKEN': await bootstrapAntiforgery(request),
     },
     data: {
       fullName: 'Sign In User',
@@ -49,7 +62,10 @@ async function registerUserViaApi(request: APIRequestContext, email: string): Pr
       acceptedPrivacyVersion: legalVersions.privacyVersion,
     },
   });
-  expect(response.ok()).toBe(true);
+  expect(
+    response.ok(),
+    `registration E2E seed failed (${response.status()}): ${await response.text()}`,
+  ).toBe(true);
 }
 
 async function waitForVerificationToken(
@@ -97,9 +113,13 @@ async function createVerifiedUser(request: APIRequestContext, email: string): Pr
   await registerUserViaApi(request, email);
   const token = await waitForVerificationToken(request, email);
   const response = await request.post(`${apiURL}/api/auth/verify-email`, {
+    headers: { 'X-CSRF-TOKEN': await bootstrapAntiforgery(request) },
     data: { token },
   });
-  expect(response.ok()).toBe(true);
+  expect(
+    response.ok(),
+    `verification E2E seed failed (${response.status()}): ${await response.text()}`,
+  ).toBe(true);
 }
 
 async function fillSignInForm(page: Page, email: string): Promise<void> {
@@ -110,10 +130,6 @@ async function fillSignInForm(page: Page, email: string): Promise<void> {
 async function expectAuthenticatedFrame(page: Page, userName: string): Promise<void> {
   await expect(page.getByRole('banner')).toContainText('Dashboard');
   await expect(page.getByRole('navigation', { name: 'Modules' })).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Business objects' })).toHaveAttribute(
-    'href',
-    '/business-objects',
-  );
   await expect(page.getByRole('main')).toHaveText('');
   await page.getByRole('button', { name: /Account menu/ }).click();
   await expect(page.getByText(userName).first()).toBeVisible();
@@ -143,13 +159,17 @@ function watchThemePreferenceWrites(page: Page): () => number {
   return () => writes;
 }
 
-function watchAuthorizationActivity(page: Page) {
+function watchBrowserSessionActivity(page: Page) {
+  let sessionRequests = 0;
   const statuses: number[] = [];
   const origins: string[] = [];
   const consoleErrors: string[] = [];
 
   page.on('request', (request) => {
     const url = new URL(request.url());
+    if (request.method() === 'GET' && url.pathname === '/api/auth/session') {
+      sessionRequests += 1;
+    }
     if (url.pathname === '/connect/authorize') {
       origins.push(url.origin);
     }
@@ -169,9 +189,10 @@ function watchAuthorizationActivity(page: Page) {
   });
 
   return {
+    browserSessionRequests: () => sessionRequests,
     consoleErrors: () => consoleErrors,
-    origins: () => origins,
-    statuses: () => statuses,
+    oauthOrigins: () => origins,
+    oauthStatuses: () => statuses,
   };
 }
 
@@ -228,21 +249,23 @@ test.describe('sign in user', () => {
     test.skip(!maildevURL, 'Set E2E_MAILDEV_URL to run sign-in-user email verification.');
 
     const email = uniqueEmail('sign001');
-    const authorization = watchAuthorizationActivity(page);
+    const sessionActivity = watchBrowserSessionActivity(page);
     const languageWrites = watchLanguagePreferenceWrites(page);
     const themeWrites = watchThemePreferenceWrites(page);
     await createVerifiedUser(request, email);
 
     await page.goto('/sign-in');
-    const webOrigin = new URL(page.url()).origin;
     await recordVisitedPaths(page);
     await fillSignInForm(page, email);
     await page.getByRole('button', { name: /sign in/i }).click();
 
     await expect(page).toHaveURL(/\/dashboard$/, { timeout: 30_000 });
     await expectAuthenticatedFrame(page, 'Sign In User');
-    expect(authorization.origins()).not.toHaveLength(0);
-    expect(new Set(authorization.origins())).toEqual(new Set([webOrigin]));
+    await expect.poll(() => getVisitedPaths(page)).not.toContain('/callback');
+    expect(sessionActivity.browserSessionRequests()).toBe(2);
+    expect(sessionActivity.oauthOrigins()).toEqual([]);
+    expect(sessionActivity.oauthStatuses()).toEqual([]);
+    expect(sessionActivity.consoleErrors()).toEqual([]);
     expect(languageWrites()).toBe(0);
     expect(themeWrites()).toBe(0);
   });
@@ -250,19 +273,21 @@ test.describe('sign in user', () => {
   test('AT-002 unauthenticated dashboard access routes to sign-in with registration link', async ({
     page,
   }) => {
-    const authorization = watchAuthorizationActivity(page);
+    const sessionActivity = watchBrowserSessionActivity(page);
     await page.goto('/dashboard');
 
     await expect(page).toHaveURL(/\/sign-in$/);
     await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible();
     await page.getByRole('link', { name: /create account/i }).click();
     await expect(page).toHaveURL(/\/register$/);
-    const authorizeCountBeforeHover = authorization.statuses().length;
+    const sessionCountBeforeHover = sessionActivity.browserSessionRequests();
     await page.getByRole('link', { name: 'Sign in' }).hover();
 
-    expect(authorization.statuses()).toEqual([302]);
-    expect(authorization.statuses()).toHaveLength(authorizeCountBeforeHover);
-    expect(authorization.consoleErrors()).toEqual([]);
+    expect(sessionCountBeforeHover).toBe(1);
+    expect(sessionActivity.browserSessionRequests()).toBe(sessionCountBeforeHover);
+    expect(sessionActivity.oauthOrigins()).toEqual([]);
+    expect(sessionActivity.oauthStatuses()).toEqual([]);
+    expect(sessionActivity.consoleErrors()).toEqual([]);
   });
 
   test('AT-006 unverified sign-in separates warning, resend action, and feedback', async ({
@@ -407,14 +432,16 @@ test.describe('sign in user', () => {
     test.skip(!maildevURL, 'Set E2E_MAILDEV_URL to run sign-in-user email verification.');
 
     const email = uniqueEmail('sign015');
-    const authorization = watchAuthorizationActivity(page);
+    const sessionActivity = watchBrowserSessionActivity(page);
     await createVerifiedUser(request, email);
 
     await page.goto('/');
     await expect(page).toHaveURL(/\/sign-in$/);
     await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible();
-    expect(authorization.statuses()).toEqual([302]);
-    expect(authorization.consoleErrors()).toEqual([]);
+    expect(sessionActivity.browserSessionRequests()).toBe(1);
+    expect(sessionActivity.oauthOrigins()).toEqual([]);
+    expect(sessionActivity.oauthStatuses()).toEqual([]);
+    expect(sessionActivity.consoleErrors()).toEqual([]);
 
     await fillSignInForm(page, email);
     await page.getByRole('button', { name: /sign in/i }).click();
@@ -427,5 +454,9 @@ test.describe('sign in user', () => {
     await expect(page).toHaveURL(/\/dashboard$/, { timeout: 30_000 });
     await expectAuthenticatedFrame(page, 'Sign In User');
     await expect.poll(() => getVisitedPaths(page)).not.toContain('/sign-in');
+    expect(sessionActivity.browserSessionRequests()).toBe(3);
+    expect(sessionActivity.oauthOrigins()).toEqual([]);
+    expect(sessionActivity.oauthStatuses()).toEqual([]);
+    expect(sessionActivity.consoleErrors()).toEqual([]);
   });
 });

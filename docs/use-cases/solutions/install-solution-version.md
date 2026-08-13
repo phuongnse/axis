@@ -101,13 +101,14 @@ Allow a current-Workspace lifecycle administrator to install one already publish
 
 | Surface | Required contract |
 |---|---|
-| Version selection | Shows only safe release identity/provenance/trust details and the target Workspace; unavailable, incompatible, untrusted, and revoked releases have no install action. |
-| Install preflight | Leads with the pinned version and Workspace, then presents the ordered component plan and explicit confirmation consequence. |
-| Operation progress | Shows current, confirmed, and pending entries as a sequence; progress is announced without focus theft and can be revisited after response loss. |
+| Collection selection | One primary solution-version table combines immutable release identity with current-Workspace provisioning, compliance, and operation state. Search state is shareable; selecting a release or an existing installation opens a stable task while preserving collection context. |
+| Version selection | The release task shows only safe identity/provenance/trust details and the target Workspace; unavailable, incompatible, untrusted, and revoked releases have no install action. |
+| Install preflight | The release task leads with the pinned version and Workspace, then presents the ordered component plan and explicit confirmation consequence. |
+| Operation progress | The installation task shows current, confirmed, and pending entries as an ordered sequence; progress is announced without focus theft and can be revisited from the installation collection after response loss. |
 | Result | Separates Installed, incomplete/recoverable, and `Noncompliant` outcomes. It exposes ordered safe component outcomes and the next permitted action, not raw package or signature material. |
 | Resume | Shows the existing operation identity and completed/pending entries before a resume action. A revoked publisher, unavailable dependency, or already-running operation explains why resume is unavailable. |
 
-Required UI quality: identity, plan, state, and recovery information are programmatically labelled; confirmation and resume have deliberate focus behavior; every progress/result state is keyboard and screen-reader inspectable; long component identities/hashes remain readable without compact-layout overflow; universal UI copy is localized; no raw package, signature material, secret, or cross-Workspace data is rendered.
+Required UI quality: the collection follows the [Collection Page](../../foundations/data-display/collection-page.md) contract and release/installation work follows the [Managed Dialog](../../foundations/overlays/managed-dialog.md) task contract; identity, plan, state, and recovery information are programmatically labelled; confirmation and resume have deliberate focus behavior; every progress/result state is keyboard and screen-reader inspectable; long component identities/hashes remain readable without compact-layout overflow; universal UI copy is localized; no raw package, signature material, secret, or cross-Workspace data is rendered.
 
 > **Implementation status**
 >

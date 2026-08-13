@@ -524,6 +524,7 @@ export function RuleEditorDialog({
     if (dirty) setDiscardOpen(true);
     else onOpenChange(false);
   };
+  const closeBusy = saveMutation.isPending || lifecycleMutation.isPending;
   return (
     <ManagedDialog
       surfaceId="rule-editor"
@@ -532,7 +533,7 @@ export function RuleEditorDialog({
         if (!nextOpen) requestClose();
       }}
       dirty={dirty}
-      closeDisabled={saveMutation.isPending || lifecycleMutation.isPending}
+      closeDisabled={closeBusy}
       title={
         !detailQuery.isError && detail?.name
           ? detail.name
@@ -545,12 +546,14 @@ export function RuleEditorDialog({
           <>
             <RuleOriginBadge origin={detail.origin} />
             <StatusBadge
-              tone={
+              state={
                 detail.status === 'Active'
-                  ? 'success'
+                  ? 'positive'
                   : detail.status === 'Archived'
-                    ? 'muted'
-                    : 'neutral'
+                    ? 'inactive'
+                    : detail.status === 'Inactive'
+                      ? 'inactive'
+                      : 'neutral'
               }
             >
               {detail.status}
@@ -560,7 +563,12 @@ export function RuleEditorDialog({
       }
       footer={
         readOnly ? (
-          <ManagedDialogAction type="button" variant="outline" onClick={() => onOpenChange(false)}>
+          <ManagedDialogAction
+            type="button"
+            variant="outline"
+            disabled={closeBusy}
+            onClick={requestClose}
+          >
             {t('app.close')}
           </ManagedDialogAction>
         ) : (

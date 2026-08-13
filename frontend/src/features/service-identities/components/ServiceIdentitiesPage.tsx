@@ -9,6 +9,7 @@ import {
   type DataTableColumnDef,
   type DataTableDefinition,
   type DataTableQueryState,
+  DataTableRecordAction,
 } from '@/components/shared/data-table';
 import { useManagedWindowActions } from '@/components/shared/ManagedWindowManager';
 import { PageAction } from '@/components/shared/PageLayout';
@@ -47,13 +48,11 @@ export function ServiceIdentitiesPage() {
         cell: ({ row }) => {
           const title = row.original.clientId ?? t('serviceIdentities.notAvailable');
           return (
-            <PageAction
-              type="button"
-              variant="link"
+            <DataTableRecordAction
               onClick={() => openWindow(serviceIdentityWindowDescriptor(row.original, title))}
             >
               {title}
-            </PageAction>
+            </DataTableRecordAction>
           );
         },
       },
@@ -74,7 +73,7 @@ export function ServiceIdentitiesPage() {
         enableSorting: false,
         meta: { label: t('serviceIdentities.status') },
         cell: ({ row }) => (
-          <StatusBadge tone={row.original.status === 'Active' ? 'success' : 'muted'}>
+          <StatusBadge state={row.original.status === 'Active' ? 'positive' : 'inactive'}>
             {row.original.status === 'Active'
               ? t('serviceIdentities.active')
               : t('serviceIdentities.inactive')}

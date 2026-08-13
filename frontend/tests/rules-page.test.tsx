@@ -543,6 +543,60 @@ describe('RulesPage', () => {
     expect(notice).not.toHaveTextContent('Private lifecycle detail');
   });
 
+  it('keeps the footer exit disabled while a lifecycle mutation is pending', async () => {
+    const user = userEvent.setup();
+    const lifecycleResponse = deferred<Response>();
+    const editableDetail = workspaceDetail();
+    vi.mocked(fetch).mockImplementation((input, init) => {
+      const url = input.toString();
+      if (url.endsWith('/rules/credit_threshold') && (!init?.method || init.method === 'GET')) {
+        return Promise.resolve(jsonResponse(editableDetail));
+      }
+      if (url.endsWith('/rules/credit_threshold/archive') && init?.method === 'POST') {
+        return lifecycleResponse.promise;
+      }
+      return Promise.resolve(respondForRules(input, init));
+    });
+
+    await renderWithRouter(<RulesPage />, { path: '/rules', authenticatedPath: 'rules' });
+    await user.click(
+      within(await screen.findByRole('region', { name: 'Rules catalog' })).getByRole('button', {
+        name: 'Credit threshold',
+      }),
+    );
+    const editor = await screen.findByRole('dialog', { name: 'Credit threshold' });
+    const footer = editor.querySelector<HTMLElement>('[data-slot="managed-dialog-footer"]');
+    expect(footer).not.toBeNull();
+    const cancel = within(footer as HTMLElement).getByRole('button', { name: 'Cancel' });
+    expect(cancel).toBeEnabled();
+
+    await user.click(within(editor).getByRole('button', { name: 'Archive' }));
+    const confirmation = await screen.findByRole('alertdialog', { name: 'Archive this rule?' });
+    await user.click(within(confirmation).getByRole('button', { name: 'Archive' }));
+
+    await waitFor(() => expect(cancel).toBeDisabled());
+    expect(editor).toBeVisible();
+
+    lifecycleResponse.resolve(
+      jsonResponse(
+        workspaceDetail({
+          ...editableDetail,
+          status: 'Archived',
+          actions: {
+            canEditDraft: false,
+            canCreateVersion: false,
+            canActivateVersion: false,
+            canDeactivate: false,
+            canArchive: false,
+          },
+        }),
+      ),
+    );
+    await waitFor(() =>
+      expect(within(footer as HTMLElement).getByRole('button', { name: 'Close' })).toBeEnabled(),
+    );
+  });
+
   it('composes the shared resource workspace for built-in and workspace rules', async () => {
     vi.mocked(fetch).mockImplementation((input) => Promise.resolve(respondForRules(input)));
 

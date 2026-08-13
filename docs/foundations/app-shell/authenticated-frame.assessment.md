@@ -6,7 +6,7 @@
 
 This is the criterion-level technical assessment for the complete `authenticated-frame` review unit. The evaluated page/process starts on the authenticated `/dashboard` page, whose main content intentionally remains empty, and covers the viewport shell, App Header outside the Account popup, module-navigation boundary, route-content/context-transition boundary, global managed-window and notification layers, and footer.
 
-The assessment does not absorb Account popup anatomy, module-navigation taxonomy or destination behavior, managed-task-window anatomy, notification content, Dashboard content, route-specific content, profile behavior, sign-out/session correctness, backend correctness, or product-wide certification. Those are different owners. The current outcome is **accepted and enforced for this scoped surface**.
+The assessment does not absorb Account popup anatomy, module-navigation taxonomy or destination behavior, managed-task-window anatomy, notification content, Dashboard content, route-specific content, profile behavior, sign-out/session correctness, backend correctness, or product-wide certification. Those are different owners. Theme-linked technical evidence and project-owner review are complete for this scoped surface.
 
 Normative and informative references:
 
@@ -24,10 +24,10 @@ Normative and informative references:
 | Appearance | Light and dark; deterministic reduced-motion media; rest and keyboard-focus states; component evidence for pending, obscured, blocked, recovery, and persistent-layer states |
 | Content | Canonical EN plus VI; long signed-in identity; WCAG text-spacing overrides; intentionally empty Dashboard main content |
 | Input/semantics | Pointer and keyboard journeys, banner/navigation/main/contentinfo landmarks, named controls and destinations, `aria-current`, `aria-busy`, live context status, and browser accessibility-tree snapshot |
-| Visual | Accepted light/dark × desktop/compact captures plus a VI 320 CSS-pixel text-spacing/reflow capture, all with Account closed |
+| Visual | Candidate light/dark × desktop/compact captures plus a VI 320 CSS-pixel text-spacing/reflow capture, all with Account closed |
 | Deterministic checks | Component owner/slot contracts, browser geometry/overflow/contrast/runtime-error assertions, typecheck/lint/style policy, manifest trace policy, typed consumer inventory, and clean-cutover assessment |
 
-Automation is supporting evidence, not the conformance or perceptual decision. The browser contrast check enumerates every visible Authenticated Frame text node in light and dark states and applies the WCAG relative-luminance threshold. Reflow evidence uses a 320 CSS-pixel viewport, the W3C equivalent boundary for 1280 CSS pixels at 400%, and separately applies the specified letter, word, and line spacing. It does not simulate browser zoom by changing the root font size. Account remains closed in accepted captures so its independently enforced popup is not counted as frame evidence.
+Automation is supporting evidence, not the conformance or perceptual decision. The browser contrast check enumerates every visible Authenticated Frame text node in light and dark states and applies the WCAG relative-luminance threshold. Reflow evidence uses a 320 CSS-pixel viewport, the W3C equivalent boundary for 1280 CSS pixels at 400%, and separately applies the specified letter, word, and line spacing. It does not simulate browser zoom by changing the root font size. Account remains closed in accepted captures so its independently owned popup is not counted as frame evidence.
 
 ## WCAG 2.2 A/AA applicability
 
@@ -71,7 +71,7 @@ Automation is supporting evidence, not the conformance or perceptual decision. T
 | 2.4.11 Focus Not Obscured (Minimum) | Pass | The focused destination is asserted in the viewport; header, footer, and empty main content do not overlap the active control. |
 | 2.5.1 Pointer Gestures | N/A | No multipoint or path-based gesture. |
 | 2.5.2 Pointer Cancellation | Pass | Frame actions use standard link/button activation; no down-event-only behavior. |
-| 2.5.3 Label in Name | Pass | Visible destination labels are their accessible names; the Account trigger inherits the accepted context-bearing name contract from `account-surface`. |
+| 2.5.3 Label in Name | Pass | Visible destination labels are their accessible names; the Account trigger inherits the context-bearing name contract from `account-surface`. |
 | 2.5.4 Motion Actuation | N/A | No device/user motion input. |
 | 2.5.7 Dragging Movements | N/A | No dragging operation in the frame. |
 | 2.5.8 Target Size (Minimum) | Pass | Browser geometry asserts at least 44 CSS pixels in compact/reflow and at least 32 CSS pixels on desktop, both above the 24 CSS-pixel AA minimum. |
@@ -101,9 +101,9 @@ Automation is supporting evidence, not the conformance or perceptual decision. T
 | Learnability | The same product/page/account orientation and destination order persists while the navigation changes from side rail to horizontal row. |
 | Controllability | Navigation and Account entry require explicit activation; a context transition blocks only stale content while the authoritative Workspace is restored, then returns control. |
 | Use-error robustness | The shell keeps global structure mounted during refresh/recovery, prevents interaction with stale route state, and separates retry/application logic from presentation slots. |
-| User engagement | Calm neutral hierarchy, restrained boundaries, one accent focus treatment, and stable whitespace keep global chrome legible without competing with future route content. The accepted matrix records the current perceptual judgment. |
+| User engagement | Calm neutral hierarchy, restrained boundaries, one accent focus treatment, and stable whitespace keep global chrome legible without competing with future route content; project-owner review accepted the scoped matrix. |
 
-The human-centred lifecycle evidence evaluates one coherent frame boundary, intentionally keeps Dashboard content empty, and exercises adverse locale, content length, width, text spacing, theme, motion, and context-transition conditions. No technical or review gap remains in the accepted matrix.
+The human-centred lifecycle evidence evaluates one coherent frame boundary, intentionally keeps Dashboard content empty, and exercises adverse locale, content length, width, text spacing, theme, motion, and context-transition conditions. Technical, perceptual, and standards evidence are complete and accepted for this boundary.
 
 ## Ownership and retirement
 
@@ -116,4 +116,4 @@ The human-centred lifecycle evidence evaluates one coherent frame boundary, inte
 
 ## Review disposition
 
-Technical assessment: **accepted for the declared Authenticated Frame**. Lifecycle disposition: **enforced** with all current profile requirements covered, accepted perceptual evidence, typed consumer ownership, and current retirement proof. Any later change applies the profile invalidation map and reopens only the affected review unit.
+Technical assessment: **complete for the declared Authenticated Frame**. Lifecycle disposition: **enforced**. The revalidated theme matrix and criterion-level assessment are accepted; all 18 profile requirements, typed consumer ownership, and retirement proof are current.

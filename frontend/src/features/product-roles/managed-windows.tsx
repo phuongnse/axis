@@ -374,7 +374,7 @@ function ProductRoleAssignmentDialog({
       title={subjectName}
       description={t('productRoles.currentDescription')}
       titleAccessory={
-        <StatusBadge tone={assignment.isActive ? 'success' : 'muted'}>
+        <StatusBadge state={assignment.isActive ? 'positive' : 'inactive'}>
           {assignment.isActive ? t('productRoles.active') : t('productRoles.revokedStatus')}
         </StatusBadge>
       }

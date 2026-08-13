@@ -4,9 +4,9 @@
 
 ## Decision and scope
 
-This is the criterion-level technical assessment for the complete `managed-task-window` review unit. The evaluated page/process includes the app-scoped manager, expanded window, header controls, body scroll owner, mandatory footer, overlapping-window activation, minimized dock, overflow switcher, stable identity, dirty/busy closure policy, authenticated-navigation continuity, and Workspace/session-authority teardown. It covers all five registered consumer families: Business Objects, Rules, Memberships, Product Roles, and Service Identities.
+This is the criterion-level technical assessment for the complete `managed-task-window` review unit. The evaluated page/process includes the app-scoped manager, expanded window, header controls, body scroll owner, mandatory footer, overlapping-window activation, minimized dock, overflow switcher, stable identity, dirty/busy closure policy, authenticated-navigation continuity, and Workspace/session-authority teardown. It covers all six registered consumer families: Business Objects, Rules, Memberships, Product Roles, Service Identities, and Solution Delivery.
 
-The assessment does not absorb Resource Workspace anatomy, feature form or API semantics, feature authorization, product validation, alert-dialog content, Process Workbench, compact overlay primitives, persistence across reloads, or product-wide certification. Business Object Definition is the maximal visual representative because it exercises title status, description, tabs, editable form state, three footer actions, multiple overlapping identities, minimized overflow, and dirty lifecycle behavior. The current outcome is **technically complete and awaiting project-owner review**; the five perceptual artifacts remain candidates.
+The assessment does not absorb Resource Workspace anatomy, feature form or API semantics, feature authorization, product validation, alert-dialog content, compact overlay primitives, persistence across reloads, or product-wide certification. Business Object Definition is the maximal visual representative because it exercises title status, description, tabs, editable form state, three footer actions, multiple overlapping identities, minimized overflow, and dirty lifecycle behavior. Solution Delivery supplies focused product-state evidence as a registered consumer. The five owner perceptual artifacts are accepted review evidence.
 
 Normative and informative references:
 
@@ -25,14 +25,14 @@ Normative and informative references:
 | Appearance | Light and dark; deterministic reduced-motion media; active, inactive, docked, dirty, busy, disabled, focus, and unavailable states |
 | Content | Canonical EN plus VI; Business Object Definition as the maximal visual representative; long localized header/form copy and WCAG text-spacing overrides |
 | Input/semantics | Pointer and keyboard journeys; non-modal named dialogs; active-window focus trap and Escape; localized named chrome; tabs; labelled form fields; one switcher in the active footer with an all-minimized tray fallback; current/dirty state; mandatory footer exit |
-| Visual | Five candidate captures: light/dark × desktop/compact plus VI at the 320 CSS-pixel text-spacing/reflow boundary |
+| Visual | Five accepted captures: light/dark × desktop/compact plus VI at the 320 CSS-pixel text-spacing/reflow boundary |
 | Deterministic checks | Typed owner/id contract; five-family real-symbol registry; 50%×75% default and 35%×50% minimum geometry; maximize/restore; desktop top-right and compact centered header-control geometry; 32/44 CSS-pixel chrome/footer/tray targets; semantic layer materialization; tray topmost hit testing and footer collision; internal/document overflow; accessibility-tree snapshot; locale; reduced motion; exact screenshots; clean-cutover sweep |
 
 Automation supports but does not make the perceptual or standards-review decision. Desktop captures show two active-capable overlapping windows without a route scrim, align chrome with the title row at the top-right, and place `Windows (N)` at the leading edge of the active footer. Compact captures preserve the footer placement, center the four chrome controls between full-width identity and description rows, and show one fullscreen window, one visible dock, `+N`, and a topmost tray in the reserved footer safe area. When every window is minimized, deterministic component evidence moves the single switcher to the tray so recovery remains available. Reflow evidence uses a 320 CSS-pixel viewport, the W3C equivalent boundary for 1280 CSS pixels at 400%, and separately applies the specified letter, word, and line spacing.
 
 ## WCAG 2.2 A/AA applicability
 
-`Technical pass` means no failure was found within the declared page/process and current representative matrix. `N/A` means the scoped process contains no content or operation to which the criterion applies. These candidate findings are not a product-wide certification claim and require project-owner review before acceptance.
+`Technical pass` means no failure was found within the declared page/process and current representative matrix. `N/A` means the scoped process contains no content or operation to which the criterion applies. These accepted findings apply only to the scoped review unit and are not a product-wide certification claim.
 
 | Criterion | Result | Scoped evidence or rationale |
 |---|---|---|
@@ -49,15 +49,15 @@ Automation supports but does not make the perceptual or standards-review decisio
 | 1.3.5 Identify Input Purpose | N/A | The representative fields do not collect personal information covered by this criterion. |
 | 1.4.1 Use of Color | Technical pass | Active, dirty, disabled, status, tab, focus, and error states retain non-color indicators. |
 | 1.4.2 Audio Control | N/A | No audio. |
-| 1.4.3 Contrast (Minimum) | Technical pass | Canonical theme roles and light/dark captures cover title, description, form, tab, footer, dock, and switcher text. |
+| 1.4.3 Contrast (Minimum) | Technical pass | The browser matrix enumerates visible title, description, form, tab, footer, dock, menu, and switcher text and requires at least 4.5:1 in both themes. |
 | 1.4.4 Resize Text | Technical pass | The 320 CSS-pixel boundary keeps the complete process readable and internally scrollable without clipping. |
 | 1.4.5 Images of Text | Technical pass | No image of text. |
 | 1.4.10 Reflow | Technical pass | Compact windows fill only the authenticated work area; body scroll remains internal; document width and height ownership do not overflow. |
-| 1.4.11 Non-text Contrast | Technical pass | Window, control, input, focus, tab, dock, switcher, and tray boundaries use canonical semantic theme roles in both themes. |
-| 1.4.12 Text Spacing | Technical pass | The VI matrix applies WCAG spacing values, then rechecks internal/document overflow, target geometry, tray layering, and the candidate capture. |
+| 1.4.11 Non-text Contrast | Technical pass | Runtime measurement requires at least 3:1 for editable-field boundaries, the settled keyboard-focus boundary, header controls, dock controls, switcher, and tray affordances in both themes. The theme gate independently rejects canonical input boundaries below 3:1 on base, card, or popover canvases; resting text-entry and outline-action fills inherit the managed canvas so boundary contrast does not become false active-state emphasis. |
+| 1.4.12 Text Spacing | Technical pass | The VI matrix applies WCAG spacing values, then rechecks internal/document overflow, target geometry, tray layering, and the accepted capture. |
 | 1.4.13 Content on Hover or Focus | Technical pass | No required content is hover-only; switcher/dropdown content is dismissible and focus-managed. |
 | 2.1.1 Keyboard | Technical pass | Header/footer controls, tabs, fields, switcher, dock restore/close, confirmations, and product actions are keyboard operable; active-window focus is contained. |
-| 2.1.2 No Keyboard Trap | Technical pass | Tab wraps within only the active expanded window; minimize or guarded close returns access to the route and prior focus. |
+| 2.1.2 No Keyboard Trap | Technical pass | Native Tab order advances through rendered controls and wraps only at the active expanded window boundaries; CSS-hidden descendants are excluded, and minimize or guarded close returns access to the route and prior focus. |
 | 2.1.4 Character Key Shortcuts | N/A | No single-character shortcut. |
 | 2.2.1 Timing Adjustable | N/A | No managed-window interaction has a user-facing time limit. |
 | 2.2.2 Pause, Stop, Hide | N/A | No moving, blinking, scrolling, or auto-updating content requires a pause control. |
@@ -94,29 +94,29 @@ Automation supports but does not make the perceptual or standards-review decisio
 
 ## Interaction and human-centred evaluation
 
-These are candidate technical findings for the declared Managed Task Window review unit.
+These are current technical findings for the declared Managed Task Window review unit.
 
 | Principle | Current technical assessment |
 |---|---|
 | Suitability for the task | Independent resource workflows remain mounted and recoverable while the route stays visible; one active window owns interaction without a global scrim. |
 | Self-descriptiveness | Localized title, description, status, sections, chrome, mandatory exit, switcher count/state, dock title, dirty marker, and busy availability expose the current task and options. |
 | Conformity with expectations | Windowed desktop geometry, fullscreen compact behavior, familiar minimize/maximize/reset/close actions, stable footer, and explicit discard confirmation match enterprise application conventions. |
-| Learnability | Five consumer families reuse one header/body/footer, density, layer, dock, switcher, focus, and lifecycle grammar. |
+| Learnability | Six consumer families reuse one header/body/footer, density, layer, dock, switcher, focus, and lifecycle grammar. |
 | Controllability | Users can focus, minimize, restore, maximize, reset, switch, cancel, close, or keep editing; route state and sibling windows remain independent. |
 | Use-error robustness | Stable identity deduplicates launches; consumer dirty/busy guards cover every exit path; unavailable renderers fail locally; authority transitions purge stale windows. |
-| User engagement | Restrained elevation, no route scrim, calm semantic colors, predictable overlap, and compact safe-area handling keep attention on the active task. The candidate matrix awaits project-owner judgment. |
+| User engagement | Restrained elevation, no route scrim, standardized semantic state colors, predictable overlap, and compact safe-area handling keep attention on the active task; the accepted matrix records the current perceptual judgment. |
 
-The human-centred lifecycle evidence evaluates one coherent shared boundary and exercises adverse width, locale, text spacing, theme, motion, overlap, minimized overflow, dirty/busy state, unavailable data, navigation, sign-out, and authority-transition conditions. Technical evidence is complete; perceptual and standards acceptance remain pending project-owner review.
+The human-centred lifecycle evidence evaluates one coherent shared boundary and exercises adverse width, locale, text spacing, theme, motion, overlap, minimized overflow, dirty/busy state, unavailable data, navigation, sign-out, and authority-transition conditions. Technical evidence and project-owner review are complete for this review unit.
 
 ## Ownership and retirement
 
-- `ManagedDialog` is the only expanded-window anatomy and geometry owner and requires one of the five finite `managed-task-window` consumer ids or the host fallback id.
+- `ManagedDialog` is the only expanded-window anatomy and geometry owner and requires one of the six finite `managed-task-window` consumer ids or the host fallback id.
 - `ManagedWindowProvider`, `ManagedWindowHost`, and `ManagedDialog` are the only app-scoped descriptor, identity, activation, dock, switcher placement, renderer, z-order, and teardown owners. `ManagedDialog` renders the active-footer switcher; `ManagedWindowHost` renders its all-minimized recovery fallback.
 - `ManagedDialogTabs` owns the shared General/business/system section order and mounted panel behavior without owning product section meaning.
-- Business Objects, Rules, Memberships, Product Roles, and Service Identities retain query, authorization, form, mutation, validation, dirty/busy decision, status, and localized product semantics. Shared `ManagedDialogAction` adapters own footer target geometry.
+- Business Objects, Rules, Memberships, Product Roles, Service Identities, and Solution Delivery retain query, authorization, form, mutation, validation, dirty/busy decision, status, and localized product semantics. Shared `ManagedDialogAction` adapters own footer target geometry.
 - The supported path contains no route-owned modal editor, parallel managed-window registry, persisted geometry/draft compatibility path, provider-specific window composition, or legacy fallback. The retirement sweep is `rg -n "ManagedDialog|ManagedWindowProvider|ManagedWindowHost|managed-window|managed-task-window" frontend/src frontend/tests frontend/e2e` and must be reviewed with the typed registry evidence.
-- Process Workbench and compact command/dialog primitives remain separate owners and are not retired or absorbed.
+- Compact command/dialog primitives remain separate owners and are not retired or absorbed. The unused Process Workbench path is retired rather than retained as a parallel owner or compatibility wrapper.
 
 ## Review disposition
 
-Technical assessment: **complete for the declared Managed Task Window candidate**. Human-facing lifecycle roll-up: **Awaiting review**. Fifteen non-review profile requirements have current acceptance traces and technical evidence. `standard.human-centred-evaluation`, `standard.interaction-principles`, and `standard.wcag-2-2-aa` remain explicit gaps until project-owner review accepts the candidate matrix and criterion-level assessment.
+Technical assessment: **accepted for the declared Managed Task Window**. Human-facing lifecycle roll-up: **Complete**. All eighteen current profile requirements are acceptance-traced with accepted perceptual evidence, criterion-level standards assessment, typed consumer ownership, rendered owner markers, and current retirement proof.

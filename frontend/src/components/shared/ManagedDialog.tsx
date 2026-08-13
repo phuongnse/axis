@@ -314,7 +314,7 @@ export function ManagedDialog({
       modal={false}
       disablePointerDismissal
       onOpenChange={(nextOpen) => {
-        if (!nextOpen && expanded && active) requestConsumerClose();
+        if (!nextOpen && expanded && active) requestClose(windowId);
       }}
     >
       <DialogPortal container={portalContainer} className="pointer-events-auto">
@@ -373,11 +373,11 @@ export function ManagedDialog({
           >
             <div
               data-slot="managed-dialog-header"
-              className="managed-dialog-drag-handle flex shrink-0 cursor-default flex-col gap-3 border-b p-4 sm:cursor-move"
+              className="managed-dialog-drag-handle flex shrink-0 cursor-default select-none flex-col gap-1 border-b p-4 sm:cursor-move"
             >
               <div
                 data-slot="managed-dialog-header-primary"
-                className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4"
+                className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
               >
                 <div
                   data-slot="managed-dialog-header-identity"
@@ -389,7 +389,7 @@ export function ManagedDialog({
                 </div>
                 <div
                   data-slot="managed-dialog-header-controls"
-                  className="flex shrink-0 items-center gap-1 self-center sm:self-start"
+                  className="flex shrink-0 items-center gap-1 self-center sm:self-center"
                 >
                   <ManagedDialogIconAction
                     type="button"
@@ -670,16 +670,15 @@ function trapFocus(event: ReactKeyboardEvent<HTMLDivElement>) {
     event.preventDefault();
     return;
   }
-  const currentIndex = focusable.indexOf(document.activeElement as HTMLElement);
-  const nextIndex = event.shiftKey
-    ? currentIndex <= 0
-      ? focusable.length - 1
-      : currentIndex - 1
-    : currentIndex < 0 || currentIndex === focusable.length - 1
-      ? 0
-      : currentIndex + 1;
-  event.preventDefault();
-  focusable[nextIndex]?.focus();
+  const current = event.target instanceof HTMLElement ? event.target : document.activeElement;
+  const currentIndex = focusable.indexOf(current as HTMLElement);
+  if (event.shiftKey && currentIndex === 0) {
+    event.preventDefault();
+    focusable.at(-1)?.focus();
+  } else if (!event.shiftKey && currentIndex === focusable.length - 1) {
+    event.preventDefault();
+    focusable[0]?.focus();
+  }
 }
 
 function firstFocusable(container: HTMLElement) {
@@ -691,7 +690,19 @@ function focusableElements(container: HTMLElement) {
     ...container.querySelectorAll<HTMLElement>(
       'button:not(:disabled), a[href], input:not(:disabled), textarea:not(:disabled), select:not(:disabled), [tabindex]:not([tabindex="-1"])',
     ),
-  ].filter(
-    (element) => !element.hasAttribute('hidden') && element.getAttribute('aria-hidden') !== 'true',
-  );
+  ].filter((element) => {
+    if (
+      element.closest('[hidden], [aria-hidden="true"], [inert]') ||
+      element.hasAttribute('hidden') ||
+      element.getAttribute('aria-hidden') === 'true'
+    ) {
+      return false;
+    }
+    for (let current: HTMLElement | null = element; current; current = current.parentElement) {
+      const style = window.getComputedStyle(current);
+      if (style.display === 'none' || style.visibility === 'hidden') return false;
+      if (current === container) break;
+    }
+    return true;
+  });
 }

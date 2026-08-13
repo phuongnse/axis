@@ -31,6 +31,7 @@ const navigateMock = vi.fn();
 const routerInvalidateMock = vi.fn(() => Promise.resolve());
 const moduleNavigationAvailabilityMock = vi.hoisted(() => vi.fn());
 const testWindowRenderers: ManagedWindowRendererRegistry = {
+  'busy-test': BusyTestWindowRenderer,
   test: TestWindowRenderer,
   'sizing-test': SizingTestWindowRenderer,
 };
@@ -491,6 +492,33 @@ describe('AppShell', () => {
     expect(screen.queryByRole('button', { name: 'Windows (1)' })).not.toBeInTheDocument();
   });
 
+  it('keeps a busy managed window open when Escape requests closure', async () => {
+    const user = userEvent.setup();
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <AppShell
+          surfaceId="authenticated-frame"
+          navigationContributions={[]}
+          windowRenderers={testWindowRenderers}
+        >
+          <BusyTestWindowLauncher />
+        </AppShell>
+      </QueryClientProvider>,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Open busy test window' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Busy test window' });
+    expect(within(dialog).getByRole('button', { name: 'Close dialog' })).toBeDisabled();
+
+    await user.keyboard('{Escape}');
+
+    expect(screen.getByRole('dialog', { name: 'Busy test window' })).toBeVisible();
+  });
+
   it('keeps the account surface and shell geometry stable through the authoritative context cutover', async () => {
     const user = userEvent.setup();
     let resolveSessionRestore!: (authenticated: boolean) => void;
@@ -738,16 +766,17 @@ describe('AppShell', () => {
     expect(dialog.querySelector('[data-slot="managed-dialog-header"]')).toHaveClass(
       'flex',
       'flex-col',
+      'gap-1',
     );
     expect(dialog.querySelector('[data-slot="managed-dialog-header-primary"]')).toHaveClass(
       'flex-col',
       'sm:flex-row',
-      'sm:items-start',
+      'sm:items-center',
       'sm:justify-between',
     );
     expect(dialog.querySelector('[data-slot="managed-dialog-header-controls"]')).toHaveClass(
       'self-center',
-      'sm:self-start',
+      'sm:self-center',
     );
     const headerButtons = dialog.querySelectorAll(
       '[data-slot="managed-dialog-header"] [data-slot="button"]',
@@ -792,6 +821,35 @@ describe('AppShell', () => {
     );
     expect(windowsTrigger).toHaveClass('bg-popover', 'dark:bg-popover', 'dark:hover:bg-muted');
     expect(windowsTrigger).not.toHaveClass('dark:bg-input/30', 'dark:hover:bg-input/50');
+  });
+
+  it('keeps the Windows trigger keyboard-reachable past non-rendered body controls', async () => {
+    const user = userEvent.setup();
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <AppShell
+          surfaceId="authenticated-frame"
+          navigationContributions={[]}
+          windowRenderers={testWindowRenderers}
+        >
+          <TestWindowLauncher />
+        </AppShell>
+      </QueryClientProvider>,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Open test window' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Persistent test window' });
+    const windowsTrigger = within(dialog).getByRole('button', { name: 'Windows (1)' });
+    within(dialog).getByRole('button', { name: 'Reset dialog' }).focus();
+    for (let index = 0; index < 8 && document.activeElement !== windowsTrigger; index += 1) {
+      await user.tab();
+    }
+
+    expect(windowsTrigger).toHaveFocus();
   });
 
   it('offers an explicit footer Close action when a renderer is unavailable', async () => {
@@ -874,7 +932,7 @@ describe('AppShell', () => {
       );
       expect(
         overflowingDialog.querySelector('[data-slot="managed-dialog-header-primary"]'),
-      ).toHaveClass('flex-col', 'sm:flex-row', 'sm:items-start', 'sm:justify-between');
+      ).toHaveClass('flex-col', 'sm:flex-row', 'sm:items-center', 'sm:justify-between');
       const overflowingWindow = overflowingDialog.querySelector(
         '[data-slot="managed-dialog-window"]',
       );
@@ -1048,7 +1106,53 @@ function TestWindowRenderer() {
         </button>
       }
     >
-      <ManagedDialogBody>Persistent state</ManagedDialogBody>
+      <ManagedDialogBody>
+        Persistent state
+        <span style={{ display: 'none' }}>
+          <button type="button">Non-rendered action</button>
+        </span>
+      </ManagedDialogBody>
+    </ManagedDialog>
+  );
+}
+
+function BusyTestWindowLauncher() {
+  const { openWindow } = useManagedWindowActions();
+  return (
+    <button
+      type="button"
+      onClick={() =>
+        openWindow({
+          id: 'test:busy',
+          kind: 'busy-test',
+          resourceKey: 'busy',
+          title: 'Busy test window',
+        })
+      }
+    >
+      Open busy test window
+    </button>
+  );
+}
+
+function BusyTestWindowRenderer() {
+  const { windowId, closeWindow } = useCurrentManagedWindow();
+  return (
+    <ManagedDialog
+      surfaceId="managed-window-host"
+      open
+      title="Busy test window"
+      closeDisabled
+      onOpenChange={(open) => {
+        if (!open) closeWindow(windowId);
+      }}
+      footer={
+        <button type="button" disabled>
+          Close
+        </button>
+      }
+    >
+      <ManagedDialogBody>Busy state</ManagedDialogBody>
     </ManagedDialog>
   );
 }

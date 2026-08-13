@@ -10,6 +10,7 @@ import {
   type DataTableColumnDef,
   type DataTableDefinition,
   type DataTableQueryState,
+  DataTableRecordAction,
 } from '@/components/shared/data-table';
 import { useManagedWindowActions } from '@/components/shared/ManagedWindowManager';
 import { PageAction } from '@/components/shared/PageLayout';
@@ -144,15 +145,13 @@ export function BusinessObjectsPage() {
         enableSorting: false,
         meta: { label: t('businessObjects.name') },
         cell: ({ row }) => (
-          <PageAction
-            type="button"
-            variant="link"
+          <DataTableRecordAction
             onFocus={() => prefetchDefinition(row.original.id)}
             onMouseEnter={() => prefetchDefinition(row.original.id)}
             onClick={() => openDefinition(row.original)}
           >
             {row.original.name}
-          </PageAction>
+          </DataTableRecordAction>
         ),
       },
       {
@@ -306,8 +305,8 @@ export function BusinessObjectsPage() {
 function DefinitionStatusBadge({ status }: { status?: 'Unpublished' | 'Published' }) {
   const { t } = useTranslation();
   return status === 'Published' ? (
-    <StatusBadge tone="success">{t('businessObjects.published')}</StatusBadge>
+    <StatusBadge state="positive">{t('businessObjects.published')}</StatusBadge>
   ) : (
-    <StatusBadge tone="neutral">{t('businessObjects.unpublished')}</StatusBadge>
+    <StatusBadge state="neutral">{t('businessObjects.unpublished')}</StatusBadge>
   );
 }

@@ -636,13 +636,18 @@ function DataRow<TData>({
                 ...pinnedColumnStyle(cell.column),
               }}
               className={cn(
-                'bg-inherit align-top first:pl-3',
-                virtual && 'flex shrink-0 items-start',
+                'bg-inherit py-1 align-middle first:pl-3',
+                virtual && 'flex shrink-0 items-center',
               )}
             >
               <div
                 data-slot="data-table-cell-content"
-                className="flex min-w-0 items-center gap-1.5"
+                className={cn(
+                  'flex min-w-0 items-center',
+                  axisStyles.spacing.gap.inline,
+                  axisStyles.density.minHeight.touchTarget,
+                  axisStyles.density.minHeight.compactControlAtSmall,
+                )}
                 style={canExpand && row.depth > 0 ? { paddingLeft: row.depth * 16 } : undefined}
               >
                 {grouped || canExpand ? (
@@ -729,10 +734,21 @@ function LoadingRows<TData>({
           {columns.map((columnDefinition, column) => (
             <TableCell
               key={`loading-${rowId}-${columnDefinition.id}`}
-              className={cn('first:pl-3', virtualized && 'flex shrink-0 items-center')}
+              className={cn(
+                'py-1 align-middle first:pl-3',
+                virtualized && 'flex shrink-0 items-center',
+              )}
               style={virtualized ? { width: columnDefinition.getSize() } : undefined}
             >
-              <Skeleton className="h-5 w-full max-w-48" />
+              <div
+                className={cn(
+                  'flex min-w-0 items-center',
+                  axisStyles.density.minHeight.touchTarget,
+                  axisStyles.density.minHeight.compactControlAtSmall,
+                )}
+              >
+                <Skeleton className="h-5 w-full max-w-48" />
+              </div>
               {row === 0 && column === 0 ? (
                 <span className="sr-only">{messages.loading}</span>
               ) : null}

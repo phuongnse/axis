@@ -6,7 +6,7 @@
 
 This is the criterion-level technical assessment for the complete `account-surface` review unit. The evaluated page/process starts on the authenticated `/dashboard` page, whose main content intentionally remains empty, opens the Account trigger, orients the signed-in identity, exposes eligible Workspace choices, changes language/theme, presents pending/recovery state, and hands off create-Organization or sign-out commands to their owning workflows.
 
-The assessment does not cover Account profile editing, the implementation behind create Organization or sign-out, route-specific content, other surfaces, backend/session correctness, or product-wide certification. Those are different owners. The current outcome is **accepted and enforced for this scoped surface**. The accepted presentation keeps the identity icon top-aligned with the primary identity text, and that invariant is captured and mechanically verified.
+The assessment does not cover Account profile editing, the implementation behind create Organization or sign-out, route-specific content, other surfaces, backend/session correctness, or product-wide certification. Those are different owners. Theme-linked technical evidence and project-owner review are complete for this scoped surface. The accepted presentation keeps the identity icon top-aligned with the primary identity text, and that invariant is captured and mechanically verified.
 
 Normative and informative references:
 
@@ -24,7 +24,7 @@ Normative and informative references:
 | Appearance | Light and dark; deterministic reduced-motion media; default, hover, current, pending, failure/retry, and keyboard-focus states |
 | Content | Canonical EN plus VI; long human name, long email/domain, and long Workspace label; WCAG text-spacing overrides |
 | Input/semantics | Pointer and keyboard journeys, named landmarks/regions/groups, `aria-current`, `aria-pressed`, `aria-busy`, live status, accessible-name composition, and browser accessibility-tree snapshot |
-| Visual | Accepted light/dark × desktop/compact captures plus a VI 320 CSS-pixel text-spacing/reflow capture; identity avatar top-aligned with primary text |
+| Visual | Candidate light/dark × desktop/compact captures plus a VI 320 CSS-pixel text-spacing/reflow capture; identity avatar top-aligned with primary text |
 | Deterministic checks | Component contracts, browser geometry/overflow/contrast/runtime-error assertions, typecheck/lint/style policy, manifest trace policy, and clean-cutover inventory |
 
 Automation is supporting evidence, not the conformance decision. The browser contrast check enumerates every visible Account text node in light and dark states and applies the WCAG relative-luminance threshold. Reflow evidence uses a 320 CSS-pixel viewport, the W3C equivalent boundary for 1280 CSS pixels at 400%, and separately applies the specified letter, word, and line spacing. It does not simulate browser zoom by changing the root font size.
@@ -53,7 +53,7 @@ Automation is supporting evidence, not the conformance decision. The browser con
 | 1.4.5 Images of Text | Pass | No image of text; the brand image is decorative beside live page-context text. |
 | 1.4.10 Reflow | Pass | 320 CSS-pixel VI journey asserts no page or surface horizontal overflow and no two-dimensional content dependency. The Account surface owns bounded vertical scrolling when height is constrained. |
 | 1.4.11 Non-text Contrast | Pass | Canonical boundary, focus-ring, selected/current, icon, and control roles come from the Axis theme; state-difference and focus evidence exercise their rendered presence in both themes. |
-| 1.4.12 Text Spacing | Pass | The 320 VI journey applies WCAG letter/word/line spacing, then rechecks wrapping, target geometry, surface overflow, document scroll, focus reachability, and the candidate capture. |
+| 1.4.12 Text Spacing | Pass | The 320 VI journey applies WCAG letter/word/line spacing, then rechecks wrapping, target geometry, surface overflow, document scroll, focus reachability, and the accepted capture. |
 | 1.4.13 Content on Hover or Focus | N/A | No information-only hover/focus popup exists; the Account popup is explicitly invoked and dismissible. |
 | 2.1.1 Keyboard | Pass | Trigger, choices, retry, create, and sign-out are native/accessible primitive buttons; keyboard journeys reach and operate the sequence. |
 | 2.1.2 No Keyboard Trap | Pass | Escape dismisses the ordinary popup and focus can traverse to sign-out; the deliberate transition lock persists only while the authoritative operation is pending. |
@@ -101,9 +101,9 @@ Automation is supporting evidence, not the conformance decision. The browser con
 | Learnability | One leading scan axis and repeated option anatomy make Workspace, language, and theme choices predictable without instruction text. |
 | Controllability | The user explicitly opens/closes the surface and activates choices; authoritative transitions lock dismissal only while context integrity requires it, then return control. |
 | Use-error robustness | Current/pending choices are protected from duplicate activation; outcome-unknown, refresh, preference, and sign-out failures remain visible and expose recovery where safe. |
-| User engagement | Calm neutral hierarchy, restrained depth, readable identity, localized copy, and consistent spacing support orientation without decorative competition. Final perceptual judgment belongs to project-owner review. |
+| User engagement | Calm neutral hierarchy, restrained depth, readable identity, localized copy, and consistent spacing support orientation without decorative competition; project-owner review accepted the scoped result. |
 
-The human-centred lifecycle evidence evaluates one coherent Account surface boundary, keeps Dashboard content empty, exercises representative user tasks and adverse content/mode conditions, and requires the identity icon to remain top-aligned. Responsive overflow and contrast failures discovered by the evaluation were resolved, and the complete matrix was reverified before enforcement.
+The human-centred lifecycle evidence evaluates one coherent Account surface boundary, keeps Dashboard content empty, exercises representative user tasks and adverse content/mode conditions, and requires the identity icon to remain top-aligned. Responsive overflow and contrast failures discovered by the evaluation were resolved, and the complete matrix was reverified and accepted.
 
 ## Ownership and retirement
 
@@ -115,4 +115,4 @@ The human-centred lifecycle evidence evaluates one coherent Account surface boun
 
 ## Review disposition
 
-Technical assessment: **accepted for the declared Account surface**. Lifecycle disposition: **enforced** with all current profile requirements covered, accepted perceptual evidence, typed consumer ownership, and current retirement proof. Any later change applies the profile invalidation map and reopens only the affected review unit.
+Technical assessment: **complete for the declared Account surface**. Lifecycle disposition: **enforced**. The revalidated theme matrix and criterion-level assessment are accepted; all 18 profile requirements, typed consumer ownership, and retirement proof are current.

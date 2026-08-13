@@ -717,25 +717,29 @@
       }
     },
     "managed-task-window": {
-      "state": "defined",
+      "state": "enforced",
       "spec": "docs/foundations/overlays/managed-dialog.md",
       "coverageProfile": "axis-ui-v1",
-      "acceptance": { "status": "pending" },
+      "acceptance": { "status": "accepted" },
       "evidence": {
         "assessment": ["docs/foundations/overlays/managed-task-window.assessment.md"],
         "component": [
           "frontend/src/features/memberships/components/MembershipManagementPage.test.tsx",
           "frontend/src/features/product-roles/components/ProductRoleAssignmentsPage.test.tsx",
           "frontend/src/features/service-identities/components/ServiceIdentitiesPage.test.tsx",
+          "frontend/src/features/solutions/components/SolutionsPage.test.tsx",
           "frontend/tests/app-shell.test.tsx",
           "frontend/tests/business-objects-page.test.tsx",
           "frontend/tests/managed-dialog-tabs.test.tsx",
           "frontend/tests/rules-page.test.tsx",
           "frontend/tests/surface-contracts.test.tsx"
         ],
-        "browser": ["frontend/e2e/define-business-object.pw.ts"],
+        "browser": [
+          "frontend/e2e/define-business-object.pw.ts",
+          "frontend/e2e/product-delivery-governance.pw.ts"
+        ],
         "perceptual": {
-          "status": "candidate",
+          "status": "accepted",
           "artifacts": [
             "frontend/e2e/define-business-object.pw.ts-snapshots/managed-task-window-dark-compact-en-chromium-linux.png",
             "frontend/e2e/define-business-object.pw.ts-snapshots/managed-task-window-dark-desktop-en-chromium-linux.png",
@@ -819,6 +823,7 @@
                 "frontend/src/features/memberships/components/MembershipManagementPage.test.tsx",
                 "frontend/src/features/product-roles/components/ProductRoleAssignmentsPage.test.tsx",
                 "frontend/src/features/service-identities/components/ServiceIdentitiesPage.test.tsx",
+                "frontend/src/features/solutions/components/SolutionsPage.test.tsx",
                 "frontend/tests/business-objects-page.test.tsx",
                 "frontend/tests/rules-page.test.tsx",
                 "frontend/tests/surface-contracts.test.tsx"
@@ -832,6 +837,52 @@
                 "frontend/tests/surface-contracts.test.tsx"
               ],
               "modes": []
+            },
+            "standard.human-centred-evaluation": {
+              "acceptance": ["docs/foundations/overlays/managed-dialog.md#AT-006"],
+              "evidence": ["docs/foundations/overlays/managed-task-window.assessment.md"],
+              "modes": []
+            },
+            "standard.interaction-principles": {
+              "acceptance": [
+                "docs/foundations/overlays/managed-dialog.md#AT-001",
+                "docs/foundations/overlays/managed-dialog.md#AT-004",
+                "docs/foundations/overlays/managed-dialog.md#AT-005",
+                "docs/foundations/overlays/managed-dialog.md#AT-006"
+              ],
+              "evidence": [
+                "docs/foundations/overlays/managed-task-window.assessment.md",
+                "frontend/e2e/define-business-object.pw.ts",
+                "frontend/tests/app-shell.test.tsx",
+                "frontend/tests/business-objects-page.test.tsx"
+              ],
+              "modes": ["keyboard", "pointer"]
+            },
+            "standard.wcag-2-2-aa": {
+              "acceptance": [
+                "docs/foundations/overlays/managed-dialog.md#AT-001",
+                "docs/foundations/overlays/managed-dialog.md#AT-003",
+                "docs/foundations/overlays/managed-dialog.md#AT-004",
+                "docs/foundations/overlays/managed-dialog.md#AT-005",
+                "docs/foundations/overlays/managed-dialog.md#AT-006"
+              ],
+              "evidence": [
+                "docs/foundations/overlays/managed-task-window.assessment.md",
+                "frontend/e2e/define-business-object.pw.ts",
+                "frontend/tests/app-shell.test.tsx",
+                "frontend/tests/business-objects-page.test.tsx",
+                "frontend/tests/managed-dialog-tabs.test.tsx",
+                "frontend/tests/surface-contracts.test.tsx"
+              ],
+              "modes": [
+                "compact",
+                "desktop",
+                "keyboard",
+                "locale",
+                "reduced-motion",
+                "screen-reader",
+                "zoom-reflow"
+              ]
             },
             "visual.color-tone-contrast": {
               "acceptance": ["docs/foundations/overlays/managed-dialog.md#AT-004"],
@@ -924,50 +975,7 @@
               "modes": ["compact", "dark", "desktop", "light", "locale", "zoom-reflow"]
             }
           },
-          "gaps": [
-            "standard.human-centred-evaluation",
-            "standard.interaction-principles",
-            "standard.wcag-2-2-aa"
-          ],
-          "notApplicable": {}
-        }
-      }
-    },
-    "process-workbench": {
-      "state": "defined",
-      "spec": "docs/foundations/visual-system/axis-visual-system.md",
-      "coverageProfile": "axis-ui-v1",
-      "acceptance": { "status": "pending" },
-      "evidence": {
-        "assessment": [],
-        "component": [
-          "frontend/src/features/solutions/components/SolutionsPage.test.tsx",
-          "frontend/tests/surface-contracts.test.tsx"
-        ],
-        "browser": ["frontend/e2e/product-delivery-governance.pw.ts"],
-        "perceptual": { "status": "missing", "artifacts": [] },
-        "coverage": {
-          "covered": {},
-          "gaps": [
-            "behavior.anatomy-layout",
-            "behavior.interaction-focus-keyboard",
-            "behavior.localization-content-resilience",
-            "behavior.responsive-scroll-overflow",
-            "behavior.state-feedback-async-recovery",
-            "lifecycle.consumer-ownership-adoption",
-            "lifecycle.retirement-compatibility",
-            "standard.human-centred-evaluation",
-            "standard.interaction-principles",
-            "standard.wcag-2-2-aa",
-            "visual.color-tone-contrast",
-            "visual.density-touch-target",
-            "visual.elevation-layer",
-            "visual.iconography",
-            "visual.motion",
-            "visual.spacing",
-            "visual.surface-border-radius",
-            "visual.typography-hierarchy"
-          ],
+          "gaps": [],
           "notApplicable": {}
         }
       }
@@ -983,13 +991,18 @@
           "frontend/src/features/memberships/components/MembershipManagementPage.test.tsx",
           "frontend/src/features/product-roles/components/ProductRoleAssignmentsPage.test.tsx",
           "frontend/src/features/service-identities/components/ServiceIdentitiesPage.test.tsx",
+          "frontend/src/features/solutions/components/SolutionsPage.test.tsx",
           "frontend/tests/business-objects-page.test.tsx",
           "frontend/tests/data-table.test.tsx",
           "frontend/tests/resource-workspace.test.tsx",
           "frontend/tests/rules-page.test.tsx",
           "frontend/tests/surface-contracts.test.tsx"
         ],
-        "browser": ["frontend/e2e/define-business-object.pw.ts", "frontend/e2e/manage-rules.pw.ts"],
+        "browser": [
+          "frontend/e2e/define-business-object.pw.ts",
+          "frontend/e2e/manage-rules.pw.ts",
+          "frontend/e2e/product-delivery-governance.pw.ts"
+        ],
         "perceptual": {
           "status": "accepted",
           "artifacts": [
@@ -1074,6 +1087,7 @@
                 "frontend/src/features/memberships/components/MembershipManagementPage.test.tsx",
                 "frontend/src/features/product-roles/components/ProductRoleAssignmentsPage.test.tsx",
                 "frontend/src/features/service-identities/components/ServiceIdentitiesPage.test.tsx",
+                "frontend/src/features/solutions/components/SolutionsPage.test.tsx",
                 "frontend/tests/business-objects-page.test.tsx",
                 "frontend/tests/rules-page.test.tsx",
                 "frontend/tests/surface-contracts.test.tsx"
@@ -1232,6 +1246,7 @@
     "account-surface": true,
     "authenticated-frame": true,
     "entry-surface": true,
+    "managed-task-window": true,
     "resource-workspace": true
   }
 }

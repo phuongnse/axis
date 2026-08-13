@@ -552,7 +552,9 @@ async function expectAccountSurfaceScreenshot(page: Page, name: string): Promise
   await expect(accountSurface).toHaveAttribute('data-axis-surface-contract', 'account-surface');
   await expect(accountSurface.locator('[aria-busy="true"]')).toHaveCount(0);
   await accountSurface.evaluate((element) =>
-    Promise.all(element.getAnimations({ subtree: true }).map((animation) => animation.finished)),
+    Promise.allSettled(
+      element.getAnimations({ subtree: true }).map((animation) => animation.finished),
+    ),
   );
   await page.mouse.move(1, 1);
   await expect(accountSurface).toHaveScreenshot(`${name}.png`, {
@@ -593,7 +595,9 @@ async function expectAuthenticatedFrameScreenshot(
   await expect(frame).toHaveAttribute('data-axis-surface-contract', 'authenticated-frame');
   await expect(frame.locator('[data-slot="account-surface"]')).toHaveCount(0);
   await frame.evaluate((element) =>
-    Promise.all(element.getAnimations({ subtree: true }).map((animation) => animation.finished)),
+    Promise.allSettled(
+      element.getAnimations({ subtree: true }).map((animation) => animation.finished),
+    ),
   );
   await page.mouse.move(1, 1);
   await expect(frame).toHaveScreenshot(`${name}.png`, {
@@ -1253,7 +1257,9 @@ test.describe('app frame', () => {
     const accountView = page.locator('[data-slot="account-surface"]');
     await expect(accountView).toBeVisible();
     await accountView.evaluate((element) =>
-      Promise.all(element.getAnimations({ subtree: true }).map((animation) => animation.finished)),
+      Promise.allSettled(
+        element.getAnimations({ subtree: true }).map((animation) => animation.finished),
+      ),
     );
     const organizationWorkspaceOption = accountView.getByRole('button', {
       name: organizationWorkspace.name,
@@ -1437,7 +1443,9 @@ test.describe('app frame', () => {
     await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible();
     const accountMenu = page.locator('[data-slot="account-surface"]');
     await accountMenu.evaluate((element) =>
-      Promise.all(element.getAnimations({ subtree: true }).map((animation) => animation.finished)),
+      Promise.allSettled(
+        element.getAnimations({ subtree: true }).map((animation) => animation.finished),
+      ),
     );
     const initialMenuBox = await accountMenu.boundingBox();
     const darkOption = page.getByRole('button', { name: 'Dark' });

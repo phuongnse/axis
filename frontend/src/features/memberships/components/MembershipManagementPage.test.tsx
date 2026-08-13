@@ -180,6 +180,10 @@ describe('MembershipManagementPage', () => {
     renderPage();
 
     const table = await screen.findByRole('region', { name: 'Workspace invitation outcomes' });
+    expect(await within(table).findByText('Delivery failed')).toHaveAttribute(
+      'data-status-state',
+      'critical',
+    );
     await user.click(await within(table).findByRole('button', { name: 'member@example.com' }));
     const dialog = await screen.findByRole('dialog', { name: 'member@example.com' });
     await user.click(within(dialog).getByRole('button', { name: 'Resend' }));

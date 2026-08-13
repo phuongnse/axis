@@ -350,7 +350,7 @@ function MembershipInvitationDialog({
       title={title}
       description={t('memberships.description')}
       titleAccessory={
-        <StatusBadge tone={statusTone(invitation.status)}>
+        <StatusBadge state={invitationState(invitation.status)}>
           {t(`memberships.status${invitation.status ?? 'Pending'}`)}
         </StatusBadge>
       }
@@ -467,10 +467,12 @@ function Fact({ label, value }: { label: string; value: string }) {
   );
 }
 
-function statusTone(status: string | undefined) {
-  if (status === 'Accepted') return 'success' as const;
-  if (status === 'Pending') return 'info' as const;
-  return 'muted' as const;
+function invitationState(status: string | undefined) {
+  if (status === 'Accepted') return 'positive' as const;
+  if (status === 'Pending') return 'informative' as const;
+  if (status === 'Expired') return 'caution' as const;
+  if (status === 'Revoked') return 'inactive' as const;
+  return 'neutral' as const;
 }
 
 function invitationEmailCode(error: unknown): boolean {

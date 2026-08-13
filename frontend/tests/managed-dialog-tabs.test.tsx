@@ -30,6 +30,9 @@ describe('ManagedDialogTabs', () => {
     expect(tablist.parentElement).toHaveAttribute('data-slot', 'managed-dialog-tab-scroll');
     expect(tablist.parentElement).toHaveClass('sm:overflow-x-clip');
     expect(tablist.parentElement).toHaveClass('overflow-y-hidden');
+    for (const tab of within(tablist).getAllByRole('tab')) {
+      expect(tab).toHaveClass('text-muted-foreground', 'data-active:text-foreground');
+    }
 
     await user.click(screen.getByRole('tab', { name: 'System info' }));
     expect(screen.getByText('System content')).toBeVisible();

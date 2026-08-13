@@ -355,7 +355,7 @@ export function BusinessObjectDefinitionDialog({
         }
         titleAccessory={
           definition && !detailQuery.isError ? (
-            <StatusBadge tone={definition.status === 'Published' ? 'success' : 'neutral'}>
+            <StatusBadge state={definition.status === 'Published' ? 'positive' : 'neutral'}>
               {t(
                 definition.status === 'Published'
                   ? 'businessObjects.published'

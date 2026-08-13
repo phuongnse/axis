@@ -13,6 +13,8 @@ export const persistentItemHighlight =
 export const selectedItemHighlight =
   'aria-selected:bg-secondary aria-selected:text-secondary-foreground';
 
+export const sectionTabLabelState = 'text-muted-foreground data-active:text-foreground';
+
 export const keyboardFocusRing = 'focus-visible:ring-2 focus-visible:ring-ring';
 
 export const searchMatchHighlight =

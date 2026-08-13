@@ -46,9 +46,9 @@ Dependencies flow in that order only. A feature cannot import a lower-level prov
 |---|---|---|
 | Hierarchy | page, section, component, body, label, metadata | Use typography, spacing, and contrast before adding containers or decoration. One level has one role across the product. |
 | Typography | display, title, section, body, label, metadata, code | Size, weight, line height, and tracking express the hierarchy role; features do not tune them independently. |
-| Color and tone | base, muted, emphasis, brand intent, information, success, warning, destructive | Neutral tone carries structure; brand marks primary intent; semantic color communicates meaning and is never the only cue. |
+| Color and tone | base, muted, emphasis, brand intent, information, success, warning, destructive | Neutral tone carries structure; brand marks primary intent rather than status; semantic color communicates meaning and is never the only cue. Durable state labels expose informative, positive, caution, critical, neutral, or inactive meaning to their shared owner, which alone maps that meaning to the canonical color pair. Canonical text pairs maintain at least 4.5:1 contrast, while focus and input control boundaries maintain at least 3:1 against every supported base, card, and popover canvas. Resting text-entry and outline-control fills inherit their owning canvas instead of reusing the stronger boundary token as a fill. |
 | Space | inline, region, section, page-compact, page-default, page-wide | Use the shared rhythm by relationship. A feature does not invent reusable gaps or page gutters. |
-| Density | compact-control, default-control, touch-target | Desktop density stays efficient; pointer size never weakens the compact touch target. |
+| Density | compact-control, default-control, touch-target | Desktop density stays efficient; pointer size never weakens the compact touch target. Collection rows use one owner-defined vertical rhythm: cells align content centrally, loading reserves the same row geometry, and multi-line content expands the row without changing sibling alignment. |
 | Surface | base, floating, managed | Base content uses structure without elevation; contextual overlays float; long-lived tasks use managed elevation. |
 | Radius | flat, control, floating, managed | Radius communicates boundary depth, not decoration. Features do not choose a new tier. |
 | Elevation | none, floating, managed, dock | Elevation follows surface depth and remains equivalent in light and dark modes. |
@@ -146,7 +146,7 @@ Only entries whose state is `enforced` and whose id is present in `enforcedContr
 
 | ID | Boundary | Scenario | Covers AC | Verification | Required |
 |---|---|---|---|---|---|
-| AT-001 | Static frontend | Strict semantic schema deterministically projects CSS and a typed runtime style contract and rejects missing, unknown, or stale roles. | AC-001, AC-002, AC-003 | Frontend CI | Yes |
+| AT-001 | Static frontend | Strict semantic schema deterministically projects CSS and a typed runtime style contract and rejects missing, unknown, stale, or insufficient-contrast roles. | AC-001, AC-002, AC-003, AC-005 | Frontend CI | Yes |
 | AT-002 | Static frontend | Ownership checks reject generated-style bypass, hard-coded semantic values, provider leakage, feature-local interaction visuals, and profile, manifest lifecycle, candidate/accepted, coverage-partition, acceptance-trace, evidence-mode, acceptance-state, or registry drift. | AC-001, AC-006, AC-007 | Frontend CI | Yes |
 | AT-003 | UI component | Representative role mappings prove hierarchy, state priority, async geometry, scroll ownership, accessibility, and reduced motion without establishing component-local policy. | AC-002, AC-003, AC-004, AC-005 | UI component test | Yes |
 | AT-004 | Layout smoke | Each registered surface contract proves its representative states in light/dark and desktop/compact layouts without document overflow or console errors. | AC-002, AC-004, AC-005 | Browser automation | Yes |
@@ -169,9 +169,9 @@ Only entries whose state is `enforced` and whose id is present in `enforcedContr
 > | Frontend | Partial |
 > | Tests | Partial |
 >
-> **Gaps vs spec:** Account, Authenticated Frame, Entry Surface, and Resource Workspace are enforced `axis-ui-v1` contracts: each has all eighteen requirements acceptance-traced and five version-controlled captures accepted. Their human-facing roll-up is `Complete`. Managed Task Window is a technically complete candidate with fifteen non-review requirements covered and the three standards requirements intentionally pending project-owner review. Process Workbench still classifies all profile requirements as gaps. Existing evidence does not advance any lifecycle state without complete requirement traces and the review required by that state.
+> **Gaps vs spec:** None for the five registered surface contracts. Account, Authenticated Frame, Entry Surface, Resource Workspace, and Managed Task Window each retain complete accepted evidence, 18/18 current profile coverage, enforced ownership, and current retirement proof. Solution Delivery is a typed consumer of Resource Workspace and Managed Task Window, and the unused Process Workbench contract is retired cleanly. Existing evidence does not advance any future lifecycle state without complete requirement traces and the review required by that state.
 >
-> **Deferred follow-ups:** N/A; missing contract evidence remains current work and cannot be converted into an exception.
+> **Deferred follow-ups:** N/A; future owner or consumer work requires its own declared review unit and cannot be converted into an exception.
 >
 > **Verification:** Current verification is recorded in [docs/foundations/visual-system/axis-visual-system.evidence.md](./axis-visual-system.evidence.md); stale or unregistered consumer evidence does not establish enforcement.
 >

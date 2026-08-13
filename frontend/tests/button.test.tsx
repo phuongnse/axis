@@ -24,7 +24,13 @@ describe('Button', () => {
       </Button>,
     );
     const button = screen.getByTestId('btn');
-    expect(button).toHaveClass('border-border', 'bg-background');
+    expect(button).toHaveClass(
+      'border-border',
+      'bg-transparent',
+      'dark:border-border',
+      'dark:bg-transparent',
+      'dark:hover:bg-muted',
+    );
   });
 
   it('should pass through standard HTML button props', () => {
