@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next';
 
 import { EntryAction, EntrySurface } from '@/components/shared/EntrySurface';
 import { StatusNotice } from '@/components/shared/StatusNotice';
-import { PreferencesMenu } from '@/features/preferences';
+import { useEntryPreferencesModel } from '@/features/preferences';
 
 interface SessionUnavailablePageProps {
   onRetry: () => void;
@@ -10,11 +10,12 @@ interface SessionUnavailablePageProps {
 
 export function SessionUnavailablePage({ onRetry }: SessionUnavailablePageProps) {
   const { t } = useTranslation();
+  const preferences = useEntryPreferencesModel();
 
   return (
     <EntrySurface
       surfaceId="session-unavailable"
-      utilities={<PreferencesMenu />}
+      preferences={preferences}
       title={t('auth.sessionUnavailableTitle')}
     >
       <div className="space-y-4">

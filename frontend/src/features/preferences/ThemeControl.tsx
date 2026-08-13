@@ -4,6 +4,7 @@ import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { AccountPreferenceGroupModel } from '@/components/shared/AccountSurface';
 import { AsyncContent } from '@/components/shared/AsyncContent';
+import type { EntryPreferenceGroupModel } from '@/components/shared/EntrySurface';
 import { OptionList, OptionListItem } from '@/components/shared/OptionList';
 import { Button } from '@/components/ui/button';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
@@ -126,6 +127,27 @@ export function useAccountThemePreferenceModel(): AccountPreferenceGroupModel {
       };
     }),
     pendingLabel: t('app.saving'),
+    value: mode,
+  };
+}
+
+export function useEntryThemePreferenceModel(): EntryPreferenceGroupModel {
+  const { t } = useTranslation();
+  const { mode } = useThemePreference();
+
+  return {
+    label: t('app.theme'),
+    onSelect: (value) => {
+      if (isSupportedThemeMode(value)) setThemeMode(value);
+    },
+    options: supportedThemeModes.map((item) => {
+      const Icon = themeModeIcons[item.value];
+      return {
+        icon: <Icon />,
+        label: t(item.labelKey),
+        value: item.value,
+      };
+    }),
     value: mode,
   };
 }

@@ -252,10 +252,77 @@ async function expectEntrySurfaceScreenshot(
   });
 }
 
+interface EntryPreferenceLabels {
+  language: string;
+  preferences: string;
+  theme: string;
+}
+
+async function expectEntryPreferencesOpen(
+  page: Page,
+  minimumHeight: 32 | 44,
+  labels: EntryPreferenceLabels,
+): Promise<Locator> {
+  const preferences = page.locator('[data-slot="entry-preferences"]');
+  if (!(await preferences.isVisible())) {
+    await page.locator('[data-slot="entry-utilities"] button').click();
+  }
+
+  await expect(preferences).toBeVisible();
+  await expect(preferences).toHaveAccessibleName(labels.preferences);
+  await expect(preferences).toHaveAttribute('aria-label', labels.preferences);
+  await expect(preferences.getByText(labels.preferences, { exact: true })).toHaveCount(0);
+  await expect(preferences.getByRole('group', { name: labels.language })).toBeVisible();
+  await expect(preferences.getByRole('group', { name: labels.theme })).toBeVisible();
+
+  const geometry = await preferences.evaluate((element) => {
+    const bounds = element.getBoundingClientRect();
+    const targets = Array.from(element.querySelectorAll<HTMLElement>('button')).map((target) => {
+      const targetBounds = target.getBoundingClientRect();
+      return {
+        height: targetBounds.height,
+        name: target.getAttribute('aria-label') ?? target.textContent?.trim() ?? '',
+        width: targetBounds.width,
+      };
+    });
+    return {
+      bottom: bounds.bottom,
+      left: bounds.left,
+      right: bounds.right,
+      targets,
+      top: bounds.top,
+      viewportHeight: window.innerHeight,
+      viewportWidth: window.innerWidth,
+    };
+  });
+
+  expect(geometry.left).toBeGreaterThanOrEqual(-1);
+  expect(geometry.top).toBeGreaterThanOrEqual(-1);
+  expect(geometry.right).toBeLessThanOrEqual(geometry.viewportWidth + 1);
+  expect(geometry.bottom).toBeLessThanOrEqual(geometry.viewportHeight + 1);
+  expect(geometry.targets).toHaveLength(5);
+  expect(
+    geometry.targets.every(
+      ({ height, width }) => height >= minimumHeight - 1 && width >= minimumHeight - 1,
+    ),
+    `all open Preferences targets meet the ${minimumHeight}px geometry: ${JSON.stringify(geometry.targets)}`,
+  ).toBe(true);
+
+  return preferences;
+}
+
 async function selectPreference(page: Page, name: 'Dark' | 'Light'): Promise<void> {
-  await page.getByRole('button', { name: 'Preferences' }).click();
-  await page.getByRole('button', { name, exact: true }).click();
-  await page.keyboard.press('Escape');
+  const preferences = await expectEntryPreferencesOpen(page, 32, {
+    language: 'Language',
+    preferences: 'Preferences',
+    theme: 'Theme',
+  });
+  await preferences.getByRole('button', { name, exact: true }).click();
+  await expect(preferences).toBeVisible();
+  await expect(preferences.getByRole('button', { name, exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
 }
 
 test.describe('Entry Surface foundation', () => {
@@ -288,10 +355,17 @@ test.describe('Entry Surface foundation', () => {
       'textbox "Full name"',
       'textbox "Email address"',
       'button "Create account"',
+      'button "Preferences"',
       'link "Sign in"',
     ]) {
       expect(ariaTree).toContain(semanticEntry);
     }
+    const preferences = await expectEntryPreferencesOpen(page, 32, {
+      language: 'Language',
+      preferences: 'Preferences',
+      theme: 'Theme',
+    });
+    await expectVisibleTextContrast(preferences, 8);
     await expectEntrySurfaceScreenshot(page, 'entry-surface-light-desktop-en');
 
     await selectPreference(page, 'Dark');
@@ -303,6 +377,11 @@ test.describe('Entry Surface foundation', () => {
     await expectNoHorizontalOverflow(page);
     await expectEntrySurfaceFits(page);
     await expectEntryTargetGeometry(page, 44);
+    await expectEntryPreferencesOpen(page, 44, {
+      language: 'Language',
+      preferences: 'Preferences',
+      theme: 'Theme',
+    });
     await expectEntryConsentFirstLineAlignment(page);
     await expect
       .poll(() =>
@@ -344,6 +423,25 @@ test.describe('Entry Surface foundation', () => {
     const termsCheckbox = page.getByRole('checkbox', { name: /điều khoản dịch vụ/i });
     await termsCheckbox.focus();
     await expectVisibleFocusIndicator(termsCheckbox);
+    const preferences = await expectEntryPreferencesOpen(page, 44, {
+      language: 'Ngôn ngữ',
+      preferences: 'Tùy chọn',
+      theme: 'Giao diện',
+    });
+    await preferences.evaluate((element) => {
+      for (const target of [element, ...element.querySelectorAll<HTMLElement>('*')]) {
+        target.style.setProperty('letter-spacing', '0.12em', 'important');
+        target.style.setProperty('line-height', '1.5', 'important');
+        target.style.setProperty('word-spacing', '0.16em', 'important');
+      }
+    });
+    await expectNoHorizontalOverflow(page);
+    await expectEntryPreferencesOpen(page, 44, {
+      language: 'Ngôn ngữ',
+      preferences: 'Tùy chọn',
+      theme: 'Giao diện',
+    });
+    await expectVisibleTextContrast(preferences, 8);
     await expectEntrySurfaceScreenshot(page, 'entry-surface-light-compact-vi-reflow', {
       canonicalLanguage: false,
     });

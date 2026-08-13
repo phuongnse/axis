@@ -1,13 +1,16 @@
 import { Link } from '@tanstack/react-router';
-import type { ComponentProps, ReactNode } from 'react';
+import { ChevronDown, Settings2 } from 'lucide-react';
+import { type ComponentProps, type ReactNode, useId } from 'react';
 import { AsyncButton } from '@/components/shared/AsyncButton';
 import { BrandHeader } from '@/components/shared/BrandHeader';
+import { OptionList, OptionListItem } from '@/components/shared/OptionList';
 import { EntryLayout } from '@/components/shared/PageLayout';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { type SurfaceIdFor, surfaceContractAttributes } from '@/lib/ui-foundation';
 import { cn } from '@/lib/utils';
 import { axisStyles } from '@/theme.generated';
@@ -23,6 +26,100 @@ const entryActionGeometry = cn(
   axisStyles.density.minWidth.compactControlAtSmall,
   'w-full',
 );
+
+const entryUtilityTargetGeometry = cn(
+  axisStyles.density.minHeight.touchTarget,
+  axisStyles.density.minWidth.touchTarget,
+  axisStyles.density.minHeight.compactControlAtSmall,
+  axisStyles.density.minWidth.compactControlAtSmall,
+);
+
+interface EntryPreferenceOption {
+  icon: ReactNode;
+  label: string;
+  value: string;
+}
+
+interface EntryPreferenceGroupModel {
+  label: string;
+  onSelect: (value: string) => void;
+  options: readonly EntryPreferenceOption[];
+  value: string;
+}
+
+interface EntryPreferencesModel {
+  label: string;
+  language: EntryPreferenceGroupModel;
+  theme: EntryPreferenceGroupModel;
+}
+
+function EntryPreferenceGroup({ model }: { model: EntryPreferenceGroupModel }) {
+  const labelId = useId();
+
+  return (
+    <section aria-labelledby={labelId} className={cn('grid', axisStyles.spacing.gap.inline)}>
+      <div
+        id={labelId}
+        className={cn(
+          'text-muted-foreground',
+          axisStyles.spacing.padding.inline.inline,
+          axisStyles.typography.scale.metadata,
+          axisStyles.typography.weight.label,
+        )}
+      >
+        {model.label}
+      </div>
+      <OptionList label={model.label} value={model.value} onValueChange={model.onSelect}>
+        {model.options.map((option) => (
+          <OptionListItem key={option.value} icon={option.icon} value={option.value}>
+            {option.label}
+          </OptionListItem>
+        ))}
+      </OptionList>
+    </section>
+  );
+}
+
+function EntryPreferences({ model }: { model: EntryPreferencesModel }) {
+  return (
+    <Popover>
+      <PopoverTrigger
+        render={
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className={entryUtilityTargetGeometry}
+            aria-label={model.label}
+            title={model.label}
+          />
+        }
+      >
+        <Settings2 aria-hidden />
+        <span>{model.label}</span>
+        <ChevronDown aria-hidden />
+      </PopoverTrigger>
+      <PopoverContent
+        data-slot="entry-preferences"
+        align="end"
+        aria-label={model.label}
+        className="max-h-(--available-height) w-80 max-w-(--available-width) gap-0 overflow-y-auto p-0"
+      >
+        <div
+          data-slot="entry-preferences-groups"
+          className={cn(
+            'grid',
+            axisStyles.spacing.gap.region,
+            axisStyles.spacing.padding.all.region,
+          )}
+        >
+          <EntryPreferenceGroup model={model.language} />
+          <EntryPreferenceGroup model={model.theme} />
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
 
 type EntryActionProps = Omit<ComponentProps<typeof Button>, 'className'>;
 
@@ -77,21 +174,21 @@ interface EntrySurfaceProps {
   banner?: ReactNode;
   children: ReactNode;
   footer?: ReactNode;
+  preferences: EntryPreferencesModel;
   surfaceId: SurfaceIdFor<'entry-surface'>;
   title: string;
-  utilities: ReactNode;
 }
 
 export function EntrySurface({
   banner,
   children,
   footer,
+  preferences,
   surfaceId,
   title,
-  utilities,
 }: EntrySurfaceProps) {
   return (
-    <EntryLayout utilities={utilities}>
+    <EntryLayout utilities={<EntryPreferences model={preferences} />}>
       <Card
         {...surfaceContractAttributes('entry-surface', surfaceId)}
         data-slot="entry-surface"
@@ -130,4 +227,7 @@ export {
   type EntryConsentLabelProps,
   EntryInput,
   type EntryInputProps,
+  type EntryPreferenceGroupModel,
+  type EntryPreferenceOption,
+  type EntryPreferencesModel,
 };

@@ -11,7 +11,7 @@ import { StatusNotice } from '@/components/shared/StatusNotice';
 import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field';
 import { useResendVerification } from '@/features/auth/hooks/useResendVerification';
 import { useSignIn } from '@/features/auth/hooks/useSignIn';
-import { PreferencesMenu } from '@/features/preferences';
+import { useEntryPreferencesModel } from '@/features/preferences';
 
 function SignInFooter({ t }: { t: ReturnType<typeof useTranslation>['t'] }) {
   return (
@@ -23,6 +23,7 @@ function SignInFooter({ t }: { t: ReturnType<typeof useTranslation>['t'] }) {
 
 export function SignInPage() {
   const { t } = useTranslation();
+  const preferences = useEntryPreferencesModel();
   const {
     form,
     loading,
@@ -57,7 +58,7 @@ export function SignInPage() {
   return (
     <EntrySurface
       surfaceId="sign-in"
-      utilities={<PreferencesMenu />}
+      preferences={preferences}
       title={t('auth.signIn')}
       footer={<SignInFooter t={t} />}
     >

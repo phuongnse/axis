@@ -2,14 +2,15 @@ import { cleanup, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useTranslation } from 'react-i18next';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { EntrySurface } from '@/components/shared/EntrySurface';
 import { useAuthStore } from '@/features/auth/auth-store';
 import {
   LANGUAGE_STORAGE_KEY,
   LanguageControl,
-  PreferencesMenu,
   PreferencesProfileSync,
   resolveInitialLanguage,
   supportedLanguages,
+  useEntryPreferencesModel,
 } from '@/features/preferences';
 import { translations } from '@/features/preferences/translations';
 import { renderWithRouter } from './render-with-router';
@@ -56,13 +57,15 @@ function setAuthenticatedSession() {
 
 function TranslatedFormHarness() {
   const { t } = useTranslation();
+  const preferences = useEntryPreferencesModel();
 
   return (
-    <form>
-      <PreferencesMenu />
-      <label htmlFor="email">{t('auth.email')}</label>
-      <input id="email" />
-    </form>
+    <EntrySurface surfaceId="registration" preferences={preferences} title="Registration">
+      <form>
+        <label htmlFor="email">{t('auth.email')}</label>
+        <input id="email" />
+      </form>
+    </EntrySurface>
   );
 }
 

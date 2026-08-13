@@ -11,7 +11,7 @@ import {
 } from '@/components/shared/EntrySurface';
 import { StatusNotice } from '@/components/shared/StatusNotice';
 import { restoreBrowserSession, signOutUser } from '@/features/auth/api';
-import { PreferencesMenu } from '@/features/preferences';
+import { useEntryPreferencesModel } from '@/features/preferences';
 import { ApiError } from '@/lib/api';
 import {
   acceptWorkspaceInvitation,
@@ -45,6 +45,7 @@ async function loadPageState(): Promise<PageState> {
 
 export function AcceptWorkspaceInvitationPage() {
   const { t, i18n } = useTranslation();
+  const preferences = useEntryPreferencesModel();
   const navigate = useNavigate();
   const [state, setState] = useState<PageState>({ kind: 'loading' });
   const [actionPending, setActionPending] = useState(false);
@@ -103,7 +104,7 @@ export function AcceptWorkspaceInvitationPage() {
     return (
       <EntrySurface
         surfaceId="invitation-acceptance"
-        utilities={<PreferencesMenu />}
+        preferences={preferences}
         title={t('invitationAccept.loadingTitle')}
       >
         <AsyncContent pending pendingLabel={t('invitationAccept.loading')}>
@@ -117,7 +118,7 @@ export function AcceptWorkspaceInvitationPage() {
     return (
       <EntrySurface
         surfaceId="invitation-acceptance"
-        utilities={<PreferencesMenu />}
+        preferences={preferences}
         title={t('invitationAccept.authenticateTitle')}
       >
         <div className="space-y-4">
@@ -136,7 +137,7 @@ export function AcceptWorkspaceInvitationPage() {
     return (
       <EntrySurface
         surfaceId="invitation-acceptance"
-        utilities={<PreferencesMenu />}
+        preferences={preferences}
         title={t('invitationAccept.wrongAccountTitle')}
       >
         <div className="space-y-4">
@@ -161,7 +162,7 @@ export function AcceptWorkspaceInvitationPage() {
     return (
       <EntrySurface
         surfaceId="invitation-acceptance"
-        utilities={<PreferencesMenu />}
+        preferences={preferences}
         title={t('invitationAccept.invalidTitle')}
       >
         <StatusNotice tone="warning">{t('invitationAccept.invalidBody')}</StatusNotice>
@@ -173,7 +174,7 @@ export function AcceptWorkspaceInvitationPage() {
     return (
       <EntrySurface
         surfaceId="invitation-acceptance"
-        utilities={<PreferencesMenu />}
+        preferences={preferences}
         title={t('invitationAccept.errorTitle')}
       >
         <div className="space-y-4">
@@ -190,7 +191,7 @@ export function AcceptWorkspaceInvitationPage() {
     return (
       <EntrySurface
         surfaceId="invitation-acceptance"
-        utilities={<PreferencesMenu />}
+        preferences={preferences}
         title={t('invitationAccept.successTitle')}
       >
         <div className="space-y-4">
@@ -218,7 +219,7 @@ export function AcceptWorkspaceInvitationPage() {
   return (
     <EntrySurface
       surfaceId="invitation-acceptance"
-      utilities={<PreferencesMenu />}
+      preferences={preferences}
       title={t('invitationAccept.reviewTitle')}
     >
       <div className="space-y-5">

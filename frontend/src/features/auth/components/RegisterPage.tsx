@@ -14,7 +14,7 @@ import { StatusNotice } from '@/components/shared/StatusNotice';
 import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field';
 import { PasswordCriteria } from '@/features/auth/components/PasswordCriteria';
 import { useRegister } from '@/features/auth/hooks/useRegister';
-import { PreferencesMenu } from '@/features/preferences';
+import { useEntryPreferencesModel } from '@/features/preferences';
 
 interface LegalLinkProps {
   children?: ReactNode;
@@ -36,6 +36,7 @@ function LegalLink({ children, href }: LegalLinkProps) {
 
 export function RegisterPage() {
   const { t } = useTranslation();
+  const preferences = useEntryPreferencesModel();
   const { form, loading, submit, submitError } = useRegister();
   const {
     register,
@@ -49,7 +50,7 @@ export function RegisterPage() {
   return (
     <EntrySurface
       surfaceId="registration"
-      utilities={<PreferencesMenu />}
+      preferences={preferences}
       title={t('auth.register.title')}
       footer={
         <>

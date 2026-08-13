@@ -25,10 +25,6 @@ type UnboundedContentSlot<T> = {
   [Key in keyof T]-?: ReactNode extends NonNullable<T[Key]> ? Key : never;
 }[keyof T];
 
-vi.mock('@/features/preferences', () => ({
-  PreferencesMenu: () => <div data-slot="test-preferences">Preferences</div>,
-}));
-
 describe('surface contracts', () => {
   it('binds active surface ids to finite contracts at compile time', () => {
     expect(activeSurfaceContracts['account-actions']).toBe('account-surface');
@@ -91,7 +87,21 @@ describe('surface contracts', () => {
     const { container } = render(
       <EntrySurface
         surfaceId="sign-in"
-        utilities={<div data-slot="test-utilities">Utilities</div>}
+        preferences={{
+          label: 'Preferences',
+          language: {
+            label: 'Language',
+            onSelect: vi.fn(),
+            options: [{ icon: 'EN', label: 'English', value: 'en' }],
+            value: 'en',
+          },
+          theme: {
+            label: 'Theme',
+            onSelect: vi.fn(),
+            options: [{ icon: 'System', label: 'System', value: 'system' }],
+            value: 'system',
+          },
+        }}
         title="Sign in"
         banner={<p role="alert">Session expired</p>}
         footer={<a href="/register">Create account</a>}
@@ -126,7 +136,7 @@ describe('surface contracts', () => {
       | 'notifications'
     >();
     expectTypeOf<UnboundedContentSlot<EntrySurfaceProps>>().toEqualTypeOf<
-      'banner' | 'children' | 'footer' | 'utilities'
+      'banner' | 'children' | 'footer'
     >();
     expectTypeOf<UnboundedContentSlot<ManagedDialogProps>>().toEqualTypeOf<
       'children' | 'description' | 'footer' | 'titleAccessory'

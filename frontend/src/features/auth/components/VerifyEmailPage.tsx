@@ -6,7 +6,12 @@ import { type FieldPath, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 import { AsyncContent } from '@/components/shared/AsyncContent';
-import { EntryAsyncAction, EntryInput, EntrySurface } from '@/components/shared/EntrySurface';
+import {
+  EntryAsyncAction,
+  EntryInput,
+  type EntryPreferencesModel,
+  EntrySurface,
+} from '@/components/shared/EntrySurface';
 import { StatusNotice, type StatusNoticeTone } from '@/components/shared/StatusNotice';
 import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field';
 import { useRefreshClientValidationErrors } from '@/features/auth/hooks/useRefreshClientValidationErrors';
@@ -15,7 +20,7 @@ import { useVerifyEmail } from '@/features/auth/hooks/useVerifyEmail';
 import { loadRegistrationContext } from '@/features/auth/registration-context';
 import type { VerifyEmailErrorKind } from '@/features/auth/types';
 import { useQueryParam } from '@/features/auth/use-query-param';
-import { currentSiteLanguage, PreferencesMenu } from '@/features/preferences';
+import { currentSiteLanguage, useEntryPreferencesModel } from '@/features/preferences';
 
 type Translate = ReturnType<typeof useTranslation>['t'];
 
@@ -34,11 +39,13 @@ function VerifyEmailOutcome({
   kind,
   email,
   onResend,
+  preferences,
   resendLoading,
 }: {
   kind: VerifyEmailErrorKind;
   email: string;
   onResend: (email: string) => Promise<void>;
+  preferences: EntryPreferencesModel;
   resendLoading: boolean;
 }) {
   const { t } = useTranslation();
@@ -102,7 +109,7 @@ function VerifyEmailOutcome({
   return (
     <EntrySurface
       surfaceId="verify-email"
-      utilities={<PreferencesMenu />}
+      preferences={preferences}
       title={config.title}
       footer={footer}
     >
@@ -155,6 +162,7 @@ function VerifyEmailOutcome({
 
 export function VerifyEmailPage() {
   const { t } = useTranslation();
+  const preferences = useEntryPreferencesModel();
   const token = useQueryParam('token');
   const context = loadRegistrationContext();
   const { submit, completeSignIn, loading, errorKind, sessionEstablished } = useVerifyEmail();
@@ -201,6 +209,7 @@ export function VerifyEmailPage() {
         kind="invalid"
         email={context?.email ?? ''}
         onResend={async () => {}}
+        preferences={preferences}
         resendLoading={false}
       />
     );
@@ -210,7 +219,7 @@ export function VerifyEmailPage() {
     return (
       <EntrySurface
         surfaceId="verify-email"
-        utilities={<PreferencesMenu />}
+        preferences={preferences}
         title={t('verify.title')}
         footer={
           <>
@@ -234,6 +243,7 @@ export function VerifyEmailPage() {
         kind={errorKind}
         email={context?.email ?? ''}
         onResend={resend}
+        preferences={preferences}
         resendLoading={resendState === 'sending'}
       />
     );
@@ -243,7 +253,7 @@ export function VerifyEmailPage() {
     return (
       <EntrySurface
         surfaceId="verify-email"
-        utilities={<PreferencesMenu />}
+        preferences={preferences}
         title={t('verify.success.title')}
         footer={
           <>
@@ -275,7 +285,7 @@ export function VerifyEmailPage() {
   return (
     <EntrySurface
       surfaceId="verify-email"
-      utilities={<PreferencesMenu />}
+      preferences={preferences}
       title={t('verify.title')}
       footer={
         <>
